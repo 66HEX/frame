@@ -1,5 +1,6 @@
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Emitter, command};
 use tauri_plugin_shell::ShellExt;
 use tauri_plugin_shell::process::CommandEvent;
@@ -75,14 +76,39 @@ fn parse_time(time_str: &str) -> Option<f64> {
     Some(h * 3600.0 + m * 60.0 + s)
 }
 
+fn build_output_path(file_path: &str, container: &str, output_name: Option<String>) -> String {
+    if let Some(custom) = output_name.and_then(|name| {
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    }) {
+        let input_path = Path::new(file_path);
+        let mut output: PathBuf = match input_path.parent() {
+            Some(parent) if !parent.as_os_str().is_empty() => parent.to_path_buf(),
+            _ => PathBuf::new(),
+        };
+        output.push(custom);
+        if output.extension().is_none() {
+            output.set_extension(container);
+        }
+        output.to_string_lossy().to_string()
+    } else {
+        format!("{}_converted.{}", file_path, container)
+    }
+}
+
 #[command]
 pub async fn start_conversion(
     app: AppHandle,
     id: String,
     file_path: String,
+    output_name: Option<String>,
     config: ConversionConfig,
 ) -> Result<(), String> {
-    let output_path = format!("{}_converted.{}", file_path, config.container);
+    let output_path = build_output_path(&file_path, &config.container, output_name);
     let args = build_ffmpeg_args(&file_path, &output_path, &config);
 
     let sidecar_command = app

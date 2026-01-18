@@ -22,6 +22,7 @@ export interface FileItem {
   progress: number;
   originalFormat: string;
   config: ConversionConfig;
+  outputName: string;
   path: string;
 }
 

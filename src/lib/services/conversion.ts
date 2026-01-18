@@ -17,11 +17,17 @@ export interface ErrorEvent {
     error: string;
 }
 
-export async function startConversion(id: string, filePath: string, config: ConversionConfig) {
+export async function startConversion(
+    id: string,
+    filePath: string,
+    config: ConversionConfig,
+    outputName?: string,
+) {
     try {
         await invoke("start_conversion", {
             id,
             filePath,
+            outputName,
             config,
         });
     } catch (error) {

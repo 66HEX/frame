@@ -6,7 +6,7 @@
 
     import Titlebar from "$lib/components/Titlebar.svelte";
     import FileList from "$lib/components/FileList.svelte";
-    import SettingsPanel from "$lib/components/SettingsPanel.svelte";
+    import SettingsPanel from "$lib/components/settings/SettingsPanel.svelte";
     import EmptySelection from "$lib/components/EmptySelection.svelte";
     import {
         type FileItem,
@@ -45,6 +45,11 @@
 
     function createInitialConfig(): ConversionConfig {
         return getDefaultConfig();
+    }
+
+    function deriveOutputName(fileName: string): string {
+        const base = fileName.replace(/\.[^/.]+$/, "");
+        return base ? `${base}_converted` : "output_converted";
     }
 
     function applyPresetToSelection(preset: PresetDefinition) {
@@ -174,6 +179,7 @@
                     progress: 0,
                     originalFormat: name.split(".").pop() || "unknown",
                     config: createInitialConfig(),
+                    outputName: deriveOutputName(name),
                     path: pathStr,
                 });
             }
@@ -200,6 +206,14 @@
         }
     }
 
+    function updateSelectedOutputName(value: string) {
+        if (selectedFileId) {
+            files = files.map((f) =>
+                f.id === selectedFileId ? { ...f, outputName: value } : f,
+            );
+        }
+    }
+
     async function startConversion() {
         const pendingFiles = files.filter((f) => f.status === FileStatus.IDLE);
         if (pendingFiles.length === 0) return;
@@ -213,7 +227,12 @@
         );
 
         for (const file of pendingFiles) {
-            await startConversionService(file.id, file.path, file.config);
+            await startConversionService(
+                file.id,
+                file.path,
+                file.config,
+                file.outputName,
+            );
         }
     }
 </script>
@@ -243,8 +262,10 @@
                 {#if selectedFile}
                     <SettingsPanel
                         config={selectedFile.config}
+                        outputName={selectedFile.outputName}
                         presets={presets}
                         onUpdate={updateSelectedConfig}
+                        onUpdateOutputName={updateSelectedOutputName}
                         onApplyPreset={applyPresetToSelection}
                         onSavePreset={handleSavePreset}
                         onDeletePreset={handleDeletePreset}
