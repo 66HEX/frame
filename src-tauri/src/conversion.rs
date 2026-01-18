@@ -371,7 +371,7 @@ pub async fn estimate_output(
     let metadata_ref = metadata.as_ref();
     let audio_only = is_audio_only_container(&config.container);
 
-    let mut video_kbps = if audio_only {
+    let video_kbps = if audio_only {
         0.0
     } else {
         let height = infer_target_height(&config, metadata_ref);
@@ -407,6 +407,7 @@ pub async fn estimate_output(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tauri::async_runtime;
 
     fn contains_args(args: &[String], expected: &[&str]) -> bool {
         expected.iter().all(|e| args.iter().any(|a| a == e))
@@ -512,5 +513,81 @@ mod tests {
 
         assert_eq!(parse_time("invalid"), None);
         assert_eq!(parse_time("00:10"), None);
+    }
+
+    #[test]
+    fn test_build_output_path_with_custom_name() {
+        let custom = build_output_path(
+            "/Users/hex/Videos/clip.mov",
+            "mp4",
+            Some("final_render".into()),
+        );
+        assert_eq!(custom, "/Users/hex/Videos/final_render.mp4");
+
+        let default = build_output_path("/tmp/sample.mov", "mp4", None);
+        assert_eq!(default, "/tmp/sample.mov_converted.mp4");
+    }
+
+    fn sample_config(container: &str) -> ConversionConfig {
+        ConversionConfig {
+            container: container.into(),
+            video_codec: "libx264".into(),
+            audio_codec: "aac".into(),
+            resolution: "original".into(),
+            crf: 23,
+            preset: "medium".into(),
+        }
+    }
+
+    fn sample_metadata() -> ProbeMetadata {
+        ProbeMetadata {
+            duration: Some("00:01:00.00".into()),
+            bitrate: Some("4000 kb/s".into()),
+            video_codec: Some("h264".into()),
+            audio_codec: Some("aac".into()),
+            resolution: Some("1920x1080".into()),
+        }
+    }
+
+    #[test]
+    fn test_estimate_output_standard_video() {
+        let config = sample_config("mp4");
+        let metadata = sample_metadata();
+
+        let estimate =
+            async_runtime::block_on(async { estimate_output(config, Some(metadata)).await.unwrap() });
+
+        assert_eq!(estimate.video_kbps, 4000);
+        assert_eq!(estimate.audio_kbps, 128);
+        assert_eq!(estimate.total_kbps, 4128);
+        let size = estimate.size_mb.expect("size should exist");
+        assert!((size - 30.2).abs() < 0.5);
+    }
+
+    #[test]
+    fn test_estimate_output_without_audio_stream() {
+        let config = sample_config("mp4");
+        let mut metadata = sample_metadata();
+        metadata.audio_codec = None;
+
+        let estimate =
+            async_runtime::block_on(async { estimate_output(config, Some(metadata)).await.unwrap() });
+
+        assert_eq!(estimate.audio_kbps, 0);
+        assert!(estimate.video_kbps > 0);
+    }
+
+    #[test]
+    fn test_estimate_output_audio_only_container() {
+        let mut config = sample_config("mp3");
+        config.audio_codec = "mp3".into();
+        let metadata = sample_metadata();
+
+        let estimate =
+            async_runtime::block_on(async { estimate_output(config, Some(metadata)).await.unwrap() });
+
+        assert_eq!(estimate.video_kbps, 0);
+        assert_eq!(estimate.audio_kbps, 128);
+        assert_eq!(estimate.total_kbps, 128);
     }
 }
