@@ -21,19 +21,6 @@
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
     }
-
-    function getStatusColor() {
-        switch (item.status) {
-            case FileStatus.COMPLETED:
-                return "bg-ds-blue-600";
-            case FileStatus.CONVERTING:
-                return "bg-ds-amber-800 animate-pulse";
-            case FileStatus.ERROR:
-                return "bg-ds-red-600";
-            default:
-                return "bg-ds-gray-600";
-        }
-    }
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -43,10 +30,6 @@
     class="group flex items-center px-4 py-3 border-b border-ds-gray-100 cursor-pointer transition-colors
     {isSelected ? 'bg-ds-gray-100' : 'hover:bg-ds-gray-100/50'}"
 >
-    <div class="mr-4 my-auto h-full self-start">
-        <div class="w-2.5 h-2.5 {getStatusColor()}"></div>
-    </div>
-
     <div class="flex-1 grid grid-cols-12 gap-4 items-center font-mono">
         <div class="col-span-5 flex items-center gap-2 overflow-hidden">
             <span class="text-[13px] text-foreground truncate">{item.name}</span
