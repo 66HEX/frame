@@ -80,8 +80,7 @@
             <div
                 class="h-10 border-b border-gray-alpha-100 flex items-center justify-between px-4"
             >
-                <div class="flex items-center gap-2">
-                    <FileText size={12} class="text-gray-alpha-600" />
+                <div class="flex items-center">
                     <span
                         class="text-[10px] font-medium uppercase tracking-widest text-gray-alpha-600"
                         >Estimated Output</span

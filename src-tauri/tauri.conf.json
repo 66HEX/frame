@@ -14,10 +14,10 @@
     "windows": [
       {
         "title": "relay",
-        "width": 1300,
-        "height": 800,
-        "minHeight": 800,
-        "minWidth": 1300,
+        "width": 1200,
+        "height": 750,
+        "minHeight": 750,
+        "minWidth": 1200,
         "resizable": true,
         "fullscreen": false,
         "decorations": false,

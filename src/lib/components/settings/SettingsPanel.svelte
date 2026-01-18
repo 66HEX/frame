@@ -61,32 +61,22 @@
     <div
         class="h-10 border-b border-gray-alpha-100 flex items-center justify-between px-4"
     >
-        <div class="flex items-center gap-2">
-            <Sliders size={12} class="text-gray-alpha-600" />
-            <span
-                class="text-[10px] font-medium uppercase tracking-widest text-gray-alpha-600"
-                >Configuration</span
-            >
-        </div>
-    </div>
-
-    <div class="flex-1 overflow-y-auto p-4 space-y-4">
-        <div
-            class="flex items-center gap-2 border-b border-gray-alpha-100 pb-2"
-        >
+        <div class="flex items-center gap-4 w-full justify-start">
             {#each TABS as tab}
                 <button
-                    class="px-3 py-1.5 text-[10px] font-mono uppercase tracking-widest font-medium rounded border transition-all
+                    class="text-[10px] font-mono uppercase tracking-widest font-medium transition-all
                     {activeTab === tab.id
-                        ? 'bg-ds-blue-900/20 text-ds-blue-600 border-ds-blue-600'
-                        : 'border-transparent text-gray-alpha-600 hover:bg-gray-alpha-100 hover:text-foreground'}"
+                        ? 'text-ds-blue-600'
+                        : 'text-gray-alpha-600 hover:text-foreground'}"
                     onclick={() => (activeTab = tab.id)}
                 >
                     {tab.label}
                 </button>
             {/each}
         </div>
+    </div>
 
+    <div class="flex-1 overflow-y-auto p-4 space-y-4">
         {#if activeTab === "source"}
             <SourceTab
                 {metadata}

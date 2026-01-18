@@ -30,7 +30,7 @@
             value={outputName}
             oninput={(e) => onUpdateOutputName?.(e.currentTarget.value)}
             placeholder="my_render_final"
-            class="w-full text-[11px] font-mono uppercase tracking-wide px-3 py-1.5 border border-gray-alpha-100 rounded bg-transparent focus:outline-none focus:border-ds-blue-600"
+            class="w-full text-[11px] font-mono uppercase tracking-wide px-3 py-1.5 border border-gray-alpha-200 rounded bg-transparent focus:outline-none focus:border-ds-blue-600"
             {disabled}
         />
         <p class="text-[10px] text-gray-alpha-600 uppercase tracking-wide">
