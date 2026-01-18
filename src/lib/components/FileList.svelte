@@ -18,9 +18,7 @@
 <div
     class="col-span-12 lg:col-span-8 border border-ds-gray-100 rounded-lg overflow-hidden flex flex-col relative group"
 >
-    <div
-        class="h-10 border-b border-ds-gray-100 backdrop-blur-sm flex items-center px-4 z-10"
-    >
+    <div class="h-10 border-b border-ds-gray-100 flex items-center px-4 z-10">
         <div class="w-2.5 mr-4"></div>
         <div
             class="flex-1 grid grid-cols-12 gap-4 text-[10px] font-mono text-ds-gray-500 uppercase tracking-widest"
@@ -55,8 +53,8 @@
                     <FileItemRow
                         item={file}
                         isSelected={selectedFileId === file.id}
-                        onSelect={onSelect}
-                        onRemove={onRemove}
+                        {onSelect}
+                        {onRemove}
                     />
                 {/each}
                 <div class="p-4 text-center border-t border-ds-gray-100 mt-2">

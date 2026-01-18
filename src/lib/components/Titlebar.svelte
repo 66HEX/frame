@@ -36,35 +36,35 @@
 </script>
 
 <div
-    class="w-full py-2 flex items-center justify-between px-4 select-none z-50 shrink-0"
+    class="w-full pt-2 flex items-center justify-between px-4 select-none z-50 shrink-0"
     data-tauri-drag-region
 >
     <div class="flex items-center gap-6">
-        <div class="flex items-center gap-2 z-50 mr-2">
+        <div class="flex items-center gap-2 z-50 mr-2 group">
             <button
                 onclick={close}
-                class="w-3 h-3 rounded-full bg-[#FF5F57] hover:bg-[#FF5F57]/80 flex items-center justify-center group transition-colors border border-black/10"
+                class="size-3.5 rounded-full bg-[#FF5F57] flex items-center justify-center transition-colors border border-black/10"
                 title="Close"
             >
                 <X
                     size={8}
                     class="opacity-0 group-hover:opacity-100 text-black/60"
-                    strokeWidth={3}
+                    strokeWidth={4}
                 />
             </button>
             <button
                 onclick={minimize}
-                class="w-3 h-3 rounded-full bg-[#FEBC2E] hover:bg-[#FEBC2E]/80 flex items-center justify-center group transition-colors border border-black/10"
+                class="size-3.5 rounded-full bg-[#FEBC2E] flex items-center justify-center transition-colors border border-black/10"
                 title="Minimize"
             >
                 <Minus
                     size={8}
                     class="opacity-0 group-hover:opacity-100 text-black/60"
-                    strokeWidth={3}
+                    strokeWidth={4}
                 />
             </button>
             <div
-                class="w-3 h-3 rounded-full bg-[#28C840] opacity-30 border border-black/10 cursor-default"
+                class="size-3.5 rounded-full bg-[#28C840] border border-black/10 cursor-default"
             ></div>
         </div>
 
@@ -96,7 +96,7 @@
         </div>
     </div>
 
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-3 mt-2">
         {#if onAddFile}
             <button
                 onclick={onAddFile}

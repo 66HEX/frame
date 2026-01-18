@@ -23,6 +23,7 @@ serde_json = "1.0.149"
 regex = "1.12.2"
 tauri-plugin-dialog = "2.6.0"
 tauri-plugin-fs = "2.4.5"
+window-vibrancy = "0.7.1"
 
 [profile.release]
 opt-level = "z"
