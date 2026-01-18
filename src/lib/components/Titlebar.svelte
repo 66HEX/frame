@@ -1,6 +1,6 @@
 <script lang="ts">
     import { getCurrentWindow } from "@tauri-apps/api/window";
-    import { X, Minus, Plus, Play, FileVideo, HardDrive } from "lucide-svelte";
+    import { Plus, Play, FileVideo, HardDrive } from "lucide-svelte";
 
     const appWindow = getCurrentWindow();
 
@@ -26,6 +26,15 @@
         appWindow.close();
     }
 
+    async function toggleMaximize() {
+        const maximized = await appWindow.isMaximized();
+        if (maximized) {
+            await appWindow.unmaximize();
+        } else {
+            await appWindow.maximize();
+        }
+    }
+
     function formatTotalSize(bytes: number) {
         if (bytes === 0) return "0 KB";
         const mb = bytes / (1024 * 1024);
@@ -40,32 +49,85 @@
     data-tauri-drag-region
 >
     <div class="flex items-center gap-6">
-        <div class="flex items-center gap-2 z-50 mr-2 group">
+        <div class="flex items-center z-50 mr-2 group">
             <button
                 onclick={close}
-                class="size-3.5 rounded-full bg-[#FF5F57] flex items-center justify-center transition-colors border border-black/10"
+                class="size-6 rounded-full flex items-center justify-center transition-opacity"
                 title="Close"
             >
-                <X
-                    size={8}
-                    class="opacity-0 group-hover:opacity-100 text-black/60"
-                    strokeWidth={4}
-                />
+                <svg
+                    viewBox="-10 -10 20 20"
+                    class="w-full h-full"
+                    aria-hidden="true"
+                >
+                    <circle
+                        r="6"
+                        fill="#ff5f56"
+                        stroke="#e0443e"
+                        stroke-width="0.6"
+                    />
+                    <path
+                        d="M-1.8 -1.8 L1.8 1.8 M1.8 -1.8 L-1.8 1.8"
+                        stroke="#4a0002"
+                        stroke-width="1.5"
+                        stroke-linecap="round"
+                        class="opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+                    />
+                </svg>
             </button>
             <button
                 onclick={minimize}
-                class="size-3.5 rounded-full bg-[#FEBC2E] flex items-center justify-center transition-colors border border-black/10"
+                class="size-6 rounded-full flex items-center justify-center transition-opacity"
                 title="Minimize"
             >
-                <Minus
-                    size={8}
-                    class="opacity-0 group-hover:opacity-100 text-black/60"
-                    strokeWidth={4}
-                />
+                <svg
+                    viewBox="-10 -10 20 20"
+                    class="w-full h-full"
+                    aria-hidden="true"
+                >
+                    <circle
+                        r="6"
+                        fill="#ffbd2e"
+                        stroke="#dea123"
+                        stroke-width="0.6"
+                    />
+                    <line
+                        x1="-2.4"
+                        y1="0"
+                        x2="2.4"
+                        y2="0"
+                        stroke="#5a3900"
+                        stroke-width="1.5"
+                        stroke-linecap="round"
+                        class="opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+                    />
+                </svg>
             </button>
-            <div
-                class="size-3.5 rounded-full bg-[#28C840] border border-black/10 cursor-default"
-            ></div>
+            <button
+                onclick={toggleMaximize}
+                class="size-6 rounded-full flex items-center justify-center transition-opacity"
+                title="Toggle size"
+            >
+                <svg
+                    viewBox="-10 -10 20 20"
+                    class="w-full h-full"
+                    aria-hidden="true"
+                >
+                    <circle
+                        r="6"
+                        fill="#27c93f"
+                        stroke="#1aab29"
+                        stroke-width="0.6"
+                    />
+                    <g
+                        fill="#004200"
+                        class="opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+                    >
+                        <path d="M-2.1 2.1 L-2.1 -1.5 L1.5 2.1 Z" />
+                        <path d="M2.1 -2.1 L2.1 1.5 L-1.5 -2.1 Z" />
+                    </g>
+                </svg>
+            </button>
         </div>
 
         <div class="h-6 w-px bg-ds-gray-100/50"></div>
@@ -113,7 +175,7 @@
                 disabled={isProcessing || fileCount === 0}
                 class="flex items-center gap-2 px-4 py-1.5 rounded text-[10px] font-mono font-medium uppercase tracking-wide transition-all
             {isProcessing || fileCount === 0
-                    ? 'bg-black border border-ds-gray-200 text-ds-gray-600 cursor-not-allowed'
+                    ? 'bg-foreground text-black hover:bg-white border border-foreground opacity-50 cursor-not-allowed'
                     : 'bg-foreground text-black hover:bg-white border border-foreground'}"
             >
                 {#if isProcessing}
