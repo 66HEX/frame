@@ -75,7 +75,7 @@
 <div class="space-y-4">
     <div class="space-y-3">
         <div
-            class="text-[10px] text-ds-gray-500 uppercase tracking-widest border-b border-ds-gray-100 pb-1"
+            class="text-[10px] text-gray-alpha-600 uppercase tracking-widest border-b border-gray-alpha-100 pb-1"
         >
             Output Name
         </div>
@@ -84,10 +84,10 @@
             value={outputName}
             oninput={(e) => onUpdateOutputName?.(e.currentTarget.value)}
             placeholder="my_render_final"
-            class="w-full text-[11px] font-mono uppercase tracking-wide px-3 py-1.5 border border-ds-gray-100 rounded bg-transparent focus:outline-none focus:border-ds-blue-600"
+            class="w-full text-[11px] font-mono uppercase tracking-wide px-3 py-1.5 border border-gray-alpha-100 rounded bg-transparent focus:outline-none focus:border-ds-blue-600"
             {disabled}
         />
-        <p class="text-[10px] text-ds-gray-500 uppercase tracking-wide">
+        <p class="text-[10px] text-gray-alpha-600 uppercase tracking-wide">
             Stored next to the original file. Extension follows the selected
             container automatically.
         </p>
@@ -95,7 +95,7 @@
 
     <div class="space-y-3">
         <span
-            class="text-[10px] text-ds-gray-500 uppercase tracking-widest block border-b border-ds-gray-100 pb-1"
+            class="text-[10px] text-gray-alpha-600 uppercase tracking-widest block border-b border-gray-alpha-100 pb-1"
         >
             Output Container
         </span>
@@ -107,7 +107,7 @@
                     class="text-[11px] py-1.5 px-2 border rounded transition-all text-center uppercase
                     {config.container === fmt
                         ? 'bg-ds-blue-900/20 text-ds-blue-600 border-ds-blue-600'
-                        : 'bg-transparent text-ds-gray-500 border-ds-gray-200 hover:border-ds-gray-400'}"
+                        : 'bg-transparent text-gray-alpha-600 border-gray-alpha-200 hover:bg-gray-alpha-100 hover:text-foreground'}"
                 >
                     {fmt}
                 </button>
@@ -117,22 +117,22 @@
 
     <div class="space-y-3">
         <span
-            class="text-[10px] text-ds-gray-500 uppercase tracking-widest block border-b border-ds-gray-100 pb-1"
+            class="text-[10px] text-gray-alpha-600 uppercase tracking-widest block border-b border-gray-alpha-100 pb-1"
         >
             Estimated Output
         </span>
         <div
             class="grid grid-cols-2 gap-2 text-[11px] font-mono uppercase tracking-wide"
         >
-            <div class="text-ds-gray-500">Size</div>
+            <div class="text-gray-alpha-600">Size</div>
             <div class="text-foreground">
                 {#if estimating}…{:else}{formatSize(estimate?.sizeMb)}{/if}
             </div>
-            <div class="text-ds-gray-500">Video</div>
+            <div class="text-gray-alpha-600">Video</div>
             <div class="text-foreground">
                 {estimate ? `${estimate.videoKbps} kb/s` : "—"}
             </div>
-            <div class="text-ds-gray-500">Audio</div>
+            <div class="text-gray-alpha-600">Audio</div>
             <div class="text-foreground">
                 {estimate
                     ? estimate.audioKbps > 0
@@ -140,7 +140,7 @@
                         : "—"
                     : "—"}
             </div>
-            <div class="text-ds-gray-500">Total</div>
+            <div class="text-gray-alpha-600">Total</div>
             <div class="text-foreground">
                 {estimate ? `${estimate.totalKbps} kb/s` : "—"}
             </div>

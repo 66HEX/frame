@@ -27,8 +27,8 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     onclick={() => onSelect(item.id)}
-    class="group flex items-center px-4 py-3 border-b border-ds-gray-100 cursor-pointer transition-colors
-    {isSelected ? 'bg-ds-gray-100' : 'hover:bg-ds-gray-100/50'}"
+    class="group flex items-center px-4 py-3 border-b border-gray-alpha-100 cursor-pointer transition-colors
+    {isSelected ? 'bg-gray-alpha-100' : 'hover:bg-gray-alpha-100'}"
 >
     <div class="flex-1 grid grid-cols-12 gap-4 items-center font-mono">
         <div class="col-span-5 flex items-center gap-2 overflow-hidden">
@@ -37,13 +37,13 @@
         </div>
 
         <div class="col-span-3 text-right">
-            <span class="text-[13px] text-ds-gray-500"
+            <span class="text-[13px] text-gray-alpha-600"
                 >{formatSize(item.size)}</span
             >
         </div>
 
         <div class="col-span-2 text-right">
-            <span class="text-[13px] text-ds-gray-500 uppercase"
+            <span class="text-[13px] text-gray-alpha-600 uppercase"
                 >{item.originalFormat}</span
             >
         </div>
@@ -56,7 +56,7 @@
             {:else if item.status === FileStatus.COMPLETED}
                 <span class="text-[13px] text-ds-blue-600">READY</span>
             {:else}
-                <span class="text-[13px] text-ds-gray-600">WAITING</span>
+                <span class="text-[13px] text-gray-alpha-600">WAITING</span>
             {/if}
         </div>
     </div>
@@ -66,7 +66,7 @@
             e.stopPropagation();
             onRemove(item.id);
         }}
-        class="ml-4 opacity-0 group-hover:opacity-100 text-ds-gray-500 hover:text-ds-red-600 transition-all"
+        class="ml-4 opacity-0 group-hover:opacity-100 text-gray-alpha-600 hover:text-ds-red-600 transition-all"
     >
         <Trash2 size={14} />
     </button>

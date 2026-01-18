@@ -130,22 +130,10 @@
             </button>
         </div>
 
-        <div class="h-6 w-px bg-ds-gray-100/50"></div>
+        <div class="h-6 w-px bg-gray-alpha-100"></div>
 
         <div
-            class="flex items-center pointer-events-none"
-            data-tauri-drag-region
-        >
-            <span
-                class="text-foreground font-bold tracking-tight uppercase text-xs"
-                >Relay</span
-            >
-        </div>
-
-        <div class="h-6 w-px bg-ds-gray-100/50"></div>
-
-        <div
-            class="flex items-center gap-4 text-[10px] font-mono text-ds-gray-500"
+            class="flex items-center gap-4 text-[10px] font-mono text-gray-alpha-600"
         >
             <div class="flex items-center gap-2">
                 <HardDrive size={12} />
@@ -162,7 +150,7 @@
         {#if onAddFile}
             <button
                 onclick={onAddFile}
-                class="flex items-center gap-2 bg-ds-gray-100 hover:bg-ds-gray-200 text-foreground px-3 py-1.5 rounded text-[10px] font-mono font-medium transition-colors cursor-pointer border border-ds-gray-200 uppercase tracking-wide"
+                class="flex items-center gap-2 bg-gray-alpha-100 hover:bg-gray-alpha-200 text-foreground px-3 py-1.5 rounded text-[10px] font-mono font-medium transition-colors cursor-pointer border border-gray-alpha-100 uppercase tracking-wide"
             >
                 <Plus size={12} />
                 Add Source

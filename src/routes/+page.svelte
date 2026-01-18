@@ -100,7 +100,6 @@
         }
     }
 
-
     $effect(() => {
         const unlistenPromise = setupConversionListeners(
             (payload) => {
@@ -297,7 +296,7 @@
             />
 
             <div
-                class="col-span-12 lg:col-span-4 border border-ds-gray-100 rounded-lg overflow-hidden flex flex-col"
+                class="col-span-12 lg:col-span-4 border border-gray-alpha-100 rounded-lg bg-gray-alpha-100 overflow-hidden flex flex-col"
             >
                 {#if selectedFile}
                     <SettingsPanel
@@ -306,7 +305,7 @@
                         metadata={selectedFile.metadata}
                         metadataStatus={selectedFile.metadataStatus}
                         metadataError={selectedFile.metadataError}
-                        presets={presets}
+                        {presets}
                         onUpdate={updateSelectedConfig}
                         onUpdateOutputName={updateSelectedOutputName}
                         onApplyPreset={applyPresetToSelection}

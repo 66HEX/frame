@@ -59,25 +59,27 @@
 
 <div class="flex flex-col h-full font-mono">
     <div
-        class="h-10 border-b border-ds-gray-100 flex items-center justify-between px-4"
+        class="h-10 border-b border-gray-alpha-100 flex items-center justify-between px-4"
     >
         <div class="flex items-center gap-2">
-            <Sliders size={12} class="text-ds-gray-500" />
+            <Sliders size={12} class="text-gray-alpha-600" />
             <span
-                class="text-[10px] font-bold uppercase tracking-widest text-ds-gray-500"
+                class="text-[10px] font-bold uppercase tracking-widest text-gray-alpha-600"
                 >Configuration</span
             >
         </div>
     </div>
 
     <div class="flex-1 overflow-y-auto p-4 space-y-4">
-        <div class="flex items-center gap-2 border-b border-ds-gray-100 pb-2">
+        <div
+            class="flex items-center gap-2 border-b border-gray-alpha-100 pb-2"
+        >
             {#each TABS as tab}
                 <button
                     class="px-3 py-1.5 text-[10px] font-mono uppercase tracking-widest rounded border transition-all
                     {activeTab === tab.id
                         ? 'bg-ds-blue-900/20 text-ds-blue-600 border-ds-blue-600'
-                        : 'border-transparent text-ds-gray-500 hover:border-ds-gray-300'}"
+                        : 'border-transparent text-gray-alpha-600 hover:bg-gray-alpha-100 hover:text-foreground'}"
                     onclick={() => (activeTab = tab.id)}
                 >
                     {tab.label}
@@ -87,7 +89,7 @@
 
         {#if activeTab === "source"}
             <SourceTab
-                metadata={metadata}
+                {metadata}
                 status={metadataStatus}
                 error={metadataError}
             />
@@ -96,7 +98,7 @@
                 {config}
                 {disabled}
                 {outputName}
-                metadata={metadata}
+                {metadata}
                 {onUpdate}
                 {onUpdateOutputName}
             />

@@ -143,12 +143,48 @@ html {
     background-color: var(--ds-gray-alpha-200);
 }
 
+.text-gray-alpha-600 {
+    color: var(--ds-gray-alpha-600);
+}
+
 .text-gray-900 {
     color: var(--ds-gray-900);
 }
 
 .text-gray-1000 {
     color: var(--ds-gray-1000);
+}
+
+.hover\:bg-gray-alpha-200:hover {
+    background-color: var(--ds-gray-alpha-200);
+}
+
+.hover\:text-ds-red-600:hover {
+    color: var(--ds-red-600);
+}
+
+.hover\:text-foreground:hover {
+    color: var(--foreground);
+}
+
+.border-gray-alpha-100 {
+    border-color: var(--ds-gray-alpha-100);
+}
+
+.border-gray-alpha-200 {
+    border-color: var(--ds-gray-alpha-200);
+}
+
+.border-gray-alpha-400 {
+    border-color: var(--ds-gray-alpha-400);
+}
+
+.hover\:border-gray-alpha-200:hover {
+    border-color: var(--ds-gray-alpha-200);
+}
+
+.hover\:border-gray-alpha-400:hover {
+    border-color: var(--ds-gray-alpha-400);
 }
 
 .tabular-nums {

@@ -23,7 +23,7 @@
 <div class="space-y-4">
     <div class="space-y-3">
         <span
-            class="text-[10px] text-ds-gray-500 uppercase tracking-widest block border-b border-ds-gray-100 pb-1"
+            class="text-[10px] text-gray-alpha-600 uppercase tracking-widest block border-b border-gray-alpha-100 pb-1"
         >
             Resolution
         </span>
@@ -35,7 +35,7 @@
                     class="text-[11px] py-1.5 px-2 border rounded transition-all text-center uppercase
                     {config.resolution === res
                         ? 'bg-ds-blue-900/20 text-ds-blue-600 border-ds-blue-600'
-                        : 'bg-transparent text-ds-gray-500 border-ds-gray-200 hover:border-ds-gray-400'}"
+                        : 'bg-transparent text-gray-alpha-600 border-gray-alpha-200 hover:bg-gray-alpha-100 hover:text-foreground'}"
                 >
                     {res}
                 </button>
@@ -45,7 +45,7 @@
 
     <div class="space-y-3">
         <span
-            class="text-[10px] text-ds-gray-500 uppercase tracking-widest block border-b border-ds-gray-100 pb-1"
+            class="text-[10px] text-gray-alpha-600 uppercase tracking-widest block border-b border-gray-alpha-100 pb-1"
         >
             Video Encoder
         </span>
@@ -56,8 +56,8 @@
                     {disabled}
                     class="text-[11px] py-1.5 px-3 border-l-2 text-left transition-all uppercase flex justify-between
                     {config.videoCodec === codec.id
-                        ? 'border-l-ds-blue-600 bg-ds-gray-100/10 text-foreground pl-3'
-                        : 'border-l-transparent text-ds-gray-500 hover:text-ds-gray-300 pl-2'}"
+                        ? 'border-l-ds-blue-600 bg-gray-alpha-100 text-foreground pl-3'
+                        : 'border-l-transparent text-gray-alpha-600 hover:text-foreground pl-2'}"
                 >
                     <span>{codec.id}</span>
                     <span class="opacity-50 text-[9px]">{codec.label}</span>
@@ -70,7 +70,7 @@
         <div class="flex justify-between items-end">
             <label
                 for="quality-factor"
-                class="text-[10px] text-ds-gray-500 uppercase tracking-widest"
+                class="text-[10px] text-gray-alpha-600 uppercase tracking-widest"
                 >Quality Factor</label
             >
             <div
@@ -79,7 +79,7 @@
                 CRF {config.crf}
             </div>
         </div>
-        <div class="h-1.5 bg-ds-gray-100 rounded-full w-full relative">
+        <div class="h-1.5 bg-gray-alpha-100 rounded-full w-full relative">
             <div
                 class="absolute top-0 left-0 h-full bg-foreground rounded-full"
                 style="width: {(config.crf / 51) * 100}%"
@@ -96,7 +96,9 @@
                 {disabled}
             />
         </div>
-        <div class="flex justify-between text-[9px] text-ds-gray-600 uppercase">
+        <div
+            class="flex justify-between text-[9px] text-gray-alpha-600 uppercase"
+        >
             <span>Lossless</span>
             <span>Smallest</span>
         </div>

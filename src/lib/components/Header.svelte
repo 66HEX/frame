@@ -25,7 +25,7 @@
 </script>
 
 <div
-    class="col-span-12 h-16 border border-ds-gray-100 rounded-lg flex items-center justify-between px-6 shadow-sm"
+    class="col-span-12 h-16 border border-gray-alpha-100 rounded-lg flex items-center justify-between px-6 shadow-sm"
 >
     <div class="flex items-center gap-6">
         <div class="flex items-center gap-2">
@@ -36,13 +36,15 @@
                 <span class="text-sm font-bold tracking-tight uppercase">
                     Relay
                 </span>
-                <span class="text-[10px] font-mono text-ds-gray-500">
+                <span class="text-[10px] font-mono text-gray-alpha-600">
                     FFMPEG Converter
                 </span>
             </div>
         </div>
         <div class="h-8 w-px bg-ds-gray-100"></div>
-        <div class="flex items-center gap-4 text-xs font-mono text-ds-gray-500">
+        <div
+            class="flex items-center gap-4 text-xs font-mono text-gray-alpha-600"
+        >
             <div class="flex items-center gap-2">
                 <HardDrive size={14} />
                 <span>STORAGE: {formatTotalSize(totalSize)}</span>
@@ -68,7 +70,7 @@
             disabled={isProcessing || fileCount === 0}
             class="flex items-center gap-2 px-5 py-2 rounded text-xs font-mono font-medium uppercase tracking-wide transition-all
             {isProcessing || fileCount === 0
-                ? 'bg-black border border-ds-gray-200 text-ds-gray-600 cursor-not-allowed'
+                ? 'bg-black border border-ds-gray-200 text-gray-alpha-600 cursor-not-allowed'
                 : 'bg-foreground text-black hover:bg-white border border-foreground'}"
         >
             {#if isProcessing}

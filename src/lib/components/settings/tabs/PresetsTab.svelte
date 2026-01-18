@@ -86,9 +86,9 @@
 
 <div class="space-y-3">
     <div
-        class="flex items-center justify-between border-b border-ds-gray-100 pb-1"
+        class="flex items-center justify-between border-b border-gray-alpha-100 pb-1"
     >
-        <span class="text-[10px] text-ds-gray-500 uppercase tracking-widest"
+        <span class="text-[10px] text-gray-alpha-600 uppercase tracking-widest"
             >Preset Library</span
         >
         {#if notice}
@@ -108,7 +108,7 @@
             type="text"
             bind:value={newPresetName}
             placeholder="Preset Label"
-            class="flex-1 text-[11px] font-mono uppercase tracking-wide px-3 py-1.5 border border-ds-gray-100 rounded bg-transparent focus:outline-none focus:border-ds-blue-600"
+            class="flex-1 text-[11px] font-mono uppercase tracking-wide px-3 py-1.5 border border-gray-alpha-100 rounded bg-transparent focus:outline-none focus:border-ds-blue-600"
             {disabled}
         />
         <button
@@ -116,8 +116,8 @@
             disabled={disabled || !newPresetName.trim()}
             class="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wide border rounded transition-all
             {disabled || !newPresetName.trim()
-                ? 'opacity-50 cursor-not-allowed border-ds-gray-200 text-ds-gray-400'
-                : 'border-ds-blue-600 text-ds-blue-600 hover:bg-ds-blue-900/10'}"
+                ? 'opacity-50 cursor-not-allowed border-gray-alpha-200 text-gray-alpha-600'
+                : 'border-ds-blue-600 text-ds-blue-600 hover:bg-ds-blue-900/20'}"
         >
             Save
         </button>
@@ -126,13 +126,18 @@
     <div class="space-y-1.5 max-h-52 overflow-y-auto">
         {#each presets as preset (preset.id)}
             <div
-                class="flex items-center gap-2 border border-ds-gray-100 rounded px-2 py-1.5 group/preset-button"
+                class="flex items-center gap-2 border rounded px-2 py-1.5 transition-all group {configsMatch(
+                    config,
+                    preset.config,
+                )
+                    ? 'bg-ds-blue-900/20 border-ds-blue-600'
+                    : 'hover:bg-gray-alpha-100 border-gray-alpha-200'}"
             >
                 <button
-                    class="flex-1 text-left flex items-center justify-between gap-2 text-[11px] font-mono uppercase tracking-tight
+                    class="flex-1 text-left flex items-center justify-between gap-2 text-[11px] font-mono uppercase tracking-tight transition-colors
                     {configsMatch(config, preset.config)
                         ? 'text-ds-blue-600'
-                        : 'text-ds-gray-600 group-hover/preset-button:text-foreground'}"
+                        : 'text-gray-alpha-600 group-hover:text-foreground!'}"
                     onclick={() => applyPreset(preset)}
                     {disabled}
                 >
@@ -145,7 +150,7 @@
                 </button>
                 {#if !preset.builtIn}
                     <button
-                        class="size-4 flex items-center justify-center rounded text-ds-gray-500 hover:text-ds-red-700 transition-colors"
+                        class="size-4 flex items-center justify-center rounded text-gray-alpha-600 hover:text-ds-red-600 transition-colors"
                         title="Delete preset"
                         onclick={() => removePreset(preset)}
                         {disabled}

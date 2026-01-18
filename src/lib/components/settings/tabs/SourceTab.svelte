@@ -19,7 +19,7 @@
 <div class="space-y-3">
     {#if status === "loading"}
         <div
-            class="text-[11px] font-mono uppercase tracking-wide text-ds-gray-500"
+            class="text-[11px] font-mono uppercase tracking-wide text-gray-alpha-600"
         >
             Analyzing source…
         </div>
@@ -29,7 +29,7 @@
         >
             <p>Failed to read metadata.</p>
             {#if error}
-                <p class="text-[10px] text-ds-gray-500 normal-case">
+                <p class="text-[10px] text-gray-alpha-600 normal-case">
                     {error}
                 </p>
             {/if}
@@ -39,21 +39,21 @@
             <div
                 class="grid grid-cols-2 gap-2 text-[11px] font-mono uppercase tracking-wide"
             >
-                <div class="text-ds-gray-500">Duration</div>
+                <div class="text-gray-alpha-600">Duration</div>
                 <div>{display(metadata.duration)}</div>
-                <div class="text-ds-gray-500">Video Codec</div>
+                <div class="text-gray-alpha-600">Video Codec</div>
                 <div>{display(metadata.videoCodec)}</div>
-                <div class="text-ds-gray-500">Resolution</div>
+                <div class="text-gray-alpha-600">Resolution</div>
                 <div>{display(metadata.resolution)}</div>
-                <div class="text-ds-gray-500">Audio Codec</div>
+                <div class="text-gray-alpha-600">Audio Codec</div>
                 <div>{display(metadata.audioCodec)}</div>
-                <div class="text-ds-gray-500">Bitrate</div>
+                <div class="text-gray-alpha-600">Bitrate</div>
                 <div>{display(metadata.bitrate)}</div>
             </div>
         </div>
     {:else}
         <div
-            class="text-[11px] font-mono uppercase tracking-wide text-ds-gray-500"
+            class="text-[11px] font-mono uppercase tracking-wide text-gray-alpha-600"
         >
             Metadata unavailable.
         </div>
