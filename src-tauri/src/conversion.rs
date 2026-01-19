@@ -147,6 +147,12 @@ struct ErrorPayload {
     error: String,
 }
 
+#[derive(Clone, Serialize)]
+struct LogPayload {
+    id: String,
+    line: String,
+}
+
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct AudioTrack {
@@ -366,7 +372,16 @@ async fn run_ffmpeg_worker(app: AppHandle, task: ConversionTask) -> Result<(), S
     while let Some(event) = rx.recv().await {
         match event {
             CommandEvent::Stderr(line_bytes) => {
-                let line = String::from_utf8_lossy(&line_bytes);
+                let line = String::from_utf8_lossy(&line_bytes).to_string();
+
+                // Emit raw log
+                let _ = app_clone.emit(
+                    "conversion-log",
+                    LogPayload {
+                        id: id.clone(),
+                        line: line.clone(),
+                    },
+                );
 
                 if total_duration.is_none() {
                     if let Some(caps) = duration_regex.captures(&line) {

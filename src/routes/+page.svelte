@@ -5,6 +5,7 @@
     import { stat } from "@tauri-apps/plugin-fs";
 
     import Titlebar from "$lib/components/Titlebar.svelte";
+    import LogsView from "$lib/components/LogsView.svelte";
     import FileList from "$lib/components/FileList.svelte";
     import SettingsPanel from "$lib/components/settings/SettingsPanel.svelte";
     import EmptySelection from "$lib/components/EmptySelection.svelte";
@@ -33,6 +34,9 @@
     let selectedFileId = $state<string | null>(null);
     let isProcessing = $state(false);
     let customPresets = $state<PresetDefinition[]>([]);
+
+    let activeView = $state<"dashboard" | "logs">("dashboard");
+    let logs = $state<Record<string, string[]>>({});
 
     let selectedFile = $derived(files.find((f) => f.id === selectedFileId));
     let totalSize = $derived(files.reduce((acc, curr) => acc + curr.size, 0));
@@ -131,6 +135,10 @@
                 );
                 checkAllDone();
             },
+            (payload) => {
+                const current = logs[payload.id] || [];
+                logs = { ...logs, [payload.id]: [...current, payload.line] };
+            },
         );
 
         return () => {
@@ -204,6 +212,10 @@
     function handleRemoveFile(id: string) {
         files = files.filter((f) => f.id !== id);
         if (selectedFileId === id) selectedFileId = null;
+
+        const newLogs = { ...logs };
+        delete newLogs[id];
+        logs = newLogs;
     }
 
     function updateSelectedConfig(newConfig: Partial<ConversionConfig>) {
@@ -240,13 +252,13 @@
                 : f,
         );
         try {
-            const metadata = await probeMedia(path);
+            const probeMetadata = await probeMedia(path);
             files = files.map((f) =>
                 f.id === fileId
                     ? {
                           ...f,
                           metadataStatus: "ready",
-                          metadata,
+                          metadata: probeMetadata,
                           metadataError: undefined,
                       }
                     : f,
@@ -274,6 +286,12 @@
 
         isProcessing = true;
 
+        pendingFiles.forEach((f) => {
+            if (!logs[f.id]) {
+                logs = { ...logs, [f.id]: [] };
+            }
+        });
+
         files = files.map((f) =>
             f.status === FileStatus.IDLE
                 ? { ...f, status: FileStatus.QUEUED, progress: 0 }
@@ -298,54 +316,62 @@
         {totalSize}
         fileCount={files.length}
         {isProcessing}
+        {activeView}
+        onChangeView={(v) => (activeView = v)}
         onAddFile={handleAddFile}
         onStartConversion={startConversion}
     />
-    <div class="flex-1 p-4 overflow-hidden">
-        <div class="grid grid-cols-12 gap-4 h-full">
-            <FileList
-                {files}
-                {selectedFileId}
-                onSelect={(id) => (selectedFileId = id)}
-                onRemove={handleRemoveFile}
-            />
 
-            <div
-                class="col-span-12 lg:col-span-4 grid gap-3 h-full grid-rows-[minmax(0,1fr)_180px] min-h-0"
-            >
-                <div
-                    class="border border-gray-alpha-100 rounded-lg bg-gray-alpha-100 overflow-y-auto h-full min-h-0 custom-scrollbar"
-                >
-                    {#if selectedFile}
-                        <SettingsPanel
-                            config={selectedFile.config}
-                            outputName={selectedFile.outputName}
-                            metadata={selectedFile.metadata}
-                            metadataStatus={selectedFile.metadataStatus}
-                            metadataError={selectedFile.metadataError}
-                            {presets}
-                            onUpdate={updateSelectedConfig}
-                            onUpdateOutputName={updateSelectedOutputName}
-                            onApplyPreset={applyPresetToSelection}
-                            onSavePreset={handleSavePreset}
-                            onDeletePreset={handleDeletePreset}
-                            disabled={selectedFile.status ===
-                                FileStatus.CONVERTING ||
-                                selectedFile.status === FileStatus.COMPLETED}
-                        />
-                    {:else}
-                        <EmptySelection />
-                    {/if}
-                </div>
-
-                <div class="h-full">
-                    <EstimatedOutputPanel
-                        config={selectedFile?.config}
-                        metadata={selectedFile?.metadata}
-                        metadataStatus={selectedFile?.metadataStatus}
+    <div class="flex-1 p-4 overflow-hidden relative">
+        {#if activeView === "dashboard"}
+            <div class="grid grid-cols-12 gap-4 h-full">
+                    <FileList
+                        {files}
+                        {selectedFileId}
+                        onSelect={(id) => (selectedFileId = id)}
+                        onRemove={handleRemoveFile}
                     />
+
+                    <div
+                        class="col-span-12 lg:col-span-4 grid gap-3 h-full grid-rows-[minmax(0,1fr)_180px] min-h-0"
+                    >
+                        <div
+                            class="border border-gray-alpha-100 rounded-lg bg-gray-alpha-100 overflow-y-auto h-full min-h-0 custom-scrollbar"
+                        >
+                            {#if selectedFile}
+                                <SettingsPanel
+                                    config={selectedFile.config}
+                                    outputName={selectedFile.outputName}
+                                    metadata={selectedFile.metadata}
+                                    metadataStatus={selectedFile.metadataStatus}
+                                    metadataError={selectedFile.metadataError}
+                                    {presets}
+                                    onUpdate={updateSelectedConfig}
+                                    onUpdateOutputName={updateSelectedOutputName}
+                                    onApplyPreset={applyPresetToSelection}
+                                    onSavePreset={handleSavePreset}
+                                    onDeletePreset={handleDeletePreset}
+                                    disabled={selectedFile.status ===
+                                        FileStatus.CONVERTING ||
+                                        selectedFile.status ===
+                                            FileStatus.COMPLETED}
+                                />
+                            {:else}
+                                <EmptySelection />
+                            {/if}
+                        </div>
+
+                        <div class="h-full">
+                            <EstimatedOutputPanel
+                                config={selectedFile?.config}
+                                metadata={selectedFile?.metadata}
+                                metadataStatus={selectedFile?.metadataStatus}
+                            />
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
+            {:else if activeView === "logs"}
+                <LogsView {logs} {files} />
+            {/if}
     </div>
 </div>

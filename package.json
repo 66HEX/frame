@@ -13,14 +13,15 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@google/genai": "^1.37.0",
     "@tailwindcss/vite": "^4.1.18",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.6.0",
     "@tauri-apps/plugin-fs": "^2.4.5",
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-store": "^2",
+    "clsx": "^2.1.1",
     "lucide-svelte": "^0.562.0",
+    "tailwind-merge": "^3.4.0",
     "tailwindcss": "^4.1.18",
     "uuid": "^13.0.0"
   },

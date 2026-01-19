@@ -17,6 +17,11 @@ export interface ErrorEvent {
     error: string;
 }
 
+export interface LogEvent {
+    id: string;
+    line: string;
+}
+
 export async function startConversion(
     id: string,
     filePath: string,
@@ -39,7 +44,8 @@ export async function startConversion(
 export async function setupConversionListeners(
     onProgress: (payload: ProgressEvent) => void,
     onCompleted: (payload: CompletedEvent) => void,
-    onError: (payload: ErrorEvent) => void
+    onError: (payload: ErrorEvent) => void,
+    onLog: (payload: LogEvent) => void
 ): Promise<UnlistenFn> {
     const unlistenProgress = await listen<ProgressEvent>("conversion-progress", (event) => {
         onProgress(event.payload);
@@ -53,9 +59,14 @@ export async function setupConversionListeners(
         onError(event.payload);
     });
 
+    const unlistenLog = await listen<LogEvent>("conversion-log", (event) => {
+        onLog(event.payload);
+    });
+
     return () => {
         unlistenProgress();
         unlistenCompleted();
         unlistenError();
+        unlistenLog();
     };
 }

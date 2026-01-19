@@ -1,6 +1,14 @@
 <script lang="ts">
     import { getCurrentWindow } from "@tauri-apps/api/window";
-    import { Plus, Play, FileVideo, HardDrive } from "lucide-svelte";
+    import {
+        Plus,
+        Play,
+        FileVideo,
+        HardDrive,
+        LayoutList,
+        Terminal,
+    } from "lucide-svelte";
+    import { cn } from "$lib/utils/cn";
 
     const appWindow = getCurrentWindow();
 
@@ -8,14 +16,18 @@
         totalSize = 0,
         fileCount = 0,
         isProcessing = false,
+        activeView = "dashboard",
         onAddFile,
         onStartConversion,
+        onChangeView,
     }: {
         totalSize?: number;
         fileCount?: number;
         isProcessing?: boolean;
+        activeView?: "dashboard" | "logs";
         onAddFile?: () => void;
         onStartConversion?: () => void;
+        onChangeView?: (view: "dashboard" | "logs") => void;
     } = $props();
 
     function minimize() {
@@ -132,6 +144,39 @@
 
         <div class="h-6 w-px bg-gray-alpha-100"></div>
 
+        {#if onChangeView}
+            <div
+                class="flex items-center gap-1 bg-gray-alpha-100 p-0.5 rounded border border-gray-alpha-100"
+            >
+                <button
+                    onclick={() => onChangeView("dashboard")}
+                    class={cn(
+                        "flex items-center gap-2 px-3 py-1 rounded-xs text-[10px] font-mono font-medium transition-all uppercase tracking-wide",
+                        activeView === "dashboard"
+                            ? "bg-foreground text-black shadow-sm"
+                            : "text-gray-alpha-600 hover:text-foreground",
+                    )}
+                >
+                    <LayoutList size={12} />
+                    <span>Dashboard</span>
+                </button>
+                <button
+                    onclick={() => onChangeView("logs")}
+                    class={cn(
+                        "flex items-center gap-2 px-3 py-1 rounded-xs text-[10px] font-mono font-medium transition-all uppercase tracking-wide",
+                        activeView === "logs"
+                            ? "bg-foreground text-black shadow-sm"
+                            : "text-gray-alpha-600 hover:text-foreground",
+                    )}
+                >
+                    <Terminal size={12} />
+                    <span>Logs</span>
+                </button>
+            </div>
+        {/if}
+
+        <div class="h-6 w-px bg-gray-alpha-100"></div>
+
         <div
             class="flex items-center gap-4 text-[10px] font-mono text-gray-alpha-600"
         >
@@ -163,8 +208,8 @@
                 disabled={isProcessing || fileCount === 0}
                 class="flex items-center gap-2 px-4 py-1.5 rounded text-[10px] font-mono font-medium uppercase tracking-wide transition-all
             {isProcessing || fileCount === 0
-                    ? 'bg-foreground text-black hover:bg-white border border-foreground opacity-50 cursor-not-allowed'
-                    : 'bg-foreground text-black hover:bg-white border border-foreground'}"
+                    ? 'bg-foreground text-black hover:bg-foreground border border-foreground opacity-50 cursor-not-allowed'
+                    : 'bg-foreground text-black hover:bg-foreground border border-foreground'}"
             >
                 {#if isProcessing}
                     <span class="animate-pulse">PROCESSING...</span>
