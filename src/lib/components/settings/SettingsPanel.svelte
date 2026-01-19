@@ -16,9 +16,9 @@
     const TABS = [
         { id: "source", label: "Source" },
         { id: "output", label: "Output" },
-        { id: "presets", label: "Presets" },
         { id: "video", label: "Video" },
         { id: "audio", label: "Audio" },
+        { id: "presets", label: "Presets" },
     ] as const;
     type TabId = (typeof TABS)[number]["id"];
 

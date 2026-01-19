@@ -137,21 +137,21 @@
                                     #{track.index}
                                 </span>
                                 <span
-                                    class="text-[11px] uppercase font-bold tracking-tight"
+                                    class="text-[10px] uppercase font-bold tracking-tight"
                                 >
                                     {track.codec}
                                 </span>
-                            </div>
-                            <div
-                                class="text-[9px] uppercase tracking-wide opacity-60"
-                            >
-                                {track.channels} CH
-                                {#if track.language}
-                                    <span class="mx-1">•</span>
-                                    {track.language}{/if}
-                                {#if track.label}
-                                    <span class="mx-1">•</span>
-                                    {track.label}{/if}
+                                <div class="text-[9px] uppercase tracking-wide">
+                                    <span class="mx-0.5">•</span>
+
+                                    {track.channels} CH
+                                    {#if track.language}
+                                        <span class="mx-0.5">•</span>
+                                        {track.language}{/if}
+                                    {#if track.label}
+                                        <span class="mx-0.5">•</span>
+                                        {track.label}{/if}
+                                </div>
                             </div>
                         </div>
 
