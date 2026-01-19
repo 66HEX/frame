@@ -118,32 +118,58 @@
             >
                 Source Tracks
             </span>
-            <div class="space-y-1.5">
+            <div class="grid grid-cols-1 gap-2">
                 {#each metadata.audioTracks as track}
+                    {@const isSelected = (
+                        config.selectedAudioTracks || []
+                    ).includes(track.index)}
                     <button
                         onclick={() => toggleTrack(track.index)}
                         {disabled}
-                        class="w-full text-[11px] py-1.5 px-3 border rounded text-left transition-all flex items-center justify-between
-                        {(config.selectedAudioTracks || []).includes(
-                            track.index,
-                        )
-                            ? 'bg-ds-blue-900/10 border-ds-blue-600 text-foreground'
-                            : 'bg-transparent border-gray-alpha-200 text-gray-alpha-600 hover:text-foreground hover:bg-gray-alpha-100'}"
+                        class="w-full py-2 px-3 border rounded transition-all text-left flex items-center justify-between
+                        {isSelected
+                            ? 'bg-ds-blue-900/20 text-ds-blue-600 border-ds-blue-600'
+                            : 'bg-transparent text-gray-alpha-600 border-gray-alpha-200 hover:bg-gray-alpha-100 hover:text-foreground'}"
                     >
-                        <div class="flex flex-col items-start">
-                            <span class="uppercase font-medium"
-                                >Stream #{track.index}</span
-                            >
-                            <span class="text-[9px] opacity-70">
-                                {track.codec} • {track.channels}ch
-                                {#if track.language}• {track.language}{/if}
-                            </span>
-                        </div>
-                        {#if (config.selectedAudioTracks || []).includes(track.index)}
+                        <div class="space-y-0.5">
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] font-mono opacity-70">
+                                    #{track.index}
+                                </span>
+                                <span
+                                    class="text-[11px] uppercase font-bold tracking-tight"
+                                >
+                                    {track.codec}
+                                </span>
+                            </div>
                             <div
-                                class="w-2 h-2 rounded-full bg-ds-blue-600"
+                                class="text-[9px] uppercase tracking-wide opacity-60"
+                            >
+                                {track.channels} CH
+                                {#if track.language}
+                                    <span class="mx-1">•</span>
+                                    {track.language}{/if}
+                                {#if track.label}
+                                    <span class="mx-1">•</span>
+                                    {track.label}{/if}
+                            </div>
+                        </div>
+
+                        <div
+                            class="w-4 h-4 rounded-full border flex items-center justify-center transition-all duration-200
+                            {isSelected
+                                ? 'border-ds-blue-600'
+                                : 'border-gray-alpha-200'}"
+                        >
+                            <div
+                                class="w-2 h-2 rounded-full bg-ds-blue-600 transition-all duration-200"
+                                style="opacity: {isSelected
+                                    ? 1
+                                    : 0}; transform: scale({isSelected
+                                    ? 1
+                                    : 0.5});"
                             ></div>
-                        {/if}
+                        </div>
                     </button>
                 {/each}
             </div>
