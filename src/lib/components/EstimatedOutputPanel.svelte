@@ -69,7 +69,7 @@
 <div class="h-full">
     {#if !config}
         <div
-            class="border bg-gray-alpha-100 border-gray-alpha-100 rounded-lg h-full flex items-center justify-center px-4 text-center text-[10px] font-mono font-medium text-gray-alpha-600 uppercase"
+            class="border bg-gray-alpha-100 border-gray-alpha-100 rounded-lg h-full flex items-center justify-center px-4 text-center text-[10px] font-medium text-gray-alpha-600 uppercase"
         >
             Select a file to view estimated output.
         </div>
@@ -89,14 +89,12 @@
             </div>
             {#if metadataStatus === "loading"}
                 <div
-                    class="flex-1 flex items-center justify-center text-[11px] font-mono text-gray-alpha-600 uppercase tracking-wide"
+                    class="flex-1 flex items-center justify-center text-[11px] text-gray-alpha-600 uppercase tracking-wide"
                 >
                     Gathering metadata…
                 </div>
             {:else}
-                <div
-                    class="grid grid-cols-2 gap-2 text-[11px] p-4 font-mono uppercase"
-                >
+                <div class="grid grid-cols-2 gap-2 text-[11px] p-4 uppercase">
                     <div class="text-gray-alpha-600">Size</div>
                     <div class="text-foreground">
                         {#if estimating}…{:else}{formatSize(

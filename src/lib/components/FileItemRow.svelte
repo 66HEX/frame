@@ -33,7 +33,7 @@
         isSelected ? "bg-gray-alpha-100" : "hover:bg-gray-alpha-100",
     )}
 >
-    <div class="flex-1 grid grid-cols-12 gap-4 items-center font-mono">
+    <div class="flex-1 grid grid-cols-12 gap-4 items-center">
         <div class="col-span-5 flex items-center gap-2 overflow-hidden">
             <span class="text-[13px] text-foreground truncate">{item.name}</span
             >

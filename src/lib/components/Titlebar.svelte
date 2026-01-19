@@ -151,7 +151,7 @@
                 <button
                     onclick={() => onChangeView("dashboard")}
                     class={cn(
-                        "flex items-center gap-2 px-3 py-1 rounded-xs text-[10px] font-mono font-medium transition-all uppercase tracking-wide",
+                        "flex items-center gap-2 px-3 py-1 rounded-xs text-[10px]  font-medium transition-all uppercase tracking-wide",
                         activeView === "dashboard"
                             ? "bg-foreground text-black shadow-sm"
                             : "text-gray-alpha-600 hover:text-foreground",
@@ -163,7 +163,7 @@
                 <button
                     onclick={() => onChangeView("logs")}
                     class={cn(
-                        "flex items-center gap-2 px-3 py-1 rounded-xs text-[10px] font-mono font-medium transition-all uppercase tracking-wide",
+                        "flex items-center gap-2 px-3 py-1 rounded-xs text-[10px]  font-medium transition-all uppercase tracking-wide",
                         activeView === "logs"
                             ? "bg-foreground text-black shadow-sm"
                             : "text-gray-alpha-600 hover:text-foreground",
@@ -177,9 +177,7 @@
 
         <div class="h-6 w-px bg-gray-alpha-100"></div>
 
-        <div
-            class="flex items-center gap-4 text-[10px] font-mono text-gray-alpha-600"
-        >
+        <div class="flex items-center gap-4 text-[10px] text-gray-alpha-600">
             <div class="flex items-center gap-2">
                 <HardDrive size={12} />
                 <span>STORAGE: {formatTotalSize(totalSize)}</span>
@@ -195,7 +193,7 @@
         {#if onAddFile}
             <button
                 onclick={onAddFile}
-                class="flex items-center gap-2 bg-gray-alpha-100 hover:bg-gray-alpha-200 text-foreground px-3 py-1.5 rounded text-[10px] font-mono font-medium transition-colors cursor-pointer border border-gray-alpha-100 uppercase tracking-wide"
+                class="flex items-center gap-2 bg-gray-alpha-100 hover:bg-gray-alpha-200 text-foreground px-3 py-1.5 rounded text-[10px] font-medium transition-colors cursor-pointer border border-gray-alpha-100 uppercase tracking-wide"
             >
                 <Plus size={12} />
                 Add Source
@@ -207,8 +205,9 @@
                 onclick={onStartConversion}
                 disabled={isProcessing || fileCount === 0}
                 class={cn(
-                    "flex items-center gap-2 px-4 py-1.5 rounded text-[10px] font-mono font-medium uppercase tracking-wide transition-all bg-foreground text-black hover:bg-foreground border border-foreground",
-                    (isProcessing || fileCount === 0) && "opacity-50 cursor-not-allowed",
+                    "flex items-center gap-2 px-4 py-1.5 rounded text-[10px]  font-medium uppercase tracking-wide transition-all bg-foreground text-black hover:bg-foreground border border-foreground",
+                    (isProcessing || fileCount === 0) &&
+                        "opacity-50 cursor-not-allowed",
                 )}
             >
                 {#if isProcessing}

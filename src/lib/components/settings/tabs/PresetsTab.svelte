@@ -95,7 +95,7 @@
         {#if notice}
             <span
                 class={cn(
-                    "text-[9px] font-mono uppercase tracking-wide",
+                    "text-[9px]  uppercase tracking-wide",
                     notice.tone === "error"
                         ? "text-ds-red-700"
                         : "text-ds-blue-600",
@@ -111,14 +111,14 @@
             type="text"
             bind:value={newPresetName}
             placeholder="Preset Label"
-            class="flex-1 text-[11px] font-mono placeholder:uppercase tracking-wide px-3 py-1.5 border border-gray-alpha-200 rounded bg-transparent focus:outline-none focus:border-ds-blue-600! transition-all"
+            class="flex-1 text-[11px] placeholder:uppercase tracking-wide px-3 py-1.5 border border-gray-alpha-200 rounded bg-transparent focus:outline-none focus:border-ds-blue-600! transition-all"
             {disabled}
         />
         <button
             onclick={savePreset}
             disabled={disabled || !newPresetName.trim()}
             class={cn(
-                "px-3 py-1.5 text-[10px] font-mono uppercase tracking-wide border rounded transition-all",
+                "px-3 py-1.5 text-[10px]  uppercase tracking-wide border rounded transition-all",
                 disabled || !newPresetName.trim()
                     ? "opacity-50 cursor-not-allowed border-gray-alpha-200 text-gray-alpha-600"
                     : "border-ds-blue-600 text-ds-blue-600 hover:bg-ds-blue-900/20",
@@ -148,7 +148,7 @@
                 }}
             >
                 <span
-                    class="flex-1 flex items-center justify-between gap-2 text-[11px] font-mono uppercase tracking-tight pointer-events-none"
+                    class="flex-1 flex items-center justify-between gap-2 text-[11px] uppercase tracking-tight pointer-events-none"
                 >
                     <span class="truncate">{preset.name}</span>
                     <span class="text-[9px] font-semibold">

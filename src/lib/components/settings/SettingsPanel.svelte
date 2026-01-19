@@ -57,7 +57,7 @@
     let activeTab = $state<TabId>("source");
 </script>
 
-<div class="flex flex-col h-full font-mono">
+<div class="flex flex-col h-full">
     <div
         class="h-10 border-b border-gray-alpha-100 flex items-center justify-between px-4"
     >
@@ -68,7 +68,7 @@
                 <button
                     disabled={isVideoDisabled}
                     class={cn(
-                        "text-[10px] font-mono uppercase tracking-widest font-medium transition-all",
+                        "text-[10px]  uppercase tracking-widest font-medium transition-all",
                         activeTab === tab.id
                             ? "text-ds-blue-600"
                             : "text-gray-alpha-600 hover:text-foreground",

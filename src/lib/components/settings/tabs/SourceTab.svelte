@@ -42,14 +42,12 @@
 
 <div class="space-y-3">
     {#if status === "loading"}
-        <div
-            class="text-[11px] font-mono uppercase tracking-wide text-gray-alpha-600"
-        >
+        <div class="text-[11px] uppercase tracking-wide text-gray-alpha-600">
             Analyzing source…
         </div>
     {:else if status === "error"}
         <div
-            class="text-[11px] font-mono uppercase tracking-wide text-ds-red-700 space-y-1"
+            class="text-[11px] uppercase tracking-wide text-ds-red-700 space-y-1"
         >
             <p>Failed to read metadata.</p>
             {#if error}
@@ -61,7 +59,7 @@
     {:else if metadata}
         <div class="space-y-2">
             <div
-                class="grid grid-cols-2 gap-2 text-[11px] font-mono uppercase tracking-wide"
+                class="grid grid-cols-2 gap-2 text-[11px] uppercase tracking-wide"
             >
                 <div class="text-gray-alpha-600">Duration</div>
                 <div>{formatDuration(metadata.duration)}</div>
@@ -76,9 +74,7 @@
             </div>
         </div>
     {:else}
-        <div
-            class="text-[11px] font-mono uppercase tracking-wide text-gray-alpha-600"
-        >
+        <div class="text-[11px] uppercase tracking-wide text-gray-alpha-600">
             Metadata unavailable.
         </div>
     {/if}

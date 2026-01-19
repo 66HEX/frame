@@ -78,7 +78,7 @@
                     value={config.audioBitrate}
                     oninput={(e) =>
                         onUpdate({ audioBitrate: e.currentTarget.value })}
-                    class="w-full text-[11px] font-mono uppercase tracking-wide px-3 py-1.5 border border-gray-alpha-200 rounded bg-transparent focus:outline-none focus:border-ds-blue-600! transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    class="w-full text-[11px] uppercase tracking-wide px-3 py-1.5 border border-gray-alpha-200 rounded bg-transparent focus:outline-none focus:border-ds-blue-600! transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     {disabled}
                 />
             </div>
@@ -140,7 +140,7 @@
                     >
                         <div class="space-y-0.5">
                             <div class="flex items-center gap-2">
-                                <span class="text-[10px] font-mono opacity-70">
+                                <span class="text-[10px] opacity-70">
                                     #{track.index}
                                 </span>
                                 <span

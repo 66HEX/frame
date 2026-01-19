@@ -310,7 +310,7 @@
 </script>
 
 <div
-    class="flex flex-col absolute inset-0 text-foreground font-sans overflow-hidden selection:bg-ds-blue-900 selection:text-white"
+    class="flex flex-col absolute inset-0 text-foreground font-mono overflow-hidden selection:bg-ds-blue-900 selection:text-white"
 >
     <Titlebar
         {totalSize}
@@ -325,53 +325,53 @@
     <div class="flex-1 p-4 overflow-hidden relative">
         {#if activeView === "dashboard"}
             <div class="grid grid-cols-12 gap-4 h-full">
-                    <FileList
-                        {files}
-                        {selectedFileId}
-                        onSelect={(id) => (selectedFileId = id)}
-                        onRemove={handleRemoveFile}
-                    />
+                <FileList
+                    {files}
+                    {selectedFileId}
+                    onSelect={(id) => (selectedFileId = id)}
+                    onRemove={handleRemoveFile}
+                />
 
+                <div
+                    class="col-span-12 lg:col-span-4 grid gap-3 h-full grid-rows-[minmax(0,1fr)_180px] min-h-0"
+                >
                     <div
-                        class="col-span-12 lg:col-span-4 grid gap-3 h-full grid-rows-[minmax(0,1fr)_180px] min-h-0"
+                        class="border border-gray-alpha-100 rounded-lg bg-gray-alpha-100 overflow-y-auto h-full min-h-0 custom-scrollbar"
                     >
-                        <div
-                            class="border border-gray-alpha-100 rounded-lg bg-gray-alpha-100 overflow-y-auto h-full min-h-0 custom-scrollbar"
-                        >
-                            {#if selectedFile}
-                                <SettingsPanel
-                                    config={selectedFile.config}
-                                    outputName={selectedFile.outputName}
-                                    metadata={selectedFile.metadata}
-                                    metadataStatus={selectedFile.metadataStatus}
-                                    metadataError={selectedFile.metadataError}
-                                    {presets}
-                                    onUpdate={updateSelectedConfig}
-                                    onUpdateOutputName={updateSelectedOutputName}
-                                    onApplyPreset={applyPresetToSelection}
-                                    onSavePreset={handleSavePreset}
-                                    onDeletePreset={handleDeletePreset}
-                                    disabled={selectedFile.status ===
-                                        FileStatus.CONVERTING ||
-                                        selectedFile.status ===
-                                            FileStatus.COMPLETED}
-                                />
-                            {:else}
-                                <EmptySelection />
-                            {/if}
-                        </div>
-
-                        <div class="h-full">
-                            <EstimatedOutputPanel
-                                config={selectedFile?.config}
-                                metadata={selectedFile?.metadata}
-                                metadataStatus={selectedFile?.metadataStatus}
+                        {#if selectedFile}
+                            <SettingsPanel
+                                config={selectedFile.config}
+                                outputName={selectedFile.outputName}
+                                metadata={selectedFile.metadata}
+                                metadataStatus={selectedFile.metadataStatus}
+                                metadataError={selectedFile.metadataError}
+                                {presets}
+                                onUpdate={updateSelectedConfig}
+                                onUpdateOutputName={updateSelectedOutputName}
+                                onApplyPreset={applyPresetToSelection}
+                                onSavePreset={handleSavePreset}
+                                onDeletePreset={handleDeletePreset}
+                                disabled={selectedFile.status ===
+                                    FileStatus.CONVERTING ||
+                                    selectedFile.status ===
+                                        FileStatus.COMPLETED}
                             />
-                        </div>
+                        {:else}
+                            <EmptySelection />
+                        {/if}
+                    </div>
+
+                    <div class="h-full">
+                        <EstimatedOutputPanel
+                            config={selectedFile?.config}
+                            metadata={selectedFile?.metadata}
+                            metadataStatus={selectedFile?.metadataStatus}
+                        />
                     </div>
                 </div>
-            {:else if activeView === "logs"}
-                <LogsView {logs} {files} />
-            {/if}
+            </div>
+        {:else if activeView === "logs"}
+            <LogsView {logs} {files} />
+        {/if}
     </div>
 </div>

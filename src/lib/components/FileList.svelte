@@ -22,7 +22,7 @@
         class="h-10 border-b border-gray-alpha-100 flex items-center px-4 z-10"
     >
         <div
-            class="flex-1 grid grid-cols-12 gap-4 text-[10px] font-mono text-gray-alpha-600 font-medium uppercase tracking-widest"
+            class="flex-1 grid grid-cols-12 gap-4 text-[10px] text-gray-alpha-600 font-medium uppercase tracking-widest"
         >
             <div class="col-span-5">Name</div>
             <div class="col-span-3 text-right">Size</div>
@@ -38,7 +38,7 @@
                 class="h-full flex flex-col items-center justify-center p-10 select-none"
             >
                 <div
-                    class="text-[10px] font-mono text-gray-alpha-600 font-medium uppercase"
+                    class="text-[10px] text-gray-alpha-600 font-medium uppercase"
                 >
                     Drop files or use ADD SOURCE
                 </div>
@@ -57,7 +57,7 @@
                     class="p-4 text-center border-t border-gray-alpha-100 mt-2"
                 >
                     <span
-                        class="text-[10px] font-mono text-gray-alpha-600 uppercase tracking-widest"
+                        class="text-[10px] text-gray-alpha-600 uppercase tracking-widest"
                     >
                         END OF LIST // {files.length} OBJECTS
                     </span>

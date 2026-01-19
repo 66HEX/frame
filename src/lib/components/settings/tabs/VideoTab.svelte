@@ -83,7 +83,7 @@
                         value={config.customWidth}
                         oninput={(e) =>
                             onUpdate({ customWidth: e.currentTarget.value })}
-                        class="w-full text-[11px] font-mono uppercase tracking-wide px-3 py-1.5 border border-gray-alpha-200 rounded bg-transparent focus:outline-none focus:border-ds-blue-600! transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        class="w-full text-[11px] uppercase tracking-wide px-3 py-1.5 border border-gray-alpha-200 rounded bg-transparent focus:outline-none focus:border-ds-blue-600! transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         {disabled}
                     />
                 </div>
@@ -100,7 +100,7 @@
                         value={config.customHeight}
                         oninput={(e) =>
                             onUpdate({ customHeight: e.currentTarget.value })}
-                        class="w-full text-[11px] font-mono uppercase tracking-wide px-3 py-1.5 border border-gray-alpha-200 rounded bg-transparent focus:outline-none focus:border-ds-blue-600! transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        class="w-full text-[11px] uppercase tracking-wide px-3 py-1.5 border border-gray-alpha-200 rounded bg-transparent focus:outline-none focus:border-ds-blue-600! transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         {disabled}
                     />
                 </div>
@@ -224,7 +224,7 @@
                     >Quality Factor</label
                 >
                 <div
-                    class="text-[10px] bg-ds-blue-900/20 text-ds-blue-600 border border-ds-blue-600 font-mono px-1.5 rounded font-medium"
+                    class="text-[10px] bg-ds-blue-900/20 text-ds-blue-600 border border-ds-blue-600 px-1.5 rounded font-medium"
                 >
                     CRF {config.crf}
                 </div>
@@ -269,7 +269,7 @@
                     value={config.videoBitrate}
                     oninput={(e) =>
                         onUpdate({ videoBitrate: e.currentTarget.value })}
-                    class="w-full text-[11px] font-mono uppercase tracking-wide px-3 py-1.5 border border-gray-alpha-200 rounded bg-transparent focus:outline-none focus:border-ds-blue-600! transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    class="w-full text-[11px] uppercase tracking-wide px-3 py-1.5 border border-gray-alpha-200 rounded bg-transparent focus:outline-none focus:border-ds-blue-600! transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     {disabled}
                 />
             </div>

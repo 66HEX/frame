@@ -1,14 +1,6 @@
 @import "tailwindcss";
 
 @font-face {
-    font-family: "Geist";
-    src: url("../lib/assets/fonts/Geist.ttf") format("truetype");
-    font-weight: 200 800;
-    font-style: normal;
-    font-display: swap;
-}
-
-@font-face {
     font-family: "GeistMono";
     src: url("../lib/assets/fonts/GeistMono.ttf") format("truetype");
     font-weight: 200 800;
@@ -20,7 +12,6 @@
     --background: #ffffff;
     --foreground: #171717;
 
-    --font-geist-sans: "Geist", sans-serif;
     --font-geist-mono: "GeistMono", monospace;
 
     --ds-background-100: #ffffff;
@@ -61,7 +52,6 @@
 @theme inline {
     --color-background: var(--background);
     --color-foreground: var(--foreground);
-    --font-sans: var(--font-geist-sans);
     --font-mono: var(--font-geist-mono);
     --color-gray-alpha-100: var(--ds-gray-alpha-100);
     --color-gray-900: var(--ds-gray-900);
