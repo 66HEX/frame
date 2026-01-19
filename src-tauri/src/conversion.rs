@@ -57,38 +57,43 @@ pub struct OutputEstimate {
 }
 
 pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -> Vec<String> {
-    let mut args = vec![
-        "-i".to_string(),
-        input.to_string(),
-        "-c:v".to_string(),
-        config.video_codec.clone(),
-    ];
+    let mut args = vec!["-i".to_string(), input.to_string()];
 
-    if config.video_bitrate_mode == "bitrate" {
-        args.push("-b:v".to_string());
-        args.push(format!("{}k", config.video_bitrate));
+    let is_audio_only = is_audio_only_container(&config.container);
+
+    if is_audio_only {
+        args.push("-vn".to_string());
     } else {
-        args.push("-crf".to_string());
-        args.push(config.crf.to_string());
+        args.push("-c:v".to_string());
+        args.push(config.video_codec.clone());
+
+        if config.video_bitrate_mode == "bitrate" {
+            args.push("-b:v".to_string());
+            args.push(format!("{}k", config.video_bitrate));
+        } else {
+            args.push("-crf".to_string());
+            args.push(config.crf.to_string());
+        }
+
+        args.push("-preset".to_string());
+        args.push(config.preset.clone());
+
+        if config.resolution != "original" {
+            let scale = match config.resolution.as_str() {
+                "1080p" => "scale=-1:1080",
+                "720p" => "scale=-1:720",
+                "480p" => "scale=-1:480",
+                _ => "scale=-1:-1",
+            };
+            args.push("-vf".to_string());
+            args.push(scale.to_string());
+        }
     }
 
-    args.push("-preset".to_string());
-    args.push(config.preset.clone());
     args.push("-c:a".to_string());
     args.push(config.audio_codec.clone());
     args.push("-b:a".to_string());
     args.push(format!("{}k", config.audio_bitrate));
-
-    if config.resolution != "original" {
-        let scale = match config.resolution.as_str() {
-            "1080p" => "scale=-1:1080",
-            "720p" => "scale=-1:720",
-            "480p" => "scale=-1:480",
-            _ => "scale=-1:-1",
-        };
-        args.push("-vf".to_string());
-        args.push(scale.to_string());
-    }
 
     args.push("-y".to_string());
     args.push(output.to_string());
