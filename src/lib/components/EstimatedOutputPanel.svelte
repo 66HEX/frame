@@ -6,7 +6,6 @@
 		SourceMetadata
 	} from '$lib/types';
 	import { estimateOutput } from '$lib/services/media';
-	import { FileText } from 'lucide-svelte';
 
 	let {
 		config,

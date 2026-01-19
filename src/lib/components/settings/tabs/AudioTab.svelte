@@ -49,9 +49,9 @@
 		</span>
 		<div class="space-y-3">
 			<div class="grid grid-cols-3 gap-2">
-				{#each CHANNELS as ch}
+				{#each CHANNELS as ch (ch.id)}
 					<button
-						onclick={() => onUpdate({ audioChannels: ch.id as any })}
+						onclick={() => onUpdate({ audioChannels: ch.id })}
 						{disabled}
 						class={cn(
 							'text-[11px] py-1.5 px-2 border rounded transition-all text-center uppercase',
@@ -89,7 +89,7 @@
 			Audio Codec
 		</span>
 		<div class="grid grid-cols-1">
-			{#each AUDIO_CODECS as codec}
+			{#each AUDIO_CODECS as codec (codec.id)}
 				{@const isMp3Container = config.container === 'mp3'}
 				{@const isAllowed = !isMp3Container || codec.id === 'mp3'}
 				<button
@@ -120,7 +120,7 @@
 				Source Tracks
 			</span>
 			<div class="grid grid-cols-1 gap-2">
-				{#each metadata.audioTracks as track}
+				{#each metadata.audioTracks as track (track.index)}
 					{@const isSelected = (config.selectedAudioTracks || []).includes(track.index)}
 					<button
 						onclick={() => toggleTrack(track.index)}

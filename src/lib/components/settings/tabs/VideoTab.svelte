@@ -46,7 +46,7 @@
 			Resolution & Framerate
 		</span>
 		<div class="grid grid-cols-2 gap-2 mb-2">
-			{#each RESOLUTIONS as res}
+			{#each RESOLUTIONS as res (res)}
 				<button
 					onclick={() => onUpdate({ resolution: res })}
 					{disabled}
@@ -102,7 +102,7 @@
 				Scaling Algorithm
 			</span>
 			<div class="grid grid-cols-2 gap-2">
-				{#each SCALING_ALGOS as algo}
+				{#each SCALING_ALGOS as algo (algo.id)}
 					<button
 						onclick={() => onUpdate({ scalingAlgorithm: algo.id })}
 						disabled={disabled || config.resolution === 'original'}
@@ -126,7 +126,7 @@
 				Framerate
 			</span>
 			<div class="grid grid-cols-2 gap-2">
-				{#each FPS_OPTIONS as opt}
+				{#each FPS_OPTIONS as opt (opt.id)}
 					<button
 						onclick={() => onUpdate({ fps: opt.id })}
 						{disabled}
@@ -151,7 +151,7 @@
 			Video Encoder
 		</span>
 		<div class="grid grid-cols-1 gap-1.5">
-			{#each VIDEO_CODECS as codec}
+			{#each VIDEO_CODECS as codec (codec.id)}
 				<button
 					onclick={() => onUpdate({ videoCodec: codec.id })}
 					{disabled}

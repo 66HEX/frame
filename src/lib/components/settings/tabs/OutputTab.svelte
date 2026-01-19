@@ -46,7 +46,7 @@
 			Output Container
 		</span>
 		<div class="grid grid-cols-2 gap-2">
-			{#each CONTAINERS as fmt}
+			{#each CONTAINERS as fmt (fmt)}
 				<button
 					onclick={() => onUpdate({ container: fmt })}
 					{disabled}

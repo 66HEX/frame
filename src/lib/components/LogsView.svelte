@@ -34,7 +34,7 @@
 	class="h-full border border-gray-alpha-100 bg-gray-alpha-100 rounded-lg overflow-hidden flex flex-col"
 >
 	<div class="h-10 border-b border-gray-alpha-100 flex items-center px-4 overflow-x-auto gap-6">
-		{#each activeFiles as file}
+		{#each activeFiles as file (file.id)}
 			<button
 				onclick={() => (selectedLogFileId = file.id)}
 				class={cn(
@@ -63,7 +63,7 @@
 			>
 				{#if currentLogs.length > 0}
 					<div class="flex flex-col">
-						{#each currentLogs as line, i}
+						{#each currentLogs as line, i (i)}
 							<div class="flex hover:bg-gray-alpha-100 rounded px-1 -mx-1 group text-[10px]">
 								<span
 									class="select-none w-8 text-right mr-3 shrink-0 text-gray-alpha-600 text-[10px] pt-[0.5px]"

@@ -56,7 +56,7 @@
 <div class="flex flex-col h-full">
 	<div class="h-10 border-b border-gray-alpha-100 flex items-center justify-between px-4">
 		<div class="flex items-center gap-4 w-full justify-start">
-			{#each TABS as tab}
+			{#each TABS as tab (tab.id)}
 				{@const isVideoDisabled = tab.id === 'video' && config.container === 'mp3'}
 				<button
 					disabled={isVideoDisabled}
