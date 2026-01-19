@@ -14,11 +14,11 @@
   "license": "MIT",
   "dependencies": {
     "@tailwindcss/vite": "^4.1.18",
-    "@tauri-apps/api": "^2",
+    "@tauri-apps/api": "^2.9.1",
     "@tauri-apps/plugin-dialog": "^2.6.0",
     "@tauri-apps/plugin-fs": "^2.4.5",
-    "@tauri-apps/plugin-opener": "^2",
-    "@tauri-apps/plugin-store": "^2",
+    "@tauri-apps/plugin-opener": "^2.5.3",
+    "@tauri-apps/plugin-store": "^2.4.2",
     "clsx": "^2.1.1",
     "lucide-svelte": "^0.562.0",
     "tailwind-merge": "^3.4.0",
@@ -26,13 +26,22 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
-    "@sveltejs/adapter-static": "^3.0.6",
-    "@sveltejs/kit": "^2.9.0",
-    "@sveltejs/vite-plugin-svelte": "^5.0.0",
-    "svelte": "^5.46.0",
-    "svelte-check": "^4.3.4",
+    "@eslint/js": "^9.39.2",
+    "@sveltejs/adapter-static": "^3.0.10",
+    "@sveltejs/kit": "^2.50.0",
+    "@sveltejs/vite-plugin-svelte": "^6.2.4",
+    "@tauri-apps/cli": "^2.9.6",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-svelte": "^3.14.0",
+    "eslint-plugin-tailwindcss": "^3.18.2",
+    "globals": "^17.0.0",
+    "prettier": "^3.8.0",
+    "prettier-plugin-svelte": "^3.4.1",
+    "svelte": "^5.47.1",
+    "svelte-check": "^4.3.5",
     "typescript": "^5.9.3",
-    "vite": "^7.2.7",
-    "@tauri-apps/cli": "^2"
+    "typescript-eslint": "^8.53.1",
+    "vite": "^7.3.1"
   }
 }
