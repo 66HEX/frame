@@ -310,7 +310,7 @@
 </script>
 
 <div
-    class="flex flex-col absolute inset-0 text-foreground font-mono overflow-hidden selection:bg-ds-blue-900 selection:text-white"
+    class="flex flex-col absolute inset-0 text-foreground font-mono overflow-hidden"
 >
     <Titlebar
         {totalSize}
@@ -333,7 +333,7 @@
                 />
 
                 <div
-                    class="col-span-12 lg:col-span-4 grid gap-3 h-full grid-rows-[minmax(0,1fr)_180px] min-h-0"
+                    class="col-span-12 lg:col-span-4 grid gap-3 h-full grid-rows-[minmax(0,1fr)_160px] min-h-0"
                 >
                     <div
                         class="border border-gray-alpha-100 rounded-lg bg-gray-alpha-100 overflow-y-auto h-full min-h-0 custom-scrollbar"
