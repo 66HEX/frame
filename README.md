@@ -20,6 +20,14 @@
 </div>
 <br />
 
+> [!WARNING]  
+> **Unsigned Application Notice (macOS)**
+> Since the application is currently unsigned, macOS will flag it and its sidecar binaries with a quarantine attribute. To run the app, remove the attribute manually:
+>
+> ```bash
+> xattr -dr com.apple.quarantine /Applications/Frame.app
+> ```
+
 ## Features
 
 ### Media Conversion Core
@@ -40,7 +48,7 @@
 *   **Concurrent Processing:** Async task queue manager implemented in Rust (`tokio::mpsc`) limiting concurrent FFmpeg processes (default: 2).
 *   **Real-time Telemetry:** Stream parsing of FFmpeg `stderr` for accurate progress tracking and log output.
 *   **Output Estimation:** Pre-conversion calculation of projected file size and bitrate allocation.
-*   **Preset Management:** JSON-based configuration persistence for reusable conversion profiles.
+*   **Preset Management:** Configuration persistence for reusable conversion profiles.
 
 ## Technical Stack
 
