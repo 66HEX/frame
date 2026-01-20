@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest'
+          - platform: 'macos-14' # Apple Silicon runner
             args: '--target aarch64-apple-darwin'
           - platform: 'windows-latest'
             args: ''
@@ -27,13 +27,38 @@ jobs:
         with:
           bun-version: latest
 
-      - name: install Rust stable
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
+          targets: ${{ matrix.platform == 'macos-14' && 'aarch64-apple-darwin' || '' }}
 
-      - name: install frontend dependencies
+      - name: Install Frontend Dependencies
         run: bun install
+
+      - name: Create binaries directory
+        run: mkdir -p src-tauri/binaries
+
+      - name: Setup FFmpeg (macOS)
+        if: matrix.platform == 'macos-14'
+        run: |
+          brew install ffmpeg
+          FFMPEG_PATH=$(which ffmpeg)
+          FFPROBE_PATH=$(which ffprobe)
+          cp $FFMPEG_PATH src-tauri/binaries/ffmpeg-aarch64-apple-darwin
+          cp $FFPROBE_PATH src-tauri/binaries/ffprobe-aarch64-apple-darwin
+
+      - name: Setup FFmpeg (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+          $output = "ffmpeg.zip"
+          Invoke-WebRequest -Uri $url -OutFile $output
+          Expand-Archive -Path $output -DestinationPath .
+          $ffmpegPath = Get-ChildItem -Path "ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe" -Recurse | Select-Object -First 1
+          $ffprobePath = Get-ChildItem -Path "ffmpeg-master-latest-win64-gpl/bin/ffprobe.exe" -Recurse | Select-Object -First 1
+          Move-Item -Path $ffmpegPath.FullName -Destination "src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe" -Force
+          Move-Item -Path $ffprobePath.FullName -Destination "src-tauri/binaries/ffprobe-x86_64-pc-windows-msvc.exe" -Force
 
       - uses: tauri-apps/tauri-action@v1
         env:
