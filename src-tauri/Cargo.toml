@@ -28,6 +28,7 @@ window-vibrancy = "0.7.1"
 tokio = "1.49.0"
 tauri-plugin-prevent-default = "4.0.3"
 thiserror = "2.0.18"
+tauri-plugin-os = "2.3.2"
 
 [profile.release]
 opt-level = "z"
