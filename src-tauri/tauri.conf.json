@@ -4,9 +4,9 @@
 	"version": "0.1.0",
 	"identifier": "Frame",
 	"build": {
-		"beforeDevCommand": "command -v bun >/dev/null && bun run dev || command -v pnpm >/dev/null && pnpm run dev || command -v yarn >/dev/null && yarn dev || npm run dev",
+		"beforeDevCommand": "node scripts/run.cjs dev",
 		"devUrl": "http://localhost:1420",
-		"beforeBuildCommand": "command -v bun >/dev/null && bun run build || command -v pnpm >/dev/null && pnpm run build || command -v yarn >/dev/null && yarn build || npm run build",
+		"beforeBuildCommand": "node scripts/run.cjs build",
 		"frontendDist": "../build"
 	},
 	"app": {
