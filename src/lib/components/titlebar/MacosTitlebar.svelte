@@ -52,7 +52,7 @@
 	class="w-full pt-2 flex items-center justify-between px-4 select-none z-50 shrink-0"
 	data-tauri-drag-region
 >
-	<div class="flex items-center gap-6 pointer-events-none">
+	<div class="flex items-center gap-6 pointer-events-none mt-2">
 		<div class="flex items-center z-50 mr-2 group pointer-events-auto">
 			<button
 				onclick={close}
