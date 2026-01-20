@@ -35,12 +35,10 @@ jobs:
       - name: Install Frontend Dependencies
         run: bun install
 
-      - name: Create binaries directory
-        run: mkdir -p src-tauri/binaries
-
       - name: Setup FFmpeg (macOS)
         if: matrix.platform == 'macos-14'
         run: |
+          mkdir -p src-tauri/binaries
           brew install ffmpeg
           FFMPEG_PATH=$(which ffmpeg)
           FFPROBE_PATH=$(which ffprobe)
@@ -51,6 +49,7 @@ jobs:
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         run: |
+          New-Item -Path "src-tauri/binaries" -ItemType Directory -Force
           $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
           $output = "ffmpeg.zip"
           Invoke-WebRequest -Uri $url -OutFile $output
@@ -60,7 +59,7 @@ jobs:
           Move-Item -Path $ffmpegPath.FullName -Destination "src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe" -Force
           Move-Item -Path $ffprobePath.FullName -Destination "src-tauri/binaries/ffprobe-x86_64-pc-windows-msvc.exe" -Force
 
-      - uses: tauri-apps/tauri-action@v1
+      - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
