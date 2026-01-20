@@ -5,9 +5,37 @@ use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Emitter, command};
 use tauri_plugin_shell::ShellExt;
 use tauri_plugin_shell::process::CommandEvent;
+use thiserror::Error;
 use tokio::sync::mpsc;
 
 const MAX_CONCURRENCY: usize = 2;
+
+#[derive(Debug, Error)]
+pub enum ConversionError {
+    #[error("Shell command failed: {0}")]
+    Shell(String),
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("JSON parsing failed: {0}")]
+    Json(#[from] serde_json::Error),
+    #[error("Internal channel error: {0}")]
+    Channel(String),
+    #[error("Probe failed: {0}")]
+    Probe(String),
+    #[error("Worker process error: {0}")]
+    Worker(String),
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
+}
+
+impl Serialize for ConversionError {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
 
 #[derive(Debug, Clone)]
 struct ConversionTask {
@@ -20,7 +48,7 @@ struct ConversionTask {
 enum ManagerMessage {
     Enqueue(ConversionTask),
     TaskCompleted(String),
-    TaskError(String, String),
+    TaskError(String, ConversionError),
 }
 
 pub struct ConversionManager {
@@ -86,7 +114,6 @@ impl ConversionManager {
             if let Some(task) = queue.pop_front() {
                 active_tasks.insert(task.id.clone(), ());
 
-                // Spawn the actual worker
                 let app_clone = app.clone();
                 let tx_worker = tx.clone();
                 let task_clone = task.clone();
@@ -348,17 +375,19 @@ fn build_output_path(file_path: &str, container: &str, output_name: Option<Strin
     }
 }
 
-async fn run_ffmpeg_worker(app: AppHandle, task: ConversionTask) -> Result<(), String> {
+async fn run_ffmpeg_worker(app: AppHandle, task: ConversionTask) -> Result<(), ConversionError> {
     let output_path = build_output_path(&task.file_path, &task.config.container, task.output_name);
     let args = build_ffmpeg_args(&task.file_path, &output_path, &task.config);
 
     let sidecar_command = app
         .shell()
         .sidecar("ffmpeg")
-        .map_err(|e| e.to_string())?
+        .map_err(|e| ConversionError::Shell(e.to_string()))?
         .args(args);
 
-    let (mut rx, _) = sidecar_command.spawn().map_err(|e| e.to_string())?;
+    let (mut rx, _) = sidecar_command
+        .spawn()
+        .map_err(|e| ConversionError::Shell(e.to_string()))?;
 
     let id = task.id;
     let app_clone = app.clone();
@@ -374,7 +403,6 @@ async fn run_ffmpeg_worker(app: AppHandle, task: ConversionTask) -> Result<(), S
             CommandEvent::Stderr(line_bytes) => {
                 let line = String::from_utf8_lossy(&line_bytes).to_string();
 
-                // Emit raw log
                 let _ = app_clone.emit(
                     "conversion-log",
                     LogPayload {
@@ -433,8 +461,64 @@ async fn run_ffmpeg_worker(app: AppHandle, task: ConversionTask) -> Result<(), S
                 error: err_msg.clone(),
             },
         );
-        Err(err_msg)
+        Err(ConversionError::Worker(err_msg))
     }
+}
+
+fn validate_task_input(file_path: &str, config: &ConversionConfig) -> Result<(), ConversionError> {
+    let input_path = Path::new(file_path);
+    if !input_path.exists() {
+        return Err(ConversionError::InvalidInput(format!(
+            "Input file does not exist: {}",
+            file_path
+        )));
+    }
+    if !input_path.is_file() {
+        return Err(ConversionError::InvalidInput(format!(
+            "Input path is not a file: {}",
+            file_path
+        )));
+    }
+
+    if config.resolution == "custom" {
+        let w_str = config.custom_width.as_deref().unwrap_or("-1");
+        let h_str = config.custom_height.as_deref().unwrap_or("-1");
+
+        let w = w_str.parse::<i32>().map_err(|_| {
+            ConversionError::InvalidInput(format!("Invalid custom width: {}", w_str))
+        })?;
+        let h = h_str.parse::<i32>().map_err(|_| {
+            ConversionError::InvalidInput(format!("Invalid custom height: {}", h_str))
+        })?;
+
+        if w == 0 || h == 0 {
+            return Err(ConversionError::InvalidInput(
+                "Resolution dimensions cannot be zero".to_string(),
+            ));
+        }
+        // -1 is allowed for "keep aspect ratio", but strictly negative values < -1 are invalid for scale filter
+        if w < -1 || h < -1 {
+            return Err(ConversionError::InvalidInput(
+                "Resolution dimensions cannot be negative (except -1 for auto)".to_string(),
+            ));
+        }
+    }
+
+    if config.video_bitrate_mode == "bitrate" && !is_audio_only_container(&config.container) {
+        let bitrate = config.video_bitrate.parse::<f64>().map_err(|_| {
+            ConversionError::InvalidInput(format!(
+                "Invalid video bitrate: {}",
+                config.video_bitrate
+            ))
+        })?;
+        if bitrate <= 0.0 {
+            return Err(ConversionError::InvalidInput(
+                "Video bitrate must be positive".to_string(),
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 #[command]
@@ -444,7 +528,9 @@ pub async fn queue_conversion(
     file_path: String,
     output_name: Option<String>,
     config: ConversionConfig,
-) -> Result<(), String> {
+) -> Result<(), ConversionError> {
+    validate_task_input(&file_path, &config)?;
+
     let task = ConversionTask {
         id,
         file_path,
@@ -456,12 +542,15 @@ pub async fn queue_conversion(
         .sender
         .send(ManagerMessage::Enqueue(task))
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| ConversionError::Channel(e.to_string()))?;
     Ok(())
 }
 
 #[command]
-pub async fn probe_media(app: AppHandle, file_path: String) -> Result<ProbeMetadata, String> {
+pub async fn probe_media(
+    app: AppHandle,
+    file_path: String,
+) -> Result<ProbeMetadata, ConversionError> {
     let args = vec![
         "-v".to_string(),
         "quiet".to_string(),
@@ -475,18 +564,19 @@ pub async fn probe_media(app: AppHandle, file_path: String) -> Result<ProbeMetad
     let output = app
         .shell()
         .sidecar("ffprobe")
-        .map_err(|e| e.to_string())?
+        .map_err(|e| ConversionError::Shell(e.to_string()))?
         .args(args)
         .output()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| ConversionError::Shell(e.to_string()))?;
 
     if !output.status.success() {
-        return Err(format!("ffprobe failed: {:?}", output.stderr));
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        return Err(ConversionError::Probe(stderr));
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let probe_data: FfprobeOutput = serde_json::from_str(&stdout).map_err(|e| e.to_string())?;
+    let probe_data: FfprobeOutput = serde_json::from_str(&stdout)?;
 
     let mut metadata = ProbeMetadata::default();
 
@@ -628,7 +718,7 @@ fn is_audio_only_container(container: &str) -> bool {
 pub async fn estimate_output(
     config: ConversionConfig,
     metadata: Option<ProbeMetadata>,
-) -> Result<OutputEstimate, String> {
+) -> Result<OutputEstimate, ConversionError> {
     let metadata_ref = metadata.as_ref();
     let audio_only = is_audio_only_container(&config.container);
 
