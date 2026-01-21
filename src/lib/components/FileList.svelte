@@ -1,7 +1,6 @@
 <script lang="ts">
 	import FileItemRow from '$lib/components/FileItemRow.svelte';
 	import type { FileItem } from '$lib/types';
-	import { Check } from 'lucide-svelte';
 	import Checkbox from '$lib/components/ui/Checkbox.svelte';
 
 	let {

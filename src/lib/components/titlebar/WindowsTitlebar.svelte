@@ -131,7 +131,7 @@
 					<Button
 						onclick={onStartConversion}
 						disabled={isProcessing || selectedCount === 0}
-						variant="primary"
+						variant="default"
 						size="sm"
 						class={cn('gap-2 pointer-events-auto', isProcessing && 'cursor-progress')}
 					>
