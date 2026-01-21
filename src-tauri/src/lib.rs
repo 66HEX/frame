@@ -1,7 +1,7 @@
 mod conversion;
 use tauri::Manager;
 use tauri_plugin_store::Builder as StoreBuilder;
-use window_vibrancy::{apply_blur, apply_vibrancy, NSVisualEffectMaterial};
+use window_vibrancy::{NSVisualEffectMaterial, apply_mica, apply_vibrancy};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -14,7 +14,7 @@ pub fn run() {
                 .expect("Unsupported platform! 'apply_vibrancy' is only supported on macOS");
 
             #[cfg(target_os = "windows")]
-            apply_blur(&window, None)
+            apply_mica(&window, Some(true))
                 .expect("Unsupported platform! 'apply_blur' is only supported on Windows");
 
             app.manage(conversion::ConversionManager::new(app.handle().clone()));
