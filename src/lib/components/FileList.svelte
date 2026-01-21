@@ -2,6 +2,7 @@
 	import FileItemRow from '$lib/components/FileItemRow.svelte';
 	import type { FileItem } from '$lib/types';
 	import { Check } from 'lucide-svelte';
+	import Checkbox from '$lib/components/ui/Checkbox.svelte';
 
 	let {
 		files,
@@ -33,16 +34,11 @@
 			class="flex-1 grid grid-cols-12 gap-4 text-[10px] text-gray-alpha-600 font-medium uppercase tracking-widest items-center"
 		>
 			<div class="col-span-1 flex items-center justify-center relative">
-				<input
-					type="checkbox"
-					class="appearance-none w-3.5 h-3.5 border border-gray-alpha-400 rounded-sm bg-transparent checked:bg-ds-blue-600 checked:border-ds-blue-600 transition-colors cursor-pointer"
+				<Checkbox
 					checked={allChecked}
 					indeterminate={isIndeterminate}
 					onchange={(e) => onToggleAllBatch(e.currentTarget.checked)}
 				/>
-				{#if allChecked}
-					<Check size={10} class="absolute text-foreground pointer-events-none" />
-				{/if}
 			</div>
 			<div class="col-span-4">Name</div>
 			<div class="col-span-3 text-right">Size</div>

@@ -15,10 +15,23 @@
 :root {
 	color-scheme: light dark;
 	interpolate-size: allow-keywords;
+	text-box: trim-both cap alphabetic;
 }
 
 html {
 	text-size-adjust: 100%;
+	background: transparent;
+	border-radius: 16px;
+}
+
+body {
+	background: transparent;
+	color: var(--foreground);
+	font-family: var(--font-mono), ui-monospace, monospace;
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+	height: 100vh;
 }
 
 input,
@@ -127,21 +140,6 @@ select {
 		--ds-gray-alpha-400: rgba(255, 255, 255, 0.2);
 		--ds-gray-alpha-600: rgba(255, 255, 255, 0.4);
 	}
-}
-
-body {
-	background: transparent;
-	color: var(--foreground);
-	font-family: var(--font-mono), ui-monospace, monospace;
-	margin: 0;
-	padding: 0;
-	overflow: hidden;
-	height: 100vh;
-}
-
-html {
-	background: transparent;
-	border-radius: 16px;
 }
 
 .bg-gray-alpha-100 {
