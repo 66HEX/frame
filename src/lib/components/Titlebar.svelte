@@ -7,6 +7,7 @@
 	let {
 		totalSize = 0,
 		fileCount = 0,
+		selectedCount = 0,
 		isProcessing = false,
 		activeView = 'dashboard',
 		onAddFile,
@@ -15,6 +16,7 @@
 	}: {
 		totalSize?: number;
 		fileCount?: number;
+		selectedCount?: number;
 		isProcessing?: boolean;
 		activeView?: 'dashboard' | 'logs';
 		onAddFile?: () => void;
@@ -33,6 +35,7 @@
 	<WindowsTitlebar
 		{totalSize}
 		{fileCount}
+		{selectedCount}
 		{isProcessing}
 		{activeView}
 		{onAddFile}
@@ -43,6 +46,7 @@
 	<MacosTitlebar
 		{totalSize}
 		{fileCount}
+		{selectedCount}
 		{isProcessing}
 		{activeView}
 		{onAddFile}

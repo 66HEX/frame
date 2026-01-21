@@ -41,6 +41,7 @@
 	let selectedFile = $derived(files.find((f) => f.id === selectedFileId));
 	let totalSize = $derived(files.reduce((acc, curr) => acc + curr.size, 0));
 	let presets = $derived([...DEFAULT_PRESETS, ...customPresets] as PresetDefinition[]);
+	let selectedCount = $derived(files.filter((f) => f.isSelectedForConversion).length);
 
 	onMount(async () => {
 		customPresets = await loadCustomPresets();
@@ -301,6 +302,7 @@
 	<Titlebar
 		{totalSize}
 		fileCount={files.length}
+		{selectedCount}
 		{isProcessing}
 		{activeView}
 		onChangeView={(v) => (activeView = v)}

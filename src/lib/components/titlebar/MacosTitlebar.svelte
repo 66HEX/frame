@@ -10,6 +10,7 @@
 	let {
 		totalSize = 0,
 		fileCount = 0,
+		selectedCount = 0,
 		isProcessing = false,
 		activeView = 'dashboard',
 		onAddFile,
@@ -18,6 +19,7 @@
 	}: {
 		totalSize?: number;
 		fileCount?: number;
+		selectedCount?: number;
 		isProcessing?: boolean;
 		activeView?: 'dashboard' | 'logs';
 		onAddFile?: () => void;
@@ -168,7 +170,7 @@
 		{#if onStartConversion}
 			<Button
 				onclick={onStartConversion}
-				disabled={isProcessing || fileCount === 0}
+				disabled={isProcessing || selectedCount === 0}
 				variant="default"
 				class={cn('gap-2 pointer-events-auto', isProcessing && 'cursor-progress')}
 			>
