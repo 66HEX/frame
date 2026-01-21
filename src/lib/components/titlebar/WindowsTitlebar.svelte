@@ -167,7 +167,7 @@
 			<Square size={14} />
 		</Button>
 		<Button
-			variant="destructive"
+			variant="titlebar-destructive"
 			size="none"
 			onclick={close}
 			class="h-full w-12 rounded-none"
