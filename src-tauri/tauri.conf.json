@@ -13,7 +13,6 @@
 		"macOSPrivateApi": true,
 		"windows": [
 			{
-				"title": "Frame",
 				"width": 1200,
 				"height": 800,
 				"minHeight": 800,
