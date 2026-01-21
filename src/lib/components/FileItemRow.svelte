@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { FileStatus, type FileItem } from '../types';
-	import { Trash2, Check } from 'lucide-svelte';
+	import { Trash2 } from 'lucide-svelte';
 	import { cn } from '$lib/utils/cn';
+	import Button from '$lib/components/ui/Button.svelte';
+	import Checkbox from '$lib/components/ui/Checkbox.svelte';
 
 	let {
 		item,
@@ -40,15 +42,10 @@
 			class="col-span-1 flex items-center justify-center relative"
 			onclick={(e) => e.stopPropagation()}
 		>
-			<input
-				type="checkbox"
-				class="appearance-none w-3.5 h-3.5 border border-gray-alpha-400 rounded-sm bg-transparent checked:bg-ds-blue-600 checked:border-ds-blue-600 transition-colors cursor-pointer"
+			<Checkbox
 				checked={item.isSelectedForConversion}
 				onchange={(e) => onToggleBatch(item.id, e.currentTarget.checked)}
 			/>
-			{#if item.isSelectedForConversion}
-				<Check size={10} class="absolute text-foreground pointer-events-none" />
-			{/if}
 		</div>
 
 		<div class="col-span-4 flex items-center gap-2 overflow-hidden">
@@ -78,13 +75,15 @@
 		</div>
 	</div>
 
-	<button
+	<Button
 		onclick={(e) => {
 			e.stopPropagation();
 			onRemove(item.id);
 		}}
-		class="ml-4 w-8 h-4 flex items-center justify-center opacity-0 group-hover:opacity-100 text-gray-alpha-600 hover:text-ds-red-600 transition-all"
+		variant="destructive"
+		size="none"
+		class="ml-4 w-8 h-4 opacity-0 group-hover:opacity-100 text-gray-alpha-600 hover:text-ds-red-600 hover:bg-transparent"
 	>
 		<Trash2 size={14} />
-	</button>
+	</Button>
 </div>

@@ -13,6 +13,7 @@
 	} from 'lucide-svelte';
 	import { cn } from '$lib/utils/cn';
 	import frameIcon from '$lib/assets/icons/frame.svg?raw';
+	import Button from '$lib/components/ui/Button.svelte';
 
 	const appWindow = getCurrentWindow();
 
@@ -74,32 +75,26 @@
 
 				{#if onChangeView}
 					<div
-						class="flex items-center gap-1 bg-gray-alpha-100 p-0.5 h-7 rounded border border-gray-alpha-100 pointer-events-auto"
+						class="flex items-center gap-1 bg-gray-alpha-100 p-0.5 h-7.5 rounded border border-gray-alpha-100 pointer-events-auto"
 					>
-						<button
+						<Button
+							variant={activeView === 'dashboard' ? 'default' : 'titlebar-ghost'}
+							size="sm"
 							onclick={() => onChangeView('dashboard')}
-							class={cn(
-								'flex items-center gap-2 px-3 py-1 rounded-xs text-[10px] font-medium transition-all uppercase tracking-wide',
-								activeView === 'dashboard'
-									? 'bg-foreground text-black shadow-sm'
-									: 'text-gray-alpha-600 hover:text-foreground'
-							)}
+							class="gap-2"
 						>
 							<LayoutList size={12} />
 							<span>Dashboard</span>
-						</button>
-						<button
+						</Button>
+						<Button
+							variant={activeView === 'logs' ? 'default' : 'titlebar-ghost'}
+							size="sm"
 							onclick={() => onChangeView('logs')}
-							class={cn(
-								'flex items-center gap-2 px-3 py-1 rounded-xs text-[10px] font-medium transition-all uppercase tracking-wide',
-								activeView === 'logs'
-									? 'bg-foreground text-black shadow-sm'
-									: 'text-gray-alpha-600 hover:text-foreground'
-							)}
+							class="gap-2"
 						>
 							<Terminal size={12} />
 							<span>Logs</span>
-						</button>
+						</Button>
 					</div>
 				{/if}
 
@@ -119,23 +114,24 @@
 
 			<div class="col-span-4 flex items-center gap-3 mt-2">
 				{#if onAddFile}
-					<button
+					<Button
 						onclick={onAddFile}
-						class="flex items-center gap-2 bg-gray-alpha-100 h-7 hover:bg-gray-alpha-200 text-foreground px-3 py-1.5 rounded text-[10px] font-medium transition-colors cursor-pointer border border-gray-alpha-100 uppercase tracking-wide pointer-events-auto"
+						variant="secondary"
+						size="sm"
+						class="gap-2 pointer-events-auto"
 					>
 						<Plus size={12} />
 						Add Source
-					</button>
+					</Button>
 				{/if}
 
 				{#if onStartConversion}
-					<button
+					<Button
 						onclick={onStartConversion}
 						disabled={isProcessing || fileCount === 0}
-						class={cn(
-							'flex items-center gap-2 px-4 py-1.5 rounded h-7 text-[10px] font-medium uppercase tracking-wide transition-all bg-foreground text-black hover:bg-foreground border border-foreground pointer-events-auto',
-							(isProcessing || fileCount === 0) && 'opacity-50 cursor-not-allowed'
-						)}
+						variant="default"
+						size="sm"
+						class={cn('gap-2 pointer-events-auto', isProcessing && 'cursor-progress')}
 					>
 						{#if isProcessing}
 							<span class="animate-pulse">PROCESSING...</span>
@@ -143,33 +139,39 @@
 							<Play size={12} fill="currentColor" />
 							START
 						{/if}
-					</button>
+					</Button>
 				{/if}
 			</div>
 		</div>
 	</div>
 
 	<div class="absolute right-0 top-0 h-full flex items-center pointer-events-auto z-50">
-		<button
+		<Button
+			variant="ghost"
+			size="none"
 			onclick={minimize}
-			class="h-full w-12 flex items-center justify-center hover:bg-gray-alpha-100 transition-colors text-foreground"
+			class="h-full w-12 rounded-none"
 			title="Minimize"
 		>
 			<Minus size={16} />
-		</button>
-		<button
+		</Button>
+		<Button
+			variant="ghost"
+			size="none"
 			onclick={toggleMaximize}
-			class="h-full w-12 flex items-center justify-center hover:bg-gray-alpha-100 transition-colors text-foreground"
+			class="h-full w-12 rounded-none"
 			title="Maximize"
 		>
 			<Square size={14} />
-		</button>
-		<button
+		</Button>
+		<Button
+			variant="destructive"
+			size="none"
 			onclick={close}
-			class="h-full w-12 flex items-center justify-center hover:bg-ds-red-600 hover:text-foreground transition-colors text-foreground"
+			class="h-full w-12 rounded-none"
 			title="Close"
 		>
 			<X size={16} />
-		</button>
+		</Button>
 	</div>
 </div>

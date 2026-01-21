@@ -3,6 +3,7 @@
 	import { Plus, Play, FileVideo, HardDrive, LayoutList, Terminal } from 'lucide-svelte';
 	import { cn } from '$lib/utils/cn';
 	import frameIcon from '$lib/assets/icons/frame.svg?raw';
+	import Button from '$lib/components/ui/Button.svelte';
 
 	const appWindow = getCurrentWindow();
 
@@ -121,30 +122,24 @@
 			<div
 				class="flex items-center gap-1 bg-gray-alpha-100 p-0.5 h-7.5 rounded border border-gray-alpha-100 pointer-events-auto"
 			>
-				<button
+				<Button
+					variant={activeView === 'dashboard' ? 'default' : 'titlebar-ghost'}
+					size="sm"
 					onclick={() => onChangeView('dashboard')}
-					class={cn(
-						'flex items-center gap-2 px-3 py-1 rounded-xs text-[10px]  font-medium transition-all uppercase tracking-wide',
-						activeView === 'dashboard'
-							? 'bg-foreground text-black shadow-sm'
-							: 'text-gray-alpha-600 hover:text-foreground'
-					)}
+					class="gap-2"
 				>
 					<LayoutList size={12} />
 					<span>Dashboard</span>
-				</button>
-				<button
+				</Button>
+				<Button
+					variant={activeView === 'logs' ? 'default' : 'titlebar-ghost'}
+					size="sm"
 					onclick={() => onChangeView('logs')}
-					class={cn(
-						'flex items-center gap-2 px-3 py-1 rounded-xs text-[10px] font-medium transition-all uppercase tracking-wide',
-						activeView === 'logs'
-							? 'bg-foreground text-black shadow-sm'
-							: 'text-gray-alpha-600 hover:text-foreground'
-					)}
+					class="gap-2"
 				>
 					<Terminal size={12} />
 					<span>Logs</span>
-				</button>
+				</Button>
 			</div>
 		{/if}
 
@@ -164,23 +159,18 @@
 
 	<div class="flex items-center gap-3 mt-2 pointer-events-none">
 		{#if onAddFile}
-			<button
-				onclick={onAddFile}
-				class="flex items-center gap-2 bg-gray-alpha-100 hover:bg-gray-alpha-200 h-7.5 text-foreground px-3 py-1.5 rounded text-[10px] font-medium transition-colors cursor-pointer border border-gray-alpha-100 uppercase tracking-wide pointer-events-auto"
-			>
+			<Button onclick={onAddFile} variant="secondary" class="gap-2 pointer-events-auto">
 				<Plus size={12} />
 				Add Source
-			</button>
+			</Button>
 		{/if}
 
 		{#if onStartConversion}
-			<button
+			<Button
 				onclick={onStartConversion}
 				disabled={isProcessing || fileCount === 0}
-				class={cn(
-					'flex items-center gap-2 px-4 py-1.5 rounded text-[10px] h-7.5 font-medium uppercase tracking-wide transition-all bg-foreground text-black hover:bg-foreground border border-foreground pointer-events-auto',
-					(isProcessing || fileCount === 0) && 'opacity-50 cursor-not-allowed'
-				)}
+				variant="default"
+				class={cn('gap-2 pointer-events-auto', isProcessing && 'cursor-progress')}
 			>
 				{#if isProcessing}
 					<span class="animate-pulse">PROCESSING...</span>
@@ -188,7 +178,7 @@
 					<Play size={12} fill="currentColor" />
 					START
 				{/if}
-			</button>
+			</Button>
 		{/if}
 	</div>
 </div>

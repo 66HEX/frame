@@ -1,6 +1,10 @@
 <script lang="ts">
 	import { cn } from '$lib/utils/cn';
 	import type { ConversionConfig, SourceMetadata } from '$lib/types';
+	import Button from '$lib/components/ui/Button.svelte';
+	import ListItem from '$lib/components/ui/ListItem.svelte';
+	import Input from '$lib/components/ui/Input.svelte';
+	import Label from '$lib/components/ui/Label.svelte';
 
 	const AUDIO_CODECS = [
 		{ id: 'aac', label: 'AAC / Stereo' },
@@ -42,95 +46,65 @@
 
 <div class="space-y-4">
 	<div class="space-y-3">
-		<span
-			class="text-[10px] text-gray-alpha-600 uppercase tracking-widest block border-b border-gray-alpha-100 pb-1"
-		>
-			Channels & Bitrate
-		</span>
+		<Label variant="section">Channels & Bitrate</Label>
 		<div class="space-y-3">
 			<div class="grid grid-cols-3 gap-2">
 				{#each CHANNELS as ch (ch.id)}
-					<button
+					<Button
+						variant={config.audioChannels === ch.id ? 'selected' : 'outline'}
 						onclick={() => onUpdate({ audioChannels: ch.id })}
 						{disabled}
-						class={cn(
-							'text-[11px] py-1.5 px-2 h-7.5 border rounded transition-all text-center uppercase',
-							config.audioChannels === ch.id
-								? 'bg-ds-blue-900/20 text-ds-blue-600 border-ds-blue-600'
-								: 'bg-transparent text-gray-alpha-600 border-gray-alpha-200 hover:bg-gray-alpha-100 hover:text-foreground'
-						)}
+						class="w-full"
 					>
 						{ch.label}
-					</button>
+					</Button>
 				{/each}
 			</div>
 
 			<div class="space-y-2 pt-1">
-				<label
-					for="audio-bitrate"
-					class="text-[10px] text-gray-alpha-600 uppercase tracking-widest whitespace-nowrap"
-					>Bitrate (kbps)</label
-				>
-				<input
+				<Label for="audio-bitrate">Bitrate (kbps)</Label>
+				<Input
 					id="audio-bitrate"
 					type="number"
 					value={config.audioBitrate}
 					oninput={(e) => onUpdate({ audioBitrate: e.currentTarget.value })}
-					class="w-full text-[11px] uppercase tracking-wide px-3 py-1.5 border border-gray-alpha-200 rounded bg-transparent focus:outline-none focus:border-ds-blue-600! transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
 					{disabled}
 				/>
 			</div>
 		</div>
 	</div>
 	<div class="space-y-3 pt-2">
-		<span
-			class="text-[10px] text-gray-alpha-600 uppercase tracking-widest block border-b border-gray-alpha-100 pb-1"
-		>
-			Audio Codec
-		</span>
+		<Label variant="section">Audio Codec</Label>
 		<div class="grid grid-cols-1">
 			{#each AUDIO_CODECS as codec (codec.id)}
 				{@const isMp3Container = config.container === 'mp3'}
 				{@const isAllowed = !isMp3Container || codec.id === 'mp3'}
-				<button
+				<ListItem
+					selected={config.audioCodec === codec.id}
 					onclick={() => onUpdate({ audioCodec: codec.id })}
 					disabled={disabled || !isAllowed}
-					class={cn(
-						'text-[11px] py-1.5 px-3 border-l-2 text-left transition-all uppercase flex justify-between',
-						config.audioCodec === codec.id
-							? 'border-l-ds-blue-600 bg-gray-alpha-100 text-foreground pl-3'
-							: 'border-l-transparent text-gray-alpha-600 hover:text-foreground pl-2',
-						!isAllowed && 'opacity-50 cursor-not-allowed'
-					)}
+					class={cn(!isAllowed && 'opacity-50 cursor-not-allowed')}
 				>
 					<span>{codec.id}</span>
 					<span class="opacity-50 text-[9px]">
 						{isMp3Container && codec.id !== 'mp3' ? 'Incompatible with MP3' : codec.label}
 					</span>
-				</button>
+				</ListItem>
 			{/each}
 		</div>
 	</div>
 
 	{#if metadata?.audioTracks && metadata.audioTracks.length > 0}
 		<div class="space-y-3 pt-2">
-			<span
-				class="text-[10px] text-gray-alpha-600 uppercase tracking-widest block border-b border-gray-alpha-100 pb-1"
-			>
-				Source Tracks
-			</span>
+			<Label variant="section">Source Tracks</Label>
 			<div class="grid grid-cols-1 gap-2">
 				{#each metadata.audioTracks as track (track.index)}
 					{@const isSelected = (config.selectedAudioTracks || []).includes(track.index)}
-					<button
+					<Button
+						variant={isSelected ? 'selected' : 'outline'}
 						onclick={() => toggleTrack(track.index)}
 						{disabled}
-						class={cn(
-							'w-full py-2 px-3 border rounded transition-all text-left flex items-center justify-between',
-							isSelected
-								? 'bg-ds-blue-900/20 text-ds-blue-600 border-ds-blue-600'
-								: 'bg-transparent text-gray-alpha-600 border-gray-alpha-200 hover:bg-gray-alpha-100 hover:text-foreground'
-						)}
+						class="w-full h-auto py-2 px-3 flex items-center justify-between text-left"
 					>
 						<div class="space-y-0.5">
 							<div class="flex items-center gap-2">
@@ -156,16 +130,16 @@
 
 						<div
 							class={cn(
-								'w-4 h-4 rounded-full border flex items-center justify-center transition-all duration-200',
+								'w-3 h-3 rounded-full border flex items-center justify-center transition-all duration-200',
 								isSelected ? 'border-ds-blue-600' : 'border-gray-alpha-200'
 							)}
 						>
 							<div
-								class="w-2 h-2 rounded-full bg-ds-blue-600 transition-all duration-200"
+								class="w-1.5 h-1.5 rounded-full bg-ds-blue-600 transition-all duration-200"
 								style="opacity: {isSelected ? 1 : 0}; transform: scale({isSelected ? 1 : 0.5});"
 							></div>
 						</div>
-					</button>
+					</Button>
 				{/each}
 			</div>
 		</div>

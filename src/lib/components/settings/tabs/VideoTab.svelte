@@ -1,6 +1,10 @@
 <script lang="ts">
-	import { cn } from '$lib/utils/cn';
 	import type { ConversionConfig } from '$lib/types';
+	import Button from '$lib/components/ui/Button.svelte';
+	import ListItem from '$lib/components/ui/ListItem.svelte';
+	import Input from '$lib/components/ui/Input.svelte';
+	import Label from '$lib/components/ui/Label.svelte';
+	import Slider from '$lib/components/ui/Slider.svelte';
 
 	const RESOLUTIONS = ['original', '1080p', '720p', '480p', 'custom'] as const;
 	const VIDEO_CODECS = [
@@ -40,55 +44,41 @@
 
 <div class="space-y-4">
 	<div class="space-y-3">
-		<span
-			class="text-[10px] text-gray-alpha-600 uppercase tracking-widest block border-b border-gray-alpha-100 pb-1"
-		>
-			Resolution & Framerate
-		</span>
+		<Label variant="section">Resolution & Framerate</Label>
 		<div class="grid grid-cols-2 gap-2 mb-2">
 			{#each RESOLUTIONS as res (res)}
-				<button
+				<Button
+					variant={config.resolution === res ? 'selected' : 'outline'}
 					onclick={() => onUpdate({ resolution: res })}
 					{disabled}
-					class={cn(
-						'text-[11px] py-1.5 px-2 border h-7.5 rounded transition-all text-center uppercase',
-						config.resolution === res
-							? 'bg-ds-blue-900/20 text-ds-blue-600 border-ds-blue-600'
-							: 'bg-transparent text-gray-alpha-600 border-gray-alpha-200 hover:bg-gray-alpha-100 hover:text-foreground'
-					)}
+					class="w-full"
 				>
 					{res}
-				</button>
+				</Button>
 			{/each}
 		</div>
 
 		{#if config.resolution === 'custom'}
 			<div class="grid grid-cols-2 gap-2 mb-2 pt-1">
 				<div class="flex flex-col gap-1">
-					<label for="width" class="text-[9px] text-gray-alpha-600 uppercase tracking-widest pb-1"
-						>Width</label
-					>
-					<input
+					<Label for="width">Width</Label>
+					<Input
 						id="width"
 						type="number"
 						placeholder="1920"
 						value={config.customWidth}
 						oninput={(e) => onUpdate({ customWidth: e.currentTarget.value })}
-						class="w-full text-[11px] uppercase tracking-wide px-3 py-1.5 border border-gray-alpha-200 rounded bg-transparent focus:outline-none focus:border-ds-blue-600! transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
 						{disabled}
 					/>
 				</div>
 				<div class="flex flex-col gap-1">
-					<label for="height" class="text-[9px] text-gray-alpha-600 uppercase tracking-widest pb-1"
-						>Height</label
-					>
-					<input
+					<Label for="height">Height</Label>
+					<Input
 						id="height"
 						type="number"
 						placeholder="1080"
 						value={config.customHeight}
 						oninput={(e) => onUpdate({ customHeight: e.currentTarget.value })}
-						class="w-full text-[11px] uppercase tracking-wide px-3 py-1.5 border border-gray-alpha-200 rounded bg-transparent focus:outline-none focus:border-ds-blue-600! transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
 						{disabled}
 					/>
 				</div>
@@ -96,140 +86,93 @@
 		{/if}
 
 		<div class="space-y-3 pt-2">
-			<span
-				class="text-[10px] text-gray-alpha-600 uppercase tracking-widest block border-b border-gray-alpha-100 pb-1"
-			>
-				Scaling Algorithm
-			</span>
+			<Label variant="section">Scaling Algorithm</Label>
 			<div class="grid grid-cols-2 gap-2">
 				{#each SCALING_ALGOS as algo (algo.id)}
-					<button
+					<Button
+						variant={config.scalingAlgorithm === algo.id ? 'selected' : 'outline'}
 						onclick={() => onUpdate({ scalingAlgorithm: algo.id })}
 						disabled={disabled || config.resolution === 'original'}
-						class={cn(
-							'text-[11px] py-1.5 px-2 h-7.5 border rounded transition-all text-center uppercase',
-							config.scalingAlgorithm === algo.id
-								? 'bg-ds-blue-900/20 text-ds-blue-600 border-ds-blue-600'
-								: 'bg-transparent text-gray-alpha-600 border-gray-alpha-200 disabled:cursor-not-allowed hover:bg-gray-alpha-100 hover:text-foreground disabled:opacity-50'
-						)}
+						class="w-full"
 					>
 						{algo.label}
-					</button>
+					</Button>
 				{/each}
 			</div>
 		</div>
 
 		<div class="space-y-3 pt-2">
-			<span
-				class="text-[10px] text-gray-alpha-600 uppercase tracking-widest block border-b border-gray-alpha-100 pb-1"
-			>
-				Framerate
-			</span>
+			<Label variant="section">Framerate</Label>
 			<div class="grid grid-cols-2 gap-2">
 				{#each FPS_OPTIONS as opt (opt.id)}
-					<button
+					<Button
+						variant={config.fps === opt.id ? 'selected' : 'outline'}
 						onclick={() => onUpdate({ fps: opt.id })}
 						{disabled}
-						class={cn(
-							'text-[11px] py-1.5 px-2 h-7.5 border rounded transition-all text-center uppercase',
-							config.fps === opt.id
-								? 'bg-ds-blue-900/20 text-ds-blue-600 border-ds-blue-600'
-								: 'bg-transparent text-gray-alpha-600 border-gray-alpha-200 hover:bg-gray-alpha-100 hover:text-foreground'
-						)}
+						class="w-full"
 					>
 						{opt.label}
-					</button>
+					</Button>
 				{/each}
 			</div>
 		</div>
 	</div>
 
 	<div class="space-y-3 pt-2">
-		<span
-			class="text-[10px] text-gray-alpha-600 uppercase tracking-widest block border-b border-gray-alpha-100 pb-1"
-		>
-			Video Encoder
-		</span>
+		<Label variant="section">Video Encoder</Label>
 		<div class="grid grid-cols-1 gap-1.5">
 			{#each VIDEO_CODECS as codec (codec.id)}
-				<button
+				<ListItem
+					selected={config.videoCodec === codec.id}
 					onclick={() => onUpdate({ videoCodec: codec.id })}
 					{disabled}
-					class={cn(
-						'text-[11px] py-1.5 px-3 border-l-2 text-left transition-all uppercase flex justify-between',
-						config.videoCodec === codec.id
-							? 'border-l-ds-blue-600 bg-gray-alpha-100 text-foreground pl-3'
-							: 'border-l-transparent text-gray-alpha-600 hover:text-foreground pl-2'
-					)}
 				>
 					<span>{codec.id}</span>
 					<span class="opacity-50 text-[9px]">{codec.label}</span>
-				</button>
+				</ListItem>
 			{/each}
 		</div>
 	</div>
 
 	<div class="space-y-3 pt-2">
-		<span
-			class="text-[10px] text-gray-alpha-600 uppercase tracking-widest block border-b border-gray-alpha-100 pb-1"
-		>
-			Quality Control
-		</span>
+		<Label variant="section">Quality Control</Label>
 		<div class="grid grid-cols-2 gap-2">
-			<button
+			<Button
+				variant={config.videoBitrateMode === 'crf' ? 'selected' : 'outline'}
 				onclick={() => onUpdate({ videoBitrateMode: 'crf' })}
 				{disabled}
-				class={cn(
-					'text-[11px] py-1.5 px-2 h-7.5 border rounded transition-all text-center uppercase',
-					config.videoBitrateMode === 'crf'
-						? 'bg-ds-blue-900/20 text-ds-blue-600 border-ds-blue-600'
-						: 'bg-transparent text-gray-alpha-600 border-gray-alpha-200 hover:bg-gray-alpha-100 hover:text-foreground'
-				)}
+				class="w-full"
 			>
 				Constant Quality
-			</button>
-			<button
+			</Button>
+			<Button
+				variant={config.videoBitrateMode === 'bitrate' ? 'selected' : 'outline'}
 				onclick={() => onUpdate({ videoBitrateMode: 'bitrate' })}
 				{disabled}
-				class={cn(
-					'text-[11px] py-1.5 px-2 border rounded transition-all text-center uppercase',
-					config.videoBitrateMode === 'bitrate'
-						? 'bg-ds-blue-900/20 text-ds-blue-600 border-ds-blue-600'
-						: 'bg-transparent text-gray-alpha-600 border-gray-alpha-200 hover:bg-gray-alpha-100 hover:text-foreground'
-				)}
+				class="w-full"
 			>
 				Target Bitrate
-			</button>
+			</Button>
 		</div>
 	</div>
 
 	{#if config.videoBitrateMode === 'crf'}
 		<div class="space-y-2 pt-2">
 			<div class="flex justify-between items-end">
-				<label
-					for="quality-factor"
-					class="text-[10px] text-gray-alpha-600 uppercase tracking-widest pb-1"
-					>Quality Factor</label
-				>
+				<Label for="quality-factor">Quality Factor</Label>
 				<div
-					class="text-[10px] bg-ds-blue-900/20 text-ds-blue-600 border border-ds-blue-600 px-1.5 py-1 rounded font-medium"
+					class="text-[10px] bg-ds-blue-900/20 text-ds-blue-600 border border-ds-blue-600 px-1.5 rounded font-medium"
 				>
 					CRF {config.crf}
 				</div>
 			</div>
-			<div class="h-1.5 bg-gray-alpha-100 rounded-full w-full relative">
-				<div
-					class="absolute top-0 left-0 h-full bg-foreground rounded-full"
-					style="width: {(config.crf / 51) * 100}%"
-				></div>
-				<input
+			<div class="py-2">
+				<Slider
 					id="quality-factor"
-					type="range"
-					min="0"
-					max="51"
+					min={0}
+					max={51}
 					value={config.crf}
 					oninput={(e) => onUpdate({ crf: parseInt(e.currentTarget.value) })}
-					class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
 					{disabled}
 				/>
 			</div>
@@ -241,19 +184,14 @@
 	{:else}
 		<div class="space-y-2 pt-1">
 			<div class="flex justify-between items-end">
-				<label
-					for="video-bitrate"
-					class="text-[10px] text-gray-alpha-600 uppercase tracking-widest whitespace-nowrap"
-					>Target Bitrate (kbps)</label
-				>
+				<Label for="video-bitrate">Target Bitrate (kbps)</Label>
 			</div>
 			<div class="flex items-center gap-2">
-				<input
+				<Input
 					id="video-bitrate"
 					type="number"
 					value={config.videoBitrate}
 					oninput={(e) => onUpdate({ videoBitrate: e.currentTarget.value })}
-					class="w-full text-[11px] uppercase tracking-wide px-3 py-1.5 border border-gray-alpha-200 rounded bg-transparent focus:outline-none focus:border-ds-blue-600! transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
 					{disabled}
 				/>
 			</div>

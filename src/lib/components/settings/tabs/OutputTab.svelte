@@ -1,6 +1,8 @@
 <script lang="ts">
-	import { cn } from '$lib/utils/cn';
 	import type { ConversionConfig } from '$lib/types';
+	import Button from '$lib/components/ui/Button.svelte';
+	import Input from '$lib/components/ui/Input.svelte';
+	import Label from '$lib/components/ui/Label.svelte';
 
 	const CONTAINERS = ['mp4', 'mkv', 'webm', 'mov', 'mp3'] as const;
 
@@ -21,17 +23,13 @@
 
 <div class="space-y-4">
 	<div class="space-y-3">
-		<div
-			class="text-[10px] text-gray-alpha-600 uppercase tracking-widest border-b border-gray-alpha-100 pb-1"
-		>
-			Output Name
-		</div>
-		<input
+		<Label variant="section">Output Name</Label>
+		<Input
 			type="text"
 			value={outputName}
 			oninput={(e) => onUpdateOutputName?.(e.currentTarget.value)}
 			placeholder="my_render_final"
-			class="w-full text-[11px] placeholder:uppercase tracking-wide px-3 py-1.5 h-7.5 border border-gray-alpha-200 rounded bg-transparent focus:outline-none focus:border-ds-blue-600! transition-all"
+			class="placeholder:uppercase"
 			{disabled}
 		/>
 		<p class="text-[10px] text-gray-alpha-600 uppercase tracking-wide">
@@ -40,25 +38,17 @@
 	</div>
 
 	<div class="space-y-3 pt-2">
-		<span
-			class="text-[10px] text-gray-alpha-600 uppercase tracking-widest block border-b border-gray-alpha-100 pb-1"
-		>
-			Output Container
-		</span>
+		<Label variant="section">Output Container</Label>
 		<div class="grid grid-cols-2 gap-2">
 			{#each CONTAINERS as fmt (fmt)}
-				<button
+				<Button
+					variant={config.container === fmt ? 'selected' : 'outline'}
 					onclick={() => onUpdate({ container: fmt })}
 					{disabled}
-					class={cn(
-						'text-[11px] py-1.5 px-2 h-7.5 border rounded transition-all text-center uppercase',
-						config.container === fmt
-							? 'bg-ds-blue-900/20 text-ds-blue-600 border-ds-blue-600'
-							: 'bg-transparent text-gray-alpha-600 border-gray-alpha-200 hover:bg-gray-alpha-100 hover:text-foreground'
-					)}
+					class="w-full"
 				>
 					{fmt}
-				</button>
+				</Button>
 			{/each}
 		</div>
 	</div>
