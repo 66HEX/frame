@@ -181,7 +181,8 @@
 					config: createInitialConfig(),
 					outputName: deriveOutputName(name),
 					metadataStatus: 'idle',
-					path: pathStr
+					path: pathStr,
+					isSelectedForConversion: true
 				});
 			}
 
@@ -256,8 +257,22 @@
 		}
 	}
 
+	async function handleToggleBatch(id: string, isChecked: boolean) {
+		files = files.map((f) => (f.id === id ? { ...f, isSelectedForConversion: isChecked } : f));
+	}
+
+	function handleToggleAllBatch(isChecked: boolean) {
+		files = files.map((f) => ({ ...f, isSelectedForConversion: isChecked }));
+	}
+
 	async function startConversion() {
-		const pendingFiles = files.filter((f) => f.status === FileStatus.IDLE);
+		const pendingFiles = files.filter(
+			(f) =>
+				f.isSelectedForConversion &&
+				f.status !== FileStatus.CONVERTING &&
+				f.status !== FileStatus.QUEUED
+		);
+
 		if (pendingFiles.length === 0) return;
 
 		isProcessing = true;
@@ -268,9 +283,13 @@
 			}
 		});
 
-		files = files.map((f) =>
-			f.status === FileStatus.IDLE ? { ...f, status: FileStatus.QUEUED, progress: 0 } : f
-		);
+		files = files.map((f) => {
+			const isPending =
+				f.isSelectedForConversion &&
+				f.status !== FileStatus.CONVERTING &&
+				f.status !== FileStatus.QUEUED;
+			return isPending ? { ...f, status: FileStatus.QUEUED, progress: 0 } : f;
+		});
 
 		for (const file of pendingFiles) {
 			await startConversionService(file.id, file.path, file.config, file.outputName);
@@ -297,6 +316,8 @@
 					{selectedFileId}
 					onSelect={(id) => (selectedFileId = id)}
 					onRemove={handleRemoveFile}
+					onToggleBatch={handleToggleBatch}
+					onToggleAllBatch={handleToggleAllBatch}
 				/>
 
 				<div

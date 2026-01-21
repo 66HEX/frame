@@ -54,6 +54,7 @@ export interface FileItem {
 	metadataStatus: MetadataStatus;
 	metadataError?: string;
 	path: string;
+	isSelectedForConversion: boolean;
 }
 
 export interface PresetDefinition {

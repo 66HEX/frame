@@ -1,17 +1,19 @@
 <script lang="ts">
 	import { FileStatus, type FileItem } from '../types';
-	import { Trash2 } from 'lucide-svelte';
+	import { Trash2, Check } from 'lucide-svelte';
 	import { cn } from '$lib/utils/cn';
 
 	let {
 		item,
 		onRemove,
 		onSelect,
+		onToggleBatch,
 		isSelected
 	}: {
 		item: FileItem;
 		onRemove: (id: string) => void;
 		onSelect: (id: string) => void;
+		onToggleBatch: (id: string, isChecked: boolean) => void;
 		isSelected: boolean;
 	} = $props();
 
@@ -34,7 +36,22 @@
 	)}
 >
 	<div class="flex-1 grid grid-cols-12 gap-4 items-center">
-		<div class="col-span-5 flex items-center gap-2 overflow-hidden">
+		<div
+			class="col-span-1 flex items-center justify-center relative"
+			onclick={(e) => e.stopPropagation()}
+		>
+			<input
+				type="checkbox"
+				class="appearance-none w-3.5 h-3.5 border border-gray-alpha-400 rounded-sm bg-transparent checked:bg-ds-blue-600 checked:border-ds-blue-600 transition-colors cursor-pointer"
+				checked={item.isSelectedForConversion}
+				onchange={(e) => onToggleBatch(item.id, e.currentTarget.checked)}
+			/>
+			{#if item.isSelectedForConversion}
+				<Check size={10} class="absolute text-foreground pointer-events-none" />
+			{/if}
+		</div>
+
+		<div class="col-span-4 flex items-center gap-2 overflow-hidden">
 			<span class="text-[13px] text-foreground truncate">{item.name}</span>
 		</div>
 
