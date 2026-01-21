@@ -31,7 +31,7 @@ if (!pm) {
 
 console.log(`Using ${pm} to run "${command}"...`);
 
-const args = pm === "npm" ? ["run", command] : [command];
+const args = (pm === "npm" || pm === "bun") ? ["run", command] : [command];
 const result = spawnSync(pm, args, { stdio: "inherit", shell: true });
 
 process.exit(result.status ?? 1);
