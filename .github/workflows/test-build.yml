@@ -1,0 +1,72 @@
+name: 'Test Build'
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-14'
+            args: '--target aarch64-apple-darwin'
+            os_name: 'macos'
+          - platform: 'windows-latest'
+            args: ''
+            os_name: 'windows'
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-14' && 'aarch64-apple-darwin' || '' }}
+
+      - name: Install Frontend Dependencies
+        run: bun install
+
+      - name: Setup FFmpeg (macOS)
+        if: matrix.platform == 'macos-14'
+        run: |
+          mkdir -p src-tauri/binaries
+          brew install ffmpeg
+          FFMPEG_PATH=$(which ffmpeg)
+          FFPROBE_PATH=$(which ffprobe)
+          cp $FFMPEG_PATH src-tauri/binaries/ffmpeg-aarch64-apple-darwin
+          cp $FFPROBE_PATH src-tauri/binaries/ffprobe-aarch64-apple-darwin
+
+      - name: Setup FFmpeg (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          New-Item -Path "src-tauri/binaries" -ItemType Directory -Force
+          $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+          $output = "ffmpeg.zip"
+          Invoke-WebRequest -Uri $url -OutFile $output
+          Expand-Archive -Path $output -DestinationPath .
+          $ffmpegPath = Get-ChildItem -Path "ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe" -Recurse | Select-Object -First 1
+          $ffprobePath = Get-ChildItem -Path "ffmpeg-master-latest-win64-gpl/bin/ffprobe.exe" -Recurse | Select-Object -First 1
+          Move-Item -Path $ffmpegPath.FullName -Destination "src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe" -Force
+          Move-Item -Path $ffprobePath.FullName -Destination "src-tauri/binaries/ffprobe-x86_64-pc-windows-msvc.exe" -Force
+
+      - name: Build App
+        run: bun tauri build ${{ matrix.args }}
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frame-build-${{ matrix.os_name }}
+          path: |
+            src-tauri/target/**/bundle/dmg/*.dmg
+            src-tauri/target/**/bundle/nsis/*.exe
+          retention-days: 5
