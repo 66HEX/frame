@@ -51,8 +51,12 @@
 				<span class="text-[13px] text-ds-amber-800">{Math.round(item.progress)}%</span>
 			{:else if item.status === FileStatus.COMPLETED}
 				<span class="text-[13px] text-ds-blue-600">READY</span>
+			{:else if item.status === FileStatus.QUEUED}
+				<span class="text-[13px] text-gray-alpha-600">QUEUED</span>
+			{:else if item.status === FileStatus.ERROR}
+				<span class="text-[13px] text-ds-red-600">ERROR</span>
 			{:else}
-				<span class="text-[13px] text-gray-alpha-600">WAITING</span>
+				<span class="text-[13px] text-gray-alpha-600">IDLE</span>
 			{/if}
 		</div>
 	</div>
