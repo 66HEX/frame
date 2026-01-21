@@ -39,7 +39,7 @@
 		</p>
 	</div>
 
-	<div class="space-y-3">
+	<div class="space-y-3 pt-2">
 		<span
 			class="text-[10px] text-gray-alpha-600 uppercase tracking-widest block border-b border-gray-alpha-100 pb-1"
 		>

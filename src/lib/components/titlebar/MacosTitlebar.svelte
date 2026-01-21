@@ -119,7 +119,7 @@
 
 		{#if onChangeView}
 			<div
-				class="flex items-center gap-1 bg-gray-alpha-100 p-0.5 rounded border border-gray-alpha-100 pointer-events-auto"
+				class="flex items-center gap-1 bg-gray-alpha-100 p-0.5 h-7 rounded border border-gray-alpha-100 pointer-events-auto"
 			>
 				<button
 					onclick={() => onChangeView('dashboard')}
@@ -136,7 +136,7 @@
 				<button
 					onclick={() => onChangeView('logs')}
 					class={cn(
-						'flex items-center gap-2 px-3 py-1 rounded-xs text-[10px]  font-medium transition-all uppercase tracking-wide',
+						'flex items-center gap-2 px-3 py-1 rounded-xs text-[10px] font-medium transition-all uppercase tracking-wide',
 						activeView === 'logs'
 							? 'bg-foreground text-black shadow-sm'
 							: 'text-gray-alpha-600 hover:text-foreground'
@@ -166,7 +166,7 @@
 		{#if onAddFile}
 			<button
 				onclick={onAddFile}
-				class="flex items-center gap-2 bg-gray-alpha-100 hover:bg-gray-alpha-200 text-foreground px-3 py-1.5 rounded text-[10px] font-medium transition-colors cursor-pointer border border-gray-alpha-100 uppercase tracking-wide pointer-events-auto"
+				class="flex items-center gap-2 bg-gray-alpha-100 hover:bg-gray-alpha-200 h-7 text-foreground px-3 py-1.5 rounded text-[10px] font-medium transition-colors cursor-pointer border border-gray-alpha-100 uppercase tracking-wide pointer-events-auto"
 			>
 				<Plus size={12} />
 				Add Source
@@ -178,7 +178,7 @@
 				onclick={onStartConversion}
 				disabled={isProcessing || fileCount === 0}
 				class={cn(
-					'flex items-center gap-2 px-4 py-1.5 rounded text-[10px]  font-medium uppercase tracking-wide transition-all bg-foreground text-black hover:bg-foreground border border-foreground pointer-events-auto',
+					'flex items-center gap-2 px-4 py-1.5 rounded text-[10px] h-7 font-medium uppercase tracking-wide transition-all bg-foreground text-black hover:bg-foreground border border-foreground pointer-events-auto',
 					(isProcessing || fileCount === 0) && 'opacity-50 cursor-not-allowed'
 				)}
 			>

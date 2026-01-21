@@ -144,7 +144,7 @@
 		</div>
 	</div>
 
-	<div class="space-y-3">
+	<div class="space-y-3 pt-2">
 		<span
 			class="text-[10px] text-gray-alpha-600 uppercase tracking-widest block border-b border-gray-alpha-100 pb-1"
 		>
@@ -169,7 +169,7 @@
 		</div>
 	</div>
 
-	<div class="space-y-3">
+	<div class="space-y-3 pt-2">
 		<span
 			class="text-[10px] text-gray-alpha-600 uppercase tracking-widest block border-b border-gray-alpha-100 pb-1"
 		>
@@ -204,7 +204,7 @@
 	</div>
 
 	{#if config.videoBitrateMode === 'crf'}
-		<div class="space-y-2 pt-1">
+		<div class="space-y-2 pt-2">
 			<div class="flex justify-between items-end">
 				<label
 					for="quality-factor"

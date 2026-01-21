@@ -74,7 +74,7 @@
 
 				{#if onChangeView}
 					<div
-						class="flex items-center gap-1 bg-gray-alpha-100 p-0.5 rounded border border-gray-alpha-100 pointer-events-auto"
+						class="flex items-center gap-1 bg-gray-alpha-100 p-0.5 h-7 rounded border border-gray-alpha-100 pointer-events-auto"
 					>
 						<button
 							onclick={() => onChangeView('dashboard')}
@@ -121,7 +121,7 @@
 				{#if onAddFile}
 					<button
 						onclick={onAddFile}
-						class="flex items-center gap-2 bg-gray-alpha-100 hover:bg-gray-alpha-200 text-foreground px-3 py-1.5 rounded text-[10px] font-medium transition-colors cursor-pointer border border-gray-alpha-100 uppercase tracking-wide pointer-events-auto"
+						class="flex items-center gap-2 bg-gray-alpha-100 h-7 hover:bg-gray-alpha-200 text-foreground px-3 py-1.5 rounded text-[10px] font-medium transition-colors cursor-pointer border border-gray-alpha-100 uppercase tracking-wide pointer-events-auto"
 					>
 						<Plus size={12} />
 						Add Source
@@ -133,7 +133,7 @@
 						onclick={onStartConversion}
 						disabled={isProcessing || fileCount === 0}
 						class={cn(
-							'flex items-center gap-2 px-4 py-1.5 rounded text-[10px] font-medium uppercase tracking-wide transition-all bg-foreground text-black hover:bg-foreground border border-foreground pointer-events-auto',
+							'flex items-center gap-2 px-4 py-1.5 rounded h-7 text-[10px] font-medium uppercase tracking-wide transition-all bg-foreground text-black hover:bg-foreground border border-foreground pointer-events-auto',
 							(isProcessing || fileCount === 0) && 'opacity-50 cursor-not-allowed'
 						)}
 					>
