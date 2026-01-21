@@ -300,7 +300,7 @@
 				/>
 
 				<div
-					class="col-span-12 lg:col-span-4 grid gap-3 h-full grid-rows-[minmax(0,1fr)_160px] min-h-0"
+					class="col-span-12 lg:col-span-4 grid gap-3 h-full grid-rows-[minmax(0,1fr)_130px] min-h-0"
 				>
 					<div
 						class="border border-gray-alpha-100 rounded-lg bg-gray-alpha-100 overflow-y-auto h-full min-h-0 custom-scrollbar"
