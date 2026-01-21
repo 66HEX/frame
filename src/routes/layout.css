@@ -8,6 +8,26 @@
 	font-display: swap;
 }
 
+* {
+	box-sizing: border-box;
+	min-width: 0;
+	text-box: trim-both cap alphabetic;
+}
+:root {
+	color-scheme: light dark;
+	interpolate-size: allow-keywords;
+}
+
+html {
+	text-size-adjust: 100%;
+}
+
+input,
+textarea,
+select {
+	field-sizing: content;
+}
+
 :root {
 	--background: #ffffff;
 	--foreground: #171717;

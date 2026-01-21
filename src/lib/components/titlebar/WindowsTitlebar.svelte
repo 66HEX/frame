@@ -61,7 +61,7 @@
 <div class="w-full h-10 select-none z-50 shrink-0 relative" data-tauri-drag-region>
 	<div class="absolute inset-0 px-4 flex items-center pointer-events-none">
 		<div class="w-full grid grid-cols-12 gap-4">
-			<div class="col-span-8 flex items-center gap-6 mt-4">
+			<div class="col-span-8 flex items-center gap-6 mt-0.5">
 				<span
 					class="flex items-center justify-center [&>svg]:size-5 [&>svg]:opacity-60 [&>svg]:fill-current text-foreground pointer-events-none"
 					aria-hidden="true"
@@ -117,7 +117,7 @@
 				</div>
 			</div>
 
-			<div class="col-span-4 flex items-center gap-3 mt-4">
+			<div class="col-span-4 flex items-center gap-3 mt-0.5">
 				{#if onAddFile}
 					<button
 						onclick={onAddFile}
@@ -149,9 +149,7 @@
 		</div>
 	</div>
 
-	<div
-		class="absolute right-0 top-0 h-full flex items-center pointer-events-auto border-2 border-transparent rounded-tr-2xl z-50"
-	>
+	<div class="absolute right-0 top-0 h-full flex items-center pointer-events-auto z-50">
 		<button
 			onclick={minimize}
 			class="h-full w-12 flex items-center justify-center hover:bg-gray-alpha-100 transition-colors text-foreground"
@@ -168,7 +166,7 @@
 		</button>
 		<button
 			onclick={close}
-			class="h-full w-12 flex items-center rounded-tr-[14px] justify-center hover:bg-ds-red-600 hover:text-foreground transition-colors text-foreground"
+			class="h-full w-12 flex items-center justify-center hover:bg-ds-red-600 hover:text-foreground transition-colors text-foreground"
 			title="Close"
 		>
 			<X size={16} />
