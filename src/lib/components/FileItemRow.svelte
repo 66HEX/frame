@@ -62,7 +62,7 @@
 			e.stopPropagation();
 			onRemove(item.id);
 		}}
-		class="ml-4 opacity-0 group-hover:opacity-100 text-gray-alpha-600 hover:text-ds-red-600 transition-all"
+		class="ml-4 w-8 h-4 flex items-center justify-center opacity-0 group-hover:opacity-100 text-gray-alpha-600 hover:text-ds-red-600 transition-all"
 	>
 		<Trash2 size={14} />
 	</button>
