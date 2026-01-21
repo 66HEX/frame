@@ -52,7 +52,7 @@
 	class="w-full pt-2 flex items-center justify-between px-4 select-none z-50 shrink-0"
 	data-tauri-drag-region
 >
-	<div class="flex items-center gap-6 pointer-events-none mt-0.5">
+	<div class="flex items-center gap-6 pointer-events-none mt-2">
 		<div class="flex items-center z-50 mr-2 group pointer-events-auto">
 			<button
 				onclick={close}
@@ -119,7 +119,7 @@
 
 		{#if onChangeView}
 			<div
-				class="flex items-center gap-1 bg-gray-alpha-100 p-0.5 h-7 rounded border border-gray-alpha-100 pointer-events-auto"
+				class="flex items-center gap-1 bg-gray-alpha-100 p-0.5 h-7.5 rounded border border-gray-alpha-100 pointer-events-auto"
 			>
 				<button
 					onclick={() => onChangeView('dashboard')}
@@ -162,11 +162,11 @@
 		</div>
 	</div>
 
-	<div class="flex items-center gap-3 mt-0.5 pointer-events-none">
+	<div class="flex items-center gap-3 mt-2 pointer-events-none">
 		{#if onAddFile}
 			<button
 				onclick={onAddFile}
-				class="flex items-center gap-2 bg-gray-alpha-100 hover:bg-gray-alpha-200 h-7 text-foreground px-3 py-1.5 rounded text-[10px] font-medium transition-colors cursor-pointer border border-gray-alpha-100 uppercase tracking-wide pointer-events-auto"
+				class="flex items-center gap-2 bg-gray-alpha-100 hover:bg-gray-alpha-200 h-7.5 text-foreground px-3 py-1.5 rounded text-[10px] font-medium transition-colors cursor-pointer border border-gray-alpha-100 uppercase tracking-wide pointer-events-auto"
 			>
 				<Plus size={12} />
 				Add Source
@@ -178,7 +178,7 @@
 				onclick={onStartConversion}
 				disabled={isProcessing || fileCount === 0}
 				class={cn(
-					'flex items-center gap-2 px-4 py-1.5 rounded text-[10px] h-7 font-medium uppercase tracking-wide transition-all bg-foreground text-black hover:bg-foreground border border-foreground pointer-events-auto',
+					'flex items-center gap-2 px-4 py-1.5 rounded text-[10px] h-7.5 font-medium uppercase tracking-wide transition-all bg-foreground text-black hover:bg-foreground border border-foreground pointer-events-auto',
 					(isProcessing || fileCount === 0) && 'opacity-50 cursor-not-allowed'
 				)}
 			>

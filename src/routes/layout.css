@@ -11,7 +11,6 @@
 * {
 	box-sizing: border-box;
 	min-width: 0;
-	text-box: trim-both cap alphabetic;
 }
 :root {
 	color-scheme: light dark;

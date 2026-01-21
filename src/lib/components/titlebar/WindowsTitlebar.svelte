@@ -61,7 +61,7 @@
 <div class="w-full h-10 select-none z-50 shrink-0 relative" data-tauri-drag-region>
 	<div class="absolute inset-0 px-4 flex items-center pointer-events-none">
 		<div class="w-full grid grid-cols-12 gap-4">
-			<div class="col-span-8 flex items-center gap-6 mt-0.5">
+			<div class="col-span-8 flex items-center gap-6 mt-2">
 				<span
 					class="flex items-center justify-center [&>svg]:size-5 [&>svg]:opacity-60 [&>svg]:fill-current text-foreground pointer-events-none"
 					aria-hidden="true"
@@ -117,7 +117,7 @@
 				</div>
 			</div>
 
-			<div class="col-span-4 flex items-center gap-3 mt-0.5">
+			<div class="col-span-4 flex items-center gap-3 mt-2">
 				{#if onAddFile}
 					<button
 						onclick={onAddFile}

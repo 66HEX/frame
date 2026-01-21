@@ -52,7 +52,7 @@
 		</div>
 
 		<div class="col-span-4 flex items-center gap-2 overflow-hidden">
-			<span class="text-[13px] text-foreground truncate">{item.name}</span>
+			<span class="text-[13px] text-foreground truncate [text-box:none]!">{item.name}</span>
 		</div>
 
 		<div class="col-span-3 text-right">

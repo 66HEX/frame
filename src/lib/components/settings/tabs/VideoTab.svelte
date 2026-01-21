@@ -51,7 +51,7 @@
 					onclick={() => onUpdate({ resolution: res })}
 					{disabled}
 					class={cn(
-						'text-[11px] py-1.5 px-2 border rounded transition-all text-center uppercase',
+						'text-[11px] py-1.5 px-2 border h-7.5 rounded transition-all text-center uppercase',
 						config.resolution === res
 							? 'bg-ds-blue-900/20 text-ds-blue-600 border-ds-blue-600'
 							: 'bg-transparent text-gray-alpha-600 border-gray-alpha-200 hover:bg-gray-alpha-100 hover:text-foreground'
@@ -107,7 +107,7 @@
 						onclick={() => onUpdate({ scalingAlgorithm: algo.id })}
 						disabled={disabled || config.resolution === 'original'}
 						class={cn(
-							'text-[11px] py-1.5 px-2 border rounded transition-all text-center uppercase',
+							'text-[11px] py-1.5 px-2 h-7.5 border rounded transition-all text-center uppercase',
 							config.scalingAlgorithm === algo.id
 								? 'bg-ds-blue-900/20 text-ds-blue-600 border-ds-blue-600'
 								: 'bg-transparent text-gray-alpha-600 border-gray-alpha-200 disabled:cursor-not-allowed hover:bg-gray-alpha-100 hover:text-foreground disabled:opacity-50'
@@ -131,7 +131,7 @@
 						onclick={() => onUpdate({ fps: opt.id })}
 						{disabled}
 						class={cn(
-							'text-[11px] py-1.5 px-2 border rounded transition-all text-center uppercase',
+							'text-[11px] py-1.5 px-2 h-7.5 border rounded transition-all text-center uppercase',
 							config.fps === opt.id
 								? 'bg-ds-blue-900/20 text-ds-blue-600 border-ds-blue-600'
 								: 'bg-transparent text-gray-alpha-600 border-gray-alpha-200 hover:bg-gray-alpha-100 hover:text-foreground'
@@ -180,7 +180,7 @@
 				onclick={() => onUpdate({ videoBitrateMode: 'crf' })}
 				{disabled}
 				class={cn(
-					'text-[11px] py-1.5 px-2 border rounded transition-all text-center uppercase',
+					'text-[11px] py-1.5 px-2 h-7.5 border rounded transition-all text-center uppercase',
 					config.videoBitrateMode === 'crf'
 						? 'bg-ds-blue-900/20 text-ds-blue-600 border-ds-blue-600'
 						: 'bg-transparent text-gray-alpha-600 border-gray-alpha-200 hover:bg-gray-alpha-100 hover:text-foreground'

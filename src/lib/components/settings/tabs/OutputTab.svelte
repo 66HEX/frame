@@ -31,7 +31,7 @@
 			value={outputName}
 			oninput={(e) => onUpdateOutputName?.(e.currentTarget.value)}
 			placeholder="my_render_final"
-			class="w-full text-[11px] placeholder:uppercase tracking-wide px-3 py-1.5 border border-gray-alpha-200 rounded bg-transparent focus:outline-none focus:border-ds-blue-600! transition-all"
+			class="w-full text-[11px] placeholder:uppercase tracking-wide px-3 py-1.5 h-7.5 border border-gray-alpha-200 rounded bg-transparent focus:outline-none focus:border-ds-blue-600! transition-all"
 			{disabled}
 		/>
 		<p class="text-[10px] text-gray-alpha-600 uppercase tracking-wide">
@@ -51,7 +51,7 @@
 					onclick={() => onUpdate({ container: fmt })}
 					{disabled}
 					class={cn(
-						'text-[11px] py-1.5 px-2 border rounded transition-all text-center uppercase',
+						'text-[11px] py-1.5 px-2 h-7.5 border rounded transition-all text-center uppercase',
 						config.container === fmt
 							? 'bg-ds-blue-900/20 text-ds-blue-600 border-ds-blue-600'
 							: 'bg-transparent text-gray-alpha-600 border-gray-alpha-200 hover:bg-gray-alpha-100 hover:text-foreground'

@@ -101,14 +101,14 @@
 			type="text"
 			bind:value={newPresetName}
 			placeholder="Preset Label"
-			class="flex-1 text-[11px] placeholder:uppercase tracking-wide px-3 py-1.5 border border-gray-alpha-200 rounded bg-transparent focus:outline-none focus:border-ds-blue-600! transition-all"
+			class="flex-1 text-[11px] placeholder:uppercase tracking-wide px-3 py-1.5 h-7.5 border border-gray-alpha-200 rounded bg-transparent focus:outline-none focus:border-ds-blue-600! transition-all"
 			{disabled}
 		/>
 		<button
 			onclick={savePreset}
 			disabled={disabled || !newPresetName.trim()}
 			class={cn(
-				'px-3 py-1.5 text-[10px]  uppercase tracking-wide border rounded transition-all',
+				'px-3 py-1.5 text-[10px] h-7.5 uppercase tracking-wide border rounded transition-all',
 				disabled || !newPresetName.trim()
 					? 'opacity-50 cursor-not-allowed border-gray-alpha-200 text-gray-alpha-600'
 					: 'border-ds-blue-600 text-ds-blue-600 hover:bg-ds-blue-900/20'
@@ -122,7 +122,7 @@
 		{#each presets as preset (preset.id)}
 			<div
 				class={cn(
-					'w-full flex items-center gap-2 border rounded px-2 py-1.5 transition-all text-left cursor-pointer',
+					'w-full flex items-center gap-2 border rounded px-2 py-1.5 h-7.5 transition-all text-left cursor-pointer',
 					configsMatch(config, preset.config)
 						? 'bg-ds-blue-900/20 border-ds-blue-600 text-ds-blue-600'
 						: 'border-gray-alpha-200 hover:bg-gray-alpha-100 text-gray-alpha-600 hover:text-foreground!'

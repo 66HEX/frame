@@ -54,7 +54,7 @@
 						onclick={() => onUpdate({ audioChannels: ch.id })}
 						{disabled}
 						class={cn(
-							'text-[11px] py-1.5 px-2 border rounded transition-all text-center uppercase',
+							'text-[11px] py-1.5 px-2 h-7.5 border rounded transition-all text-center uppercase',
 							config.audioChannels === ch.id
 								? 'bg-ds-blue-900/20 text-ds-blue-600 border-ds-blue-600'
 								: 'bg-transparent text-gray-alpha-600 border-gray-alpha-200 hover:bg-gray-alpha-100 hover:text-foreground'
