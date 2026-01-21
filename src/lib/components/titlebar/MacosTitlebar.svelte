@@ -52,33 +52,33 @@
 </script>
 
 <div
-	class="w-full pt-2 flex items-center justify-between px-4 select-none z-50 shrink-0"
+	class="z-50 flex w-full shrink-0 items-center justify-between px-4 pt-2 select-none"
 	data-tauri-drag-region
 >
-	<div class="flex items-center gap-6 pointer-events-none mt-2">
-		<div class="flex items-center z-50 mr-2 group pointer-events-auto">
+	<div class="pointer-events-none mt-2 flex items-center gap-6">
+		<div class="group pointer-events-auto z-50 mr-2 flex items-center">
 			<button
 				onclick={close}
-				class="size-6 rounded-full flex items-center justify-center transition-opacity"
+				class="flex size-6 items-center justify-center rounded-full transition-opacity"
 				title="Close"
 			>
-				<svg viewBox="-10 -10 20 20" class="w-full h-full" aria-hidden="true">
+				<svg viewBox="-10 -10 20 20" class="h-full w-full" aria-hidden="true">
 					<circle r="6" fill="#ff5f56" stroke="#e0443e" stroke-width="0.6" />
 					<path
 						d="M-1.8 -1.8 L1.8 1.8 M1.8 -1.8 L-1.8 1.8"
 						stroke="#4a0002"
 						stroke-width="1.5"
 						stroke-linecap="round"
-						class="opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+						class="opacity-0 transition-opacity duration-150 group-hover:opacity-100"
 					/>
 				</svg>
 			</button>
 			<button
 				onclick={minimize}
-				class="size-6 rounded-full flex items-center justify-center transition-opacity"
+				class="flex size-6 items-center justify-center rounded-full transition-opacity"
 				title="Minimize"
 			>
-				<svg viewBox="-10 -10 20 20" class="w-full h-full" aria-hidden="true">
+				<svg viewBox="-10 -10 20 20" class="h-full w-full" aria-hidden="true">
 					<circle r="6" fill="#ffbd2e" stroke="#dea123" stroke-width="0.6" />
 					<line
 						x1="-2.4"
@@ -88,20 +88,20 @@
 						stroke="#5a3900"
 						stroke-width="1.5"
 						stroke-linecap="round"
-						class="opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+						class="opacity-0 transition-opacity duration-150 group-hover:opacity-100"
 					/>
 				</svg>
 			</button>
 			<button
 				onclick={toggleMaximize}
-				class="size-6 rounded-full flex items-center justify-center transition-opacity"
+				class="flex size-6 items-center justify-center rounded-full transition-opacity"
 				title="Toggle size"
 			>
-				<svg viewBox="-10 -10 20 20" class="w-full h-full" aria-hidden="true">
+				<svg viewBox="-10 -10 20 20" class="h-full w-full" aria-hidden="true">
 					<circle r="6" fill="#27c93f" stroke="#1aab29" stroke-width="0.6" />
 					<g
 						fill="#004200"
-						class="opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+						class="opacity-0 transition-opacity duration-150 group-hover:opacity-100"
 					>
 						<path d="M-2.1 2.1 L-2.1 -1.5 L1.5 2.1 Z" />
 						<path d="M2.1 -2.1 L2.1 1.5 L-1.5 -2.1 Z" />
@@ -111,18 +111,18 @@
 		</div>
 
 		<span
-			class="flex items-center justify-center px-2 [&>svg]:size-5 [&>svg]:opacity-60 [&>svg]:fill-current text-foreground pointer-events-none"
+			class="pointer-events-none flex items-center justify-center px-2 text-foreground [&>svg]:size-5 [&>svg]:fill-current [&>svg]:opacity-60"
 			aria-hidden="true"
 		>
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 			{@html frameIcon}
 		</span>
 
-		<div class="h-6 w-px bg-gray-alpha-100 pointer-events-none"></div>
+		<div class="pointer-events-none h-6 w-px bg-gray-alpha-100"></div>
 
 		{#if onChangeView}
 			<div
-				class="flex items-center gap-1 bg-gray-alpha-100 p-0.5 h-7.5 rounded border border-gray-alpha-100 pointer-events-auto"
+				class="pointer-events-auto flex h-7.5 items-center gap-1 rounded border border-gray-alpha-100 bg-gray-alpha-100 p-0.5"
 			>
 				<Button
 					variant={activeView === 'dashboard' ? 'default' : 'titlebar-ghost'}
@@ -145,9 +145,9 @@
 			</div>
 		{/if}
 
-		<div class="h-6 w-px bg-gray-alpha-100 pointer-events-none"></div>
+		<div class="pointer-events-none h-6 w-px bg-gray-alpha-100"></div>
 
-		<div class="flex items-center gap-4 text-[10px] text-gray-alpha-600 pointer-events-none">
+		<div class="text-gray-alpha-600 pointer-events-none flex items-center gap-4 text-[10px]">
 			<div class="flex items-center gap-2">
 				<HardDrive size={12} />
 				<span>STORAGE: {formatTotalSize(totalSize)}</span>
@@ -159,9 +159,9 @@
 		</div>
 	</div>
 
-	<div class="flex items-center gap-3 mt-2 pointer-events-none">
+	<div class="pointer-events-none mt-2 flex items-center gap-3">
 		{#if onAddFile}
-			<Button onclick={onAddFile} variant="secondary" class="gap-2 pointer-events-auto">
+			<Button onclick={onAddFile} variant="secondary" class="pointer-events-auto gap-2">
 				<Plus size={12} />
 				Add Source
 			</Button>
@@ -172,7 +172,7 @@
 				onclick={onStartConversion}
 				disabled={isProcessing || selectedCount === 0}
 				variant="default"
-				class={cn('gap-2 pointer-events-auto', isProcessing && 'cursor-progress')}
+				class={cn('pointer-events-auto gap-2', isProcessing && 'cursor-progress')}
 			>
 				{#if isProcessing}
 					<span class="animate-pulse">PROCESSING...</span>

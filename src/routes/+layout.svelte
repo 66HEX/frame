@@ -4,9 +4,9 @@
 </script>
 
 <div
-	class="flex flex-col h-screen overflow-hidden bg-black/60 rounded-2xl border-none -mt-2.5 select-none **:focus:outline-none **:focus:ring-"
+	class="**:focus:ring- -mt-2.5 flex h-screen flex-col overflow-hidden rounded-2xl border-none bg-black/60 select-none **:focus:outline-none"
 >
-	<div class="flex-1 relative">
+	<div class="relative flex-1">
 		{@render children()}
 	</div>
 </div>

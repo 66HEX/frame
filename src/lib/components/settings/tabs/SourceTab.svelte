@@ -42,19 +42,19 @@
 
 <div class="space-y-3">
 	{#if status === 'loading'}
-		<div class="text-[11px] uppercase tracking-wide text-gray-alpha-600">Analyzing source…</div>
+		<div class="text-gray-alpha-600 text-[11px] tracking-wide uppercase">Analyzing source…</div>
 	{:else if status === 'error'}
-		<div class="text-[11px] uppercase tracking-wide text-ds-red-700 space-y-1">
+		<div class="space-y-1 text-[11px] tracking-wide text-ds-red-700 uppercase">
 			<p>Failed to read metadata.</p>
 			{#if error}
-				<p class="text-[10px] text-gray-alpha-600 normal-case">
+				<p class="text-gray-alpha-600 text-[10px] normal-case">
 					{error}
 				</p>
 			{/if}
 		</div>
 	{:else if metadata}
 		<div class="space-y-2">
-			<div class="grid grid-cols-2 gap-2 text-[11px] uppercase tracking-wide">
+			<div class="grid grid-cols-2 gap-2 text-[11px] tracking-wide uppercase">
 				<div class="text-gray-alpha-600">Duration</div>
 				<div>{formatDuration(metadata.duration)}</div>
 				<div class="text-gray-alpha-600">Video Codec</div>
@@ -68,6 +68,6 @@
 			</div>
 		</div>
 	{:else}
-		<div class="text-[11px] uppercase tracking-wide text-gray-alpha-600">Metadata unavailable.</div>
+		<div class="text-gray-alpha-600 text-[11px] tracking-wide uppercase">Metadata unavailable.</div>
 	{/if}
 </div>

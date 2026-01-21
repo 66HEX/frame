@@ -63,27 +63,27 @@
 <div class="h-full">
 	{#if !config}
 		<div
-			class="border bg-gray-alpha-100 border-gray-alpha-100 rounded-lg h-full flex items-center justify-center px-4 text-center text-[10px] font-medium text-gray-alpha-600 uppercase"
+			class="text-gray-alpha-600 flex h-full items-center justify-center rounded-lg border border-gray-alpha-100 bg-gray-alpha-100 px-4 text-center text-[10px] font-medium uppercase"
 		>
 			Select a file to view estimated output.
 		</div>
 	{:else}
-		<div class="bg-gray-alpha-100 border border-gray-alpha-100 rounded-lg flex flex-col h-full">
-			<div class="h-10 border-b border-gray-alpha-100 flex items-center justify-between px-4">
+		<div class="flex h-full flex-col rounded-lg border border-gray-alpha-100 bg-gray-alpha-100">
+			<div class="flex h-10 items-center justify-between border-b border-gray-alpha-100 px-4">
 				<div class="flex items-center">
-					<span class="text-[10px] font-medium uppercase tracking-widest text-gray-alpha-600"
+					<span class="text-gray-alpha-600 text-[10px] font-medium tracking-widest uppercase"
 						>Estimated Output</span
 					>
 				</div>
 			</div>
 			{#if metadataStatus === 'loading'}
 				<div
-					class="flex-1 flex items-center justify-center text-[11px] text-gray-alpha-600 uppercase tracking-wide"
+					class="text-gray-alpha-600 flex flex-1 items-center justify-center text-[11px] tracking-wide uppercase"
 				>
 					Gathering metadata…
 				</div>
 			{:else}
-				<div class="grid grid-cols-2 gap-2 text-[11px] p-4 uppercase">
+				<div class="grid grid-cols-2 gap-2 p-4 text-[11px] uppercase">
 					<div class="text-gray-alpha-600">Size</div>
 					<div class="text-foreground">
 						{#if estimating}…{:else}{formatSize(estimate?.sizeMb)}{/if}
@@ -102,7 +102,7 @@
 					</div>
 				</div>
 				{#if estimateError}
-					<div class="text-[10px] text-ds-red-700 normal-case px-4 pb-3">
+					<div class="px-4 pb-3 text-[10px] text-ds-red-700 normal-case">
 						{estimateError}
 					</div>
 				{/if}

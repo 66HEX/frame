@@ -83,10 +83,10 @@
 					selected={config.audioCodec === codec.id}
 					onclick={() => onUpdate({ audioCodec: codec.id })}
 					disabled={disabled || !isAllowed}
-					class={cn(!isAllowed && 'opacity-50 cursor-not-allowed')}
+					class={cn(!isAllowed && 'cursor-not-allowed opacity-50')}
 				>
 					<span>{codec.id}</span>
-					<span class="opacity-50 text-[9px]">
+					<span class="text-[9px] opacity-50">
 						{isMp3Container && codec.id !== 'mp3' ? 'Incompatible with MP3' : codec.label}
 					</span>
 				</ListItem>
@@ -104,17 +104,17 @@
 						variant={isSelected ? 'selected' : 'outline'}
 						onclick={() => toggleTrack(track.index)}
 						{disabled}
-						class="w-full h-auto py-2 px-3 flex items-center justify-between text-left"
+						class="flex h-auto w-full items-center justify-between px-3 py-2 text-left"
 					>
 						<div class="space-y-0.5">
 							<div class="flex items-center gap-2">
 								<span class="text-[10px] opacity-70">
 									#{track.index}
 								</span>
-								<span class="text-[10px] uppercase font-bold tracking-tight">
+								<span class="text-[10px] font-bold tracking-tight uppercase">
 									{track.codec}
 								</span>
-								<div class="text-[9px] uppercase tracking-wide">
+								<div class="text-[9px] tracking-wide uppercase">
 									<span class="mx-0.5">•</span>
 
 									{track.channels} CH
@@ -130,12 +130,12 @@
 
 						<div
 							class={cn(
-								'w-3 h-3 rounded-full border flex items-center justify-center transition-all duration-200',
+								'flex h-3 w-3 items-center justify-center rounded-full border transition-all duration-200',
 								isSelected ? 'border-ds-blue-600' : 'border-gray-alpha-200'
 							)}
 						>
 							<div
-								class="w-1.5 h-1.5 rounded-full bg-ds-blue-600 transition-all duration-200"
+								class="h-1.5 w-1.5 rounded-full bg-ds-blue-600 transition-all duration-200"
 								style="opacity: {isSelected ? 1 : 0}; transform: scale({isSelected ? 1 : 0.5});"
 							></div>
 						</div>

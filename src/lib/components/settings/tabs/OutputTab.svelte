@@ -32,7 +32,7 @@
 			class="placeholder:uppercase"
 			{disabled}
 		/>
-		<p class="text-[10px] text-gray-alpha-600 uppercase tracking-wide">
+		<p class="text-gray-alpha-600 text-[10px] tracking-wide uppercase">
 			Stored next to the original file. Extension follows the selected container automatically.
 		</p>
 	</div>

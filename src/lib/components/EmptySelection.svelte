@@ -1,7 +1,7 @@
 <div
-	class="h-full flex flex-col items-center justify-center text-center p-8 bg-ds-gray-100/5 relative overflow-hidden"
+	class="relative flex h-full flex-col items-center justify-center overflow-hidden bg-ds-gray-100/5 p-8 text-center"
 >
-	<p class="text-[10px] text-gray-alpha-600 max-w-50 font-medium">
+	<p class="text-gray-alpha-600 max-w-50 text-[10px] font-medium">
 		SELECT AN ITEM FROM THE QUEUE TO ACCESS CONFIGURATION
 	</p>
 </div>

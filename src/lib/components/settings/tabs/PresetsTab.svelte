@@ -83,11 +83,11 @@
 
 <div class="space-y-3">
 	<div class="flex items-center justify-between border-b border-gray-alpha-100 pb-1">
-		<span class="text-[10px] text-gray-alpha-600 uppercase tracking-widest">Preset Library</span>
+		<span class="text-gray-alpha-600 text-[10px] tracking-widest uppercase">Preset Library</span>
 		{#if notice}
 			<span
 				class={cn(
-					'text-[9px]  uppercase tracking-wide',
+					'text-[9px]  tracking-wide uppercase',
 					notice.tone === 'error' ? 'text-ds-red-700' : 'text-ds-blue-600'
 				)}
 			>
@@ -101,16 +101,16 @@
 			type="text"
 			bind:value={newPresetName}
 			placeholder="Preset Label"
-			class="flex-1 text-[11px] placeholder:uppercase tracking-wide px-3 py-1.5 h-7.5 border border-gray-alpha-200 rounded bg-transparent focus:outline-none focus:border-ds-blue-600! transition-all"
+			class="border-gray-alpha-200 h-7.5 flex-1 rounded border bg-transparent px-3 py-1.5 text-[11px] tracking-wide transition-all placeholder:uppercase focus:border-ds-blue-600! focus:outline-none"
 			{disabled}
 		/>
 		<button
 			onclick={savePreset}
 			disabled={disabled || !newPresetName.trim()}
 			class={cn(
-				'px-3 py-1.5 text-[10px] h-7.5 uppercase tracking-wide border rounded transition-all',
+				'h-7.5 rounded border px-3 py-1.5 text-[10px] tracking-wide uppercase transition-all',
 				disabled || !newPresetName.trim()
-					? 'opacity-50 cursor-not-allowed border-gray-alpha-200 text-gray-alpha-600'
+					? 'border-gray-alpha-200 text-gray-alpha-600 cursor-not-allowed opacity-50'
 					: 'border-ds-blue-600 text-ds-blue-600 hover:bg-ds-blue-900/20'
 			)}
 		>
@@ -118,14 +118,14 @@
 		</button>
 	</div>
 
-	<div class="space-y-1.5 max-h-52 overflow-y-auto">
+	<div class="max-h-52 space-y-1.5 overflow-y-auto">
 		{#each presets as preset (preset.id)}
 			<div
 				class={cn(
-					'w-full flex items-center gap-2 border rounded px-2 py-1.5 h-7.5 transition-all text-left cursor-pointer',
+					'flex h-7.5 w-full cursor-pointer items-center gap-2 rounded border px-2 py-1.5 text-left transition-all',
 					configsMatch(config, preset.config)
-						? 'bg-ds-blue-900/20 border-ds-blue-600 text-ds-blue-600'
-						: 'border-gray-alpha-200 hover:bg-gray-alpha-100 text-gray-alpha-600 hover:text-foreground!'
+						? 'border-ds-blue-600 bg-ds-blue-900/20 text-ds-blue-600'
+						: 'border-gray-alpha-200 text-gray-alpha-600 hover:bg-gray-alpha-100 hover:text-foreground!'
 				)}
 				role="button"
 				tabindex="0"
@@ -138,7 +138,7 @@
 				}}
 			>
 				<span
-					class="flex-1 flex items-center justify-between gap-2 text-[11px] uppercase tracking-tight pointer-events-none"
+					class="pointer-events-none flex flex-1 items-center justify-between gap-2 text-[11px] tracking-tight uppercase"
 				>
 					<span class="truncate">{preset.name}</span>
 					<span class="text-[9px] font-semibold">
@@ -148,7 +148,7 @@
 				{#if !preset.builtIn}
 					<button
 						type="button"
-						class="size-4 flex items-center justify-center rounded text-gray-alpha-600 hover:text-ds-red-600 transition-colors"
+						class="text-gray-alpha-600 flex size-4 items-center justify-center rounded transition-colors hover:text-ds-red-600"
 						title="Delete preset"
 						onclick={(event) => {
 							event.stopPropagation();

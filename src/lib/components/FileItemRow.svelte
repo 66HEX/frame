@@ -33,13 +33,13 @@
 <div
 	onclick={() => onSelect(item.id)}
 	class={cn(
-		'group flex items-center px-4 py-3 border-b border-gray-alpha-100 cursor-pointer transition-colors',
+		'group flex cursor-pointer items-center border-b border-gray-alpha-100 px-4 py-3 transition-colors',
 		isSelected ? 'bg-gray-alpha-100' : 'hover:bg-gray-alpha-100'
 	)}
 >
-	<div class="flex-1 grid grid-cols-12 gap-4 items-center">
+	<div class="grid flex-1 grid-cols-12 items-center gap-4">
 		<div
-			class="col-span-1 flex items-center justify-center relative"
+			class="relative col-span-1 flex items-center justify-center"
 			onclick={(e) => e.stopPropagation()}
 		>
 			<Checkbox
@@ -49,15 +49,15 @@
 		</div>
 
 		<div class="col-span-4 flex items-center gap-2 overflow-hidden">
-			<span class="text-[13px] text-foreground truncate [text-box:none]!">{item.name}</span>
+			<span class="truncate text-[13px] text-foreground [text-box:none]!">{item.name}</span>
 		</div>
 
 		<div class="col-span-3 text-right">
-			<span class="text-[13px] text-gray-alpha-600">{formatSize(item.size)}</span>
+			<span class="text-gray-alpha-600 text-[13px]">{formatSize(item.size)}</span>
 		</div>
 
 		<div class="col-span-2 text-right">
-			<span class="text-[13px] text-gray-alpha-600 uppercase">{item.originalFormat}</span>
+			<span class="text-gray-alpha-600 text-[13px] uppercase">{item.originalFormat}</span>
 		</div>
 
 		<div class="col-span-2 text-right">
@@ -66,11 +66,11 @@
 			{:else if item.status === FileStatus.COMPLETED}
 				<span class="text-[13px] text-ds-blue-600">READY</span>
 			{:else if item.status === FileStatus.QUEUED}
-				<span class="text-[13px] text-gray-alpha-600">QUEUED</span>
+				<span class="text-gray-alpha-600 text-[13px]">QUEUED</span>
 			{:else if item.status === FileStatus.ERROR}
 				<span class="text-[13px] text-ds-red-600">ERROR</span>
 			{:else}
-				<span class="text-[13px] text-gray-alpha-600">IDLE</span>
+				<span class="text-gray-alpha-600 text-[13px]">IDLE</span>
 			{/if}
 		</div>
 	</div>
@@ -82,7 +82,7 @@
 		}}
 		variant="destructive"
 		size="none"
-		class="ml-4 w-8 h-4 opacity-0 group-hover:opacity-100 text-gray-alpha-600 hover:text-ds-red-600 hover:bg-transparent"
+		class="text-gray-alpha-600 ml-4 h-4 w-8 opacity-0 group-hover:opacity-100 hover:bg-transparent hover:text-ds-red-600"
 	>
 		<Trash2 size={14} />
 	</Button>

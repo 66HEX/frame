@@ -61,23 +61,23 @@
 	}
 </script>
 
-<div class="w-full h-10 select-none z-50 shrink-0 relative" data-tauri-drag-region>
-	<div class="absolute inset-0 px-4 flex items-center pointer-events-none">
-		<div class="w-full grid grid-cols-12 gap-4">
-			<div class="col-span-8 flex items-center gap-6 mt-2">
+<div class="relative z-50 h-10 w-full shrink-0 select-none" data-tauri-drag-region>
+	<div class="pointer-events-none absolute inset-0 flex items-center px-4">
+		<div class="grid w-full grid-cols-12 gap-4">
+			<div class="col-span-8 mt-2 flex items-center gap-6">
 				<span
-					class="flex items-center justify-center [&>svg]:size-5 [&>svg]:opacity-60 [&>svg]:fill-current text-foreground pointer-events-none"
+					class="pointer-events-none flex items-center justify-center text-foreground [&>svg]:size-5 [&>svg]:fill-current [&>svg]:opacity-60"
 					aria-hidden="true"
 				>
 					<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 					{@html frameIcon}
 				</span>
 
-				<div class="h-5 w-px bg-gray-alpha-100 pointer-events-none"></div>
+				<div class="pointer-events-none h-5 w-px bg-gray-alpha-100"></div>
 
 				{#if onChangeView}
 					<div
-						class="flex items-center gap-1 bg-gray-alpha-100 p-0.5 h-7.5 rounded border border-gray-alpha-100 pointer-events-auto"
+						class="pointer-events-auto flex h-7.5 items-center gap-1 rounded border border-gray-alpha-100 bg-gray-alpha-100 p-0.5"
 					>
 						<Button
 							variant={activeView === 'dashboard' ? 'default' : 'titlebar-ghost'}
@@ -100,9 +100,9 @@
 					</div>
 				{/if}
 
-				<div class="h-5 w-px bg-gray-alpha-100 pointer-events-none"></div>
+				<div class="pointer-events-none h-5 w-px bg-gray-alpha-100"></div>
 
-				<div class="flex items-center gap-4 text-[10px] text-gray-alpha-600 pointer-events-none">
+				<div class="text-gray-alpha-600 pointer-events-none flex items-center gap-4 text-[10px]">
 					<div class="flex items-center gap-2">
 						<HardDrive size={12} />
 						<span>STORAGE: {formatTotalSize(totalSize)}</span>
@@ -114,13 +114,13 @@
 				</div>
 			</div>
 
-			<div class="col-span-4 flex items-center gap-3 mt-2">
+			<div class="col-span-4 mt-2 flex items-center gap-3">
 				{#if onAddFile}
 					<Button
 						onclick={onAddFile}
 						variant="secondary"
 						size="sm"
-						class="gap-2 pointer-events-auto"
+						class="pointer-events-auto gap-2"
 					>
 						<Plus size={12} />
 						Add Source
@@ -133,7 +133,7 @@
 						disabled={isProcessing || selectedCount === 0}
 						variant="default"
 						size="sm"
-						class={cn('gap-2 pointer-events-auto', isProcessing && 'cursor-progress')}
+						class={cn('pointer-events-auto gap-2', isProcessing && 'cursor-progress')}
 					>
 						{#if isProcessing}
 							<span class="animate-pulse">PROCESSING...</span>
@@ -147,7 +147,7 @@
 		</div>
 	</div>
 
-	<div class="absolute right-0 top-0 h-full flex items-center pointer-events-auto z-50">
+	<div class="pointer-events-auto absolute top-0 right-0 z-50 flex h-full items-center">
 		<Button
 			variant="ghost"
 			size="none"

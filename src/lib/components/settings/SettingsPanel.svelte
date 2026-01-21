@@ -53,17 +53,17 @@
 	let activeTab = $state<TabId>('source');
 </script>
 
-<div class="flex flex-col h-full">
-	<div class="h-10 border-b border-gray-alpha-100 flex items-center justify-between px-4">
-		<div class="flex items-center gap-4 w-full justify-start">
+<div class="flex h-full flex-col">
+	<div class="flex h-10 items-center justify-between border-b border-gray-alpha-100 px-4">
+		<div class="flex w-full items-center justify-start gap-4">
 			{#each TABS as tab (tab.id)}
 				{@const isVideoDisabled = tab.id === 'video' && config.container === 'mp3'}
 				<button
 					disabled={isVideoDisabled}
 					class={cn(
-						'text-[10px]  uppercase tracking-widest font-medium transition-all',
+						'text-[10px]  font-medium tracking-widest uppercase transition-all',
 						activeTab === tab.id ? 'text-ds-blue-600' : 'text-gray-alpha-600 hover:text-foreground',
-						isVideoDisabled && 'opacity-50 cursor-not-allowed'
+						isVideoDisabled && 'cursor-not-allowed opacity-50'
 					)}
 					onclick={() => (activeTab = tab.id)}
 				>
@@ -73,7 +73,7 @@
 		</div>
 	</div>
 
-	<div class="flex-1 overflow-y-auto p-4 space-y-4">
+	<div class="flex-1 space-y-4 overflow-y-auto p-4">
 		{#if activeTab === 'source'}
 			<SourceTab {metadata} status={metadataStatus} error={metadataError} />
 		{:else if activeTab === 'output'}

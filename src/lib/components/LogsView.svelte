@@ -31,14 +31,14 @@
 </script>
 
 <div
-	class="h-full border border-gray-alpha-100 bg-gray-alpha-100 rounded-lg overflow-hidden flex flex-col"
+	class="flex h-full flex-col overflow-hidden rounded-lg border border-gray-alpha-100 bg-gray-alpha-100"
 >
-	<div class="h-10 border-b border-gray-alpha-100 flex items-center px-4 overflow-x-auto gap-6">
+	<div class="flex h-10 items-center gap-6 overflow-x-auto border-b border-gray-alpha-100 px-4">
 		{#each activeFiles as file (file.id)}
 			<button
 				onclick={() => (selectedLogFileId = file.id)}
 				class={cn(
-					'text-[10px]  uppercase tracking-widest font-medium transition-all shrink-0',
+					'shrink-0  text-[10px] font-medium tracking-widest uppercase transition-all',
 					selectedLogFileId === file.id
 						? 'text-ds-blue-600'
 						: 'text-gray-alpha-600 hover:text-foreground'
@@ -49,35 +49,35 @@
 		{/each}
 
 		{#if activeFiles.length === 0}
-			<span class="text-[10px] text-gray-alpha-600 uppercase tracking-widest font-medium">
+			<span class="text-gray-alpha-600 text-[10px] font-medium tracking-widest uppercase">
 				No active processes
 			</span>
 		{/if}
 	</div>
 
-	<div class="flex-1 overflow-hidden flex flex-col relative">
+	<div class="relative flex flex-1 flex-col overflow-hidden">
 		{#if activeFiles.length > 0}
 			<div
-				class="flex-1 overflow-y-auto py-4 text-foreground leading-relaxed"
+				class="flex-1 overflow-y-auto py-4 leading-relaxed text-foreground"
 				bind:this={logContainer}
 			>
 				{#if currentLogs.length > 0}
 					<div class="flex flex-col">
 						{#each currentLogs as line, i (i)}
-							<div class="flex hover:bg-gray-alpha-100 rounded px-1 -mx-1 py-1 group text-[10px]">
+							<div class="group -mx-1 flex rounded px-1 py-1 text-[10px] hover:bg-gray-alpha-100">
 								<span
-									class="select-none w-8 text-right mr-3 shrink-0 text-gray-alpha-600 text-[10px] pt-[0.5px]"
+									class="text-gray-alpha-600 mr-3 w-8 shrink-0 pt-[0.5px] text-right text-[10px] select-none"
 									>{i + 1}</span
 								>
-								<span class="break-all whitespace-nowrap text-gray-alpha-400">{line}</span>
+								<span class="text-gray-alpha-400 break-all whitespace-nowrap">{line}</span>
 							</div>
 						{/each}
 					</div>
 				{:else}
 					<div
-						class="h-full flex flex-col items-center justify-center text-gray-alpha-600 space-y-2 select-none"
+						class="text-gray-alpha-600 flex h-full flex-col items-center justify-center space-y-2 select-none"
 					>
-						<div class="text-[10px] uppercase tracking-widest font-medium">
+						<div class="text-[10px] font-medium tracking-widest uppercase">
 							Process started, waiting for output...
 						</div>
 					</div>
@@ -85,9 +85,9 @@
 			</div>
 		{:else}
 			<div
-				class="h-full flex flex-col items-center justify-center text-gray-alpha-600 space-y-2 select-none"
+				class="text-gray-alpha-600 flex h-full flex-col items-center justify-center space-y-2 select-none"
 			>
-				<div class="text-[10px] uppercase tracking-widest font-medium">
+				<div class="text-[10px] font-medium tracking-widest uppercase">
 					Select a task to view console output
 				</div>
 			</div>

@@ -45,7 +45,7 @@
 <div class="space-y-4">
 	<div class="space-y-3">
 		<Label variant="section">Resolution & Framerate</Label>
-		<div class="grid grid-cols-2 gap-2 mb-2">
+		<div class="mb-2 grid grid-cols-2 gap-2">
 			{#each RESOLUTIONS as res (res)}
 				<Button
 					variant={config.resolution === res ? 'selected' : 'outline'}
@@ -59,7 +59,7 @@
 		</div>
 
 		{#if config.resolution === 'custom'}
-			<div class="grid grid-cols-2 gap-2 mb-2 pt-1">
+			<div class="mb-2 grid grid-cols-2 gap-2 pt-1">
 				<div class="flex flex-col gap-1">
 					<Label for="width">Width</Label>
 					<Input
@@ -128,7 +128,7 @@
 					{disabled}
 				>
 					<span>{codec.id}</span>
-					<span class="opacity-50 text-[9px]">{codec.label}</span>
+					<span class="text-[9px] opacity-50">{codec.label}</span>
 				</ListItem>
 			{/each}
 		</div>
@@ -158,10 +158,10 @@
 
 	{#if config.videoBitrateMode === 'crf'}
 		<div class="space-y-2 pt-2">
-			<div class="flex justify-between items-end">
+			<div class="flex items-end justify-between">
 				<Label for="quality-factor">Quality Factor</Label>
 				<div
-					class="text-[10px] bg-ds-blue-900/20 text-ds-blue-600 border border-ds-blue-600 px-1.5 rounded font-medium"
+					class="rounded border border-ds-blue-600 bg-ds-blue-900/20 px-1.5 text-[10px] font-medium text-ds-blue-600"
 				>
 					CRF {config.crf}
 				</div>
@@ -176,14 +176,14 @@
 					{disabled}
 				/>
 			</div>
-			<div class="flex justify-between text-[9px] text-gray-alpha-600 uppercase">
+			<div class="text-gray-alpha-600 flex justify-between text-[9px] uppercase">
 				<span>Lossless</span>
 				<span>Smallest</span>
 			</div>
 		</div>
 	{:else}
 		<div class="space-y-2 pt-1">
-			<div class="flex justify-between items-end">
+			<div class="flex items-end justify-between">
 				<Label for="video-bitrate">Target Bitrate (kbps)</Label>
 			</div>
 			<div class="flex items-center gap-2">
