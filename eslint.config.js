@@ -28,6 +28,12 @@ export default [
 		}
 	},
 	{
+		files: ['**/*.cjs'],
+		rules: {
+			'@typescript-eslint/no-require-imports': 'off'
+		}
+	},
+	{
 		ignores: ['build/', '.svelte-kit/', 'dist/', 'node_modules/', 'src-tauri/target/']
 	}
 ];
