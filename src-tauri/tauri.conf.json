@@ -4,9 +4,9 @@
 	"version": "0.2.0",
 	"identifier": "Frame",
 	"build": {
-		"beforeDevCommand": "bun run dev",
+		"beforeDevCommand": "node scripts/run.cjs dev",
 		"devUrl": "http://localhost:1420",
-		"beforeBuildCommand": "bun run build",
+		"beforeBuildCommand": "node scripts/run.cjs build",
 		"frontendDist": "../build"
 	},
 	"app": {
