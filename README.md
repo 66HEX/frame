@@ -31,57 +31,64 @@
 ## Features
 
 ### Media Conversion Core
-*   **Container Support:** `mp4`, `mkv`, `webm`, `mov`, `mp3`.
-*   **Video Encoders:**
-    *   `libx264` (H.264 / AVC)
-    *   `libx265` (H.265 / HEVC)
-    *   `vp9` (Google VP9)
-    *   `prores` (Apple ProRes)
-    *   `libsvtav1` (Scalable Video Technology AV1)
-    *   **Hardware Acceleration:** `h264_videotoolbox` (Apple Silicon), `h264_nvenc` (NVIDIA).
-*   **Audio Encoders:** `aac`, `ac3` (Dolby Digital), `libopus`, `mp3`.
-*   **Bitrate Control:** Constant Rate Factor (CRF) or Target Bitrate (kbps).
-*   **Scaling:** Bicubic, Lanczos, Bilinear, Nearest Neighbor.
-*   **Metadata Probing:** Automated extraction of stream details (codec, duration, bitrate, channel layout) via `ffprobe`.
+
+- **Container Support:** `mp4`, `mkv`, `webm`, `mov`, `mp3`.
+- **Video Encoders:**
+  - `libx264` (H.264 / AVC)
+  - `libx265` (H.265 / HEVC)
+  - `vp9` (Google VP9)
+  - `prores` (Apple ProRes)
+  - `libsvtav1` (Scalable Video Technology AV1)
+  - **Hardware Acceleration:** `h264_videotoolbox` (Apple Silicon), `h264_nvenc` (NVIDIA).
+- **Audio Encoders:** `aac`, `ac3` (Dolby Digital), `libopus`, `mp3`.
+- **Bitrate Control:** Constant Rate Factor (CRF) or Target Bitrate (kbps).
+- **Scaling:** Bicubic, Lanczos, Bilinear, Nearest Neighbor.
+- **Metadata Probing:** Automated extraction of stream details (codec, duration, bitrate, channel layout) via `ffprobe`.
 
 ### Architecture & Workflow
-*   **Concurrent Processing:** Async task queue manager implemented in Rust (`tokio::mpsc`) limiting concurrent FFmpeg processes (default: 2).
-*   **Real-time Telemetry:** Stream parsing of FFmpeg `stderr` for accurate progress tracking and log output.
-*   **Output Estimation:** Pre-conversion calculation of projected file size and bitrate allocation.
-*   **Preset Management:** Configuration persistence for reusable conversion profiles.
+
+- **Concurrent Processing:** Async task queue manager implemented in Rust (`tokio::mpsc`) limiting concurrent FFmpeg processes (default: 2).
+- **Real-time Telemetry:** Stream parsing of FFmpeg `stderr` for accurate progress tracking and log output.
+- **Output Estimation:** Pre-conversion calculation of projected file size and bitrate allocation.
+- **Preset Management:** Configuration persistence for reusable conversion profiles.
 
 ## Technical Stack
 
 ### Backend (Rust / Tauri)
-*   **Core:** Tauri v2 (Rust Edition 2024).
-*   **Runtime:** `tokio` (Async I/O).
-*   **Serialization:** `serde`, `serde_json`.
-*   **Process Management:** `tauri-plugin-shell` for sidecar execution (FFmpeg/FFprobe).
-*   **System Integration:** `tauri-plugin-dialog`, `tauri-plugin-fs`, `window-vibrancy`.
+
+- **Core:** Tauri v2 (Rust Edition 2024).
+- **Runtime:** `tokio` (Async I/O).
+- **Serialization:** `serde`, `serde_json`.
+- **Process Management:** `tauri-plugin-shell` for sidecar execution (FFmpeg/FFprobe).
+- **System Integration:** `tauri-plugin-dialog`, `tauri-plugin-fs`, `window-vibrancy`.
 
 ### Frontend (SvelteKit)
-*   **Framework:** Svelte 5 (Runes API).
-*   **Build System:** Vite.
-*   **Styling:** Tailwind CSS v4, `clsx`, `tailwind-merge`.
-*   **State Management:** Svelte 5 `$state` / `$props`.
-*   **Typography:** Geist Mono (embedded).
+
+- **Framework:** Svelte 5 (Runes API).
+- **Build System:** Vite.
+- **Styling:** Tailwind CSS v4, `clsx`, `tailwind-merge`.
+- **State Management:** Svelte 5 `$state` / `$props`.
+- **Typography:** Geist Mono (embedded).
 
 ## Installation
 
 ### Prerequisites
-*   Node.js runtime (or Bun).
-*   Rust toolchain (`cargo`).
-*   **FFmpeg** and **FFprobe** binaries must be present in the `src-tauri/binaries/` directory.
-    *   Naming convention: `ffmpeg-<target-triple>` (e.g., `ffmpeg-aarch64-apple-darwin`).
+
+- Node.js runtime (or Bun).
+- Rust toolchain (`cargo`).
+- **FFmpeg** and **FFprobe** binaries must be present in the `src-tauri/binaries/` directory.
+  - Naming convention: `ffmpeg-<target-triple>` (e.g., `ffmpeg-aarch64-apple-darwin`).
 
 ### Build Instructions
 
 1.  **Install dependencies:**
+
     ```bash
     bun install
     ```
 
 2.  **Start development server:**
+
     ```bash
     bun run tauri dev
     ```
@@ -95,10 +102,10 @@
 
 1.  **Input:** Use the system dialog to select files.
 2.  **Configuration:**
-    *   **Source:** View detected file metadata.
-    *   **Output:** Select container format and output filename.
-    *   **Video:** Configure codec, bitrate/CRF, resolution, and framerate.
-    *   **Audio:** Select codec, bitrate, channels, and specific tracks.
+    - **Source:** View detected file metadata.
+    - **Output:** Select container format and output filename.
+    - **Video:** Configure codec, bitrate/CRF, resolution, and framerate.
+    - **Audio:** Select codec, bitrate, channels, and specific tracks.
 3.  **Execution:** Initiates the conversion process via the Rust backend.
 4.  **Monitoring:** View real-time logs and percentage counters in the UI.
 
