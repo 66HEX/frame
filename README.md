@@ -9,7 +9,7 @@
 	<img src="https://img.shields.io/badge/Rust-Edition_2024-black?style=flat-square&logo=rust" alt="Rust" />
 	<img src="https://img.shields.io/badge/TypeScript-5.9.3-blue?style=flat-square&logo=typescript" alt="TypeScript" />
 	<img src="https://img.shields.io/badge/Tailwind_CSS-v4-38bdf8?style=flat-square&logo=tailwindcss" alt="Tailwind" />
-	<img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License" />
+	<img src="https://img.shields.io/badge/license-GPL--3.0-green?style=flat-square" alt="License" />
 </div>
 
 **Frame** is a high-performance media conversion utility built on the Tauri v2 framework. It provides a native, macOS-only interface for FFmpeg operations, allowing for granular control over video and audio transcoding parameters. The application leverages a Rust-based backend for concurrent task management and process execution, coupled with a Svelte 5 frontend for configuration and state monitoring.
@@ -104,4 +104,4 @@
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+GPLv3 License. See [LICENSE](LICENSE) for details.

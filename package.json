@@ -13,7 +13,7 @@
 		"format": "prettier --write .",
 		"tauri": "tauri"
 	},
-	"license": "MIT",
+	"license": "GPL-3.0-or-later",
 	"dependencies": {
 		"@tailwindcss/vite": "^4.1.18",
 		"@tauri-apps/api": "^2.9.1",
