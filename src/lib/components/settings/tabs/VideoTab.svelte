@@ -212,7 +212,7 @@
 					>Quality Factor</label
 				>
 				<div
-					class="text-[10px] bg-ds-blue-900/20 text-ds-blue-600 border border-ds-blue-600 px-1.5 rounded font-medium"
+					class="text-[10px] bg-ds-blue-900/20 text-ds-blue-600 border border-ds-blue-600 px-1.5 py-1 rounded font-medium"
 				>
 					CRF {config.crf}
 				</div>
