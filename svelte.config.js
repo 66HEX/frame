@@ -8,6 +8,13 @@ const config = {
 		adapter: adapter({
 			fallback: 'index.html'
 		})
+	},
+	vitePlugin: {
+		inspector: {
+			toggleKeyCombo: 'alt-x',
+			holdMode: true,
+			showOutputWindow: false
+		}
 	}
 };
 

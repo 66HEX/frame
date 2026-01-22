@@ -76,8 +76,10 @@
 
 - Node.js runtime (or Bun).
 - Rust toolchain (`cargo`).
-- **FFmpeg** and **FFprobe** binaries must be present in the `src-tauri/binaries/` directory.
-  - Naming convention: `ffmpeg-<target-triple>` (e.g., `ffmpeg-aarch64-apple-darwin`).
+- **FFmpeg** and **FFprobe** binaries must be present.
+  - **macOS**: Place in `src-tauri/binaries/` named as `ffmpeg-aarch64-apple-darwin`.
+  - **Windows**: Place in `src-tauri/` (root) named as `ffmpeg-x86_64-pc-windows-msvc.exe`.
+    - **Note:** Run `powershell ./scripts/setup-windows.ps1` to automatically configure this if you have Chocolatey installed.
 
 ### Build Instructions
 

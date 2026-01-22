@@ -30,7 +30,10 @@
 	"bundle": {
 		"active": true,
 		"targets": "all",
-		"externalBin": ["binaries/ffmpeg", "binaries/ffprobe"],
+		"externalBin": [
+			"ffmpeg",
+			"ffprobe"
+		],
 		"icon": [
 			"icons/32x32.png",
 			"icons/128x128.png",

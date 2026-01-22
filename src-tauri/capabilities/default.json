@@ -2,7 +2,9 @@
 	"$schema": "../gen/schemas/desktop-schema.json",
 	"identifier": "default",
 	"description": "Capability for the main window",
-	"windows": ["main"],
+	"windows": [
+		"main"
+	],
 	"permissions": [
 		"core:default",
 		"opener:default",
@@ -17,18 +19,22 @@
 		"store:default",
 		{
 			"identifier": "fs:allow-stat",
-			"allow": [{ "path": "$HOME/**" }]
+			"allow": [
+				{
+					"path": "$HOME/**"
+				}
+			]
 		},
 		{
 			"identifier": "shell:allow-execute",
 			"allow": [
 				{
-					"name": "binaries/ffmpeg",
+					"name": "ffmpeg",
 					"sidecar": true,
 					"args": true
 				},
 				{
-					"name": "binaries/ffprobe",
+					"name": "ffprobe",
 					"sidecar": true,
 					"args": true
 				}
