@@ -29,12 +29,12 @@
 			"identifier": "shell:allow-execute",
 			"allow": [
 				{
-					"name": "ffmpeg",
+					"name": "binaries/ffmpeg",
 					"sidecar": true,
 					"args": true
 				},
 				{
-					"name": "ffprobe",
+					"name": "binaries/ffprobe",
 					"sidecar": true,
 					"args": true
 				}
