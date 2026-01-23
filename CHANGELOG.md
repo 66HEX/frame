@@ -24,8 +24,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Input Validation:** Restricted numeric input fields to digits only.
-- **Svelte Plugins:** Restored missing `prevent_default` plugin functionality.
-- **Linux Compatibility:** Added `xdg-utils` dependency for ARM builds.
 - **CI/CD:** Resolved binary caching conflicts and build dependency issues.
 - **Windows Packaging:** Removed problematic MSI target.
 
