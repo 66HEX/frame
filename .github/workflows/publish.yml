@@ -16,7 +16,7 @@ jobs:
           - platform: 'macos-14' # Apple Silicon runner
             args: '--target aarch64-apple-darwin'
             arch: 'aarch64'
-          - platform: 'macos-13' # Intel runner
+          - platform: 'macos-15' # Intel runner
             args: '--target x86_64-apple-darwin'
             arch: 'x86_64'
           - platform: 'windows-latest'

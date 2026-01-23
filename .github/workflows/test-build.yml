@@ -13,7 +13,7 @@ jobs:
             args: '--target aarch64-apple-darwin'
             os_name: 'macos-arm64'
             arch: 'aarch64'
-          - platform: 'macos-13'
+          - platform: 'macos-15'
             args: '--target x86_64-apple-darwin'
             os_name: 'macos-intel'
             arch: 'x86_64'
