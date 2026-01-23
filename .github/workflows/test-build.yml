@@ -11,7 +11,12 @@ jobs:
         include:
           - platform: 'macos-14'
             args: '--target aarch64-apple-darwin'
-            os_name: 'macos'
+            os_name: 'macos-arm64'
+            arch: 'aarch64'
+          - platform: 'macos-13'
+            args: '--target x86_64-apple-darwin'
+            os_name: 'macos-intel'
+            arch: 'x86_64'
           - platform: 'windows-latest'
             args: ''
             os_name: 'windows'
@@ -61,14 +66,14 @@ jobs:
           key: ffmpeg-binaries-${{ matrix.platform }}-${{ matrix.arch }}-v2
 
       - name: Setup FFmpeg (macOS)
-        if: matrix.platform == 'macos-14' && steps.cache-ffmpeg.outputs.cache-hit != 'true'
+        if: runner.os == 'macOS' && steps.cache-ffmpeg.outputs.cache-hit != 'true'
         run: |
           mkdir -p src-tauri/binaries
           brew install ffmpeg
           FFMPEG_PATH=$(which ffmpeg)
           FFPROBE_PATH=$(which ffprobe)
-          cp $FFMPEG_PATH src-tauri/binaries/ffmpeg-aarch64-apple-darwin
-          cp $FFPROBE_PATH src-tauri/binaries/ffprobe-aarch64-apple-darwin
+          cp $FFMPEG_PATH src-tauri/binaries/ffmpeg-${{ matrix.arch }}-apple-darwin
+          cp $FFPROBE_PATH src-tauri/binaries/ffprobe-${{ matrix.arch }}-apple-darwin
 
       - name: Setup FFmpeg (Linux)
         if: runner.os == 'Linux' && steps.cache-ffmpeg.outputs.cache-hit != 'true'
