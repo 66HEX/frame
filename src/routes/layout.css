@@ -40,44 +40,32 @@ select {
 }
 
 :root {
-	--background: #131313;
+	--background: #131314;
 	--foreground: #ffffff;
 
 	--font-geist-mono: 'GeistMono', monospace;
 
-	--ds-background-100: #000000;
-	--ds-background-200: #2a2d33;
-	--ds-gray-100: #373b44;
-	--ds-gray-200: #434852;
-	--ds-gray-300: #4f5560;
-	--ds-gray-400: #5f6674;
-	--ds-gray-500: #7f8796;
-	--ds-gray-600: #b4b8c1;
-	--ds-gray-700: #eaebed;
-	--ds-gray-800: #fefefe;
-	--ds-gray-900: #b6bbc4;
-	--ds-gray-1000: #ffffff;
 	--ds-gray-alpha-100: rgba(255, 255, 255, 0.05);
 	--ds-gray-alpha-200: rgba(255, 255, 255, 0.1);
 	--ds-gray-alpha-400: rgba(255, 255, 255, 0.2);
 	--ds-gray-alpha-600: rgba(255, 255, 255, 0.4);
 
-	--ds-blue-500: #0b63f2;
-	--ds-blue-600: #124cca;
-	--ds-blue-700: #163dab;
-	--ds-blue-800: #163083;
-	--ds-blue-900: #0051cc;
+	--ds-blue-500: #3b82f6;
+	--ds-blue-600: #2563eb;
+	--ds-blue-700: #1d4ed8;
+	--ds-blue-800: #1e40af;
+	--ds-blue-900: #0066ff;
 
-	--ds-red-600: #b21c1c;
-	--ds-red-700: #8c1515;
-	--ds-red-800: #6d1313;
-	--ds-red-900: #ad0f2f;
+	--ds-red-600: #dc2626;
+	--ds-red-700: #b91c1c;
+	--ds-red-800: #991b1b;
+	--ds-red-900: #dc143c;
 
-	--ds-green-600: #0f7635;
-	--ds-green-700: #0d5428;
+	--ds-green-600: #16a34a;
+	--ds-green-700: #15803d;
 
-	--ds-amber-800: #c47e08;
-	--ds-orange-600: #b94509;
+	--ds-amber-800: #f59e0b;
+	--ds-orange-600: #ea580c;
 }
 
 @theme inline {
@@ -85,19 +73,6 @@ select {
 	--color-foreground: var(--foreground);
 	--font-mono: var(--font-geist-mono);
 	--color-gray-alpha-100: var(--ds-gray-alpha-100);
-	--color-gray-900: var(--ds-gray-900);
-	--color-gray-1000: var(--ds-gray-1000);
-
-	--color-ds-gray-100: var(--ds-gray-100);
-	--color-ds-gray-200: var(--ds-gray-200);
-	--color-ds-gray-300: var(--ds-gray-300);
-	--color-ds-gray-400: var(--ds-gray-400);
-	--color-ds-gray-500: var(--ds-gray-500);
-	--color-ds-gray-600: var(--ds-gray-600);
-	--color-ds-gray-700: var(--ds-gray-700);
-	--color-ds-gray-800: var(--ds-gray-800);
-	--color-ds-gray-900: var(--ds-gray-900);
-	--color-ds-gray-1000: var(--ds-gray-1000);
 
 	--color-ds-blue-500: var(--ds-blue-500);
 	--color-ds-blue-600: var(--ds-blue-600);
@@ -127,14 +102,6 @@ select {
 
 .text-gray-alpha-600 {
 	color: var(--ds-gray-alpha-600);
-}
-
-.text-gray-900 {
-	color: var(--ds-gray-900);
-}
-
-.text-gray-1000 {
-	color: var(--ds-gray-1000);
 }
 
 .hover\:bg-gray-alpha-200:hover {
@@ -181,7 +148,7 @@ select {
 	background: var(--ds-gray-alpha-100);
 }
 ::-webkit-scrollbar-thumb {
-	background: var(--ds-gray-200);
+	background: var(--ds-gray-alpha-200);
 	border-radius: 3px;
 }
 .custom-scrollbar::-webkit-scrollbar {
