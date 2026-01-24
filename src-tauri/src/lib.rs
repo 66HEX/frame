@@ -2,7 +2,7 @@ mod conversion;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_store::Builder as StoreBuilder;
 #[cfg(target_os = "windows")]
-use window_vibrancy::apply_mica;
+use window_vibrancy::apply_acrylic;
 #[cfg(target_os = "macos")]
 use window_vibrancy::{NSVisualEffectMaterial, apply_vibrancy};
 
@@ -16,6 +16,9 @@ async fn close_splash(window: tauri::Window) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "windows")]
+    const WINDOWS_ACRYLIC_COLOR: (u8, u8, u8, u8) = (19, 19, 20, 180);
+
     tauri::Builder::default()
         .setup(|app| {
             let mut builder =
@@ -35,7 +38,7 @@ pub fn run() {
 
             #[cfg(target_os = "windows")]
             {
-                builder = builder.transparent(false);
+                builder = builder.transparent(true);
             }
 
             let window = builder.build().unwrap();
@@ -45,8 +48,9 @@ pub fn run() {
                 .expect("Unsupported platform! 'apply_vibrancy' is only supported on macOS");
 
             #[cfg(target_os = "windows")]
-            apply_mica(&window, Some(true))
-                .expect("Unsupported platform! 'apply_blur' is only supported on Windows");
+            if let Err(e) = apply_acrylic(&window, Some(WINDOWS_ACRYLIC_COLOR)) {
+                eprintln!("Acrylic effect not available: {e}. Using solid background.");
+            }
 
             let splash = WebviewWindowBuilder::new(app, "splash", WebviewUrl::App("splash".into()))
                 .title("Splash")
@@ -64,8 +68,9 @@ pub fn run() {
                 .expect("Unsupported platform! 'apply_vibrancy' is only supported on macOS");
 
             #[cfg(target_os = "windows")]
-            apply_mica(&splash, Some(true))
-                .expect("Unsupported platform! 'apply_blur' is only supported on Windows");
+            if let Err(e) = apply_acrylic(&splash, Some(WINDOWS_ACRYLIC_COLOR)) {
+                eprintln!("Acrylic effect not available for splash: {e}. Using solid background.");
+            }
 
             app.manage(conversion::ConversionManager::new(app.handle().clone()));
 
