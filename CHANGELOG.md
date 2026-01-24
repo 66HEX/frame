@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-01-24
+
+### Changed
+
+- **Design:** Improved color palette contrast and introduced a colder hue for better visual aesthetics.
+- **Cleanup:** Removed unused light mode design tokens.
+
+### Fixed
+
+- **UI:** Resolved inconsistencies in card colors.
+- **Type Safety:** Fixed an async `onMount` type error in the main page component.
+
 ## [0.2.0] - 2026-01-24
 
 ### Added
@@ -106,7 +118,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.2.0...HEAD
+[Unreleased]: https://github.com/66HEX/frame/compare/0.2.1...HEAD
+[0.2.1]: https://github.com/66HEX/frame/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/66HEX/frame/compare/0.2.0-beta.4...0.2.0
 [0.2.0-beta.4]: https://github.com/66HEX/frame/compare/0.2.0-beta.3...0.2.0-beta.4
 [0.2.0-beta.3]: https://github.com/66HEX/frame/compare/0.2.0-beta.2...0.2.0-beta.3
