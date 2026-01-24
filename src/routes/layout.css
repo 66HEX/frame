@@ -42,43 +42,43 @@ select {
 
 :root {
 	--background: #ffffff;
-	--foreground: #171717;
+	--foreground: #000000;
 
 	--font-geist-mono: 'GeistMono', monospace;
 
 	--ds-background-100: #ffffff;
 	--ds-background-200: #fafafa;
-	--ds-gray-100: #f5f5f5;
-	--ds-gray-200: #e5e5e5;
-	--ds-gray-300: #d4d4d4;
-	--ds-gray-400: #a3a3a3;
-	--ds-gray-500: #737373;
-	--ds-gray-600: #525252;
-	--ds-gray-700: #404040;
-	--ds-gray-800: #262626;
-	--ds-gray-900: #737373;
-	--ds-gray-1000: #0a0a0a;
+	--ds-gray-100: #d6d8dd;
+	--ds-gray-200: #c4c8cf;
+	--ds-gray-300: #b2b6c0;
+	--ds-gray-400: #7c8493;
+	--ds-gray-500: #4f5560;
+	--ds-gray-600: #31353c;
+	--ds-gray-700: #212328;
+	--ds-gray-800: #090a0c;
+	--ds-gray-900: #4f5560;
+	--ds-gray-1000: #000000;
 	--ds-gray-alpha-100: rgba(0, 0, 0, 0.05);
 	--ds-gray-alpha-200: rgba(0, 0, 0, 0.1);
 	--ds-gray-alpha-400: rgba(0, 0, 0, 0.2);
 	--ds-gray-alpha-600: rgba(0, 0, 0, 0.4);
 
-	--ds-blue-500: #3b82f6;
-	--ds-blue-600: #2563eb;
-	--ds-blue-700: #1d4ed8;
-	--ds-blue-800: #1e40af;
-	--ds-blue-900: #0066ff;
+	--ds-blue-500: #0b63f2;
+	--ds-blue-600: #124cca;
+	--ds-blue-700: #163dab;
+	--ds-blue-800: #163083;
+	--ds-blue-900: #0051cc;
 
-	--ds-red-600: #dc2626;
-	--ds-red-700: #b91c1c;
-	--ds-red-800: #991b1b;
-	--ds-red-900: #dc143c;
+	--ds-red-600: #b21c1c;
+	--ds-red-700: #8c1515;
+	--ds-red-800: #6d1313;
+	--ds-red-900: #ad0f2f;
 
-	--ds-green-600: #16a34a;
-	--ds-green-700: #15803d;
+	--ds-green-600: #0f7635;
+	--ds-green-700: #0d5428;
 
-	--ds-amber-800: #f59e0b;
-	--ds-orange-600: #ea580c;
+	--ds-amber-800: #c47e08;
+	--ds-orange-600: #b94509;
 }
 
 @theme inline {
@@ -120,21 +120,21 @@ select {
 
 @media (prefers-color-scheme: dark) {
 	:root {
-		--background: #000000;
-		--foreground: #ededed;
+		--background: #131313;
+		--foreground: #ffffff;
 
 		--ds-background-100: #000000;
-		--ds-background-200: #171717;
-		--ds-gray-100: #262626;
-		--ds-gray-200: #333333;
-		--ds-gray-300: #404040;
-		--ds-gray-400: #525252;
-		--ds-gray-500: #737373;
-		--ds-gray-600: #a3a3a3;
-		--ds-gray-700: #d4d4d4;
-		--ds-gray-800: #e5e5e5;
-		--ds-gray-900: #a1a1aa;
-		--ds-gray-1000: #fafafa;
+		--ds-background-200: #2a2d33;
+		--ds-gray-100: #373b44;
+		--ds-gray-200: #434852;
+		--ds-gray-300: #4f5560;
+		--ds-gray-400: #5f6674;
+		--ds-gray-500: #7f8796;
+		--ds-gray-600: #b4b8c1;
+		--ds-gray-700: #eaebed;
+		--ds-gray-800: #fefefe;
+		--ds-gray-900: #b6bbc4;
+		--ds-gray-1000: #ffffff;
 		--ds-gray-alpha-100: rgba(255, 255, 255, 0.05);
 		--ds-gray-alpha-200: rgba(255, 255, 255, 0.1);
 		--ds-gray-alpha-400: rgba(255, 255, 255, 0.2);

@@ -8,7 +8,7 @@
 		{
 			variants: {
 				variant: {
-					default: 'bg-foreground text-black hover:bg-foreground/90',
+					default: 'bg-foreground text-background hover:bg-foreground/90',
 					outline:
 						'bg-transparent border border-gray-alpha-200 text-gray-alpha-600 hover:bg-gray-alpha-100 hover:text-foreground',
 					secondary:

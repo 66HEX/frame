@@ -219,10 +219,6 @@
 
 		for (const pathStr of paths) {
 			const name = pathStr.split(/[/\\]/).pop() || 'unknown';
-			// Basic filtering for known extensions could be done here if desired,
-			// but we can also just accept all and let probe fail or let user decide.
-			// For better UX, let's filter only likely media files or accept all.
-			// Given the file picker filters, maybe we should be lenient here or check ext.
 
 			let size = 0;
 			try {
