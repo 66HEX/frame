@@ -1,6 +1,6 @@
 [package]
 name = "frame"
-version = "0.3.1"
+version = "0.3.2"
 description = "A simple FFmpeg GUI"
 edition = "2024"
 authors = ["Marek Jóźwiak <hexthecoder@gmail.com>"]
