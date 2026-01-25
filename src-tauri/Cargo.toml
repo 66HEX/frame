@@ -1,6 +1,6 @@
 [package]
 name = "frame"
-version = "0.3.2"
+version = "0.3.3"
 description = "A simple FFmpeg GUI"
 edition = "2024"
 authors = ["Marek Jóźwiak <hexthecoder@gmail.com>"]
@@ -24,7 +24,6 @@ regex = "1.12.2"
 tauri-plugin-dialog = "2.6.0"
 tauri-plugin-fs = "2.4.5"
 tauri-plugin-store = "2.3.0"
-window-vibrancy = "0.7.1"
 tokio = "1.49.0"
 tauri-plugin-prevent-default = "4.0.3"
 thiserror = "2.0.18"

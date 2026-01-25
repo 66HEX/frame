@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3] - 2026-01-25
+
+### Changed
+
+- **Window Effects:** Dropped the `window_vibrancy` crate in favor of Tauri's built-in `WindowEffect` / `EffectsBuilder`, keeping the same Acrylic / HudWindow visuals while relying on the maintained `tauri_utils` surface.
+- **UI:** Removed the global `border-radius` on the HTML root since rounded corners are handled elsewhere.
+
 ## [0.3.2] - 2026-01-25
 
 ### Added
@@ -197,7 +204,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.3.2...HEAD
+[Unreleased]: https://github.com/66HEX/frame/compare/0.3.3...HEAD
+[0.3.3]: https://github.com/66HEX/frame/compare/0.3.2...0.3.3
 [0.3.2]: https://github.com/66HEX/frame/compare/0.3.1...0.3.2
 [0.3.1]: https://github.com/66HEX/frame/compare/0.3.0...0.3.1
 [0.3.0]: https://github.com/66HEX/frame/compare/0.2.3...0.3.0

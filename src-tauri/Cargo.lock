@@ -1005,7 +1005,7 @@ dependencies = [
 
 [[package]]
 name = "frame"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "regex",
  "serde",
@@ -1023,7 +1023,6 @@ dependencies = [
  "tauri-plugin-updater",
  "thiserror 2.0.18",
  "tokio",
- "window-vibrancy 0.7.1",
 ]
 
 [[package]]
@@ -3981,7 +3980,7 @@ dependencies = [
  "url",
  "webkit2gtk",
  "webview2-com",
- "window-vibrancy 0.6.0",
+ "window-vibrancy",
  "windows",
 ]
 
@@ -5135,21 +5134,6 @@ dependencies = [
  "objc2-foundation",
  "raw-window-handle",
  "windows-sys 0.59.0",
- "windows-version",
-]
-
-[[package]]
-name = "window-vibrancy"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "010797bd7c40396fbc59d3105089fed0885fe267a0ef4a0a4646df54e28647f6"
-dependencies = [
- "objc2",
- "objc2-app-kit",
- "objc2-core-foundation",
- "objc2-foundation",
- "raw-window-handle",
- "windows-sys 0.60.2",
  "windows-version",
 ]
 
