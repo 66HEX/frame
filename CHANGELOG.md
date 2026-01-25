@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3-beta.2] - 2026-01-25
+
+### Fixed
+
+- **Auto-Update:** Resolved signature verification errors by properly passing the private key password to the bundler in the CI/CD pipeline.
+- **macOS Updates:** Enabled updater support for macOS by adding the `.app` bundle target, allowing for the generation of required `.tar.gz` artifacts.
+
 ## [0.2.3-beta.1] - 2026-01-25
 
 ### Added
@@ -138,7 +145,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.2.3-beta.1...HEAD
+[Unreleased]: https://github.com/66HEX/frame/compare/0.2.3-beta.2...HEAD
+[0.2.3-beta.2]: https://github.com/66HEX/frame/compare/0.2.3-beta.1...0.2.3-beta.2
 [0.2.3-beta.1]: https://github.com/66HEX/frame/compare/0.2.2...0.2.3-beta.1
 [0.2.2]: https://github.com/66HEX/frame/compare/0.2.1...0.2.2
 [0.2.1]: https://github.com/66HEX/frame/compare/0.2.0...0.2.1

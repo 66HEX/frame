@@ -1005,7 +1005,7 @@ dependencies = [
 
 [[package]]
 name = "frame"
-version = "0.2.3-beta.1"
+version = "0.2.3-beta.2"
 dependencies = [
  "regex",
  "serde",
