@@ -1,6 +1,6 @@
 {
 	"name": "frame",
-	"version": "0.2.3-beta.3",
+	"version": "0.2.3",
 	"description": "",
 	"type": "module",
 	"scripts": {

@@ -12,6 +12,8 @@
 	import SettingsPanel from '$lib/components/settings/SettingsPanel.svelte';
 	import EmptySelection from '$lib/components/EmptySelection.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
+	import Label from '$lib/components/ui/Label.svelte';
+
 	import {
 		type FileItem,
 		FileStatus,
@@ -498,20 +500,19 @@
 			class="absolute inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-sm"
 		>
 			<div
-				class="border-gray-alpha-200 flex w-100 flex-col gap-4 rounded-lg border bg-gray-alpha-100 p-3 shadow-2xl backdrop-blur-sm"
+				class="flex w-100 flex-col gap-4 rounded-lg border border-ds-blue-600 bg-ds-blue-900/20 p-3 shadow-2xl backdrop-blur-sm"
 			>
 				<div>
-					<h3 class="text-[11px] font-medium text-foreground uppercase">Update Available</h3>
-					<p
-						class="text-gray-alpha-600 font-mono text-[10px] font-medium tracking-widest uppercase"
-					>
+					<Label variant="section" class="text-foreground">Update Available</Label>
+
+					<p class="text-gray-alpha-600 font-mono text-[9px] font-medium tracking-widest uppercase">
 						Version {updateStore.version} is available.
 					</p>
 				</div>
 
 				{#if updateStore.body}
 					<div
-						class="text-gray-alpha-600 max-h-32 overflow-y-auto rounded-md bg-gray-alpha-100 p-2 font-mono text-[10px]"
+						class="text-gray-alpha-600 max-h-32 overflow-y-auto rounded-sm bg-gray-alpha-100 p-2 font-mono text-[10px]"
 					>
 						{updateStore.body}
 					</div>

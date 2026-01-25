@@ -143,6 +143,31 @@ jobs:
           Move-Item -Path $ffmpegPath.FullName -Destination "src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe" -Force
           Move-Item -Path $ffprobePath.FullName -Destination "src-tauri/binaries/ffprobe-x86_64-pc-windows-msvc.exe" -Force
 
+      - name: Get Version
+        id: get_version
+        shell: bash
+        run: echo "VERSION=$(jq -r .version package.json)" >> $GITHUB_OUTPUT
+
+      - name: Get Release Notes
+        id: release_notes
+        shell: bash
+        run: |
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
+          # Extract changelog entry using awk
+          # Looks for line starting with "## [VERSION]" and prints until next line starting with "## "
+          NOTES=$(awk -v ver="[$VERSION]" '/^## / { if (p) { exit }; if ($2 == ver) { p=1; next } } p' CHANGELOG.md)
+          
+          if [ -z "$NOTES" ]; then
+            NOTES="See the assets to download this version and install."
+          fi
+          
+          # Output multiline string to GITHUB_OUTPUT
+          {
+            echo "BODY<<EOF"
+            echo "$NOTES"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -151,7 +176,7 @@ jobs:
         with:
           tagName: __VERSION__
           releaseName: 'v__VERSION__'
-          releaseBody: 'See the assets to download this version and install.'
+          releaseBody: ${{ steps.release_notes.outputs.BODY }}
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
