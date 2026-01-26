@@ -156,11 +156,11 @@ jobs:
           # Extract changelog entry using awk
           # Looks for line starting with "## [VERSION]" and prints until next line starting with "## "
           NOTES=$(awk -v ver="[$VERSION]" '/^## / { if (p) { exit }; if ($2 == ver) { p=1; next } } p' CHANGELOG.md)
-          
+
           if [ -z "$NOTES" ]; then
             NOTES="See the assets to download this version and install."
           fi
-          
+
           # Output multiline string to GITHUB_OUTPUT
           {
             echo "BODY<<EOF"
@@ -181,3 +181,110 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
           tauriScript: 'bun tauri'
+
+  update-tap:
+    needs: publish-tauri
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Checkout Tap Repository
+        uses: actions/checkout@v4
+        with:
+          repository: 66HEX/homebrew-frame
+          token: ${{ secrets.TAP_GITHUB_TOKEN }}
+          path: tap
+
+      - name: Get Version
+        id: version
+        working-directory: source
+        run: echo "VERSION=$(jq -r .version package.json)" >> $GITHUB_OUTPUT
+
+      - name: Calculate Hashes
+        id: hashes
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          # URLs for the newly published artifacts
+          # Note: Tauri v2 with productName "Frame" usually generates "Frame_...dmg"
+          URL_ARM="https://github.com/66HEX/frame/releases/download/v${VERSION}/Frame_${VERSION}_aarch64.dmg"
+          URL_INTEL="https://github.com/66HEX/frame/releases/download/v${VERSION}/Frame_${VERSION}_x64.dmg"
+
+          echo "Downloading artifacts for analysis..."
+          echo "ARM: $URL_ARM"
+          curl -L --fail -o frame-arm.dmg "$URL_ARM"
+
+          echo "Intel: $URL_INTEL"
+          curl -L --fail -o frame-intel.dmg "$URL_INTEL"
+
+          echo "Calculating SHA256 hashes..."
+          HASH_ARM=$(sha256sum frame-arm.dmg | awk '{print $1}')
+          HASH_INTEL=$(sha256sum frame-intel.dmg | awk '{print $1}')
+
+          echo "ARM: $HASH_ARM"
+          echo "INTEL: $HASH_INTEL"
+
+          echo "HASH_ARM=$HASH_ARM" >> $GITHUB_OUTPUT
+          echo "HASH_INTEL=$HASH_INTEL" >> $GITHUB_OUTPUT
+
+      - name: Update Cask
+        working-directory: tap
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+          HASH_ARM: ${{ steps.hashes.outputs.HASH_ARM }}
+          HASH_INTEL: ${{ steps.hashes.outputs.HASH_INTEL }}
+        run: |
+          mkdir -p Casks
+
+          cat <<EOF > Casks/frame.rb
+          cask "frame" do
+            arch arm: "aarch64", intel: "x64"
+
+            version "$VERSION"
+            sha256 arm:   "$HASH_ARM",
+                   intel: "$HASH_INTEL"
+
+            url "https://github.com/66HEX/frame/releases/download/v#{version}/Frame_#{version}_#{arch}.dmg"
+            name "Frame"
+            desc "High-performance media conversion utility"
+            homepage "https://github.com/66HEX/frame"
+
+            auto_updates true
+            depends_on macos: ">= :high_sierra"
+
+            app "Frame.app"
+
+            zap trash: [
+              "~/Library/Application Support/com.66hex.frame",
+              "~/Library/Caches/com.66hex.frame",
+              "~/Library/Preferences/com.66hex.frame.plist",
+              "~/Library/Saved Application State/com.66hex.frame.savedState",
+            ]
+
+            caveats <<~EOS
+              Frame is not notarized. On first launch, you may need to:
+              1. Right-click the app and select "Open".
+              2. Click "Open" in the security dialog.
+
+              Alternatively, you can run:
+                xattr -dr com.apple.quarantine /Applications/Frame.app
+            EOS
+          end
+          EOF
+
+          # Commit and Push
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add Casks/frame.rb
+
+          # Check if there are changes before committing to avoid failure
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Update Frame to v$VERSION"
+            git push
+          fi

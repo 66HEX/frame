@@ -71,7 +71,16 @@
 - **State Management:** Svelte 5 `$state` / `$props`.
 - **Typography:** Geist Mono (embedded).
 
-## Installation
+### Installation
+
+#### via Homebrew (macOS)
+
+The easiest way to install and keep Frame updated on macOS is via our custom Homebrew Tap:
+
+```bash
+brew tap 66HEX/frame
+brew install --cask frame
+```
 
 ### Use Prebuilt Releases
 
