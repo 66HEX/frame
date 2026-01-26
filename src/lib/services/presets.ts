@@ -132,6 +132,27 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			quality: 50,
 			preset: 'medium'
 		}
+	},
+	{
+		id: 'audio-wav',
+		name: 'Audio WAV (Lossless)',
+		builtIn: true,
+		config: {
+			container: 'wav',
+			videoCodec: 'libx264',
+			videoBitrateMode: 'crf',
+			videoBitrate: '0',
+			audioCodec: 'pcm_s16le',
+			audioBitrate: '0',
+			audioChannels: 'original',
+			selectedAudioTracks: [],
+			resolution: 'original',
+			scalingAlgorithm: 'bicubic',
+			fps: 'original',
+			crf: 23,
+			quality: 50,
+			preset: 'medium'
+		}
 	}
 ];
 
