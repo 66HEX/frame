@@ -22,7 +22,7 @@ use windows::{
         Foundation::{CloseHandle, HANDLE, HMODULE},
         System::{
             LibraryLoader::{GetModuleHandleA, GetProcAddress},
-            Threading::{OpenProcess, PROCESS_SUSPEND_RESUME},
+            Threading::{OpenProcess, PROCESS_SUSPEND_RESUME, PROCESS_TERMINATE, TerminateProcess},
         },
     },
 };
@@ -351,6 +351,50 @@ unsafe fn windows_suspend_resume(pid: u32, suspend: bool) -> Result<(), Conversi
             "Could not find NtSuspendProcess/NtResumeProcess in ntdll".to_string(),
         ))
     }
+}
+
+impl ConversionManager {
+    pub fn cancel_task(&self, id: &str) -> Result<(), ConversionError> {
+        let tasks = self.active_tasks.lock().unwrap();
+        if let Some(&pid) = tasks.get(id) {
+            // First resume the process to ensure it can handle the kill signal properly
+            #[cfg(unix)]
+            unsafe {
+                let _ = libc::kill(pid as libc::pid_t, libc::SIGCONT);
+                if libc::kill(pid as libc::pid_t, libc::SIGKILL) != 0 {
+                    return Err(ConversionError::Shell("Failed to send SIGKILL".to_string()));
+                }
+            }
+
+            #[cfg(windows)]
+            unsafe {
+                // Resume first just in case
+                let _ = windows_suspend_resume(pid, false);
+                
+                let process_handle = OpenProcess(
+                    windows::Win32::System::Threading::PROCESS_TERMINATE,
+                    false,
+                    pid
+                ).map_err(|e| ConversionError::Shell(format!("Failed to open process for termination: {}", e)))?;
+                
+                let _ = windows::Win32::System::Threading::TerminateProcess(process_handle, 1);
+                let _ = CloseHandle(process_handle);
+            }
+            
+            Ok(())
+        } else {
+            // Task might not be running yet or already finished, which is fine for cancel
+            Ok(())
+        }
+    }
+}
+
+#[command]
+pub async fn cancel_conversion(
+    manager: tauri::State<'_, ConversionManager>,
+    id: String,
+) -> Result<(), ConversionError> {
+    manager.cancel_task(&id)
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

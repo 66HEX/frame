@@ -59,6 +59,15 @@ export async function resumeConversion(id: string) {
 	}
 }
 
+export async function cancelConversion(id: string) {
+	try {
+		await invoke('cancel_conversion', { id });
+	} catch (error) {
+		console.error('Failed to cancel conversion:', error);
+		throw error;
+	}
+}
+
 export async function setupConversionListeners(
 	onProgress: (payload: ProgressEvent) => void,
 	onCompleted: (payload: CompletedEvent) => void,
