@@ -115,7 +115,7 @@
 		}}
 		variant="destructive"
 		size="none"
-		disabled={item.status === FileStatus.CONVERTING || item.status === FileStatus.QUEUED}
+		disabled={item.status === FileStatus.CONVERTING}
 		class="text-gray-alpha-600 ml-4 h-4 w-8 opacity-0 group-hover:opacity-100 hover:bg-transparent hover:text-ds-red-600 disabled:pointer-events-none disabled:opacity-50"
 	>
 		<Trash2 size={14} />

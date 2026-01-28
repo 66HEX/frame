@@ -90,6 +90,7 @@ pub fn run() {
             conversion::queue_conversion,
             conversion::pause_conversion,
             conversion::resume_conversion,
+            conversion::cancel_conversion,
             conversion::probe_media,
             conversion::get_max_concurrency,
             conversion::set_max_concurrency,

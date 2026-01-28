@@ -28,7 +28,8 @@
 		startConversion as startConversionService,
 		setupConversionListeners,
 		pauseConversion,
-		resumeConversion
+		resumeConversion,
+		cancelConversion
 	} from '$lib/services/conversion';
 	import { probeMedia, getDefaultAudioCodec } from '$lib/services/media';
 	import {
@@ -354,10 +355,16 @@
 		}
 	}
 
-	function handleRemoveFile(id: string) {
+	async function handleRemoveFile(id: string) {
 		const file = files.find((f) => f.id === id);
-		if (file && (file.status === FileStatus.CONVERTING || file.status === FileStatus.QUEUED)) {
-			return;
+		if (file && (file.status === FileStatus.CONVERTING || file.status === FileStatus.PAUSED)) {
+			// If the file is currently processing, we must cancel it on the backend first
+			// to kill the process and free up the queue slot.
+			try {
+				await cancelConversion(id);
+			} catch (e) {
+				console.error('Failed to cancel conversion task', e);
+			}
 		}
 
 		files = files.filter((f) => f.id !== id);
@@ -366,6 +373,8 @@
 		const newLogs = { ...logs };
 		delete newLogs[id];
 		logs = newLogs;
+
+		checkAllDone();
 	}
 
 	function updateSelectedConfig(newConfig: Partial<ConversionConfig>) {
