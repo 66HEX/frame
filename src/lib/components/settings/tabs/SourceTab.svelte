@@ -82,7 +82,9 @@
 
 <div class="space-y-3">
 	{#if status === 'loading'}
-		<div class="text-gray-alpha-600 text-[11px] tracking-wide uppercase">{$_('source.analyzing')}</div>
+		<div class="text-gray-alpha-600 text-[11px] tracking-wide uppercase">
+			{$_('source.analyzing')}
+		</div>
 	{:else if status === 'error'}
 		<div class="space-y-1 text-[11px] tracking-wide text-ds-red-700 uppercase">
 			<p>{$_('source.failedToRead')}</p>
@@ -118,6 +120,8 @@
 			</div>
 		</div>
 	{:else}
-		<div class="text-gray-alpha-600 text-[11px] tracking-wide uppercase">{$_('source.unavailable')}</div>
+		<div class="text-gray-alpha-600 text-[11px] tracking-wide uppercase">
+			{$_('source.unavailable')}
+		</div>
 	{/if}
 </div>

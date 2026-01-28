@@ -40,7 +40,7 @@
 
 ### Konvertierungskern
 
-- **Container-Unterstützung:** `mp4`, `mkv`, `webm`, `mov`, `mp3`
+- **Container-Unterstützung:** `mp4`, `mkv`, `webm`, `mov`, `mp3`, `m4a`, `wav`, `flac`.
 - **Video-Encoder:**
   - `libx264` (H.264 / AVC)
   - `libx265` (H.265 / HEVC)

@@ -86,7 +86,7 @@
 					disabled={disabled || ['flac', 'alac', 'pcm_s16le'].includes(config.audioCodec)}
 				/>
 				{#if ['flac', 'alac', 'pcm_s16le'].includes(config.audioCodec)}
-					<p class="text-[9px] text-gray-alpha-600 uppercase">
+					<p class="text-gray-alpha-600 text-[9px] uppercase">
 						{$_('audio.bitrateIgnored')}
 					</p>
 				{/if}
@@ -137,7 +137,8 @@
 								<div class="text-[9px] tracking-wide uppercase">
 									<span class="mx-0.5">•</span>
 
-									{track.channels} {$_('audio.channels')}
+									{track.channels}
+									{$_('audio.channels')}
 									{#if track.language}
 										<span class="mx-0.5">•</span>
 										{track.language}{/if}

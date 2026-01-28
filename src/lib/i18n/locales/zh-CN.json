@@ -1,169 +1,169 @@
 {
-  "_meta": {
-    "name": "简体中文",
-    "flag": "🇨🇳"
-  },
-  "common": {
-    "save": "保存",
-    "apply": "应用",
-    "cancel": "取消",
-    "close": "关闭",
-    "delete": "删除",
-    "name": "名称",
-    "size": "大小",
-    "state": "状态",
-    "target": "目标"
-  },
-  "titlebar": {
-    "close": "关闭",
-    "minimize": "最小化",
-    "maximize": "最大化",
-    "toggleSize": "切换大小",
-    "dashboard": "仪表板",
-    "logs": "日志",
-    "storage": "存储：",
-    "items": "项目：",
-    "addSource": "添加源文件",
-    "processing": "处理中...",
-    "start": "开始"
-  },
-  "fileList": {
-    "dropFiles": "拖放文件或使用添加源文件",
-    "endOfList": "列表结束 // 共 {count} 个对象",
-    "importSource": "导入源文件"
-  },
-  "fileStatus": {
-    "ready": "完成",
-    "queued": "队列中",
-    "error": "错误",
-    "idle": "空闲"
-  },
-  "emptySelection": {
-    "hint": "从队列中选择一个项目以访问配置"
-  },
-  "tabs": {
-    "source": "源文件",
-    "output": "输出",
-    "video": "视频",
-    "audio": "音频",
-    "presets": "预设"
-  },
-  "source": {
-    "analyzing": "正在分析源文件…",
-    "failedToRead": "读取元数据失败。",
-    "unavailable": "元数据不可用。",
-    "duration": "时长",
-    "frameRate": "帧率",
-    "dimensions": "尺寸",
-    "videoCodec": "视频编码",
-    "videoBitrate": "视频比特率",
-    "audioCodec": "音频编码",
-    "containerBitrate": "容器比特率"
-  },
-  "output": {
-    "outputName": "输出名称",
-    "placeholder": "my_render_final",
-    "hint": "存储在原始文件旁边。扩展名会根据所选容器自动设置。",
-    "container": "输出容器"
-  },
-  "video": {
-    "resolutionFramerate": "分辨率和帧率",
-    "width": "宽度",
-    "height": "高度",
-    "scalingAlgorithm": "缩放算法",
-    "framerate": "帧率",
-    "sameAsSource": "与源相同",
-    "encoder": "视频编码器",
-    "encodingSpeed": "编码速度",
-    "qualityControl": "质量控制",
-    "constantQuality": "恒定质量",
-    "targetBitrate": "目标比特率",
-    "encodingQuality": "编码质量",
-    "qualityFactor": "质量因子",
-    "lowQuality": "低质量",
-    "bestQuality": "最佳质量",
-    "lossless": "无损",
-    "smallest": "最小",
-    "targetBitrateKbps": "目标比特率 (kbps)"
-  },
-  "audio": {
-    "channelsBitrate": "声道和比特率",
-    "original": "原始",
-    "stereo": "立体声 (2.0)",
-    "mono": "单声道 (1.0)",
-    "bitrateKbps": "比特率 (kbps)",
-    "bitrateIgnored": "无损编码器忽略比特率设置",
-    "codec": "音频编码器",
-    "incompatibleContainer": "不兼容的容器",
-    "sourceTracks": "源音轨",
-    "channels": "声道"
-  },
-  "presets": {
-    "library": "预设库",
-    "label": "预设名称",
-    "applied": "已应用",
-    "deletePreset": "删除预设",
-    "nameRequired": "名称必填",
-    "notSaved": "预设未保存",
-    "saved": "预设已保存",
-    "appliedName": "已应用 {name}",
-    "unableToDelete": "无法删除",
-    "removed": "预设已删除"
-  },
-  "settings": {
-    "title": "设置",
-    "maxConcurrency": "最大并发数",
-    "saving": "保存中...",
-    "appUpdates": "应用更新",
-    "checkOnStartup": "启动时检查更新",
-    "checking": "检查中...",
-    "checkForUpdates": "检查更新",
-    "updateAvailable": "有可用更新！",
-    "latestVersion": "已是最新版本。",
-    "errorChecking": "检查更新时出错。",
-    "visuals": "视觉效果",
-    "windowTint": "窗口色调",
-    "language": "语言"
-  },
-  "logs": {
-    "noActiveProcesses": "无活动进程",
-    "waitingForOutput": "进程已启动，等待输出...",
-    "selectTask": "选择一个任务以查看控制台输出"
-  },
-  "update": {
-    "available": "有可用更新",
-    "versionAvailable": "版本 {version} 可用。",
-    "later": "稍后",
-    "updateNow": "立即更新"
-  },
-  "encodingSpeed": {
-    "ultrafast": "极快",
-    "ultrafastDesc": "最大文件，最快转换",
-    "superfast": "超快",
-    "superfastDesc": "非常大的文件",
-    "veryfast": "很快",
-    "veryfastDesc": "较大文件",
-    "faster": "较快",
-    "fasterDesc": "中等偏大文件",
-    "fast": "快速",
-    "fastDesc": "稍大文件",
-    "medium": "中等",
-    "mediumDesc": "平衡",
-    "slow": "慢速",
-    "slowDesc": "更好的压缩",
-    "slower": "较慢",
-    "slowerDesc": "高压缩",
-    "veryslow": "极慢",
-    "veryslowDesc": "最小文件，最慢转换"
-  },
-  "scalingAlgorithm": {
-    "bicubic": "双三次",
-    "lanczos": "Lanczos",
-    "bilinear": "双线性",
-    "nearest": "最近邻"
-  },
-  "languages": {
-    "en-US": "English",
-    "zh-CN": "简体中文"
-  }
+	"_meta": {
+		"name": "简体中文",
+		"flag": "🇨🇳"
+	},
+	"common": {
+		"save": "保存",
+		"apply": "应用",
+		"cancel": "取消",
+		"close": "关闭",
+		"delete": "删除",
+		"name": "名称",
+		"size": "大小",
+		"state": "状态",
+		"target": "目标"
+	},
+	"titlebar": {
+		"close": "关闭",
+		"minimize": "最小化",
+		"maximize": "最大化",
+		"toggleSize": "切换大小",
+		"dashboard": "仪表板",
+		"logs": "日志",
+		"storage": "存储：",
+		"items": "项目：",
+		"addSource": "添加源文件",
+		"processing": "处理中...",
+		"start": "开始"
+	},
+	"fileList": {
+		"dropFiles": "拖放文件或使用添加源文件",
+		"endOfList": "列表结束 // 共 {count} 个对象",
+		"importSource": "导入源文件"
+	},
+	"fileStatus": {
+		"ready": "完成",
+		"queued": "队列中",
+		"error": "错误",
+		"idle": "空闲"
+	},
+	"emptySelection": {
+		"hint": "从队列中选择一个项目以访问配置"
+	},
+	"tabs": {
+		"source": "源文件",
+		"output": "输出",
+		"video": "视频",
+		"audio": "音频",
+		"presets": "预设"
+	},
+	"source": {
+		"analyzing": "正在分析源文件…",
+		"failedToRead": "读取元数据失败。",
+		"unavailable": "元数据不可用。",
+		"duration": "时长",
+		"frameRate": "帧率",
+		"dimensions": "尺寸",
+		"videoCodec": "视频编码",
+		"videoBitrate": "视频比特率",
+		"audioCodec": "音频编码",
+		"containerBitrate": "容器比特率"
+	},
+	"output": {
+		"outputName": "输出名称",
+		"placeholder": "my_render_final",
+		"hint": "存储在原始文件旁边。扩展名会根据所选容器自动设置。",
+		"container": "输出容器"
+	},
+	"video": {
+		"resolutionFramerate": "分辨率和帧率",
+		"width": "宽度",
+		"height": "高度",
+		"scalingAlgorithm": "缩放算法",
+		"framerate": "帧率",
+		"sameAsSource": "与源相同",
+		"encoder": "视频编码器",
+		"encodingSpeed": "编码速度",
+		"qualityControl": "质量控制",
+		"constantQuality": "恒定质量",
+		"targetBitrate": "目标比特率",
+		"encodingQuality": "编码质量",
+		"qualityFactor": "质量因子",
+		"lowQuality": "低质量",
+		"bestQuality": "最佳质量",
+		"lossless": "无损",
+		"smallest": "最小",
+		"targetBitrateKbps": "目标比特率 (kbps)"
+	},
+	"audio": {
+		"channelsBitrate": "声道和比特率",
+		"original": "原始",
+		"stereo": "立体声 (2.0)",
+		"mono": "单声道 (1.0)",
+		"bitrateKbps": "比特率 (kbps)",
+		"bitrateIgnored": "无损编码器忽略比特率设置",
+		"codec": "音频编码器",
+		"incompatibleContainer": "不兼容的容器",
+		"sourceTracks": "源音轨",
+		"channels": "声道"
+	},
+	"presets": {
+		"library": "预设库",
+		"label": "预设名称",
+		"applied": "已应用",
+		"deletePreset": "删除预设",
+		"nameRequired": "名称必填",
+		"notSaved": "预设未保存",
+		"saved": "预设已保存",
+		"appliedName": "已应用 {name}",
+		"unableToDelete": "无法删除",
+		"removed": "预设已删除"
+	},
+	"settings": {
+		"title": "设置",
+		"maxConcurrency": "最大并发数",
+		"saving": "保存中...",
+		"appUpdates": "应用更新",
+		"checkOnStartup": "启动时检查更新",
+		"checking": "检查中...",
+		"checkForUpdates": "检查更新",
+		"updateAvailable": "有可用更新！",
+		"latestVersion": "已是最新版本。",
+		"errorChecking": "检查更新时出错。",
+		"visuals": "视觉效果",
+		"windowTint": "窗口色调",
+		"language": "语言"
+	},
+	"logs": {
+		"noActiveProcesses": "无活动进程",
+		"waitingForOutput": "进程已启动，等待输出...",
+		"selectTask": "选择一个任务以查看控制台输出"
+	},
+	"update": {
+		"available": "有可用更新",
+		"versionAvailable": "版本 {version} 可用。",
+		"later": "稍后",
+		"updateNow": "立即更新"
+	},
+	"encodingSpeed": {
+		"ultrafast": "极快",
+		"ultrafastDesc": "最大文件，最快转换",
+		"superfast": "超快",
+		"superfastDesc": "非常大的文件",
+		"veryfast": "很快",
+		"veryfastDesc": "较大文件",
+		"faster": "较快",
+		"fasterDesc": "中等偏大文件",
+		"fast": "快速",
+		"fastDesc": "稍大文件",
+		"medium": "中等",
+		"mediumDesc": "平衡",
+		"slow": "慢速",
+		"slowDesc": "更好的压缩",
+		"slower": "较慢",
+		"slowerDesc": "高压缩",
+		"veryslow": "极慢",
+		"veryslowDesc": "最小文件，最慢转换"
+	},
+	"scalingAlgorithm": {
+		"bicubic": "双三次",
+		"lanczos": "Lanczos",
+		"bilinear": "双线性",
+		"nearest": "最近邻"
+	},
+	"languages": {
+		"en-US": "English",
+		"zh-CN": "简体中文"
+	}
 }

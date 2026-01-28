@@ -1,165 +1,165 @@
 {
-  "_meta": {
-    "name": "Français",
-    "flag": "🇫🇷"
-  },
-  "common": {
-    "save": "Enregistrer",
-    "apply": "Appliquer",
-    "cancel": "Annuler",
-    "close": "Fermer",
-    "delete": "Supprimer",
-    "name": "Nom",
-    "size": "Taille",
-    "state": "État",
-    "target": "Cible"
-  },
-  "titlebar": {
-    "close": "Fermer",
-    "minimize": "Réduire",
-    "maximize": "Agrandir",
-    "toggleSize": "Changer taille",
-    "dashboard": "Tableau de bord",
-    "logs": "Journaux",
-    "storage": "STOCKAGE :",
-    "items": "ÉLÉMENTS :",
-    "addSource": "Ajouter source",
-    "processing": "TRAITEMENT...",
-    "start": "DÉMARRER"
-  },
-  "fileList": {
-    "dropFiles": "Déposez des fichiers ou utilisez AJOUTER SOURCE",
-    "endOfList": "FIN DE LISTE // {count} OBJETS",
-    "importSource": "Importer fichiers source"
-  },
-  "fileStatus": {
-    "ready": "PRÊT",
-    "queued": "EN FILE",
-    "error": "ERREUR",
-    "idle": "INACTIF"
-  },
-  "emptySelection": {
-    "hint": "SÉLECTIONNEZ UN ÉLÉMENT DE LA FILE POUR ACCÉDER À LA CONFIGURATION"
-  },
-  "tabs": {
-    "source": "Source",
-    "output": "Sortie",
-    "video": "Vidéo",
-    "audio": "Audio",
-    "presets": "Préréglages"
-  },
-  "source": {
-    "analyzing": "Analyse de la source…",
-    "failedToRead": "Échec de lecture des métadonnées.",
-    "unavailable": "Métadonnées indisponibles.",
-    "duration": "Durée",
-    "frameRate": "Images/s",
-    "dimensions": "Dimensions",
-    "videoCodec": "Codec vidéo",
-    "videoBitrate": "Débit vidéo",
-    "audioCodec": "Codec audio",
-    "containerBitrate": "Débit conteneur"
-  },
-  "output": {
-    "outputName": "Nom de sortie",
-    "placeholder": "mon_rendu_final",
-    "hint": "Stocké à côté du fichier original. L'extension suit le conteneur sélectionné.",
-    "container": "Conteneur de sortie"
-  },
-  "video": {
-    "resolutionFramerate": "Résolution et images/s",
-    "width": "Largeur",
-    "height": "Hauteur",
-    "scalingAlgorithm": "Algorithme de mise à l'échelle",
-    "framerate": "Images/s",
-    "sameAsSource": "Identique à la source",
-    "encoder": "Encodeur vidéo",
-    "encodingSpeed": "Vitesse d'encodage",
-    "qualityControl": "Contrôle qualité",
-    "constantQuality": "Qualité constante",
-    "targetBitrate": "Débit cible",
-    "encodingQuality": "Qualité d'encodage",
-    "qualityFactor": "Facteur de qualité",
-    "lowQuality": "Basse qualité",
-    "bestQuality": "Meilleure qualité",
-    "lossless": "Sans perte",
-    "smallest": "Plus petit",
-    "targetBitrateKbps": "Débit cible (kbps)"
-  },
-  "audio": {
-    "channelsBitrate": "Canaux et débit",
-    "original": "Original",
-    "stereo": "Stéréo (2.0)",
-    "mono": "Mono (1.0)",
-    "bitrateKbps": "Débit (kbps)",
-    "bitrateIgnored": "Débit ignoré pour les codecs sans perte",
-    "codec": "Codec audio",
-    "incompatibleContainer": "Conteneur incompatible",
-    "sourceTracks": "Pistes source",
-    "channels": "CH"
-  },
-  "presets": {
-    "library": "Bibliothèque de préréglages",
-    "label": "Étiquette du préréglage",
-    "applied": "APPLIQUÉ",
-    "deletePreset": "Supprimer préréglage",
-    "nameRequired": "Nom requis",
-    "notSaved": "Préréglage non enregistré",
-    "saved": "Préréglage enregistré",
-    "appliedName": "Appliqué {name}",
-    "unableToDelete": "Impossible de supprimer",
-    "removed": "Préréglage supprimé"
-  },
-  "settings": {
-    "title": "Paramètres",
-    "maxConcurrency": "Concurrence max",
-    "saving": "Enregistrement...",
-    "appUpdates": "Mises à jour",
-    "checkOnStartup": "Vérifier les mises à jour au démarrage",
-    "checking": "Vérification...",
-    "checkForUpdates": "Vérifier les mises à jour",
-    "updateAvailable": "Mise à jour disponible !",
-    "latestVersion": "Vous avez la dernière version.",
-    "errorChecking": "Erreur lors de la vérification.",
-    "visuals": "Apparence",
-    "windowTint": "Teinte de fenêtre",
-    "language": "Langue"
-  },
-  "logs": {
-    "noActiveProcesses": "Aucun processus actif",
-    "waitingForOutput": "Processus démarré, en attente de sortie...",
-    "selectTask": "Sélectionnez une tâche pour voir la sortie"
-  },
-  "update": {
-    "available": "Mise à jour disponible",
-    "versionAvailable": "Version {version} disponible.",
-    "later": "Plus tard",
-    "updateNow": "Mettre à jour"
-  },
-  "encodingSpeed": {
-    "ultrafast": "Ultra-rapide",
-    "ultrafastDesc": "Fichier max, conversion la plus rapide",
-    "superfast": "Super-rapide",
-    "superfastDesc": "Très gros fichier",
-    "veryfast": "Très rapide",
-    "veryfastDesc": "Gros fichier",
-    "faster": "Plus rapide",
-    "fasterDesc": "Fichier modérément gros",
-    "fast": "Rapide",
-    "fastDesc": "Fichier légèrement plus gros",
-    "medium": "Moyen",
-    "mediumDesc": "Équilibré",
-    "slow": "Lent",
-    "slowDesc": "Meilleure compression",
-    "slower": "Plus lent",
-    "slowerDesc": "Haute compression",
-    "veryslow": "Très lent",
-    "veryslowDesc": "Fichier min, conversion la plus lente"
-  },
-  "scalingAlgorithm": {
-    "bicubic": "Bicubique",
-    "lanczos": "Lanczos",
-    "bilinear": "Bilinéaire",
-    "nearest": "Plus proche voisin"
-  }
+	"_meta": {
+		"name": "Français",
+		"flag": "🇫🇷"
+	},
+	"common": {
+		"save": "Enregistrer",
+		"apply": "Appliquer",
+		"cancel": "Annuler",
+		"close": "Fermer",
+		"delete": "Supprimer",
+		"name": "Nom",
+		"size": "Taille",
+		"state": "État",
+		"target": "Cible"
+	},
+	"titlebar": {
+		"close": "Fermer",
+		"minimize": "Réduire",
+		"maximize": "Agrandir",
+		"toggleSize": "Changer taille",
+		"dashboard": "Tableau de bord",
+		"logs": "Journaux",
+		"storage": "STOCKAGE :",
+		"items": "ÉLÉMENTS :",
+		"addSource": "Ajouter source",
+		"processing": "TRAITEMENT...",
+		"start": "DÉMARRER"
+	},
+	"fileList": {
+		"dropFiles": "Déposez des fichiers ou utilisez AJOUTER SOURCE",
+		"endOfList": "FIN DE LISTE // {count} OBJETS",
+		"importSource": "Importer fichiers source"
+	},
+	"fileStatus": {
+		"ready": "PRÊT",
+		"queued": "EN FILE",
+		"error": "ERREUR",
+		"idle": "INACTIF"
+	},
+	"emptySelection": {
+		"hint": "SÉLECTIONNEZ UN ÉLÉMENT DE LA FILE POUR ACCÉDER À LA CONFIGURATION"
+	},
+	"tabs": {
+		"source": "Source",
+		"output": "Sortie",
+		"video": "Vidéo",
+		"audio": "Audio",
+		"presets": "Préréglages"
+	},
+	"source": {
+		"analyzing": "Analyse de la source…",
+		"failedToRead": "Échec de lecture des métadonnées.",
+		"unavailable": "Métadonnées indisponibles.",
+		"duration": "Durée",
+		"frameRate": "Images/s",
+		"dimensions": "Dimensions",
+		"videoCodec": "Codec vidéo",
+		"videoBitrate": "Débit vidéo",
+		"audioCodec": "Codec audio",
+		"containerBitrate": "Débit conteneur"
+	},
+	"output": {
+		"outputName": "Nom de sortie",
+		"placeholder": "mon_rendu_final",
+		"hint": "Stocké à côté du fichier original. L'extension suit le conteneur sélectionné.",
+		"container": "Conteneur de sortie"
+	},
+	"video": {
+		"resolutionFramerate": "Résolution et images/s",
+		"width": "Largeur",
+		"height": "Hauteur",
+		"scalingAlgorithm": "Algorithme de mise à l'échelle",
+		"framerate": "Images/s",
+		"sameAsSource": "Identique à la source",
+		"encoder": "Encodeur vidéo",
+		"encodingSpeed": "Vitesse d'encodage",
+		"qualityControl": "Contrôle qualité",
+		"constantQuality": "Qualité constante",
+		"targetBitrate": "Débit cible",
+		"encodingQuality": "Qualité d'encodage",
+		"qualityFactor": "Facteur de qualité",
+		"lowQuality": "Basse qualité",
+		"bestQuality": "Meilleure qualité",
+		"lossless": "Sans perte",
+		"smallest": "Plus petit",
+		"targetBitrateKbps": "Débit cible (kbps)"
+	},
+	"audio": {
+		"channelsBitrate": "Canaux et débit",
+		"original": "Original",
+		"stereo": "Stéréo (2.0)",
+		"mono": "Mono (1.0)",
+		"bitrateKbps": "Débit (kbps)",
+		"bitrateIgnored": "Débit ignoré pour les codecs sans perte",
+		"codec": "Codec audio",
+		"incompatibleContainer": "Conteneur incompatible",
+		"sourceTracks": "Pistes source",
+		"channels": "CH"
+	},
+	"presets": {
+		"library": "Bibliothèque de préréglages",
+		"label": "Étiquette du préréglage",
+		"applied": "APPLIQUÉ",
+		"deletePreset": "Supprimer préréglage",
+		"nameRequired": "Nom requis",
+		"notSaved": "Préréglage non enregistré",
+		"saved": "Préréglage enregistré",
+		"appliedName": "Appliqué {name}",
+		"unableToDelete": "Impossible de supprimer",
+		"removed": "Préréglage supprimé"
+	},
+	"settings": {
+		"title": "Paramètres",
+		"maxConcurrency": "Concurrence max",
+		"saving": "Enregistrement...",
+		"appUpdates": "Mises à jour",
+		"checkOnStartup": "Vérifier les mises à jour au démarrage",
+		"checking": "Vérification...",
+		"checkForUpdates": "Vérifier les mises à jour",
+		"updateAvailable": "Mise à jour disponible !",
+		"latestVersion": "Vous avez la dernière version.",
+		"errorChecking": "Erreur lors de la vérification.",
+		"visuals": "Apparence",
+		"windowTint": "Teinte de fenêtre",
+		"language": "Langue"
+	},
+	"logs": {
+		"noActiveProcesses": "Aucun processus actif",
+		"waitingForOutput": "Processus démarré, en attente de sortie...",
+		"selectTask": "Sélectionnez une tâche pour voir la sortie"
+	},
+	"update": {
+		"available": "Mise à jour disponible",
+		"versionAvailable": "Version {version} disponible.",
+		"later": "Plus tard",
+		"updateNow": "Mettre à jour"
+	},
+	"encodingSpeed": {
+		"ultrafast": "Ultra-rapide",
+		"ultrafastDesc": "Fichier max, conversion la plus rapide",
+		"superfast": "Super-rapide",
+		"superfastDesc": "Très gros fichier",
+		"veryfast": "Très rapide",
+		"veryfastDesc": "Gros fichier",
+		"faster": "Plus rapide",
+		"fasterDesc": "Fichier modérément gros",
+		"fast": "Rapide",
+		"fastDesc": "Fichier légèrement plus gros",
+		"medium": "Moyen",
+		"mediumDesc": "Équilibré",
+		"slow": "Lent",
+		"slowDesc": "Meilleure compression",
+		"slower": "Plus lent",
+		"slowerDesc": "Haute compression",
+		"veryslow": "Très lent",
+		"veryslowDesc": "Fichier min, conversion la plus lente"
+	},
+	"scalingAlgorithm": {
+		"bicubic": "Bicubique",
+		"lanczos": "Lanczos",
+		"bilinear": "Bilinéaire",
+		"nearest": "Plus proche voisin"
+	}
 }

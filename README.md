@@ -40,7 +40,7 @@
 
 ### Media Conversion Core
 
-- **Container Support:** `mp4`, `mkv`, `webm`, `mov`, `mp3`.
+- **Container Support:** `mp4`, `mkv`, `webm`, `mov`, `mp3`, `m4a`, `wav`, `flac`.
 - **Video Encoders:**
   - `libx264` (H.264 / AVC)
   - `libx265` (H.265 / HEVC)

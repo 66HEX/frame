@@ -21,13 +21,14 @@
 		type FileItem,
 		FileStatus,
 		type ConversionConfig,
-		type PresetDefinition
+		type PresetDefinition,
+		AUDIO_ONLY_CONTAINERS
 	} from '$lib/types';
 	import {
 		startConversion as startConversionService,
 		setupConversionListeners
 	} from '$lib/services/conversion';
-	import { probeMedia } from '$lib/services/media';
+	import { probeMedia, getDefaultAudioCodec } from '$lib/services/media';
 	import {
 		loadInitialMaxConcurrency,
 		persistMaxConcurrency,
@@ -317,8 +318,16 @@
 			multiple: true,
 			filters: [
 				{
+					name: 'Media Files',
+					extensions: ['mp4', 'mov', 'mkv', 'avi', 'webm', 'mp3', 'm4a', 'wav', 'flac']
+				},
+				{
 					name: 'Videos',
 					extensions: ['mp4', 'mov', 'mkv', 'avi', 'webm']
+				},
+				{
+					name: 'Audio',
+					extensions: ['mp3', 'm4a', 'wav', 'flac']
 				}
 			]
 		});
@@ -371,16 +380,27 @@
 		);
 		try {
 			const probeMetadata = await probeMedia(path);
-			files = files.map((f) =>
-				f.id === fileId
-					? {
-							...f,
-							metadataStatus: 'ready',
-							metadata: probeMetadata,
-							metadataError: undefined
-						}
-					: f
-			);
+			files = files.map((f) => {
+				if (f.id !== fileId) return f;
+
+				let newConfig = f.config;
+				if (!probeMetadata.videoCodec && !AUDIO_ONLY_CONTAINERS.includes(f.config.container)) {
+					const defaultAudioContainer = 'mp3';
+					newConfig = {
+						...f.config,
+						container: defaultAudioContainer,
+						audioCodec: getDefaultAudioCodec(defaultAudioContainer)
+					};
+				}
+
+				return {
+					...f,
+					metadataStatus: 'ready',
+					metadata: probeMetadata,
+					metadataError: undefined,
+					config: newConfig
+				};
+			});
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Failed to probe source';
 			files = files.map((f) =>

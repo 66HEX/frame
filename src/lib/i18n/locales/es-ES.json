@@ -1,165 +1,165 @@
 {
-  "_meta": {
-    "name": "Español",
-    "flag": "🇪🇸"
-  },
-  "common": {
-    "save": "Guardar",
-    "apply": "Aplicar",
-    "cancel": "Cancelar",
-    "close": "Cerrar",
-    "delete": "Eliminar",
-    "name": "Nombre",
-    "size": "Tamaño",
-    "state": "Estado",
-    "target": "Destino"
-  },
-  "titlebar": {
-    "close": "Cerrar",
-    "minimize": "Minimizar",
-    "maximize": "Maximizar",
-    "toggleSize": "Cambiar tamaño",
-    "dashboard": "Panel",
-    "logs": "Registros",
-    "storage": "ALMACENAMIENTO:",
-    "items": "ELEMENTOS:",
-    "addSource": "Añadir fuente",
-    "processing": "PROCESANDO...",
-    "start": "INICIAR"
-  },
-  "fileList": {
-    "dropFiles": "Suelta archivos o usa AÑADIR FUENTE",
-    "endOfList": "FIN DE LISTA // {count} OBJETOS",
-    "importSource": "Importar archivos fuente"
-  },
-  "fileStatus": {
-    "ready": "LISTO",
-    "queued": "EN COLA",
-    "error": "ERROR",
-    "idle": "INACTIVO"
-  },
-  "emptySelection": {
-    "hint": "SELECCIONA UN ELEMENTO DE LA COLA PARA ACCEDER A LA CONFIGURACIÓN"
-  },
-  "tabs": {
-    "source": "Fuente",
-    "output": "Salida",
-    "video": "Vídeo",
-    "audio": "Audio",
-    "presets": "Ajustes"
-  },
-  "source": {
-    "analyzing": "Analizando fuente…",
-    "failedToRead": "Error al leer metadatos.",
-    "unavailable": "Metadatos no disponibles.",
-    "duration": "Duración",
-    "frameRate": "Fotogramas",
-    "dimensions": "Dimensiones",
-    "videoCodec": "Códec de vídeo",
-    "videoBitrate": "Tasa de vídeo",
-    "audioCodec": "Códec de audio",
-    "containerBitrate": "Tasa del contenedor"
-  },
-  "output": {
-    "outputName": "Nombre de salida",
-    "placeholder": "mi_render_final",
-    "hint": "Se guarda junto al archivo original. La extensión sigue al contenedor seleccionado.",
-    "container": "Contenedor de salida"
-  },
-  "video": {
-    "resolutionFramerate": "Resolución y fotogramas",
-    "width": "Ancho",
-    "height": "Alto",
-    "scalingAlgorithm": "Algoritmo de escalado",
-    "framerate": "Fotogramas",
-    "sameAsSource": "Igual que fuente",
-    "encoder": "Codificador de vídeo",
-    "encodingSpeed": "Velocidad de codificación",
-    "qualityControl": "Control de calidad",
-    "constantQuality": "Calidad constante",
-    "targetBitrate": "Tasa objetivo",
-    "encodingQuality": "Calidad de codificación",
-    "qualityFactor": "Factor de calidad",
-    "lowQuality": "Baja calidad",
-    "bestQuality": "Mejor calidad",
-    "lossless": "Sin pérdida",
-    "smallest": "Más pequeño",
-    "targetBitrateKbps": "Tasa objetivo (kbps)"
-  },
-  "audio": {
-    "channelsBitrate": "Canales y tasa",
-    "original": "Original",
-    "stereo": "Estéreo (2.0)",
-    "mono": "Mono (1.0)",
-    "bitrateKbps": "Tasa (kbps)",
-    "bitrateIgnored": "Tasa ignorada para códecs sin pérdida",
-    "codec": "Códec de audio",
-    "incompatibleContainer": "Contenedor incompatible",
-    "sourceTracks": "Pistas de origen",
-    "channels": "CH"
-  },
-  "presets": {
-    "library": "Biblioteca de ajustes",
-    "label": "Etiqueta de ajuste",
-    "applied": "APLICADO",
-    "deletePreset": "Eliminar ajuste",
-    "nameRequired": "Nombre requerido",
-    "notSaved": "Ajuste no guardado",
-    "saved": "Ajuste guardado",
-    "appliedName": "Aplicado {name}",
-    "unableToDelete": "No se puede eliminar",
-    "removed": "Ajuste eliminado"
-  },
-  "settings": {
-    "title": "Configuración",
-    "maxConcurrency": "Concurrencia máxima",
-    "saving": "Guardando...",
-    "appUpdates": "Actualizaciones",
-    "checkOnStartup": "Buscar actualizaciones al iniciar",
-    "checking": "Comprobando...",
-    "checkForUpdates": "Buscar actualizaciones",
-    "updateAvailable": "¡Actualización disponible!",
-    "latestVersion": "Tienes la última versión.",
-    "errorChecking": "Error al buscar actualizaciones.",
-    "visuals": "Visuales",
-    "windowTint": "Tinte de ventana",
-    "language": "Idioma"
-  },
-  "logs": {
-    "noActiveProcesses": "Sin procesos activos",
-    "waitingForOutput": "Proceso iniciado, esperando salida...",
-    "selectTask": "Selecciona una tarea para ver la salida"
-  },
-  "update": {
-    "available": "Actualización disponible",
-    "versionAvailable": "Versión {version} disponible.",
-    "later": "Más tarde",
-    "updateNow": "Actualizar ahora"
-  },
-  "encodingSpeed": {
-    "ultrafast": "Ultrarrápido",
-    "ultrafastDesc": "Archivo más grande, conversión más rápida",
-    "superfast": "Superrápido",
-    "superfastDesc": "Archivo muy grande",
-    "veryfast": "Muy rápido",
-    "veryfastDesc": "Archivo grande",
-    "faster": "Más rápido",
-    "fasterDesc": "Archivo moderadamente grande",
-    "fast": "Rápido",
-    "fastDesc": "Archivo ligeramente más grande",
-    "medium": "Medio",
-    "mediumDesc": "Equilibrado",
-    "slow": "Lento",
-    "slowDesc": "Mejor compresión",
-    "slower": "Más lento",
-    "slowerDesc": "Alta compresión",
-    "veryslow": "Muy lento",
-    "veryslowDesc": "Archivo más pequeño, conversión más lenta"
-  },
-  "scalingAlgorithm": {
-    "bicubic": "Bicúbico",
-    "lanczos": "Lanczos",
-    "bilinear": "Bilineal",
-    "nearest": "Vecino más cercano"
-  }
+	"_meta": {
+		"name": "Español",
+		"flag": "🇪🇸"
+	},
+	"common": {
+		"save": "Guardar",
+		"apply": "Aplicar",
+		"cancel": "Cancelar",
+		"close": "Cerrar",
+		"delete": "Eliminar",
+		"name": "Nombre",
+		"size": "Tamaño",
+		"state": "Estado",
+		"target": "Destino"
+	},
+	"titlebar": {
+		"close": "Cerrar",
+		"minimize": "Minimizar",
+		"maximize": "Maximizar",
+		"toggleSize": "Cambiar tamaño",
+		"dashboard": "Panel",
+		"logs": "Registros",
+		"storage": "ALMACENAMIENTO:",
+		"items": "ELEMENTOS:",
+		"addSource": "Añadir fuente",
+		"processing": "PROCESANDO...",
+		"start": "INICIAR"
+	},
+	"fileList": {
+		"dropFiles": "Suelta archivos o usa AÑADIR FUENTE",
+		"endOfList": "FIN DE LISTA // {count} OBJETOS",
+		"importSource": "Importar archivos fuente"
+	},
+	"fileStatus": {
+		"ready": "LISTO",
+		"queued": "EN COLA",
+		"error": "ERROR",
+		"idle": "INACTIVO"
+	},
+	"emptySelection": {
+		"hint": "SELECCIONA UN ELEMENTO DE LA COLA PARA ACCEDER A LA CONFIGURACIÓN"
+	},
+	"tabs": {
+		"source": "Fuente",
+		"output": "Salida",
+		"video": "Vídeo",
+		"audio": "Audio",
+		"presets": "Ajustes"
+	},
+	"source": {
+		"analyzing": "Analizando fuente…",
+		"failedToRead": "Error al leer metadatos.",
+		"unavailable": "Metadatos no disponibles.",
+		"duration": "Duración",
+		"frameRate": "Fotogramas",
+		"dimensions": "Dimensiones",
+		"videoCodec": "Códec de vídeo",
+		"videoBitrate": "Tasa de vídeo",
+		"audioCodec": "Códec de audio",
+		"containerBitrate": "Tasa del contenedor"
+	},
+	"output": {
+		"outputName": "Nombre de salida",
+		"placeholder": "mi_render_final",
+		"hint": "Se guarda junto al archivo original. La extensión sigue al contenedor seleccionado.",
+		"container": "Contenedor de salida"
+	},
+	"video": {
+		"resolutionFramerate": "Resolución y fotogramas",
+		"width": "Ancho",
+		"height": "Alto",
+		"scalingAlgorithm": "Algoritmo de escalado",
+		"framerate": "Fotogramas",
+		"sameAsSource": "Igual que fuente",
+		"encoder": "Codificador de vídeo",
+		"encodingSpeed": "Velocidad de codificación",
+		"qualityControl": "Control de calidad",
+		"constantQuality": "Calidad constante",
+		"targetBitrate": "Tasa objetivo",
+		"encodingQuality": "Calidad de codificación",
+		"qualityFactor": "Factor de calidad",
+		"lowQuality": "Baja calidad",
+		"bestQuality": "Mejor calidad",
+		"lossless": "Sin pérdida",
+		"smallest": "Más pequeño",
+		"targetBitrateKbps": "Tasa objetivo (kbps)"
+	},
+	"audio": {
+		"channelsBitrate": "Canales y tasa",
+		"original": "Original",
+		"stereo": "Estéreo (2.0)",
+		"mono": "Mono (1.0)",
+		"bitrateKbps": "Tasa (kbps)",
+		"bitrateIgnored": "Tasa ignorada para códecs sin pérdida",
+		"codec": "Códec de audio",
+		"incompatibleContainer": "Contenedor incompatible",
+		"sourceTracks": "Pistas de origen",
+		"channels": "CH"
+	},
+	"presets": {
+		"library": "Biblioteca de ajustes",
+		"label": "Etiqueta de ajuste",
+		"applied": "APLICADO",
+		"deletePreset": "Eliminar ajuste",
+		"nameRequired": "Nombre requerido",
+		"notSaved": "Ajuste no guardado",
+		"saved": "Ajuste guardado",
+		"appliedName": "Aplicado {name}",
+		"unableToDelete": "No se puede eliminar",
+		"removed": "Ajuste eliminado"
+	},
+	"settings": {
+		"title": "Configuración",
+		"maxConcurrency": "Concurrencia máxima",
+		"saving": "Guardando...",
+		"appUpdates": "Actualizaciones",
+		"checkOnStartup": "Buscar actualizaciones al iniciar",
+		"checking": "Comprobando...",
+		"checkForUpdates": "Buscar actualizaciones",
+		"updateAvailable": "¡Actualización disponible!",
+		"latestVersion": "Tienes la última versión.",
+		"errorChecking": "Error al buscar actualizaciones.",
+		"visuals": "Visuales",
+		"windowTint": "Tinte de ventana",
+		"language": "Idioma"
+	},
+	"logs": {
+		"noActiveProcesses": "Sin procesos activos",
+		"waitingForOutput": "Proceso iniciado, esperando salida...",
+		"selectTask": "Selecciona una tarea para ver la salida"
+	},
+	"update": {
+		"available": "Actualización disponible",
+		"versionAvailable": "Versión {version} disponible.",
+		"later": "Más tarde",
+		"updateNow": "Actualizar ahora"
+	},
+	"encodingSpeed": {
+		"ultrafast": "Ultrarrápido",
+		"ultrafastDesc": "Archivo más grande, conversión más rápida",
+		"superfast": "Superrápido",
+		"superfastDesc": "Archivo muy grande",
+		"veryfast": "Muy rápido",
+		"veryfastDesc": "Archivo grande",
+		"faster": "Más rápido",
+		"fasterDesc": "Archivo moderadamente grande",
+		"fast": "Rápido",
+		"fastDesc": "Archivo ligeramente más grande",
+		"medium": "Medio",
+		"mediumDesc": "Equilibrado",
+		"slow": "Lento",
+		"slowDesc": "Mejor compresión",
+		"slower": "Más lento",
+		"slowerDesc": "Alta compresión",
+		"veryslow": "Muy lento",
+		"veryslowDesc": "Archivo más pequeño, conversión más lenta"
+	},
+	"scalingAlgorithm": {
+		"bicubic": "Bicúbico",
+		"lanczos": "Lanczos",
+		"bilinear": "Bilineal",
+		"nearest": "Vecino más cercano"
+	}
 }

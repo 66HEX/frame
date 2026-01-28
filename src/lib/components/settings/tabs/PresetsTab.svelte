@@ -2,7 +2,12 @@
 	import { onDestroy } from 'svelte';
 	import { Trash2 } from 'lucide-svelte';
 	import { cn } from '$lib/utils/cn';
-	import type { ConversionConfig, PresetDefinition } from '$lib/types';
+	import {
+		AUDIO_ONLY_CONTAINERS,
+		type ConversionConfig,
+		type PresetDefinition,
+		type SourceMetadata
+	} from '$lib/types';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import ListItem from '$lib/components/ui/ListItem.svelte';
@@ -12,6 +17,7 @@
 	let {
 		config,
 		presets = [],
+		metadata,
 		disabled = false,
 		onApplyPreset,
 		onSavePreset,
@@ -19,6 +25,7 @@
 	}: {
 		config: ConversionConfig;
 		presets?: PresetDefinition[];
+		metadata?: SourceMetadata;
 		disabled?: boolean;
 		onApplyPreset?: (preset: PresetDefinition) => void;
 		onSavePreset?: (name: string) => Promise<boolean | void> | boolean | void;
@@ -29,6 +36,8 @@
 	type NoticeTone = 'success' | 'error';
 	let notice = $state<{ text: string; tone: NoticeTone } | null>(null);
 	let noticeTimeout: ReturnType<typeof setTimeout> | null = null;
+
+	const isSourceAudioOnly = $derived(!!metadata && !metadata.videoCodec);
 
 	onDestroy(() => {
 		if (noticeTimeout) clearTimeout(noticeTimeout);
@@ -118,21 +127,28 @@
 
 	<div class="space-y-1.5">
 		{#each presets as preset (preset.id)}
+			{@const isCompatible =
+				!isSourceAudioOnly || AUDIO_ONLY_CONTAINERS.includes(preset.config.container)}
 			<ListItem
 				selected={configsMatch(config, preset.config)}
-				onclick={() => applyPreset(preset)}
+				onclick={() => isCompatible && applyPreset(preset)}
+				disabled={disabled || !isCompatible}
 				onkeydown={(event) => {
 					if (event.key === 'Enter' || event.key === ' ') {
 						event.preventDefault();
-						applyPreset(preset);
+						if (isCompatible) applyPreset(preset);
 					}
 				}}
-				class="pr-1"
+				class={cn('pr-1', !isCompatible && 'cursor-not-allowed opacity-50')}
 			>
 				<span class="truncate">{preset.name}</span>
 				<div class="flex items-center gap-2">
 					<span class="pr-2 text-[9px] font-medium opacity-50">
-						{configsMatch(config, preset.config) ? $_('presets.applied') : ''}
+						{#if !isCompatible}
+							{$_('audio.incompatibleContainer')}
+						{:else if configsMatch(config, preset.config)}
+							{$_('presets.applied')}
+						{/if}
 					</span>
 					{#if !preset.builtIn}
 						<Button

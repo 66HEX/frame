@@ -1,5 +1,10 @@
 <script lang="ts">
-	import type { ConversionConfig } from '$lib/types';
+	import {
+		ALL_CONTAINERS,
+		AUDIO_ONLY_CONTAINERS,
+		type ConversionConfig,
+		type SourceMetadata
+	} from '$lib/types';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Label from '$lib/components/ui/Label.svelte';
@@ -7,26 +12,27 @@
 
 	import { isAudioCodecAllowed, getDefaultAudioCodec } from '$lib/services/media';
 
-	const CONTAINERS = ['mp4', 'mkv', 'webm', 'mov', 'mp3', 'm4a', 'wav', 'flac'] as const;
-
 	let {
 		config,
 		disabled = false,
 		outputName = '',
+		metadata,
 		onUpdate,
 		onUpdateOutputName
 	}: {
 		config: ConversionConfig;
 		disabled?: boolean;
 		outputName?: string;
+		metadata?: SourceMetadata;
 		onUpdate: (config: Partial<ConversionConfig>) => void;
 		onUpdateOutputName?: (value: string) => void;
 	} = $props();
 
+	const isSourceAudioOnly = $derived(!!metadata && !metadata.videoCodec);
+
 	function handleContainerChange(newContainer: string) {
 		const updates: Partial<ConversionConfig> = { container: newContainer };
 
-		// Check if current audio codec is valid for the new container
 		if (!isAudioCodecAllowed(config.audioCodec, newContainer)) {
 			updates.audioCodec = getDefaultAudioCodec(newContainer);
 		}
@@ -53,11 +59,13 @@
 	<div class="space-y-3 pt-2">
 		<Label variant="section">{$_('output.container')}</Label>
 		<div class="grid grid-cols-2 gap-2">
-			{#each CONTAINERS as fmt (fmt)}
+			{#each ALL_CONTAINERS as fmt (fmt)}
+				{@const isVideoContainer = !AUDIO_ONLY_CONTAINERS.includes(fmt)}
+				{@const isDisabled = disabled || (isSourceAudioOnly && isVideoContainer)}
 				<Button
 					variant={config.container === fmt ? 'selected' : 'outline'}
 					onclick={() => handleContainerChange(fmt)}
-					{disabled}
+					disabled={isDisabled}
 					class="w-full"
 				>
 					{fmt}

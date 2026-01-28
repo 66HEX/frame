@@ -1,165 +1,165 @@
 {
-  "_meta": {
-    "name": "Deutsch",
-    "flag": "🇩🇪"
-  },
-  "common": {
-    "save": "Speichern",
-    "apply": "Anwenden",
-    "cancel": "Abbrechen",
-    "close": "Schließen",
-    "delete": "Löschen",
-    "name": "Name",
-    "size": "Größe",
-    "state": "Status",
-    "target": "Ziel"
-  },
-  "titlebar": {
-    "close": "Schließen",
-    "minimize": "Minimieren",
-    "maximize": "Maximieren",
-    "toggleSize": "Größe umschalten",
-    "dashboard": "Dashboard",
-    "logs": "Protokolle",
-    "storage": "SPEICHER:",
-    "items": "ELEMENTE:",
-    "addSource": "Quelle hinzufügen",
-    "processing": "VERARBEITUNG...",
-    "start": "START"
-  },
-  "fileList": {
-    "dropFiles": "Dateien ablegen oder QUELLE HINZUFÜGEN",
-    "endOfList": "LISTENENDE // {count} OBJEKTE",
-    "importSource": "Quelldateien importieren"
-  },
-  "fileStatus": {
-    "ready": "BEREIT",
-    "queued": "WARTESCHLANGE",
-    "error": "FEHLER",
-    "idle": "LEERLAUF"
-  },
-  "emptySelection": {
-    "hint": "WÄHLEN SIE EIN ELEMENT AUS DER WARTESCHLANGE FÜR DIE KONFIGURATION"
-  },
-  "tabs": {
-    "source": "Quelle",
-    "output": "Ausgabe",
-    "video": "Video",
-    "audio": "Audio",
-    "presets": "Voreinstellungen"
-  },
-  "source": {
-    "analyzing": "Quelle wird analysiert…",
-    "failedToRead": "Metadaten konnten nicht gelesen werden.",
-    "unavailable": "Metadaten nicht verfügbar.",
-    "duration": "Dauer",
-    "frameRate": "Bildrate",
-    "dimensions": "Abmessungen",
-    "videoCodec": "Video-Codec",
-    "videoBitrate": "Video-Bitrate",
-    "audioCodec": "Audio-Codec",
-    "containerBitrate": "Container-Bitrate"
-  },
-  "output": {
-    "outputName": "Ausgabename",
-    "placeholder": "mein_render_final",
-    "hint": "Wird neben der Originaldatei gespeichert. Erweiterung folgt dem Container.",
-    "container": "Ausgabe-Container"
-  },
-  "video": {
-    "resolutionFramerate": "Auflösung & Bildrate",
-    "width": "Breite",
-    "height": "Höhe",
-    "scalingAlgorithm": "Skalierungsalgorithmus",
-    "framerate": "Bildrate",
-    "sameAsSource": "Wie Quelle",
-    "encoder": "Video-Encoder",
-    "encodingSpeed": "Kodiergeschwindigkeit",
-    "qualityControl": "Qualitätskontrolle",
-    "constantQuality": "Konstante Qualität",
-    "targetBitrate": "Ziel-Bitrate",
-    "encodingQuality": "Kodierqualität",
-    "qualityFactor": "Qualitätsfaktor",
-    "lowQuality": "Niedrige Qualität",
-    "bestQuality": "Beste Qualität",
-    "lossless": "Verlustfrei",
-    "smallest": "Kleinste",
-    "targetBitrateKbps": "Ziel-Bitrate (kbps)"
-  },
-  "audio": {
-    "channelsBitrate": "Kanäle & Bitrate",
-    "original": "Original",
-    "stereo": "Stereo (2.0)",
-    "mono": "Mono (1.0)",
-    "bitrateKbps": "Bitrate (kbps)",
-    "bitrateIgnored": "Bitrate wird bei verlustfreien Codecs ignoriert",
-    "codec": "Audio-Codec",
-    "incompatibleContainer": "Inkompatibler Container",
-    "sourceTracks": "Quellspuren",
-    "channels": "KAN"
-  },
-  "presets": {
-    "library": "Voreinstellungsbibliothek",
-    "label": "Voreinstellungsname",
-    "applied": "ANGEWENDET",
-    "deletePreset": "Voreinstellung löschen",
-    "nameRequired": "Name erforderlich",
-    "notSaved": "Voreinstellung nicht gespeichert",
-    "saved": "Voreinstellung gespeichert",
-    "appliedName": "{name} angewendet",
-    "unableToDelete": "Löschen nicht möglich",
-    "removed": "Voreinstellung entfernt"
-  },
-  "settings": {
-    "title": "Einstellungen",
-    "maxConcurrency": "Max. Parallelität",
-    "saving": "Speichern...",
-    "appUpdates": "App-Updates",
-    "checkOnStartup": "Beim Start nach Updates suchen",
-    "checking": "Prüfen...",
-    "checkForUpdates": "Nach Updates suchen",
-    "updateAvailable": "Update verfügbar!",
-    "latestVersion": "Sie haben die neueste Version.",
-    "errorChecking": "Fehler bei der Update-Prüfung.",
-    "visuals": "Darstellung",
-    "windowTint": "Fenstertönung",
-    "language": "Sprache"
-  },
-  "logs": {
-    "noActiveProcesses": "Keine aktiven Prozesse",
-    "waitingForOutput": "Prozess gestartet, warte auf Ausgabe...",
-    "selectTask": "Aufgabe auswählen für Konsolenausgabe"
-  },
-  "update": {
-    "available": "Update verfügbar",
-    "versionAvailable": "Version {version} verfügbar.",
-    "later": "Später",
-    "updateNow": "Jetzt aktualisieren"
-  },
-  "encodingSpeed": {
-    "ultrafast": "Ultraschnell",
-    "ultrafastDesc": "Größte Datei, schnellste Konvertierung",
-    "superfast": "Superschnell",
-    "superfastDesc": "Sehr große Datei",
-    "veryfast": "Sehr schnell",
-    "veryfastDesc": "Große Datei",
-    "faster": "Schneller",
-    "fasterDesc": "Mäßig große Datei",
-    "fast": "Schnell",
-    "fastDesc": "Etwas größere Datei",
-    "medium": "Mittel",
-    "mediumDesc": "Ausgewogen",
-    "slow": "Langsam",
-    "slowDesc": "Bessere Kompression",
-    "slower": "Langsamer",
-    "slowerDesc": "Hohe Kompression",
-    "veryslow": "Sehr langsam",
-    "veryslowDesc": "Kleinste Datei, langsamste Konvertierung"
-  },
-  "scalingAlgorithm": {
-    "bicubic": "Bikubisch",
-    "lanczos": "Lanczos",
-    "bilinear": "Bilinear",
-    "nearest": "Nächster Nachbar"
-  }
+	"_meta": {
+		"name": "Deutsch",
+		"flag": "🇩🇪"
+	},
+	"common": {
+		"save": "Speichern",
+		"apply": "Anwenden",
+		"cancel": "Abbrechen",
+		"close": "Schließen",
+		"delete": "Löschen",
+		"name": "Name",
+		"size": "Größe",
+		"state": "Status",
+		"target": "Ziel"
+	},
+	"titlebar": {
+		"close": "Schließen",
+		"minimize": "Minimieren",
+		"maximize": "Maximieren",
+		"toggleSize": "Größe umschalten",
+		"dashboard": "Dashboard",
+		"logs": "Protokolle",
+		"storage": "SPEICHER:",
+		"items": "ELEMENTE:",
+		"addSource": "Quelle hinzufügen",
+		"processing": "VERARBEITUNG...",
+		"start": "START"
+	},
+	"fileList": {
+		"dropFiles": "Dateien ablegen oder QUELLE HINZUFÜGEN",
+		"endOfList": "LISTENENDE // {count} OBJEKTE",
+		"importSource": "Quelldateien importieren"
+	},
+	"fileStatus": {
+		"ready": "BEREIT",
+		"queued": "WARTESCHLANGE",
+		"error": "FEHLER",
+		"idle": "LEERLAUF"
+	},
+	"emptySelection": {
+		"hint": "WÄHLEN SIE EIN ELEMENT AUS DER WARTESCHLANGE FÜR DIE KONFIGURATION"
+	},
+	"tabs": {
+		"source": "Quelle",
+		"output": "Ausgabe",
+		"video": "Video",
+		"audio": "Audio",
+		"presets": "Voreinstellungen"
+	},
+	"source": {
+		"analyzing": "Quelle wird analysiert…",
+		"failedToRead": "Metadaten konnten nicht gelesen werden.",
+		"unavailable": "Metadaten nicht verfügbar.",
+		"duration": "Dauer",
+		"frameRate": "Bildrate",
+		"dimensions": "Abmessungen",
+		"videoCodec": "Video-Codec",
+		"videoBitrate": "Video-Bitrate",
+		"audioCodec": "Audio-Codec",
+		"containerBitrate": "Container-Bitrate"
+	},
+	"output": {
+		"outputName": "Ausgabename",
+		"placeholder": "mein_render_final",
+		"hint": "Wird neben der Originaldatei gespeichert. Erweiterung folgt dem Container.",
+		"container": "Ausgabe-Container"
+	},
+	"video": {
+		"resolutionFramerate": "Auflösung & Bildrate",
+		"width": "Breite",
+		"height": "Höhe",
+		"scalingAlgorithm": "Skalierungsalgorithmus",
+		"framerate": "Bildrate",
+		"sameAsSource": "Wie Quelle",
+		"encoder": "Video-Encoder",
+		"encodingSpeed": "Kodiergeschwindigkeit",
+		"qualityControl": "Qualitätskontrolle",
+		"constantQuality": "Konstante Qualität",
+		"targetBitrate": "Ziel-Bitrate",
+		"encodingQuality": "Kodierqualität",
+		"qualityFactor": "Qualitätsfaktor",
+		"lowQuality": "Niedrige Qualität",
+		"bestQuality": "Beste Qualität",
+		"lossless": "Verlustfrei",
+		"smallest": "Kleinste",
+		"targetBitrateKbps": "Ziel-Bitrate (kbps)"
+	},
+	"audio": {
+		"channelsBitrate": "Kanäle & Bitrate",
+		"original": "Original",
+		"stereo": "Stereo (2.0)",
+		"mono": "Mono (1.0)",
+		"bitrateKbps": "Bitrate (kbps)",
+		"bitrateIgnored": "Bitrate wird bei verlustfreien Codecs ignoriert",
+		"codec": "Audio-Codec",
+		"incompatibleContainer": "Inkompatibler Container",
+		"sourceTracks": "Quellspuren",
+		"channels": "KAN"
+	},
+	"presets": {
+		"library": "Voreinstellungsbibliothek",
+		"label": "Voreinstellungsname",
+		"applied": "ANGEWENDET",
+		"deletePreset": "Voreinstellung löschen",
+		"nameRequired": "Name erforderlich",
+		"notSaved": "Voreinstellung nicht gespeichert",
+		"saved": "Voreinstellung gespeichert",
+		"appliedName": "{name} angewendet",
+		"unableToDelete": "Löschen nicht möglich",
+		"removed": "Voreinstellung entfernt"
+	},
+	"settings": {
+		"title": "Einstellungen",
+		"maxConcurrency": "Max. Parallelität",
+		"saving": "Speichern...",
+		"appUpdates": "App-Updates",
+		"checkOnStartup": "Beim Start nach Updates suchen",
+		"checking": "Prüfen...",
+		"checkForUpdates": "Nach Updates suchen",
+		"updateAvailable": "Update verfügbar!",
+		"latestVersion": "Sie haben die neueste Version.",
+		"errorChecking": "Fehler bei der Update-Prüfung.",
+		"visuals": "Darstellung",
+		"windowTint": "Fenstertönung",
+		"language": "Sprache"
+	},
+	"logs": {
+		"noActiveProcesses": "Keine aktiven Prozesse",
+		"waitingForOutput": "Prozess gestartet, warte auf Ausgabe...",
+		"selectTask": "Aufgabe auswählen für Konsolenausgabe"
+	},
+	"update": {
+		"available": "Update verfügbar",
+		"versionAvailable": "Version {version} verfügbar.",
+		"later": "Später",
+		"updateNow": "Jetzt aktualisieren"
+	},
+	"encodingSpeed": {
+		"ultrafast": "Ultraschnell",
+		"ultrafastDesc": "Größte Datei, schnellste Konvertierung",
+		"superfast": "Superschnell",
+		"superfastDesc": "Sehr große Datei",
+		"veryfast": "Sehr schnell",
+		"veryfastDesc": "Große Datei",
+		"faster": "Schneller",
+		"fasterDesc": "Mäßig große Datei",
+		"fast": "Schnell",
+		"fastDesc": "Etwas größere Datei",
+		"medium": "Mittel",
+		"mediumDesc": "Ausgewogen",
+		"slow": "Langsam",
+		"slowDesc": "Bessere Kompression",
+		"slower": "Langsamer",
+		"slowerDesc": "Hohe Kompression",
+		"veryslow": "Sehr langsam",
+		"veryslowDesc": "Kleinste Datei, langsamste Konvertierung"
+	},
+	"scalingAlgorithm": {
+		"bicubic": "Bikubisch",
+		"lanczos": "Lanczos",
+		"bilinear": "Bilinear",
+		"nearest": "Nächster Nachbar"
+	}
 }

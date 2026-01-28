@@ -24,6 +24,7 @@
 					sm: 'h-6 px-2',
 					xs: 'h-6 px-2',
 					icon: 'h-7.5 w-7.5',
+					'icon-large': 'h-10 w-10',
 					none: 'p-0'
 				}
 			},

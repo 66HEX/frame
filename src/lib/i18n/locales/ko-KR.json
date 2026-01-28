@@ -1,165 +1,165 @@
 {
-  "_meta": {
-    "name": "한국어",
-    "flag": "🇰🇷"
-  },
-  "common": {
-    "save": "저장",
-    "apply": "적용",
-    "cancel": "취소",
-    "close": "닫기",
-    "delete": "삭제",
-    "name": "이름",
-    "size": "크기",
-    "state": "상태",
-    "target": "대상"
-  },
-  "titlebar": {
-    "close": "닫기",
-    "minimize": "최소화",
-    "maximize": "최대화",
-    "toggleSize": "크기 전환",
-    "dashboard": "대시보드",
-    "logs": "로그",
-    "storage": "저장소:",
-    "items": "항목:",
-    "addSource": "소스 추가",
-    "processing": "처리 중...",
-    "start": "시작"
-  },
-  "fileList": {
-    "dropFiles": "파일을 드롭하거나 소스 추가 사용",
-    "endOfList": "목록 끝 // {count}개 객체",
-    "importSource": "소스 파일 가져오기"
-  },
-  "fileStatus": {
-    "ready": "준비",
-    "queued": "대기",
-    "error": "오류",
-    "idle": "유휴"
-  },
-  "emptySelection": {
-    "hint": "설정에 접근하려면 대기열에서 항목을 선택하세요"
-  },
-  "tabs": {
-    "source": "소스",
-    "output": "출력",
-    "video": "비디오",
-    "audio": "오디오",
-    "presets": "프리셋"
-  },
-  "source": {
-    "analyzing": "소스 분석 중…",
-    "failedToRead": "메타데이터 읽기 실패",
-    "unavailable": "메타데이터 없음",
-    "duration": "재생 시간",
-    "frameRate": "프레임 레이트",
-    "dimensions": "해상도",
-    "videoCodec": "비디오 코덱",
-    "videoBitrate": "비디오 비트레이트",
-    "audioCodec": "오디오 코덱",
-    "containerBitrate": "컨테이너 비트레이트"
-  },
-  "output": {
-    "outputName": "출력 이름",
-    "placeholder": "my_render_final",
-    "hint": "원본 파일 옆에 저장됩니다. 확장자는 선택한 컨테이너를 따릅니다.",
-    "container": "출력 컨테이너"
-  },
-  "video": {
-    "resolutionFramerate": "해상도 및 프레임 레이트",
-    "width": "너비",
-    "height": "높이",
-    "scalingAlgorithm": "스케일링 알고리즘",
-    "framerate": "프레임 레이트",
-    "sameAsSource": "소스와 동일",
-    "encoder": "비디오 인코더",
-    "encodingSpeed": "인코딩 속도",
-    "qualityControl": "품질 제어",
-    "constantQuality": "고정 품질",
-    "targetBitrate": "목표 비트레이트",
-    "encodingQuality": "인코딩 품질",
-    "qualityFactor": "품질 계수",
-    "lowQuality": "저품질",
-    "bestQuality": "최고 품질",
-    "lossless": "무손실",
-    "smallest": "최소",
-    "targetBitrateKbps": "목표 비트레이트 (kbps)"
-  },
-  "audio": {
-    "channelsBitrate": "채널 및 비트레이트",
-    "original": "원본",
-    "stereo": "스테레오 (2.0)",
-    "mono": "모노 (1.0)",
-    "bitrateKbps": "비트레이트 (kbps)",
-    "bitrateIgnored": "무손실 코덱에서는 비트레이트 무시",
-    "codec": "오디오 코덱",
-    "incompatibleContainer": "호환되지 않는 컨테이너",
-    "sourceTracks": "소스 트랙",
-    "channels": "CH"
-  },
-  "presets": {
-    "library": "프리셋 라이브러리",
-    "label": "프리셋 라벨",
-    "applied": "적용됨",
-    "deletePreset": "프리셋 삭제",
-    "nameRequired": "이름 필요",
-    "notSaved": "프리셋 미저장",
-    "saved": "프리셋 저장됨",
-    "appliedName": "{name} 적용됨",
-    "unableToDelete": "삭제 불가",
-    "removed": "프리셋 삭제됨"
-  },
-  "settings": {
-    "title": "설정",
-    "maxConcurrency": "최대 동시 실행",
-    "saving": "저장 중...",
-    "appUpdates": "앱 업데이트",
-    "checkOnStartup": "시작 시 업데이트 확인",
-    "checking": "확인 중...",
-    "checkForUpdates": "업데이트 확인",
-    "updateAvailable": "업데이트 있음!",
-    "latestVersion": "최신 버전입니다.",
-    "errorChecking": "업데이트 확인 오류",
-    "visuals": "외관",
-    "windowTint": "창 색조",
-    "language": "언어"
-  },
-  "logs": {
-    "noActiveProcesses": "활성 프로세스 없음",
-    "waitingForOutput": "프로세스 시작됨, 출력 대기 중...",
-    "selectTask": "콘솔 출력을 보려면 작업 선택"
-  },
-  "update": {
-    "available": "업데이트 있음",
-    "versionAvailable": "버전 {version} 사용 가능",
-    "later": "나중에",
-    "updateNow": "지금 업데이트"
-  },
-  "encodingSpeed": {
-    "ultrafast": "초고속",
-    "ultrafastDesc": "최대 파일, 최고속 변환",
-    "superfast": "매우 빠름",
-    "superfastDesc": "매우 큰 파일",
-    "veryfast": "아주 빠름",
-    "veryfastDesc": "큰 파일",
-    "faster": "빠름",
-    "fasterDesc": "다소 큰 파일",
-    "fast": "빠른",
-    "fastDesc": "약간 큰 파일",
-    "medium": "보통",
-    "mediumDesc": "균형",
-    "slow": "느림",
-    "slowDesc": "더 나은 압축",
-    "slower": "더 느림",
-    "slowerDesc": "높은 압축",
-    "veryslow": "매우 느림",
-    "veryslowDesc": "최소 파일, 최저속 변환"
-  },
-  "scalingAlgorithm": {
-    "bicubic": "바이큐빅",
-    "lanczos": "란초스",
-    "bilinear": "바이리니어",
-    "nearest": "니어레스트"
-  }
+	"_meta": {
+		"name": "한국어",
+		"flag": "🇰🇷"
+	},
+	"common": {
+		"save": "저장",
+		"apply": "적용",
+		"cancel": "취소",
+		"close": "닫기",
+		"delete": "삭제",
+		"name": "이름",
+		"size": "크기",
+		"state": "상태",
+		"target": "대상"
+	},
+	"titlebar": {
+		"close": "닫기",
+		"minimize": "최소화",
+		"maximize": "최대화",
+		"toggleSize": "크기 전환",
+		"dashboard": "대시보드",
+		"logs": "로그",
+		"storage": "저장소:",
+		"items": "항목:",
+		"addSource": "소스 추가",
+		"processing": "처리 중...",
+		"start": "시작"
+	},
+	"fileList": {
+		"dropFiles": "파일을 드롭하거나 소스 추가 사용",
+		"endOfList": "목록 끝 // {count}개 객체",
+		"importSource": "소스 파일 가져오기"
+	},
+	"fileStatus": {
+		"ready": "준비",
+		"queued": "대기",
+		"error": "오류",
+		"idle": "유휴"
+	},
+	"emptySelection": {
+		"hint": "설정에 접근하려면 대기열에서 항목을 선택하세요"
+	},
+	"tabs": {
+		"source": "소스",
+		"output": "출력",
+		"video": "비디오",
+		"audio": "오디오",
+		"presets": "프리셋"
+	},
+	"source": {
+		"analyzing": "소스 분석 중…",
+		"failedToRead": "메타데이터 읽기 실패",
+		"unavailable": "메타데이터 없음",
+		"duration": "재생 시간",
+		"frameRate": "프레임 레이트",
+		"dimensions": "해상도",
+		"videoCodec": "비디오 코덱",
+		"videoBitrate": "비디오 비트레이트",
+		"audioCodec": "오디오 코덱",
+		"containerBitrate": "컨테이너 비트레이트"
+	},
+	"output": {
+		"outputName": "출력 이름",
+		"placeholder": "my_render_final",
+		"hint": "원본 파일 옆에 저장됩니다. 확장자는 선택한 컨테이너를 따릅니다.",
+		"container": "출력 컨테이너"
+	},
+	"video": {
+		"resolutionFramerate": "해상도 및 프레임 레이트",
+		"width": "너비",
+		"height": "높이",
+		"scalingAlgorithm": "스케일링 알고리즘",
+		"framerate": "프레임 레이트",
+		"sameAsSource": "소스와 동일",
+		"encoder": "비디오 인코더",
+		"encodingSpeed": "인코딩 속도",
+		"qualityControl": "품질 제어",
+		"constantQuality": "고정 품질",
+		"targetBitrate": "목표 비트레이트",
+		"encodingQuality": "인코딩 품질",
+		"qualityFactor": "품질 계수",
+		"lowQuality": "저품질",
+		"bestQuality": "최고 품질",
+		"lossless": "무손실",
+		"smallest": "최소",
+		"targetBitrateKbps": "목표 비트레이트 (kbps)"
+	},
+	"audio": {
+		"channelsBitrate": "채널 및 비트레이트",
+		"original": "원본",
+		"stereo": "스테레오 (2.0)",
+		"mono": "모노 (1.0)",
+		"bitrateKbps": "비트레이트 (kbps)",
+		"bitrateIgnored": "무손실 코덱에서는 비트레이트 무시",
+		"codec": "오디오 코덱",
+		"incompatibleContainer": "호환되지 않는 컨테이너",
+		"sourceTracks": "소스 트랙",
+		"channels": "CH"
+	},
+	"presets": {
+		"library": "프리셋 라이브러리",
+		"label": "프리셋 라벨",
+		"applied": "적용됨",
+		"deletePreset": "프리셋 삭제",
+		"nameRequired": "이름 필요",
+		"notSaved": "프리셋 미저장",
+		"saved": "프리셋 저장됨",
+		"appliedName": "{name} 적용됨",
+		"unableToDelete": "삭제 불가",
+		"removed": "프리셋 삭제됨"
+	},
+	"settings": {
+		"title": "설정",
+		"maxConcurrency": "최대 동시 실행",
+		"saving": "저장 중...",
+		"appUpdates": "앱 업데이트",
+		"checkOnStartup": "시작 시 업데이트 확인",
+		"checking": "확인 중...",
+		"checkForUpdates": "업데이트 확인",
+		"updateAvailable": "업데이트 있음!",
+		"latestVersion": "최신 버전입니다.",
+		"errorChecking": "업데이트 확인 오류",
+		"visuals": "외관",
+		"windowTint": "창 색조",
+		"language": "언어"
+	},
+	"logs": {
+		"noActiveProcesses": "활성 프로세스 없음",
+		"waitingForOutput": "프로세스 시작됨, 출력 대기 중...",
+		"selectTask": "콘솔 출력을 보려면 작업 선택"
+	},
+	"update": {
+		"available": "업데이트 있음",
+		"versionAvailable": "버전 {version} 사용 가능",
+		"later": "나중에",
+		"updateNow": "지금 업데이트"
+	},
+	"encodingSpeed": {
+		"ultrafast": "초고속",
+		"ultrafastDesc": "최대 파일, 최고속 변환",
+		"superfast": "매우 빠름",
+		"superfastDesc": "매우 큰 파일",
+		"veryfast": "아주 빠름",
+		"veryfastDesc": "큰 파일",
+		"faster": "빠름",
+		"fasterDesc": "다소 큰 파일",
+		"fast": "빠른",
+		"fastDesc": "약간 큰 파일",
+		"medium": "보통",
+		"mediumDesc": "균형",
+		"slow": "느림",
+		"slowDesc": "더 나은 압축",
+		"slower": "더 느림",
+		"slowerDesc": "높은 압축",
+		"veryslow": "매우 느림",
+		"veryslowDesc": "최소 파일, 최저속 변환"
+	},
+	"scalingAlgorithm": {
+		"bicubic": "바이큐빅",
+		"lanczos": "란초스",
+		"bilinear": "바이리니어",
+		"nearest": "니어레스트"
+	}
 }

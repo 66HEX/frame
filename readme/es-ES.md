@@ -40,7 +40,7 @@
 
 ### Núcleo de conversión
 
-- **Contenedores soportados:** `mp4`, `mkv`, `webm`, `mov`, `mp3`
+- **Contenedores soportados:** `mp4`, `mkv`, `webm`, `mov`, `mp3`, `m4a`, `wav`, `flac`.
 - **Codificadores de video:**
   - `libx264` (H.264 / AVC)
   - `libx265` (H.265 / HEVC)

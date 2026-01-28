@@ -16,7 +16,6 @@
 	};
 
 	onMount(() => {
-		// 异步获取系统语言并更新（如果没有存储的语言设置）
 		initI18n();
 
 		platform = type();
@@ -33,7 +32,8 @@
 <div
 	class="**:focus:ring-none flex h-screen flex-col overflow-hidden border-none bg-background select-none **:focus:outline-none"
 	class:rounded-2xl={platform === 'macos'}
-	style="background-color: color-mix(in srgb, var(--background), transparent {100 - themeStore.opacity}%)"
+	style="background-color: color-mix(in srgb, var(--background), transparent {100 -
+		themeStore.opacity}%)"
 >
 	<div class="relative flex-1">
 		{@render children()}

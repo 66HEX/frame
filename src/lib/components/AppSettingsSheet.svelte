@@ -109,7 +109,9 @@
 	transition:fly={{ x: 320, duration: 300, opacity: 1 }}
 >
 	<div class="flex items-center justify-between border-b border-gray-alpha-100 px-4 py-3">
-		<h2 class="text-[10px] font-medium tracking-widest text-foreground uppercase">{$_('settings.title')}</h2>
+		<h2 class="text-[10px] font-medium tracking-widest text-foreground uppercase">
+			{$_('settings.title')}
+		</h2>
 		<button onclick={onClose} class="text-gray-alpha-600 transition-colors hover:text-foreground">
 			<X size={16} />
 		</button>
@@ -182,19 +184,22 @@
 			<Label variant="section">{$_('settings.language')}</Label>
 			<div class="flex flex-wrap gap-2">
 				{#each supportedLocales as loc (loc.code)}
-					<button
-						type="button"
-						class="group relative flex h-10 w-10 items-center justify-center rounded-md border transition-colors {currentLocale === loc.code ? 'border-blue-500 bg-blue-500/10' : 'border-gray-alpha-200 hover:border-gray-alpha-400'}"
+					<Button
+						variant={currentLocale === loc.code ? 'selected' : 'outline'}
 						onclick={() => {
 							currentLocale = loc.code;
 							setLocale(loc.code);
 						}}
+						size="icon-large"
+						class="group relative"
 					>
 						<span class="text-xl">{loc.flag}</span>
-						<span class="pointer-events-none absolute -top-8 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded bg-foreground px-2 py-1 text-xs text-background opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+						<span
+							class="pointer-events-none absolute -top-8 left-1/2 z-10 -translate-x-1/2 rounded bg-foreground px-2 py-1 text-xs whitespace-nowrap text-background normal-case opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
+						>
 							{loc.name}
 						</span>
-					</button>
+					</Button>
 				{/each}
 			</div>
 		</div>

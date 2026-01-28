@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { cn } from '$lib/utils/cn';
-	import type {
-		ConversionConfig,
-		MetadataStatus,
-		PresetDefinition,
-		SourceMetadata
+	import {
+		AUDIO_ONLY_CONTAINERS,
+		type ConversionConfig,
+		type MetadataStatus,
+		type PresetDefinition,
+		type SourceMetadata
 	} from '$lib/types';
 	import { _ } from '$lib/i18n';
 
@@ -45,9 +46,9 @@
 		metadataError?: string;
 	} = $props();
 
-	const AUDIO_ONLY_CONTAINERS = ['mp3', 'm4a', 'wav', 'flac'];
-
 	let activeTab = $state<TabId>('source');
+
+	const isSourceAudioOnly = $derived(!!metadata && !metadata.videoCodec);
 </script>
 
 <div class="flex h-full flex-col">
@@ -55,7 +56,8 @@
 		<div class="flex w-full items-center justify-start gap-4">
 			{#each TABS as tabId (tabId)}
 				{@const isVideoDisabled =
-					tabId === 'video' && AUDIO_ONLY_CONTAINERS.includes(config.container)}
+					tabId === 'video' &&
+					(AUDIO_ONLY_CONTAINERS.includes(config.container) || isSourceAudioOnly)}
 				<button
 					disabled={isVideoDisabled}
 					class={cn(
@@ -75,9 +77,17 @@
 		{#if activeTab === 'source'}
 			<SourceTab {metadata} status={metadataStatus} error={metadataError} />
 		{:else if activeTab === 'output'}
-			<OutputTab {config} {disabled} {outputName} {onUpdate} {onUpdateOutputName} />
+			<OutputTab {config} {disabled} {metadata} {outputName} {onUpdate} {onUpdateOutputName} />
 		{:else if activeTab === 'presets'}
-			<PresetsTab {config} {disabled} {presets} {onApplyPreset} {onSavePreset} {onDeletePreset} />
+			<PresetsTab
+				{config}
+				{disabled}
+				{presets}
+				{metadata}
+				{onApplyPreset}
+				{onSavePreset}
+				{onDeletePreset}
+			/>
 		{:else if activeTab === 'video'}
 			<VideoTab {config} {disabled} {onUpdate} />
 		{:else}

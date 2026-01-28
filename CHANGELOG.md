@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-01-28
+
+### Added
+
+- **Audio File Support:** Added full support for importing and converting standalone audio files (MP3, WAV, FLAC, M4A, AAC).
+- **Smart UI Adaptation:** The interface now automatically adapts when an audio file is selected:
+  - **Tab Management:** The "Video" tab is automatically disabled.
+  - **Container Filtering:** Video containers (MP4, MKV, etc.) are disabled in the output settings to prevent invalid configurations.
+  - **Preset Filtering:** Incompatible video presets are visually disabled in the presets library.
+- **Auto-Format Switching:** Importing an audio-only file automatically switches the output configuration to a compatible audio format (e.g., MP3) if a video container was previously selected.
+
 ## [0.5.0] - 2026-01-27
 
 ### Added
@@ -61,7 +72,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - **UI:** Removed Windows titlebar in favor of Linux titlebar which aligns better with the overall design and user experience.
-
 
 ## [0.2.3] - 2026-01-25
 
@@ -227,7 +237,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.5.0...HEAD
+[Unreleased]: https://github.com/66HEX/frame/compare/0.6.0...HEAD
+[0.5.0]: https://github.com/66HEX/frame/compare/0.5.0...0.6.0
 [0.5.0]: https://github.com/66HEX/frame/compare/0.4.0...0.5.0
 [0.4.0]: https://github.com/66HEX/frame/compare/0.3.3...0.4.0
 [0.3.3]: https://github.com/66HEX/frame/compare/0.3.2...0.3.3
