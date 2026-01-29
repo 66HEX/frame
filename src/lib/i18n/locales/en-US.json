@@ -95,6 +95,7 @@
 		"bitrateKbps": "Bitrate (kbps)",
 		"bitrateIgnored": "Bitrate ignored for lossless codecs",
 		"volume": "Volume",
+		"volumeMuted": "Audio is muted",
 		"volumeReduced": "Audio will be quieter",
 		"volumeBoosted": "Audio will be louder (may clip)",
 		"codec": "Audio Codec",

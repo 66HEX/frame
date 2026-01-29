@@ -107,11 +107,17 @@
 					oninput={(e) => onUpdate({ audioVolume: Number(e.currentTarget.value) })}
 					disabled={disabled}
 				/>
-				{#if config.audioVolume !== 100}
-					<p class="text-gray-alpha-600 text-[9px] uppercase">
-						{config.audioVolume < 100 ? $_('audio.volumeReduced') : $_('audio.volumeBoosted')}
-					</p>
-				{/if}
+			{#if config.audioVolume !== 100}
+				<p class="text-gray-alpha-600 text-[9px] uppercase">
+					{#if config.audioVolume === 0}
+						{$_('audio.volumeMuted')}
+					{:else if config.audioVolume < 100}
+						{$_('audio.volumeReduced')}
+					{:else}
+						{$_('audio.volumeBoosted')}
+					{/if}
+				</p>
+			{/if}
 			</div>
 		</div>
 	</div>
