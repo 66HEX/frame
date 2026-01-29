@@ -97,7 +97,10 @@
 			<div class="space-y-2 pt-1">
 				<div class="flex items-center justify-between">
 					<Label for="audio-volume">{$_('audio.volume')}</Label>
-					<span class="text-[10px] tabular-nums text-gray-alpha-600">{config.audioVolume}%</span>
+					<span
+						class="rounded border border-ds-blue-600 bg-ds-blue-900/20 px-1.5 text-[10px] font-medium text-ds-blue-600"
+						>{config.audioVolume}%</span
+					>
 				</div>
 				<Slider
 					id="audio-volume"
@@ -106,19 +109,12 @@
 					step={1}
 					value={config.audioVolume}
 					oninput={(e) => onUpdate({ audioVolume: Number(e.currentTarget.value) })}
-					disabled={disabled}
+					{disabled}
 				/>
-			{#if config.audioVolume !== 100}
-				<p class="text-gray-alpha-600 text-[9px] uppercase">
-					{#if config.audioVolume === 0}
-						{$_('audio.volumeMuted')}
-					{:else if config.audioVolume < 100}
-						{$_('audio.volumeReduced')}
-					{:else}
-						{$_('audio.volumeBoosted')}
-					{/if}
-				</p>
-			{/if}
+				<div class="text-gray-alpha-600 flex justify-between text-[9px] uppercase">
+					<span>{$_('audio.muted')}</span>
+					<span>{$_('audio.maxVolume')}</span>
+				</div>
 			</div>
 
 			<div class="flex items-start gap-2 pt-2">
