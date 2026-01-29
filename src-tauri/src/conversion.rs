@@ -28,6 +28,7 @@ use windows::{
 };
 
 const DEFAULT_MAX_CONCURRENCY: usize = 2;
+const VOLUME_EPSILON: f64 = 0.01;
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -409,6 +410,10 @@ pub struct ConversionConfig {
     pub audio_codec: String,
     pub audio_bitrate: String,
     pub audio_channels: String,
+    #[serde(default = "default_audio_volume")]
+    pub audio_volume: f64,
+    #[serde(default)]
+    pub audio_normalize: bool,
     pub selected_audio_tracks: Vec<u32>,
     pub resolution: String,
     pub custom_width: Option<String>,
@@ -425,6 +430,10 @@ pub struct ConversionConfig {
 
 fn default_quality() -> u32 {
     50
+}
+
+fn default_audio_volume() -> f64 {
+    100.0
 }
 
 #[derive(Clone, Serialize)]
@@ -610,6 +619,22 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
             args.push("1".to_string());
         }
         _ => {}
+    }
+
+    let mut audio_filters: Vec<String> = Vec::new();
+
+    if config.audio_normalize {
+        audio_filters.push("loudnorm=I=-16:TP=-1.5:LRA=11".to_string());
+    }
+
+    if (config.audio_volume - 100.0).abs() > VOLUME_EPSILON {
+        let volume_factor = config.audio_volume / 100.0;
+        audio_filters.push(format!("volume={:.2}", volume_factor));
+    }
+
+    if !audio_filters.is_empty() {
+        args.push("-af".to_string());
+        args.push(audio_filters.join(","));
     }
 
     args.push("-y".to_string());
@@ -982,6 +1007,7 @@ mod tests {
             audio_codec: "aac".into(),
             audio_bitrate: "128".into(),
             audio_channels: "original".into(),
+            audio_volume: 100.0,
             selected_audio_tracks: vec![],
             resolution: "original".into(),
             custom_width: None,
@@ -1019,6 +1045,7 @@ mod tests {
             audio_codec: "aac".into(),
             audio_bitrate: "128".into(),
             audio_channels: "original".into(),
+            audio_volume: 100.0,
             selected_audio_tracks: vec![],
             resolution: "1080p".into(),
             custom_width: None,
@@ -1047,6 +1074,7 @@ mod tests {
             audio_codec: "aac".into(),
             audio_bitrate: "128".into(),
             audio_channels: "original".into(),
+            audio_volume: 100.0,
             selected_audio_tracks: vec![],
             resolution: "720p".into(),
             custom_width: None,
@@ -1076,6 +1104,7 @@ mod tests {
             audio_codec: "ac3".into(),
             audio_bitrate: "192".into(),
             audio_channels: "original".into(),
+            audio_volume: 100.0,
             selected_audio_tracks: vec![],
             resolution: "original".into(),
             custom_width: None,
@@ -1107,6 +1136,7 @@ mod tests {
             audio_codec: "libopus".into(),
             audio_bitrate: "96".into(),
             audio_channels: "original".into(),
+            audio_volume: 100.0,
             selected_audio_tracks: vec![],
             resolution: "original".into(),
             custom_width: None,
@@ -1158,6 +1188,7 @@ mod tests {
             audio_codec: "aac".into(),
             audio_bitrate: "128".into(),
             audio_channels: "original".into(),
+            audio_volume: 100.0,
             selected_audio_tracks: vec![],
             resolution: "original".into(),
             custom_width: None,
@@ -1262,5 +1293,24 @@ mod tests {
                 vf_arg
             );
         }
+    }
+
+    #[test]
+    fn test_audio_volume_filter() {
+        let config = sample_config("mp4");
+        let args = build_ffmpeg_args("in.mp4", "out.mp4", &config);
+        assert!(!args.iter().any(|a| a == "-af"), "no -af at 100% volume");
+
+        let mut config_reduced = sample_config("mp4");
+        config_reduced.audio_volume = 50.0;
+        let args_reduced = build_ffmpeg_args("in.mp4", "out.mp4", &config_reduced);
+        let af_index = args_reduced.iter().position(|r| r == "-af").unwrap();
+        assert_eq!(args_reduced[af_index + 1], "volume=0.50");
+
+        let mut config_boosted = sample_config("mp4");
+        config_boosted.audio_volume = 150.0;
+        let args_boosted = build_ffmpeg_args("in.mp4", "out.mp4", &config_boosted);
+        let af_index = args_boosted.iter().position(|r| r == "-af").unwrap();
+        assert_eq!(args_boosted[af_index + 1], "volume=1.50");
     }
 }

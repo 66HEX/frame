@@ -25,7 +25,7 @@
 		bind:checked
 		{indeterminate}
 		class={cn(
-			'peer border-gray-alpha-400 h-3.5 w-3.5 cursor-pointer appearance-none rounded border bg-transparent transition-colors checked:border-ds-blue-600 checked:bg-ds-blue-600 disabled:cursor-not-allowed disabled:opacity-50',
+			'peer border-gray-alpha-400 h-3.5 w-3.5 cursor-pointer appearance-none rounded border bg-transparent transition-colors checked:border-ds-blue-600 checked:bg-ds-blue-600 disabled:pointer-events-none disabled:opacity-50',
 			className
 		)}
 		{...props}

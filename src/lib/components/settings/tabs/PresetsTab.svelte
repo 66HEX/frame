@@ -139,7 +139,7 @@
 						if (isCompatible) applyPreset(preset);
 					}
 				}}
-				class={cn('pr-1', !isCompatible && 'cursor-not-allowed opacity-50')}
+				class={cn('pr-1', !isCompatible && 'pointer-events-none opacity-50')}
 			>
 				<span class="truncate">{preset.name}</span>
 				<div class="flex items-center gap-2">

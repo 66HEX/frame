@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { fade } from 'svelte/transition';
+	import { fade, scale } from 'svelte/transition';
 	import { convertFileSrc } from '@tauri-apps/api/core';
 	import { Play, Pause } from 'lucide-svelte';
 	import Button from '$lib/components/ui/Button.svelte';
@@ -155,11 +155,11 @@
 	onclick={onCancel}
 >
 	<div
-		class="flex h-[85vh] w-[80vw] flex-col overflow-hidden rounded-xl border border-ds-blue-600 bg-ds-blue-900/20 p-3 shadow-2xl"
-		transition:fade={{ duration: 100 }}
+		class="flex h-[85vh] w-[80vw] flex-col overflow-hidden rounded-xl border border-ds-blue-600 bg-ds-blue-900/20 p-3 shadow-2xl backdrop-blur-sm"
+		transition:scale={{ start: 1.025, duration: 100, opacity: 1 }}
 		onclick={(e) => e.stopPropagation()}
 	>
-		<div class="relative flex-1">
+		<div class="relative flex-1 rounded-lg bg-black">
 			<video
 				bind:this={videoRef}
 				src={videoSrc}
@@ -175,7 +175,7 @@
 
 			{#if !isPlaying}
 				<div
-					class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-background/40"
+					class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-background/60"
 				>
 					<div
 						class="flex size-16 items-center justify-center rounded-full bg-gray-alpha-100 backdrop-blur-md"
@@ -186,7 +186,7 @@
 			{/if}
 		</div>
 
-		<div class="mt-4">
+		<div class="mt-4 px-2">
 			<div
 				class="relative mb-6 h-8 cursor-pointer select-none"
 				bind:this={sliderRef}

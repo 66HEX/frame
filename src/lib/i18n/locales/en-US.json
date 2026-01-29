@@ -94,6 +94,11 @@
 		"mono": "Mono (1.0)",
 		"bitrateKbps": "Bitrate (kbps)",
 		"bitrateIgnored": "Bitrate ignored for lossless codecs",
+		"volume": "Volume",
+		"muted": "Muted",
+		"maxVolume": "Max Volume",
+		"normalize": "Normalize Audio",
+		"normalizeHint": "EBU R128 loudness normalization for consistent volume",
 		"codec": "Audio Codec",
 		"incompatibleContainer": "Incompatible container",
 		"sourceTracks": "Source Tracks",
@@ -173,9 +178,5 @@
 		"lanczos": "Lanczos",
 		"bilinear": "Bilinear",
 		"nearest": "Nearest"
-	},
-	"languages": {
-		"en-US": "English",
-		"zh-CN": "简体中文"
 	}
 }
