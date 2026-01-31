@@ -30,7 +30,6 @@
 	},
 	"fileList": {
 		"dropFiles": "Drop files or use ADD SOURCE",
-		"endOfList": "END OF LIST // {count} OBJECTS",
 		"importSource": "Import Source Files"
 	},
 	"fileStatus": {

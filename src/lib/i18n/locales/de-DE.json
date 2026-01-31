@@ -30,7 +30,6 @@
 	},
 	"fileList": {
 		"dropFiles": "Dateien ablegen oder QUELLE HINZUFÜGEN",
-		"endOfList": "LISTENENDE // {count} OBJEKTE",
 		"importSource": "Quelldateien importieren"
 	},
 	"fileStatus": {

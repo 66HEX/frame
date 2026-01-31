@@ -30,7 +30,6 @@
 	},
 	"fileList": {
 		"dropFiles": "拖放文件或使用添加源文件",
-		"endOfList": "列表结束 // 共 {count} 个对象",
 		"importSource": "导入源文件"
 	},
 	"fileStatus": {

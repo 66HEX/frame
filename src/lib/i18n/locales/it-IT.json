@@ -30,7 +30,6 @@
 	},
 	"fileList": {
 		"dropFiles": "Trascina file o usa AGGIUNGI SORGENTE",
-		"endOfList": "FINE ELENCO // {count} OGGETTI",
 		"importSource": "Importa file sorgente"
 	},
 	"fileStatus": {

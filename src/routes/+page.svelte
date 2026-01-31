@@ -13,7 +13,7 @@
 	import SettingsPanel from '$lib/components/settings/SettingsPanel.svelte';
 	import EmptySelection from '$lib/components/EmptySelection.svelte';
 	import AppSettingsSheet from '$lib/components/AppSettingsSheet.svelte';
-	import TrimModal from '$lib/components/TrimModal.svelte';
+	import PreviewPanel from '$lib/components/PreviewPanel.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Label from '$lib/components/ui/Label.svelte';
 	import { _ } from '$lib/i18n';
@@ -59,13 +59,11 @@
 	let maxConcurrencySetting = $state(2);
 	let isDragging = $state(false);
 	let showSettings = $state(false);
-	let trimmingFileId = $state<string | null>(null);
 
 	let activeView = $state<'dashboard' | 'logs'>('dashboard');
 	let logs = $state<Record<string, string[]>>({});
 
 	let selectedFile = $derived(files.find((f) => f.id === selectedFileId));
-	let trimmingFile = $derived(files.find((f) => f.id === trimmingFileId));
 	let totalSize = $derived(files.reduce((acc, curr) => acc + curr.size, 0));
 	let presets = $derived([...DEFAULT_PRESETS, ...customPresets] as PresetDefinition[]);
 	let selectedCount = $derived(files.filter((f) => f.isSelectedForConversion).length);
@@ -469,27 +467,19 @@
 		}
 	}
 
-	function handleOpenTrim(id: string) {
-		trimmingFileId = id;
-	}
-
 	function handleSaveTrim(start?: string, end?: string) {
-		if (trimmingFileId) {
-			files = files.map((f) => {
-				if (f.id === trimmingFileId) {
-					return {
-						...f,
-						config: {
-							...f.config,
-							startTime: start,
-							endTime: end
-						}
-					};
+		if (!selectedFileId) return;
+		files = files.map((f) => {
+			if (f.id !== selectedFileId) return f;
+			return {
+				...f,
+				config: {
+					...f.config,
+					startTime: start,
+					endTime: end
 				}
-				return f;
-			});
-			trimmingFileId = null;
-		}
+			};
+		});
 	}
 
 	async function startConversion() {
@@ -540,17 +530,42 @@
 	<div class="relative flex-1 overflow-hidden p-4">
 		{#if activeView === 'dashboard'}
 			<div class="grid h-full grid-cols-12 gap-4">
-				<FileList
-					{files}
-					{selectedFileId}
-					onSelect={(id) => (selectedFileId = id)}
-					onRemove={handleRemoveFile}
-					onToggleBatch={handleToggleBatch}
-					onToggleAllBatch={handleToggleAllBatch}
-					onPause={handlePause}
-					onResume={handleResume}
-					onTrim={handleOpenTrim}
-				/>
+				<div class="col-span-12 h-full min-h-0 lg:col-span-8">
+					<div class="grid h-full grid-rows-12 gap-4">
+						<div class="row-span-8 min-h-0">
+							{#if selectedFile}
+								{#key selectedFile.id}
+									<PreviewPanel
+										filePath={selectedFile.path}
+										initialStartTime={selectedFile.config.startTime}
+										initialEndTime={selectedFile.config.endTime}
+										rotation={selectedFile.config.rotation}
+										flipHorizontal={selectedFile.config.flipHorizontal}
+										flipVertical={selectedFile.config.flipVertical}
+										onSave={handleSaveTrim}
+									/>
+								{/key}
+							{:else}
+								<div
+									class="flex h-full flex-col items-center justify-center rounded-lg border border-gray-alpha-100 bg-gray-alpha-100"
+								></div>
+							{/if}
+						</div>
+
+						<div class="row-span-4 min-h-0">
+							<FileList
+								{files}
+								{selectedFileId}
+								onSelect={(id) => (selectedFileId = id)}
+								onRemove={handleRemoveFile}
+								onToggleBatch={handleToggleBatch}
+								onToggleAllBatch={handleToggleAllBatch}
+								onPause={handlePause}
+								onResume={handleResume}
+							/>
+						</div>
+					</div>
+				</div>
 
 				<div class="col-span-12 h-full min-h-0 lg:col-span-4">
 					<div
@@ -659,19 +674,6 @@
 			maxConcurrency={maxConcurrencySetting}
 			onUpdate={handleUpdateMaxConcurrency}
 			onClose={() => (showSettings = false)}
-		/>
-	{/if}
-
-	{#if trimmingFile}
-		<TrimModal
-			filePath={trimmingFile.path}
-			initialStartTime={trimmingFile.config.startTime}
-			initialEndTime={trimmingFile.config.endTime}
-			rotation={trimmingFile.config.rotation}
-			flipHorizontal={trimmingFile.config.flipHorizontal}
-			flipVertical={trimmingFile.config.flipVertical}
-			onSave={handleSaveTrim}
-			onCancel={() => (trimmingFileId = null)}
 		/>
 	{/if}
 </div>

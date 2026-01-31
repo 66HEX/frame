@@ -30,7 +30,6 @@
 	},
 	"fileList": {
 		"dropFiles": "Déposez des fichiers ou utilisez AJOUTER SOURCE",
-		"endOfList": "FIN DE LISTE // {count} OBJETS",
 		"importSource": "Importer fichiers source"
 	},
 	"fileStatus": {

@@ -1,9 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { fade, scale } from 'svelte/transition';
 	import { convertFileSrc } from '@tauri-apps/api/core';
-	import { Play, Pause } from 'lucide-svelte';
-	import Button from '$lib/components/ui/Button.svelte';
+	import { Play } from 'lucide-svelte';
 	import Label from '$lib/components/ui/Label.svelte';
 	import TimecodeInput from '$lib/components/ui/TimecodeInput.svelte';
 	import { _ } from '$lib/i18n';
@@ -16,8 +14,7 @@
 		rotation = '0',
 		flipHorizontal = false,
 		flipVertical = false,
-		onSave,
-		onCancel
+		onSave
 	}: {
 		filePath: string;
 		initialStartTime?: string;
@@ -26,7 +23,6 @@
 		flipHorizontal?: boolean;
 		flipVertical?: boolean;
 		onSave: (start?: string, end?: string) => void;
-		onCancel: () => void;
 	} = $props();
 
 	let videoSrc = $state('');
@@ -73,6 +69,26 @@
 	let duration = $state(0);
 	let startValue = $state(0);
 	let endValue = $state(0);
+	let previousInitialStart: string | undefined;
+	let previousInitialEnd: string | undefined;
+
+	$effect(() => {
+		if (initialStartTime !== previousInitialStart) {
+			previousInitialStart = initialStartTime;
+			startValue = initialStartTime ? parseTimeToSeconds(initialStartTime) : 0;
+		}
+	});
+
+	$effect(() => {
+		if (initialEndTime !== previousInitialEnd) {
+			previousInitialEnd = initialEndTime;
+			if (initialEndTime) {
+				endValue = parseTimeToSeconds(initialEndTime);
+			} else {
+				endValue = duration || 0;
+			}
+		}
+	});
 
 	function parseTimeToSeconds(timeStr?: string): number {
 		if (!timeStr) return 0;
@@ -89,10 +105,6 @@
 		const s = seconds % 60;
 		return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toFixed(3).padStart(6, '0')}`;
 	}
-
-	onMount(() => {
-		if (initialStartTime) startValue = parseTimeToSeconds(initialStartTime);
-	});
 
 	function handleMetadata() {
 		if (videoRef) {
@@ -133,9 +145,9 @@
 		}
 	}
 
-	function handleSave() {
+	function commitTrimValues() {
 		const startStr = startValue > 0 ? formatTime(startValue) : undefined;
-		const endStr = endValue < duration ? formatTime(endValue) : undefined;
+		const endStr = duration > 0 && endValue < duration ? formatTime(endValue) : undefined;
 		onSave(startStr, endStr);
 	}
 
@@ -159,13 +171,18 @@
 		if (dragging === 'start') {
 			startValue = Math.min(time, endValue - 1);
 			if (videoRef) videoRef.currentTime = startValue;
+			commitTrimValues();
 		} else {
 			endValue = Math.max(time, startValue + 1);
 			if (videoRef) videoRef.currentTime = endValue;
+			commitTrimValues();
 		}
 	}
 
 	function handleMouseUp() {
+		if (dragging) {
+			commitTrimValues();
+		}
 		dragging = null;
 		window.removeEventListener('mousemove', handleMouseMove);
 		window.removeEventListener('mouseup', handleMouseUp);
@@ -183,134 +200,115 @@
 	}
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-	class="absolute inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-sm"
-	transition:fade={{ duration: 100 }}
-	onclick={onCancel}
+	class="flex h-full flex-col overflow-hidden rounded-xl border border-gray-alpha-100 bg-gray-alpha-100 p-4"
 >
 	<div
-		class="flex w-[80vw] flex-col overflow-hidden rounded-xl border border-ds-blue-600 bg-ds-blue-900/20 p-3 shadow-2xl backdrop-blur-sm"
-		transition:scale={{ start: 1.025, duration: 100, opacity: 1 }}
-		onclick={(e) => e.stopPropagation()}
+		class="border-gray-alpha-200 relative flex min-h-0 flex-1 items-center justify-center rounded-lg border bg-background"
+		bind:this={containerRef}
 	>
-		<div
-			transition:fade={{ duration: 100 }}
-			class="relative flex h-100 items-center justify-center rounded-lg bg-background"
-			bind:this={containerRef}
+		<video
+			bind:this={videoRef}
+			src={videoSrc}
+			class="block overflow-hidden rounded-lg bg-background object-contain"
+			style={videoStyle}
+			style:transform={transformStyle}
+			onloadedmetadata={handleMetadata}
+			ontimeupdate={handleTimeUpdate}
+			onplay={() => (isPlaying = true)}
+			onpause={() => (isPlaying = false)}
+			onclick={togglePlay}
 		>
-			<video
-				bind:this={videoRef}
-				src={videoSrc}
-				class="block overflow-hidden rounded-lg bg-background object-contain transition-transform duration-300"
-				style={videoStyle}
-				style:transform={transformStyle}
-				onloadedmetadata={handleMetadata}
-				ontimeupdate={handleTimeUpdate}
-				onplay={() => (isPlaying = true)}
-				onpause={() => (isPlaying = false)}
-				onclick={togglePlay}
-			>
-				<track kind="captions" />
-			</video>
+			<track kind="captions" />
+		</video>
 
-			{#if !isPlaying}
-				<div
-					class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-background/60"
-				>
-					<div
-						class="flex size-16 items-center justify-center rounded-full bg-gray-alpha-100 backdrop-blur-md"
-					>
-						<Play size={24} fill="currentColor" class="ml-1" />
-					</div>
-				</div>
-			{/if}
-		</div>
-
-		<div class="mt-4 px-2">
+		{#if !isPlaying}
 			<div
-				class="relative mb-6 h-8 cursor-pointer select-none"
-				bind:this={sliderRef}
-				onmousedown={(e) => e.target === sliderRef && seekTo(e)}
+				class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-background/80"
 			>
 				<div
-					class="pointer-events-none absolute top-1/2 left-0 h-1.5 w-full -translate-y-1/2 overflow-hidden rounded-full bg-gray-alpha-100"
+					class="bg-gray-alpha-200 flex size-16 items-center justify-center rounded-full backdrop-blur-md"
 				>
-					<div
-						class="bg-gray-alpha-200 absolute h-full"
-						style="left: {(startValue / duration) * 100}%; right: {100 -
-							(endValue / duration) * 100}%;"
-					></div>
-				</div>
-
-				<div
-					class="bg-gray-alpha-600 pointer-events-none absolute top-1/2 z-10 h-4 w-0.5 -translate-y-1/2"
-					style="left: {(currentTime / duration) * 100}%"
-				></div>
-
-				<div
-					class="absolute top-1/2 z-20 -ml-2 flex h-4 w-4 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full border border-ds-blue-600 bg-background shadow-lg"
-					style="left: {(startValue / duration) * 100}%"
-					onmousedown={(e) => handleMouseDown(e, 'start')}
-				>
-					<div class="h-1.5 w-1.5 rounded-full bg-ds-blue-600"></div>
-				</div>
-
-				<div
-					class="absolute top-1/2 z-20 -ml-2 flex h-4 w-4 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full border border-ds-blue-600 bg-background shadow-lg"
-					style="left: {(endValue / duration) * 100}%"
-					onmousedown={(e) => handleMouseDown(e, 'end')}
-				>
-					<div class="h-1.5 w-1.5 rounded-full bg-ds-blue-600"></div>
+					<Play size={24} fill="currentColor" class="ml-1" />
 				</div>
 			</div>
+		{/if}
+	</div>
 
-			<div class="flex items-end justify-between gap-4">
-				<div class="flex gap-4">
-					<div class="space-y-1.5">
-						<Label>{$_('trim.startTime')}</Label>
-						<TimecodeInput
-							value={startValue}
-							onchange={(val) => {
-								if (val >= 0 && val < endValue) {
-									startValue = val;
-									if (videoRef) videoRef.currentTime = startValue;
-								}
-							}}
-						/>
-					</div>
-					<div class="space-y-1.5">
-						<Label>{$_('trim.endTime')}</Label>
-						<TimecodeInput
-							value={endValue}
-							onchange={(val) => {
-								if (val > startValue && val <= duration) {
-									endValue = val;
-									if (videoRef) videoRef.currentTime = endValue;
-								}
-							}}
-						/>
-					</div>
-					<div class="space-y-1.5">
-						<Label>{$_('trim.duration')}</Label>
-						<div class="text-gray-alpha-600 py-1.5 font-mono text-[10px] tracking-wide">
-							{formatTime(endValue - startValue)}
-						</div>
-					</div>
+	<div class="mt-4 px-2">
+		<div
+			class="relative mb-6 h-8 cursor-pointer select-none"
+			bind:this={sliderRef}
+			onmousedown={(e) => e.target === sliderRef && seekTo(e)}
+			role="presentation"
+		>
+			<div
+				class="pointer-events-none absolute top-1/2 left-0 h-1.5 w-full -translate-y-1/2 overflow-hidden rounded-full bg-gray-alpha-100"
+			>
+				<div
+					class="bg-gray-alpha-200 absolute h-full"
+					style="left: {(startValue / duration) * 100}%; right: {100 -
+						(endValue / duration) * 100}%;"
+				></div>
+			</div>
+
+			<div
+				class="bg-gray-alpha-600 pointer-events-none absolute top-1/2 z-10 h-4 w-0.5 -translate-y-1/2"
+				style="left: {(currentTime / duration) * 100}%"
+			></div>
+
+			<div
+				class="absolute top-1/2 z-20 -ml-2 flex h-4 w-4 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full border border-ds-blue-600 bg-background shadow-lg"
+				style="left: {(startValue / duration) * 100}%"
+				onmousedown={(e) => handleMouseDown(e, 'start')}
+				role="presentation"
+			>
+				<div class="h-1.5 w-1.5 rounded-full bg-ds-blue-600"></div>
+			</div>
+
+			<div
+				class="absolute top-1/2 z-20 -ml-2 flex h-4 w-4 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full border border-ds-blue-600 bg-background shadow-lg"
+				style="left: {(endValue / duration) * 100}%"
+				onmousedown={(e) => handleMouseDown(e, 'end')}
+				role="presentation"
+			>
+				<div class="h-1.5 w-1.5 rounded-full bg-ds-blue-600"></div>
+			</div>
+		</div>
+
+		<div class="flex flex-wrap items-end justify-between gap-4">
+			<div class="flex flex-wrap gap-4">
+				<div class="space-y-1.5">
+					<Label>{$_('trim.startTime')}</Label>
+					<TimecodeInput
+						value={startValue}
+						onchange={(val) => {
+							if (val >= 0 && val < endValue) {
+								startValue = val;
+								if (videoRef) videoRef.currentTime = startValue;
+								commitTrimValues();
+							}
+						}}
+					/>
 				</div>
-
-				<div class="flex items-center gap-2">
-					<Button variant="ghost" size="icon" onclick={togglePlay}>
-						{#if isPlaying}
-							<Pause size={14} />
-						{:else}
-							<Play size={14} />
-						{/if}
-					</Button>
-					<div class="bg-gray-alpha-200 mx-2 h-4 w-px"></div>
-					<Button variant="outline" onclick={onCancel}>{$_('trim.cancel')}</Button>
-					<Button onclick={handleSave}>{$_('trim.save')}</Button>
+				<div class="space-y-1.5">
+					<Label>{$_('trim.endTime')}</Label>
+					<TimecodeInput
+						value={endValue}
+						onchange={(val) => {
+							if (val > startValue && val <= duration) {
+								endValue = val;
+								if (videoRef) videoRef.currentTime = endValue;
+								commitTrimValues();
+							}
+						}}
+					/>
+				</div>
+				<div class="space-y-1.5">
+					<Label>{$_('trim.duration')}</Label>
+					<div class="text-gray-alpha-600 py-1.5 font-mono text-[10px] tracking-wide">
+						{formatTime(endValue - startValue)}
+					</div>
 				</div>
 			</div>
 		</div>

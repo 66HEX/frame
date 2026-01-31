@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { FileStatus, type FileItem } from '../types';
-	import { Trash2, Pause, Play, Scissors } from 'lucide-svelte';
+	import { Trash2, Pause, Play } from 'lucide-svelte';
 	import { cn } from '$lib/utils/cn';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Checkbox from '$lib/components/ui/Checkbox.svelte';
@@ -13,7 +13,6 @@
 		onToggleBatch,
 		onPause,
 		onResume,
-		onTrim,
 		isSelected
 	}: {
 		item: FileItem;
@@ -22,7 +21,6 @@
 		onToggleBatch: (id: string, isChecked: boolean) => void;
 		onPause?: (id: string) => void;
 		onResume?: (id: string) => void;
-		onTrim?: (id: string) => void;
 		isSelected: boolean;
 	} = $props();
 
@@ -40,7 +38,7 @@
 <div
 	onclick={() => onSelect(item.id)}
 	class={cn(
-		'group flex cursor-pointer items-center border-b border-gray-alpha-100 px-4 py-3 transition-colors',
+		'group flex h-10 cursor-pointer items-center border-b border-gray-alpha-100 px-4 transition-colors',
 		isSelected ? 'bg-gray-alpha-100' : 'hover:bg-gray-alpha-100'
 	)}
 >
@@ -108,30 +106,6 @@
 					class="text-gray-alpha-600 transition-colors hover:text-foreground"
 				>
 					<Play size={14} fill="currentColor" color="none" />
-				</button>
-			{/if}
-
-			{#if item.metadata?.videoCodec}
-				{@const isDisabled =
-					item.status === FileStatus.CONVERTING ||
-					item.status === FileStatus.PAUSED ||
-					item.status === FileStatus.COMPLETED}
-				<button
-					onclick={(e) => {
-						e.stopPropagation();
-						onTrim?.(item.id);
-					}}
-					disabled={isDisabled}
-					class={cn(
-						'transition-colors',
-						isDisabled ? 'pointer-events-none opacity-50' : 'hover:text-foreground',
-						(item.config.startTime || item.config.endTime) && !isDisabled
-							? 'text-ds-blue-600'
-							: 'text-gray-alpha-600'
-					)}
-					title="Trim Video"
-				>
-					<Scissors size={14} />
 				</button>
 			{/if}
 

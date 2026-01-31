@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Dashboard layout:** Split the left column into a 12-row grid so the trim preview card permanently occupies the top section while the file list sits below it. This removes the floating trim modal and gives the timeline controls dedicated real estate.
+- **Trim workflow:** The trimming card now applies start/end changes immediately (no Save/Cancel buttons) and is always visible with the selected file, providing constant video preview and faster adjustments without opening overlays.
+
 ## [0.11.0] - 2026-01-31
 
 ### Added

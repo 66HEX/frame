@@ -30,7 +30,6 @@
 	},
 	"fileList": {
 		"dropFiles": "ファイルをドロップまたはソース追加を使用",
-		"endOfList": "リスト終了 // {count} オブジェクト",
 		"importSource": "ソースファイルをインポート"
 	},
 	"fileStatus": {

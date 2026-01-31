@@ -30,7 +30,6 @@
 	},
 	"fileList": {
 		"dropFiles": "파일을 드롭하거나 소스 추가 사용",
-		"endOfList": "목록 끝 // {count}개 객체",
 		"importSource": "소스 파일 가져오기"
 	},
 	"fileStatus": {

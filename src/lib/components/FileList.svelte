@@ -12,8 +12,7 @@
 		onToggleBatch,
 		onToggleAllBatch,
 		onPause,
-		onResume,
-		onTrim
+		onResume
 	}: {
 		files: FileItem[];
 		selectedFileId: string | null;
@@ -23,7 +22,6 @@
 		onToggleAllBatch: (isChecked: boolean) => void;
 		onPause?: (id: string) => void;
 		onResume?: (id: string) => void;
-		onTrim?: (id: string) => void;
 	} = $props();
 
 	let allChecked = $derived(files.length > 0 && files.every((f) => f.isSelectedForConversion));
@@ -33,7 +31,7 @@
 </script>
 
 <div
-	class="group relative col-span-12 flex flex-col overflow-hidden rounded-lg border border-gray-alpha-100 bg-gray-alpha-100 lg:col-span-8"
+	class="group relative flex h-full flex-col overflow-hidden rounded-lg border border-gray-alpha-100 bg-gray-alpha-100"
 >
 	<div class="z-10 flex h-10 items-center border-b border-gray-alpha-100 px-4">
 		<div
@@ -76,14 +74,8 @@
 						{onToggleBatch}
 						{onPause}
 						{onResume}
-						{onTrim}
 					/>
 				{/each}
-				<div class="mt-2 border-t border-gray-alpha-100 p-4 text-center">
-					<span class="text-gray-alpha-600 text-[10px] tracking-widest uppercase">
-						{$_('fileList.endOfList', { values: { count: files.length } })}
-					</span>
-				</div>
 			</div>
 		{/if}
 	</div>
