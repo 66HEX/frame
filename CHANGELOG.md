@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **HEVC Hardware Acceleration:** Added support for H.265 (HEVC) hardware encoding via `hevc_videotoolbox` (Apple Silicon/Intel) and `hevc_nvenc` (NVIDIA).
+- **Smart Encoder Detection:** The application now dynamically scans `ffmpeg` capabilities at startup to only show encoders supported by the user's hardware (e.g., hiding NVENC on macOS or VideoToolbox on Windows), replacing the previous static OS-based filtering.
+
 ## [0.14.0] - 2026-02-01
 
 ### Added

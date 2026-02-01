@@ -1,4 +1,5 @@
 mod conversion;
+mod capabilities;
 use tauri::window::{Color, EffectState};
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_store::Builder as StoreBuilder;
@@ -94,6 +95,7 @@ pub fn run() {
             conversion::probe_media,
             conversion::get_max_concurrency,
             conversion::set_max_concurrency,
+            capabilities::get_available_encoders,
             close_splash
         ])
         .run(tauri::generate_context!())

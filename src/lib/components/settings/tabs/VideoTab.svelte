@@ -5,7 +5,7 @@
 	import Input from '$lib/components/ui/Input.svelte';
 	import Label from '$lib/components/ui/Label.svelte';
 	import Slider from '$lib/components/ui/Slider.svelte';
-	import { platform } from '@tauri-apps/plugin-os';
+	import { capabilities } from '$lib/stores/capabilities.svelte';
 	import { _ } from '$lib/i18n';
 
 	const RESOLUTIONS = ['original', '1080p', '720p', '480p', 'custom'] as const;
@@ -16,17 +16,20 @@
 		{ id: 'prores', label: 'Apple ProRes' },
 		{ id: 'libsvtav1', label: 'AV1 / SVT' },
 		{ id: 'h264_videotoolbox', label: 'H.264 (Apple Silicon)' },
-		{ id: 'h264_nvenc', label: 'H.264 (NVIDIA)' }
+		{ id: 'h264_nvenc', label: 'H.264 (NVIDIA)' },
+		{ id: 'hevc_videotoolbox', label: 'H.265 (Apple Silicon)' },
+		{ id: 'hevc_nvenc', label: 'H.265 (NVIDIA)' }
 	] as const;
 
-	const currentPlatform = platform();
-
-	const availableCodecs = ALL_VIDEO_CODECS.filter((codec) => {
-		if (codec.id === 'h264_videotoolbox') return currentPlatform === 'macos';
-		if (codec.id === 'h264_nvenc')
-			return currentPlatform === 'windows' || currentPlatform === 'linux';
-		return true;
-	});
+	const availableCodecs = $derived(
+		ALL_VIDEO_CODECS.filter((codec) => {
+			if (codec.id === 'h264_videotoolbox') return capabilities.encoders.h264_videotoolbox;
+			if (codec.id === 'h264_nvenc') return capabilities.encoders.h264_nvenc;
+			if (codec.id === 'hevc_videotoolbox') return capabilities.encoders.hevc_videotoolbox;
+			if (codec.id === 'hevc_nvenc') return capabilities.encoders.hevc_nvenc;
+			return true;
+		})
+	);
 
 	const PRESETS = [
 		'ultrafast',
@@ -55,7 +58,10 @@
 	} = $props();
 
 	const isHardwareEncoder = $derived(
-		config.videoCodec === 'h264_videotoolbox' || config.videoCodec === 'h264_nvenc'
+		config.videoCodec === 'h264_videotoolbox' ||
+			config.videoCodec === 'h264_nvenc' ||
+			config.videoCodec === 'hevc_videotoolbox' ||
+			config.videoCodec === 'hevc_nvenc'
 	);
 </script>
 

@@ -616,7 +616,7 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         if config.video_bitrate_mode == "bitrate" {
             args.push("-b:v".to_string());
             args.push(format!("{}k", config.video_bitrate));
-        } else if config.video_codec == "h264_nvenc" {
+        } else if config.video_codec == "h264_nvenc" || config.video_codec == "hevc_nvenc" {
             // NVENC uses -rc:v vbr and -cq:v (1-51), where 1 is best.
             // Map Quality (1-100, 100 best) to CQ (51-1).
             let cq = (52.0 - (config.quality as f64 / 2.0))
@@ -626,7 +626,9 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
             args.push("vbr".to_string());
             args.push("-cq:v".to_string());
             args.push(cq.to_string());
-        } else if config.video_codec == "h264_videotoolbox" {
+        } else if config.video_codec == "h264_videotoolbox"
+            || config.video_codec == "hevc_videotoolbox"
+        {
             // VideoToolbox uses -q:v (1-100), where 100 is best.
             args.push("-q:v".to_string());
             args.push(config.quality.to_string());
@@ -1449,19 +1451,6 @@ mod tests {
     }
 
     #[test]
-    fn test_hardware_encoder_videotoolbox() {
-        let mut config = sample_config("mov");
-        config.video_codec = "h264_videotoolbox".into();
-        config.quality = 55;
-
-        let args = build_ffmpeg_args("in.mov", "out.mov", &config);
-
-        assert!(contains_args(&args, &["-c:v", "h264_videotoolbox"]));
-        assert!(contains_args(&args, &["-q:v", "55"]));
-        assert!(!args.iter().any(|a| a == "-crf"));
-    }
-
-    #[test]
     fn test_hardware_encoder_nvenc() {
         let mut config = sample_config("mp4");
         config.video_codec = "h264_nvenc".into();
@@ -1473,6 +1462,30 @@ mod tests {
         assert!(contains_args(&args, &["-rc:v", "vbr"]));
         assert!(contains_args(&args, &["-cq:v", "27"]));
         assert!(!args.iter().any(|a| a == "-crf"));
+
+        // Test HEVC NVENC
+        config.video_codec = "hevc_nvenc".into();
+        let args_hevc = build_ffmpeg_args("in.mp4", "out.mp4", &config);
+        assert!(contains_args(&args_hevc, &["-c:v", "hevc_nvenc"]));
+        assert!(contains_args(&args_hevc, &["-cq:v", "27"]));
+    }
+
+    #[test]
+    fn test_hardware_encoder_videotoolbox() {
+        let mut config = sample_config("mov");
+        config.video_codec = "h264_videotoolbox".into();
+        config.quality = 55;
+
+        let args = build_ffmpeg_args("in.mov", "out.mov", &config);
+
+        assert!(contains_args(&args, &["-c:v", "h264_videotoolbox"]));
+        assert!(contains_args(&args, &["-q:v", "55"]));
+        assert!(!args.iter().any(|a| a == "-crf"));
+
+        config.video_codec = "hevc_videotoolbox".into();
+        let args_hevc = build_ffmpeg_args("in.mov", "out.mov", &config);
+        assert!(contains_args(&args_hevc, &["-c:v", "hevc_videotoolbox"]));
+        assert!(contains_args(&args_hevc, &["-q:v", "55"]));
     }
 
     #[test]

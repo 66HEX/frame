@@ -49,6 +49,7 @@
 	import { sendAppNotification } from '$lib/services/notifications';
 
 	import { updateStore } from '$lib/stores/update.svelte';
+	import { initCapabilities } from '$lib/stores/capabilities.svelte';
 	import { checkForAppUpdate, installAppUpdate } from '$lib/services/update';
 	import { marked } from 'marked';
 
@@ -80,6 +81,7 @@
 		let mounted = true;
 
 		(async () => {
+			await initCapabilities();
 			customPresets = await loadCustomPresets();
 			try {
 				maxConcurrencySetting = await loadInitialMaxConcurrency();
@@ -203,7 +205,6 @@
 	}
 
 	function handleApplyPresetToAll(preset: PresetDefinition) {
-		const nextConfig = clonePresetConfig(preset.config);
 		files = files.map((f) =>
 			f.status === FileStatus.IDLE ? { ...f, config: clonePresetConfig(preset.config) } : f
 		);
