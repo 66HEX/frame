@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-02-01
+
 ### Added
 
+- **Windows Titlebar:** Introduced a dedicated titlebar component for Windows, replacing the previously shared Linux titlebar. This provides a more native look and feel on Windows systems.
 - **Dynamic Font Switching:** Added the ability to toggle between Geist Mono and Geist Sans fonts across the entire application.
   - **New Visual Setting:** Added a font family selector in the App Settings under the Visuals section.
   - **Persistence:** The chosen font preference is saved and automatically applied on subsequent launches.
@@ -370,7 +373,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.15.0...HEAD
+[Unreleased]: https://github.com/66HEX/frame/compare/0.16.0...HEAD
+[0.16.0]: https://github.com/66HEX/frame/compare/0.15.0...0.16.0
 [0.15.0]: https://github.com/66HEX/frame/compare/0.14.0...0.15.0
 [0.14.0]: https://github.com/66HEX/frame/compare/0.13.1...0.14.0
 [0.13.1]: https://github.com/66HEX/frame/compare/0.13.0...0.13.1
