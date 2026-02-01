@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-02-01
+
+### Added
+
+- **Batch Preset Application:** Added a new "Apply to All" button in the Presets tab. This allows users to instantly apply a selected preset to all pending files in the queue after a confirmation dialog, significantly speeding up batch configuration workflows.
+
 ## [0.13.1] - 2026-02-01
 
 ### Fixed
@@ -329,7 +335,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.13.1...HEAD
+[Unreleased]: https://github.com/66HEX/frame/compare/0.14.0...HEAD
+[0.14.0]: https://github.com/66HEX/frame/compare/0.13.1...0.14.0
 [0.13.1]: https://github.com/66HEX/frame/compare/0.13.0...0.13.1
 [0.13.0]: https://github.com/66HEX/frame/compare/0.12.0...0.13.0
 [0.12.0]: https://github.com/66HEX/frame/compare/0.11.0...0.12.0
