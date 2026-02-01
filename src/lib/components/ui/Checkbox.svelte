@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { cn } from '$lib/utils/cn';
-	import { Check } from 'lucide-svelte';
+	import { IconCheck } from '$lib/icons';
 	import type { HTMLInputAttributes } from 'svelte/elements';
 
 	type Props = HTMLInputAttributes & {
@@ -31,6 +31,6 @@
 		{...props}
 	/>
 	{#if checked && !indeterminate}
-		<Check size={10} class="pointer-events-none absolute text-foreground opacity-100" />
+		<IconCheck size={10} class="pointer-events-none absolute text-foreground opacity-100" />
 	{/if}
 </div>

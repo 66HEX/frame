@@ -5,7 +5,7 @@
 	import Label from '$lib/components/ui/Label.svelte';
 	import { _ } from '$lib/i18n';
 	import { openNativeFileDialog } from '$lib/services/dialog';
-	import { X } from 'lucide-svelte';
+	import { IconClose } from '$lib/icons';
 
 	let {
 		config,
@@ -90,7 +90,7 @@
 							{disabled}
 							title={$_('subtitles.clearFile')}
 						>
-							<X size={14} />
+							<IconClose size={14} />
 						</Button>
 					</div>
 				{/if}

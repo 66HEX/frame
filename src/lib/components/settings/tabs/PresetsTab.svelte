@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import { Trash2, ListChecks } from 'lucide-svelte';
+	import { IconTrash, IconListChecks } from '$lib/icons';
 	import { ask } from '@tauri-apps/plugin-dialog';
 	import { cn } from '$lib/utils/cn';
 	import {
@@ -198,7 +198,7 @@
 							}}
 							{disabled}
 						>
-							<ListChecks size={12} />
+							<IconListChecks size={12} />
 						</Button>
 					{/if}
 
@@ -214,7 +214,7 @@
 							}}
 							{disabled}
 						>
-							<Trash2 size={12} />
+							<IconTrash size={12} />
 						</Button>
 					{/if}
 				</div>

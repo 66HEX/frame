@@ -17,7 +17,15 @@
 	import SubtitlesTab from './tabs/SubtitlesTab.svelte';
 	import MetadataTab from './tabs/MetadataTab.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
-	import { FileUp, FileDown, Film, Music, Captions, Tags, Bookmark } from 'lucide-svelte';
+	import {
+		IconFileUp,
+		IconFileDown,
+		IconFilm,
+		IconMusic,
+		IconCaptions,
+		IconTags,
+		IconBookmark
+	} from '$lib/icons';
 
 	const TABS = ['source', 'output', 'video', 'audio', 'subtitles', 'metadata', 'presets'] as const;
 	type TabId = (typeof TABS)[number];
@@ -56,14 +64,14 @@
 
 	const isSourceAudioOnly = $derived(!!metadata && !metadata.videoCodec);
 
-	const icons: Record<TabId, typeof FileUp> = {
-		source: FileUp,
-		output: FileDown,
-		video: Film,
-		audio: Music,
-		subtitles: Captions,
-		metadata: Tags,
-		presets: Bookmark
+	const icons: Record<TabId, typeof IconFileUp> = {
+		source: IconFileUp,
+		output: IconFileDown,
+		video: IconFilm,
+		audio: IconMusic,
+		subtitles: IconCaptions,
+		metadata: IconTags,
+		presets: IconBookmark
 	};
 </script>
 

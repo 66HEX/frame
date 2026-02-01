@@ -2,12 +2,12 @@
 	import { onMount } from 'svelte';
 	import { convertFileSrc } from '@tauri-apps/api/core';
 	import {
-		Crop as CropIcon,
-		FlipHorizontal as FlipHorizontalIcon,
-		FlipVertical as FlipVerticalIcon,
-		Play,
-		RotateCw
-	} from 'lucide-svelte';
+		IconCrop as CropIcon,
+		IconFlipHorizontal as FlipHorizontalIcon,
+		IconFlipVertical as FlipVerticalIcon,
+		IconPlay,
+		IconRotateCw
+	} from '$lib/icons';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Label from '$lib/components/ui/Label.svelte';
 	import TimecodeInput from '$lib/components/ui/TimecodeInput.svelte';
@@ -662,7 +662,7 @@
 					class="bg-gray-alpha-200 flex size-16 items-center justify-center rounded-full backdrop-blur-md"
 					style="transform-origin: center;"
 				>
-					<Play size={24} fill="currentColor" class="ml-1" />
+					<IconPlay size={24} fill="currentColor" class="ml-1" />
 				</div>
 			</div>
 		{/if}
@@ -774,7 +774,7 @@
 					onclick={handleRotateToggle}
 					disabled={controlsDisabled}
 				>
-					<RotateCw size={14} />
+					<IconRotateCw size={14} />
 				</Button>
 				<Button
 					size="icon"

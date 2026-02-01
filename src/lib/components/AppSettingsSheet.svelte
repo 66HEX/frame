@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { fly, fade } from 'svelte/transition';
-	import { X } from 'lucide-svelte';
+	import { IconClose } from '$lib/icons';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Label from '$lib/components/ui/Label.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
@@ -121,7 +121,7 @@
 			{$_('settings.title')}
 		</h2>
 		<button onclick={onClose} class="text-gray-alpha-600 transition-colors hover:text-foreground">
-			<X size={16} />
+			<IconClose size={16} />
 		</button>
 	</div>
 

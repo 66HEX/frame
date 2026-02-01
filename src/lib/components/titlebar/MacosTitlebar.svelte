@@ -1,6 +1,14 @@
 <script lang="ts">
 	import { getCurrentWindow } from '@tauri-apps/api/window';
-	import { Plus, Play, FileVideo, HardDrive, LayoutList, Terminal, Settings } from 'lucide-svelte';
+	import {
+		IconPlus,
+		IconPlay,
+		IconFileVideo,
+		IconHardDrive,
+		IconLayoutList,
+		IconTerminal,
+		IconSettings
+	} from '$lib/icons';
 	import { cn } from '$lib/utils/cn';
 	import frameIcon from '$lib/assets/icons/frame.svg?raw';
 	import Button from '$lib/components/ui/Button.svelte';
@@ -133,7 +141,7 @@
 					onclick={() => onChangeView('dashboard')}
 					class="gap-2"
 				>
-					<LayoutList size={12} />
+					<IconLayoutList size={12} />
 					<span>{$_('titlebar.dashboard')}</span>
 				</Button>
 				<Button
@@ -142,7 +150,7 @@
 					onclick={() => onChangeView('logs')}
 					class="gap-2"
 				>
-					<Terminal size={12} />
+					<IconTerminal size={12} />
 					<span>{$_('titlebar.logs')}</span>
 				</Button>
 			</div>
@@ -152,11 +160,11 @@
 
 		<div class="text-gray-alpha-600 pointer-events-none flex items-center gap-4 text-[10px]">
 			<div class="flex items-center gap-2">
-				<HardDrive size={12} />
+				<IconHardDrive size={12} />
 				<span>{$_('titlebar.storage')} {formatTotalSize(totalSize)}</span>
 			</div>
 			<div class="flex items-center gap-2">
-				<FileVideo size={12} />
+				<IconFileVideo size={12} />
 				<span>{$_('titlebar.items')} {fileCount}</span>
 			</div>
 		</div>
@@ -165,12 +173,12 @@
 	<div class="pointer-events-none mt-2 flex items-center gap-3">
 		{#if onOpenSettings}
 			<Button onclick={onOpenSettings} variant="secondary" size="icon" class="pointer-events-auto">
-				<Settings size={14} />
+				<IconSettings size={14} />
 			</Button>
 		{/if}
 		{#if onAddFile}
 			<Button onclick={onAddFile} variant="secondary" class="pointer-events-auto gap-2">
-				<Plus size={12} />
+				<IconPlus size={12} />
 				{$_('titlebar.addSource')}
 			</Button>
 		{/if}
@@ -185,7 +193,7 @@
 				{#if isProcessing}
 					<span class="animate-pulse">{$_('titlebar.processing')}</span>
 				{:else}
-					<Play size={12} fill="currentColor" />
+					<IconPlay size={12} fill="currentColor" />
 					{$_('titlebar.start')}
 				{/if}
 			</Button>

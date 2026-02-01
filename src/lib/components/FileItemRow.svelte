@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { FileStatus, type FileItem } from '../types';
-	import { Trash2, Pause, Play } from 'lucide-svelte';
+	import { IconTrash, IconPause, IconPlay } from '$lib/icons';
 	import { cn } from '$lib/utils/cn';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Checkbox from '$lib/components/ui/Checkbox.svelte';
@@ -95,7 +95,7 @@
 					}}
 					class="text-gray-alpha-600 transition-colors hover:text-foreground"
 				>
-					<Pause size={14} fill="currentColor" color="none" />
+					<IconPause size={14} fill="currentColor" color="none" />
 				</button>
 			{:else if item.status === FileStatus.PAUSED}
 				<button
@@ -105,7 +105,7 @@
 					}}
 					class="text-gray-alpha-600 transition-colors hover:text-foreground"
 				>
-					<Play size={14} fill="currentColor" color="none" />
+					<IconPlay size={14} fill="currentColor" color="none" />
 				</button>
 			{/if}
 
@@ -119,7 +119,7 @@
 				disabled={item.status === FileStatus.CONVERTING}
 				class="text-gray-alpha-600 h-4 w-4 hover:bg-transparent hover:text-ds-red-600 disabled:pointer-events-none disabled:opacity-50"
 			>
-				<Trash2 size={14} />
+				<IconTrash size={14} />
 			</Button>
 		</div>
 	</div>
