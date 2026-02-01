@@ -48,7 +48,7 @@
   - `prores` (Apple ProRes)
   - `libsvtav1` (Scalable Video Technology AV1)
   - **Hardware Acceleration:** `h264_videotoolbox` (Apple Silicon), `h264_nvenc` (NVIDIA).
-- **Audio Encoders:** `aac`, `ac3` (Dolby Digital), `libopus`, `mp3`.
+- **Audio Encoders:** `aac`, `ac3` (Dolby Digital), `libopus`, `mp3`, `alac` (Apple Lossless), `flac` (Free Lossless Audio Codec), `pcm_s16le` (WAV).
 - **Bitrate Control:** Constant Rate Factor (CRF) or Target Bitrate (kbps).
 - **Scaling:** Bicubic, Lanczos, Bilinear, Nearest Neighbor.
 - **Metadata Probing:** Automated extraction of stream details (codec, duration, bitrate, channel layout) via `ffprobe`.
