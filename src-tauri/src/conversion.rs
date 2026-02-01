@@ -1424,16 +1424,19 @@ mod tests {
         config.resolution = "custom".into();
         config.custom_width = Some("1280".into());
         config.custom_height = Some("720".into());
-        config.fps = "30".into();
         config.scaling_algorithm = "lanczos".into();
+        config.fps = "60".into();
 
         let args = build_ffmpeg_args("in.mp4", "out.mp4", &config);
 
-        let vf_index = args.iter().position(|r| r == "-vf").unwrap();
-        assert_eq!(args[vf_index + 1], "scale=1280:720:flags=lanczos");
+        let vf_arg = args.iter().find(|a| a.starts_with("scale=")).unwrap();
+        assert_eq!(
+            vf_arg,
+            "scale=1280:720:force_original_aspect_ratio=decrease:flags=lanczos,pad=1280:720:(ow-iw)/2:(oh-ih)/2"
+        );
 
-        let fps_index = args.iter().position(|r| r == "-r").unwrap();
-        assert_eq!(args[fps_index + 1], "30");
+        let fps_index = args.iter().position(|a| a == "-r").unwrap();
+        assert_eq!(args[fps_index + 1], "60");
     }
 
     #[test]
