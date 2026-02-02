@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **AV1 Hardware Acceleration:** Added support for NVIDIA's AV1 hardware encoder (`av1_nvenc`) for compatible RTX 40-series GPUs. Integrated with the existing quality slider for consistent VBR control.
+
 ## [0.17.0] - 2026-02-02
 
 ### Added

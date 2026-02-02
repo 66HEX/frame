@@ -18,7 +18,8 @@
 		{ id: 'h264_videotoolbox', label: 'H.264 (Apple Silicon)' },
 		{ id: 'h264_nvenc', label: 'H.264 (NVIDIA)' },
 		{ id: 'hevc_videotoolbox', label: 'H.265 (Apple Silicon)' },
-		{ id: 'hevc_nvenc', label: 'H.265 (NVIDIA)' }
+		{ id: 'hevc_nvenc', label: 'H.265 (NVIDIA)' },
+		{ id: 'av1_nvenc', label: 'AV1 (NVIDIA)' }
 	] as const;
 
 	const availableCodecs = $derived(
@@ -27,6 +28,7 @@
 			if (codec.id === 'h264_nvenc') return capabilities.encoders.h264_nvenc;
 			if (codec.id === 'hevc_videotoolbox') return capabilities.encoders.hevc_videotoolbox;
 			if (codec.id === 'hevc_nvenc') return capabilities.encoders.hevc_nvenc;
+			if (codec.id === 'av1_nvenc') return capabilities.encoders.av1_nvenc;
 			return true;
 		})
 	);
@@ -61,7 +63,8 @@
 		config.videoCodec === 'h264_videotoolbox' ||
 			config.videoCodec === 'h264_nvenc' ||
 			config.videoCodec === 'hevc_videotoolbox' ||
-			config.videoCodec === 'hevc_nvenc'
+			config.videoCodec === 'hevc_nvenc' ||
+			config.videoCodec === 'av1_nvenc'
 	);
 </script>
 
