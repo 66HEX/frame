@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import { IconTrash, IconListChecks } from '$lib/icons';
-	import { ask } from '@tauri-apps/plugin-dialog';
+	import { askNativeDialog } from '$lib/services/dialog';
 	import { cn } from '$lib/utils/cn';
 	import {
 		AUDIO_ONLY_CONTAINERS,
@@ -102,15 +102,13 @@
 	async function handleApplyToAll(preset: PresetDefinition) {
 		if (disabled || !onApplyPresetToAll) return;
 
-		const confirmed = await ask(
-			$_('presets.confirmApplyAllBody', { values: { name: preset.name } }),
-			{
-				title: $_('presets.confirmApplyAllTitle'),
-				kind: 'warning',
-				okLabel: $_('common.apply'),
-				cancelLabel: $_('common.cancel')
-			}
-		);
+		const confirmed = await askNativeDialog({
+			message: $_('presets.confirmApplyAllBody', { values: { name: preset.name } }),
+			title: $_('presets.confirmApplyAllTitle'),
+			kind: 'warning',
+			okLabel: $_('common.apply'),
+			cancelLabel: $_('common.cancel')
+		});
 
 		if (confirmed) {
 			onApplyPresetToAll(preset);

@@ -29,3 +29,15 @@ export async function openNativeFileDialog(
 
 	return result[0];
 }
+
+export interface NativeAskDialogOptions {
+	title?: string;
+	message: string;
+	kind?: 'info' | 'warning' | 'error' | 'question';
+	okLabel?: string;
+	cancelLabel?: string;
+}
+
+export async function askNativeDialog(options: NativeAskDialogOptions): Promise<boolean> {
+	return await invoke<boolean>('ask_native_dialog', { options });
+}

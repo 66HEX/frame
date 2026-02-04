@@ -134,6 +134,7 @@ pub fn run() {
             conversion::commands::set_max_concurrency,
             capabilities::get_available_encoders,
             dialog::open_native_file_dialog,
+            dialog::ask_native_dialog,
             close_splash
         ])
         .run(tauri::generate_context!())

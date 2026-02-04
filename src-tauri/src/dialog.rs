@@ -158,6 +158,71 @@ pub async fn open_native_file_dialog<R: Runtime>(
     Ok(selections)
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeAskDialogOptions {
+    pub title: Option<String>,
+    pub message: String,
+    pub kind: Option<String>, // "info", "warning", "error", "question"
+    pub ok_label: Option<String>,
+    pub cancel_label: Option<String>,
+}
+
+#[command]
+pub async fn ask_native_dialog<R: Runtime>(
+    window: Window<R>,
+    dialog: State<'_, Dialog<R>>,
+    options: NativeAskDialogOptions,
+) -> Result<bool, String> {
+    #[cfg(target_os = "macos")]
+    let dialog_host = prepare_dialog_host(&window);
+
+    let mut dialog_builder = dialog.message(options.message);
+
+    if let Some(title) = options.title {
+        dialog_builder = dialog_builder.title(title);
+    }
+
+    if let Some(kind) = options.kind {
+        let message_kind = match kind.as_str() {
+            "info" => tauri_plugin_dialog::MessageDialogKind::Info,
+            "warning" => tauri_plugin_dialog::MessageDialogKind::Warning,
+            "error" => tauri_plugin_dialog::MessageDialogKind::Error,
+            _ => tauri_plugin_dialog::MessageDialogKind::Info,
+        };
+        dialog_builder = dialog_builder.kind(message_kind);
+    }
+
+    match (options.ok_label, options.cancel_label) {
+        (Some(ok), Some(cancel)) => {
+            dialog_builder = dialog_builder
+                .buttons(tauri_plugin_dialog::MessageDialogButtons::OkCancelCustom(ok, cancel));
+        }
+        (Some(ok), None) => {
+            dialog_builder =
+                dialog_builder.buttons(tauri_plugin_dialog::MessageDialogButtons::OkCustom(ok));
+        }
+        (None, Some(cancel)) => {
+            dialog_builder = dialog_builder.buttons(
+                tauri_plugin_dialog::MessageDialogButtons::OkCancelCustom("Ok".to_string(), cancel),
+            );
+        }
+        (None, None) => {}
+    }
+
+    #[cfg(target_os = "macos")]
+    if let Some(host) = dialog_host.as_ref() {
+        dialog_builder = dialog_builder.parent(host);
+    }
+
+    let result = dialog_builder.blocking_show();
+
+    #[cfg(target_os = "macos")]
+    cleanup_dialog_host(&window, dialog_host);
+
+    Ok(result)
+}
+
 #[cfg(target_os = "macos")]
 fn prepare_dialog_host<R: Runtime>(window: &Window<R>) -> Option<WebviewWindow<R>> {
     let app_handle = window.app_handle();
