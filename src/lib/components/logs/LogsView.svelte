@@ -82,10 +82,10 @@
 						{#each currentLogs as line, i (i)}
 							<div class="group -mx-1 flex rounded px-1 py-1 text-[10px] hover:bg-gray-alpha-100">
 								<span
-									class="mr-3 w-8 shrink-0 pt-[0.5px] text-right text-[10px] text-gray-alpha-600 select-none"
+									class="mr-3 w-8 shrink-0 pt-[0.5px] text-right text-[10px] text-gray-alpha-400 select-none"
 									>{i + 1}</span
 								>
-								<span class="break-all whitespace-nowrap text-gray-alpha-400">{line}</span>
+								<span class="break-all whitespace-nowrap text-gray-alpha-600">{line}</span>
 							</div>
 						{/each}
 					</div>
