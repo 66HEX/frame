@@ -52,6 +52,12 @@
 
 	const SCALING_ALGOS = ['bicubic', 'lanczos', 'bilinear', 'nearest'] as const;
 
+	const ML_UPSCALING_OPTIONS = [
+		{ id: 'none', label: 'None' },
+		{ id: 'esrgan-2x', label: 'ESRGAN 2x' },
+		{ id: 'esrgan-4x', label: 'ESRGAN 4x' }
+	] as const;
+
 	const FPS_OPTIONS = ['original', '24', '30', '60'] as const;
 
 	let {
@@ -169,6 +175,25 @@
 					</Button>
 				{/each}
 			</div>
+		</div>
+
+		<div class="space-y-3 pt-2">
+			<Label variant="section">{$_('video.mlUpscaling')}</Label>
+			<div class="grid grid-cols-2 gap-2">
+				{#each ML_UPSCALING_OPTIONS as opt (opt.id)}
+					<Button
+						variant={(config.mlUpscale || 'none') === opt.id ? 'selected' : 'outline'}
+						onclick={() => onUpdate({ mlUpscale: opt.id as any })}
+						{disabled}
+						class="w-full"
+					>
+						{opt.label}
+					</Button>
+				{/each}
+			</div>
+			<p class="text-[9px] text-gray-alpha-600 uppercase">
+				{$_('video.mlUpscalingHint')}
+			</p>
 		</div>
 
 		<div class="space-y-3 pt-2">

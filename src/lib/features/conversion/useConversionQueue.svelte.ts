@@ -55,7 +55,12 @@ export function createConversionQueue(callbacks: ConversionCallbacks) {
 			(payload) => {
 				callbacks.onLogsUpdate((logs) => {
 					const current = logs[payload.id] || [];
-					return { ...logs, [payload.id]: [...current, payload.line] };
+					const newLogs = [...current, payload.line];
+					// Limit to last 500 lines to maintain performance
+					if (newLogs.length > 500) {
+						return { ...logs, [payload.id]: newLogs.slice(-500) };
+					}
+					return { ...logs, [payload.id]: newLogs };
 				});
 			}
 		);

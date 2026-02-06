@@ -1,5 +1,5 @@
 pub mod commands;
-mod error;
+pub mod error;
 pub(crate) mod ffmpeg;
 pub(crate) mod manager;
 mod probe;

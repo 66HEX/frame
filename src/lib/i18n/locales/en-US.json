@@ -143,7 +143,9 @@
 		"presetIncompatible": "Incompatible encoder",
 		"videotoolboxOptions": "VideoToolbox Options",
 		"videotoolboxAllowSw": "Allow software fallback",
-		"videotoolboxAllowSwHint": "Drop back to CPU encoding if hardware fails"
+		"videotoolboxAllowSwHint": "Drop back to CPU encoding if hardware fails",
+		"mlUpscaling": "ML Upscaling",
+		"mlUpscalingHint": "Upscale using ESRGAN models (ONNX). Very intensive."
 	},
 	"audio": {
 		"channelsBitrate": "Channels & Bitrate",

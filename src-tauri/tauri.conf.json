@@ -23,7 +23,14 @@
 		"active": true,
 		"targets": ["nsis", "dmg", "appimage", "deb", "app"],
 		"createUpdaterArtifacts": true,
-		"externalBin": ["binaries/ffmpeg", "binaries/ffprobe"],
+		"externalBin": [
+			"binaries/ffmpeg",
+			"binaries/ffprobe",
+			"binaries/realesrgan-ncnn-vulkan"
+		],
+		"resources": [
+			"binaries/models/*"
+		],
 		"icon": [
 			"icons/32x32.png",
 			"icons/128x128.png",
