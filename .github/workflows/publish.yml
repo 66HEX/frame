@@ -86,6 +86,35 @@ jobs:
           # Run the setup script
           node scripts/setup-ffmpeg.cjs
 
+      - name: Setup Upscaler (Common)
+        if: runner.os != 'Linux' || matrix.arch != 'arm64'
+        run: node scripts/setup-upscaler.cjs
+
+      - name: Setup Upscaler (Linux ARM64 Build)
+        if: runner.os == 'Linux' && matrix.arch == 'arm64'
+        run: |
+           # Install build deps
+           sudo apt-get update
+           sudo apt-get install -y cmake libvulkan-dev glslang-dev glslang-tools libgomp1
+
+           # Clone repo with submodules
+           git clone --recursive https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan.git
+           cd Real-ESRGAN-ncnn-vulkan
+           
+           # Build
+           mkdir build && cd build
+           cmake ../src
+           make -j$(nproc)
+           
+           # Move binary
+           cd ../..
+           mkdir -p src-tauri/binaries
+           mv Real-ESRGAN-ncnn-vulkan/build/realesrgan-ncnn-vulkan src-tauri/binaries/realesrgan-ncnn-vulkan-aarch64-unknown-linux-gnu
+           chmod +x src-tauri/binaries/realesrgan-ncnn-vulkan-aarch64-unknown-linux-gnu
+           
+           # Cleanup
+           rm -rf Real-ESRGAN-ncnn-vulkan
+
       - name: Get Version
         id: get_version
         shell: bash
