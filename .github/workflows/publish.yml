@@ -83,12 +83,12 @@ jobs:
              sudo apt-get update && sudo apt-get install -y unzip
           fi
           
-          # Run the setup script
-          node scripts/setup-ffmpeg.cjs
+          # Run the setup script with target architecture
+          node scripts/setup-ffmpeg.cjs --arch ${{ matrix.arch }}
 
       - name: Setup Upscaler (Common)
         if: runner.os != 'Linux' || matrix.arch != 'arm64'
-        run: node scripts/setup-upscaler.cjs
+        run: node scripts/setup-upscaler.cjs --arch ${{ matrix.arch }}
 
       - name: Setup Upscaler (Linux ARM64 Build)
         if: runner.os == 'Linux' && matrix.arch == 'arm64'

@@ -18,6 +18,14 @@ if (typeof fetch !== 'function') {
 }
 
 const force = process.argv.includes('--force');
+
+// Parse --arch and --platform from arguments
+const archArgIndex = process.argv.indexOf('--arch');
+const archOverride = archArgIndex !== -1 ? process.argv[archArgIndex + 1] : null;
+
+const platformArgIndex = process.argv.indexOf('--platform');
+const platformOverride = platformArgIndex !== -1 ? process.argv[platformArgIndex + 1] : null;
+
 const repoRoot = path.resolve(__dirname, '..');
 const BIN_DIR = path.join(repoRoot, 'src-tauri', 'binaries');
 const TMP_ROOT_PREFIX = path.join(os.tmpdir(), 'frame-upscaler-');
@@ -35,6 +43,17 @@ const TARGETS = {
 			url: `${REPO_BASE}/realesrgan-ncnn-vulkan-20220424-macos.zip`,
 			zipEntryName: 'realesrgan-ncnn-vulkan',
 			dest: 'realesrgan-ncnn-vulkan-aarch64-apple-darwin'
+		},
+		// Support for matrix arch aliases
+		x86_64: {
+			url: `${REPO_BASE}/realesrgan-ncnn-vulkan-20220424-macos.zip`,
+			zipEntryName: 'realesrgan-ncnn-vulkan',
+			dest: 'realesrgan-ncnn-vulkan-x86_64-apple-darwin'
+		},
+		aarch64: {
+			url: `${REPO_BASE}/realesrgan-ncnn-vulkan-20220424-macos.zip`,
+			zipEntryName: 'realesrgan-ncnn-vulkan',
+			dest: 'realesrgan-ncnn-vulkan-aarch64-apple-darwin'
 		}
 	},
 	linux: {
@@ -46,10 +65,20 @@ const TARGETS = {
 		arm64: {
 			// No official prebuilt binary for Linux ARM64 in v0.2.0
 			manualBuild: true
+		},
+		x86_64: {
+			url: `${REPO_BASE}/realesrgan-ncnn-vulkan-20220424-ubuntu.zip`,
+			zipEntryName: 'realesrgan-ncnn-vulkan',
+			dest: 'realesrgan-ncnn-vulkan-x86_64-unknown-linux-gnu'
 		}
 	},
 	win32: {
 		x64: {
+			url: `${REPO_BASE}/realesrgan-ncnn-vulkan-20220424-windows.zip`,
+			zipEntryName: 'realesrgan-ncnn-vulkan.exe',
+			dest: 'realesrgan-ncnn-vulkan-x86_64-pc-windows-msvc.exe'
+		},
+		x86_64: {
 			url: `${REPO_BASE}/realesrgan-ncnn-vulkan-20220424-windows.zip`,
 			zipEntryName: 'realesrgan-ncnn-vulkan.exe',
 			dest: 'realesrgan-ncnn-vulkan-x86_64-pc-windows-msvc.exe'
@@ -58,8 +87,8 @@ const TARGETS = {
 };
 
 async function main() {
-	const platform = os.platform();
-	const arch = os.arch();
+	const platform = platformOverride || os.platform();
+	const arch = archOverride || os.arch();
 	const target = TARGETS[platform]?.[arch];
 
 	if (!target) {

@@ -18,6 +18,14 @@ if (typeof fetch !== 'function') {
 }
 
 const force = process.argv.includes('--force');
+
+// Parse --arch and --platform from arguments
+const archArgIndex = process.argv.indexOf('--arch');
+const archOverride = archArgIndex !== -1 ? process.argv[archArgIndex + 1] : null;
+
+const platformArgIndex = process.argv.indexOf('--platform');
+const platformOverride = platformArgIndex !== -1 ? process.argv[platformArgIndex + 1] : null;
+
 const repoRoot = path.resolve(__dirname, '..');
 const BIN_DIR = path.join(repoRoot, 'src-tauri', 'binaries');
 const TMP_ROOT_PREFIX = path.join(os.tmpdir(), 'frame-binaries-');
@@ -29,14 +37,38 @@ const WINDOWS_ZIP_URL =
 const TARGETS = {
 	darwin: {
 		x64: createMartinTarget('macOS (Intel)', 'macos', 'amd64', 'x86_64', 'apple-darwin'),
-		arm64: createMartinTarget('macOS (Apple Silicon)', 'macos', 'arm64', 'aarch64', 'apple-darwin')
+		arm64: createMartinTarget('macOS (Apple Silicon)', 'macos', 'arm64', 'aarch64', 'apple-darwin'),
+		x86_64: createMartinTarget('macOS (Intel)', 'macos', 'amd64', 'x86_64', 'apple-darwin'),
+		aarch64: createMartinTarget('macOS (Apple Silicon)', 'macos', 'arm64', 'aarch64', 'apple-darwin')
 	},
 	linux: {
 		x64: createMartinTarget('Linux x86_64', 'linux', 'amd64', 'x86_64', 'unknown-linux-gnu'),
-		arm64: createMartinTarget('Linux ARM64', 'linux', 'arm64', 'aarch64', 'unknown-linux-gnu')
+		arm64: createMartinTarget('Linux ARM64', 'linux', 'arm64', 'aarch64', 'unknown-linux-gnu'),
+		x86_64: createMartinTarget('Linux x86_64', 'linux', 'amd64', 'x86_64', 'unknown-linux-gnu'),
+		aarch64: createMartinTarget('Linux ARM64', 'linux', 'arm64', 'aarch64', 'unknown-linux-gnu')
 	},
 	win32: {
 		x64: {
+			label: 'Windows x86_64',
+			sharedArchive: {
+				url: WINDOWS_ZIP_URL,
+				entries: [
+					{
+						id: 'ffmpeg',
+						expectedNames: ['ffmpeg.exe'],
+						dest: 'ffmpeg-x86_64-pc-windows-msvc.exe',
+						makeExecutable: false
+					},
+					{
+						id: 'ffprobe',
+						expectedNames: ['ffprobe.exe'],
+						dest: 'ffprobe-x86_64-pc-windows-msvc.exe',
+						makeExecutable: false
+					}
+				]
+			}
+		},
+		x86_64: {
 			label: 'Windows x86_64',
 			sharedArchive: {
 				url: WINDOWS_ZIP_URL,
@@ -82,8 +114,8 @@ function createMartinTarget(label, osSegment, downloadSegment, archLabel, suffix
 }
 
 async function main() {
-	const platform = os.platform();
-	const arch = os.arch();
+	const platform = platformOverride || os.platform();
+	const arch = archOverride || os.arch();
 	const target = TARGETS[platform]?.[arch];
 
 	if (!target) {
