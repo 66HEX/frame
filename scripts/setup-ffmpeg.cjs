@@ -45,7 +45,8 @@ const TARGETS = {
 		x64: createMartinTarget('Linux x86_64', 'linux', 'amd64', 'x86_64', 'unknown-linux-gnu'),
 		arm64: createMartinTarget('Linux ARM64', 'linux', 'arm64', 'aarch64', 'unknown-linux-gnu'),
 		x86_64: createMartinTarget('Linux x86_64', 'linux', 'amd64', 'x86_64', 'unknown-linux-gnu'),
-		aarch64: createMartinTarget('Linux ARM64', 'linux', 'arm64', 'aarch64', 'unknown-linux-gnu')
+		aarch64: createMartinTarget('Linux ARM64', 'linux', 'arm64', 'aarch64', 'unknown-linux-gnu'),
+		amd64: createMartinTarget('Linux x86_64', 'linux', 'amd64', 'x86_64', 'unknown-linux-gnu')
 	},
 	win32: {
 		x64: {

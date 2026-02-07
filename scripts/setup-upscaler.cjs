@@ -70,6 +70,11 @@ const TARGETS = {
 			url: `${REPO_BASE}/realesrgan-ncnn-vulkan-20220424-ubuntu.zip`,
 			zipEntryName: 'realesrgan-ncnn-vulkan',
 			dest: 'realesrgan-ncnn-vulkan-x86_64-unknown-linux-gnu'
+		},
+		amd64: {
+			url: `${REPO_BASE}/realesrgan-ncnn-vulkan-20220424-ubuntu.zip`,
+			zipEntryName: 'realesrgan-ncnn-vulkan',
+			dest: 'realesrgan-ncnn-vulkan-x86_64-unknown-linux-gnu'
 		}
 	},
 	win32: {
