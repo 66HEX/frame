@@ -144,7 +144,8 @@
 		"videotoolboxOptions": "VideoToolboxオプション",
 		"videotoolboxAllowSw": "ソフトウェアフォールバックを許可",
 		"videotoolboxAllowSwHint": "ハードウェアが失敗した場合にCPUエンコードに戻ります",
-		"mlUpscaling": "MLアップスケーリング"
+		"mlUpscaling": "MLアップスケーリング",
+		"codecIncompatible": "互換性のないコンテナ"
 	},
 	"audio": {
 		"channelsBitrate": "チャンネルとビットレート",

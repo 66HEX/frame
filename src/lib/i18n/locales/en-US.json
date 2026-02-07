@@ -144,7 +144,8 @@
 		"videotoolboxOptions": "VideoToolbox Options",
 		"videotoolboxAllowSw": "Allow software fallback",
 		"videotoolboxAllowSwHint": "Drop back to CPU encoding if hardware fails",
-		"mlUpscaling": "ML Upscaling"
+		"mlUpscaling": "ML Upscaling",
+		"codecIncompatible": "Incompatible container"
 	},
 	"audio": {
 		"channelsBitrate": "Channels & Bitrate",

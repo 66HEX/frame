@@ -144,7 +144,8 @@
 		"videotoolboxOptions": "VideoToolbox-Optionen",
 		"videotoolboxAllowSw": "Software-Fallback erlauben",
 		"videotoolboxAllowSwHint": "Zurück zur CPU-Kodierung, falls Hardware ausfällt",
-		"mlUpscaling": "ML-Hochskalierung"
+		"mlUpscaling": "ML-Hochskalierung",
+		"codecIncompatible": "Inkompatibles Format"
 	},
 	"audio": {
 		"channelsBitrate": "Kanäle & Bitrate",

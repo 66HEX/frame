@@ -144,7 +144,8 @@
 		"videotoolboxOptions": "VideoToolbox 选项",
 		"videotoolboxAllowSw": "允许软件回退",
 		"videotoolboxAllowSwHint": "如果硬件失败则回退到 CPU 编码",
-		"mlUpscaling": "ML 超分辨率"
+		"mlUpscaling": "ML 超分辨率",
+		"codecIncompatible": "不兼容的容器"
 	},
 	"audio": {
 		"channelsBitrate": "声道和比特率",

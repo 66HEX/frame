@@ -144,7 +144,8 @@
 		"videotoolboxOptions": "Options VideoToolbox",
 		"videotoolboxAllowSw": "Autoriser le repli logiciel",
 		"videotoolboxAllowSwHint": "Basculer sur l'encodage CPU en cas d'échec matériel",
-		"mlUpscaling": "Mise à l'échelle ML"
+		"mlUpscaling": "Mise à l'échelle ML",
+		"codecIncompatible": "Conteneur incompatible"
 	},
 	"audio": {
 		"channelsBitrate": "Canaux et débit",

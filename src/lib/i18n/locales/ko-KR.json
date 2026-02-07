@@ -144,7 +144,8 @@
 		"videotoolboxOptions": "VideoToolbox 옵션",
 		"videotoolboxAllowSw": "소프트웨어 폴백 허용",
 		"videotoolboxAllowSwHint": "하드웨어 실패 시 CPU 인코딩으로 전환",
-		"mlUpscaling": "ML 업스케일링"
+		"mlUpscaling": "ML 업스케일링",
+		"codecIncompatible": "호환되지 않는 컨테이너"
 	},
 	"audio": {
 		"channelsBitrate": "채널 및 비트레이트",

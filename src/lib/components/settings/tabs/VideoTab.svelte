@@ -50,6 +50,42 @@
 	const NVENC_ENCODERS = new Set(['h264_nvenc', 'hevc_nvenc', 'av1_nvenc']);
 	const VIDEOTOOLBOX_ENCODERS = new Set(['h264_videotoolbox', 'hevc_videotoolbox']);
 
+	const CONTAINER_CODEC_COMPATIBILITY: Record<string, Set<string>> = {
+		mp4: new Set([
+			'libx264',
+			'libx265',
+			'vp9',
+			'libsvtav1',
+			'h264_videotoolbox',
+			'h264_nvenc',
+			'hevc_videotoolbox',
+			'hevc_nvenc',
+			'av1_nvenc'
+		]),
+		mkv: new Set([
+			'libx264',
+			'libx265',
+			'vp9',
+			'prores',
+			'libsvtav1',
+			'h264_videotoolbox',
+			'h264_nvenc',
+			'hevc_videotoolbox',
+			'hevc_nvenc',
+			'av1_nvenc'
+		]),
+		webm: new Set(['vp9']),
+		mov: new Set([
+			'libx264',
+			'libx265',
+			'prores',
+			'h264_videotoolbox',
+			'h264_nvenc',
+			'hevc_videotoolbox',
+			'hevc_nvenc'
+		])
+	};
+
 	const SCALING_ALGOS = ['bicubic', 'lanczos', 'bilinear', 'nearest'] as const;
 
 	const ML_UPSCALING_OPTIONS = [
@@ -93,9 +129,27 @@
 		return true;
 	}
 
+	function isCodecAllowed(container: string, codec: string) {
+		const allowed = CONTAINER_CODEC_COMPATIBILITY[container];
+		if (!allowed) return true;
+		return allowed.has(codec);
+	}
+
+	function firstAllowedCodec(container: string) {
+		return availableCodecs.find((c) => isCodecAllowed(container, c.id));
+	}
+
 	function firstAllowedPreset(codec: string) {
 		return PRESETS.find((preset) => isPresetAllowed(codec, preset));
 	}
+
+	$effect(() => {
+		const fallback = firstAllowedCodec(config.container);
+		if (!fallback) return;
+		if (!isCodecAllowed(config.container, config.videoCodec)) {
+			onUpdate({ videoCodec: fallback.id });
+		}
+	});
 
 	$effect(() => {
 		const fallback = firstAllowedPreset(config.videoCodec);
@@ -222,13 +276,21 @@
 		<Label variant="section">{$_('video.encoder')}</Label>
 		<div class="grid grid-cols-1">
 			{#each availableCodecs as codec (codec.id)}
+				{@const codecAllowed = isCodecAllowed(config.container, codec.id)}
 				<ListItem
-					selected={config.videoCodec === codec.id}
-					onclick={() => onUpdate({ videoCodec: codec.id })}
-					{disabled}
+					selected={codecAllowed && config.videoCodec === codec.id}
+					onclick={() => codecAllowed && onUpdate({ videoCodec: codec.id })}
+					disabled={disabled || !codecAllowed}
+					class={cn(!codecAllowed && 'pointer-events-none opacity-50')}
 				>
 					<span>{codec.id}</span>
-					<span class="text-[9px] opacity-50">{codec.label}</span>
+					<span class="text-[9px] opacity-50">
+						{#if codecAllowed}
+							{codec.label}
+						{:else}
+							{$_('video.codecIncompatible')}
+						{/if}
+					</span>
 				</ListItem>
 			{/each}
 		</div>

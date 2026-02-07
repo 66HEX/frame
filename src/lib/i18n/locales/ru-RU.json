@@ -144,7 +144,8 @@
 		"videotoolboxOptions": "Настройки VideoToolbox",
 		"videotoolboxAllowSw": "Разрешить программный фолбек",
 		"videotoolboxAllowSwHint": "Переключиться на ЦП при сбое оборудования",
-		"mlUpscaling": "ML-масштабирование"
+		"mlUpscaling": "ML-масштабирование",
+		"codecIncompatible": "Несовместимый контейнер"
 	},
 	"audio": {
 		"channelsBitrate": "Каналы и битрейт",

@@ -144,7 +144,8 @@
 		"videotoolboxOptions": "Opzioni VideoToolbox",
 		"videotoolboxAllowSw": "Consenti fallback software",
 		"videotoolboxAllowSwHint": "Passa alla codifica CPU se l'hardware fallisce",
-		"mlUpscaling": "Upscaling ML"
+		"mlUpscaling": "Upscaling ML",
+		"codecIncompatible": "Contenitore incompatibile"
 	},
 	"audio": {
 		"channelsBitrate": "Canali e bitrate",
