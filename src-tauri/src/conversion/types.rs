@@ -156,6 +156,11 @@ pub struct ProgressPayload {
 }
 
 #[derive(Clone, Serialize)]
+pub struct StartedPayload {
+    pub id: String,
+}
+
+#[derive(Clone, Serialize)]
 pub struct CompletedPayload {
     pub id: String,
     pub output_path: String,

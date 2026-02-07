@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Progress Display:** Resolved an issue where the UI would remain stuck on "Queued" status during the ML upscaling decode phase. A new `conversion-started` event now immediately updates the status to "Converting" when processing begins.
+- **Windows Progress Indicator:** Fixed progress percentage not updating for h264 and h264_nvenc codecs on Windows. The FFmpeg stderr parser now correctly handles Windows-style carriage return (`\r`) line separators.
+
 ## [0.19.0] - 2026-02-07
 
 ### Added

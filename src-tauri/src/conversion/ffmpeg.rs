@@ -10,7 +10,7 @@ use crate::conversion::error::ConversionError;
 use crate::conversion::manager::ManagerMessage;
 use crate::conversion::types::{
     CompletedPayload, ConversionConfig, ConversionTask, ErrorPayload, LogPayload, MetadataConfig,
-    MetadataMode, ProgressPayload, VOLUME_EPSILON,
+    MetadataMode, ProgressPayload, StartedPayload, VOLUME_EPSILON,
 };
 
 pub(crate) fn parse_frame_rate_string(value: Option<&str>) -> Option<f64> {
@@ -593,6 +593,13 @@ async fn run_upscale_worker(
         .await;
 
     let _ = app_clone.emit(
+        "conversion-started",
+        StartedPayload {
+            id: id_clone.clone(),
+        },
+    );
+
+    let _ = app_clone.emit(
         "conversion-progress",
         ProgressPayload {
             id: id_clone.clone(),
@@ -915,6 +922,19 @@ pub async fn run_ffmpeg_worker(
         .send(ManagerMessage::TaskStarted(id.clone(), child.pid()))
         .await;
 
+    let _ = app_clone.emit(
+        "conversion-started",
+        StartedPayload { id: id.clone() },
+    );
+
+    let _ = app_clone.emit(
+        "conversion-progress",
+        ProgressPayload {
+            id: id.clone(),
+            progress: 0.0,
+        },
+    );
+
     let duration_regex = Regex::new(r"Duration: (\d{2}:\d{2}:\d{2}\.\d{2})").unwrap();
     let time_regex = Regex::new(r"time=(\d{2}:\d{2}:\d{2}\.\d{2})").unwrap();
 
@@ -948,43 +968,50 @@ pub async fn run_ffmpeg_worker(
     while let Some(event) = rx.recv().await {
         match event {
             CommandEvent::Stderr(line_bytes) => {
-                let line = String::from_utf8_lossy(&line_bytes).to_string();
+                let raw_output = String::from_utf8_lossy(&line_bytes).to_string();
 
-                let _ = app_clone.emit(
-                    "conversion-log",
-                    LogPayload {
-                        id: id.clone(),
-                        line: line.clone(),
-                    },
-                );
+                for segment in raw_output.split(['\r', '\n']) {
+                    let line = segment.trim();
+                    if line.is_empty() {
+                        continue;
+                    }
 
-                if let Some(caps) = time_regex.captures(&line) {
-                    if let Some(match_str) = caps.get(1) {
-                        if let Some(current_time) = parse_time(match_str.as_str()) {
-                            let duration = if expected_duration > 0.0 {
-                                expected_duration
-                            } else if let Some(d) = total_duration {
-                                d
-                            } else if let Some(caps) = duration_regex.captures(&line) {
-                                if let Some(m) = caps.get(1) {
-                                    total_duration = parse_time(m.as_str());
-                                    total_duration.unwrap_or(0.0)
+                    let _ = app_clone.emit(
+                        "conversion-log",
+                        LogPayload {
+                            id: id.clone(),
+                            line: line.to_string(),
+                        },
+                    );
+
+                    if let Some(caps) = time_regex.captures(line) {
+                        if let Some(match_str) = caps.get(1) {
+                            if let Some(current_time) = parse_time(match_str.as_str()) {
+                                let duration = if expected_duration > 0.0 {
+                                    expected_duration
+                                } else if let Some(d) = total_duration {
+                                    d
+                                } else if let Some(caps) = duration_regex.captures(line) {
+                                    if let Some(m) = caps.get(1) {
+                                        total_duration = parse_time(m.as_str());
+                                        total_duration.unwrap_or(0.0)
+                                    } else {
+                                        0.0
+                                    }
                                 } else {
                                     0.0
-                                }
-                            } else {
-                                0.0
-                            };
+                                };
 
-                            if duration > 0.0 {
-                                let progress = (current_time / duration * 100.0).min(100.0);
-                                let _ = app_clone.emit(
-                                    "conversion-progress",
-                                    ProgressPayload {
-                                        id: id.clone(),
-                                        progress,
-                                    },
-                                );
+                                if duration > 0.0 {
+                                    let progress = (current_time / duration * 100.0).min(100.0);
+                                    let _ = app_clone.emit(
+                                        "conversion-progress",
+                                        ProgressPayload {
+                                            id: id.clone(),
+                                            progress,
+                                        },
+                                    );
+                                }
                             }
                         }
                     }
