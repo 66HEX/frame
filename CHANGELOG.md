@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Progress Display:** Resolved an issue where the UI would remain stuck on "Queued" status during the ML upscaling decode phase. A new `conversion-started` event now immediately updates the status to "Converting" when processing begins.
 - **Windows Progress Indicator:** Fixed progress percentage not updating for h264 and h264_nvenc codecs on Windows. The FFmpeg stderr parser now correctly handles Windows-style carriage return (`\r`) line separators.
+- **ML Upscale Parameter Parity:** The AI upscaling pipeline now supports all parameters from the standard conversion: rotation, flip, subtitle burn, FPS change, NVENC/VideoToolbox options, audio processing (codec, bitrate, volume, normalize, channels), metadata handling, and subtitle track selection.
 
 ## [0.19.0] - 2026-02-07
 
