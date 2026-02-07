@@ -68,7 +68,7 @@
 				</Button>
 			{/each}
 		</div>
-		<p class="text-gray-alpha-600 text-[9px] uppercase">
+		<p class="text-[9px] text-gray-alpha-600 uppercase">
 			{$_(`metadata.modes.${config.metadata.mode}Desc`)}
 		</p>
 	</div>

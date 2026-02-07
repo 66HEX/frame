@@ -28,7 +28,7 @@ mod tests {
             audio_bitrate: "128".into(),
             audio_channels: "original".into(),
             audio_volume: 100.0,
-            selected_audio_tracks: vec![],
+            selected_audio_tracks: vec![1],
             selected_subtitle_tracks: vec![],
             subtitle_burn_path: None,
             resolution: "original".into(),
@@ -46,6 +46,7 @@ mod tests {
             rotation: "0".into(),
             flip_horizontal: false,
             flip_vertical: false,
+            ml_upscale: None,
             crop: None,
             nvenc_spatial_aq: false,
             nvenc_temporal_aq: false,
@@ -78,7 +79,7 @@ mod tests {
         let args = build_ffmpeg_args("in.mp4", "out.mp4", &config);
 
         let vf_index = args.iter().position(|r| r == "-vf").unwrap();
-        assert_eq!(args[vf_index + 1], "scale=-1:1080:flags=bicubic");
+        assert_eq!(args[vf_index + 1], "scale=-2:1080:flags=bicubic");
     }
 
     #[test]
@@ -89,7 +90,18 @@ mod tests {
         let args = build_ffmpeg_args("in.mp4", "out.mp4", &config);
 
         let vf_index = args.iter().position(|r| r == "-vf").unwrap();
-        assert_eq!(args[vf_index + 1], "scale=-1:720:flags=bicubic");
+        assert_eq!(args[vf_index + 1], "scale=-2:720:flags=bicubic");
+    }
+
+    #[test]
+    fn test_resolution_scaling_480p() {
+        let mut config = sample_config("mp4");
+        config.resolution = "480p".into();
+
+        let args = build_ffmpeg_args("in.mp4", "out.mp4", &config);
+
+        let vf_index = args.iter().position(|r| r == "-vf").unwrap();
+        assert_eq!(args[vf_index + 1], "scale=-2:480:flags=bicubic");
     }
 
     #[test]

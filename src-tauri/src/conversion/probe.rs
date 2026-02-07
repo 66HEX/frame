@@ -3,11 +3,8 @@ use tauri_plugin_shell::ShellExt;
 
 use crate::conversion::error::ConversionError;
 use crate::conversion::ffmpeg::{parse_frame_rate_string, parse_probe_bitrate};
-use crate::conversion::types::{
-    AudioTrack, FfprobeOutput, ProbeMetadata, SubtitleTrack,
-};
+use crate::conversion::types::{AudioTrack, FfprobeOutput, ProbeMetadata, SubtitleTrack};
 
-/// Probe media file using FFprobe and return metadata.
 pub async fn probe_media_file(
     app: &AppHandle,
     file_path: &str,

@@ -100,7 +100,7 @@ Le moyen le plus simple d'exécuter Frame est de télécharger un package depuis
 - Binaires **FFmpeg** et **FFprobe** dans le répertoire `src-tauri/binaries/`
   - Convention de nommage : `ffmpeg-<target-triple>` (ex : `ffmpeg-aarch64-apple-darwin`)
 
-> Astuce : Exécutez `bun run setup:binaries` pour télécharger automatiquement les binaires appropriés. Utilisez `--force` pour rafraîchir.
+> Astuce : Exécutez `bun run setup:ffmpeg` pour télécharger automatiquement les binaires appropriés. Utilisez `--force` pour rafraîchir.
 
 ### Instructions de compilation
 
@@ -132,6 +132,11 @@ Le moyen le plus simple d'exécuter Frame est de télécharger un package depuis
     - **Préréglages :** Sauvegarder et charger des profils de conversion
 3.  **Exécution :** Lancer le processus de conversion via le backend Rust
 4.  **Monitoring :** Voir les logs en temps réel et le pourcentage de progression
+
+## Remerciements
+
+- **Real-ESRGAN**: Copyright (c) 2021, Xintao Wang. Sous licence [BSD 3-Clause](https://github.com/xinntao/Real-ESRGAN/blob/master/LICENSE).
+- **FFmpeg**: Sous licence [GPLv3](https://www.ffmpeg.org/legal.html).
 
 ## Licence
 

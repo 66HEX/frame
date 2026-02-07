@@ -106,7 +106,7 @@
 
 				<div class="pointer-events-none h-5 w-px bg-gray-alpha-100"></div>
 
-				<div class="text-gray-alpha-600 pointer-events-none flex items-center gap-4 text-[10px]">
+				<div class="pointer-events-none flex items-center gap-4 text-[10px] text-gray-alpha-600">
 					<div class="flex items-center gap-2">
 						<IconHardDrive size={14} />
 						<span>{$_('titlebar.storage')} {formatTotalSize(totalSize)}</span>
@@ -155,35 +155,34 @@
 		</div>
 	</div>
 
-	<div
-		class="pointer-events-auto absolute top-0 right-0 z-50 flex h-full items-center gap-0.5 px-2"
-	>
+	<div class="pointer-events-auto absolute top-0 right-0 z-50 flex h-full items-center">
 		<Button
 			variant="ghost"
 			size="none"
 			onclick={minimize}
-			class="size-7 rounded-lg"
+			class="h-full w-[46px] rounded-none"
 			title={$_('titlebar.minimize')}
 		>
-			<IconMinus size={16} />
+			<IconMinus size={18} />
 		</Button>
 		<Button
 			variant="ghost"
 			size="none"
 			onclick={toggleMaximize}
-			class="size-7 rounded-lg"
+			class="h-full w-[46px] rounded-none"
 			title={$_('titlebar.toggleSize')}
 		>
-			<IconSquare size={16} />
+			<!-- This is "smaller" so as to match the Fluent icon style better -->
+			<IconSquare size={14} />
 		</Button>
 		<Button
 			variant="titlebar-destructive"
 			size="none"
 			onclick={close}
-			class="size-7 rounded-lg"
+			class="h-full w-[46px] rounded-none"
 			title={$_('titlebar.close')}
 		>
-			<IconClose size={16} />
+			<IconClose size={18} />
 		</Button>
 	</div>
 </div>

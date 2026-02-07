@@ -1,11 +1,10 @@
-use tauri::{command, AppHandle};
+use tauri::{AppHandle, command};
 
 use crate::conversion::error::ConversionError;
 use crate::conversion::ffmpeg::validate_task_input;
 use crate::conversion::manager::{ConversionManager, ManagerMessage};
 use crate::conversion::probe::probe_media_file;
 use crate::conversion::types::{ConversionConfig, ConversionTask, ProbeMetadata};
-
 
 #[command]
 pub async fn queue_conversion(
@@ -56,7 +55,6 @@ pub async fn cancel_conversion(
     manager.cancel_task(&id)
 }
 
-
 #[command]
 pub async fn probe_media(
     app: AppHandle,
@@ -64,7 +62,6 @@ pub async fn probe_media(
 ) -> Result<ProbeMetadata, ConversionError> {
     probe_media_file(&app, &file_path).await
 }
-
 
 #[command]
 pub fn get_max_concurrency(

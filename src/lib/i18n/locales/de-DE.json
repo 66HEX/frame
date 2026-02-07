@@ -143,7 +143,8 @@
 		"presetIncompatible": "Inkompatibler Encoder",
 		"videotoolboxOptions": "VideoToolbox-Optionen",
 		"videotoolboxAllowSw": "Software-Fallback erlauben",
-		"videotoolboxAllowSwHint": "Zurück zur CPU-Kodierung, falls Hardware ausfällt"
+		"videotoolboxAllowSwHint": "Zurück zur CPU-Kodierung, falls Hardware ausfällt",
+		"mlUpscaling": "ML-Hochskalierung"
 	},
 	"audio": {
 		"channelsBitrate": "Kanäle & Bitrate",

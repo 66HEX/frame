@@ -100,7 +100,7 @@ brew install --cask frame
 - **FFmpeg** 和 **FFprobe** 二进制文件必须放在 `src-tauri/binaries/` 目录下
   - 命名规范：`ffmpeg-<target-triple>`（如 `ffmpeg-aarch64-apple-darwin` 或 `ffmpeg-x86_64-pc-windows-msvc.exe`）
 
-> 提示：运行 `bun run setup:binaries`（或 `npm run setup:binaries`）可自动下载适合你系统的二进制文件。使用 `--force` 可刷新已有下载。
+> 提示：运行 `bun run setup:ffmpeg`（或 `npm run setup:ffmpeg`）可自动下载适合你系统的二进制文件。使用 `--force` 可刷新已有下载。
 
 ### 构建说明
 
@@ -132,6 +132,11 @@ brew install --cask frame
     - **预设：** 保存和加载可复用的转换配置
 3.  **执行：** 通过 Rust 后端启动转换进程
 4.  **监控：** 在界面中查看实时日志和进度百分比
+
+## 致谢
+
+- **Real-ESRGAN**: Copyright (c) 2021, Xintao Wang. 许可协议: [BSD 3-Clause](https://github.com/xinntao/Real-ESRGAN/blob/master/LICENSE).
+- **FFmpeg**: 许可协议: [GPLv3](https://www.ffmpeg.org/legal.html).
 
 ## 许可证
 

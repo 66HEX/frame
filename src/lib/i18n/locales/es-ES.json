@@ -143,7 +143,8 @@
 		"presetIncompatible": "Codificador incompatible",
 		"videotoolboxOptions": "Opciones de VideoToolbox",
 		"videotoolboxAllowSw": "Permitir respaldo por software",
-		"videotoolboxAllowSwHint": "Usar codificación por CPU si falla el hardware"
+		"videotoolboxAllowSwHint": "Usar codificación por CPU si falla el hardware",
+		"mlUpscaling": "Escalado por ML"
 	},
 	"audio": {
 		"channelsBitrate": "Canales y tasa",

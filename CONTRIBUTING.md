@@ -38,7 +38,7 @@ To build and run Frame locally, you will need:
     The application requires FFmpeg/FFprobe sidecars in `src-tauri/binaries/`. We provide a script to fetch them:
 
     ```bash
-    bun run setup:binaries
+    bun run setup:ffmpeg
     ```
 
 4.  **Run in development mode:**

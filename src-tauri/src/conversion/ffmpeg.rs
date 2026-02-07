@@ -1,6 +1,7 @@
 use regex::Regex;
 use std::path::{Path, PathBuf};
-use tauri::{AppHandle, Emitter};
+use tauri::path::BaseDirectory;
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_shell::ShellExt;
 use tauri_plugin_shell::process::CommandEvent;
 use tokio::sync::mpsc;
@@ -8,10 +9,9 @@ use tokio::sync::mpsc;
 use crate::conversion::error::ConversionError;
 use crate::conversion::manager::ManagerMessage;
 use crate::conversion::types::{
-    CompletedPayload, ConversionConfig, ConversionTask, ErrorPayload, LogPayload,
-    MetadataConfig, MetadataMode, ProgressPayload, VOLUME_EPSILON,
+    CompletedPayload, ConversionConfig, ConversionTask, ErrorPayload, LogPayload, MetadataConfig,
+    MetadataMode, ProgressPayload, VOLUME_EPSILON,
 };
-
 
 pub(crate) fn parse_frame_rate_string(value: Option<&str>) -> Option<f64> {
     let value = value?.trim();
@@ -80,7 +80,6 @@ fn parse_time(time_str: &str) -> Option<f64> {
     Some(h * 3600.0 + m * 60.0 + s)
 }
 
-
 pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -> Vec<String> {
     let mut args = Vec::new();
 
@@ -94,10 +93,27 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
     args.push("-i".to_string());
     args.push(input.to_string());
 
-    if let Some(end) = &config.end_time {
-        if !end.is_empty() {
-            args.push("-to".to_string());
-            args.push(end.clone());
+    if let Some(end_str) = &config.end_time {
+        if !end_str.is_empty() {
+            if let Some(start_str) = &config.start_time {
+                if !start_str.is_empty() {
+                    if let (Some(start_t), Some(end_t)) =
+                        (parse_time(start_str), parse_time(end_str))
+                    {
+                        let duration = end_t - start_t;
+                        if duration > 0.0 {
+                            args.push("-t".to_string());
+                            args.push(format!("{:.3}", duration));
+                        }
+                    }
+                } else {
+                    args.push("-to".to_string());
+                    args.push(end_str.clone());
+                }
+            } else {
+                args.push("-to".to_string());
+                args.push(end_str.clone());
+            }
         }
     }
 
@@ -130,8 +146,6 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
             args.push("-b:v".to_string());
             args.push(format!("{}k", config.video_bitrate));
         } else if is_nvenc {
-            // NVENC uses -rc:v vbr and -cq:v (1-51), where 1 is best.
-            // Map Quality (1-100, 100 best) to CQ (51-1).
             let cq = (52.0 - (config.quality as f64 / 2.0))
                 .round()
                 .clamp(1.0, 51.0) as u32;
@@ -140,7 +154,6 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
             args.push("-cq:v".to_string());
             args.push(cq.to_string());
         } else if is_videotoolbox {
-            // VideoToolbox uses -q:v (1-100), where 100 is best.
             args.push("-q:v".to_string());
             args.push(config.quality.to_string());
         } else {
@@ -208,7 +221,6 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
 
         if let Some(burn_path) = &config.subtitle_burn_path {
             if !burn_path.is_empty() {
-                // FFmpeg subtitles filter needs specific escaping for paths, especially on Windows
                 let escaped_path = burn_path.replace('\\', "/").replace(':', "\\:");
                 video_filters.push(format!("subtitles='{}'", escaped_path));
             }
@@ -227,7 +239,6 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
                 let w = config.custom_width.as_deref().unwrap_or("-1");
                 let h = config.custom_height.as_deref().unwrap_or("-1");
                 if w != "-1" && h != "-1" {
-                    // Fit within the box, preserving aspect ratio, and pad with black bars
                     format!(
                         "scale={w}:{h}:force_original_aspect_ratio=decrease{algo},pad={w}:{h}:(ow-iw)/2:(oh-ih)/2",
                         w = w,
@@ -241,9 +252,9 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
                 }
             } else {
                 match config.resolution.as_str() {
-                    "1080p" => format!("scale=-1:1080{}", algorithm),
-                    "720p" => format!("scale=-1:720{}", algorithm),
-                    "480p" => format!("scale=-1:480{}", algorithm),
+                    "1080p" => format!("scale=-2:1080{}", algorithm),
+                    "720p" => format!("scale=-2:720{}", algorithm),
+                    "480p" => format!("scale=-2:480{}", algorithm),
                     _ => "scale=-1:-1".to_string(),
                 }
             };
@@ -276,13 +287,17 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         }
     }
 
+    if !config.selected_audio_tracks.is_empty() {
+        args.push("-c:a".to_string());
+        args.push(config.audio_codec.clone());
+    }
+
     if !config.selected_subtitle_tracks.is_empty() {
         for track_index in &config.selected_subtitle_tracks {
             args.push("-map".to_string());
             args.push(format!("0:{}", track_index));
         }
     } else if !is_audio_only {
-        // By default, copy all subtitles if none are explicitly selected
         args.push("-map".to_string());
         args.push("0:s?".to_string());
     }
@@ -297,11 +312,10 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         args.push("copy".to_string());
     }
 
-    args.push("-c:a".to_string());
-    args.push(config.audio_codec.clone());
-
     let lossless_audio_codecs = ["flac", "alac", "pcm_s16le"];
-    if !lossless_audio_codecs.contains(&config.audio_codec.as_str()) {
+    if !lossless_audio_codecs.contains(&config.audio_codec.as_str())
+        && !config.selected_audio_tracks.is_empty()
+    {
         args.push("-b:a".to_string());
         args.push(format!("{}k", config.audio_bitrate));
     }
@@ -379,7 +393,6 @@ fn add_metadata_flags(args: &mut Vec<String>, metadata: &MetadataConfig) {
     }
 }
 
-
 pub fn build_output_path(file_path: &str, container: &str, output_name: Option<String>) -> String {
     if let Some(custom) = output_name.and_then(|name| {
         let trimmed = name.trim();
@@ -404,8 +417,10 @@ pub fn build_output_path(file_path: &str, container: &str, output_name: Option<S
     }
 }
 
-
-pub fn validate_task_input(file_path: &str, config: &ConversionConfig) -> Result<(), ConversionError> {
+pub fn validate_task_input(
+    file_path: &str,
+    config: &ConversionConfig,
+) -> Result<(), ConversionError> {
     let input_path = Path::new(file_path);
     if !input_path.exists() {
         return Err(ConversionError::InvalidInput(format!(
@@ -436,7 +451,6 @@ pub fn validate_task_input(file_path: &str, config: &ConversionConfig) -> Result
                 "Resolution dimensions cannot be zero".to_string(),
             ));
         }
-        // -1 is allowed for "keep aspect ratio", but strictly negative values < -1 are invalid for scale filter
         if w < -1 || h < -1 {
             return Err(ConversionError::InvalidInput(
                 "Resolution dimensions cannot be negative (except -1 for auto)".to_string(),
@@ -461,12 +475,426 @@ pub fn validate_task_input(file_path: &str, config: &ConversionConfig) -> Result
     Ok(())
 }
 
+async fn run_upscale_worker(
+    app: AppHandle,
+    tx: mpsc::Sender<ManagerMessage>,
+    task: ConversionTask,
+) -> Result<(), ConversionError> {
+    let (scale, model_name) = match task.config.ml_upscale.as_deref() {
+        Some("esrgan-2x") => ("2", "realesr-animevideov3-x2"),
+        Some("esrgan-4x") => ("4", "realesr-animevideov3-x4"),
+        _ => return Err(ConversionError::InvalidInput("Invalid upscale mode".into())),
+    };
+
+    let output_path = build_output_path(&task.file_path, &task.config.container, task.output_name);
+
+    let probe = crate::conversion::probe::probe_media_file(&app, &task.file_path)
+        .await
+        .map_err(|e| ConversionError::Worker(format!("Probe failed: {}", e)))?;
+
+    let fps = probe.frame_rate.unwrap_or(30.0);
+    let full_duration = probe
+        .duration
+        .as_deref()
+        .and_then(parse_time)
+        .unwrap_or(0.0);
+
+    let start_t = task
+        .config
+        .start_time
+        .as_deref()
+        .and_then(parse_time)
+        .unwrap_or(0.0);
+    let end_t = task
+        .config
+        .end_time
+        .as_deref()
+        .and_then(parse_time)
+        .unwrap_or(full_duration);
+    let active_duration = (end_t - start_t).max(0.0);
+    let total_frames = (active_duration * fps).ceil() as u32;
+
+    let temp_dir = std::env::temp_dir().join(format!("frame_upscale_{}", task.id));
+    if temp_dir.exists() {
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+    std::fs::create_dir_all(&temp_dir).map_err(ConversionError::Io)?;
+    let input_frames_dir = temp_dir.join("input");
+    let output_frames_dir = temp_dir.join("output");
+    std::fs::create_dir_all(&input_frames_dir).map_err(ConversionError::Io)?;
+    std::fs::create_dir_all(&output_frames_dir).map_err(ConversionError::Io)?;
+
+    let app_clone = app.clone();
+    let id_clone = task.id.clone();
+
+    let mut dec_args = vec!["-i".to_string(), task.file_path.clone()];
+    if let Some(start) = &task.config.start_time {
+        if !start.is_empty() {
+            dec_args.insert(0, "-ss".to_string());
+            dec_args.insert(1, start.clone());
+        }
+    }
+
+    if let Some(end) = &task.config.end_time {
+        if !end.is_empty() {
+            if let Some(start) = &task.config.start_time {
+                if !start.is_empty() {
+                    if let (Some(s_t), Some(e_t)) = (parse_time(start), parse_time(end)) {
+                        let duration = e_t - s_t;
+                        if duration > 0.0 {
+                            dec_args.push("-t".to_string());
+                            dec_args.push(format!("{:.3}", duration));
+                        }
+                    }
+                } else {
+                    dec_args.push("-to".to_string());
+                    dec_args.push(end.clone());
+                }
+            } else {
+                dec_args.push("-to".to_string());
+                dec_args.push(end.clone());
+            }
+        }
+    }
+
+    if let Some(crop) = &task.config.crop {
+        if crop.enabled {
+            let crop_width = crop.width.max(1.0).round() as i32;
+            let crop_height = crop.height.max(1.0).round() as i32;
+            let crop_x = crop.x.max(0.0).round() as i32;
+            let crop_y = crop.y.max(0.0).round() as i32;
+            dec_args.push("-vf".to_string());
+            dec_args.push(format!(
+                "crop={}:{}:{}:{}",
+                crop_width, crop_height, crop_x, crop_y
+            ));
+        }
+    }
+    dec_args.push(
+        input_frames_dir
+            .join("frame_%08d.png")
+            .to_string_lossy()
+            .to_string(),
+    );
+
+    let (mut dec_rx, dec_child) = app
+        .shell()
+        .sidecar("ffmpeg")
+        .map_err(|e| ConversionError::Shell(e.to_string()))?
+        .args(dec_args)
+        .spawn()
+        .map_err(|e| ConversionError::Shell(e.to_string()))?;
+
+    let _ = tx
+        .send(ManagerMessage::TaskStarted(
+            task.id.clone(),
+            dec_child.pid(),
+        ))
+        .await;
+
+    let _ = app_clone.emit(
+        "conversion-progress",
+        ProgressPayload {
+            id: id_clone.clone(),
+            progress: 0.0,
+        },
+    );
+
+    let frame_regex = Regex::new(r"frame=\s*(\d+)").unwrap();
+    let mut decode_success = false;
+
+    while let Some(event) = dec_rx.recv().await {
+        match event {
+            CommandEvent::Stderr(ref line_bytes) => {
+                let line = String::from_utf8_lossy(line_bytes);
+                let _ = app_clone.emit(
+                    "conversion-log",
+                    LogPayload {
+                        id: id_clone.clone(),
+                        line: format!("[DECODE] {}", line.trim()),
+                    },
+                );
+
+                if total_frames > 0 {
+                    if let Some(caps) = frame_regex.captures(&line) {
+                        if let Some(frame_match) = caps.get(1) {
+                            if let Ok(current_frame) = frame_match.as_str().parse::<u32>() {
+                                let decode_progress =
+                                    (current_frame as f64 / total_frames as f64) * 5.0;
+                                let _ = app_clone.emit(
+                                    "conversion-progress",
+                                    ProgressPayload {
+                                        id: id_clone.clone(),
+                                        progress: decode_progress.min(5.0),
+                                    },
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+            CommandEvent::Terminated(payload) => {
+                decode_success = payload.code == Some(0);
+                break;
+            }
+            _ => {}
+        }
+    }
+
+    if !decode_success {
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        return Err(ConversionError::Worker("Frame extraction failed".into()));
+    }
+
+    let actual_frames = std::fs::read_dir(&input_frames_dir)
+        .map(|entries| {
+            entries
+                .filter_map(|e| e.ok())
+                .filter(|e| {
+                    e.path()
+                        .extension()
+                        .map(|ext| ext == "png")
+                        .unwrap_or(false)
+                })
+                .count() as u32
+        })
+        .unwrap_or(total_frames);
+    let total_frames = if actual_frames > 0 {
+        actual_frames
+    } else {
+        total_frames
+    };
+
+    let models_path = app
+        .path()
+        .resolve("resources/models", BaseDirectory::Resource)
+        .map_err(|e| ConversionError::Shell(e.to_string()))?;
+
+    let upscaler_args = vec![
+        "-v".to_string(),
+        "-i".to_string(),
+        input_frames_dir.to_string_lossy().to_string(),
+        "-o".to_string(),
+        output_frames_dir.to_string_lossy().to_string(),
+        "-s".to_string(),
+        scale.to_string(),
+        "-f".to_string(),
+        "png".to_string(),
+        "-m".to_string(),
+        models_path.to_string_lossy().to_string(),
+        "-n".to_string(),
+        model_name.to_string(),
+        "-j".to_string(),
+        "4:4:4".to_string(),
+        "-g".to_string(),
+        "0".to_string(),
+        "-t".to_string(),
+        "0".to_string(),
+    ];
+
+    let (mut upscale_rx, upscale_child) = app
+        .shell()
+        .sidecar("realesrgan-ncnn-vulkan")
+        .map_err(|e| ConversionError::Shell(e.to_string()))?
+        .args(upscaler_args)
+        .spawn()
+        .map_err(|e| ConversionError::Shell(e.to_string()))?;
+
+    let _ = tx
+        .send(ManagerMessage::TaskStarted(
+            task.id.clone(),
+            upscale_child.pid(),
+        ))
+        .await;
+
+    let mut upscale_success = false;
+    let mut last_error = String::new();
+    let mut completed_frames: u32 = 0;
+
+    while let Some(event) = upscale_rx.recv().await {
+        if let CommandEvent::Stderr(ref line_bytes) = event {
+            let line = String::from_utf8_lossy(line_bytes);
+            let trimmed = line.trim();
+            last_error = line.to_string();
+
+            let is_percentage_line = trimmed.ends_with('%')
+                && trimmed
+                    .chars()
+                    .next()
+                    .map(|c| c.is_ascii_digit())
+                    .unwrap_or(false);
+            if !is_percentage_line && !trimmed.is_empty() {
+                let _ = app_clone.emit(
+                    "conversion-log",
+                    LogPayload {
+                        id: id_clone.clone(),
+                        line: format!("[UPSCALE] {}", trimmed),
+                    },
+                );
+            }
+
+            if line.contains("→") || line.contains("->") {
+                completed_frames += 1;
+
+                let progress = if total_frames > 0 {
+                    5.0 + (completed_frames as f64 / total_frames as f64) * 85.0
+                } else {
+                    5.0 + (completed_frames as f64).min(85.0)
+                };
+
+                let _ = app_clone.emit(
+                    "conversion-progress",
+                    ProgressPayload {
+                        id: id_clone.clone(),
+                        progress: progress.min(90.0),
+                    },
+                );
+            }
+        }
+        if let CommandEvent::Terminated(payload) = event {
+            upscale_success = payload.code == Some(0);
+            break;
+        }
+    }
+    if !upscale_success {
+        return Err(ConversionError::Worker(format!(
+            "Upscaling failed: {}",
+            last_error
+        )));
+    }
+
+    let mut enc_args = vec![
+        "-framerate".to_string(),
+        fps.to_string(),
+        "-start_number".to_string(),
+        "1".to_string(),
+        "-i".to_string(),
+        output_frames_dir
+            .join("frame_%08d.png")
+            .to_string_lossy()
+            .to_string(),
+    ];
+
+    if let Some(start) = &task.config.start_time {
+        if !start.is_empty() {
+            enc_args.push("-ss".to_string());
+            enc_args.push(start.clone());
+        }
+    }
+
+    enc_args.push("-i".to_string());
+    enc_args.push(task.file_path.clone());
+
+    enc_args.extend(vec![
+        "-map".to_string(),
+        "0:v:0".to_string(),
+        "-map".to_string(),
+        "1:a?".to_string(),
+        "-c:v".to_string(),
+        task.config.video_codec.clone(),
+    ]);
+
+    if task.config.video_bitrate_mode == "bitrate" {
+        enc_args.push("-b:v".to_string());
+        enc_args.push(format!("{}k", task.config.video_bitrate));
+    } else {
+        enc_args.push("-crf".to_string());
+        enc_args.push(task.config.crf.to_string());
+    }
+
+    enc_args.push("-c:a".to_string());
+    enc_args.push("copy".to_string());
+    enc_args.push("-preset".to_string());
+    enc_args.push(task.config.preset.clone());
+    enc_args.push("-pix_fmt".to_string());
+    enc_args.push("yuv420p".to_string());
+    enc_args.push("-shortest".to_string());
+    enc_args.push("-y".to_string());
+    enc_args.push(output_path.clone());
+
+    let (mut enc_rx, enc_child) = app
+        .shell()
+        .sidecar("ffmpeg")
+        .map_err(|e| ConversionError::Shell(e.to_string()))?
+        .args(enc_args)
+        .spawn()
+        .map_err(|e| ConversionError::Shell(e.to_string()))?;
+
+    let _ = tx
+        .send(ManagerMessage::TaskStarted(
+            task.id.clone(),
+            enc_child.pid(),
+        ))
+        .await;
+
+    let encode_frame_regex = Regex::new(r"frame=\s*(\d+)").unwrap();
+
+    while let Some(event) = enc_rx.recv().await {
+        match event {
+            CommandEvent::Stderr(ref line_bytes) => {
+                let line = String::from_utf8_lossy(line_bytes);
+                let _ = app_clone.emit(
+                    "conversion-log",
+                    LogPayload {
+                        id: id_clone.clone(),
+                        line: format!("[ENCODE] {}", line.trim()),
+                    },
+                );
+
+                if total_frames > 0 {
+                    if let Some(caps) = encode_frame_regex.captures(&line) {
+                        if let Some(frame_match) = caps.get(1) {
+                            if let Ok(current_frame) = frame_match.as_str().parse::<u32>() {
+                                let encode_progress =
+                                    90.0 + (current_frame as f64 / total_frames as f64) * 10.0;
+                                let _ = app_clone.emit(
+                                    "conversion-progress",
+                                    ProgressPayload {
+                                        id: id_clone.clone(),
+                                        progress: encode_progress.min(99.0),
+                                    },
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+            CommandEvent::Terminated(payload) => {
+                let _ = std::fs::remove_dir_all(&temp_dir);
+                if payload.code == Some(0) {
+                    let _ = app.emit(
+                        "conversion-completed",
+                        CompletedPayload {
+                            id: task.id.clone(),
+                            output_path,
+                        },
+                    );
+                    return Ok(());
+                } else {
+                    return Err(ConversionError::Worker(format!(
+                        "Encoder failed with code {:?}",
+                        payload.code
+                    )));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Ok(())
+}
 
 pub async fn run_ffmpeg_worker(
     app: AppHandle,
     tx: mpsc::Sender<ManagerMessage>,
     task: ConversionTask,
 ) -> Result<(), ConversionError> {
+    if let Some(upscale_mode) = &task.config.ml_upscale {
+        if upscale_mode != "none" && !upscale_mode.is_empty() {
+            return run_upscale_worker(app, tx, task).await;
+        }
+    }
+
     let output_path = build_output_path(&task.file_path, &task.config.container, task.output_name);
     let args = build_ffmpeg_args(&task.file_path, &output_path, &task.config);
 
@@ -483,7 +911,6 @@ pub async fn run_ffmpeg_worker(
     let id = task.id;
     let app_clone = app.clone();
 
-    // Notify manager about the PID
     let _ = tx
         .send(ManagerMessage::TaskStarted(id.clone(), child.pid()))
         .await;
@@ -491,8 +918,32 @@ pub async fn run_ffmpeg_worker(
     let duration_regex = Regex::new(r"Duration: (\d{2}:\d{2}:\d{2}\.\d{2})").unwrap();
     let time_regex = Regex::new(r"time=(\d{2}:\d{2}:\d{2}\.\d{2})").unwrap();
 
-    let mut total_duration: Option<f64> = None;
     let mut exit_code: Option<i32> = None;
+    let mut total_duration: Option<f64> = None;
+
+    let expected_duration = {
+        let start_t = task
+            .config
+            .start_time
+            .as_deref()
+            .and_then(parse_time)
+            .unwrap_or(0.0);
+        let probe = crate::conversion::probe::probe_media_file(&app, &task.file_path)
+            .await
+            .ok();
+        let full_duration = probe
+            .and_then(|p| p.duration)
+            .as_deref()
+            .and_then(parse_time)
+            .unwrap_or(0.0);
+        let end_t = task
+            .config
+            .end_time
+            .as_deref()
+            .and_then(parse_time)
+            .unwrap_or(full_duration);
+        (end_t - start_t).max(0.0)
+    };
 
     while let Some(event) = rx.recv().await {
         match event {
@@ -507,18 +958,25 @@ pub async fn run_ffmpeg_worker(
                     },
                 );
 
-                if total_duration.is_none() {
-                    if let Some(caps) = duration_regex.captures(&line) {
-                        if let Some(match_str) = caps.get(1) {
-                            total_duration = parse_time(match_str.as_str());
-                        }
-                    }
-                }
+                if let Some(caps) = time_regex.captures(&line) {
+                    if let Some(match_str) = caps.get(1) {
+                        if let Some(current_time) = parse_time(match_str.as_str()) {
+                            let duration = if expected_duration > 0.0 {
+                                expected_duration
+                            } else if let Some(d) = total_duration {
+                                d
+                            } else if let Some(caps) = duration_regex.captures(&line) {
+                                if let Some(m) = caps.get(1) {
+                                    total_duration = parse_time(m.as_str());
+                                    total_duration.unwrap_or(0.0)
+                                } else {
+                                    0.0
+                                }
+                            } else {
+                                0.0
+                            };
 
-                if let Some(duration) = total_duration {
-                    if let Some(caps) = time_regex.captures(&line) {
-                        if let Some(match_str) = caps.get(1) {
-                            if let Some(current_time) = parse_time(match_str.as_str()) {
+                            if duration > 0.0 {
                                 let progress = (current_time / duration * 100.0).min(100.0);
                                 let _ = app_clone.emit(
                                     "conversion-progress",

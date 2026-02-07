@@ -13,7 +13,6 @@ export async function getAvailableEncoders(): Promise<AvailableEncoders> {
 		return await invoke('get_available_encoders');
 	} catch (error) {
 		console.error('Failed to get available encoders:', error);
-		// Fallback to safe defaults if detection fails
 		return {
 			h264_videotoolbox: false,
 			h264_nvenc: false,

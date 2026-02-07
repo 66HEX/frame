@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 pub const DEFAULT_MAX_CONCURRENCY: usize = 2;
 pub const VOLUME_EPSILON: f64 = 0.01;
 
-
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct AudioTrack {
@@ -25,7 +24,6 @@ pub struct SubtitleTrack {
     pub language: Option<String>,
     pub label: Option<String>,
 }
-
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -53,7 +51,6 @@ pub struct ProbeMetadata {
     pub color_primaries: Option<String>,
     pub profile: Option<String>,
 }
-
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -91,6 +88,8 @@ pub struct ConversionConfig {
     pub flip_horizontal: bool,
     #[serde(default)]
     pub flip_vertical: bool,
+    #[serde(default)]
+    pub ml_upscale: Option<String>,
     #[serde(default)]
     pub crop: Option<CropConfig>,
     #[serde(default)]
@@ -150,7 +149,6 @@ pub enum MetadataMode {
     Replace,
 }
 
-
 #[derive(Clone, Serialize)]
 pub struct ProgressPayload {
     pub id: String,
@@ -174,7 +172,6 @@ pub struct LogPayload {
     pub id: String,
     pub line: String,
 }
-
 
 #[derive(Deserialize)]
 pub struct FfprobeOutput {
@@ -226,7 +223,6 @@ pub struct FfprobeTags {
     #[serde(rename = "DATE")]
     pub date_upper: Option<String>,
 }
-
 
 #[derive(Debug, Clone)]
 pub struct ConversionTask {

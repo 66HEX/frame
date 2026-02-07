@@ -100,7 +100,7 @@ Frame을 실행하는 가장 쉬운 방법은 [GitHub Releases](https://github.c
 - **FFmpeg** 및 **FFprobe** 바이너리를 `src-tauri/binaries/` 디렉토리에 배치
   - 명명 규칙: `ffmpeg-<target-triple>` (예: `ffmpeg-aarch64-apple-darwin` 또는 `ffmpeg-x86_64-pc-windows-msvc.exe`)
 
-> 팁: `bun run setup:binaries` (또는 `npm run setup:binaries`)를 실행하면 OS/아키텍처에 맞는 바이너리를 자동 다운로드합니다. `--force`로 기존 다운로드를 갱신할 수 있습니다.
+> 팁: `bun run setup:ffmpeg` (또는 `npm run setup:ffmpeg`)를 실행하면 OS/아키텍처에 맞는 바이너리를 자동 다운로드합니다. `--force`로 기존 다운로드를 갱신할 수 있습니다.
 
 ### 빌드 방법
 
@@ -132,6 +132,11 @@ Frame을 실행하는 가장 쉬운 방법은 [GitHub Releases](https://github.c
     - **프리셋:** 재사용 가능한 변환 프로필 저장 및 불러오기
 3.  **실행:** Rust 백엔드를 통해 변환 프로세스 시작
 4.  **모니터링:** UI에서 실시간 로그와 진행률 확인
+
+## 감사의 말
+
+- **Real-ESRGAN**: Copyright (c) 2021, Xintao Wang. 라이선스: [BSD 3-Clause](https://github.com/xinntao/Real-ESRGAN/blob/master/LICENSE).
+- **FFmpeg**: 라이선스: [GPLv3](https://www.ffmpeg.org/legal.html).
 
 ## 라이선스
 

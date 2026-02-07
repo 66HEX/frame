@@ -52,6 +52,12 @@
 
 	const SCALING_ALGOS = ['bicubic', 'lanczos', 'bilinear', 'nearest'] as const;
 
+	const ML_UPSCALING_OPTIONS = [
+		{ id: 'none', label: 'None' },
+		{ id: 'esrgan-2x', label: 'ESRGAN 2x' },
+		{ id: 'esrgan-4x', label: 'ESRGAN 4x' }
+	] as const;
+
 	const FPS_OPTIONS = ['original', '24', '30', '60'] as const;
 
 	let {
@@ -67,7 +73,15 @@
 	const isNvencEncoder = $derived(NVENC_ENCODERS.has(config.videoCodec));
 	const isVideotoolboxEncoder = $derived(VIDEOTOOLBOX_ENCODERS.has(config.videoCodec));
 	const isHardwareEncoder = $derived(isNvencEncoder || isVideotoolboxEncoder);
+	const isMlUpscaleActive = $derived(config.mlUpscale && config.mlUpscale !== 'none');
+	const effectiveResolution = $derived(isMlUpscaleActive ? 'original' : config.resolution);
 	const presetOptions = PRESETS;
+
+	$effect(() => {
+		if (isMlUpscaleActive && config.resolution !== 'original') {
+			onUpdate({ resolution: 'original' });
+		}
+	});
 
 	function isPresetAllowed(codec: string, preset: (typeof PRESETS)[number]) {
 		if (VIDEOTOOLBOX_ENCODERS.has(codec)) {
@@ -110,9 +124,9 @@
 		<div class="mb-2 grid grid-cols-2 gap-2">
 			{#each RESOLUTIONS as res (res)}
 				<Button
-					variant={config.resolution === res ? 'selected' : 'outline'}
+					variant={effectiveResolution === res ? 'selected' : 'outline'}
 					onclick={() => onUpdate({ resolution: res })}
-					{disabled}
+					disabled={disabled || isMlUpscaleActive}
 					class="w-full"
 				>
 					{res}
@@ -166,6 +180,22 @@
 						class="w-full"
 					>
 						{$_(`scalingAlgorithm.${algo}`)}
+					</Button>
+				{/each}
+			</div>
+		</div>
+
+		<div class="space-y-3 pt-2">
+			<Label variant="section">{$_('video.mlUpscaling')}</Label>
+			<div class="grid grid-cols-2 gap-2">
+				{#each ML_UPSCALING_OPTIONS as opt (opt.id)}
+					<Button
+						variant={(config.mlUpscale || 'none') === opt.id ? 'selected' : 'outline'}
+						onclick={() => onUpdate({ mlUpscale: opt.id as ConversionConfig['mlUpscale'] })}
+						{disabled}
+						class="w-full"
+					>
+						{opt.label}
 					</Button>
 				{/each}
 			</div>

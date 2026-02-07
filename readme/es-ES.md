@@ -100,7 +100,7 @@ La forma más fácil de ejecutar Frame es descargar un paquete precompilado desd
 - Binarios **FFmpeg** y **FFprobe** en el directorio `src-tauri/binaries/`
   - Convención de nombres: `ffmpeg-<target-triple>` (ej: `ffmpeg-aarch64-apple-darwin`)
 
-> Consejo: Ejecuta `bun run setup:binaries` para descargar automáticamente los binarios correctos. Usa `--force` para actualizar descargas existentes.
+> Consejo: Ejecuta `bun run setup:ffmpeg` para descargar automáticamente los binarios correctos. Usa `--force` para actualizar descargas existentes.
 
 ### Instrucciones de compilación
 
@@ -132,6 +132,11 @@ La forma más fácil de ejecutar Frame es descargar un paquete precompilado desd
     - **Ajustes:** Guardar y cargar perfiles de conversión reutilizables
 3.  **Ejecución:** Inicia el proceso de conversión vía backend Rust
 4.  **Monitoreo:** Ver logs en tiempo real y porcentaje de progreso en la UI
+
+## Agradecimientos
+
+- **Real-ESRGAN**: Copyright (c) 2021, Xintao Wang. Licenciado bajo [BSD 3-Clause](https://github.com/xinntao/Real-ESRGAN/blob/master/LICENSE).
+- **FFmpeg**: Licenciado bajo [GPLv3](https://www.ffmpeg.org/legal.html).
 
 ## Licencia
 

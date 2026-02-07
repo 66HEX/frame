@@ -158,7 +158,7 @@
 
 		<div class="pointer-events-none h-6 w-px bg-gray-alpha-100"></div>
 
-		<div class="text-gray-alpha-600 pointer-events-none flex items-center gap-4 text-[10px]">
+		<div class="pointer-events-none flex items-center gap-4 text-[10px] text-gray-alpha-600">
 			<div class="flex items-center gap-2">
 				<IconHardDrive size={14} />
 				<span>{$_('titlebar.storage')} {formatTotalSize(totalSize)}</span>

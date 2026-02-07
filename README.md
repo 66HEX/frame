@@ -144,7 +144,7 @@ bun install
 Frame requires FFmpeg and FFprobe sidecar binaries. We provide a script to fetch the correct version for your platform automatically:
 
 ```bash
-bun run setup:binaries
+bun run setup:ffmpeg
 ```
 
 **4. Build or Run**
@@ -179,6 +179,11 @@ bun run setup:binaries
   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=66HEX/frame&type=timeline" />
   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=66HEX/frame&type=timeline" />
 </picture>
+
+## Acknowledgments & Third-Party Code
+
+- **Real-ESRGAN**: Copyright (c) 2021, Xintao Wang. Licensed under [BSD 3-Clause](https://github.com/xinntao/Real-ESRGAN/blob/master/LICENSE).
+- **FFmpeg**: Licensed under [GPLv3](https://www.ffmpeg.org/legal.html).
 
 ## License
 

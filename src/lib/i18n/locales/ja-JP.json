@@ -143,7 +143,8 @@
 		"presetIncompatible": "互換性のないエンコーダー",
 		"videotoolboxOptions": "VideoToolboxオプション",
 		"videotoolboxAllowSw": "ソフトウェアフォールバックを許可",
-		"videotoolboxAllowSwHint": "ハードウェアが失敗した場合にCPUエンコードに戻ります"
+		"videotoolboxAllowSwHint": "ハードウェアが失敗した場合にCPUエンコードに戻ります",
+		"mlUpscaling": "MLアップスケーリング"
 	},
 	"audio": {
 		"channelsBitrate": "チャンネルとビットレート",

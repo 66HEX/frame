@@ -7,7 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.18.10] - 2026-02-05
+## [0.19.0] - 2026-02-07
+
+### Added
+- **AI Upscaling:** Integrated AI-powered video upscaling using Real-ESRGAN models (x2, x4) for high-quality resolution enhancement.
+- **Features Architecture:** Introduced a new modular architecture in `src/lib/features/` to separate business logic from UI components.
+  - `conversion`: Logic for queue management, presets, and conversion progress.
+  - `files`: Logic for file list management and drag-and-drop operations.
+  - `update`: Logic for app update checks and installation.
+- **Component Reorganization:** Improved project structure by organizing components into logical subdirectories (`file-list`, `layout`, `logs`).
+- **Unified Exports:** Implemented index files for feature modules and component groups to simplify imports and improve maintainability.
+
+### Performance
+- **Log Virtualization:** Implemented a virtualized list for the application logs, enabling smooth scrolling and rendering of thousands of entries without UI lag.
+
+### Fixed
+- **Video Trimming:** Resolved an issue where trimming a segment from the middle of a video would ignore the end point. The logic now uses a calculated duration (`-t`) instead of an absolute end time (`-to`) when a start offset is present.
+- **Progress Reporting:** Fixed inaccurate progress bars during trimmed conversions. Progress is now correctly calculated relative to the trimmed segment length rather than the full source duration.
+
+### Fixed
+- **Process Lifecycle:** Resolved a "zombie process" issue on macOS where the application would remain running in the dock after closing the main window, due to hidden helper windows keeps the event loop alive.
+- **UI Contrast:** Fixed text contrast in `LogsView` to improve readability.
+
+## [0.18.1] - 2026-02-05
 
 ### Added
 
@@ -217,7 +239,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Containers:** Added `.flac`, `.wav`, and `.m4a` to the output container options.
 - **Presets:** Added dedicated built-in presets for "Audio FLAC" and "Audio WAV" (Lossless).
 - **Distribution:** Added official Homebrew Tap support. Users can now install via `brew tap 66HEX/frame && brew install --cask frame`.
-- **Developer Experience:** Added `bun run setup:binaries` to pull platform-specific FFmpeg/FFprobe binaries into `src-tauri/binaries`, mirroring the CI release workflow.
+- **Developer Experience:** Added `bun run setup:ffmpeg` to pull platform-specific FFmpeg/FFprobe binaries into `src-tauri/binaries`, mirroring the CI release workflow.
 
 ### Changed
 
@@ -421,7 +443,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.18.1...HEAD
+[Unreleased]: https://github.com/66HEX/frame/compare/0.19.0...HEAD
+[0.19.0]: https://github.com/66HEX/frame/compare/0.18.1...0.19.0
 [0.18.1]: https://github.com/66HEX/frame/compare/0.18.0...0.18.1
 [0.18.0]: https://github.com/66HEX/frame/compare/0.17.0...0.18.0
 [0.17.0]: https://github.com/66HEX/frame/compare/0.16.0...0.17.0

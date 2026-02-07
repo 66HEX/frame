@@ -74,85 +74,46 @@ jobs:
           path: src-tauri/binaries
           key: ffmpeg-binaries-${{ matrix.platform }}-${{ matrix.arch }}-v3
 
-      - name: Setup FFmpeg (macOS)
-        if: runner.os == 'macOS' && steps.cache-ffmpeg.outputs.cache-hit != 'true'
+      - name: Setup FFmpeg
+        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
+        shell: bash
         run: |
-          mkdir -p src-tauri/binaries
-
-          if [ "${{ matrix.arch }}" = "x86_64" ]; then
-            # Download Intel binaries
-            curl -L -o ffmpeg.zip https://ffmpeg.martin-riedl.de/redirect/latest/macos/amd64/release/ffmpeg.zip
-            curl -L -o ffprobe.zip https://ffmpeg.martin-riedl.de/redirect/latest/macos/amd64/release/ffprobe.zip
-          elif [ "${{ matrix.arch }}" = "aarch64" ]; then
-            # Download Apple Silicon binaries
-            curl -L -o ffmpeg.zip https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffmpeg.zip
-            curl -L -o ffprobe.zip https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffprobe.zip
+          # Ensure unzip is available (Linux/Windows need it, macOS has it)
+          if [ "$RUNNER_OS" == "Linux" ]; then
+             sudo apt-get update && sudo apt-get install -y unzip
           fi
+          
+          # Run the setup script
+          node scripts/setup-ffmpeg.cjs
 
-          # Unzip and move binaries
-          # The zip usually contains the binary directly
-          unzip -o ffmpeg.zip
-          unzip -o ffprobe.zip
+      - name: Setup Upscaler (Common)
+        if: runner.os != 'Linux' || matrix.arch != 'arm64'
+        run: node scripts/setup-upscaler.cjs
 
-          # Move and rename
-          mv ffmpeg src-tauri/binaries/ffmpeg-${{ matrix.arch }}-apple-darwin
-          mv ffprobe src-tauri/binaries/ffprobe-${{ matrix.arch }}-apple-darwin
-
-          # Cleanup
-          rm ffmpeg.zip ffprobe.zip
-
-          # Make executable
-          chmod +x src-tauri/binaries/ffmpeg-${{ matrix.arch }}-apple-darwin
-          chmod +x src-tauri/binaries/ffprobe-${{ matrix.arch }}-apple-darwin
-
-      - name: Setup FFmpeg (Linux)
-        if: runner.os == 'Linux' && steps.cache-ffmpeg.outputs.cache-hit != 'true'
+      - name: Setup Upscaler (Linux ARM64 Build)
+        if: runner.os == 'Linux' && matrix.arch == 'arm64'
         run: |
-          mkdir -p src-tauri/binaries
+           # Install build deps
+           sudo apt-get update
+           sudo apt-get install -y cmake libvulkan-dev glslang-dev glslang-tools libgomp1
 
-          # Ensure unzip is available
-          sudo apt-get update && sudo apt-get install -y unzip
-
-          if [ "${{ matrix.arch }}" = "amd64" ]; then
-            # Download Linux AMD64 binaries
-            curl -L -o ffmpeg.zip https://ffmpeg.martin-riedl.de/redirect/latest/linux/amd64/release/ffmpeg.zip
-            curl -L -o ffprobe.zip https://ffmpeg.martin-riedl.de/redirect/latest/linux/amd64/release/ffprobe.zip
-            TARGET_ARCH="x86_64"
-          elif [ "${{ matrix.arch }}" = "arm64" ]; then
-            # Download Linux ARM64 binaries
-            curl -L -o ffmpeg.zip https://ffmpeg.martin-riedl.de/redirect/latest/linux/arm64/release/ffmpeg.zip
-            curl -L -o ffprobe.zip https://ffmpeg.martin-riedl.de/redirect/latest/linux/arm64/release/ffprobe.zip
-            TARGET_ARCH="aarch64"
-          fi
-
-          # Unzip
-          unzip -o ffmpeg.zip
-          unzip -o ffprobe.zip
-
-          # Move and rename
-          mv ffmpeg src-tauri/binaries/ffmpeg-${TARGET_ARCH}-unknown-linux-gnu
-          mv ffprobe src-tauri/binaries/ffprobe-${TARGET_ARCH}-unknown-linux-gnu
-
-          # Cleanup
-          rm ffmpeg.zip ffprobe.zip
-
-          # Make executable
-          chmod +x src-tauri/binaries/ffmpeg-${TARGET_ARCH}-unknown-linux-gnu
-          chmod +x src-tauri/binaries/ffprobe-${TARGET_ARCH}-unknown-linux-gnu
-
-      - name: Setup FFmpeg (Windows)
-        if: matrix.platform == 'windows-latest' && steps.cache-ffmpeg.outputs.cache-hit != 'true'
-        shell: pwsh
-        run: |
-          New-Item -Path "src-tauri/binaries" -ItemType Directory -Force
-          $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
-          $output = "ffmpeg.zip"
-          Invoke-WebRequest -Uri $url -OutFile $output
-          Expand-Archive -Path $output -DestinationPath .
-          $ffmpegPath = Get-ChildItem -Path "ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe" -Recurse | Select-Object -First 1
-          $ffprobePath = Get-ChildItem -Path "ffmpeg-master-latest-win64-gpl/bin/ffprobe.exe" -Recurse | Select-Object -First 1
-          Move-Item -Path $ffmpegPath.FullName -Destination "src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe" -Force
-          Move-Item -Path $ffprobePath.FullName -Destination "src-tauri/binaries/ffprobe-x86_64-pc-windows-msvc.exe" -Force
+           # Clone repo with submodules
+           git clone --recursive https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan.git
+           cd Real-ESRGAN-ncnn-vulkan
+           
+           # Build
+           mkdir build && cd build
+           cmake ../src
+           make -j$(nproc)
+           
+           # Move binary
+           cd ../..
+           mkdir -p src-tauri/binaries
+           mv Real-ESRGAN-ncnn-vulkan/build/realesrgan-ncnn-vulkan src-tauri/binaries/realesrgan-ncnn-vulkan-aarch64-unknown-linux-gnu
+           chmod +x src-tauri/binaries/realesrgan-ncnn-vulkan-aarch64-unknown-linux-gnu
+           
+           # Cleanup
+           rm -rf Real-ESRGAN-ncnn-vulkan
 
       - name: Get Version
         id: get_version

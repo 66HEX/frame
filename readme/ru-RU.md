@@ -100,7 +100,7 @@ brew install --cask frame
 - Бинарные файлы **FFmpeg** и **FFprobe** в директории `src-tauri/binaries/`
   - Соглашение об именах: `ffmpeg-<target-triple>` (например, `ffmpeg-aarch64-apple-darwin`)
 
-> Совет: Выполните `bun run setup:binaries` для автоматической загрузки нужных бинарных файлов. Используйте `--force` для обновления.
+> Совет: Выполните `bun run setup:ffmpeg` для автоматической загрузки нужных бинарных файлов. Используйте `--force` для обновления.
 
 ### Инструкции по сборке
 
@@ -132,6 +132,11 @@ brew install --cask frame
     - **Пресеты:** Сохранение и загрузка профилей конвертации
 3.  **Выполнение:** Запуск процесса конвертации через бэкенд Rust
 4.  **Мониторинг:** Просмотр логов и прогресса в реальном времени
+
+## Благодарности
+
+- **Real-ESRGAN**: Copyright (c) 2021, Xintao Wang. Лицензия: [BSD 3-Clause](https://github.com/xinntao/Real-ESRGAN/blob/master/LICENSE).
+- **FFmpeg**: Лицензия: [GPLv3](https://www.ffmpeg.org/legal.html).
 
 ## Лицензия
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { FileStatus, type FileItem } from '../types';
+	import { FileStatus, type FileItem } from '$lib/types';
 	import { IconTrash, IconPause, IconPlay } from '$lib/icons';
 	import { cn } from '$lib/utils/cn';
 	import Button from '$lib/components/ui/Button.svelte';

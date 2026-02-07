@@ -74,6 +74,9 @@ pub fn run() {
                             apply_window_effect(&target);
                         });
                     }
+                    if let WindowEvent::CloseRequested { .. } = event {
+                        event_window.app_handle().exit(0);
+                    }
                 });
             }
 

@@ -62,6 +62,7 @@ export interface ConversionConfig {
 	rotation: '0' | '90' | '180' | '270';
 	flipHorizontal: boolean;
 	flipVertical: boolean;
+	mlUpscale?: 'none' | 'esrgan-2x' | 'esrgan-4x';
 	crop?: CropSettings | null;
 	nvencSpatialAq: boolean;
 	nvencTemporalAq: boolean;

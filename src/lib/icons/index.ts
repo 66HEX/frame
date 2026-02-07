@@ -24,3 +24,4 @@ export { default as IconTags } from './components/IconTags.svelte';
 export { default as IconTerminal } from './components/IconTerminal.svelte';
 export { default as IconTrash } from './components/IconTrash.svelte';
 export { default as IconClose } from './components/IconClose.svelte';
+export { default as IconArrowDown } from './components/IconArrowDown.svelte';
