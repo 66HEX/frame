@@ -93,10 +93,27 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
     args.push("-i".to_string());
     args.push(input.to_string());
 
-    if let Some(end) = &config.end_time {
-        if !end.is_empty() {
-            args.push("-to".to_string());
-            args.push(end.clone());
+    if let Some(end_str) = &config.end_time {
+        if !end_str.is_empty() {
+            if let Some(start_str) = &config.start_time {
+                if !start_str.is_empty() {
+                    if let (Some(start_t), Some(end_t)) =
+                        (parse_time(start_str), parse_time(end_str))
+                    {
+                        let duration = end_t - start_t;
+                        if duration > 0.0 {
+                            args.push("-t".to_string());
+                            args.push(format!("{:.3}", duration));
+                        }
+                    }
+                } else {
+                    args.push("-to".to_string());
+                    args.push(end_str.clone());
+                }
+            } else {
+                args.push("-to".to_string());
+                args.push(end_str.clone());
+            }
         }
     }
 
@@ -476,12 +493,26 @@ async fn run_upscale_worker(
         .map_err(|e| ConversionError::Worker(format!("Probe failed: {}", e)))?;
 
     let fps = probe.frame_rate.unwrap_or(30.0);
-    let total_duration = probe
+    let full_duration = probe
         .duration
         .as_deref()
         .and_then(parse_time)
         .unwrap_or(0.0);
-    let total_frames = (total_duration * fps).ceil() as u32;
+
+    let start_t = task
+        .config
+        .start_time
+        .as_deref()
+        .and_then(parse_time)
+        .unwrap_or(0.0);
+    let end_t = task
+        .config
+        .end_time
+        .as_deref()
+        .and_then(parse_time)
+        .unwrap_or(full_duration);
+    let active_duration = (end_t - start_t).max(0.0);
+    let total_frames = (active_duration * fps).ceil() as u32;
 
     let temp_dir = std::env::temp_dir().join(format!("frame_upscale_{}", task.id));
     if temp_dir.exists() {
@@ -503,10 +534,26 @@ async fn run_upscale_worker(
             dec_args.insert(1, start.clone());
         }
     }
+
     if let Some(end) = &task.config.end_time {
         if !end.is_empty() {
-            dec_args.push("-to".to_string());
-            dec_args.push(end.clone());
+            if let Some(start) = &task.config.start_time {
+                if !start.is_empty() {
+                    if let (Some(s_t), Some(e_t)) = (parse_time(start), parse_time(end)) {
+                        let duration = e_t - s_t;
+                        if duration > 0.0 {
+                            dec_args.push("-t".to_string());
+                            dec_args.push(format!("{:.3}", duration));
+                        }
+                    }
+                } else {
+                    dec_args.push("-to".to_string());
+                    dec_args.push(end.clone());
+                }
+            } else {
+                dec_args.push("-to".to_string());
+                dec_args.push(end.clone());
+            }
         }
     }
 
@@ -737,7 +784,7 @@ async fn run_upscale_worker(
 
     enc_args.push("-i".to_string());
     enc_args.push(task.file_path.clone());
-    
+
     enc_args.extend(vec![
         "-map".to_string(),
         "0:v:0".to_string(),
@@ -871,8 +918,32 @@ pub async fn run_ffmpeg_worker(
     let duration_regex = Regex::new(r"Duration: (\d{2}:\d{2}:\d{2}\.\d{2})").unwrap();
     let time_regex = Regex::new(r"time=(\d{2}:\d{2}:\d{2}\.\d{2})").unwrap();
 
-    let mut total_duration: Option<f64> = None;
     let mut exit_code: Option<i32> = None;
+    let mut total_duration: Option<f64> = None;
+
+    let expected_duration = {
+        let start_t = task
+            .config
+            .start_time
+            .as_deref()
+            .and_then(parse_time)
+            .unwrap_or(0.0);
+        let probe = crate::conversion::probe::probe_media_file(&app, &task.file_path)
+            .await
+            .ok();
+        let full_duration = probe
+            .and_then(|p| p.duration)
+            .as_deref()
+            .and_then(parse_time)
+            .unwrap_or(0.0);
+        let end_t = task
+            .config
+            .end_time
+            .as_deref()
+            .and_then(parse_time)
+            .unwrap_or(full_duration);
+        (end_t - start_t).max(0.0)
+    };
 
     while let Some(event) = rx.recv().await {
         match event {
@@ -887,18 +958,25 @@ pub async fn run_ffmpeg_worker(
                     },
                 );
 
-                if total_duration.is_none() {
-                    if let Some(caps) = duration_regex.captures(&line) {
-                        if let Some(match_str) = caps.get(1) {
-                            total_duration = parse_time(match_str.as_str());
-                        }
-                    }
-                }
+                if let Some(caps) = time_regex.captures(&line) {
+                    if let Some(match_str) = caps.get(1) {
+                        if let Some(current_time) = parse_time(match_str.as_str()) {
+                            let duration = if expected_duration > 0.0 {
+                                expected_duration
+                            } else if let Some(d) = total_duration {
+                                d
+                            } else if let Some(caps) = duration_regex.captures(&line) {
+                                if let Some(m) = caps.get(1) {
+                                    total_duration = parse_time(m.as_str());
+                                    total_duration.unwrap_or(0.0)
+                                } else {
+                                    0.0
+                                }
+                            } else {
+                                0.0
+                            };
 
-                if let Some(duration) = total_duration {
-                    if let Some(caps) = time_regex.captures(&line) {
-                        if let Some(match_str) = caps.get(1) {
-                            if let Some(current_time) = parse_time(match_str.as_str()) {
+                            if duration > 0.0 {
                                 let progress = (current_time / duration * 100.0).min(100.0);
                                 let _ = app_clone.emit(
                                     "conversion-progress",

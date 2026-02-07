@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Log Virtualization:** Implemented a virtualized list for the application logs, enabling smooth scrolling and rendering of thousands of entries without UI lag.
 
 ### Fixed
+- **Video Trimming:** Resolved an issue where trimming a segment from the middle of a video would ignore the end point. The logic now uses a calculated duration (`-t`) instead of an absolute end time (`-to`) when a start offset is present.
+- **Progress Reporting:** Fixed inaccurate progress bars during trimmed conversions. Progress is now correctly calculated relative to the trimmed segment length rather than the full source duration.
+
+### Fixed
 - **Process Lifecycle:** Resolved a "zombie process" issue on macOS where the application would remain running in the dock after closing the main window, due to hidden helper windows keeps the event loop alive.
 - **UI Contrast:** Fixed text contrast in `LogsView` to improve readability.
 

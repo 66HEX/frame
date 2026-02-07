@@ -163,7 +163,7 @@ pub async fn open_native_file_dialog<R: Runtime>(
 pub struct NativeAskDialogOptions {
     pub title: Option<String>,
     pub message: String,
-    pub kind: Option<String>, // "info", "warning", "error", "question"
+    pub kind: Option<String>,
     pub ok_label: Option<String>,
     pub cancel_label: Option<String>,
 }
