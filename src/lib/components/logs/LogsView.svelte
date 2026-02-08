@@ -6,6 +6,8 @@
 	import type { SvelteVirtualListScrollOptions } from '@humanspeak/svelte-virtual-list';
 	import { tick, untrack } from 'svelte';
 	import { IconArrowDown } from '$lib/icons';
+	import { getHighlighter, highlightLogLineSync } from '$lib/services/shiki';
+	import type { HighlighterCore } from 'shiki/core';
 
 	let {
 		logs,
@@ -19,6 +21,14 @@
 	let virtualListRef = $state<{
 		scroll: (options: SvelteVirtualListScrollOptions) => void;
 	} | null>(null);
+
+	let highlighter = $state<HighlighterCore | null>(null);
+
+	$effect(() => {
+		getHighlighter().then((hl) => {
+			highlighter = hl;
+		});
+	});
 
 	let activeFiles = $derived(files.filter((f) => logs[f.id] || f.status !== FileStatus.IDLE));
 
@@ -137,7 +147,13 @@
 									class="mr-3 w-8 shrink-0 pt-[0.5px] text-right text-[10px] text-gray-alpha-400 select-none"
 									>{item.index}</span
 								>
-								<span class="break-all whitespace-nowrap text-gray-alpha-600">{item.line}</span>
+								<span class="log-line break-all whitespace-nowrap">
+									{#if highlighter}
+										{@html highlightLogLineSync(highlighter, item.line)}
+									{:else}
+										{item.line}
+									{/if}
+								</span>
 							</div>
 						{/snippet}
 					</VirtualList>
@@ -177,5 +193,20 @@
 	:global(.logs-viewport) {
 		height: 100% !important;
 		overflow-y: auto !important;
+	}
+
+	.log-line :global(pre),
+	.log-line :global(code) {
+		display: inline;
+		background: transparent !important;
+		padding: 0 !important;
+		margin: 0 !important;
+		font-size: inherit;
+		/* font-family: inherit; */
+		line-height: inherit;
+	}
+
+	.log-line :global(pre.shiki) {
+		background: transparent !important;
 	}
 </style>
