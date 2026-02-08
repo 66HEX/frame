@@ -92,14 +92,28 @@ pub async fn run_upscale_worker(
         },
     );
 
-    let mut dec_args = vec!["-i".to_string(), task.file_path.clone()];
+    let mut dec_args = Vec::new();
+
+    // Hardware decode acceleration (only -hwaccel, no output_format since we need CPU frames)
+    if task.config.hw_decode {
+        if crate::conversion::utils::is_nvenc_codec(&task.config.video_codec) {
+            dec_args.push("-hwaccel".to_string());
+            dec_args.push("cuda".to_string());
+        } else if crate::conversion::utils::is_videotoolbox_codec(&task.config.video_codec) {
+            dec_args.push("-hwaccel".to_string());
+            dec_args.push("videotoolbox".to_string());
+        }
+    }
 
     if let Some(start) = &task.config.start_time {
         if !start.is_empty() {
-            dec_args.insert(0, "-ss".to_string());
-            dec_args.insert(1, start.clone());
+            dec_args.push("-ss".to_string());
+            dec_args.push(start.clone());
         }
     }
+
+    dec_args.push("-i".to_string());
+    dec_args.push(task.file_path.clone());
 
     if let Some(end) = &task.config.end_time {
         if !end.is_empty() {
@@ -397,8 +411,6 @@ pub async fn run_upscale_worker(
     add_subtitle_copy_args(&mut enc_args, &task.config);
     add_fps_args(&mut enc_args, &task.config);
 
-    enc_args.push("-pix_fmt".to_string());
-    enc_args.push("yuv420p".to_string());
     enc_args.push("-shortest".to_string());
     enc_args.push("-y".to_string());
     enc_args.push(output_path.clone());

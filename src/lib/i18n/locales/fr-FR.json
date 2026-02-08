@@ -145,7 +145,10 @@
 		"videotoolboxAllowSw": "Autoriser le repli logiciel",
 		"videotoolboxAllowSwHint": "Basculer sur l'encodage CPU en cas d'échec matériel",
 		"mlUpscaling": "Mise à l'échelle ML",
-		"codecIncompatible": "Conteneur incompatible"
+		"codecIncompatible": "Conteneur incompatible",
+		"hardwareAcceleration": "Accélération matérielle",
+		"hwDecode": "Décodage matériel",
+		"hwDecodeHint": "Utiliser le GPU pour décoder la vidéo d'entrée (plus rapide)"
 	},
 	"audio": {
 		"channelsBitrate": "Canaux et débit",

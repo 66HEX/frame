@@ -145,7 +145,10 @@
 		"videotoolboxAllowSw": "Permitir respaldo por software",
 		"videotoolboxAllowSwHint": "Usar codificación por CPU si falla el hardware",
 		"mlUpscaling": "Escalado por ML",
-		"codecIncompatible": "Contenedor incompatible"
+		"codecIncompatible": "Contenedor incompatible",
+		"hardwareAcceleration": "Aceleración de hardware",
+		"hwDecode": "Decodificación por hardware",
+		"hwDecodeHint": "Usar GPU para decodificar el video de entrada (más rápido)"
 	},
 	"audio": {
 		"channelsBitrate": "Canales y tasa",

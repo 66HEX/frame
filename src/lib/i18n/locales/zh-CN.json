@@ -145,7 +145,10 @@
 		"videotoolboxAllowSw": "允许软件回退",
 		"videotoolboxAllowSwHint": "如果硬件失败则回退到 CPU 编码",
 		"mlUpscaling": "ML 超分辨率",
-		"codecIncompatible": "不兼容的容器"
+		"codecIncompatible": "不兼容的容器",
+		"hardwareAcceleration": "硬件加速",
+		"hwDecode": "硬件解码",
+		"hwDecodeHint": "使用GPU解码输入视频（更快）"
 	},
 	"audio": {
 		"channelsBitrate": "声道和比特率",

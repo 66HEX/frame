@@ -98,6 +98,8 @@ pub struct ConversionConfig {
     pub nvenc_temporal_aq: bool,
     #[serde(default)]
     pub videotoolbox_allow_sw: bool,
+    #[serde(default = "default_hw_decode")]
+    pub hw_decode: bool,
 }
 
 fn default_rotation() -> String {
@@ -110,6 +112,10 @@ fn default_quality() -> u32 {
 
 fn default_audio_volume() -> f64 {
     100.0
+}
+
+fn default_hw_decode() -> bool {
+    false
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]

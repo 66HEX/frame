@@ -145,7 +145,10 @@
 		"videotoolboxAllowSw": "Consenti fallback software",
 		"videotoolboxAllowSwHint": "Passa alla codifica CPU se l'hardware fallisce",
 		"mlUpscaling": "Upscaling ML",
-		"codecIncompatible": "Contenitore incompatibile"
+		"codecIncompatible": "Contenitore incompatibile",
+		"hardwareAcceleration": "Accelerazione hardware",
+		"hwDecode": "Decodifica hardware",
+		"hwDecodeHint": "Usa la GPU per decodificare il video in ingresso (più veloce)"
 	},
 	"audio": {
 		"channelsBitrate": "Canali e bitrate",

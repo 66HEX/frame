@@ -41,7 +41,8 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			crop: null,
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
-			videotoolboxAllowSw: false
+			videotoolboxAllowSw: false,
+			hwDecode: false
 		}
 	},
 	{
@@ -78,7 +79,8 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			crop: null,
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
-			videotoolboxAllowSw: false
+			videotoolboxAllowSw: false,
+			hwDecode: false
 		}
 	},
 	{
@@ -115,7 +117,8 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			crop: null,
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
-			videotoolboxAllowSw: false
+			videotoolboxAllowSw: false,
+			hwDecode: false
 		}
 	},
 	{
@@ -152,7 +155,8 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			crop: null,
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
-			videotoolboxAllowSw: false
+			videotoolboxAllowSw: false,
+			hwDecode: false
 		}
 	},
 	{
@@ -189,7 +193,8 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			crop: null,
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
-			videotoolboxAllowSw: false
+			videotoolboxAllowSw: false,
+			hwDecode: false
 		}
 	},
 	{
@@ -226,7 +231,8 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			crop: null,
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
-			videotoolboxAllowSw: false
+			videotoolboxAllowSw: false,
+			hwDecode: false
 		}
 	},
 	{
@@ -263,7 +269,8 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			crop: null,
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
-			videotoolboxAllowSw: false
+			videotoolboxAllowSw: false,
+			hwDecode: false
 		}
 	},
 	{
@@ -302,7 +309,8 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			crop: null,
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
-			videotoolboxAllowSw: false
+			videotoolboxAllowSw: false,
+			hwDecode: false
 		}
 	},
 	{
@@ -339,7 +347,8 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			crop: null,
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
-			videotoolboxAllowSw: false
+			videotoolboxAllowSw: false,
+			hwDecode: false
 		}
 	},
 	{
@@ -378,7 +387,8 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			crop: null,
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
-			videotoolboxAllowSw: false
+			videotoolboxAllowSw: false,
+			hwDecode: false
 		}
 	},
 	{
@@ -415,7 +425,8 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			crop: null,
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
-			videotoolboxAllowSw: false
+			videotoolboxAllowSw: false,
+			hwDecode: false
 		}
 	},
 	{
@@ -454,7 +465,8 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			crop: null,
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
-			videotoolboxAllowSw: false
+			videotoolboxAllowSw: false,
+			hwDecode: false
 		}
 	},
 	{
@@ -491,7 +503,8 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			crop: null,
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
-			videotoolboxAllowSw: false
+			videotoolboxAllowSw: false,
+			hwDecode: false
 		}
 	}
 ];

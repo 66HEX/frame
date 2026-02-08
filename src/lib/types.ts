@@ -67,6 +67,7 @@ export interface ConversionConfig {
 	nvencSpatialAq: boolean;
 	nvencTemporalAq: boolean;
 	videotoolboxAllowSw: boolean;
+	hwDecode: boolean;
 }
 
 export type MetadataMode = 'preserve' | 'clean' | 'replace';

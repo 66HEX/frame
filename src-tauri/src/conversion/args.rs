@@ -4,10 +4,15 @@ use crate::conversion::codec::{add_audio_codec_args, add_fps_args, add_subtitle_
 use crate::conversion::error::ConversionError;
 use crate::conversion::filters::{build_audio_filters, build_video_filters};
 use crate::conversion::types::{ConversionConfig, MetadataConfig, MetadataMode};
-use crate::conversion::utils::{is_audio_only_container, parse_time};
+use crate::conversion::utils::{get_hwaccel_args, is_audio_only_container, parse_time};
 
 pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -> Vec<String> {
     let mut args = Vec::new();
+
+    // Hardware decode acceleration (must be before -i)
+    if config.hw_decode {
+        args.extend(get_hwaccel_args(&config.video_codec));
+    }
 
     if let Some(start) = &config.start_time {
         if !start.is_empty() {

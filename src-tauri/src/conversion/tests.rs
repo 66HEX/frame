@@ -41,6 +41,7 @@ mod tests {
             nvenc_spatial_aq: false,
             nvenc_temporal_aq: false,
             videotoolbox_allow_sw: false,
+            hw_decode: false,
         }
     }
 
@@ -545,6 +546,7 @@ mod scenario_tests {
             nvenc_spatial_aq: false,
             nvenc_temporal_aq: false,
             videotoolbox_allow_sw: false,
+            hw_decode: false,
         }
     }
 
@@ -790,5 +792,119 @@ mod scenario_tests {
 
         assert!(args.contains(&"libsvtav1".to_string()));
         assert!(args.contains(&"28".to_string()));
+    }
+}
+
+#[cfg(test)]
+mod hwaccel_tests {
+    use crate::conversion::args::build_ffmpeg_args;
+    use crate::conversion::types::{ConversionConfig, MetadataConfig};
+    use crate::conversion::utils::get_hwaccel_args;
+
+    fn hwaccel_config(codec: &str) -> ConversionConfig {
+        ConversionConfig {
+            container: "mp4".into(),
+            video_codec: codec.into(),
+            video_bitrate_mode: "crf".into(),
+            video_bitrate: "5000".into(),
+            audio_codec: "aac".into(),
+            audio_bitrate: "128".into(),
+            audio_channels: "original".into(),
+            audio_volume: 100.0,
+            selected_audio_tracks: vec![],
+            selected_subtitle_tracks: vec![],
+            subtitle_burn_path: None,
+            resolution: "original".into(),
+            custom_width: None,
+            custom_height: None,
+            scaling_algorithm: "bicubic".into(),
+            fps: "original".into(),
+            crf: 23,
+            quality: 50,
+            preset: "medium".into(),
+            start_time: None,
+            end_time: None,
+            audio_normalize: false,
+            metadata: MetadataConfig::default(),
+            rotation: "0".into(),
+            flip_horizontal: false,
+            flip_vertical: false,
+            ml_upscale: None,
+            crop: None,
+            nvenc_spatial_aq: false,
+            nvenc_temporal_aq: false,
+            videotoolbox_allow_sw: false,
+            hw_decode: true,
+        }
+    }
+
+    #[test]
+    fn get_hwaccel_args_nvenc_codecs() {
+        for codec in ["h264_nvenc", "hevc_nvenc", "av1_nvenc"] {
+            let args = get_hwaccel_args(codec);
+            assert_eq!(args.len(), 4);
+            assert_eq!(args[0], "-hwaccel");
+            assert_eq!(args[1], "cuda");
+            assert_eq!(args[2], "-hwaccel_output_format");
+            assert_eq!(args[3], "cuda");
+        }
+    }
+
+    #[test]
+    fn get_hwaccel_args_videotoolbox_codecs() {
+        for codec in ["h264_videotoolbox", "hevc_videotoolbox"] {
+            let args = get_hwaccel_args(codec);
+            assert_eq!(args.len(), 2);
+            assert_eq!(args[0], "-hwaccel");
+            assert_eq!(args[1], "videotoolbox");
+        }
+    }
+
+    #[test]
+    fn get_hwaccel_args_software_codecs() {
+        for codec in ["libx264", "libx265", "libsvtav1", "libvpx-vp9"] {
+            let args = get_hwaccel_args(codec);
+            assert!(args.is_empty());
+        }
+    }
+
+    #[test]
+    fn hwaccel_cuda_in_ffmpeg_args() {
+        let config = hwaccel_config("h264_nvenc");
+        let args = build_ffmpeg_args("in.mp4", "out.mp4", &config);
+
+        // hwaccel args must come BEFORE -i
+        let hwaccel_idx = args.iter().position(|a| a == "-hwaccel").unwrap();
+        let i_idx = args.iter().position(|a| a == "-i").unwrap();
+        assert!(hwaccel_idx < i_idx, "hwaccel must come before -i");
+        assert!(args.contains(&"cuda".to_string()));
+        assert!(args.contains(&"-hwaccel_output_format".to_string()));
+    }
+
+    #[test]
+    fn hwaccel_videotoolbox_in_ffmpeg_args() {
+        let config = hwaccel_config("hevc_videotoolbox");
+        let args = build_ffmpeg_args("in.mov", "out.mov", &config);
+
+        let hwaccel_idx = args.iter().position(|a| a == "-hwaccel").unwrap();
+        let i_idx = args.iter().position(|a| a == "-i").unwrap();
+        assert!(hwaccel_idx < i_idx);
+        assert!(args.contains(&"videotoolbox".to_string()));
+    }
+
+    #[test]
+    fn hwaccel_disabled() {
+        let mut config = hwaccel_config("h264_nvenc");
+        config.hw_decode = false;
+
+        let args = build_ffmpeg_args("in.mp4", "out.mp4", &config);
+        assert!(!args.contains(&"-hwaccel".to_string()));
+    }
+
+    #[test]
+    fn hwaccel_ignored_for_software_encoder() {
+        let config = hwaccel_config("libx264");
+        let args = build_ffmpeg_args("in.mp4", "out.mp4", &config);
+        assert!(!args.contains(&"-hwaccel".to_string()));
     }
 }

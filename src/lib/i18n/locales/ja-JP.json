@@ -145,7 +145,10 @@
 		"videotoolboxAllowSw": "ソフトウェアフォールバックを許可",
 		"videotoolboxAllowSwHint": "ハードウェアが失敗した場合にCPUエンコードに戻ります",
 		"mlUpscaling": "MLアップスケーリング",
-		"codecIncompatible": "互換性のないコンテナ"
+		"codecIncompatible": "互換性のないコンテナ",
+		"hardwareAcceleration": "ハードウェアアクセラレーション",
+		"hwDecode": "ハードウェアデコード",
+		"hwDecodeHint": "入力動画のデコードにGPUを使用（高速）"
 	},
 	"audio": {
 		"channelsBitrate": "チャンネルとビットレート",

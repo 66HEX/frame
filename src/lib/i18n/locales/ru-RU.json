@@ -145,7 +145,10 @@
 		"videotoolboxAllowSw": "Разрешить программный фолбек",
 		"videotoolboxAllowSwHint": "Переключиться на ЦП при сбое оборудования",
 		"mlUpscaling": "ML-масштабирование",
-		"codecIncompatible": "Несовместимый контейнер"
+		"codecIncompatible": "Несовместимый контейнер",
+		"hardwareAcceleration": "Аппаратное ускорение",
+		"hwDecode": "Аппаратное декодирование",
+		"hwDecodeHint": "Использовать GPU для декодирования входного видео (быстрее)"
 	},
 	"audio": {
 		"channelsBitrate": "Каналы и битрейт",

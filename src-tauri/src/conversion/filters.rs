@@ -129,6 +129,7 @@ mod tests {
             nvenc_spatial_aq: false,
             nvenc_temporal_aq: false,
             videotoolbox_allow_sw: false,
+            hw_decode: false,
         }
     }
 

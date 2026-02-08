@@ -1,8 +1,7 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-pub static FRAME_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"frame=\s*(\d+)").unwrap());
+pub static FRAME_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"frame=\s*(\d+)").unwrap());
 
 pub static DURATION_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"Duration:\s*(\d+(?::\d+){0,3}(?:\.\d+)?)").unwrap());
@@ -82,5 +81,20 @@ pub fn parse_time(time_str: &str) -> Option<f64> {
             Some(h * 3600.0 + m * 60.0 + s)
         }
         _ => None,
+    }
+}
+
+pub fn get_hwaccel_args(video_codec: &str) -> Vec<String> {
+    if is_nvenc_codec(video_codec) {
+        vec![
+            "-hwaccel".to_string(),
+            "cuda".to_string(),
+            "-hwaccel_output_format".to_string(),
+            "cuda".to_string(),
+        ]
+    } else if is_videotoolbox_codec(video_codec) {
+        vec!["-hwaccel".to_string(), "videotoolbox".to_string()]
+    } else {
+        vec![]
     }
 }

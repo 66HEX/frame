@@ -472,4 +472,24 @@
 			</div>
 		</div>
 	{/if}
+
+	{#if isHardwareEncoder}
+		<div class="space-y-3 pt-2">
+			<Label variant="section">{$_('video.hardwareAcceleration')}</Label>
+			<div class="flex items-start gap-2">
+				<Checkbox
+					id="hw-decode"
+					checked={config.hwDecode}
+					onchange={() => onUpdate({ hwDecode: !config.hwDecode })}
+					{disabled}
+				/>
+				<div class="space-y-0.5">
+					<Label for="hw-decode">{$_('video.hwDecode')}</Label>
+					<p class="text-[9px] text-gray-alpha-600 uppercase">
+						{$_('video.hwDecodeHint')}
+					</p>
+				</div>
+			</div>
+		</div>
+	{/if}
 </div>

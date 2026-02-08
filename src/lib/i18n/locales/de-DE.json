@@ -145,7 +145,10 @@
 		"videotoolboxAllowSw": "Software-Fallback erlauben",
 		"videotoolboxAllowSwHint": "Zurück zur CPU-Kodierung, falls Hardware ausfällt",
 		"mlUpscaling": "ML-Hochskalierung",
-		"codecIncompatible": "Inkompatibles Format"
+		"codecIncompatible": "Inkompatibles Format",
+		"hardwareAcceleration": "Hardwarebeschleunigung",
+		"hwDecode": "Hardware-Dekodierung",
+		"hwDecodeHint": "GPU für die Dekodierung des Eingabevideos verwenden (schneller)"
 	},
 	"audio": {
 		"channelsBitrate": "Kanäle & Bitrate",

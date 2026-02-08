@@ -145,7 +145,10 @@
 		"videotoolboxAllowSw": "Allow software fallback",
 		"videotoolboxAllowSwHint": "Drop back to CPU encoding if hardware fails",
 		"mlUpscaling": "ML Upscaling",
-		"codecIncompatible": "Incompatible container"
+		"codecIncompatible": "Incompatible container",
+		"hardwareAcceleration": "Hardware Acceleration",
+		"hwDecode": "Hardware Decoding",
+		"hwDecodeHint": "Use GPU for decoding input video (faster)"
 	},
 	"audio": {
 		"channelsBitrate": "Channels & Bitrate",
