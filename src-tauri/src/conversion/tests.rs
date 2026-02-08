@@ -1,8 +1,10 @@
 #[cfg(test)]
 mod tests {
-    use crate::conversion::args::{build_ffmpeg_args, build_output_path};
+    use crate::conversion::args::{build_ffmpeg_args, build_output_path, validate_task_input};
     use crate::conversion::types::{ConversionConfig, MetadataConfig};
     use crate::conversion::utils::parse_time;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn contains_args(args: &[String], expected: &[&str]) -> bool {
         expected.iter().all(|e| args.iter().any(|a| a == e))
@@ -316,6 +318,37 @@ mod tests {
         assert!(contains_args(&args, &["-map", "0:s?"]));
         assert!(contains_args(&args, &["-c:a", "aac"]));
         assert!(contains_args(&args, &["-b:a", "128k"]));
+        assert!(contains_args(&args, &["-c:s", "mov_text"]));
+    }
+
+    #[test]
+    fn test_subtitle_stream_not_mapped_when_burn_in_used_without_track_selection() {
+        let mut config = sample_config("mp4");
+        config.selected_subtitle_tracks = vec![];
+        config.subtitle_burn_path = Some("/tmp/captions.srt".into());
+
+        let args = build_ffmpeg_args("in.mp4", "out.mp4", &config);
+
+        assert!(!contains_args(&args, &["-map", "0:s?"]));
+        assert!(!contains_args(&args, &["-c:s", "mov_text"]));
+    }
+
+    #[test]
+    fn test_validate_rejects_ml_upscale_for_audio_only_container() {
+        let mut config = sample_config("mp3");
+        config.ml_upscale = Some("esrgan-2x".into());
+
+        let ts = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("frame-validate-{}.tmp", ts));
+        fs::write(&path, b"test").unwrap();
+
+        let result = validate_task_input(path.to_str().unwrap(), &config);
+        let _ = fs::remove_file(&path);
+
+        assert!(result.is_err());
     }
 }
 

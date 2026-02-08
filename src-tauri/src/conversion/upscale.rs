@@ -6,8 +6,7 @@ use tokio::sync::mpsc;
 
 use crate::conversion::args::{add_metadata_flags, build_output_path};
 use crate::conversion::codec::{
-    add_audio_codec_args, add_audio_codec_args_copy, add_fps_args, add_subtitle_copy_args,
-    add_video_codec_args,
+    add_audio_codec_args, add_fps_args, add_subtitle_codec_args, add_video_codec_args,
 };
 use crate::conversion::error::ConversionError;
 use crate::conversion::filters::{build_audio_filters, build_video_filters};
@@ -389,18 +388,18 @@ pub async fn run_upscale_worker(
             enc_args.push("-map".to_string());
             enc_args.push(format!("1:{}", track_index));
         }
-    } else {
+    } else if task
+        .config
+        .subtitle_burn_path
+        .as_ref()
+        .map_or(true, |path| path.trim().is_empty())
+    {
         enc_args.push("-map".to_string());
         enc_args.push("1:s?".to_string());
     }
 
     add_video_codec_args(&mut enc_args, &task.config);
-
-    if !task.config.selected_audio_tracks.is_empty() {
-        add_audio_codec_args(&mut enc_args, &task.config);
-    } else {
-        add_audio_codec_args_copy(&mut enc_args);
-    }
+    add_audio_codec_args(&mut enc_args, &task.config);
 
     let audio_filters = build_audio_filters(&task.config);
     if !audio_filters.is_empty() {
@@ -408,7 +407,15 @@ pub async fn run_upscale_worker(
         enc_args.push(audio_filters.join(","));
     }
 
-    add_subtitle_copy_args(&mut enc_args, &task.config);
+    if !task.config.selected_subtitle_tracks.is_empty()
+        || task
+            .config
+            .subtitle_burn_path
+            .as_ref()
+            .map_or(true, |path| path.trim().is_empty())
+    {
+        add_subtitle_codec_args(&mut enc_args, &task.config);
+    }
     add_fps_args(&mut enc_args, &task.config);
 
     enc_args.push("-shortest".to_string());

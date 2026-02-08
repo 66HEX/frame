@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::conversion::codec::{add_audio_codec_args, add_fps_args, add_subtitle_copy_args, add_video_codec_args};
+use crate::conversion::codec::{add_audio_codec_args, add_fps_args, add_subtitle_codec_args, add_video_codec_args};
 use crate::conversion::error::ConversionError;
 use crate::conversion::filters::{build_audio_filters, build_video_filters};
 use crate::conversion::types::{ConversionConfig, MetadataConfig, MetadataMode};
@@ -64,6 +64,10 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
     }
 
     let is_audio_only = is_audio_only_container(&config.container);
+    let has_burn_subtitles = config
+        .subtitle_burn_path
+        .as_ref()
+        .is_some_and(|path| !path.trim().is_empty());
 
     if is_audio_only {
         args.push("-vn".to_string());
@@ -109,12 +113,12 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
                 args.push("-map".to_string());
                 args.push(format!("0:{}", track_index));
             }
-        } else {
+            add_subtitle_codec_args(&mut args, config);
+        } else if !has_burn_subtitles {
             args.push("-map".to_string());
             args.push("0:s?".to_string());
+            add_subtitle_codec_args(&mut args, config);
         }
-
-        add_subtitle_copy_args(&mut args, config);
     }
 
     let audio_filters = build_audio_filters(config);
@@ -247,5 +251,98 @@ pub fn validate_task_input(
         }
     }
 
+    let is_audio_only = is_audio_only_container(&config.container);
+    if !is_audio_only && !is_video_codec_allowed(&config.container, &config.video_codec) {
+        return Err(ConversionError::InvalidInput(format!(
+            "Video codec '{}' is not compatible with container '{}'",
+            config.video_codec, config.container
+        )));
+    }
+
+    if !is_audio_codec_allowed(&config.container, &config.audio_codec) {
+        return Err(ConversionError::InvalidInput(format!(
+            "Audio codec '{}' is not compatible with container '{}'",
+            config.audio_codec, config.container
+        )));
+    }
+
+    let has_ml_upscale = config
+        .ml_upscale
+        .as_ref()
+        .is_some_and(|mode| !mode.is_empty() && mode != "none");
+
+    if is_audio_only && has_ml_upscale {
+        return Err(ConversionError::InvalidInput(
+            "ML upscaling requires a video container".to_string(),
+        ));
+    }
+
+    if is_audio_only
+        && (!config.selected_subtitle_tracks.is_empty()
+            || config
+                .subtitle_burn_path
+                .as_ref()
+                .is_some_and(|path| !path.trim().is_empty()))
+    {
+        return Err(ConversionError::InvalidInput(
+            "Subtitle options are not available for audio-only containers".to_string(),
+        ));
+    }
+
     Ok(())
+}
+
+fn is_video_codec_allowed(container: &str, codec: &str) -> bool {
+    match container {
+        "mp4" => matches!(
+            codec,
+            "libx264"
+                | "libx265"
+                | "vp9"
+                | "libsvtav1"
+                | "h264_videotoolbox"
+                | "h264_nvenc"
+                | "hevc_videotoolbox"
+                | "hevc_nvenc"
+                | "av1_nvenc"
+        ),
+        "mkv" => matches!(
+            codec,
+            "libx264"
+                | "libx265"
+                | "vp9"
+                | "prores"
+                | "libsvtav1"
+                | "h264_videotoolbox"
+                | "h264_nvenc"
+                | "hevc_videotoolbox"
+                | "hevc_nvenc"
+                | "av1_nvenc"
+        ),
+        "webm" => codec == "vp9",
+        "mov" => matches!(
+            codec,
+            "libx264"
+                | "libx265"
+                | "prores"
+                | "h264_videotoolbox"
+                | "h264_nvenc"
+                | "hevc_videotoolbox"
+                | "hevc_nvenc"
+        ),
+        _ => true,
+    }
+}
+
+fn is_audio_codec_allowed(container: &str, codec: &str) -> bool {
+    match container {
+        "mp3" => codec == "mp3",
+        "wav" => codec == "pcm_s16le",
+        "flac" => codec == "flac",
+        "m4a" => matches!(codec, "aac" | "alac"),
+        "mp4" => matches!(codec, "aac" | "ac3" | "libopus" | "mp3" | "alac"),
+        "webm" => matches!(codec, "libopus" | "vorbis"),
+        "mov" | "mkv" => true,
+        _ => true,
+    }
 }

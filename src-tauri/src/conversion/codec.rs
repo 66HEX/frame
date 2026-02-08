@@ -77,20 +77,17 @@ pub fn add_audio_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
     }
 }
 
-pub fn add_audio_codec_args_copy(args: &mut Vec<String>) {
-    args.push("-c:a".to_string());
-    args.push("copy".to_string());
-}
+pub fn add_subtitle_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
+    let codec = match config.container.as_str() {
+        "mkv" => Some("copy"),
+        "mp4" | "mov" => Some("mov_text"),
+        "webm" => Some("webvtt"),
+        _ => None,
+    };
 
-pub fn add_subtitle_copy_args(args: &mut Vec<String>, config: &ConversionConfig) {
-    if config.subtitle_burn_path.is_none()
-        || config
-            .subtitle_burn_path
-            .as_ref()
-            .map_or(true, |p| p.is_empty())
-    {
+    if let Some(codec) = codec {
         args.push("-c:s".to_string());
-        args.push("copy".to_string());
+        args.push(codec.to_string());
     }
 }
 
