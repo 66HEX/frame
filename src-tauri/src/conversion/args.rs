@@ -67,6 +67,18 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
 
     if is_audio_only {
         args.push("-vn".to_string());
+
+        if !config.selected_audio_tracks.is_empty() {
+            for track_index in &config.selected_audio_tracks {
+                args.push("-map".to_string());
+                args.push(format!("0:{}", track_index));
+            }
+        } else {
+            args.push("-map".to_string());
+            args.push("0:a?".to_string());
+        }
+
+        add_audio_codec_args(&mut args, config);
     } else {
         add_video_codec_args(&mut args, config);
 
@@ -77,37 +89,33 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         }
 
         add_fps_args(&mut args, config);
-    }
-
-    if (!config.selected_audio_tracks.is_empty() || !config.selected_subtitle_tracks.is_empty())
-        && !is_audio_only
-    {
         args.push("-map".to_string());
         args.push("0:v:0".to_string());
-    }
 
-    if !config.selected_audio_tracks.is_empty() {
-        for track_index in &config.selected_audio_tracks {
+        if !config.selected_audio_tracks.is_empty() {
+            for track_index in &config.selected_audio_tracks {
+                args.push("-map".to_string());
+                args.push(format!("0:{}", track_index));
+            }
+        } else {
             args.push("-map".to_string());
-            args.push(format!("0:{}", track_index));
+            args.push("0:a?".to_string());
         }
-    }
 
-    if !config.selected_audio_tracks.is_empty() {
         add_audio_codec_args(&mut args, config);
-    }
 
-    if !config.selected_subtitle_tracks.is_empty() {
-        for track_index in &config.selected_subtitle_tracks {
+        if !config.selected_subtitle_tracks.is_empty() {
+            for track_index in &config.selected_subtitle_tracks {
+                args.push("-map".to_string());
+                args.push(format!("0:{}", track_index));
+            }
+        } else {
             args.push("-map".to_string());
-            args.push(format!("0:{}", track_index));
+            args.push("0:s?".to_string());
         }
-    } else if !is_audio_only {
-        args.push("-map".to_string());
-        args.push("0:s?".to_string());
-    }
 
-    add_subtitle_copy_args(&mut args, config);
+        add_subtitle_copy_args(&mut args, config);
+    }
 
     let audio_filters = build_audio_filters(config);
     if !audio_filters.is_empty() {

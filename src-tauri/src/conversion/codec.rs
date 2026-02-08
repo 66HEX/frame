@@ -55,15 +55,13 @@ pub fn add_video_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
 }
 
 pub fn add_audio_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
-    if !config.selected_audio_tracks.is_empty() {
-        args.push("-c:a".to_string());
-        args.push(config.audio_codec.clone());
+    args.push("-c:a".to_string());
+    args.push(config.audio_codec.clone());
 
-        let lossless_audio_codecs = ["flac", "alac", "pcm_s16le"];
-        if !lossless_audio_codecs.contains(&config.audio_codec.as_str()) {
-            args.push("-b:a".to_string());
-            args.push(format!("{}k", config.audio_bitrate));
-        }
+    let lossless_audio_codecs = ["flac", "alac", "pcm_s16le"];
+    if !lossless_audio_codecs.contains(&config.audio_codec.as_str()) {
+        args.push("-b:a".to_string());
+        args.push(format!("{}k", config.audio_bitrate));
     }
 
     match config.audio_channels.as_str() {

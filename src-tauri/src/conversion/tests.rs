@@ -302,6 +302,21 @@ mod tests {
         let af_index = args_boosted.iter().position(|r| r == "-af").unwrap();
         assert_eq!(args_boosted[af_index + 1], "volume=1.50");
     }
+
+    #[test]
+    fn test_default_stream_mapping_when_tracks_not_selected() {
+        let mut config = sample_config("mp4");
+        config.selected_audio_tracks = vec![];
+        config.selected_subtitle_tracks = vec![];
+
+        let args = build_ffmpeg_args("in.mp4", "out.mp4", &config);
+
+        assert!(contains_args(&args, &["-map", "0:v:0"]));
+        assert!(contains_args(&args, &["-map", "0:a?"]));
+        assert!(contains_args(&args, &["-map", "0:s?"]));
+        assert!(contains_args(&args, &["-c:a", "aac"]));
+        assert!(contains_args(&args, &["-b:a", "128k"]));
+    }
 }
 
 #[cfg(test)]
