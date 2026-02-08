@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **FFmpeg Stream Mapping:** Standard conversions now always map streams deterministically (`0:v:0`, `0:a?`, `0:s?`) when track overrides are not selected, eliminating ambiguous defaults and missing-stream edge cases.
 - **Audio Config Application:** Audio codec and bitrate settings are now applied consistently even when no explicit source audio tracks are selected.
 - **Cross-Tab Config Consistency:** Configuration normalization now runs in the shared state layer (including preset application), so container/codec/preset/upscale compatibility is enforced even if the Video tab was never opened.
+- **Compatibility Rule Unification:** Video container/codec/preset compatibility now comes from a shared frontend module used by both UI selection logic and config normalization, preventing drift between tab behavior and saved state validation.
 - **Input Validation Hardening:** Backend validation now rejects incompatible codec/container combinations and blocks ML upscaling with audio-only outputs before task enqueue.
 - **Subtitle Container Handling:** Subtitle stream behavior is now container-aware (`mov_text` for MP4/MOV, `webvtt` for WebM, `copy` for MKV) and no longer auto-maps subtitle tracks when only burn-in subtitles are requested.
 - **Queue Startup Recovery:** Conversion queue startup now handles per-file enqueue failures gracefully, marking only failed items as errors while continuing with valid tasks and keeping processing state in sync.

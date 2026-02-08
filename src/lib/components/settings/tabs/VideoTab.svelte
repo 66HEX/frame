@@ -9,23 +9,21 @@
 	import Checkbox from '$lib/components/ui/Checkbox.svelte';
 	import { capabilities } from '$lib/stores/capabilities.svelte';
 	import { _ } from '$lib/i18n';
+	import {
+		VIDEO_CODEC_OPTIONS,
+		VIDEO_PRESETS,
+		NVENC_ENCODERS,
+		VIDEOTOOLBOX_ENCODERS,
+		getFirstAllowedPreset,
+		getFirstAllowedVideoCodec,
+		isVideoCodecAllowed,
+		isVideoPresetAllowed
+	} from '$lib/services/video-compatibility';
 
 	const RESOLUTIONS = ['original', '1080p', '720p', '480p', 'custom'] as const;
-	const ALL_VIDEO_CODECS = [
-		{ id: 'libx264', label: 'H.264 / AVC' },
-		{ id: 'libx265', label: 'H.265 / HEVC' },
-		{ id: 'vp9', label: 'VP9 / Web' },
-		{ id: 'prores', label: 'Apple ProRes' },
-		{ id: 'libsvtav1', label: 'AV1 / SVT' },
-		{ id: 'h264_videotoolbox', label: 'H.264 (Apple Silicon)' },
-		{ id: 'h264_nvenc', label: 'H.264 (NVIDIA)' },
-		{ id: 'hevc_videotoolbox', label: 'H.265 (Apple Silicon)' },
-		{ id: 'hevc_nvenc', label: 'H.265 (NVIDIA)' },
-		{ id: 'av1_nvenc', label: 'AV1 (NVIDIA)' }
-	] as const;
 
 	const availableCodecs = $derived(
-		ALL_VIDEO_CODECS.filter((codec) => {
+		VIDEO_CODEC_OPTIONS.filter((codec) => {
 			if (codec.id === 'h264_videotoolbox') return capabilities.encoders.h264_videotoolbox;
 			if (codec.id === 'h264_nvenc') return capabilities.encoders.h264_nvenc;
 			if (codec.id === 'hevc_videotoolbox') return capabilities.encoders.hevc_videotoolbox;
@@ -34,57 +32,6 @@
 			return true;
 		})
 	);
-
-	const PRESETS = [
-		'ultrafast',
-		'superfast',
-		'veryfast',
-		'faster',
-		'fast',
-		'medium',
-		'slow',
-		'slower',
-		'veryslow'
-	] as const;
-	const NVENC_ALLOWED_PRESETS = new Set(['fast', 'medium', 'slow']);
-	const NVENC_ENCODERS = new Set(['h264_nvenc', 'hevc_nvenc', 'av1_nvenc']);
-	const VIDEOTOOLBOX_ENCODERS = new Set(['h264_videotoolbox', 'hevc_videotoolbox']);
-
-	const CONTAINER_CODEC_COMPATIBILITY: Record<string, Set<string>> = {
-		mp4: new Set([
-			'libx264',
-			'libx265',
-			'vp9',
-			'libsvtav1',
-			'h264_videotoolbox',
-			'h264_nvenc',
-			'hevc_videotoolbox',
-			'hevc_nvenc',
-			'av1_nvenc'
-		]),
-		mkv: new Set([
-			'libx264',
-			'libx265',
-			'vp9',
-			'prores',
-			'libsvtav1',
-			'h264_videotoolbox',
-			'h264_nvenc',
-			'hevc_videotoolbox',
-			'hevc_nvenc',
-			'av1_nvenc'
-		]),
-		webm: new Set(['vp9']),
-		mov: new Set([
-			'libx264',
-			'libx265',
-			'prores',
-			'h264_videotoolbox',
-			'h264_nvenc',
-			'hevc_videotoolbox',
-			'hevc_nvenc'
-		])
-	};
 
 	const SCALING_ALGOS = ['bicubic', 'lanczos', 'bilinear', 'nearest'] as const;
 
@@ -111,7 +58,7 @@
 	const isHardwareEncoder = $derived(isNvencEncoder || isVideotoolboxEncoder);
 	const isMlUpscaleActive = $derived(config.mlUpscale && config.mlUpscale !== 'none');
 	const effectiveResolution = $derived(isMlUpscaleActive ? 'original' : config.resolution);
-	const presetOptions = PRESETS;
+	const presetOptions = VIDEO_PRESETS;
 
 	$effect(() => {
 		if (isMlUpscaleActive && config.resolution !== 'original') {
@@ -119,42 +66,25 @@
 		}
 	});
 
-	function isPresetAllowed(codec: string, preset: (typeof PRESETS)[number]) {
-		if (VIDEOTOOLBOX_ENCODERS.has(codec)) {
-			return false;
-		}
-		if (NVENC_ENCODERS.has(codec)) {
-			return NVENC_ALLOWED_PRESETS.has(preset);
-		}
-		return true;
-	}
-
-	function isCodecAllowed(container: string, codec: string) {
-		const allowed = CONTAINER_CODEC_COMPATIBILITY[container];
-		if (!allowed) return true;
-		return allowed.has(codec);
-	}
-
 	function firstAllowedCodec(container: string) {
-		return availableCodecs.find((c) => isCodecAllowed(container, c.id));
-	}
-
-	function firstAllowedPreset(codec: string) {
-		return PRESETS.find((preset) => isPresetAllowed(codec, preset));
+		const fallbackId = getFirstAllowedVideoCodec(
+			container,
+			availableCodecs.map((codec) => codec.id)
+		);
+		return availableCodecs.find((codec) => codec.id === fallbackId);
 	}
 
 	$effect(() => {
 		const fallback = firstAllowedCodec(config.container);
 		if (!fallback) return;
-		if (!isCodecAllowed(config.container, config.videoCodec)) {
+		if (!isVideoCodecAllowed(config.container, config.videoCodec)) {
 			onUpdate({ videoCodec: fallback.id });
 		}
 	});
 
 	$effect(() => {
-		const fallback = firstAllowedPreset(config.videoCodec);
-		if (!fallback) return;
-		if (!isPresetAllowed(config.videoCodec, config.preset as (typeof PRESETS)[number])) {
+		if (!isVideoPresetAllowed(config.videoCodec, config.preset)) {
+			const fallback = getFirstAllowedPreset(config.videoCodec);
 			onUpdate({ preset: fallback });
 		}
 	});
@@ -276,7 +206,7 @@
 		<Label variant="section">{$_('video.encoder')}</Label>
 		<div class="grid grid-cols-1">
 			{#each availableCodecs as codec (codec.id)}
-				{@const codecAllowed = isCodecAllowed(config.container, codec.id)}
+				{@const codecAllowed = isVideoCodecAllowed(config.container, codec.id)}
 				<ListItem
 					selected={codecAllowed && config.videoCodec === codec.id}
 					onclick={() => codecAllowed && onUpdate({ videoCodec: codec.id })}
@@ -300,7 +230,7 @@
 		<Label variant="section">{$_('video.encodingSpeed')}</Label>
 		<div class="grid grid-cols-1">
 			{#each presetOptions as preset (preset)}
-				{@const allowed = isPresetAllowed(config.videoCodec, preset)}
+				{@const allowed = isVideoPresetAllowed(config.videoCodec, preset)}
 				<ListItem
 					selected={allowed && config.preset === preset}
 					onclick={() => allowed && onUpdate({ preset })}
