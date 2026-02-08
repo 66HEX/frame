@@ -14,7 +14,7 @@ use crate::conversion::manager::ManagerMessage;
 use crate::conversion::types::{
     CompletedPayload, ConversionTask, LogPayload, MetadataMode, ProgressPayload, StartedPayload,
 };
-use crate::conversion::utils::{FRAME_REGEX, parse_time};
+use crate::conversion::utils::{FRAME_REGEX, parse_time, sanitize_external_tool_path};
 
 pub async fn run_upscale_worker(
     app: AppHandle,
@@ -232,15 +232,15 @@ pub async fn run_upscale_worker(
     let upscaler_args = vec![
         "-v".to_string(),
         "-i".to_string(),
-        input_frames_dir.to_string_lossy().to_string(),
+        sanitize_external_tool_path(&input_frames_dir),
         "-o".to_string(),
-        output_frames_dir.to_string_lossy().to_string(),
+        sanitize_external_tool_path(&output_frames_dir),
         "-s".to_string(),
         scale.to_string(),
         "-f".to_string(),
         "png".to_string(),
         "-m".to_string(),
-        models_path.to_string_lossy().to_string(),
+        sanitize_external_tool_path(&models_path),
         "-n".to_string(),
         model_name.to_string(),
         "-j".to_string(),

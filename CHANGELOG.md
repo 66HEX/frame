@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.1] - 2026-02-08
+
+### Fixed
+
+- **Windows ML Upscaling Paths:** Normalized extended-length Windows paths (`\\?\...`) before passing frame and model directories to the Real-ESRGAN sidecar, fixing `_wfopen ... failed` errors during upscaling.
+
 ## [0.21.0] - 2026-02-08
 
 ### Fixed
@@ -495,7 +501,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.21.0...HEAD
+[Unreleased]: https://github.com/66HEX/frame/compare/0.21.1...HEAD
+[0.21.1]: https://github.com/66HEX/frame/compare/0.21.0...0.21.1
 [0.21.0]: https://github.com/66HEX/frame/compare/0.20.0...0.21.0
 [0.20.0]: https://github.com/66HEX/frame/compare/0.19.0...0.20.0
 [0.19.0]: https://github.com/66HEX/frame/compare/0.18.1...0.19.0

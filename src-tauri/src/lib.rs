@@ -96,8 +96,6 @@ pub fn run() {
 
             #[cfg(target_os = "macos")]
             {
-                use tauri::LogicalSize;
-
                 let dialog_host = WebviewWindowBuilder::new(
                     app,
                     "dialog-host",
@@ -112,11 +110,13 @@ pub fn run() {
                 .parent(&window)
                 .expect("Failed to set parent window")
                 .transparent(true)
+                .background_color(Color(0, 0, 0, 0))
                 .skip_taskbar(true)
+                .shadow(false)
                 .build()
                 .unwrap();
 
-                let _ = dialog_host.set_size(LogicalSize::new(1.0, 1.0));
+                let _ = dialog_host.hide();
             }
 
             app.manage(conversion::ConversionManager::new(app.handle().clone()));

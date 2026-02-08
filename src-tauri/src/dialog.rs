@@ -227,7 +227,14 @@ pub async fn ask_native_dialog<R: Runtime>(
 #[cfg(target_os = "macos")]
 fn prepare_dialog_host<R: Runtime>(window: &Window<R>) -> Option<WebviewWindow<R>> {
     let app_handle = window.app_handle();
-    app_handle.get_webview_window("dialog-host")
+    let dialog_host = app_handle.get_webview_window("dialog-host");
+
+    if let Some(host) = dialog_host.as_ref() {
+        let _ = host.set_shadow(false);
+        let _ = host.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(1, 1)));
+    }
+
+    dialog_host
 }
 
 #[cfg(target_os = "macos")]

@@ -1,5 +1,6 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
+use std::path::Path;
 
 pub static FRAME_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"frame=\s*(\d+)").unwrap());
 
@@ -96,5 +97,23 @@ pub fn get_hwaccel_args(video_codec: &str) -> Vec<String> {
         vec!["-hwaccel".to_string(), "videotoolbox".to_string()]
     } else {
         vec![]
+    }
+}
+
+pub fn sanitize_external_tool_path(path: &Path) -> String {
+    #[cfg(windows)]
+    {
+        let raw = path.to_string_lossy();
+        if let Some(stripped_unc) = raw.strip_prefix(r"\\?\UNC\") {
+            return format!(r"\\{}", stripped_unc);
+        }
+        if let Some(stripped) = raw.strip_prefix(r"\\?\") {
+            return stripped.to_string();
+        }
+        raw.into_owned()
+    }
+    #[cfg(not(windows))]
+    {
+        path.to_string_lossy().into_owned()
     }
 }

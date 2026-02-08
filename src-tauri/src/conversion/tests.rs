@@ -467,9 +467,11 @@ mod parsing_tests {
 
 #[cfg(test)]
 mod utils_tests {
+    use std::path::Path;
+
     use crate::conversion::utils::{
         is_audio_only_container, is_nvenc_codec, is_videotoolbox_codec, map_nvenc_preset,
-        parse_frame_rate_string, parse_probe_bitrate,
+        parse_frame_rate_string, parse_probe_bitrate, sanitize_external_tool_path,
     };
 
     #[test]
@@ -566,6 +568,33 @@ mod utils_tests {
         assert_eq!(map_nvenc_preset("p1"), "p1");
         assert_eq!(map_nvenc_preset("p7"), "p7");
         assert_eq!(map_nvenc_preset("unknown"), "medium");
+    }
+
+    #[test]
+    fn sanitize_external_tool_path_compatible_format() {
+        #[cfg(windows)]
+        {
+            assert_eq!(
+                sanitize_external_tool_path(Path::new(r"\\?\C:\Users\Karolina\models")),
+                r"C:\Users\Karolina\models"
+            );
+            assert_eq!(
+                sanitize_external_tool_path(Path::new(r"\\?\UNC\server\share\models")),
+                r"\\server\share\models"
+            );
+            assert_eq!(
+                sanitize_external_tool_path(Path::new(r"C:\Users\Karolina\models")),
+                r"C:\Users\Karolina\models"
+            );
+        }
+
+        #[cfg(not(windows))]
+        {
+            assert_eq!(
+                sanitize_external_tool_path(Path::new("/tmp/frame/models")),
+                "/tmp/frame/models"
+            );
+        }
     }
 }
 
