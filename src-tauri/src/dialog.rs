@@ -102,7 +102,7 @@ pub async fn open_native_file_dialog<R: Runtime>(
                                     .map_err(|e| e.to_string())?;
                             }
                             tauri_scope
-                                .allow_directory(&path, options.directory)
+                                .allow_directory(&path, options.recursive)
                                 .map_err(|e| e.to_string())?;
                             selections.push(path.to_string_lossy().into_owned());
                         }
@@ -116,7 +116,7 @@ pub async fn open_native_file_dialog<R: Runtime>(
                             .map_err(|e| e.to_string())?;
                     }
                     tauri_scope
-                        .allow_directory(&path, options.directory)
+                        .allow_directory(&path, options.recursive)
                         .map_err(|e| e.to_string())?;
                     selections.push(path.to_string_lossy().into_owned());
                 }
@@ -188,6 +188,7 @@ pub async fn ask_native_dialog<R: Runtime>(
             "info" => tauri_plugin_dialog::MessageDialogKind::Info,
             "warning" => tauri_plugin_dialog::MessageDialogKind::Warning,
             "error" => tauri_plugin_dialog::MessageDialogKind::Error,
+            "question" => tauri_plugin_dialog::MessageDialogKind::Info,
             _ => tauri_plugin_dialog::MessageDialogKind::Info,
         };
         dialog_builder = dialog_builder.kind(message_kind);

@@ -7,7 +7,7 @@ use crate::conversion::args::{build_ffmpeg_args, build_output_path};
 use crate::conversion::error::ConversionError;
 use crate::conversion::manager::ManagerMessage;
 use crate::conversion::types::{
-    CompletedPayload, ConversionTask, ErrorPayload, LogPayload, ProgressPayload, StartedPayload,
+    CompletedPayload, ConversionTask, LogPayload, ProgressPayload, StartedPayload,
 };
 use crate::conversion::upscale::run_upscale_worker;
 use crate::conversion::utils::{DURATION_REGEX, TIME_REGEX, parse_time};
@@ -153,13 +153,6 @@ pub async fn run_ffmpeg_worker(
         Ok(())
     } else {
         let err_msg = format!("Process terminated with code {:?}", exit_code);
-        let _ = app.emit(
-            "conversion-error",
-            ErrorPayload {
-                id: id.clone(),
-                error: err_msg.clone(),
-            },
-        );
         Err(ConversionError::Worker(err_msg))
     }
 }

@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.2] - 2026-02-09
+
+### Fixed
+
+- **Runtime Log Highlighting Dependencies:** Moved `shiki` from `devDependencies` to `dependencies` and added direct runtime dependency on `@shikijs/themes`, so packaged builds include required log-highlighting modules.
+- **Output Name Path Safety:** Hardened output name handling on both frontend and backend so custom names cannot escape the source directory via absolute paths or traversal segments.
+- **Error Event Duplication:** Removed duplicate `conversion-error` emission from the worker path so failures are reported once through manager flow.
+- **Settings Persistence Race:** Prevented settings write-back before initial hydration completes, fixing startup-time overwrites of saved preferences.
+- **Subtitle Burn Path Escaping:** Expanded FFmpeg subtitle filter escaping for special characters (including quotes and bracket/comma tokens) to avoid burn-in command breakage on valid file paths.
+- **Localization Consistency:** Replaced remaining hardcoded UI strings in logs/source panels with i18n keys and synced locale dictionaries.
+- **Concurrency Limit Reactivity:** Applying a new max concurrency value now immediately re-processes the queue so pending tasks can start without waiting for another queue event.
+- **Trim Range Validation:** Task validation now rejects non-increasing trim ranges (`end_time <= start_time`) and malformed trim timestamps before enqueue.
+- **Output Extension Consistency:** Custom output names now always end with the selected container extension, preventing mismatches between UI container choice and written file suffix.
+- **Dialog Directory Scope:** Folder picker permission scopes now respect the `recursive` flag when granting Tauri directory access, avoiding unintentionally broad directory grants.
+- **Native Dialog Kind Contract:** Backend dialog kind parsing now explicitly accepts `question`, matching the frontend `askNativeDialog` type contract.
+- **ML Upscale FPS Timeline:** Upscale re-encode now always reads extracted PNG frames at source FPS, while optional target FPS conversion is applied only on output (`-r`), preventing unintended playback speed changes.
+- **ML Upscale Metadata Preserve:** In upscale mode, `metadata.mode = preserve` now maps metadata from the original source input (`-map_metadata 1`) so source tags are retained as expected.
+- **ML Upscale Argument Regression Tests:** Added focused unit tests for upscale encode argument building (source FPS input timing and metadata mode behavior) to catch future pipeline regressions.
+
 ## [0.21.1] - 2026-02-08
 
 ### Fixed
@@ -501,7 +520,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.21.1...HEAD
+[Unreleased]: https://github.com/66HEX/frame/compare/0.21.2...HEAD
+[0.21.2]: https://github.com/66HEX/frame/compare/0.21.1...0.21.2
 [0.21.1]: https://github.com/66HEX/frame/compare/0.21.0...0.21.1
 [0.21.0]: https://github.com/66HEX/frame/compare/0.20.0...0.21.0
 [0.20.0]: https://github.com/66HEX/frame/compare/0.19.0...0.20.0

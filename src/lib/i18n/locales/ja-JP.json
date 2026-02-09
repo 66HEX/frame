@@ -103,7 +103,8 @@
 		"fileInfo": "ファイル情報",
 		"videoStream": "ビデオストリーム",
 		"audioStream": "オーディオストリーム",
-		"track": "トラック"
+		"track": "トラック",
+		"language": "言語"
 	},
 	"output": {
 		"outputName": "出力名",
@@ -204,7 +205,8 @@
 	"logs": {
 		"noActiveProcesses": "アクティブなプロセスはありません",
 		"waitingForOutput": "プロセスが開始されました、出力を待っています...",
-		"selectTask": "コンソール出力を表示するタスクを選択してください"
+		"selectTask": "コンソール出力を表示するタスクを選択してください",
+		"scrollToBottom": "一番下へスクロール"
 	},
 	"update": {
 		"available": "更新があります",

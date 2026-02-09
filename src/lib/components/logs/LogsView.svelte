@@ -158,25 +158,25 @@
 							</div>
 						{/snippet}
 					</VirtualList>
-				{:else}
-					<div
-						class="flex h-full flex-col items-center justify-center space-y-2 text-gray-alpha-600 select-none"
-					>
-						<div class="text-[10px] font-medium tracking-widest uppercase">
-							Waiting for output...
+					{:else}
+						<div
+							class="flex h-full flex-col items-center justify-center space-y-2 text-gray-alpha-600 select-none"
+						>
+							<div class="text-[10px] font-medium tracking-widest uppercase">
+								{$_('logs.waitingForOutput')}
+							</div>
 						</div>
-					</div>
-				{/if}
+					{/if}
 
-				{#if !shouldStickToBottom}
-					<button
-						onclick={scrollToBottom}
-						class="absolute right-4 bottom-4 z-10 rounded-full bg-blue-600 p-2 text-foreground shadow-lg backdrop-blur-md transition-all"
-						title="Scroll to bottom"
-					>
-						<IconArrowDown size={14} />
-					</button>
-				{/if}
+					{#if !shouldStickToBottom}
+						<button
+							onclick={scrollToBottom}
+							class="absolute right-4 bottom-4 z-10 rounded-full bg-blue-600 p-2 text-foreground shadow-lg backdrop-blur-md transition-all"
+							title={$_('logs.scrollToBottom')}
+						>
+							<IconArrowDown size={14} />
+						</button>
+					{/if}
 			</div>
 		{:else}
 			<div

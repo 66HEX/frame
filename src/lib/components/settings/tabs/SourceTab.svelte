@@ -187,7 +187,7 @@
 								{/if}
 
 								{#if track.language}
-									<div class="text-gray-alpha-600">Language</div>
+									<div class="text-gray-alpha-600">{$_('source.language')}</div>
 									<div class="text-right font-medium">{display(track.language)}</div>
 								{/if}
 							</div>

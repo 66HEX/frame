@@ -32,7 +32,13 @@ pub fn build_video_filters(config: &ConversionConfig, include_scale: bool) -> Ve
 
     if let Some(burn_path) = &config.subtitle_burn_path {
         if !burn_path.is_empty() {
-            let escaped_path = burn_path.replace('\\', "/").replace(':', "\\:");
+            let escaped_path = burn_path
+                .replace('\\', "/")
+                .replace(':', "\\:")
+                .replace('\'', "\\'")
+                .replace('[', "\\[")
+                .replace(']', "\\]")
+                .replace(',', "\\,");
             filters.push(format!("subtitles='{}'", escaped_path));
         }
     }
@@ -188,5 +194,18 @@ mod tests {
         config.audio_volume = 150.0;
         let filters = build_audio_filters(&config);
         assert_eq!(filters, vec!["volume=1.50"]);
+    }
+
+    #[test]
+    fn test_subtitle_burn_path_escaping() {
+        let mut config = default_config();
+        config.subtitle_burn_path = Some("C:\\Media\\John's [cut],final.srt".to_string());
+
+        let filters = build_video_filters(&config, true);
+
+        assert_eq!(
+            filters,
+            vec!["subtitles='C\\:/Media/John\\'s \\[cut\\]\\,final.srt'"]
+        );
     }
 }

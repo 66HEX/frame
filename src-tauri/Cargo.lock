@@ -1005,7 +1005,7 @@ dependencies = [
 
 [[package]]
 name = "frame"
-version = "0.21.1"
+version = "0.21.2"
 dependencies = [
  "libc",
  "once_cell",

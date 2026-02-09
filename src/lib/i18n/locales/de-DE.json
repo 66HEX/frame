@@ -103,7 +103,8 @@
 		"fileInfo": "Dateiinformationen",
 		"videoStream": "Videostream",
 		"audioStream": "Audiostream",
-		"track": "Spur"
+		"track": "Spur",
+		"language": "Sprache"
 	},
 	"output": {
 		"outputName": "Ausgabename",
@@ -204,7 +205,8 @@
 	"logs": {
 		"noActiveProcesses": "Keine aktiven Prozesse",
 		"waitingForOutput": "Prozess gestartet, warte auf Ausgabe...",
-		"selectTask": "Aufgabe auswählen für Konsolenausgabe"
+		"selectTask": "Aufgabe auswählen für Konsolenausgabe",
+		"scrollToBottom": "Nach unten scrollen"
 	},
 	"update": {
 		"available": "Update verfügbar",

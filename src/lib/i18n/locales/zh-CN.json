@@ -103,7 +103,8 @@
 		"fileInfo": "文件信息",
 		"videoStream": "视频流",
 		"audioStream": "音频流",
-		"track": "轨道"
+		"track": "轨道",
+		"language": "语言"
 	},
 	"output": {
 		"outputName": "输出名称",
@@ -204,7 +205,8 @@
 	"logs": {
 		"noActiveProcesses": "无活动进程",
 		"waitingForOutput": "进程已启动，等待输出...",
-		"selectTask": "选择一个任务以查看控制台输出"
+		"selectTask": "选择一个任务以查看控制台输出",
+		"scrollToBottom": "滚动到底部"
 	},
 	"update": {
 		"available": "有可用更新",

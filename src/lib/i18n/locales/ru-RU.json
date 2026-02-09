@@ -103,7 +103,8 @@
 		"fileInfo": "Информация о файле",
 		"videoStream": "Видеопоток",
 		"audioStream": "Аудиопоток",
-		"track": "Дорожка"
+		"track": "Дорожка",
+		"language": "Язык"
 	},
 	"output": {
 		"outputName": "Имя выхода",
@@ -204,7 +205,8 @@
 	"logs": {
 		"noActiveProcesses": "Нет активных процессов",
 		"waitingForOutput": "Процесс запущен, ожидание вывода...",
-		"selectTask": "Выберите задачу для просмотра вывода"
+		"selectTask": "Выберите задачу для просмотра вывода",
+		"scrollToBottom": "Прокрутить вниз"
 	},
 	"update": {
 		"available": "Доступно обновление",

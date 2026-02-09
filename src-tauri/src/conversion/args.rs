@@ -174,24 +174,37 @@ pub fn add_metadata_flags(args: &mut Vec<String>, metadata: &MetadataConfig) {
     }
 }
 
+fn sanitize_output_name(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let candidate = trimmed
+        .rsplit(|ch| ch == '/' || ch == '\\')
+        .next()
+        .map(str::trim)
+        .unwrap_or("");
+
+    if candidate.is_empty() || candidate == "." || candidate == ".." {
+        return None;
+    }
+
+    Some(candidate.to_string())
+}
+
 pub fn build_output_path(file_path: &str, container: &str, output_name: Option<String>) -> String {
-    if let Some(custom) = output_name.and_then(|name| {
-        let trimmed = name.trim();
-        if trimmed.is_empty() {
-            None
-        } else {
-            Some(trimmed.to_string())
-        }
-    }) {
+    if let Some(custom) = output_name
+        .as_deref()
+        .and_then(sanitize_output_name)
+    {
         let input_path = Path::new(file_path);
         let mut output: PathBuf = match input_path.parent() {
             Some(parent) if !parent.as_os_str().is_empty() => parent.to_path_buf(),
             _ => PathBuf::new(),
         };
         output.push(custom);
-        if output.extension().is_none() {
-            output.set_extension(container);
-        }
+        output.set_extension(container);
         output.to_string_lossy().to_string()
     } else {
         format!("{}_converted.{}", file_path, container)
@@ -214,6 +227,37 @@ pub fn validate_task_input(
             "Input path is not a file: {}",
             file_path
         )));
+    }
+
+    let start_time = config.start_time.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let end_time = config.end_time.as_deref().map(str::trim).filter(|s| !s.is_empty());
+
+    if let Some(start) = start_time {
+        if parse_time(start).is_none() {
+            return Err(ConversionError::InvalidInput(format!(
+                "Invalid start time: {}",
+                start
+            )));
+        }
+    }
+
+    if let Some(end) = end_time {
+        if parse_time(end).is_none() {
+            return Err(ConversionError::InvalidInput(format!(
+                "Invalid end time: {}",
+                end
+            )));
+        }
+    }
+
+    if let (Some(start), Some(end)) = (start_time, end_time) {
+        if let (Some(start_t), Some(end_t)) = (parse_time(start), parse_time(end)) {
+            if end_t <= start_t {
+                return Err(ConversionError::InvalidInput(
+                    "End time must be greater than start time".to_string(),
+                ));
+            }
+        }
     }
 
     if config.resolution == "custom" {

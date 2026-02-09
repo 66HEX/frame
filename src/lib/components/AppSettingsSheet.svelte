@@ -10,6 +10,8 @@
 	import Slider from './ui/Slider.svelte';
 	import {
 		loadAutoUpdateCheck,
+		loadWindowOpacity,
+		loadFontFamily,
 		persistAutoUpdateCheck,
 		persistWindowOpacity,
 		persistFontFamily
@@ -42,6 +44,7 @@
 
 	let isSaving = $state(false);
 	let isCheckingForUpdate = $state(false);
+	let hasHydratedSettings = $state(false);
 	let checkStatus = $state('');
 	let autoUpdateCheck = $state(true);
 	let opacity = $state(themeStore.opacity);
@@ -49,9 +52,19 @@
 	let currentLocale = $state($locale || 'en-US');
 
 	onMount(async () => {
-		autoUpdateCheck = await loadAutoUpdateCheck();
-		opacity = themeStore.opacity;
-		fontFamily = themeStore.fontFamily;
+		const [savedAutoUpdateCheck, savedOpacity, savedFontFamily] = await Promise.all([
+			loadAutoUpdateCheck(),
+			loadWindowOpacity(),
+			loadFontFamily()
+		]);
+
+		autoUpdateCheck = savedAutoUpdateCheck;
+		opacity = savedOpacity;
+		fontFamily = savedFontFamily;
+
+		themeStore.opacity = savedOpacity;
+		themeStore.fontFamily = savedFontFamily;
+		hasHydratedSettings = true;
 	});
 
 	$effect(() => {
@@ -61,17 +74,26 @@
 	});
 
 	$effect(() => {
-		persistAutoUpdateCheck(autoUpdateCheck);
+		if (!hasHydratedSettings) return;
+		void persistAutoUpdateCheck(autoUpdateCheck).catch((error) => {
+			console.error('Failed to persist auto-update setting', error);
+		});
 	});
 
 	$effect(() => {
+		if (!hasHydratedSettings) return;
 		themeStore.opacity = opacity;
-		persistWindowOpacity(opacity);
+		void persistWindowOpacity(opacity).catch((error) => {
+			console.error('Failed to persist window opacity', error);
+		});
 	});
 
 	$effect(() => {
+		if (!hasHydratedSettings) return;
 		themeStore.fontFamily = fontFamily;
-		persistFontFamily(fontFamily);
+		void persistFontFamily(fontFamily).catch((error) => {
+			console.error('Failed to persist font family', error);
+		});
 	});
 
 	async function handleSave() {

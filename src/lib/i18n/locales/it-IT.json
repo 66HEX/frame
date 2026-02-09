@@ -103,7 +103,8 @@
 		"fileInfo": "Informazioni file",
 		"videoStream": "Flusso video",
 		"audioStream": "Flusso audio",
-		"track": "Traccia"
+		"track": "Traccia",
+		"language": "Lingua"
 	},
 	"output": {
 		"outputName": "Nome output",
@@ -204,7 +205,8 @@
 	"logs": {
 		"noActiveProcesses": "Nessun processo attivo",
 		"waitingForOutput": "Processo avviato, in attesa di output...",
-		"selectTask": "Seleziona un'attività per vedere l'output"
+		"selectTask": "Seleziona un'attività per vedere l'output",
+		"scrollToBottom": "Scorri in basso"
 	},
 	"update": {
 		"available": "Aggiornamento disponibile",

@@ -103,7 +103,8 @@
 		"fileInfo": "파일 정보",
 		"videoStream": "비디오 스트림",
 		"audioStream": "오디오 스트림",
-		"track": "트랙"
+		"track": "트랙",
+		"language": "언어"
 	},
 	"output": {
 		"outputName": "출력 이름",
@@ -204,7 +205,8 @@
 	"logs": {
 		"noActiveProcesses": "활성 프로세스 없음",
 		"waitingForOutput": "프로세스 시작됨, 출력 대기 중...",
-		"selectTask": "콘솔 출력을 보려면 작업 선택"
+		"selectTask": "콘솔 출력을 보려면 작업 선택",
+		"scrollToBottom": "맨 아래로 스크롤"
 	},
 	"update": {
 		"available": "업데이트 있음",

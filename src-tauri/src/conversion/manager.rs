@@ -29,6 +29,7 @@ use crate::conversion::worker::run_ffmpeg_worker;
 
 pub enum ManagerMessage {
     Enqueue(ConversionTask),
+    ConcurrencyUpdated,
     TaskStarted(String, u32),
     TaskCompleted(String),
     TaskError(String, ConversionError),
@@ -71,6 +72,18 @@ impl ConversionManager {
 
                         queued_ids.insert(task.id.clone());
                         queue.push_back(task);
+                        ConversionManager::process_queue(
+                            &app,
+                            &tx_clone,
+                            &mut queue,
+                            &mut queued_ids,
+                            &mut running_tasks,
+                            Arc::clone(&limiter),
+                            Arc::clone(&cancelled_tasks_loop),
+                        )
+                        .await;
+                    }
+                    ManagerMessage::ConcurrencyUpdated => {
                         ConversionManager::process_queue(
                             &app,
                             &tx_clone,
@@ -245,6 +258,10 @@ impl ConversionManager {
             ));
         }
         self.max_concurrency.store(value, Ordering::SeqCst);
+        let tx = self.sender.clone();
+        tauri::async_runtime::spawn(async move {
+            let _ = tx.send(ManagerMessage::ConcurrencyUpdated).await;
+        });
         Ok(())
     }
 

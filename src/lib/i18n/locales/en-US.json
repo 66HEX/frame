@@ -103,7 +103,8 @@
 		"fileInfo": "File Information",
 		"videoStream": "Video Stream",
 		"audioStream": "Audio Stream",
-		"track": "Track"
+		"track": "Track",
+		"language": "Language"
 	},
 	"output": {
 		"outputName": "Output Name",
@@ -204,7 +205,8 @@
 	"logs": {
 		"noActiveProcesses": "No active processes",
 		"waitingForOutput": "Process started, waiting for output...",
-		"selectTask": "Select a task to view console output"
+		"selectTask": "Select a task to view console output",
+		"scrollToBottom": "Scroll to bottom"
 	},
 	"update": {
 		"available": "Update Available",
