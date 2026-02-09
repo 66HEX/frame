@@ -173,6 +173,13 @@ mod tests {
         );
         assert_eq!(absolute, "/Users/hex/Videos/pwned.mp4");
 
+        let forced_container = build_output_path(
+            "/Users/hex/Videos/clip.mov",
+            "mp4",
+            Some("custom_name.mkv".into()),
+        );
+        assert_eq!(forced_container, "/Users/hex/Videos/custom_name.mp4");
+
         let default = build_output_path("/tmp/sample.mov", "mp4", None);
         assert_eq!(default, "/tmp/sample.mov_converted.mp4");
     }

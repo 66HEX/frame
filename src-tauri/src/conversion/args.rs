@@ -204,9 +204,7 @@ pub fn build_output_path(file_path: &str, container: &str, output_name: Option<S
             _ => PathBuf::new(),
         };
         output.push(custom);
-        if output.extension().is_none() {
-            output.set_extension(container);
-        }
+        output.set_extension(container);
         output.to_string_lossy().to_string()
     } else {
         format!("{}_converted.{}", file_path, container)
