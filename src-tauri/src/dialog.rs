@@ -102,7 +102,7 @@ pub async fn open_native_file_dialog<R: Runtime>(
                                     .map_err(|e| e.to_string())?;
                             }
                             tauri_scope
-                                .allow_directory(&path, options.directory)
+                                .allow_directory(&path, options.recursive)
                                 .map_err(|e| e.to_string())?;
                             selections.push(path.to_string_lossy().into_owned());
                         }
@@ -116,7 +116,7 @@ pub async fn open_native_file_dialog<R: Runtime>(
                             .map_err(|e| e.to_string())?;
                     }
                     tauri_scope
-                        .allow_directory(&path, options.directory)
+                        .allow_directory(&path, options.recursive)
                         .map_err(|e| e.to_string())?;
                     selections.push(path.to_string_lossy().into_owned());
                 }

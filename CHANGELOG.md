@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Concurrency Limit Reactivity:** Applying a new max concurrency value now immediately re-processes the queue so pending tasks can start without waiting for another queue event.
 - **Trim Range Validation:** Task validation now rejects non-increasing trim ranges (`end_time <= start_time`) and malformed trim timestamps before enqueue.
 - **Output Extension Consistency:** Custom output names now always end with the selected container extension, preventing mismatches between UI container choice and written file suffix.
+- **Dialog Directory Scope:** Folder picker permission scopes now respect the `recursive` flag when granting Tauri directory access, avoiding unintentionally broad directory grants.
 
 ## [0.21.1] - 2026-02-08
 
