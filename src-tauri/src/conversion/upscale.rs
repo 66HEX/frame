@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use tauri::path::BaseDirectory;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_shell::ShellExt;
@@ -12,9 +14,110 @@ use crate::conversion::error::ConversionError;
 use crate::conversion::filters::{build_audio_filters, build_video_filters};
 use crate::conversion::manager::ManagerMessage;
 use crate::conversion::types::{
-    CompletedPayload, ConversionTask, LogPayload, MetadataMode, ProgressPayload, StartedPayload,
+    CompletedPayload, ConversionConfig, ConversionTask, LogPayload, MetadataMode, ProgressPayload,
+    StartedPayload,
 };
 use crate::conversion::utils::{FRAME_REGEX, parse_time, sanitize_external_tool_path};
+
+pub(crate) fn build_upscale_encode_args(
+    output_frames_dir: &Path,
+    source_file_path: &str,
+    output_path: &str,
+    source_fps: f64,
+    config: &ConversionConfig,
+) -> Vec<String> {
+    let mut enc_args = vec![
+        "-framerate".to_string(),
+        source_fps.to_string(),
+        "-start_number".to_string(),
+        "1".to_string(),
+        "-i".to_string(),
+        output_frames_dir
+            .join("frame_%08d.png")
+            .to_string_lossy()
+            .to_string(),
+    ];
+
+    if let Some(start) = &config.start_time {
+        if !start.is_empty() {
+            enc_args.push("-ss".to_string());
+            enc_args.push(start.clone());
+        }
+    }
+
+    enc_args.push("-i".to_string());
+    enc_args.push(source_file_path.to_string());
+
+    match config.metadata.mode {
+        MetadataMode::Clean => {
+            enc_args.push("-map_metadata".to_string());
+            enc_args.push("-1".to_string());
+        }
+        MetadataMode::Replace => {
+            enc_args.push("-map_metadata".to_string());
+            enc_args.push("-1".to_string());
+            add_metadata_flags(&mut enc_args, &config.metadata);
+        }
+        MetadataMode::Preserve => {
+            enc_args.push("-map_metadata".to_string());
+            enc_args.push("1".to_string());
+            add_metadata_flags(&mut enc_args, &config.metadata);
+        }
+    }
+
+    enc_args.push("-map".to_string());
+    enc_args.push("0:v:0".to_string());
+
+    if !config.selected_audio_tracks.is_empty() {
+        for track_index in &config.selected_audio_tracks {
+            enc_args.push("-map".to_string());
+            enc_args.push(format!("1:{}", track_index));
+        }
+    } else {
+        enc_args.push("-map".to_string());
+        enc_args.push("1:a?".to_string());
+    }
+
+    if !config.selected_subtitle_tracks.is_empty() {
+        for track_index in &config.selected_subtitle_tracks {
+            enc_args.push("-map".to_string());
+            enc_args.push(format!("1:{}", track_index));
+        }
+    } else if config
+        .subtitle_burn_path
+        .as_ref()
+        .map_or(true, |path| path.trim().is_empty())
+    {
+        enc_args.push("-map".to_string());
+        enc_args.push("1:s?".to_string());
+    }
+
+    add_video_codec_args(&mut enc_args, config);
+    add_audio_codec_args(&mut enc_args, config);
+
+    let audio_filters = build_audio_filters(config);
+    if !audio_filters.is_empty() {
+        enc_args.push("-af".to_string());
+        enc_args.push(audio_filters.join(","));
+    }
+
+    if !config.selected_subtitle_tracks.is_empty()
+        || config
+            .subtitle_burn_path
+            .as_ref()
+            .map_or(true, |path| path.trim().is_empty())
+    {
+        add_subtitle_codec_args(&mut enc_args, config);
+    }
+
+    add_fps_args(&mut enc_args, config);
+
+    enc_args.push("-shortest".to_string());
+    enc_args.push("-y".to_string());
+    enc_args.push(output_path.to_string());
+
+    enc_args
+}
 
 pub async fn run_upscale_worker(
     app: AppHandle,
@@ -323,96 +426,13 @@ pub async fn run_upscale_worker(
         )));
     }
 
-    let mut enc_args = vec![
-        "-framerate".to_string(),
-        fps.to_string(),
-        "-start_number".to_string(),
-        "1".to_string(),
-        "-i".to_string(),
-        output_frames_dir
-            .join("frame_%08d.png")
-            .to_string_lossy()
-            .to_string(),
-    ];
-
-    if let Some(start) = &task.config.start_time {
-        if !start.is_empty() {
-            enc_args.push("-ss".to_string());
-            enc_args.push(start.clone());
-        }
-    }
-
-    enc_args.push("-i".to_string());
-    enc_args.push(task.file_path.clone());
-
-    match task.config.metadata.mode {
-        MetadataMode::Clean => {
-            enc_args.push("-map_metadata".to_string());
-            enc_args.push("-1".to_string());
-        }
-        MetadataMode::Replace => {
-            enc_args.push("-map_metadata".to_string());
-            enc_args.push("-1".to_string());
-            add_metadata_flags(&mut enc_args, &task.config.metadata);
-        }
-        MetadataMode::Preserve => {
-            enc_args.push("-map_metadata".to_string());
-            enc_args.push("1".to_string());
-            add_metadata_flags(&mut enc_args, &task.config.metadata);
-        }
-    }
-
-    enc_args.push("-map".to_string());
-    enc_args.push("0:v:0".to_string());
-
-    if !task.config.selected_audio_tracks.is_empty() {
-        for track_index in &task.config.selected_audio_tracks {
-            enc_args.push("-map".to_string());
-            enc_args.push(format!("1:{}", track_index));
-        }
-    } else {
-        enc_args.push("-map".to_string());
-        enc_args.push("1:a?".to_string());
-    }
-
-    if !task.config.selected_subtitle_tracks.is_empty() {
-        for track_index in &task.config.selected_subtitle_tracks {
-            enc_args.push("-map".to_string());
-            enc_args.push(format!("1:{}", track_index));
-        }
-    } else if task
-        .config
-        .subtitle_burn_path
-        .as_ref()
-        .map_or(true, |path| path.trim().is_empty())
-    {
-        enc_args.push("-map".to_string());
-        enc_args.push("1:s?".to_string());
-    }
-
-    add_video_codec_args(&mut enc_args, &task.config);
-    add_audio_codec_args(&mut enc_args, &task.config);
-
-    let audio_filters = build_audio_filters(&task.config);
-    if !audio_filters.is_empty() {
-        enc_args.push("-af".to_string());
-        enc_args.push(audio_filters.join(","));
-    }
-
-    if !task.config.selected_subtitle_tracks.is_empty()
-        || task
-            .config
-            .subtitle_burn_path
-            .as_ref()
-            .map_or(true, |path| path.trim().is_empty())
-    {
-        add_subtitle_codec_args(&mut enc_args, &task.config);
-    }
-    add_fps_args(&mut enc_args, &task.config);
-
-    enc_args.push("-shortest".to_string());
-    enc_args.push("-y".to_string());
-    enc_args.push(output_path.clone());
+    let enc_args = build_upscale_encode_args(
+        &output_frames_dir,
+        &task.file_path,
+        &output_path,
+        fps,
+        &task.config,
+    );
 
     let (mut enc_rx, enc_child) = app
         .shell()

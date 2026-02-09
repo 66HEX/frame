@@ -1,13 +1,20 @@
 #[cfg(test)]
 mod tests {
     use crate::conversion::args::{build_ffmpeg_args, build_output_path, validate_task_input};
-    use crate::conversion::types::{ConversionConfig, MetadataConfig};
+    use crate::conversion::types::{ConversionConfig, MetadataConfig, MetadataMode};
+    use crate::conversion::upscale::build_upscale_encode_args;
     use crate::conversion::utils::parse_time;
     use std::fs;
+    use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn contains_args(args: &[String], expected: &[&str]) -> bool {
         expected.iter().all(|e| args.iter().any(|a| a == e))
+    }
+
+    fn contains_arg_pair(args: &[String], first: &str, second: &str) -> bool {
+        args.windows(2)
+            .any(|window| window[0] == first && window[1] == second)
     }
 
     fn sample_config(container: &str) -> ConversionConfig {
@@ -401,6 +408,59 @@ mod tests {
         let _ = fs::remove_file(&path);
 
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_upscale_encode_uses_source_framerate_for_image_sequence() {
+        let mut config = sample_config("mp4");
+        config.fps = "60".into();
+
+        let args = build_upscale_encode_args(
+            &PathBuf::from("/tmp/frame_upscale_test/output"),
+            "input.mp4",
+            "output.mp4",
+            23.976,
+            &config,
+        );
+
+        let framerate_idx = args.iter().position(|arg| arg == "-framerate").unwrap();
+        assert_eq!(args[framerate_idx + 1], "23.976");
+        assert!(contains_arg_pair(&args, "-r", "60"));
+    }
+
+    #[test]
+    fn test_upscale_encode_preserve_metadata_maps_from_source_input() {
+        let mut config = sample_config("mp4");
+        config.metadata.mode = MetadataMode::Preserve;
+
+        let args = build_upscale_encode_args(
+            &PathBuf::from("/tmp/frame_upscale_test/output"),
+            "input.mp4",
+            "output.mp4",
+            30.0,
+            &config,
+        );
+
+        assert!(contains_arg_pair(&args, "-map_metadata", "1"));
+        assert!(!contains_arg_pair(&args, "-map_metadata", "-1"));
+    }
+
+    #[test]
+    fn test_upscale_encode_replace_metadata_remains_clean_then_custom() {
+        let mut config = sample_config("mp4");
+        config.metadata.mode = MetadataMode::Replace;
+        config.metadata.title = Some("Upscaled".into());
+
+        let args = build_upscale_encode_args(
+            &PathBuf::from("/tmp/frame_upscale_test/output"),
+            "input.mp4",
+            "output.mp4",
+            30.0,
+            &config,
+        );
+
+        assert!(contains_arg_pair(&args, "-map_metadata", "-1"));
+        assert!(contains_args(&args, &["-metadata", "title=Upscaled"]));
     }
 }
 
