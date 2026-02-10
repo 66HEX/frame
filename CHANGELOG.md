@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **VideoToolbox Selection Freeze:** Resolved an infinite reactive loop in the settings panel triggered by selecting VideoToolbox encoders, which were incorrectly reporting all encoding presets as invalid.
 - **Upscaling Duration and Gaps:** Forced Constant Frame Rate (CFR) and synchronization during frame extraction to prevent duration drift and sequence gaps (static images) in AI-upscaled videos.
 - **Upscaling Pixel Format:** Restored pixel format preservation in the AI upscaling pipeline, ensuring output matches source bit-depth (e.g., 10-bit) or defaults to compatible yuv420p.
 - **AI Upscale Progress:** Improved progress accuracy by driving updates from per-frame completion logs and hardening calculations for videos where total frame counts cannot be pre-determined.

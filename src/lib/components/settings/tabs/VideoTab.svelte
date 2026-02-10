@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { ConversionConfig } from '$lib/types';
 	import { cn } from '$lib/utils/cn';
 	import Button from '$lib/components/ui/Button.svelte';
@@ -63,13 +64,13 @@
 
 	$effect(() => {
 		if (isMlUpscaleActive && config.resolution !== 'original') {
-			onUpdate({ resolution: 'original' });
+			untrack(() => onUpdate({ resolution: 'original' }));
 		}
 	});
 
 	$effect(() => {
 		if (!mlUpscaleAvailable && config.mlUpscale && config.mlUpscale !== 'none') {
-			onUpdate({ mlUpscale: 'none' });
+			untrack(() => onUpdate({ mlUpscale: 'none' }));
 		}
 	});
 
@@ -82,17 +83,28 @@
 	}
 
 	$effect(() => {
-		const fallback = firstAllowedCodec(config.container);
-		if (!fallback) return;
-		if (!isVideoCodecAllowed(config.container, config.videoCodec)) {
-			onUpdate({ videoCodec: fallback.id });
+		// We want to re-run this when container or videoCodec changes
+		const container = config.container;
+		const videoCodec = config.videoCodec;
+		
+		if (!isVideoCodecAllowed(container, videoCodec)) {
+			const fallback = firstAllowedCodec(container);
+			if (fallback) {
+				untrack(() => onUpdate({ videoCodec: fallback.id }));
+			}
 		}
 	});
 
 	$effect(() => {
-		if (!isVideoPresetAllowed(config.videoCodec, config.preset)) {
-			const fallback = getFirstAllowedPreset(config.videoCodec);
-			onUpdate({ preset: fallback });
+		// We want to re-run this when videoCodec or preset changes
+		const videoCodec = config.videoCodec;
+		const preset = config.preset;
+
+		if (!isVideoPresetAllowed(videoCodec, preset)) {
+			const fallback = getFirstAllowedPreset(videoCodec);
+			if (fallback !== preset) {
+				untrack(() => onUpdate({ preset: fallback }));
+			}
 		}
 	});
 
@@ -233,29 +245,31 @@
 		</div>
 	</div>
 
-	<div class="space-y-3 pt-2">
-		<Label variant="section">{$_('video.encodingSpeed')}</Label>
-		<div class="grid grid-cols-1">
-			{#each presetOptions as preset (preset)}
-				{@const allowed = isVideoPresetAllowed(config.videoCodec, preset)}
-				<ListItem
-					selected={allowed && config.preset === preset}
-					onclick={() => allowed && onUpdate({ preset })}
-					disabled={disabled || !allowed}
-					class={cn(!allowed && 'pointer-events-none opacity-50')}
-				>
-					<span>{$_(`encodingSpeed.${preset}`)}</span>
-					<span class="text-[9px] opacity-50">
-						{#if allowed}
-							{$_(`encodingSpeed.${preset}Desc`)}
-						{:else}
-							{$_('video.presetIncompatible')}
-						{/if}
-					</span>
-				</ListItem>
-			{/each}
+	{#if !isVideotoolboxEncoder}
+		<div class="space-y-3 pt-2">
+			<Label variant="section">{$_('video.encodingSpeed')}</Label>
+			<div class="grid grid-cols-1">
+				{#each presetOptions as preset (preset)}
+					{@const allowed = isVideoPresetAllowed(config.videoCodec, preset)}
+					<ListItem
+						selected={allowed && config.preset === preset}
+						onclick={() => allowed && onUpdate({ preset })}
+						disabled={disabled || !allowed}
+						class={cn(!allowed && 'pointer-events-none opacity-50')}
+					>
+						<span>{$_(`encodingSpeed.${preset}`)}</span>
+						<span class="text-[9px] opacity-50">
+							{#if allowed}
+								{$_(`encodingSpeed.${preset}Desc`)}
+							{:else}
+								{$_('video.presetIncompatible')}
+							{/if}
+						</span>
+					</ListItem>
+				{/each}
+			</div>
 		</div>
-	</div>
+	{/if}
 
 	<div class="space-y-3 pt-2">
 		<Label variant="section">{$_('video.qualityControl')}</Label>

@@ -68,7 +68,7 @@ export const CONTAINER_VIDEO_CODEC_COMPATIBILITY: Record<string, Set<string>> = 
 export const VIDEO_CODEC_FALLBACK_ORDER = ['libx264', 'libx265', 'vp9', 'prores', 'libsvtav1'];
 
 export function isVideoPresetAllowed(codec: string, preset: string): boolean {
-	if (VIDEOTOOLBOX_ENCODERS.has(codec)) return false;
+	if (VIDEOTOOLBOX_ENCODERS.has(codec)) return true;
 	if (NVENC_ENCODERS.has(codec)) return NVENC_ALLOWED_PRESETS.has(preset as VideoPreset);
 	return VIDEO_PRESETS.includes(preset as VideoPreset);
 }
