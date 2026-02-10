@@ -445,6 +445,7 @@ pub async fn run_upscale_worker(
     let mut upscale_success = false;
     let mut last_error = String::new();
     let mut completed_frames: u32 = 0;
+    let mut last_upscale_progress: f64 = 5.0;
 
     while let Some(event) = upscale_rx.recv().await {
         if let CommandEvent::Stderr(ref line_bytes) = event {
@@ -458,6 +459,24 @@ pub async fn run_upscale_worker(
                     .next()
                     .map(|c| c.is_ascii_digit())
                     .unwrap_or(false);
+
+            if is_percentage_line {
+                let percentage = trimmed.trim_end_matches('%').trim().parse::<f64>().ok();
+                if let Some(percentage) = percentage {
+                    let progress = 5.0 + (percentage.clamp(0.0, 100.0) / 100.0) * 85.0;
+                    if progress > last_upscale_progress {
+                        last_upscale_progress = progress;
+                        let _ = app_clone.emit(
+                            "conversion-progress",
+                            ProgressPayload {
+                                id: id_clone.clone(),
+                                progress: progress.min(90.0),
+                            },
+                        );
+                    }
+                }
+            }
+
             if !is_percentage_line && !trimmed.is_empty() {
                 let _ = app_clone.emit(
                     "conversion-log",
@@ -471,19 +490,21 @@ pub async fn run_upscale_worker(
             if line.contains("→") || line.contains("->") {
                 completed_frames += 1;
 
-                let progress = if total_frames > 0 {
-                    5.0 + (completed_frames as f64 / total_frames as f64) * 85.0
-                } else {
-                    5.0 + (completed_frames as f64).min(85.0)
-                };
+                if total_frames == 0 {
+                    continue;
+                }
+                let progress = 5.0 + (completed_frames as f64 / total_frames as f64) * 85.0;
 
-                let _ = app_clone.emit(
-                    "conversion-progress",
-                    ProgressPayload {
-                        id: id_clone.clone(),
-                        progress: progress.min(90.0),
-                    },
-                );
+                if progress > last_upscale_progress {
+                    last_upscale_progress = progress;
+                    let _ = app_clone.emit(
+                        "conversion-progress",
+                        ProgressPayload {
+                            id: id_clone.clone(),
+                            progress: progress.min(90.0),
+                        },
+                    );
+                }
             }
         }
         if let CommandEvent::Terminated(payload) = event {
