@@ -68,7 +68,7 @@
 				</Button>
 			{/each}
 		</div>
-		<p class="text-[9px] text-gray-alpha-600 uppercase">
+		<p class="text-[9px] text-gray-alpha-600">
 			{$_(`metadata.modes.${config.metadata.mode}Desc`)}
 		</p>
 	</div>
@@ -81,7 +81,6 @@
 					<div class="space-y-2">
 						<Label for="metadata-{field.key}">{$_(field.label)}</Label>
 						<Input
-							class="placeholder:normal-case"
 							id="metadata-{field.key}"
 							value={config.metadata[field.key] || ''}
 							{disabled}

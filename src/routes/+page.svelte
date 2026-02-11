@@ -221,7 +221,7 @@
 				transition:scale={{ start: 1.05, duration: 100, opacity: 1 }}
 				class="flex h-36 w-72 flex-col items-center justify-center rounded-lg border border-dashed border-blue-600 bg-blue-900/20 shadow-2xl backdrop-blur-sm"
 			>
-				<p class="text-[10px] font-medium tracking-widest text-blue-500 uppercase">
+				<p class="text-[10px] font-medium tracking-widest text-blue-500">
 					{$_('fileList.importSource')}
 				</p>
 			</div>

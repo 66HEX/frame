@@ -86,7 +86,7 @@
 		// We want to re-run this when container or videoCodec changes
 		const container = config.container;
 		const videoCodec = config.videoCodec;
-		
+
 		if (!isVideoCodecAllowed(container, videoCodec)) {
 			const fallback = firstAllowedCodec(container);
 			if (fallback) {
@@ -191,16 +191,16 @@
 		<div class="space-y-3 pt-2">
 			<Label variant="section">{$_('video.mlUpscaling')}</Label>
 			<div class="grid grid-cols-2 gap-2">
-					{#each ML_UPSCALING_OPTIONS as opt (opt.id)}
-						<Button
-							variant={(config.mlUpscale || 'none') === opt.id ? 'selected' : 'outline'}
-							onclick={() => onUpdate({ mlUpscale: opt.id as ConversionConfig['mlUpscale'] })}
-							disabled={disabled || (opt.id !== 'none' && !mlUpscaleAvailable)}
-							class="w-full"
-						>
-							{opt.label}
-						</Button>
-					{/each}
+				{#each ML_UPSCALING_OPTIONS as opt (opt.id)}
+					<Button
+						variant={(config.mlUpscale || 'none') === opt.id ? 'selected' : 'outline'}
+						onclick={() => onUpdate({ mlUpscale: opt.id as ConversionConfig['mlUpscale'] })}
+						disabled={disabled || (opt.id !== 'none' && !mlUpscaleAvailable)}
+						class="w-full"
+					>
+						{opt.label}
+					</Button>
+				{/each}
 			</div>
 		</div>
 
@@ -335,7 +335,7 @@
 					/>
 				{/if}
 			</div>
-			<div class="flex justify-between text-[9px] text-gray-alpha-600 uppercase">
+			<div class="flex justify-between text-[9px] text-gray-alpha-600">
 				{#if isHardwareEncoder}
 					<span>{$_('video.lowQuality')}</span>
 					<span>{$_('video.bestQuality')}</span>
@@ -379,7 +379,7 @@
 					/>
 					<div class="space-y-0.5">
 						<Label for="nvenc-spatial-aq">{$_('video.nvencSpatialAq')}</Label>
-						<p class="text-[9px] text-gray-alpha-600 uppercase">
+						<p class="text-[9px] text-gray-alpha-600">
 							{$_('video.nvencSpatialAqHint')}
 						</p>
 					</div>
@@ -393,7 +393,7 @@
 					/>
 					<div class="space-y-0.5">
 						<Label for="nvenc-temporal-aq">{$_('video.nvencTemporalAq')}</Label>
-						<p class="text-[9px] text-gray-alpha-600 uppercase">
+						<p class="text-[9px] text-gray-alpha-600">
 							{$_('video.nvencTemporalAqHint')}
 						</p>
 					</div>
@@ -415,7 +415,7 @@
 					/>
 					<div class="space-y-0.5">
 						<Label for="videotoolbox-allow-sw">{$_('video.videotoolboxAllowSw')}</Label>
-						<p class="text-[9px] text-gray-alpha-600 uppercase">
+						<p class="text-[9px] text-gray-alpha-600">
 							{$_('video.videotoolboxAllowSwHint')}
 						</p>
 					</div>
@@ -436,7 +436,7 @@
 				/>
 				<div class="space-y-0.5">
 					<Label for="hw-decode">{$_('video.hwDecode')}</Label>
-					<p class="text-[9px] text-gray-alpha-600 uppercase">
+					<p class="text-[9px] text-gray-alpha-600">
 						{$_('video.hwDecodeHint')}
 					</p>
 				</div>

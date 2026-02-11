@@ -67,7 +67,7 @@
 				>
 					<span
 						class={cn(
-							'truncate uppercase',
+							'truncate',
 							config.subtitleBurnPath ? 'text-foreground' : 'text-gray-alpha-600'
 						)}
 					>
@@ -95,7 +95,7 @@
 					</div>
 				{/if}
 			</div>
-			<p class="text-[9px] text-gray-alpha-600 uppercase">
+			<p class="text-[9px] text-gray-alpha-600">
 				{$_('subtitles.burnInHint')}
 			</p>
 		</div>
@@ -118,10 +118,10 @@
 								<span class="text-[10px] opacity-70">
 									#{track.index}
 								</span>
-								<span class="text-[10px] font-medium tracking-wide uppercase">
+								<span class="text-[10px] font-medium tracking-wide">
 									{track.codec}
 								</span>
-								<div class="text-[9px] tracking-wide uppercase">
+								<div class="text-[9px] tracking-wide">
 									{#if track.language}
 										<span class="mx-0.5">•</span>
 										{track.language}{/if}
@@ -150,7 +150,7 @@
 	{:else}
 		<div class="space-y-3 pt-2">
 			<Label variant="section">{$_('subtitles.sourceTracks')}</Label>
-			<p class="text-[9px] text-gray-alpha-600 uppercase">
+			<p class="text-[9px] text-gray-alpha-600">
 				{$_('subtitles.none')}
 			</p>
 		</div>

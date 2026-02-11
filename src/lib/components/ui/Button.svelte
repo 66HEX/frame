@@ -4,7 +4,7 @@
 	import type { HTMLButtonAttributes } from 'svelte/elements';
 
 	const buttonVariants = cva(
-		'inline-flex items-center justify-center whitespace-nowrap rounded-sm text-[10px] font-medium uppercase tracking-wide transition-all disabled:pointer-events-none disabled:transition-none disabled:shadow-none',
+		'inline-flex items-center justify-center whitespace-nowrap rounded-sm text-[10px] font-medium tracking-wide transition-all disabled:pointer-events-none disabled:transition-none disabled:shadow-none',
 		{
 			variants: {
 				variant: {

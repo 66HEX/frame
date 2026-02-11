@@ -20,9 +20,22 @@
 	box-sizing: border-box;
 	min-width: 0;
 }
+
 :root {
 	interpolate-size: allow-keywords;
 	text-box: trim-both cap alphabetic;
+}
+
+* {
+	text-transform: uppercase;
+}
+
+input {
+	text-transform: none;
+}
+
+input::placeholder {
+	text-transform: uppercase;
 }
 
 html {
@@ -109,13 +122,16 @@ select {
 	width: 6px;
 	height: 6px;
 }
+
 ::-webkit-scrollbar-track {
 	background: var(--ds-gray-alpha-100);
 }
+
 ::-webkit-scrollbar-thumb {
 	background: var(--ds-gray-alpha-200);
 	border-radius: 3px;
 }
+
 .custom-scrollbar::-webkit-scrollbar {
 	width: 4px;
 }

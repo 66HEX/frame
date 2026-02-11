@@ -46,20 +46,20 @@
 	}
 </script>
 
-	<div class="space-y-4">
-		<div class="space-y-3">
-			<Label variant="section">{$_('output.outputName')}</Label>
-			<Input
-				type="text"
-				value={outputName}
-				oninput={(e) => onUpdateOutputName?.(sanitizeOutputName(e.currentTarget.value))}
-				placeholder={$_('output.placeholder')}
-				{disabled}
-			/>
-			<p class="text-[9px] tracking-wide text-gray-alpha-600 uppercase">
-				{$_('output.hint')}
-			</p>
-		</div>
+<div class="space-y-4">
+	<div class="space-y-3">
+		<Label variant="section">{$_('output.outputName')}</Label>
+		<Input
+			type="text"
+			value={outputName}
+			oninput={(e) => onUpdateOutputName?.(sanitizeOutputName(e.currentTarget.value))}
+			placeholder={$_('output.placeholder')}
+			{disabled}
+		/>
+		<p class="text-[9px] tracking-wide text-gray-alpha-600">
+			{$_('output.hint')}
+		</p>
+	</div>
 
 	<div class="space-y-3 pt-2">
 		<Label variant="section">{$_('output.container')}</Label>

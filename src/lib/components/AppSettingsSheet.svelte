@@ -139,7 +139,7 @@
 	transition:fly={{ x: 320, duration: 300, opacity: 1 }}
 >
 	<div class="flex items-center justify-between border-b border-gray-alpha-100 px-4 py-3">
-		<h2 class="text-[10px] font-medium tracking-widest text-foreground uppercase">
+		<h2 class="text-[10px] font-medium tracking-widest text-foreground">
 			{$_('settings.title')}
 		</h2>
 		<button onclick={onClose} class="text-gray-alpha-600 transition-colors hover:text-foreground">
@@ -240,8 +240,8 @@
 					<Label for="auto-update-check">{$_('settings.checkOnStartup')}</Label>
 				</div>
 				<Button
-					variant="outline"
-					class="w-full justify-start"
+					variant="default"
+					class="w-full"
 					onclick={handleCheckUpdate}
 					disabled={isCheckingForUpdate}
 				>

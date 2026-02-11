@@ -22,24 +22,24 @@
 		"toggleSize": "Größe umschalten",
 		"dashboard": "Dashboard",
 		"logs": "Protokolle",
-		"storage": "SPEICHER:",
-		"items": "ELEMENTE:",
+		"storage": "Speicher:",
+		"items": "Elemente:",
 		"addSource": "Quelle hinzufügen",
-		"processing": "VERARBEITUNG...",
-		"start": "START"
+		"processing": "Verarbeitung...",
+		"start": "Start"
 	},
 	"fileList": {
 		"dropFiles": "Dateien ablegen oder QUELLE HINZUFÜGEN",
 		"importSource": "Quelldateien importieren"
 	},
 	"fileStatus": {
-		"ready": "BEREIT",
-		"queued": "WARTESCHLANGE",
-		"error": "FEHLER",
-		"idle": "LEERLAUF"
+		"ready": "Bereit",
+		"queued": "Warteschlange",
+		"error": "Fehler",
+		"idle": "Leerlauf"
 	},
 	"emptySelection": {
-		"hint": "WÄHLEN SIE EIN ELEMENT AUS DER WARTESCHLANGE FÜR DIE KONFIGURATION"
+		"hint": "Wählen sie ein element aus der warteschlange für die konfiguration"
 	},
 	"tabs": {
 		"source": "Quelle",
@@ -166,12 +166,12 @@
 		"codec": "Audio-Codec",
 		"incompatibleContainer": "Inkompatibler Container",
 		"sourceTracks": "Quellspuren",
-		"channels": "KAN"
+		"channels": "Kan"
 	},
 	"presets": {
 		"library": "Voreinstellungsbibliothek",
 		"label": "Voreinstellungsname",
-		"applied": "ANGEWENDET",
+		"applied": "Angewendet",
 		"deletePreset": "Voreinstellung löschen",
 		"nameRequired": "Name erforderlich",
 		"notSaved": "Voreinstellung nicht gespeichert",

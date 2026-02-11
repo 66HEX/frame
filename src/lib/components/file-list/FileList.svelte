@@ -35,7 +35,7 @@
 >
 	<div class="z-10 flex h-10 items-center border-b border-gray-alpha-100 px-4">
 		<div
-			class="grid flex-1 grid-cols-12 items-center gap-4 text-[10px] font-medium tracking-widest text-gray-alpha-600 uppercase"
+			class="grid flex-1 grid-cols-12 items-center gap-4 text-[10px] font-medium tracking-widest text-gray-alpha-600"
 		>
 			<div class="relative col-span-1 flex items-center justify-center">
 				<Checkbox
@@ -49,9 +49,7 @@
 			<div class="col-span-2 text-right">{$_('common.target')}</div>
 			<div class="col-span-2 text-right">{$_('common.state')}</div>
 		</div>
-		<div
-			class="ml-4 w-16 text-right text-[10px] font-medium tracking-widest text-gray-alpha-600 uppercase"
-		>
+		<div class="ml-4 w-16 text-right text-[10px] font-medium tracking-widest text-gray-alpha-600">
 			{$_('common.actions')}
 		</div>
 	</div>
@@ -59,7 +57,7 @@
 	<div class="relative z-10 flex-1 overflow-y-auto">
 		{#if files.length === 0}
 			<div class="flex h-full flex-col items-center justify-center p-10 select-none">
-				<div class="text-[10px] font-medium text-gray-alpha-600 uppercase">
+				<div class="text-[10px] font-medium text-gray-alpha-600">
 					{$_('fileList.dropFiles')}
 				</div>
 			</div>

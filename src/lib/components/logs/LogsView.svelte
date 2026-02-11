@@ -114,7 +114,7 @@
 			<button
 				onclick={() => (selectedLogFileId = file.id)}
 				class={cn(
-					'shrink-0 text-[10px] font-medium tracking-widest uppercase transition-all',
+					'shrink-0 text-[10px] font-medium tracking-widest transition-all',
 					selectedLogFileId === file.id
 						? 'text-blue-600'
 						: 'text-gray-alpha-600 hover:text-foreground'
@@ -125,7 +125,7 @@
 		{/each}
 
 		{#if activeFiles.length === 0}
-			<span class="text-[10px] font-medium tracking-widest text-gray-alpha-600 uppercase">
+			<span class="text-[10px] font-medium tracking-widest text-gray-alpha-600">
 				{$_('logs.noActiveProcesses')}
 			</span>
 		{/if}
@@ -158,31 +158,31 @@
 							</div>
 						{/snippet}
 					</VirtualList>
-					{:else}
-						<div
-							class="flex h-full flex-col items-center justify-center space-y-2 text-gray-alpha-600 select-none"
-						>
-							<div class="text-[10px] font-medium tracking-widest uppercase">
-								{$_('logs.waitingForOutput')}
-							</div>
+				{:else}
+					<div
+						class="flex h-full flex-col items-center justify-center space-y-2 text-gray-alpha-600 select-none"
+					>
+						<div class="text-[10px] font-medium tracking-widest">
+							{$_('logs.waitingForOutput')}
 						</div>
-					{/if}
+					</div>
+				{/if}
 
-					{#if !shouldStickToBottom}
-						<button
-							onclick={scrollToBottom}
-							class="absolute right-4 bottom-4 z-10 rounded-full bg-blue-600 p-2 text-foreground shadow-lg backdrop-blur-md transition-all"
-							title={$_('logs.scrollToBottom')}
-						>
-							<IconArrowDown size={14} />
-						</button>
-					{/if}
+				{#if !shouldStickToBottom}
+					<button
+						onclick={scrollToBottom}
+						class="absolute right-4 bottom-4 z-10 rounded-full bg-blue-600 p-2 text-foreground shadow-lg backdrop-blur-md transition-all"
+						title={$_('logs.scrollToBottom')}
+					>
+						<IconArrowDown size={14} />
+					</button>
+				{/if}
 			</div>
 		{:else}
 			<div
 				class="flex h-full flex-col items-center justify-center space-y-2 text-gray-alpha-600 select-none"
 			>
-				<div class="text-[10px] font-medium tracking-widest uppercase">
+				<div class="text-[10px] font-medium tracking-widest">
 					{$_('logs.selectTask')}
 				</div>
 			</div>

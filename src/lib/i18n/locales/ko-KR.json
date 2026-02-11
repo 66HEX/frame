@@ -136,20 +136,20 @@
 		"lossless": "무손실",
 		"smallest": "최소",
 		"targetBitrateKbps": "목표 비트레이트 (kbps)",
-		"nvencOptions": "NVENC 옵션",
-		"nvencSpatialAq": "공간 AQ",
+		"nvencOptions": "Nvenc 옵션",
+		"nvencSpatialAq": "공간 aq",
 		"nvencSpatialAqHint": "복잡한 장면의 디테일 향상",
-		"nvencTemporalAq": "시간 AQ",
+		"nvencTemporalAq": "시간 aq",
 		"nvencTemporalAqHint": "프레임 간 품질 안정화",
 		"presetIncompatible": "호환되지 않는 인코더",
 		"videotoolboxOptions": "VideoToolbox 옵션",
 		"videotoolboxAllowSw": "소프트웨어 폴백 허용",
-		"videotoolboxAllowSwHint": "하드웨어 실패 시 CPU 인코딩으로 전환",
-		"mlUpscaling": "ML 업스케일링",
+		"videotoolboxAllowSwHint": "하드웨어 실패 시 cpu 인코딩으로 전환",
+		"mlUpscaling": "Ml 업스케일링",
 		"codecIncompatible": "호환되지 않는 컨테이너",
 		"hardwareAcceleration": "하드웨어 가속",
 		"hwDecode": "하드웨어 디코딩",
-		"hwDecodeHint": "입력 비디오 디코딩에 GPU 사용 (더 빠름)"
+		"hwDecodeHint": "입력 비디오 디코딩에 gpu 사용 (더 빠름)"
 	},
 	"audio": {
 		"channelsBitrate": "채널 및 비트레이트",
@@ -162,11 +162,11 @@
 		"muted": "음소거",
 		"maxVolume": "최대 볼륨",
 		"normalize": "오디오 노멀라이즈",
-		"normalizeHint": "일관된 볼륨을 위한 EBU R128 라우드니스 노멀라이즈",
+		"normalizeHint": "일관된 볼륨을 위한 ebu r128 라우드니스 노멀라이즈",
 		"codec": "오디오 코덱",
 		"incompatibleContainer": "호환되지 않는 컨테이너",
 		"sourceTracks": "소스 트랙",
-		"channels": "CH"
+		"channels": "Ch"
 	},
 	"presets": {
 		"library": "프리셋 라이브러리",

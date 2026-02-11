@@ -22,24 +22,24 @@
 		"toggleSize": "Toggle size",
 		"dashboard": "Dashboard",
 		"logs": "Logs",
-		"storage": "STORAGE:",
-		"items": "ITEMS:",
+		"storage": "Storage:",
+		"items": "Items:",
 		"addSource": "Add Source",
-		"processing": "PROCESSING...",
-		"start": "START"
+		"processing": "Processing...",
+		"start": "Start"
 	},
 	"fileList": {
 		"dropFiles": "Drop files or use ADD SOURCE",
 		"importSource": "Import Source Files"
 	},
 	"fileStatus": {
-		"ready": "READY",
-		"queued": "QUEUED",
-		"error": "ERROR",
-		"idle": "IDLE"
+		"ready": "Ready",
+		"queued": "Queued",
+		"error": "Error",
+		"idle": "Idle"
 	},
 	"emptySelection": {
-		"hint": "SELECT AN ITEM FROM THE QUEUE TO ACCESS CONFIGURATION"
+		"hint": "Select an item from the queue to access configuration"
 	},
 	"tabs": {
 		"source": "Source",
@@ -166,12 +166,12 @@
 		"codec": "Audio Codec",
 		"incompatibleContainer": "Incompatible container",
 		"sourceTracks": "Source Tracks",
-		"channels": "CH"
+		"channels": "Ch"
 	},
 	"presets": {
 		"library": "Preset Library",
 		"label": "Preset Label",
-		"applied": "APPLIED",
+		"applied": "Applied",
 		"deletePreset": "Delete preset",
 		"nameRequired": "Name required",
 		"notSaved": "Preset not saved",

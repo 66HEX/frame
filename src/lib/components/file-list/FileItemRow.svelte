@@ -54,7 +54,9 @@
 		</div>
 
 		<div class="col-span-5 flex items-center gap-2 overflow-hidden">
-			<span class="truncate text-[13px] text-foreground [text-box:none]!">{item.name}</span>
+			<span class="truncate text-[13px] text-foreground normal-case! [text-box:none]!"
+				>{item.name}</span
+			>
 		</div>
 
 		<div class="col-span-2 text-right">
@@ -62,7 +64,7 @@
 		</div>
 
 		<div class="col-span-2 text-right">
-			<span class="text-[13px] text-gray-alpha-600 uppercase">{item.originalFormat}</span>
+			<span class="text-[13px] text-gray-alpha-600">{item.originalFormat}</span>
 		</div>
 
 		<div class="col-span-2 text-right">

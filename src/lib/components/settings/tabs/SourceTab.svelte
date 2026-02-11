@@ -94,14 +94,14 @@
 
 <div class="space-y-6">
 	{#if status === 'loading'}
-		<div class="text-[11px] tracking-wide text-gray-alpha-600 uppercase">
+		<div class="text-[11px] tracking-wide text-gray-alpha-600">
 			{$_('source.analyzing')}
 		</div>
 	{:else if status === 'error'}
-		<div class="space-y-1 text-[11px] tracking-wide text-red-700 uppercase">
+		<div class="space-y-1 text-[11px] tracking-wide text-red-700">
 			<p>{$_('source.failedToRead')}</p>
 			{#if error}
-				<p class="text-[10px] text-gray-alpha-600 normal-case">
+				<p class="text-[10px] text-gray-alpha-600">
 					{error}
 				</p>
 			{/if}
@@ -109,7 +109,7 @@
 	{:else if metadata}
 		<div class="space-y-3">
 			<Label variant="section">{$_('source.fileInfo')}</Label>
-			<div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px] tracking-wide uppercase">
+			<div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px] tracking-wide">
 				<div class="text-gray-alpha-600">{$_('source.duration')}</div>
 				<div class="text-right font-medium">{formatDuration(metadata.duration)}</div>
 
@@ -121,7 +121,7 @@
 		{#if metadata.videoCodec}
 			<div class="space-y-3">
 				<Label variant="section">{$_('source.videoStream')}</Label>
-				<div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px] tracking-wide uppercase">
+				<div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px] tracking-wide">
 					<div class="text-gray-alpha-600">{$_('source.videoCodec')}</div>
 					<div class="text-right font-medium">{display(metadata.videoCodec)}</div>
 
@@ -164,12 +164,12 @@
 					{#each metadata.audioTracks as track, i (track.index)}
 						<div class="space-y-2">
 							<div class="flex items-center gap-2">
-								<span class="text-[9px] font-bold tracking-widest text-blue-600 uppercase"
+								<span class="text-[9px] font-bold tracking-widest text-blue-600"
 									>{$_('source.track')} #{i + 1}</span
 								>
 								<div class="h-px flex-1 bg-gray-alpha-100"></div>
 							</div>
-							<div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px] tracking-wide uppercase">
+							<div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px] tracking-wide">
 								<div class="text-gray-alpha-600">{$_('audio.codec')}</div>
 								<div class="text-right font-medium">{display(track.codec)}</div>
 
@@ -197,7 +197,7 @@
 			</div>
 		{/if}
 	{:else}
-		<div class="text-[11px] tracking-wide text-gray-alpha-600 uppercase">
+		<div class="text-[11px] tracking-wide text-gray-alpha-600">
 			{$_('source.unavailable')}
 		</div>
 	{/if}

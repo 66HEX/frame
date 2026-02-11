@@ -109,7 +109,7 @@
 					oninput={(e) => onUpdate({ audioVolume: Number(e.currentTarget.value) })}
 					{disabled}
 				/>
-				<div class="flex justify-between text-[9px] text-gray-alpha-600 uppercase">
+				<div class="flex justify-between text-[9px] text-gray-alpha-600">
 					<span>{$_('audio.muted')}</span>
 					<span>{$_('audio.maxVolume')}</span>
 				</div>
@@ -124,7 +124,7 @@
 				/>
 				<div class="space-y-0.5">
 					<Label for="audio-normalize">{$_('audio.normalize')}</Label>
-					<p class="text-[9px] text-gray-alpha-600 uppercase">
+					<p class="text-[9px] text-gray-alpha-600">
 						{$_('audio.normalizeHint')}
 					</p>
 				</div>
@@ -169,10 +169,10 @@
 								<span class="text-[10px] opacity-70">
 									#{track.index}
 								</span>
-								<span class="text-[10px] font-medium tracking-wide uppercase">
+								<span class="text-[10px] font-medium tracking-wide">
 									{track.codec}
 								</span>
-								<div class="text-[9px] tracking-wide uppercase">
+								<div class="text-[9px] tracking-wide">
 									<span class="mx-0.5">•</span>
 
 									{track.channels}

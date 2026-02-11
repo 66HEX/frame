@@ -22,24 +22,24 @@
 		"toggleSize": "Cambia dimensione",
 		"dashboard": "Dashboard",
 		"logs": "Log",
-		"storage": "ARCHIVIO:",
-		"items": "ELEMENTI:",
+		"storage": "Archivio:",
+		"items": "Elementi:",
 		"addSource": "Aggiungi sorgente",
-		"processing": "ELABORAZIONE...",
-		"start": "AVVIA"
+		"processing": "Elaborazione...",
+		"start": "Avvia"
 	},
 	"fileList": {
 		"dropFiles": "Trascina file o usa AGGIUNGI SORGENTE",
 		"importSource": "Importa file sorgente"
 	},
 	"fileStatus": {
-		"ready": "PRONTO",
-		"queued": "IN CODA",
-		"error": "ERRORE",
-		"idle": "INATTIVO"
+		"ready": "Pronto",
+		"queued": "In coda",
+		"error": "Errore",
+		"idle": "Inattivo"
 	},
 	"emptySelection": {
-		"hint": "SELEZIONA UN ELEMENTO DALLA CODA PER ACCEDERE ALLA CONFIGURAZIONE"
+		"hint": "Seleziona un elemento dalla coda per accedere alla configurazione"
 	},
 	"tabs": {
 		"source": "Sorgente",
@@ -166,12 +166,12 @@
 		"codec": "Codec audio",
 		"incompatibleContainer": "Container incompatibile",
 		"sourceTracks": "Tracce sorgente",
-		"channels": "CH"
+		"channels": "Ch"
 	},
 	"presets": {
 		"library": "Libreria preset",
 		"label": "Etichetta preset",
-		"applied": "APPLICATO",
+		"applied": "Applicato",
 		"deletePreset": "Elimina preset",
 		"nameRequired": "Nome richiesto",
 		"notSaved": "Preset non salvato",

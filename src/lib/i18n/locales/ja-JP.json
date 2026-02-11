@@ -136,20 +136,20 @@
 		"lossless": "ロスレス",
 		"smallest": "最小",
 		"targetBitrateKbps": "目標ビットレート (kbps)",
-		"nvencOptions": "NVENCオプション",
-		"nvencSpatialAq": "空間AQ",
+		"nvencOptions": "Nvencオプション",
+		"nvencSpatialAq": "空間aq",
 		"nvencSpatialAqHint": "複雑なシーンの細部を改善します",
-		"nvencTemporalAq": "時間AQ",
+		"nvencTemporalAq": "時間aq",
 		"nvencTemporalAqHint": "フレーム間の品質を安定させます",
 		"presetIncompatible": "互換性のないエンコーダー",
 		"videotoolboxOptions": "VideoToolboxオプション",
 		"videotoolboxAllowSw": "ソフトウェアフォールバックを許可",
-		"videotoolboxAllowSwHint": "ハードウェアが失敗した場合にCPUエンコードに戻ります",
-		"mlUpscaling": "MLアップスケーリング",
+		"videotoolboxAllowSwHint": "ハードウェアが失敗した場合にcpuエンコードに戻ります",
+		"mlUpscaling": "Mlアップスケーリング",
 		"codecIncompatible": "互換性のないコンテナ",
 		"hardwareAcceleration": "ハードウェアアクセラレーション",
 		"hwDecode": "ハードウェアデコード",
-		"hwDecodeHint": "入力動画のデコードにGPUを使用（高速）"
+		"hwDecodeHint": "入力動画のデコードにgpuを使用（高速）"
 	},
 	"audio": {
 		"channelsBitrate": "チャンネルとビットレート",
@@ -162,11 +162,11 @@
 		"muted": "ミュート",
 		"maxVolume": "最大音量",
 		"normalize": "音量の正規化",
-		"normalizeHint": "一貫した音量のためのEBU R128ラウドネス正規化",
+		"normalizeHint": "一貫した音量のためのebu r128ラウドネス正規化",
 		"codec": "オーディオコーデック",
 		"incompatibleContainer": "互換性のないコンテナ",
 		"sourceTracks": "ソーストラック",
-		"channels": "CH"
+		"channels": "Ch"
 	},
 	"presets": {
 		"library": "プリセットライブラリ",

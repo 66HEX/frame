@@ -22,24 +22,24 @@
 		"toggleSize": "Cambiar tamaño",
 		"dashboard": "Panel",
 		"logs": "Registros",
-		"storage": "ALMACENAMIENTO:",
-		"items": "ELEMENTOS:",
+		"storage": "Almacenamiento:",
+		"items": "Elementos:",
 		"addSource": "Añadir fuente",
-		"processing": "PROCESANDO...",
-		"start": "INICIAR"
+		"processing": "Procesando...",
+		"start": "Iniciar"
 	},
 	"fileList": {
 		"dropFiles": "Suelta archivos o usa AÑADIR FUENTE",
 		"importSource": "Importar archivos fuente"
 	},
 	"fileStatus": {
-		"ready": "LISTO",
-		"queued": "EN COLA",
-		"error": "ERROR",
-		"idle": "INACTIVO"
+		"ready": "Listo",
+		"queued": "En cola",
+		"error": "Error",
+		"idle": "Inactivo"
 	},
 	"emptySelection": {
-		"hint": "SELECCIONA UN ELEMENTO DE LA COLA PARA ACCEDER A LA CONFIGURACIÓN"
+		"hint": "Selecciona un elemento de la cola para acceder a la configuración"
 	},
 	"tabs": {
 		"source": "Fuente",
@@ -166,12 +166,12 @@
 		"codec": "Códec de audio",
 		"incompatibleContainer": "Contenedor incompatible",
 		"sourceTracks": "Pistas de origen",
-		"channels": "CH"
+		"channels": "Ch"
 	},
 	"presets": {
 		"library": "Biblioteca de ajustes",
 		"label": "Etiqueta de ajuste",
-		"applied": "APLICADO",
+		"applied": "Aplicado",
 		"deletePreset": "Eliminar ajuste",
 		"nameRequired": "Nombre requerido",
 		"notSaved": "Ajuste no guardado",

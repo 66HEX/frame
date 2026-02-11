@@ -22,24 +22,24 @@
 		"toggleSize": "Changer taille",
 		"dashboard": "Tableau de bord",
 		"logs": "Journaux",
-		"storage": "STOCKAGE :",
-		"items": "ÉLÉMENTS :",
+		"storage": "Stockage :",
+		"items": "Éléments :",
 		"addSource": "Ajouter source",
-		"processing": "TRAITEMENT...",
-		"start": "DÉMARRER"
+		"processing": "Traitement...",
+		"start": "Démarrer"
 	},
 	"fileList": {
 		"dropFiles": "Déposez des fichiers ou utilisez AJOUTER SOURCE",
 		"importSource": "Importer fichiers source"
 	},
 	"fileStatus": {
-		"ready": "PRÊT",
-		"queued": "EN FILE",
-		"error": "ERREUR",
-		"idle": "INACTIF"
+		"ready": "Prêt",
+		"queued": "En file",
+		"error": "Erreur",
+		"idle": "Inactif"
 	},
 	"emptySelection": {
-		"hint": "SÉLECTIONNEZ UN ÉLÉMENT DE LA FILE POUR ACCÉDER À LA CONFIGURATION"
+		"hint": "Sélectionnez un élément de la file pour accéder à la configuration"
 	},
 	"tabs": {
 		"source": "Source",
@@ -166,12 +166,12 @@
 		"codec": "Codec audio",
 		"incompatibleContainer": "Conteneur incompatible",
 		"sourceTracks": "Pistes source",
-		"channels": "CH"
+		"channels": "Ch"
 	},
 	"presets": {
 		"library": "Bibliothèque de préréglages",
 		"label": "Étiquette du préréglage",
-		"applied": "APPLIQUÉ",
+		"applied": "Appliqué",
 		"deletePreset": "Supprimer préréglage",
 		"nameRequired": "Nom requis",
 		"notSaved": "Préréglage non enregistré",

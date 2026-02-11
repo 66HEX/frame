@@ -700,7 +700,7 @@
 		{/if}
 		{#if cropMode && draftCrop}
 			<div
-				class="pointer-events-auto absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-md border border-gray-alpha-200 bg-background p-1 text-[10px] font-medium uppercase shadow-xl"
+				class="pointer-events-auto absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-md border border-gray-alpha-200 bg-background p-1 text-[10px] font-medium shadow-xl"
 			>
 				{#each ASPECT_OPTIONS as option (option.id)}
 					<Button
