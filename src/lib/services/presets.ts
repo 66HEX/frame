@@ -42,7 +42,10 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
 			videotoolboxAllowSw: false,
-			hwDecode: false
+			hwDecode: false,
+			gifColors: 256,
+			gifDither: 'sierra2_4a',
+			gifLoop: 0
 		}
 	},
 	{
@@ -80,7 +83,10 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
 			videotoolboxAllowSw: false,
-			hwDecode: false
+			hwDecode: false,
+			gifColors: 256,
+			gifDither: 'sierra2_4a',
+			gifLoop: 0
 		}
 	},
 	{
@@ -118,7 +124,94 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
 			videotoolboxAllowSw: false,
-			hwDecode: false
+			hwDecode: false,
+			gifColors: 256,
+			gifDither: 'sierra2_4a',
+			gifLoop: 0
+		}
+	},
+	{
+		id: 'gif-web-small',
+		name: 'GIF Web Small',
+		builtIn: true,
+		config: {
+			container: 'gif',
+			videoCodec: 'gif',
+			videoBitrateMode: 'crf',
+			videoBitrate: '0',
+			audioCodec: 'aac',
+			audioBitrate: '0',
+			audioChannels: 'original',
+			audioVolume: 100,
+			audioNormalize: false,
+			selectedAudioTracks: [],
+			selectedSubtitleTracks: [],
+			subtitleBurnPath: undefined,
+			resolution: 'custom',
+			customWidth: '640',
+			customHeight: '360',
+			scalingAlgorithm: 'lanczos',
+			fps: '12',
+			crf: 23,
+			quality: 50,
+			preset: 'medium',
+			startTime: undefined,
+			endTime: undefined,
+			metadata: {
+				mode: 'clean'
+			},
+			rotation: '0',
+			flipHorizontal: false,
+			flipVertical: false,
+			crop: null,
+			nvencSpatialAq: false,
+			nvencTemporalAq: false,
+			videotoolboxAllowSw: false,
+			hwDecode: false,
+			gifColors: 128,
+			gifDither: 'sierra2_4a',
+			gifLoop: 0
+		}
+	},
+	{
+		id: 'gif-quality',
+		name: 'GIF High Quality',
+		builtIn: true,
+		config: {
+			container: 'gif',
+			videoCodec: 'gif',
+			videoBitrateMode: 'crf',
+			videoBitrate: '0',
+			audioCodec: 'aac',
+			audioBitrate: '0',
+			audioChannels: 'original',
+			audioVolume: 100,
+			audioNormalize: false,
+			selectedAudioTracks: [],
+			selectedSubtitleTracks: [],
+			subtitleBurnPath: undefined,
+			resolution: '720p',
+			scalingAlgorithm: 'lanczos',
+			fps: '15',
+			crf: 23,
+			quality: 50,
+			preset: 'medium',
+			startTime: undefined,
+			endTime: undefined,
+			metadata: {
+				mode: 'clean'
+			},
+			rotation: '0',
+			flipHorizontal: false,
+			flipVertical: false,
+			crop: null,
+			nvencSpatialAq: false,
+			nvencTemporalAq: false,
+			videotoolboxAllowSw: false,
+			hwDecode: false,
+			gifColors: 256,
+			gifDither: 'floyd_steinberg',
+			gifLoop: 0
 		}
 	},
 	{
@@ -156,7 +249,10 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
 			videotoolboxAllowSw: false,
-			hwDecode: false
+			hwDecode: false,
+			gifColors: 256,
+			gifDither: 'sierra2_4a',
+			gifLoop: 0
 		}
 	},
 	{
@@ -194,7 +290,10 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
 			videotoolboxAllowSw: false,
-			hwDecode: false
+			hwDecode: false,
+			gifColors: 256,
+			gifDither: 'sierra2_4a',
+			gifLoop: 0
 		}
 	},
 	{
@@ -232,7 +331,10 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
 			videotoolboxAllowSw: false,
-			hwDecode: false
+			hwDecode: false,
+			gifColors: 256,
+			gifDither: 'sierra2_4a',
+			gifLoop: 0
 		}
 	},
 	{
@@ -270,7 +372,10 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
 			videotoolboxAllowSw: false,
-			hwDecode: false
+			hwDecode: false,
+			gifColors: 256,
+			gifDither: 'sierra2_4a',
+			gifLoop: 0
 		}
 	},
 	{
@@ -310,7 +415,10 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
 			videotoolboxAllowSw: false,
-			hwDecode: false
+			hwDecode: false,
+			gifColors: 256,
+			gifDither: 'sierra2_4a',
+			gifLoop: 0
 		}
 	},
 	{
@@ -348,7 +456,10 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
 			videotoolboxAllowSw: false,
-			hwDecode: false
+			hwDecode: false,
+			gifColors: 256,
+			gifDither: 'sierra2_4a',
+			gifLoop: 0
 		}
 	},
 	{
@@ -388,7 +499,10 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
 			videotoolboxAllowSw: false,
-			hwDecode: false
+			hwDecode: false,
+			gifColors: 256,
+			gifDither: 'sierra2_4a',
+			gifLoop: 0
 		}
 	},
 	{
@@ -426,7 +540,10 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
 			videotoolboxAllowSw: false,
-			hwDecode: false
+			hwDecode: false,
+			gifColors: 256,
+			gifDither: 'sierra2_4a',
+			gifLoop: 0
 		}
 	},
 	{
@@ -466,7 +583,10 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
 			videotoolboxAllowSw: false,
-			hwDecode: false
+			hwDecode: false,
+			gifColors: 256,
+			gifDither: 'sierra2_4a',
+			gifLoop: 0
 		}
 	},
 	{
@@ -504,7 +624,10 @@ export const DEFAULT_PRESETS: PresetDefinition[] = [
 			nvencSpatialAq: false,
 			nvencTemporalAq: false,
 			videotoolboxAllowSw: false,
-			hwDecode: false
+			hwDecode: false,
+			gifColors: 256,
+			gifDither: 'sierra2_4a',
+			gifLoop: 0
 		}
 	}
 ];

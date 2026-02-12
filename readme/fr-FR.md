@@ -40,7 +40,7 @@
 
 ### Cœur de conversion
 
-- **Conteneurs supportés :** `mp4`, `mkv`, `webm`, `mov`, `mp3`, `m4a`, `wav`, `flac`.
+- **Conteneurs supportés :** `mp4`, `mkv`, `webm`, `mov`, `gif`, `mp3`, `m4a`, `wav`, `flac`.
 - **Encodeurs vidéo :**
   - `libx264` (H.264 / AVC)
   - `libx265` (H.265 / HEVC)

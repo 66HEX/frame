@@ -5,6 +5,10 @@ use crate::conversion::codec::{
 };
 use crate::conversion::error::ConversionError;
 use crate::conversion::filters::{build_audio_filters, build_video_filters};
+use crate::conversion::media_rules::{
+    container_supports_audio, container_supports_subtitles, is_audio_codec_allowed,
+    is_video_codec_allowed, is_video_only_container,
+};
 use crate::conversion::types::{ConversionConfig, MetadataConfig, MetadataMode};
 use crate::conversion::utils::{get_hwaccel_args, is_audio_only_container, parse_time};
 
@@ -66,6 +70,7 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
     }
 
     let is_audio_only = is_audio_only_container(&config.container);
+    let is_video_only = is_video_only_container(&config.container);
     let has_burn_subtitles = config
         .subtitle_burn_path
         .as_ref()
@@ -85,6 +90,21 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         }
 
         add_audio_codec_args(&mut args, config);
+    } else if is_video_only {
+        args.push("-filter_complex".to_string());
+        args.push(build_gif_filter_complex(config));
+
+        args.push("-map".to_string());
+        args.push("[gif_out]".to_string());
+        args.push("-an".to_string());
+
+        args.push("-c:v".to_string());
+        args.push("gif".to_string());
+
+        args.push("-loop".to_string());
+        args.push(config.gif_loop.to_string());
+        args.push("-f".to_string());
+        args.push("gif".to_string());
     } else {
         add_video_codec_args(&mut args, config);
 
@@ -123,16 +143,48 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         }
     }
 
-    let audio_filters = build_audio_filters(config);
-    if !audio_filters.is_empty() {
-        args.push("-af".to_string());
-        args.push(audio_filters.join(","));
+    if !is_video_only {
+        let audio_filters = build_audio_filters(config);
+        if !audio_filters.is_empty() {
+            args.push("-af".to_string());
+            args.push(audio_filters.join(","));
+        }
     }
 
     args.push("-y".to_string());
     args.push(output.to_string());
 
     args
+}
+
+fn normalize_gif_dither(dither: &str) -> &'static str {
+    match dither {
+        "none" => "none",
+        "bayer" => "bayer",
+        "floyd_steinberg" => "floyd_steinberg",
+        "sierra2_4a" => "sierra2_4a",
+        _ => "sierra2_4a",
+    }
+}
+
+fn build_gif_filter_complex(config: &ConversionConfig) -> String {
+    let mut filters = build_video_filters(config, true);
+    if config.fps != "original" {
+        filters.push(format!("fps={}", config.fps));
+    }
+
+    let chain = if filters.is_empty() {
+        "split[gif_src][gif_palette_src]".to_string()
+    } else {
+        format!("{},split[gif_src][gif_palette_src]", filters.join(","))
+    };
+
+    let colors = config.gif_colors.clamp(2, 256);
+    let dither = normalize_gif_dither(&config.gif_dither);
+
+    format!(
+        "[0:v:0]{chain};[gif_palette_src]palettegen=max_colors={colors}:stats_mode=single[gif_palette];[gif_src][gif_palette]paletteuse=dither={dither}:new=1[gif_out]"
+    )
 }
 
 pub fn add_metadata_flags(args: &mut Vec<String>, metadata: &MetadataConfig) {
@@ -194,10 +246,7 @@ fn sanitize_output_name(raw: &str) -> Option<String> {
 }
 
 pub fn build_output_path(file_path: &str, container: &str, output_name: Option<String>) -> String {
-    if let Some(custom) = output_name
-        .as_deref()
-        .and_then(sanitize_output_name)
-    {
+    if let Some(custom) = output_name.as_deref().and_then(sanitize_output_name) {
         let input_path = Path::new(file_path);
         let mut output: PathBuf = match input_path.parent() {
             Some(parent) if !parent.as_os_str().is_empty() => parent.to_path_buf(),
@@ -229,8 +278,16 @@ pub fn validate_task_input(
         )));
     }
 
-    let start_time = config.start_time.as_deref().map(str::trim).filter(|s| !s.is_empty());
-    let end_time = config.end_time.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let start_time = config
+        .start_time
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    let end_time = config
+        .end_time
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
 
     if let Some(start) = start_time {
         if parse_time(start).is_none() {
@@ -283,7 +340,10 @@ pub fn validate_task_input(
         }
     }
 
-    if config.video_bitrate_mode == "bitrate" && !is_audio_only_container(&config.container) {
+    if config.video_bitrate_mode == "bitrate"
+        && !is_audio_only_container(&config.container)
+        && !is_video_only_container(&config.container)
+    {
         let bitrate = config.video_bitrate.parse::<f64>().map_err(|_| {
             ConversionError::InvalidInput(format!(
                 "Invalid video bitrate: {}",
@@ -298,6 +358,9 @@ pub fn validate_task_input(
     }
 
     let is_audio_only = is_audio_only_container(&config.container);
+    let is_video_only = is_video_only_container(&config.container);
+    let supports_audio = container_supports_audio(&config.container);
+    let supports_subtitles = container_supports_subtitles(&config.container);
     if !is_audio_only && !is_video_codec_allowed(&config.container, &config.video_codec) {
         return Err(ConversionError::InvalidInput(format!(
             "Video codec '{}' is not compatible with container '{}'",
@@ -305,7 +368,7 @@ pub fn validate_task_input(
         )));
     }
 
-    if !is_audio_codec_allowed(&config.container, &config.audio_codec) {
+    if supports_audio && !is_audio_codec_allowed(&config.container, &config.audio_codec) {
         return Err(ConversionError::InvalidInput(format!(
             "Audio codec '{}' is not compatible with container '{}'",
             config.audio_codec, config.container
@@ -326,13 +389,19 @@ pub fn validate_task_input(
         }
     }
 
-    if is_audio_only && has_ml_upscale {
+    if (is_audio_only || is_video_only) && has_ml_upscale {
         return Err(ConversionError::InvalidInput(
-            "ML upscaling requires a video container".to_string(),
+            "ML upscaling requires an audio-capable video container".to_string(),
         ));
     }
 
-    if is_audio_only
+    if !supports_audio && !config.selected_audio_tracks.is_empty() {
+        return Err(ConversionError::InvalidInput(
+            "Audio track selection is not available for this container".to_string(),
+        ));
+    }
+
+    if !supports_subtitles
         && (!config.selected_subtitle_tracks.is_empty()
             || config
                 .subtitle_burn_path
@@ -340,64 +409,28 @@ pub fn validate_task_input(
                 .is_some_and(|path| !path.trim().is_empty()))
     {
         return Err(ConversionError::InvalidInput(
-            "Subtitle options are not available for audio-only containers".to_string(),
+            "Subtitle options are not available for this container".to_string(),
         ));
     }
 
+    if is_video_only {
+        if !(2..=256).contains(&config.gif_colors) {
+            return Err(ConversionError::InvalidInput(format!(
+                "GIF palette size must be between 2 and 256 colors: {}",
+                config.gif_colors
+            )));
+        }
+
+        if !matches!(
+            config.gif_dither.as_str(),
+            "none" | "bayer" | "floyd_steinberg" | "sierra2_4a"
+        ) {
+            return Err(ConversionError::InvalidInput(format!(
+                "Invalid GIF dither mode: {}",
+                config.gif_dither
+            )));
+        }
+    }
+
     Ok(())
-}
-
-fn is_video_codec_allowed(container: &str, codec: &str) -> bool {
-    match container {
-        "mp4" => matches!(
-            codec,
-            "libx264"
-                | "libx265"
-                | "vp9"
-                | "libsvtav1"
-                | "h264_videotoolbox"
-                | "h264_nvenc"
-                | "hevc_videotoolbox"
-                | "hevc_nvenc"
-                | "av1_nvenc"
-        ),
-        "mkv" => matches!(
-            codec,
-            "libx264"
-                | "libx265"
-                | "vp9"
-                | "prores"
-                | "libsvtav1"
-                | "h264_videotoolbox"
-                | "h264_nvenc"
-                | "hevc_videotoolbox"
-                | "hevc_nvenc"
-                | "av1_nvenc"
-        ),
-        "webm" => codec == "vp9",
-        "mov" => matches!(
-            codec,
-            "libx264"
-                | "libx265"
-                | "prores"
-                | "h264_videotoolbox"
-                | "h264_nvenc"
-                | "hevc_videotoolbox"
-                | "hevc_nvenc"
-        ),
-        _ => true,
-    }
-}
-
-fn is_audio_codec_allowed(container: &str, codec: &str) -> bool {
-    match container {
-        "mp3" => codec == "mp3",
-        "wav" => codec == "pcm_s16le",
-        "flac" => codec == "flac",
-        "m4a" => matches!(codec, "aac" | "alac"),
-        "mp4" => matches!(codec, "aac" | "ac3" | "libopus" | "mp3" | "alac"),
-        "webm" => matches!(codec, "libopus" | "vorbis"),
-        "mov" | "mkv" => true,
-        _ => true,
-    }
 }

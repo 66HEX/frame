@@ -100,6 +100,12 @@ pub struct ConversionConfig {
     pub videotoolbox_allow_sw: bool,
     #[serde(default = "default_hw_decode")]
     pub hw_decode: bool,
+    #[serde(default = "default_gif_colors")]
+    pub gif_colors: u16,
+    #[serde(default = "default_gif_dither")]
+    pub gif_dither: String,
+    #[serde(default = "default_gif_loop")]
+    pub gif_loop: u16,
 }
 
 fn default_rotation() -> String {
@@ -116,6 +122,18 @@ fn default_audio_volume() -> f64 {
 
 fn default_hw_decode() -> bool {
     false
+}
+
+fn default_gif_colors() -> u16 {
+    256
+}
+
+fn default_gif_dither() -> String {
+    "sierra2_4a".to_string()
+}
+
+fn default_gif_loop() -> u16 {
+    0
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]

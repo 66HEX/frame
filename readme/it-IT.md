@@ -40,7 +40,7 @@
 
 ### Core di conversione
 
-- **Container supportati:** `mp4`, `mkv`, `webm`, `mov`, `mp3`, `m4a`, `wav`, `flac`.
+- **Container supportati:** `mp4`, `mkv`, `webm`, `mov`, `gif`, `mp3`, `m4a`, `wav`, `flac`.
 - **Encoder video:**
   - `libx264` (H.264 / AVC)
   - `libx265` (H.265 / HEVC)

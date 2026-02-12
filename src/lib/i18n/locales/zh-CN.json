@@ -149,7 +149,11 @@
 		"codecIncompatible": "不兼容的容器",
 		"hardwareAcceleration": "硬件加速",
 		"hwDecode": "硬件解码",
-		"hwDecodeHint": "使用gpu解码输入视频（更快）"
+		"hwDecodeHint": "使用gpu解码输入视频（更快）",
+		"gifColors": "调色板颜色数",
+		"gifDither": "抖动",
+		"gifLoop": "循环次数",
+		"gifLoopHint": "使用 0 表示无限循环。"
 	},
 	"audio": {
 		"channelsBitrate": "声道和比特率",

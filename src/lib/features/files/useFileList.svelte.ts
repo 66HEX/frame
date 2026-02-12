@@ -89,11 +89,11 @@ export function createFileListManager() {
 			filters: [
 				{
 					name: 'Media Files',
-					extensions: ['mp4', 'mov', 'mkv', 'avi', 'webm', 'mp3', 'm4a', 'wav', 'flac']
+					extensions: ['mp4', 'mov', 'mkv', 'avi', 'webm', 'gif', 'mp3', 'm4a', 'wav', 'flac']
 				},
 				{
 					name: 'Videos',
-					extensions: ['mp4', 'mov', 'mkv', 'avi', 'webm']
+					extensions: ['mp4', 'mov', 'mkv', 'avi', 'webm', 'gif']
 				},
 				{
 					name: 'Audio',

@@ -330,7 +330,7 @@
 		},
 
 		"container-formats": {
-			"match": "\\b(?:mp4|mov|m4a|3gp|3g2|mj2|matroska|mkv|webm|avi|flv|mpegts|ts|m2ts|ogg|wav|aiff|flac|mp3|hls|dash|image2|segment|concat|nut|srt|ass)\\b",
+			"match": "\\b(?:mp4|mov|m4a|3gp|3g2|mj2|matroska|mkv|webm|avi|flv|gif|mpegts|ts|m2ts|ogg|wav|aiff|flac|mp3|hls|dash|image2|segment|concat|nut|srt|ass)\\b",
 			"name": "entity.name.type.container.ffmpeg-log"
 		},
 

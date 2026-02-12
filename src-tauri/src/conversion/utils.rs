@@ -1,3 +1,4 @@
+use crate::conversion::media_rules;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::path::Path;
@@ -41,10 +42,7 @@ pub fn parse_probe_bitrate(raw: Option<&str>) -> Option<f64> {
 }
 
 pub fn is_audio_only_container(container: &str) -> bool {
-    matches!(
-        container.to_lowercase().as_str(),
-        "mp3" | "wav" | "flac" | "aac" | "m4a"
-    )
+    media_rules::is_audio_only_container(container)
 }
 
 pub fn is_nvenc_codec(codec: &str) -> bool {

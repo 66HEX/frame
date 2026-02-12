@@ -149,7 +149,11 @@
 		"codecIncompatible": "Conteneur incompatible",
 		"hardwareAcceleration": "Accélération matérielle",
 		"hwDecode": "Décodage matériel",
-		"hwDecodeHint": "Utiliser le GPU pour décoder la vidéo d'entrée (plus rapide)"
+		"hwDecodeHint": "Utiliser le GPU pour décoder la vidéo d'entrée (plus rapide)",
+		"gifColors": "Couleurs de palette",
+		"gifDither": "Tramage",
+		"gifLoop": "Nombre de boucles",
+		"gifLoopHint": "Utilisez 0 pour une boucle infinie."
 	},
 	"audio": {
 		"channelsBitrate": "Canaux et débit",

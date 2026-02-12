@@ -1,0 +1,61 @@
+{
+	"allContainers": ["mp4", "mkv", "webm", "mov", "gif", "mp3", "m4a", "wav", "flac"],
+	"audioOnlyContainers": ["mp3", "m4a", "wav", "flac", "aac"],
+	"videoOnlyContainers": ["gif"],
+	"containerVideoCodecCompatibility": {
+		"mp4": [
+			"libx264",
+			"libx265",
+			"vp9",
+			"libsvtav1",
+			"h264_videotoolbox",
+			"h264_nvenc",
+			"hevc_videotoolbox",
+			"hevc_nvenc",
+			"av1_nvenc"
+		],
+		"mkv": [
+			"libx264",
+			"libx265",
+			"vp9",
+			"prores",
+			"libsvtav1",
+			"h264_videotoolbox",
+			"h264_nvenc",
+			"hevc_videotoolbox",
+			"hevc_nvenc",
+			"av1_nvenc"
+		],
+		"webm": ["vp9"],
+		"mov": [
+			"libx264",
+			"libx265",
+			"prores",
+			"h264_videotoolbox",
+			"h264_nvenc",
+			"hevc_videotoolbox",
+			"hevc_nvenc"
+		],
+		"gif": ["gif"]
+	},
+	"containerAudioCodecCompatibility": {
+		"mp3": ["mp3"],
+		"wav": ["pcm_s16le"],
+		"flac": ["flac"],
+		"m4a": ["aac", "alac"],
+		"mp4": ["aac", "ac3", "libopus", "mp3", "alac"],
+		"mov": ["*"],
+		"mkv": ["*"],
+		"webm": ["libopus", "vorbis"],
+		"gif": []
+	},
+	"defaultAudioCodec": {
+		"mp3": "mp3",
+		"wav": "pcm_s16le",
+		"flac": "flac",
+		"m4a": "aac",
+		"webm": "libopus"
+	},
+	"defaultAudioCodecFallback": "aac",
+	"videoCodecFallbackOrder": ["libx264", "libx265", "vp9", "prores", "libsvtav1", "gif"]
+}

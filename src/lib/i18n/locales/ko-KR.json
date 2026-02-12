@@ -149,7 +149,11 @@
 		"codecIncompatible": "호환되지 않는 컨테이너",
 		"hardwareAcceleration": "하드웨어 가속",
 		"hwDecode": "하드웨어 디코딩",
-		"hwDecodeHint": "입력 비디오 디코딩에 gpu 사용 (더 빠름)"
+		"hwDecodeHint": "입력 비디오 디코딩에 gpu 사용 (더 빠름)",
+		"gifColors": "팔레트 색상 수",
+		"gifDither": "디더링",
+		"gifLoop": "루프 횟수",
+		"gifLoopHint": "무한 루프는 0을 사용하세요."
 	},
 	"audio": {
 		"channelsBitrate": "채널 및 비트레이트",

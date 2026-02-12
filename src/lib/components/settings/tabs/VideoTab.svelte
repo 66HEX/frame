@@ -10,6 +10,7 @@
 	import Checkbox from '$lib/components/ui/Checkbox.svelte';
 	import { capabilities } from '$lib/stores/capabilities.svelte';
 	import { _ } from '$lib/i18n';
+	import { isGifContainer } from '$lib/constants/media-rules';
 	import {
 		VIDEO_CODEC_OPTIONS,
 		VIDEO_PRESETS,
@@ -43,6 +44,14 @@
 	] as const;
 
 	const FPS_OPTIONS = ['original', '24', '30', '60'] as const;
+	const GIF_FPS_OPTIONS = ['original', '8', '10', '12', '15', '20', '24', '30'] as const;
+	const GIF_COLOR_OPTIONS = [32, 64, 128, 256] as const;
+	const GIF_DITHER_OPTIONS = [
+		{ id: 'sierra2_4a', label: 'Sierra2_4a' },
+		{ id: 'floyd_steinberg', label: 'Floyd-Steinberg' },
+		{ id: 'bayer', label: 'Bayer' },
+		{ id: 'none', label: 'None' }
+	] as const;
 
 	let {
 		config,
@@ -57,8 +66,9 @@
 	const isNvencEncoder = $derived(NVENC_ENCODERS.has(config.videoCodec));
 	const isVideotoolboxEncoder = $derived(VIDEOTOOLBOX_ENCODERS.has(config.videoCodec));
 	const isHardwareEncoder = $derived(isNvencEncoder || isVideotoolboxEncoder);
+	const isGifMode = $derived(isGifContainer(config.container));
 	const mlUpscaleAvailable = $derived(capabilities.encoders.ml_upscale);
-	const isMlUpscaleActive = $derived(config.mlUpscale && config.mlUpscale !== 'none');
+	const isMlUpscaleActive = $derived(!isGifMode && config.mlUpscale && config.mlUpscale !== 'none');
 	const effectiveResolution = $derived(isMlUpscaleActive ? 'original' : config.resolution);
 	const presetOptions = VIDEO_PRESETS;
 
@@ -69,7 +79,7 @@
 	});
 
 	$effect(() => {
-		if (!mlUpscaleAvailable && config.mlUpscale && config.mlUpscale !== 'none') {
+		if ((isGifMode || !mlUpscaleAvailable) && config.mlUpscale && config.mlUpscale !== 'none') {
 			untrack(() => onUpdate({ mlUpscale: 'none' }));
 		}
 	});
@@ -118,6 +128,15 @@
 	function toggleVideotoolboxAllowSw() {
 		if (disabled) return;
 		onUpdate({ videotoolboxAllowSw: !config.videotoolboxAllowSw });
+	}
+
+	function updateGifLoop(value: string) {
+		const parsed = Number.parseInt(value.replace(/[^0-9]/g, ''), 10);
+		if (Number.isNaN(parsed)) {
+			onUpdate({ gifLoop: 0 });
+			return;
+		}
+		onUpdate({ gifLoop: Math.max(0, Math.min(65535, parsed)) });
 	}
 </script>
 
@@ -188,26 +207,28 @@
 			</div>
 		</div>
 
-		<div class="space-y-3 pt-2">
-			<Label variant="section">{$_('video.mlUpscaling')}</Label>
-			<div class="grid grid-cols-2 gap-2">
-				{#each ML_UPSCALING_OPTIONS as opt (opt.id)}
-					<Button
-						variant={(config.mlUpscale || 'none') === opt.id ? 'selected' : 'outline'}
-						onclick={() => onUpdate({ mlUpscale: opt.id as ConversionConfig['mlUpscale'] })}
-						disabled={disabled || (opt.id !== 'none' && !mlUpscaleAvailable)}
-						class="w-full"
-					>
-						{opt.label}
-					</Button>
-				{/each}
+		{#if !isGifMode}
+			<div class="space-y-3 pt-2">
+				<Label variant="section">{$_('video.mlUpscaling')}</Label>
+				<div class="grid grid-cols-2 gap-2">
+					{#each ML_UPSCALING_OPTIONS as opt (opt.id)}
+						<Button
+							variant={(config.mlUpscale || 'none') === opt.id ? 'selected' : 'outline'}
+							onclick={() => onUpdate({ mlUpscale: opt.id as ConversionConfig['mlUpscale'] })}
+							disabled={disabled || (opt.id !== 'none' && !mlUpscaleAvailable)}
+							class="w-full"
+						>
+							{opt.label}
+						</Button>
+					{/each}
+				</div>
 			</div>
-		</div>
+		{/if}
 
 		<div class="space-y-3 pt-2">
 			<Label variant="section">{$_('video.framerate')}</Label>
 			<div class="grid grid-cols-2 gap-2">
-				{#each FPS_OPTIONS as opt (opt)}
+				{#each isGifMode ? GIF_FPS_OPTIONS : FPS_OPTIONS as opt (opt)}
 					<Button
 						variant={config.fps === opt ? 'selected' : 'outline'}
 						onclick={() => onUpdate({ fps: opt })}
@@ -219,228 +240,282 @@
 				{/each}
 			</div>
 		</div>
+
+		{#if isGifMode}
+			<div class="space-y-3 pt-2">
+				<Label variant="section">{$_('video.gifColors')}</Label>
+				<div class="grid grid-cols-2 gap-2">
+					{#each GIF_COLOR_OPTIONS as colors (colors)}
+						<Button
+							variant={(config.gifColors ?? 256) === colors ? 'selected' : 'outline'}
+							onclick={() => onUpdate({ gifColors: colors })}
+							{disabled}
+							class="w-full"
+						>
+							{colors}
+						</Button>
+					{/each}
+				</div>
+			</div>
+		{/if}
+		{#if isGifMode}
+			<div class="space-y-3 pt-2">
+				<Label variant="section">{$_('video.gifDither')}</Label>
+				<div class="grid grid-cols-1">
+					{#each GIF_DITHER_OPTIONS as option (option.id)}
+						<ListItem
+							selected={(config.gifDither ?? 'sierra2_4a') === option.id}
+							onclick={() =>
+								onUpdate({
+									gifDither: option.id as ConversionConfig['gifDither']
+								})}
+							{disabled}
+						>
+							<span>{option.label}</span>
+							<span class="text-[9px] opacity-50">{option.id}</span>
+						</ListItem>
+					{/each}
+				</div>
+			</div>
+		{/if}
+		{#if isGifMode}
+			<div class="space-y-3 pt-2">
+				<Label variant="section" for="gif-loop">{$_('video.gifLoop')}</Label>
+				<Input
+					id="gif-loop"
+					type="text"
+					inputmode="numeric"
+					value={String(config.gifLoop ?? 0)}
+					oninput={(e) => updateGifLoop(e.currentTarget.value)}
+					{disabled}
+				/>
+				<p class="text-[9px] text-gray-alpha-600">{$_('video.gifLoopHint')}</p>
+			</div>
+		{/if}
 	</div>
 
-	<div class="space-y-3 pt-2">
-		<Label variant="section">{$_('video.encoder')}</Label>
-		<div class="grid grid-cols-1">
-			{#each availableCodecs as codec (codec.id)}
-				{@const codecAllowed = isVideoCodecAllowed(config.container, codec.id)}
-				<ListItem
-					selected={codecAllowed && config.videoCodec === codec.id}
-					onclick={() => codecAllowed && onUpdate({ videoCodec: codec.id })}
-					disabled={disabled || !codecAllowed}
-					class={cn(!codecAllowed && 'pointer-events-none opacity-50')}
-				>
-					<span>{codec.id}</span>
-					<span class="text-[9px] opacity-50">
-						{#if codecAllowed}
-							{codec.label}
-						{:else}
-							{$_('video.codecIncompatible')}
-						{/if}
-					</span>
-				</ListItem>
-			{/each}
-		</div>
-	</div>
-
-	{#if !isVideotoolboxEncoder}
+	{#if !isGifMode}
 		<div class="space-y-3 pt-2">
-			<Label variant="section">{$_('video.encodingSpeed')}</Label>
+			<Label variant="section">{$_('video.encoder')}</Label>
 			<div class="grid grid-cols-1">
-				{#each presetOptions as preset (preset)}
-					{@const allowed = isVideoPresetAllowed(config.videoCodec, preset)}
+				{#each availableCodecs as codec (codec.id)}
+					{@const codecAllowed = isVideoCodecAllowed(config.container, codec.id)}
 					<ListItem
-						selected={allowed && config.preset === preset}
-						onclick={() => allowed && onUpdate({ preset })}
-						disabled={disabled || !allowed}
-						class={cn(!allowed && 'pointer-events-none opacity-50')}
+						selected={codecAllowed && config.videoCodec === codec.id}
+						onclick={() => codecAllowed && onUpdate({ videoCodec: codec.id })}
+						disabled={disabled || !codecAllowed}
+						class={cn(!codecAllowed && 'pointer-events-none opacity-50')}
 					>
-						<span>{$_(`encodingSpeed.${preset}`)}</span>
+						<span>{codec.id}</span>
 						<span class="text-[9px] opacity-50">
-							{#if allowed}
-								{$_(`encodingSpeed.${preset}Desc`)}
+							{#if codecAllowed}
+								{codec.label}
 							{:else}
-								{$_('video.presetIncompatible')}
+								{$_('video.codecIncompatible')}
 							{/if}
 						</span>
 					</ListItem>
 				{/each}
 			</div>
 		</div>
-	{/if}
 
-	<div class="space-y-3 pt-2">
-		<Label variant="section">{$_('video.qualityControl')}</Label>
-		<div class="grid grid-cols-2 gap-2">
-			<Button
-				variant={config.videoBitrateMode === 'crf' ? 'selected' : 'outline'}
-				onclick={() => onUpdate({ videoBitrateMode: 'crf' })}
-				{disabled}
-				class="w-full"
-			>
-				{$_('video.constantQuality')}
-			</Button>
-			<Button
-				variant={config.videoBitrateMode === 'bitrate' ? 'selected' : 'outline'}
-				onclick={() => onUpdate({ videoBitrateMode: 'bitrate' })}
-				{disabled}
-				class="w-full"
-			>
-				{$_('video.targetBitrate')}
-			</Button>
-		</div>
-	</div>
+		{#if !isVideotoolboxEncoder}
+			<div class="space-y-3 pt-2">
+				<Label variant="section">{$_('video.encodingSpeed')}</Label>
+				<div class="grid grid-cols-1">
+					{#each presetOptions as preset (preset)}
+						{@const allowed = isVideoPresetAllowed(config.videoCodec, preset)}
+						<ListItem
+							selected={allowed && config.preset === preset}
+							onclick={() => allowed && onUpdate({ preset })}
+							disabled={disabled || !allowed}
+							class={cn(!allowed && 'pointer-events-none opacity-50')}
+						>
+							<span>{$_(`encodingSpeed.${preset}`)}</span>
+							<span class="text-[9px] opacity-50">
+								{#if allowed}
+									{$_(`encodingSpeed.${preset}Desc`)}
+								{:else}
+									{$_('video.presetIncompatible')}
+								{/if}
+							</span>
+						</ListItem>
+					{/each}
+				</div>
+			</div>
+		{/if}
 
-	{#if config.videoBitrateMode === 'crf'}
-		<div class="space-y-2 pt-2">
-			<div class="flex items-end justify-between">
-				<Label for="quality-factor">
-					{#if isHardwareEncoder}
-						{$_('video.encodingQuality')}
-					{:else}
-						{$_('video.qualityFactor')}
-					{/if}
-				</Label>
-				<div
-					class="rounded border border-blue-600 bg-blue-900/20 px-1.5 text-[10px] font-medium text-blue-600"
+		<div class="space-y-3 pt-2">
+			<Label variant="section">{$_('video.qualityControl')}</Label>
+			<div class="grid grid-cols-2 gap-2">
+				<Button
+					variant={config.videoBitrateMode === 'crf' ? 'selected' : 'outline'}
+					onclick={() => onUpdate({ videoBitrateMode: 'crf' })}
+					{disabled}
+					class="w-full"
 				>
+					{$_('video.constantQuality')}
+				</Button>
+				<Button
+					variant={config.videoBitrateMode === 'bitrate' ? 'selected' : 'outline'}
+					onclick={() => onUpdate({ videoBitrateMode: 'bitrate' })}
+					{disabled}
+					class="w-full"
+				>
+					{$_('video.targetBitrate')}
+				</Button>
+			</div>
+		</div>
+
+		{#if config.videoBitrateMode === 'crf'}
+			<div class="space-y-2 pt-2">
+				<div class="flex items-end justify-between">
+					<Label for="quality-factor">
+						{#if isHardwareEncoder}
+							{$_('video.encodingQuality')}
+						{:else}
+							{$_('video.qualityFactor')}
+						{/if}
+					</Label>
+					<div
+						class="rounded border border-blue-600 bg-blue-900/20 px-1.5 text-[10px] font-medium text-blue-600"
+					>
+						{#if isHardwareEncoder}
+							Q {config.quality}
+						{:else}
+							CRF {config.crf}
+						{/if}
+					</div>
+				</div>
+				<div class="py-2">
 					{#if isHardwareEncoder}
-						Q {config.quality}
+						<Slider
+							id="quality-factor"
+							min={1}
+							max={100}
+							step={1}
+							value={config.quality}
+							oninput={(e) => onUpdate({ quality: parseInt(e.currentTarget.value) })}
+							{disabled}
+						/>
 					{:else}
-						CRF {config.crf}
+						<Slider
+							id="quality-factor"
+							min={0}
+							max={51}
+							value={config.crf}
+							oninput={(e) => onUpdate({ crf: parseInt(e.currentTarget.value) })}
+							{disabled}
+						/>
+					{/if}
+				</div>
+				<div class="flex justify-between text-[9px] text-gray-alpha-600">
+					{#if isHardwareEncoder}
+						<span>{$_('video.lowQuality')}</span>
+						<span>{$_('video.bestQuality')}</span>
+					{:else}
+						<span>{$_('video.lossless')}</span>
+						<span>{$_('video.smallest')}</span>
 					{/if}
 				</div>
 			</div>
-			<div class="py-2">
-				{#if isHardwareEncoder}
-					<Slider
-						id="quality-factor"
-						min={1}
-						max={100}
-						step={1}
-						value={config.quality}
-						oninput={(e) => onUpdate({ quality: parseInt(e.currentTarget.value) })}
-						{disabled}
-					/>
-				{:else}
-					<Slider
-						id="quality-factor"
-						min={0}
-						max={51}
-						value={config.crf}
-						oninput={(e) => onUpdate({ crf: parseInt(e.currentTarget.value) })}
-						{disabled}
-					/>
-				{/if}
-			</div>
-			<div class="flex justify-between text-[9px] text-gray-alpha-600">
-				{#if isHardwareEncoder}
-					<span>{$_('video.lowQuality')}</span>
-					<span>{$_('video.bestQuality')}</span>
-				{:else}
-					<span>{$_('video.lossless')}</span>
-					<span>{$_('video.smallest')}</span>
-				{/if}
-			</div>
-		</div>
-	{:else}
-		<div class="space-y-2 pt-1">
-			<div class="flex items-end justify-between">
-				<Label for="video-bitrate">{$_('video.targetBitrateKbps')}</Label>
-			</div>
-			<div class="flex items-center gap-2">
-				<Input
-					id="video-bitrate"
-					type="text"
-					inputmode="numeric"
-					value={config.videoBitrate}
-					oninput={(e) => {
-						const value = e.currentTarget.value.replace(/[^0-9]/g, '');
-						onUpdate({ videoBitrate: value });
-					}}
-					{disabled}
-				/>
-			</div>
-		</div>
-	{/if}
-
-	{#if isNvencEncoder}
-		<div class="space-y-3 pt-2">
-			<Label variant="section">{$_('video.nvencOptions')}</Label>
-			<div class="space-y-2">
-				<div class="flex items-start gap-2">
-					<Checkbox
-						id="nvenc-spatial-aq"
-						checked={config.nvencSpatialAq}
-						onchange={() => toggleNvencOption('nvencSpatialAq')}
-						{disabled}
-					/>
-					<div class="space-y-0.5">
-						<Label for="nvenc-spatial-aq">{$_('video.nvencSpatialAq')}</Label>
-						<p class="text-[9px] text-gray-alpha-600">
-							{$_('video.nvencSpatialAqHint')}
-						</p>
-					</div>
+		{:else}
+			<div class="space-y-2 pt-1">
+				<div class="flex items-end justify-between">
+					<Label for="video-bitrate">{$_('video.targetBitrateKbps')}</Label>
 				</div>
-				<div class="flex items-start gap-2">
-					<Checkbox
-						id="nvenc-temporal-aq"
-						checked={config.nvencTemporalAq}
-						onchange={() => toggleNvencOption('nvencTemporalAq')}
+				<div class="flex items-center gap-2">
+					<Input
+						id="video-bitrate"
+						type="text"
+						inputmode="numeric"
+						value={config.videoBitrate}
+						oninput={(e) => {
+							const value = e.currentTarget.value.replace(/[^0-9]/g, '');
+							onUpdate({ videoBitrate: value });
+						}}
 						{disabled}
 					/>
-					<div class="space-y-0.5">
-						<Label for="nvenc-temporal-aq">{$_('video.nvencTemporalAq')}</Label>
-						<p class="text-[9px] text-gray-alpha-600">
-							{$_('video.nvencTemporalAqHint')}
-						</p>
+				</div>
+			</div>
+		{/if}
+
+		{#if isNvencEncoder}
+			<div class="space-y-3 pt-2">
+				<Label variant="section">{$_('video.nvencOptions')}</Label>
+				<div class="space-y-2">
+					<div class="flex items-start gap-2">
+						<Checkbox
+							id="nvenc-spatial-aq"
+							checked={config.nvencSpatialAq}
+							onchange={() => toggleNvencOption('nvencSpatialAq')}
+							{disabled}
+						/>
+						<div class="space-y-0.5">
+							<Label for="nvenc-spatial-aq">{$_('video.nvencSpatialAq')}</Label>
+							<p class="text-[9px] text-gray-alpha-600">
+								{$_('video.nvencSpatialAqHint')}
+							</p>
+						</div>
+					</div>
+					<div class="flex items-start gap-2">
+						<Checkbox
+							id="nvenc-temporal-aq"
+							checked={config.nvencTemporalAq}
+							onchange={() => toggleNvencOption('nvencTemporalAq')}
+							{disabled}
+						/>
+						<div class="space-y-0.5">
+							<Label for="nvenc-temporal-aq">{$_('video.nvencTemporalAq')}</Label>
+							<p class="text-[9px] text-gray-alpha-600">
+								{$_('video.nvencTemporalAqHint')}
+							</p>
+						</div>
 					</div>
 				</div>
 			</div>
-		</div>
-	{/if}
+		{/if}
 
-	{#if isVideotoolboxEncoder}
-		<div class="space-y-3 pt-2">
-			<Label variant="section">{$_('video.videotoolboxOptions')}</Label>
-			<div class="space-y-2">
+		{#if isVideotoolboxEncoder}
+			<div class="space-y-3 pt-2">
+				<Label variant="section">{$_('video.videotoolboxOptions')}</Label>
+				<div class="space-y-2">
+					<div class="flex items-start gap-2">
+						<Checkbox
+							id="videotoolbox-allow-sw"
+							checked={config.videotoolboxAllowSw}
+							onchange={toggleVideotoolboxAllowSw}
+							{disabled}
+						/>
+						<div class="space-y-0.5">
+							<Label for="videotoolbox-allow-sw">{$_('video.videotoolboxAllowSw')}</Label>
+							<p class="text-[9px] text-gray-alpha-600">
+								{$_('video.videotoolboxAllowSwHint')}
+							</p>
+						</div>
+					</div>
+				</div>
+			</div>
+		{/if}
+
+		{#if isHardwareEncoder}
+			<div class="space-y-3 pt-2">
+				<Label variant="section">{$_('video.hardwareAcceleration')}</Label>
 				<div class="flex items-start gap-2">
 					<Checkbox
-						id="videotoolbox-allow-sw"
-						checked={config.videotoolboxAllowSw}
-						onchange={toggleVideotoolboxAllowSw}
+						id="hw-decode"
+						checked={config.hwDecode}
+						onchange={() => onUpdate({ hwDecode: !config.hwDecode })}
 						{disabled}
 					/>
 					<div class="space-y-0.5">
-						<Label for="videotoolbox-allow-sw">{$_('video.videotoolboxAllowSw')}</Label>
+						<Label for="hw-decode">{$_('video.hwDecode')}</Label>
 						<p class="text-[9px] text-gray-alpha-600">
-							{$_('video.videotoolboxAllowSwHint')}
+							{$_('video.hwDecodeHint')}
 						</p>
 					</div>
 				</div>
 			</div>
-		</div>
-	{/if}
-
-	{#if isHardwareEncoder}
-		<div class="space-y-3 pt-2">
-			<Label variant="section">{$_('video.hardwareAcceleration')}</Label>
-			<div class="flex items-start gap-2">
-				<Checkbox
-					id="hw-decode"
-					checked={config.hwDecode}
-					onchange={() => onUpdate({ hwDecode: !config.hwDecode })}
-					{disabled}
-				/>
-				<div class="space-y-0.5">
-					<Label for="hw-decode">{$_('video.hwDecode')}</Label>
-					<p class="text-[9px] text-gray-alpha-600">
-						{$_('video.hwDecodeHint')}
-					</p>
-				</div>
-			</div>
-		</div>
+		{/if}
 	{/if}
 </div>

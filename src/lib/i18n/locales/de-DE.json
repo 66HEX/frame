@@ -149,7 +149,11 @@
 		"codecIncompatible": "Inkompatibles Format",
 		"hardwareAcceleration": "Hardwarebeschleunigung",
 		"hwDecode": "Hardware-Dekodierung",
-		"hwDecodeHint": "GPU für die Dekodierung des Eingabevideos verwenden (schneller)"
+		"hwDecodeHint": "GPU für die Dekodierung des Eingabevideos verwenden (schneller)",
+		"gifColors": "Palettenfarben",
+		"gifDither": "Rasterung",
+		"gifLoop": "Wiederholungen",
+		"gifLoopHint": "0 für Endlosschleife verwenden."
 	},
 	"audio": {
 		"channelsBitrate": "Kanäle & Bitrate",

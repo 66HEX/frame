@@ -51,6 +51,9 @@ mod tests {
             nvenc_temporal_aq: false,
             videotoolbox_allow_sw: false,
             hw_decode: false,
+            gif_colors: 256,
+            gif_dither: "sierra2_4a".into(),
+            gif_loop: 0,
         }
     }
 
@@ -372,12 +375,70 @@ mod tests {
     }
 
     #[test]
+    fn test_gif_uses_palette_pipeline_without_audio_or_subtitles() {
+        let mut config = sample_config("gif");
+        config.video_codec = "gif".into();
+        config.fps = "15".into();
+        config.gif_colors = 128;
+        config.gif_dither = "floyd_steinberg".into();
+        config.gif_loop = 0;
+        config.selected_audio_tracks = vec![1];
+        config.selected_subtitle_tracks = vec![2];
+        config.subtitle_burn_path = Some("/tmp/captions.srt".into());
+
+        let args = build_ffmpeg_args("in.mp4", "out.gif", &config);
+
+        assert!(contains_args(&args, &["-map", "[gif_out]"]));
+        assert!(contains_args(&args, &["-an"]));
+        assert!(contains_args(&args, &["-c:v", "gif"]));
+        assert!(contains_arg_pair(&args, "-loop", "0"));
+        assert!(!args.iter().any(|arg| arg == "-c:a"));
+        assert!(!args.iter().any(|arg| arg == "-c:s"));
+
+        let fc_index = args
+            .iter()
+            .position(|arg| arg == "-filter_complex")
+            .unwrap();
+        let filter_complex = &args[fc_index + 1];
+        assert!(filter_complex.starts_with("[0:v:0]"));
+        assert!(filter_complex.contains("palettegen=max_colors=128:stats_mode=single"));
+        assert!(filter_complex.contains("paletteuse=dither=floyd_steinberg:new=1"));
+        assert!(filter_complex.contains("fps=15"));
+    }
+
+    #[test]
     fn test_validate_rejects_ml_upscale_for_audio_only_container() {
         let mut config = sample_config("mp3");
         config.ml_upscale = Some("esrgan-2x".into());
 
         let path = create_temp_input_file();
 
+        let result = validate_task_input(path.to_str().unwrap(), &config);
+        let _ = fs::remove_file(&path);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_rejects_audio_track_selection_for_gif() {
+        let mut config = sample_config("gif");
+        config.video_codec = "gif".into();
+        config.selected_audio_tracks = vec![0];
+
+        let path = create_temp_input_file();
+        let result = validate_task_input(path.to_str().unwrap(), &config);
+        let _ = fs::remove_file(&path);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_rejects_invalid_gif_dither() {
+        let mut config = sample_config("gif");
+        config.video_codec = "gif".into();
+        config.gif_dither = "jarvis".into();
+
+        let path = create_temp_input_file();
         let result = validate_task_input(path.to_str().unwrap(), &config);
         let _ = fs::remove_file(&path);
 
@@ -596,6 +657,13 @@ mod parsing_tests {
 mod utils_tests {
     use std::path::Path;
 
+    use crate::conversion::media_rules::{
+        container_supports_audio as container_supports_audio_rule,
+        container_supports_subtitles as container_supports_subtitles_rule,
+        is_audio_codec_allowed as is_audio_codec_allowed_rule,
+        is_video_codec_allowed as is_video_codec_allowed_rule,
+        is_video_only_container as is_video_only_container_rule,
+    };
     use crate::conversion::utils::{
         is_audio_only_container, is_nvenc_codec, is_videotoolbox_codec, map_nvenc_preset,
         parse_frame_rate_string, parse_probe_bitrate, sanitize_external_tool_path,
@@ -650,7 +718,7 @@ mod utils_tests {
 
     #[test]
     fn audio_only_containers() {
-        let audio_containers = ["mp3", "wav", "flac", "aac", "m4a", "MP3", "FLAC"];
+        let audio_containers = ["mp3", "wav", "flac", "m4a", "aac", "MP3", "FLAC"];
         let video_containers = ["mp4", "mkv", "webm", "mov", "avi"];
 
         for c in audio_containers {
@@ -663,6 +731,21 @@ mod utils_tests {
                 c
             );
         }
+    }
+
+    #[test]
+    fn shared_codec_rules_are_applied() {
+        assert!(is_video_codec_allowed_rule("webm", "vp9"));
+        assert!(!is_video_codec_allowed_rule("webm", "libx264"));
+        assert!(is_video_codec_allowed_rule("gif", "gif"));
+        assert!(!is_video_codec_allowed_rule("gif", "libx264"));
+        assert!(is_audio_codec_allowed_rule("mov", "aac"));
+        assert!(is_audio_codec_allowed_rule("mkv", "flac"));
+        assert!(!is_audio_codec_allowed_rule("mp4", "flac"));
+        assert!(!is_audio_codec_allowed_rule("gif", "aac"));
+        assert!(is_video_only_container_rule("gif"));
+        assert!(!container_supports_audio_rule("gif"));
+        assert!(!container_supports_subtitles_rule("gif"));
     }
 
     #[test]
@@ -764,6 +847,9 @@ mod scenario_tests {
             nvenc_temporal_aq: false,
             videotoolbox_allow_sw: false,
             hw_decode: false,
+            gif_colors: 256,
+            gif_dither: "sierra2_4a".into(),
+            gif_loop: 0,
         }
     }
 
@@ -1053,6 +1139,9 @@ mod hwaccel_tests {
             nvenc_temporal_aq: false,
             videotoolbox_allow_sw: false,
             hw_decode: true,
+            gif_colors: 256,
+            gif_dither: "sierra2_4a".into(),
+            gif_loop: 0,
         }
     }
 

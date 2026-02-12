@@ -1,6 +1,11 @@
 import { AUDIO_ONLY_CONTAINERS, type ConversionConfig, type SourceMetadata } from '$lib/types';
 import { getDefaultAudioCodec, isAudioCodecAllowed } from '$lib/services/media';
 import {
+	containerSupportsAudio,
+	containerSupportsSubtitles,
+	isGifContainer
+} from '$lib/constants/media-rules';
+import {
 	NVENC_ENCODERS,
 	VIDEOTOOLBOX_ENCODERS,
 	getFirstAllowedPreset,
@@ -26,15 +31,53 @@ export function normalizeConversionConfig(
 		next.container = 'mp3';
 	}
 
-	if (!isAudioCodecAllowed(next.audioCodec, next.container)) {
+	if (typeof next.gifColors !== 'number' || !Number.isFinite(next.gifColors)) {
+		next.gifColors = 256;
+	}
+	next.gifColors = Math.min(256, Math.max(2, Math.round(next.gifColors)));
+
+	if (typeof next.gifLoop !== 'number' || !Number.isFinite(next.gifLoop)) {
+		next.gifLoop = 0;
+	}
+	next.gifLoop = Math.min(65535, Math.max(0, Math.round(next.gifLoop)));
+
+	const allowedGifDither = new Set(['none', 'bayer', 'floyd_steinberg', 'sierra2_4a']);
+	if (!next.gifDither || !allowedGifDither.has(next.gifDither)) {
+		next.gifDither = 'sierra2_4a';
+	}
+
+	const supportsAudio = containerSupportsAudio(next.container);
+	if (supportsAudio && !isAudioCodecAllowed(next.audioCodec, next.container)) {
 		next.audioCodec = getDefaultAudioCodec(next.container);
 	}
 
 	const isAudioContainer = AUDIO_ONLY_CONTAINERS.includes(next.container);
+	const supportsSubtitles = containerSupportsSubtitles(next.container);
+	const isGifOutput = isGifContainer(next.container);
 	if (isAudioContainer) {
 		next.mlUpscale = 'none';
 		next.selectedSubtitleTracks = [];
 		next.subtitleBurnPath = undefined;
+	}
+
+	if (!supportsAudio) {
+		next.selectedAudioTracks = [];
+		next.audioNormalize = false;
+	}
+
+	if (!supportsSubtitles) {
+		next.selectedSubtitleTracks = [];
+		next.subtitleBurnPath = undefined;
+	}
+
+	if (isGifOutput) {
+		next.videoCodec = 'gif';
+		next.videoBitrateMode = 'crf';
+		next.mlUpscale = 'none';
+		next.hwDecode = false;
+		next.nvencSpatialAq = false;
+		next.nvencTemporalAq = false;
+		next.videotoolboxAllowSw = false;
 	}
 
 	if (!isAudioContainer && !isVideoCodecAllowed(next.container, next.videoCodec)) {

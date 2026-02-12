@@ -11,6 +11,7 @@
 	import { _ } from '$lib/i18n';
 
 	import { isAudioCodecAllowed, getDefaultAudioCodec } from '$lib/services/media';
+	import { containerSupportsAudio } from '$lib/constants/media-rules';
 
 	let {
 		config,
@@ -38,7 +39,10 @@
 	function handleContainerChange(newContainer: string) {
 		const updates: Partial<ConversionConfig> = { container: newContainer };
 
-		if (!isAudioCodecAllowed(config.audioCodec, newContainer)) {
+		if (
+			containerSupportsAudio(newContainer) &&
+			!isAudioCodecAllowed(config.audioCodec, newContainer)
+		) {
 			updates.audioCodec = getDefaultAudioCodec(newContainer);
 		}
 

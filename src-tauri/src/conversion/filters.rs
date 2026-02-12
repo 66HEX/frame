@@ -136,6 +136,9 @@ mod tests {
             nvenc_temporal_aq: false,
             videotoolbox_allow_sw: false,
             hw_decode: false,
+            gif_colors: 256,
+            gif_dither: "sierra2_4a".to_string(),
+            gif_loop: 0,
         }
     }
 

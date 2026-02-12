@@ -149,7 +149,11 @@
 		"codecIncompatible": "互換性のないコンテナ",
 		"hardwareAcceleration": "ハードウェアアクセラレーション",
 		"hwDecode": "ハードウェアデコード",
-		"hwDecodeHint": "入力動画のデコードにgpuを使用（高速）"
+		"hwDecodeHint": "入力動画のデコードにgpuを使用（高速）",
+		"gifColors": "パレットカラー数",
+		"gifDither": "ディザリング",
+		"gifLoop": "ループ回数",
+		"gifLoopHint": "無限ループは 0 を使用します。"
 	},
 	"audio": {
 		"channelsBitrate": "チャンネルとビットレート",
