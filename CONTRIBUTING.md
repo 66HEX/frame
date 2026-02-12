@@ -83,6 +83,10 @@ Before submitting a PR, please ensure:
 
 If you find a bug or have a feature request, please [open an issue](https://github.com/66HEX/frame/issues). Include as much detail as possible, such as your operating system and the FFmpeg logs (accessible via the "Logs" view in the app).
 
+## Financial Support
+
+If you want to support the long-term maintenance of Frame (especially code-signing for macOS and Windows builds), use [GitHub Sponsors](https://github.com/sponsors/66HEX).
+
 ---
 
 By contributing to this project, you agree that your contributions will be licensed under the project's [LICENSE](LICENSE).
