@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **ML Upscale Sidecar Permission:** Added missing Tauri shell capability for `realesrgan-ncnn-vulkan` so runtime encoder detection and AI upscaling execution can start the sidecar successfully.
+- **Update Dialog HTML Safety:** Escaped release note HTML before Markdown rendering in the in-app updater dialog to prevent rendering untrusted raw HTML from update metadata.
 
 ## [0.23.0] - 2026-02-12
 
