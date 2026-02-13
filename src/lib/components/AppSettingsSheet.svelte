@@ -231,7 +231,7 @@
 					>
 						<span class="text-xl">{loc.flag}</span>
 						<span
-							class="pointer-events-none absolute -top-8 left-1/2 z-10 -translate-x-1/2 rounded bg-foreground px-2 py-1 text-xs whitespace-nowrap text-background normal-case opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
+							class="pointer-events-none absolute -top-8 left-1/2 z-10 -translate-x-1/2 rounded bg-foreground px-2 py-1 text-xs whitespace-nowrap text-background normal-case! opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
 						>
 							{loc.name}
 						</span>
