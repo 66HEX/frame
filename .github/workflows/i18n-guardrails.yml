@@ -1,0 +1,37 @@
+name: i18n Guardrails
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'bun.lock'
+      - '.github/workflows/i18n-guardrails.yml'
+  push:
+    branches:
+      - master
+      - release
+    paths:
+      - 'src/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'bun.lock'
+      - '.github/workflows/i18n-guardrails.yml'
+
+jobs:
+  i18n-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Validate i18n keys and locale sync
+        run: bun run i18n:check

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **i18n Guardrails Tooling:** Added `i18n:extract`, `i18n:check`, and `i18n:sync` scripts with `en-US` as source-of-truth, locale key diff checks, placeholder parity validation, and optional sync autofill for missing translations.
+- **CI Locale Validation:** Added a dedicated GitHub Actions workflow that runs i18n guardrail checks on pull requests and pushes.
+
 ### Fixed
 
 - **File List Action Hover Drift:** Replaced the row bottom separator from `border-b` to an `::after` 1px line to eliminate subpixel vertical drift when action buttons appear on hover.
