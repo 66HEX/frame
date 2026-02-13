@@ -20,37 +20,35 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         args.extend(get_hwaccel_args(&config.video_codec));
     }
 
-    if let Some(start) = &config.start_time {
-        if !start.is_empty() {
-            args.push("-ss".to_string());
-            args.push(start.clone());
-        }
+    if let Some(start) = &config.start_time
+        && !start.is_empty()
+    {
+        args.push("-ss".to_string());
+        args.push(start.clone());
     }
 
     args.push("-i".to_string());
     args.push(input.to_string());
 
-    if let Some(end_str) = &config.end_time {
-        if !end_str.is_empty() {
-            if let Some(start_str) = &config.start_time {
-                if !start_str.is_empty() {
-                    if let (Some(start_t), Some(end_t)) =
-                        (parse_time(start_str), parse_time(end_str))
-                    {
-                        let duration = end_t - start_t;
-                        if duration > 0.0 {
-                            args.push("-t".to_string());
-                            args.push(format!("{:.3}", duration));
-                        }
+    if let Some(end_str) = &config.end_time
+        && !end_str.is_empty()
+    {
+        if let Some(start_str) = &config.start_time {
+            if !start_str.is_empty() {
+                if let (Some(start_t), Some(end_t)) = (parse_time(start_str), parse_time(end_str)) {
+                    let duration = end_t - start_t;
+                    if duration > 0.0 {
+                        args.push("-t".to_string());
+                        args.push(format!("{:.3}", duration));
                     }
-                } else {
-                    args.push("-to".to_string());
-                    args.push(end_str.clone());
                 }
             } else {
                 args.push("-to".to_string());
                 args.push(end_str.clone());
             }
+        } else {
+            args.push("-to".to_string());
+            args.push(end_str.clone());
         }
     }
 
@@ -188,41 +186,41 @@ fn build_gif_filter_complex(config: &ConversionConfig) -> String {
 }
 
 pub fn add_metadata_flags(args: &mut Vec<String>, metadata: &MetadataConfig) {
-    if let Some(v) = &metadata.title {
-        if !v.is_empty() {
-            args.push("-metadata".to_string());
-            args.push(format!("title={}", v));
-        }
+    if let Some(v) = &metadata.title
+        && !v.is_empty()
+    {
+        args.push("-metadata".to_string());
+        args.push(format!("title={}", v));
     }
-    if let Some(v) = &metadata.artist {
-        if !v.is_empty() {
-            args.push("-metadata".to_string());
-            args.push(format!("artist={}", v));
-        }
+    if let Some(v) = &metadata.artist
+        && !v.is_empty()
+    {
+        args.push("-metadata".to_string());
+        args.push(format!("artist={}", v));
     }
-    if let Some(v) = &metadata.album {
-        if !v.is_empty() {
-            args.push("-metadata".to_string());
-            args.push(format!("album={}", v));
-        }
+    if let Some(v) = &metadata.album
+        && !v.is_empty()
+    {
+        args.push("-metadata".to_string());
+        args.push(format!("album={}", v));
     }
-    if let Some(v) = &metadata.genre {
-        if !v.is_empty() {
-            args.push("-metadata".to_string());
-            args.push(format!("genre={}", v));
-        }
+    if let Some(v) = &metadata.genre
+        && !v.is_empty()
+    {
+        args.push("-metadata".to_string());
+        args.push(format!("genre={}", v));
     }
-    if let Some(v) = &metadata.date {
-        if !v.is_empty() {
-            args.push("-metadata".to_string());
-            args.push(format!("date={}", v));
-        }
+    if let Some(v) = &metadata.date
+        && !v.is_empty()
+    {
+        args.push("-metadata".to_string());
+        args.push(format!("date={}", v));
     }
-    if let Some(v) = &metadata.comment {
-        if !v.is_empty() {
-            args.push("-metadata".to_string());
-            args.push(format!("comment={}", v));
-        }
+    if let Some(v) = &metadata.comment
+        && !v.is_empty()
+    {
+        args.push("-metadata".to_string());
+        args.push(format!("comment={}", v));
     }
 }
 
@@ -233,7 +231,7 @@ fn sanitize_output_name(raw: &str) -> Option<String> {
     }
 
     let candidate = trimmed
-        .rsplit(|ch| ch == '/' || ch == '\\')
+        .rsplit(['/', '\\'])
         .next()
         .map(str::trim)
         .unwrap_or("");
@@ -289,32 +287,31 @@ pub fn validate_task_input(
         .map(str::trim)
         .filter(|s| !s.is_empty());
 
-    if let Some(start) = start_time {
-        if parse_time(start).is_none() {
-            return Err(ConversionError::InvalidInput(format!(
-                "Invalid start time: {}",
-                start
-            )));
-        }
+    if let Some(start) = start_time
+        && parse_time(start).is_none()
+    {
+        return Err(ConversionError::InvalidInput(format!(
+            "Invalid start time: {}",
+            start
+        )));
     }
 
-    if let Some(end) = end_time {
-        if parse_time(end).is_none() {
-            return Err(ConversionError::InvalidInput(format!(
-                "Invalid end time: {}",
-                end
-            )));
-        }
+    if let Some(end) = end_time
+        && parse_time(end).is_none()
+    {
+        return Err(ConversionError::InvalidInput(format!(
+            "Invalid end time: {}",
+            end
+        )));
     }
 
-    if let (Some(start), Some(end)) = (start_time, end_time) {
-        if let (Some(start_t), Some(end_t)) = (parse_time(start), parse_time(end)) {
-            if end_t <= start_t {
-                return Err(ConversionError::InvalidInput(
-                    "End time must be greater than start time".to_string(),
-                ));
-            }
-        }
+    if let (Some(start), Some(end)) = (start_time, end_time)
+        && let (Some(start_t), Some(end_t)) = (parse_time(start), parse_time(end))
+        && end_t <= start_t
+    {
+        return Err(ConversionError::InvalidInput(
+            "End time must be greater than start time".to_string(),
+        ));
     }
 
     if config.resolution == "custom" {
@@ -380,13 +377,16 @@ pub fn validate_task_input(
         .as_ref()
         .is_some_and(|mode| !mode.is_empty() && mode != "none");
 
-    if let Some(mode) = config.ml_upscale.as_deref() {
-        if !mode.is_empty() && mode != "none" && mode != "esrgan-2x" && mode != "esrgan-4x" {
-            return Err(ConversionError::InvalidInput(format!(
-                "Invalid ML upscale mode: {}",
-                mode
-            )));
-        }
+    if let Some(mode) = config.ml_upscale.as_deref()
+        && !mode.is_empty()
+        && mode != "none"
+        && mode != "esrgan-2x"
+        && mode != "esrgan-4x"
+    {
+        return Err(ConversionError::InvalidInput(format!(
+            "Invalid ML upscale mode: {}",
+            mode
+        )));
     }
 
     if (is_audio_only || is_video_only) && has_ml_upscale {

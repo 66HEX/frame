@@ -8,9 +8,6 @@ use tokio::sync::mpsc;
 
 use crate::conversion::types::{ErrorPayload, LogPayload};
 
-#[cfg(unix)]
-use libc;
-
 #[cfg(windows)]
 use windows::{
     Win32::{
@@ -28,7 +25,7 @@ use crate::conversion::types::{ConversionTask, DEFAULT_MAX_CONCURRENCY};
 use crate::conversion::worker::run_ffmpeg_worker;
 
 pub enum ManagerMessage {
-    Enqueue(ConversionTask),
+    Enqueue(Box<ConversionTask>),
     ConcurrencyUpdated,
     TaskStarted(String, u32),
     TaskCompleted(String),
@@ -61,6 +58,7 @@ impl ConversionManager {
             while let Some(msg) = rx.recv().await {
                 match msg {
                     ManagerMessage::Enqueue(task) => {
+                        let task = *task;
                         {
                             let mut cancelled = cancelled_tasks_loop.lock().unwrap();
                             cancelled.remove(&task.id);

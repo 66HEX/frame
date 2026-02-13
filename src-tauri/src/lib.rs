@@ -9,10 +9,10 @@ use tokio::time::sleep;
 
 #[tauri::command]
 async fn close_splash(window: tauri::Window) {
-    if let Some(splash) = window.get_webview_window("splash") {
-        if let Err(error) = splash.close() {
-            eprintln!("Failed to close splash window: {}", error);
-        }
+    if let Some(splash) = window.get_webview_window("splash")
+        && let Err(error) = splash.close()
+    {
+        eprintln!("Failed to close splash window: {}", error);
     }
 
     if let Some(main) = window.get_webview_window("main") {

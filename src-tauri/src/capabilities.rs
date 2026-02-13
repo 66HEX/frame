@@ -14,7 +14,10 @@ pub struct AvailableEncoders {
 }
 
 fn has_upscale_models(app: &AppHandle) -> bool {
-    let models_path = match app.path().resolve("resources/models", BaseDirectory::Resource) {
+    let models_path = match app
+        .path()
+        .resolve("resources/models", BaseDirectory::Resource)
+    {
         Ok(path) => path,
         Err(_) => return false,
     };
