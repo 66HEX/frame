@@ -1,3 +1,8 @@
+#!/usr/bin/env node
+/**
+ * Scans source files for i18n key usage and prints a structured usage report.
+ * Usage: node scripts/i18n-extract.mjs
+ */
 import path from 'node:path';
 import {
 	LOCALES_DIR,

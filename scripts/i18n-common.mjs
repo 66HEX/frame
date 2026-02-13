@@ -1,3 +1,6 @@
+/**
+ * Shared helpers for i18n extract/check/sync scripts.
+ */
 import fs from 'node:fs/promises';
 import path from 'node:path';
 

@@ -1,3 +1,8 @@
+#!/usr/bin/env node
+/**
+ * Validates locale key parity, placeholder consistency, and source key coverage.
+ * Usage: node scripts/i18n-check.mjs
+ */
 import path from 'node:path';
 import {
 	LOCALES_DIR,

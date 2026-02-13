@@ -1,3 +1,8 @@
+#!/usr/bin/env node
+/**
+ * Syncs non-source locales to the source locale structure and optionally writes updates.
+ * Usage: node scripts/i18n-sync.mjs [--write] [--keep-extra]
+ */
 import path from 'node:path';
 import {
 	LOCALES_DIR,
