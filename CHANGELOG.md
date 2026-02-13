@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.1] - 2026-02-14
+
 ### Added
 
 - **i18n Guardrails Tooling:** Added `i18n:extract`, `i18n:check`, and `i18n:sync` scripts with `en-US` as source-of-truth, locale key diff checks, placeholder parity validation, and optional sync autofill for missing translations.
@@ -578,7 +580,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.23.0...HEAD
+[Unreleased]: https://github.com/66HEX/frame/compare/0.23.1...HEAD
+[0.23.1]: https://github.com/66HEX/frame/compare/0.23.0...0.23.1
 [0.23.0]: https://github.com/66HEX/frame/compare/0.22.0...0.23.0
 [0.22.0]: https://github.com/66HEX/frame/compare/0.21.2...0.22.0
 [0.21.2]: https://github.com/66HEX/frame/compare/0.21.1...0.21.2
