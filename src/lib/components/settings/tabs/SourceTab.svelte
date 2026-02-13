@@ -98,7 +98,7 @@
 			{$_('source.analyzing')}
 		</div>
 	{:else if status === 'error'}
-		<div class="space-y-1 text-[11px] tracking-wide text-red-700">
+		<div class="space-y-1 text-[11px] tracking-wide text-red-600">
 			<p>{$_('source.failedToRead')}</p>
 			{#if error}
 				<p class="text-[10px] text-gray-alpha-600">
