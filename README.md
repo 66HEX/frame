@@ -16,6 +16,9 @@
 	<img src="https://img.shields.io/badge/TypeScript-5.9.3-blue?style=flat-square&logo=typescript" alt="TypeScript" />
 	<img src="https://img.shields.io/badge/Tailwind_CSS-v4-38bdf8?style=flat-square&logo=tailwindcss" alt="Tailwind" />
 	<img src="https://img.shields.io/badge/license-GPL--3.0-green?style=flat-square" alt="License" />
+	<a href="https://github.com/sponsors/66HEX">
+		<img src="https://img.shields.io/badge/Sponsor-GitHub-pink?style=flat-square&logo=githubsponsors" alt="GitHub Sponsors" />
+	</a>
 </div>
 
 **Frame** is a high-performance media conversion utility built on the Tauri v2 framework. It provides a native interface for FFmpeg operations, allowing for granular control over video and audio transcoding parameters. The application leverages a Rust-based backend for concurrent task management and process execution, coupled with a Svelte 5 frontend for configuration and state monitoring.
@@ -35,6 +38,21 @@
 >   xattr -dr com.apple.quarantine /Applications/Frame.app
 >   ```
 > - **Windows:** Windows SmartScreen may prevent the application from starting. Click **"More info"** and then **"Run anyway"** to proceed.
+
+## GitHub Sponsors
+
+If Frame helps you, consider supporting the project on GitHub Sponsors:
+
+[**Sponsor Frame**](https://github.com/sponsors/66HEX)
+
+Current funding goals:
+
+- **Apple Developer Program:** `$99/year` to sign and notarize macOS builds.
+- **Microsoft code-signing certificate:** estimated `$300-$700/year` to sign Windows builds and reduce SmartScreen friction.
+
+Sponsor contributions are used first for these release-signing costs.
+
+See [GitHub Sponsors](https://github.com/sponsors/66HEX) for full sponsorship details, tier suggestions, and a launch checklist.
 
 ## Features
 

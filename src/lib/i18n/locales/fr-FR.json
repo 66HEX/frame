@@ -18,7 +18,6 @@
 	"titlebar": {
 		"close": "Fermer",
 		"minimize": "Réduire",
-		"maximize": "Agrandir",
 		"toggleSize": "Changer taille",
 		"dashboard": "Tableau de bord",
 		"logs": "Journaux",
@@ -52,12 +51,10 @@
 	},
 	"subtitles": {
 		"burnIn": "Incruster les sous-titres",
-		"externalFile": "Fichier de sous-titres externe",
 		"selectFile": "Sélectionner un fichier .srt ou .ass",
 		"clearFile": "Effacer",
 		"sourceTracks": "Pistes source",
 		"none": "Aucun sous-titre",
-		"copyAll": "Copier tous les sous-titres",
 		"burnInHint": "L'incrustation des sous-titres forcera le ré-encodage de la vidéo."
 	},
 	"metadata": {
@@ -90,7 +87,6 @@
 		"dimensions": "Dimensions",
 		"videoCodec": "Codec vidéo",
 		"videoBitrate": "Débit vidéo",
-		"audioCodec": "Codec audio",
 		"containerBitrate": "Débit conteneur",
 		"pixelFormat": "Format de pixel",
 		"colorSpace": "Espace colorimétrique",
@@ -99,7 +95,6 @@
 		"profile": "Profil",
 		"sampleRate": "Taux d'échantillonnage",
 		"bitrate": "Débit",
-		"channels": "Canaux",
 		"fileInfo": "Informations sur le fichier",
 		"videoStream": "Flux vidéo",
 		"audioStream": "Flux audio",
@@ -114,9 +109,7 @@
 	},
 	"video": {
 		"resolutionFramerate": "Résolution et images/s",
-		"transform": "Transformation",
 		"rotation": "Rotation",
-		"flip": "Miroir",
 		"flipHorizontal": "Horizontal",
 		"flipVertical": "Vertical",
 		"width": "Largeur",
@@ -228,9 +221,7 @@
 	"trim": {
 		"startTime": "Heure de début",
 		"endTime": "Heure de fin",
-		"duration": "Durée",
-		"save": "Enregistrer",
-		"cancel": "Annuler"
+		"duration": "Durée"
 	},
 	"crop": {
 		"enter": "Recadrer",

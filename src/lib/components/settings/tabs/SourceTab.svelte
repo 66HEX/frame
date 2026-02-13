@@ -98,7 +98,7 @@
 			{$_('source.analyzing')}
 		</div>
 	{:else if status === 'error'}
-		<div class="space-y-1 text-[11px] tracking-wide text-red-700">
+		<div class="space-y-1 text-[11px] tracking-wide text-red-600">
 			<p>{$_('source.failedToRead')}</p>
 			{#if error}
 				<p class="text-[10px] text-gray-alpha-600">
@@ -149,6 +149,11 @@
 					{#if metadata.colorRange}
 						<div class="text-gray-alpha-600">{$_('source.colorRange')}</div>
 						<div class="text-right font-medium">{display(metadata.colorRange)}</div>
+					{/if}
+
+					{#if metadata.colorPrimaries}
+						<div class="text-gray-alpha-600">{$_('source.colorPrimaries')}</div>
+						<div class="text-right font-medium">{display(metadata.colorPrimaries)}</div>
 					{/if}
 
 					<div class="text-gray-alpha-600">{$_('source.videoBitrate')}</div>

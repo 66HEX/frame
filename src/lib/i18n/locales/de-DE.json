@@ -18,7 +18,6 @@
 	"titlebar": {
 		"close": "Schließen",
 		"minimize": "Minimieren",
-		"maximize": "Maximieren",
 		"toggleSize": "Größe umschalten",
 		"dashboard": "Dashboard",
 		"logs": "Protokolle",
@@ -52,12 +51,10 @@
 	},
 	"subtitles": {
 		"burnIn": "Untertitel einbrennen",
-		"externalFile": "Externe Untertiteldatei",
 		"selectFile": ".srt oder .ass Datei auswählen",
 		"clearFile": "Löschen",
 		"sourceTracks": "Quellspuren",
 		"none": "Keine Untertitel",
-		"copyAll": "Alle Untertitel kopieren",
 		"burnInHint": "Das Einbrennen von Untertiteln erzwingt eine erneute Videokodierung."
 	},
 	"metadata": {
@@ -90,7 +87,6 @@
 		"dimensions": "Abmessungen",
 		"videoCodec": "Video-Codec",
 		"videoBitrate": "Video-Bitrate",
-		"audioCodec": "Audio-Codec",
 		"containerBitrate": "Container-Bitrate",
 		"pixelFormat": "Pixelformat",
 		"colorSpace": "Farbraum",
@@ -99,7 +95,6 @@
 		"profile": "Profil",
 		"sampleRate": "Abtastrate",
 		"bitrate": "Bitrate",
-		"channels": "Kanäle",
 		"fileInfo": "Dateiinformationen",
 		"videoStream": "Videostream",
 		"audioStream": "Audiostream",
@@ -114,9 +109,7 @@
 	},
 	"video": {
 		"resolutionFramerate": "Auflösung & Bildrate",
-		"transform": "Transformieren",
 		"rotation": "Drehung",
-		"flip": "Spiegeln",
 		"flipHorizontal": "Horizontal",
 		"flipVertical": "Vertikal",
 		"width": "Breite",
@@ -228,9 +221,7 @@
 	"trim": {
 		"startTime": "Startzeit",
 		"endTime": "Endzeit",
-		"duration": "Dauer",
-		"save": "Speichern",
-		"cancel": "Abbrechen"
+		"duration": "Dauer"
 	},
 	"crop": {
 		"enter": "Zuschneiden",

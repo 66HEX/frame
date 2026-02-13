@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod tests {
+mod conversion_tests {
     use crate::conversion::args::{build_ffmpeg_args, build_output_path, validate_task_input};
     use crate::conversion::types::{ConversionConfig, MetadataConfig, MetadataMode};
     use crate::conversion::upscale::build_upscale_encode_args;

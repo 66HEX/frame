@@ -34,7 +34,7 @@ pub async fn queue_conversion(
 
     manager
         .sender
-        .send(ManagerMessage::Enqueue(task))
+        .send(ManagerMessage::Enqueue(Box::new(task)))
         .await
         .map_err(|e| ConversionError::Channel(e.to_string()))?;
     Ok(())

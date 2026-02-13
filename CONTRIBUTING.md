@@ -68,9 +68,18 @@ Before submitting a PR, please ensure:
 1.  **Build:** The project builds correctly: `bun tauri build --no-bundle`.
 2.  **Rust Tests:** All backend tests pass: `cd src-tauri && cargo test`.
 3.  **Type Check & Lint:** Run `bun run check` and `bun run lint` to catch frontend issues.
-4.  **Formatting:** Ensure all code is properly formatted:
+4.  **i18n Guardrails:** Run `bun run i18n:check` to validate locale key sync, placeholder consistency, and key usage coverage.
+5.  **Formatting:** Ensure all code is properly formatted:
     - For Rust: `cd src-tauri && cargo fmt`
     - For Frontend: `bun run format`
+
+### Translation Workflow
+
+- `en-US` is the source-of-truth locale.
+- Extract currently used i18n keys from code: `bun run i18n:extract`.
+- Validate locale integrity and sync rules: `bun run i18n:check`.
+- Preview sync changes in other locales: `bun run i18n:sync`.
+- Apply sync changes (fills missing keys with TODO-marked English fallback, removes stale keys): `bun run i18n:sync:write`.
 
 ## Pull Request Process
 
@@ -82,6 +91,10 @@ Before submitting a PR, please ensure:
 ## Reporting Issues
 
 If you find a bug or have a feature request, please [open an issue](https://github.com/66HEX/frame/issues). Include as much detail as possible, such as your operating system and the FFmpeg logs (accessible via the "Logs" view in the app).
+
+## Financial Support
+
+If you want to support the long-term maintenance of Frame (especially code-signing for macOS and Windows builds), use [GitHub Sponsors](https://github.com/sponsors/66HEX).
 
 ---
 

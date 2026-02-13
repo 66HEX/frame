@@ -18,7 +18,6 @@
 	"titlebar": {
 		"close": "Закрыть",
 		"minimize": "Свернуть",
-		"maximize": "Развернуть",
 		"toggleSize": "Изменить размер",
 		"dashboard": "Панель",
 		"logs": "Логи",
@@ -52,12 +51,10 @@
 	},
 	"subtitles": {
 		"burnIn": "Вшивание субтитров",
-		"externalFile": "Внешний файл субтитров",
 		"selectFile": "Выберите файл .srt или .ass",
 		"clearFile": "Очистить",
 		"sourceTracks": "Исходные дорожки",
 		"none": "Нет субтитров",
-		"copyAll": "Копировать все субтитры",
 		"burnInHint": "Вшивание субтитров потребует перекодирования видео."
 	},
 	"metadata": {
@@ -90,7 +87,6 @@
 		"dimensions": "Размеры",
 		"videoCodec": "Видеокодек",
 		"videoBitrate": "Битрейт видео",
-		"audioCodec": "Аудиокодек",
 		"containerBitrate": "Битрейт контейнера",
 		"pixelFormat": "Формат пикселей",
 		"colorSpace": "Цветовое пространство",
@@ -99,7 +95,6 @@
 		"profile": "Профиль",
 		"sampleRate": "Частота дискретизации",
 		"bitrate": "Битрейт",
-		"channels": "Каналы",
 		"fileInfo": "Информация о файле",
 		"videoStream": "Видеопоток",
 		"audioStream": "Аудиопоток",
@@ -114,9 +109,7 @@
 	},
 	"video": {
 		"resolutionFramerate": "Разрешение и частота кадров",
-		"transform": "Преобразование",
 		"rotation": "Поворот",
-		"flip": "Отражение",
 		"flipHorizontal": "По горизонтали",
 		"flipVertical": "По вертикали",
 		"width": "Ширина",
@@ -228,9 +221,7 @@
 	"trim": {
 		"startTime": "Начало",
 		"endTime": "Конец",
-		"duration": "Длительность",
-		"save": "Сохранить",
-		"cancel": "Отмена"
+		"duration": "Длительность"
 	},
 	"crop": {
 		"enter": "Кадрировать",

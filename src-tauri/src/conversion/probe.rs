@@ -36,10 +36,11 @@ pub async fn probe_media_file(
     let stdout = String::from_utf8_lossy(&output.stdout);
     let probe_data: FfprobeOutput = serde_json::from_str(&stdout)?;
 
-    let mut metadata = ProbeMetadata::default();
-
-    metadata.duration = probe_data.format.duration;
-    metadata.bitrate = probe_data.format.bit_rate;
+    let mut metadata = ProbeMetadata {
+        duration: probe_data.format.duration,
+        bitrate: probe_data.format.bit_rate,
+        ..ProbeMetadata::default()
+    };
 
     if let Some(tags) = probe_data.format.tags {
         metadata.tags = Some(tags);
@@ -53,12 +54,13 @@ pub async fn probe_media_file(
         metadata.color_primaries = video_stream.color_primaries.clone();
         metadata.profile = video_stream.profile.clone();
 
-        if let (Some(w), Some(h)) = (video_stream.width, video_stream.height) {
-            if w > 0 && h > 0 {
-                metadata.width = Some(w as u32);
-                metadata.height = Some(h as u32);
-                metadata.resolution = Some(format!("{}x{}", w, h));
-            }
+        if let (Some(w), Some(h)) = (video_stream.width, video_stream.height)
+            && w > 0
+            && h > 0
+        {
+            metadata.width = Some(w as u32);
+            metadata.height = Some(h as u32);
+            metadata.resolution = Some(format!("{}x{}", w, h));
         }
 
         if metadata.frame_rate.is_none() {
@@ -114,16 +116,16 @@ pub async fn probe_media_file(
         metadata.audio_codec = Some(first_audio.codec.clone());
     }
 
-    if metadata.video_bitrate_kbps.is_none() {
-        if let Some(container_kbps) = parse_probe_bitrate(metadata.bitrate.as_deref()) {
-            let audio_sum: f64 = metadata
-                .audio_tracks
-                .iter()
-                .filter_map(|track| track.bitrate_kbps)
-                .sum();
-            if container_kbps > audio_sum {
-                metadata.video_bitrate_kbps = Some(container_kbps - audio_sum);
-            }
+    if metadata.video_bitrate_kbps.is_none()
+        && let Some(container_kbps) = parse_probe_bitrate(metadata.bitrate.as_deref())
+    {
+        let audio_sum: f64 = metadata
+            .audio_tracks
+            .iter()
+            .filter_map(|track| track.bitrate_kbps)
+            .sum();
+        if container_kbps > audio_sum {
+            metadata.video_bitrate_kbps = Some(container_kbps - audio_sum);
         }
     }
 

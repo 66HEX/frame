@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Sponsor Frame
+    url: https://github.com/sponsors/66HEX
+    about: Help fund code-signing for macOS and Windows releases.
+  - name: Security Report (Private)
+    url: mailto:hexthecoder@gmail.com
+    about: Report vulnerabilities privately instead of opening a public issue.

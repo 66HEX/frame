@@ -39,11 +39,11 @@ pub(crate) fn build_upscale_encode_args(
             .to_string(),
     ];
 
-    if let Some(start) = &config.start_time {
-        if !start.is_empty() {
-            enc_args.push("-ss".to_string());
-            enc_args.push(start.clone());
-        }
+    if let Some(start) = &config.start_time
+        && !start.is_empty()
+    {
+        enc_args.push("-ss".to_string());
+        enc_args.push(start.clone());
     }
 
     enc_args.push("-i".to_string());
@@ -87,7 +87,7 @@ pub(crate) fn build_upscale_encode_args(
     } else if config
         .subtitle_burn_path
         .as_ref()
-        .map_or(true, |path| path.trim().is_empty())
+        .is_none_or(|path| path.trim().is_empty())
     {
         enc_args.push("-map".to_string());
         enc_args.push("1:s?".to_string());
@@ -106,7 +106,7 @@ pub(crate) fn build_upscale_encode_args(
         || config
             .subtitle_burn_path
             .as_ref()
-            .map_or(true, |path| path.trim().is_empty())
+            .is_none_or(|path| path.trim().is_empty())
     {
         add_subtitle_codec_args(&mut enc_args, config);
     }
@@ -145,13 +145,9 @@ pub(crate) fn resolve_upscale_mode(
     }
 }
 
-pub(crate) fn compute_upscale_threads(
-    source_width: u32,
-    source_height: u32,
-    scale: u32,
-) -> String {
-    let output_pixels = (source_width as u64 * scale as u64)
-        * (source_height as u64 * scale as u64);
+pub(crate) fn compute_upscale_threads(source_width: u32, source_height: u32, scale: u32) -> String {
+    let output_pixels =
+        (source_width as u64 * scale as u64) * (source_height as u64 * scale as u64);
 
     // proc: concurrent GPU inference frames — limited by VRAM
     // > 4K output (~8.3M px): ~500MB+ per frame → single concurrent frame
@@ -325,35 +321,35 @@ pub async fn run_upscale_worker(
         }
     }
 
-    if let Some(start) = &task.config.start_time {
-        if !start.is_empty() {
-            dec_args.push("-ss".to_string());
-            dec_args.push(start.clone());
-        }
+    if let Some(start) = &task.config.start_time
+        && !start.is_empty()
+    {
+        dec_args.push("-ss".to_string());
+        dec_args.push(start.clone());
     }
 
     dec_args.push("-i".to_string());
     dec_args.push(task.file_path.clone());
 
-    if let Some(end) = &task.config.end_time {
-        if !end.is_empty() {
-            if let Some(start) = &task.config.start_time {
-                if !start.is_empty() {
-                    if let (Some(s_t), Some(e_t)) = (parse_time(start), parse_time(end)) {
-                        let duration = e_t - s_t;
-                        if duration > 0.0 {
-                            dec_args.push("-t".to_string());
-                            dec_args.push(format!("{:.3}", duration));
-                        }
+    if let Some(end) = &task.config.end_time
+        && !end.is_empty()
+    {
+        if let Some(start) = &task.config.start_time {
+            if !start.is_empty() {
+                if let (Some(s_t), Some(e_t)) = (parse_time(start), parse_time(end)) {
+                    let duration = e_t - s_t;
+                    if duration > 0.0 {
+                        dec_args.push("-t".to_string());
+                        dec_args.push(format!("{:.3}", duration));
                     }
-                } else {
-                    dec_args.push("-to".to_string());
-                    dec_args.push(end.clone());
                 }
             } else {
                 dec_args.push("-to".to_string());
                 dec_args.push(end.clone());
             }
+        } else {
+            dec_args.push("-to".to_string());
+            dec_args.push(end.clone());
         }
     }
 
@@ -405,22 +401,19 @@ pub async fn run_upscale_worker(
                     },
                 );
 
-                if total_frames > 0 {
-                    if let Some(caps) = FRAME_REGEX.captures(&line) {
-                        if let Some(frame_match) = caps.get(1) {
-                            if let Ok(current_frame) = frame_match.as_str().parse::<u32>() {
-                                let decode_progress =
-                                    (current_frame as f64 / total_frames as f64) * 5.0;
-                                let _ = app_clone.emit(
-                                    "conversion-progress",
-                                    ProgressPayload {
-                                        id: id_clone.clone(),
-                                        progress: decode_progress.min(5.0),
-                                    },
-                                );
-                            }
-                        }
-                    }
+                if total_frames > 0
+                    && let Some(caps) = FRAME_REGEX.captures(&line)
+                    && let Some(frame_match) = caps.get(1)
+                    && let Ok(current_frame) = frame_match.as_str().parse::<u32>()
+                {
+                    let decode_progress = (current_frame as f64 / total_frames as f64) * 5.0;
+                    let _ = app_clone.emit(
+                        "conversion-progress",
+                        ProgressPayload {
+                            id: id_clone.clone(),
+                            progress: decode_progress.min(5.0),
+                        },
+                    );
                 }
             }
             CommandEvent::Terminated(payload) => {
@@ -598,22 +591,20 @@ pub async fn run_upscale_worker(
                     },
                 );
 
-                if total_frames > 0 {
-                    if let Some(caps) = FRAME_REGEX.captures(&line) {
-                        if let Some(frame_match) = caps.get(1) {
-                            if let Ok(current_frame) = frame_match.as_str().parse::<u32>() {
-                                let encode_progress =
-                                    90.0 + (current_frame as f64 / total_frames as f64) * 10.0;
-                                let _ = app_clone.emit(
-                                    "conversion-progress",
-                                    ProgressPayload {
-                                        id: id_clone.clone(),
-                                        progress: encode_progress.min(99.0),
-                                    },
-                                );
-                            }
-                        }
-                    }
+                if total_frames > 0
+                    && let Some(caps) = FRAME_REGEX.captures(&line)
+                    && let Some(frame_match) = caps.get(1)
+                    && let Ok(current_frame) = frame_match.as_str().parse::<u32>()
+                {
+                    let encode_progress =
+                        90.0 + (current_frame as f64 / total_frames as f64) * 10.0;
+                    let _ = app_clone.emit(
+                        "conversion-progress",
+                        ProgressPayload {
+                            id: id_clone.clone(),
+                            progress: encode_progress.min(99.0),
+                        },
+                    );
                 }
             }
             CommandEvent::Terminated(payload) => {

@@ -18,7 +18,6 @@
 	"titlebar": {
 		"close": "閉じる",
 		"minimize": "最小化",
-		"maximize": "最大化",
 		"toggleSize": "サイズ切替",
 		"dashboard": "ダッシュボード",
 		"logs": "ログ",
@@ -52,12 +51,10 @@
 	},
 	"subtitles": {
 		"burnIn": "字幕の焼き付け",
-		"externalFile": "外部字幕ファイル",
 		"selectFile": ".srt または .ass ファイルを選択",
 		"clearFile": "クリア",
 		"sourceTracks": "ソーストラック",
 		"none": "字幕なし",
-		"copyAll": "すべての字幕をコピー",
 		"burnInHint": "字幕を焼き付けると、ビデオの再エンコードが強制されます。"
 	},
 	"metadata": {
@@ -90,7 +87,6 @@
 		"dimensions": "解像度",
 		"videoCodec": "ビデオコーデック",
 		"videoBitrate": "ビデオビットレート",
-		"audioCodec": "オーディオコーデック",
 		"containerBitrate": "コンテナビットレート",
 		"pixelFormat": "ピクセル形式",
 		"colorSpace": "色空間",
@@ -99,7 +95,6 @@
 		"profile": "プロファイル",
 		"sampleRate": "サンプリングレート",
 		"bitrate": "ビットレート",
-		"channels": "チャンネル",
 		"fileInfo": "ファイル情報",
 		"videoStream": "ビデオストリーム",
 		"audioStream": "オーディオストリーム",
@@ -114,9 +109,7 @@
 	},
 	"video": {
 		"resolutionFramerate": "解像度とフレームレート",
-		"transform": "変換",
 		"rotation": "回転",
-		"flip": "反転",
 		"flipHorizontal": "水平",
 		"flipVertical": "垂直",
 		"width": "幅",
@@ -228,9 +221,7 @@
 	"trim": {
 		"startTime": "開始時間",
 		"endTime": "終了時間",
-		"duration": "再生時間",
-		"save": "保存",
-		"cancel": "キャンセル"
+		"duration": "再生時間"
 	},
 	"crop": {
 		"enter": "トリミング",

@@ -17,10 +17,11 @@ pub async fn run_ffmpeg_worker(
     tx: mpsc::Sender<ManagerMessage>,
     task: ConversionTask,
 ) -> Result<(), ConversionError> {
-    if let Some(upscale_mode) = &task.config.ml_upscale {
-        if upscale_mode != "none" && !upscale_mode.is_empty() {
-            return run_upscale_worker(app, tx, task).await;
-        }
+    if let Some(upscale_mode) = &task.config.ml_upscale
+        && upscale_mode != "none"
+        && !upscale_mode.is_empty()
+    {
+        return run_upscale_worker(app, tx, task).await;
     }
 
     let output_path = build_output_path(
@@ -102,35 +103,34 @@ pub async fn run_ffmpeg_worker(
                         },
                     );
 
-                    if let Some(caps) = TIME_REGEX.captures(line) {
-                        if let Some(match_str) = caps.get(1) {
-                            if let Some(current_time) = parse_time(match_str.as_str()) {
-                                let duration = if expected_duration > 0.0 {
-                                    expected_duration
-                                } else if let Some(d) = total_duration {
-                                    d
-                                } else if let Some(caps) = DURATION_REGEX.captures(line) {
-                                    if let Some(m) = caps.get(1) {
-                                        total_duration = parse_time(m.as_str());
-                                        total_duration.unwrap_or(0.0)
-                                    } else {
-                                        0.0
-                                    }
-                                } else {
-                                    0.0
-                                };
-
-                                if duration > 0.0 {
-                                    let progress = (current_time / duration * 100.0).min(100.0);
-                                    let _ = app.emit(
-                                        "conversion-progress",
-                                        ProgressPayload {
-                                            id: id.clone(),
-                                            progress,
-                                        },
-                                    );
-                                }
+                    if let Some(caps) = TIME_REGEX.captures(line)
+                        && let Some(match_str) = caps.get(1)
+                        && let Some(current_time) = parse_time(match_str.as_str())
+                    {
+                        let duration = if expected_duration > 0.0 {
+                            expected_duration
+                        } else if let Some(d) = total_duration {
+                            d
+                        } else if let Some(caps) = DURATION_REGEX.captures(line) {
+                            if let Some(m) = caps.get(1) {
+                                total_duration = parse_time(m.as_str());
+                                total_duration.unwrap_or(0.0)
+                            } else {
+                                0.0
                             }
+                        } else {
+                            0.0
+                        };
+
+                        if duration > 0.0 {
+                            let progress = (current_time / duration * 100.0).min(100.0);
+                            let _ = app.emit(
+                                "conversion-progress",
+                                ProgressPayload {
+                                    id: id.clone(),
+                                    progress,
+                                },
+                            );
                         }
                     }
                 }

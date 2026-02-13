@@ -9,10 +9,19 @@ use tokio::time::sleep;
 
 #[tauri::command]
 async fn close_splash(window: tauri::Window) {
-    if let Some(splash) = window.get_webview_window("splash") {
-        splash.close().unwrap();
+    if let Some(splash) = window.get_webview_window("splash")
+        && let Err(error) = splash.close()
+    {
+        eprintln!("Failed to close splash window: {}", error);
     }
-    window.get_webview_window("main").unwrap().show().unwrap();
+
+    if let Some(main) = window.get_webview_window("main") {
+        if let Err(error) = main.show() {
+            eprintln!("Failed to show main window: {}", error);
+        }
+    } else {
+        eprintln!("Main window is not available while closing splash");
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -27,7 +36,7 @@ fn apply_window_effect(window: &tauri::WebviewWindow) {
                 .radius(16.0)
                 .build(),
         )
-        .expect("Unsupported platform! 'HudWindow' effect is only supported on macOS");
+        .unwrap_or_else(|error| eprintln!("Failed to apply macOS window effect: {}", error));
 }
 
 #[cfg(target_os = "windows")]
@@ -36,7 +45,7 @@ fn apply_window_effect(window: &tauri::WebviewWindow) {
 
     window
         .set_effects(EffectsBuilder::new().effect(Effect::Acrylic).build())
-        .expect("Unsupported platform! 'Acrylic' effect is only supported on Windows");
+        .unwrap_or_else(|error| eprintln!("Failed to apply Windows window effect: {}", error));
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
@@ -61,7 +70,7 @@ pub fn run() {
                     .background_color(Color(0, 0, 0, 0))
                     .transparent(true);
 
-            let window = builder.build().unwrap();
+            let window = builder.build()?;
 
             apply_window_effect(&window);
             {
@@ -89,14 +98,13 @@ pub fn run() {
                 .transparent(true)
                 .background_color(Color(0, 0, 0, 0))
                 .visible(false)
-                .build()
-                .unwrap();
+                .build()?;
 
             apply_window_effect(&splash);
 
             #[cfg(target_os = "macos")]
             {
-                let dialog_host = WebviewWindowBuilder::new(
+                match WebviewWindowBuilder::new(
                     app,
                     "dialog-host",
                     WebviewUrl::App("dialog-host.html".into()),
@@ -108,15 +116,30 @@ pub fn run() {
                 .fullscreen(false)
                 .visible(false)
                 .parent(&window)
-                .expect("Failed to set parent window")
-                .transparent(true)
-                .background_color(Color(0, 0, 0, 0))
-                .skip_taskbar(true)
-                .shadow(false)
-                .build()
-                .unwrap();
-
-                let _ = dialog_host.hide();
+                {
+                    Ok(dialog_builder) => {
+                        match dialog_builder
+                            .transparent(true)
+                            .background_color(Color(0, 0, 0, 0))
+                            .skip_taskbar(true)
+                            .shadow(false)
+                            .build()
+                        {
+                            Ok(dialog_host) => {
+                                let _ = dialog_host.hide();
+                            }
+                            Err(error) => {
+                                eprintln!("Failed to build macOS dialog host window: {}", error);
+                            }
+                        }
+                    }
+                    Err(error) => {
+                        eprintln!(
+                            "Failed to configure macOS dialog host parent window: {}",
+                            error
+                        );
+                    }
+                }
             }
 
             app.manage(conversion::ConversionManager::new(app.handle().clone()));

@@ -13,6 +13,19 @@
 		onUpdate: () => void;
 		onCancel: () => void;
 	} = $props();
+
+	function escapeHtml(input: string): string {
+		return input
+			.replaceAll('&', '&amp;')
+			.replaceAll('<', '&lt;')
+			.replaceAll('>', '&gt;')
+			.replaceAll('"', '&quot;')
+			.replaceAll("'", '&#39;');
+	}
+
+	function renderReleaseNotes(markdown: string): string {
+		return marked.parse(escapeHtml(markdown), { async: false });
+	}
 </script>
 
 {#if updateStore.showDialog}
@@ -32,14 +45,14 @@
 				</p>
 			</div>
 
-			{#if updateStore.body}
-				<div
-					class="markdown-content max-h-35 overflow-y-auto rounded bg-gray-alpha-100 p-3 text-xs tracking-wide text-gray-alpha-600"
-				>
-					<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-					{@html marked.parse(updateStore.body)}
-				</div>
-			{/if}
+				{#if updateStore.body}
+					<div
+						class="markdown-content max-h-35 overflow-y-auto rounded bg-gray-alpha-100 p-3 text-xs tracking-wide text-gray-alpha-600"
+					>
+						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+						{@html renderReleaseNotes(updateStore.body)}
+					</div>
+				{/if}
 
 			{#if updateStore.error}
 				<div class="text-xs text-red-600">

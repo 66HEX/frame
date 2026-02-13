@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.1] - 2026-02-14
+
+### Added
+
+- **i18n Guardrails Tooling:** Added `i18n:extract`, `i18n:check`, and `i18n:sync` scripts with `en-US` as source-of-truth, locale key diff checks, placeholder parity validation, and optional sync autofill for missing translations.
+- **CI Locale Validation:** Added a dedicated GitHub Actions workflow that runs i18n guardrail checks on pull requests and pushes.
+
+### Fixed
+
+- **Conversion Failure Dialog Regression:** Restored native error dialog display for failed conversions with localized title and close action label.
+- **Source Metadata Coverage:** Added missing Source tab rendering for `colorPrimaries` metadata returned by ffprobe probing.
+- **Stale Locale Key Cleanup:** Removed unused i18n keys across all locale files after UI scope verification (keeping `common.*` keys intentionally reusable).
+- **File List Action Hover Drift:** Replaced the row bottom separator from `border-b` to an `::after` 1px line to eliminate subpixel vertical drift when action buttons appear on hover.
+- **ML Upscale Sidecar Permission:** Added missing Tauri shell capability for `realesrgan-ncnn-vulkan` so runtime encoder detection and AI upscaling execution can start the sidecar successfully.
+- **Update Dialog HTML Safety:** Escaped release note HTML before Markdown rendering in the in-app updater dialog to prevent rendering untrusted raw HTML from update metadata.
+- **Manual Update Check Recovery:** Hardened the settings-side update check flow so request failures no longer leave the UI stuck in a perpetual "Checking..." state.
+- **Startup Panic Guarding:** Replaced panic-prone window unwraps in the Tauri bootstrap and splash-close flow with explicit error handling to reduce fatal crashes during window lifecycle edge cases.
+- **i18n Build Warnings:** Removed duplicate locale eager/dynamic import pattern in the i18n bootstrap, eliminating repeated Vite chunking warnings during production builds.
+- **Capability Surface Hardening:** Removed unused global `fs:allow-read-file` capability grant to reduce default filesystem exposure.
+- **Rust Lint Compliance:** Applied `cargo clippy` recommendations across conversion, dialog, and window lifecycle modules, including enum size reduction, conditional simplifications, and minor API usage cleanups to keep `clippy -D warnings` green.
+
 ## [0.23.0] - 2026-02-12
 
 ### Added
@@ -559,7 +580,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.23.0...HEAD
+[Unreleased]: https://github.com/66HEX/frame/compare/0.23.1...HEAD
+[0.23.1]: https://github.com/66HEX/frame/compare/0.23.0...0.23.1
 [0.23.0]: https://github.com/66HEX/frame/compare/0.22.0...0.23.0
 [0.22.0]: https://github.com/66HEX/frame/compare/0.21.2...0.22.0
 [0.21.2]: https://github.com/66HEX/frame/compare/0.21.1...0.21.2

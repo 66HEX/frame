@@ -17,30 +17,30 @@ pub fn build_video_filters(config: &ConversionConfig, include_scale: bool) -> Ve
         _ => {}
     }
 
-    if let Some(crop) = &config.crop {
-        if crop.enabled {
-            let crop_width = crop.width.max(1.0).round() as i32;
-            let crop_height = crop.height.max(1.0).round() as i32;
-            let crop_x = crop.x.max(0.0).round() as i32;
-            let crop_y = crop.y.max(0.0).round() as i32;
-            filters.push(format!(
-                "crop={}:{}:{}:{}",
-                crop_width, crop_height, crop_x, crop_y
-            ));
-        }
+    if let Some(crop) = &config.crop
+        && crop.enabled
+    {
+        let crop_width = crop.width.max(1.0).round() as i32;
+        let crop_height = crop.height.max(1.0).round() as i32;
+        let crop_x = crop.x.max(0.0).round() as i32;
+        let crop_y = crop.y.max(0.0).round() as i32;
+        filters.push(format!(
+            "crop={}:{}:{}:{}",
+            crop_width, crop_height, crop_x, crop_y
+        ));
     }
 
-    if let Some(burn_path) = &config.subtitle_burn_path {
-        if !burn_path.is_empty() {
-            let escaped_path = burn_path
-                .replace('\\', "/")
-                .replace(':', "\\:")
-                .replace('\'', "\\'")
-                .replace('[', "\\[")
-                .replace(']', "\\]")
-                .replace(',', "\\,");
-            filters.push(format!("subtitles='{}'", escaped_path));
-        }
+    if let Some(burn_path) = &config.subtitle_burn_path
+        && !burn_path.is_empty()
+    {
+        let escaped_path = burn_path
+            .replace('\\', "/")
+            .replace(':', "\\:")
+            .replace('\'', "\\'")
+            .replace('[', "\\[")
+            .replace(']', "\\]")
+            .replace(',', "\\,");
+        filters.push(format!("subtitles='{}'", escaped_path));
     }
 
     if include_scale && (config.resolution != "original" || config.resolution == "custom") {

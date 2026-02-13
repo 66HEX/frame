@@ -108,18 +108,18 @@ pub async fn open_native_file_dialog<R: Runtime>(
                         }
                     }
                 }
-            } else if let Some(folder) = dialog_builder.blocking_pick_folder() {
-                if let Ok(path) = folder.into_path() {
-                    if let Some(scope) = window.try_fs_scope() {
-                        scope
-                            .allow_directory(&path, options.recursive)
-                            .map_err(|e| e.to_string())?;
-                    }
-                    tauri_scope
+            } else if let Some(folder) = dialog_builder.blocking_pick_folder()
+                && let Ok(path) = folder.into_path()
+            {
+                if let Some(scope) = window.try_fs_scope() {
+                    scope
                         .allow_directory(&path, options.recursive)
                         .map_err(|e| e.to_string())?;
-                    selections.push(path.to_string_lossy().into_owned());
                 }
+                tauri_scope
+                    .allow_directory(&path, options.recursive)
+                    .map_err(|e| e.to_string())?;
+                selections.push(path.to_string_lossy().into_owned());
             }
         }
         #[cfg(mobile)]
