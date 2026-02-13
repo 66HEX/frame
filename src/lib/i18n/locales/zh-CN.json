@@ -18,7 +18,6 @@
 	"titlebar": {
 		"close": "关闭",
 		"minimize": "最小化",
-		"maximize": "最大化",
 		"toggleSize": "切换大小",
 		"dashboard": "仪表板",
 		"logs": "日志",
@@ -52,12 +51,10 @@
 	},
 	"subtitles": {
 		"burnIn": "内嵌字幕",
-		"externalFile": "外部字幕文件",
 		"selectFile": "选择 .srt 或 .ass 文件",
 		"clearFile": "清除",
 		"sourceTracks": "源轨道",
 		"none": "无字幕",
-		"copyAll": "复制所有字幕",
 		"burnInHint": "内嵌字幕将强制视频重新编码。"
 	},
 	"metadata": {
@@ -90,7 +87,6 @@
 		"dimensions": "尺寸",
 		"videoCodec": "视频编码",
 		"videoBitrate": "视频比特率",
-		"audioCodec": "音频编码",
 		"containerBitrate": "容器比特率",
 		"pixelFormat": "像素格式",
 		"colorSpace": "色彩空间",
@@ -99,7 +95,6 @@
 		"profile": "配置文件",
 		"sampleRate": "采样率",
 		"bitrate": "比特率",
-		"channels": "声道",
 		"fileInfo": "文件信息",
 		"videoStream": "视频流",
 		"audioStream": "音频流",
@@ -114,9 +109,7 @@
 	},
 	"video": {
 		"resolutionFramerate": "分辨率和帧率",
-		"transform": "变换",
 		"rotation": "旋转",
-		"flip": "翻转",
 		"flipHorizontal": "水平",
 		"flipVertical": "垂直",
 		"width": "宽度",
@@ -228,9 +221,7 @@
 	"trim": {
 		"startTime": "开始时间",
 		"endTime": "结束时间",
-		"duration": "时长",
-		"save": "保存",
-		"cancel": "取消"
+		"duration": "时长"
 	},
 	"crop": {
 		"enter": "裁剪",

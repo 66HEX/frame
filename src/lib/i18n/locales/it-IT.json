@@ -18,7 +18,6 @@
 	"titlebar": {
 		"close": "Chiudi",
 		"minimize": "Riduci",
-		"maximize": "Ingrandisci",
 		"toggleSize": "Cambia dimensione",
 		"dashboard": "Dashboard",
 		"logs": "Log",
@@ -52,12 +51,10 @@
 	},
 	"subtitles": {
 		"burnIn": "Sottotitoli impressi",
-		"externalFile": "File sottotitoli esterno",
 		"selectFile": "Seleziona file .srt o .ass",
 		"clearFile": "Cancella",
 		"sourceTracks": "Tracce sorgente",
 		"none": "Nessun sottotitolo",
-		"copyAll": "Copia tutti i sottotitoli",
 		"burnInHint": "L'impressione dei sottotitoli forzerà la ricodifica del video."
 	},
 	"metadata": {
@@ -90,7 +87,6 @@
 		"dimensions": "Dimensioni",
 		"videoCodec": "Codec video",
 		"videoBitrate": "Bitrate video",
-		"audioCodec": "Codec audio",
 		"containerBitrate": "Bitrate container",
 		"pixelFormat": "Formato pixel",
 		"colorSpace": "Spazio colore",
@@ -99,7 +95,6 @@
 		"profile": "Profilo",
 		"sampleRate": "Frequenza campionamento",
 		"bitrate": "Bitrate",
-		"channels": "Canali",
 		"fileInfo": "Informazioni file",
 		"videoStream": "Flusso video",
 		"audioStream": "Flusso audio",
@@ -114,9 +109,7 @@
 	},
 	"video": {
 		"resolutionFramerate": "Risoluzione e frame rate",
-		"transform": "Trasforma",
 		"rotation": "Rotazione",
-		"flip": "Capovolgi",
 		"flipHorizontal": "Orizzontale",
 		"flipVertical": "Verticale",
 		"width": "Larghezza",
@@ -228,9 +221,7 @@
 	"trim": {
 		"startTime": "Tempo inizio",
 		"endTime": "Tempo fine",
-		"duration": "Durata",
-		"save": "Salva",
-		"cancel": "Annulla"
+		"duration": "Durata"
 	},
 	"crop": {
 		"enter": "Ritaglia",

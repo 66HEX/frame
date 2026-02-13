@@ -5,6 +5,7 @@ import {
 	resumeConversion,
 	cancelConversion
 } from '$lib/services/conversion';
+import { askNativeDialog } from '$lib/services/dialog';
 import { sendAppNotification } from '$lib/services/notifications';
 import { FileStatus, type FileItem } from '$lib/types';
 import { _ } from '$lib/i18n';
@@ -50,6 +51,18 @@ export function createConversionQueue(callbacks: ConversionCallbacks) {
 							: f
 					)
 				);
+
+				const failedFile = callbacks.getFiles().find((f) => f.id === payload.id);
+				const t = get(_);
+				void askNativeDialog({
+					title: t('errors.conversionFailed'),
+					message: `${failedFile?.name ?? payload.id}: ${payload.error}`,
+					kind: 'error',
+					okLabel: t('common.close')
+				}).catch((error) => {
+					console.error('Failed to show conversion error dialog', error);
+				});
+
 				checkAllDone();
 			},
 			(payload) => {

@@ -151,6 +151,11 @@
 						<div class="text-right font-medium">{display(metadata.colorRange)}</div>
 					{/if}
 
+					{#if metadata.colorPrimaries}
+						<div class="text-gray-alpha-600">{$_('source.colorPrimaries')}</div>
+						<div class="text-right font-medium">{display(metadata.colorPrimaries)}</div>
+					{/if}
+
 					<div class="text-gray-alpha-600">{$_('source.videoBitrate')}</div>
 					<div class="text-right font-medium">{formatBitrateKbps(metadata.videoBitrateKbps)}</div>
 				</div>

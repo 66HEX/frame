@@ -18,7 +18,6 @@
 	"titlebar": {
 		"close": "닫기",
 		"minimize": "최소화",
-		"maximize": "최대화",
 		"toggleSize": "크기 전환",
 		"dashboard": "대시보드",
 		"logs": "로그",
@@ -52,12 +51,10 @@
 	},
 	"subtitles": {
 		"burnIn": "자막 삽입 (Burn-in)",
-		"externalFile": "외부 자막 파일",
 		"selectFile": ".srt 또는 .ass 파일 선택",
 		"clearFile": "지우기",
 		"sourceTracks": "소스 트랙",
 		"none": "자막 없음",
-		"copyAll": "모든 자막 복사",
 		"burnInHint": "자막을 삽입하면 비디오 재인코딩이 강제됩니다."
 	},
 	"metadata": {
@@ -90,7 +87,6 @@
 		"dimensions": "해상도",
 		"videoCodec": "비디오 코덱",
 		"videoBitrate": "비디오 비트레이트",
-		"audioCodec": "오디오 코덱",
 		"containerBitrate": "컨테이너 비트레이트",
 		"pixelFormat": "픽셀 형식",
 		"colorSpace": "색 공간",
@@ -99,7 +95,6 @@
 		"profile": "프로필",
 		"sampleRate": "샘플링 레이트",
 		"bitrate": "비트레이트",
-		"channels": "채널",
 		"fileInfo": "파일 정보",
 		"videoStream": "비디오 스트림",
 		"audioStream": "오디오 스트림",
@@ -114,9 +109,7 @@
 	},
 	"video": {
 		"resolutionFramerate": "해상도 및 프레임 레이트",
-		"transform": "변환",
 		"rotation": "회전",
-		"flip": "뒤집기",
 		"flipHorizontal": "수평",
 		"flipVertical": "수직",
 		"width": "너비",
@@ -228,9 +221,7 @@
 	"trim": {
 		"startTime": "시작 시간",
 		"endTime": "종료 시간",
-		"duration": "재생 시간",
-		"save": "저장",
-		"cancel": "취소"
+		"duration": "재생 시간"
 	},
 	"crop": {
 		"enter": "자르기",

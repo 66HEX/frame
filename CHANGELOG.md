@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Conversion Failure Dialog Regression:** Restored native error dialog display for failed conversions with localized title and close action label.
+- **Source Metadata Coverage:** Added missing Source tab rendering for `colorPrimaries` metadata returned by ffprobe probing.
+- **Stale Locale Key Cleanup:** Removed unused i18n keys across all locale files after UI scope verification (keeping `common.*` keys intentionally reusable).
 - **File List Action Hover Drift:** Replaced the row bottom separator from `border-b` to an `::after` 1px line to eliminate subpixel vertical drift when action buttons appear on hover.
 - **ML Upscale Sidecar Permission:** Added missing Tauri shell capability for `realesrgan-ncnn-vulkan` so runtime encoder detection and AI upscaling execution can start the sidecar successfully.
 - **Update Dialog HTML Safety:** Escaped release note HTML before Markdown rendering in the in-app updater dialog to prevent rendering untrusted raw HTML from update metadata.
