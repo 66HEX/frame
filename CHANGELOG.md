@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Manual Update Check Recovery:** Hardened the settings-side update check flow so request failures no longer leave the UI stuck in a perpetual "Checking..." state.
 - **Startup Panic Guarding:** Replaced panic-prone window unwraps in the Tauri bootstrap and splash-close flow with explicit error handling to reduce fatal crashes during window lifecycle edge cases.
 - **i18n Build Warnings:** Removed duplicate locale eager/dynamic import pattern in the i18n bootstrap, eliminating repeated Vite chunking warnings during production builds.
+- **Capability Surface Hardening:** Removed unused global `fs:allow-read-file` capability grant to reduce default filesystem exposure.
 
 ## [0.23.0] - 2026-02-12
 
