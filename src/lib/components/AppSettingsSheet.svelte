@@ -109,18 +109,25 @@
 	async function handleCheckUpdate() {
 		isCheckingForUpdate = true;
 		checkStatus = '';
-		const result = await checkForAppUpdate();
-		if (result.available) {
-			updateStore.isAvailable = true;
-			updateStore.version = result.version || '';
-			updateStore.body = result.body || '';
-			updateStore.updateObject = result.updateObject;
-			updateStore.showDialog = true;
-			checkStatus = $_('settings.updateAvailable');
-		} else {
-			checkStatus = $_('settings.latestVersion');
+		try {
+			const result = await checkForAppUpdate();
+			if (result.available) {
+				updateStore.isAvailable = true;
+				updateStore.version = result.version || '';
+				updateStore.body = result.body || '';
+				updateStore.updateObject = result.updateObject;
+				updateStore.showDialog = true;
+				checkStatus = $_('settings.updateAvailable');
+			} else {
+				checkStatus = $_('settings.latestVersion');
+			}
+		} catch (error) {
+			console.error('Manual update check failed', error);
+			checkStatus = $_('settings.errorChecking');
+		} finally {
+			isCheckingForUpdate = false;
 		}
-		isCheckingForUpdate = false;
+
 		setTimeout(() => {
 			checkStatus = '';
 		}, 3000);
