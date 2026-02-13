@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **File List Action Hover Drift:** Replaced the row bottom separator from `border-b` to an `::after` 1px line to eliminate subpixel vertical drift when action buttons appear on hover.
 - **ML Upscale Sidecar Permission:** Added missing Tauri shell capability for `realesrgan-ncnn-vulkan` so runtime encoder detection and AI upscaling execution can start the sidecar successfully.
 - **Update Dialog HTML Safety:** Escaped release note HTML before Markdown rendering in the in-app updater dialog to prevent rendering untrusted raw HTML from update metadata.
 - **Manual Update Check Recovery:** Hardened the settings-side update check flow so request failures no longer leave the UI stuck in a perpetual "Checking..." state.

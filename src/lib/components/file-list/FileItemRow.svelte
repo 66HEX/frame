@@ -38,7 +38,7 @@
 <div
 	onclick={() => onSelect(item.id)}
 	class={cn(
-		'group flex h-10 cursor-pointer items-center border-b border-gray-alpha-100 px-4 transition-colors',
+		"group flex h-10 cursor-pointer items-center px-4 transition-colors after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-gray-alpha-100 after:content-['']",
 		isSelected ? 'bg-gray-alpha-100' : 'hover:bg-gray-alpha-100'
 	)}
 >
