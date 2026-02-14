@@ -41,6 +41,7 @@ export interface CropSettings {
 }
 
 export interface ConversionConfig {
+	processingMode?: 'reencode' | 'copy';
 	container: string;
 	videoCodec: string;
 	videoBitrateMode: 'crf' | 'bitrate';

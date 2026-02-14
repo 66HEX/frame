@@ -55,7 +55,8 @@
 		"clearFile": "Klar",
 		"sourceTracks": "Quell-Tracks",
 		"none": "Keine Untertitel",
-		"burnInHint": "Das Einbrennen von Untertiteln erzwingt eine Neukodierung des Videos."
+		"burnInHint": "Das Einbrennen von Untertiteln erzwingt eine Neukodierung des Videos.",
+		"copyModeHint": "Eingebrannte Untertitel sind im Stream-Kopiermodus deaktiviert."
 	},
 	"metadata": {
 		"mode": "Metadatenmodus",
@@ -102,6 +103,11 @@
 		"language": "Sprache"
 	},
 	"output": {
+		"processingMode": "Verarbeitungsmodus",
+		"reencode": "Neu codieren",
+		"streamCopy": "Ausschnitt / Stream kopieren",
+		"reencodeHint": "Dekodiert und kodiert Medien, sodass alle Filter- und Codec-Einstellungen verfügbar sind.",
+		"streamCopyHint": "Schnelles Trimmen/Remuxen ohne Neukodierung. Die Schnittgenauigkeit hängt von den Keyframes ab.",
 		"outputName": "Ausgabenname",
 		"placeholder": "my_render_final",
 		"hint": "Neben der Originaldatei gespeichert. Die Erweiterung folgt automatisch dem ausgewählten Container.",
@@ -150,6 +156,7 @@
 	},
 	"audio": {
 		"channelsBitrate": "Kanäle & Bitrate",
+		"copyModeHint": "Codec, Bitrate, Lautstärke und Normalisierung sind im Stream-Kopiermodus deaktiviert.",
 		"original": "Original",
 		"stereo": "Stereo (2.0)",
 		"mono": "Mono (1.0)",

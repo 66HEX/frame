@@ -55,7 +55,8 @@
 		"clearFile": "清除",
 		"sourceTracks": "源音轨",
 		"none": "无字幕",
-		"burnInHint": "在字幕中添加燃烧效果将强制视频重新编码。"
+		"burnInHint": "在字幕中添加燃烧效果将强制视频重新编码。",
+		"copyModeHint": "在流复制模式下，烧录字幕功能被禁用。"
 	},
 	"metadata": {
 		"mode": "元数据模式",
@@ -102,6 +103,11 @@
 		"language": "语言"
 	},
 	"output": {
+		"processingMode": "处理模式",
+		"reencode": "重新编码",
+		"streamCopy": "剪切 / 流复制",
+		"reencodeHint": "解码和编码媒体，使所有滤镜和编解码器设置均可用。",
+		"streamCopyHint": "快速修剪/重新封装，无需重新编码。剪切精度取决于关键帧。",
 		"outputName": "输出名称",
 		"placeholder": "我的最终渲染",
 		"hint": "存储在原始文件旁边。扩展名会自动跟随所选容器。",
@@ -150,6 +156,7 @@
 	},
 	"audio": {
 		"channelsBitrate": "频道与比特率",
+		"copyModeHint": "在流复制模式下，编解码器、比特率、音量和标准化功能均被禁用。",
 		"original": "原版",
 		"stereo": "立体声 (2.0)",
 		"mono": "单核（1.0）",

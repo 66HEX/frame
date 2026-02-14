@@ -20,6 +20,7 @@ export function normalizeConversionConfig(
 ): ConversionConfig {
 	const next: ConversionConfig = {
 		...config,
+		processingMode: config.processingMode === 'copy' ? 'copy' : 'reencode',
 		selectedAudioTracks: [...(config.selectedAudioTracks ?? [])],
 		selectedSubtitleTracks: [...(config.selectedSubtitleTracks ?? [])],
 		metadata: { ...config.metadata },
@@ -54,6 +55,32 @@ export function normalizeConversionConfig(
 	const isAudioContainer = AUDIO_ONLY_CONTAINERS.includes(next.container);
 	const supportsSubtitles = containerSupportsSubtitles(next.container);
 	const isGifOutput = isGifContainer(next.container);
+
+	if (isGifOutput && next.processingMode === 'copy') {
+		next.processingMode = 'reencode';
+	}
+
+	const isCopyMode = next.processingMode === 'copy';
+
+	if (isCopyMode) {
+		next.subtitleBurnPath = undefined;
+		next.audioNormalize = false;
+		next.audioVolume = 100;
+		next.resolution = 'original';
+		next.customWidth = undefined;
+		next.customHeight = undefined;
+		next.fps = 'original';
+		next.rotation = '0';
+		next.flipHorizontal = false;
+		next.flipVertical = false;
+		next.crop = null;
+		next.mlUpscale = 'none';
+		next.hwDecode = false;
+		next.nvencSpatialAq = false;
+		next.nvencTemporalAq = false;
+		next.videotoolboxAllowSw = false;
+	}
+
 	if (isAudioContainer) {
 		next.mlUpscale = 'none';
 		next.selectedSubtitleTracks = [];
@@ -70,7 +97,7 @@ export function normalizeConversionConfig(
 		next.subtitleBurnPath = undefined;
 	}
 
-	if (isGifOutput) {
+	if (isGifOutput && !isCopyMode) {
 		next.videoCodec = 'gif';
 		next.videoBitrateMode = 'crf';
 		next.mlUpscale = 'none';
@@ -80,15 +107,20 @@ export function normalizeConversionConfig(
 		next.videotoolboxAllowSw = false;
 	}
 
-	if (!isAudioContainer && !isVideoCodecAllowed(next.container, next.videoCodec)) {
+	if (!isCopyMode && !isAudioContainer && !isVideoCodecAllowed(next.container, next.videoCodec)) {
 		next.videoCodec = getFirstAllowedVideoCodec(next.container);
 	}
 
-	if (next.mlUpscale && next.mlUpscale !== 'none' && next.resolution !== 'original') {
+	if (
+		!isCopyMode &&
+		next.mlUpscale &&
+		next.mlUpscale !== 'none' &&
+		next.resolution !== 'original'
+	) {
 		next.resolution = 'original';
 	}
 
-	if (!isVideoPresetAllowed(next.videoCodec, next.preset)) {
+	if (!isCopyMode && !isVideoPresetAllowed(next.videoCodec, next.preset)) {
 		next.preset = getFirstAllowedPreset(next.videoCodec);
 	}
 

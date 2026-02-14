@@ -1,6 +1,6 @@
 use tauri::{AppHandle, command};
 
-use crate::conversion::args::validate_task_input;
+use crate::conversion::args::{validate_stream_copy_compatibility, validate_task_input};
 use crate::conversion::error::ConversionError;
 use crate::conversion::manager::{ConversionManager, ManagerMessage};
 use crate::conversion::probe::probe_media_file;
@@ -16,6 +16,11 @@ pub async fn queue_conversion(
     config: ConversionConfig,
 ) -> Result<(), ConversionError> {
     validate_task_input(&file_path, &config)?;
+
+    if config.processing_mode == "copy" {
+        let probe = probe_media_file(&app, &file_path).await?;
+        validate_stream_copy_compatibility(&config, &probe)?;
+    }
 
     if let Some(mode) = config
         .ml_upscale

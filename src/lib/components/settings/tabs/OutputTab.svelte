@@ -11,7 +11,12 @@
 	import { _ } from '$lib/i18n';
 
 	import { isAudioCodecAllowed, getDefaultAudioCodec } from '$lib/services/media';
-	import { containerSupportsAudio } from '$lib/constants/media-rules';
+	import {
+		containerSupportsAudio,
+		isAudioStreamCodecAllowedForContainer,
+		isSubtitleCodecAllowedForContainer,
+		isVideoStreamCodecAllowedForContainer
+	} from '$lib/constants/media-rules';
 
 	let {
 		config,
@@ -30,16 +35,47 @@
 	} = $props();
 
 	const isSourceAudioOnly = $derived(!!metadata && !metadata.videoCodec);
+	const isCopyMode = $derived((config.processingMode ?? 'reencode') === 'copy');
+	const selectedAudioCodecs = $derived.by(() => {
+		const tracks = metadata?.audioTracks ?? [];
+		if (tracks.length === 0) return [] as string[];
+		const selectedAudioTracks = config.selectedAudioTracks ?? [];
+
+		if (selectedAudioTracks.length === 0) {
+			return tracks.map((track) => track.codec);
+		}
+
+		const selected = new Set(selectedAudioTracks);
+		return tracks.filter((track) => selected.has(track.index)).map((track) => track.codec);
+	});
+
+	const selectedSubtitleCodecs = $derived.by(() => {
+		const tracks = metadata?.subtitleTracks ?? [];
+		if (tracks.length === 0) return [] as string[];
+		const selectedSubtitleTracks = config.selectedSubtitleTracks ?? [];
+
+		if (selectedSubtitleTracks.length === 0) {
+			return tracks.map((track) => track.codec);
+		}
+
+		const selected = new Set(selectedSubtitleTracks);
+		return tracks.filter((track) => selected.has(track.index)).map((track) => track.codec);
+	});
 
 	function sanitizeOutputName(value: string): string {
 		const candidate = value.split(/[/\\]/).pop()?.trim() ?? '';
 		return candidate === '.' || candidate === '..' ? '' : candidate;
 	}
 
+	function handleProcessingModeChange(mode: 'reencode' | 'copy') {
+		onUpdate({ processingMode: mode });
+	}
+
 	function handleContainerChange(newContainer: string) {
 		const updates: Partial<ConversionConfig> = { container: newContainer };
 
 		if (
+			!isCopyMode &&
 			containerSupportsAudio(newContainer) &&
 			!isAudioCodecAllowed(config.audioCodec, newContainer)
 		) {
@@ -48,9 +84,68 @@
 
 		onUpdate(updates);
 	}
+
+	function isContainerCompatibleForStreamCopy(container: string): boolean {
+		if (!isCopyMode) return true;
+		if (container === 'gif') return false;
+		if (!metadata) return true;
+
+		const isAudioOnlyTarget = AUDIO_ONLY_CONTAINERS.includes(container);
+		if (isAudioOnlyTarget) {
+			return (
+				selectedAudioCodecs.length > 0 &&
+				selectedAudioCodecs.every((codec) =>
+					isAudioStreamCodecAllowedForContainer(container, codec)
+				)
+			);
+		}
+
+		const videoCodec = metadata.videoCodec;
+		if (!videoCodec) return false;
+		if (!isVideoStreamCodecAllowedForContainer(container, videoCodec)) return false;
+
+		if (
+			selectedAudioCodecs.some((codec) => !isAudioStreamCodecAllowedForContainer(container, codec))
+		) {
+			return false;
+		}
+
+		if (
+			selectedSubtitleCodecs.some((codec) => !isSubtitleCodecAllowedForContainer(container, codec))
+		) {
+			return false;
+		}
+
+		return true;
+	}
 </script>
 
 <div class="space-y-4">
+	<div class="space-y-3">
+		<Label variant="section">{$_('output.processingMode')}</Label>
+		<div class="grid grid-cols-2 gap-2">
+			<Button
+				variant={!isCopyMode ? 'selected' : 'outline'}
+				onclick={() => handleProcessingModeChange('reencode')}
+				{disabled}
+				class="w-full"
+			>
+				{$_('output.reencode')}
+			</Button>
+			<Button
+				variant={isCopyMode ? 'selected' : 'outline'}
+				onclick={() => handleProcessingModeChange('copy')}
+				{disabled}
+				class="w-full"
+			>
+				{$_('output.streamCopy')}
+			</Button>
+		</div>
+		<p class="text-[9px] tracking-wide text-gray-alpha-600">
+			{isCopyMode ? $_('output.streamCopyHint') : $_('output.reencodeHint')}
+		</p>
+	</div>
+
 	<div class="space-y-3">
 		<Label variant="section">{$_('output.outputName')}</Label>
 		<Input
@@ -70,7 +165,9 @@
 		<div class="grid grid-cols-2 gap-2">
 			{#each ALL_CONTAINERS as fmt (fmt)}
 				{@const isVideoContainer = !AUDIO_ONLY_CONTAINERS.includes(fmt)}
-				{@const isDisabled = disabled || (isSourceAudioOnly && isVideoContainer)}
+				{@const isIncompatibleForCopy = !isContainerCompatibleForStreamCopy(fmt)}
+				{@const isDisabled =
+					disabled || (isSourceAudioOnly && isVideoContainer) || isIncompatibleForCopy}
 				<Button
 					variant={config.container === fmt ? 'selected' : 'outline'}
 					onclick={() => handleContainerChange(fmt)}

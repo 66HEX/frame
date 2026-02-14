@@ -55,7 +55,8 @@
 		"clearFile": "Despejado",
 		"sourceTracks": "Pistas originales",
 		"none": "Sin subtítulos",
-		"burnInHint": "La incrustación de subtítulos obligará a recodificar el vídeo."
+		"burnInHint": "La incrustación de subtítulos obligará a recodificar el vídeo.",
+		"copyModeHint": "Los subtítulos incrustados están desactivados en el modo de copia de transmisión."
 	},
 	"metadata": {
 		"mode": "Modo metadatos",
@@ -102,6 +103,11 @@
 		"language": "Idioma"
 	},
 	"output": {
+		"processingMode": "Modo de procesamiento",
+		"reencode": "Recodificar",
+		"streamCopy": "Cortar / Copiar secuencia",
+		"reencodeHint": "Decodifica y codifica medios para que todos los filtros y ajustes de códec estén disponibles.",
+		"streamCopyHint": "Recorte rápido/remux sin recodificación. La precisión del corte depende de los fotogramas clave.",
 		"outputName": "Nombre de salida",
 		"placeholder": "mi_render_final",
 		"hint": "Se almacena junto al archivo original. La extensión sigue automáticamente al contenedor seleccionado.",
@@ -150,14 +156,15 @@
 	},
 	"audio": {
 		"channelsBitrate": "Canales y velocidad de bits",
+		"copyModeHint": "El códec, la velocidad de bits, el volumen y la normalización están desactivados en el modo de copia de transmisión.",
 		"original": "Original",
 		"stereo": "Estéreo (2.0)",
 		"mono": "Mono (1.0)",
 		"bitrateKbps": "Velocidad de bits (kbps)",
 		"bitrateIgnored": "Se ignora la tasa de bits para códecs sin pérdida.",
+		"volume": "Volumen",
 		"muted": "Silenciado",
 		"maxVolume": "Volumen máximo",
-		"volume": "Volumen",
 		"normalize": "Normalizar audio",
 		"normalizeHint": "Normalización de volumen EBU R128 para un volumen constante",
 		"codec": "Códec de audio",

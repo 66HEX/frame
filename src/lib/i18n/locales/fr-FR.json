@@ -55,7 +55,8 @@
 		"clearFile": "Effacer",
 		"sourceTracks": "Pistes sources",
 		"none": "Pas de sous-titres",
-		"burnInHint": "La gravure des sous-titres entraînera un réencodage de la vidéo."
+		"burnInHint": "La gravure des sous-titres entraînera un réencodage de la vidéo.",
+		"copyModeHint": "Les sous-titres incrustés sont désactivés en mode copie de flux."
 	},
 	"metadata": {
 		"mode": "Mode métadonnées",
@@ -102,6 +103,11 @@
 		"language": "Langue"
 	},
 	"output": {
+		"processingMode": "Mode de traitement",
+		"reencode": "Réencoder",
+		"streamCopy": "Couper / Copier le flux",
+		"reencodeHint": "Décode et encode les médias afin que tous les filtres et paramètres de codec soient disponibles.",
+		"streamCopyHint": "Découpage/remux rapide sans réencodage. La précision de la découpe dépend des images clés.",
 		"outputName": "Nom de la sortie",
 		"placeholder": "mon_rendu_final",
 		"hint": "Stocké à côté du fichier d'origine. L'extension suit automatiquement le conteneur sélectionné.",
@@ -150,6 +156,7 @@
 	},
 	"audio": {
 		"channelsBitrate": "Canaux et débit binaire",
+		"copyModeHint": "Le codec, le débit binaire, le volume et la normalisation sont désactivés en mode copie de flux.",
 		"original": "Original",
 		"stereo": "Stéréo (2.0)",
 		"mono": "Mono (1.0)",

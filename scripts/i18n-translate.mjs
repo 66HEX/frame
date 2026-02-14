@@ -171,7 +171,10 @@ async function requestDeepLTranslation({
 		}
 
 		for (const text of texts) {
-			params.append('text', useTagHandling ? encodePlaceholders(text) : encodePlaceholdersFallback(text));
+			params.append(
+				'text',
+				useTagHandling ? encodePlaceholders(text) : encodePlaceholdersFallback(text)
+			);
 		}
 
 		const response = await fetch(apiUrl, {
@@ -199,9 +202,7 @@ async function requestDeepLTranslation({
 				await new Promise((resolve) => setTimeout(resolve, delayMs));
 				continue;
 			}
-			throw new Error(
-				`DeepL request failed (${response.status}): ${body.slice(0, 500)}`
-			);
+			throw new Error(`DeepL request failed (${response.status}): ${body.slice(0, 500)}`);
 		}
 
 		const json = await response.json();
@@ -276,7 +277,9 @@ async function main() {
 
 	console.log(`Source locale: ${config.sourceLocale}`);
 	console.log(`Target locales: ${targetLocaleFiles.length}`);
-	console.log(`Mode: ${writeMode ? 'write' : 'dry-run'}${rewriteExisting ? ' + rewrite-existing' : ''}`);
+	console.log(
+		`Mode: ${writeMode ? 'write' : 'dry-run'}${rewriteExisting ? ' + rewrite-existing' : ''}`
+	);
 
 	let translatedLocaleCount = 0;
 

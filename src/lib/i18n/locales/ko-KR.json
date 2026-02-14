@@ -55,7 +55,8 @@
 		"clearFile": "맑음",
 		"sourceTracks": "소스 트랙",
 		"none": "자막 없음",
-		"burnInHint": "자막에 화상 효과를 적용하면 동영상이 재인코딩됩니다."
+		"burnInHint": "자막에 화상 효과를 적용하면 동영상이 재인코딩됩니다.",
+		"copyModeHint": "스트림 복사 모드에서는 번인 자막이 비활성화됩니다."
 	},
 	"metadata": {
 		"mode": "메타데이터 모드",
@@ -102,6 +103,11 @@
 		"language": "언어"
 	},
 	"output": {
+		"processingMode": "처리 모드",
+		"reencode": "재인코딩",
+		"streamCopy": "잘라내기 / 스트림 복사",
+		"reencodeHint": "미디어를 디코딩 및 인코딩하여 모든 필터 및 코덱 설정을 사용할 수 있도록 합니다.",
+		"streamCopyHint": "재인코딩 없이 빠른 트림/리밈. 절단 정밀도는 키프레임에 따라 달라집니다.",
 		"outputName": "출력 이름",
 		"placeholder": "내_렌더_최종",
 		"hint": "원본 파일 옆에 저장됩니다. 확장자는 선택한 컨테이너를 자동으로 따릅니다.",
@@ -150,6 +156,7 @@
 	},
 	"audio": {
 		"channelsBitrate": "채널 및 비트레이트",
+		"copyModeHint": "스트림 복사 모드에서는 코덱, 비트레이트, 볼륨 및 정규화가 비활성화됩니다.",
 		"original": "원본",
 		"stereo": "스테레오 (2.0)",
 		"mono": "모노 (1.0)",

@@ -104,6 +104,7 @@ mod tests {
 
     fn default_config() -> ConversionConfig {
         ConversionConfig {
+            processing_mode: "reencode".to_string(),
             container: "mp4".to_string(),
             video_codec: "libx264".to_string(),
             video_bitrate_mode: "crf".to_string(),

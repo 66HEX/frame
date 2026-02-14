@@ -55,7 +55,8 @@
 		"clearFile": "Chiaro",
 		"sourceTracks": "Brani originali",
 		"none": "Senza sottotitoli",
-		"burnInHint": "L'inserimento dei sottotitoli richiederà la ricodifica del video."
+		"burnInHint": "L'inserimento dei sottotitoli richiederà la ricodifica del video.",
+		"copyModeHint": "I sottotitoli Burn-in sono disabilitati nella modalità di copia dello streaming."
 	},
 	"metadata": {
 		"mode": "Modalità metadati",
@@ -102,6 +103,11 @@
 		"language": "Lingua"
 	},
 	"output": {
+		"processingMode": "Modalità di elaborazione",
+		"reencode": "Ricodifica",
+		"streamCopy": "Taglia / Copia streaming",
+		"reencodeHint": "Decodifica e codifica i file multimediali in modo che siano disponibili tutte le impostazioni dei filtri e dei codec.",
+		"streamCopyHint": "Ritaglio/remux veloce senza ricodifica. La precisione del taglio dipende dai fotogrammi chiave.",
 		"outputName": "Nome output",
 		"placeholder": "il_mio_render_finale",
 		"hint": "Archiviato accanto al file originale. L'estensione segue automaticamente il contenitore selezionato.",
@@ -150,6 +156,7 @@
 	},
 	"audio": {
 		"channelsBitrate": "Canali e bitrate",
+		"copyModeHint": "Codec, bitrate, volume e normalizzazione sono disabilitati nella modalità di copia dello stream.",
 		"original": "Originale",
 		"stereo": "Stereo (2.0)",
 		"mono": "Mono (1.0)",

@@ -55,7 +55,9 @@ async function main() {
 	const errors = [];
 	const warnings = [];
 
-	const usedButMissingInSource = extracted.staticKeys.filter((key) => !sourceKeys.includes(key)).sort();
+	const usedButMissingInSource = extracted.staticKeys
+		.filter((key) => !sourceKeys.includes(key))
+		.sort();
 	if (usedButMissingInSource.length > 0) {
 		errors.push(
 			[
@@ -78,7 +80,9 @@ async function main() {
 
 		if (missingKeys.length > 0) {
 			errors.push(
-				[`[${localeCode}] Missing keys (${missingKeys.length}):`, formatList(missingKeys, 25)].join('\n')
+				[`[${localeCode}] Missing keys (${missingKeys.length}):`, formatList(missingKeys, 25)].join(
+					'\n'
+				)
 			);
 		}
 

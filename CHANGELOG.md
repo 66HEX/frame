@@ -11,12 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **DeepL Translation Automation:** Added `i18n-translate` tooling to translate locale keys from `en-US` via DeepL with header-based authentication, placeholder preservation, retry handling, and parser-error fallback behavior.
 - **Reusable Tooltip Component:** Added `ui/Tooltip.svelte` with configurable side variants via `class-variance-authority`, arrow rendering, Svelte transition animation, and delayed-first-hover behavior with instant trigger-to-trigger switching.
+- **Stream Copy / Remux Mode:** Added a new `Cut / Stream Copy` processing mode for trim + remux workflows without re-encoding (`-c copy`), including queue/config support across frontend and backend.
 
 ### Changed
 
 - **Translation Workflow Commands:** Added `i18n:translate`, `i18n:translate:write`, `i18n:translate:rewrite`, and `i18n:sync:auto` scripts plus updated contributor workflow documentation.
 - **Non-English Locale Consistency:** Re-translated all non-source locale files from the current `en-US` dictionary baseline to reduce cross-locale copy drift.
 - **App Settings Language Hover UI:** Replaced inline CSS hover labels in language selection with the shared tooltip component for consistent interaction behavior.
+- **Shared Media Rules (Copy Validation):** Extended `media-rules.json` with stream-level container compatibility tables (video/audio/subtitle) and applied them in both UI container availability and backend preflight validation for stream copy tasks.
 
 ## [0.23.2] - 2026-02-14
 

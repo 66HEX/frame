@@ -10,14 +10,18 @@
 	let {
 		config,
 		disabled = false,
+		copyMode = false,
 		onUpdate,
 		metadata
 	}: {
 		config: ConversionConfig;
 		disabled?: boolean;
+		copyMode?: boolean;
 		onUpdate: (config: Partial<ConversionConfig>) => void;
 		metadata?: SourceMetadata;
 	} = $props();
+
+	const burnInDisabled = $derived(disabled || copyMode);
 
 	function toggleTrack(index: number) {
 		if (disabled) return;
@@ -32,7 +36,7 @@
 	}
 
 	async function selectExternalSubtitle() {
-		if (disabled) return;
+		if (burnInDisabled) return;
 		const selected = await openNativeFileDialog({
 			multiple: false,
 			filters: [
@@ -49,7 +53,7 @@
 	}
 
 	function clearExternalSubtitle() {
-		if (disabled) return;
+		if (burnInDisabled) return;
 		onUpdate({ subtitleBurnPath: undefined });
 	}
 </script>
@@ -61,7 +65,7 @@
 			<div class="relative flex items-center">
 				<Button
 					variant="outline"
-					{disabled}
+					disabled={burnInDisabled}
 					onclick={selectExternalSubtitle}
 					class={cn('w-full transition-colors', config.subtitleBurnPath ? 'pr-8' : '')}
 				>
@@ -87,7 +91,7 @@
 								e.stopPropagation();
 								clearExternalSubtitle();
 							}}
-							{disabled}
+							disabled={burnInDisabled}
 							title={$_('subtitles.clearFile')}
 						>
 							<IconClose size={14} />
@@ -96,7 +100,7 @@
 				{/if}
 			</div>
 			<p class="text-[9px] text-gray-alpha-600">
-				{$_('subtitles.burnInHint')}
+				{copyMode ? $_('subtitles.copyModeHint') : $_('subtitles.burnInHint')}
 			</p>
 		</div>
 	</div>
