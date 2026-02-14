@@ -69,12 +69,7 @@
 					onclick={selectExternalSubtitle}
 					class={cn('w-full transition-colors', config.subtitleBurnPath ? 'pr-8' : '')}
 				>
-					<span
-						class={cn(
-							'truncate',
-							config.subtitleBurnPath ? 'text-foreground' : 'text-gray-alpha-600'
-						)}
-					>
+					<span class={cn('truncate text-foreground')}>
 						{config.subtitleBurnPath
 							? config.subtitleBurnPath.split(/[\\/]/).pop()
 							: $_('subtitles.selectFile')}

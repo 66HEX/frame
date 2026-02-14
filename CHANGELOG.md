@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **App Settings Language Hover UI:** Replaced inline CSS hover labels in language selection with the shared tooltip component for consistent interaction behavior.
 - **Shared Media Rules (Copy Validation):** Extended `media-rules.json` with stream-level container compatibility tables (video/audio/subtitle) and applied them in both UI container availability and backend preflight validation for stream copy tasks.
 
+### Fixed
+
+- **Input Placeholder Contrast:** Increased placeholder/readability contrast in shared text and timecode inputs and aligned subtitle burn file picker text to foreground color for better visibility.
+
 ## [0.23.2] - 2026-02-14
 
 ### Fixed
