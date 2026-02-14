@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.2] - 2026-02-14
+
+### Fixed
+
+- **i18n Production Startup Regression:** Restored eager locale module loading and registered dictionaries from the preloaded module map to prevent release builds from stalling on splash.
+- **i18n Build Noise:** Removed mixed eager/dynamic locale import behavior that triggered repeated Vite chunking warnings during production builds.
+
 ## [0.23.1] - 2026-02-14
 
 ### Added
@@ -580,7 +587,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.23.1...HEAD
+[Unreleased]: https://github.com/66HEX/frame/compare/0.23.2...HEAD
+[0.23.2]: https://github.com/66HEX/frame/compare/0.23.1...0.23.2
 [0.23.1]: https://github.com/66HEX/frame/compare/0.23.0...0.23.1
 [0.23.0]: https://github.com/66HEX/frame/compare/0.22.0...0.23.0
 [0.22.0]: https://github.com/66HEX/frame/compare/0.21.2...0.22.0
