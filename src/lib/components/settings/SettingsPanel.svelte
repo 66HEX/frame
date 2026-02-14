@@ -114,10 +114,7 @@
 					variant={activeTab === tabId ? 'default' : 'ghost'}
 					size="icon"
 					title={$_(`tabs.${tabId}`)}
-					class={cn(
-						'size-6 border border-transparent',
-						isDisabled && 'pointer-events-none opacity-50'
-					)}
+					class={cn('size-6', isDisabled && 'pointer-events-none opacity-50')}
 					onclick={() => (activeTab = tabId)}
 				>
 					<Icon size={16} />

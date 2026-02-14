@@ -151,16 +151,49 @@ select {
 }
 
 .card-highlight {
+	position: relative;
+	isolation: isolate;
+}
+
+.card-highlight::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	pointer-events: none;
+	z-index: 1;
 	box-shadow: inset 0 1px 0 0 var(--ds-gray-alpha-200);
 }
 
 .input-highlight {
+	position: relative;
+	isolation: isolate;
+}
+
+.input-highlight::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	pointer-events: none;
+	z-index: 1;
 	box-shadow:
 		inset 0 0.5px 0 0 rgba(0, 0, 0, 0.2),
 		inset 0 -0.5px 0 0 var(--ds-gray-alpha-400);
 }
 
 .button-highlight {
+	position: relative;
+	isolation: isolate;
+}
+
+.button-highlight::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	pointer-events: none;
+	z-index: 1;
 	box-shadow:
 		inset 0 0.5px 0 var(--ds-gray-alpha-400),
 		inset 0 0 0 0.5px var(--ds-gray-alpha-200);

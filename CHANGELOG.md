@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.1] - 2026-02-14
+
+### Changed
+
+- **Neumorphic Highlight Layering:** Reworked shared `.card-highlight`, `.input-highlight`, and `.button-highlight` styles to use isolated `::before` overlay layers for more consistent inner-highlight rendering.
+- **Ghost Button Border Cleanup:** Removed redundant transparent borders from ghost buttons and icon tab/aspect controls to simplify control outlines and spacing.
+- **Selection Indicator Polish:** Updated audio/subtitle track selectors and checkbox surfaces to follow current window opacity and use a clearer active-state marker color.
+
 ## [0.24.0] - 2026-02-14
 
 ### Added
@@ -607,7 +615,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.24.0...HEAD
+[Unreleased]: https://github.com/66HEX/frame/compare/0.24.1...HEAD
+[0.24.1]: https://github.com/66HEX/frame/compare/0.24.0...0.24.1
 [0.24.0]: https://github.com/66HEX/frame/compare/0.23.2...0.24.0
 [0.23.2]: https://github.com/66HEX/frame/compare/0.23.1...0.23.2
 [0.23.1]: https://github.com/66HEX/frame/compare/0.23.0...0.23.1

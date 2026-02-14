@@ -13,7 +13,7 @@
 					secondary:
 						'bg-gray-alpha-100 button-highlight text-shadow text-foreground hover:bg-gray-alpha-200 disabled:bg-gray-alpha-100 disabled:text-foreground disabled:opacity-50',
 					ghost:
-						'hover:bg-gray-alpha-100 text-gray-alpha-600 hover:text-foreground border border-transparent disabled:bg-transparent disabled:opacity-50',
+						'hover:bg-gray-alpha-100 text-gray-alpha-600 hover:text-foreground disabled:bg-transparent disabled:opacity-50',
 					'titlebar-ghost': 'text-gray-alpha-600 hover:text-foreground disabled:opacity-50',
 					destructive: 'hover:text-red-700 disabled:opacity-50',
 					'titlebar-destructive':
