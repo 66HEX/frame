@@ -38,7 +38,7 @@
 		bind:checked
 		{indeterminate}
 		class={cn(
-			'peer h-3.5 w-3.5 cursor-pointer appearance-none rounded bg-transparent transition-colors checked:border-blue-600 checked:bg-blue-600 disabled:pointer-events-none disabled:opacity-50',
+			'peer h-3.5 w-3.5 appearance-none rounded bg-transparent transition-colors checked:border-blue-600 checked:bg-blue-600 disabled:pointer-events-none disabled:opacity-50',
 			className
 		)}
 		{...props}

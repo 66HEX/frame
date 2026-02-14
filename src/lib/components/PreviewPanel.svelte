@@ -595,7 +595,7 @@
 	class="card-highlight flex h-full flex-col overflow-hidden rounded-lg border border-gray-alpha-100 bg-gray-alpha-100 p-4"
 >
 	<div
-		class="relative flex min-h-0 flex-1 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-gray-alpha-200 bg-black"
+		class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-lg border border-gray-alpha-200 bg-black"
 		bind:this={containerRef}
 		onclick={() => !cropMode && togglePlay()}
 		onmouseenter={() => (isHovering = true)}
@@ -677,7 +677,7 @@
 		</div>
 		{#if !cropMode && (!isPlaying || isHovering)}
 			<div
-				class="absolute inset-0 z-10 flex cursor-pointer items-center justify-center"
+				class="absolute inset-0 z-10 flex items-center justify-center"
 				onclick={(e) => {
 					e.stopPropagation();
 					togglePlay();

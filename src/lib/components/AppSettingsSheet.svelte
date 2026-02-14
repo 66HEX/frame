@@ -136,7 +136,7 @@
 </script>
 
 <button
-	class="absolute inset-0 z-60 cursor-default bg-background/60 backdrop-blur-sm"
+	class="absolute inset-0 z-60 bg-background/60 backdrop-blur-sm"
 	transition:fade={{ duration: 300 }}
 	onclick={onClose}
 	aria-label="Close settings"
