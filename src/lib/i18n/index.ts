@@ -4,20 +4,26 @@ import { locale as osLocale } from '@tauri-apps/plugin-os';
 
 const defaultLocale = 'en-US';
 
-export const supportedLocales = [
-	{ code: 'en-US', name: 'English', flag: '🇺🇸' },
-	{ code: 'zh-CN', name: '简体中文', flag: '🇨🇳' },
-	{ code: 'ja-JP', name: '日本語', flag: '🇯🇵' },
-	{ code: 'ko-KR', name: '한국어', flag: '🇰🇷' },
-	{ code: 'es-ES', name: 'Español', flag: '🇪🇸' },
-	{ code: 'ru-RU', name: 'Русский', flag: '🇷🇺' },
-	{ code: 'fr-FR', name: 'Français', flag: '🇫🇷' },
-	{ code: 'de-DE', name: 'Deutsch', flag: '🇩🇪' },
-	{ code: 'it-IT', name: 'Italiano', flag: '🇮🇹' }
-] as const;
+const localeModules = import.meta.glob('./locales/*.json', { eager: true }) as Record<
+	string,
+	{ default: Record<string, unknown> & { _meta: { name: string; flag: string } } }
+>;
+
+export const supportedLocales = Object.entries(localeModules).map(([path, module]) => {
+	const code = path.replace('./locales/', '').replace('.json', '');
+	const meta = module.default._meta;
+	return { code, name: meta.name, flag: meta.flag };
+});
 
 for (const loc of supportedLocales) {
-	register(loc.code, () => import(`./locales/${loc.code}.json`));
+	const path = `./locales/${loc.code}.json`;
+	const module = localeModules[path];
+
+	if (module) {
+		register(loc.code, async () => module.default);
+	} else {
+		console.error(`Missing locale module: ${path}`);
+	}
 }
 
 function mapLocaleCode(localeStr: string | null): string {
