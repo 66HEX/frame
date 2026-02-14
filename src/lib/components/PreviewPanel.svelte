@@ -705,7 +705,6 @@
 				{#each ASPECT_OPTIONS as option (option.id)}
 					<Button
 						size="sm"
-						class="border border-transparent"
 						variant={cropAspect === option.id ? 'default' : 'ghost'}
 						onclick={() => selectAspect(option.id)}
 					>
