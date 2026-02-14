@@ -4,6 +4,7 @@
 	import Input from '$lib/components/ui/Input.svelte';
 	import Label from '$lib/components/ui/Label.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
+	import Tooltip from '$lib/components/ui/Tooltip.svelte';
 	import { checkForAppUpdate } from '$lib/services/update';
 	import { updateStore } from '$lib/stores/update.svelte';
 	import Checkbox from './ui/Checkbox.svelte';
@@ -220,22 +221,18 @@
 			<Label variant="section">{$_('settings.language')}</Label>
 			<div class="flex flex-wrap gap-2">
 				{#each supportedLocales as loc (loc.code)}
-					<Button
-						variant={currentLocale === loc.code ? 'selected' : 'outline'}
-						onclick={() => {
-							currentLocale = loc.code;
-							setLocale(loc.code);
-						}}
-						size="icon-large"
-						class="group relative"
-					>
-						<span class="text-xl">{loc.flag}</span>
-						<span
-							class="pointer-events-none absolute -top-8 left-1/2 z-10 -translate-x-1/2 rounded bg-foreground px-2 py-1 text-xs whitespace-nowrap text-background normal-case! opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
+					<Tooltip content={loc.name}>
+						<Button
+							variant={currentLocale === loc.code ? 'selected' : 'outline'}
+							onclick={() => {
+								currentLocale = loc.code;
+								setLocale(loc.code);
+							}}
+							size="icon-large"
 						>
-							{loc.name}
-						</span>
-					</Button>
+							<span class="text-xl">{loc.flag}</span>
+						</Button>
+					</Tooltip>
 				{/each}
 			</div>
 		</div>
