@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-02-14
+
 ### Added
 
 - **DeepL Translation Automation:** Added `i18n-translate` tooling to translate locale keys from `en-US` via DeepL with header-based authentication, placeholder preservation, retry handling, and parser-error fallback behavior.
@@ -605,7 +607,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.23.2...HEAD
+[Unreleased]: https://github.com/66HEX/frame/compare/0.24.0...HEAD
+[0.24.0]: https://github.com/66HEX/frame/compare/0.23.2...0.24.0
 [0.23.2]: https://github.com/66HEX/frame/compare/0.23.1...0.23.2
 [0.23.1]: https://github.com/66HEX/frame/compare/0.23.0...0.23.1
 [0.23.0]: https://github.com/66HEX/frame/compare/0.22.0...0.23.0
