@@ -135,7 +135,7 @@
 			<span
 				class={cn(
 					'absolute top-0 right-0 text-[9px] tracking-wide',
-					notice.tone === 'error' ? 'text-red-600' : 'text-blue-600'
+					notice.tone === 'error' ? 'text-red-700' : 'text-blue-700'
 				)}
 			>
 				{notice.text}
@@ -153,7 +153,7 @@
 				{disabled}
 			/>
 		</div>
-		<Button onclick={savePreset} disabled={disabled || !newPresetName.trim()} variant="outline">
+		<Button onclick={savePreset} disabled={disabled || !newPresetName.trim()} variant="secondary">
 			{$_('common.save')}
 		</Button>
 	</div>
@@ -186,7 +186,7 @@
 
 					{#if isCompatible}
 						<Button
-							variant="ghost"
+							variant="secondary"
 							size="none"
 							class="size-5 shrink-0 opacity-50 hover:opacity-100"
 							title={$_('presets.applyToAll')}

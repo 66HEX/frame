@@ -107,7 +107,7 @@
 </script>
 
 <div
-	class="flex h-full flex-col overflow-hidden rounded-lg border border-gray-alpha-100 bg-gray-alpha-100"
+	class="card-highlight flex h-full flex-col overflow-hidden rounded-lg border border-gray-alpha-100 bg-gray-alpha-100"
 >
 	<div class="flex h-10 items-center gap-6 overflow-x-auto border-b border-gray-alpha-100 px-4">
 		{#each activeFiles as file (file.id)}
@@ -116,7 +116,7 @@
 				class={cn(
 					'shrink-0 text-[10px] font-medium tracking-widest transition-all',
 					selectedLogFileId === file.id
-						? 'text-blue-600'
+						? 'text-blue-700'
 						: 'text-gray-alpha-600 hover:text-foreground'
 				)}
 			>
@@ -171,7 +171,7 @@
 				{#if !shouldStickToBottom}
 					<button
 						onclick={scrollToBottom}
-						class="absolute right-4 bottom-4 z-10 rounded-full bg-blue-600 p-2 text-foreground shadow-lg backdrop-blur-md transition-all"
+						class="absolute right-4 bottom-4 z-10 rounded-full bg-blue-700 p-2 text-foreground shadow-lg backdrop-blur-md transition-all"
 						title={$_('logs.scrollToBottom')}
 					>
 						<IconArrowDown size={14} />

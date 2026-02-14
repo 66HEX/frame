@@ -18,14 +18,14 @@
 	}: Props = $props();
 </script>
 
-<div class="relative flex items-center justify-center">
+<div class="button button-highlight relative flex items-center justify-center rounded">
 	<input
 		type="checkbox"
 		bind:this={ref}
 		bind:checked
 		{indeterminate}
 		class={cn(
-			'peer h-3.5 w-3.5 cursor-pointer appearance-none rounded border border-gray-alpha-400 bg-transparent transition-colors checked:border-blue-600 checked:bg-blue-600 disabled:pointer-events-none disabled:opacity-50',
+			'peer h-3.5 w-3.5 cursor-pointer appearance-none rounded bg-transparent transition-colors checked:border-blue-600 checked:bg-blue-600 disabled:pointer-events-none disabled:opacity-50',
 			className
 		)}
 		{...props}

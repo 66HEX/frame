@@ -125,7 +125,7 @@
 		<Label variant="section">{$_('output.processingMode')}</Label>
 		<div class="grid grid-cols-2 gap-2">
 			<Button
-				variant={!isCopyMode ? 'selected' : 'outline'}
+				variant={!isCopyMode ? 'default' : 'secondary'}
 				onclick={() => handleProcessingModeChange('reencode')}
 				{disabled}
 				class="w-full"
@@ -133,7 +133,7 @@
 				{$_('output.reencode')}
 			</Button>
 			<Button
-				variant={isCopyMode ? 'selected' : 'outline'}
+				variant={isCopyMode ? 'default' : 'secondary'}
 				onclick={() => handleProcessingModeChange('copy')}
 				{disabled}
 				class="w-full"
@@ -169,7 +169,7 @@
 				{@const isDisabled =
 					disabled || (isSourceAudioOnly && isVideoContainer) || isIncompatibleForCopy}
 				<Button
-					variant={config.container === fmt ? 'selected' : 'outline'}
+					variant={config.container === fmt ? 'default' : 'secondary'}
 					onclick={() => handleContainerChange(fmt)}
 					disabled={isDisabled}
 					class="w-full"

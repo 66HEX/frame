@@ -143,7 +143,7 @@
 ></button>
 
 <div
-	class="absolute top-0 right-0 bottom-0 z-70 w-80 rounded-l-xl border-l border-gray-alpha-200 bg-background/60 shadow-2xl backdrop-blur-md"
+	class="absolute top-0 right-0 bottom-0 z-70 w-80 rounded-l-xl border-l border-gray-alpha-200 bg-sidebar shadow-2xl"
 	transition:fly={{ x: 320, duration: 300, opacity: 1 }}
 >
 	<div class="flex items-center justify-between border-b border-gray-alpha-100 px-4 py-3">
@@ -179,7 +179,7 @@
 				<Button
 					onclick={handleSave}
 					disabled={isSaving || localValue.current === String(maxConcurrency)}
-					variant="outline"
+					variant="secondary"
 				>
 					{isSaving ? $_('settings.saving') : $_('common.apply')}
 				</Button>
@@ -200,14 +200,14 @@
 				<Label>{$_('settings.fontFamily')}</Label>
 				<div class="grid grid-cols-2 gap-2">
 					<Button
-						variant={fontFamily === 'mono' ? 'selected' : 'outline'}
+						variant={fontFamily === 'mono' ? 'default' : 'secondary'}
 						onclick={() => (fontFamily = 'mono')}
 						class="w-full"
 					>
 						{$_('settings.fontMono')}
 					</Button>
 					<Button
-						variant={fontFamily === 'sans' ? 'selected' : 'outline'}
+						variant={fontFamily === 'sans' ? 'default' : 'secondary'}
 						onclick={() => (fontFamily = 'sans')}
 						class="w-full"
 					>
@@ -223,7 +223,7 @@
 				{#each supportedLocales as loc (loc.code)}
 					<Tooltip content={loc.name}>
 						<Button
-							variant={currentLocale === loc.code ? 'selected' : 'outline'}
+							variant={currentLocale === loc.code ? 'default' : 'secondary'}
 							onclick={() => {
 								currentLocale = loc.code;
 								setLocale(loc.code);
@@ -241,7 +241,7 @@
 			<div class="flex flex-col space-y-3">
 				<div class="flex items-center gap-2 py-0.5">
 					<Checkbox id="auto-update-check" bind:checked={autoUpdateCheck} />
-					<Label for="auto-update-check">{$_('settings.checkOnStartup')}</Label>
+					<Label for="auto-update-check" class="pt-0.5">{$_('settings.checkOnStartup')}</Label>
 				</div>
 				<Button
 					variant="default"
@@ -252,7 +252,7 @@
 					{isCheckingForUpdate ? $_('settings.checking') : $_('settings.checkForUpdates')}
 				</Button>
 				{#if checkStatus}
-					<span class="text-[10px] text-blue-600">{checkStatus}</span>
+					<span class="text-[10px] text-blue-700">{checkStatus}</span>
 				{/if}
 			</div>
 		</div>

@@ -31,7 +31,7 @@
 </script>
 
 <div
-	class="group relative flex h-full flex-col overflow-hidden rounded-lg border border-gray-alpha-100 bg-gray-alpha-100"
+	class="group card-highlight flex h-full flex-col overflow-hidden rounded-lg border border-gray-alpha-100 bg-gray-alpha-100"
 >
 	<div class="z-10 flex h-10 items-center border-b border-gray-alpha-100 px-4">
 		<div

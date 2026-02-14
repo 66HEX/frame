@@ -83,7 +83,7 @@
 
 				{#if onChangeView}
 					<div
-						class="pointer-events-auto flex h-7.5 items-center gap-1 rounded border border-gray-alpha-100 bg-gray-alpha-100 p-0.5"
+						class="button-highlight pointer-events-auto flex h-7.5 items-center gap-1 rounded-md bg-gray-alpha-100 p-0.5"
 					>
 						<Button
 							variant={activeView === 'dashboard' ? 'default' : 'titlebar-ghost'}

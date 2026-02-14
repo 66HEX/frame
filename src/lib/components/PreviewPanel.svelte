@@ -592,7 +592,7 @@
 </script>
 
 <div
-	class="flex h-full flex-col overflow-hidden rounded-xl border border-gray-alpha-100 bg-gray-alpha-100 p-4"
+	class="card-highlight flex h-full flex-col overflow-hidden rounded-lg border border-gray-alpha-100 bg-gray-alpha-100 p-4"
 >
 	<div
 		class="relative flex min-h-0 flex-1 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-gray-alpha-200 bg-black"
@@ -705,7 +705,8 @@
 				{#each ASPECT_OPTIONS as option (option.id)}
 					<Button
 						size="sm"
-						variant={cropAspect === option.id ? 'selected' : 'ghost'}
+						class="border border-transparent"
+						variant={cropAspect === option.id ? 'default' : 'ghost'}
 						onclick={() => selectAspect(option.id)}
 					>
 						{option.labelKey ? $_(option.labelKey) : option.display}
@@ -752,7 +753,7 @@
 				role="presentation"
 				onmousedown={(e) => !controlsDisabled && handleMouseDown(e, 'start')}
 			>
-				<div class="h-1.5 w-1.5 rounded-full bg-blue-600"></div>
+				<div class="h-1.5 w-1.5 rounded-full bg-blue-700"></div>
 			</div>
 
 			<div
@@ -762,7 +763,7 @@
 				role="presentation"
 				onmousedown={(e) => !controlsDisabled && handleMouseDown(e, 'end')}
 			>
-				<div class="h-1.5 w-1.5 rounded-full bg-blue-600"></div>
+				<div class="h-1.5 w-1.5 rounded-full bg-blue-700"></div>
 			</div>
 		</div>
 
@@ -817,7 +818,7 @@
 				</Button>
 				<Button
 					size="icon"
-					variant={flipHorizontal ? 'selected' : 'ghost'}
+					variant={flipHorizontal ? 'default' : 'ghost'}
 					title={$_('video.flipHorizontal')}
 					onclick={() => toggleFlip('horizontal')}
 					disabled={controlsDisabled}
@@ -826,7 +827,7 @@
 				</Button>
 				<Button
 					size="icon"
-					variant={flipVertical ? 'selected' : 'ghost'}
+					variant={flipVertical ? 'default' : 'ghost'}
 					title={$_('video.flipVertical')}
 					onclick={() => toggleFlip('vertical')}
 					disabled={controlsDisabled}
@@ -835,7 +836,7 @@
 				</Button>
 				<Button
 					size="icon"
-					variant={cropMode ? 'selected' : appliedCrop ? 'selected' : 'ghost'}
+					variant={cropMode ? 'default' : appliedCrop ? 'default' : 'ghost'}
 					title={$_('crop.enter')}
 					onclick={toggleCropMode}
 					disabled={controlsDisabled || !hasCropDimensions}

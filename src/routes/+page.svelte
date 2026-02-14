@@ -161,7 +161,7 @@
 								{/key}
 							{:else}
 								<div
-									class="flex h-full flex-col items-center justify-center rounded-lg border border-gray-alpha-100 bg-gray-alpha-100"
+									class="card-highlight flex h-full flex-col items-center justify-center overflow-hidden rounded-lg border border-gray-alpha-100 bg-gray-alpha-100"
 								></div>
 							{/if}
 						</div>
@@ -183,27 +183,29 @@
 
 				<div class="col-span-4 h-full min-h-0">
 					<div
-						class="custom-scrollbar h-full min-h-0 overflow-y-auto rounded-lg border border-gray-alpha-100 bg-gray-alpha-100"
+						class="card-highlight h-full min-h-0 overflow-hidden rounded-lg border border-gray-alpha-100 bg-gray-alpha-100"
 					>
-						{#if selectedFile}
-							<SettingsPanel
-								config={selectedFile.config}
-								outputName={selectedFile.outputName}
-								metadata={selectedFile.metadata}
-								metadataStatus={selectedFile.metadataStatus}
-								metadataError={selectedFile.metadataError}
-								{presets}
-								onUpdate={fileListManager.updateSelectedConfig}
-								onUpdateOutputName={fileListManager.updateSelectedOutputName}
-								onApplyPreset={presetsManager.applyPresetToSelection}
-								onApplyPresetToAll={presetsManager.handleApplyPresetToAll}
-								onSavePreset={presetsManager.handleSavePreset}
-								onDeletePreset={presetsManager.handleDeletePreset}
-								disabled={selectedFileLocked}
-							/>
-						{:else}
-							<EmptySelection />
-						{/if}
+						<div class="custom-scrollbar h-full min-h-0 overflow-y-auto">
+							{#if selectedFile}
+								<SettingsPanel
+									config={selectedFile.config}
+									outputName={selectedFile.outputName}
+									metadata={selectedFile.metadata}
+									metadataStatus={selectedFile.metadataStatus}
+									metadataError={selectedFile.metadataError}
+									{presets}
+									onUpdate={fileListManager.updateSelectedConfig}
+									onUpdateOutputName={fileListManager.updateSelectedOutputName}
+									onApplyPreset={presetsManager.applyPresetToSelection}
+									onApplyPresetToAll={presetsManager.handleApplyPresetToAll}
+									onSavePreset={presetsManager.handleSavePreset}
+									onDeletePreset={presetsManager.handleDeletePreset}
+									disabled={selectedFileLocked}
+								/>
+							{:else}
+								<EmptySelection />
+							{/if}
+						</div>
 					</div>
 				</div>
 			</div>
@@ -219,9 +221,9 @@
 		>
 			<div
 				transition:scale={{ start: 1.05, duration: 100, opacity: 1 }}
-				class="flex h-36 w-72 flex-col items-center justify-center rounded-lg border border-dashed border-blue-600 bg-blue-900/20 shadow-2xl backdrop-blur-sm"
+				class="card-highlight flex h-36 w-72 flex-col items-center justify-center rounded-lg border border-gray-alpha-100 bg-sidebar shadow-2xl"
 			>
-				<p class="text-[10px] font-medium tracking-widest text-blue-500">
+				<p class="text-[10px] font-medium tracking-widest text-foreground">
 					{$_('fileList.importSource')}
 				</p>
 			</div>

@@ -100,7 +100,9 @@
 </script>
 
 <div class="flex h-full flex-col">
-	<div class="flex h-10 items-center justify-between border-b border-gray-alpha-100 px-4">
+	<div
+		class="relative flex h-10 items-center justify-between px-4 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-gray-alpha-100 after:content-['']"
+	>
 		<div class="flex w-full items-center justify-start gap-1">
 			{#each TABS as tabId (tabId)}
 				{@const isVideoDisabled = tabId === 'video' && !supportsVideoTab}
@@ -109,10 +111,13 @@
 				{@const isDisabled = isVideoDisabled || isAudioDisabled || isSubtitlesDisabled}
 				{@const Icon = icons[tabId]}
 				<Button
-					variant={activeTab === tabId ? 'selected' : 'ghost'}
+					variant={activeTab === tabId ? 'default' : 'ghost'}
 					size="icon"
 					title={$_(`tabs.${tabId}`)}
-					class={cn('size-6 transition-all', isDisabled && 'pointer-events-none opacity-50')}
+					class={cn(
+						'size-6 border border-transparent',
+						isDisabled && 'pointer-events-none opacity-50'
+					)}
 					onclick={() => (activeTab = tabId)}
 				>
 					<Icon size={16} />

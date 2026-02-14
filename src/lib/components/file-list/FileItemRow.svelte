@@ -76,11 +76,11 @@
 					)}>{Math.round(item.progress)}%</span
 				>
 			{:else if item.status === FileStatus.COMPLETED}
-				<span class="text-[13px] text-blue-600">{$_('fileStatus.ready')}</span>
+				<span class="text-[13px] text-blue-700">{$_('fileStatus.ready')}</span>
 			{:else if item.status === FileStatus.QUEUED}
 				<span class="text-[13px] text-gray-alpha-600">{$_('fileStatus.queued')}</span>
 			{:else if item.status === FileStatus.ERROR}
-				<span class="text-[13px] text-red-600">{$_('fileStatus.error')}</span>
+				<span class="text-[13px] text-red-700">{$_('fileStatus.error')}</span>
 			{:else}
 				<span class="text-[13px] text-gray-alpha-600">{$_('fileStatus.idle')}</span>
 			{/if}
@@ -119,7 +119,7 @@
 				variant="destructive"
 				size="none"
 				disabled={item.status === FileStatus.CONVERTING}
-				class="h-4 w-4 text-gray-alpha-600 hover:bg-transparent hover:text-red-600 disabled:pointer-events-none disabled:opacity-50"
+				class="h-4 w-4 text-gray-alpha-600 hover:bg-transparent hover:text-red-700 disabled:pointer-events-none disabled:opacity-50"
 			>
 				<IconTrash size={16} />
 			</Button>

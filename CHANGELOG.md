@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Neumorphic UI Redesign:** Reworked the app shell and core UI controls in a neumorphic style across dashboard/settings/logs/titlebars, including updated surface tokens (`background`/`sidebar`) and new shared highlight treatments for cards, buttons, and inputs.
 - **Translation Workflow Commands:** Added `i18n:translate`, `i18n:translate:write`, `i18n:translate:rewrite`, and `i18n:sync:auto` scripts plus updated contributor workflow documentation.
 - **Non-English Locale Consistency:** Re-translated all non-source locale files from the current `en-US` dictionary baseline to reduce cross-locale copy drift.
 - **App Settings Language Hover UI:** Replaced inline CSS hover labels in language selection with the shared tooltip component for consistent interaction behavior.

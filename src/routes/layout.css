@@ -60,9 +60,9 @@ select {
 }
 
 :root {
-	--background: #17171c;
+	--background: #17191d;
 	--foreground: #ffffff;
-
+	--sidebar: #232529;
 	--font-geist-mono: 'GeistMono', monospace;
 	--font-geist-sans: 'GeistSans', sans-serif;
 	--app-font-family: var(--font-geist-mono);
@@ -93,6 +93,7 @@ select {
 @theme inline {
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
+	--color-sidebar: var(--sidebar);
 	--font-mono: var(--font-geist-mono);
 
 	--color-gray-alpha-100: var(--ds-gray-alpha-100);
@@ -147,4 +148,20 @@ select {
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
 	background: var(--ds-gray-alpha-400);
+}
+
+.card-highlight {
+	box-shadow: inset 0 1px 0 0 var(--ds-gray-alpha-200);
+}
+
+.input-highlight {
+	box-shadow:
+		inset 0 0.5px 0 0 rgba(0, 0, 0, 0.2),
+		inset 0 -0.5px 0 0 var(--ds-gray-alpha-400);
+}
+
+.button-highlight {
+	box-shadow:
+		inset 0 0.5px 0 var(--ds-gray-alpha-400),
+		inset 0 0 0 0.5px var(--ds-gray-alpha-200);
 }

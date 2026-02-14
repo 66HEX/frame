@@ -72,7 +72,7 @@
 			<div class="grid grid-cols-3 gap-2">
 				{#each CHANNELS as ch (ch)}
 					<Button
-						variant={config.audioChannels === ch ? 'selected' : 'outline'}
+						variant={config.audioChannels === ch ? 'default' : 'secondary'}
 						onclick={() => onUpdate({ audioChannels: ch })}
 						disabled={encodeControlsDisabled}
 						class="w-full"
@@ -102,7 +102,7 @@
 				<div class="flex items-center justify-between">
 					<Label for="audio-volume">{$_('audio.volume')}</Label>
 					<span
-						class="rounded border border-blue-600 bg-blue-900/20 px-1.5 text-[10px] font-medium text-blue-600"
+						class="button-highlight rounded bg-blue-700 px-1.5 text-[10px] font-medium text-foreground"
 						>{config.audioVolume}%</span
 					>
 				</div>
@@ -165,7 +165,7 @@
 					{@const isSelected = (config.selectedAudioTracks || []).includes(track.index)}
 					{@const trackBitrate = formatTrackBitrate(track.bitrateKbps)}
 					<Button
-						variant={isSelected ? 'selected' : 'outline'}
+						variant={isSelected ? 'default' : 'secondary'}
 						onclick={() => toggleTrack(track.index)}
 						{disabled}
 						class="flex h-auto w-full items-center justify-between px-3 py-2 text-left"
@@ -199,12 +199,12 @@
 
 						<div
 							class={cn(
-								'flex h-3 w-3 items-center justify-center rounded-full border transition-all',
-								isSelected ? 'border-blue-600' : 'border-gray-alpha-200'
+								'button-highlight flex h-3 w-3 items-center justify-center rounded-full border transition-all',
+								isSelected ? 'border-foreground' : 'border-gray-alpha-200'
 							)}
 						>
 							<div
-								class="h-1.5 w-1.5 rounded-full bg-blue-600 transition-all"
+								class="h-1.5 w-1.5 rounded-full bg-foreground transition-all"
 								style="opacity: {isSelected ? 1 : 0}; transform: scale({isSelected ? 1 : 0.5});"
 							></div>
 						</div>

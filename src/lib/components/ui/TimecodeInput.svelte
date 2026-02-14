@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { untrack, tick } from 'svelte';
 	import { cn } from '$lib/utils/cn';
+	import { themeStore } from '$lib/stores/theme.svelte';
+	import { loadWindowOpacity } from '$lib/services/settings';
+	import { onMount } from 'svelte';
 
 	let {
 		value = 0,
@@ -13,6 +16,12 @@
 		disabled?: boolean;
 		class?: string;
 	} = $props();
+
+	onMount(() => {
+		loadWindowOpacity().then((val) => {
+			themeStore.opacity = val;
+		});
+	});
 
 	function secondsToTimecode(totalSeconds: number): string {
 		const h = Math.floor(totalSeconds / 3600);
@@ -193,18 +202,24 @@
 	}
 </script>
 
-<input
-	bind:this={inputRef}
-	type="text"
-	value={displayValue}
-	{disabled}
-	class={cn(
-		'flex h-7.5 w-full rounded-sm border border-gray-alpha-200 bg-transparent px-3 py-1.5 text-[11px] tracking-wide transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-alpha-400 focus-visible:border-blue-600! focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50',
-		className
-	)}
-	onkeydown={handleKeyDown}
-	onpaste={handlePaste}
-	oncontextmenu={(e) => e.preventDefault()}
-	spellcheck="false"
-	autocomplete="off"
-/>
+<div
+	class="input-highlight relative h-7.5 w-full rounded-sm border border-gray-alpha-200"
+	style="background-color: color-mix(in srgb, var(--background), transparent {100 -
+		themeStore.opacity}%)"
+>
+	<input
+		bind:this={inputRef}
+		type="text"
+		value={displayValue}
+		{disabled}
+		class={cn(
+			'flex w-full px-3 py-1.5  text-[11px] tracking-wide transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-alpha-400 focus-visible:border-blue-600! focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50',
+			className
+		)}
+		onkeydown={handleKeyDown}
+		onpaste={handlePaste}
+		oncontextmenu={(e) => e.preventDefault()}
+		spellcheck="false"
+		autocomplete="off"
+	/>
+</div>
