@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **DeepL Translation Automation:** Added `i18n-translate` tooling to translate locale keys from `en-US` via DeepL with header-based authentication, placeholder preservation, retry handling, and parser-error fallback behavior.
+
+### Changed
+
+- **Translation Workflow Commands:** Added `i18n:translate`, `i18n:translate:write`, `i18n:translate:rewrite`, and `i18n:sync:auto` scripts plus updated contributor workflow documentation.
+- **Non-English Locale Consistency:** Re-translated all non-source locale files from the current `en-US` dictionary baseline to reduce cross-locale copy drift.
+
 ## [0.23.2] - 2026-02-14
 
 ### Fixed

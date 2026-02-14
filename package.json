@@ -15,6 +15,10 @@
 		"i18n:check": "node scripts/i18n-check.mjs",
 		"i18n:sync": "node scripts/i18n-sync.mjs",
 		"i18n:sync:write": "node scripts/i18n-sync.mjs --write",
+		"i18n:translate": "node scripts/i18n-translate.mjs",
+		"i18n:translate:write": "node scripts/i18n-translate.mjs --write",
+		"i18n:translate:rewrite": "node scripts/i18n-translate.mjs --write --rewrite-existing",
+		"i18n:sync:auto": "node scripts/i18n-sync.mjs --write && node scripts/i18n-translate.mjs --write",
 		"tauri": "tauri",
 		"setup:ffmpeg": "node scripts/setup-ffmpeg.cjs",
 		"setup:upscaler": "node scripts/setup-upscaler.cjs"
