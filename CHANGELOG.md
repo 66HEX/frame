@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-02-14
+
+### Added
+
+- **DeepL Translation Automation:** Added `i18n-translate` tooling to translate locale keys from `en-US` via DeepL with header-based authentication, placeholder preservation, retry handling, and parser-error fallback behavior.
+- **Reusable Tooltip Component:** Added `ui/Tooltip.svelte` with configurable side variants via `class-variance-authority`, arrow rendering, Svelte transition animation, and delayed-first-hover behavior with instant trigger-to-trigger switching.
+- **Stream Copy / Remux Mode:** Added a new `Cut / Stream Copy` processing mode for trim + remux workflows without re-encoding (`-c copy`), including queue/config support across frontend and backend.
+
+### Changed
+
+- **Neumorphic UI Redesign:** Reworked the app shell and core UI controls in a neumorphic style across dashboard/settings/logs/titlebars, including updated surface tokens (`background`/`sidebar`) and new shared highlight treatments for cards, buttons, and inputs.
+- **Translation Workflow Commands:** Added `i18n:translate`, `i18n:translate:write`, `i18n:translate:rewrite`, and `i18n:sync:auto` scripts plus updated contributor workflow documentation.
+- **Non-English Locale Consistency:** Re-translated all non-source locale files from the current `en-US` dictionary baseline to reduce cross-locale copy drift.
+- **App Settings Language Hover UI:** Replaced inline CSS hover labels in language selection with the shared tooltip component for consistent interaction behavior.
+- **Shared Media Rules (Copy Validation):** Extended `media-rules.json` with stream-level container compatibility tables (video/audio/subtitle) and applied them in both UI container availability and backend preflight validation for stream copy tasks.
+
+### Fixed
+
+- **Input Placeholder Contrast:** Increased placeholder/readability contrast in shared text and timecode inputs and aligned subtitle burn file picker text to foreground color for better visibility.
+
 ## [0.23.2] - 2026-02-14
 
 ### Fixed
@@ -587,7 +607,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.23.2...HEAD
+[Unreleased]: https://github.com/66HEX/frame/compare/0.24.0...HEAD
+[0.24.0]: https://github.com/66HEX/frame/compare/0.23.2...0.24.0
 [0.23.2]: https://github.com/66HEX/frame/compare/0.23.1...0.23.2
 [0.23.1]: https://github.com/66HEX/frame/compare/0.23.0...0.23.1
 [0.23.0]: https://github.com/66HEX/frame/compare/0.22.0...0.23.0

@@ -25,16 +25,19 @@
 	let {
 		config,
 		disabled = false,
+		copyMode = false,
 		onUpdate,
 		metadata
 	}: {
 		config: ConversionConfig;
 		disabled?: boolean;
+		copyMode?: boolean;
 		onUpdate: (config: Partial<ConversionConfig>) => void;
 		metadata?: SourceMetadata;
 	} = $props();
 
 	const isLossless = $derived(['flac', 'alac', 'pcm_s16le'].includes(config.audioCodec));
+	const encodeControlsDisabled = $derived(disabled || copyMode);
 
 	function toggleTrack(index: number) {
 		if (disabled) return;
@@ -62,13 +65,16 @@
 <div class="space-y-4">
 	<div class="space-y-3">
 		<Label variant="section">{$_('audio.channelsBitrate')}</Label>
+		{#if copyMode}
+			<p class="text-[9px] text-gray-alpha-600">{$_('audio.copyModeHint')}</p>
+		{/if}
 		<div class="space-y-3">
 			<div class="grid grid-cols-3 gap-2">
 				{#each CHANNELS as ch (ch)}
 					<Button
-						variant={config.audioChannels === ch ? 'selected' : 'outline'}
+						variant={config.audioChannels === ch ? 'default' : 'secondary'}
 						onclick={() => onUpdate({ audioChannels: ch })}
-						{disabled}
+						disabled={encodeControlsDisabled}
 						class="w-full"
 					>
 						{$_(`audio.${ch}`)}
@@ -88,7 +94,7 @@
 						const value = e.currentTarget.value.replace(/[^0-9]/g, '');
 						onUpdate({ audioBitrate: value });
 					}}
-					disabled={disabled || isLossless}
+					disabled={encodeControlsDisabled || isLossless}
 				/>
 			</div>
 
@@ -96,7 +102,7 @@
 				<div class="flex items-center justify-between">
 					<Label for="audio-volume">{$_('audio.volume')}</Label>
 					<span
-						class="rounded border border-blue-600 bg-blue-900/20 px-1.5 text-[10px] font-medium text-blue-600"
+						class="button-highlight rounded bg-blue-700 px-1.5 text-[10px] font-medium text-foreground"
 						>{config.audioVolume}%</span
 					>
 				</div>
@@ -107,7 +113,7 @@
 					step={1}
 					value={config.audioVolume}
 					oninput={(e) => onUpdate({ audioVolume: Number(e.currentTarget.value) })}
-					{disabled}
+					disabled={encodeControlsDisabled}
 				/>
 				<div class="flex justify-between text-[9px] text-gray-alpha-600">
 					<span>{$_('audio.muted')}</span>
@@ -120,7 +126,7 @@
 					id="audio-normalize"
 					checked={config.audioNormalize}
 					onchange={(e) => onUpdate({ audioNormalize: e.currentTarget.checked })}
-					{disabled}
+					disabled={encodeControlsDisabled}
 				/>
 				<div class="space-y-0.5">
 					<Label for="audio-normalize">{$_('audio.normalize')}</Label>
@@ -139,8 +145,8 @@
 				<ListItem
 					selected={config.audioCodec === codec.id}
 					onclick={() => onUpdate({ audioCodec: codec.id })}
-					disabled={disabled || !allowed}
-					class={cn(!allowed && 'pointer-events-none opacity-50')}
+					disabled={encodeControlsDisabled || !allowed}
+					class={cn((encodeControlsDisabled || !allowed) && 'pointer-events-none opacity-50')}
 				>
 					<span>{codec.id}</span>
 					<span class="text-[9px] opacity-50">
@@ -159,7 +165,7 @@
 					{@const isSelected = (config.selectedAudioTracks || []).includes(track.index)}
 					{@const trackBitrate = formatTrackBitrate(track.bitrateKbps)}
 					<Button
-						variant={isSelected ? 'selected' : 'outline'}
+						variant={isSelected ? 'default' : 'secondary'}
 						onclick={() => toggleTrack(track.index)}
 						{disabled}
 						class="flex h-auto w-full items-center justify-between px-3 py-2 text-left"
@@ -193,12 +199,12 @@
 
 						<div
 							class={cn(
-								'flex h-3 w-3 items-center justify-center rounded-full border transition-all',
-								isSelected ? 'border-blue-600' : 'border-gray-alpha-200'
+								'button-highlight flex h-3 w-3 items-center justify-center rounded-full border transition-all',
+								isSelected ? 'border-foreground' : 'border-gray-alpha-200'
 							)}
 						>
 							<div
-								class="h-1.5 w-1.5 rounded-full bg-blue-600 transition-all"
+								class="h-1.5 w-1.5 rounded-full bg-foreground transition-all"
 								style="opacity: {isSelected ? 1 : 0}; transform: scale({isSelected ? 1 : 0.5});"
 							></div>
 						</div>

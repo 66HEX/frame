@@ -80,6 +80,10 @@ Before submitting a PR, please ensure:
 - Validate locale integrity and sync rules: `bun run i18n:check`.
 - Preview sync changes in other locales: `bun run i18n:sync`.
 - Apply sync changes (fills missing keys with TODO-marked English fallback, removes stale keys): `bun run i18n:sync:write`.
+- Configure DeepL access: export `DEEPL_API_KEY=...`.
+- Translate only new TODO/missing keys from `en-US`: `bun run i18n:translate:write`.
+- Re-translate all non-source locale keys from `en-US`: `bun run i18n:translate:rewrite`.
+- One-shot sync + auto-translate for new keys while developing: `bun run i18n:sync:auto`.
 
 ## Pull Request Process
 

@@ -42,7 +42,9 @@ async function main() {
 		...extracted.literalReferencedKeys
 	]);
 
-	const missingInSourceLocale = extracted.staticKeys.filter((key) => !baseKeySet.includes(key)).sort();
+	const missingInSourceLocale = extracted.staticKeys
+		.filter((key) => !baseKeySet.includes(key))
+		.sort();
 
 	const output = {
 		sourceLocale: config.sourceLocale,

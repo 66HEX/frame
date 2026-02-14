@@ -55,6 +55,8 @@ pub struct ProbeMetadata {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ConversionConfig {
+    #[serde(default = "default_processing_mode")]
+    pub processing_mode: String,
     pub container: String,
     pub video_codec: String,
     pub video_bitrate_mode: String,
@@ -110,6 +112,10 @@ pub struct ConversionConfig {
 
 fn default_rotation() -> String {
     "0".to_string()
+}
+
+fn default_processing_mode() -> String {
+    "reencode".to_string()
 }
 
 fn default_quality() -> u32 {

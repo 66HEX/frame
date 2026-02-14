@@ -59,7 +59,7 @@
 		<div class="grid grid-cols-3 gap-2">
 			{#each MODES as mode (mode.value)}
 				<Button
-					variant={config.metadata.mode === mode.value ? 'selected' : 'outline'}
+					variant={config.metadata.mode === mode.value ? 'default' : 'secondary'}
 					{disabled}
 					class="w-full"
 					onclick={() => updateMetadata('mode', mode.value)}

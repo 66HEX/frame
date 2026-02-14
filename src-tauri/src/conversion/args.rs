@@ -7,10 +7,135 @@ use crate::conversion::error::ConversionError;
 use crate::conversion::filters::{build_audio_filters, build_video_filters};
 use crate::conversion::media_rules::{
     container_supports_audio, container_supports_subtitles, is_audio_codec_allowed,
-    is_video_codec_allowed, is_video_only_container,
+    is_audio_stream_codec_allowed, is_subtitle_codec_allowed, is_video_codec_allowed,
+    is_video_only_container, is_video_stream_codec_allowed,
 };
-use crate::conversion::types::{ConversionConfig, MetadataConfig, MetadataMode};
+use crate::conversion::types::{
+    AudioTrack, ConversionConfig, MetadataConfig, MetadataMode, ProbeMetadata, SubtitleTrack,
+    VOLUME_EPSILON,
+};
 use crate::conversion::utils::{get_hwaccel_args, is_audio_only_container, parse_time};
+
+fn is_copy_mode(config: &ConversionConfig) -> bool {
+    config.processing_mode == "copy"
+}
+
+fn collect_selected_audio_tracks<'a>(
+    config: &ConversionConfig,
+    probe: &'a ProbeMetadata,
+) -> Result<Vec<&'a AudioTrack>, ConversionError> {
+    if config.selected_audio_tracks.is_empty() {
+        return Ok(probe.audio_tracks.iter().collect());
+    }
+
+    config
+        .selected_audio_tracks
+        .iter()
+        .map(|index| {
+            probe
+                .audio_tracks
+                .iter()
+                .find(|track| track.index == *index)
+                .ok_or_else(|| {
+                    ConversionError::InvalidInput(format!(
+                        "Selected audio track #{} was not found in source",
+                        index
+                    ))
+                })
+        })
+        .collect()
+}
+
+fn collect_selected_subtitle_tracks<'a>(
+    config: &ConversionConfig,
+    probe: &'a ProbeMetadata,
+) -> Result<Vec<&'a SubtitleTrack>, ConversionError> {
+    if config.selected_subtitle_tracks.is_empty() {
+        return Ok(probe.subtitle_tracks.iter().collect());
+    }
+
+    config
+        .selected_subtitle_tracks
+        .iter()
+        .map(|index| {
+            probe
+                .subtitle_tracks
+                .iter()
+                .find(|track| track.index == *index)
+                .ok_or_else(|| {
+                    ConversionError::InvalidInput(format!(
+                        "Selected subtitle track #{} was not found in source",
+                        index
+                    ))
+                })
+        })
+        .collect()
+}
+
+pub fn validate_stream_copy_compatibility(
+    config: &ConversionConfig,
+    probe: &ProbeMetadata,
+) -> Result<(), ConversionError> {
+    if !is_copy_mode(config) {
+        return Ok(());
+    }
+
+    let is_audio_only = is_audio_only_container(&config.container);
+
+    if is_audio_only {
+        let selected_audio = collect_selected_audio_tracks(config, probe)?;
+        if selected_audio.is_empty() {
+            return Err(ConversionError::InvalidInput(
+                "Source has no audio streams to copy into an audio container".to_string(),
+            ));
+        }
+        for track in selected_audio {
+            if !is_audio_stream_codec_allowed(&config.container, &track.codec) {
+                return Err(ConversionError::InvalidInput(format!(
+                    "Audio codec '{}' from source track #{} is incompatible with container '{}'",
+                    track.codec, track.index, config.container
+                )));
+            }
+        }
+        return Ok(());
+    }
+
+    let video_codec = probe.video_codec.as_deref().ok_or_else(|| {
+        ConversionError::InvalidInput(
+            "Source has no video stream; choose an audio container for stream copy".to_string(),
+        )
+    })?;
+    if !is_video_stream_codec_allowed(&config.container, video_codec) {
+        return Err(ConversionError::InvalidInput(format!(
+            "Video codec '{}' is incompatible with container '{}'",
+            video_codec, config.container
+        )));
+    }
+
+    if container_supports_audio(&config.container) {
+        for track in collect_selected_audio_tracks(config, probe)? {
+            if !is_audio_stream_codec_allowed(&config.container, &track.codec) {
+                return Err(ConversionError::InvalidInput(format!(
+                    "Audio codec '{}' from source track #{} is incompatible with container '{}'",
+                    track.codec, track.index, config.container
+                )));
+            }
+        }
+    }
+
+    if container_supports_subtitles(&config.container) {
+        for track in collect_selected_subtitle_tracks(config, probe)? {
+            if !is_subtitle_codec_allowed(&config.container, &track.codec) {
+                return Err(ConversionError::InvalidInput(format!(
+                    "Subtitle codec '{}' from source track #{} is incompatible with container '{}'",
+                    track.codec, track.index, config.container
+                )));
+            }
+        }
+    }
+
+    Ok(())
+}
 
 pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -> Vec<String> {
     let mut args = Vec::new();
@@ -73,6 +198,39 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         .subtitle_burn_path
         .as_ref()
         .is_some_and(|path| !path.trim().is_empty());
+
+    if is_copy_mode(config) {
+        if !is_audio_only {
+            args.push("-map".to_string());
+            args.push("0:v?".to_string());
+        }
+
+        if !config.selected_audio_tracks.is_empty() {
+            for track_index in &config.selected_audio_tracks {
+                args.push("-map".to_string());
+                args.push(format!("0:{}", track_index));
+            }
+        } else if container_supports_audio(&config.container) {
+            args.push("-map".to_string());
+            args.push("0:a?".to_string());
+        }
+
+        if !config.selected_subtitle_tracks.is_empty() {
+            for track_index in &config.selected_subtitle_tracks {
+                args.push("-map".to_string());
+                args.push(format!("0:{}", track_index));
+            }
+        } else if container_supports_subtitles(&config.container) {
+            args.push("-map".to_string());
+            args.push("0:s?".to_string());
+        }
+
+        args.push("-c".to_string());
+        args.push("copy".to_string());
+        args.push("-y".to_string());
+        args.push(output.to_string());
+        return args;
+    }
 
     if is_audio_only {
         args.push("-vn".to_string());
@@ -286,6 +444,15 @@ pub fn validate_task_input(
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty());
+    let processing_mode = config.processing_mode.trim();
+
+    if processing_mode != "reencode" && processing_mode != "copy" {
+        return Err(ConversionError::InvalidInput(format!(
+            "Invalid processing mode: {}",
+            processing_mode
+        )));
+    }
+    let is_copy_mode = processing_mode == "copy";
 
     if let Some(start) = start_time
         && parse_time(start).is_none()
@@ -314,7 +481,7 @@ pub fn validate_task_input(
         ));
     }
 
-    if config.resolution == "custom" {
+    if !is_copy_mode && config.resolution == "custom" {
         let w_str = config.custom_width.as_deref().unwrap_or("-1");
         let h_str = config.custom_height.as_deref().unwrap_or("-1");
 
@@ -337,7 +504,8 @@ pub fn validate_task_input(
         }
     }
 
-    if config.video_bitrate_mode == "bitrate"
+    if !is_copy_mode
+        && config.video_bitrate_mode == "bitrate"
         && !is_audio_only_container(&config.container)
         && !is_video_only_container(&config.container)
     {
@@ -358,14 +526,20 @@ pub fn validate_task_input(
     let is_video_only = is_video_only_container(&config.container);
     let supports_audio = container_supports_audio(&config.container);
     let supports_subtitles = container_supports_subtitles(&config.container);
-    if !is_audio_only && !is_video_codec_allowed(&config.container, &config.video_codec) {
+    if !is_copy_mode
+        && !is_audio_only
+        && !is_video_codec_allowed(&config.container, &config.video_codec)
+    {
         return Err(ConversionError::InvalidInput(format!(
             "Video codec '{}' is not compatible with container '{}'",
             config.video_codec, config.container
         )));
     }
 
-    if supports_audio && !is_audio_codec_allowed(&config.container, &config.audio_codec) {
+    if !is_copy_mode
+        && supports_audio
+        && !is_audio_codec_allowed(&config.container, &config.audio_codec)
+    {
         return Err(ConversionError::InvalidInput(format!(
             "Audio codec '{}' is not compatible with container '{}'",
             config.audio_codec, config.container
@@ -393,6 +567,66 @@ pub fn validate_task_input(
         return Err(ConversionError::InvalidInput(
             "ML upscaling requires an audio-capable video container".to_string(),
         ));
+    }
+
+    if is_copy_mode {
+        if is_video_only {
+            return Err(ConversionError::InvalidInput(
+                "Stream copy mode is not available for video-only containers".to_string(),
+            ));
+        }
+
+        if has_ml_upscale {
+            return Err(ConversionError::InvalidInput(
+                "ML upscaling requires re-encoding mode".to_string(),
+            ));
+        }
+
+        if config
+            .subtitle_burn_path
+            .as_ref()
+            .is_some_and(|path| !path.trim().is_empty())
+        {
+            return Err(ConversionError::InvalidInput(
+                "Burn-in subtitles are unavailable in stream copy mode".to_string(),
+            ));
+        }
+
+        if (config.audio_volume - 100.0).abs() > VOLUME_EPSILON {
+            return Err(ConversionError::InvalidInput(
+                "Audio volume adjustment requires re-encoding".to_string(),
+            ));
+        }
+
+        if config.audio_normalize {
+            return Err(ConversionError::InvalidInput(
+                "Audio normalization requires re-encoding".to_string(),
+            ));
+        }
+
+        if config.rotation != "0" || config.flip_horizontal || config.flip_vertical {
+            return Err(ConversionError::InvalidInput(
+                "Video transforms require re-encoding".to_string(),
+            ));
+        }
+
+        if config.crop.as_ref().is_some_and(|crop| crop.enabled) {
+            return Err(ConversionError::InvalidInput(
+                "Cropping requires re-encoding".to_string(),
+            ));
+        }
+
+        if config.resolution != "original" || config.fps != "original" {
+            return Err(ConversionError::InvalidInput(
+                "Resolution and FPS changes require re-encoding".to_string(),
+            ));
+        }
+
+        if config.hw_decode {
+            return Err(ConversionError::InvalidInput(
+                "Hardware decoding is unavailable in stream copy mode".to_string(),
+            ));
+        }
     }
 
     if !supports_audio && !config.selected_audio_tracks.is_empty() {

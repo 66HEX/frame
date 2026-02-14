@@ -35,7 +35,7 @@
 	>
 		<div
 			transition:scale={{ start: 1.05, duration: 100, opacity: 1 }}
-			class="flex w-100 flex-col gap-4 rounded-lg border border-blue-600 bg-blue-900/20 p-3 shadow-2xl backdrop-blur-sm"
+			class="card-highlight flex w-100 flex-col gap-4 rounded-lg border border-gray-alpha-100 bg-sidebar p-3 shadow-2xl"
 		>
 			<div>
 				<Label variant="section" class="text-foreground">{$_('update.available')}</Label>
@@ -45,17 +45,17 @@
 				</p>
 			</div>
 
-				{#if updateStore.body}
-					<div
-						class="markdown-content max-h-35 overflow-y-auto rounded bg-gray-alpha-100 p-3 text-xs tracking-wide text-gray-alpha-600"
-					>
-						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-						{@html renderReleaseNotes(updateStore.body)}
-					</div>
-				{/if}
+			{#if updateStore.body}
+				<div
+					class="markdown-content max-h-35 overflow-y-auto rounded bg-gray-alpha-100 p-3 text-xs tracking-wide text-gray-alpha-600"
+				>
+					<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+					{@html renderReleaseNotes(updateStore.body)}
+				</div>
+			{/if}
 
 			{#if updateStore.error}
-				<div class="text-xs text-red-600">
+				<div class="text-xs text-red-700">
 					{updateStore.error}
 				</div>
 			{/if}
@@ -64,7 +64,7 @@
 				<div class="space-y-1">
 					<div class="h-1 w-full overflow-hidden rounded-full bg-gray-alpha-200">
 						<div
-							class="h-full bg-blue-600 transition-all duration-300"
+							class="h-full bg-blue-700 transition-all duration-300"
 							style="width: {updateStore.progress}%"
 						></div>
 					</div>

@@ -38,6 +38,13 @@
 		],
 		"gif": ["gif"]
 	},
+	"containerVideoStreamCodecCompatibility": {
+		"mp4": ["h264", "hevc", "av1", "vp9", "mpeg4", "mjpeg"],
+		"mkv": ["*"],
+		"mov": ["*"],
+		"webm": ["vp8", "vp9", "av1"],
+		"gif": ["gif"]
+	},
 	"containerAudioCodecCompatibility": {
 		"mp3": ["mp3"],
 		"wav": ["pcm_s16le"],
@@ -48,6 +55,33 @@
 		"mkv": ["*"],
 		"webm": ["libopus", "vorbis"],
 		"gif": []
+	},
+	"containerAudioStreamCodecCompatibility": {
+		"mp3": ["mp3"],
+		"wav": [
+			"pcm_s16le",
+			"pcm_s24le",
+			"pcm_s32le",
+			"pcm_f32le",
+			"pcm_f64le",
+			"pcm_u8",
+			"pcm_s8",
+			"pcm_alaw",
+			"pcm_mulaw"
+		],
+		"flac": ["flac"],
+		"m4a": ["aac", "alac", "ac3", "eac3", "mp3"],
+		"mp4": ["aac", "ac3", "eac3", "opus", "mp3", "alac"],
+		"mov": ["*"],
+		"mkv": ["*"],
+		"webm": ["opus", "vorbis"],
+		"gif": []
+	},
+	"containerSubtitleCodecCompatibility": {
+		"mp4": ["mov_text"],
+		"mov": ["*"],
+		"mkv": ["*"],
+		"webm": ["webvtt"]
 	},
 	"defaultAudioCodec": {
 		"mp3": "mp3",

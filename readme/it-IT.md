@@ -47,8 +47,8 @@
   - `vp9` (Google VP9)
   - `prores` (Apple ProRes)
   - `libsvtav1` (SVT-AV1)
-  - **Accelerazione hardware:** `h264_videotoolbox` (Apple Silicon), `h264_nvenc` (NVIDIA)
-- **Encoder audio:** `aac`, `ac3` (Dolby Digital), `libopus`, `mp3`
+  - **Accelerazione hardware:** `h264_videotoolbox` (Apple Silicon), `hevc_videotoolbox` (Apple Silicon), `h264_nvenc` (NVIDIA), `hevc_nvenc` (NVIDIA), `av1_nvenc` (NVIDIA)
+- **Encoder audio:** `aac`, `ac3` (Dolby Digital), `libopus`, `mp3`, `alac` (Apple Lossless), `flac` (Free Lossless Audio Codec), `pcm_s16le` (WAV)
 - **Controllo bitrate:** Qualità costante (CRF) o bitrate target (kbps)
 - **Ridimensionamento:** Bicubico, Lanczos, Bilineare, Vicino più prossimo
 - **Analisi metadati:** Estrazione automatica delle informazioni sui flussi tramite `ffprobe`
@@ -68,7 +68,7 @@
 - **Runtime:** `tokio` (I/O asincrono)
 - **Serializzazione:** `serde`, `serde_json`
 - **Gestione processi:** `tauri-plugin-shell` per esecuzione sidecar (FFmpeg/FFprobe)
-- **Integrazione sistema:** `tauri-plugin-dialog`, `tauri-plugin-fs`, `window-vibrancy`
+- **Integrazione sistema:** `tauri-plugin-dialog`, `tauri-plugin-fs`, API effetti finestra di Tauri (`tauri::window::set_effects`)
 
 ### Frontend (SvelteKit)
 
@@ -77,7 +77,7 @@
 - **Stili:** Tailwind CSS v4, `clsx`, `tailwind-merge`
 - **Gestione stato:** Svelte 5 `$state` / `$props`
 - **Internazionalizzazione:** Interfaccia multilingue con rilevamento automatico della lingua di sistema
-- **Tipografia:** Geist Mono (incorporato)
+- **Tipografia:** Geist Sans (incorporato), Geist Mono (incorporato)
 
 ### Installazione
 

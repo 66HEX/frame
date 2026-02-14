@@ -65,12 +65,13 @@
 	let activeTab = $state<TabId>('source');
 
 	const isSourceAudioOnly = $derived(!!metadata && !metadata.videoCodec);
+	const isCopyMode = $derived((config.processingMode ?? 'reencode') === 'copy');
 	const isAudioContainer = $derived(AUDIO_ONLY_CONTAINERS.includes(config.container));
 	const supportsAudio = $derived(containerSupportsAudio(config.container));
 	const supportsSubtitles = $derived(
 		!isSourceAudioOnly && containerSupportsSubtitles(config.container)
 	);
-	const supportsVideoTab = $derived(!isSourceAudioOnly && !isAudioContainer);
+	const supportsVideoTab = $derived(!isSourceAudioOnly && !isAudioContainer && !isCopyMode);
 
 	$effect(() => {
 		const tab = activeTab;
@@ -99,7 +100,9 @@
 </script>
 
 <div class="flex h-full flex-col">
-	<div class="flex h-10 items-center justify-between border-b border-gray-alpha-100 px-4">
+	<div
+		class="relative flex h-10 items-center justify-between px-4 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-gray-alpha-100 after:content-['']"
+	>
 		<div class="flex w-full items-center justify-start gap-1">
 			{#each TABS as tabId (tabId)}
 				{@const isVideoDisabled = tabId === 'video' && !supportsVideoTab}
@@ -108,10 +111,13 @@
 				{@const isDisabled = isVideoDisabled || isAudioDisabled || isSubtitlesDisabled}
 				{@const Icon = icons[tabId]}
 				<Button
-					variant={activeTab === tabId ? 'selected' : 'ghost'}
+					variant={activeTab === tabId ? 'default' : 'ghost'}
 					size="icon"
 					title={$_(`tabs.${tabId}`)}
-					class={cn('size-6 transition-all', isDisabled && 'pointer-events-none opacity-50')}
+					class={cn(
+						'size-6 border border-transparent',
+						isDisabled && 'pointer-events-none opacity-50'
+					)}
 					onclick={() => (activeTab = tabId)}
 				>
 					<Icon size={16} />
@@ -139,9 +145,21 @@
 		{:else if activeTab === 'video'}
 			<VideoTab {config} disabled={disabled || !supportsVideoTab} {onUpdate} />
 		{:else if activeTab === 'audio'}
-			<AudioTab {config} disabled={disabled || !supportsAudio} {onUpdate} {metadata} />
+			<AudioTab
+				{config}
+				copyMode={isCopyMode}
+				disabled={disabled || !supportsAudio}
+				{onUpdate}
+				{metadata}
+			/>
 		{:else if activeTab === 'subtitles'}
-			<SubtitlesTab {config} disabled={disabled || !supportsSubtitles} {onUpdate} {metadata} />
+			<SubtitlesTab
+				{config}
+				copyMode={isCopyMode}
+				disabled={disabled || !supportsSubtitles}
+				{onUpdate}
+				{metadata}
+			/>
 		{:else}
 			<MetadataTab {config} {disabled} {onUpdate} {metadata} />
 		{/if}

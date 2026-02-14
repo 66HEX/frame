@@ -10,14 +10,18 @@
 	let {
 		config,
 		disabled = false,
+		copyMode = false,
 		onUpdate,
 		metadata
 	}: {
 		config: ConversionConfig;
 		disabled?: boolean;
+		copyMode?: boolean;
 		onUpdate: (config: Partial<ConversionConfig>) => void;
 		metadata?: SourceMetadata;
 	} = $props();
+
+	const burnInDisabled = $derived(disabled || copyMode);
 
 	function toggleTrack(index: number) {
 		if (disabled) return;
@@ -32,7 +36,7 @@
 	}
 
 	async function selectExternalSubtitle() {
-		if (disabled) return;
+		if (burnInDisabled) return;
 		const selected = await openNativeFileDialog({
 			multiple: false,
 			filters: [
@@ -49,7 +53,7 @@
 	}
 
 	function clearExternalSubtitle() {
-		if (disabled) return;
+		if (burnInDisabled) return;
 		onUpdate({ subtitleBurnPath: undefined });
 	}
 </script>
@@ -60,17 +64,12 @@
 		<div class="space-y-3">
 			<div class="relative flex items-center">
 				<Button
-					variant="outline"
-					{disabled}
+					variant="secondary"
+					disabled={burnInDisabled}
 					onclick={selectExternalSubtitle}
 					class={cn('w-full transition-colors', config.subtitleBurnPath ? 'pr-8' : '')}
 				>
-					<span
-						class={cn(
-							'truncate',
-							config.subtitleBurnPath ? 'text-foreground' : 'text-gray-alpha-600'
-						)}
-					>
+					<span class={cn('truncate text-foreground')}>
 						{config.subtitleBurnPath
 							? config.subtitleBurnPath.split(/[\\/]/).pop()
 							: $_('subtitles.selectFile')}
@@ -82,12 +81,12 @@
 						<Button
 							variant="destructive"
 							size="none"
-							class="h-4 w-4 text-gray-alpha-600 hover:bg-transparent hover:text-red-600 disabled:pointer-events-none disabled:opacity-50"
+							class="h-4 w-4 text-gray-alpha-600 hover:bg-transparent hover:text-red-700 disabled:pointer-events-none disabled:opacity-50"
 							onclick={(e) => {
 								e.stopPropagation();
 								clearExternalSubtitle();
 							}}
-							{disabled}
+							disabled={burnInDisabled}
 							title={$_('subtitles.clearFile')}
 						>
 							<IconClose size={14} />
@@ -96,7 +95,7 @@
 				{/if}
 			</div>
 			<p class="text-[9px] text-gray-alpha-600">
-				{$_('subtitles.burnInHint')}
+				{copyMode ? $_('subtitles.copyModeHint') : $_('subtitles.burnInHint')}
 			</p>
 		</div>
 	</div>
@@ -108,7 +107,7 @@
 				{#each metadata.subtitleTracks as track (track.index)}
 					{@const isSelected = (config.selectedSubtitleTracks || []).includes(track.index)}
 					<Button
-						variant={isSelected ? 'selected' : 'outline'}
+						variant={isSelected ? 'default' : 'secondary'}
 						onclick={() => toggleTrack(track.index)}
 						{disabled}
 						class="flex h-auto w-full items-center justify-between px-3 py-2 text-left"
@@ -134,12 +133,12 @@
 
 						<div
 							class={cn(
-								'flex h-3 w-3 items-center justify-center rounded-full border transition-all',
-								isSelected ? 'border-blue-600' : 'border-gray-alpha-200'
+								'button-highlight flex h-3 w-3 items-center justify-center rounded-full border transition-all',
+								isSelected ? 'border-foreground' : 'border-gray-alpha-200'
 							)}
 						>
 							<div
-								class="h-1.5 w-1.5 rounded-full bg-blue-600 transition-all"
+								class="h-1.5 w-1.5 rounded-full bg-foreground transition-all"
 								style="opacity: {isSelected ? 1 : 0}; transform: scale({isSelected ? 1 : 0.5});"
 							></div>
 						</div>

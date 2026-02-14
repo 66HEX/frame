@@ -146,7 +146,7 @@
 		<div class="mb-2 grid grid-cols-2 gap-2">
 			{#each RESOLUTIONS as res (res)}
 				<Button
-					variant={effectiveResolution === res ? 'selected' : 'outline'}
+					variant={effectiveResolution === res ? 'default' : 'secondary'}
 					onclick={() => onUpdate({ resolution: res })}
 					disabled={disabled || isMlUpscaleActive}
 					class="w-full"
@@ -196,7 +196,7 @@
 			<div class="grid grid-cols-2 gap-2">
 				{#each SCALING_ALGOS as algo (algo)}
 					<Button
-						variant={config.scalingAlgorithm === algo ? 'selected' : 'outline'}
+						variant={config.scalingAlgorithm === algo ? 'default' : 'secondary'}
 						onclick={() => onUpdate({ scalingAlgorithm: algo })}
 						disabled={disabled || config.resolution === 'original'}
 						class="w-full"
@@ -213,7 +213,7 @@
 				<div class="grid grid-cols-2 gap-2">
 					{#each ML_UPSCALING_OPTIONS as opt (opt.id)}
 						<Button
-							variant={(config.mlUpscale || 'none') === opt.id ? 'selected' : 'outline'}
+							variant={(config.mlUpscale || 'none') === opt.id ? 'default' : 'secondary'}
 							onclick={() => onUpdate({ mlUpscale: opt.id as ConversionConfig['mlUpscale'] })}
 							disabled={disabled || (opt.id !== 'none' && !mlUpscaleAvailable)}
 							class="w-full"
@@ -230,7 +230,7 @@
 			<div class="grid grid-cols-2 gap-2">
 				{#each isGifMode ? GIF_FPS_OPTIONS : FPS_OPTIONS as opt (opt)}
 					<Button
-						variant={config.fps === opt ? 'selected' : 'outline'}
+						variant={config.fps === opt ? 'default' : 'secondary'}
 						onclick={() => onUpdate({ fps: opt })}
 						{disabled}
 						class="w-full"
@@ -247,7 +247,7 @@
 				<div class="grid grid-cols-2 gap-2">
 					{#each GIF_COLOR_OPTIONS as colors (colors)}
 						<Button
-							variant={(config.gifColors ?? 256) === colors ? 'selected' : 'outline'}
+							variant={(config.gifColors ?? 256) === colors ? 'default' : 'secondary'}
 							onclick={() => onUpdate({ gifColors: colors })}
 							{disabled}
 							class="w-full"
@@ -349,7 +349,7 @@
 			<Label variant="section">{$_('video.qualityControl')}</Label>
 			<div class="grid grid-cols-2 gap-2">
 				<Button
-					variant={config.videoBitrateMode === 'crf' ? 'selected' : 'outline'}
+					variant={config.videoBitrateMode === 'crf' ? 'default' : 'secondary'}
 					onclick={() => onUpdate({ videoBitrateMode: 'crf' })}
 					{disabled}
 					class="w-full"
@@ -357,7 +357,7 @@
 					{$_('video.constantQuality')}
 				</Button>
 				<Button
-					variant={config.videoBitrateMode === 'bitrate' ? 'selected' : 'outline'}
+					variant={config.videoBitrateMode === 'bitrate' ? 'default' : 'secondary'}
 					onclick={() => onUpdate({ videoBitrateMode: 'bitrate' })}
 					{disabled}
 					class="w-full"
@@ -378,7 +378,7 @@
 						{/if}
 					</Label>
 					<div
-						class="rounded border border-blue-600 bg-blue-900/20 px-1.5 text-[10px] font-medium text-blue-600"
+						class="button-highlight rounded bg-blue-700 px-1.5 text-[10px] font-medium text-foreground"
 					>
 						{#if isHardwareEncoder}
 							Q {config.quality}

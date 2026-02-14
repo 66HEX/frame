@@ -1,7 +1,12 @@
 #[cfg(test)]
 mod conversion_tests {
-    use crate::conversion::args::{build_ffmpeg_args, build_output_path, validate_task_input};
-    use crate::conversion::types::{ConversionConfig, MetadataConfig, MetadataMode};
+    use crate::conversion::args::{
+        build_ffmpeg_args, build_output_path, validate_stream_copy_compatibility,
+        validate_task_input,
+    };
+    use crate::conversion::types::{
+        AudioTrack, ConversionConfig, MetadataConfig, MetadataMode, ProbeMetadata, SubtitleTrack,
+    };
     use crate::conversion::upscale::build_upscale_encode_args;
     use crate::conversion::utils::parse_time;
     use std::fs;
@@ -19,6 +24,7 @@ mod conversion_tests {
 
     fn sample_config(container: &str) -> ConversionConfig {
         ConversionConfig {
+            processing_mode: "reencode".into(),
             container: container.into(),
             video_codec: "libx264".into(),
             video_bitrate_mode: "crf".into(),
@@ -65,6 +71,45 @@ mod conversion_tests {
         let path = std::env::temp_dir().join(format!("frame-validate-{}.tmp", ts));
         fs::write(&path, b"test").unwrap();
         path
+    }
+
+    fn sample_probe() -> ProbeMetadata {
+        ProbeMetadata {
+            video_codec: Some("h264".into()),
+            audio_tracks: vec![AudioTrack {
+                index: 1,
+                codec: "aac".into(),
+                channels: "2".into(),
+                language: Some("eng".into()),
+                label: None,
+                bitrate_kbps: Some(192.0),
+                sample_rate: Some("48000".into()),
+            }],
+            subtitle_tracks: vec![SubtitleTrack {
+                index: 2,
+                codec: "subrip".into(),
+                language: Some("eng".into()),
+                label: None,
+            }],
+            ..ProbeMetadata::default()
+        }
+    }
+
+    fn webm_probe() -> ProbeMetadata {
+        ProbeMetadata {
+            video_codec: Some("vp9".into()),
+            audio_tracks: vec![AudioTrack {
+                index: 1,
+                codec: "opus".into(),
+                channels: "2".into(),
+                language: Some("eng".into()),
+                label: None,
+                bitrate_kbps: Some(128.0),
+                sample_rate: Some("48000".into()),
+            }],
+            subtitle_tracks: vec![],
+            ..ProbeMetadata::default()
+        }
     }
 
     #[test]
@@ -375,6 +420,44 @@ mod conversion_tests {
     }
 
     #[test]
+    fn test_stream_copy_trim_and_mapping() {
+        let mut config = sample_config("mp4");
+        config.processing_mode = "copy".into();
+        config.start_time = Some("00:01:30.000".into());
+        config.end_time = Some("00:03:00.000".into());
+        config.selected_audio_tracks = vec![1, 2];
+        config.selected_subtitle_tracks = vec![3];
+
+        let args = build_ffmpeg_args("in.mp4", "out.mp4", &config);
+
+        assert!(contains_args(&args, &["-c", "copy"]));
+        assert!(contains_arg_pair(&args, "-ss", "00:01:30.000"));
+        assert!(contains_arg_pair(&args, "-t", "90.000"));
+        assert!(contains_args(&args, &["-map", "0:v?"]));
+        assert!(contains_args(&args, &["-map", "0:1"]));
+        assert!(contains_args(&args, &["-map", "0:2"]));
+        assert!(contains_args(&args, &["-map", "0:3"]));
+        assert!(!args.iter().any(|a| a == "-c:v"));
+        assert!(!args.iter().any(|a| a == "-c:a"));
+        assert!(!args.iter().any(|a| a == "-vf"));
+        assert!(!args.iter().any(|a| a == "-af"));
+    }
+
+    #[test]
+    fn test_stream_copy_default_optional_track_mapping() {
+        let mut config = sample_config("mp4");
+        config.processing_mode = "copy".into();
+        config.selected_audio_tracks = vec![];
+        config.selected_subtitle_tracks = vec![];
+
+        let args = build_ffmpeg_args("in.mp4", "out.mp4", &config);
+
+        assert!(contains_args(&args, &["-map", "0:v?"]));
+        assert!(contains_args(&args, &["-map", "0:a?"]));
+        assert!(contains_args(&args, &["-map", "0:s?"]));
+    }
+
+    #[test]
     fn test_gif_uses_palette_pipeline_without_audio_or_subtitles() {
         let mut config = sample_config("gif");
         config.video_codec = "gif".into();
@@ -480,6 +563,104 @@ mod conversion_tests {
         let result = validate_task_input(path.to_str().unwrap(), &config);
         let _ = fs::remove_file(&path);
 
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_rejects_stream_copy_with_burn_in_subtitles() {
+        let mut config = sample_config("mp4");
+        config.processing_mode = "copy".into();
+        config.subtitle_burn_path = Some("/tmp/captions.srt".into());
+
+        let path = create_temp_input_file();
+        let result = validate_task_input(path.to_str().unwrap(), &config);
+        let _ = fs::remove_file(&path);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_rejects_stream_copy_with_transforms() {
+        let mut config = sample_config("mp4");
+        config.processing_mode = "copy".into();
+        config.rotation = "90".into();
+
+        let path = create_temp_input_file();
+        let result = validate_task_input(path.to_str().unwrap(), &config);
+        let _ = fs::remove_file(&path);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_rejects_stream_copy_with_ml_upscale() {
+        let mut config = sample_config("mp4");
+        config.processing_mode = "copy".into();
+        config.ml_upscale = Some("esrgan-2x".into());
+
+        let path = create_temp_input_file();
+        let result = validate_task_input(path.to_str().unwrap(), &config);
+        let _ = fs::remove_file(&path);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_accepts_stream_copy_with_trim() {
+        let mut config = sample_config("mp4");
+        config.processing_mode = "copy".into();
+        config.start_time = Some("00:00:05.000".into());
+        config.end_time = Some("00:00:10.000".into());
+        config.selected_audio_tracks = vec![1];
+        config.selected_subtitle_tracks = vec![];
+
+        let path = create_temp_input_file();
+        let result = validate_task_input(path.to_str().unwrap(), &config);
+        let _ = fs::remove_file(&path);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_stream_copy_compatibility_rejects_aac_into_mp3() {
+        let mut config = sample_config("mp3");
+        config.processing_mode = "copy".into();
+        config.selected_audio_tracks = vec![1];
+
+        let probe = sample_probe();
+        let result = validate_stream_copy_compatibility(&config, &probe);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_stream_copy_compatibility_allows_aac_into_m4a() {
+        let mut config = sample_config("m4a");
+        config.processing_mode = "copy".into();
+        config.selected_audio_tracks = vec![1];
+
+        let probe = sample_probe();
+        let result = validate_stream_copy_compatibility(&config, &probe);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_stream_copy_compatibility_rejects_subrip_into_mp4() {
+        let mut config = sample_config("mp4");
+        config.processing_mode = "copy".into();
+        config.selected_subtitle_tracks = vec![2];
+
+        let probe = sample_probe();
+        let result = validate_stream_copy_compatibility(&config, &probe);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_stream_copy_compatibility_allows_webm_to_webm() {
+        let mut config = sample_config("webm");
+        config.processing_mode = "copy".into();
+
+        let probe = webm_probe();
+        let result = validate_stream_copy_compatibility(&config, &probe);
         assert!(result.is_ok());
     }
 
@@ -661,8 +842,11 @@ mod utils_tests {
         container_supports_audio as container_supports_audio_rule,
         container_supports_subtitles as container_supports_subtitles_rule,
         is_audio_codec_allowed as is_audio_codec_allowed_rule,
+        is_audio_stream_codec_allowed as is_audio_stream_codec_allowed_rule,
+        is_subtitle_codec_allowed as is_subtitle_codec_allowed_rule,
         is_video_codec_allowed as is_video_codec_allowed_rule,
         is_video_only_container as is_video_only_container_rule,
+        is_video_stream_codec_allowed as is_video_stream_codec_allowed_rule,
     };
     use crate::conversion::utils::{
         is_audio_only_container, is_nvenc_codec, is_videotoolbox_codec, map_nvenc_preset,
@@ -739,10 +923,18 @@ mod utils_tests {
         assert!(!is_video_codec_allowed_rule("webm", "libx264"));
         assert!(is_video_codec_allowed_rule("gif", "gif"));
         assert!(!is_video_codec_allowed_rule("gif", "libx264"));
+        assert!(is_video_stream_codec_allowed_rule("mp4", "h264"));
+        assert!(is_video_stream_codec_allowed_rule("mkv", "mpeg4"));
+        assert!(!is_video_stream_codec_allowed_rule("webm", "h264"));
         assert!(is_audio_codec_allowed_rule("mov", "aac"));
         assert!(is_audio_codec_allowed_rule("mkv", "flac"));
         assert!(!is_audio_codec_allowed_rule("mp4", "flac"));
         assert!(!is_audio_codec_allowed_rule("gif", "aac"));
+        assert!(is_audio_stream_codec_allowed_rule("webm", "opus"));
+        assert!(!is_audio_stream_codec_allowed_rule("webm", "aac"));
+        assert!(is_subtitle_codec_allowed_rule("mkv", "subrip"));
+        assert!(is_subtitle_codec_allowed_rule("webm", "webvtt"));
+        assert!(!is_subtitle_codec_allowed_rule("mp4", "subrip"));
         assert!(is_video_only_container_rule("gif"));
         assert!(!container_supports_audio_rule("gif"));
         assert!(!container_supports_subtitles_rule("gif"));
@@ -815,6 +1007,7 @@ mod scenario_tests {
 
     fn base_config() -> ConversionConfig {
         ConversionConfig {
+            processing_mode: "reencode".into(),
             container: "mp4".into(),
             video_codec: "libx264".into(),
             video_bitrate_mode: "crf".into(),
@@ -1107,6 +1300,7 @@ mod hwaccel_tests {
 
     fn hwaccel_config(codec: &str) -> ConversionConfig {
         ConversionConfig {
+            processing_mode: "reencode".into(),
             container: "mp4".into(),
             video_codec: codec.into(),
             video_bitrate_mode: "crf".into(),

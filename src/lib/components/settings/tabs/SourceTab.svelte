@@ -98,7 +98,7 @@
 			{$_('source.analyzing')}
 		</div>
 	{:else if status === 'error'}
-		<div class="space-y-1 text-[11px] tracking-wide text-red-600">
+		<div class="space-y-1 text-[11px] tracking-wide text-red-700">
 			<p>{$_('source.failedToRead')}</p>
 			{#if error}
 				<p class="text-[10px] text-gray-alpha-600">
@@ -169,7 +169,7 @@
 					{#each metadata.audioTracks as track, i (track.index)}
 						<div class="space-y-2">
 							<div class="flex items-center gap-2">
-								<span class="text-[9px] font-bold tracking-widest text-blue-600"
+								<span class="text-[9px] font-bold tracking-widest text-blue-700"
 									>{$_('source.track')} #{i + 1}</span
 								>
 								<div class="h-px flex-1 bg-gray-alpha-100"></div>

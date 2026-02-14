@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./icon.png" width="128" height="128" alt="Frame Icon" />
+  <img src="./icon.png" width="256" height="256" alt="Frame Icon" />
   <h1>Frame</h1>
 </div>
 
@@ -65,7 +65,7 @@ See [GitHub Sponsors](https://github.com/sponsors/66HEX) for full sponsorship de
   - `vp9` (Google VP9)
   - `prores` (Apple ProRes)
   - `libsvtav1` (Scalable Video Technology AV1)
-  - **Hardware Acceleration:** `h264_videotoolbox` (Apple Silicon), `h264_nvenc` (NVIDIA).
+  - **Hardware Acceleration:** `h264_videotoolbox` (Apple Silicon), `hevc_videotoolbox` (Apple Silicon), `h264_nvenc` (NVIDIA), `hevc_nvenc` (NVIDIA), `av1_nvenc` (NVIDIA).
 - **Audio Encoders:** `aac`, `ac3` (Dolby Digital), `libopus`, `mp3`, `alac` (Apple Lossless), `flac` (Free Lossless Audio Codec), `pcm_s16le` (WAV).
 - **Bitrate Control:** Constant Rate Factor (CRF) or Target Bitrate (kbps).
 - **Scaling:** Bicubic, Lanczos, Bilinear, Nearest Neighbor.
@@ -86,7 +86,7 @@ See [GitHub Sponsors](https://github.com/sponsors/66HEX) for full sponsorship de
 - **Runtime:** `tokio` (Async I/O).
 - **Serialization:** `serde`, `serde_json`.
 - **Process Management:** `tauri-plugin-shell` for sidecar execution (FFmpeg/FFprobe).
-- **System Integration:** `tauri-plugin-dialog`, `tauri-plugin-fs`, `window-vibrancy`.
+- **System Integration:** `tauri-plugin-dialog`, `tauri-plugin-fs`, Tauri window effects API (`tauri::window::set_effects`).
 
 ### Frontend (SvelteKit)
 

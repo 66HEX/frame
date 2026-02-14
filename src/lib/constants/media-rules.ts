@@ -5,7 +5,10 @@ interface MediaRules {
 	audioOnlyContainers: string[];
 	videoOnlyContainers: string[];
 	containerVideoCodecCompatibility: Record<string, string[]>;
+	containerVideoStreamCodecCompatibility?: Record<string, string[]>;
 	containerAudioCodecCompatibility: Record<string, string[]>;
+	containerAudioStreamCodecCompatibility?: Record<string, string[]>;
+	containerSubtitleCodecCompatibility: Record<string, string[]>;
 	defaultAudioCodec: Record<string, string>;
 	defaultAudioCodecFallback: string;
 	videoCodecFallbackOrder: string[];
@@ -30,7 +33,14 @@ function buildCodecMap(source: Record<string, string[]>): Record<string, Set<str
 const AUDIO_ONLY_CONTAINER_SET = new Set(MEDIA_RULES.audioOnlyContainers.map(normalizeContainer));
 const VIDEO_ONLY_CONTAINER_SET = new Set(MEDIA_RULES.videoOnlyContainers.map(normalizeContainer));
 const VIDEO_COMPATIBILITY_MAP = buildCodecMap(MEDIA_RULES.containerVideoCodecCompatibility);
+const VIDEO_STREAM_COMPATIBILITY_MAP = buildCodecMap(
+	MEDIA_RULES.containerVideoStreamCodecCompatibility ?? {}
+);
 const AUDIO_COMPATIBILITY_MAP = buildCodecMap(MEDIA_RULES.containerAudioCodecCompatibility);
+const AUDIO_STREAM_COMPATIBILITY_MAP = buildCodecMap(
+	MEDIA_RULES.containerAudioStreamCodecCompatibility ?? {}
+);
+const SUBTITLE_COMPATIBILITY_MAP = buildCodecMap(MEDIA_RULES.containerSubtitleCodecCompatibility);
 const DEFAULT_AUDIO_CODEC_MAP = Object.fromEntries(
 	Object.entries(MEDIA_RULES.defaultAudioCodec).map(([container, codec]) => [
 		normalizeContainer(container),
@@ -66,14 +76,35 @@ export function isGifContainer(container: string): boolean {
 export function isVideoCodecAllowedForContainer(container: string, codec: string): boolean {
 	const allowedCodecs = VIDEO_COMPATIBILITY_MAP[normalizeContainer(container)];
 	if (!allowedCodecs) return true;
-	return allowedCodecs.has(codec);
+	return allowedCodecs.has(codec.toLowerCase());
 }
 
 export function isAudioCodecAllowedForContainer(container: string, codec: string): boolean {
 	const allowedCodecs = AUDIO_COMPATIBILITY_MAP[normalizeContainer(container)];
 	if (!allowedCodecs) return true;
 	if (allowedCodecs.has(ANY_CODEC_TOKEN)) return true;
-	return allowedCodecs.has(codec);
+	return allowedCodecs.has(codec.toLowerCase());
+}
+
+export function isVideoStreamCodecAllowedForContainer(container: string, codec: string): boolean {
+	const allowedCodecs = VIDEO_STREAM_COMPATIBILITY_MAP[normalizeContainer(container)];
+	if (!allowedCodecs) return true;
+	if (allowedCodecs.has(ANY_CODEC_TOKEN)) return true;
+	return allowedCodecs.has(codec.toLowerCase());
+}
+
+export function isSubtitleCodecAllowedForContainer(container: string, codec: string): boolean {
+	const allowedCodecs = SUBTITLE_COMPATIBILITY_MAP[normalizeContainer(container)];
+	if (!allowedCodecs) return true;
+	if (allowedCodecs.has(ANY_CODEC_TOKEN)) return true;
+	return allowedCodecs.has(codec.toLowerCase());
+}
+
+export function isAudioStreamCodecAllowedForContainer(container: string, codec: string): boolean {
+	const allowedCodecs = AUDIO_STREAM_COMPATIBILITY_MAP[normalizeContainer(container)];
+	if (!allowedCodecs) return true;
+	if (allowedCodecs.has(ANY_CODEC_TOKEN)) return true;
+	return allowedCodecs.has(codec.toLowerCase());
 }
 
 export function getDefaultAudioCodecForContainer(container: string): string {

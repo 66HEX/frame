@@ -11,7 +11,13 @@ struct MediaRulesRaw {
     #[serde(default)]
     video_only_containers: Vec<String>,
     container_video_codec_compatibility: HashMap<String, Vec<String>>,
+    #[serde(default)]
+    container_video_stream_codec_compatibility: HashMap<String, Vec<String>>,
     container_audio_codec_compatibility: HashMap<String, Vec<String>>,
+    #[serde(default)]
+    container_audio_stream_codec_compatibility: HashMap<String, Vec<String>>,
+    #[serde(default)]
+    container_subtitle_codec_compatibility: HashMap<String, Vec<String>>,
 }
 
 #[derive(Debug)]
@@ -19,7 +25,10 @@ struct MediaRules {
     audio_only_containers: HashSet<String>,
     video_only_containers: HashSet<String>,
     container_video_codec_compatibility: HashMap<String, HashSet<String>>,
+    container_video_stream_codec_compatibility: HashMap<String, HashSet<String>>,
     container_audio_codec_compatibility: HashMap<String, HashSet<String>>,
+    container_audio_stream_codec_compatibility: HashMap<String, HashSet<String>>,
+    container_subtitle_codec_compatibility: HashMap<String, HashSet<String>>,
 }
 
 impl From<MediaRulesRaw> for MediaRules {
@@ -45,8 +54,38 @@ impl From<MediaRulesRaw> for MediaRules {
                     )
                 })
                 .collect(),
+            container_video_stream_codec_compatibility: raw
+                .container_video_stream_codec_compatibility
+                .into_iter()
+                .map(|(container, codecs)| {
+                    (
+                        container.to_ascii_lowercase(),
+                        codecs.into_iter().collect::<HashSet<_>>(),
+                    )
+                })
+                .collect(),
             container_audio_codec_compatibility: raw
                 .container_audio_codec_compatibility
+                .into_iter()
+                .map(|(container, codecs)| {
+                    (
+                        container.to_ascii_lowercase(),
+                        codecs.into_iter().collect::<HashSet<_>>(),
+                    )
+                })
+                .collect(),
+            container_audio_stream_codec_compatibility: raw
+                .container_audio_stream_codec_compatibility
+                .into_iter()
+                .map(|(container, codecs)| {
+                    (
+                        container.to_ascii_lowercase(),
+                        codecs.into_iter().collect::<HashSet<_>>(),
+                    )
+                })
+                .collect(),
+            container_subtitle_codec_compatibility: raw
+                .container_subtitle_codec_compatibility
                 .into_iter()
                 .map(|(container, codecs)| {
                     (
@@ -75,11 +114,24 @@ pub fn is_audio_only_container(container: &str) -> bool {
 
 pub fn is_video_codec_allowed(container: &str, codec: &str) -> bool {
     let container = container.to_ascii_lowercase();
+    let codec = codec.to_ascii_lowercase();
     match MEDIA_RULES
         .container_video_codec_compatibility
         .get(&container)
     {
-        Some(allowed) => allowed.contains(codec),
+        Some(allowed) => allowed.contains(&codec),
+        None => true,
+    }
+}
+
+pub fn is_video_stream_codec_allowed(container: &str, codec: &str) -> bool {
+    let container = container.to_ascii_lowercase();
+    let codec = codec.to_ascii_lowercase();
+    match MEDIA_RULES
+        .container_video_stream_codec_compatibility
+        .get(&container)
+    {
+        Some(allowed) => allowed.contains(ANY_CODEC_TOKEN) || allowed.contains(&codec),
         None => true,
     }
 }
@@ -100,11 +152,36 @@ pub fn container_supports_subtitles(container: &str) -> bool {
 
 pub fn is_audio_codec_allowed(container: &str, codec: &str) -> bool {
     let container = container.to_ascii_lowercase();
+    let codec = codec.to_ascii_lowercase();
     match MEDIA_RULES
         .container_audio_codec_compatibility
         .get(&container)
     {
-        Some(allowed) => allowed.contains(ANY_CODEC_TOKEN) || allowed.contains(codec),
+        Some(allowed) => allowed.contains(ANY_CODEC_TOKEN) || allowed.contains(&codec),
+        None => true,
+    }
+}
+
+pub fn is_audio_stream_codec_allowed(container: &str, codec: &str) -> bool {
+    let container = container.to_ascii_lowercase();
+    let codec = codec.to_ascii_lowercase();
+    match MEDIA_RULES
+        .container_audio_stream_codec_compatibility
+        .get(&container)
+    {
+        Some(allowed) => allowed.contains(ANY_CODEC_TOKEN) || allowed.contains(&codec),
+        None => true,
+    }
+}
+
+pub fn is_subtitle_codec_allowed(container: &str, codec: &str) -> bool {
+    let container = container.to_ascii_lowercase();
+    let codec = codec.to_ascii_lowercase();
+    match MEDIA_RULES
+        .container_subtitle_codec_compatibility
+        .get(&container)
+    {
+        Some(allowed) => allowed.contains(ANY_CODEC_TOKEN) || allowed.contains(&codec),
         None => true,
     }
 }

@@ -5,40 +5,40 @@
 	},
 	"common": {
 		"save": "Speichern",
-		"apply": "Anwenden",
+		"apply": "Bewerben",
 		"cancel": "Abbrechen",
 		"close": "Schließen",
 		"delete": "Löschen",
 		"name": "Name",
 		"size": "Größe",
-		"state": "Status",
+		"state": "Bundesstaat",
 		"target": "Ziel",
-		"actions": "Aktionen"
+		"actions": "Maßnahmen"
 	},
 	"titlebar": {
 		"close": "Schließen",
 		"minimize": "Minimieren",
 		"toggleSize": "Größe umschalten",
-		"dashboard": "Dashboard",
+		"dashboard": "Armaturenbrett",
 		"logs": "Protokolle",
-		"storage": "Speicher:",
-		"items": "Elemente:",
+		"storage": "Lagerung:",
+		"items": "Artikel:",
 		"addSource": "Quelle hinzufügen",
-		"processing": "Verarbeitung...",
+		"processing": "Wird verarbeitet...",
 		"start": "Start"
 	},
 	"fileList": {
-		"dropFiles": "Dateien ablegen oder QUELLE HINZUFÜGEN",
-		"importSource": "Quelldateien importieren"
+		"dropFiles": "Dateien ablegen oder ADD SOURCE verwenden",
+		"importSource": "Importieren von Quelldateien"
 	},
 	"fileStatus": {
 		"ready": "Bereit",
-		"queued": "Warteschlange",
+		"queued": "In der Warteschlange",
 		"error": "Fehler",
 		"idle": "Leerlauf"
 	},
 	"emptySelection": {
-		"hint": "Wählen sie ein element aus der warteschlange für die konfiguration"
+		"hint": "Wählen Sie ein Element aus der Warteschlange aus, um auf die Konfiguration zuzugreifen."
 	},
 	"tabs": {
 		"source": "Quelle",
@@ -50,24 +50,25 @@
 		"presets": "Voreinstellungen"
 	},
 	"subtitles": {
-		"burnIn": "Untertitel einbrennen",
-		"selectFile": ".srt oder .ass Datei auswählen",
-		"clearFile": "Löschen",
-		"sourceTracks": "Quellspuren",
+		"burnIn": "Eingebrannte Untertitel",
+		"selectFile": "Wählen Sie eine .srt- oder .ass-Datei aus.",
+		"clearFile": "Klar",
+		"sourceTracks": "Quell-Tracks",
 		"none": "Keine Untertitel",
-		"burnInHint": "Das Einbrennen von Untertiteln erzwingt eine erneute Videokodierung."
+		"burnInHint": "Das Einbrennen von Untertiteln erzwingt eine Neukodierung des Videos.",
+		"copyModeHint": "Eingebrannte Untertitel sind im Stream-Kopiermodus deaktiviert."
 	},
 	"metadata": {
-		"mode": "Metadaten-Modus",
-		"fieldsSection": "Metadaten-Felder",
-		"placeholderPreserve": "Leer lassen, um Original zu behalten",
+		"mode": "Metadatenmodus",
+		"fieldsSection": "Metadatenfelder",
+		"placeholderPreserve": "Leer lassen, um Original beizubehalten",
 		"modes": {
 			"preserve": "Erhalten",
-			"preserveDesc": "Behält die ursprünglichen Metadaten. Unten eingegebene Werte überschreiben bestimmte Felder.",
-			"clean": "Bereinigen",
+			"preserveDesc": "Behält die ursprünglichen Metadaten bei. Die unten eingegebenen Werte überschreiben bestimmte Felder.",
+			"clean": "Sauber",
 			"cleanDesc": "Entfernt alle Metadaten-Tags aus der Ausgabedatei.",
 			"replace": "Ersetzen",
-			"replaceDesc": "Entfernt ursprüngliche Metadaten und fügt nur die unten eingegebenen Werte hinzu."
+			"replaceDesc": "Entfernt die ursprünglichen Metadaten und fügt nur die unten eingegebenen Werte hinzu."
 		},
 		"fields": {
 			"title": "Titel",
@@ -83,118 +84,124 @@
 		"failedToRead": "Metadaten konnten nicht gelesen werden.",
 		"unavailable": "Metadaten nicht verfügbar.",
 		"duration": "Dauer",
-		"frameRate": "Bildrate",
+		"frameRate": "Bildfrequenz",
 		"dimensions": "Abmessungen",
-		"videoCodec": "Video-Codec",
+		"videoCodec": "Videocodec",
 		"videoBitrate": "Video-Bitrate",
 		"containerBitrate": "Container-Bitrate",
 		"pixelFormat": "Pixelformat",
 		"colorSpace": "Farbraum",
-		"colorRange": "Farbbereich",
-		"colorPrimaries": "Farbprimären",
+		"colorRange": "Farbpalette",
+		"colorPrimaries": "Primärfarben",
 		"profile": "Profil",
 		"sampleRate": "Abtastrate",
 		"bitrate": "Bitrate",
-		"fileInfo": "Dateiinformationen",
+		"fileInfo": "Datei-Informationen",
 		"videoStream": "Videostream",
 		"audioStream": "Audiostream",
 		"track": "Spur",
 		"language": "Sprache"
 	},
 	"output": {
-		"outputName": "Ausgabename",
-		"placeholder": "mein_render_final",
-		"hint": "Wird neben der Originaldatei gespeichert. Erweiterung folgt dem Container.",
-		"container": "Ausgabe-Container"
+		"processingMode": "Verarbeitungsmodus",
+		"reencode": "Neu codieren",
+		"streamCopy": "Ausschnitt / Stream kopieren",
+		"reencodeHint": "Dekodiert und kodiert Medien, sodass alle Filter- und Codec-Einstellungen verfügbar sind.",
+		"streamCopyHint": "Schnelles Trimmen/Remuxen ohne Neukodierung. Die Schnittgenauigkeit hängt von den Keyframes ab.",
+		"outputName": "Ausgabenname",
+		"placeholder": "my_render_final",
+		"hint": "Neben der Originaldatei gespeichert. Die Erweiterung folgt automatisch dem ausgewählten Container.",
+		"container": "Ausgabecontainer"
 	},
 	"video": {
-		"resolutionFramerate": "Auflösung & Bildrate",
-		"rotation": "Drehung",
+		"resolutionFramerate": "Auflösung und Bildfrequenz",
+		"rotation": "Rotation",
 		"flipHorizontal": "Horizontal",
 		"flipVertical": "Vertikal",
 		"width": "Breite",
 		"height": "Höhe",
 		"scalingAlgorithm": "Skalierungsalgorithmus",
-		"framerate": "Bildrate",
+		"framerate": "Bildfrequenz",
 		"sameAsSource": "Wie Quelle",
 		"encoder": "Video-Encoder",
-		"encodingSpeed": "Kodiergeschwindigkeit",
+		"encodingSpeed": "Kodierungsgeschwindigkeit",
 		"qualityControl": "Qualitätskontrolle",
 		"constantQuality": "Konstante Qualität",
-		"targetBitrate": "Ziel-Bitrate",
-		"encodingQuality": "Kodierqualität",
+		"targetBitrate": "Zielbitrate",
+		"encodingQuality": "Kodierungsqualität",
 		"qualityFactor": "Qualitätsfaktor",
-		"lowQuality": "Niedrige Qualität",
+		"lowQuality": "Geringe Qualität",
 		"bestQuality": "Beste Qualität",
 		"lossless": "Verlustfrei",
 		"smallest": "Kleinste",
-		"targetBitrateKbps": "Ziel-Bitrate (kbps)",
+		"targetBitrateKbps": "Zielbitrate (kbps)",
 		"nvencOptions": "NVENC-Optionen",
-		"nvencSpatialAq": "Räumliche AQ",
+		"nvencSpatialAq": "Räumliche Luftqualität",
 		"nvencSpatialAqHint": "Verbessert Details in Szenen mit hoher Komplexität",
 		"nvencTemporalAq": "Zeitliche AQ",
-		"nvencTemporalAqHint": "Stabilisiert die Qualität zwischen Frames",
+		"nvencTemporalAqHint": "Stabilisiert die Qualität zwischen den Einzelbildern",
 		"presetIncompatible": "Inkompatibler Encoder",
 		"videotoolboxOptions": "VideoToolbox-Optionen",
-		"videotoolboxAllowSw": "Software-Fallback erlauben",
-		"videotoolboxAllowSwHint": "Zurück zur CPU-Kodierung, falls Hardware ausfällt",
+		"videotoolboxAllowSw": "Software-Fallback zulassen",
+		"videotoolboxAllowSwHint": "Bei Hardwareausfall auf CPU-Codierung zurückfallen",
 		"mlUpscaling": "ML-Hochskalierung",
-		"codecIncompatible": "Inkompatibles Format",
+		"codecIncompatible": "Inkompatibler Behälter",
 		"hardwareAcceleration": "Hardwarebeschleunigung",
-		"hwDecode": "Hardware-Dekodierung",
-		"hwDecodeHint": "GPU für die Dekodierung des Eingabevideos verwenden (schneller)",
+		"hwDecode": "Hardware-Decodierung",
+		"hwDecodeHint": "Verwenden Sie die GPU zum Dekodieren des Eingabevideos (schneller)",
 		"gifColors": "Palettenfarben",
-		"gifDither": "Rasterung",
-		"gifLoop": "Wiederholungen",
-		"gifLoopHint": "0 für Endlosschleife verwenden."
+		"gifDither": "Dithering",
+		"gifLoop": "Schleifenzahl",
+		"gifLoopHint": "Verwenden Sie 0 für eine Endlosschleife."
 	},
 	"audio": {
 		"channelsBitrate": "Kanäle & Bitrate",
+		"copyModeHint": "Codec, Bitrate, Lautstärke und Normalisierung sind im Stream-Kopiermodus deaktiviert.",
 		"original": "Original",
 		"stereo": "Stereo (2.0)",
 		"mono": "Mono (1.0)",
 		"bitrateKbps": "Bitrate (kbps)",
 		"bitrateIgnored": "Bitrate wird bei verlustfreien Codecs ignoriert",
-		"volume": "Lautstärke",
-		"muted": "Stumm",
-		"maxVolume": "Max. Lautstärke",
+		"volume": "Volumen",
+		"muted": "Gedämpft",
+		"maxVolume": "Maximale Lautstärke",
 		"normalize": "Audio normalisieren",
-		"normalizeHint": "EBU R128 Lautstärkenormalisierung für gleichmäßige Lautstärke",
+		"normalizeHint": "EBU R128 Lautstärkenormalisierung für gleichbleibende Lautstärke",
 		"codec": "Audio-Codec",
-		"incompatibleContainer": "Inkompatibler Container",
-		"sourceTracks": "Quellspuren",
-		"channels": "Kan"
+		"incompatibleContainer": "Inkompatibler Behälter",
+		"sourceTracks": "Quell-Tracks",
+		"channels": "Ch"
 	},
 	"presets": {
-		"library": "Voreinstellungsbibliothek",
-		"label": "Voreinstellungsname",
-		"applied": "Angewendet",
+		"library": "Voreingestellte Bibliothek",
+		"label": "Voreingestellte Bezeichnung",
+		"applied": "Angewandt",
 		"deletePreset": "Voreinstellung löschen",
 		"nameRequired": "Name erforderlich",
 		"notSaved": "Voreinstellung nicht gespeichert",
 		"saved": "Voreinstellung gespeichert",
-		"appliedName": "{name} angewendet",
-		"appliedAll": "Auf alle Elemente angewendet",
+		"appliedName": "Angewandte {name}",
+		"appliedAll": "Gilt für alle Artikel",
 		"applyToAll": "Auf alle anwenden",
 		"confirmApplyAllTitle": "Auf alle anwenden?",
-		"confirmApplyAllBody": "Dadurch wird \"{name}\" auf alle ausstehenden Dateien in der Warteschlange angewendet. Vorhandene Einstellungen werden überschrieben.",
-		"unableToDelete": "Löschen nicht möglich",
+		"confirmApplyAllBody": "Dadurch wird „{name}“ auf alle ausstehenden Dateien in der Warteschlange angewendet. Vorhandene Einstellungen werden überschrieben.",
+		"unableToDelete": "Kann nicht gelöscht werden",
 		"removed": "Voreinstellung entfernt"
 	},
 	"settings": {
 		"title": "Einstellungen",
-		"maxConcurrency": "Max. Parallelität",
+		"maxConcurrency": "Maximale Parallelität",
 		"saving": "Speichern...",
 		"appUpdates": "App-Updates",
 		"checkOnStartup": "Beim Start nach Updates suchen",
-		"checking": "Prüfen...",
-		"checkForUpdates": "Nach Updates suchen",
+		"checking": "Überprüfen...",
+		"checkForUpdates": "Auf Updates prüfen",
 		"updateAvailable": "Update verfügbar!",
-		"latestVersion": "Sie haben die neueste Version.",
-		"errorChecking": "Fehler bei der Update-Prüfung.",
-		"visuals": "Darstellung",
-		"windowTint": "Fenstertönung",
-		"fontFamily": "Schriftart",
+		"latestVersion": "Sie verwenden die neueste Version.",
+		"errorChecking": "Fehler bei der Überprüfung auf Updates.",
+		"visuals": "Visuelle Elemente",
+		"windowTint": "Fensterfolie",
+		"fontFamily": "Schriftfamilie",
 		"fontMono": "Mono",
 		"fontSans": "Sans",
 		"language": "Sprache"
@@ -202,18 +209,18 @@
 	"logs": {
 		"noActiveProcesses": "Keine aktiven Prozesse",
 		"waitingForOutput": "Prozess gestartet, warte auf Ausgabe...",
-		"selectTask": "Aufgabe auswählen für Konsolenausgabe",
-		"scrollToBottom": "Nach unten scrollen"
+		"selectTask": "Wählen Sie eine Aufgabe aus, um die Konsolenausgabe anzuzeigen.",
+		"scrollToBottom": "Zum Ende scrollen"
 	},
 	"update": {
 		"available": "Update verfügbar",
-		"versionAvailable": "Version {version} verfügbar.",
+		"versionAvailable": "Version {version} ist verfügbar.",
 		"later": "Später",
 		"updateNow": "Jetzt aktualisieren"
 	},
 	"notifications": {
 		"conversionFinishedTitle": "Warteschlange beendet",
-		"conversionFinishedBody": "{count} Dateien verarbeitet mit {errors} Fehlern."
+		"conversionFinishedBody": "Verarbeitete „{count}“-Dateien mit „{errors}“-Fehlern."
 	},
 	"errors": {
 		"conversionFailed": "Konvertierung fehlgeschlagen"
@@ -224,10 +231,10 @@
 		"duration": "Dauer"
 	},
 	"crop": {
-		"enter": "Zuschneiden",
-		"apply": "Anwenden",
+		"enter": "Ernte",
+		"apply": "Bewerben",
 		"reset": "Zurücksetzen",
-		"free": "Frei"
+		"free": "Kostenlos"
 	},
 	"encodingSpeed": {
 		"ultrafast": "Ultraschnell",
@@ -243,7 +250,7 @@
 		"medium": "Mittel",
 		"mediumDesc": "Ausgewogen",
 		"slow": "Langsam",
-		"slowDesc": "Bessere Kompression",
+		"slowDesc": "Bessere Komprimierung",
 		"slower": "Langsamer",
 		"slowerDesc": "Hohe Kompression",
 		"veryslow": "Sehr langsam",
@@ -253,6 +260,6 @@
 		"bicubic": "Bikubisch",
 		"lanczos": "Lanczos",
 		"bilinear": "Bilinear",
-		"nearest": "Nächster Nachbar"
+		"nearest": "Nächstgelegen"
 	}
 }

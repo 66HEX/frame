@@ -55,7 +55,8 @@
 		"clearFile": "Clear",
 		"sourceTracks": "Source Tracks",
 		"none": "No subtitles",
-		"burnInHint": "Burning in subtitles will force video re-encoding."
+		"burnInHint": "Burning in subtitles will force video re-encoding.",
+		"copyModeHint": "Burn-in subtitles are disabled in stream copy mode."
 	},
 	"metadata": {
 		"mode": "Metadata Mode",
@@ -102,6 +103,11 @@
 		"language": "Language"
 	},
 	"output": {
+		"processingMode": "Processing Mode",
+		"reencode": "Re-encode",
+		"streamCopy": "Cut / Stream Copy",
+		"reencodeHint": "Decodes and encodes media so all filters and codec settings are available.",
+		"streamCopyHint": "Fast trim/remux without re-encoding. Cut precision depends on keyframes.",
 		"outputName": "Output Name",
 		"placeholder": "my_render_final",
 		"hint": "Stored next to the original file. Extension follows the selected container automatically.",
@@ -150,6 +156,7 @@
 	},
 	"audio": {
 		"channelsBitrate": "Channels & Bitrate",
+		"copyModeHint": "Codec, bitrate, volume, and normalization are disabled in stream copy mode.",
 		"original": "Original",
 		"stereo": "Stereo (2.0)",
 		"mono": "Mono (1.0)",

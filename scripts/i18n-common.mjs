@@ -224,7 +224,14 @@ export function syncLocaleTree(baseNode, localeNode, localeCode, pathPrefix, sta
 				);
 			} else {
 				stats.added.push(nextPath);
-				nextNode[key] = syncLocaleTree(childBase, undefined, localeCode, nextPath, stats, keepExtra);
+				nextNode[key] = syncLocaleTree(
+					childBase,
+					undefined,
+					localeCode,
+					nextPath,
+					stats,
+					keepExtra
+				);
 			}
 		}
 
