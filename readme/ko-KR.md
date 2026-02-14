@@ -47,8 +47,8 @@
   - `vp9` (Google VP9)
   - `prores` (Apple ProRes)
   - `libsvtav1` (SVT-AV1)
-  - **하드웨어 가속:** `h264_videotoolbox` (Apple Silicon), `h264_nvenc` (NVIDIA)
-- **오디오 인코더:** `aac`, `ac3` (Dolby Digital), `libopus`, `mp3`
+  - **하드웨어 가속:** `h264_videotoolbox` (Apple Silicon), `hevc_videotoolbox` (Apple Silicon), `h264_nvenc` (NVIDIA), `hevc_nvenc` (NVIDIA), `av1_nvenc` (NVIDIA)
+- **오디오 인코더:** `aac`, `ac3` (Dolby Digital), `libopus`, `mp3`, `alac` (Apple Lossless), `flac` (Free Lossless Audio Codec), `pcm_s16le` (WAV)
 - **비트레이트 제어:** 고정 품질 (CRF) 또는 목표 비트레이트 (kbps)
 - **스케일링:** 바이큐빅, 란초스, 바이리니어, 니어레스트
 - **메타데이터 분석:** `ffprobe`를 통한 스트림 정보 자동 추출 (코덱, 재생 시간, 비트레이트, 채널 레이아웃)
@@ -68,7 +68,7 @@
 - **런타임:** `tokio` (비동기 I/O)
 - **직렬화:** `serde`, `serde_json`
 - **프로세스 관리:** `tauri-plugin-shell` (FFmpeg/FFprobe 사이드카 실행)
-- **시스템 통합:** `tauri-plugin-dialog`, `tauri-plugin-fs`, `window-vibrancy`
+- **시스템 통합:** `tauri-plugin-dialog`, `tauri-plugin-fs`, Tauri 윈도우 효과 API (`tauri::window::set_effects`)
 
 ### 프론트엔드 (SvelteKit)
 
@@ -77,7 +77,7 @@
 - **스타일링:** Tailwind CSS v4, `clsx`, `tailwind-merge`
 - **상태 관리:** Svelte 5 `$state` / `$props`
 - **국제화:** 다국어 인터페이스, 시스템 언어 자동 감지
-- **타이포그래피:** Geist Mono (내장)
+- **타이포그래피:** Geist Sans (내장), Geist Mono (내장)
 
 ### 설치
 

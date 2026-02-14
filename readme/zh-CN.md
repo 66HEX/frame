@@ -47,8 +47,8 @@
   - `vp9` (Google VP9)
   - `prores` (Apple ProRes)
   - `libsvtav1` (SVT-AV1)
-  - **硬件加速：** `h264_videotoolbox` (Apple Silicon)、`h264_nvenc` (NVIDIA)
-- **音频编码器：** `aac`、`ac3` (杜比数字)、`libopus`、`mp3`
+  - **硬件加速：** `h264_videotoolbox` (Apple Silicon)、`hevc_videotoolbox` (Apple Silicon)、`h264_nvenc` (NVIDIA)、`hevc_nvenc` (NVIDIA)、`av1_nvenc` (NVIDIA)
+- **音频编码器：** `aac`、`ac3` (杜比数字)、`libopus`、`mp3`、`alac` (Apple Lossless)、`flac` (Free Lossless Audio Codec)、`pcm_s16le` (WAV)
 - **码率控制：** 固定质量因子 (CRF) 或目标码率 (kbps)
 - **缩放算法：** 双三次、Lanczos、双线性、最近邻
 - **元数据探测：** 通过 `ffprobe` 自动提取流信息（编码器、时长、码率、声道布局）
@@ -68,7 +68,7 @@
 - **运行时：** `tokio` (异步 I/O)
 - **序列化：** `serde`、`serde_json`
 - **进程管理：** `tauri-plugin-shell` 用于 sidecar 执行 (FFmpeg/FFprobe)
-- **系统集成：** `tauri-plugin-dialog`、`tauri-plugin-fs`、`window-vibrancy`
+- **系统集成：** `tauri-plugin-dialog`、`tauri-plugin-fs`、Tauri 窗口效果 API (`tauri::window::set_effects`)
 
 ### 前端 (SvelteKit)
 
@@ -77,7 +77,7 @@
 - **样式：** Tailwind CSS v4、`clsx`、`tailwind-merge`
 - **状态管理：** Svelte 5 `$state` / `$props`
 - **国际化：** 多语言界面，自动检测系统语言
-- **字体：** Geist Mono (内嵌)
+- **字体：** Geist Sans (内嵌), Geist Mono (内嵌)
 
 ### 安装
 

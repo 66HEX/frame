@@ -47,8 +47,8 @@
   - `vp9` (Google VP9)
   - `prores` (Apple ProRes)
   - `libsvtav1` (SVT-AV1)
-  - **ハードウェアアクセラレーション：** `h264_videotoolbox` (Apple Silicon)、`h264_nvenc` (NVIDIA)
-- **オーディオエンコーダー：** `aac`、`ac3` (Dolby Digital)、`libopus`、`mp3`
+  - **ハードウェアアクセラレーション：** `h264_videotoolbox` (Apple Silicon)、`hevc_videotoolbox` (Apple Silicon)、`h264_nvenc` (NVIDIA)、`hevc_nvenc` (NVIDIA)、`av1_nvenc` (NVIDIA)
+- **オーディオエンコーダー：** `aac`、`ac3` (Dolby Digital)、`libopus`、`mp3`、`alac` (Apple Lossless)、`flac` (Free Lossless Audio Codec)、`pcm_s16le` (WAV)
 - **ビットレート制御：** 固定品質 (CRF) または目標ビットレート (kbps)
 - **スケーリング：** バイキュービック、ランチョス、バイリニア、ニアレスト
 - **メタデータ解析：** `ffprobe` によるストリーム情報の自動抽出（コーデック、再生時間、ビットレート、チャンネルレイアウト）
@@ -68,7 +68,7 @@
 - **ランタイム：** `tokio` (非同期 I/O)
 - **シリアライゼーション：** `serde`、`serde_json`
 - **プロセス管理：** `tauri-plugin-shell` (FFmpeg/FFprobe のサイドカー実行)
-- **システム統合：** `tauri-plugin-dialog`、`tauri-plugin-fs`、`window-vibrancy`
+- **システム統合：** `tauri-plugin-dialog`、`tauri-plugin-fs`、Tauri ウィンドウエフェクト API (`tauri::window::set_effects`)
 
 ### フロントエンド (SvelteKit)
 
@@ -77,7 +77,7 @@
 - **スタイリング：** Tailwind CSS v4、`clsx`、`tailwind-merge`
 - **状態管理：** Svelte 5 `$state` / `$props`
 - **国際化：** 多言語インターフェース、システム言語の自動検出
-- **タイポグラフィ：** Geist Mono (埋め込み)
+- **タイポグラフィ：** Geist Sans (埋め込み)、Geist Mono (埋め込み)
 
 ### インストール
 
