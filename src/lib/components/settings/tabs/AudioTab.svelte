@@ -111,7 +111,7 @@
 				<div class="flex items-center justify-between">
 					<Label for="audio-volume">{$_('audio.volume')}</Label>
 					<span
-						class="button-highlight rounded bg-blue-700 px-1.5 text-[10px] font-semibold text-foreground"
+						class="button-highlight rounded bg-blue-700 px-1.5 text-[10px] font-semibold text-foreground shadow-sm shadow-black/5"
 						>{config.audioVolume}%</span
 					>
 				</div>
@@ -133,7 +133,6 @@
 			<div class="flex items-start gap-2 pt-2">
 				<Checkbox
 					id="audio-normalize"
-					class="pt-0.5"
 					checked={config.audioNormalize}
 					onchange={(e) => onUpdate({ audioNormalize: e.currentTarget.checked })}
 					disabled={encodeControlsDisabled}

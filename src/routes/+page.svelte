@@ -161,7 +161,7 @@
 								{/key}
 							{:else}
 								<div
-									class="card-highlight flex h-full flex-col items-center justify-center overflow-hidden rounded-lg border border-gray-alpha-100 bg-gray-alpha-100"
+									class="card-highlight flex h-full flex-col items-center justify-center overflow-hidden rounded-lg border border-gray-alpha-100 bg-gray-alpha-100 shadow-md shadow-black/5"
 								></div>
 							{/if}
 						</div>
@@ -183,7 +183,7 @@
 
 				<div class="col-span-4 h-full min-h-0">
 					<div
-						class="card-highlight h-full min-h-0 overflow-hidden rounded-lg border border-gray-alpha-100 bg-gray-alpha-100"
+						class="card-highlight h-full min-h-0 rounded-lg border border-gray-alpha-100 bg-gray-alpha-100 shadow-md shadow-black/5"
 					>
 						<div class="custom-scrollbar h-full min-h-0 overflow-y-auto">
 							{#if selectedFile}

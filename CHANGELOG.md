@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Surface Depth Polish:** Added subtle shadow treatment to primary cards, shared buttons, value badges, and titlebar view switchers for a more consistent neumorphic depth layer.
+- **Preview Panel Control Polish:** Applied the shared button highlight style to crop aspect controls and aligned preview transform action markup for cleaner, consistent control rendering.
+- **Control Sizing and Radius Cleanup:** Tightened slider track corner radius, simplified subtitle clear button sizing/icon scale, and removed redundant checkbox top offset styling in audio settings.
+
 ## [0.25.0] - 2026-02-15
 
 ### Changed

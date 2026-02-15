@@ -90,7 +90,7 @@
 						<Button
 							variant="destructive"
 							size="none"
-							class="h-4 w-4 text-gray-alpha-600 hover:bg-transparent hover:text-red-700 disabled:pointer-events-none disabled:opacity-50"
+							class="size-5"
 							onclick={(e) => {
 								e.stopPropagation();
 								clearExternalSubtitle();
@@ -98,7 +98,7 @@
 							disabled={burnInDisabled}
 							title={$_('subtitles.clearFile')}
 						>
-							<IconClose size={14} />
+							<IconClose size={12} />
 						</Button>
 					</div>
 				{/if}

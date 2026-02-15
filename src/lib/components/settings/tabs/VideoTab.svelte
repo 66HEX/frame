@@ -385,7 +385,7 @@
 						{/if}
 					</Label>
 					<div
-						class="button-highlight rounded bg-blue-700 px-1.5 text-[10px] font-semibold text-foreground"
+						class="button-highlight rounded bg-blue-700 px-1.5 text-[10px] font-semibold text-foreground shadow-sm shadow-black/5"
 					>
 						{#if isHardwareEncoder}
 							Q {config.quality}
