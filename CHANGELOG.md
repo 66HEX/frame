@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Two-Tone Borders and Separators:** Replaced single-tone divider/border treatments with a two-tone background + subtle shadow style to better match the neumorphic UI direction.
+- **Cursor Style Cleanup:** Removed redundant `cursor-*` utility classes from non-actionable/neutral surfaces (settings overlay, preview container layers, file rows, checkbox, slider) to keep cursor behavior visually consistent with element semantics.
 
 ## [0.24.1] - 2026-02-14
 
