@@ -109,26 +109,30 @@
 <div
 	class="card-highlight flex h-full flex-col overflow-hidden rounded-lg border border-gray-alpha-100 bg-gray-alpha-100"
 >
-	<div class="flex h-10 items-center gap-6 overflow-x-auto border-b border-gray-alpha-100 px-4">
-		{#each activeFiles as file (file.id)}
-			<button
-				onclick={() => (selectedLogFileId = file.id)}
-				class={cn(
-					'shrink-0 text-[10px] font-medium tracking-widest transition-all',
-					selectedLogFileId === file.id
-						? 'text-blue-700'
-						: 'text-gray-alpha-600 hover:text-foreground'
-				)}
-			>
-				{file.name}
-			</button>
-		{/each}
+	<div
+		class="relative h-10 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-background after:shadow-2xs after:shadow-gray-alpha-100 after:content-['']"
+	>
+		<div class="flex h-full items-center gap-6 overflow-x-auto px-4">
+			{#each activeFiles as file (file.id)}
+				<button
+					onclick={() => (selectedLogFileId = file.id)}
+					class={cn(
+						'shrink-0 text-[10px] font-medium tracking-widest transition-all',
+						selectedLogFileId === file.id
+							? 'text-blue-700'
+							: 'text-gray-alpha-600 hover:text-foreground'
+					)}
+				>
+					{file.name}
+				</button>
+			{/each}
 
-		{#if activeFiles.length === 0}
-			<span class="text-[10px] font-medium tracking-widest text-gray-alpha-600">
-				{$_('logs.noActiveProcesses')}
-			</span>
-		{/if}
+			{#if activeFiles.length === 0}
+				<span class="text-[10px] font-medium tracking-widest text-gray-alpha-600">
+					{$_('logs.noActiveProcesses')}
+				</span>
+			{/if}
+		</div>
 	</div>
 
 	<div class="relative flex flex-1 flex-col overflow-hidden" bind:this={wrapperDiv}>

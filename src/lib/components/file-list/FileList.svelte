@@ -33,7 +33,9 @@
 <div
 	class="group card-highlight flex h-full flex-col overflow-hidden rounded-lg border border-gray-alpha-100 bg-gray-alpha-100"
 >
-	<div class="z-10 flex h-10 items-center border-b border-gray-alpha-100 px-4">
+	<div
+		class="relative z-10 flex h-10 items-center px-4 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-background after:shadow-2xs after:shadow-gray-alpha-100 after:content-['']"
+	>
 		<div
 			class="grid flex-1 grid-cols-12 items-center gap-4 text-[10px] font-medium tracking-widest text-gray-alpha-600"
 		>

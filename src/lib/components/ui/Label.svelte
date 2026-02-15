@@ -7,7 +7,7 @@
 		variants: {
 			variant: {
 				default: 'text-[9px] block',
-				section: 'text-[10px] border-b border-gray-alpha-100 pb-1 block w-full mb-3'
+				section: 'text-[10px] pb-1 block w-full mb-3'
 			}
 		},
 		defaultVariants: {
@@ -25,4 +25,7 @@
 
 <label bind:this={ref} class={cn(labelVariants({ variant, className }))} {...props}>
 	{@render children?.()}
+	{#if variant === 'section'}
+		<div class="mt-1 h-px bg-background shadow-2xs shadow-gray-alpha-100"></div>
+	{/if}
 </label>

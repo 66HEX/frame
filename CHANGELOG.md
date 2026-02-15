@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Two-Tone Borders and Separators:** Replaced single-tone divider/border treatments with a two-tone background + subtle shadow style to better match the neumorphic UI direction.
+
 ## [0.24.1] - 2026-02-14
 
 ### Changed
