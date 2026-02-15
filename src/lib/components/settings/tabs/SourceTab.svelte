@@ -2,6 +2,7 @@
 	import type { MetadataStatus, SourceMetadata } from '$lib/types';
 	import Label from '$lib/components/ui/Label.svelte';
 	import { _ } from '$lib/i18n';
+	import { themeStore } from '$lib/stores/theme.svelte';
 
 	let {
 		metadata,
@@ -172,7 +173,11 @@
 								<span class="text-[10px] font-semibold text-blue-700"
 									>{$_('source.track')} #{i + 1}</span
 								>
-								<div class="h-px flex-1 bg-background shadow-2xs shadow-gray-alpha-100"></div>
+								<div
+									class="h-px flex-1 [background-color:var(--divider-background)] shadow-2xs shadow-gray-alpha-100"
+									style="--divider-background: color-mix(in srgb, var(--background), transparent {100 -
+										themeStore.opacity}%)"
+								></div>
 							</div>
 							<div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px]">
 								<div class="text-gray-alpha-600">{$_('audio.codec')}</div>

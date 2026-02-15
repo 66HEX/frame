@@ -8,6 +8,7 @@
 	import { IconArrowDown } from '$lib/icons';
 	import { getHighlighter, highlightLogLineSync } from '$lib/services/shiki';
 	import type { HighlighterCore } from 'shiki/core';
+	import { themeStore } from '$lib/stores/theme.svelte';
 
 	let {
 		logs,
@@ -110,7 +111,9 @@
 	class="card-highlight flex h-full flex-col overflow-hidden rounded-lg border border-gray-alpha-100 bg-gray-alpha-100"
 >
 	<div
-		class="relative h-10 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-background after:shadow-2xs after:shadow-gray-alpha-100 after:content-['']"
+		class="relative h-10 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:[background-color:var(--divider-background)] after:shadow-2xs after:shadow-gray-alpha-100 after:content-['']"
+		style="--divider-background: color-mix(in srgb, var(--background), transparent {100 -
+			themeStore.opacity}%)"
 	>
 		<div class="flex h-full items-center gap-6 overflow-x-auto px-4">
 			{#each activeFiles as file (file.id)}

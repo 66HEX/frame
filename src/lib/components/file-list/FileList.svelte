@@ -3,6 +3,7 @@
 	import type { FileItem } from '$lib/types';
 	import Checkbox from '$lib/components/ui/Checkbox.svelte';
 	import { _ } from '$lib/i18n';
+	import { themeStore } from '$lib/stores/theme.svelte';
 
 	let {
 		files,
@@ -34,7 +35,9 @@
 	class="group card-highlight flex h-full flex-col overflow-hidden rounded-lg border border-gray-alpha-100 bg-gray-alpha-100"
 >
 	<div
-		class="relative z-10 flex h-10 items-center px-4 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-background after:shadow-2xs after:shadow-gray-alpha-100 after:content-['']"
+		class="relative z-10 flex h-10 items-center px-4 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:[background-color:var(--divider-background)] after:shadow-2xs after:shadow-gray-alpha-100 after:content-['']"
+		style="--divider-background: color-mix(in srgb, var(--background), transparent {100 -
+			themeStore.opacity}%)"
 	>
 		<div
 			class="grid flex-1 grid-cols-12 items-center gap-4 text-[10px] font-semibold text-gray-alpha-600"
