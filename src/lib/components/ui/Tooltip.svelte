@@ -8,23 +8,11 @@
 	import { cva, type VariantProps } from 'class-variance-authority';
 	import { scale } from 'svelte/transition';
 	import type { Snippet } from 'svelte';
+	import { tick } from 'svelte';
 	import { cn } from '$lib/utils/cn';
 
 	const tooltipContentVariants = cva(
-		'pointer-events-none absolute z-50 rounded-sm bg-foreground px-2 py-1 text-[10px] font-semibold whitespace-nowrap normal-case! text-background shadow-lg',
-		{
-			variants: {
-				side: {
-					top: 'bottom-full left-1/2 mb-2 -translate-x-1/2',
-					right: 'top-1/2 left-full ml-2 -translate-y-1/2',
-					bottom: 'top-full left-1/2 mt-2 -translate-x-1/2',
-					left: 'top-1/2 right-full mr-2 -translate-y-1/2'
-				}
-			},
-			defaultVariants: {
-				side: 'top'
-			}
-		}
+		'pointer-events-none fixed z-200 rounded-sm bg-foreground px-2 py-1 text-[10px] font-semibold whitespace-nowrap normal-case! text-background shadow-lg'
 	);
 
 	const tooltipArrowVariants = cva('absolute h-0 w-0', {
@@ -43,7 +31,7 @@
 		}
 	});
 
-	type Side = NonNullable<VariantProps<typeof tooltipContentVariants>['side']>;
+	type Side = NonNullable<VariantProps<typeof tooltipArrowVariants>['side']>;
 
 	type Props = {
 		children?: Snippet;
@@ -72,6 +60,9 @@
 	let isOpen = $state(false);
 	let isPointerInside = $state(false);
 	let isFocusInside = $state(false);
+	let triggerRef: HTMLDivElement | undefined = $state();
+	let tooltipRef: HTMLDivElement | undefined = $state();
+	let tooltipStyle = $state('');
 
 	let openTimeout: ReturnType<typeof setTimeout> | undefined;
 	let closeTimeout: ReturnType<typeof setTimeout> | undefined;
@@ -181,6 +172,76 @@
 		}
 	}
 
+	function portal(node: HTMLElement) {
+		document.body.appendChild(node);
+		return {
+			destroy() {
+				node.remove();
+			}
+		};
+	}
+
+	function updateTooltipPosition() {
+		if (!isOpen || !triggerRef || !tooltipRef) return;
+
+		const triggerRect = triggerRef.getBoundingClientRect();
+		const tooltipWidth = tooltipRef.offsetWidth;
+		const tooltipHeight = tooltipRef.offsetHeight;
+		const offset = 8;
+		const viewportPadding = 8;
+
+		let top = 0;
+		let left = 0;
+
+		switch (side) {
+			case 'right':
+				top = triggerRect.top + triggerRect.height / 2 - tooltipHeight / 2;
+				left = triggerRect.right + offset;
+				break;
+			case 'bottom':
+				top = triggerRect.bottom + offset;
+				left = triggerRect.left + triggerRect.width / 2 - tooltipWidth / 2;
+				break;
+			case 'left':
+				top = triggerRect.top + triggerRect.height / 2 - tooltipHeight / 2;
+				left = triggerRect.left - tooltipWidth - offset;
+				break;
+			case 'top':
+			default:
+				top = triggerRect.top - tooltipHeight - offset;
+				left = triggerRect.left + triggerRect.width / 2 - tooltipWidth / 2;
+				break;
+		}
+
+		const maxTop = window.innerHeight - tooltipHeight - viewportPadding;
+		const maxLeft = window.innerWidth - tooltipWidth - viewportPadding;
+
+		top = Math.min(Math.max(viewportPadding, top), Math.max(viewportPadding, maxTop));
+		left = Math.min(Math.max(viewportPadding, left), Math.max(viewportPadding, maxLeft));
+
+		tooltipStyle = `top: ${top}px; left: ${left}px;`;
+	}
+
+	$effect(() => {
+		if (!isOpen) return;
+
+		void tick().then(() => {
+			updateTooltipPosition();
+		});
+
+		const handleViewportChange = () => {
+			updateTooltipPosition();
+		};
+
+		window.addEventListener('resize', handleViewportChange);
+		window.addEventListener('scroll', handleViewportChange, true);
+
+		return () => {
+			window.removeEventListener('resize', handleViewportChange);
+			window.removeEventListener('scroll', handleViewportChange, true);
+		};
+	});
+
 	$effect(() => {
 		return () => {
 			clearOpenTimeout();
@@ -191,6 +252,7 @@
 </script>
 
 <div
+	bind:this={triggerRef}
 	class={cn('relative inline-flex', className)}
 	onpointerenter={onPointerEnter}
 	onpointerleave={onPointerLeave}
@@ -202,9 +264,12 @@
 
 	{#if isOpen && (content || tooltip)}
 		<div
+			bind:this={tooltipRef}
+			use:portal
 			id={tooltipId}
 			role="tooltip"
-			class={cn(tooltipContentVariants({ side }), tooltipClass)}
+			class={cn(tooltipContentVariants(), tooltipClass)}
+			style={tooltipStyle}
 			transition:scale={{ start: 0.92, duration: 130 }}
 		>
 			{#if tooltip}

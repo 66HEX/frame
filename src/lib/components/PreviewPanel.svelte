@@ -13,6 +13,7 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import Label from '$lib/components/ui/Label.svelte';
 	import TimecodeInput from '$lib/components/ui/TimecodeInput.svelte';
+	import Tooltip from '$lib/components/ui/Tooltip.svelte';
 	import { _ } from '$lib/i18n';
 	import type { ConversionConfig, CropSettings } from '$lib/types';
 	import {
@@ -805,44 +806,48 @@
 					</div>
 				</div>
 			</div>
-			<div class="absolute right-0 bottom-0 flex gap-2">
-				<Button
-					size="icon"
-					variant="ghost"
-					title={$_('video.rotation')}
-					onclick={handleRotateToggle}
-					disabled={controlsDisabled}
-				>
-					<IconRotateCw size={16} />
-				</Button>
-				<Button
-					size="icon"
-					variant={flipHorizontal ? 'default' : 'ghost'}
-					title={$_('video.flipHorizontal')}
-					onclick={() => toggleFlip('horizontal')}
-					disabled={controlsDisabled}
-				>
-					<FlipHorizontalIcon size={16} />
-				</Button>
-				<Button
-					size="icon"
-					variant={flipVertical ? 'default' : 'ghost'}
-					title={$_('video.flipVertical')}
-					onclick={() => toggleFlip('vertical')}
-					disabled={controlsDisabled}
-				>
-					<FlipVerticalIcon size={16} />
-				</Button>
-				<Button
-					size="icon"
-					variant={cropMode ? 'default' : appliedCrop ? 'default' : 'ghost'}
-					title={$_('crop.enter')}
-					onclick={toggleCropMode}
-					disabled={controlsDisabled || !hasCropDimensions}
-				>
-					<CropIcon size={16} />
-				</Button>
-			</div>
+				<div class="absolute right-0 bottom-0 flex gap-2">
+					<Tooltip content={$_('video.rotation')}>
+						<Button
+							size="icon"
+							variant="ghost"
+							onclick={handleRotateToggle}
+							disabled={controlsDisabled}
+						>
+							<IconRotateCw size={16} />
+						</Button>
+					</Tooltip>
+					<Tooltip content={$_('video.flipHorizontal')}>
+						<Button
+							size="icon"
+							variant={flipHorizontal ? 'default' : 'ghost'}
+							onclick={() => toggleFlip('horizontal')}
+							disabled={controlsDisabled}
+						>
+							<FlipHorizontalIcon size={16} />
+						</Button>
+					</Tooltip>
+					<Tooltip content={$_('video.flipVertical')}>
+						<Button
+							size="icon"
+							variant={flipVertical ? 'default' : 'ghost'}
+							onclick={() => toggleFlip('vertical')}
+							disabled={controlsDisabled}
+						>
+							<FlipVerticalIcon size={16} />
+						</Button>
+					</Tooltip>
+					<Tooltip content={$_('crop.enter')}>
+						<Button
+							size="icon"
+							variant={cropMode ? 'default' : appliedCrop ? 'default' : 'ghost'}
+							onclick={toggleCropMode}
+							disabled={controlsDisabled || !hasCropDimensions}
+						>
+							<CropIcon size={16} />
+						</Button>
+					</Tooltip>
+				</div>
 		</div>
 	</div>
 </div>

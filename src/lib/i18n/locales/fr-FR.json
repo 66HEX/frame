@@ -9,6 +9,8 @@
 		"cancel": "Annuler",
 		"close": "Fermer",
 		"delete": "Supprimer",
+		"pause": "Pause",
+		"resume": "Reprendre",
 		"name": "Nom",
 		"size": "Taille",
 		"state": "État",

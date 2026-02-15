@@ -4,6 +4,7 @@
 	import { cn } from '$lib/utils/cn';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Checkbox from '$lib/components/ui/Checkbox.svelte';
+	import Tooltip from '$lib/components/ui/Tooltip.svelte';
 	import { _ } from '$lib/i18n';
 	import { themeStore } from '$lib/stores/theme.svelte';
 
@@ -56,7 +57,7 @@
 			/>
 		</div>
 
-		<div class="col-span-5 flex items-center gap-2 overflow-hidden">
+		<div class="col-span-5 flex items-center gap-2">
 			<span class="truncate text-xs text-foreground normal-case! [text-box:none]!">{item.name}</span
 			>
 		</div>
@@ -91,40 +92,46 @@
 
 	<div class="ml-4 flex w-16 items-center justify-end gap-2">
 		<div class="flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-			{#if item.status === FileStatus.CONVERTING}
-				<button
-					onclick={(e) => {
-						e.stopPropagation();
-						onPause?.(item.id);
-					}}
-					class="text-gray-alpha-600 transition-colors hover:text-foreground"
-				>
-					<IconPause size={16} fill="currentColor" color="none" />
-				</button>
-			{:else if item.status === FileStatus.PAUSED}
-				<button
-					onclick={(e) => {
-						e.stopPropagation();
-						onResume?.(item.id);
-					}}
-					class="text-gray-alpha-600 transition-colors hover:text-foreground"
-				>
-					<IconPlay size={16} color="currentColor" />
-				</button>
-			{/if}
+				{#if item.status === FileStatus.CONVERTING}
+					<Tooltip content={$_('common.pause')}>
+						<button
+							onclick={(e) => {
+								e.stopPropagation();
+								onPause?.(item.id);
+							}}
+							class="text-gray-alpha-600 transition-colors hover:text-foreground"
+						>
+							<IconPause size={16} fill="currentColor" color="none" />
+						</button>
+					</Tooltip>
+				{:else if item.status === FileStatus.PAUSED}
+					<Tooltip content={$_('common.resume')}>
+						<button
+							onclick={(e) => {
+								e.stopPropagation();
+								onResume?.(item.id);
+							}}
+							class="text-gray-alpha-600 transition-colors hover:text-foreground"
+						>
+							<IconPlay size={16} color="currentColor" />
+						</button>
+					</Tooltip>
+				{/if}
 
-			<Button
-				onclick={(e) => {
-					e.stopPropagation();
-					onRemove(item.id);
-				}}
-				variant="destructive"
-				class="size-5 shrink-0"
-				size="none"
-				disabled={item.status === FileStatus.CONVERTING}
-			>
-				<IconTrash size={12} class="pl-px" />
-			</Button>
+			<Tooltip content={$_('common.delete')}>
+				<Button
+					onclick={(e) => {
+						e.stopPropagation();
+						onRemove(item.id);
+					}}
+					variant="destructive"
+					class="size-5 shrink-0"
+					size="none"
+					disabled={item.status === FileStatus.CONVERTING}
+				>
+					<IconTrash size={12} class="pl-px" />
+				</Button>
+			</Tooltip>
 		</div>
 	</div>
 </div>

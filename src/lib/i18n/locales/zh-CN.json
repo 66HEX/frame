@@ -9,6 +9,8 @@
 		"cancel": "取消",
 		"close": "关闭",
 		"delete": "删除",
+		"pause": "暂停",
+		"resume": "继续",
 		"name": "名称",
 		"size": "尺寸",
 		"state": "州",

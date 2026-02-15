@@ -13,6 +13,7 @@
 	import Input from '$lib/components/ui/Input.svelte';
 	import ListItem from '$lib/components/ui/ListItem.svelte';
 	import Label from '$lib/components/ui/Label.svelte';
+	import Tooltip from '$lib/components/ui/Tooltip.svelte';
 	import { _ } from '$lib/i18n';
 
 	let {
@@ -184,37 +185,39 @@
 						{/if}
 					</span>
 
-					{#if isCompatible}
-						<Button
-							variant="secondary"
-							size="none"
-							class="size-5 shrink-0"
-							title={$_('presets.applyToAll')}
-							onclick={(event) => {
-								event.stopPropagation();
-								handleApplyToAll(preset);
-							}}
-							{disabled}
-						>
-							<IconListChecks size={12} />
-						</Button>
-					{/if}
+						{#if isCompatible}
+							<Tooltip content={$_('presets.applyToAll')}>
+								<Button
+									variant="secondary"
+									size="none"
+									class="size-5 shrink-0"
+									onclick={(event) => {
+										event.stopPropagation();
+										handleApplyToAll(preset);
+									}}
+									{disabled}
+								>
+									<IconListChecks size={12} />
+								</Button>
+							</Tooltip>
+						{/if}
 
-					{#if !preset.builtIn}
-						<Button
-							variant="destructive"
-							size="none"
-							class="size-5 shrink-0"
-							title={$_('presets.deletePreset')}
-							onclick={(event) => {
-								event.stopPropagation();
-								removePreset(preset);
-							}}
-							{disabled}
-						>
-							<IconTrash size={12} />
-						</Button>
-					{/if}
+						{#if !preset.builtIn}
+							<Tooltip content={$_('presets.deletePreset')}>
+								<Button
+									variant="destructive"
+									size="none"
+									class="size-5 shrink-0"
+									onclick={(event) => {
+										event.stopPropagation();
+										removePreset(preset);
+									}}
+									{disabled}
+								>
+									<IconTrash size={12} />
+								</Button>
+							</Tooltip>
+						{/if}
 				</div>
 			</ListItem>
 		{/each}
