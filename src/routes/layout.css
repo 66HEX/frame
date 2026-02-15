@@ -2,14 +2,6 @@
 
 @font-face {
 	font-family: 'LoskeleyMono';
-	src: url('../lib/assets/fonts/LoskeleyMono/IoskeleyMono-Light.ttf') format('truetype');
-	font-weight: 300;
-	font-style: normal;
-	font-display: swap;
-}
-
-@font-face {
-	font-family: 'LoskeleyMono';
 	src: url('../lib/assets/fonts/LoskeleyMono/IoskeleyMono-Regular.ttf') format('truetype');
 	font-weight: 400;
 	font-style: normal;
@@ -45,54 +37,6 @@
 	src: url('../lib/assets/fonts/LoskeleyMono/IoskeleyMono-ExtraBold.ttf') format('truetype');
 	font-weight: 800;
 	font-style: normal;
-	font-display: swap;
-}
-
-@font-face {
-	font-family: 'LoskeleyMono';
-	src: url('../lib/assets/fonts/LoskeleyMono/IoskeleyMono-LightItalic.ttf') format('truetype');
-	font-weight: 300;
-	font-style: italic;
-	font-display: swap;
-}
-
-@font-face {
-	font-family: 'LoskeleyMono';
-	src: url('../lib/assets/fonts/LoskeleyMono/IoskeleyMono-Italic.ttf') format('truetype');
-	font-weight: 400;
-	font-style: italic;
-	font-display: swap;
-}
-
-@font-face {
-	font-family: 'LoskeleyMono';
-	src: url('../lib/assets/fonts/LoskeleyMono/IoskeleyMono-MediumItalic.ttf') format('truetype');
-	font-weight: 500;
-	font-style: italic;
-	font-display: swap;
-}
-
-@font-face {
-	font-family: 'LoskeleyMono';
-	src: url('../lib/assets/fonts/LoskeleyMono/IoskeleyMono-SemiBoldItalic.ttf') format('truetype');
-	font-weight: 600;
-	font-style: italic;
-	font-display: swap;
-}
-
-@font-face {
-	font-family: 'LoskeleyMono';
-	src: url('../lib/assets/fonts/LoskeleyMono/IoskeleyMono-BoldItalic.ttf') format('truetype');
-	font-weight: 700;
-	font-style: italic;
-	font-display: swap;
-}
-
-@font-face {
-	font-family: 'LoskeleyMono';
-	src: url('../lib/assets/fonts/LoskeleyMono/IoskeleyMono-ExtraBoldItalic.ttf') format('truetype');
-	font-weight: 800;
-	font-style: italic;
 	font-display: swap;
 }
 
