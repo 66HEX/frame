@@ -747,23 +747,23 @@
 			></div>
 
 			<div
-				class="absolute top-1/2 z-20 -ml-2 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded-full border border-blue-600 bg-background shadow-lg"
+				class="button-highlight absolute! top-1/2 z-20 -ml-2 flex size-3.5 -translate-y-1/2 items-center justify-center rounded-full bg-blue-700 shadow-md shadow-black/5"
 				class:cursor-ew-resize={!controlsDisabled}
 				style="left: {(startValue / duration) * 100}%"
 				role="presentation"
 				onmousedown={(e) => !controlsDisabled && handleMouseDown(e, 'start')}
 			>
-				<div class="h-1.5 w-1.5 rounded-full bg-blue-700"></div>
+				<div class="button-highlight size-2 rounded-full bg-sidebar"></div>
 			</div>
 
 			<div
-				class="absolute top-1/2 z-20 -ml-2 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded-full border border-blue-600 bg-background shadow-lg"
+				class="button-highlight absolute! top-1/2 z-20 -ml-2 flex size-3.5 -translate-y-1/2 items-center justify-center rounded-full bg-blue-700 shadow-md shadow-black/5"
 				class:cursor-ew-resize={!controlsDisabled}
 				style="left: {(endValue / duration) * 100}%"
 				role="presentation"
 				onmousedown={(e) => !controlsDisabled && handleMouseDown(e, 'end')}
 			>
-				<div class="h-1.5 w-1.5 rounded-full bg-blue-700"></div>
+				<div class="button-highlight size-2 rounded-full bg-sidebar"></div>
 			</div>
 		</div>
 
