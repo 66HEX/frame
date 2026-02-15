@@ -117,7 +117,7 @@
 				<button
 					onclick={() => (selectedLogFileId = file.id)}
 					class={cn(
-						'shrink-0 text-[10px] font-medium tracking-widest transition-all',
+						'shrink-0 text-[10px] font-semibold transition-all',
 						selectedLogFileId === file.id
 							? 'text-blue-700'
 							: 'text-gray-alpha-600 hover:text-foreground'
@@ -128,7 +128,7 @@
 			{/each}
 
 			{#if activeFiles.length === 0}
-				<span class="text-[10px] font-medium tracking-widest text-gray-alpha-600">
+				<span class="text-[10px] font-semibold text-gray-alpha-600">
 					{$_('logs.noActiveProcesses')}
 				</span>
 			{/if}
@@ -166,7 +166,7 @@
 					<div
 						class="flex h-full flex-col items-center justify-center space-y-2 text-gray-alpha-600 select-none"
 					>
-						<div class="text-[10px] font-medium tracking-widest">
+						<div class="text-[10px] font-semibold">
 							{$_('logs.waitingForOutput')}
 						</div>
 					</div>
@@ -186,7 +186,7 @@
 			<div
 				class="flex h-full flex-col items-center justify-center space-y-2 text-gray-alpha-600 select-none"
 			>
-				<div class="text-[10px] font-medium tracking-widest">
+				<div class="text-[10px] font-semibold">
 					{$_('logs.selectTask')}
 				</div>
 			</div>

@@ -700,7 +700,7 @@
 		{/if}
 		{#if cropMode && draftCrop}
 			<div
-				class="pointer-events-auto absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-md border border-gray-alpha-200 bg-background p-1 text-[10px] font-medium shadow-xl"
+				class="pointer-events-auto absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-md border border-gray-alpha-200 bg-background p-1 text-[10px] font-semibold shadow-xl"
 			>
 				{#each ASPECT_OPTIONS as option (option.id)}
 					<Button
@@ -800,7 +800,7 @@
 				</div>
 				<div class="space-y-1.5">
 					<Label>{$_('trim.duration')}</Label>
-					<div class="py-1.5 text-[11px] tracking-wide text-foreground">
+					<div class="flex h-7.5 items-center text-[10px] text-foreground">
 						{formatTime(endValue - startValue)}
 					</div>
 				</div>

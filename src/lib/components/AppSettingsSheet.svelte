@@ -147,7 +147,7 @@
 	transition:fly={{ x: 320, duration: 300, opacity: 1 }}
 >
 	<div class="flex items-center justify-between border-b border-gray-alpha-100 px-4 py-3">
-		<h2 class="text-[10px] font-medium tracking-widest text-foreground">
+		<h2 class="text-[10px] font-semibold text-foreground">
 			{$_('settings.title')}
 		</h2>
 		<button onclick={onClose} class="text-gray-alpha-600 transition-colors hover:text-foreground">
@@ -228,9 +228,9 @@
 								currentLocale = loc.code;
 								setLocale(loc.code);
 							}}
-							size="icon-large"
+							size="icon"
 						>
-							<span class="text-xl">{loc.flag}</span>
+							<span class="emoji text-base">{loc.flag}</span>
 						</Button>
 					</Tooltip>
 				{/each}
@@ -240,8 +240,8 @@
 			<Label variant="section">{$_('settings.appUpdates')}</Label>
 			<div class="flex flex-col space-y-3">
 				<div class="flex items-center gap-2 py-0.5">
-					<Checkbox id="auto-update-check" bind:checked={autoUpdateCheck} />
-					<Label for="auto-update-check" class="pt-0.5">{$_('settings.checkOnStartup')}</Label>
+					<Checkbox class="mt-px" id="auto-update-check" bind:checked={autoUpdateCheck} />
+					<Label for="auto-update-check">{$_('settings.checkOnStartup')}</Label>
 				</div>
 				<Button
 					variant="default"
@@ -252,7 +252,7 @@
 					{isCheckingForUpdate ? $_('settings.checking') : $_('settings.checkForUpdates')}
 				</Button>
 				{#if checkStatus}
-					<span class="text-[10px] text-blue-700">{checkStatus}</span>
+					<span class="text-[10px] font-semibold text-blue-700">{checkStatus}</span>
 				{/if}
 			</div>
 		</div>

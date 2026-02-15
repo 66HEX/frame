@@ -77,7 +77,7 @@
 - **스타일링:** Tailwind CSS v4, `clsx`, `tailwind-merge`
 - **상태 관리:** Svelte 5 `$state` / `$props`
 - **국제화:** 다국어 인터페이스, 시스템 언어 자동 감지
-- **타이포그래피:** Geist Sans (내장), Geist Mono (내장)
+- **타이포그래피:** Archivo (내장), Loskeley Mono (내장)
 
 ### 설치
 

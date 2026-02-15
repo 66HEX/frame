@@ -11,7 +11,7 @@
 	import { cn } from '$lib/utils/cn';
 
 	const tooltipContentVariants = cva(
-		'pointer-events-none absolute z-50 rounded-sm bg-foreground px-2 py-1 text-[10px] font-medium tracking-wide whitespace-nowrap normal-case! text-background shadow-lg',
+		'pointer-events-none absolute z-50 rounded-sm bg-foreground px-2 py-1 text-[10px] font-semibold whitespace-nowrap normal-case! text-background shadow-lg',
 		{
 			variants: {
 				side: {

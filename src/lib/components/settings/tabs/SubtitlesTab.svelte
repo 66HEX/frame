@@ -103,7 +103,7 @@
 					</div>
 				{/if}
 			</div>
-			<p class="text-[9px] text-gray-alpha-600">
+			<p class="text-[10px] text-gray-alpha-600">
 				{copyMode ? $_('subtitles.copyModeHint') : $_('subtitles.burnInHint')}
 			</p>
 		</div>
@@ -126,10 +126,10 @@
 								<span class="text-[10px] opacity-70">
 									#{track.index}
 								</span>
-								<span class="text-[10px] font-medium tracking-wide">
+								<span class="text-[10px] font-semibold">
 									{track.codec}
 								</span>
-								<div class="text-[9px] tracking-wide">
+								<div class="text-[10px]">
 									{#if track.language}
 										<span class="mx-0.5">•</span>
 										{track.language}{/if}
@@ -159,7 +159,7 @@
 	{:else}
 		<div class="space-y-3 pt-2">
 			<Label variant="section">{$_('subtitles.sourceTracks')}</Label>
-			<p class="text-[9px] text-gray-alpha-600">
+			<p class="text-[10px] text-gray-alpha-600">
 				{$_('subtitles.none')}
 			</p>
 		</div>

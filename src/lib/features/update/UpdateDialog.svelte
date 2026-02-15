@@ -40,14 +40,14 @@
 			<div>
 				<Label variant="section" class="text-foreground">{$_('update.available')}</Label>
 
-				<p class="text-[10px] font-medium tracking-wide text-gray-alpha-600">
+				<p class="text-[10px] font-semibold text-gray-alpha-600">
 					{$_('update.versionAvailable', { values: { version: updateStore.version } })}
 				</p>
 			</div>
 
 			{#if updateStore.body}
 				<div
-					class="markdown-content max-h-35 overflow-y-auto rounded bg-gray-alpha-100 p-3 text-xs tracking-wide text-gray-alpha-600"
+					class="markdown-content max-h-35 overflow-y-auto rounded bg-gray-alpha-100 p-3 text-xs text-gray-alpha-600"
 				>
 					<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 					{@html renderReleaseNotes(updateStore.body)}

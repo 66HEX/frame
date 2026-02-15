@@ -3,10 +3,10 @@
 	import { cn } from '$lib/utils/cn';
 	import type { HTMLLabelAttributes } from 'svelte/elements';
 
-	const labelVariants = cva('tracking-widest text-gray-alpha-600 font-medium', {
+	const labelVariants = cva('text-gray-alpha-600 font-semibold', {
 		variants: {
 			variant: {
-				default: 'text-[9px] block',
+				default: 'text-[10px] block',
 				section: 'text-[10px] pb-1 block w-full mb-3'
 			}
 		},

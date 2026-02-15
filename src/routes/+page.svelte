@@ -223,7 +223,7 @@
 				transition:scale={{ start: 1.05, duration: 100, opacity: 1 }}
 				class="card-highlight flex h-36 w-72 flex-col items-center justify-center rounded-lg border border-gray-alpha-100 bg-sidebar shadow-2xl"
 			>
-				<p class="text-[10px] font-medium tracking-widest text-foreground">
+				<p class="text-[10px] font-semibold text-foreground">
 					{$_('fileList.importSource')}
 				</p>
 			</div>

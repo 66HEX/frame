@@ -30,7 +30,7 @@
 <div
 	style="background-color: color-mix(in srgb, var(--background), transparent {100 -
 		themeStore.opacity}%)"
-	class="button button-highlight relative flex items-center justify-center rounded"
+	class={cn('button button-highlight relative flex items-center justify-center rounded', className)}
 >
 	<input
 		type="checkbox"
@@ -38,8 +38,7 @@
 		bind:checked
 		{indeterminate}
 		class={cn(
-			'peer h-3.5 w-3.5 appearance-none rounded bg-transparent transition-colors checked:border-blue-600 checked:bg-blue-600 disabled:pointer-events-none disabled:opacity-50',
-			className
+			'peer h-3.5 w-3.5 appearance-none rounded bg-transparent transition-colors checked:bg-blue-600 disabled:pointer-events-none disabled:opacity-50'
 		)}
 		{...props}
 	/>

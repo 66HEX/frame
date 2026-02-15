@@ -141,7 +141,7 @@
 				{$_('output.streamCopy')}
 			</Button>
 		</div>
-		<p class="text-[9px] tracking-wide text-gray-alpha-600">
+		<p class="text-[10px] text-gray-alpha-600">
 			{isCopyMode ? $_('output.streamCopyHint') : $_('output.reencodeHint')}
 		</p>
 	</div>
@@ -155,7 +155,7 @@
 			placeholder={$_('output.placeholder')}
 			{disabled}
 		/>
-		<p class="text-[9px] tracking-wide text-gray-alpha-600">
+		<p class="text-[10px] text-gray-alpha-600">
 			{$_('output.hint')}
 		</p>
 	</div>
@@ -172,7 +172,7 @@
 					variant={config.container === fmt ? 'default' : 'secondary'}
 					onclick={() => handleContainerChange(fmt)}
 					disabled={isDisabled}
-					class="w-full"
+					class="w-full uppercase"
 				>
 					{fmt}
 				</Button>

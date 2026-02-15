@@ -134,7 +134,7 @@
 		{#if notice}
 			<span
 				class={cn(
-					'absolute top-0 right-0 text-[9px] tracking-wide',
+					'absolute top-0 right-0 text-[10px] font-semibold',
 					notice.tone === 'error' ? 'text-red-700' : 'text-blue-700'
 				)}
 			>
@@ -176,7 +176,7 @@
 			>
 				<span class="truncate">{preset.name}</span>
 				<div class="flex items-center gap-2">
-					<span class="pr-2 text-[9px] font-medium opacity-50">
+					<span class="pr-2 text-[10px] font-semibold opacity-50">
 						{#if !isCompatible}
 							{$_('audio.incompatibleContainer')}
 						{:else if configsMatch(config, preset.config)}
@@ -188,7 +188,7 @@
 						<Button
 							variant="secondary"
 							size="none"
-							class="size-5 shrink-0 opacity-50 hover:opacity-100"
+							class="size-5 shrink-0"
 							title={$_('presets.applyToAll')}
 							onclick={(event) => {
 								event.stopPropagation();
@@ -196,7 +196,7 @@
 							}}
 							{disabled}
 						>
-							<IconListChecks size={14} />
+							<IconListChecks size={12} />
 						</Button>
 					{/if}
 
@@ -204,7 +204,7 @@
 						<Button
 							variant="destructive"
 							size="none"
-							class="size-5 shrink-0 opacity-50 hover:opacity-100"
+							class="size-5 shrink-0"
 							title={$_('presets.deletePreset')}
 							onclick={(event) => {
 								event.stopPropagation();
