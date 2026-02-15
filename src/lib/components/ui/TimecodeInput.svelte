@@ -203,7 +203,7 @@
 </script>
 
 <div
-	class="input-highlight relative h-7.5 w-full rounded-sm border border-gray-alpha-200"
+	class="input-highlight relative flex h-7.5 w-full items-center rounded-sm border border-gray-alpha-200"
 	style="background-color: color-mix(in srgb, var(--background), transparent {100 -
 		themeStore.opacity}%)"
 >
@@ -213,7 +213,7 @@
 		value={displayValue}
 		{disabled}
 		class={cn(
-			'flex w-full px-3 py-1.5  text-[11px] tracking-wide transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-alpha-600 focus-visible:border-blue-600! focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50',
+			'flex h-8 w-full px-3 text-[10px] font-semibold transition-colors placeholder:text-gray-alpha-600 focus-visible:border-blue-600! focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50',
 			className
 		)}
 		onkeydown={handleKeyDown}

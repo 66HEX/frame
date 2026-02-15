@@ -37,9 +37,9 @@
 	$effect(() => {
 		const root = document.documentElement;
 		if (themeStore.fontFamily === 'sans') {
-			root.style.setProperty('--app-font-family', 'var(--font-geist-sans)');
+			root.style.setProperty('--app-font-family', 'var(--font-archivo)');
 		} else {
-			root.style.setProperty('--app-font-family', 'var(--font-geist-mono)');
+			root.style.setProperty('--app-font-family', 'var(--font-loskeley-mono)');
 		}
 	});
 </script>

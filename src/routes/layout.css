@@ -1,19 +1,57 @@
 @import 'tailwindcss';
 
 @font-face {
-	font-family: 'GeistMono';
-	src: url('../lib/assets/fonts/GeistMono.ttf') format('truetype');
+	font-family: 'LoskeleyMono';
+	src: url('../lib/assets/fonts/LoskeleyMono/IoskeleyMono-Regular.ttf') format('truetype');
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'LoskeleyMono';
+	src: url('../lib/assets/fonts/LoskeleyMono/IoskeleyMono-Medium.ttf') format('truetype');
+	font-weight: 500;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'LoskeleyMono';
+	src: url('../lib/assets/fonts/LoskeleyMono/IoskeleyMono-SemiBold.ttf') format('truetype');
+	font-weight: 600;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'LoskeleyMono';
+	src: url('../lib/assets/fonts/LoskeleyMono/IoskeleyMono-Bold.ttf') format('truetype');
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'LoskeleyMono';
+	src: url('../lib/assets/fonts/LoskeleyMono/IoskeleyMono-ExtraBold.ttf') format('truetype');
+	font-weight: 800;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Archivo';
+	src: url('../lib/assets/fonts/Archivo/Archivo-VariableFont_wdth,wght.ttf') format('truetype');
 	font-weight: 200 800;
 	font-style: normal;
 	font-display: swap;
 }
 
 @font-face {
-	font-family: 'GeistSans';
-	src: url('../lib/assets/fonts/Geist.ttf') format('truetype');
-	font-weight: 200 800;
-	font-style: normal;
-	font-display: swap;
+	font-family: 'EmojiFont';
+	src: local('Apple Color Emoji'), local('Segoe UI Emoji'), local('Noto Color Emoji');
+	unicode-range: U+1F300-1F9FF, U+2600-26FF, U+2700-27BF;
 }
 
 * {
@@ -24,6 +62,31 @@
 :root {
 	interpolate-size: allow-keywords;
 	text-box: trim-both cap alphabetic;
+}
+
+html {
+	text-size-adjust: 100%;
+	background: transparent;
+}
+
+body {
+	background: transparent;
+	color: var(--foreground);
+	font-family: var(--app-font-family), 'EmojiFont', ui-sans-serif, system-ui, sans-serif;
+	font-weight: 500;
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+	height: 100vh;
+}
+.emoji {
+	font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji' !important;
+}
+
+input,
+textarea,
+select {
+	field-sizing: content;
 }
 
 * {
@@ -38,34 +101,13 @@ input::placeholder {
 	text-transform: uppercase;
 }
 
-html {
-	text-size-adjust: 100%;
-	background: transparent;
-}
-
-body {
-	background: transparent;
-	color: var(--foreground);
-	font-family: var(--app-font-family), ui-sans-serif, system-ui, sans-serif;
-	margin: 0;
-	padding: 0;
-	overflow: hidden;
-	height: 100vh;
-}
-
-input,
-textarea,
-select {
-	field-sizing: content;
-}
-
 :root {
 	--background: #17191d;
 	--foreground: #ffffff;
 	--sidebar: #232529;
-	--font-geist-mono: 'GeistMono', monospace;
-	--font-geist-sans: 'GeistSans', sans-serif;
-	--app-font-family: var(--font-geist-mono);
+	--font-loskeley-mono: 'LoskeleyMono', monospace;
+	--font-archivo: 'Archivo', sans-serif;
+	--app-font-family: var(--font-loskeley-mono);
 
 	--ds-gray-alpha-100: rgba(255, 255, 255, 0.05);
 	--ds-gray-alpha-200: rgba(255, 255, 255, 0.1);
@@ -94,7 +136,7 @@ select {
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
 	--color-sidebar: var(--sidebar);
-	--font-mono: var(--font-geist-mono);
+	--font-mono: var(--font-loskeley-mono);
 
 	--color-gray-alpha-100: var(--ds-gray-alpha-100);
 	--color-gray-alpha-200: var(--ds-gray-alpha-200);

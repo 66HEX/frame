@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-02-15
+
+### Changed
+
+- **Typography System Rework:** Replaced embedded Geist fonts with Archivo + Loskeley Mono, rewired app font tokens/switching (`mono`/`sans`), and normalized typography across UI components (size/weight/letter-spacing) for more consistent readability. Updated all localized README files to reflect the new font stack.
+- **Two-Tone Borders and Separators:** Replaced single-tone divider/border treatments with a two-tone background + subtle shadow style to better match the neumorphic UI direction.
+- **Cursor Style Cleanup:** Removed redundant `cursor-*` utility classes from non-actionable/neutral surfaces (settings overlay, preview container layers, file rows, checkbox, slider) to keep cursor behavior visually consistent with element semantics.
+- **Action Tooltips (Preview/List/Presets):** Replaced native `title` attributes with shared tooltip UI for preview transform controls, file row action controls, and preset action buttons for consistent hover labels.
+- **Tooltip Layering and Positioning:** Updated shared tooltip rendering to use a body portal with viewport-aware fixed positioning, so labels are not clipped by parent overflow and stay visually centered.
+- **Common Action Copy:** Added shared i18n keys `common.pause` and `common.resume` and applied translated values across all supported locales.
+
 ## [0.24.1] - 2026-02-14
 
 ### Changed
@@ -615,7 +626,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.24.1...HEAD
+[Unreleased]: https://github.com/66HEX/frame/compare/0.25.0...HEAD
+[0.25.0]: https://github.com/66HEX/frame/compare/0.24.1...0.25.0
 [0.24.1]: https://github.com/66HEX/frame/compare/0.24.0...0.24.1
 [0.24.0]: https://github.com/66HEX/frame/compare/0.23.2...0.24.0
 [0.23.2]: https://github.com/66HEX/frame/compare/0.23.1...0.23.2

@@ -9,6 +9,8 @@
 		"cancel": "취소",
 		"close": "닫기",
 		"delete": "삭제",
+		"pause": "일시정지",
+		"resume": "재개",
 		"name": "이름",
 		"size": "크기",
 		"state": "주",

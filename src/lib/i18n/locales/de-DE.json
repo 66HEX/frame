@@ -9,6 +9,8 @@
 		"cancel": "Abbrechen",
 		"close": "Schließen",
 		"delete": "Löschen",
+		"pause": "Pause",
+		"resume": "Fortsetzen",
 		"name": "Name",
 		"size": "Größe",
 		"state": "Bundesstaat",

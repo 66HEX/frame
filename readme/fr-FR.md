@@ -77,7 +77,7 @@
 - **Styles :** Tailwind CSS v4, `clsx`, `tailwind-merge`
 - **Gestion d'état :** Svelte 5 `$state` / `$props`
 - **Internationalisation :** Interface multilingue avec détection automatique de la langue système
-- **Typographie :** Geist Sans (intégrée), Geist Mono (intégrée)
+- **Typographie :** Archivo (intégrée), Loskeley Mono (intégrée)
 
 ### Installation
 

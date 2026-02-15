@@ -13,6 +13,7 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import Label from '$lib/components/ui/Label.svelte';
 	import TimecodeInput from '$lib/components/ui/TimecodeInput.svelte';
+	import Tooltip from '$lib/components/ui/Tooltip.svelte';
 	import { _ } from '$lib/i18n';
 	import type { ConversionConfig, CropSettings } from '$lib/types';
 	import {
@@ -595,7 +596,7 @@
 	class="card-highlight flex h-full flex-col overflow-hidden rounded-lg border border-gray-alpha-100 bg-gray-alpha-100 p-4"
 >
 	<div
-		class="relative flex min-h-0 flex-1 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-gray-alpha-200 bg-black"
+		class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-lg border border-gray-alpha-200 bg-black"
 		bind:this={containerRef}
 		onclick={() => !cropMode && togglePlay()}
 		onmouseenter={() => (isHovering = true)}
@@ -677,7 +678,7 @@
 		</div>
 		{#if !cropMode && (!isPlaying || isHovering)}
 			<div
-				class="absolute inset-0 z-10 flex cursor-pointer items-center justify-center"
+				class="absolute inset-0 z-10 flex items-center justify-center"
 				onclick={(e) => {
 					e.stopPropagation();
 					togglePlay();
@@ -700,7 +701,7 @@
 		{/if}
 		{#if cropMode && draftCrop}
 			<div
-				class="pointer-events-auto absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-md border border-gray-alpha-200 bg-background p-1 text-[10px] font-medium shadow-xl"
+				class="pointer-events-auto absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-md border border-gray-alpha-200 bg-background p-1 text-[10px] font-semibold shadow-xl"
 			>
 				{#each ASPECT_OPTIONS as option (option.id)}
 					<Button
@@ -800,49 +801,53 @@
 				</div>
 				<div class="space-y-1.5">
 					<Label>{$_('trim.duration')}</Label>
-					<div class="py-1.5 text-[11px] tracking-wide text-foreground">
+					<div class="flex h-7.5 items-center text-[10px] text-foreground">
 						{formatTime(endValue - startValue)}
 					</div>
 				</div>
 			</div>
-			<div class="absolute right-0 bottom-0 flex gap-2">
-				<Button
-					size="icon"
-					variant="ghost"
-					title={$_('video.rotation')}
-					onclick={handleRotateToggle}
-					disabled={controlsDisabled}
-				>
-					<IconRotateCw size={16} />
-				</Button>
-				<Button
-					size="icon"
-					variant={flipHorizontal ? 'default' : 'ghost'}
-					title={$_('video.flipHorizontal')}
-					onclick={() => toggleFlip('horizontal')}
-					disabled={controlsDisabled}
-				>
-					<FlipHorizontalIcon size={16} />
-				</Button>
-				<Button
-					size="icon"
-					variant={flipVertical ? 'default' : 'ghost'}
-					title={$_('video.flipVertical')}
-					onclick={() => toggleFlip('vertical')}
-					disabled={controlsDisabled}
-				>
-					<FlipVerticalIcon size={16} />
-				</Button>
-				<Button
-					size="icon"
-					variant={cropMode ? 'default' : appliedCrop ? 'default' : 'ghost'}
-					title={$_('crop.enter')}
-					onclick={toggleCropMode}
-					disabled={controlsDisabled || !hasCropDimensions}
-				>
-					<CropIcon size={16} />
-				</Button>
-			</div>
+				<div class="absolute right-0 bottom-0 flex gap-2">
+					<Tooltip content={$_('video.rotation')}>
+						<Button
+							size="icon"
+							variant="ghost"
+							onclick={handleRotateToggle}
+							disabled={controlsDisabled}
+						>
+							<IconRotateCw size={16} />
+						</Button>
+					</Tooltip>
+					<Tooltip content={$_('video.flipHorizontal')}>
+						<Button
+							size="icon"
+							variant={flipHorizontal ? 'default' : 'ghost'}
+							onclick={() => toggleFlip('horizontal')}
+							disabled={controlsDisabled}
+						>
+							<FlipHorizontalIcon size={16} />
+						</Button>
+					</Tooltip>
+					<Tooltip content={$_('video.flipVertical')}>
+						<Button
+							size="icon"
+							variant={flipVertical ? 'default' : 'ghost'}
+							onclick={() => toggleFlip('vertical')}
+							disabled={controlsDisabled}
+						>
+							<FlipVerticalIcon size={16} />
+						</Button>
+					</Tooltip>
+					<Tooltip content={$_('crop.enter')}>
+						<Button
+							size="icon"
+							variant={cropMode ? 'default' : appliedCrop ? 'default' : 'ghost'}
+							onclick={toggleCropMode}
+							disabled={controlsDisabled || !hasCropDimensions}
+						>
+							<CropIcon size={16} />
+						</Button>
+					</Tooltip>
+				</div>
 		</div>
 	</div>
 </div>

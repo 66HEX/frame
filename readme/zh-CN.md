@@ -77,7 +77,7 @@
 - **样式：** Tailwind CSS v4、`clsx`、`tailwind-merge`
 - **状态管理：** Svelte 5 `$state` / `$props`
 - **国际化：** 多语言界面，自动检测系统语言
-- **字体：** Geist Sans (内嵌), Geist Mono (内嵌)
+- **字体：** Archivo (内嵌), Loskeley Mono (内嵌)
 
 ### 安装
 

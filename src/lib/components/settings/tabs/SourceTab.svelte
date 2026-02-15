@@ -2,6 +2,7 @@
 	import type { MetadataStatus, SourceMetadata } from '$lib/types';
 	import Label from '$lib/components/ui/Label.svelte';
 	import { _ } from '$lib/i18n';
+	import { themeStore } from '$lib/stores/theme.svelte';
 
 	let {
 		metadata,
@@ -94,11 +95,11 @@
 
 <div class="space-y-6">
 	{#if status === 'loading'}
-		<div class="text-[11px] tracking-wide text-gray-alpha-600">
+		<div class="text-xs text-gray-alpha-600">
 			{$_('source.analyzing')}
 		</div>
 	{:else if status === 'error'}
-		<div class="space-y-1 text-[11px] tracking-wide text-red-700">
+		<div class="space-y-1 text-xs text-red-700">
 			<p>{$_('source.failedToRead')}</p>
 			{#if error}
 				<p class="text-[10px] text-gray-alpha-600">
@@ -109,55 +110,55 @@
 	{:else if metadata}
 		<div class="space-y-3">
 			<Label variant="section">{$_('source.fileInfo')}</Label>
-			<div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px] tracking-wide">
+			<div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px]">
 				<div class="text-gray-alpha-600">{$_('source.duration')}</div>
-				<div class="text-right font-medium">{formatDuration(metadata.duration)}</div>
+				<div class="text-right font-semibold">{formatDuration(metadata.duration)}</div>
 
 				<div class="text-gray-alpha-600">{$_('source.containerBitrate')}</div>
-				<div class="text-right font-medium">{formatContainerBitrate(metadata.bitrate)}</div>
+				<div class="text-right font-semibold">{formatContainerBitrate(metadata.bitrate)}</div>
 			</div>
 		</div>
 
 		{#if metadata.videoCodec}
 			<div class="space-y-3">
 				<Label variant="section">{$_('source.videoStream')}</Label>
-				<div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px] tracking-wide">
+				<div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px]">
 					<div class="text-gray-alpha-600">{$_('source.videoCodec')}</div>
-					<div class="text-right font-medium">{display(metadata.videoCodec)}</div>
+					<div class="text-right font-semibold">{display(metadata.videoCodec)}</div>
 
 					{#if metadata.profile}
 						<div class="text-gray-alpha-600">{$_('source.profile')}</div>
-						<div class="text-right font-medium">{display(metadata.profile)}</div>
+						<div class="text-right font-semibold">{display(metadata.profile)}</div>
 					{/if}
 
 					<div class="text-gray-alpha-600">{$_('source.dimensions')}</div>
-					<div class="text-right font-medium">{formatResolution(metadata)}</div>
+					<div class="text-right font-semibold">{formatResolution(metadata)}</div>
 
 					<div class="text-gray-alpha-600">{$_('source.frameRate')}</div>
-					<div class="text-right font-medium">{formatFrameRate(metadata.frameRate)}</div>
+					<div class="text-right font-semibold">{formatFrameRate(metadata.frameRate)}</div>
 
 					{#if metadata.pixelFormat}
 						<div class="text-gray-alpha-600">{$_('source.pixelFormat')}</div>
-						<div class="text-right font-medium">{display(metadata.pixelFormat)}</div>
+						<div class="text-right font-semibold">{display(metadata.pixelFormat)}</div>
 					{/if}
 
 					{#if metadata.colorSpace}
 						<div class="text-gray-alpha-600">{$_('source.colorSpace')}</div>
-						<div class="text-right font-medium">{display(metadata.colorSpace)}</div>
+						<div class="text-right font-semibold">{display(metadata.colorSpace)}</div>
 					{/if}
 
 					{#if metadata.colorRange}
 						<div class="text-gray-alpha-600">{$_('source.colorRange')}</div>
-						<div class="text-right font-medium">{display(metadata.colorRange)}</div>
+						<div class="text-right font-semibold">{display(metadata.colorRange)}</div>
 					{/if}
 
 					{#if metadata.colorPrimaries}
 						<div class="text-gray-alpha-600">{$_('source.colorPrimaries')}</div>
-						<div class="text-right font-medium">{display(metadata.colorPrimaries)}</div>
+						<div class="text-right font-semibold">{display(metadata.colorPrimaries)}</div>
 					{/if}
 
 					<div class="text-gray-alpha-600">{$_('source.videoBitrate')}</div>
-					<div class="text-right font-medium">{formatBitrateKbps(metadata.videoBitrateKbps)}</div>
+					<div class="text-right font-semibold">{formatBitrateKbps(metadata.videoBitrateKbps)}</div>
 				</div>
 			</div>
 		{/if}
@@ -169,31 +170,35 @@
 					{#each metadata.audioTracks as track, i (track.index)}
 						<div class="space-y-2">
 							<div class="flex items-center gap-2">
-								<span class="text-[9px] font-bold tracking-widest text-blue-700"
+								<span class="text-[10px] font-semibold text-blue-700"
 									>{$_('source.track')} #{i + 1}</span
 								>
-								<div class="h-px flex-1 bg-gray-alpha-100"></div>
+								<div
+									class="h-px flex-1 [background-color:var(--divider-background)] shadow-2xs shadow-gray-alpha-100"
+									style="--divider-background: color-mix(in srgb, var(--background), transparent {100 -
+										themeStore.opacity}%)"
+								></div>
 							</div>
-							<div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px] tracking-wide">
+							<div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px]">
 								<div class="text-gray-alpha-600">{$_('audio.codec')}</div>
-								<div class="text-right font-medium">{display(track.codec)}</div>
+								<div class="text-right font-semibold">{display(track.codec)}</div>
 
 								<div class="text-gray-alpha-600">{$_('audio.channels')}</div>
-								<div class="text-right font-medium">{display(track.channels)}</div>
+								<div class="text-right font-semibold">{display(track.channels)}</div>
 
 								{#if track.sampleRate}
 									<div class="text-gray-alpha-600">{$_('source.sampleRate')}</div>
-									<div class="text-right font-medium">{formatHz(track.sampleRate)}</div>
+									<div class="text-right font-semibold">{formatHz(track.sampleRate)}</div>
 								{/if}
 
 								{#if track.bitrateKbps}
 									<div class="text-gray-alpha-600">{$_('source.bitrate')}</div>
-									<div class="text-right font-medium">{formatBitrateKbps(track.bitrateKbps)}</div>
+									<div class="text-right font-semibold">{formatBitrateKbps(track.bitrateKbps)}</div>
 								{/if}
 
 								{#if track.language}
 									<div class="text-gray-alpha-600">{$_('source.language')}</div>
-									<div class="text-right font-medium">{display(track.language)}</div>
+									<div class="text-right font-semibold">{display(track.language)}</div>
 								{/if}
 							</div>
 						</div>
@@ -202,7 +207,7 @@
 			</div>
 		{/if}
 	{:else}
-		<div class="text-[11px] tracking-wide text-gray-alpha-600">
+		<div class="text-xs text-gray-alpha-600">
 			{$_('source.unavailable')}
 		</div>
 	{/if}

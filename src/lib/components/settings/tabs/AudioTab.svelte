@@ -75,7 +75,7 @@
 	<div class="space-y-3">
 		<Label variant="section">{$_('audio.channelsBitrate')}</Label>
 		{#if copyMode}
-			<p class="text-[9px] text-gray-alpha-600">{$_('audio.copyModeHint')}</p>
+			<p class="text-[10px] text-gray-alpha-600">{$_('audio.copyModeHint')}</p>
 		{/if}
 		<div class="space-y-3">
 			<div class="grid grid-cols-3 gap-2">
@@ -111,7 +111,7 @@
 				<div class="flex items-center justify-between">
 					<Label for="audio-volume">{$_('audio.volume')}</Label>
 					<span
-						class="button-highlight rounded bg-blue-700 px-1.5 text-[10px] font-medium text-foreground"
+						class="button-highlight rounded bg-blue-700 px-1.5 text-[10px] font-semibold text-foreground"
 						>{config.audioVolume}%</span
 					>
 				</div>
@@ -124,7 +124,7 @@
 					oninput={(e) => onUpdate({ audioVolume: Number(e.currentTarget.value) })}
 					disabled={encodeControlsDisabled}
 				/>
-				<div class="flex justify-between text-[9px] text-gray-alpha-600">
+				<div class="flex justify-between text-[10px] text-gray-alpha-600">
 					<span>{$_('audio.muted')}</span>
 					<span>{$_('audio.maxVolume')}</span>
 				</div>
@@ -133,13 +133,14 @@
 			<div class="flex items-start gap-2 pt-2">
 				<Checkbox
 					id="audio-normalize"
+					class="pt-0.5"
 					checked={config.audioNormalize}
 					onchange={(e) => onUpdate({ audioNormalize: e.currentTarget.checked })}
 					disabled={encodeControlsDisabled}
 				/>
 				<div class="space-y-0.5">
 					<Label for="audio-normalize">{$_('audio.normalize')}</Label>
-					<p class="text-[9px] text-gray-alpha-600">
+					<p class="text-[10px] text-gray-alpha-600">
 						{$_('audio.normalizeHint')}
 					</p>
 				</div>
@@ -157,8 +158,8 @@
 					disabled={encodeControlsDisabled || !allowed}
 					class={cn((encodeControlsDisabled || !allowed) && 'pointer-events-none opacity-50')}
 				>
-					<span>{codec.id}</span>
-					<span class="text-[9px] opacity-50">
+					<span>{codec.id.toUpperCase()}</span>
+					<span class="text-[10px] opacity-50">
 						{!allowed ? $_('audio.incompatibleContainer') : codec.label}
 					</span>
 				</ListItem>
@@ -184,10 +185,10 @@
 								<span class="text-[10px] opacity-70">
 									#{track.index}
 								</span>
-								<span class="text-[10px] font-medium tracking-wide">
+								<span class="text-[10px] font-semibold">
 									{track.codec}
 								</span>
-								<div class="text-[9px] tracking-wide">
+								<div class="text-[10px]">
 									<span class="mx-0.5">•</span>
 
 									{track.channels}

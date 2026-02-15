@@ -38,7 +38,7 @@
 		{min}
 		{max}
 		{step}
-		class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+		class="absolute inset-0 h-full w-full opacity-0"
 		{...props}
 	/>
 </div>

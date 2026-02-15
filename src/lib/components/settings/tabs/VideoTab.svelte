@@ -23,6 +23,7 @@
 	} from '$lib/services/video-compatibility';
 
 	const RESOLUTIONS = ['original', '1080p', '720p', '480p', 'custom'] as const;
+	type ResolutionOption = (typeof RESOLUTIONS)[number];
 
 	const availableCodecs = $derived(
 		VIDEO_CODEC_OPTIONS.filter((codec) => {
@@ -138,6 +139,12 @@
 		}
 		onUpdate({ gifLoop: Math.max(0, Math.min(65535, parsed)) });
 	}
+
+	function getResolutionLabel(resolution: ResolutionOption): string {
+		if (resolution === 'original') return 'Original';
+		if (resolution === 'custom') return 'Custom';
+		return resolution;
+	}
 </script>
 
 <div class="space-y-4">
@@ -151,7 +158,7 @@
 					disabled={disabled || isMlUpscaleActive}
 					class="w-full"
 				>
-					{res}
+					{getResolutionLabel(res)}
 				</Button>
 			{/each}
 		</div>
@@ -272,7 +279,7 @@
 							{disabled}
 						>
 							<span>{option.label}</span>
-							<span class="text-[9px] opacity-50">{option.id}</span>
+							<span class="text-[10px] opacity-50">{option.id}</span>
 						</ListItem>
 					{/each}
 				</div>
@@ -289,7 +296,7 @@
 					oninput={(e) => updateGifLoop(e.currentTarget.value)}
 					{disabled}
 				/>
-				<p class="text-[9px] text-gray-alpha-600">{$_('video.gifLoopHint')}</p>
+				<p class="text-[10px] text-gray-alpha-600">{$_('video.gifLoopHint')}</p>
 			</div>
 		{/if}
 	</div>
@@ -306,8 +313,8 @@
 						disabled={disabled || !codecAllowed}
 						class={cn(!codecAllowed && 'pointer-events-none opacity-50')}
 					>
-						<span>{codec.id}</span>
-						<span class="text-[9px] opacity-50">
+						<span>{codec.id.toUpperCase()}</span>
+						<span class="text-[10px] opacity-50">
 							{#if codecAllowed}
 								{codec.label}
 							{:else}
@@ -332,7 +339,7 @@
 							class={cn(!allowed && 'pointer-events-none opacity-50')}
 						>
 							<span>{$_(`encodingSpeed.${preset}`)}</span>
-							<span class="text-[9px] opacity-50">
+							<span class="text-[10px] opacity-50">
 								{#if allowed}
 									{$_(`encodingSpeed.${preset}Desc`)}
 								{:else}
@@ -378,7 +385,7 @@
 						{/if}
 					</Label>
 					<div
-						class="button-highlight rounded bg-blue-700 px-1.5 text-[10px] font-medium text-foreground"
+						class="button-highlight rounded bg-blue-700 px-1.5 text-[10px] font-semibold text-foreground"
 					>
 						{#if isHardwareEncoder}
 							Q {config.quality}
@@ -409,7 +416,7 @@
 						/>
 					{/if}
 				</div>
-				<div class="flex justify-between text-[9px] text-gray-alpha-600">
+				<div class="flex justify-between text-[10px] text-gray-alpha-600">
 					{#if isHardwareEncoder}
 						<span>{$_('video.lowQuality')}</span>
 						<span>{$_('video.bestQuality')}</span>
@@ -453,7 +460,7 @@
 						/>
 						<div class="space-y-0.5">
 							<Label for="nvenc-spatial-aq">{$_('video.nvencSpatialAq')}</Label>
-							<p class="text-[9px] text-gray-alpha-600">
+							<p class="text-[10px] text-gray-alpha-600">
 								{$_('video.nvencSpatialAqHint')}
 							</p>
 						</div>
@@ -467,7 +474,7 @@
 						/>
 						<div class="space-y-0.5">
 							<Label for="nvenc-temporal-aq">{$_('video.nvencTemporalAq')}</Label>
-							<p class="text-[9px] text-gray-alpha-600">
+							<p class="text-[10px] text-gray-alpha-600">
 								{$_('video.nvencTemporalAqHint')}
 							</p>
 						</div>
@@ -483,13 +490,14 @@
 					<div class="flex items-start gap-2">
 						<Checkbox
 							id="videotoolbox-allow-sw"
+							class="mt-px"
 							checked={config.videotoolboxAllowSw}
 							onchange={toggleVideotoolboxAllowSw}
 							{disabled}
 						/>
 						<div class="space-y-0.5">
 							<Label for="videotoolbox-allow-sw">{$_('video.videotoolboxAllowSw')}</Label>
-							<p class="text-[9px] text-gray-alpha-600">
+							<p class="text-[10px] text-gray-alpha-600">
 								{$_('video.videotoolboxAllowSwHint')}
 							</p>
 						</div>
@@ -504,13 +512,14 @@
 				<div class="flex items-start gap-2">
 					<Checkbox
 						id="hw-decode"
+						class="mt-px"
 						checked={config.hwDecode}
 						onchange={() => onUpdate({ hwDecode: !config.hwDecode })}
 						{disabled}
 					/>
 					<div class="space-y-0.5">
 						<Label for="hw-decode">{$_('video.hwDecode')}</Label>
-						<p class="text-[9px] text-gray-alpha-600">
+						<p class="text-[10px] text-gray-alpha-600">
 							{$_('video.hwDecodeHint')}
 						</p>
 					</div>

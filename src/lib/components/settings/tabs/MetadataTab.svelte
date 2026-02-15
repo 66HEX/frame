@@ -68,7 +68,7 @@
 				</Button>
 			{/each}
 		</div>
-		<p class="text-[9px] text-gray-alpha-600">
+		<p class="text-[10px] text-gray-alpha-600">
 			{$_(`metadata.modes.${config.metadata.mode}Desc`)}
 		</p>
 	</div>

@@ -9,6 +9,7 @@
 		type SourceMetadata
 	} from '$lib/types';
 	import { _ } from '$lib/i18n';
+	import { themeStore } from '$lib/stores/theme.svelte';
 
 	import SourceTab from './tabs/SourceTab.svelte';
 	import OutputTab from './tabs/OutputTab.svelte';
@@ -101,7 +102,9 @@
 
 <div class="flex h-full flex-col">
 	<div
-		class="relative flex h-10 items-center justify-between px-4 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-gray-alpha-100 after:content-['']"
+		class="relative flex h-10 items-center justify-between px-4 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:[background-color:var(--divider-background)] after:shadow-2xs after:shadow-gray-alpha-100 after:content-['']"
+		style="--divider-background: color-mix(in srgb, var(--background), transparent {100 -
+			themeStore.opacity}%)"
 	>
 		<div class="flex w-full items-center justify-start gap-1">
 			{#each TABS as tabId (tabId)}

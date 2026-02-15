@@ -9,6 +9,8 @@
 		"cancel": "キャンセル",
 		"close": "閉じる",
 		"delete": "削除",
+		"pause": "一時停止",
+		"resume": "再開",
 		"name": "名前",
 		"size": "サイズ",
 		"state": "州",
