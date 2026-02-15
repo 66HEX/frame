@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-02-15
+
 ### Changed
 
 - **Typography System Rework:** Replaced embedded Geist fonts with Archivo + Loskeley Mono, rewired app font tokens/switching (`mono`/`sans`), and normalized typography across UI components (size/weight/letter-spacing) for more consistent readability. Updated all localized README files to reflect the new font stack.
@@ -624,7 +626,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.24.1...HEAD
+[Unreleased]: https://github.com/66HEX/frame/compare/0.25.0...HEAD
+[0.25.0]: https://github.com/66HEX/frame/compare/0.24.1...0.25.0
 [0.24.1]: https://github.com/66HEX/frame/compare/0.24.0...0.24.1
 [0.24.0]: https://github.com/66HEX/frame/compare/0.23.2...0.24.0
 [0.23.2]: https://github.com/66HEX/frame/compare/0.23.1...0.23.2
