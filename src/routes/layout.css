@@ -130,6 +130,19 @@ input::placeholder {
 
 	--ds-amber-800: #f59e0b;
 	--ds-orange-600: #ea580c;
+
+	--ds-shadow-sm:
+		0px 1px 1px -0.5px rgba(0, 0, 0, 0.4),
+		0px 3px 3px -1.5px rgba(0, 0, 0, 0.24);
+	--ds-shadow-md:
+		0px 1px 1px -0.5px rgba(0, 0, 0, 0.4),
+		0px 3px 3px -1.5px rgba(0, 0, 0, 0.24),
+		0px 6px 6px -3px rgba(0, 0, 0, 0.16);
+	--ds-shadow-lg:
+		0px 1px 1px -0.5px rgba(0, 0, 0, 0.42),
+		0px 3px 3px -1.5px rgba(0, 0, 0, 0.26),
+		0px 6px 6px -3px rgba(0, 0, 0, 0.2),
+		0px 12px 12px -6px rgba(0, 0, 0, 0.16);
 }
 
 @theme inline {
@@ -195,16 +208,39 @@ input::placeholder {
 .card-highlight {
 	position: relative;
 	isolation: isolate;
+	overflow: hidden;
+	color: var(--foreground);
+	box-shadow:
+		inset 0 1px 0 color-mix(in srgb, var(--background) 70%, transparent),
+		inset 0 -1px 0 color-mix(in srgb, var(--ds-gray-alpha-600) 55%, transparent),
+		var(--ds-shadow-sm);
 }
 
-.card-highlight::before {
+.card-highlight::after {
 	content: '';
 	position: absolute;
 	inset: 0;
 	border-radius: inherit;
 	pointer-events: none;
 	z-index: 1;
-	box-shadow: inset 0 1px 0 0 var(--ds-gray-alpha-200);
+	border: 1.5px solid transparent;
+	-webkit-mask:
+		linear-gradient(black, black) padding-box,
+		linear-gradient(black, black);
+	mask:
+		linear-gradient(black, black) padding-box,
+		linear-gradient(black, black);
+	-webkit-mask-composite: xor;
+	mask-composite: exclude;
+	background: linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--foreground) 24%, transparent),
+			color-mix(in srgb, var(--ds-gray-alpha-400) 70%, transparent) 42%,
+			color-mix(in srgb, var(--ds-gray-alpha-200) 64%, transparent) 78%,
+			color-mix(in srgb, var(--background) 80%, transparent)
+		)
+		border-box;
+	opacity: 0.9;
 }
 
 .input-highlight {
@@ -227,6 +263,10 @@ input::placeholder {
 .button-highlight {
 	position: relative;
 	isolation: isolate;
+	overflow: hidden;
+	box-shadow:
+		inset 0 1px 0 color-mix(in srgb, var(--foreground) 8%, transparent),
+		inset 0 -1px 0 color-mix(in srgb, var(--ds-gray-alpha-400) 80%, transparent);
 }
 
 .button-highlight::before {
@@ -236,7 +276,153 @@ input::placeholder {
 	border-radius: inherit;
 	pointer-events: none;
 	z-index: 1;
+	border: 1px solid color-mix(in srgb, var(--ds-gray-alpha-200) 80%, transparent);
+	opacity: 0.85;
+}
+
+.btn-primary,
+.btn-secondary,
+.btn-destructive {
+	position: relative;
+	appearance: none;
+	overflow: hidden;
+	transition:
+		filter 150ms ease-out,
+		box-shadow 150ms ease-out,
+		color 150ms ease-out;
+}
+
+.btn-primary {
+	color: var(--foreground);
+	text-shadow: 0 -1px 0 rgb(0 0 0 / 0.35);
+	background:
+		radial-gradient(ellipse at -16px top, rgb(255 255 255 / 0.22), transparent 62%),
+		linear-gradient(
+			180deg,
+			var(--ds-blue-700),
+			color-mix(in srgb, var(--ds-blue-800) 78%, black)
+		);
 	box-shadow:
-		inset 0 0.5px 0 var(--ds-gray-alpha-400),
-		inset 0 0 0 0.5px var(--ds-gray-alpha-200);
+		inset 0 1px 0 rgb(255 255 255 / 0.24),
+		inset 0 -1px 0 rgb(0 0 0 / 0.2),
+		var(--ds-shadow-sm),
+		var(--ds-shadow-md);
+}
+
+.btn-primary::after,
+.btn-secondary::after,
+.btn-destructive::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	pointer-events: none;
+	border: 1.5px solid transparent;
+	-webkit-mask:
+		linear-gradient(black, black) padding-box,
+		linear-gradient(black, black);
+	mask:
+		linear-gradient(black, black) padding-box,
+		linear-gradient(black, black);
+	-webkit-mask-composite: xor;
+	mask-composite: exclude;
+}
+
+.btn-primary::after {
+	background: linear-gradient(
+			180deg,
+			rgb(255 255 255 / 0.72),
+			rgb(0 0 0 / 0.3) 41%,
+			rgb(0 0 0 / 0.28) 75%,
+			rgb(255 255 255 / 0.3)
+		)
+		border-box;
+	mix-blend-mode: overlay;
+}
+
+.btn-secondary {
+	color: var(--foreground);
+	text-shadow: 0 -1px 0 rgb(0 0 0 / 0.3);
+	background:
+		radial-gradient(
+			120% 140% at 0% 0%,
+			color-mix(in srgb, var(--background) 86%, transparent),
+			transparent 58%
+		),
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--sidebar) 92%, var(--background) 8%),
+			color-mix(in srgb, var(--sidebar) 76%, var(--background) 24%)
+		);
+	box-shadow:
+		inset 0 1px 0 color-mix(in srgb, var(--foreground) 10%, transparent),
+		inset 0 -1px 0 color-mix(in srgb, var(--ds-gray-alpha-400) 80%, transparent),
+		var(--ds-shadow-sm),
+		var(--ds-shadow-lg);
+}
+
+.btn-secondary::after {
+	background: linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--foreground) 16%, transparent),
+			color-mix(in srgb, var(--ds-gray-alpha-400) 70%, transparent) 41%,
+			color-mix(in srgb, var(--ds-gray-alpha-200) 64%, transparent) 75%,
+			color-mix(in srgb, var(--background) 80%, transparent)
+		)
+		border-box;
+	opacity: 0.9;
+}
+
+.btn-destructive {
+	color: var(--ds-red-700);
+	text-shadow: 0 -1px 0 rgb(0 0 0 / 0.28);
+	background:
+		radial-gradient(ellipse at -16px top, rgb(255 255 255 / 0.16), transparent 64%),
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--ds-red-700) 18%, var(--sidebar) 82%),
+			color-mix(in srgb, var(--ds-red-900) 22%, var(--background) 78%)
+		);
+	box-shadow:
+		inset 0 1px 0 color-mix(in srgb, var(--foreground) 8%, transparent),
+		inset 0 -1px 0 color-mix(in srgb, var(--ds-red-700) 30%, transparent),
+		var(--ds-shadow-sm),
+		var(--ds-shadow-md);
+}
+
+.btn-destructive::after {
+	background: linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--foreground) 16%, transparent),
+			color-mix(in srgb, var(--ds-red-700) 32%, transparent) 45%,
+			color-mix(in srgb, var(--ds-red-900) 35%, transparent) 80%,
+			color-mix(in srgb, var(--background) 84%, transparent)
+		)
+		border-box;
+	opacity: 0.9;
+}
+
+@media (hover: hover) {
+	.btn-primary:hover:not(:disabled) {
+		filter: brightness(1.08) saturate(1.04);
+	}
+
+	.btn-secondary:hover:not(:disabled) {
+		filter: brightness(1.07);
+		box-shadow:
+			inset 0 1px 0 color-mix(in srgb, var(--foreground) 14%, transparent),
+			inset 0 -1px 0 color-mix(in srgb, var(--ds-gray-alpha-400) 88%, transparent),
+			var(--ds-shadow-sm),
+			var(--ds-shadow-lg);
+	}
+
+	.btn-destructive:hover:not(:disabled) {
+		filter: brightness(1.09) saturate(1.05);
+	}
+}
+
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-destructive:disabled {
+	filter: saturate(0.8);
 }
