@@ -131,13 +131,13 @@ input::placeholder {
 	--ds-amber-800: #f59e0b;
 	--ds-orange-600: #ea580c;
 
-	--ds-shadow-sm: 0px 1px 1px -0.5px rgba(0, 0, 0, 0.4), 0px 3px 3px -1.5px rgba(0, 0, 0, 0.24);
-	--ds-shadow-md:
-		0px 1px 1px -0.5px rgba(0, 0, 0, 0.4), 0px 3px 3px -1.5px rgba(0, 0, 0, 0.24),
-		0px 6px 6px -3px rgba(0, 0, 0, 0.16);
-	--ds-shadow-lg:
-		0px 1px 1px -0.5px rgba(0, 0, 0, 0.42), 0px 3px 3px -1.5px rgba(0, 0, 0, 0.26),
-		0px 6px 6px -3px rgba(0, 0, 0, 0.2), 0px 12px 12px -6px rgba(0, 0, 0, 0.16);
+		--ds-shadow-sm: 0px 1px 1px -0.5px rgba(0, 0, 0, 0.3), 0px 2px 2px -1.5px rgba(0, 0, 0, 0.16);
+		--ds-shadow-md:
+			0px 1px 1px -0.5px rgba(0, 0, 0, 0.3), 0px 2px 2px -1.5px rgba(0, 0, 0, 0.16),
+			0px 4px 4px -3px rgba(0, 0, 0, 0.1);
+		--ds-shadow-lg:
+			0px 1px 1px -0.5px rgba(0, 0, 0, 0.32), 0px 2px 2px -1.5px rgba(0, 0, 0, 0.2),
+			0px 4px 4px -3px rgba(0, 0, 0, 0.14), 0px 8px 8px -6px rgba(0, 0, 0, 0.12);
 }
 
 @theme inline {
@@ -206,7 +206,7 @@ input::placeholder {
 	overflow: hidden;
 	color: var(--foreground);
 	box-shadow:
-		inset 0 1px 0 color-mix(in srgb, var(--background) 70%, transparent),
+		inset 0 1px 0 color-mix(in srgb, var(--background) 82%, transparent),
 		inset 0 -1px 0 color-mix(in srgb, var(--ds-gray-alpha-600) 55%, transparent),
 		var(--ds-shadow-sm);
 }
@@ -229,7 +229,7 @@ input::placeholder {
 	mask-composite: exclude;
 	background: linear-gradient(
 			180deg,
-			color-mix(in srgb, var(--foreground) 24%, transparent),
+			color-mix(in srgb, var(--foreground) 14%, transparent),
 			color-mix(in srgb, var(--ds-gray-alpha-400) 70%, transparent) 42%,
 			color-mix(in srgb, var(--ds-gray-alpha-200) 64%, transparent) 78%,
 			color-mix(in srgb, var(--background) 80%, transparent)
@@ -260,7 +260,7 @@ input::placeholder {
 	isolation: isolate;
 	overflow: hidden;
 	box-shadow:
-		inset 0 1px 0 color-mix(in srgb, var(--foreground) 8%, transparent),
+		inset 0 1px 0 color-mix(in srgb, var(--foreground) 5%, transparent),
 		inset 0 -1px 0 color-mix(in srgb, var(--ds-gray-alpha-400) 80%, transparent);
 }
 
@@ -272,7 +272,7 @@ input::placeholder {
 	pointer-events: none;
 	z-index: 1;
 	border: 1px solid color-mix(in srgb, var(--ds-gray-alpha-200) 80%, transparent);
-	opacity: 0.85;
+	opacity: 0.75;
 }
 
 .btn-primary,
@@ -294,10 +294,10 @@ input::placeholder {
 		radial-gradient(ellipse at -16px top, rgb(255 255 255 / 0.22), transparent 62%),
 		linear-gradient(180deg, var(--ds-blue-700), color-mix(in srgb, var(--ds-blue-800) 78%, black));
 	box-shadow:
-		inset 0 1px 0 rgb(255 255 255 / 0.24),
+		inset 0 1px 0 rgb(255 255 255 / 0.14),
 		inset 0 -1px 0 rgb(0 0 0 / 0.2),
 		var(--ds-shadow-sm),
-		var(--ds-shadow-md);
+		var(--ds-shadow-sm);
 }
 
 .btn-primary::after,
@@ -322,10 +322,10 @@ input::placeholder {
 .btn-primary::after {
 	background: linear-gradient(
 			180deg,
-			rgb(255 255 255 / 0.72),
+			rgb(255 255 255 / 0.5),
 			rgb(0 0 0 / 0.3) 41%,
 			rgb(0 0 0 / 0.28) 75%,
-			rgb(255 255 255 / 0.3)
+			rgb(255 255 255 / 0.2)
 		)
 		border-box;
 	mix-blend-mode: overlay;
@@ -346,16 +346,16 @@ input::placeholder {
 			color-mix(in srgb, var(--sidebar) 76%, var(--background) 24%)
 		);
 	box-shadow:
-		inset 0 1px 0 color-mix(in srgb, var(--foreground) 10%, transparent),
+		inset 0 1px 0 color-mix(in srgb, var(--foreground) 6%, transparent),
 		inset 0 -1px 0 color-mix(in srgb, var(--ds-gray-alpha-400) 80%, transparent),
 		var(--ds-shadow-sm),
-		var(--ds-shadow-lg);
+		var(--ds-shadow-md);
 }
 
 .btn-secondary::after {
 	background: linear-gradient(
 			180deg,
-			color-mix(in srgb, var(--foreground) 16%, transparent),
+			color-mix(in srgb, var(--foreground) 10%, transparent),
 			color-mix(in srgb, var(--ds-gray-alpha-400) 70%, transparent) 41%,
 			color-mix(in srgb, var(--ds-gray-alpha-200) 64%, transparent) 75%,
 			color-mix(in srgb, var(--background) 80%, transparent)
@@ -375,16 +375,16 @@ input::placeholder {
 			color-mix(in srgb, var(--ds-red-900) 22%, var(--background) 78%)
 		);
 	box-shadow:
-		inset 0 1px 0 color-mix(in srgb, var(--foreground) 8%, transparent),
+		inset 0 1px 0 color-mix(in srgb, var(--foreground) 5%, transparent),
 		inset 0 -1px 0 color-mix(in srgb, var(--ds-red-700) 30%, transparent),
 		var(--ds-shadow-sm),
-		var(--ds-shadow-md);
+		var(--ds-shadow-sm);
 }
 
 .btn-destructive::after {
 	background: linear-gradient(
 			180deg,
-			color-mix(in srgb, var(--foreground) 16%, transparent),
+			color-mix(in srgb, var(--foreground) 10%, transparent),
 			color-mix(in srgb, var(--ds-red-700) 32%, transparent) 45%,
 			color-mix(in srgb, var(--ds-red-900) 35%, transparent) 80%,
 			color-mix(in srgb, var(--background) 84%, transparent)
@@ -401,10 +401,10 @@ input::placeholder {
 	.btn-secondary:hover:not(:disabled) {
 		filter: brightness(1.07);
 		box-shadow:
-			inset 0 1px 0 color-mix(in srgb, var(--foreground) 14%, transparent),
+			inset 0 1px 0 color-mix(in srgb, var(--foreground) 10%, transparent),
 			inset 0 -1px 0 color-mix(in srgb, var(--ds-gray-alpha-400) 88%, transparent),
 			var(--ds-shadow-sm),
-			var(--ds-shadow-lg);
+			var(--ds-shadow-md);
 	}
 
 	.btn-destructive:hover:not(:disabled) {
