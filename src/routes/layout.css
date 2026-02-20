@@ -131,18 +131,13 @@ input::placeholder {
 	--ds-amber-800: #f59e0b;
 	--ds-orange-600: #ea580c;
 
-	--ds-shadow-sm:
-		0px 1px 1px -0.5px rgba(0, 0, 0, 0.4),
-		0px 3px 3px -1.5px rgba(0, 0, 0, 0.24);
+	--ds-shadow-sm: 0px 1px 1px -0.5px rgba(0, 0, 0, 0.4), 0px 3px 3px -1.5px rgba(0, 0, 0, 0.24);
 	--ds-shadow-md:
-		0px 1px 1px -0.5px rgba(0, 0, 0, 0.4),
-		0px 3px 3px -1.5px rgba(0, 0, 0, 0.24),
+		0px 1px 1px -0.5px rgba(0, 0, 0, 0.4), 0px 3px 3px -1.5px rgba(0, 0, 0, 0.24),
 		0px 6px 6px -3px rgba(0, 0, 0, 0.16);
 	--ds-shadow-lg:
-		0px 1px 1px -0.5px rgba(0, 0, 0, 0.42),
-		0px 3px 3px -1.5px rgba(0, 0, 0, 0.26),
-		0px 6px 6px -3px rgba(0, 0, 0, 0.2),
-		0px 12px 12px -6px rgba(0, 0, 0, 0.16);
+		0px 1px 1px -0.5px rgba(0, 0, 0, 0.42), 0px 3px 3px -1.5px rgba(0, 0, 0, 0.26),
+		0px 6px 6px -3px rgba(0, 0, 0, 0.2), 0px 12px 12px -6px rgba(0, 0, 0, 0.16);
 }
 
 @theme inline {
@@ -297,11 +292,7 @@ input::placeholder {
 	text-shadow: 0 -1px 0 rgb(0 0 0 / 0.35);
 	background:
 		radial-gradient(ellipse at -16px top, rgb(255 255 255 / 0.22), transparent 62%),
-		linear-gradient(
-			180deg,
-			var(--ds-blue-700),
-			color-mix(in srgb, var(--ds-blue-800) 78%, black)
-		);
+		linear-gradient(180deg, var(--ds-blue-700), color-mix(in srgb, var(--ds-blue-800) 78%, black));
 	box-shadow:
 		inset 0 1px 0 rgb(255 255 255 / 0.24),
 		inset 0 -1px 0 rgb(0 0 0 / 0.2),

@@ -592,9 +592,7 @@
 	}
 </script>
 
-<div
-	class="card-highlight flex h-full flex-col overflow-hidden rounded-lg border border-gray-alpha-100 bg-gray-alpha-100 p-4 shadow-md shadow-black/5"
->
+<div class="card-highlight flex h-full flex-col overflow-hidden rounded-lg bg-gray-alpha-100 p-4">
 	<div
 		class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-lg border border-gray-alpha-200 bg-black"
 		bind:this={containerRef}
