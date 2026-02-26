@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Preview Panel Control Polish:** Applied the shared button highlight style to crop aspect controls and aligned preview transform action markup for cleaner, consistent control rendering.
 - **Control Sizing and Radius Cleanup:** Tightened slider track corner radius, simplified subtitle clear button sizing/icon scale, and removed redundant checkbox top offset styling in audio settings.
 
+## [0.25.2] - 2026-02-26
+
+### Fixed
+
+- **Linux AppImage Media Runtime:** Enabled AppImage media framework bundling (`bundleMediaFramework`) in Tauri config to avoid host/plugin version mismatches that could break WebKit/GStreamer playback pipelines on some distributions.
+- **Linux Release Build Inputs:** Added GStreamer plugin packages (`base`, `good`, `bad`, `libav`) to the Linux publish workflow so AppImage bundling captures a complete, matching media runtime during CI builds.
+
 ## [0.25.1] - 2026-02-26
 
 ### Fixed
