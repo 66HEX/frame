@@ -23,10 +23,10 @@
 	let percentage = $derived(((value - min) / (max - min)) * 100);
 </script>
 
-<div class={cn('relative h-1.5 w-full rounded-full bg-gray-alpha-100', className)}>
+<div class={cn('relative h-1.5 w-full rounded-[1px] bg-gray-alpha-100', className)}>
 	<!-- Fill Track -->
 	<div
-		class="absolute top-0 left-0 h-full rounded-full bg-foreground"
+		class="absolute top-0 left-0 h-full rounded-[1px] bg-foreground"
 		style="width: {Math.max(0, Math.min(100, percentage))}%"
 	></div>
 

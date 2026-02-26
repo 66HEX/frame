@@ -35,7 +35,7 @@
 	>
 		<div
 			transition:scale={{ start: 1.05, duration: 100, opacity: 1 }}
-			class="card-highlight flex w-100 flex-col gap-4 rounded-lg border border-gray-alpha-100 bg-sidebar p-3 shadow-2xl"
+			class="card-highlight flex w-100 flex-col gap-4 rounded-lg bg-sidebar p-3"
 		>
 			<div>
 				<Label variant="section" class="text-foreground">{$_('update.available')}</Label>

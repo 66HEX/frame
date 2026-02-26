@@ -592,9 +592,7 @@
 	}
 </script>
 
-<div
-	class="card-highlight flex h-full flex-col overflow-hidden rounded-lg border border-gray-alpha-100 bg-gray-alpha-100 p-4"
->
+<div class="card-highlight flex h-full flex-col overflow-hidden rounded-lg bg-gray-alpha-100 p-4">
 	<div
 		class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-lg border border-gray-alpha-200 bg-black"
 		bind:this={containerRef}
@@ -701,7 +699,7 @@
 		{/if}
 		{#if cropMode && draftCrop}
 			<div
-				class="pointer-events-auto absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-md border border-gray-alpha-200 bg-background p-1 text-[10px] font-semibold shadow-xl"
+				class="button-highlight pointer-events-auto absolute! bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-md border border-gray-alpha-200 bg-background p-1 text-[10px] font-semibold shadow-xl"
 			>
 				{#each ASPECT_OPTIONS as option (option.id)}
 					<Button
@@ -747,23 +745,23 @@
 			></div>
 
 			<div
-				class="absolute top-1/2 z-20 -ml-2 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded-full border border-blue-600 bg-background shadow-lg"
+				class="button-highlight absolute! top-1/2 z-20 -ml-2 flex size-3.5 -translate-y-1/2 items-center justify-center rounded-full bg-blue-700 shadow-md shadow-black/5"
 				class:cursor-ew-resize={!controlsDisabled}
 				style="left: {(startValue / duration) * 100}%"
 				role="presentation"
 				onmousedown={(e) => !controlsDisabled && handleMouseDown(e, 'start')}
 			>
-				<div class="h-1.5 w-1.5 rounded-full bg-blue-700"></div>
+				<div class="button-highlight size-2 rounded-full bg-sidebar"></div>
 			</div>
 
 			<div
-				class="absolute top-1/2 z-20 -ml-2 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded-full border border-blue-600 bg-background shadow-lg"
+				class="button-highlight absolute! top-1/2 z-20 -ml-2 flex size-3.5 -translate-y-1/2 items-center justify-center rounded-full bg-blue-700 shadow-md shadow-black/5"
 				class:cursor-ew-resize={!controlsDisabled}
 				style="left: {(endValue / duration) * 100}%"
 				role="presentation"
 				onmousedown={(e) => !controlsDisabled && handleMouseDown(e, 'end')}
 			>
-				<div class="h-1.5 w-1.5 rounded-full bg-blue-700"></div>
+				<div class="button-highlight size-2 rounded-full bg-sidebar"></div>
 			</div>
 		</div>
 
@@ -806,48 +804,48 @@
 					</div>
 				</div>
 			</div>
-				<div class="absolute right-0 bottom-0 flex gap-2">
-					<Tooltip content={$_('video.rotation')}>
-						<Button
-							size="icon"
-							variant="ghost"
-							onclick={handleRotateToggle}
-							disabled={controlsDisabled}
-						>
-							<IconRotateCw size={16} />
-						</Button>
-					</Tooltip>
-					<Tooltip content={$_('video.flipHorizontal')}>
-						<Button
-							size="icon"
-							variant={flipHorizontal ? 'default' : 'ghost'}
-							onclick={() => toggleFlip('horizontal')}
-							disabled={controlsDisabled}
-						>
-							<FlipHorizontalIcon size={16} />
-						</Button>
-					</Tooltip>
-					<Tooltip content={$_('video.flipVertical')}>
-						<Button
-							size="icon"
-							variant={flipVertical ? 'default' : 'ghost'}
-							onclick={() => toggleFlip('vertical')}
-							disabled={controlsDisabled}
-						>
-							<FlipVerticalIcon size={16} />
-						</Button>
-					</Tooltip>
-					<Tooltip content={$_('crop.enter')}>
-						<Button
-							size="icon"
-							variant={cropMode ? 'default' : appliedCrop ? 'default' : 'ghost'}
-							onclick={toggleCropMode}
-							disabled={controlsDisabled || !hasCropDimensions}
-						>
-							<CropIcon size={16} />
-						</Button>
-					</Tooltip>
-				</div>
+			<div class="absolute right-0 bottom-0 flex gap-2">
+				<Tooltip content={$_('video.rotation')}>
+					<Button
+						size="icon"
+						variant="ghost"
+						onclick={handleRotateToggle}
+						disabled={controlsDisabled}
+					>
+						<IconRotateCw size={16} />
+					</Button>
+				</Tooltip>
+				<Tooltip content={$_('video.flipHorizontal')}>
+					<Button
+						size="icon"
+						variant={flipHorizontal ? 'default' : 'ghost'}
+						onclick={() => toggleFlip('horizontal')}
+						disabled={controlsDisabled}
+					>
+						<FlipHorizontalIcon size={16} />
+					</Button>
+				</Tooltip>
+				<Tooltip content={$_('video.flipVertical')}>
+					<Button
+						size="icon"
+						variant={flipVertical ? 'default' : 'ghost'}
+						onclick={() => toggleFlip('vertical')}
+						disabled={controlsDisabled}
+					>
+						<FlipVerticalIcon size={16} />
+					</Button>
+				</Tooltip>
+				<Tooltip content={$_('crop.enter')}>
+					<Button
+						size="icon"
+						variant={cropMode ? 'default' : appliedCrop ? 'default' : 'ghost'}
+						onclick={toggleCropMode}
+						disabled={controlsDisabled || !hasCropDimensions}
+					>
+						<CropIcon size={16} />
+					</Button>
+				</Tooltip>
+			</div>
 		</div>
 	</div>
 </div>
