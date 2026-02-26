@@ -118,25 +118,27 @@ brew install --cask frame
 
 ### Linux System Requirements
 
-Even when using the **AppImage**, Frame relies on the system's **WebKitGTK** and **GStreamer** libraries for rendering the UI and handling media playback. If the application crashes upon adding a source or the video preview remains blank, you likely need to install the missing GStreamer plugins.
+Even when using the **AppImage**, Frame relies on the system's **WebKitGTK** and **GStreamer** libraries for rendering the UI and handling media playback. Native dialogs on Linux also require **XDG Desktop Portal** integration (plus a desktop-specific backend) and `zenity` as fallback. If the application crashes upon adding a source, the video preview remains blank, or file dialogs fail to open/theme correctly, install the packages below.
 
 - **Ubuntu / Debian:**
 
   ```bash
   sudo apt update
-  sudo apt install libwebkit2gtk-4.1-0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-libav
+  sudo apt install libwebkit2gtk-4.1-0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-libav xdg-desktop-portal xdg-desktop-portal-gtk zenity
   ```
 
 - **Arch Linux:**
 
   ```bash
-  sudo pacman -S --needed webkit2gtk-4.1 gst-plugins-base gst-plugins-good gst-libav
+  sudo pacman -S --needed webkit2gtk-4.1 gst-plugins-base gst-plugins-good gst-libav xdg-desktop-portal xdg-desktop-portal-gtk zenity
   ```
 
 - **Fedora:**
   ```bash
-  sudo dnf install webkit2gtk4.1 gstreamer1-plugins-base gstreamer1-plugins-good gstreamer1-libav
+  sudo dnf install webkit2gtk4.1 gstreamer1-plugins-base gstreamer1-plugins-good gstreamer1-libav xdg-desktop-portal xdg-desktop-portal-gtk zenity
   ```
+
+> **KDE users:** install `xdg-desktop-portal-kde` (instead of `xdg-desktop-portal-gtk`) to get Plasma-native themed dialogs.
 
 ### Build from Source
 
