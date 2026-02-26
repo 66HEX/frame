@@ -41,6 +41,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: 1.91.1
           targets: ${{ matrix.platform == 'macos-14' && 'aarch64-apple-darwin' || matrix.platform == 'macos-15' && 'x86_64-apple-darwin' || '' }}
 
       - name: Install Linux Dependencies
@@ -154,7 +155,7 @@ jobs:
           releaseBody: ${{ steps.release_notes.outputs.BODY }}
           releaseDraft: false
           prerelease: false
-          args: ${{ matrix.args }}
+          args: ${{ matrix.args != '' && format('{0} -- --locked', matrix.args) || '-- --locked' }}
           tauriScript: 'bun tauri'
 
   update-tap:
