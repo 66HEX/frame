@@ -1,0 +1,263 @@
+{
+	"_meta": {
+		"name": "Filipino",
+		"flag": "🇵🇭"
+	},
+	"common": {
+		"save": "I-save",
+		"apply": "Ilapat",
+		"cancel": "Kanselahin",
+		"close": "Isara",
+		"delete": "Tanggalin",
+		"name": "Pangalan",
+		"size": "Laki",
+		"state": "Estado",
+		"target": "Target",
+		"actions": "Mga Aksyon"
+	},
+	"titlebar": {
+		"close": "Isara",
+		"minimize": "Palitin",
+		"maximize": "Palakihin",
+		"toggleSize": "I-toggle ang laki",
+		"dashboard": "Dashboard",
+		"logs": "Mga Log",
+		"storage": "Storage:",
+		"items": "Mga Item:",
+		"addSource": "Magdagdag ng Source",
+		"processing": "Pinoproseso...",
+		"start": "Simulan"
+	},
+	"fileList": {
+		"dropFiles": "Mag-drop ng mga file o gumamit ng MAGDAGDAG NG SOURCE",
+		"importSource": "Mag-import ng Source Files"
+	},
+	"fileStatus": {
+		"ready": "Handa",
+		"queued": "Nakahilera",
+		"error": "Error",
+		"idle": "Naghihintay"
+	},
+	"emptySelection": {
+		"hint": "Pumili ng item mula sa queue upang ma-access ang configuration"
+	},
+	"tabs": {
+		"source": "Source",
+		"output": "Output",
+		"video": "Video",
+		"audio": "Audio",
+		"subtitles": "Mga Subtitle",
+		"metadata": "Metadata",
+		"presets": "Mga Preset"
+	},
+	"subtitles": {
+		"burnIn": "I-burn ang Mga Subtitle",
+		"externalFile": "External Subtitle File",
+		"selectFile": "Pumili ng .srt o .ass file",
+		"clearFile": "I-clear",
+		"sourceTracks": "Mga Source Track",
+		"none": "Walang subtitle",
+		"copyAll": "Kopyahin lahat ng subtitle",
+		"burnInHint": "Ang pag-burn ng mga subtitle ay puwersahin ang muling pag-encode ng video."
+	},
+	"metadata": {
+		"mode": "Metadata Mode",
+		"fieldsSection": "Mga Metadata Field",
+		"placeholderPreserve": "Iwanang blangko upang panatilihin ang orihinal",
+		"modes": {
+			"preserve": "Panatilihin",
+			"preserveDesc": "Pinapanatili ang orihinal na metadata. Ang mga halagang ipinasok sa ibaba ay mag-overwrite ng mga partikular na field.",
+			"clean": "Linisin",
+			"cleanDesc": "Tinatanggal ang lahat ng metadata tag mula sa output file.",
+			"replace": "Palitan",
+			"replaceDesc": "Tinatanggal ang orihinal na metadata at idinadagdag lamang ang mga halagang ipinasok sa ibaba."
+		},
+		"fields": {
+			"title": "Pamagat",
+			"artist": "Artist",
+			"album": "Album",
+			"genre": "Genre",
+			"date": "Petsa / Taon",
+			"comment": "Komento"
+		}
+	},
+	"source": {
+		"analyzing": "Sinusuri ang source…",
+		"failedToRead": "Nabigo ang pagbasa ng metadata.",
+		"unavailable": "Hindi available ang metadata.",
+		"duration": "Tagal",
+		"frameRate": "Frame Rate",
+		"dimensions": "Mga Sukat",
+		"videoCodec": "Video Codec",
+		"videoBitrate": "Video Bitrate",
+		"audioCodec": "Audio Codec",
+		"containerBitrate": "Container Bitrate",
+		"pixelFormat": "Pixel Format",
+		"colorSpace": "Color Space",
+		"colorRange": "Color Range",
+		"colorPrimaries": "Color Primaries",
+		"profile": "Profile",
+		"sampleRate": "Sample Rate",
+		"bitrate": "Bitrate",
+		"channels": "Mga Channel",
+		"fileInfo": "Impormasyon ng File",
+		"videoStream": "Video Stream",
+		"audioStream": "Audio Stream",
+		"track": "Track",
+		"language": "Wika"
+	},
+	"output": {
+		"outputName": "Pangalan ng Output",
+		"placeholder": "aking_render_final",
+		"hint": "Nakaimbak sa tabi ng orihinal na file. Ang extension ay sumusunod sa napiling container nang awtomatiko.",
+		"container": "Output Container"
+	},
+	"video": {
+		"resolutionFramerate": "Resolution & Framerate",
+		"transform": "I-transform",
+		"rotation": "Pag-ikot",
+		"flip": "I-flip",
+		"flipHorizontal": "Pahalang",
+		"flipVertical": "Patayo",
+		"width": "Lapad",
+		"height": "Taas",
+		"scalingAlgorithm": "Scaling Algorithm",
+		"framerate": "Framerate",
+		"sameAsSource": "Katulad ng source",
+		"encoder": "Video Encoder",
+		"encodingSpeed": "Bilis ng Pag-encode",
+		"qualityControl": "Kontrol ng Kalidad",
+		"constantQuality": "Pare-parehong Kalidad",
+		"targetBitrate": "Target Bitrate",
+		"encodingQuality": "Kalidad ng Pag-encode",
+		"qualityFactor": "Quality Factor",
+		"lowQuality": "Mababang Kalidad",
+		"bestQuality": "Pinakamahusay na Kalidad",
+		"lossless": "Walang Pagkawala",
+		"smallest": "Pinakamaliit",
+		"targetBitrateKbps": "Target Bitrate (kbps)",
+		"nvencOptions": "Mga Opsyon ng NVENC",
+		"nvencSpatialAq": "Spatial AQ",
+		"nvencSpatialAqHint": "Pinabubuti ang detalye sa mga scene na may mataas na komplikasyon",
+		"nvencTemporalAq": "Temporal AQ",
+		"nvencTemporalAqHint": "Pinag-iistable ang kalidad sa pagitan ng mga frame",
+		"presetIncompatible": "Hindi compatible na encoder",
+		"videotoolboxOptions": "Mga Opsyon ng VideoToolbox",
+		"videotoolboxAllowSw": "Payagan ang software fallback",
+		"videotoolboxAllowSwHint": "Bumalik sa CPU encoding kung nabigo ang hardware",
+		"mlUpscaling": "ML Upscaling",
+		"codecIncompatible": "Hindi compatible na container",
+		"hardwareAcceleration": "Hardware Acceleration",
+		"hwDecode": "Hardware Decoding",
+		"hwDecodeHint": "Gumamit ng GPU para sa pag-decode ng input video (mas mabilis)"
+	},
+	"audio": {
+		"channelsBitrate": "Mga Channel & Bitrate",
+		"original": "Orihinal",
+		"stereo": "Stereo (2.0)",
+		"mono": "Mono (1.0)",
+		"bitrateKbps": "Bitrate (kbps)",
+		"bitrateIgnored": "Hindi pinapansin ang bitrate para sa lossless codec",
+		"volume": "Volume",
+		"muted": "Naka-mute",
+		"maxVolume": "Max na Volume",
+		"normalize": "I-normalize ang Audio",
+		"normalizeHint": "EBU R128 loudness normalization para sa pare-parehong volume",
+		"codec": "Audio Codec",
+		"incompatibleContainer": "Hindi compatible na container",
+		"sourceTracks": "Mga Source Track",
+		"channels": "Ch"
+	},
+	"presets": {
+		"library": "Library ng Preset",
+		"label": "Label ng Preset",
+		"applied": "Nailapat",
+		"deletePreset": "Tanggalin ang preset",
+		"nameRequired": "Kailangan ng pangalan",
+		"notSaved": "Hindi na-save ang preset",
+		"saved": "Na-save ang preset",
+		"appliedName": "Nailapat ang {name}",
+		"appliedAll": "Nailapat sa lahat ng item",
+		"applyToAll": "Ilapat sa lahat",
+		"confirmApplyAllTitle": "Ilapat sa lahat?",
+		"confirmApplyAllBody": "Ito ay maglalapat ng \"{name}\" sa lahat ng pending na file sa queue. Ang mga umiiral na setting ay mai-overwrite.",
+		"unableToDelete": "Hindi matanggal",
+		"removed": "Tinanggal ang preset"
+	},
+	"settings": {
+		"title": "Mga Setting",
+		"maxConcurrency": "Max na Concurrency",
+		"saving": "Sine-save...",
+		"appUpdates": "Mga Update ng App",
+		"checkOnStartup": "Suriin ang mga update sa pagsisimula",
+		"checking": "Sinusuri...",
+		"checkForUpdates": "Suriin ang Mga Update",
+		"updateAvailable": "May available na update!",
+		"latestVersion": "Ikaw ay nasa pinakabagong bersyon.",
+		"errorChecking": "Error sa pagsuri ng mga update.",
+		"visuals": "Mga Visual",
+		"windowTint": "Kulay ng Window",
+		"fontFamily": "Pamilya ng Font",
+		"fontMono": "Mono",
+		"fontSans": "Sans",
+		"language": "Wika"
+	},
+	"logs": {
+		"noActiveProcesses": "Walang aktibong proseso",
+		"waitingForOutput": "Nagsimula ang proseso, naghihintay ng output...",
+		"selectTask": "Pumili ng task upang makita ang console output",
+		"scrollToBottom": "Mag-scroll sa ibaba"
+	},
+	"update": {
+		"available": "May Available na Update",
+		"versionAvailable": "Available ang bersyon {version}.",
+		"later": "Mamaya na",
+		"updateNow": "I-update Ngayon"
+	},
+	"notifications": {
+		"conversionFinishedTitle": "Tapos na ang Queue",
+		"conversionFinishedBody": "Naproseso ang {count} na mga file na may {errors} na error."
+	},
+	"errors": {
+		"conversionFailed": "Nabigo ang Conversion"
+	},
+	"trim": {
+		"startTime": "Oras ng Pagsisimula",
+		"endTime": "Oras ng Pagtatapos",
+		"duration": "Tagal",
+		"save": "I-save ang Trim",
+		"cancel": "Kanselahin"
+	},
+	"crop": {
+		"enter": "I-crop",
+		"apply": "Ilapat",
+		"reset": "I-reset",
+		"free": "Libre"
+	},
+	"encodingSpeed": {
+		"ultrafast": "Napakabilis",
+		"ultrafastDesc": "Pinakamalaking file, pinakamabilis na conversion",
+		"superfast": "Sobrang bilis",
+		"superfastDesc": "Napakalalaking file",
+		"veryfast": "Napakabilis",
+		"veryfastDesc": "Malaking file",
+		"faster": "Mas mabilis",
+		"fasterDesc": "Katamtamang malaking file",
+		"fast": "Mabilis",
+		"fastDesc": "Bahagyang mas malaking file",
+		"medium": "Katamtaman",
+		"mediumDesc": "Balanse",
+		"slow": "Mabagal",
+		"slowDesc": "Mas magandang compression",
+		"slower": "Mas mabagal",
+		"slowerDesc": "Mataas na compression",
+		"veryslow": "Napakabagal",
+		"veryslowDesc": "Pinakamaliit na file, pinakamabagal na conversion"
+	},
+	"scalingAlgorithm": {
+		"bicubic": "Bicubic",
+		"lanczos": "Lanczos",
+		"bilinear": "Bilinear",
+		"nearest": "Pinakamalapit"
+	}
+}
