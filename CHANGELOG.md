@@ -7,11 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
+## [0.25.3] - 2026-03-02
 
-- **Surface Depth Polish:** Added subtle shadow treatment to primary cards, shared buttons, value badges, and titlebar view switchers for a more consistent neumorphic depth layer.
-- **Preview Panel Control Polish:** Applied the shared button highlight style to crop aspect controls and aligned preview transform action markup for cleaner, consistent control rendering.
-- **Control Sizing and Radius Cleanup:** Tightened slider track corner radius, simplified subtitle clear button sizing/icon scale, and removed redundant checkbox top offset styling in audio settings.
+### Removed
+
+- Reverted accidentally public experimental UI; purged unintended commits from history to restore the stable state.
 
 ## [0.25.2] - 2026-02-26
 
@@ -645,7 +645,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.25.0...HEAD
+[Unreleased]: https://github.com/66HEX/frame/compare/0.25.3...HEAD
+[0.25.3]: https://github.com/66HEX/frame/compare/0.25.2...0.25.3
 [0.25.0]: https://github.com/66HEX/frame/compare/0.24.1...0.25.0
 [0.24.1]: https://github.com/66HEX/frame/compare/0.24.0...0.24.1
 [0.24.0]: https://github.com/66HEX/frame/compare/0.23.2...0.24.0
