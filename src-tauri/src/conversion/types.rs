@@ -118,19 +118,19 @@ fn default_processing_mode() -> String {
     "reencode".to_string()
 }
 
-fn default_quality() -> u32 {
+const fn default_quality() -> u32 {
     50
 }
 
-fn default_audio_volume() -> f64 {
+const fn default_audio_volume() -> f64 {
     100.0
 }
 
-fn default_hw_decode() -> bool {
+const fn default_hw_decode() -> bool {
     false
 }
 
-fn default_gif_colors() -> u16 {
+const fn default_gif_colors() -> u16 {
     256
 }
 
@@ -138,7 +138,7 @@ fn default_gif_dither() -> String {
     "sierra2_4a".to_string()
 }
 
-fn default_gif_loop() -> u16 {
+const fn default_gif_loop() -> u16 {
     0
 }
 
@@ -170,7 +170,7 @@ pub struct MetadataConfig {
     pub comment: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum MetadataMode {
     #[default]

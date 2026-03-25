@@ -1,6 +1,6 @@
-use once_cell::sync::Lazy;
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
+use std::sync::LazyLock;
 
 const ANY_CODEC_TOKEN: &str = "*";
 
@@ -98,7 +98,7 @@ impl From<MediaRulesRaw> for MediaRules {
     }
 }
 
-static MEDIA_RULES: Lazy<MediaRules> = Lazy::new(|| {
+static MEDIA_RULES: LazyLock<MediaRules> = LazyLock::new(|| {
     let raw: MediaRulesRaw =
         serde_json::from_str(include_str!("../../../src/lib/shared/media-rules.json"))
             .expect("Shared media rules JSON is invalid");

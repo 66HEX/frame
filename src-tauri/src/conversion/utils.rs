@@ -1,15 +1,15 @@
 use crate::conversion::media_rules;
-use once_cell::sync::Lazy;
 use regex::Regex;
 use std::path::Path;
+use std::sync::LazyLock;
 
-pub static FRAME_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"frame=\s*(\d+)").unwrap());
+pub static FRAME_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"frame=\s*(\d+)").unwrap());
 
-pub static DURATION_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"Duration:\s*(\d+(?::\d+){0,3}(?:\.\d+)?)").unwrap());
+pub static DURATION_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"Duration:\s*(\d+(?::\d+){0,3}(?:\.\d+)?)").unwrap());
 
-pub static TIME_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"time=\s*(\d+(?::\d+){0,3}(?:\.\d+)?)").unwrap());
+pub static TIME_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"time=\s*(\d+(?::\d+){0,3}(?:\.\d+)?)").unwrap());
 
 pub fn parse_frame_rate_string(value: Option<&str>) -> Option<f64> {
     let value = value?.trim();
@@ -55,9 +55,10 @@ pub fn is_videotoolbox_codec(codec: &str) -> bool {
 
 pub fn map_nvenc_preset(preset: &str) -> String {
     match preset {
-        "fast" | "medium" | "slow" => preset.to_string(),
         "default" => "default".to_string(),
-        "p1" | "p2" | "p3" | "p4" | "p5" | "p6" | "p7" => preset.to_string(),
+        "fast" | "medium" | "slow" | "p1" | "p2" | "p3" | "p4" | "p5" | "p6" | "p7" => {
+            preset.to_string()
+        }
         "ultrafast" | "superfast" | "veryfast" | "faster" => "fast".to_string(),
         "slower" | "veryslow" => "slow".to_string(),
         _ => "medium".to_string(),
@@ -71,13 +72,13 @@ pub fn parse_time(time_str: &str) -> Option<f64> {
         2 => {
             let m: f64 = parts[0].parse().ok()?;
             let s: f64 = parts[1].trim().parse().ok()?;
-            Some(m * 60.0 + s)
+            Some(m.mul_add(60.0, s))
         }
         3 => {
             let h: f64 = parts[0].parse().ok()?;
             let m: f64 = parts[1].parse().ok()?;
             let s: f64 = parts[2].trim().parse().ok()?;
-            Some(h * 3600.0 + m * 60.0 + s)
+            Some(h.mul_add(3600.0, m * 60.0) + s)
         }
         _ => None,
     }

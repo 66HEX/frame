@@ -24,10 +24,7 @@ pub fn build_video_filters(config: &ConversionConfig, include_scale: bool) -> Ve
         let crop_height = crop.height.max(1.0).round() as i32;
         let crop_x = crop.x.max(0.0).round() as i32;
         let crop_y = crop.y.max(0.0).round() as i32;
-        filters.push(format!(
-            "crop={}:{}:{}:{}",
-            crop_width, crop_height, crop_x, crop_y
-        ));
+        filters.push(format!("crop={crop_width}:{crop_height}:{crop_x}:{crop_y}"));
     }
 
     if let Some(burn_path) = &config.subtitle_burn_path
@@ -40,7 +37,7 @@ pub fn build_video_filters(config: &ConversionConfig, include_scale: bool) -> Ve
             .replace('[', "\\[")
             .replace(']', "\\]")
             .replace(',', "\\,");
-        filters.push(format!("subtitles='{}'", escaped_path));
+        filters.push(format!("subtitles='{escaped_path}'"));
     }
 
     if include_scale && (config.resolution != "original" || config.resolution == "custom") {
@@ -57,21 +54,18 @@ pub fn build_video_filters(config: &ConversionConfig, include_scale: bool) -> Ve
             let h = config.custom_height.as_deref().unwrap_or("-1");
             if w != "-1" && h != "-1" {
                 format!(
-                    "scale={w}:{h}:force_original_aspect_ratio=decrease{algo},pad={w}:{h}:(ow-iw)/2:(oh-ih)/2",
-                    w = w,
-                    h = h,
-                    algo = algorithm
+                    "scale={w}:{h}:force_original_aspect_ratio=decrease{algorithm},pad={w}:{h}:(ow-iw)/2:(oh-ih)/2"
                 )
             } else if w == "-1" && h == "-1" {
                 "scale=-1:-1".to_string()
             } else {
-                format!("scale={}:{}{}", w, h, algorithm)
+                format!("scale={w}:{h}{algorithm}")
             }
         } else {
             match config.resolution.as_str() {
-                "1080p" => format!("scale=-2:1080{}", algorithm),
-                "720p" => format!("scale=-2:720{}", algorithm),
-                "480p" => format!("scale=-2:480{}", algorithm),
+                "1080p" => format!("scale=-2:1080{algorithm}"),
+                "720p" => format!("scale=-2:720{algorithm}"),
+                "480p" => format!("scale=-2:480{algorithm}"),
                 _ => "scale=-1:-1".to_string(),
             }
         };
@@ -91,7 +85,7 @@ pub fn build_audio_filters(config: &ConversionConfig) -> Vec<String> {
 
     if (config.audio_volume - 100.0).abs() > VOLUME_EPSILON {
         let volume_factor = config.audio_volume / 100.0;
-        filters.push(format!("volume={:.2}", volume_factor));
+        filters.push(format!("volume={volume_factor:.2}"));
     }
 
     filters

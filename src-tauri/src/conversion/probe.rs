@@ -60,7 +60,7 @@ pub async fn probe_media_file(
         {
             metadata.width = Some(w as u32);
             metadata.height = Some(h as u32);
-            metadata.resolution = Some(format!("{}x{}", w, h));
+            metadata.resolution = Some(format!("{w}x{h}"));
         }
 
         if metadata.frame_rate.is_none() {
@@ -85,10 +85,7 @@ pub async fn probe_media_file(
         metadata.audio_tracks.push(AudioTrack {
             index: stream.index,
             codec: stream.codec_name.clone().unwrap_or("unknown".to_string()),
-            channels: stream
-                .channels
-                .map(|c| c.to_string())
-                .unwrap_or("?".to_string()),
+            channels: stream.channels.map_or("?".to_string(), |c| c.to_string()),
             label,
             language,
             bitrate_kbps: track_bitrate,

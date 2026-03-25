@@ -207,32 +207,22 @@ mod conversion_tests {
 
     #[test]
     fn test_build_output_path_with_custom_name() {
-        let custom = build_output_path(
-            "/Users/hex/Videos/clip.mov",
-            "mp4",
-            Some("final_render".into()),
-        );
+        let custom = build_output_path("/Users/hex/Videos/clip.mov", "mp4", Some("final_render"));
         assert_eq!(custom, "/Users/hex/Videos/final_render.mp4");
 
         let nested = build_output_path(
             "/Users/hex/Videos/clip.mov",
             "mp4",
-            Some("../escape/render".into()),
+            Some("../escape/render"),
         );
         assert_eq!(nested, "/Users/hex/Videos/render.mp4");
 
-        let absolute = build_output_path(
-            "/Users/hex/Videos/clip.mov",
-            "mp4",
-            Some("/tmp/pwned.mp4".into()),
-        );
+        let absolute =
+            build_output_path("/Users/hex/Videos/clip.mov", "mp4", Some("/tmp/pwned.mp4"));
         assert_eq!(absolute, "/Users/hex/Videos/pwned.mp4");
 
-        let forced_container = build_output_path(
-            "/Users/hex/Videos/clip.mov",
-            "mp4",
-            Some("custom_name.mkv".into()),
-        );
+        let forced_container =
+            build_output_path("/Users/hex/Videos/clip.mov", "mp4", Some("custom_name.mkv"));
         assert_eq!(forced_container, "/Users/hex/Videos/custom_name.mp4");
 
         let default = build_output_path("/tmp/sample.mov", "mp4", None);

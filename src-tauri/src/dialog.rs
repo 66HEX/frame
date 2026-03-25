@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 use tauri::{Manager, Runtime, State, WebviewWindow, Window, command};
@@ -30,7 +30,7 @@ pub struct NativeFileDialogOptions {
 #[cfg(mobile)]
 fn set_default_path<R: Runtime>(
     mut dialog_builder: FileDialogBuilder<R>,
-    default_path: PathBuf,
+    default_path: &Path,
 ) -> FileDialogBuilder<R> {
     if let Some(file_name) = default_path.file_name() {
         dialog_builder = dialog_builder.set_file_name(file_name.to_string_lossy());
@@ -41,7 +41,7 @@ fn set_default_path<R: Runtime>(
 #[cfg(desktop)]
 fn set_default_path<R: Runtime>(
     mut dialog_builder: FileDialogBuilder<R>,
-    default_path: PathBuf,
+    default_path: &Path,
 ) -> FileDialogBuilder<R> {
     let default_path: PathBuf = default_path.components().collect();
     if default_path.is_file() || !default_path.exists() {
@@ -72,10 +72,10 @@ pub async fn open_native_file_dialog<R: Runtime>(
     if let Some(title) = options.title.clone() {
         dialog_builder = dialog_builder.set_title(title);
     }
-    if let Some(default_path) = options.default_path.clone() {
+    if let Some(default_path) = options.default_path.as_ref() {
         dialog_builder = set_default_path(dialog_builder, default_path);
     }
-    for filter in options.filters.iter() {
+    for filter in &options.filters {
         let extensions: Vec<&str> = filter.extensions.iter().map(|s| &**s).collect();
         dialog_builder = dialog_builder.add_filter(filter.name.clone(), &extensions);
     }
@@ -185,10 +185,8 @@ pub async fn ask_native_dialog<R: Runtime>(
 
     if let Some(kind) = options.kind {
         let message_kind = match kind.as_str() {
-            "info" => tauri_plugin_dialog::MessageDialogKind::Info,
             "warning" => tauri_plugin_dialog::MessageDialogKind::Warning,
             "error" => tauri_plugin_dialog::MessageDialogKind::Error,
-            "question" => tauri_plugin_dialog::MessageDialogKind::Info,
             _ => tauri_plugin_dialog::MessageDialogKind::Info,
         };
         dialog_builder = dialog_builder.kind(message_kind);

@@ -38,8 +38,7 @@ fn collect_selected_audio_tracks<'a>(
                 .find(|track| track.index == *index)
                 .ok_or_else(|| {
                     ConversionError::InvalidInput(format!(
-                        "Selected audio track #{} was not found in source",
-                        index
+                        "Selected audio track #{index} was not found in source"
                     ))
                 })
         })
@@ -64,8 +63,7 @@ fn collect_selected_subtitle_tracks<'a>(
                 .find(|track| track.index == *index)
                 .ok_or_else(|| {
                     ConversionError::InvalidInput(format!(
-                        "Selected subtitle track #{} was not found in source",
-                        index
+                        "Selected subtitle track #{index} was not found in source"
                     ))
                 })
         })
@@ -159,17 +157,17 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         && !end_str.is_empty()
     {
         if let Some(start_str) = &config.start_time {
-            if !start_str.is_empty() {
-                if let (Some(start_t), Some(end_t)) = (parse_time(start_str), parse_time(end_str)) {
-                    let duration = end_t - start_t;
-                    if duration > 0.0 {
-                        args.push("-t".to_string());
-                        args.push(format!("{:.3}", duration));
-                    }
-                }
-            } else {
+            if start_str.is_empty() {
                 args.push("-to".to_string());
                 args.push(end_str.clone());
+            } else if let (Some(start_t), Some(end_t)) =
+                (parse_time(start_str), parse_time(end_str))
+            {
+                let duration = end_t - start_t;
+                if duration > 0.0 {
+                    args.push("-t".to_string());
+                    args.push(format!("{duration:.3}"));
+                }
             }
         } else {
             args.push("-to".to_string());
@@ -208,7 +206,7 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         if !config.selected_audio_tracks.is_empty() {
             for track_index in &config.selected_audio_tracks {
                 args.push("-map".to_string());
-                args.push(format!("0:{}", track_index));
+                args.push(format!("0:{track_index}"));
             }
         } else if container_supports_audio(&config.container) {
             args.push("-map".to_string());
@@ -218,7 +216,7 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         if !config.selected_subtitle_tracks.is_empty() {
             for track_index in &config.selected_subtitle_tracks {
                 args.push("-map".to_string());
-                args.push(format!("0:{}", track_index));
+                args.push(format!("0:{track_index}"));
             }
         } else if container_supports_subtitles(&config.container) {
             args.push("-map".to_string());
@@ -235,14 +233,14 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
     if is_audio_only {
         args.push("-vn".to_string());
 
-        if !config.selected_audio_tracks.is_empty() {
-            for track_index in &config.selected_audio_tracks {
-                args.push("-map".to_string());
-                args.push(format!("0:{}", track_index));
-            }
-        } else {
+        if config.selected_audio_tracks.is_empty() {
             args.push("-map".to_string());
             args.push("0:a?".to_string());
+        } else {
+            for track_index in &config.selected_audio_tracks {
+                args.push("-map".to_string());
+                args.push(format!("0:{track_index}"));
+            }
         }
 
         add_audio_codec_args(&mut args, config);
@@ -274,14 +272,14 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         args.push("-map".to_string());
         args.push("0:v:0".to_string());
 
-        if !config.selected_audio_tracks.is_empty() {
-            for track_index in &config.selected_audio_tracks {
-                args.push("-map".to_string());
-                args.push(format!("0:{}", track_index));
-            }
-        } else {
+        if config.selected_audio_tracks.is_empty() {
             args.push("-map".to_string());
             args.push("0:a?".to_string());
+        } else {
+            for track_index in &config.selected_audio_tracks {
+                args.push("-map".to_string());
+                args.push(format!("0:{track_index}"));
+            }
         }
 
         add_audio_codec_args(&mut args, config);
@@ -289,7 +287,7 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         if !config.selected_subtitle_tracks.is_empty() {
             for track_index in &config.selected_subtitle_tracks {
                 args.push("-map".to_string());
-                args.push(format!("0:{}", track_index));
+                args.push(format!("0:{track_index}"));
             }
             add_subtitle_codec_args(&mut args, config);
         } else if !has_burn_subtitles {
@@ -348,37 +346,37 @@ pub fn add_metadata_flags(args: &mut Vec<String>, metadata: &MetadataConfig) {
         && !v.is_empty()
     {
         args.push("-metadata".to_string());
-        args.push(format!("title={}", v));
+        args.push(format!("title={v}"));
     }
     if let Some(v) = &metadata.artist
         && !v.is_empty()
     {
         args.push("-metadata".to_string());
-        args.push(format!("artist={}", v));
+        args.push(format!("artist={v}"));
     }
     if let Some(v) = &metadata.album
         && !v.is_empty()
     {
         args.push("-metadata".to_string());
-        args.push(format!("album={}", v));
+        args.push(format!("album={v}"));
     }
     if let Some(v) = &metadata.genre
         && !v.is_empty()
     {
         args.push("-metadata".to_string());
-        args.push(format!("genre={}", v));
+        args.push(format!("genre={v}"));
     }
     if let Some(v) = &metadata.date
         && !v.is_empty()
     {
         args.push("-metadata".to_string());
-        args.push(format!("date={}", v));
+        args.push(format!("date={v}"));
     }
     if let Some(v) = &metadata.comment
         && !v.is_empty()
     {
         args.push("-metadata".to_string());
-        args.push(format!("comment={}", v));
+        args.push(format!("comment={v}"));
     }
 }
 
@@ -388,11 +386,7 @@ fn sanitize_output_name(raw: &str) -> Option<String> {
         return None;
     }
 
-    let candidate = trimmed
-        .rsplit(['/', '\\'])
-        .next()
-        .map(str::trim)
-        .unwrap_or("");
+    let candidate = trimmed.rsplit(['/', '\\']).next().map_or("", str::trim);
 
     if candidate.is_empty() || candidate == "." || candidate == ".." {
         return None;
@@ -401,8 +395,8 @@ fn sanitize_output_name(raw: &str) -> Option<String> {
     Some(candidate.to_string())
 }
 
-pub fn build_output_path(file_path: &str, container: &str, output_name: Option<String>) -> String {
-    if let Some(custom) = output_name.as_deref().and_then(sanitize_output_name) {
+pub fn build_output_path(file_path: &str, container: &str, output_name: Option<&str>) -> String {
+    if let Some(custom) = output_name.and_then(sanitize_output_name) {
         let input_path = Path::new(file_path);
         let mut output: PathBuf = match input_path.parent() {
             Some(parent) if !parent.as_os_str().is_empty() => parent.to_path_buf(),
@@ -412,7 +406,7 @@ pub fn build_output_path(file_path: &str, container: &str, output_name: Option<S
         output.set_extension(container);
         output.to_string_lossy().to_string()
     } else {
-        format!("{}_converted.{}", file_path, container)
+        format!("{file_path}_converted.{container}")
     }
 }
 
@@ -423,14 +417,12 @@ pub fn validate_task_input(
     let input_path = Path::new(file_path);
     if !input_path.exists() {
         return Err(ConversionError::InvalidInput(format!(
-            "Input file does not exist: {}",
-            file_path
+            "Input file does not exist: {file_path}"
         )));
     }
     if !input_path.is_file() {
         return Err(ConversionError::InvalidInput(format!(
-            "Input path is not a file: {}",
-            file_path
+            "Input path is not a file: {file_path}"
         )));
     }
 
@@ -448,8 +440,7 @@ pub fn validate_task_input(
 
     if processing_mode != "reencode" && processing_mode != "copy" {
         return Err(ConversionError::InvalidInput(format!(
-            "Invalid processing mode: {}",
-            processing_mode
+            "Invalid processing mode: {processing_mode}"
         )));
     }
     let is_copy_mode = processing_mode == "copy";
@@ -458,8 +449,7 @@ pub fn validate_task_input(
         && parse_time(start).is_none()
     {
         return Err(ConversionError::InvalidInput(format!(
-            "Invalid start time: {}",
-            start
+            "Invalid start time: {start}"
         )));
     }
 
@@ -467,8 +457,7 @@ pub fn validate_task_input(
         && parse_time(end).is_none()
     {
         return Err(ConversionError::InvalidInput(format!(
-            "Invalid end time: {}",
-            end
+            "Invalid end time: {end}"
         )));
     }
 
@@ -485,11 +474,11 @@ pub fn validate_task_input(
         let w_str = config.custom_width.as_deref().unwrap_or("-1");
         let h_str = config.custom_height.as_deref().unwrap_or("-1");
 
-        let w = w_str.parse::<i32>().map_err(|_| {
-            ConversionError::InvalidInput(format!("Invalid custom width: {}", w_str))
-        })?;
+        let w = w_str
+            .parse::<i32>()
+            .map_err(|_| ConversionError::InvalidInput(format!("Invalid custom width: {w_str}")))?;
         let h = h_str.parse::<i32>().map_err(|_| {
-            ConversionError::InvalidInput(format!("Invalid custom height: {}", h_str))
+            ConversionError::InvalidInput(format!("Invalid custom height: {h_str}"))
         })?;
 
         if w == 0 || h == 0 {
@@ -558,8 +547,7 @@ pub fn validate_task_input(
         && mode != "esrgan-4x"
     {
         return Err(ConversionError::InvalidInput(format!(
-            "Invalid ML upscale mode: {}",
-            mode
+            "Invalid ML upscale mode: {mode}"
         )));
     }
 

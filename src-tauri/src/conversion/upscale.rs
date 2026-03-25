@@ -19,7 +19,7 @@ use crate::conversion::types::{
 };
 use crate::conversion::utils::{FRAME_REGEX, parse_time, sanitize_external_tool_path};
 
-pub(crate) fn build_upscale_encode_args(
+pub fn build_upscale_encode_args(
     output_frames_dir: &Path,
     source_file_path: &str,
     output_path: &str,
@@ -69,20 +69,20 @@ pub(crate) fn build_upscale_encode_args(
     enc_args.push("-map".to_string());
     enc_args.push("0:v:0".to_string());
 
-    if !config.selected_audio_tracks.is_empty() {
-        for track_index in &config.selected_audio_tracks {
-            enc_args.push("-map".to_string());
-            enc_args.push(format!("1:{}", track_index));
-        }
-    } else {
+    if config.selected_audio_tracks.is_empty() {
         enc_args.push("-map".to_string());
         enc_args.push("1:a?".to_string());
+    } else {
+        for track_index in &config.selected_audio_tracks {
+            enc_args.push("-map".to_string());
+            enc_args.push(format!("1:{track_index}"));
+        }
     }
 
     if !config.selected_subtitle_tracks.is_empty() {
         for track_index in &config.selected_subtitle_tracks {
             enc_args.push("-map".to_string());
-            enc_args.push(format!("1:{}", track_index));
+            enc_args.push(format!("1:{track_index}"));
         }
     } else if config
         .subtitle_burn_path
@@ -132,22 +132,19 @@ pub(crate) fn build_upscale_encode_args(
     enc_args
 }
 
-pub(crate) fn resolve_upscale_mode(
-    mode: &str,
-) -> Result<(&'static str, &'static str), ConversionError> {
+pub fn resolve_upscale_mode(mode: &str) -> Result<(&'static str, &'static str), ConversionError> {
     match mode {
         "esrgan-2x" => Ok(("2", "realesr-animevideov3-x2")),
         "esrgan-4x" => Ok(("4", "realesr-animevideov3-x4")),
         _ => Err(ConversionError::InvalidInput(format!(
-            "Invalid upscale mode: {}",
-            mode
+            "Invalid upscale mode: {mode}"
         ))),
     }
 }
 
-pub(crate) fn compute_upscale_threads(source_width: u32, source_height: u32, scale: u32) -> String {
-    let output_pixels =
-        (source_width as u64 * scale as u64) * (source_height as u64 * scale as u64);
+pub fn compute_upscale_threads(source_width: u32, source_height: u32, scale: u32) -> String {
+    let output_pixels = (u64::from(source_width) * u64::from(scale))
+        * (u64::from(source_height) * u64::from(scale));
 
     // proc: concurrent GPU inference frames — limited by VRAM
     // > 4K output (~8.3M px): ~500MB+ per frame → single concurrent frame
@@ -167,13 +164,10 @@ pub(crate) fn compute_upscale_threads(source_width: u32, source_height: u32, sca
         .unwrap_or(4);
     let io = cpus.div_ceil(2).clamp(1, 4);
 
-    format!("{}:{}:{}", io, proc, io)
+    format!("{io}:{proc}:{io}")
 }
 
-pub(crate) async fn validate_upscale_runtime(
-    app: &AppHandle,
-    mode: &str,
-) -> Result<(), ConversionError> {
+pub async fn validate_upscale_runtime(app: &AppHandle, mode: &str) -> Result<(), ConversionError> {
     let (_, model_name) = resolve_upscale_mode(mode)?;
 
     let models_path = app
@@ -181,8 +175,8 @@ pub(crate) async fn validate_upscale_runtime(
         .resolve("resources/models", BaseDirectory::Resource)
         .map_err(|e| ConversionError::Shell(e.to_string()))?;
 
-    let model_param = models_path.join(format!("{}.param", model_name));
-    let model_bin = models_path.join(format!("{}.bin", model_name));
+    let model_param = models_path.join(format!("{model_name}.param"));
+    let model_bin = models_path.join(format!("{model_name}.bin"));
 
     if !model_param.is_file() || !model_bin.is_file() {
         return Err(ConversionError::InvalidInput(format!(
@@ -197,8 +191,7 @@ pub(crate) async fn validate_upscale_runtime(
         .sidecar("realesrgan-ncnn-vulkan")
         .map_err(|e| {
             ConversionError::InvalidInput(format!(
-                "Upscaler sidecar is unavailable: {}. Run `bun run setup:upscaler` and rebuild the app.",
-                e
+                "Upscaler sidecar is unavailable: {e}. Run `bun run setup:upscaler` and rebuild the app."
             ))
         })?
         .args(["-h"])
@@ -206,15 +199,14 @@ pub(crate) async fn validate_upscale_runtime(
         .await
         .map_err(|e| {
             ConversionError::InvalidInput(format!(
-                "Upscaler sidecar failed to start: {}. Verify binary permissions and system dependencies (Vulkan/Metal).",
-                e
+                "Upscaler sidecar failed to start: {e}. Verify binary permissions and system dependencies (Vulkan/Metal)."
             ))
         })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        let details = if !stderr.is_empty() { stderr } else { stdout };
+        let details = if stderr.is_empty() { stdout } else { stderr };
         let details_lc = details.to_ascii_lowercase();
         let looks_like_help = details_lc.contains("usage: realesrgan-ncnn-vulkan")
             || details_lc.contains("-i input-path")
@@ -251,12 +243,12 @@ pub async fn run_upscale_worker(
     let output_path = build_output_path(
         &task.file_path,
         &task.config.container,
-        task.output_name.clone(),
+        task.output_name.as_deref(),
     );
 
     let probe = crate::conversion::probe::probe_media_file(&app, &task.file_path)
         .await
-        .map_err(|e| ConversionError::Worker(format!("Probe failed: {}", e)))?;
+        .map_err(|e| ConversionError::Worker(format!("Probe failed: {e}")))?;
 
     let fps = probe.frame_rate.unwrap_or(30.0);
     let full_duration = probe
@@ -335,17 +327,15 @@ pub async fn run_upscale_worker(
         && !end.is_empty()
     {
         if let Some(start) = &task.config.start_time {
-            if !start.is_empty() {
-                if let (Some(s_t), Some(e_t)) = (parse_time(start), parse_time(end)) {
-                    let duration = e_t - s_t;
-                    if duration > 0.0 {
-                        dec_args.push("-t".to_string());
-                        dec_args.push(format!("{:.3}", duration));
-                    }
-                }
-            } else {
+            if start.is_empty() {
                 dec_args.push("-to".to_string());
                 dec_args.push(end.clone());
+            } else if let (Some(s_t), Some(e_t)) = (parse_time(start), parse_time(end)) {
+                let duration = e_t - s_t;
+                if duration > 0.0 {
+                    dec_args.push("-t".to_string());
+                    dec_args.push(format!("{duration:.3}"));
+                }
             }
         } else {
             dec_args.push("-to".to_string());
@@ -406,7 +396,8 @@ pub async fn run_upscale_worker(
                     && let Some(frame_match) = caps.get(1)
                     && let Ok(current_frame) = frame_match.as_str().parse::<u32>()
                 {
-                    let decode_progress = (current_frame as f64 / total_frames as f64) * 5.0;
+                    let decode_progress =
+                        (f64::from(current_frame) / f64::from(total_frames)) * 5.0;
                     let _ = app_clone.emit(
                         "conversion-progress",
                         ProgressPayload {
@@ -432,13 +423,8 @@ pub async fn run_upscale_worker(
     let actual_frames = std::fs::read_dir(&input_frames_dir)
         .map(|entries| {
             entries
-                .filter_map(|e| e.ok())
-                .filter(|e| {
-                    e.path()
-                        .extension()
-                        .map(|ext| ext == "png")
-                        .unwrap_or(false)
-                })
+                .filter_map(std::result::Result::ok)
+                .filter(|e| e.path().extension().is_some_and(|ext| ext == "png"))
                 .count() as u32
         })
         .unwrap_or(total_frames);
@@ -506,18 +492,14 @@ pub async fn run_upscale_worker(
             last_error = line.to_string();
 
             let is_percentage_line = trimmed.ends_with('%')
-                && trimmed
-                    .chars()
-                    .next()
-                    .map(|c| c.is_ascii_digit())
-                    .unwrap_or(false);
+                && trimmed.chars().next().is_some_and(|c| c.is_ascii_digit());
 
             if !is_percentage_line && !trimmed.is_empty() {
                 let _ = app_clone.emit(
                     "conversion-log",
                     LogPayload {
                         id: id_clone.clone(),
-                        line: format!("[UPSCALE] {}", trimmed),
+                        line: format!("[UPSCALE] {trimmed}"),
                     },
                 );
             }
@@ -528,7 +510,8 @@ pub async fn run_upscale_worker(
                 if total_frames == 0 {
                     continue;
                 }
-                let progress = 5.0 + (completed_frames as f64 / total_frames as f64) * 85.0;
+                let progress =
+                    (f64::from(completed_frames) / f64::from(total_frames)).mul_add(85.0, 5.0);
 
                 if progress > last_upscale_progress {
                     last_upscale_progress = progress;
@@ -550,8 +533,7 @@ pub async fn run_upscale_worker(
     if !upscale_success {
         let _ = std::fs::remove_dir_all(&temp_dir);
         return Err(ConversionError::Worker(format!(
-            "Upscaling failed: {}",
-            last_error
+            "Upscaling failed: {last_error}"
         )));
     }
 
@@ -597,7 +579,7 @@ pub async fn run_upscale_worker(
                     && let Ok(current_frame) = frame_match.as_str().parse::<u32>()
                 {
                     let encode_progress =
-                        90.0 + (current_frame as f64 / total_frames as f64) * 10.0;
+                        (f64::from(current_frame) / f64::from(total_frames)).mul_add(10.0, 90.0);
                     let _ = app_clone.emit(
                         "conversion-progress",
                         ProgressPayload {
@@ -618,12 +600,11 @@ pub async fn run_upscale_worker(
                         },
                     );
                     return Ok(());
-                } else {
-                    return Err(ConversionError::Worker(format!(
-                        "Encoder failed with code {:?}",
-                        payload.code
-                    )));
                 }
+                return Err(ConversionError::Worker(format!(
+                    "Encoder failed with code {:?}",
+                    payload.code
+                )));
             }
             _ => {}
         }

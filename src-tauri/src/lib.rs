@@ -12,12 +12,12 @@ async fn close_splash(window: tauri::Window) {
     if let Some(splash) = window.get_webview_window("splash")
         && let Err(error) = splash.close()
     {
-        eprintln!("Failed to close splash window: {}", error);
+        eprintln!("Failed to close splash window: {error}");
     }
 
     if let Some(main) = window.get_webview_window("main") {
         if let Err(error) = main.show() {
-            eprintln!("Failed to show main window: {}", error);
+            eprintln!("Failed to show main window: {error}");
         }
     } else {
         eprintln!("Main window is not available while closing splash");
@@ -36,7 +36,7 @@ fn apply_window_effect(window: &tauri::WebviewWindow) {
                 .radius(16.0)
                 .build(),
         )
-        .unwrap_or_else(|error| eprintln!("Failed to apply macOS window effect: {}", error));
+        .unwrap_or_else(|error| eprintln!("Failed to apply macOS window effect: {error}"));
 }
 
 #[cfg(target_os = "windows")]
@@ -45,12 +45,16 @@ fn apply_window_effect(window: &tauri::WebviewWindow) {
 
     window
         .set_effects(EffectsBuilder::new().effect(Effect::Acrylic).build())
-        .unwrap_or_else(|error| eprintln!("Failed to apply Windows window effect: {}", error));
+        .unwrap_or_else(|error| eprintln!("Failed to apply Windows window effect: {error}"));
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 fn apply_window_effect(_window: &tauri::WebviewWindow) {}
 
+/// Boots the Tauri application runtime and registers plugins, windows, and commands.
+///
+/// # Panics
+/// Panics if `tauri::Builder::run` fails to initialize or run the application context.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -129,15 +133,12 @@ pub fn run() {
                                 let _ = dialog_host.hide();
                             }
                             Err(error) => {
-                                eprintln!("Failed to build macOS dialog host window: {}", error);
+                                eprintln!("Failed to build macOS dialog host window: {error}");
                             }
                         }
                     }
                     Err(error) => {
-                        eprintln!(
-                            "Failed to configure macOS dialog host parent window: {}",
-                            error
-                        );
+                        eprintln!("Failed to configure macOS dialog host parent window: {error}");
                     }
                 }
             }

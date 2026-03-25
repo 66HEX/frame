@@ -14,12 +14,11 @@ pub struct AvailableEncoders {
 }
 
 fn has_upscale_models(app: &AppHandle) -> bool {
-    let models_path = match app
+    let Ok(models_path) = app
         .path()
         .resolve("resources/models", BaseDirectory::Resource)
-    {
-        Ok(path) => path,
-        Err(_) => return false,
+    else {
+        return false;
     };
 
     [
@@ -51,11 +50,7 @@ pub async fn get_available_encoders(app: AppHandle) -> Result<AvailableEncoders,
 
     let has_encoder = |name: &str| -> bool {
         let pattern = format!(r"(?m)^\s*[A-Z.]+\s+{}\s+", regex::escape(name));
-        if let Ok(re) = Regex::new(&pattern) {
-            re.is_match(&stdout)
-        } else {
-            stdout.contains(name)
-        }
+        Regex::new(&pattern).map_or_else(|_| stdout.contains(name), |re| re.is_match(&stdout))
     };
 
     let has_upscaler_sidecar = app.shell().sidecar("realesrgan-ncnn-vulkan").is_ok();

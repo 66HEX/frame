@@ -77,7 +77,7 @@ impl ConversionManager {
 
                         queued_ids.insert(task.id.clone());
                         queue.push_back(task);
-                        ConversionManager::process_queue(
+                        Self::process_queue(
                             &app,
                             &tx_clone,
                             &mut queue,
@@ -85,11 +85,10 @@ impl ConversionManager {
                             &mut running_tasks,
                             Arc::clone(&limiter),
                             Arc::clone(&cancelled_tasks_loop),
-                        )
-                        .await;
+                        );
                     }
                     ManagerMessage::ConcurrencyUpdated => {
-                        ConversionManager::process_queue(
+                        Self::process_queue(
                             &app,
                             &tx_clone,
                             &mut queue,
@@ -97,8 +96,7 @@ impl ConversionManager {
                             &mut running_tasks,
                             Arc::clone(&limiter),
                             Arc::clone(&cancelled_tasks_loop),
-                        )
-                        .await;
+                        );
                     }
                     ManagerMessage::TaskStarted(id, pid) => {
                         let is_cancelled = {
@@ -108,14 +106,14 @@ impl ConversionManager {
 
                         if is_cancelled {
                             if pid > 0 {
-                                let _ = ConversionManager::terminate_process(pid);
+                                let _ = Self::terminate_process(pid);
                             }
                             running_tasks.remove(&id);
                             {
                                 let mut tasks = active_tasks_loop.lock().unwrap();
                                 tasks.remove(&id);
                             }
-                            ConversionManager::process_queue(
+                            Self::process_queue(
                                 &app,
                                 &tx_clone,
                                 &mut queue,
@@ -123,8 +121,7 @@ impl ConversionManager {
                                 &mut running_tasks,
                                 Arc::clone(&limiter),
                                 Arc::clone(&cancelled_tasks_loop),
-                            )
-                            .await;
+                            );
                             continue;
                         }
 
@@ -149,7 +146,7 @@ impl ConversionManager {
                             );
                         }
 
-                        ConversionManager::process_queue(
+                        Self::process_queue(
                             &app,
                             &tx_clone,
                             &mut queue,
@@ -157,8 +154,7 @@ impl ConversionManager {
                             &mut running_tasks,
                             Arc::clone(&limiter),
                             Arc::clone(&cancelled_tasks_loop),
-                        )
-                        .await;
+                        );
                     }
                     ManagerMessage::TaskError(id, err) => {
                         let was_cancelled = {
@@ -175,17 +171,15 @@ impl ConversionManager {
                                     line: "[INFO] Task cancelled".to_string(),
                                 },
                             );
-                            let _ = app.emit(
-                                "conversion-cancelled",
-                                CancelledPayload { id: id.clone() },
-                            );
+                            let _ = app
+                                .emit("conversion-cancelled", CancelledPayload { id: id.clone() });
                         } else {
-                            eprintln!("Task {} failed: {}", id, err);
+                            eprintln!("Task {id} failed: {err}");
                             let _ = app.emit(
                                 "conversion-log",
                                 LogPayload {
                                     id: id.clone(),
-                                    line: format!("[ERROR] {}", err),
+                                    line: format!("[ERROR] {err}"),
                                 },
                             );
                             let _ = app.emit(
@@ -197,7 +191,7 @@ impl ConversionManager {
                             );
                         }
 
-                        ConversionManager::process_queue(
+                        Self::process_queue(
                             &app,
                             &tx_clone,
                             &mut queue,
@@ -205,8 +199,7 @@ impl ConversionManager {
                             &mut running_tasks,
                             Arc::clone(&limiter),
                             Arc::clone(&cancelled_tasks_loop),
-                        )
-                        .await;
+                        );
                     }
                 }
             }
@@ -220,7 +213,7 @@ impl ConversionManager {
         }
     }
 
-    async fn process_queue(
+    fn process_queue(
         app: &AppHandle,
         tx: &mpsc::Sender<ManagerMessage>,
         queue: &mut VecDeque<ConversionTask>,
@@ -359,18 +352,18 @@ impl ConversionManager {
         if let Some(process) = process {
             if process.pid > 0 {
                 ensure_same_process(id, process)?;
-                ConversionManager::terminate_process(process.pid)?;
+                Self::terminate_process(process.pid)?;
             }
-            ConversionManager::cleanup_temp_upscale_dir(id);
+            Self::cleanup_temp_upscale_dir(id);
             Ok(())
         } else {
-            ConversionManager::cleanup_temp_upscale_dir(id);
+            Self::cleanup_temp_upscale_dir(id);
             Ok(())
         }
     }
 
     fn cleanup_temp_upscale_dir(id: &str) {
-        let temp_dir = std::env::temp_dir().join(format!("frame_upscale_{}", id));
+        let temp_dir = std::env::temp_dir().join(format!("frame_upscale_{id}"));
         if temp_dir.exists() {
             let _ = std::fs::remove_dir_all(&temp_dir);
         }
@@ -415,7 +408,7 @@ fn process_start_time(pid: u32) -> Option<u64> {
     let target = Pid::from_u32(pid);
     let mut system = System::new();
     system.refresh_processes(ProcessesToUpdate::Some(&[target]), true);
-    system.process(target).map(|process| process.start_time())
+    system.process(target).map(sysinfo::Process::start_time)
 }
 
 fn ensure_same_process(id: &str, process: ActiveProcess) -> Result<(), ConversionError> {

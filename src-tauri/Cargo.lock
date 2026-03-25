@@ -1044,7 +1044,6 @@ name = "frame"
 version = "0.25.3"
 dependencies = [
  "libc",
- "once_cell",
  "regex",
  "serde",
  "serde_json",
