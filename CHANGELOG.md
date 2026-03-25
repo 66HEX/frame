@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Process Identity Guarding:** Task control operations (`pause`/`resume`/`cancel`) now verify the active process identity using PID + process start-time metadata, reducing the risk of signaling a different process when PIDs are reused by the OS.
 - **Manager Runtime Coverage:** Added targeted unit tests for conversion-manager state cleanup and process-identity validation paths, increasing automated coverage of cancel/error/pause-resume critical runtime behavior.
 - **Extended Clippy Quality Pass:** Applied a broad pedantic/nursery/perf cleanup in Rust backend modules (queue manager, args/upscale/worker pipelines, dialog/capabilities, core bootstrap), preserving `clippy -D warnings` and reducing extended-clippy findings from ~173 to ~52 warnings.
+- **Extended Clippy Follow-up (Queue/Probe/Rules):** Refined conversion manager task-tracking internals (`HashSet` for running IDs), hardened Unix PID conversions, simplified media-rule lookups, and optimized probe metadata assignment paths; kept `cargo test --locked` and `clippy -D warnings` green while reducing extended-clippy findings from ~52 to ~22 warnings.
 
 ## [0.25.3] - 2026-03-02
 

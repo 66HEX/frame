@@ -115,25 +115,19 @@ pub fn is_audio_only_container(container: &str) -> bool {
 pub fn is_video_codec_allowed(container: &str, codec: &str) -> bool {
     let container = container.to_ascii_lowercase();
     let codec = codec.to_ascii_lowercase();
-    match MEDIA_RULES
+    MEDIA_RULES
         .container_video_codec_compatibility
         .get(&container)
-    {
-        Some(allowed) => allowed.contains(&codec),
-        None => true,
-    }
+        .is_none_or(|allowed| allowed.contains(&codec))
 }
 
 pub fn is_video_stream_codec_allowed(container: &str, codec: &str) -> bool {
     let container = container.to_ascii_lowercase();
     let codec = codec.to_ascii_lowercase();
-    match MEDIA_RULES
+    MEDIA_RULES
         .container_video_stream_codec_compatibility
         .get(&container)
-    {
-        Some(allowed) => allowed.contains(ANY_CODEC_TOKEN) || allowed.contains(&codec),
-        None => true,
-    }
+        .is_none_or(|allowed| allowed.contains(ANY_CODEC_TOKEN) || allowed.contains(&codec))
 }
 
 pub fn is_video_only_container(container: &str) -> bool {
@@ -153,35 +147,26 @@ pub fn container_supports_subtitles(container: &str) -> bool {
 pub fn is_audio_codec_allowed(container: &str, codec: &str) -> bool {
     let container = container.to_ascii_lowercase();
     let codec = codec.to_ascii_lowercase();
-    match MEDIA_RULES
+    MEDIA_RULES
         .container_audio_codec_compatibility
         .get(&container)
-    {
-        Some(allowed) => allowed.contains(ANY_CODEC_TOKEN) || allowed.contains(&codec),
-        None => true,
-    }
+        .is_none_or(|allowed| allowed.contains(ANY_CODEC_TOKEN) || allowed.contains(&codec))
 }
 
 pub fn is_audio_stream_codec_allowed(container: &str, codec: &str) -> bool {
     let container = container.to_ascii_lowercase();
     let codec = codec.to_ascii_lowercase();
-    match MEDIA_RULES
+    MEDIA_RULES
         .container_audio_stream_codec_compatibility
         .get(&container)
-    {
-        Some(allowed) => allowed.contains(ANY_CODEC_TOKEN) || allowed.contains(&codec),
-        None => true,
-    }
+        .is_none_or(|allowed| allowed.contains(ANY_CODEC_TOKEN) || allowed.contains(&codec))
 }
 
 pub fn is_subtitle_codec_allowed(container: &str, codec: &str) -> bool {
     let container = container.to_ascii_lowercase();
     let codec = codec.to_ascii_lowercase();
-    match MEDIA_RULES
+    MEDIA_RULES
         .container_subtitle_codec_compatibility
         .get(&container)
-    {
-        Some(allowed) => allowed.contains(ANY_CODEC_TOKEN) || allowed.contains(&codec),
-        None => true,
-    }
+        .is_none_or(|allowed| allowed.contains(ANY_CODEC_TOKEN) || allowed.contains(&codec))
 }

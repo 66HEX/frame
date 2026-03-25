@@ -47,19 +47,21 @@ pub async fn probe_media_file(
     }
 
     if let Some(video_stream) = probe_data.streams.iter().find(|s| s.codec_type == "video") {
-        metadata.video_codec = video_stream.codec_name.clone();
-        metadata.pixel_format = video_stream.pix_fmt.clone();
-        metadata.color_space = video_stream.color_space.clone();
-        metadata.color_range = video_stream.color_range.clone();
-        metadata.color_primaries = video_stream.color_primaries.clone();
-        metadata.profile = video_stream.profile.clone();
+        metadata.video_codec.clone_from(&video_stream.codec_name);
+        metadata.pixel_format.clone_from(&video_stream.pix_fmt);
+        metadata.color_space.clone_from(&video_stream.color_space);
+        metadata.color_range.clone_from(&video_stream.color_range);
+        metadata
+            .color_primaries
+            .clone_from(&video_stream.color_primaries);
+        metadata.profile.clone_from(&video_stream.profile);
 
         if let (Some(w), Some(h)) = (video_stream.width, video_stream.height)
             && w > 0
             && h > 0
         {
-            metadata.width = Some(w as u32);
-            metadata.height = Some(h as u32);
+            metadata.width = u32::try_from(w).ok();
+            metadata.height = u32::try_from(h).ok();
             metadata.resolution = Some(format!("{w}x{h}"));
         }
 
@@ -84,8 +86,13 @@ pub async fn probe_media_file(
 
         metadata.audio_tracks.push(AudioTrack {
             index: stream.index,
-            codec: stream.codec_name.clone().unwrap_or("unknown".to_string()),
-            channels: stream.channels.map_or("?".to_string(), |c| c.to_string()),
+            codec: stream
+                .codec_name
+                .clone()
+                .unwrap_or_else(|| "unknown".to_string()),
+            channels: stream
+                .channels
+                .map_or_else(|| "?".to_string(), |c| c.to_string()),
             label,
             language,
             bitrate_kbps: track_bitrate,
@@ -103,7 +110,10 @@ pub async fn probe_media_file(
 
         metadata.subtitle_tracks.push(SubtitleTrack {
             index: stream.index,
-            codec: stream.codec_name.clone().unwrap_or("unknown".to_string()),
+            codec: stream
+                .codec_name
+                .clone()
+                .unwrap_or_else(|| "unknown".to_string()),
             language,
             label,
         });

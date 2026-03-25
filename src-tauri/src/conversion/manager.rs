@@ -60,7 +60,7 @@ impl ConversionManager {
         tauri::async_runtime::spawn(async move {
             let mut queue: VecDeque<ConversionTask> = VecDeque::new();
             let mut queued_ids: HashSet<String> = HashSet::new();
-            let mut running_tasks: HashMap<String, ()> = HashMap::new();
+            let mut running_tasks: HashSet<String> = HashSet::new();
 
             while let Some(msg) = rx.recv().await {
                 match msg {
@@ -71,7 +71,7 @@ impl ConversionManager {
                             cancelled.remove(&task.id);
                         }
 
-                        if running_tasks.contains_key(&task.id) || queued_ids.contains(&task.id) {
+                        if running_tasks.contains(&task.id) || queued_ids.contains(&task.id) {
                             continue;
                         }
 
@@ -83,8 +83,8 @@ impl ConversionManager {
                             &mut queue,
                             &mut queued_ids,
                             &mut running_tasks,
-                            Arc::clone(&limiter),
-                            Arc::clone(&cancelled_tasks_loop),
+                            &limiter,
+                            &cancelled_tasks_loop,
                         );
                     }
                     ManagerMessage::ConcurrencyUpdated => {
@@ -94,8 +94,8 @@ impl ConversionManager {
                             &mut queue,
                             &mut queued_ids,
                             &mut running_tasks,
-                            Arc::clone(&limiter),
-                            Arc::clone(&cancelled_tasks_loop),
+                            &limiter,
+                            &cancelled_tasks_loop,
                         );
                     }
                     ManagerMessage::TaskStarted(id, pid) => {
@@ -119,8 +119,8 @@ impl ConversionManager {
                                 &mut queue,
                                 &mut queued_ids,
                                 &mut running_tasks,
-                                Arc::clone(&limiter),
-                                Arc::clone(&cancelled_tasks_loop),
+                                &limiter,
+                                &cancelled_tasks_loop,
                             );
                             continue;
                         }
@@ -152,8 +152,8 @@ impl ConversionManager {
                             &mut queue,
                             &mut queued_ids,
                             &mut running_tasks,
-                            Arc::clone(&limiter),
-                            Arc::clone(&cancelled_tasks_loop),
+                            &limiter,
+                            &cancelled_tasks_loop,
                         );
                     }
                     ManagerMessage::TaskError(id, err) => {
@@ -197,8 +197,8 @@ impl ConversionManager {
                             &mut queue,
                             &mut queued_ids,
                             &mut running_tasks,
-                            Arc::clone(&limiter),
-                            Arc::clone(&cancelled_tasks_loop),
+                            &limiter,
+                            &cancelled_tasks_loop,
                         );
                     }
                 }
@@ -218,9 +218,9 @@ impl ConversionManager {
         tx: &mpsc::Sender<ManagerMessage>,
         queue: &mut VecDeque<ConversionTask>,
         queued_ids: &mut HashSet<String>,
-        running_tasks: &mut HashMap<String, ()>,
-        max_concurrency: Arc<AtomicUsize>,
-        cancelled_tasks: Arc<Mutex<HashSet<String>>>,
+        running_tasks: &mut HashSet<String>,
+        max_concurrency: &Arc<AtomicUsize>,
+        cancelled_tasks: &Arc<Mutex<HashSet<String>>>,
     ) {
         let limit = max_concurrency.load(Ordering::SeqCst).max(1);
 
@@ -235,7 +235,7 @@ impl ConversionManager {
                     continue;
                 }
 
-                running_tasks.insert(task.id.clone(), ());
+                running_tasks.insert(task.id.clone());
 
                 let app_clone = app.clone();
                 let tx_worker = tx.clone();
@@ -292,7 +292,8 @@ impl ConversionManager {
 
             #[cfg(unix)]
             unsafe {
-                if libc::kill(process.pid as libc::pid_t, libc::SIGSTOP) != 0 {
+                let pid = pid_to_unix_pid(process.pid)?;
+                if libc::kill(pid, libc::SIGSTOP) != 0 {
                     return Err(ConversionError::Shell("Failed to send SIGSTOP".to_string()));
                 }
             }
@@ -322,7 +323,8 @@ impl ConversionManager {
 
             #[cfg(unix)]
             unsafe {
-                if libc::kill(process.pid as libc::pid_t, libc::SIGCONT) != 0 {
+                let pid = pid_to_unix_pid(process.pid)?;
+                if libc::kill(pid, libc::SIGCONT) != 0 {
                     return Err(ConversionError::Shell("Failed to send SIGCONT".to_string()));
                 }
             }
@@ -349,17 +351,15 @@ impl ConversionManager {
             tasks.get(id).copied()
         };
 
-        if let Some(process) = process {
-            if process.pid > 0 {
-                ensure_same_process(id, process)?;
-                Self::terminate_process(process.pid)?;
-            }
-            Self::cleanup_temp_upscale_dir(id);
-            Ok(())
-        } else {
-            Self::cleanup_temp_upscale_dir(id);
-            Ok(())
+        if let Some(process) = process
+            && process.pid > 0
+        {
+            ensure_same_process(id, process)?;
+            Self::terminate_process(process.pid)?;
         }
+
+        Self::cleanup_temp_upscale_dir(id);
+        Ok(())
     }
 
     fn cleanup_temp_upscale_dir(id: &str) {
@@ -372,8 +372,9 @@ impl ConversionManager {
     #[cfg(unix)]
     fn terminate_process(pid: u32) -> Result<(), ConversionError> {
         unsafe {
-            let _ = libc::kill(pid as libc::pid_t, libc::SIGCONT);
-            if libc::kill(pid as libc::pid_t, libc::SIGKILL) != 0 {
+            let pid = pid_to_unix_pid(pid)?;
+            let _ = libc::kill(pid, libc::SIGCONT);
+            if libc::kill(pid, libc::SIGKILL) != 0 {
                 return Err(ConversionError::Shell("Failed to send SIGKILL".to_string()));
             }
         }
@@ -425,9 +426,15 @@ fn ensure_same_process(id: &str, process: ActiveProcess) -> Result<(), Conversio
     Ok(())
 }
 
+#[cfg(unix)]
+fn pid_to_unix_pid(pid: u32) -> Result<libc::pid_t, ConversionError> {
+    libc::pid_t::try_from(pid)
+        .map_err(|_| ConversionError::Shell(format!("PID {pid} is out of range for libc::pid_t")))
+}
+
 fn finalize_task_state(
     id: &str,
-    running_tasks: &mut HashMap<String, ()>,
+    running_tasks: &mut HashSet<String>,
     active_tasks: &mut HashMap<String, ActiveProcess>,
     cancelled_tasks: &mut HashSet<String>,
 ) -> bool {
@@ -444,7 +451,7 @@ mod tests {
     #[test]
     fn finalize_task_state_cleans_all_maps_for_cancelled_task() {
         let id = "task-1";
-        let mut running = HashMap::from([(id.to_string(), ())]);
+        let mut running = HashSet::from([id.to_string()]);
         let mut active = HashMap::from([(
             id.to_string(),
             ActiveProcess {
@@ -457,7 +464,7 @@ mod tests {
         let was_cancelled = finalize_task_state(id, &mut running, &mut active, &mut cancelled);
 
         assert!(was_cancelled);
-        assert!(!running.contains_key(id));
+        assert!(!running.contains(id));
         assert!(!active.contains_key(id));
         assert!(!cancelled.contains(id));
     }
@@ -465,7 +472,7 @@ mod tests {
     #[test]
     fn finalize_task_state_cleans_all_maps_for_non_cancelled_task() {
         let id = "task-2";
-        let mut running = HashMap::from([(id.to_string(), ())]);
+        let mut running = HashSet::from([id.to_string()]);
         let mut active = HashMap::from([(
             id.to_string(),
             ActiveProcess {
@@ -478,7 +485,7 @@ mod tests {
         let was_cancelled = finalize_task_state(id, &mut running, &mut active, &mut cancelled);
 
         assert!(!was_cancelled);
-        assert!(!running.contains_key(id));
+        assert!(!running.contains(id));
         assert!(!active.contains_key(id));
     }
 
