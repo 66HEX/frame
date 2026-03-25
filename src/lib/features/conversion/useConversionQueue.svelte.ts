@@ -71,17 +71,27 @@ export function createConversionQueue(callbacks: ConversionCallbacks) {
 					return { ...logs, [payload.id]: [...current, payload.line] };
 				});
 			},
-			(payload) => {
-				callbacks.onFilesUpdate((files) =>
-					files.map((f) => {
-						if (f.id === payload.id && f.status === FileStatus.QUEUED) {
-							return { ...f, status: FileStatus.CONVERTING, progress: 0 };
-						}
-						return f;
-					})
-				);
-			}
-		);
+				(payload) => {
+					callbacks.onFilesUpdate((files) =>
+						files.map((f) => {
+							if (f.id === payload.id && f.status === FileStatus.QUEUED) {
+								return { ...f, status: FileStatus.CONVERTING, progress: 0 };
+							}
+							return f;
+						})
+					);
+				},
+				(payload) => {
+					callbacks.onFilesUpdate((files) =>
+						files.map((f) =>
+							f.id === payload.id
+								? { ...f, status: FileStatus.IDLE, progress: 0, conversionError: undefined }
+								: f
+						)
+					);
+					checkAllDone();
+				}
+			);
 
 		return () => {
 			unlistenPromise?.then((unlisten) => unlisten());

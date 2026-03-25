@@ -26,6 +26,10 @@ export interface StartedEvent {
 	id: string;
 }
 
+export interface CancelledEvent {
+	id: string;
+}
+
 export async function startConversion(
 	id: string,
 	filePath: string,
@@ -77,7 +81,8 @@ export async function setupConversionListeners(
 	onCompleted: (payload: CompletedEvent) => void,
 	onError: (payload: ErrorEvent) => void,
 	onLog: (payload: LogEvent) => void,
-	onStarted: (payload: StartedEvent) => void
+	onStarted: (payload: StartedEvent) => void,
+	onCancelled: (payload: CancelledEvent) => void
 ): Promise<UnlistenFn> {
 	const unlistenStarted = await listen<StartedEvent>('conversion-started', (event) => {
 		onStarted(event.payload);
@@ -99,11 +104,16 @@ export async function setupConversionListeners(
 		onLog(event.payload);
 	});
 
+	const unlistenCancelled = await listen<CancelledEvent>('conversion-cancelled', (event) => {
+		onCancelled(event.payload);
+	});
+
 	return () => {
 		unlistenStarted();
 		unlistenProgress();
 		unlistenCompleted();
 		unlistenError();
 		unlistenLog();
+		unlistenCancelled();
 	};
 }

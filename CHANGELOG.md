@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Cancellation Event Semantics:** Conversion manager now emits a dedicated `conversion-cancelled` event instead of `conversion-error` when a task was intentionally canceled, preventing false error dialogs and restoring clean cancellation flow in the queue UI.
+
 ## [0.25.3] - 2026-03-02
 
 ### Removed

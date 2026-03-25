@@ -6,7 +6,7 @@ use std::sync::{
 use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc;
 
-use crate::conversion::types::{ErrorPayload, LogPayload};
+use crate::conversion::types::{CancelledPayload, ErrorPayload, LogPayload};
 
 #[cfg(windows)]
 use windows::{
@@ -147,32 +147,45 @@ impl ConversionManager {
                         .await;
                     }
                     ManagerMessage::TaskError(id, err) => {
-                        eprintln!("Task {} failed: {}", id, err);
-
-                        let _ = app.emit(
-                            "conversion-log",
-                            LogPayload {
-                                id: id.clone(),
-                                line: format!("[ERROR] {}", err),
-                            },
-                        );
-
-                        let _ = app.emit(
-                            "conversion-error",
-                            ErrorPayload {
-                                id: id.clone(),
-                                error: err.to_string(),
-                            },
-                        );
+                        let was_cancelled = {
+                            let mut cancelled = cancelled_tasks_loop.lock().unwrap();
+                            cancelled.remove(&id)
+                        };
 
                         running_tasks.remove(&id);
                         {
-                            let mut cancelled = cancelled_tasks_loop.lock().unwrap();
-                            cancelled.remove(&id);
-                        }
-                        {
                             let mut tasks = active_tasks_loop.lock().unwrap();
                             tasks.remove(&id);
+                        }
+
+                        if was_cancelled {
+                            let _ = app.emit(
+                                "conversion-log",
+                                LogPayload {
+                                    id: id.clone(),
+                                    line: "[INFO] Task cancelled".to_string(),
+                                },
+                            );
+                            let _ = app.emit(
+                                "conversion-cancelled",
+                                CancelledPayload { id: id.clone() },
+                            );
+                        } else {
+                            eprintln!("Task {} failed: {}", id, err);
+                            let _ = app.emit(
+                                "conversion-log",
+                                LogPayload {
+                                    id: id.clone(),
+                                    line: format!("[ERROR] {}", err),
+                                },
+                            );
+                            let _ = app.emit(
+                                "conversion-error",
+                                ErrorPayload {
+                                    id: id.clone(),
+                                    error: err.to_string(),
+                                },
+                            );
                         }
 
                         ConversionManager::process_queue(
