@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Cancellation Event Semantics:** Conversion manager now emits a dedicated `conversion-cancelled` event instead of `conversion-error` when a task was intentionally canceled, preventing false error dialogs and restoring clean cancellation flow in the queue UI.
+- **Process Identity Guarding:** Task control operations (`pause`/`resume`/`cancel`) now verify the active process identity using PID + process start-time metadata, reducing the risk of signaling a different process when PIDs are reused by the OS.
 
 ## [0.25.3] - 2026-03-02
 

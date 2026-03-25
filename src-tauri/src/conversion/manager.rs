@@ -3,6 +3,7 @@ use std::sync::{
     Arc, Mutex,
     atomic::{AtomicUsize, Ordering},
 };
+use sysinfo::{Pid, ProcessesToUpdate, System};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc;
 
@@ -35,8 +36,14 @@ pub enum ManagerMessage {
 pub struct ConversionManager {
     pub(crate) sender: mpsc::Sender<ManagerMessage>,
     max_concurrency: Arc<AtomicUsize>,
-    active_tasks: Arc<Mutex<HashMap<String, u32>>>,
+    active_tasks: Arc<Mutex<HashMap<String, ActiveProcess>>>,
     cancelled_tasks: Arc<Mutex<HashSet<String>>>,
+}
+
+#[derive(Clone, Copy)]
+struct ActiveProcess {
+    pid: u32,
+    start_time: u64,
 }
 
 impl ConversionManager {
@@ -122,7 +129,13 @@ impl ConversionManager {
                         }
 
                         let mut tasks = active_tasks_loop.lock().unwrap();
-                        tasks.insert(id, pid);
+                        tasks.insert(
+                            id,
+                            ActiveProcess {
+                                pid,
+                                start_time: process_start_time(pid).unwrap_or(0),
+                            },
+                        );
                     }
                     ManagerMessage::TaskCompleted(id) => {
                         running_tasks.remove(&id);
@@ -277,22 +290,27 @@ impl ConversionManager {
     }
 
     pub fn pause_task(&self, id: &str) -> Result<(), ConversionError> {
-        let tasks = self.active_tasks.lock().unwrap();
-        if let Some(&pid) = tasks.get(id) {
-            if pid == 0 {
+        let process = {
+            let tasks = self.active_tasks.lock().unwrap();
+            tasks.get(id).copied()
+        };
+
+        if let Some(process) = process {
+            if process.pid == 0 {
                 return Err(ConversionError::TaskNotFound(id.to_string()));
             }
+            ensure_same_process(id, process)?;
 
             #[cfg(unix)]
             unsafe {
-                if libc::kill(pid as libc::pid_t, libc::SIGSTOP) != 0 {
+                if libc::kill(process.pid as libc::pid_t, libc::SIGSTOP) != 0 {
                     return Err(ConversionError::Shell("Failed to send SIGSTOP".to_string()));
                 }
             }
 
             #[cfg(windows)]
             unsafe {
-                windows_suspend_resume(pid, true)?;
+                windows_suspend_resume(process.pid, true)?;
             }
 
             Ok(())
@@ -302,22 +320,27 @@ impl ConversionManager {
     }
 
     pub fn resume_task(&self, id: &str) -> Result<(), ConversionError> {
-        let tasks = self.active_tasks.lock().unwrap();
-        if let Some(&pid) = tasks.get(id) {
-            if pid == 0 {
+        let process = {
+            let tasks = self.active_tasks.lock().unwrap();
+            tasks.get(id).copied()
+        };
+
+        if let Some(process) = process {
+            if process.pid == 0 {
                 return Err(ConversionError::TaskNotFound(id.to_string()));
             }
+            ensure_same_process(id, process)?;
 
             #[cfg(unix)]
             unsafe {
-                if libc::kill(pid as libc::pid_t, libc::SIGCONT) != 0 {
+                if libc::kill(process.pid as libc::pid_t, libc::SIGCONT) != 0 {
                     return Err(ConversionError::Shell("Failed to send SIGCONT".to_string()));
                 }
             }
 
             #[cfg(windows)]
             unsafe {
-                windows_suspend_resume(pid, false)?;
+                windows_suspend_resume(process.pid, false)?;
             }
 
             Ok(())
@@ -332,10 +355,15 @@ impl ConversionManager {
             cancelled.insert(id.to_string());
         }
 
-        let tasks = self.active_tasks.lock().unwrap();
-        if let Some(&pid) = tasks.get(id) {
-            if pid > 0 {
-                ConversionManager::terminate_process(pid)?;
+        let process = {
+            let tasks = self.active_tasks.lock().unwrap();
+            tasks.get(id).copied()
+        };
+
+        if let Some(process) = process {
+            if process.pid > 0 {
+                ensure_same_process(id, process)?;
+                ConversionManager::terminate_process(process.pid)?;
             }
             ConversionManager::cleanup_temp_upscale_dir(id);
             Ok(())
@@ -382,6 +410,30 @@ impl ConversionManager {
         }
         Ok(())
     }
+}
+
+fn process_start_time(pid: u32) -> Option<u64> {
+    if pid == 0 {
+        return None;
+    }
+    let target = Pid::from_u32(pid);
+    let mut system = System::new();
+    system.refresh_processes(ProcessesToUpdate::Some(&[target]), true);
+    system.process(target).map(|process| process.start_time())
+}
+
+fn ensure_same_process(id: &str, process: ActiveProcess) -> Result<(), ConversionError> {
+    if process.start_time == 0 {
+        return Ok(());
+    }
+
+    let current_start = process_start_time(process.pid)
+        .ok_or_else(|| ConversionError::TaskNotFound(id.to_string()))?;
+    if current_start != process.start_time {
+        return Err(ConversionError::TaskNotFound(id.to_string()));
+    }
+
+    Ok(())
 }
 
 #[cfg(windows)]
