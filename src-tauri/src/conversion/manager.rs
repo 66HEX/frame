@@ -138,14 +138,15 @@ impl ConversionManager {
                         );
                     }
                     ManagerMessage::TaskCompleted(id) => {
-                        running_tasks.remove(&id);
                         {
                             let mut cancelled = cancelled_tasks_loop.lock().unwrap();
-                            cancelled.remove(&id);
-                        }
-                        {
                             let mut tasks = active_tasks_loop.lock().unwrap();
-                            tasks.remove(&id);
+                            let _ = finalize_task_state(
+                                &id,
+                                &mut running_tasks,
+                                &mut tasks,
+                                &mut cancelled,
+                            );
                         }
 
                         ConversionManager::process_queue(
@@ -162,14 +163,9 @@ impl ConversionManager {
                     ManagerMessage::TaskError(id, err) => {
                         let was_cancelled = {
                             let mut cancelled = cancelled_tasks_loop.lock().unwrap();
-                            cancelled.remove(&id)
-                        };
-
-                        running_tasks.remove(&id);
-                        {
                             let mut tasks = active_tasks_loop.lock().unwrap();
-                            tasks.remove(&id);
-                        }
+                            finalize_task_state(&id, &mut running_tasks, &mut tasks, &mut cancelled)
+                        };
 
                         if was_cancelled {
                             let _ = app.emit(
@@ -434,6 +430,96 @@ fn ensure_same_process(id: &str, process: ActiveProcess) -> Result<(), Conversio
     }
 
     Ok(())
+}
+
+fn finalize_task_state(
+    id: &str,
+    running_tasks: &mut HashMap<String, ()>,
+    active_tasks: &mut HashMap<String, ActiveProcess>,
+    cancelled_tasks: &mut HashSet<String>,
+) -> bool {
+    running_tasks.remove(id);
+    active_tasks.remove(id);
+    cancelled_tasks.remove(id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ActiveProcess, ensure_same_process, finalize_task_state, process_start_time};
+    use std::collections::{HashMap, HashSet};
+
+    #[test]
+    fn finalize_task_state_cleans_all_maps_for_cancelled_task() {
+        let id = "task-1";
+        let mut running = HashMap::from([(id.to_string(), ())]);
+        let mut active = HashMap::from([(
+            id.to_string(),
+            ActiveProcess {
+                pid: 42,
+                start_time: 7,
+            },
+        )]);
+        let mut cancelled = HashSet::from([id.to_string()]);
+
+        let was_cancelled = finalize_task_state(id, &mut running, &mut active, &mut cancelled);
+
+        assert!(was_cancelled);
+        assert!(!running.contains_key(id));
+        assert!(!active.contains_key(id));
+        assert!(!cancelled.contains(id));
+    }
+
+    #[test]
+    fn finalize_task_state_cleans_all_maps_for_non_cancelled_task() {
+        let id = "task-2";
+        let mut running = HashMap::from([(id.to_string(), ())]);
+        let mut active = HashMap::from([(
+            id.to_string(),
+            ActiveProcess {
+                pid: 55,
+                start_time: 9,
+            },
+        )]);
+        let mut cancelled = HashSet::<String>::new();
+
+        let was_cancelled = finalize_task_state(id, &mut running, &mut active, &mut cancelled);
+
+        assert!(!was_cancelled);
+        assert!(!running.contains_key(id));
+        assert!(!active.contains_key(id));
+    }
+
+    #[test]
+    fn ensure_same_process_accepts_current_process_identity() {
+        let pid = std::process::id();
+        let start_time =
+            process_start_time(pid).expect("Current process start time should be readable");
+
+        let result = ensure_same_process("self", ActiveProcess { pid, start_time });
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn ensure_same_process_rejects_mismatched_start_time() {
+        let pid = std::process::id();
+        let start_time =
+            process_start_time(pid).expect("Current process start time should be readable");
+
+        let err = ensure_same_process(
+            "self",
+            ActiveProcess {
+                pid,
+                start_time: start_time.saturating_add(1),
+            },
+        )
+        .expect_err("Mismatched process start time should fail");
+
+        assert!(
+            err.to_string().contains("Task not found"),
+            "Unexpected error: {err}"
+        );
+    }
 }
 
 #[cfg(windows)]
