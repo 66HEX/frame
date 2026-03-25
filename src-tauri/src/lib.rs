@@ -56,6 +56,14 @@ fn apply_window_effect(_window: &tauri::WebviewWindow) {}
 /// # Panics
 /// Panics if `tauri::Builder::run` fails to initialize or run the application context.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+#[expect(
+    clippy::too_many_lines,
+    reason = "application bootstrap keeps plugin/window wiring in one startup entry point"
+)]
+#[expect(
+    clippy::large_stack_frames,
+    reason = "tauri builder and invoke-handler macro expansion require large stack frame in bootstrap"
+)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())

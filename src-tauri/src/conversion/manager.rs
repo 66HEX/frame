@@ -47,6 +47,10 @@ struct ActiveProcess {
 }
 
 impl ConversionManager {
+    #[expect(
+        clippy::too_many_lines,
+        reason = "manager event loop keeps enqueue/start/error transitions in one deterministic block"
+    )]
     pub fn new(app: AppHandle) -> Self {
         let (tx, mut rx) = mpsc::channel(32);
         let tx_clone = tx.clone();

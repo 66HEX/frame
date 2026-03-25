@@ -135,6 +135,10 @@ pub fn validate_stream_copy_compatibility(
     Ok(())
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "FFmpeg command assembly stays in one place to keep ordering guarantees explicit"
+)]
 pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -> Vec<String> {
     let mut args = Vec::new();
 
@@ -316,7 +320,6 @@ fn normalize_gif_dither(dither: &str) -> &'static str {
         "none" => "none",
         "bayer" => "bayer",
         "floyd_steinberg" => "floyd_steinberg",
-        "sierra2_4a" => "sierra2_4a",
         _ => "sierra2_4a",
     }
 }
@@ -396,20 +399,25 @@ fn sanitize_output_name(raw: &str) -> Option<String> {
 }
 
 pub fn build_output_path(file_path: &str, container: &str, output_name: Option<&str>) -> String {
-    if let Some(custom) = output_name.and_then(sanitize_output_name) {
-        let input_path = Path::new(file_path);
-        let mut output: PathBuf = match input_path.parent() {
-            Some(parent) if !parent.as_os_str().is_empty() => parent.to_path_buf(),
-            _ => PathBuf::new(),
-        };
-        output.push(custom);
-        output.set_extension(container);
-        output.to_string_lossy().to_string()
-    } else {
-        format!("{file_path}_converted.{container}")
-    }
+    output_name.and_then(sanitize_output_name).map_or_else(
+        || format!("{file_path}_converted.{container}"),
+        |custom| {
+            let input_path = Path::new(file_path);
+            let mut output: PathBuf = match input_path.parent() {
+                Some(parent) if !parent.as_os_str().is_empty() => parent.to_path_buf(),
+                _ => PathBuf::new(),
+            };
+            output.push(custom);
+            output.set_extension(container);
+            output.to_string_lossy().to_string()
+        },
+    )
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "Validation intentionally mirrors UI options in one function for consistent backend guardrails"
+)]
 pub fn validate_task_input(
     file_path: &str,
     config: &ConversionConfig,

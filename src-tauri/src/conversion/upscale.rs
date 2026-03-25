@@ -160,11 +160,35 @@ pub fn compute_upscale_threads(source_width: u32, source_height: u32, scale: u32
 
     // load/save: I/O threads — limited by CPU cores
     let cpus = std::thread::available_parallelism()
-        .map(|n| n.get() as u32)
+        .map(|n| u32::try_from(n.get()).unwrap_or(u32::MAX))
         .unwrap_or(4);
     let io = cpus.div_ceil(2).clamp(1, 4);
 
     format!("{io}:{proc}:{io}")
+}
+
+fn ceil_to_u32_saturating(value: f64) -> u32 {
+    if !value.is_finite() || value <= 0.0 {
+        return 0;
+    }
+    if value >= f64::from(u32::MAX) {
+        return u32::MAX;
+    }
+
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "value is finite, non-negative and bounded to u32 range"
+    )]
+    #[expect(
+        clippy::cast_sign_loss,
+        reason = "negative values are returned early before the cast"
+    )]
+    let converted = value.ceil() as u32;
+    converted
+}
+
+fn usize_to_u32_saturating(value: usize) -> u32 {
+    u32::try_from(value).unwrap_or(u32::MAX)
 }
 
 pub async fn validate_upscale_runtime(app: &AppHandle, mode: &str) -> Result<(), ConversionError> {
@@ -227,6 +251,10 @@ pub async fn validate_upscale_runtime(app: &AppHandle, mode: &str) -> Result<(),
     Ok(())
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "upscale pipeline stages (decode/upscale/encode) stay linear for predictable cleanup"
+)]
 pub async fn run_upscale_worker(
     app: AppHandle,
     tx: mpsc::Sender<ManagerMessage>,
@@ -270,7 +298,7 @@ pub async fn run_upscale_worker(
         .and_then(parse_time)
         .unwrap_or(full_duration);
     let active_duration = (end_t - start_t).max(0.0);
-    let total_frames = (active_duration * fps).ceil() as u32;
+    let total_frames = ceil_to_u32_saturating(active_duration * fps);
 
     let temp_dir = std::env::temp_dir().join(format!("frame_upscale_{}", task.id));
     if temp_dir.exists() {
@@ -425,8 +453,9 @@ pub async fn run_upscale_worker(
             entries
                 .filter_map(std::result::Result::ok)
                 .filter(|e| e.path().extension().is_some_and(|ext| ext == "png"))
-                .count() as u32
+                .count()
         })
+        .map(usize_to_u32_saturating)
         .unwrap_or(total_frames);
     let total_frames = if actual_frames > 0 {
         actual_frames

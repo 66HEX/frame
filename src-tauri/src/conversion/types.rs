@@ -54,6 +54,10 @@ pub struct ProbeMetadata {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "conversion config mirrors UI toggles and serialized API fields"
+)]
 pub struct ConversionConfig {
     #[serde(default = "default_processing_mode")]
     pub processing_mode: String,

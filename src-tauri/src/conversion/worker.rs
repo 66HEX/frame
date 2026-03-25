@@ -12,6 +12,10 @@ use crate::conversion::types::{
 use crate::conversion::upscale::run_upscale_worker;
 use crate::conversion::utils::{DURATION_REGEX, TIME_REGEX, parse_time};
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "streaming ffmpeg event handling is easier to reason about in one worker routine"
+)]
 pub async fn run_ffmpeg_worker(
     app: AppHandle,
     tx: mpsc::Sender<ManagerMessage>,

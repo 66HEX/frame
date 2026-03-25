@@ -1,5 +1,18 @@
 use crate::conversion::types::{ConversionConfig, VOLUME_EPSILON};
 
+fn rounded_i32(value: f64, min_value: f64) -> i32 {
+    let clamped = value
+        .max(min_value)
+        .round()
+        .clamp(f64::from(i32::MIN), f64::from(i32::MAX));
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "value is rounded and clamped into i32 range first"
+    )]
+    let converted = clamped as i32;
+    converted
+}
+
 pub fn build_video_filters(config: &ConversionConfig, include_scale: bool) -> Vec<String> {
     let mut filters = Vec::new();
 
@@ -20,10 +33,10 @@ pub fn build_video_filters(config: &ConversionConfig, include_scale: bool) -> Ve
     if let Some(crop) = &config.crop
         && crop.enabled
     {
-        let crop_width = crop.width.max(1.0).round() as i32;
-        let crop_height = crop.height.max(1.0).round() as i32;
-        let crop_x = crop.x.max(0.0).round() as i32;
-        let crop_y = crop.y.max(0.0).round() as i32;
+        let crop_width = rounded_i32(crop.width, 1.0);
+        let crop_height = rounded_i32(crop.height, 1.0);
+        let crop_x = rounded_i32(crop.x, 0.0);
+        let crop_y = rounded_i32(crop.y, 0.0);
         filters.push(format!("crop={crop_width}:{crop_height}:{crop_x}:{crop_y}"));
     }
 
@@ -94,7 +107,7 @@ pub fn build_audio_filters(config: &ConversionConfig) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::conversion::types::CropConfig;
+    use crate::conversion::types::{CropConfig, MetadataConfig};
 
     fn default_config() -> ConversionConfig {
         ConversionConfig {
@@ -121,7 +134,7 @@ mod tests {
             preset: "medium".to_string(),
             start_time: None,
             end_time: None,
-            metadata: Default::default(),
+            metadata: MetadataConfig::default(),
             rotation: "0".to_string(),
             flip_horizontal: false,
             flip_vertical: false,

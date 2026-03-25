@@ -5,6 +5,10 @@ use crate::conversion::error::ConversionError;
 use crate::conversion::types::{AudioTrack, FfprobeOutput, ProbeMetadata, SubtitleTrack};
 use crate::conversion::utils::{parse_frame_rate_string, parse_probe_bitrate};
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "ffprobe parsing keeps track extraction in one pass over streams"
+)]
 pub async fn probe_media_file(
     app: &AppHandle,
     file_path: &str,

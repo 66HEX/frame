@@ -4,6 +4,10 @@ use tauri::{AppHandle, Manager, command};
 use tauri_plugin_shell::ShellExt;
 
 #[derive(serde::Serialize, Clone, Debug)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "encoder availability is represented as explicit frontend feature flags"
+)]
 pub struct AvailableEncoders {
     pub h264_videotoolbox: bool,
     pub h264_nvenc: bool,

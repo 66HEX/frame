@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Manager Runtime Coverage:** Added targeted unit tests for conversion-manager state cleanup and process-identity validation paths, increasing automated coverage of cancel/error/pause-resume critical runtime behavior.
 - **Extended Clippy Quality Pass:** Applied a broad pedantic/nursery/perf cleanup in Rust backend modules (queue manager, args/upscale/worker pipelines, dialog/capabilities, core bootstrap), preserving `clippy -D warnings` and reducing extended-clippy findings from ~173 to ~52 warnings.
 - **Extended Clippy Follow-up (Queue/Probe/Rules):** Refined conversion manager task-tracking internals (`HashSet` for running IDs), hardened Unix PID conversions, simplified media-rule lookups, and optimized probe metadata assignment paths; kept `cargo test --locked` and `clippy -D warnings` green while reducing extended-clippy findings from ~52 to ~22 warnings.
+- **Extended Clippy Completion (Pedantic/Nursery/Perf):** Finalized remaining extended-clippy items across conversion pipeline and tests (numeric conversion safety, assertion/message cleanup, extension checks, unnecessary collection removal, and documented intentional architectural lint expectations), bringing `cargo clippy --all-targets --all-features --locked -- -W clippy::pedantic -W clippy::nursery -W clippy::perf` to 0 warnings.
 
 ## [0.25.3] - 2026-03-02
 

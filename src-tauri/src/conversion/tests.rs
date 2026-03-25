@@ -68,7 +68,7 @@ mod conversion_tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let path = std::env::temp_dir().join(format!("frame-validate-{}.tmp", ts));
+        let path = std::env::temp_dir().join(format!("frame-validate-{ts}.tmp"));
         fs::write(&path, b"test").unwrap();
         path
     }
@@ -192,7 +192,13 @@ mod conversion_tests {
 
         assert!(contains_args(&args, &["-c:v", "libvpx-vp9"]));
         assert!(contains_args(&args, &["-c:a", "libopus"]));
-        assert!(args.last().unwrap().ends_with(".webm"));
+        assert_eq!(
+            std::path::Path::new(args.last().unwrap())
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .map(str::to_ascii_lowercase),
+            Some("webm".to_string())
+        );
     }
 
     #[test]
@@ -354,10 +360,7 @@ mod conversion_tests {
             let vf_arg = args.iter().find(|a| a.starts_with("scale=")).unwrap();
             assert!(
                 vf_arg.ends_with(expected_flag),
-                "Algorithm {} expected flag {}, got {}",
-                algo_name,
-                expected_flag,
-                vf_arg
+                "Algorithm {algo_name} expected flag {expected_flag}, got {vf_arg}"
             );
         }
     }
@@ -737,8 +740,7 @@ mod parsing_tests {
         for output in invalid_outputs {
             assert!(
                 TIME_REGEX.captures(output).is_none(),
-                "Should not match: {}",
-                output
+                "Should not match: {output}"
             );
         }
     }
@@ -847,11 +849,11 @@ mod utils_tests {
     fn frame_rate_fractional() {
         assert_eq!(
             parse_frame_rate_string(Some("30000/1001")),
-            Some(29.97002997002997)
+            Some(29.970_029_970_029_97)
         );
         assert_eq!(
             parse_frame_rate_string(Some("24000/1001")),
-            Some(23.976023976023978)
+            Some(23.976_023_976_023_978)
         );
         assert_eq!(parse_frame_rate_string(Some("60/1")), Some(60.0));
         assert_eq!(parse_frame_rate_string(Some("25/1")), Some(25.0));
@@ -896,14 +898,10 @@ mod utils_tests {
         let video_containers = ["mp4", "mkv", "webm", "mov", "avi"];
 
         for c in audio_containers {
-            assert!(is_audio_only_container(c), "{} should be audio-only", c);
+            assert!(is_audio_only_container(c), "{c} should be audio-only");
         }
         for c in video_containers {
-            assert!(
-                !is_audio_only_container(c),
-                "{} should not be audio-only",
-                c
-            );
+            assert!(!is_audio_only_container(c), "{c} should not be audio-only");
         }
     }
 
@@ -1091,7 +1089,13 @@ mod scenario_tests {
         assert!(args.contains(&"libx265".to_string()));
         assert!(args.contains(&"16".to_string()));
         assert!(args.contains(&"flac".to_string()));
-        assert!(args.last().unwrap().ends_with(".mkv"));
+        assert_eq!(
+            std::path::Path::new(args.last().unwrap())
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .map(str::to_ascii_lowercase),
+            Some("mkv".to_string())
+        );
     }
 
     #[test]
@@ -1236,7 +1240,13 @@ mod scenario_tests {
         assert!(args.contains(&"libvpx-vp9".to_string()));
         assert!(args.contains(&"libopus".to_string()));
         assert!(args.contains(&"30".to_string()));
-        assert!(args.last().unwrap().ends_with(".webm"));
+        assert_eq!(
+            std::path::Path::new(args.last().unwrap())
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .map(str::to_ascii_lowercase),
+            Some("webm".to_string())
+        );
     }
 
     #[test]
@@ -1246,14 +1256,8 @@ mod scenario_tests {
 
         let args = build_ffmpeg_args("multi_audio.mkv", "output.mp4", &config);
 
-        let map_positions: Vec<usize> = args
-            .iter()
-            .enumerate()
-            .filter(|(_, a)| *a == "-map")
-            .map(|(i, _)| i)
-            .collect();
-
-        assert!(map_positions.len() >= 2);
+        let map_count = args.iter().filter(|arg| *arg == "-map").count();
+        assert!(map_count >= 2);
     }
 
     #[test]

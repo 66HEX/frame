@@ -12,9 +12,7 @@ pub fn add_video_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
         args.push("-b:v".to_string());
         args.push(format!("{}k", config.video_bitrate));
     } else if is_nvenc {
-        let cq = (52.0 - (f64::from(config.quality) / 2.0))
-            .round()
-            .clamp(1.0, 51.0) as u32;
+        let cq = 52_u32.saturating_sub(config.quality / 2).clamp(1, 51);
         args.push("-rc:v".to_string());
         args.push("vbr".to_string());
         args.push("-cq:v".to_string());
