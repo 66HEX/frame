@@ -1,5 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
-import { dialogStore } from '$lib/stores/dialog.svelte';
+import { confirm, message, open } from '@tauri-apps/plugin-dialog';
 
 export interface NativeDialogFilter {
 	name: string;
@@ -18,25 +17,24 @@ export interface NativeFileDialogOptions {
 export async function openNativeFileDialog(
 	options: NativeFileDialogOptions = {}
 ): Promise<string | string[] | null> {
-	dialogStore.isActive = true;
+	const result = await open({
+		title: options.title,
+		filters: options.filters,
+		multiple: options.multiple,
+		directory: options.directory,
+		defaultPath: options.defaultPath,
+		recursive: options.recursive
+	});
 
-	await new Promise((resolve) => setTimeout(resolve, 32));
-
-	try {
-		const result = await invoke<string[]>('open_native_file_dialog', { options });
-
-		if (!result || result.length === 0) {
-			return null;
-		}
-
-		if (options.multiple) {
-			return result;
-		}
-
-		return result[0];
-	} finally {
-		dialogStore.isActive = false;
+	if (!result) {
+		return null;
 	}
+
+	if (options.multiple) {
+		return Array.isArray(result) ? result : [result];
+	}
+
+	return Array.isArray(result) ? (result[0] ?? null) : result;
 }
 
 export interface NativeAskDialogOptions {
@@ -48,13 +46,22 @@ export interface NativeAskDialogOptions {
 }
 
 export async function askNativeDialog(options: NativeAskDialogOptions): Promise<boolean> {
-	dialogStore.isActive = true;
+	const kind = options.kind === 'question' ? 'info' : options.kind;
 
-	await new Promise((resolve) => setTimeout(resolve, 32));
-
-	try {
-		return await invoke<boolean>('ask_native_dialog', { options });
-	} finally {
-		dialogStore.isActive = false;
+	if (options.cancelLabel) {
+		return confirm(options.message, {
+			title: options.title,
+			kind,
+			okLabel: options.okLabel,
+			cancelLabel: options.cancelLabel
+		});
 	}
+
+	await message(options.message, {
+		title: options.title,
+		kind,
+		buttons: options.okLabel ? { ok: options.okLabel } : 'Ok'
+	});
+
+	return true;
 }

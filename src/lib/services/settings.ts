@@ -4,12 +4,10 @@ import { Store } from '@tauri-apps/plugin-store';
 const SETTINGS_STORE_PATH = 'app-settings.dat';
 const MAX_CONCURRENCY_KEY = 'maxConcurrency';
 const AUTO_UPDATE_CHECK_KEY = 'autoUpdateCheck';
-const WINDOW_OPACITY_KEY = 'windowOpacity';
 const FONT_FAMILY_KEY = 'fontFamily';
 
 const DEFAULT_MAX_CONCURRENCY = 2;
 const DEFAULT_AUTO_UPDATE_CHECK = true;
-const DEFAULT_WINDOW_OPACITY = 100;
 const DEFAULT_FONT_FAMILY = 'mono';
 
 let storePromise: Promise<Store> | null = null;
@@ -20,7 +18,6 @@ async function getStore(): Promise<Store> {
 			defaults: {
 				[MAX_CONCURRENCY_KEY]: DEFAULT_MAX_CONCURRENCY,
 				[AUTO_UPDATE_CHECK_KEY]: DEFAULT_AUTO_UPDATE_CHECK,
-				[WINDOW_OPACITY_KEY]: DEFAULT_WINDOW_OPACITY,
 				[FONT_FAMILY_KEY]: DEFAULT_FONT_FAMILY
 			}
 		});
@@ -74,27 +71,6 @@ export async function loadAutoUpdateCheck(): Promise<boolean> {
 export async function persistAutoUpdateCheck(value: boolean): Promise<void> {
 	const store = await getStore();
 	await store.set(AUTO_UPDATE_CHECK_KEY, value);
-	await store.save();
-}
-
-export async function loadWindowOpacity(): Promise<number> {
-	try {
-		const store = await getStore();
-		const stored = await store.get<number>(WINDOW_OPACITY_KEY);
-
-		if (typeof stored === 'number' && stored >= 0 && stored <= 100) {
-			return stored;
-		}
-	} catch (error) {
-		console.error('Failed to load window opacity setting', error);
-	}
-
-	return DEFAULT_WINDOW_OPACITY;
-}
-
-export async function persistWindowOpacity(value: number): Promise<void> {
-	const store = await getStore();
-	await store.set(WINDOW_OPACITY_KEY, value);
 	await store.save();
 }
 

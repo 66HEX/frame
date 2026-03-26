@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Native Dialog + Window Surface Simplification:** Removed custom Rust dialog commands and the macOS `dialog-host` workaround in favor of direct `@tauri-apps/plugin-dialog` usage on the frontend. Also removed window effects/transparency plumbing (window tint setting, opacity store hydration, and opacity-driven background mixing), keeping the app on standard opaque window surfaces.
+
 ### Fixed
 
 - **Cancellation Event Semantics:** Conversion manager now emits a dedicated `conversion-cancelled` event instead of `conversion-error` when a task was intentionally canceled, preventing false error dialogs and restoring clean cancellation flow in the queue UI.

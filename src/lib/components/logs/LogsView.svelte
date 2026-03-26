@@ -8,7 +8,6 @@
 	import { IconArrowDown } from '$lib/icons';
 	import { getHighlighter, highlightLogLineSync } from '$lib/services/shiki';
 	import type { HighlighterCore } from 'shiki/core';
-	import { themeStore } from '$lib/stores/theme.svelte';
 
 	let {
 		logs,
@@ -112,8 +111,7 @@
 >
 	<div
 		class="relative h-10 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:[background-color:var(--divider-background)] after:shadow-2xs after:shadow-gray-alpha-100 after:content-['']"
-		style="--divider-background: color-mix(in srgb, var(--background), transparent {100 -
-			themeStore.opacity}%)"
+		style="--divider-background: var(--background)"
 	>
 		<div class="flex h-full items-center gap-6 overflow-x-auto px-4">
 			{#each activeFiles as file (file.id)}

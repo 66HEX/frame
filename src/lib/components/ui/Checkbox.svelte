@@ -2,9 +2,6 @@
 	import { cn } from '$lib/utils/cn';
 	import { IconCheck } from '$lib/icons';
 	import type { HTMLInputAttributes } from 'svelte/elements';
-	import { themeStore } from '$lib/stores/theme.svelte';
-	import { loadWindowOpacity } from '$lib/services/settings';
-	import { onMount } from 'svelte';
 
 	type Props = HTMLInputAttributes & {
 		checked?: boolean;
@@ -19,17 +16,10 @@
 		ref = $bindable(),
 		...props
 	}: Props = $props();
-
-	onMount(() => {
-		loadWindowOpacity().then((val) => {
-			themeStore.opacity = val;
-		});
-	});
 </script>
 
 <div
-	style="background-color: color-mix(in srgb, var(--background), transparent {100 -
-		themeStore.opacity}%)"
+	style="background-color: var(--background)"
 	class={cn('button button-highlight relative flex items-center justify-center rounded', className)}
 >
 	<input
