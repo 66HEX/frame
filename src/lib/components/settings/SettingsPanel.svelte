@@ -22,7 +22,6 @@
 	import {
 		IconFileUp,
 		IconFileDown,
-		IconFileVideo,
 		IconFilm,
 		IconFileImage,
 		IconMusic,
