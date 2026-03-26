@@ -27,8 +27,7 @@
 		{@render children?.()}
 		{#if variant === 'section'}
 			<div
-				class="mt-1 h-px [background-color:var(--divider-background)] shadow-2xs shadow-gray-alpha-100"
-				style="--divider-background: var(--background)"
+				class="mt-1 h-px bg-background shadow-2xs shadow-gray-alpha-100"
 			></div>
 		{/if}
 </label>

@@ -173,8 +173,7 @@
 									>{$_('source.track')} #{i + 1}</span
 								>
 									<div
-										class="h-px flex-1 [background-color:var(--divider-background)] shadow-2xs shadow-gray-alpha-100"
-										style="--divider-background: var(--background)"
+										class="h-px flex-1 bg-background shadow-2xs shadow-gray-alpha-100"
 									></div>
 							</div>
 							<div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px]">

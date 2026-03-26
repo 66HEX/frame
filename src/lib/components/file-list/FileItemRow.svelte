@@ -38,9 +38,8 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
 	onclick={() => onSelect(item.id)}
-	style="--divider-background: var(--background)"
 	class={cn(
-		"group relative flex h-10 items-center px-4 transition-colors after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:[background-color:var(--divider-background)] after:shadow-2xs after:shadow-gray-alpha-100 after:content-['']",
+		"group relative flex h-10 items-center px-4 transition-colors after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-background after:shadow-2xs after:shadow-gray-alpha-100 after:content-['']",
 		isSelected ? 'bg-gray-alpha-100' : 'hover:bg-gray-alpha-100'
 	)}
 >
