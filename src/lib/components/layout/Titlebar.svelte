@@ -11,7 +11,7 @@
 		selectedCount = 0,
 		isProcessing = false,
 		canStart = false,
-		activeView = 'dashboard',
+		activeView = 'workspace',
 		onAddFile,
 		onStartConversion,
 		onChangeView,
@@ -22,10 +22,10 @@
 		selectedCount?: number;
 		isProcessing?: boolean;
 		canStart?: boolean;
-		activeView?: 'dashboard' | 'logs';
+		activeView?: 'workspace' | 'logs';
 		onAddFile?: () => void;
 		onStartConversion?: () => void;
-		onChangeView?: (view: 'dashboard' | 'logs') => void;
+		onChangeView?: (view: 'workspace' | 'logs') => void;
 		onOpenSettings?: () => void;
 	} = $props();
 

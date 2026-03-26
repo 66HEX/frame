@@ -41,7 +41,7 @@
 	let isProcessing = $state(false);
 	let maxConcurrencySetting = $state(2);
 	let showSettings = $state(false);
-	let activeView = $state<'dashboard' | 'logs'>('dashboard');
+	let activeView = $state<'workspace' | 'logs'>('workspace');
 
 	const files = $derived(fileListManager.files);
 	const selectedFile = $derived(fileListManager.selectedFile);
@@ -144,7 +144,7 @@
 	/>
 
 	<div class="relative flex-1 overflow-hidden p-4">
-		{#if activeView === 'dashboard'}
+		{#if activeView === 'workspace'}
 			<div class="grid h-full grid-cols-12 gap-4">
 				<div class="col-span-8 h-full min-h-0">
 					<div class="grid h-full grid-rows-12 gap-4">

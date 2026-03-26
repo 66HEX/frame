@@ -22,7 +22,7 @@
 		selectedCount = 0,
 		isProcessing = false,
 		canStart = false,
-		activeView = 'dashboard',
+		activeView = 'workspace',
 		onAddFile,
 		onStartConversion,
 		onChangeView,
@@ -33,10 +33,10 @@
 		selectedCount?: number;
 		isProcessing?: boolean;
 		canStart?: boolean;
-		activeView?: 'dashboard' | 'logs';
+		activeView?: 'workspace' | 'logs';
 		onAddFile?: () => void;
 		onStartConversion?: () => void;
-		onChangeView?: (view: 'dashboard' | 'logs') => void;
+		onChangeView?: (view: 'workspace' | 'logs') => void;
 		onOpenSettings?: () => void;
 	} = $props();
 
@@ -138,13 +138,13 @@
 				class="button-highlight pointer-events-auto flex h-7.5 items-center gap-1 rounded-md bg-gray-alpha-100 p-0.5 shadow-sm shadow-black/5"
 			>
 				<Button
-					variant={activeView === 'dashboard' ? 'default' : 'titlebar-ghost'}
+					variant={activeView === 'workspace' ? 'default' : 'titlebar-ghost'}
 					size="sm"
-					onclick={() => onChangeView('dashboard')}
+					onclick={() => onChangeView('workspace')}
 					class="gap-2"
 				>
 					<IconLayoutList size={14} />
-					<span>{$_('titlebar.dashboard')}</span>
+					<span>{$_('titlebar.workspace')}</span>
 				</Button>
 				<Button
 					variant={activeView === 'logs' ? 'default' : 'titlebar-ghost'}

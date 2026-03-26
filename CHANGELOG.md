@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Native Dialog + Window Surface Simplification:** Removed custom Rust dialog commands and the macOS `dialog-host` workaround in favor of direct `@tauri-apps/plugin-dialog` usage on the frontend. Also removed window effects/transparency plumbing (window tint setting, opacity store hydration, and opacity-driven background mixing), keeping the app on standard opaque window surfaces.
 - **Crop Overlay Visual Overhaul:** Reworked the preview crop overlay presentation with stronger contrast, improved frame styling, clearer rule-of-thirds guides, refined corner marks, and larger/more readable drag handles for a more professional editor-like feel.
 - **Fixed App Typography Mode:** Removed runtime font-family switching and locked UI typography to the embedded Loskeley Mono stack for consistent visuals across sessions/platforms.
+- **Primary View Rename (`Dashboard` → `Workspace`):** Renamed the main app view identifier/labels across page state, titlebar controls, and locale dictionaries; synced non-source locales to the new `titlebar.workspace` key and applied translated values.
 
 ### Fixed
 
