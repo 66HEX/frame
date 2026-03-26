@@ -5,6 +5,7 @@ export { default as IconListChecks } from './components/IconListChecks.svelte';
 export { default as IconCrop } from './components/IconCrop.svelte';
 export { default as IconFileDown } from './components/IconFileDown.svelte';
 export { default as IconFileUp } from './components/IconFileUp.svelte';
+export { default as IconFileImage } from './components/IconFileImage.svelte';
 export { default as IconMusic } from './components/IconMusic.svelte';
 export { default as IconFileVideo } from './components/IconFileVideo.svelte';
 export { default as IconFilm } from './components/IconFilm.svelte';

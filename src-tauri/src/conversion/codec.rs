@@ -2,19 +2,30 @@ use crate::conversion::types::ConversionConfig;
 use crate::conversion::utils::{is_nvenc_codec, is_videotoolbox_codec, map_nvenc_preset};
 
 pub fn add_video_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
+    let is_still_image_codec = matches!(
+        config.video_codec.as_str(),
+        "png" | "mjpeg" | "libwebp" | "bmp" | "tiff"
+    );
+
     let is_nvenc = is_nvenc_codec(&config.video_codec);
     let is_videotoolbox = is_videotoolbox_codec(&config.video_codec);
 
     args.push("-c:v".to_string());
     args.push(config.video_codec.clone());
 
+    if is_still_image_codec {
+        if config.video_codec == "mjpeg" || config.video_codec == "libwebp" {
+            args.push("-q:v".to_string());
+            args.push(config.quality.to_string());
+        }
+        return;
+    }
+
     if config.video_bitrate_mode == "bitrate" {
         args.push("-b:v".to_string());
         args.push(format!("{}k", config.video_bitrate));
     } else if is_nvenc {
-        let cq = (52.0 - (config.quality as f64 / 2.0))
-            .round()
-            .clamp(1.0, 51.0) as u32;
+        let cq = 52_u32.saturating_sub(config.quality / 2).clamp(1, 51);
         args.push("-rc:v".to_string());
         args.push("vbr".to_string());
         args.push("-cq:v".to_string());

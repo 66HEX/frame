@@ -12,6 +12,10 @@ use crate::conversion::types::{
 use crate::conversion::upscale::run_upscale_worker;
 use crate::conversion::utils::{DURATION_REGEX, TIME_REGEX, parse_time};
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "streaming ffmpeg event handling is easier to reason about in one worker routine"
+)]
 pub async fn run_ffmpeg_worker(
     app: AppHandle,
     tx: mpsc::Sender<ManagerMessage>,
@@ -27,7 +31,7 @@ pub async fn run_ffmpeg_worker(
     let output_path = build_output_path(
         &task.file_path,
         &task.config.container,
-        task.output_name.clone(),
+        task.output_name.as_deref(),
     );
     let args = build_ffmpeg_args(&task.file_path, &output_path, &task.config);
 
@@ -112,12 +116,10 @@ pub async fn run_ffmpeg_worker(
                         } else if let Some(d) = total_duration {
                             d
                         } else if let Some(caps) = DURATION_REGEX.captures(line) {
-                            if let Some(m) = caps.get(1) {
+                            caps.get(1).map_or(0.0, |m| {
                                 total_duration = parse_time(m.as_str());
                                 total_duration.unwrap_or(0.0)
-                            } else {
-                                0.0
-                            }
+                            })
                         } else {
                             0.0
                         };
@@ -152,7 +154,7 @@ pub async fn run_ffmpeg_worker(
         );
         Ok(())
     } else {
-        let err_msg = format!("Process terminated with code {:?}", exit_code);
+        let err_msg = format!("Process terminated with code {exit_code:?}");
         Err(ConversionError::Worker(err_msg))
     }
 }

@@ -95,7 +95,7 @@ See [GitHub Sponsors](https://github.com/sponsors/66HEX) for full sponsorship de
 - **Styling:** Tailwind CSS v4, `clsx`, `tailwind-merge`.
 - **State Management:** Svelte 5 `$state` / `$props`.
 - **Internationalization:** Multi-language interface with automatic system language detection.
-- **Typography:** Archivo (embedded), Loskeley Mono (embedded).
+- **Typography:** Loskeley Mono (embedded).
 
 ## Installation
 
@@ -106,6 +106,20 @@ The easiest way to get started is to download the latest release for your platfo
 [**Download Latest Release**](https://github.com/66HEX/frame/releases)
 
 > **Note:** Since the application is not yet code-signed, you may need to manually approve it in your system settings (see the warning at the top of this file).
+
+### WinGet (Windows)
+
+Frame is available in the official WinGet repository under the `66HEX.Frame` identifier.
+
+```powershell
+winget install --id 66HEX.Frame -e
+```
+
+To update:
+
+```powershell
+winget upgrade --id 66HEX.Frame -e
+```
 
 ### Homebrew (macOS)
 

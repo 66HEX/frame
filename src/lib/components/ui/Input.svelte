@@ -1,27 +1,17 @@
 <script lang="ts">
 	import { cn } from '$lib/utils/cn';
 	import type { HTMLInputAttributes } from 'svelte/elements';
-	import { themeStore } from '$lib/stores/theme.svelte';
-	import { loadWindowOpacity } from '$lib/services/settings';
-	import { onMount } from 'svelte';
 
 	type Props = HTMLInputAttributes & {
 		ref?: HTMLInputElement;
 	};
 
 	let { class: className, value = $bindable(), ref = $bindable(), ...props }: Props = $props();
-
-	onMount(() => {
-		loadWindowOpacity().then((val) => {
-			themeStore.opacity = val;
-		});
-	});
 </script>
 
 <div
 	class="input-highlight relative flex h-8 w-full items-center rounded-sm border border-gray-alpha-200"
-	style="background-color: color-mix(in srgb, var(--background), transparent {100 -
-		themeStore.opacity}%)"
+	style="background-color: var(--background)"
 >
 	<input
 		bind:this={ref}

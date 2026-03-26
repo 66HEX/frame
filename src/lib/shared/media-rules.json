@@ -1,7 +1,8 @@
 {
-	"allContainers": ["mp4", "mkv", "webm", "mov", "gif", "mp3", "m4a", "wav", "flac"],
+	"allContainers": ["mp4", "mkv", "webm", "mov", "gif", "png", "jpg", "webp", "bmp", "tiff", "mp3", "m4a", "wav", "flac"],
 	"audioOnlyContainers": ["mp3", "m4a", "wav", "flac", "aac"],
 	"videoOnlyContainers": ["gif"],
+	"imageContainers": ["png", "jpg", "webp", "bmp", "tiff"],
 	"containerVideoCodecCompatibility": {
 		"mp4": [
 			"libx264",
@@ -36,7 +37,52 @@
 			"hevc_videotoolbox",
 			"hevc_nvenc"
 		],
-		"gif": ["gif"]
+		"gif": ["gif"],
+		"png": ["png"],
+		"jpg": ["mjpeg"],
+		"webp": ["libwebp"],
+		"bmp": ["bmp"],
+		"tiff": ["tiff"]
+	},
+	"containerEncoderPixelFormatCompatibility": {
+		"mp4": {
+			"libx264": ["yuv420p", "yuv422p", "yuv444p", "yuv420p10le", "yuv422p10le", "yuv444p10le"],
+			"libx265": ["yuv420p", "yuv422p", "yuv444p", "yuv420p10le", "yuv422p10le", "yuv444p10le"],
+			"vp9": ["yuv420p", "yuv422p", "yuv444p"],
+			"libsvtav1": ["yuv420p", "yuv420p10le"],
+			"h264_videotoolbox": ["yuv420p"],
+			"hevc_videotoolbox": ["yuv420p", "yuv420p10le"],
+			"h264_nvenc": ["yuv420p"],
+			"hevc_nvenc": ["yuv420p", "yuv420p10le"],
+			"av1_nvenc": ["yuv420p", "yuv420p10le"]
+		},
+		"mkv": {
+			"libx264": ["yuv420p", "yuv422p", "yuv444p", "yuv420p10le", "yuv422p10le", "yuv444p10le"],
+			"libx265": ["yuv420p", "yuv422p", "yuv444p", "yuv420p10le", "yuv422p10le", "yuv444p10le"],
+			"vp9": ["yuv420p", "yuv422p", "yuv444p"],
+			"prores": ["yuv422p10le", "yuv444p10le"],
+			"libsvtav1": ["yuv420p", "yuv420p10le"],
+			"h264_videotoolbox": ["yuv420p"],
+			"hevc_videotoolbox": ["yuv420p", "yuv420p10le"],
+			"h264_nvenc": ["yuv420p"],
+			"hevc_nvenc": ["yuv420p", "yuv420p10le"],
+			"av1_nvenc": ["yuv420p", "yuv420p10le"]
+		},
+		"webm": {
+			"vp9": ["yuv420p", "yuv422p", "yuv444p"]
+		},
+		"mov": {
+			"libx264": ["yuv420p", "yuv422p", "yuv444p", "yuv420p10le", "yuv422p10le", "yuv444p10le"],
+			"libx265": ["yuv420p", "yuv422p", "yuv444p", "yuv420p10le", "yuv422p10le", "yuv444p10le"],
+			"prores": ["yuv422p10le", "yuv444p10le"],
+			"h264_videotoolbox": ["yuv420p"],
+			"hevc_videotoolbox": ["yuv420p", "yuv420p10le"],
+			"h264_nvenc": ["yuv420p"],
+			"hevc_nvenc": ["yuv420p", "yuv420p10le"]
+		},
+		"gif": {
+			"gif": []
+		}
 	},
 	"containerVideoStreamCodecCompatibility": {
 		"mp4": ["h264", "hevc", "av1", "vp9", "mpeg4", "mjpeg"],
@@ -54,7 +100,12 @@
 		"mov": ["*"],
 		"mkv": ["*"],
 		"webm": ["libopus", "vorbis"],
-		"gif": []
+		"gif": [],
+		"png": [],
+		"jpg": [],
+		"webp": [],
+		"bmp": [],
+		"tiff": []
 	},
 	"containerAudioStreamCodecCompatibility": {
 		"mp3": ["mp3"],
@@ -75,7 +126,12 @@
 		"mov": ["*"],
 		"mkv": ["*"],
 		"webm": ["opus", "vorbis"],
-		"gif": []
+		"gif": [],
+		"png": [],
+		"jpg": [],
+		"webp": [],
+		"bmp": [],
+		"tiff": []
 	},
 	"containerSubtitleCodecCompatibility": {
 		"mp4": ["mov_text"],

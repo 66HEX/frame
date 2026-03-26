@@ -35,6 +35,7 @@
 
 	let {
 		filePath,
+		mediaKind = 'video',
 
 		initialStartTime,
 		initialEndTime,
@@ -49,6 +50,7 @@
 		sourceHeight
 	}: {
 		filePath: string;
+		mediaKind?: 'video' | 'audio' | 'image';
 		initialStartTime?: string;
 		initialEndTime?: string;
 		rotation?: ConversionConfig['rotation'];
@@ -66,6 +68,7 @@
 	let containerRef: HTMLDivElement | undefined = $state();
 	let videoWrapperRef: HTMLDivElement | undefined = $state();
 	let videoRef: HTMLVideoElement | undefined = $state();
+	let imageRef: HTMLImageElement | undefined = $state();
 	let containerWidth = $state(0);
 	let containerHeight = $state(0);
 	let videoBounds = $state({ width: 0, height: 0 });
@@ -98,6 +101,8 @@
 	} | null = null;
 
 	const isSideRotation = $derived(rotation === '90' || rotation === '270');
+	const isImage = $derived(mediaKind === 'image');
+	const trimDisabled = $derived(controlsDisabled || isImage);
 
 	const videoStyle = $derived.by(() => {
 		if (!containerWidth || !containerHeight) {
@@ -160,7 +165,7 @@
 		return `width: ${baseW}px; height: ${baseH}px; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) ${transforms};`;
 	});
 
-	const hasCropDimensions = $derived(() => {
+	const hasCropDimensions = $derived.by(() => {
 		const baseWidth = sourceWidth ?? naturalVideoWidth;
 		const baseHeight = sourceHeight ?? naturalVideoHeight;
 		if (!baseWidth || !baseHeight) return false;
@@ -282,7 +287,20 @@
 		}
 	}
 
+	function handleImageLoad() {
+		if (!imageRef) return;
+		naturalVideoWidth = imageRef.naturalWidth;
+		naturalVideoHeight = imageRef.naturalHeight;
+		duration = 0;
+		startValue = 0;
+		endValue = 0;
+		currentTime = 0;
+		isPlaying = false;
+		updateVideoBounds();
+	}
+
 	function handleTimeUpdate() {
+		if (isImage) return;
 		if (videoRef) {
 			currentTime = videoRef.currentTime;
 			if (dragging) return;
@@ -296,6 +314,7 @@
 	}
 
 	function togglePlay() {
+		if (isImage) return;
 		if (videoRef) {
 			if (isPlaying) {
 				videoRef.pause();
@@ -310,12 +329,14 @@
 	}
 
 	function commitTrimValues() {
+		if (isImage) return;
 		const startStr = startValue > 0 ? formatTime(startValue) : undefined;
 		const endStr = duration > 0 && endValue < duration ? formatTime(endValue) : undefined;
 		onSave(startStr, endStr);
 	}
 
 	function handleMouseDown(e: MouseEvent, type: 'start' | 'end') {
+		if (isImage) return;
 		e.preventDefault();
 		e.stopPropagation();
 		dragging = type;
@@ -324,6 +345,7 @@
 	}
 
 	function handleMouseMove(e: MouseEvent) {
+		if (isImage) return;
 		if (!dragging || !sliderRef) return;
 		const rect = sliderRef.getBoundingClientRect();
 		const percent = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
@@ -346,6 +368,7 @@
 	}
 
 	function handleMouseUp() {
+		if (isImage) return;
 		if (dragging === 'scrub') {
 			if (wasPlayingBeforeScrub && videoRef) {
 				videoRef.play();
@@ -359,6 +382,7 @@
 	}
 
 	function seekTo(e: MouseEvent) {
+		if (isImage) return;
 		if (!sliderRef) return;
 		const rect = sliderRef.getBoundingClientRect();
 		const percent = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
@@ -375,6 +399,11 @@
 		}
 		window.addEventListener('mousemove', handleMouseMove);
 		window.addEventListener('mouseup', handleMouseUp);
+	}
+
+	function toTimelinePercent(value: number): number {
+		if (!duration || !Number.isFinite(duration) || duration <= 0) return 0;
+		return (value / duration) * 100;
 	}
 
 	function updateVideoBounds() {
@@ -598,7 +627,7 @@
 	<div
 		class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-lg border border-gray-alpha-200 bg-black"
 		bind:this={containerRef}
-		onclick={() => !cropMode && togglePlay()}
+		onclick={() => !isImage && !cropMode && togglePlay()}
 		onmouseenter={() => (isHovering = true)}
 		onmouseleave={() => (isHovering = false)}
 		role="presentation"
@@ -609,74 +638,92 @@
 			style={videoStyle}
 		>
 			<div class="origin-center" style={transformStyle}>
-				<video
-					bind:this={videoRef}
-					src={videoSrc}
-					class="block h-full w-full bg-black object-contain"
-					onloadedmetadata={handleMetadata}
-					ontimeupdate={handleTimeUpdate}
-					onplay={() => (isPlaying = true)}
-					onpause={() => (isPlaying = false)}
-				>
-					<track kind="captions" />
-				</video>
-
-				{#if cropMode && draftCrop}
-					<div class="pointer-events-none absolute inset-0">
-						<div
-							class="absolute top-0 left-0 w-full bg-black/40"
-							style={`height: ${draftCrop.y * 100}%;`}
-						></div>
-						<div
-							class="absolute left-0 bg-black/40"
-							style={`top: ${draftCrop.y * 100}%; height: ${draftCrop.height * 100}%; width: ${
-								draftCrop.x * 100
-							}%;`}
-						></div>
-						<div
-							class="absolute right-0 bg-black/40"
-							style={`top: ${draftCrop.y * 100}%; height: ${draftCrop.height * 100}%; width: ${
-								(1 - draftCrop.x - draftCrop.width) * 100
-							}%;`}
-						></div>
-						<div
-							class="absolute bottom-0 left-0 w-full bg-black/40"
-							style={`height: ${(1 - draftCrop.y - draftCrop.height) * 100}%;`}
-						></div>
-					</div>
-
-					<div
-						class="absolute rounded border border-foreground shadow-xl"
-						style={`left: ${draftCrop.x * 100}%; top: ${draftCrop.y * 100}%; width: ${
-							draftCrop.width * 100
-						}%; height: ${draftCrop.height * 100}%;`}
-						role="presentation"
-						onmousedown={(event) => beginCropDrag('move', event)}
+				{#if isImage}
+					<img
+						bind:this={imageRef}
+						src={videoSrc}
+						alt="Preview"
+						class="block h-full w-full bg-black object-contain"
+						draggable="false"
+						onload={handleImageLoad}
+					/>
+				{:else}
+					<video
+						bind:this={videoRef}
+						src={videoSrc}
+						class="block h-full w-full bg-black object-contain"
+						onloadedmetadata={handleMetadata}
+						ontimeupdate={handleTimeUpdate}
+						onplay={() => (isPlaying = true)}
+						onpause={() => (isPlaying = false)}
 					>
-						{#each [1, 2] as index (index)}
-							<div
-								class="absolute left-0 h-px w-full bg-foreground/40"
-								style={`top: ${(index / 3) * 100}%`}
-							></div>
-							<div
-								class="absolute top-0 h-full w-px bg-foreground/40"
-								style={`left: ${(index / 3) * 100}%`}
-							></div>
-						{/each}
-
-						{#each [{ id: 'nw', top: 0, left: 0 }, { id: 'n', top: 0, left: 50 }, { id: 'ne', top: 0, left: 100 }, { id: 'e', top: 50, left: 100 }, { id: 'se', top: 100, left: 100 }, { id: 's', top: 100, left: 50 }, { id: 'sw', top: 100, left: 0 }, { id: 'w', top: 50, left: 0 }] as handle (handle.id)}
-							<span
-								onmousedown={(event) => beginCropDrag(handle.id as DragHandle, event)}
-								class="absolute block size-3 rounded-full border border-foreground bg-foreground"
-								style={`cursor: ${getHandleCursor(handle.id, isSideRotation)}; top: calc(${handle.top}% - 6px); left: calc(${handle.left}% - 6px);`}
-								role="presentation"
-							></span>
-						{/each}
-					</div>
+						<track kind="captions" />
+					</video>
 				{/if}
 			</div>
+
+			{#if cropMode && draftCrop}
+				<div class="pointer-events-none absolute inset-0 z-20">
+					<div
+						class="absolute top-0 left-0 w-full bg-black/55 backdrop-blur-[1px]"
+						style={`height: ${draftCrop.y * 100}%;`}
+					></div>
+					<div
+						class="absolute left-0 bg-black/55 backdrop-blur-[1px]"
+						style={`top: ${draftCrop.y * 100}%; height: ${draftCrop.height * 100}%; width: ${
+							draftCrop.x * 100
+						}%;`}
+					></div>
+					<div
+						class="absolute right-0 bg-black/55 backdrop-blur-[1px]"
+						style={`top: ${draftCrop.y * 100}%; height: ${draftCrop.height * 100}%; width: ${
+							(1 - draftCrop.x - draftCrop.width) * 100
+						}%;`}
+					></div>
+					<div
+						class="absolute bottom-0 left-0 w-full bg-black/55 backdrop-blur-[1px]"
+						style={`height: ${(1 - draftCrop.y - draftCrop.height) * 100}%;`}
+					></div>
+				</div>
+
+				<div
+					class="absolute z-30 rounded-md border border-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.45),0_14px_30px_rgba(0,0,0,0.35)] ring-1 ring-white/20"
+					style={`left: ${draftCrop.x * 100}%; top: ${draftCrop.y * 100}%; width: ${
+						draftCrop.width * 100
+					}%; height: ${draftCrop.height * 100}%;`}
+					role="presentation"
+					onmousedown={(event) => beginCropDrag('move', event)}
+				>
+					{#each [1, 2] as index (index)}
+						<div
+							class="pointer-events-none absolute left-0 h-px w-full bg-white/70"
+							style={`top: ${(index / 3) * 100}%`}
+						></div>
+						<div
+							class="pointer-events-none absolute top-0 h-full w-px bg-white/70"
+							style={`left: ${(index / 3) * 100}%`}
+						></div>
+					{/each}
+
+					{#each [{ top: 0, left: 0, w: 16, h: 2 }, { top: 0, left: 0, w: 2, h: 16 }, { top: 0, left: 100, w: 16, h: 2 }, { top: 0, left: 100, w: 2, h: 16 }, { top: 100, left: 0, w: 16, h: 2 }, { top: 100, left: 0, w: 2, h: 16 }, { top: 100, left: 100, w: 16, h: 2 }, { top: 100, left: 100, w: 2, h: 16 }] as cornerMark (cornerMark.top + '-' + cornerMark.left + '-' + cornerMark.w)}
+						<div
+							class="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/95 shadow-[0_0_0_1px_rgba(0,0,0,0.4)]"
+							style={`top: ${cornerMark.top}%; left: ${cornerMark.left}%; width: ${cornerMark.w}px; height: ${cornerMark.h}px;`}
+						></div>
+					{/each}
+
+					{#each [{ id: 'nw', top: 0, left: 0 }, { id: 'n', top: 0, left: 50 }, { id: 'ne', top: 0, left: 100 }, { id: 'e', top: 50, left: 100 }, { id: 'se', top: 100, left: 100 }, { id: 's', top: 100, left: 50 }, { id: 'sw', top: 100, left: 0 }, { id: 'w', top: 50, left: 0 }] as handle (handle.id)}
+						<span
+							onmousedown={(event) => beginCropDrag(handle.id as DragHandle, event)}
+							class="absolute block h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-black/35 bg-white shadow-[0_2px_10px_rgba(0,0,0,0.75)] transition-transform hover:scale-110"
+							style={`cursor: ${getHandleCursor(handle.id, isSideRotation)}; top: ${handle.top}%; left: ${handle.left}%;`}
+							role="presentation"
+						></span>
+					{/each}
+				</div>
+			{/if}
 		</div>
-		{#if !cropMode && (!isPlaying || isHovering)}
+		{#if !isImage && !cropMode && (!isPlaying || isHovering)}
 			<div
 				class="absolute inset-0 z-10 flex items-center justify-center"
 				onclick={(e) => {
@@ -701,7 +748,7 @@
 		{/if}
 		{#if cropMode && draftCrop}
 			<div
-				class="button-highlight pointer-events-auto absolute! bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-md border border-gray-alpha-200 bg-background p-1 text-[10px] font-semibold shadow-xl"
+				class="button-highlight pointer-events-auto absolute! bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-md border border-gray-alpha-200 bg-background p-1 text-[10px] font-semibold shadow-xl"
 			>
 				{#each ASPECT_OPTIONS as option (option.id)}
 					<Button
@@ -724,44 +771,43 @@
 	<div class="mt-4 px-2">
 		<div
 			class="relative mb-6 h-8 select-none"
-			class:cursor-pointer={!controlsDisabled}
-			class:pointer-events-none={controlsDisabled}
-			class:opacity-50={controlsDisabled}
+			class:cursor-pointer={!trimDisabled}
+			class:pointer-events-none={trimDisabled}
+			class:opacity-50={trimDisabled}
 			bind:this={sliderRef}
 			role="presentation"
-			onmousedown={(e) => !controlsDisabled && e.target === sliderRef && seekTo(e)}
+			onmousedown={(e) => !trimDisabled && e.target === sliderRef && seekTo(e)}
 		>
 			<div
 				class="pointer-events-none absolute top-1/2 left-0 h-1.5 w-full -translate-y-1/2 overflow-hidden rounded-full bg-gray-alpha-100"
 			>
 				<div
 					class="absolute h-full bg-gray-alpha-200"
-					style="left: {(startValue / duration) * 100}%; right: {100 -
-						(endValue / duration) * 100}%;"
+					style={`left: ${toTimelinePercent(startValue)}%; right: ${100 - toTimelinePercent(endValue)}%;`}
 				></div>
 			</div>
 
 			<div
 				class="pointer-events-none absolute top-1/2 z-10 h-4 w-0.5 -translate-y-1/2 bg-gray-alpha-600"
-				style="left: {(currentTime / duration) * 100}%"
+				style={`left: ${toTimelinePercent(currentTime)}%`}
 			></div>
 
 			<div
 				class="button-highlight absolute! top-1/2 z-20 -ml-2 flex size-3.5 -translate-y-1/2 items-center justify-center rounded-full bg-blue-700 shadow-md shadow-black/5"
-				class:cursor-ew-resize={!controlsDisabled}
-				style="left: {(startValue / duration) * 100}%"
+				class:cursor-ew-resize={!trimDisabled}
+				style={`left: ${toTimelinePercent(startValue)}%`}
 				role="presentation"
-				onmousedown={(e) => !controlsDisabled && handleMouseDown(e, 'start')}
+				onmousedown={(e) => !trimDisabled && handleMouseDown(e, 'start')}
 			>
 				<div class="button-highlight size-2 rounded-full bg-sidebar"></div>
 			</div>
 
 			<div
 				class="button-highlight absolute! top-1/2 z-20 -ml-2 flex size-3.5 -translate-y-1/2 items-center justify-center rounded-full bg-blue-700 shadow-md shadow-black/5"
-				class:cursor-ew-resize={!controlsDisabled}
-				style="left: {(endValue / duration) * 100}%"
+				class:cursor-ew-resize={!trimDisabled}
+				style={`left: ${toTimelinePercent(endValue)}%`}
 				role="presentation"
-				onmousedown={(e) => !controlsDisabled && handleMouseDown(e, 'end')}
+				onmousedown={(e) => !trimDisabled && handleMouseDown(e, 'end')}
 			>
 				<div class="button-highlight size-2 rounded-full bg-sidebar"></div>
 			</div>
@@ -771,38 +817,46 @@
 			<div class="flex flex-wrap gap-4">
 				<div class="space-y-1.5">
 					<Label>{$_('trim.startTime')}</Label>
-					<TimecodeInput
-						class="w-32"
-						value={startValue}
-						disabled={controlsDisabled}
-						onchange={(val) => {
-							if (val >= 0 && val < endValue) {
-								startValue = val;
-								if (videoRef) videoRef.currentTime = startValue;
-								commitTrimValues();
-							}
-						}}
-					/>
+					{#if isImage}
+						<div class="flex h-7.5 w-32 items-center text-[10px] text-gray-alpha-600">--:--:--.---</div>
+					{:else}
+						<TimecodeInput
+							class="w-32"
+							value={startValue}
+							disabled={trimDisabled}
+							onchange={(val) => {
+								if (val >= 0 && val < endValue) {
+									startValue = val;
+									if (videoRef) videoRef.currentTime = startValue;
+									commitTrimValues();
+								}
+							}}
+						/>
+					{/if}
 				</div>
 				<div class="space-y-1.5">
 					<Label>{$_('trim.endTime')}</Label>
-					<TimecodeInput
-						class="w-32"
-						value={endValue}
-						disabled={controlsDisabled}
-						onchange={(val) => {
-							if (val > startValue && val <= duration) {
-								endValue = val;
-								if (videoRef) videoRef.currentTime = endValue;
-								commitTrimValues();
-							}
-						}}
-					/>
+					{#if isImage}
+						<div class="flex h-7.5 w-32 items-center text-[10px] text-gray-alpha-600">--:--:--.---</div>
+					{:else}
+						<TimecodeInput
+							class="w-32"
+							value={endValue}
+							disabled={trimDisabled}
+							onchange={(val) => {
+								if (val > startValue && val <= duration) {
+									endValue = val;
+									if (videoRef) videoRef.currentTime = endValue;
+									commitTrimValues();
+								}
+							}}
+						/>
+					{/if}
 				</div>
 				<div class="space-y-1.5">
 					<Label>{$_('trim.duration')}</Label>
 					<div class="flex h-7.5 items-center text-[10px] text-foreground">
-						{formatTime(endValue - startValue)}
+						{isImage ? '--:--:--.---' : formatTime(endValue - startValue)}
 					</div>
 				</div>
 			</div>

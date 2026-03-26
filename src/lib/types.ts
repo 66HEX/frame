@@ -69,6 +69,14 @@ export interface ConversionConfig {
 	flipHorizontal: boolean;
 	flipVertical: boolean;
 	mlUpscale?: 'none' | 'esrgan-2x' | 'esrgan-4x';
+	pixelFormat?:
+		| 'auto'
+		| 'yuv420p'
+		| 'yuv422p'
+		| 'yuv444p'
+		| 'yuv420p10le'
+		| 'yuv422p10le'
+		| 'yuv444p10le';
 	crop?: CropSettings | null;
 	nvencSpatialAq: boolean;
 	nvencTemporalAq: boolean;
@@ -92,6 +100,7 @@ export interface MetadataConfig {
 }
 
 export interface SourceMetadata {
+	mediaKind?: 'video' | 'audio' | 'image';
 	duration?: string;
 	bitrate?: string;
 	videoCodec?: string;

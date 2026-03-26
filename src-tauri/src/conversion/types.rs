@@ -28,6 +28,8 @@ pub struct SubtitleTrack {
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ProbeMetadata {
+    #[serde(default = "default_media_kind")]
+    pub media_kind: String,
     pub duration: Option<String>,
     pub bitrate: Option<String>,
     pub video_codec: Option<String>,
@@ -54,6 +56,10 @@ pub struct ProbeMetadata {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "conversion config mirrors UI toggles and serialized API fields"
+)]
 pub struct ConversionConfig {
     #[serde(default = "default_processing_mode")]
     pub processing_mode: String,
@@ -102,6 +108,8 @@ pub struct ConversionConfig {
     pub videotoolbox_allow_sw: bool,
     #[serde(default = "default_hw_decode")]
     pub hw_decode: bool,
+    #[serde(default = "default_pixel_format")]
+    pub pixel_format: String,
     #[serde(default = "default_gif_colors")]
     pub gif_colors: u16,
     #[serde(default = "default_gif_dither")]
@@ -114,23 +122,31 @@ fn default_rotation() -> String {
     "0".to_string()
 }
 
+fn default_media_kind() -> String {
+    "video".to_string()
+}
+
 fn default_processing_mode() -> String {
     "reencode".to_string()
 }
 
-fn default_quality() -> u32 {
+const fn default_quality() -> u32 {
     50
 }
 
-fn default_audio_volume() -> f64 {
+const fn default_audio_volume() -> f64 {
     100.0
 }
 
-fn default_hw_decode() -> bool {
+const fn default_hw_decode() -> bool {
     false
 }
 
-fn default_gif_colors() -> u16 {
+fn default_pixel_format() -> String {
+    "auto".to_string()
+}
+
+const fn default_gif_colors() -> u16 {
     256
 }
 
@@ -138,7 +154,7 @@ fn default_gif_dither() -> String {
     "sierra2_4a".to_string()
 }
 
-fn default_gif_loop() -> u16 {
+const fn default_gif_loop() -> u16 {
     0
 }
 
@@ -170,7 +186,7 @@ pub struct MetadataConfig {
     pub comment: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum MetadataMode {
     #[default]
@@ -187,6 +203,11 @@ pub struct ProgressPayload {
 
 #[derive(Clone, Serialize)]
 pub struct StartedPayload {
+    pub id: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct CancelledPayload {
     pub id: String,
 }
 
@@ -237,6 +258,7 @@ pub struct FfprobeStream {
 
 #[derive(Deserialize)]
 pub struct FfprobeFormat {
+    pub format_name: Option<String>,
     pub duration: Option<String>,
     pub bit_rate: Option<String>,
     pub tags: Option<FfprobeTags>,

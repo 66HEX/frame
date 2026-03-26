@@ -7,8 +7,9 @@ use crate::conversion::error::ConversionError;
 use crate::conversion::filters::{build_audio_filters, build_video_filters};
 use crate::conversion::media_rules::{
     container_supports_audio, container_supports_subtitles, is_audio_codec_allowed,
-    is_audio_stream_codec_allowed, is_subtitle_codec_allowed, is_video_codec_allowed,
-    is_video_only_container, is_video_stream_codec_allowed,
+    is_audio_stream_codec_allowed, is_image_container, is_subtitle_codec_allowed,
+    is_video_codec_allowed, is_video_only_container, is_video_pixel_format_allowed,
+    is_video_stream_codec_allowed,
 };
 use crate::conversion::types::{
     AudioTrack, ConversionConfig, MetadataConfig, MetadataMode, ProbeMetadata, SubtitleTrack,
@@ -18,6 +19,11 @@ use crate::conversion::utils::{get_hwaccel_args, is_audio_only_container, parse_
 
 fn is_copy_mode(config: &ConversionConfig) -> bool {
     config.processing_mode == "copy"
+}
+
+fn has_custom_pixel_format(config: &ConversionConfig) -> bool {
+    let pixel_format = config.pixel_format.trim();
+    !pixel_format.is_empty() && pixel_format != "auto"
 }
 
 fn collect_selected_audio_tracks<'a>(
@@ -38,8 +44,7 @@ fn collect_selected_audio_tracks<'a>(
                 .find(|track| track.index == *index)
                 .ok_or_else(|| {
                     ConversionError::InvalidInput(format!(
-                        "Selected audio track #{} was not found in source",
-                        index
+                        "Selected audio track #{index} was not found in source"
                     ))
                 })
         })
@@ -64,8 +69,7 @@ fn collect_selected_subtitle_tracks<'a>(
                 .find(|track| track.index == *index)
                 .ok_or_else(|| {
                     ConversionError::InvalidInput(format!(
-                        "Selected subtitle track #{} was not found in source",
-                        index
+                        "Selected subtitle track #{index} was not found in source"
                     ))
                 })
         })
@@ -137,6 +141,10 @@ pub fn validate_stream_copy_compatibility(
     Ok(())
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "FFmpeg command assembly stays in one place to keep ordering guarantees explicit"
+)]
 pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -> Vec<String> {
     let mut args = Vec::new();
 
@@ -159,17 +167,17 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         && !end_str.is_empty()
     {
         if let Some(start_str) = &config.start_time {
-            if !start_str.is_empty() {
-                if let (Some(start_t), Some(end_t)) = (parse_time(start_str), parse_time(end_str)) {
-                    let duration = end_t - start_t;
-                    if duration > 0.0 {
-                        args.push("-t".to_string());
-                        args.push(format!("{:.3}", duration));
-                    }
-                }
-            } else {
+            if start_str.is_empty() {
                 args.push("-to".to_string());
                 args.push(end_str.clone());
+            } else if let (Some(start_t), Some(end_t)) =
+                (parse_time(start_str), parse_time(end_str))
+            {
+                let duration = end_t - start_t;
+                if duration > 0.0 {
+                    args.push("-t".to_string());
+                    args.push(format!("{duration:.3}"));
+                }
             }
         } else {
             args.push("-to".to_string());
@@ -194,6 +202,8 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
 
     let is_audio_only = is_audio_only_container(&config.container);
     let is_video_only = is_video_only_container(&config.container);
+    let is_image_output = is_image_container(&config.container);
+    let is_gif_output = config.container.eq_ignore_ascii_case("gif");
     let has_burn_subtitles = config
         .subtitle_burn_path
         .as_ref()
@@ -208,7 +218,7 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         if !config.selected_audio_tracks.is_empty() {
             for track_index in &config.selected_audio_tracks {
                 args.push("-map".to_string());
-                args.push(format!("0:{}", track_index));
+                args.push(format!("0:{track_index}"));
             }
         } else if container_supports_audio(&config.container) {
             args.push("-map".to_string());
@@ -218,7 +228,7 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         if !config.selected_subtitle_tracks.is_empty() {
             for track_index in &config.selected_subtitle_tracks {
                 args.push("-map".to_string());
-                args.push(format!("0:{}", track_index));
+                args.push(format!("0:{track_index}"));
             }
         } else if container_supports_subtitles(&config.container) {
             args.push("-map".to_string());
@@ -235,18 +245,18 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
     if is_audio_only {
         args.push("-vn".to_string());
 
-        if !config.selected_audio_tracks.is_empty() {
-            for track_index in &config.selected_audio_tracks {
-                args.push("-map".to_string());
-                args.push(format!("0:{}", track_index));
-            }
-        } else {
+        if config.selected_audio_tracks.is_empty() {
             args.push("-map".to_string());
             args.push("0:a?".to_string());
+        } else {
+            for track_index in &config.selected_audio_tracks {
+                args.push("-map".to_string());
+                args.push(format!("0:{track_index}"));
+            }
         }
 
         add_audio_codec_args(&mut args, config);
-    } else if is_video_only {
+    } else if is_video_only && is_gif_output {
         args.push("-filter_complex".to_string());
         args.push(build_gif_filter_complex(config));
 
@@ -261,8 +271,31 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         args.push(config.gif_loop.to_string());
         args.push("-f".to_string());
         args.push("gif".to_string());
+    } else if is_image_output {
+        add_video_codec_args(&mut args, config);
+        if has_custom_pixel_format(config) {
+            args.push("-pix_fmt".to_string());
+            args.push(config.pixel_format.trim().to_string());
+        }
+
+        let video_filters = build_video_filters(config, true);
+        if !video_filters.is_empty() {
+            args.push("-vf".to_string());
+            args.push(video_filters.join(","));
+        }
+
+        args.push("-map".to_string());
+        args.push("0:v:0".to_string());
+        args.push("-frames:v".to_string());
+        args.push("1".to_string());
+        args.push("-update".to_string());
+        args.push("1".to_string());
     } else {
         add_video_codec_args(&mut args, config);
+        if has_custom_pixel_format(config) {
+            args.push("-pix_fmt".to_string());
+            args.push(config.pixel_format.trim().to_string());
+        }
 
         let video_filters = build_video_filters(config, true);
         if !video_filters.is_empty() {
@@ -274,14 +307,14 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         args.push("-map".to_string());
         args.push("0:v:0".to_string());
 
-        if !config.selected_audio_tracks.is_empty() {
-            for track_index in &config.selected_audio_tracks {
-                args.push("-map".to_string());
-                args.push(format!("0:{}", track_index));
-            }
-        } else {
+        if config.selected_audio_tracks.is_empty() {
             args.push("-map".to_string());
             args.push("0:a?".to_string());
+        } else {
+            for track_index in &config.selected_audio_tracks {
+                args.push("-map".to_string());
+                args.push(format!("0:{track_index}"));
+            }
         }
 
         add_audio_codec_args(&mut args, config);
@@ -289,7 +322,7 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         if !config.selected_subtitle_tracks.is_empty() {
             for track_index in &config.selected_subtitle_tracks {
                 args.push("-map".to_string());
-                args.push(format!("0:{}", track_index));
+                args.push(format!("0:{track_index}"));
             }
             add_subtitle_codec_args(&mut args, config);
         } else if !has_burn_subtitles {
@@ -299,7 +332,7 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         }
     }
 
-    if !is_video_only {
+    if !is_video_only && !is_image_output {
         let audio_filters = build_audio_filters(config);
         if !audio_filters.is_empty() {
             args.push("-af".to_string());
@@ -318,7 +351,6 @@ fn normalize_gif_dither(dither: &str) -> &'static str {
         "none" => "none",
         "bayer" => "bayer",
         "floyd_steinberg" => "floyd_steinberg",
-        "sierra2_4a" => "sierra2_4a",
         _ => "sierra2_4a",
     }
 }
@@ -348,37 +380,37 @@ pub fn add_metadata_flags(args: &mut Vec<String>, metadata: &MetadataConfig) {
         && !v.is_empty()
     {
         args.push("-metadata".to_string());
-        args.push(format!("title={}", v));
+        args.push(format!("title={v}"));
     }
     if let Some(v) = &metadata.artist
         && !v.is_empty()
     {
         args.push("-metadata".to_string());
-        args.push(format!("artist={}", v));
+        args.push(format!("artist={v}"));
     }
     if let Some(v) = &metadata.album
         && !v.is_empty()
     {
         args.push("-metadata".to_string());
-        args.push(format!("album={}", v));
+        args.push(format!("album={v}"));
     }
     if let Some(v) = &metadata.genre
         && !v.is_empty()
     {
         args.push("-metadata".to_string());
-        args.push(format!("genre={}", v));
+        args.push(format!("genre={v}"));
     }
     if let Some(v) = &metadata.date
         && !v.is_empty()
     {
         args.push("-metadata".to_string());
-        args.push(format!("date={}", v));
+        args.push(format!("date={v}"));
     }
     if let Some(v) = &metadata.comment
         && !v.is_empty()
     {
         args.push("-metadata".to_string());
-        args.push(format!("comment={}", v));
+        args.push(format!("comment={v}"));
     }
 }
 
@@ -388,11 +420,7 @@ fn sanitize_output_name(raw: &str) -> Option<String> {
         return None;
     }
 
-    let candidate = trimmed
-        .rsplit(['/', '\\'])
-        .next()
-        .map(str::trim)
-        .unwrap_or("");
+    let candidate = trimmed.rsplit(['/', '\\']).next().map_or("", str::trim);
 
     if candidate.is_empty() || candidate == "." || candidate == ".." {
         return None;
@@ -401,21 +429,26 @@ fn sanitize_output_name(raw: &str) -> Option<String> {
     Some(candidate.to_string())
 }
 
-pub fn build_output_path(file_path: &str, container: &str, output_name: Option<String>) -> String {
-    if let Some(custom) = output_name.as_deref().and_then(sanitize_output_name) {
-        let input_path = Path::new(file_path);
-        let mut output: PathBuf = match input_path.parent() {
-            Some(parent) if !parent.as_os_str().is_empty() => parent.to_path_buf(),
-            _ => PathBuf::new(),
-        };
-        output.push(custom);
-        output.set_extension(container);
-        output.to_string_lossy().to_string()
-    } else {
-        format!("{}_converted.{}", file_path, container)
-    }
+pub fn build_output_path(file_path: &str, container: &str, output_name: Option<&str>) -> String {
+    output_name.and_then(sanitize_output_name).map_or_else(
+        || format!("{file_path}_converted.{container}"),
+        |custom| {
+            let input_path = Path::new(file_path);
+            let mut output: PathBuf = match input_path.parent() {
+                Some(parent) if !parent.as_os_str().is_empty() => parent.to_path_buf(),
+                _ => PathBuf::new(),
+            };
+            output.push(custom);
+            output.set_extension(container);
+            output.to_string_lossy().to_string()
+        },
+    )
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "Validation intentionally mirrors UI options in one function for consistent backend guardrails"
+)]
 pub fn validate_task_input(
     file_path: &str,
     config: &ConversionConfig,
@@ -423,14 +456,12 @@ pub fn validate_task_input(
     let input_path = Path::new(file_path);
     if !input_path.exists() {
         return Err(ConversionError::InvalidInput(format!(
-            "Input file does not exist: {}",
-            file_path
+            "Input file does not exist: {file_path}"
         )));
     }
     if !input_path.is_file() {
         return Err(ConversionError::InvalidInput(format!(
-            "Input path is not a file: {}",
-            file_path
+            "Input path is not a file: {file_path}"
         )));
     }
 
@@ -448,8 +479,7 @@ pub fn validate_task_input(
 
     if processing_mode != "reencode" && processing_mode != "copy" {
         return Err(ConversionError::InvalidInput(format!(
-            "Invalid processing mode: {}",
-            processing_mode
+            "Invalid processing mode: {processing_mode}"
         )));
     }
     let is_copy_mode = processing_mode == "copy";
@@ -458,8 +488,7 @@ pub fn validate_task_input(
         && parse_time(start).is_none()
     {
         return Err(ConversionError::InvalidInput(format!(
-            "Invalid start time: {}",
-            start
+            "Invalid start time: {start}"
         )));
     }
 
@@ -467,8 +496,7 @@ pub fn validate_task_input(
         && parse_time(end).is_none()
     {
         return Err(ConversionError::InvalidInput(format!(
-            "Invalid end time: {}",
-            end
+            "Invalid end time: {end}"
         )));
     }
 
@@ -485,11 +513,11 @@ pub fn validate_task_input(
         let w_str = config.custom_width.as_deref().unwrap_or("-1");
         let h_str = config.custom_height.as_deref().unwrap_or("-1");
 
-        let w = w_str.parse::<i32>().map_err(|_| {
-            ConversionError::InvalidInput(format!("Invalid custom width: {}", w_str))
-        })?;
+        let w = w_str
+            .parse::<i32>()
+            .map_err(|_| ConversionError::InvalidInput(format!("Invalid custom width: {w_str}")))?;
         let h = h_str.parse::<i32>().map_err(|_| {
-            ConversionError::InvalidInput(format!("Invalid custom height: {}", h_str))
+            ConversionError::InvalidInput(format!("Invalid custom height: {h_str}"))
         })?;
 
         if w == 0 || h == 0 {
@@ -524,6 +552,7 @@ pub fn validate_task_input(
 
     let is_audio_only = is_audio_only_container(&config.container);
     let is_video_only = is_video_only_container(&config.container);
+    let is_image_output = is_image_container(&config.container);
     let supports_audio = container_supports_audio(&config.container);
     let supports_subtitles = container_supports_subtitles(&config.container);
     if !is_copy_mode
@@ -558,8 +587,7 @@ pub fn validate_task_input(
         && mode != "esrgan-4x"
     {
         return Err(ConversionError::InvalidInput(format!(
-            "Invalid ML upscale mode: {}",
-            mode
+            "Invalid ML upscale mode: {mode}"
         )));
     }
 
@@ -569,16 +597,42 @@ pub fn validate_task_input(
         ));
     }
 
+    if (is_audio_only || is_video_only) && has_custom_pixel_format(config) {
+        return Err(ConversionError::InvalidInput(
+            "Pixel format override is not available for this container".to_string(),
+        ));
+    }
+
+    if !is_copy_mode
+        && has_custom_pixel_format(config)
+        && !is_video_pixel_format_allowed(
+            &config.container,
+            &config.video_codec,
+            &config.pixel_format,
+        )
+    {
+        return Err(ConversionError::InvalidInput(format!(
+            "Pixel format '{}' is not compatible with container '{}' and encoder '{}'",
+            config.pixel_format, config.container, config.video_codec
+        )));
+    }
+
     if is_copy_mode {
-        if is_video_only {
+        if is_video_only || is_image_output {
             return Err(ConversionError::InvalidInput(
-                "Stream copy mode is not available for video-only containers".to_string(),
+                "Stream copy mode is not available for image/video-only containers".to_string(),
             ));
         }
 
         if has_ml_upscale {
             return Err(ConversionError::InvalidInput(
                 "ML upscaling requires re-encoding mode".to_string(),
+            ));
+        }
+
+        if has_custom_pixel_format(config) {
+            return Err(ConversionError::InvalidInput(
+                "Pixel format override requires re-encoding mode".to_string(),
             ));
         }
 
@@ -647,7 +701,7 @@ pub fn validate_task_input(
         ));
     }
 
-    if is_video_only {
+    if is_video_only && config.container.eq_ignore_ascii_case("gif") {
         if !(2..=256).contains(&config.gif_colors) {
             return Err(ConversionError::InvalidInput(format!(
                 "GIF palette size must be between 2 and 256 colors: {}",

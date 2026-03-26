@@ -1,5 +1,7 @@
 import {
 	CONTAINER_VIDEO_CODEC_COMPATIBILITY as SHARED_CONTAINER_VIDEO_CODEC_COMPATIBILITY,
+	getAllowedPixelFormatsForContainerAndEncoder,
+	isPixelFormatAllowedForContainerAndEncoder,
 	VIDEO_CODEC_FALLBACK_ORDER as SHARED_VIDEO_CODEC_FALLBACK_ORDER
 } from '$lib/constants/media-rules';
 
@@ -30,6 +32,17 @@ export const VIDEO_CODEC_OPTIONS = [
 	{ id: 'hevc_nvenc', label: 'H.265 (NVIDIA)' },
 	{ id: 'av1_nvenc', label: 'AV1 (NVIDIA)' }
 ] as const;
+
+export const VIDEO_PIXEL_FORMAT_OPTIONS = [
+	{ id: 'auto', label: 'Auto' },
+	{ id: 'yuv420p', label: 'YUV 4:2:0 (8-bit)' },
+	{ id: 'yuv422p', label: 'YUV 4:2:2 (8-bit)' },
+	{ id: 'yuv444p', label: 'YUV 4:4:4 (8-bit)' },
+	{ id: 'yuv420p10le', label: 'YUV 4:2:0 (10-bit)' },
+	{ id: 'yuv422p10le', label: 'YUV 4:2:2 (10-bit)' },
+	{ id: 'yuv444p10le', label: 'YUV 4:4:4 (10-bit)' }
+] as const;
+export type VideoPixelFormatId = (typeof VIDEO_PIXEL_FORMAT_OPTIONS)[number]['id'];
 
 export const NVENC_ALLOWED_PRESETS = new Set<VideoPreset>(['fast', 'medium', 'slow']);
 export const NVENC_ENCODERS = new Set(['h264_nvenc', 'hevc_nvenc', 'av1_nvenc']);
@@ -67,4 +80,30 @@ export function getFirstAllowedVideoCodec(
 	}
 
 	return allowed.values().next().value ?? candidates[0] ?? VIDEO_CODEC_FALLBACK_ORDER[0];
+}
+
+export function isVideoPixelFormatAllowed(
+	container: string,
+	encoder: string,
+	pixelFormat: string
+): boolean {
+	return isPixelFormatAllowedForContainerAndEncoder(container, encoder, pixelFormat);
+}
+
+export function getAllowedVideoPixelFormats(
+	container: string,
+	encoder: string
+): VideoPixelFormatId[] {
+	return getAllowedPixelFormatsForContainerAndEncoder(
+		container,
+		encoder,
+		VIDEO_PIXEL_FORMAT_OPTIONS.map((option) => option.id)
+	) as VideoPixelFormatId[];
+}
+
+export function getFirstAllowedVideoPixelFormat(
+	container: string,
+	encoder: string
+): VideoPixelFormatId {
+	return getAllowedVideoPixelFormats(container, encoder)[0] ?? 'auto';
 }

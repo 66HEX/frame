@@ -1,9 +1,6 @@
 <script lang="ts">
 	import { untrack, tick } from 'svelte';
 	import { cn } from '$lib/utils/cn';
-	import { themeStore } from '$lib/stores/theme.svelte';
-	import { loadWindowOpacity } from '$lib/services/settings';
-	import { onMount } from 'svelte';
 
 	let {
 		value = 0,
@@ -16,12 +13,6 @@
 		disabled?: boolean;
 		class?: string;
 	} = $props();
-
-	onMount(() => {
-		loadWindowOpacity().then((val) => {
-			themeStore.opacity = val;
-		});
-	});
 
 	function secondsToTimecode(totalSeconds: number): string {
 		const h = Math.floor(totalSeconds / 3600);
@@ -204,8 +195,7 @@
 
 <div
 	class="input-highlight relative flex h-7.5 w-full items-center rounded-sm border border-gray-alpha-200"
-	style="background-color: color-mix(in srgb, var(--background), transparent {100 -
-		themeStore.opacity}%)"
+	style="background-color: var(--background)"
 >
 	<input
 		bind:this={inputRef}

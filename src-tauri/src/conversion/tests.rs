@@ -57,6 +57,7 @@ mod conversion_tests {
             nvenc_temporal_aq: false,
             videotoolbox_allow_sw: false,
             hw_decode: false,
+            pixel_format: "auto".into(),
             gif_colors: 256,
             gif_dither: "sierra2_4a".into(),
             gif_loop: 0,
@@ -68,7 +69,7 @@ mod conversion_tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let path = std::env::temp_dir().join(format!("frame-validate-{}.tmp", ts));
+        let path = std::env::temp_dir().join(format!("frame-validate-{ts}.tmp"));
         fs::write(&path, b"test").unwrap();
         path
     }
@@ -127,6 +128,15 @@ mod conversion_tests {
         assert!(contains_args(&args, &["-preset", "medium"]));
 
         assert!(!args.iter().any(|a| a == "-vf"));
+    }
+
+    #[test]
+    fn test_output_pixel_format_flag_when_overridden() {
+        let mut config = sample_config("mp4");
+        config.pixel_format = "yuv444p10le".into();
+
+        let args = build_ffmpeg_args("input.mov", "output.mp4", &config);
+        assert!(contains_arg_pair(&args, "-pix_fmt", "yuv444p10le"));
     }
 
     #[test]
@@ -192,7 +202,13 @@ mod conversion_tests {
 
         assert!(contains_args(&args, &["-c:v", "libvpx-vp9"]));
         assert!(contains_args(&args, &["-c:a", "libopus"]));
-        assert!(args.last().unwrap().ends_with(".webm"));
+        assert_eq!(
+            std::path::Path::new(args.last().unwrap())
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .map(str::to_ascii_lowercase),
+            Some("webm".to_string())
+        );
     }
 
     #[test]
@@ -207,32 +223,22 @@ mod conversion_tests {
 
     #[test]
     fn test_build_output_path_with_custom_name() {
-        let custom = build_output_path(
-            "/Users/hex/Videos/clip.mov",
-            "mp4",
-            Some("final_render".into()),
-        );
+        let custom = build_output_path("/Users/hex/Videos/clip.mov", "mp4", Some("final_render"));
         assert_eq!(custom, "/Users/hex/Videos/final_render.mp4");
 
         let nested = build_output_path(
             "/Users/hex/Videos/clip.mov",
             "mp4",
-            Some("../escape/render".into()),
+            Some("../escape/render"),
         );
         assert_eq!(nested, "/Users/hex/Videos/render.mp4");
 
-        let absolute = build_output_path(
-            "/Users/hex/Videos/clip.mov",
-            "mp4",
-            Some("/tmp/pwned.mp4".into()),
-        );
+        let absolute =
+            build_output_path("/Users/hex/Videos/clip.mov", "mp4", Some("/tmp/pwned.mp4"));
         assert_eq!(absolute, "/Users/hex/Videos/pwned.mp4");
 
-        let forced_container = build_output_path(
-            "/Users/hex/Videos/clip.mov",
-            "mp4",
-            Some("custom_name.mkv".into()),
-        );
+        let forced_container =
+            build_output_path("/Users/hex/Videos/clip.mov", "mp4", Some("custom_name.mkv"));
         assert_eq!(forced_container, "/Users/hex/Videos/custom_name.mp4");
 
         let default = build_output_path("/tmp/sample.mov", "mp4", None);
@@ -364,10 +370,7 @@ mod conversion_tests {
             let vf_arg = args.iter().find(|a| a.starts_with("scale=")).unwrap();
             assert!(
                 vf_arg.ends_with(expected_flag),
-                "Algorithm {} expected flag {}, got {}",
-                algo_name,
-                expected_flag,
-                vf_arg
+                "Algorithm {algo_name} expected flag {expected_flag}, got {vf_arg}"
             );
         }
     }
@@ -490,6 +493,33 @@ mod conversion_tests {
     }
 
     #[test]
+    fn test_image_output_uses_single_frame_pipeline_without_audio() {
+        let mut config = sample_config("png");
+        config.video_codec = "png".into();
+        config.pixel_format = "yuv444p".into();
+
+        let args = build_ffmpeg_args("input.png", "output.png", &config);
+
+        assert!(contains_args(&args, &["-map", "0:v:0"]));
+        assert!(contains_args(&args, &["-frames:v", "1"]));
+        assert!(contains_args(&args, &["-update", "1"]));
+        assert!(contains_arg_pair(&args, "-pix_fmt", "yuv444p"));
+        assert!(!args.iter().any(|arg| arg == "-c:a"));
+        assert!(!args.iter().any(|arg| arg == "0:a?"));
+    }
+
+    #[test]
+    fn test_image_output_webp_uses_still_image_codec() {
+        let mut config = sample_config("webp");
+        config.video_codec = "libwebp".into();
+
+        let args = build_ffmpeg_args("input.png", "output.webp", &config);
+
+        assert!(contains_args(&args, &["-c:v", "libwebp"]));
+        assert!(contains_args(&args, &["-frames:v", "1"]));
+    }
+
+    #[test]
     fn test_validate_rejects_ml_upscale_for_audio_only_container() {
         let mut config = sample_config("mp3");
         config.ml_upscale = Some("esrgan-2x".into());
@@ -500,6 +530,36 @@ mod conversion_tests {
         let _ = fs::remove_file(&path);
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_allows_ml_upscale_for_image_output() {
+        let mut config = sample_config("png");
+        config.video_codec = "png".into();
+        config.ml_upscale = Some("esrgan-2x".into());
+        config.selected_audio_tracks.clear();
+        config.selected_subtitle_tracks.clear();
+
+        let path = create_temp_input_file();
+        let result = validate_task_input(path.to_str().unwrap(), &config);
+        let _ = fs::remove_file(&path);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_allows_pixel_format_for_image_output() {
+        let mut config = sample_config("png");
+        config.video_codec = "png".into();
+        config.pixel_format = "yuv444p".into();
+        config.selected_audio_tracks.clear();
+        config.selected_subtitle_tracks.clear();
+
+        let path = create_temp_input_file();
+        let result = validate_task_input(path.to_str().unwrap(), &config);
+        let _ = fs::remove_file(&path);
+
+        assert!(result.is_ok());
     }
 
     #[test]
@@ -597,6 +657,32 @@ mod conversion_tests {
         let mut config = sample_config("mp4");
         config.processing_mode = "copy".into();
         config.ml_upscale = Some("esrgan-2x".into());
+
+        let path = create_temp_input_file();
+        let result = validate_task_input(path.to_str().unwrap(), &config);
+        let _ = fs::remove_file(&path);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_rejects_stream_copy_with_pixel_format_override() {
+        let mut config = sample_config("mp4");
+        config.processing_mode = "copy".into();
+        config.pixel_format = "yuv444p".into();
+
+        let path = create_temp_input_file();
+        let result = validate_task_input(path.to_str().unwrap(), &config);
+        let _ = fs::remove_file(&path);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_rejects_incompatible_pixel_format_for_container() {
+        let mut config = sample_config("mp4");
+        config.video_codec = "libsvtav1".into();
+        config.pixel_format = "yuv444p".into();
 
         let path = create_temp_input_file();
         let result = validate_task_input(path.to_str().unwrap(), &config);
@@ -719,6 +805,47 @@ mod conversion_tests {
         assert!(contains_arg_pair(&args, "-map_metadata", "-1"));
         assert!(contains_args(&args, &["-metadata", "title=Upscaled"]));
     }
+
+    #[test]
+    fn test_upscale_encode_respects_pixel_format_override() {
+        let mut config = sample_config("mp4");
+        config.pixel_format = "yuv444p".into();
+
+        let args = build_upscale_encode_args(
+            &PathBuf::from("/tmp/frame_upscale_test/output"),
+            "input.mp4",
+            "output.mp4",
+            30.0,
+            &config,
+            Some("yuv420p10le".into()),
+        );
+
+        assert!(contains_arg_pair(&args, "-pix_fmt", "yuv444p"));
+    }
+
+    #[test]
+    fn test_upscale_encode_image_output_uses_single_frame_without_audio() {
+        let mut config = sample_config("png");
+        config.video_codec = "png".into();
+        config.pixel_format = "yuv444p".into();
+        config.selected_audio_tracks.clear();
+        config.selected_subtitle_tracks.clear();
+
+        let args = build_upscale_encode_args(
+            &PathBuf::from("/tmp/frame_upscale_test/output"),
+            "input.png",
+            "output.png",
+            30.0,
+            &config,
+            None,
+        );
+
+        assert!(contains_args(&args, &["-frames:v", "1"]));
+        assert!(contains_args(&args, &["-update", "1"]));
+        assert!(contains_arg_pair(&args, "-pix_fmt", "yuv444p"));
+        assert!(!args.iter().any(|arg| arg == "-c:a"));
+        assert!(!args.iter().any(|arg| arg == "-shortest"));
+    }
 }
 
 #[cfg(test)]
@@ -747,8 +874,7 @@ mod parsing_tests {
         for output in invalid_outputs {
             assert!(
                 TIME_REGEX.captures(output).is_none(),
-                "Should not match: {}",
-                output
+                "Should not match: {output}"
             );
         }
     }
@@ -846,6 +972,7 @@ mod utils_tests {
         is_subtitle_codec_allowed as is_subtitle_codec_allowed_rule,
         is_video_codec_allowed as is_video_codec_allowed_rule,
         is_video_only_container as is_video_only_container_rule,
+        is_video_pixel_format_allowed as is_video_pixel_format_allowed_rule,
         is_video_stream_codec_allowed as is_video_stream_codec_allowed_rule,
     };
     use crate::conversion::utils::{
@@ -857,11 +984,11 @@ mod utils_tests {
     fn frame_rate_fractional() {
         assert_eq!(
             parse_frame_rate_string(Some("30000/1001")),
-            Some(29.97002997002997)
+            Some(29.970_029_970_029_97)
         );
         assert_eq!(
             parse_frame_rate_string(Some("24000/1001")),
-            Some(23.976023976023978)
+            Some(23.976_023_976_023_978)
         );
         assert_eq!(parse_frame_rate_string(Some("60/1")), Some(60.0));
         assert_eq!(parse_frame_rate_string(Some("25/1")), Some(25.0));
@@ -906,14 +1033,10 @@ mod utils_tests {
         let video_containers = ["mp4", "mkv", "webm", "mov", "avi"];
 
         for c in audio_containers {
-            assert!(is_audio_only_container(c), "{} should be audio-only", c);
+            assert!(is_audio_only_container(c), "{c} should be audio-only");
         }
         for c in video_containers {
-            assert!(
-                !is_audio_only_container(c),
-                "{} should not be audio-only",
-                c
-            );
+            assert!(!is_audio_only_container(c), "{c} should not be audio-only");
         }
     }
 
@@ -926,6 +1049,27 @@ mod utils_tests {
         assert!(is_video_stream_codec_allowed_rule("mp4", "h264"));
         assert!(is_video_stream_codec_allowed_rule("mkv", "mpeg4"));
         assert!(!is_video_stream_codec_allowed_rule("webm", "h264"));
+        assert!(is_video_pixel_format_allowed_rule(
+            "mp4", "libx264", "yuv420p"
+        ));
+        assert!(is_video_pixel_format_allowed_rule(
+            "mp4", "libx264", "yuv444p"
+        ));
+        assert!(!is_video_pixel_format_allowed_rule(
+            "mp4",
+            "libsvtav1",
+            "yuv444p"
+        ));
+        assert!(is_video_pixel_format_allowed_rule(
+            "mkv",
+            "libx265",
+            "yuv444p10le"
+        ));
+        assert!(!is_video_pixel_format_allowed_rule(
+            "webm",
+            "vp9",
+            "yuv444p10le"
+        ));
         assert!(is_audio_codec_allowed_rule("mov", "aac"));
         assert!(is_audio_codec_allowed_rule("mkv", "flac"));
         assert!(!is_audio_codec_allowed_rule("mp4", "flac"));
@@ -1040,6 +1184,7 @@ mod scenario_tests {
             nvenc_temporal_aq: false,
             videotoolbox_allow_sw: false,
             hw_decode: false,
+            pixel_format: "auto".into(),
             gif_colors: 256,
             gif_dither: "sierra2_4a".into(),
             gif_loop: 0,
@@ -1101,7 +1246,13 @@ mod scenario_tests {
         assert!(args.contains(&"libx265".to_string()));
         assert!(args.contains(&"16".to_string()));
         assert!(args.contains(&"flac".to_string()));
-        assert!(args.last().unwrap().ends_with(".mkv"));
+        assert_eq!(
+            std::path::Path::new(args.last().unwrap())
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .map(str::to_ascii_lowercase),
+            Some("mkv".to_string())
+        );
     }
 
     #[test]
@@ -1246,7 +1397,13 @@ mod scenario_tests {
         assert!(args.contains(&"libvpx-vp9".to_string()));
         assert!(args.contains(&"libopus".to_string()));
         assert!(args.contains(&"30".to_string()));
-        assert!(args.last().unwrap().ends_with(".webm"));
+        assert_eq!(
+            std::path::Path::new(args.last().unwrap())
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .map(str::to_ascii_lowercase),
+            Some("webm".to_string())
+        );
     }
 
     #[test]
@@ -1256,14 +1413,8 @@ mod scenario_tests {
 
         let args = build_ffmpeg_args("multi_audio.mkv", "output.mp4", &config);
 
-        let map_positions: Vec<usize> = args
-            .iter()
-            .enumerate()
-            .filter(|(_, a)| *a == "-map")
-            .map(|(i, _)| i)
-            .collect();
-
-        assert!(map_positions.len() >= 2);
+        let map_count = args.iter().filter(|arg| *arg == "-map").count();
+        assert!(map_count >= 2);
     }
 
     #[test]
@@ -1333,6 +1484,7 @@ mod hwaccel_tests {
             nvenc_temporal_aq: false,
             videotoolbox_allow_sw: false,
             hw_decode: true,
+            pixel_format: "auto".into(),
             gif_colors: 256,
             gif_dither: "sierra2_4a".into(),
             gif_loop: 0,

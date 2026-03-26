@@ -9,12 +9,12 @@
 		type SourceMetadata
 	} from '$lib/types';
 	import { _ } from '$lib/i18n';
-	import { themeStore } from '$lib/stores/theme.svelte';
 
 	import SourceTab from './tabs/SourceTab.svelte';
 	import OutputTab from './tabs/OutputTab.svelte';
 	import PresetsTab from './tabs/PresetsTab.svelte';
 	import VideoTab from './tabs/VideoTab.svelte';
+	import ImagesTab from './tabs/ImagesTab.svelte';
 	import AudioTab from './tabs/AudioTab.svelte';
 	import SubtitlesTab from './tabs/SubtitlesTab.svelte';
 	import MetadataTab from './tabs/MetadataTab.svelte';
@@ -23,6 +23,7 @@
 		IconFileUp,
 		IconFileDown,
 		IconFilm,
+		IconFileImage,
 		IconMusic,
 		IconCaptions,
 		IconTags,
@@ -30,7 +31,16 @@
 	} from '$lib/icons';
 	import { containerSupportsAudio, containerSupportsSubtitles } from '$lib/constants/media-rules';
 
-	const TABS = ['source', 'output', 'video', 'audio', 'subtitles', 'metadata', 'presets'] as const;
+	const TABS = [
+		'source',
+		'output',
+		'video',
+		'images',
+		'audio',
+		'subtitles',
+		'metadata',
+		'presets'
+	] as const;
 	type TabId = (typeof TABS)[number];
 
 	let {
@@ -65,26 +75,33 @@
 
 	let activeTab = $state<TabId>('source');
 
-	const isSourceAudioOnly = $derived(!!metadata && !metadata.videoCodec);
+	const sourceKind = $derived(
+		metadata?.mediaKind ?? (metadata && !metadata.videoCodec ? 'audio' : 'video')
+	);
+	const isSourceAudioOnly = $derived(sourceKind === 'audio');
+	const isSourceImage = $derived(sourceKind === 'image');
 	const isCopyMode = $derived((config.processingMode ?? 'reencode') === 'copy');
 	const isAudioContainer = $derived(AUDIO_ONLY_CONTAINERS.includes(config.container));
-	const supportsAudio = $derived(containerSupportsAudio(config.container));
+	const supportsAudio = $derived(containerSupportsAudio(config.container) && !isSourceImage);
 	const supportsSubtitles = $derived(
-		!isSourceAudioOnly && containerSupportsSubtitles(config.container)
+		!isSourceAudioOnly && !isSourceImage && containerSupportsSubtitles(config.container)
 	);
-	const supportsVideoTab = $derived(!isSourceAudioOnly && !isAudioContainer && !isCopyMode);
+	const supportsVideoTab = $derived(
+		!isSourceAudioOnly && !isSourceImage && !isAudioContainer && !isCopyMode
+	);
+	const supportsImagesTab = $derived(isSourceImage && !isAudioContainer && !isCopyMode);
+	const visibleTabs = $derived(
+		TABS.filter((tabId) => {
+			if (tabId === 'video') return supportsVideoTab;
+			if (tabId === 'images') return supportsImagesTab;
+			if (tabId === 'audio') return supportsAudio;
+			if (tabId === 'subtitles') return supportsSubtitles;
+			return true;
+		})
+	);
 
 	$effect(() => {
-		const tab = activeTab;
-		if (tab === 'video' && !supportsVideoTab) {
-			untrack(() => (activeTab = 'output'));
-			return;
-		}
-		if (tab === 'audio' && !supportsAudio) {
-			untrack(() => (activeTab = 'output'));
-			return;
-		}
-		if (tab === 'subtitles' && !supportsSubtitles) {
+		if (!visibleTabs.includes(activeTab)) {
 			untrack(() => (activeTab = 'output'));
 		}
 	});
@@ -93,6 +110,7 @@
 		source: IconFileUp,
 		output: IconFileDown,
 		video: IconFilm,
+		images: IconFileImage,
 		audio: IconMusic,
 		subtitles: IconCaptions,
 		metadata: IconTags,
@@ -102,22 +120,16 @@
 
 <div class="flex h-full flex-col">
 	<div
-		class="relative flex h-10 items-center justify-between px-4 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:[background-color:var(--divider-background)] after:shadow-2xs after:shadow-gray-alpha-100 after:content-['']"
-		style="--divider-background: color-mix(in srgb, var(--background), transparent {100 -
-			themeStore.opacity}%)"
+		class="relative flex h-10 items-center justify-between px-4 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-background after:shadow-2xs after:shadow-gray-alpha-100 after:content-['']"
 	>
 		<div class="flex w-full items-center justify-start gap-1">
-			{#each TABS as tabId (tabId)}
-				{@const isVideoDisabled = tabId === 'video' && !supportsVideoTab}
-				{@const isAudioDisabled = tabId === 'audio' && !supportsAudio}
-				{@const isSubtitlesDisabled = tabId === 'subtitles' && !supportsSubtitles}
-				{@const isDisabled = isVideoDisabled || isAudioDisabled || isSubtitlesDisabled}
+			{#each visibleTabs as tabId (tabId)}
 				{@const Icon = icons[tabId]}
 				<Button
 					variant={activeTab === tabId ? 'default' : 'ghost'}
 					size="icon"
 					title={$_(`tabs.${tabId}`)}
-					class={cn('size-6', isDisabled && 'pointer-events-none opacity-50')}
+					class={cn('size-6')}
 					onclick={() => (activeTab = tabId)}
 				>
 					<Icon size={16} />
@@ -144,6 +156,8 @@
 			/>
 		{:else if activeTab === 'video'}
 			<VideoTab {config} disabled={disabled || !supportsVideoTab} {onUpdate} />
+		{:else if activeTab === 'images'}
+			<ImagesTab {config} disabled={disabled || !supportsImagesTab} {onUpdate} />
 		{:else if activeTab === 'audio'}
 			<AudioTab
 				{config}

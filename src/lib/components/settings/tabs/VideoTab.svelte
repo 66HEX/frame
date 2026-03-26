@@ -13,10 +13,13 @@
 	import { isGifContainer } from '$lib/constants/media-rules';
 	import {
 		VIDEO_CODEC_OPTIONS,
+		VIDEO_PIXEL_FORMAT_OPTIONS,
 		VIDEO_PRESETS,
 		NVENC_ENCODERS,
 		VIDEOTOOLBOX_ENCODERS,
+		getAllowedVideoPixelFormats,
 		getFirstAllowedPreset,
+		getFirstAllowedVideoPixelFormat,
 		getFirstAllowedVideoCodec,
 		isVideoCodecAllowed,
 		isVideoPresetAllowed
@@ -72,6 +75,10 @@
 	const isMlUpscaleActive = $derived(!isGifMode && config.mlUpscale && config.mlUpscale !== 'none');
 	const effectiveResolution = $derived(isMlUpscaleActive ? 'original' : config.resolution);
 	const presetOptions = VIDEO_PRESETS;
+	const selectedPixelFormat = $derived(config.pixelFormat ?? 'auto');
+	const allowedPixelFormats = $derived(
+		new Set(getAllowedVideoPixelFormats(config.container, config.videoCodec))
+	);
 
 	$effect(() => {
 		if (isMlUpscaleActive && config.resolution !== 'original') {
@@ -82,6 +89,27 @@
 	$effect(() => {
 		if ((isGifMode || !mlUpscaleAvailable) && config.mlUpscale && config.mlUpscale !== 'none') {
 			untrack(() => onUpdate({ mlUpscale: 'none' }));
+		}
+	});
+
+	$effect(() => {
+		if (isGifMode && config.pixelFormat && config.pixelFormat !== 'auto') {
+			untrack(() => onUpdate({ pixelFormat: 'auto' }));
+		}
+	});
+
+	$effect(() => {
+		const container = config.container;
+		const pixelFormat = config.pixelFormat ?? 'auto';
+		const allowed = allowedPixelFormats;
+		if (!allowed.has(pixelFormat)) {
+			const fallback = getFirstAllowedVideoPixelFormat(
+				container,
+				config.videoCodec
+			) as ConversionConfig['pixelFormat'];
+			if (fallback !== pixelFormat) {
+				untrack(() => onUpdate({ pixelFormat: fallback }));
+			}
 		}
 	});
 
@@ -317,6 +345,33 @@
 						<span class="text-[10px] opacity-50">
 							{#if codecAllowed}
 								{codec.label}
+							{:else}
+								{$_('video.codecIncompatible')}
+							{/if}
+						</span>
+					</ListItem>
+				{/each}
+			</div>
+		</div>
+
+		<div class="space-y-3 pt-2">
+			<Label variant="section">{$_('source.pixelFormat')}</Label>
+			<div class="grid grid-cols-1">
+				{#each VIDEO_PIXEL_FORMAT_OPTIONS as option (option.id)}
+					{@const allowed = allowedPixelFormats.has(option.id)}
+					<ListItem
+						selected={allowed && selectedPixelFormat === option.id}
+						onclick={() =>
+							allowed && onUpdate({ pixelFormat: option.id as ConversionConfig['pixelFormat'] })}
+						disabled={disabled || !allowed}
+						class={cn(!allowed && 'pointer-events-none opacity-50')}
+					>
+						<span>{option.label}</span>
+						<span class="text-[10px] opacity-50">
+							{#if option.id === 'auto'}
+								Encoder default
+							{:else if allowed}
+								{option.id}
 							{:else}
 								{$_('video.codecIncompatible')}
 							{/if}

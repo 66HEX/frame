@@ -89,7 +89,28 @@ export function createFileListManager() {
 			filters: [
 				{
 					name: 'Media Files',
-					extensions: ['mp4', 'mov', 'mkv', 'avi', 'webm', 'gif', 'mp3', 'm4a', 'wav', 'flac']
+					extensions: [
+						'mp4',
+						'mov',
+						'mkv',
+						'avi',
+						'webm',
+						'gif',
+						'mp3',
+						'm4a',
+						'wav',
+						'flac',
+						'png',
+						'jpg',
+						'jpeg',
+						'webp',
+						'bmp',
+						'tif',
+						'tiff',
+						'avif',
+						'heic',
+						'heif'
+					]
 				},
 				{
 					name: 'Videos',
@@ -98,6 +119,10 @@ export function createFileListManager() {
 				{
 					name: 'Audio',
 					extensions: ['mp3', 'm4a', 'wav', 'flac']
+				},
+				{
+					name: 'Images',
+					extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'tif', 'tiff', 'avif', 'heic', 'heif']
 				}
 			]
 		});

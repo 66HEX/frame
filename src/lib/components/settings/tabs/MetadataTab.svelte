@@ -17,6 +17,10 @@
 		metadata?: SourceMetadata;
 	} = $props();
 
+	const sourceKind = $derived(
+		metadata?.mediaKind ?? (metadata && !metadata.videoCodec ? 'audio' : 'video')
+	);
+
 	function updateMetadata<K extends keyof ConversionConfig['metadata']>(
 		key: K,
 		value: ConversionConfig['metadata'][K]
@@ -43,7 +47,7 @@
 		{ value: 'replace', label: 'metadata.modes.replace' }
 	];
 
-	const FIELDS = [
+	const DEFAULT_FIELDS = [
 		{ key: 'title', label: 'metadata.fields.title' },
 		{ key: 'artist', label: 'metadata.fields.artist' },
 		{ key: 'album', label: 'metadata.fields.album' },
@@ -51,6 +55,15 @@
 		{ key: 'date', label: 'metadata.fields.date' },
 		{ key: 'comment', label: 'metadata.fields.comment' }
 	] as const;
+
+	const IMAGE_FIELDS = [
+		{ key: 'title', label: 'metadata.fields.title' },
+		{ key: 'artist', label: 'metadata.fields.artist' },
+		{ key: 'date', label: 'metadata.fields.date' },
+		{ key: 'comment', label: 'metadata.fields.comment' }
+	] as const;
+
+	const visibleFields = $derived(sourceKind === 'image' ? IMAGE_FIELDS : DEFAULT_FIELDS);
 </script>
 
 <div class="space-y-4">
@@ -77,7 +90,7 @@
 		<div class="space-y-3 pt-2">
 			<Label variant="section">{$_('metadata.fieldsSection') || 'Fields'}</Label>
 			<div class="space-y-3">
-				{#each FIELDS as field (field.key)}
+				{#each visibleFields as field (field.key)}
 					<div class="space-y-2">
 						<Label for="metadata-{field.key}">{$_(field.label)}</Label>
 						<Input

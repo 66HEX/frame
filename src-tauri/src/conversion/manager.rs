@@ -3,10 +3,11 @@ use std::sync::{
     Arc, Mutex,
     atomic::{AtomicUsize, Ordering},
 };
+use sysinfo::{Pid, ProcessesToUpdate, System};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc;
 
-use crate::conversion::types::{ErrorPayload, LogPayload};
+use crate::conversion::types::{CancelledPayload, ErrorPayload, LogPayload};
 
 #[cfg(windows)]
 use windows::{
@@ -35,11 +36,21 @@ pub enum ManagerMessage {
 pub struct ConversionManager {
     pub(crate) sender: mpsc::Sender<ManagerMessage>,
     max_concurrency: Arc<AtomicUsize>,
-    active_tasks: Arc<Mutex<HashMap<String, u32>>>,
+    active_tasks: Arc<Mutex<HashMap<String, ActiveProcess>>>,
     cancelled_tasks: Arc<Mutex<HashSet<String>>>,
 }
 
+#[derive(Clone, Copy)]
+struct ActiveProcess {
+    pid: u32,
+    start_time: u64,
+}
+
 impl ConversionManager {
+    #[expect(
+        clippy::too_many_lines,
+        reason = "manager event loop keeps enqueue/start/error transitions in one deterministic block"
+    )]
     pub fn new(app: AppHandle) -> Self {
         let (tx, mut rx) = mpsc::channel(32);
         let tx_clone = tx.clone();
@@ -53,7 +64,7 @@ impl ConversionManager {
         tauri::async_runtime::spawn(async move {
             let mut queue: VecDeque<ConversionTask> = VecDeque::new();
             let mut queued_ids: HashSet<String> = HashSet::new();
-            let mut running_tasks: HashMap<String, ()> = HashMap::new();
+            let mut running_tasks: HashSet<String> = HashSet::new();
 
             while let Some(msg) = rx.recv().await {
                 match msg {
@@ -64,34 +75,32 @@ impl ConversionManager {
                             cancelled.remove(&task.id);
                         }
 
-                        if running_tasks.contains_key(&task.id) || queued_ids.contains(&task.id) {
+                        if running_tasks.contains(&task.id) || queued_ids.contains(&task.id) {
                             continue;
                         }
 
                         queued_ids.insert(task.id.clone());
                         queue.push_back(task);
-                        ConversionManager::process_queue(
+                        Self::process_queue(
                             &app,
                             &tx_clone,
                             &mut queue,
                             &mut queued_ids,
                             &mut running_tasks,
-                            Arc::clone(&limiter),
-                            Arc::clone(&cancelled_tasks_loop),
-                        )
-                        .await;
+                            &limiter,
+                            &cancelled_tasks_loop,
+                        );
                     }
                     ManagerMessage::ConcurrencyUpdated => {
-                        ConversionManager::process_queue(
+                        Self::process_queue(
                             &app,
                             &tx_clone,
                             &mut queue,
                             &mut queued_ids,
                             &mut running_tasks,
-                            Arc::clone(&limiter),
-                            Arc::clone(&cancelled_tasks_loop),
-                        )
-                        .await;
+                            &limiter,
+                            &cancelled_tasks_loop,
+                        );
                     }
                     ManagerMessage::TaskStarted(id, pid) => {
                         let is_cancelled = {
@@ -101,90 +110,100 @@ impl ConversionManager {
 
                         if is_cancelled {
                             if pid > 0 {
-                                let _ = ConversionManager::terminate_process(pid);
+                                let _ = Self::terminate_process(pid);
                             }
                             running_tasks.remove(&id);
                             {
                                 let mut tasks = active_tasks_loop.lock().unwrap();
                                 tasks.remove(&id);
                             }
-                            ConversionManager::process_queue(
+                            Self::process_queue(
                                 &app,
                                 &tx_clone,
                                 &mut queue,
                                 &mut queued_ids,
                                 &mut running_tasks,
-                                Arc::clone(&limiter),
-                                Arc::clone(&cancelled_tasks_loop),
-                            )
-                            .await;
+                                &limiter,
+                                &cancelled_tasks_loop,
+                            );
                             continue;
                         }
 
                         let mut tasks = active_tasks_loop.lock().unwrap();
-                        tasks.insert(id, pid);
+                        tasks.insert(
+                            id,
+                            ActiveProcess {
+                                pid,
+                                start_time: process_start_time(pid).unwrap_or(0),
+                            },
+                        );
                     }
                     ManagerMessage::TaskCompleted(id) => {
-                        running_tasks.remove(&id);
                         {
                             let mut cancelled = cancelled_tasks_loop.lock().unwrap();
-                            cancelled.remove(&id);
-                        }
-                        {
                             let mut tasks = active_tasks_loop.lock().unwrap();
-                            tasks.remove(&id);
+                            let _ = finalize_task_state(
+                                &id,
+                                &mut running_tasks,
+                                &mut tasks,
+                                &mut cancelled,
+                            );
                         }
 
-                        ConversionManager::process_queue(
+                        Self::process_queue(
                             &app,
                             &tx_clone,
                             &mut queue,
                             &mut queued_ids,
                             &mut running_tasks,
-                            Arc::clone(&limiter),
-                            Arc::clone(&cancelled_tasks_loop),
-                        )
-                        .await;
+                            &limiter,
+                            &cancelled_tasks_loop,
+                        );
                     }
                     ManagerMessage::TaskError(id, err) => {
-                        eprintln!("Task {} failed: {}", id, err);
-
-                        let _ = app.emit(
-                            "conversion-log",
-                            LogPayload {
-                                id: id.clone(),
-                                line: format!("[ERROR] {}", err),
-                            },
-                        );
-
-                        let _ = app.emit(
-                            "conversion-error",
-                            ErrorPayload {
-                                id: id.clone(),
-                                error: err.to_string(),
-                            },
-                        );
-
-                        running_tasks.remove(&id);
-                        {
+                        let was_cancelled = {
                             let mut cancelled = cancelled_tasks_loop.lock().unwrap();
-                            cancelled.remove(&id);
-                        }
-                        {
                             let mut tasks = active_tasks_loop.lock().unwrap();
-                            tasks.remove(&id);
+                            finalize_task_state(&id, &mut running_tasks, &mut tasks, &mut cancelled)
+                        };
+
+                        if was_cancelled {
+                            let _ = app.emit(
+                                "conversion-log",
+                                LogPayload {
+                                    id: id.clone(),
+                                    line: "[INFO] Task cancelled".to_string(),
+                                },
+                            );
+                            let _ = app
+                                .emit("conversion-cancelled", CancelledPayload { id: id.clone() });
+                        } else {
+                            eprintln!("Task {id} failed: {err}");
+                            let _ = app.emit(
+                                "conversion-log",
+                                LogPayload {
+                                    id: id.clone(),
+                                    line: format!("[ERROR] {err}"),
+                                },
+                            );
+                            let _ = app.emit(
+                                "conversion-error",
+                                ErrorPayload {
+                                    id: id.clone(),
+                                    error: err.to_string(),
+                                },
+                            );
                         }
 
-                        ConversionManager::process_queue(
+                        Self::process_queue(
                             &app,
                             &tx_clone,
                             &mut queue,
                             &mut queued_ids,
                             &mut running_tasks,
-                            Arc::clone(&limiter),
-                            Arc::clone(&cancelled_tasks_loop),
-                        )
-                        .await;
+                            &limiter,
+                            &cancelled_tasks_loop,
+                        );
                     }
                 }
             }
@@ -198,14 +217,14 @@ impl ConversionManager {
         }
     }
 
-    async fn process_queue(
+    fn process_queue(
         app: &AppHandle,
         tx: &mpsc::Sender<ManagerMessage>,
         queue: &mut VecDeque<ConversionTask>,
         queued_ids: &mut HashSet<String>,
-        running_tasks: &mut HashMap<String, ()>,
-        max_concurrency: Arc<AtomicUsize>,
-        cancelled_tasks: Arc<Mutex<HashSet<String>>>,
+        running_tasks: &mut HashSet<String>,
+        max_concurrency: &Arc<AtomicUsize>,
+        cancelled_tasks: &Arc<Mutex<HashSet<String>>>,
     ) {
         let limit = max_concurrency.load(Ordering::SeqCst).max(1);
 
@@ -220,7 +239,7 @@ impl ConversionManager {
                     continue;
                 }
 
-                running_tasks.insert(task.id.clone(), ());
+                running_tasks.insert(task.id.clone());
 
                 let app_clone = app.clone();
                 let tx_worker = tx.clone();
@@ -264,22 +283,28 @@ impl ConversionManager {
     }
 
     pub fn pause_task(&self, id: &str) -> Result<(), ConversionError> {
-        let tasks = self.active_tasks.lock().unwrap();
-        if let Some(&pid) = tasks.get(id) {
-            if pid == 0 {
+        let process = {
+            let tasks = self.active_tasks.lock().unwrap();
+            tasks.get(id).copied()
+        };
+
+        if let Some(process) = process {
+            if process.pid == 0 {
                 return Err(ConversionError::TaskNotFound(id.to_string()));
             }
+            ensure_same_process(id, process)?;
 
             #[cfg(unix)]
             unsafe {
-                if libc::kill(pid as libc::pid_t, libc::SIGSTOP) != 0 {
+                let pid = pid_to_unix_pid(process.pid)?;
+                if libc::kill(pid, libc::SIGSTOP) != 0 {
                     return Err(ConversionError::Shell("Failed to send SIGSTOP".to_string()));
                 }
             }
 
             #[cfg(windows)]
             unsafe {
-                windows_suspend_resume(pid, true)?;
+                windows_suspend_resume(process.pid, true)?;
             }
 
             Ok(())
@@ -289,22 +314,28 @@ impl ConversionManager {
     }
 
     pub fn resume_task(&self, id: &str) -> Result<(), ConversionError> {
-        let tasks = self.active_tasks.lock().unwrap();
-        if let Some(&pid) = tasks.get(id) {
-            if pid == 0 {
+        let process = {
+            let tasks = self.active_tasks.lock().unwrap();
+            tasks.get(id).copied()
+        };
+
+        if let Some(process) = process {
+            if process.pid == 0 {
                 return Err(ConversionError::TaskNotFound(id.to_string()));
             }
+            ensure_same_process(id, process)?;
 
             #[cfg(unix)]
             unsafe {
-                if libc::kill(pid as libc::pid_t, libc::SIGCONT) != 0 {
+                let pid = pid_to_unix_pid(process.pid)?;
+                if libc::kill(pid, libc::SIGCONT) != 0 {
                     return Err(ConversionError::Shell("Failed to send SIGCONT".to_string()));
                 }
             }
 
             #[cfg(windows)]
             unsafe {
-                windows_suspend_resume(pid, false)?;
+                windows_suspend_resume(process.pid, false)?;
             }
 
             Ok(())
@@ -319,21 +350,24 @@ impl ConversionManager {
             cancelled.insert(id.to_string());
         }
 
-        let tasks = self.active_tasks.lock().unwrap();
-        if let Some(&pid) = tasks.get(id) {
-            if pid > 0 {
-                ConversionManager::terminate_process(pid)?;
-            }
-            ConversionManager::cleanup_temp_upscale_dir(id);
-            Ok(())
-        } else {
-            ConversionManager::cleanup_temp_upscale_dir(id);
-            Ok(())
+        let process = {
+            let tasks = self.active_tasks.lock().unwrap();
+            tasks.get(id).copied()
+        };
+
+        if let Some(process) = process
+            && process.pid > 0
+        {
+            ensure_same_process(id, process)?;
+            Self::terminate_process(process.pid)?;
         }
+
+        Self::cleanup_temp_upscale_dir(id);
+        Ok(())
     }
 
     fn cleanup_temp_upscale_dir(id: &str) {
-        let temp_dir = std::env::temp_dir().join(format!("frame_upscale_{}", id));
+        let temp_dir = std::env::temp_dir().join(format!("frame_upscale_{id}"));
         if temp_dir.exists() {
             let _ = std::fs::remove_dir_all(&temp_dir);
         }
@@ -342,8 +376,9 @@ impl ConversionManager {
     #[cfg(unix)]
     fn terminate_process(pid: u32) -> Result<(), ConversionError> {
         unsafe {
-            let _ = libc::kill(pid as libc::pid_t, libc::SIGCONT);
-            if libc::kill(pid as libc::pid_t, libc::SIGKILL) != 0 {
+            let pid = pid_to_unix_pid(pid)?;
+            let _ = libc::kill(pid, libc::SIGCONT);
+            if libc::kill(pid, libc::SIGKILL) != 0 {
                 return Err(ConversionError::Shell("Failed to send SIGKILL".to_string()));
             }
         }
@@ -368,6 +403,126 @@ impl ConversionManager {
             let _ = CloseHandle(process_handle);
         }
         Ok(())
+    }
+}
+
+fn process_start_time(pid: u32) -> Option<u64> {
+    if pid == 0 {
+        return None;
+    }
+    let target = Pid::from_u32(pid);
+    let mut system = System::new();
+    system.refresh_processes(ProcessesToUpdate::Some(&[target]), true);
+    system.process(target).map(sysinfo::Process::start_time)
+}
+
+fn ensure_same_process(id: &str, process: ActiveProcess) -> Result<(), ConversionError> {
+    if process.start_time == 0 {
+        return Ok(());
+    }
+
+    let current_start = process_start_time(process.pid)
+        .ok_or_else(|| ConversionError::TaskNotFound(id.to_string()))?;
+    if current_start != process.start_time {
+        return Err(ConversionError::TaskNotFound(id.to_string()));
+    }
+
+    Ok(())
+}
+
+#[cfg(unix)]
+fn pid_to_unix_pid(pid: u32) -> Result<libc::pid_t, ConversionError> {
+    libc::pid_t::try_from(pid)
+        .map_err(|_| ConversionError::Shell(format!("PID {pid} is out of range for libc::pid_t")))
+}
+
+fn finalize_task_state(
+    id: &str,
+    running_tasks: &mut HashSet<String>,
+    active_tasks: &mut HashMap<String, ActiveProcess>,
+    cancelled_tasks: &mut HashSet<String>,
+) -> bool {
+    running_tasks.remove(id);
+    active_tasks.remove(id);
+    cancelled_tasks.remove(id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ActiveProcess, ensure_same_process, finalize_task_state, process_start_time};
+    use std::collections::{HashMap, HashSet};
+
+    #[test]
+    fn finalize_task_state_cleans_all_maps_for_cancelled_task() {
+        let id = "task-1";
+        let mut running = HashSet::from([id.to_string()]);
+        let mut active = HashMap::from([(
+            id.to_string(),
+            ActiveProcess {
+                pid: 42,
+                start_time: 7,
+            },
+        )]);
+        let mut cancelled = HashSet::from([id.to_string()]);
+
+        let was_cancelled = finalize_task_state(id, &mut running, &mut active, &mut cancelled);
+
+        assert!(was_cancelled);
+        assert!(!running.contains(id));
+        assert!(!active.contains_key(id));
+        assert!(!cancelled.contains(id));
+    }
+
+    #[test]
+    fn finalize_task_state_cleans_all_maps_for_non_cancelled_task() {
+        let id = "task-2";
+        let mut running = HashSet::from([id.to_string()]);
+        let mut active = HashMap::from([(
+            id.to_string(),
+            ActiveProcess {
+                pid: 55,
+                start_time: 9,
+            },
+        )]);
+        let mut cancelled = HashSet::<String>::new();
+
+        let was_cancelled = finalize_task_state(id, &mut running, &mut active, &mut cancelled);
+
+        assert!(!was_cancelled);
+        assert!(!running.contains(id));
+        assert!(!active.contains_key(id));
+    }
+
+    #[test]
+    fn ensure_same_process_accepts_current_process_identity() {
+        let pid = std::process::id();
+        let start_time =
+            process_start_time(pid).expect("Current process start time should be readable");
+
+        let result = ensure_same_process("self", ActiveProcess { pid, start_time });
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn ensure_same_process_rejects_mismatched_start_time() {
+        let pid = std::process::id();
+        let start_time =
+            process_start_time(pid).expect("Current process start time should be readable");
+
+        let err = ensure_same_process(
+            "self",
+            ActiveProcess {
+                pid,
+                start_time: start_time.saturating_add(1),
+            },
+        )
+        .expect_err("Mismatched process start time should fail");
+
+        assert!(
+            err.to_string().contains("Task not found"),
+            "Unexpected error: {err}"
+        );
     }
 }
 

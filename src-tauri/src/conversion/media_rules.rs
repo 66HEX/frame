@@ -1,6 +1,6 @@
-use once_cell::sync::Lazy;
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
+use std::sync::LazyLock;
 
 const ANY_CODEC_TOKEN: &str = "*";
 
@@ -10,7 +10,11 @@ struct MediaRulesRaw {
     audio_only_containers: Vec<String>,
     #[serde(default)]
     video_only_containers: Vec<String>,
+    #[serde(default)]
+    image_containers: Vec<String>,
     container_video_codec_compatibility: HashMap<String, Vec<String>>,
+    #[serde(default)]
+    container_encoder_pixel_format_compatibility: HashMap<String, HashMap<String, Vec<String>>>,
     #[serde(default)]
     container_video_stream_codec_compatibility: HashMap<String, Vec<String>>,
     container_audio_codec_compatibility: HashMap<String, Vec<String>>,
@@ -24,7 +28,9 @@ struct MediaRulesRaw {
 struct MediaRules {
     audio_only_containers: HashSet<String>,
     video_only_containers: HashSet<String>,
+    image_containers: HashSet<String>,
     container_video_codec_compatibility: HashMap<String, HashSet<String>>,
+    container_encoder_pixel_format_compatibility: HashMap<String, HashMap<String, HashSet<String>>>,
     container_video_stream_codec_compatibility: HashMap<String, HashSet<String>>,
     container_audio_codec_compatibility: HashMap<String, HashSet<String>>,
     container_audio_stream_codec_compatibility: HashMap<String, HashSet<String>>,
@@ -44,13 +50,42 @@ impl From<MediaRulesRaw> for MediaRules {
                 .into_iter()
                 .map(|container| container.to_ascii_lowercase())
                 .collect(),
+            image_containers: raw
+                .image_containers
+                .into_iter()
+                .map(|container| container.to_ascii_lowercase())
+                .collect(),
             container_video_codec_compatibility: raw
                 .container_video_codec_compatibility
                 .into_iter()
                 .map(|(container, codecs)| {
                     (
                         container.to_ascii_lowercase(),
-                        codecs.into_iter().collect::<HashSet<_>>(),
+                        codecs
+                            .into_iter()
+                            .map(|codec| codec.to_ascii_lowercase())
+                            .collect::<HashSet<_>>(),
+                    )
+                })
+                .collect(),
+            container_encoder_pixel_format_compatibility: raw
+                .container_encoder_pixel_format_compatibility
+                .into_iter()
+                .map(|(container, encoder_map)| {
+                    (
+                        container.to_ascii_lowercase(),
+                        encoder_map
+                            .into_iter()
+                            .map(|(encoder, pixel_formats)| {
+                                (
+                                    encoder.to_ascii_lowercase(),
+                                    pixel_formats
+                                        .into_iter()
+                                        .map(|format| format.to_ascii_lowercase())
+                                        .collect::<HashSet<_>>(),
+                                )
+                            })
+                            .collect::<HashMap<_, _>>(),
                     )
                 })
                 .collect(),
@@ -60,7 +95,10 @@ impl From<MediaRulesRaw> for MediaRules {
                 .map(|(container, codecs)| {
                     (
                         container.to_ascii_lowercase(),
-                        codecs.into_iter().collect::<HashSet<_>>(),
+                        codecs
+                            .into_iter()
+                            .map(|codec| codec.to_ascii_lowercase())
+                            .collect::<HashSet<_>>(),
                     )
                 })
                 .collect(),
@@ -70,7 +108,10 @@ impl From<MediaRulesRaw> for MediaRules {
                 .map(|(container, codecs)| {
                     (
                         container.to_ascii_lowercase(),
-                        codecs.into_iter().collect::<HashSet<_>>(),
+                        codecs
+                            .into_iter()
+                            .map(|codec| codec.to_ascii_lowercase())
+                            .collect::<HashSet<_>>(),
                     )
                 })
                 .collect(),
@@ -80,7 +121,10 @@ impl From<MediaRulesRaw> for MediaRules {
                 .map(|(container, codecs)| {
                     (
                         container.to_ascii_lowercase(),
-                        codecs.into_iter().collect::<HashSet<_>>(),
+                        codecs
+                            .into_iter()
+                            .map(|codec| codec.to_ascii_lowercase())
+                            .collect::<HashSet<_>>(),
                     )
                 })
                 .collect(),
@@ -90,7 +134,10 @@ impl From<MediaRulesRaw> for MediaRules {
                 .map(|(container, codecs)| {
                     (
                         container.to_ascii_lowercase(),
-                        codecs.into_iter().collect::<HashSet<_>>(),
+                        codecs
+                            .into_iter()
+                            .map(|codec| codec.to_ascii_lowercase())
+                            .collect::<HashSet<_>>(),
                     )
                 })
                 .collect(),
@@ -98,7 +145,7 @@ impl From<MediaRulesRaw> for MediaRules {
     }
 }
 
-static MEDIA_RULES: Lazy<MediaRules> = Lazy::new(|| {
+static MEDIA_RULES: LazyLock<MediaRules> = LazyLock::new(|| {
     let raw: MediaRulesRaw =
         serde_json::from_str(include_str!("../../../src/lib/shared/media-rules.json"))
             .expect("Shared media rules JSON is invalid");
@@ -115,25 +162,44 @@ pub fn is_audio_only_container(container: &str) -> bool {
 pub fn is_video_codec_allowed(container: &str, codec: &str) -> bool {
     let container = container.to_ascii_lowercase();
     let codec = codec.to_ascii_lowercase();
-    match MEDIA_RULES
+    MEDIA_RULES
         .container_video_codec_compatibility
         .get(&container)
-    {
-        Some(allowed) => allowed.contains(&codec),
-        None => true,
-    }
+        .is_none_or(|allowed| allowed.contains(&codec))
 }
 
 pub fn is_video_stream_codec_allowed(container: &str, codec: &str) -> bool {
     let container = container.to_ascii_lowercase();
     let codec = codec.to_ascii_lowercase();
-    match MEDIA_RULES
+    MEDIA_RULES
         .container_video_stream_codec_compatibility
         .get(&container)
-    {
-        Some(allowed) => allowed.contains(ANY_CODEC_TOKEN) || allowed.contains(&codec),
-        None => true,
+        .is_none_or(|allowed| allowed.contains(ANY_CODEC_TOKEN) || allowed.contains(&codec))
+}
+
+pub fn is_video_pixel_format_allowed(container: &str, encoder: &str, pixel_format: &str) -> bool {
+    let container = container.to_ascii_lowercase();
+    let encoder = encoder.to_ascii_lowercase();
+    let pixel_format = pixel_format.to_ascii_lowercase();
+    if pixel_format == "auto" {
+        return true;
     }
+
+    let Some(container_rules) = MEDIA_RULES
+        .container_encoder_pixel_format_compatibility
+        .get(&container)
+    else {
+        return true;
+    };
+
+    let Some(allowed) = container_rules
+        .get(&encoder)
+        .or_else(|| container_rules.get(ANY_CODEC_TOKEN))
+    else {
+        return false;
+    };
+
+    allowed.contains(ANY_CODEC_TOKEN) || allowed.contains(&pixel_format)
 }
 
 pub fn is_video_only_container(container: &str) -> bool {
@@ -142,46 +208,45 @@ pub fn is_video_only_container(container: &str) -> bool {
         .contains(&container.to_ascii_lowercase())
 }
 
+pub fn is_image_container(container: &str) -> bool {
+    MEDIA_RULES
+        .image_containers
+        .contains(&container.to_ascii_lowercase())
+}
+
 pub fn container_supports_audio(container: &str) -> bool {
-    !is_video_only_container(container)
+    !is_video_only_container(container) && !is_image_container(container)
 }
 
 pub fn container_supports_subtitles(container: &str) -> bool {
-    !is_audio_only_container(container) && !is_video_only_container(container)
+    !is_audio_only_container(container)
+        && !is_video_only_container(container)
+        && !is_image_container(container)
 }
 
 pub fn is_audio_codec_allowed(container: &str, codec: &str) -> bool {
     let container = container.to_ascii_lowercase();
     let codec = codec.to_ascii_lowercase();
-    match MEDIA_RULES
+    MEDIA_RULES
         .container_audio_codec_compatibility
         .get(&container)
-    {
-        Some(allowed) => allowed.contains(ANY_CODEC_TOKEN) || allowed.contains(&codec),
-        None => true,
-    }
+        .is_none_or(|allowed| allowed.contains(ANY_CODEC_TOKEN) || allowed.contains(&codec))
 }
 
 pub fn is_audio_stream_codec_allowed(container: &str, codec: &str) -> bool {
     let container = container.to_ascii_lowercase();
     let codec = codec.to_ascii_lowercase();
-    match MEDIA_RULES
+    MEDIA_RULES
         .container_audio_stream_codec_compatibility
         .get(&container)
-    {
-        Some(allowed) => allowed.contains(ANY_CODEC_TOKEN) || allowed.contains(&codec),
-        None => true,
-    }
+        .is_none_or(|allowed| allowed.contains(ANY_CODEC_TOKEN) || allowed.contains(&codec))
 }
 
 pub fn is_subtitle_codec_allowed(container: &str, codec: &str) -> bool {
     let container = container.to_ascii_lowercase();
     let codec = codec.to_ascii_lowercase();
-    match MEDIA_RULES
+    MEDIA_RULES
         .container_subtitle_codec_compatibility
         .get(&container)
-    {
-        Some(allowed) => allowed.contains(ANY_CODEC_TOKEN) || allowed.contains(&codec),
-        None => true,
-    }
+        .is_none_or(|allowed| allowed.contains(ANY_CODEC_TOKEN) || allowed.contains(&codec))
 }

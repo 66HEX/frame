@@ -78,13 +78,19 @@ pub async fn probe_media(
 }
 
 #[command]
-pub fn get_max_concurrency(
-    manager: tauri::State<'_, ConversionManager>,
-) -> Result<usize, ConversionError> {
-    Ok(manager.current_max_concurrency())
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Tauri command extractors pass State by value"
+)]
+pub fn get_max_concurrency(manager: tauri::State<'_, ConversionManager>) -> usize {
+    manager.current_max_concurrency()
 }
 
 #[command]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Tauri command extractors pass State by value"
+)]
 pub fn set_max_concurrency(
     manager: tauri::State<'_, ConversionManager>,
     value: usize,

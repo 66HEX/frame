@@ -8,16 +8,7 @@
 	import { checkForAppUpdate } from '$lib/services/update';
 	import { updateStore } from '$lib/stores/update.svelte';
 	import Checkbox from './ui/Checkbox.svelte';
-	import Slider from './ui/Slider.svelte';
-	import {
-		loadAutoUpdateCheck,
-		loadWindowOpacity,
-		loadFontFamily,
-		persistAutoUpdateCheck,
-		persistWindowOpacity,
-		persistFontFamily
-	} from '$lib/services/settings';
-	import { themeStore } from '$lib/stores/theme.svelte';
+	import { loadAutoUpdateCheck, persistAutoUpdateCheck } from '$lib/services/settings';
 	import { onMount } from 'svelte';
 	import { _, locale, setLocale, supportedLocales } from '$lib/i18n';
 
@@ -48,23 +39,10 @@
 	let hasHydratedSettings = $state(false);
 	let checkStatus = $state('');
 	let autoUpdateCheck = $state(true);
-	let opacity = $state(themeStore.opacity);
-	let fontFamily = $state(themeStore.fontFamily);
 	let currentLocale = $state($locale || 'en-US');
 
 	onMount(async () => {
-		const [savedAutoUpdateCheck, savedOpacity, savedFontFamily] = await Promise.all([
-			loadAutoUpdateCheck(),
-			loadWindowOpacity(),
-			loadFontFamily()
-		]);
-
-		autoUpdateCheck = savedAutoUpdateCheck;
-		opacity = savedOpacity;
-		fontFamily = savedFontFamily;
-
-		themeStore.opacity = savedOpacity;
-		themeStore.fontFamily = savedFontFamily;
+		autoUpdateCheck = await loadAutoUpdateCheck();
 		hasHydratedSettings = true;
 	});
 
@@ -78,22 +56,6 @@
 		if (!hasHydratedSettings) return;
 		void persistAutoUpdateCheck(autoUpdateCheck).catch((error) => {
 			console.error('Failed to persist auto-update setting', error);
-		});
-	});
-
-	$effect(() => {
-		if (!hasHydratedSettings) return;
-		themeStore.opacity = opacity;
-		void persistWindowOpacity(opacity).catch((error) => {
-			console.error('Failed to persist window opacity', error);
-		});
-	});
-
-	$effect(() => {
-		if (!hasHydratedSettings) return;
-		themeStore.fontFamily = fontFamily;
-		void persistFontFamily(fontFamily).catch((error) => {
-			console.error('Failed to persist font family', error);
 		});
 	});
 
@@ -183,37 +145,6 @@
 				>
 					{isSaving ? $_('settings.saving') : $_('common.apply')}
 				</Button>
-			</div>
-		</div>
-
-		<div class="space-y-3 pt-2">
-			<Label variant="section">{$_('settings.visuals')}</Label>
-			<div class="space-y-3">
-				<div class="flex items-center justify-between">
-					<Label for="opacity-slider">{$_('settings.windowTint')}</Label>
-					<span class="text-[10px] text-gray-alpha-600">{opacity}%</span>
-				</div>
-				<Slider id="opacity-slider" min={20} max={100} step={1} bind:value={opacity} />
-			</div>
-
-			<div class="space-y-3 pt-2">
-				<Label>{$_('settings.fontFamily')}</Label>
-				<div class="grid grid-cols-2 gap-2">
-					<Button
-						variant={fontFamily === 'mono' ? 'default' : 'secondary'}
-						onclick={() => (fontFamily = 'mono')}
-						class="w-full"
-					>
-						{$_('settings.fontMono')}
-					</Button>
-					<Button
-						variant={fontFamily === 'sans' ? 'default' : 'secondary'}
-						onclick={() => (fontFamily = 'sans')}
-						class="w-full"
-					>
-						{$_('settings.fontSans')}
-					</Button>
-				</div>
 			</div>
 		</div>
 
