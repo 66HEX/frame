@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-03-27
+
 ### Added
 
 - **Image Workflow (End-to-End):** Added first-class image source handling across probing (`mediaKind=image`), settings navigation (new `Images` tab), file-picker filters, and locale dictionaries.
