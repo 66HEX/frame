@@ -620,61 +620,68 @@
 				>
 					<track kind="captions" />
 				</video>
-
-				{#if cropMode && draftCrop}
-					<div class="pointer-events-none absolute inset-0">
-						<div
-							class="absolute top-0 left-0 w-full bg-black/40"
-							style={`height: ${draftCrop.y * 100}%;`}
-						></div>
-						<div
-							class="absolute left-0 bg-black/40"
-							style={`top: ${draftCrop.y * 100}%; height: ${draftCrop.height * 100}%; width: ${
-								draftCrop.x * 100
-							}%;`}
-						></div>
-						<div
-							class="absolute right-0 bg-black/40"
-							style={`top: ${draftCrop.y * 100}%; height: ${draftCrop.height * 100}%; width: ${
-								(1 - draftCrop.x - draftCrop.width) * 100
-							}%;`}
-						></div>
-						<div
-							class="absolute bottom-0 left-0 w-full bg-black/40"
-							style={`height: ${(1 - draftCrop.y - draftCrop.height) * 100}%;`}
-						></div>
-					</div>
-
-					<div
-						class="absolute rounded border border-foreground shadow-xl"
-						style={`left: ${draftCrop.x * 100}%; top: ${draftCrop.y * 100}%; width: ${
-							draftCrop.width * 100
-						}%; height: ${draftCrop.height * 100}%;`}
-						role="presentation"
-						onmousedown={(event) => beginCropDrag('move', event)}
-					>
-						{#each [1, 2] as index (index)}
-							<div
-								class="absolute left-0 h-px w-full bg-foreground/40"
-								style={`top: ${(index / 3) * 100}%`}
-							></div>
-							<div
-								class="absolute top-0 h-full w-px bg-foreground/40"
-								style={`left: ${(index / 3) * 100}%`}
-							></div>
-						{/each}
-
-						{#each [{ id: 'nw', top: 0, left: 0 }, { id: 'n', top: 0, left: 50 }, { id: 'ne', top: 0, left: 100 }, { id: 'e', top: 50, left: 100 }, { id: 'se', top: 100, left: 100 }, { id: 's', top: 100, left: 50 }, { id: 'sw', top: 100, left: 0 }, { id: 'w', top: 50, left: 0 }] as handle (handle.id)}
-							<span
-								onmousedown={(event) => beginCropDrag(handle.id as DragHandle, event)}
-								class="absolute block size-3 rounded-full border border-foreground bg-foreground"
-								style={`cursor: ${getHandleCursor(handle.id, isSideRotation)}; top: calc(${handle.top}% - 6px); left: calc(${handle.left}% - 6px);`}
-								role="presentation"
-							></span>
-						{/each}
-					</div>
-				{/if}
 			</div>
+
+			{#if cropMode && draftCrop}
+				<div class="pointer-events-none absolute inset-0 z-20">
+					<div
+						class="absolute top-0 left-0 w-full bg-black/55 backdrop-blur-[1px]"
+						style={`height: ${draftCrop.y * 100}%;`}
+					></div>
+					<div
+						class="absolute left-0 bg-black/55 backdrop-blur-[1px]"
+						style={`top: ${draftCrop.y * 100}%; height: ${draftCrop.height * 100}%; width: ${
+							draftCrop.x * 100
+						}%;`}
+					></div>
+					<div
+						class="absolute right-0 bg-black/55 backdrop-blur-[1px]"
+						style={`top: ${draftCrop.y * 100}%; height: ${draftCrop.height * 100}%; width: ${
+							(1 - draftCrop.x - draftCrop.width) * 100
+						}%;`}
+					></div>
+					<div
+						class="absolute bottom-0 left-0 w-full bg-black/55 backdrop-blur-[1px]"
+						style={`height: ${(1 - draftCrop.y - draftCrop.height) * 100}%;`}
+					></div>
+				</div>
+
+				<div
+					class="absolute z-30 rounded-md border border-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.45),0_14px_30px_rgba(0,0,0,0.35)] ring-1 ring-white/20"
+					style={`left: ${draftCrop.x * 100}%; top: ${draftCrop.y * 100}%; width: ${
+						draftCrop.width * 100
+					}%; height: ${draftCrop.height * 100}%;`}
+					role="presentation"
+					onmousedown={(event) => beginCropDrag('move', event)}
+				>
+					{#each [1, 2] as index (index)}
+						<div
+							class="pointer-events-none absolute left-0 h-px w-full bg-white/70"
+							style={`top: ${(index / 3) * 100}%`}
+						></div>
+						<div
+							class="pointer-events-none absolute top-0 h-full w-px bg-white/70"
+							style={`left: ${(index / 3) * 100}%`}
+						></div>
+					{/each}
+
+					{#each [{ top: 0, left: 0, w: 16, h: 2 }, { top: 0, left: 0, w: 2, h: 16 }, { top: 0, left: 100, w: 16, h: 2 }, { top: 0, left: 100, w: 2, h: 16 }, { top: 100, left: 0, w: 16, h: 2 }, { top: 100, left: 0, w: 2, h: 16 }, { top: 100, left: 100, w: 16, h: 2 }, { top: 100, left: 100, w: 2, h: 16 }] as cornerMark (cornerMark.top + '-' + cornerMark.left + '-' + cornerMark.w)}
+						<div
+							class="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/95 shadow-[0_0_0_1px_rgba(0,0,0,0.4)]"
+							style={`top: ${cornerMark.top}%; left: ${cornerMark.left}%; width: ${cornerMark.w}px; height: ${cornerMark.h}px;`}
+						></div>
+					{/each}
+
+					{#each [{ id: 'nw', top: 0, left: 0 }, { id: 'n', top: 0, left: 50 }, { id: 'ne', top: 0, left: 100 }, { id: 'e', top: 50, left: 100 }, { id: 'se', top: 100, left: 100 }, { id: 's', top: 100, left: 50 }, { id: 'sw', top: 100, left: 0 }, { id: 'w', top: 50, left: 0 }] as handle (handle.id)}
+						<span
+							onmousedown={(event) => beginCropDrag(handle.id as DragHandle, event)}
+							class="absolute block h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-black/35 bg-white shadow-[0_2px_10px_rgba(0,0,0,0.75)] transition-transform hover:scale-110"
+							style={`cursor: ${getHandleCursor(handle.id, isSideRotation)}; top: ${handle.top}%; left: ${handle.left}%;`}
+							role="presentation"
+						></span>
+					{/each}
+				</div>
+			{/if}
 		</div>
 		{#if !cropMode && (!isPlaying || isHovering)}
 			<div
@@ -701,7 +708,7 @@
 		{/if}
 		{#if cropMode && draftCrop}
 			<div
-				class="button-highlight pointer-events-auto absolute! bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-md border border-gray-alpha-200 bg-background p-1 text-[10px] font-semibold shadow-xl"
+				class="button-highlight pointer-events-auto absolute! bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-md border border-gray-alpha-200 bg-background p-1 text-[10px] font-semibold shadow-xl"
 			>
 				{#each ASPECT_OPTIONS as option (option.id)}
 					<Button
