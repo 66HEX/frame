@@ -8,7 +8,7 @@ use crate::conversion::filters::{build_audio_filters, build_video_filters};
 use crate::conversion::media_rules::{
     container_supports_audio, container_supports_subtitles, is_audio_codec_allowed,
     is_audio_stream_codec_allowed, is_subtitle_codec_allowed, is_video_codec_allowed,
-    is_video_only_container, is_video_stream_codec_allowed,
+    is_video_only_container, is_video_pixel_format_allowed, is_video_stream_codec_allowed,
 };
 use crate::conversion::types::{
     AudioTrack, ConversionConfig, MetadataConfig, MetadataMode, ProbeMetadata, SubtitleTrack,
@@ -18,6 +18,11 @@ use crate::conversion::utils::{get_hwaccel_args, is_audio_only_container, parse_
 
 fn is_copy_mode(config: &ConversionConfig) -> bool {
     config.processing_mode == "copy"
+}
+
+fn has_custom_pixel_format(config: &ConversionConfig) -> bool {
+    let pixel_format = config.pixel_format.trim();
+    !pixel_format.is_empty() && pixel_format != "auto"
 }
 
 fn collect_selected_audio_tracks<'a>(
@@ -265,6 +270,10 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         args.push("gif".to_string());
     } else {
         add_video_codec_args(&mut args, config);
+        if has_custom_pixel_format(config) {
+            args.push("-pix_fmt".to_string());
+            args.push(config.pixel_format.trim().to_string());
+        }
 
         let video_filters = build_video_filters(config, true);
         if !video_filters.is_empty() {
@@ -565,6 +574,26 @@ pub fn validate_task_input(
         ));
     }
 
+    if (is_audio_only || is_video_only) && has_custom_pixel_format(config) {
+        return Err(ConversionError::InvalidInput(
+            "Pixel format override is not available for this container".to_string(),
+        ));
+    }
+
+    if !is_copy_mode
+        && has_custom_pixel_format(config)
+        && !is_video_pixel_format_allowed(
+            &config.container,
+            &config.video_codec,
+            &config.pixel_format,
+        )
+    {
+        return Err(ConversionError::InvalidInput(format!(
+            "Pixel format '{}' is not compatible with container '{}' and encoder '{}'",
+            config.pixel_format, config.container, config.video_codec
+        )));
+    }
+
     if is_copy_mode {
         if is_video_only {
             return Err(ConversionError::InvalidInput(
@@ -575,6 +604,12 @@ pub fn validate_task_input(
         if has_ml_upscale {
             return Err(ConversionError::InvalidInput(
                 "ML upscaling requires re-encoding mode".to_string(),
+            ));
+        }
+
+        if has_custom_pixel_format(config) {
+            return Err(ConversionError::InvalidInput(
+                "Pixel format override requires re-encoding mode".to_string(),
             ));
         }
 

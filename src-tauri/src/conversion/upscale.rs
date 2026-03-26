@@ -25,7 +25,7 @@ pub fn build_upscale_encode_args(
     output_path: &str,
     source_fps: f64,
     config: &ConversionConfig,
-    pixel_format: Option<String>,
+    source_pixel_format: Option<String>,
 ) -> Vec<String> {
     let mut enc_args = vec![
         "-framerate".to_string(),
@@ -113,11 +113,15 @@ pub fn build_upscale_encode_args(
 
     add_fps_args(&mut enc_args, config);
 
-    // Pixel format handling: try to preserve high bit-depth or default to yuv420p
+    // Pixel format handling: user override wins, otherwise preserve high bit-depth or default to yuv420p
     enc_args.push("-pix_fmt".to_string());
-    if let Some(pf) = pixel_format {
-        if pf.contains("10") || pf.contains("12") {
-            enc_args.push(pf);
+    let configured_pixel_format = config.pixel_format.trim();
+    if !configured_pixel_format.is_empty() && configured_pixel_format != "auto" {
+        enc_args.push(configured_pixel_format.to_string());
+    } else if let Some(pf) = source_pixel_format {
+        let normalized = pf.trim().to_string();
+        if normalized.contains("10") || normalized.contains("12") {
+            enc_args.push(normalized);
         } else {
             enc_args.push("yuv420p".to_string());
         }

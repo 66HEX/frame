@@ -7,9 +7,12 @@ import {
 } from '$lib/constants/media-rules';
 import {
 	NVENC_ENCODERS,
+	VIDEO_PIXEL_FORMAT_OPTIONS,
 	VIDEOTOOLBOX_ENCODERS,
+	getFirstAllowedVideoPixelFormat,
 	getFirstAllowedPreset,
 	getFirstAllowedVideoCodec,
+	isVideoPixelFormatAllowed,
 	isVideoCodecAllowed,
 	isVideoPresetAllowed
 } from '$lib/services/video-compatibility';
@@ -26,6 +29,14 @@ export function normalizeConversionConfig(
 		metadata: { ...config.metadata },
 		crop: config.crop ? { ...config.crop } : config.crop
 	};
+
+	const requestedPixelFormat =
+		typeof next.pixelFormat === 'string' ? next.pixelFormat.trim() : 'auto';
+	next.pixelFormat = VIDEO_PIXEL_FORMAT_OPTIONS.map((option) => option.id).includes(
+		requestedPixelFormat as (typeof VIDEO_PIXEL_FORMAT_OPTIONS)[number]['id']
+	)
+		? (requestedPixelFormat as ConversionConfig['pixelFormat'])
+		: 'auto';
 
 	const isSourceAudioOnly = Boolean(metadata && !metadata.videoCodec);
 	if (isSourceAudioOnly && !AUDIO_ONLY_CONTAINERS.includes(next.container)) {
@@ -63,6 +74,7 @@ export function normalizeConversionConfig(
 	const isCopyMode = next.processingMode === 'copy';
 
 	if (isCopyMode) {
+		next.pixelFormat = 'auto';
 		next.subtitleBurnPath = undefined;
 		next.audioNormalize = false;
 		next.audioVolume = 100;
@@ -82,6 +94,7 @@ export function normalizeConversionConfig(
 	}
 
 	if (isAudioContainer) {
+		next.pixelFormat = 'auto';
 		next.mlUpscale = 'none';
 		next.selectedSubtitleTracks = [];
 		next.subtitleBurnPath = undefined;
@@ -98,6 +111,7 @@ export function normalizeConversionConfig(
 	}
 
 	if (isGifOutput && !isCopyMode) {
+		next.pixelFormat = 'auto';
 		next.videoCodec = 'gif';
 		next.videoBitrateMode = 'crf';
 		next.mlUpscale = 'none';
@@ -109,6 +123,15 @@ export function normalizeConversionConfig(
 
 	if (!isCopyMode && !isAudioContainer && !isVideoCodecAllowed(next.container, next.videoCodec)) {
 		next.videoCodec = getFirstAllowedVideoCodec(next.container);
+	}
+
+	if (
+		!isCopyMode &&
+		!isAudioContainer &&
+		!isGifOutput &&
+		!isVideoPixelFormatAllowed(next.container, next.videoCodec, next.pixelFormat ?? 'auto')
+	) {
+		next.pixelFormat = getFirstAllowedVideoPixelFormat(next.container, next.videoCodec);
 	}
 
 	if (

@@ -106,6 +106,8 @@ pub struct ConversionConfig {
     pub videotoolbox_allow_sw: bool,
     #[serde(default = "default_hw_decode")]
     pub hw_decode: bool,
+    #[serde(default = "default_pixel_format")]
+    pub pixel_format: String,
     #[serde(default = "default_gif_colors")]
     pub gif_colors: u16,
     #[serde(default = "default_gif_dither")]
@@ -132,6 +134,10 @@ const fn default_audio_volume() -> f64 {
 
 const fn default_hw_decode() -> bool {
     false
+}
+
+fn default_pixel_format() -> String {
+    "auto".to_string()
 }
 
 const fn default_gif_colors() -> u16 {

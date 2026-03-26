@@ -57,6 +57,7 @@ mod conversion_tests {
             nvenc_temporal_aq: false,
             videotoolbox_allow_sw: false,
             hw_decode: false,
+            pixel_format: "auto".into(),
             gif_colors: 256,
             gif_dither: "sierra2_4a".into(),
             gif_loop: 0,
@@ -127,6 +128,15 @@ mod conversion_tests {
         assert!(contains_args(&args, &["-preset", "medium"]));
 
         assert!(!args.iter().any(|a| a == "-vf"));
+    }
+
+    #[test]
+    fn test_output_pixel_format_flag_when_overridden() {
+        let mut config = sample_config("mp4");
+        config.pixel_format = "yuv444p10le".into();
+
+        let args = build_ffmpeg_args("input.mov", "output.mp4", &config);
+        assert!(contains_arg_pair(&args, "-pix_fmt", "yuv444p10le"));
     }
 
     #[test]
@@ -599,6 +609,32 @@ mod conversion_tests {
     }
 
     #[test]
+    fn test_validate_rejects_stream_copy_with_pixel_format_override() {
+        let mut config = sample_config("mp4");
+        config.processing_mode = "copy".into();
+        config.pixel_format = "yuv444p".into();
+
+        let path = create_temp_input_file();
+        let result = validate_task_input(path.to_str().unwrap(), &config);
+        let _ = fs::remove_file(&path);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_rejects_incompatible_pixel_format_for_container() {
+        let mut config = sample_config("mp4");
+        config.video_codec = "libsvtav1".into();
+        config.pixel_format = "yuv444p".into();
+
+        let path = create_temp_input_file();
+        let result = validate_task_input(path.to_str().unwrap(), &config);
+        let _ = fs::remove_file(&path);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_validate_accepts_stream_copy_with_trim() {
         let mut config = sample_config("mp4");
         config.processing_mode = "copy".into();
@@ -711,6 +747,23 @@ mod conversion_tests {
 
         assert!(contains_arg_pair(&args, "-map_metadata", "-1"));
         assert!(contains_args(&args, &["-metadata", "title=Upscaled"]));
+    }
+
+    #[test]
+    fn test_upscale_encode_respects_pixel_format_override() {
+        let mut config = sample_config("mp4");
+        config.pixel_format = "yuv444p".into();
+
+        let args = build_upscale_encode_args(
+            &PathBuf::from("/tmp/frame_upscale_test/output"),
+            "input.mp4",
+            "output.mp4",
+            30.0,
+            &config,
+            Some("yuv420p10le".into()),
+        );
+
+        assert!(contains_arg_pair(&args, "-pix_fmt", "yuv444p"));
     }
 }
 
@@ -838,6 +891,7 @@ mod utils_tests {
         is_subtitle_codec_allowed as is_subtitle_codec_allowed_rule,
         is_video_codec_allowed as is_video_codec_allowed_rule,
         is_video_only_container as is_video_only_container_rule,
+        is_video_pixel_format_allowed as is_video_pixel_format_allowed_rule,
         is_video_stream_codec_allowed as is_video_stream_codec_allowed_rule,
     };
     use crate::conversion::utils::{
@@ -914,6 +968,27 @@ mod utils_tests {
         assert!(is_video_stream_codec_allowed_rule("mp4", "h264"));
         assert!(is_video_stream_codec_allowed_rule("mkv", "mpeg4"));
         assert!(!is_video_stream_codec_allowed_rule("webm", "h264"));
+        assert!(is_video_pixel_format_allowed_rule(
+            "mp4", "libx264", "yuv420p"
+        ));
+        assert!(is_video_pixel_format_allowed_rule(
+            "mp4", "libx264", "yuv444p"
+        ));
+        assert!(!is_video_pixel_format_allowed_rule(
+            "mp4",
+            "libsvtav1",
+            "yuv444p"
+        ));
+        assert!(is_video_pixel_format_allowed_rule(
+            "mkv",
+            "libx265",
+            "yuv444p10le"
+        ));
+        assert!(!is_video_pixel_format_allowed_rule(
+            "webm",
+            "vp9",
+            "yuv444p10le"
+        ));
         assert!(is_audio_codec_allowed_rule("mov", "aac"));
         assert!(is_audio_codec_allowed_rule("mkv", "flac"));
         assert!(!is_audio_codec_allowed_rule("mp4", "flac"));
@@ -1028,6 +1103,7 @@ mod scenario_tests {
             nvenc_temporal_aq: false,
             videotoolbox_allow_sw: false,
             hw_decode: false,
+            pixel_format: "auto".into(),
             gif_colors: 256,
             gif_dither: "sierra2_4a".into(),
             gif_loop: 0,
@@ -1327,6 +1403,7 @@ mod hwaccel_tests {
             nvenc_temporal_aq: false,
             videotoolbox_allow_sw: false,
             hw_decode: true,
+            pixel_format: "auto".into(),
             gif_colors: 256,
             gif_dither: "sierra2_4a".into(),
             gif_loop: 0,
