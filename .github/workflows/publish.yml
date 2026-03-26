@@ -266,3 +266,24 @@ jobs:
             git commit -m "Update Frame to v$VERSION"
             git push
           fi
+
+  publish-winget:
+    needs: publish-tauri
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get Version
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          "VERSION=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Publish release to WinGet
+        uses: vedantmgoyal9/winget-releaser@v2
+        with:
+          identifier: 66HEX.Frame
+          installers-regex: 'x64\-setup\.exe$'
+          release-tag: ${{ steps.version.outputs.VERSION }}
+          token: ${{ secrets.WINGET_ACC_TOKEN }}
