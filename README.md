@@ -21,7 +21,7 @@
 	</a>
 </div>
 
-**Frame** is a high-performance media conversion utility built on the Tauri v2 framework. It provides a native interface for FFmpeg operations, allowing for granular control over video and audio transcoding parameters. The application leverages a Rust-based backend for concurrent task management and process execution, coupled with a Svelte 5 frontend for configuration and state monitoring.
+**Frame** is a high-performance media conversion utility built on the Tauri v2 framework. It provides a native interface for FFmpeg operations, allowing for granular control over video, audio, and image conversion parameters. The application leverages a Rust-based backend for concurrent task management and process execution, coupled with a Svelte 5 frontend for configuration and state monitoring.
 
 <br />
 <div align="center">
@@ -58,7 +58,11 @@ See [GitHub Sponsors](https://github.com/sponsors/66HEX) for full sponsorship de
 
 ### Media Conversion Core
 
-- **Container Support:** `mp4`, `mkv`, `webm`, `mov`, `gif`, `mp3`, `m4a`, `wav`, `flac`.
+- **Media Types:** Video, Audio, Image.
+- **Supported Output Formats:**
+  - **Video:** `mp4`, `mkv`, `webm`, `mov`, `gif`
+  - **Audio:** `mp3`, `m4a`, `wav`, `flac`
+  - **Image:** `png`, `jpg`, `webp`, `bmp`, `tiff`
 - **Video Encoders:**
   - `libx264` (H.264 / AVC)
   - `libx265` (H.265 / HEVC)
@@ -66,11 +70,12 @@ See [GitHub Sponsors](https://github.com/sponsors/66HEX) for full sponsorship de
   - `prores` (Apple ProRes)
   - `libsvtav1` (Scalable Video Technology AV1)
   - **Hardware Acceleration:** `h264_videotoolbox` (Apple Silicon), `hevc_videotoolbox` (Apple Silicon), `h264_nvenc` (NVIDIA), `hevc_nvenc` (NVIDIA), `av1_nvenc` (NVIDIA).
+- **Image Encoders:** `png`, `mjpeg` (JPEG), `libwebp` (WebP), `bmp`, `tiff`.
 - **Audio Encoders:** `aac`, `ac3` (Dolby Digital), `libopus`, `mp3`, `alac` (Apple Lossless), `flac` (Free Lossless Audio Codec), `pcm_s16le` (WAV).
 - **Bitrate Control:** Constant Rate Factor (CRF) or Target Bitrate (kbps).
 - **Scaling:** Bicubic, Lanczos, Bilinear, Nearest Neighbor.
 - **Metadata Probing:** Automated extraction of stream details (codec, duration, bitrate, channel layout) via `ffprobe`.
-- **AI Upscaling:** Integrated `Real-ESRGAN` for high-quality video upscaling (x2, x4).
+- **AI Upscaling:** Integrated `Real-ESRGAN` for high-quality video and image upscaling (x2, x4).
 
 ### Architecture & Workflow
 
@@ -203,6 +208,7 @@ bun run setup:upscaler
     - **Source:** View detected file metadata.
     - **Output:** Select container format and output filename.
     - **Video:** Configure codec, bitrate/CRF, resolution, and framerate.
+    - **Images:** Configure image resolution/scaling, pixel format, and optional AI upscaling.
     - **Audio:** Select codec, bitrate, channels, and specific tracks.
     - **Presets:** Save and load reusable conversion profiles.
 3.  **Execution:** Initiates the conversion process via the Rust backend.
