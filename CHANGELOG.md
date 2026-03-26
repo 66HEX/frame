@@ -11,11 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Native Dialog + Window Surface Simplification:** Removed custom Rust dialog commands and the macOS `dialog-host` workaround in favor of direct `@tauri-apps/plugin-dialog` usage on the frontend. Also removed window effects/transparency plumbing (window tint setting, opacity store hydration, and opacity-driven background mixing), keeping the app on standard opaque window surfaces.
 - **Crop Overlay Visual Overhaul:** Reworked the preview crop overlay presentation with stronger contrast, improved frame styling, clearer rule-of-thirds guides, refined corner marks, and larger/more readable drag handles for a more professional editor-like feel.
+- **Fixed App Typography Mode:** Removed runtime font-family switching and locked UI typography to the embedded Loskeley Mono stack for consistent visuals across sessions/platforms.
 
 ### Fixed
 
 - **Startup Window Handshake (No Splash):** Removed the dedicated splash window flow and switched startup to show the main window only after initialization completes in the frontend boot sequence (`finally`-guarded), preventing stuck-splash states on packaged Windows installs while still avoiding hidden-window deadlocks when a startup step fails.
 - **Crop Overlay Scaling + Layering:** Moved crop overlay rendering outside the transformed video layer so handles/guides keep consistent on-screen size and no longer collapse to subpixel widths. Also raised the crop aspect-ratio action bar above overlay layers to prevent it from being visually covered during crop mode.
+- **Settings Panel Scope:** Removed the App Settings `Visuals` section and deprecated font-family controls to match the mono-only typography model.
 - **Cancellation Event Semantics:** Conversion manager now emits a dedicated `conversion-cancelled` event instead of `conversion-error` when a task was intentionally canceled, preventing false error dialogs and restoring clean cancellation flow in the queue UI.
 - **Process Identity Guarding:** Task control operations (`pause`/`resume`/`cancel`) now verify the active process identity using PID + process start-time metadata, reducing the risk of signaling a different process when PIDs are reused by the OS.
 - **Manager Runtime Coverage:** Added targeted unit tests for conversion-manager state cleanup and process-identity validation paths, increasing automated coverage of cancel/error/pause-resume critical runtime behavior.

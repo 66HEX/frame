@@ -95,7 +95,7 @@ See [GitHub Sponsors](https://github.com/sponsors/66HEX) for full sponsorship de
 - **Styling:** Tailwind CSS v4, `clsx`, `tailwind-merge`.
 - **State Management:** Svelte 5 `$state` / `$props`.
 - **Internationalization:** Multi-language interface with automatic system language detection.
-- **Typography:** Archivo (embedded), Loskeley Mono (embedded).
+- **Typography:** Loskeley Mono (embedded).
 
 ## Installation
 

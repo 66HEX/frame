@@ -8,13 +8,7 @@
 	import { checkForAppUpdate } from '$lib/services/update';
 	import { updateStore } from '$lib/stores/update.svelte';
 	import Checkbox from './ui/Checkbox.svelte';
-	import {
-		loadAutoUpdateCheck,
-		loadFontFamily,
-		persistAutoUpdateCheck,
-		persistFontFamily
-	} from '$lib/services/settings';
-	import { themeStore } from '$lib/stores/theme.svelte';
+	import { loadAutoUpdateCheck, persistAutoUpdateCheck } from '$lib/services/settings';
 	import { onMount } from 'svelte';
 	import { _, locale, setLocale, supportedLocales } from '$lib/i18n';
 
@@ -45,19 +39,10 @@
 	let hasHydratedSettings = $state(false);
 	let checkStatus = $state('');
 	let autoUpdateCheck = $state(true);
-	let fontFamily = $state(themeStore.fontFamily);
 	let currentLocale = $state($locale || 'en-US');
 
 	onMount(async () => {
-		const [savedAutoUpdateCheck, savedFontFamily] = await Promise.all([
-			loadAutoUpdateCheck(),
-			loadFontFamily()
-		]);
-
-		autoUpdateCheck = savedAutoUpdateCheck;
-		fontFamily = savedFontFamily;
-
-		themeStore.fontFamily = savedFontFamily;
+		autoUpdateCheck = await loadAutoUpdateCheck();
 		hasHydratedSettings = true;
 	});
 
@@ -71,14 +56,6 @@
 		if (!hasHydratedSettings) return;
 		void persistAutoUpdateCheck(autoUpdateCheck).catch((error) => {
 			console.error('Failed to persist auto-update setting', error);
-		});
-	});
-
-	$effect(() => {
-		if (!hasHydratedSettings) return;
-		themeStore.fontFamily = fontFamily;
-		void persistFontFamily(fontFamily).catch((error) => {
-			console.error('Failed to persist font family', error);
 		});
 	});
 
@@ -168,29 +145,6 @@
 				>
 					{isSaving ? $_('settings.saving') : $_('common.apply')}
 				</Button>
-			</div>
-		</div>
-
-		<div class="space-y-3 pt-2">
-			<Label variant="section">{$_('settings.visuals')}</Label>
-			<div class="space-y-3">
-				<Label>{$_('settings.fontFamily')}</Label>
-				<div class="grid grid-cols-2 gap-2">
-					<Button
-						variant={fontFamily === 'mono' ? 'default' : 'secondary'}
-						onclick={() => (fontFamily = 'mono')}
-						class="w-full"
-					>
-						{$_('settings.fontMono')}
-					</Button>
-					<Button
-						variant={fontFamily === 'sans' ? 'default' : 'secondary'}
-						onclick={() => (fontFamily = 'sans')}
-						class="w-full"
-					>
-						{$_('settings.fontSans')}
-					</Button>
-				</div>
 			</div>
 		</div>
 
