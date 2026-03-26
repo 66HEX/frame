@@ -47,6 +47,7 @@ pub fn run() {
                     .resizable(true)
                     .fullscreen(false)
                     .decorations(false)
+                    .transparent(true)
                     .visible(false);
 
             let window = builder.build()?;
@@ -68,6 +69,7 @@ pub fn run() {
                     .decorations(false)
                     .always_on_top(true)
                     .visible(false)
+                    .transparent(true)
                     .build()?;
 
             app.manage(conversion::ConversionManager::new(app.handle().clone()));

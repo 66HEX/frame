@@ -173,7 +173,7 @@
 
 		<div class="space-y-3 pt-2">
 			<Label variant="section">{$_('settings.visuals')}</Label>
-			<div class="space-y-3 pt-2">
+			<div class="space-y-3">
 				<Label>{$_('settings.fontFamily')}</Label>
 				<div class="grid grid-cols-2 gap-2">
 					<Button
