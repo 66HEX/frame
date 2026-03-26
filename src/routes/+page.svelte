@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { invoke } from '@tauri-apps/api/core';
+	import { getCurrentWindow } from '@tauri-apps/api/window';
 	import { scale, fade } from 'svelte/transition';
 
 	import { Titlebar } from '$lib/components/layout';
@@ -59,29 +59,36 @@
 	onMount(() => {
 		let unlistenDragDrop: (() => void) | undefined;
 		let mounted = true;
+		const currentWindow = getCurrentWindow();
 
 		(async () => {
-			await initCapabilities();
-			await presetsManager.loadPresets();
-
 			try {
-				maxConcurrencySetting = await loadInitialMaxConcurrency();
-			} catch (error) {
-				console.error('Failed to load concurrency settings', error);
-			}
+				await initCapabilities();
+				await presetsManager.loadPresets();
 
-			if (mounted) {
-				const unlisten = await dragDropManager.setupDragDrop();
+				try {
+					maxConcurrencySetting = await loadInitialMaxConcurrency();
+				} catch (error) {
+					console.error('Failed to load concurrency settings', error);
+				}
+
 				if (mounted) {
-					unlistenDragDrop = unlisten;
-				} else {
-					unlisten();
+					const unlisten = await dragDropManager.setupDragDrop();
+					if (mounted) {
+						unlistenDragDrop = unlisten;
+					} else {
+						unlisten();
+					}
+				}
+			} catch (error) {
+				console.error('Failed to initialize startup flow', error);
+			} finally {
+				if (mounted) {
+					currentWindow.show().catch((error) => {
+						console.error('Failed to show main window after startup', error);
+					});
 				}
 			}
-
-			setTimeout(() => {
-				if (mounted) invoke('close_splash');
-			}, 1000);
 		})();
 
 		updateManager.initUpdateCheck();

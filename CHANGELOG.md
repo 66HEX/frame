@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Startup Window Handshake (No Splash):** Removed the dedicated splash window flow and switched startup to show the main window only after initialization completes in the frontend boot sequence (`finally`-guarded), preventing stuck-splash states on packaged Windows installs while still avoiding hidden-window deadlocks when a startup step fails.
 - **Cancellation Event Semantics:** Conversion manager now emits a dedicated `conversion-cancelled` event instead of `conversion-error` when a task was intentionally canceled, preventing false error dialogs and restoring clean cancellation flow in the queue UI.
 - **Process Identity Guarding:** Task control operations (`pause`/`resume`/`cancel`) now verify the active process identity using PID + process start-time metadata, reducing the risk of signaling a different process when PIDs are reused by the OS.
 - **Manager Runtime Coverage:** Added targeted unit tests for conversion-manager state cleanup and process-identity validation paths, increasing automated coverage of cancel/error/pause-resume critical runtime behavior.

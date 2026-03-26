@@ -3,23 +3,6 @@ mod conversion;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_store::Builder as StoreBuilder;
 
-#[tauri::command]
-async fn close_splash(window: tauri::Window) {
-    if let Some(splash) = window.get_webview_window("splash")
-        && let Err(error) = splash.close()
-    {
-        eprintln!("Failed to close splash window: {error}");
-    }
-
-    if let Some(main) = window.get_webview_window("main") {
-        if let Err(error) = main.show() {
-            eprintln!("Failed to show main window: {error}");
-        }
-    } else {
-        eprintln!("Main window is not available while closing splash");
-    }
-}
-
 /// Boots the Tauri application runtime and registers plugins, windows, and commands.
 ///
 /// # Panics
@@ -61,17 +44,6 @@ pub fn run() {
                 });
             }
 
-            let _splash =
-                WebviewWindowBuilder::new(app, "splash", WebviewUrl::App("splash".into()))
-                    .title("Splash")
-                    .inner_size(300.0, 300.0)
-                    .resizable(false)
-                    .decorations(false)
-                    .always_on_top(true)
-                    .visible(false)
-                    .transparent(true)
-                    .build()?;
-
             app.manage(conversion::ConversionManager::new(app.handle().clone()));
 
             Ok(())
@@ -92,7 +64,6 @@ pub fn run() {
             conversion::commands::get_max_concurrency,
             conversion::commands::set_max_concurrency,
             capabilities::get_available_encoders,
-            close_splash,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
