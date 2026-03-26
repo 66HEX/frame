@@ -13,6 +13,11 @@
 		error?: string;
 	} = $props();
 
+	const sourceKind = $derived(
+		metadata?.mediaKind ?? (metadata && !metadata.videoCodec ? 'audio' : 'video')
+	);
+	const isImage = $derived(sourceKind === 'image');
+
 	function display(value?: string | number) {
 		const str = String(value);
 		return value !== undefined && str.trim().length > 0 ? str : '—';
@@ -90,6 +95,20 @@
 		}
 		return `${hz} Hz`;
 	}
+
+	function hasDurationValue(raw?: string): boolean {
+		if (!raw) return false;
+		const trimmed = raw.trim();
+		return trimmed.length > 0 && trimmed.toLowerCase() !== 'n/a';
+	}
+
+	function hasBitrateValue(raw?: string): boolean {
+		if (!raw) return false;
+		const trimmed = raw.trim();
+		if (!trimmed || trimmed.toLowerCase() === 'n/a') return false;
+		const value = Number(trimmed);
+		return Number.isFinite(value) ? value > 0 : true;
+	}
 </script>
 
 <div class="space-y-6">
@@ -107,18 +126,62 @@
 			{/if}
 		</div>
 	{:else if metadata}
-		<div class="space-y-3">
-			<Label variant="section">{$_('source.fileInfo')}</Label>
-			<div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px]">
-				<div class="text-gray-alpha-600">{$_('source.duration')}</div>
-				<div class="text-right font-semibold">{formatDuration(metadata.duration)}</div>
+		{#if isImage}
+			<div class="space-y-3">
+				<Label variant="section">{$_('source.fileInfo')}</Label>
+				<div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px]">
+					{#if metadata.videoCodec}
+						<div class="text-gray-alpha-600">{$_('source.imageCodec')}</div>
+						<div class="text-right font-semibold">{display(metadata.videoCodec)}</div>
+					{/if}
 
-				<div class="text-gray-alpha-600">{$_('source.containerBitrate')}</div>
-				<div class="text-right font-semibold">{formatContainerBitrate(metadata.bitrate)}</div>
+					<div class="text-gray-alpha-600">{$_('source.dimensions')}</div>
+					<div class="text-right font-semibold">{formatResolution(metadata)}</div>
+
+					{#if metadata.pixelFormat}
+						<div class="text-gray-alpha-600">{$_('source.pixelFormat')}</div>
+						<div class="text-right font-semibold">{display(metadata.pixelFormat)}</div>
+					{/if}
+
+					{#if metadata.profile}
+						<div class="text-gray-alpha-600">{$_('source.profile')}</div>
+						<div class="text-right font-semibold">{display(metadata.profile)}</div>
+					{/if}
+
+					{#if metadata.colorSpace}
+						<div class="text-gray-alpha-600">{$_('source.colorSpace')}</div>
+						<div class="text-right font-semibold">{display(metadata.colorSpace)}</div>
+					{/if}
+
+					{#if metadata.colorRange}
+						<div class="text-gray-alpha-600">{$_('source.colorRange')}</div>
+						<div class="text-right font-semibold">{display(metadata.colorRange)}</div>
+					{/if}
+
+					{#if metadata.colorPrimaries}
+						<div class="text-gray-alpha-600">{$_('source.colorPrimaries')}</div>
+						<div class="text-right font-semibold">{display(metadata.colorPrimaries)}</div>
+					{/if}
+				</div>
 			</div>
-		</div>
+		{:else if hasDurationValue(metadata.duration) || hasBitrateValue(metadata.bitrate)}
+			<div class="space-y-3">
+				<Label variant="section">{$_('source.fileInfo')}</Label>
+				<div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px]">
+					{#if hasDurationValue(metadata.duration)}
+						<div class="text-gray-alpha-600">{$_('source.duration')}</div>
+						<div class="text-right font-semibold">{formatDuration(metadata.duration)}</div>
+					{/if}
 
-		{#if metadata.videoCodec}
+					{#if hasBitrateValue(metadata.bitrate)}
+						<div class="text-gray-alpha-600">{$_('source.containerBitrate')}</div>
+						<div class="text-right font-semibold">{formatContainerBitrate(metadata.bitrate)}</div>
+					{/if}
+				</div>
+			</div>
+		{/if}
+
+		{#if metadata.videoCodec && !isImage}
 			<div class="space-y-3">
 				<Label variant="section">{$_('source.videoStream')}</Label>
 				<div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px]">
@@ -129,12 +192,13 @@
 						<div class="text-gray-alpha-600">{$_('source.profile')}</div>
 						<div class="text-right font-semibold">{display(metadata.profile)}</div>
 					{/if}
-
 					<div class="text-gray-alpha-600">{$_('source.dimensions')}</div>
 					<div class="text-right font-semibold">{formatResolution(metadata)}</div>
 
-					<div class="text-gray-alpha-600">{$_('source.frameRate')}</div>
-					<div class="text-right font-semibold">{formatFrameRate(metadata.frameRate)}</div>
+					{#if metadata.frameRate && metadata.frameRate > 0}
+						<div class="text-gray-alpha-600">{$_('source.frameRate')}</div>
+						<div class="text-right font-semibold">{formatFrameRate(metadata.frameRate)}</div>
+					{/if}
 
 					{#if metadata.pixelFormat}
 						<div class="text-gray-alpha-600">{$_('source.pixelFormat')}</div>
@@ -156,8 +220,10 @@
 						<div class="text-right font-semibold">{display(metadata.colorPrimaries)}</div>
 					{/if}
 
-					<div class="text-gray-alpha-600">{$_('source.videoBitrate')}</div>
-					<div class="text-right font-semibold">{formatBitrateKbps(metadata.videoBitrateKbps)}</div>
+					{#if metadata.videoBitrateKbps && metadata.videoBitrateKbps > 0}
+						<div class="text-gray-alpha-600">{$_('source.videoBitrate')}</div>
+						<div class="text-right font-semibold">{formatBitrateKbps(metadata.videoBitrateKbps)}</div>
+					{/if}
 				</div>
 			</div>
 		{/if}

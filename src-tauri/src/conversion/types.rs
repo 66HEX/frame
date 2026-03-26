@@ -28,6 +28,8 @@ pub struct SubtitleTrack {
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ProbeMetadata {
+    #[serde(default = "default_media_kind")]
+    pub media_kind: String,
     pub duration: Option<String>,
     pub bitrate: Option<String>,
     pub video_codec: Option<String>,
@@ -118,6 +120,10 @@ pub struct ConversionConfig {
 
 fn default_rotation() -> String {
     "0".to_string()
+}
+
+fn default_media_kind() -> String {
+    "video".to_string()
 }
 
 fn default_processing_mode() -> String {
@@ -252,6 +258,7 @@ pub struct FfprobeStream {
 
 #[derive(Deserialize)]
 pub struct FfprobeFormat {
+    pub format_name: Option<String>,
     pub duration: Option<String>,
     pub bit_rate: Option<String>,
     pub tags: Option<FfprobeTags>,

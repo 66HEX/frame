@@ -100,6 +100,7 @@ export interface MetadataConfig {
 }
 
 export interface SourceMetadata {
+	mediaKind?: 'video' | 'audio' | 'image';
 	duration?: string;
 	bitrate?: string;
 	videoCodec?: string;

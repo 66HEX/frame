@@ -1,9 +1,43 @@
+use std::path::Path;
+
 use tauri::AppHandle;
 use tauri_plugin_shell::ShellExt;
 
 use crate::conversion::error::ConversionError;
 use crate::conversion::types::{AudioTrack, FfprobeOutput, ProbeMetadata, SubtitleTrack};
 use crate::conversion::utils::{parse_frame_rate_string, parse_probe_bitrate};
+
+fn is_known_image_extension(file_path: &str) -> bool {
+    Path::new(file_path)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| {
+            matches!(
+                ext.to_ascii_lowercase().as_str(),
+                "png" | "jpg" | "jpeg" | "webp" | "bmp" | "tif" | "tiff" | "avif" | "heif" | "heic"
+            )
+        })
+        .unwrap_or(false)
+}
+
+fn format_name_indicates_image(format_name: Option<&str>) -> bool {
+    format_name.is_some_and(|raw| {
+        raw.split(',').map(str::trim).any(|name| {
+            matches!(
+                name,
+                "image2"
+                    | "image2pipe"
+                    | "png_pipe"
+                    | "jpeg_pipe"
+                    | "webp_pipe"
+                    | "bmp_pipe"
+                    | "tiff_pipe"
+                    | "ico_pipe"
+                    | "apng"
+            )
+        })
+    })
+}
 
 #[expect(
     clippy::too_many_lines,
@@ -39,6 +73,8 @@ pub async fn probe_media_file(
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let probe_data: FfprobeOutput = serde_json::from_str(&stdout)?;
+
+    let source_format_name = probe_data.format.format_name.clone();
 
     let mut metadata = ProbeMetadata {
         duration: probe_data.format.duration,
@@ -140,5 +176,52 @@ pub async fn probe_media_file(
         }
     }
 
+    let has_audio = !metadata.audio_tracks.is_empty();
+    let has_video = metadata.video_codec.is_some();
+    metadata.media_kind = if has_video {
+        if !has_audio
+            && (is_known_image_extension(file_path)
+                || format_name_indicates_image(source_format_name.as_deref()))
+        {
+            "image".to_string()
+        } else {
+            "video".to_string()
+        }
+    } else {
+        "audio".to_string()
+    };
+
+    if metadata.media_kind == "image" {
+        metadata.duration = None;
+        metadata.bitrate = None;
+        metadata.frame_rate = None;
+        metadata.video_bitrate_kbps = None;
+    }
+
     Ok(metadata)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{format_name_indicates_image, is_known_image_extension};
+
+    #[test]
+    fn detects_known_image_extensions() {
+        assert!(is_known_image_extension("/tmp/frame.png"));
+        assert!(is_known_image_extension("/tmp/frame.JPG"));
+        assert!(is_known_image_extension("C:\\frames\\shot.avif"));
+        assert!(!is_known_image_extension("/tmp/clip.mp4"));
+        assert!(!is_known_image_extension("/tmp/animation.gif"));
+    }
+
+    #[test]
+    fn detects_image_format_names() {
+        assert!(format_name_indicates_image(Some("image2")));
+        assert!(format_name_indicates_image(Some("mov,mp4,image2")));
+        assert!(format_name_indicates_image(Some("png_pipe")));
+        assert!(!format_name_indicates_image(Some(
+            "mov,mp4,m4a,3gp,3g2,mj2"
+        )));
+        assert!(!format_name_indicates_image(None));
+    }
 }

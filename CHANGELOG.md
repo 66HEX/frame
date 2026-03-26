@@ -7,12 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Image Workflow (End-to-End):** Added first-class image source handling across probing (`mediaKind=image`), settings navigation (new `Images` tab), file-picker filters, and locale dictionaries.
+- **Image Output Compatibility Rules:** Extended shared frontend/backend media rules with dedicated image containers/codecs (`png`, `jpg`, `webp`, `bmp`, `tiff`) and aligned container capability checks.
+- **Image Controls Parity:** Added image-side settings for resolution/scaling, ML upscaling selection, and pixel format selection using the same compatibility-driven option model as video.
+
 ### Changed
 
 - **Native Dialog + Window Surface Simplification:** Removed custom Rust dialog commands and the macOS `dialog-host` workaround in favor of direct `@tauri-apps/plugin-dialog` usage on the frontend. Also removed window effects/transparency plumbing (window tint setting, opacity store hydration, and opacity-driven background mixing), keeping the app on standard opaque window surfaces.
 - **Crop Overlay Visual Overhaul:** Reworked the preview crop overlay presentation with stronger contrast, improved frame styling, clearer rule-of-thirds guides, refined corner marks, and larger/more readable drag handles for a more professional editor-like feel.
 - **Fixed App Typography Mode:** Removed runtime font-family switching and locked UI typography to the embedded Loskeley Mono stack for consistent visuals across sessions/platforms.
 - **Primary View Rename (`Dashboard` → `Workspace`):** Renamed the main app view identifier/labels across page state, titlebar controls, and locale dictionaries; synced non-source locales to the new `titlebar.workspace` key and applied translated values.
+- **Image-Aware UI Semantics:** Source metadata now uses image-specific labels/fields for image inputs (instead of video stream semantics), hides empty non-applicable metrics, and limits metadata editing fields to image-relevant tags.
+- **Image Preview Interaction Model:** Preview now renders images as still media, disables trim timeline/timecode interactions for image inputs, and keeps transform/crop tooling available.
+- **Image Output Normalization:** Config normalization and presets/output selection now enforce image-safe behavior (re-encode only, image-capable containers, no audio/subtitle carryover).
 
 ### Fixed
 
@@ -26,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Extended Clippy Follow-up (Queue/Probe/Rules):** Refined conversion manager task-tracking internals (`HashSet` for running IDs), hardened Unix PID conversions, simplified media-rule lookups, and optimized probe metadata assignment paths; kept `cargo test --locked` and `clippy -D warnings` green while reducing extended-clippy findings from ~52 to ~22 warnings.
 - **Extended Clippy Completion (Pedantic/Nursery/Perf):** Finalized remaining extended-clippy items across conversion pipeline and tests (numeric conversion safety, assertion/message cleanup, extension checks, unnecessary collection removal, and documented intentional architectural lint expectations), bringing `cargo clippy --all-targets --all-features --locked -- -W clippy::pedantic -W clippy::nursery -W clippy::perf` to 0 warnings.
 - **Encoder-Aware Pixel Format Compatibility:** Reworked pixel format validation from container-only rules to shared `container+encoder` compatibility tables in `media-rules.json`, wired into both frontend normalization/UI option availability and Rust backend preflight validation. This prevents invalid combinations from being selectable/enqueued and avoids silent runtime pixel format downgrades in common hardware/software encoder paths.
+- **Single-Image FFmpeg Output Path:** Added explicit single-frame output flags in standard and upscale encode paths for image containers, preventing ffmpeg image-sequence pattern errors on standalone image export.
+- **Image Metadata Classification Noise:** Improved ffprobe mapping for images by classifying still-image inputs and clearing non-applicable duration/FPS/bitrate fields to avoid misleading values in UI and logs.
 
 ## [0.25.3] - 2026-03-02
 

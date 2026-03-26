@@ -15,6 +15,7 @@
 	import Label from '$lib/components/ui/Label.svelte';
 	import Tooltip from '$lib/components/ui/Tooltip.svelte';
 	import { _ } from '$lib/i18n';
+	import { isImageContainer } from '$lib/constants/media-rules';
 
 	let {
 		config,
@@ -41,7 +42,11 @@
 	let notice = $state<{ text: string; tone: NoticeTone } | null>(null);
 	let noticeTimeout: ReturnType<typeof setTimeout> | null = null;
 
-	const isSourceAudioOnly = $derived(!!metadata && !metadata.videoCodec);
+	const sourceKind = $derived(
+		metadata?.mediaKind ?? (metadata && !metadata.videoCodec ? 'audio' : 'video')
+	);
+	const isSourceAudioOnly = $derived(sourceKind === 'audio');
+	const isSourceImage = $derived(sourceKind === 'image');
 
 	onDestroy(() => {
 		if (noticeTimeout) clearTimeout(noticeTimeout);
@@ -161,8 +166,9 @@
 
 	<div class="grid grid-cols-1">
 		{#each presets as preset (preset.id)}
-			{@const isCompatible =
-				!isSourceAudioOnly || AUDIO_ONLY_CONTAINERS.includes(preset.config.container)}
+			{@const isCompatible = isSourceImage
+				? isImageContainer(preset.config.container) || preset.config.container === 'gif'
+				: !isSourceAudioOnly || AUDIO_ONLY_CONTAINERS.includes(preset.config.container)}
 			<ListItem
 				selected={configsMatch(config, preset.config)}
 				onclick={() => isCompatible && applyPreset(preset)}

@@ -7,8 +7,9 @@ use crate::conversion::error::ConversionError;
 use crate::conversion::filters::{build_audio_filters, build_video_filters};
 use crate::conversion::media_rules::{
     container_supports_audio, container_supports_subtitles, is_audio_codec_allowed,
-    is_audio_stream_codec_allowed, is_subtitle_codec_allowed, is_video_codec_allowed,
-    is_video_only_container, is_video_pixel_format_allowed, is_video_stream_codec_allowed,
+    is_audio_stream_codec_allowed, is_image_container, is_subtitle_codec_allowed,
+    is_video_codec_allowed, is_video_only_container, is_video_pixel_format_allowed,
+    is_video_stream_codec_allowed,
 };
 use crate::conversion::types::{
     AudioTrack, ConversionConfig, MetadataConfig, MetadataMode, ProbeMetadata, SubtitleTrack,
@@ -201,6 +202,8 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
 
     let is_audio_only = is_audio_only_container(&config.container);
     let is_video_only = is_video_only_container(&config.container);
+    let is_image_output = is_image_container(&config.container);
+    let is_gif_output = config.container.eq_ignore_ascii_case("gif");
     let has_burn_subtitles = config
         .subtitle_burn_path
         .as_ref()
@@ -253,7 +256,7 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         }
 
         add_audio_codec_args(&mut args, config);
-    } else if is_video_only {
+    } else if is_video_only && is_gif_output {
         args.push("-filter_complex".to_string());
         args.push(build_gif_filter_complex(config));
 
@@ -268,6 +271,25 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         args.push(config.gif_loop.to_string());
         args.push("-f".to_string());
         args.push("gif".to_string());
+    } else if is_image_output {
+        add_video_codec_args(&mut args, config);
+        if has_custom_pixel_format(config) {
+            args.push("-pix_fmt".to_string());
+            args.push(config.pixel_format.trim().to_string());
+        }
+
+        let video_filters = build_video_filters(config, true);
+        if !video_filters.is_empty() {
+            args.push("-vf".to_string());
+            args.push(video_filters.join(","));
+        }
+
+        args.push("-map".to_string());
+        args.push("0:v:0".to_string());
+        args.push("-frames:v".to_string());
+        args.push("1".to_string());
+        args.push("-update".to_string());
+        args.push("1".to_string());
     } else {
         add_video_codec_args(&mut args, config);
         if has_custom_pixel_format(config) {
@@ -310,7 +332,7 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         }
     }
 
-    if !is_video_only {
+    if !is_video_only && !is_image_output {
         let audio_filters = build_audio_filters(config);
         if !audio_filters.is_empty() {
             args.push("-af".to_string());
@@ -530,6 +552,7 @@ pub fn validate_task_input(
 
     let is_audio_only = is_audio_only_container(&config.container);
     let is_video_only = is_video_only_container(&config.container);
+    let is_image_output = is_image_container(&config.container);
     let supports_audio = container_supports_audio(&config.container);
     let supports_subtitles = container_supports_subtitles(&config.container);
     if !is_copy_mode
@@ -595,9 +618,9 @@ pub fn validate_task_input(
     }
 
     if is_copy_mode {
-        if is_video_only {
+        if is_video_only || is_image_output {
             return Err(ConversionError::InvalidInput(
-                "Stream copy mode is not available for video-only containers".to_string(),
+                "Stream copy mode is not available for image/video-only containers".to_string(),
             ));
         }
 
@@ -678,7 +701,7 @@ pub fn validate_task_input(
         ));
     }
 
-    if is_video_only {
+    if is_video_only && config.container.eq_ignore_ascii_case("gif") {
         if !(2..=256).contains(&config.gif_colors) {
             return Err(ConversionError::InvalidInput(format!(
                 "GIF palette size must be between 2 and 256 colors: {}",

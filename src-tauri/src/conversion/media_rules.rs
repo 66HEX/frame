@@ -10,6 +10,8 @@ struct MediaRulesRaw {
     audio_only_containers: Vec<String>,
     #[serde(default)]
     video_only_containers: Vec<String>,
+    #[serde(default)]
+    image_containers: Vec<String>,
     container_video_codec_compatibility: HashMap<String, Vec<String>>,
     #[serde(default)]
     container_encoder_pixel_format_compatibility: HashMap<String, HashMap<String, Vec<String>>>,
@@ -26,6 +28,7 @@ struct MediaRulesRaw {
 struct MediaRules {
     audio_only_containers: HashSet<String>,
     video_only_containers: HashSet<String>,
+    image_containers: HashSet<String>,
     container_video_codec_compatibility: HashMap<String, HashSet<String>>,
     container_encoder_pixel_format_compatibility: HashMap<String, HashMap<String, HashSet<String>>>,
     container_video_stream_codec_compatibility: HashMap<String, HashSet<String>>,
@@ -44,6 +47,11 @@ impl From<MediaRulesRaw> for MediaRules {
                 .collect(),
             video_only_containers: raw
                 .video_only_containers
+                .into_iter()
+                .map(|container| container.to_ascii_lowercase())
+                .collect(),
+            image_containers: raw
+                .image_containers
                 .into_iter()
                 .map(|container| container.to_ascii_lowercase())
                 .collect(),
@@ -200,12 +208,20 @@ pub fn is_video_only_container(container: &str) -> bool {
         .contains(&container.to_ascii_lowercase())
 }
 
+pub fn is_image_container(container: &str) -> bool {
+    MEDIA_RULES
+        .image_containers
+        .contains(&container.to_ascii_lowercase())
+}
+
 pub fn container_supports_audio(container: &str) -> bool {
-    !is_video_only_container(container)
+    !is_video_only_container(container) && !is_image_container(container)
 }
 
 pub fn container_supports_subtitles(container: &str) -> bool {
-    !is_audio_only_container(container) && !is_video_only_container(container)
+    !is_audio_only_container(container)
+        && !is_video_only_container(container)
+        && !is_image_container(container)
 }
 
 pub fn is_audio_codec_allowed(container: &str, codec: &str) -> bool {

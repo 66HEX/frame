@@ -3,7 +3,8 @@ import { getDefaultAudioCodec, isAudioCodecAllowed } from '$lib/services/media';
 import {
 	containerSupportsAudio,
 	containerSupportsSubtitles,
-	isGifContainer
+	isGifContainer,
+	isImageContainer
 } from '$lib/constants/media-rules';
 import {
 	NVENC_ENCODERS,
@@ -38,9 +39,15 @@ export function normalizeConversionConfig(
 		? (requestedPixelFormat as ConversionConfig['pixelFormat'])
 		: 'auto';
 
-	const isSourceAudioOnly = Boolean(metadata && !metadata.videoCodec);
+	const sourceKind =
+		metadata?.mediaKind ?? (metadata && !metadata.videoCodec ? 'audio' : 'video');
+	const isSourceAudioOnly = sourceKind === 'audio';
+	const isSourceImage = sourceKind === 'image';
 	if (isSourceAudioOnly && !AUDIO_ONLY_CONTAINERS.includes(next.container)) {
 		next.container = 'mp3';
+	}
+	if (isSourceImage && !isImageContainer(next.container) && next.container !== 'gif') {
+		next.container = 'png';
 	}
 
 	if (typeof next.gifColors !== 'number' || !Number.isFinite(next.gifColors)) {
@@ -91,6 +98,22 @@ export function normalizeConversionConfig(
 		next.nvencSpatialAq = false;
 		next.nvencTemporalAq = false;
 		next.videotoolboxAllowSw = false;
+	}
+
+	if (isSourceImage) {
+		next.processingMode = 'reencode';
+		next.startTime = undefined;
+		next.endTime = undefined;
+		next.selectedAudioTracks = [];
+		next.selectedSubtitleTracks = [];
+		next.subtitleBurnPath = undefined;
+		next.audioNormalize = false;
+		next.audioVolume = 100;
+		next.metadata = {
+			...next.metadata,
+			album: undefined,
+			genre: undefined
+		};
 	}
 
 	if (isAudioContainer) {

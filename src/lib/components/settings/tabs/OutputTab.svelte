@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import {
 		ALL_CONTAINERS,
 		AUDIO_ONLY_CONTAINERS,
@@ -13,6 +14,7 @@
 	import { isAudioCodecAllowed, getDefaultAudioCodec } from '$lib/services/media';
 	import {
 		containerSupportsAudio,
+		isImageContainer,
 		isAudioStreamCodecAllowedForContainer,
 		isSubtitleCodecAllowedForContainer,
 		isVideoStreamCodecAllowedForContainer
@@ -34,8 +36,19 @@
 		onUpdateOutputName?: (value: string) => void;
 	} = $props();
 
-	const isSourceAudioOnly = $derived(!!metadata && !metadata.videoCodec);
+	const sourceKind = $derived(
+		metadata?.mediaKind ?? (metadata && !metadata.videoCodec ? 'audio' : 'video')
+	);
+	const isSourceAudioOnly = $derived(sourceKind === 'audio');
+	const isSourceImage = $derived(sourceKind === 'image');
 	const isCopyMode = $derived((config.processingMode ?? 'reencode') === 'copy');
+	const visibleContainers = $derived(
+		isSourceImage
+			? ALL_CONTAINERS.filter(
+					(container) => isImageContainer(container) || container === 'gif'
+				)
+			: ALL_CONTAINERS.filter((container) => !isImageContainer(container))
+	);
 	const selectedAudioCodecs = $derived.by(() => {
 		const tracks = metadata?.audioTracks ?? [];
 		if (tracks.length === 0) return [] as string[];
@@ -60,6 +73,12 @@
 
 		const selected = new Set(selectedSubtitleTracks);
 		return tracks.filter((track) => selected.has(track.index)).map((track) => track.codec);
+	});
+
+	$effect(() => {
+		if (isSourceImage && isCopyMode) {
+			untrack(() => onUpdate({ processingMode: 'reencode' }));
+		}
 	});
 
 	function sanitizeOutputName(value: string): string {
@@ -87,6 +106,8 @@
 
 	function isContainerCompatibleForStreamCopy(container: string): boolean {
 		if (!isCopyMode) return true;
+		if (isSourceImage) return false;
+		if (isImageContainer(container)) return false;
 		if (container === 'gif') return false;
 		if (!metadata) return true;
 
@@ -135,7 +156,7 @@
 			<Button
 				variant={isCopyMode ? 'default' : 'secondary'}
 				onclick={() => handleProcessingModeChange('copy')}
-				{disabled}
+				disabled={disabled || isSourceImage}
 				class="w-full"
 			>
 				{$_('output.streamCopy')}
@@ -163,11 +184,14 @@
 	<div class="space-y-3 pt-2">
 		<Label variant="section">{$_('output.container')}</Label>
 		<div class="grid grid-cols-2 gap-2">
-			{#each ALL_CONTAINERS as fmt (fmt)}
+			{#each visibleContainers as fmt (fmt)}
 				{@const isVideoContainer = !AUDIO_ONLY_CONTAINERS.includes(fmt)}
 				{@const isIncompatibleForCopy = !isContainerCompatibleForStreamCopy(fmt)}
 				{@const isDisabled =
-					disabled || (isSourceAudioOnly && isVideoContainer) || isIncompatibleForCopy}
+					disabled ||
+					(isSourceAudioOnly && isVideoContainer) ||
+					(isSourceImage && AUDIO_ONLY_CONTAINERS.includes(fmt)) ||
+					isIncompatibleForCopy}
 				<Button
 					variant={config.container === fmt ? 'default' : 'secondary'}
 					onclick={() => handleContainerChange(fmt)}

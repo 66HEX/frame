@@ -493,6 +493,33 @@ mod conversion_tests {
     }
 
     #[test]
+    fn test_image_output_uses_single_frame_pipeline_without_audio() {
+        let mut config = sample_config("png");
+        config.video_codec = "png".into();
+        config.pixel_format = "yuv444p".into();
+
+        let args = build_ffmpeg_args("input.png", "output.png", &config);
+
+        assert!(contains_args(&args, &["-map", "0:v:0"]));
+        assert!(contains_args(&args, &["-frames:v", "1"]));
+        assert!(contains_args(&args, &["-update", "1"]));
+        assert!(contains_arg_pair(&args, "-pix_fmt", "yuv444p"));
+        assert!(!args.iter().any(|arg| arg == "-c:a"));
+        assert!(!args.iter().any(|arg| arg == "0:a?"));
+    }
+
+    #[test]
+    fn test_image_output_webp_uses_still_image_codec() {
+        let mut config = sample_config("webp");
+        config.video_codec = "libwebp".into();
+
+        let args = build_ffmpeg_args("input.png", "output.webp", &config);
+
+        assert!(contains_args(&args, &["-c:v", "libwebp"]));
+        assert!(contains_args(&args, &["-frames:v", "1"]));
+    }
+
+    #[test]
     fn test_validate_rejects_ml_upscale_for_audio_only_container() {
         let mut config = sample_config("mp3");
         config.ml_upscale = Some("esrgan-2x".into());
@@ -503,6 +530,36 @@ mod conversion_tests {
         let _ = fs::remove_file(&path);
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_allows_ml_upscale_for_image_output() {
+        let mut config = sample_config("png");
+        config.video_codec = "png".into();
+        config.ml_upscale = Some("esrgan-2x".into());
+        config.selected_audio_tracks.clear();
+        config.selected_subtitle_tracks.clear();
+
+        let path = create_temp_input_file();
+        let result = validate_task_input(path.to_str().unwrap(), &config);
+        let _ = fs::remove_file(&path);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_allows_pixel_format_for_image_output() {
+        let mut config = sample_config("png");
+        config.video_codec = "png".into();
+        config.pixel_format = "yuv444p".into();
+        config.selected_audio_tracks.clear();
+        config.selected_subtitle_tracks.clear();
+
+        let path = create_temp_input_file();
+        let result = validate_task_input(path.to_str().unwrap(), &config);
+        let _ = fs::remove_file(&path);
+
+        assert!(result.is_ok());
     }
 
     #[test]
@@ -764,6 +821,30 @@ mod conversion_tests {
         );
 
         assert!(contains_arg_pair(&args, "-pix_fmt", "yuv444p"));
+    }
+
+    #[test]
+    fn test_upscale_encode_image_output_uses_single_frame_without_audio() {
+        let mut config = sample_config("png");
+        config.video_codec = "png".into();
+        config.pixel_format = "yuv444p".into();
+        config.selected_audio_tracks.clear();
+        config.selected_subtitle_tracks.clear();
+
+        let args = build_upscale_encode_args(
+            &PathBuf::from("/tmp/frame_upscale_test/output"),
+            "input.png",
+            "output.png",
+            30.0,
+            &config,
+            None,
+        );
+
+        assert!(contains_args(&args, &["-frames:v", "1"]));
+        assert!(contains_args(&args, &["-update", "1"]));
+        assert!(contains_arg_pair(&args, "-pix_fmt", "yuv444p"));
+        assert!(!args.iter().any(|arg| arg == "-c:a"));
+        assert!(!args.iter().any(|arg| arg == "-shortest"));
     }
 }
 

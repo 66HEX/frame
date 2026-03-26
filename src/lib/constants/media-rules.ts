@@ -4,6 +4,7 @@ interface MediaRules {
 	allContainers: string[];
 	audioOnlyContainers: string[];
 	videoOnlyContainers: string[];
+	imageContainers?: string[];
 	containerVideoCodecCompatibility: Record<string, string[]>;
 	containerEncoderPixelFormatCompatibility?: Record<string, Record<string, string[]>>;
 	containerVideoStreamCodecCompatibility?: Record<string, string[]>;
@@ -49,6 +50,7 @@ function buildNestedCodecMap(
 
 const AUDIO_ONLY_CONTAINER_SET = new Set(MEDIA_RULES.audioOnlyContainers.map(normalizeContainer));
 const VIDEO_ONLY_CONTAINER_SET = new Set(MEDIA_RULES.videoOnlyContainers.map(normalizeContainer));
+const IMAGE_CONTAINER_SET = new Set((MEDIA_RULES.imageContainers ?? []).map(normalizeContainer));
 const VIDEO_COMPATIBILITY_MAP = buildCodecMap(MEDIA_RULES.containerVideoCodecCompatibility);
 const VIDEO_ENCODER_PIXEL_FORMAT_COMPATIBILITY_MAP = buildNestedCodecMap(
 	MEDIA_RULES.containerEncoderPixelFormatCompatibility ?? {}
@@ -70,6 +72,7 @@ const DEFAULT_AUDIO_CODEC_MAP = Object.fromEntries(
 
 export const ALL_CONTAINERS = Object.freeze([...MEDIA_RULES.allContainers]);
 export const AUDIO_ONLY_CONTAINERS = Object.freeze([...MEDIA_RULES.audioOnlyContainers]);
+export const IMAGE_CONTAINERS = Object.freeze([...(MEDIA_RULES.imageContainers ?? [])]);
 export const VIDEO_CODEC_FALLBACK_ORDER = Object.freeze([...MEDIA_RULES.videoCodecFallbackOrder]);
 export const CONTAINER_VIDEO_CODEC_COMPATIBILITY = VIDEO_COMPATIBILITY_MAP;
 
@@ -81,12 +84,16 @@ export function isVideoOnlyContainer(container: string): boolean {
 	return VIDEO_ONLY_CONTAINER_SET.has(normalizeContainer(container));
 }
 
+export function isImageContainer(container: string): boolean {
+	return IMAGE_CONTAINER_SET.has(normalizeContainer(container));
+}
+
 export function containerSupportsAudio(container: string): boolean {
-	return !isVideoOnlyContainer(container);
+	return !isVideoOnlyContainer(container) && !isImageContainer(container);
 }
 
 export function containerSupportsSubtitles(container: string): boolean {
-	return !isAudioOnlyContainer(container) && !isVideoOnlyContainer(container);
+	return !isAudioOnlyContainer(container) && !isVideoOnlyContainer(container) && !isImageContainer(container);
 }
 
 export function isGifContainer(container: string): boolean {

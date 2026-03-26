@@ -13,6 +13,9 @@ use crate::conversion::codec::{
 use crate::conversion::error::ConversionError;
 use crate::conversion::filters::{build_audio_filters, build_video_filters};
 use crate::conversion::manager::ManagerMessage;
+use crate::conversion::media_rules::{
+    container_supports_audio, container_supports_subtitles, is_image_container,
+};
 use crate::conversion::types::{
     CompletedPayload, ConversionConfig, ConversionTask, LogPayload, MetadataMode, ProgressPayload,
     StartedPayload,
@@ -27,6 +30,14 @@ pub fn build_upscale_encode_args(
     config: &ConversionConfig,
     source_pixel_format: Option<String>,
 ) -> Vec<String> {
+    let is_image_output = is_image_container(&config.container);
+    let supports_audio = container_supports_audio(&config.container);
+    let supports_subtitles = container_supports_subtitles(&config.container);
+    let has_burn_subtitles = config
+        .subtitle_burn_path
+        .as_ref()
+        .is_some_and(|path| !path.trim().is_empty());
+
     let mut enc_args = vec![
         "-framerate".to_string(),
         source_fps.to_string(),
@@ -69,67 +80,78 @@ pub fn build_upscale_encode_args(
     enc_args.push("-map".to_string());
     enc_args.push("0:v:0".to_string());
 
-    if config.selected_audio_tracks.is_empty() {
-        enc_args.push("-map".to_string());
-        enc_args.push("1:a?".to_string());
-    } else {
-        for track_index in &config.selected_audio_tracks {
+    if supports_audio {
+        if config.selected_audio_tracks.is_empty() {
             enc_args.push("-map".to_string());
-            enc_args.push(format!("1:{track_index}"));
+            enc_args.push("1:a?".to_string());
+        } else {
+            for track_index in &config.selected_audio_tracks {
+                enc_args.push("-map".to_string());
+                enc_args.push(format!("1:{track_index}"));
+            }
         }
     }
 
-    if !config.selected_subtitle_tracks.is_empty() {
-        for track_index in &config.selected_subtitle_tracks {
+    if supports_subtitles {
+        if !config.selected_subtitle_tracks.is_empty() {
+            for track_index in &config.selected_subtitle_tracks {
+                enc_args.push("-map".to_string());
+                enc_args.push(format!("1:{track_index}"));
+            }
+        } else if !has_burn_subtitles {
             enc_args.push("-map".to_string());
-            enc_args.push(format!("1:{track_index}"));
+            enc_args.push("1:s?".to_string());
         }
-    } else if config
-        .subtitle_burn_path
-        .as_ref()
-        .is_none_or(|path| path.trim().is_empty())
-    {
-        enc_args.push("-map".to_string());
-        enc_args.push("1:s?".to_string());
     }
 
     add_video_codec_args(&mut enc_args, config);
-    add_audio_codec_args(&mut enc_args, config);
 
-    let audio_filters = build_audio_filters(config);
-    if !audio_filters.is_empty() {
-        enc_args.push("-af".to_string());
-        enc_args.push(audio_filters.join(","));
+    if supports_audio {
+        add_audio_codec_args(&mut enc_args, config);
+
+        let audio_filters = build_audio_filters(config);
+        if !audio_filters.is_empty() {
+            enc_args.push("-af".to_string());
+            enc_args.push(audio_filters.join(","));
+        }
     }
 
-    if !config.selected_subtitle_tracks.is_empty()
-        || config
-            .subtitle_burn_path
-            .as_ref()
-            .is_none_or(|path| path.trim().is_empty())
-    {
+    if supports_subtitles && (!config.selected_subtitle_tracks.is_empty() || !has_burn_subtitles) {
         add_subtitle_codec_args(&mut enc_args, config);
     }
 
-    add_fps_args(&mut enc_args, config);
+    if is_image_output {
+        let configured_pixel_format = config.pixel_format.trim();
+        if !configured_pixel_format.is_empty() && configured_pixel_format != "auto" {
+            enc_args.push("-pix_fmt".to_string());
+            enc_args.push(configured_pixel_format.to_string());
+        }
 
-    // Pixel format handling: user override wins, otherwise preserve high bit-depth or default to yuv420p
-    enc_args.push("-pix_fmt".to_string());
-    let configured_pixel_format = config.pixel_format.trim();
-    if !configured_pixel_format.is_empty() && configured_pixel_format != "auto" {
-        enc_args.push(configured_pixel_format.to_string());
-    } else if let Some(pf) = source_pixel_format {
-        let normalized = pf.trim().to_string();
-        if normalized.contains("10") || normalized.contains("12") {
-            enc_args.push(normalized);
+        enc_args.push("-frames:v".to_string());
+        enc_args.push("1".to_string());
+        enc_args.push("-update".to_string());
+        enc_args.push("1".to_string());
+    } else {
+        add_fps_args(&mut enc_args, config);
+
+        // Pixel format handling: user override wins, otherwise preserve high bit-depth or default to yuv420p
+        enc_args.push("-pix_fmt".to_string());
+        let configured_pixel_format = config.pixel_format.trim();
+        if !configured_pixel_format.is_empty() && configured_pixel_format != "auto" {
+            enc_args.push(configured_pixel_format.to_string());
+        } else if let Some(pf) = source_pixel_format {
+            let normalized = pf.trim().to_string();
+            if normalized.contains("10") || normalized.contains("12") {
+                enc_args.push(normalized);
+            } else {
+                enc_args.push("yuv420p".to_string());
+            }
         } else {
             enc_args.push("yuv420p".to_string());
         }
-    } else {
-        enc_args.push("yuv420p".to_string());
-    }
 
-    enc_args.push("-shortest".to_string());
+        enc_args.push("-shortest".to_string());
+    }
     enc_args.push("-y".to_string());
     enc_args.push(output_path.to_string());
 
