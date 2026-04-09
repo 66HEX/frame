@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Subtitle Burn-In Style Controls:** Added subtitle styling options in the Subtitles tab for burned-in subtitles, including font family (system font list), font size, text color, outline color, and vertical position presets.
+- **Subtitle Style UI Primitives:** Added reusable `Select` and `ColorPicker` UI components (plus chevrons up/down icon) to support compact dropdown and color selection workflows in settings panels.
+
+### Changed
+
+- **Subtitle Filter Mapping (FFmpeg):** Extended conversion config and ffmpeg subtitle filter building to map subtitle style selections into `force_style` (font name/size, primary color, outline color, and alignment), including safe hex-to-ASS color conversion and coverage tests.
+- **Surface/Control Visual Consistency:** Unified card/input/button highlight styling and related control spacing across preview, file list, logs, update dialog, and workspace shells for more consistent panel rendering.
+- **Subtitle Styling Localization:** Added new subtitle style locale keys across all supported UI dictionaries for the new styling controls and hints.
+
+### Fixed
+
+- **Trim Timeline Edge Alignment:** Fixed preview timeline marker alignment so the current-time playhead and trim handles share the same center point and stay visually aligned at boundary values (`0%`/`100%`).
+
 ## [0.26.0] - 2026-03-27
 
 ### Added
