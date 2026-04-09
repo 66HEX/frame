@@ -21,7 +21,7 @@
 						'text-gray-alpha-600 hover:bg-red-700 hover:text-foreground disabled:opacity-50'
 				},
 				size: {
-					default: 'h-7.5 px-3',
+					default: 'h-7.5 px-2.5',
 					sm: 'h-6 px-2',
 					xs: 'h-6 px-2',
 					icon: 'h-7.5 w-7.5',

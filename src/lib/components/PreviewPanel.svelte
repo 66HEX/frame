@@ -622,7 +622,7 @@
 </script>
 
 <div
-	class="card-highlight flex h-full flex-col overflow-hidden rounded-lg border border-gray-alpha-100 bg-gray-alpha-100 p-4 shadow-md shadow-black/5"
+	class="card-highlight flex h-full flex-col rounded-lg bg-gray-alpha-100 p-4 shadow-md shadow-black/5"
 >
 	<div
 		class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-lg border border-gray-alpha-200 bg-black"
@@ -705,17 +705,10 @@
 						></div>
 					{/each}
 
-					{#each [{ top: 0, left: 0, w: 16, h: 2 }, { top: 0, left: 0, w: 2, h: 16 }, { top: 0, left: 100, w: 16, h: 2 }, { top: 0, left: 100, w: 2, h: 16 }, { top: 100, left: 0, w: 16, h: 2 }, { top: 100, left: 0, w: 2, h: 16 }, { top: 100, left: 100, w: 16, h: 2 }, { top: 100, left: 100, w: 2, h: 16 }] as cornerMark (cornerMark.top + '-' + cornerMark.left + '-' + cornerMark.w)}
-						<div
-							class="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/95 shadow-[0_0_0_1px_rgba(0,0,0,0.4)]"
-							style={`top: ${cornerMark.top}%; left: ${cornerMark.left}%; width: ${cornerMark.w}px; height: ${cornerMark.h}px;`}
-						></div>
-					{/each}
-
 					{#each [{ id: 'nw', top: 0, left: 0 }, { id: 'n', top: 0, left: 50 }, { id: 'ne', top: 0, left: 100 }, { id: 'e', top: 50, left: 100 }, { id: 'se', top: 100, left: 100 }, { id: 's', top: 100, left: 50 }, { id: 'sw', top: 100, left: 0 }, { id: 'w', top: 50, left: 0 }] as handle (handle.id)}
 						<span
 							onmousedown={(event) => beginCropDrag(handle.id as DragHandle, event)}
-							class="absolute block h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-black/35 bg-white shadow-[0_2px_10px_rgba(0,0,0,0.75)] transition-transform hover:scale-110"
+							class="absolute block h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/45 bg-white shadow-[0_2px_8px_rgba(0,0,0,0.75)]"
 							style={`cursor: ${getHandleCursor(handle.id, isSideRotation)}; top: ${handle.top}%; left: ${handle.left}%;`}
 							role="presentation"
 						></span>
@@ -748,7 +741,7 @@
 		{/if}
 		{#if cropMode && draftCrop}
 			<div
-				class="button-highlight pointer-events-auto absolute! bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-md border border-gray-alpha-200 bg-background p-1 text-[10px] font-semibold shadow-xl"
+				class="button-highlight pointer-events-auto absolute! bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-md bg-background p-1 text-[10px] font-semibold shadow-xl"
 			>
 				{#each ASPECT_OPTIONS as option (option.id)}
 					<Button
@@ -818,7 +811,9 @@
 				<div class="space-y-1.5">
 					<Label>{$_('trim.startTime')}</Label>
 					{#if isImage}
-						<div class="flex h-7.5 w-32 items-center text-[10px] text-gray-alpha-600">--:--:--.---</div>
+						<div class="flex h-7.5 w-32 items-center text-[10px] text-gray-alpha-600">
+							--:--:--.---
+						</div>
 					{:else}
 						<TimecodeInput
 							class="w-32"
@@ -837,7 +832,9 @@
 				<div class="space-y-1.5">
 					<Label>{$_('trim.endTime')}</Label>
 					{#if isImage}
-						<div class="flex h-7.5 w-32 items-center text-[10px] text-gray-alpha-600">--:--:--.---</div>
+						<div class="flex h-7.5 w-32 items-center text-[10px] text-gray-alpha-600">
+							--:--:--.---
+						</div>
 					{:else}
 						<TimecodeInput
 							class="w-32"

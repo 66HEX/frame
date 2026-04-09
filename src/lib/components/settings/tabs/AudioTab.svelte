@@ -197,11 +197,10 @@
 							</div>
 						</div>
 
-							<div
-								style="background-color: var(--background)"
-								class={cn(
-									'button-highlight flex h-3 w-3 items-center justify-center rounded-full transition-all'
-								)}
+						<div
+							class={cn(
+								'input-highlight flex h-3 w-3 items-center justify-center rounded-full bg-background transition-all'
+							)}
 						>
 							<div
 								class="h-1.5 w-1.5 rounded-full bg-blue-700 transition-all"
