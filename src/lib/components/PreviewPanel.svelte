@@ -781,12 +781,12 @@
 			</div>
 
 			<div
-				class="pointer-events-none absolute top-1/2 z-10 h-4 w-0.5 -translate-y-1/2 bg-gray-alpha-600"
+				class="pointer-events-none absolute top-1/2 z-10 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 bg-gray-alpha-600"
 				style={`left: ${toTimelinePercent(currentTime)}%`}
 			></div>
 
 			<div
-				class="button-highlight absolute! top-1/2 z-20 -ml-2 flex size-3.5 -translate-y-1/2 items-center justify-center rounded-full bg-blue-700 shadow-md shadow-black/5"
+				class="button-highlight absolute! top-1/2 z-20 flex size-3.5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-blue-700 shadow-md shadow-black/5"
 				class:cursor-ew-resize={!trimDisabled}
 				style={`left: ${toTimelinePercent(startValue)}%`}
 				role="presentation"
@@ -796,7 +796,7 @@
 			</div>
 
 			<div
-				class="button-highlight absolute! top-1/2 z-20 -ml-2 flex size-3.5 -translate-y-1/2 items-center justify-center rounded-full bg-blue-700 shadow-md shadow-black/5"
+				class="button-highlight absolute! top-1/2 z-20 flex size-3.5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-blue-700 shadow-md shadow-black/5"
 				class:cursor-ew-resize={!trimDisabled}
 				style={`left: ${toTimelinePercent(endValue)}%`}
 				role="presentation"
