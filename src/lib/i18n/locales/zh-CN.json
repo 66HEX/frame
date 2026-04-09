@@ -59,7 +59,17 @@
 		"sourceTracks": "源音轨",
 		"none": "无字幕",
 		"burnInHint": "烧录字幕将强制视频重新编码。",
-		"copyModeHint": "流复制模式下，烧录字幕功能被禁用。"
+		"copyModeHint": "流复制模式下，烧录字幕功能被禁用。",
+		"style": "样式",
+		"fontName": "字体",
+		"fontNamePlaceholder": "默认（例如 Arial）",
+		"fontColor": "文字颜色",
+		"outlineColor": "轮廓颜色",
+		"position": "职位",
+		"positionBottom": "底部",
+		"positionMiddle": "中间",
+		"positionTop": "顶部",
+		"styleHint": "样式仅适用于烧录字幕。"
 	},
 	"metadata": {
 		"mode": "元数据模式",

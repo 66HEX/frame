@@ -59,7 +59,17 @@
 		"sourceTracks": "Brani originali",
 		"none": "Senza sottotitoli",
 		"burnInHint": "L'inserimento dei sottotitoli richiederà la ricodifica del video.",
-		"copyModeHint": "I sottotitoli Burn-in sono disabilitati nella modalità di copia dello streaming."
+		"copyModeHint": "I sottotitoli Burn-in sono disabilitati nella modalità di copia dello streaming.",
+		"style": "Stile",
+		"fontName": "Carattere",
+		"fontNamePlaceholder": "Predefinito (ad es. Arial)",
+		"fontColor": "Colore del testo",
+		"outlineColor": "Colore del contorno",
+		"position": "Posizione",
+		"positionBottom": "In fondo",
+		"positionMiddle": "Centro",
+		"positionTop": "Inizio pagina",
+		"styleHint": "Lo stile si applica solo ai sottotitoli fissi."
 	},
 	"metadata": {
 		"mode": "Modalità metadati",

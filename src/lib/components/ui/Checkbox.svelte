@@ -19,8 +19,10 @@
 </script>
 
 <div
-	style="background-color: var(--background)"
-	class={cn('button button-highlight relative flex items-center justify-center rounded', className)}
+	class={cn(
+		'button input-highlight relative flex items-center justify-center rounded-[3px] bg-background',
+		className
+	)}
 >
 	<input
 		type="checkbox"
@@ -28,7 +30,7 @@
 		bind:checked
 		{indeterminate}
 		class={cn(
-			'peer h-3.5 w-3.5 appearance-none rounded bg-transparent transition-colors checked:bg-blue-600 disabled:pointer-events-none disabled:opacity-50'
+			'peer h-3.5 w-3.5 appearance-none rounded bg-transparent transition-colors checked:bg-blue-700 disabled:pointer-events-none disabled:opacity-50'
 		)}
 		{...props}
 	/>

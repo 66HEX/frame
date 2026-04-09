@@ -1,5 +1,6 @@
 mod capabilities;
 mod conversion;
+mod fonts;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_store::Builder as StoreBuilder;
 
@@ -64,6 +65,7 @@ pub fn run() {
             conversion::commands::get_max_concurrency,
             conversion::commands::set_max_concurrency,
             capabilities::get_available_encoders,
+            fonts::list_system_fonts,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

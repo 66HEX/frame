@@ -59,7 +59,17 @@
 		"sourceTracks": "Источник треков",
 		"none": "Без субтитров",
 		"burnInHint": "Запись субтитров приведет к повторному кодированию видео.",
-		"copyModeHint": "В режиме копирования потока субтитры Burn-in отключены."
+		"copyModeHint": "В режиме копирования потока субтитры Burn-in отключены.",
+		"style": "Стиль",
+		"fontName": "Шрифт",
+		"fontNamePlaceholder": "По умолчанию (например, Arial)",
+		"fontColor": "Цвет текста",
+		"outlineColor": "Цвет контура",
+		"position": "Должность",
+		"positionBottom": "Внизу",
+		"positionMiddle": "Средний",
+		"positionTop": "Начало",
+		"styleHint": "Стиль применяется только к встроенным субтитрам."
 	},
 	"metadata": {
 		"mode": "Режим метаданных",

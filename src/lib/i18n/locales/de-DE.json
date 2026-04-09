@@ -59,7 +59,17 @@
 		"sourceTracks": "Quell-Tracks",
 		"none": "Keine Untertitel",
 		"burnInHint": "Das Einbrennen von Untertiteln erzwingt eine Neukodierung des Videos.",
-		"copyModeHint": "Eingebrannte Untertitel sind im Stream-Kopiermodus deaktiviert."
+		"copyModeHint": "Eingebrannte Untertitel sind im Stream-Kopiermodus deaktiviert.",
+		"style": "Stil",
+		"fontName": "Schriftart",
+		"fontNamePlaceholder": "Standard (z. B. Arial)",
+		"fontColor": "Textfarbe",
+		"outlineColor": "Umrissfarbe",
+		"position": "Position",
+		"positionBottom": "Unten",
+		"positionMiddle": "Mitte",
+		"positionTop": "Oben",
+		"styleHint": "Die Formatierung gilt nur für eingebrannte Untertitel."
 	},
 	"metadata": {
 		"mode": "Metadatenmodus",

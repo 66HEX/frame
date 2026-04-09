@@ -30,9 +30,7 @@
 	);
 </script>
 
-<div
-	class="group card-highlight flex h-full flex-col overflow-hidden rounded-lg border border-gray-alpha-100 bg-gray-alpha-100"
->
+<div class="group card-highlight flex h-full flex-col rounded-lg bg-gray-alpha-100">
 	<div
 		class="relative z-10 flex h-10 items-center px-4 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-background after:shadow-2xs after:shadow-gray-alpha-100 after:content-['']"
 	>

@@ -3,9 +3,15 @@
 	import type { ConversionConfig, SourceMetadata } from '$lib/types';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Label from '$lib/components/ui/Label.svelte';
+	import Select from '$lib/components/ui/Select.svelte';
+	import ColorPicker from '$lib/components/ui/ColorPicker.svelte';
 	import { _ } from '$lib/i18n';
 	import { openNativeFileDialog } from '$lib/services/dialog';
 	import { IconClose } from '$lib/icons';
+	import { fontsStore } from '$lib/stores/fonts.svelte';
+
+	const POSITIONS = ['bottom', 'middle', 'top'] as const;
+	const FONT_SIZES = ['8', '10', '12', '14', '16', '18', '20', '22', '24', '28', '32', '36', '42', '48'] as const;
 
 	let {
 		config,
@@ -22,6 +28,12 @@
 	} = $props();
 
 	const burnInDisabled = $derived(disabled || copyMode);
+
+	$effect(() => {
+		if (!copyMode && !disabled) {
+			fontsStore.load();
+		}
+	});
 
 	function toggleTrack(index: number) {
 		if (disabled) return;
@@ -100,6 +112,77 @@
 		</div>
 	</div>
 
+	{#if !copyMode}
+		<div class="space-y-3 pt-2">
+			<Label variant="section">{$_('subtitles.style')}</Label>
+			<div class="space-y-3">
+				<div class="grid grid-cols-2 gap-2">
+					<div class="space-y-2">
+						<Label for="subtitle-font">{$_('subtitles.fontName')}</Label>
+						<Select
+							id="subtitle-font"
+							value={config.subtitleFontName ?? ''}
+							options={fontsStore.fonts}
+							placeholder={$_('subtitles.fontNamePlaceholder')}
+							disabled={burnInDisabled}
+							onchange={(v) => onUpdate({ subtitleFontName: v || undefined })}
+						/>
+					</div>
+					<div class="space-y-2">
+						<Label for="subtitle-font-size">{$_('common.size')}</Label>
+						<Select
+							id="subtitle-font-size"
+							value={config.subtitleFontSize ?? ''}
+							options={[...FONT_SIZES]}
+							placeholder="Default"
+							disabled={burnInDisabled}
+							onchange={(v) => onUpdate({ subtitleFontSize: v || undefined })}
+						/>
+					</div>
+				</div>
+
+				<div class="grid grid-cols-2 gap-2">
+					<div class="space-y-2">
+						<Label for="subtitle-font-color">{$_('subtitles.fontColor')}</Label>
+						<ColorPicker
+							id="subtitle-font-color"
+							value={config.subtitleFontColor ?? '#ffffff'}
+							onchange={(v) => onUpdate({ subtitleFontColor: v })}
+							disabled={burnInDisabled}
+						/>
+					</div>
+					<div class="space-y-2">
+						<Label for="subtitle-outline-color">{$_('subtitles.outlineColor')}</Label>
+						<ColorPicker
+							id="subtitle-outline-color"
+							value={config.subtitleOutlineColor ?? '#000000'}
+							onchange={(v) => onUpdate({ subtitleOutlineColor: v })}
+							disabled={burnInDisabled}
+						/>
+					</div>
+				</div>
+
+				<div class="space-y-2">
+					<Label>{$_('subtitles.position')}</Label>
+					<div class="grid grid-cols-3 gap-2">
+						{#each POSITIONS as pos (pos)}
+							<Button
+								variant={(config.subtitlePosition ?? 'bottom') === pos ? 'default' : 'secondary'}
+								onclick={() => onUpdate({ subtitlePosition: pos })}
+								disabled={burnInDisabled}
+								class="w-full"
+							>
+								{$_(`subtitles.position${pos.charAt(0).toUpperCase() + pos.slice(1)}`)}
+							</Button>
+						{/each}
+					</div>
+				</div>
+
+				<p class="text-[10px] text-gray-alpha-600">{$_('subtitles.styleHint')}</p>
+			</div>
+		</div>
+	{/if}
+
 	{#if metadata?.subtitleTracks && metadata.subtitleTracks.length > 0}
 		<div class="space-y-3 pt-2">
 			<Label variant="section">{$_('subtitles.sourceTracks')}</Label>
@@ -131,11 +214,10 @@
 							</div>
 						</div>
 
-							<div
-								style="background-color: var(--background)"
-								class={cn(
-									'button-highlight flex h-3 w-3 items-center justify-center rounded-full transition-all'
-								)}
+						<div
+							class={cn(
+								'input-highlight flex h-3 w-3 items-center justify-center rounded-full transition-all'
+							)}
 						>
 							<div
 								class="h-1.5 w-1.5 rounded-full bg-blue-700 transition-all"

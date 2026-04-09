@@ -169,7 +169,7 @@
 								{/key}
 							{:else}
 								<div
-									class="card-highlight flex h-full flex-col items-center justify-center overflow-hidden rounded-lg border border-gray-alpha-100 bg-gray-alpha-100 shadow-md shadow-black/5"
+									class="card-highlight flex h-full flex-col items-center justify-center rounded-lg bg-gray-alpha-100 shadow-md shadow-black/5"
 								></div>
 							{/if}
 						</div>
@@ -191,9 +191,9 @@
 
 				<div class="col-span-4 h-full min-h-0">
 					<div
-						class="card-highlight h-full min-h-0 rounded-lg border border-gray-alpha-100 bg-gray-alpha-100 shadow-md shadow-black/5"
+						class="card-highlight h-full min-h-0 rounded-lg bg-gray-alpha-100 shadow-md shadow-black/5"
 					>
-						<div class="custom-scrollbar h-full min-h-0 overflow-y-auto">
+						<div class="h-full min-h-0 custom-scrollbar overflow-y-auto">
 							{#if selectedFile}
 								<SettingsPanel
 									config={selectedFile.config}
@@ -229,7 +229,7 @@
 		>
 			<div
 				transition:scale={{ start: 1.05, duration: 100, opacity: 1 }}
-				class="card-highlight flex h-36 w-72 flex-col items-center justify-center rounded-lg border border-gray-alpha-100 bg-sidebar shadow-2xl"
+				class="card-highlight flex h-36 w-72 flex-col items-center justify-center rounded-lg bg-sidebar shadow-2xl"
 			>
 				<p class="text-[10px] font-semibold text-foreground">
 					{$_('fileList.importSource')}

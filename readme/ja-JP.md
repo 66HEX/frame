@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../icon.png" width="128" height="128" alt="Frame Icon" />
+  <img src="../icon.png" width="256" height="256" alt="Frame Icon" />
   <h1>Frame</h1>
 </div>
 
@@ -16,129 +16,217 @@
 	<img src="https://img.shields.io/badge/TypeScript-5.9.3-blue?style=flat-square&logo=typescript" alt="TypeScript" />
 	<img src="https://img.shields.io/badge/Tailwind_CSS-v4-38bdf8?style=flat-square&logo=tailwindcss" alt="Tailwind" />
 	<img src="https://img.shields.io/badge/license-GPL--3.0-green?style=flat-square" alt="License" />
+	<a href="https://github.com/sponsors/66HEX">
+		<img src="https://img.shields.io/badge/Sponsor-GitHub-pink?style=flat-square&logo=githubsponsors" alt="GitHub Sponsors" />
+	</a>
 </div>
 
-**Frame** は Tauri v2 フレームワーク上に構築された高性能メディア変換ユーティリティです。FFmpeg 操作のネイティブインターフェースを提供し、ビデオとオーディオのトランスコードパラメータを細かく制御できます。Rust ベースのバックエンドで並行タスク管理とプロセス実行を行い、Svelte 5 フロントエンドで設定と状態監視を行います。
+**Frame**は、Tauri v2フレームワーク上に構築された高性能なメディア変換ユーティリティです。 FFmpeg操作のためのネイティブ・インターフェースを提供し、ビデオ、オーディオ、画像変換パラメーターのきめ細かな制御を可能にします。 このアプリケーションは、同時タスク管理とプロセス実行のためのRustベースのバックエンドと、設定と状態監視のためのSvelte 5フロントエンドを活用しています。
 
 <br />
 <div align="center">
-  <img src="../preview.png" alt="Frame アプリケーションプレビュー" width="800" />
+  <img src="../preview.png" alt="Frame Application Preview" width="800" />
 </div>
 <br />
 
-> [!WARNING]
-> **未署名アプリケーションについて**
-> アプリケーションは現在未署名のため、OS が警告を表示します：
+> 警告
+> **無記名出願のお知らせ
+> 現在、アプリケーションは署名されていないため、オペレーティング・システムはそのアプリケーションにフラグを立てます：
 >
-> - **macOS：** システムがアプリとサイドカーバイナリに隔離属性を付与します。実行するには手動で属性を削除してください：
->   ```bash
+> - **アプリを実行するには、この属性を手動で削除してください：
+>   バッシュ
 >   xattr -dr com.apple.quarantine /Applications/Frame.app
 >   ```
-> - **Windows：** SmartScreen がアプリの起動を阻止する場合があります。**「詳細情報」** をクリックし、**「実行」** を選択してください。
+> - **Windows:**Windowsスマートスクリーンがアプリケーションの起動を妨げることがあります。 詳細情報 "**"をクリックし、**"とにかく実行 "**してください。
 
-## 機能
+## GitHub スポンサー
+
+もしFrameがあなたのお役に立てるなら、GitHub Sponsorsでプロジェクトをサポートすることをご検討ください：
+
+[スポンサー枠**](https://github.com/sponsors/66HEX)
+
+現在の資金調達目標
+
+- **Apple Developer Program:** `$99/年`でmacOSビルドに署名し、公証します。
+- **マイクロソフトのコード署名証明書：** Windowsのビルドに署名し、SmartScreenの摩擦を減らすために、年間300ドルから700ドルと推定される。
+
+スポンサーからの寄付金は、まずこれらのリリース契約費用に充てられる。
+
+スポンサーシップの詳細、ティアの提案、立ち上げのチェックリストは[GitHub Sponsors](https://github.com/sponsors/66HEX)をご覧ください。
+
+## 特徴
 
 ### メディア変換コア
 
-- **コンテナサポート：** `mp4`, `mkv`, `webm`, `mov`, `gif`, `mp3`, `m4a`, `wav`, `flac`.
-- **ビデオエンコーダー：**
-  - `libx264` (H.264 / AVC)
-  - `libx265` (H.265 / HEVC)
-  - `vp9` (Google VP9)
-  - `prores` (Apple ProRes)
-  - `libsvtav1` (SVT-AV1)
-  - **ハードウェアアクセラレーション：** `h264_videotoolbox` (Apple Silicon)、`hevc_videotoolbox` (Apple Silicon)、`h264_nvenc` (NVIDIA)、`hevc_nvenc` (NVIDIA)、`av1_nvenc` (NVIDIA)
-- **オーディオエンコーダー：** `aac`、`ac3` (Dolby Digital)、`libopus`、`mp3`、`alac` (Apple Lossless)、`flac` (Free Lossless Audio Codec)、`pcm_s16le` (WAV)
-- **ビットレート制御：** 固定品質 (CRF) または目標ビットレート (kbps)
-- **スケーリング：** バイキュービック、ランチョス、バイリニア、ニアレスト
-- **メタデータ解析：** `ffprobe` によるストリーム情報の自動抽出（コーデック、再生時間、ビットレート、チャンネルレイアウト）
-- **AI アップスケーリング：** 高品質なビデオアップスケーリング（x2, x4）のための `Real-ESRGAN` を統合
+- **メディアの種類：**ビデオ、オーディオ、イメージ。
+- *サポートされる出力フォーマット：***。
+  - **ビデオ：** `mp4`, `mkv`, `webm`, `mov`, `gif`
+  - **オーディオ:** `mp3`, `m4a`, `wav`, `flac`
+  - **画像:** `png`、`jpg`、`webp`、`bmp`、`tiff`。
+- **ビデオ・エンコーダー
+  - libx264` (H.264 / AVC)
+  - libx265` (H.265 / HEVC)
+  - vp9` (Google VP9)
+  - Prores` (Apple ProRes)
+  - libsvtav1` (スケーラブル・ビデオ・テクノロジー AV1)
+  - **ハードウェアアクセラレーション:** `h264_videotoolbox` (Apple Silicon), `hevc_videotoolbox` (Apple Silicon), `h264_nvenc` (NVIDIA), `hevc_nvenc` (NVIDIA), `av1_nvenc` (NVIDIA).
+- **画像エンコーダー: ** `png`、`mjpeg` (JPEG)、`libwebp` (WebP)、`bmp`、`tiff`。
+- **オーディオエンコーダー: ** `aac`、`ac3` (Dolby Digital)、`libopus`、`mp3`、`alac` (Apple Lossless)、`flac` (Free Lossless Audio Codec)、`pcm_s16le` (WAV).
+- **ビットレート・コントロール： **コンスタント・レート・ファクター（CRF）またはターゲット・ビットレート（kbps）。
+- **スケーリング：**バイキュービック、ランチョス、バイリニア、最近傍。
+- **メタデータのプロービング:** `ffprobe` によるストリームの詳細（コーデック、時間、ビットレート、チャンネルレイアウト）の自動抽出。
+- **AIアップスケーリング:** 高品質のビデオと画像のアップスケーリング（x2、x4）のための統合された`Real-ESRGAN`。
 
 ### アーキテクチャとワークフロー
 
-- **並行処理：** Rust 実装の非同期タスクキューマネージャー（`tokio::mpsc`）、同時 FFmpeg プロセス数を制限（デフォルト：2）
-- **リアルタイムテレメトリ：** FFmpeg `stderr` のストリーム解析による正確な進捗追跡とログ出力
-- **プリセット管理：** 再利用可能な変換プロファイルの設定永続化
+- **Concurrent Processing:** Rust で実装された非同期タスクキューマネージャ (`tokio::mpsc`) は、FFmpeg の同時処理を制限しています (デフォルト: 2)。
+- **リアルタイムテレメトリー：** FFmpeg `stderr` のストリーム解析による正確な進捗追跡とログ出力。
+- **プリセット管理:** 再利用可能な変換プロファイルのための構成永続化。
 
-## 技術スタック
+## テクニカル・スタック
 
-### バックエンド (Rust / Tauri)
+### バックエンド（Rust / Tauri）
 
-- **コア：** Tauri v2 (Rust Edition 2024)
-- **ランタイム：** `tokio` (非同期 I/O)
-- **シリアライゼーション：** `serde`、`serde_json`
-- **プロセス管理：** `tauri-plugin-shell` (FFmpeg/FFprobe のサイドカー実行)
-- **システム統合：** `tauri-plugin-dialog`、`tauri-plugin-fs`、Tauri ウィンドウエフェクト API (`tauri::window::set_effects`)
+- **コア:** Tauri v2 (Rust Edition 2024)。
+- **Runtime:** `tokio` (非同期 I/O).
+- **シリアライズ:** `serde`, `serde_json`.
+- **プロセス管理:** サイドカー実行のための `tauri-plugin-shell` (FFmpeg/FFprobe).
+- **システム統合:** `tauri-plugin-dialog`, `tauri-plugin-fs`.
 
-### フロントエンド (SvelteKit)
+### フロントエンド（SvelteKit）
 
-- **フレームワーク：** Svelte 5 (Runes API)
-- **ビルドシステム：** Vite
-- **スタイリング：** Tailwind CSS v4、`clsx`、`tailwind-merge`
-- **状態管理：** Svelte 5 `$state` / `$props`
-- **国際化：** 多言語インターフェース、システム言語の自動検出
-- **タイポグラフィ：** Archivo (埋め込み)、Loskeley Mono (埋め込み)
+- **フレームワーク:** Svelte 5 (Runes API)。
+- **ビルドシステム:** Vite.
+- **Styling:** Tailwind CSS v4、`clsx`、`tailwind-merge`。
+- **状態管理:** Svelte 5 `$state` / `$props`.
+- **国際化:** 自動システム言語検出による多言語インターフェイス。
+- **タイポグラフィ：** Loskeley Mono (embedded).
 
-### インストール
+## インストール
 
-#### Homebrew 経由 (macOS)
+### ビルド済みバイナリのダウンロード
 
-macOS で Frame をインストール・更新する最も簡単な方法は Homebrew Tap を使用することです：
+GitHubからあなたのプラットフォーム（macOS、Windows、Linux）の最新リリースを直接ダウンロードするのが一番簡単な方法だ。
+
+[最新リリース**のダウンロード](https://github.com/66HEX/frame/releases)
+
+> **注意:** アプリケーションはまだコード署名されていないため、システム設定で手動で承認する必要があるかもしれません（このファイルの一番上の警告を参照してください）。
+
+### ウィンゲット（Windows）
+
+Frameは公式のWinGetリポジトリで`66HEX.Frame`という識別子で入手できます。
+
+```powershell
+winget install --id 66HEX.Frame -e
+```
+
+更新する：
+
+```powershell
+winget upgrade --id 66HEX.Frame -e
+```
+
+### ホームブリュー（macOS）
+
+macOSユーザーの方は、カスタムHomebrew Tapを使って簡単にFrameをインストール、アップデートすることができます：
 
 ```bash
 brew tap 66HEX/frame
 brew install --cask frame
 ```
 
-### ビルド済みリリースを使用
+### Linuxシステム要件
 
-Frame を実行する最も簡単な方法は [GitHub Releases](https://github.com/66HEX/frame/releases) ページからビルド済みパッケージをダウンロードすることです。各リリースには macOS (Intel/Apple Silicon)、Windows、Linux (AppImage/Deb) 用のビルドが含まれています。バイナリは未署名のため、OS が警告を表示し手動承認が必要な場合があります。
+AppImage** を使用している場合でも、Frame は UI のレンダリングとメディア再生の処理にシステムの **WebKitGTK** および **GStreamer** ライブラリを使用しています。 Linux でのネイティブ ダイアログには、**XDG Desktop Portal** 統合 (デスクトップ固有のバックエンドを含む) とフォールバックとして `zenity` も必要です。 ソースを追加するとアプリケーションがクラッシュする、ビデオ プレビューが空白のまま、ファイル ダイアログが正しく開かない/テーマが設定されない場合は、以下のパッケージをインストールしてください。
 
-### 前提条件
+- **Ubuntu/Debian:**。
 
-- Node.js ランタイム（または Bun）
-- Rust ツールチェーン (`cargo`)
-- **FFmpeg** と **FFprobe** バイナリを `src-tauri/binaries/` ディレクトリに配置
-  - 命名規則：`ffmpeg-<target-triple>`（例：`ffmpeg-aarch64-apple-darwin` または `ffmpeg-x86_64-pc-windows-msvc.exe`）
+  ```bash
+  sudo apt update
+  sudo apt install libwebkit2gtk-4.1-0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-libav xdg-desktop-portal xdg-desktop-portal-gtk zenity
+  ```
 
-> ヒント：`bun run setup:ffmpeg`（または `npm run setup:ffmpeg`）で FFmpeg/FFprobe を、`bun run setup:upscaler`（または `npm run setup:upscaler`）で Real-ESRGAN（AI アップスケーリング）を取得できます。`--force` で既存のダウンロードを更新できます。
+- **アーチ・リナックス
 
-### ビルド手順
+  ```bash
+  sudo pacman -S --needed webkit2gtk-4.1 gst-plugins-base gst-plugins-good gst-libav xdg-desktop-portal xdg-desktop-portal-gtk zenity
+  ```
 
-1.  **依存関係をインストール：**
+- **フェドラ:**
+  ```bash
+  sudo dnf install webkit2gtk4.1 gstreamer1-plugins-base gstreamer1-plugins-good gstreamer1-libav xdg-desktop-portal xdg-desktop-portal-gtk zenity
+  ```
 
-    ```bash
-    bun install
-    ```
+> **KDE ユーザー:** Plasma ネイティブテーマのダイアログを表示するには、(`xdg-desktop-portal-gtk` の代わりに) `xdg-desktop-portal-kde` をインストールしてください。
 
-2.  **開発サーバーを起動：**
+### ソースからのビルド
 
-    ```bash
-    bun run tauri dev
-    ```
+アプリケーションを自分で作りたい場合、あるいは貢献したい場合は、以下の手順に従ってください。
 
-3.  **本番用にコンパイル：**
-    ```bash
-    bun run tauri build
-    ```
+**1.前提条件
+
+- **錆:** [錆のインストール](https://www.rust-lang.org/tools/install)
+- **Bun (または Node.js):** [Bun のインストール](https://bun.sh/)
+- **OSの依存関係：**お使いのOSの[Tauri prerequisites](https://v2.tauri.app/start/prerequisites/)に従ってください。
+
+**プロジェクト**の設定
+
+リポジトリをクローンし、依存関係をインストールする：
+
+```bash
+git clone https://github.com/66HEX/frame.git
+cd frame
+bun install
+```
+
+**3.バイナリのセットアップ
+
+Frameは、AIのアップスケーリングにFFmpeg/FFprobeのサイドカーバイナリとReal-ESRGANのサイドカーアセットを必要とします。 私たちは、あなたのプラットフォームに適したバージョンを自動的に取得するスクリプトを提供します：
+
+```bash
+bun run setup:ffmpeg
+bun run setup:upscaler
+```
+
+**ビルド・オア・ラン
+
+- **開発:**
+
+  ```bash
+  bun tauri dev
+  ```
+
+- ***Production Build:**
+  ```bash
+  bun tauri build
+  ```
 
 ## 使用方法
 
-1.  **入力：** システムダイアログでファイルを選択
-2.  **設定：**
-    - **ソース：** 検出されたファイルメタデータを表示
-    - **出力：** コンテナ形式と出力ファイル名を選択
-    - **ビデオ：** コーデック、ビットレート/CRF、解像度、フレームレートを設定
-    - **オーディオ：** コーデック、ビットレート、チャンネル、特定トラックを選択
-    - **プリセット：** 再利用可能な変換プロファイルを保存・読み込み
-3.  **実行：** Rust バックエンド経由で変換プロセスを開始
-4.  **監視：** UI でリアルタイムログと進捗率を確認
+1.  **システムダイアログを使ってファイルを選択する。
+2.  **コンフィギュレーション
+    - **検出されたファイルのメタデータを表示します。
+    - **出力：** コンテナ形式と出力ファイル名を選択。
+    - **ビデオ:** コーデック、ビットレート/CRF、解像度、フレームレートを設定する。
+    - **画像：** 画像の解像度/スケーリング、ピクセルフォーマット、およびオプションのAIアップスケーリングを設定します。
+    - **オーディオ：**コーデック、ビットレート、チャンネル、特定のトラックを選択します。
+    - **プリセット：**再利用可能な変換プロファイルの保存と読み込み。
+3.  **実行:** Rustバックエンド経由で変換プロセスを開始する。
+4.  **モニタリング：** リアルタイムのログとパーセンテージ・カウンターをUIで表示します。
 
-## 謝辞
+## スターヒストリー
 
-- **Real-ESRGAN**: Copyright (c) 2021, Xintao Wang. ライセンス: [BSD 3-Clause](https://github.com/xinntao/Real-ESRGAN/blob/master/LICENSE).
-- **FFmpeg**: ライセンス: [GPLv3](https://www.ffmpeg.org/legal.html).
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=66HEX/frame&type=timeline&theme=dark" />
+  <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=66HEX/frame&type=timeline" />
+  <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=66HEX/frame&type=timeline" />
+</picture>
+
+## 謝辞とサードパーティ・コード
+
+- **Real-ESRGAN**: Copyright (c) 2021, Xintao Wang. ライセンスは[BSD 3-Clause](https://github.com/xinntao/Real-ESRGAN/blob/master/LICENSE)です。
+- **FFmpeg**：[GPLv3](https://www.ffmpeg.org/legal.html)の下でライセンスされています。
 
 ## ライセンス
 
-GPLv3 ライセンス。詳細は [LICENSE](../LICENSE) を参照。
+GPLv3ライセンス。 詳細は[LICENSE](../LICENSE)を参照。

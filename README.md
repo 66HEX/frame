@@ -91,7 +91,7 @@ See [GitHub Sponsors](https://github.com/sponsors/66HEX) for full sponsorship de
 - **Runtime:** `tokio` (Async I/O).
 - **Serialization:** `serde`, `serde_json`.
 - **Process Management:** `tauri-plugin-shell` for sidecar execution (FFmpeg/FFprobe).
-- **System Integration:** `tauri-plugin-dialog`, `tauri-plugin-fs`, Tauri window effects API (`tauri::window::set_effects`).
+- **System Integration:** `tauri-plugin-dialog`, `tauri-plugin-fs`.
 
 ### Frontend (SvelteKit)
 

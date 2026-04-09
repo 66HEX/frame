@@ -77,6 +77,16 @@ pub struct ConversionConfig {
     pub selected_audio_tracks: Vec<u32>,
     pub selected_subtitle_tracks: Vec<u32>,
     pub subtitle_burn_path: Option<String>,
+    #[serde(default)]
+    pub subtitle_font_name: Option<String>,
+    #[serde(default)]
+    pub subtitle_font_size: Option<String>,
+    #[serde(default)]
+    pub subtitle_font_color: Option<String>,
+    #[serde(default)]
+    pub subtitle_outline_color: Option<String>,
+    #[serde(default)]
+    pub subtitle_position: Option<String>,
     pub resolution: String,
     pub custom_width: Option<String>,
     pub custom_height: Option<String>,

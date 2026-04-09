@@ -54,6 +54,11 @@ export interface ConversionConfig {
 	selectedAudioTracks: number[];
 	selectedSubtitleTracks: number[];
 	subtitleBurnPath?: string;
+	subtitleFontName?: string;
+	subtitleFontSize?: string;
+	subtitleFontColor?: string;
+	subtitleOutlineColor?: string;
+	subtitlePosition?: 'bottom' | 'top' | 'middle';
 	resolution: string;
 	customWidth?: string;
 	customHeight?: string;

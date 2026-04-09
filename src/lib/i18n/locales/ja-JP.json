@@ -59,7 +59,17 @@
 		"sourceTracks": "ソーストラック",
 		"none": "字幕なし",
 		"burnInHint": "字幕への焼き込みは動画の再エンコードを強制します。",
-		"copyModeHint": "バーンイン字幕はストリームコピーモードでは無効です。"
+		"copyModeHint": "バーンイン字幕はストリームコピーモードでは無効です。",
+		"style": "スタイル",
+		"fontName": "フォント",
+		"fontNamePlaceholder": "既定（例：Arial）",
+		"fontColor": "文字の色",
+		"outlineColor": "輪郭の色",
+		"position": "役職",
+		"positionBottom": "下部",
+		"positionMiddle": "中",
+		"positionTop": "トップ",
+		"styleHint": "このスタイルは、焼き付け字幕にのみ適用されます。"
 	},
 	"metadata": {
 		"mode": "メタデータモード",
