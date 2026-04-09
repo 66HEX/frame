@@ -59,7 +59,17 @@
 		"sourceTracks": "Pistes sources",
 		"none": "Pas de sous-titres",
 		"burnInHint": "La gravure des sous-titres entraînera un réencodage de la vidéo.",
-		"copyModeHint": "Les sous-titres incrustés sont désactivés en mode copie de flux."
+		"copyModeHint": "Les sous-titres incrustés sont désactivés en mode copie de flux.",
+		"style": "Style",
+		"fontName": "Police",
+		"fontNamePlaceholder": "Par défaut (par exemple, Arial)",
+		"fontColor": "Couleur du texte",
+		"outlineColor": "Couleur du contour",
+		"position": "Poste",
+		"positionBottom": "En bas",
+		"positionMiddle": "Au milieu",
+		"positionTop": "Haut de la page",
+		"styleHint": "Le style s'applique uniquement aux sous-titres incrustés."
 	},
 	"metadata": {
 		"mode": "Mode métadonnées",

@@ -59,7 +59,17 @@
 		"sourceTracks": "소스 트랙",
 		"none": "자막 없음",
 		"burnInHint": "자막에 화상 효과를 적용하면 동영상이 재인코딩됩니다.",
-		"copyModeHint": "스트림 복사 모드에서는 번인 자막이 비활성화됩니다."
+		"copyModeHint": "스트림 복사 모드에서는 번인 자막이 비활성화됩니다.",
+		"style": "스타일",
+		"fontName": "글꼴",
+		"fontNamePlaceholder": "기본 글꼴 (예: Arial)",
+		"fontColor": "글자 색상",
+		"outlineColor": "윤곽선 색상",
+		"position": "직책",
+		"positionBottom": "하단",
+		"positionMiddle": "중간",
+		"positionTop": "상단",
+		"styleHint": "이 스타일은 화면에 고정된 자막에만 적용됩니다."
 	},
 	"metadata": {
 		"mode": "메타데이터 모드",

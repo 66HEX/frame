@@ -1,5 +1,17 @@
 use crate::conversion::types::{ConversionConfig, VOLUME_EPSILON};
 
+/// Converts a CSS hex color (`#RRGGBB`) to an ASS/SSA color string (`&H00BBGGRR`).
+fn hex_to_ass_color(hex: &str) -> Option<String> {
+    let hex = hex.trim().trim_start_matches('#');
+    if hex.len() != 6 {
+        return None;
+    }
+    let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+    let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+    let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+    Some(format!("&H00{b:02X}{g:02X}{r:02X}"))
+}
+
 fn rounded_i32(value: f64, min_value: f64) -> i32 {
     let clamped = value
         .max(min_value)
@@ -50,7 +62,54 @@ pub fn build_video_filters(config: &ConversionConfig, include_scale: bool) -> Ve
             .replace('[', "\\[")
             .replace(']', "\\]")
             .replace(',', "\\,");
-        filters.push(format!("subtitles='{escaped_path}'"));
+
+        let mut style_parts: Vec<String> = Vec::new();
+
+        if let Some(font) = &config.subtitle_font_name
+            && !font.trim().is_empty()
+        {
+            style_parts.push(format!("FontName={}", font.trim()));
+        }
+
+        if let Some(font_size) = &config.subtitle_font_size
+            && let Ok(parsed) = font_size.trim().parse::<u16>()
+            && (8..=120).contains(&parsed)
+        {
+            style_parts.push(format!("Fontsize={parsed}"));
+        }
+
+        if let Some(color) = &config.subtitle_font_color
+            && let Some(ass) = hex_to_ass_color(color)
+        {
+            style_parts.push(format!("PrimaryColour={ass}"));
+        }
+
+        if let Some(color) = &config.subtitle_outline_color
+            && let Some(ass) = hex_to_ass_color(color)
+        {
+            style_parts.push(format!("OutlineColour={ass}"));
+        }
+
+        if let Some(pos) = &config.subtitle_position {
+            // FFmpeg's subtitles filter interprets force_style Alignment using
+            // legacy SSA-style values in this context:
+            // - bottom center: 2
+            // - top center: 6
+            // - middle center: 10
+            let alignment = match pos.as_str() {
+                "top" => "6",
+                "middle" => "10",
+                _ => "2",
+            };
+            style_parts.push(format!("Alignment={alignment}"));
+        }
+
+        if style_parts.is_empty() {
+            filters.push(format!("subtitles='{escaped_path}'"));
+        } else {
+            let style = style_parts.join(",");
+            filters.push(format!("subtitles='{escaped_path}':force_style='{style}'"));
+        }
     }
 
     if include_scale && (config.resolution != "original" || config.resolution == "custom") {
@@ -124,6 +183,11 @@ mod tests {
             selected_audio_tracks: vec![],
             selected_subtitle_tracks: vec![],
             subtitle_burn_path: None,
+            subtitle_font_name: None,
+            subtitle_font_size: None,
+            subtitle_font_color: None,
+            subtitle_outline_color: None,
+            subtitle_position: None,
             resolution: "original".to_string(),
             custom_width: None,
             custom_height: None,
@@ -218,6 +282,48 @@ mod tests {
         assert_eq!(
             filters,
             vec!["subtitles='C\\:/Media/John\\'s \\[cut\\]\\,final.srt'"]
+        );
+    }
+
+    #[test]
+    fn test_subtitle_position_top_maps_to_alignment_6() {
+        let mut config = default_config();
+        config.subtitle_burn_path = Some("/tmp/sub.srt".to_string());
+        config.subtitle_position = Some("top".to_string());
+
+        let filters = build_video_filters(&config, true);
+
+        assert_eq!(
+            filters,
+            vec!["subtitles='/tmp/sub.srt':force_style='Alignment=6'"]
+        );
+    }
+
+    #[test]
+    fn test_subtitle_position_middle_maps_to_alignment_10() {
+        let mut config = default_config();
+        config.subtitle_burn_path = Some("/tmp/sub.srt".to_string());
+        config.subtitle_position = Some("middle".to_string());
+
+        let filters = build_video_filters(&config, true);
+
+        assert_eq!(
+            filters,
+            vec!["subtitles='/tmp/sub.srt':force_style='Alignment=10'"]
+        );
+    }
+
+    #[test]
+    fn test_subtitle_font_size_adds_force_style() {
+        let mut config = default_config();
+        config.subtitle_burn_path = Some("/tmp/sub.srt".to_string());
+        config.subtitle_font_size = Some("28".to_string());
+
+        let filters = build_video_filters(&config, true);
+
+        assert_eq!(
+            filters,
+            vec!["subtitles='/tmp/sub.srt':force_style='Fontsize=28'"]
         );
     }
 }

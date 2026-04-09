@@ -59,7 +59,17 @@
 		"sourceTracks": "Pistas originales",
 		"none": "Sin subtítulos",
 		"burnInHint": "La incrustación de subtítulos obligará a recodificar el vídeo.",
-		"copyModeHint": "Los subtítulos incrustados están desactivados en el modo de copia de transmisión."
+		"copyModeHint": "Los subtítulos incrustados están desactivados en el modo de copia de transmisión.",
+		"style": "Estilo",
+		"fontName": "Fuente",
+		"fontNamePlaceholder": "Predeterminada (p. ej., Arial)",
+		"fontColor": "Color del texto",
+		"outlineColor": "Color del contorno",
+		"position": "Puesto",
+		"positionBottom": "Parte inferior",
+		"positionMiddle": "Centro",
+		"positionTop": "Inicio",
+		"styleHint": "El estilo solo se aplica a los subtítulos incrustados."
 	},
 	"metadata": {
 		"mode": "Modo metadatos",

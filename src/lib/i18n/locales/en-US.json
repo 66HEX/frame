@@ -59,7 +59,17 @@
 		"sourceTracks": "Source Tracks",
 		"none": "No subtitles",
 		"burnInHint": "Burning in subtitles will force video re-encoding.",
-		"copyModeHint": "Burn-in subtitles are disabled in stream copy mode."
+		"copyModeHint": "Burn-in subtitles are disabled in stream copy mode.",
+		"style": "Style",
+		"fontName": "Font",
+		"fontNamePlaceholder": "Default (e.g. Arial)",
+		"fontColor": "Text Color",
+		"outlineColor": "Outline Color",
+		"position": "Position",
+		"positionBottom": "Bottom",
+		"positionMiddle": "Middle",
+		"positionTop": "Top",
+		"styleHint": "Style applies to burned-in subtitles only."
 	},
 	"metadata": {
 		"mode": "Metadata Mode",
