@@ -3,7 +3,7 @@
 	import { cn } from '$lib/utils/cn';
 	import type { HTMLLabelAttributes } from 'svelte/elements';
 
-	const labelVariants = cva('text-gray-alpha-600 font-semibold', {
+	const labelVariants = cva('text-frame-gray-600', {
 		variants: {
 			variant: {
 				default: 'text-[10px] block',
@@ -24,10 +24,8 @@
 </script>
 
 <label bind:this={ref} class={cn(labelVariants({ variant, className }))} {...props}>
-		{@render children?.()}
-		{#if variant === 'section'}
-			<div
-				class="mt-1 h-px bg-background shadow-2xs shadow-gray-alpha-100"
-			></div>
-		{/if}
+	{@render children?.()}
+	{#if variant === 'section'}
+		<div class="mt-1 h-px bg-background shadow-2xs shadow-frame-gray-100"></div>
+	{/if}
 </label>

@@ -325,7 +325,7 @@
 				class="input-highlight size-3.5 shrink-0 rounded-[3px]"
 				style={`background:${normalizedValue};`}
 			></span>
-			<span class="truncate text-left text-[10px] font-semibold text-foreground uppercase">
+			<span class="truncate text-left text-[10px] text-foreground uppercase">
 				{normalizedValue}
 			</span>
 		</span>
@@ -344,14 +344,12 @@
 		in:scale={{ start: 0.98, duration: 120, easing: cubicInOut }}
 		out:scale={{ start: 0.98, duration: 90, easing: cubicInOut }}
 	>
-		<div
-			class="button-highlight w-full space-y-2 rounded-sm bg-dropdown p-2 shadow-md shadow-black/10"
-		>
+		<div class="button-highlight w-full space-y-2 rounded-sm bg-dropdown p-2 shadow-md">
 			<button
 				bind:this={svRef}
 				type="button"
 				aria-label="Pick saturation and brightness"
-				class="relative block h-24 w-full cursor-crosshair appearance-none overflow-hidden rounded-sm border border-gray-alpha-200 bg-transparent p-0"
+				class="relative block h-24 w-full cursor-crosshair appearance-none overflow-hidden rounded-sm border border-frame-gray-200 bg-transparent p-0"
 				onmousedown={startSvDrag}
 			>
 				<span

@@ -39,8 +39,7 @@ export function normalizeConversionConfig(
 		? (requestedPixelFormat as ConversionConfig['pixelFormat'])
 		: 'auto';
 
-	const sourceKind =
-		metadata?.mediaKind ?? (metadata && !metadata.videoCodec ? 'audio' : 'video');
+	const sourceKind = metadata?.mediaKind ?? (metadata && !metadata.videoCodec ? 'audio' : 'video');
 	const isSourceAudioOnly = sourceKind === 'audio';
 	const isSourceImage = sourceKind === 'image';
 	if (isSourceAudioOnly && !AUDIO_ONLY_CONTAINERS.includes(next.container)) {

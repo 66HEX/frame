@@ -79,11 +79,11 @@
 					{@html frameIcon}
 				</span>
 
-				<div class="pointer-events-none h-5 w-px bg-gray-alpha-100"></div>
+				<div class="pointer-events-none h-5 w-px bg-frame-gray-100"></div>
 
 				{#if onChangeView}
 					<div
-						class="button-highlight pointer-events-auto flex h-7.5 items-center gap-1 rounded-md bg-gray-alpha-100 p-0.5 shadow-sm shadow-black/5"
+						class="input-highlight pointer-events-auto flex h-7.5 items-center gap-1 rounded-md bg-frame-gray-100 px-0.75 py-0.5 shadow-sm"
 					>
 						<Button
 							variant={activeView === 'workspace' ? 'default' : 'titlebar-ghost'}
@@ -106,9 +106,9 @@
 					</div>
 				{/if}
 
-				<div class="pointer-events-none h-5 w-px bg-gray-alpha-100"></div>
+				<div class="pointer-events-none h-5 w-px bg-frame-gray-100"></div>
 
-				<div class="pointer-events-none flex items-center gap-4 text-[10px] text-gray-alpha-600">
+				<div class="pointer-events-none flex items-center gap-4 text-[10px] text-frame-gray-600">
 					<div class="flex items-center gap-2">
 						<IconHardDrive size={14} />
 						<span>{$_('titlebar.storage')} {formatTotalSize(totalSize)}</span>
@@ -120,7 +120,7 @@
 				</div>
 			</div>
 
-			<div class="col-span-4 mt-2 flex items-center gap-3">
+			<div class="col-span-4 mt-2 flex items-center gap-2">
 				{#if onOpenSettings}
 					<Button
 						onclick={onOpenSettings}

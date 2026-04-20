@@ -1,5 +1,20 @@
 {
-	"allContainers": ["mp4", "mkv", "webm", "mov", "gif", "png", "jpg", "webp", "bmp", "tiff", "mp3", "m4a", "wav", "flac"],
+	"allContainers": [
+		"mp4",
+		"mkv",
+		"webm",
+		"mov",
+		"gif",
+		"png",
+		"jpg",
+		"webp",
+		"bmp",
+		"tiff",
+		"mp3",
+		"m4a",
+		"wav",
+		"flac"
+	],
 	"audioOnlyContainers": ["mp3", "m4a", "wav", "flac", "aac"],
 	"videoOnlyContainers": ["gif"],
 	"imageContainers": ["png", "jpg", "webp", "bmp", "tiff"],

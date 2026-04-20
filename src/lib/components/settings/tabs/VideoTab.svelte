@@ -324,7 +324,7 @@
 					oninput={(e) => updateGifLoop(e.currentTarget.value)}
 					{disabled}
 				/>
-				<p class="text-[10px] text-gray-alpha-600">{$_('video.gifLoopHint')}</p>
+				<p class="text-[10px] text-frame-gray-600">{$_('video.gifLoopHint')}</p>
 			</div>
 		{/if}
 	</div>
@@ -440,7 +440,7 @@
 						{/if}
 					</Label>
 					<div
-						class="button-highlight rounded bg-blue-700 px-1.5 text-[10px] font-semibold text-foreground shadow-sm shadow-black/5"
+						class="button-highlight rounded bg-frame-gray-400 px-1.5 text-[10px] text-foreground shadow-sm"
 					>
 						{#if isHardwareEncoder}
 							Q {config.quality}
@@ -471,7 +471,7 @@
 						/>
 					{/if}
 				</div>
-				<div class="flex justify-between text-[10px] text-gray-alpha-600">
+				<div class="flex justify-between text-[10px] text-frame-gray-600">
 					{#if isHardwareEncoder}
 						<span>{$_('video.lowQuality')}</span>
 						<span>{$_('video.bestQuality')}</span>
@@ -515,7 +515,7 @@
 						/>
 						<div class="space-y-0.5">
 							<Label for="nvenc-spatial-aq">{$_('video.nvencSpatialAq')}</Label>
-							<p class="text-[10px] text-gray-alpha-600">
+							<p class="text-[10px] text-frame-gray-600">
 								{$_('video.nvencSpatialAqHint')}
 							</p>
 						</div>
@@ -529,7 +529,7 @@
 						/>
 						<div class="space-y-0.5">
 							<Label for="nvenc-temporal-aq">{$_('video.nvencTemporalAq')}</Label>
-							<p class="text-[10px] text-gray-alpha-600">
+							<p class="text-[10px] text-frame-gray-600">
 								{$_('video.nvencTemporalAqHint')}
 							</p>
 						</div>
@@ -552,7 +552,7 @@
 						/>
 						<div class="space-y-0.5">
 							<Label for="videotoolbox-allow-sw">{$_('video.videotoolboxAllowSw')}</Label>
-							<p class="text-[10px] text-gray-alpha-600">
+							<p class="text-[10px] text-frame-gray-600">
 								{$_('video.videotoolboxAllowSwHint')}
 							</p>
 						</div>
@@ -574,7 +574,7 @@
 					/>
 					<div class="space-y-0.5">
 						<Label for="hw-decode">{$_('video.hwDecode')}</Label>
-						<p class="text-[10px] text-gray-alpha-600">
+						<p class="text-[10px] text-frame-gray-600">
 							{$_('video.hwDecodeHint')}
 						</p>
 					</div>

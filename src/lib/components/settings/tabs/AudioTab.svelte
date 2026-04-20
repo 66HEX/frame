@@ -66,7 +66,7 @@
 	<div class="space-y-3">
 		<Label variant="section">{$_('audio.channelsBitrate')}</Label>
 		{#if copyMode}
-			<p class="text-[10px] text-gray-alpha-600">{$_('audio.copyModeHint')}</p>
+			<p class="text-[10px] text-frame-gray-600">{$_('audio.copyModeHint')}</p>
 		{/if}
 		<div class="space-y-3">
 			<div class="grid grid-cols-3 gap-2">
@@ -102,7 +102,7 @@
 				<div class="flex items-center justify-between">
 					<Label for="audio-volume">{$_('audio.volume')}</Label>
 					<span
-						class="button-highlight rounded bg-blue-700 px-1.5 text-[10px] font-semibold text-foreground shadow-sm shadow-black/5"
+						class="button-highlight rounded bg-frame-gray-400 px-1.5 text-[10px] text-foreground shadow-sm"
 						>{config.audioVolume}%</span
 					>
 				</div>
@@ -115,7 +115,7 @@
 					oninput={(e) => onUpdate({ audioVolume: Number(e.currentTarget.value) })}
 					disabled={encodeControlsDisabled}
 				/>
-				<div class="flex justify-between text-[10px] text-gray-alpha-600">
+				<div class="flex justify-between text-[10px] text-frame-gray-600">
 					<span>{$_('audio.muted')}</span>
 					<span>{$_('audio.maxVolume')}</span>
 				</div>
@@ -130,7 +130,7 @@
 				/>
 				<div class="space-y-0.5">
 					<Label for="audio-normalize">{$_('audio.normalize')}</Label>
-					<p class="text-[10px] text-gray-alpha-600">
+					<p class="text-[10px] text-frame-gray-600">
 						{$_('audio.normalizeHint')}
 					</p>
 				</div>
@@ -175,7 +175,7 @@
 								<span class="text-[10px] opacity-70">
 									#{track.index}
 								</span>
-								<span class="text-[10px] font-semibold">
+								<span class="text-[10px]">
 									{track.codec}
 								</span>
 								<div class="text-[10px]">
@@ -203,7 +203,7 @@
 							)}
 						>
 							<div
-								class="h-1.5 w-1.5 rounded-full bg-blue-700 transition-all"
+								class="h-1.5 w-1.5 rounded-full bg-frame-gray-600 transition-all"
 								style="opacity: {isSelected ? 1 : 0}; transform: scale({isSelected ? 1 : 0.5});"
 							></div>
 						</div>

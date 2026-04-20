@@ -621,11 +621,9 @@
 	}
 </script>
 
-<div
-	class="card-highlight flex h-full flex-col rounded-lg bg-gray-alpha-100 p-4 shadow-md shadow-black/5"
->
+<div class="card-highlight flex h-full flex-col rounded-lg bg-frame-gray-100 p-4 shadow-md">
 	<div
-		class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-lg border border-gray-alpha-200 bg-black"
+		class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-lg border border-frame-gray-200 bg-black"
 		bind:this={containerRef}
 		onclick={() => !isImage && !cropMode && togglePlay()}
 		onmouseenter={() => (isHovering = true)}
@@ -727,7 +725,7 @@
 			>
 				<div class="absolute inset-0 bg-black/40" transition:fade={{ duration: 100 }}></div>
 				<div
-					class="relative flex size-16 items-center justify-center rounded-full bg-gray-alpha-200 text-foreground shadow-sm backdrop-blur-md"
+					class="relative flex size-16 items-center justify-center rounded-full bg-frame-gray-200 text-foreground shadow-sm backdrop-blur-md"
 					style="transform-origin: center; will-change: opacity; transform: translateZ(0);"
 					transition:fade={{ duration: 100 }}
 				>
@@ -741,7 +739,7 @@
 		{/if}
 		{#if cropMode && draftCrop}
 			<div
-				class="button-highlight pointer-events-auto absolute! bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-md bg-background p-1 text-[10px] font-semibold shadow-xl"
+				class="button-highlight pointer-events-auto absolute! bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-md bg-background p-1 text-[10px] shadow-xl"
 			>
 				{#each ASPECT_OPTIONS as option (option.id)}
 					<Button
@@ -752,7 +750,7 @@
 						{option.labelKey ? $_(option.labelKey) : option.display}
 					</Button>
 				{/each}
-				<div class="h-4 w-px bg-gray-alpha-200"></div>
+				<div class="h-4 w-px bg-frame-gray-200"></div>
 				<Button size="sm" variant="ghost" onclick={resetCropSelection}>{$_('crop.reset')}</Button>
 				<Button size="sm" onclick={applyCrop} disabled={!draftCrop || !hasCropDimensions}>
 					{$_('crop.apply')}
@@ -772,37 +770,37 @@
 			onmousedown={(e) => !trimDisabled && e.target === sliderRef && seekTo(e)}
 		>
 			<div
-				class="pointer-events-none absolute top-1/2 left-0 h-1.5 w-full -translate-y-1/2 overflow-hidden rounded-full bg-gray-alpha-100"
+				class="pointer-events-none absolute top-1/2 left-0 h-1.5 w-full -translate-y-1/2 overflow-hidden rounded-full bg-frame-gray-100"
 			>
 				<div
-					class="absolute h-full bg-gray-alpha-200"
+					class="absolute h-full bg-frame-gray-200"
 					style={`left: ${toTimelinePercent(startValue)}%; right: ${100 - toTimelinePercent(endValue)}%;`}
 				></div>
 			</div>
 
 			<div
-				class="pointer-events-none absolute top-1/2 z-10 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 bg-gray-alpha-600"
+				class="pointer-events-none absolute top-1/2 z-10 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 bg-frame-gray-600"
 				style={`left: ${toTimelinePercent(currentTime)}%`}
 			></div>
 
 			<div
-				class="button-highlight absolute! top-1/2 z-20 flex size-3.5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-blue-700 shadow-md shadow-black/5"
+				class="button-highlight absolute! top-1/2 z-20 flex size-3.5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-frame-gray-600 shadow-md"
 				class:cursor-ew-resize={!trimDisabled}
 				style={`left: ${toTimelinePercent(startValue)}%`}
 				role="presentation"
 				onmousedown={(e) => !trimDisabled && handleMouseDown(e, 'start')}
 			>
-				<div class="button-highlight size-2 rounded-full bg-sidebar"></div>
+				<div class="input-highlight size-2 rounded-full bg-sidebar"></div>
 			</div>
 
 			<div
-				class="button-highlight absolute! top-1/2 z-20 flex size-3.5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-blue-700 shadow-md shadow-black/5"
+				class="button-highlight absolute! top-1/2 z-20 flex size-3.5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-frame-gray-600 shadow-md"
 				class:cursor-ew-resize={!trimDisabled}
 				style={`left: ${toTimelinePercent(endValue)}%`}
 				role="presentation"
 				onmousedown={(e) => !trimDisabled && handleMouseDown(e, 'end')}
 			>
-				<div class="button-highlight size-2 rounded-full bg-sidebar"></div>
+				<div class="input-highlight size-2 rounded-full bg-sidebar"></div>
 			</div>
 		</div>
 
@@ -811,7 +809,7 @@
 				<div class="space-y-1.5">
 					<Label>{$_('trim.startTime')}</Label>
 					{#if isImage}
-						<div class="flex h-7.5 w-32 items-center text-[10px] text-gray-alpha-600">
+						<div class="flex h-7.5 w-32 items-center text-[10px] text-frame-gray-600">
 							--:--:--.---
 						</div>
 					{:else}
@@ -832,7 +830,7 @@
 				<div class="space-y-1.5">
 					<Label>{$_('trim.endTime')}</Label>
 					{#if isImage}
-						<div class="flex h-7.5 w-32 items-center text-[10px] text-gray-alpha-600">
+						<div class="flex h-7.5 w-32 items-center text-[10px] text-frame-gray-600">
 							--:--:--.---
 						</div>
 					{:else}

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Theme Token System:** Migrated the UI palette to OKLCH-based `frame-*` tokens, introduced a shared radius/shadow scale, and refreshed scrollbar + highlight styling for more consistent surfaces.
+- **Primary Surfaces Refresh:** Updated preview, file list, settings panel, logs view, and update dialog styling to the new tokens (cards, borders, shadows, and typography).
+- **Titlebars (macOS/Windows/Linux):** Refined separators, view-switch group styling, and metrics text to match the new theme.
+- **File List Rows:** Improved checkbox alignment, hover/selected states, status color mapping, and action button styling.
+- **Drag-and-Drop Import:** Restyled the import overlay into a full-surface dashed dropzone with safer padding on small windows.
+
+### Removed
+
+- **Bundled Font Weights:** Removed unused Loskeley Mono Regular/Medium/Bold/ExtraBold TTF assets, keeping the SemiBold face as the single embedded weight.
+- **Unused Icon:** Removed the unused `IconFilm` component/export.
+
 ## [0.27.0] - 2026-04-09
 
 ### Added

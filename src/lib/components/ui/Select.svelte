@@ -175,13 +175,13 @@
 	<div
 		use:portal
 		style={dropdownStyle}
-		class="z-200 origin-top"
+		class="button-highlight z-200 origin-top rounded-sm"
 		in:scale={{ start: 0.98, duration: 120, easing: cubicInOut }}
 		out:scale={{ start: 0.98, duration: 90, easing: cubicInOut }}
 	>
 		<ul
 			bind:this={listRef}
-			class="button-highlight max-h-48 overflow-y-auto rounded-sm bg-dropdown shadow-md shadow-black/10"
+			class="max-h-48 overflow-y-auto rounded-sm bg-dropdown shadow-md [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
 			role="listbox"
 		>
 			{#each options as option, i (option)}
@@ -197,9 +197,9 @@
 					}}
 					onmouseenter={() => (highlighted = i)}
 					class={cn(
-						'flex h-7 w-full cursor-pointer items-center justify-between px-3 text-[10px] font-semibold text-foreground',
-						isHighlighted && 'bg-gray-alpha-100',
-						isSelected && 'text-blue-700'
+						'flex h-7 w-full items-center justify-between px-3 text-[10px] text-frame-gray-600',
+						isHighlighted && 'bg-frame-gray-100 text-foreground',
+						isSelected && 'text-foreground'
 					)}
 				>
 					<span class="truncate">{option}</span>
