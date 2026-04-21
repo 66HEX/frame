@@ -31,6 +31,8 @@ mod conversion_tests {
             video_bitrate: "5000".into(),
             audio_codec: "aac".into(),
             audio_bitrate: "128".into(),
+            audio_bitrate_mode: "bitrate".into(),
+            audio_quality: "4".into(),
             audio_channels: "original".into(),
             audio_volume: 100.0,
             selected_audio_tracks: vec![1],
@@ -1163,6 +1165,8 @@ mod scenario_tests {
             video_bitrate: "5000".into(),
             audio_codec: "aac".into(),
             audio_bitrate: "128".into(),
+            audio_bitrate_mode: "bitrate".into(),
+            audio_quality: "4".into(),
             audio_channels: "original".into(),
             audio_volume: 100.0,
             selected_audio_tracks: vec![],
@@ -1451,6 +1455,75 @@ mod scenario_tests {
         assert!(args.contains(&"libsvtav1".to_string()));
         assert!(args.contains(&"28".to_string()));
     }
+
+    fn arg_pair(args: &[String], first: &str, second: &str) -> bool {
+        args.windows(2)
+            .any(|w| w[0] == first && w[1] == second)
+    }
+
+    #[test]
+    fn audio_vbr_mp3_emits_q_a_and_drops_b_a() {
+        let mut config = base_config();
+        config.container = "mp3".into();
+        config.audio_codec = "mp3".into();
+        config.audio_bitrate_mode = "vbr".into();
+        config.audio_quality = "2".into();
+
+        let args = build_ffmpeg_args("input.wav", "out.mp3", &config);
+
+        assert!(arg_pair(&args, "-q:a", "2"));
+        assert!(!args.iter().any(|a| a == "-b:a"));
+    }
+
+    #[test]
+    fn audio_vbr_libfdk_aac_emits_vbr_flag() {
+        let mut config = base_config();
+        config.container = "m4a".into();
+        config.audio_codec = "libfdk_aac".into();
+        config.audio_bitrate_mode = "vbr".into();
+        config.audio_quality = "5".into();
+
+        let args = build_ffmpeg_args("input.wav", "out.m4a", &config);
+
+        assert!(arg_pair(&args, "-vbr", "5"));
+        assert!(!args.iter().any(|a| a == "-b:a"));
+    }
+
+    #[test]
+    fn audio_vbr_clamps_out_of_range_quality() {
+        let mut config = base_config();
+        config.container = "mp3".into();
+        config.audio_codec = "mp3".into();
+        config.audio_bitrate_mode = "vbr".into();
+        config.audio_quality = "42".into();
+
+        let args = build_ffmpeg_args("input.wav", "out.mp3", &config);
+
+        // clamped to 9 (lame upper bound)
+        assert!(arg_pair(&args, "-q:a", "9"));
+    }
+
+    #[test]
+    fn audio_vbr_falls_back_to_bitrate_for_unsupported_codec() {
+        let mut config = base_config();
+        config.audio_codec = "libopus".into();
+        config.audio_bitrate_mode = "vbr".into();
+        config.audio_bitrate = "128".into();
+
+        // build_ffmpeg_args itself doesn't validate; add_audio_codec_args must
+        // emit CBR args when the codec is not VBR-capable.
+        let args = build_ffmpeg_args("input.wav", "out.mp4", &config);
+
+        assert!(arg_pair(&args, "-b:a", "128k"));
+    }
+
+    #[test]
+    fn audio_cbr_default_still_emits_b_a() {
+        let config = base_config();
+        let args = build_ffmpeg_args("input.mov", "out.mp4", &config);
+        assert!(arg_pair(&args, "-b:a", "128k"));
+        assert!(!args.iter().any(|a| a == "-q:a"));
+    }
 }
 
 #[cfg(test)]
@@ -1468,6 +1541,8 @@ mod hwaccel_tests {
             video_bitrate: "5000".into(),
             audio_codec: "aac".into(),
             audio_bitrate: "128".into(),
+            audio_bitrate_mode: "bitrate".into(),
+            audio_quality: "4".into(),
             audio_channels: "original".into(),
             audio_volume: 100.0,
             selected_audio_tracks: vec![],

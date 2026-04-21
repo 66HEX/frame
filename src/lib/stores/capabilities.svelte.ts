@@ -7,7 +7,9 @@ export const capabilities = $state<{ encoders: AvailableEncoders }>({
 		hevc_videotoolbox: false,
 		hevc_nvenc: false,
 		av1_nvenc: false,
-		ml_upscale: false
+		ml_upscale: false,
+		libfdk_aac: false,
+		libmp3lame: false
 	}
 });
 

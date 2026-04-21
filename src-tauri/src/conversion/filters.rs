@@ -177,6 +177,8 @@ mod tests {
             video_bitrate: "5000".to_string(),
             audio_codec: "aac".to_string(),
             audio_bitrate: "192".to_string(),
+            audio_bitrate_mode: "bitrate".to_string(),
+            audio_quality: "4".to_string(),
             audio_channels: "original".to_string(),
             audio_volume: 100.0,
             audio_normalize: false,
