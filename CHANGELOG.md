@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-04-21
+
 ### Added
 
 - **Audio VBR Encoding (MP3/AAC):** Added Variable Bitrate mode to the Audio tab alongside the existing target-bitrate control, exposing a codec-aware quality slider that maps to `-q:a 0..9` for `libmp3lame` and `-vbr 1..5` for `libfdk_aac`, with per-codec clamping, copy-mode reset, and Rust-side validation. Resolves [#41](https://github.com/66HEX/frame/issues/41).
