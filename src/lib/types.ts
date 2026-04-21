@@ -48,6 +48,8 @@ export interface ConversionConfig {
 	videoBitrate: string;
 	audioCodec: string;
 	audioBitrate: string;
+	audioBitrateMode: 'bitrate' | 'vbr';
+	audioQuality: string;
 	audioChannels: string;
 	audioVolume: number;
 	audioNormalize: boolean;

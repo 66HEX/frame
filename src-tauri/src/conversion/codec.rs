@@ -70,9 +70,17 @@ pub fn add_audio_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
     args.push(config.audio_codec.clone());
 
     let lossless_audio_codecs = ["flac", "alac", "pcm_s16le"];
-    if !lossless_audio_codecs.contains(&config.audio_codec.as_str()) {
-        args.push("-b:a".to_string());
-        args.push(format!("{}k", config.audio_bitrate));
+    let is_lossless = lossless_audio_codecs.contains(&config.audio_codec.as_str());
+
+    if !is_lossless {
+        let use_vbr = config.audio_bitrate_mode == "vbr"
+            && audio_codec_supports_vbr(&config.audio_codec);
+        if use_vbr {
+            add_audio_vbr_args(args, config);
+        } else {
+            args.push("-b:a".to_string());
+            args.push(format!("{}k", config.audio_bitrate));
+        }
     }
 
     match config.audio_channels.as_str() {
@@ -86,6 +94,43 @@ pub fn add_audio_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
         }
         _ => {}
     }
+}
+
+/// Returns true if the encoder supports a quality-based VBR mode exposed by
+/// Frame. Native FFmpeg `aac` has an experimental `-q:a` path but produces
+/// inconsistent results, so we restrict VBR to the two well-behaved encoders.
+pub fn audio_codec_supports_vbr(codec: &str) -> bool {
+    matches!(codec, "mp3" | "libmp3lame" | "libfdk_aac")
+}
+
+fn add_audio_vbr_args(args: &mut Vec<String>, config: &ConversionConfig) {
+    match config.audio_codec.as_str() {
+        // libmp3lame: -q:a 0..9  (0 = best, ~245 kbps; 9 = worst, ~65 kbps)
+        "mp3" | "libmp3lame" => {
+            let q = parse_quality(&config.audio_quality, 0, 9, 4);
+            args.push("-q:a".to_string());
+            args.push(q.to_string());
+        }
+        // libfdk_aac: -vbr 1..5  (1 = ~32 kbps/ch, 5 = ~112 kbps/ch)
+        "libfdk_aac" => {
+            let q = parse_quality(&config.audio_quality, 1, 5, 4);
+            args.push("-vbr".to_string());
+            args.push(q.to_string());
+        }
+        _ => {
+            // Caller guarantees the codec supports VBR; fall back to CBR defensively.
+            args.push("-b:a".to_string());
+            args.push(format!("{}k", config.audio_bitrate));
+        }
+    }
+}
+
+fn parse_quality(raw: &str, min: u8, max: u8, fallback: u8) -> u8 {
+    raw.trim()
+        .parse::<u8>()
+        .ok()
+        .map(|v| v.clamp(min, max))
+        .unwrap_or(fallback)
 }
 
 pub fn add_subtitle_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {

@@ -15,6 +15,8 @@ pub struct AvailableEncoders {
     pub hevc_nvenc: bool,
     pub av1_nvenc: bool,
     pub ml_upscale: bool,
+    pub libfdk_aac: bool,
+    pub libmp3lame: bool,
 }
 
 fn has_upscale_models(app: &AppHandle) -> bool {
@@ -67,5 +69,7 @@ pub async fn get_available_encoders(app: AppHandle) -> Result<AvailableEncoders,
         hevc_nvenc: has_encoder("hevc_nvenc"),
         av1_nvenc: has_encoder("av1_nvenc"),
         ml_upscale,
+        libfdk_aac: has_encoder("libfdk_aac"),
+        libmp3lame: has_encoder("libmp3lame"),
     })
 }

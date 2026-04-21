@@ -140,8 +140,8 @@
 		{#if notice}
 			<span
 				class={cn(
-					'absolute top-0 right-0 text-[10px] font-semibold',
-					notice.tone === 'error' ? 'text-red-700' : 'text-blue-700'
+					'absolute top-0 right-0 text-[10px]',
+					notice.tone === 'error' ? 'text-frame-red' : 'text-foreground'
 				)}
 			>
 				{notice.text}
@@ -183,7 +183,7 @@
 			>
 				<span class="truncate">{preset.name}</span>
 				<div class="flex items-center gap-2">
-					<span class="pr-2 text-[10px] font-semibold opacity-50">
+					<span class="pr-2 text-[10px] opacity-50">
 						{#if !isCompatible}
 							{$_('audio.incompatibleContainer')}
 						{:else if configsMatch(config, preset.config)}
@@ -191,39 +191,39 @@
 						{/if}
 					</span>
 
-						{#if isCompatible}
-							<Tooltip content={$_('presets.applyToAll')}>
-								<Button
-									variant="secondary"
-									size="none"
-									class="size-5 shrink-0"
-									onclick={(event) => {
-										event.stopPropagation();
-										handleApplyToAll(preset);
-									}}
-									{disabled}
-								>
-									<IconListChecks size={12} />
-								</Button>
-							</Tooltip>
-						{/if}
+					{#if isCompatible}
+						<Tooltip content={$_('presets.applyToAll')}>
+							<Button
+								variant="secondary"
+								size="none"
+								class="size-5 shrink-0"
+								onclick={(event) => {
+									event.stopPropagation();
+									handleApplyToAll(preset);
+								}}
+								{disabled}
+							>
+								<IconListChecks size={12} />
+							</Button>
+						</Tooltip>
+					{/if}
 
-						{#if !preset.builtIn}
-							<Tooltip content={$_('presets.deletePreset')}>
-								<Button
-									variant="destructive"
-									size="none"
-									class="size-5 shrink-0"
-									onclick={(event) => {
-										event.stopPropagation();
-										removePreset(preset);
-									}}
-									{disabled}
-								>
-									<IconTrash size={12} />
-								</Button>
-							</Tooltip>
-						{/if}
+					{#if !preset.builtIn}
+						<Tooltip content={$_('presets.deletePreset')}>
+							<Button
+								variant="destructive"
+								size="none"
+								class="size-5 shrink-0"
+								onclick={(event) => {
+									event.stopPropagation();
+									removePreset(preset);
+								}}
+								{disabled}
+							>
+								<IconTrash size={12} />
+							</Button>
+						</Tooltip>
+					{/if}
 				</div>
 			</ListItem>
 		{/each}

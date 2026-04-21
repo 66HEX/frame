@@ -44,9 +44,7 @@
 	const isCopyMode = $derived((config.processingMode ?? 'reencode') === 'copy');
 	const visibleContainers = $derived(
 		isSourceImage
-			? ALL_CONTAINERS.filter(
-					(container) => isImageContainer(container) || container === 'gif'
-				)
+			? ALL_CONTAINERS.filter((container) => isImageContainer(container) || container === 'gif')
 			: ALL_CONTAINERS.filter((container) => !isImageContainer(container))
 	);
 	const selectedAudioCodecs = $derived.by(() => {
@@ -162,7 +160,7 @@
 				{$_('output.streamCopy')}
 			</Button>
 		</div>
-		<p class="text-[10px] text-gray-alpha-600">
+		<p class="text-[10px] text-frame-gray-600">
 			{isCopyMode ? $_('output.streamCopyHint') : $_('output.reencodeHint')}
 		</p>
 	</div>
@@ -176,7 +174,7 @@
 			placeholder={$_('output.placeholder')}
 			{disabled}
 		/>
-		<p class="text-[10px] text-gray-alpha-600">
+		<p class="text-[10px] text-frame-gray-600">
 			{$_('output.hint')}
 		</p>
 	</div>

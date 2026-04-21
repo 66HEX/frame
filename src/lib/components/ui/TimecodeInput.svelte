@@ -200,7 +200,7 @@
 		value={displayValue}
 		{disabled}
 		class={cn(
-			'flex h-8 w-full px-3 text-[10px] font-semibold transition-colors placeholder:text-gray-alpha-600 focus-visible:border-blue-700! focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50',
+			'flex h-8 w-full px-3 text-[10px] transition-colors placeholder:text-frame-gray-600 disabled:pointer-events-none disabled:opacity-50',
 			className
 		)}
 		onkeydown={handleKeyDown}

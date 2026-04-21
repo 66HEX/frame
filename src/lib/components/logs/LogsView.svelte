@@ -106,19 +106,19 @@
 	});
 </script>
 
-<div class="card-highlight flex h-full flex-col overflow-hidden rounded-lg bg-gray-alpha-100">
+<div class="card-highlight flex h-full flex-col overflow-hidden rounded-lg bg-frame-gray-100">
 	<div
-		class="relative h-10 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-background after:shadow-2xs after:shadow-gray-alpha-100 after:content-['']"
+		class="relative h-10 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-background after:shadow-2xs after:shadow-frame-gray-100 after:content-['']"
 	>
 		<div class="flex h-full items-center gap-6 overflow-x-auto px-4">
 			{#each activeFiles as file (file.id)}
 				<button
 					onclick={() => (selectedLogFileId = file.id)}
 					class={cn(
-						'shrink-0 text-[10px] font-semibold transition-all',
+						'shrink-0 text-[10px] transition-all',
 						selectedLogFileId === file.id
-							? 'text-blue-700'
-							: 'text-gray-alpha-600 hover:text-foreground'
+							? 'text-foreground'
+							: 'text-frame-gray-600 hover:text-foreground'
 					)}
 				>
 					{file.name}
@@ -126,7 +126,7 @@
 			{/each}
 
 			{#if activeFiles.length === 0}
-				<span class="text-[10px] font-semibold text-gray-alpha-600">
+				<span class="text-[10px] text-frame-gray-600">
 					{$_('logs.noActiveProcesses')}
 				</span>
 			{/if}
@@ -144,9 +144,9 @@
 						defaultEstimatedItemHeight={24}
 					>
 						{#snippet renderItem(item)}
-							<div class="group -mx-1 flex rounded px-1 py-0.5 text-[10px] hover:bg-gray-alpha-100">
+							<div class="group -mx-1 flex rounded px-1 py-0.5 text-[10px] hover:bg-frame-gray-100">
 								<span
-									class="mr-3 w-8 shrink-0 pt-[0.5px] text-right text-[10px] text-gray-alpha-400 select-none"
+									class="mr-3 w-8 shrink-0 pt-[0.5px] text-right text-[10px] text-frame-gray-400 select-none"
 									>{item.index}</span
 								>
 								<span class="log-line break-all whitespace-nowrap">
@@ -162,9 +162,9 @@
 					</VirtualList>
 				{:else}
 					<div
-						class="flex h-full flex-col items-center justify-center space-y-2 text-gray-alpha-600 select-none"
+						class="flex h-full flex-col items-center justify-center space-y-2 text-frame-gray-600 select-none"
 					>
-						<div class="text-[10px] font-semibold">
+						<div class="text-[10px]">
 							{$_('logs.waitingForOutput')}
 						</div>
 					</div>
@@ -173,7 +173,7 @@
 				{#if !shouldStickToBottom}
 					<button
 						onclick={scrollToBottom}
-						class="absolute right-4 bottom-4 z-10 rounded-full bg-blue-700 p-2 text-foreground shadow-lg backdrop-blur-md transition-all"
+						class="absolute right-4 bottom-4 z-10 rounded-full bg-frame-gray-400 p-2 text-foreground shadow-lg backdrop-blur-md transition-all"
 						title={$_('logs.scrollToBottom')}
 					>
 						<IconArrowDown size={14} />
@@ -182,9 +182,9 @@
 			</div>
 		{:else}
 			<div
-				class="flex h-full flex-col items-center justify-center space-y-2 text-gray-alpha-600 select-none"
+				class="flex h-full flex-col items-center justify-center space-y-2 text-frame-gray-600 select-none"
 			>
-				<div class="text-[10px] font-semibold">
+				<div class="text-[10px]">
 					{$_('logs.selectTask')}
 				</div>
 			</div>

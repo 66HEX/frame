@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use crate::conversion::codec::{
     add_audio_codec_args, add_fps_args, add_subtitle_codec_args, add_video_codec_args,
+    audio_codec_supports_vbr,
 };
 use crate::conversion::error::ConversionError;
 use crate::conversion::filters::{build_audio_filters, build_video_filters};
@@ -573,6 +574,52 @@ pub fn validate_task_input(
             "Audio codec '{}' is not compatible with container '{}'",
             config.audio_codec, config.container
         )));
+    }
+
+    if !is_copy_mode && supports_audio {
+        let lossless_audio = ["flac", "alac", "pcm_s16le"];
+        let is_lossless = lossless_audio.contains(&config.audio_codec.as_str());
+        match config.audio_bitrate_mode.as_str() {
+            "bitrate" => {
+                if !is_lossless {
+                    let bitrate = config.audio_bitrate.parse::<f64>().map_err(|_| {
+                        ConversionError::InvalidInput(format!(
+                            "Invalid audio bitrate: {}",
+                            config.audio_bitrate
+                        ))
+                    })?;
+                    if bitrate <= 0.0 {
+                        return Err(ConversionError::InvalidInput(
+                            "Audio bitrate must be positive".to_string(),
+                        ));
+                    }
+                }
+            }
+            "vbr" => {
+                if is_lossless {
+                    return Err(ConversionError::InvalidInput(
+                        "VBR is not applicable to lossless audio codecs".to_string(),
+                    ));
+                }
+                if !audio_codec_supports_vbr(&config.audio_codec) {
+                    return Err(ConversionError::InvalidInput(format!(
+                        "Audio codec '{}' does not support VBR",
+                        config.audio_codec
+                    )));
+                }
+                if config.audio_quality.trim().parse::<u8>().is_err() {
+                    return Err(ConversionError::InvalidInput(format!(
+                        "Invalid audio quality: {}",
+                        config.audio_quality
+                    )));
+                }
+            }
+            other => {
+                return Err(ConversionError::InvalidInput(format!(
+                    "Invalid audio bitrate mode: {other}"
+                )));
+            }
+        }
     }
 
     let has_ml_upscale = config

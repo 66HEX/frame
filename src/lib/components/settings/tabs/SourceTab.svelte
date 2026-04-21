@@ -113,14 +113,14 @@
 
 <div class="space-y-6">
 	{#if status === 'loading'}
-		<div class="text-xs text-gray-alpha-600">
+		<div class="text-[10px] text-frame-gray-600">
 			{$_('source.analyzing')}
 		</div>
 	{:else if status === 'error'}
-		<div class="space-y-1 text-xs text-red-700">
+		<div class="space-y-1 text-[10px] text-frame-red">
 			<p>{$_('source.failedToRead')}</p>
 			{#if error}
-				<p class="text-[10px] text-gray-alpha-600">
+				<p class="text-[10px] text-frame-gray-600">
 					{error}
 				</p>
 			{/if}
@@ -131,36 +131,36 @@
 				<Label variant="section">{$_('source.fileInfo')}</Label>
 				<div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px]">
 					{#if metadata.videoCodec}
-						<div class="text-gray-alpha-600">{$_('source.imageCodec')}</div>
-						<div class="text-right font-semibold">{display(metadata.videoCodec)}</div>
+						<div class="text-frame-gray-600">{$_('source.imageCodec')}</div>
+						<div class="text-right">{display(metadata.videoCodec)}</div>
 					{/if}
 
-					<div class="text-gray-alpha-600">{$_('source.dimensions')}</div>
-					<div class="text-right font-semibold">{formatResolution(metadata)}</div>
+					<div class="text-frame-gray-600">{$_('source.dimensions')}</div>
+					<div class="text-right">{formatResolution(metadata)}</div>
 
 					{#if metadata.pixelFormat}
-						<div class="text-gray-alpha-600">{$_('source.pixelFormat')}</div>
-						<div class="text-right font-semibold">{display(metadata.pixelFormat)}</div>
+						<div class="text-frame-gray-600">{$_('source.pixelFormat')}</div>
+						<div class="text-right">{display(metadata.pixelFormat)}</div>
 					{/if}
 
 					{#if metadata.profile}
-						<div class="text-gray-alpha-600">{$_('source.profile')}</div>
-						<div class="text-right font-semibold">{display(metadata.profile)}</div>
+						<div class="text-frame-gray-600">{$_('source.profile')}</div>
+						<div class="text-right">{display(metadata.profile)}</div>
 					{/if}
 
 					{#if metadata.colorSpace}
-						<div class="text-gray-alpha-600">{$_('source.colorSpace')}</div>
-						<div class="text-right font-semibold">{display(metadata.colorSpace)}</div>
+						<div class="text-frame-gray-600">{$_('source.colorSpace')}</div>
+						<div class="text-right">{display(metadata.colorSpace)}</div>
 					{/if}
 
 					{#if metadata.colorRange}
-						<div class="text-gray-alpha-600">{$_('source.colorRange')}</div>
-						<div class="text-right font-semibold">{display(metadata.colorRange)}</div>
+						<div class="text-frame-gray-600">{$_('source.colorRange')}</div>
+						<div class="text-right">{display(metadata.colorRange)}</div>
 					{/if}
 
 					{#if metadata.colorPrimaries}
-						<div class="text-gray-alpha-600">{$_('source.colorPrimaries')}</div>
-						<div class="text-right font-semibold">{display(metadata.colorPrimaries)}</div>
+						<div class="text-frame-gray-600">{$_('source.colorPrimaries')}</div>
+						<div class="text-right">{display(metadata.colorPrimaries)}</div>
 					{/if}
 				</div>
 			</div>
@@ -169,13 +169,13 @@
 				<Label variant="section">{$_('source.fileInfo')}</Label>
 				<div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px]">
 					{#if hasDurationValue(metadata.duration)}
-						<div class="text-gray-alpha-600">{$_('source.duration')}</div>
-						<div class="text-right font-semibold">{formatDuration(metadata.duration)}</div>
+						<div class="text-frame-gray-600">{$_('source.duration')}</div>
+						<div class="text-right">{formatDuration(metadata.duration)}</div>
 					{/if}
 
 					{#if hasBitrateValue(metadata.bitrate)}
-						<div class="text-gray-alpha-600">{$_('source.containerBitrate')}</div>
-						<div class="text-right font-semibold">{formatContainerBitrate(metadata.bitrate)}</div>
+						<div class="text-frame-gray-600">{$_('source.containerBitrate')}</div>
+						<div class="text-right">{formatContainerBitrate(metadata.bitrate)}</div>
 					{/if}
 				</div>
 			</div>
@@ -185,44 +185,46 @@
 			<div class="space-y-3">
 				<Label variant="section">{$_('source.videoStream')}</Label>
 				<div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px]">
-					<div class="text-gray-alpha-600">{$_('source.videoCodec')}</div>
-					<div class="text-right font-semibold">{display(metadata.videoCodec)}</div>
+					<div class="text-frame-gray-600">{$_('source.videoCodec')}</div>
+					<div class="text-right">{display(metadata.videoCodec)}</div>
 
 					{#if metadata.profile}
-						<div class="text-gray-alpha-600">{$_('source.profile')}</div>
-						<div class="text-right font-semibold">{display(metadata.profile)}</div>
+						<div class="text-frame-gray-600">{$_('source.profile')}</div>
+						<div class="text-right">{display(metadata.profile)}</div>
 					{/if}
-					<div class="text-gray-alpha-600">{$_('source.dimensions')}</div>
-					<div class="text-right font-semibold">{formatResolution(metadata)}</div>
+					<div class="text-frame-gray-600">{$_('source.dimensions')}</div>
+					<div class="text-right">{formatResolution(metadata)}</div>
 
 					{#if metadata.frameRate && metadata.frameRate > 0}
-						<div class="text-gray-alpha-600">{$_('source.frameRate')}</div>
-						<div class="text-right font-semibold">{formatFrameRate(metadata.frameRate)}</div>
+						<div class="text-frame-gray-600">{$_('source.frameRate')}</div>
+						<div class="text-right">{formatFrameRate(metadata.frameRate)}</div>
 					{/if}
 
 					{#if metadata.pixelFormat}
-						<div class="text-gray-alpha-600">{$_('source.pixelFormat')}</div>
-						<div class="text-right font-semibold">{display(metadata.pixelFormat)}</div>
+						<div class="text-frame-gray-600">{$_('source.pixelFormat')}</div>
+						<div class="text-right">{display(metadata.pixelFormat)}</div>
 					{/if}
 
 					{#if metadata.colorSpace}
-						<div class="text-gray-alpha-600">{$_('source.colorSpace')}</div>
-						<div class="text-right font-semibold">{display(metadata.colorSpace)}</div>
+						<div class="text-frame-gray-600">{$_('source.colorSpace')}</div>
+						<div class="text-right">{display(metadata.colorSpace)}</div>
 					{/if}
 
 					{#if metadata.colorRange}
-						<div class="text-gray-alpha-600">{$_('source.colorRange')}</div>
-						<div class="text-right font-semibold">{display(metadata.colorRange)}</div>
+						<div class="text-frame-gray-600">{$_('source.colorRange')}</div>
+						<div class="text-right">{display(metadata.colorRange)}</div>
 					{/if}
 
 					{#if metadata.colorPrimaries}
-						<div class="text-gray-alpha-600">{$_('source.colorPrimaries')}</div>
-						<div class="text-right font-semibold">{display(metadata.colorPrimaries)}</div>
+						<div class="text-frame-gray-600">{$_('source.colorPrimaries')}</div>
+						<div class="text-right">{display(metadata.colorPrimaries)}</div>
 					{/if}
 
 					{#if metadata.videoBitrateKbps && metadata.videoBitrateKbps > 0}
-						<div class="text-gray-alpha-600">{$_('source.videoBitrate')}</div>
-						<div class="text-right font-semibold">{formatBitrateKbps(metadata.videoBitrateKbps)}</div>
+						<div class="text-frame-gray-600">{$_('source.videoBitrate')}</div>
+						<div class="text-right">
+							{formatBitrateKbps(metadata.videoBitrateKbps)}
+						</div>
 					{/if}
 				</div>
 			</div>
@@ -235,33 +237,29 @@
 					{#each metadata.audioTracks as track, i (track.index)}
 						<div class="space-y-2">
 							<div class="flex items-center gap-2">
-								<span class="text-[10px] font-semibold text-blue-700"
-									>{$_('source.track')} #{i + 1}</span
-								>
-									<div
-										class="h-px flex-1 bg-background shadow-2xs shadow-gray-alpha-100"
-									></div>
+								<span class="text-[10px] text-frame-gray-600">{$_('source.track')} #{i + 1}</span>
+								<div class="h-px flex-1 bg-background shadow-2xs shadow-frame-gray-100"></div>
 							</div>
 							<div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px]">
-								<div class="text-gray-alpha-600">{$_('audio.codec')}</div>
-								<div class="text-right font-semibold">{display(track.codec)}</div>
+								<div class="text-frame-gray-600">{$_('audio.codec')}</div>
+								<div class="text-right">{display(track.codec)}</div>
 
-								<div class="text-gray-alpha-600">{$_('audio.channels')}</div>
-								<div class="text-right font-semibold">{display(track.channels)}</div>
+								<div class="text-frame-gray-600">{$_('audio.channels')}</div>
+								<div class="text-right">{display(track.channels)}</div>
 
 								{#if track.sampleRate}
-									<div class="text-gray-alpha-600">{$_('source.sampleRate')}</div>
-									<div class="text-right font-semibold">{formatHz(track.sampleRate)}</div>
+									<div class="text-frame-gray-600">{$_('source.sampleRate')}</div>
+									<div class="text-right">{formatHz(track.sampleRate)}</div>
 								{/if}
 
 								{#if track.bitrateKbps}
-									<div class="text-gray-alpha-600">{$_('source.bitrate')}</div>
-									<div class="text-right font-semibold">{formatBitrateKbps(track.bitrateKbps)}</div>
+									<div class="text-frame-gray-600">{$_('source.bitrate')}</div>
+									<div class="text-right">{formatBitrateKbps(track.bitrateKbps)}</div>
 								{/if}
 
 								{#if track.language}
-									<div class="text-gray-alpha-600">{$_('source.language')}</div>
-									<div class="text-right font-semibold">{display(track.language)}</div>
+									<div class="text-frame-gray-600">{$_('source.language')}</div>
+									<div class="text-right">{display(track.language)}</div>
 								{/if}
 							</div>
 						</div>
@@ -270,7 +268,7 @@
 			</div>
 		{/if}
 	{:else}
-		<div class="text-xs text-gray-alpha-600">
+		<div class="text-[10px] text-frame-gray-600">
 			{$_('source.unavailable')}
 		</div>
 	{/if}

@@ -8,7 +8,6 @@ export { default as IconFileUp } from './components/IconFileUp.svelte';
 export { default as IconFileImage } from './components/IconFileImage.svelte';
 export { default as IconMusic } from './components/IconMusic.svelte';
 export { default as IconFileVideo } from './components/IconFileVideo.svelte';
-export { default as IconFilm } from './components/IconFilm.svelte';
 export { default as IconFlipHorizontal } from './components/IconFlipHorizontal.svelte';
 export { default as IconFlipVertical } from './components/IconFlipVertical.svelte';
 export { default as IconHardDrive } from './components/IconHardDrive.svelte';

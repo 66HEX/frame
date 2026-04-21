@@ -93,7 +93,11 @@ export function containerSupportsAudio(container: string): boolean {
 }
 
 export function containerSupportsSubtitles(container: string): boolean {
-	return !isAudioOnlyContainer(container) && !isVideoOnlyContainer(container) && !isImageContainer(container);
+	return (
+		!isAudioOnlyContainer(container) &&
+		!isVideoOnlyContainer(container) &&
+		!isImageContainer(container)
+	);
 }
 
 export function isGifContainer(container: string): boolean {
@@ -110,7 +114,8 @@ function getPixelFormatAllowList(
 	container: string,
 	encoder: string
 ): Set<string> | null | undefined {
-	const containerRules = VIDEO_ENCODER_PIXEL_FORMAT_COMPATIBILITY_MAP[normalizeContainer(container)];
+	const containerRules =
+		VIDEO_ENCODER_PIXEL_FORMAT_COMPATIBILITY_MAP[normalizeContainer(container)];
 	if (!containerRules) return undefined;
 	return containerRules[encoder.toLowerCase()] ?? containerRules[ANY_CODEC_TOKEN] ?? null;
 }

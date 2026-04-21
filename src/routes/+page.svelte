@@ -169,7 +169,7 @@
 								{/key}
 							{:else}
 								<div
-									class="card-highlight flex h-full flex-col items-center justify-center rounded-lg bg-gray-alpha-100 shadow-md shadow-black/5"
+									class="card-highlight flex h-full flex-col items-center justify-center rounded-lg bg-frame-gray-100 shadow-md"
 								></div>
 							{/if}
 						</div>
@@ -190,9 +190,7 @@
 				</div>
 
 				<div class="col-span-4 h-full min-h-0">
-					<div
-						class="card-highlight h-full min-h-0 rounded-lg bg-gray-alpha-100 shadow-md shadow-black/5"
-					>
+					<div class="card-highlight h-full min-h-0 rounded-lg bg-frame-gray-100 shadow-md">
 						<div class="h-full min-h-0 custom-scrollbar overflow-y-auto">
 							{#if selectedFile}
 								<SettingsPanel
@@ -225,13 +223,13 @@
 	{#if isDragging}
 		<div
 			transition:fade={{ duration: 100 }}
-			class="absolute inset-0 z-100 flex items-center justify-center bg-background/60 backdrop-blur-sm"
+			class="absolute inset-0 z-100 flex items-center justify-center bg-background/60 p-4 backdrop-blur-sm"
 		>
 			<div
 				transition:scale={{ start: 1.05, duration: 100, opacity: 1 }}
-				class="card-highlight flex h-36 w-72 flex-col items-center justify-center rounded-lg bg-sidebar shadow-2xl"
+				class="flex h-full w-full flex-col items-center justify-center rounded-lg border border-dashed border-frame-gray-100 bg-frame-gray-100 shadow-2xl"
 			>
-				<p class="text-[10px] font-semibold text-foreground">
+				<p class="text-[10px] text-foreground">
 					{$_('fileList.importSource')}
 				</p>
 			</div>

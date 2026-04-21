@@ -30,14 +30,12 @@
 	);
 </script>
 
-<div class="group card-highlight flex h-full flex-col rounded-lg bg-gray-alpha-100">
+<div class="group card-highlight flex h-full flex-col rounded-lg bg-frame-gray-100">
 	<div
-		class="relative z-10 flex h-10 items-center px-4 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-background after:shadow-2xs after:shadow-gray-alpha-100 after:content-['']"
+		class="relative z-10 flex h-10 items-center px-4 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-background after:shadow-2xs after:shadow-frame-gray-100 after:content-['']"
 	>
-		<div
-			class="grid flex-1 grid-cols-12 items-center gap-4 text-[10px] font-semibold text-gray-alpha-600"
-		>
-			<div class="relative col-span-1 flex items-center justify-center">
+		<div class="grid flex-1 grid-cols-12 items-center gap-4 text-[10px] text-frame-gray-600">
+			<div class="relative col-span-1 flex items-center justify-start">
 				<Checkbox
 					checked={allChecked}
 					indeterminate={isIndeterminate}
@@ -49,7 +47,7 @@
 			<div class="col-span-2 text-right">{$_('common.target')}</div>
 			<div class="col-span-2 text-right">{$_('common.state')}</div>
 		</div>
-		<div class="ml-4 w-16 text-right text-[10px] font-semibold text-gray-alpha-600">
+		<div class="ml-4 w-16 text-right text-[10px] text-frame-gray-600">
 			{$_('common.actions')}
 		</div>
 	</div>
@@ -57,7 +55,7 @@
 	<div class="relative z-10 flex-1 overflow-y-auto">
 		{#if files.length === 0}
 			<div class="flex h-full flex-col items-center justify-center p-10 select-none">
-				<div class="text-[10px] font-semibold text-gray-alpha-600">
+				<div class="text-[10px] text-frame-gray-600">
 					{$_('fileList.dropFiles')}
 				</div>
 			</div>

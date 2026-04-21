@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-04-21
+
+### Added
+
+- **Audio VBR Encoding (MP3/AAC):** Added Variable Bitrate mode to the Audio tab alongside the existing target-bitrate control, exposing a codec-aware quality slider that maps to `-q:a 0..9` for `libmp3lame` and `-vbr 1..5` for `libfdk_aac`, with per-codec clamping, copy-mode reset, and Rust-side validation. Resolves [#41](https://github.com/66HEX/frame/issues/41).
+- **Fraunhofer FDK AAC Codec Option:** Added `libfdk_aac` as a selectable audio codec in the Audio tab when the bundled FFmpeg build exposes the encoder, and extended `mp4`/`m4a` container compatibility rules accordingly.
+- **Audio Encoder Capability Detection:** Extended `get_available_encoders` and the frontend capabilities store to detect `libfdk_aac` and `libmp3lame` at runtime, gating VBR UI surfaces behind actual encoder availability.
+- **Audio VBR Localization:** Added new audio bitrate-mode and quality-level locale keys (`qualityControl`, `targetBitrate`, `variableBitrate`, `qualityLevel`, `qualityBest`, `qualitySmallest`) across all nine supported UI dictionaries.
+
+### Changed
+
+- **Theme Token System:** Migrated the UI palette to OKLCH-based `frame-*` tokens, introduced a shared radius/shadow scale, and refreshed scrollbar + highlight styling for more consistent surfaces.
+- **Primary Surfaces Refresh:** Updated preview, file list, settings panel, logs view, and update dialog styling to the new tokens (cards, borders, shadows, and typography).
+- **Titlebars (macOS/Windows/Linux):** Refined separators, view-switch group styling, and metrics text to match the new theme.
+- **File List Rows:** Improved checkbox alignment, hover/selected states, status color mapping, and action button styling.
+- **Drag-and-Drop Import:** Restyled the import overlay into a full-surface dashed dropzone with safer padding on small windows.
+
+### Removed
+
+- **Bundled Font Weights:** Removed unused Loskeley Mono Regular/Medium/Bold/ExtraBold TTF assets, keeping the SemiBold face as the single embedded weight.
+- **Unused Icon:** Removed the unused `IconFilm` component/export.
+
 ## [0.27.0] - 2026-04-09
 
 ### Added

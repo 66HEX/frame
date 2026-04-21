@@ -14,7 +14,12 @@ function createFontsStore() {
 		}
 	}
 
-	return { get fonts() { return fonts; }, load };
+	return {
+		get fonts() {
+			return fonts;
+		},
+		load
+	};
 }
 
 export const fontsStore = createFontsStore();

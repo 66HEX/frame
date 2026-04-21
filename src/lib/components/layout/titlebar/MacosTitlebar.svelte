@@ -82,7 +82,7 @@
 						stroke="#4a0002"
 						stroke-width="1.5"
 						stroke-linecap="round"
-						class="opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+						class="opacity-0 transition-opacity group-hover:opacity-100"
 					/>
 				</svg>
 			</button>
@@ -101,7 +101,7 @@
 						stroke="#5a3900"
 						stroke-width="1.5"
 						stroke-linecap="round"
-						class="opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+						class="opacity-0 transition-opacity group-hover:opacity-100"
 					/>
 				</svg>
 			</button>
@@ -112,10 +112,7 @@
 			>
 				<svg viewBox="-10 -10 20 20" class="h-full w-full" aria-hidden="true">
 					<circle r="6" fill="#27c93f" stroke="#1aab29" stroke-width="0.6" />
-					<g
-						fill="#004200"
-						class="opacity-0 transition-opacity duration-150 group-hover:opacity-100"
-					>
+					<g fill="#004200" class="opacity-0 transition-opacity group-hover:opacity-100">
 						<path d="M-2.1 2.1 L-2.1 -1.5 L1.5 2.1 Z" />
 						<path d="M2.1 -2.1 L2.1 1.5 L-1.5 -2.1 Z" />
 					</g>
@@ -131,11 +128,11 @@
 			{@html frameIcon}
 		</span>
 
-		<div class="pointer-events-none h-6 w-px bg-gray-alpha-100"></div>
+		<div class="pointer-events-none h-6 w-px bg-frame-gray-100"></div>
 
 		{#if onChangeView}
 			<div
-				class="button-highlight pointer-events-auto flex h-7.5 items-center gap-1 rounded-md bg-gray-alpha-100 p-0.5 shadow-sm shadow-black/5"
+				class="input-highlight pointer-events-auto flex h-7.5 items-center gap-1 rounded-md bg-frame-gray-100 px-0.75 py-0.5 shadow-sm"
 			>
 				<Button
 					variant={activeView === 'workspace' ? 'default' : 'titlebar-ghost'}
@@ -158,9 +155,9 @@
 			</div>
 		{/if}
 
-		<div class="pointer-events-none h-6 w-px bg-gray-alpha-100"></div>
+		<div class="pointer-events-none h-6 w-px bg-frame-gray-100"></div>
 
-		<div class="pointer-events-none flex items-center gap-4 text-[10px] text-gray-alpha-600">
+		<div class="pointer-events-none flex items-center gap-4 text-[10px] text-frame-gray-600">
 			<div class="flex items-center gap-2">
 				<IconHardDrive size={14} />
 				<span>{$_('titlebar.storage')} {formatTotalSize(totalSize)}</span>
@@ -172,7 +169,7 @@
 		</div>
 	</div>
 
-	<div class="pointer-events-none mt-2 flex items-center gap-3">
+	<div class="pointer-events-none mt-2 flex items-center gap-2">
 		{#if onOpenSettings}
 			<Button onclick={onOpenSettings} variant="secondary" size="icon" class="pointer-events-auto">
 				<IconSettings size={16} />

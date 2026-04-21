@@ -69,6 +69,10 @@ pub struct ConversionConfig {
     pub video_bitrate: String,
     pub audio_codec: String,
     pub audio_bitrate: String,
+    #[serde(default = "default_audio_bitrate_mode")]
+    pub audio_bitrate_mode: String,
+    #[serde(default = "default_audio_quality")]
+    pub audio_quality: String,
     pub audio_channels: String,
     #[serde(default = "default_audio_volume")]
     pub audio_volume: f64,
@@ -146,6 +150,14 @@ const fn default_quality() -> u32 {
 
 const fn default_audio_volume() -> f64 {
     100.0
+}
+
+fn default_audio_bitrate_mode() -> String {
+    "bitrate".to_string()
+}
+
+fn default_audio_quality() -> String {
+    "4".to_string()
 }
 
 const fn default_hw_decode() -> bool {

@@ -1,5 +1,11 @@
 import { AUDIO_ONLY_CONTAINERS, type ConversionConfig, type SourceMetadata } from '$lib/types';
-import { getDefaultAudioCodec, isAudioCodecAllowed } from '$lib/services/media';
+import {
+	audioCodecSupportsVbr,
+	getAudioQualityRange,
+	getDefaultAudioCodec,
+	isAudioCodecAllowed
+} from '$lib/services/media';
+import { capabilities } from '$lib/stores/capabilities.svelte';
 import {
 	containerSupportsAudio,
 	containerSupportsSubtitles,
@@ -39,8 +45,7 @@ export function normalizeConversionConfig(
 		? (requestedPixelFormat as ConversionConfig['pixelFormat'])
 		: 'auto';
 
-	const sourceKind =
-		metadata?.mediaKind ?? (metadata && !metadata.videoCodec ? 'audio' : 'video');
+	const sourceKind = metadata?.mediaKind ?? (metadata && !metadata.videoCodec ? 'audio' : 'video');
 	const isSourceAudioOnly = sourceKind === 'audio';
 	const isSourceImage = sourceKind === 'image';
 	if (isSourceAudioOnly && !AUDIO_ONLY_CONTAINERS.includes(next.container)) {
@@ -70,6 +75,31 @@ export function normalizeConversionConfig(
 		next.audioCodec = getDefaultAudioCodec(next.container);
 	}
 
+	// If libfdk_aac isn't present in this FFmpeg build, fall back to native aac.
+	if (next.audioCodec === 'libfdk_aac' && !capabilities.encoders.libfdk_aac) {
+		next.audioCodec = 'aac';
+	}
+
+	// Audio bitrate mode: force CBR when the codec doesn't support VBR, and
+	// clamp the quality value into the codec-specific range. This mirrors how
+	// video preset / pixel-format normalisation works above.
+	if (next.audioBitrateMode !== 'vbr' && next.audioBitrateMode !== 'bitrate') {
+		next.audioBitrateMode = 'bitrate';
+	}
+	if (next.audioBitrateMode === 'vbr' && !audioCodecSupportsVbr(next.audioCodec)) {
+		next.audioBitrateMode = 'bitrate';
+	}
+	const qualityRange = getAudioQualityRange(next.audioCodec);
+	if (qualityRange) {
+		const parsed = Number.parseInt(next.audioQuality ?? '', 10);
+		const resolved = Number.isFinite(parsed)
+			? Math.min(qualityRange.max, Math.max(qualityRange.min, parsed))
+			: qualityRange.defaultValue;
+		next.audioQuality = String(resolved);
+	} else if (!next.audioQuality) {
+		next.audioQuality = '4';
+	}
+
 	const isAudioContainer = AUDIO_ONLY_CONTAINERS.includes(next.container);
 	const supportsSubtitles = containerSupportsSubtitles(next.container);
 	const isGifOutput = isGifContainer(next.container);
@@ -85,6 +115,7 @@ export function normalizeConversionConfig(
 		next.subtitleBurnPath = undefined;
 		next.audioNormalize = false;
 		next.audioVolume = 100;
+		next.audioBitrateMode = 'bitrate';
 		next.resolution = 'original';
 		next.customWidth = undefined;
 		next.customHeight = undefined;

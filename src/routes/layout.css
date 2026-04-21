@@ -1,172 +1,139 @@
 @import 'tailwindcss';
 
-@font-face {
-	font-family: 'LoskeleyMono';
-	src: url('../lib/assets/fonts/LoskeleyMono/IoskeleyMono-Regular.ttf') format('truetype');
-	font-weight: 400;
-	font-style: normal;
-	font-display: swap;
-}
+@layer base {
+	@font-face {
+		font-family: 'LoskeleyMono';
+		src: url('../lib/assets/fonts/LoskeleyMono/IoskeleyMono-SemiBold.ttf') format('truetype');
+		font-weight: 600;
+		font-style: normal;
+		font-display: swap;
+	}
 
-@font-face {
-	font-family: 'LoskeleyMono';
-	src: url('../lib/assets/fonts/LoskeleyMono/IoskeleyMono-Medium.ttf') format('truetype');
-	font-weight: 500;
-	font-style: normal;
-	font-display: swap;
-}
+	@font-face {
+		font-family: 'EmojiFont';
+		src: local('Apple Color Emoji'), local('Segoe UI Emoji'), local('Noto Color Emoji');
+		unicode-range: U+1F300-1F9FF, U+2600-26FF, U+2700-27BF;
+	}
 
-@font-face {
-	font-family: 'LoskeleyMono';
-	src: url('../lib/assets/fonts/LoskeleyMono/IoskeleyMono-SemiBold.ttf') format('truetype');
-	font-weight: 600;
-	font-style: normal;
-	font-display: swap;
-}
+	:root {
+		interpolate-size: allow-keywords;
+		text-box: trim-both cap alphabetic;
 
-@font-face {
-	font-family: 'LoskeleyMono';
-	src: url('../lib/assets/fonts/LoskeleyMono/IoskeleyMono-Bold.ttf') format('truetype');
-	font-weight: 700;
-	font-style: normal;
-	font-display: swap;
-}
+		--radius-base: 0.225rem;
 
-@font-face {
-	font-family: 'LoskeleyMono';
-	src: url('../lib/assets/fonts/LoskeleyMono/IoskeleyMono-ExtraBold.ttf') format('truetype');
-	font-weight: 800;
-	font-style: normal;
-	font-display: swap;
-}
+		--background: oklch(0.1987 0.0084 265);
+		--foreground: oklch(1 0 0);
+		--sidebar: oklch(0.2511 0.0064 258.36);
+		--dropdown: oklch(0.2963 0.0061 258.36);
 
-@font-face {
-	font-family: 'EmojiFont';
-	src: local('Apple Color Emoji'), local('Segoe UI Emoji'), local('Noto Color Emoji');
-	unicode-range: U+1F300-1F9FF, U+2600-26FF, U+2700-27BF;
-}
+		--frame-gray-100: oklch(1 0 0 / 0.05);
+		--frame-gray-200: oklch(1 0 0 / 0.1);
+		--frame-gray-400: oklch(1 0 0 / 0.2);
+		--frame-gray-600: oklch(1 0 0 / 0.4);
 
-* {
-	box-sizing: border-box;
-	min-width: 0;
-}
+		--frame-blue: oklch(0.4882 0.2172 264.38);
+		--frame-red: oklch(0.5054 0.1905 27.52);
+		--frame-amber: oklch(0.7686 0.1647 70.08);
+	}
 
-:root {
-	interpolate-size: allow-keywords;
-	text-box: trim-both cap alphabetic;
-}
+	* {
+		box-sizing: border-box;
+		min-width: 0;
+		text-transform: uppercase;
+	}
 
-html {
-	text-size-adjust: 100%;
-	background: transparent;
-}
+	html {
+		text-size-adjust: 100%;
+		background: transparent;
+	}
 
-body {
-	background: transparent;
-	color: var(--foreground);
-	font-family: var(--app-font-family), 'EmojiFont', ui-sans-serif, system-ui, sans-serif;
-	font-weight: 500;
-	margin: 0;
-	padding: 0;
-	overflow: hidden;
-	height: 100vh;
-}
-@utility emoji {
-	font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji' !important;
-}
+	body {
+		background: transparent;
+		color: var(--foreground);
+		font-family: var(--font-loskeley-mono), 'EmojiFont', ui-sans-serif, system-ui, sans-serif;
+		font-weight: 600;
+		margin: 0;
+		padding: 0;
+		overflow: hidden;
+		height: 100vh;
+	}
 
-input,
-textarea,
-select {
-	field-sizing: content;
-}
+	input,
+	textarea,
+	select {
+		field-sizing: content;
+	}
 
-* {
-	text-transform: uppercase;
-}
+	input {
+		text-transform: none;
+	}
 
-input {
-	text-transform: none;
-}
+	input::placeholder {
+		text-transform: uppercase;
+	}
 
-input::placeholder {
-	text-transform: uppercase;
-}
+	::-webkit-scrollbar {
+		width: 6px;
+		height: 6px;
+	}
 
-:root {
-	--background: #17191d;
-	--foreground: #ffffff;
-	--sidebar: #232529;
-	--dropdown: #2e3034;
-	--font-loskeley-mono: 'LoskeleyMono', monospace;
-	--app-font-family: var(--font-loskeley-mono);
+	::-webkit-scrollbar-track {
+		background: var(--frame-gray-100);
+	}
 
-	--ds-gray-alpha-100: rgba(255, 255, 255, 0.05);
-	--ds-gray-alpha-200: rgba(255, 255, 255, 0.1);
-	--ds-gray-alpha-400: rgba(255, 255, 255, 0.2);
-	--ds-gray-alpha-600: rgba(255, 255, 255, 0.4);
-
-	--ds-blue-500: #3b82f6;
-	--ds-blue-600: #2563eb;
-	--ds-blue-700: #1d4ed8;
-	--ds-blue-800: #1e40af;
-	--ds-blue-900: #0066ff;
-
-	--ds-red-600: #dc2626;
-	--ds-red-700: #b91c1c;
-	--ds-red-800: #991b1b;
-	--ds-red-900: #dc143c;
-
-	--ds-green-600: #16a34a;
-	--ds-green-700: #15803d;
-
-	--ds-amber-800: #f59e0b;
-	--ds-orange-600: #ea580c;
+	::-webkit-scrollbar-thumb {
+		background: var(--frame-gray-200);
+		border-radius: 3px;
+	}
 }
 
 @theme inline {
+	--font-loskeley-mono: 'LoskeleyMono', monospace;
+
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
 	--color-sidebar: var(--sidebar);
 	--color-dropdown: var(--dropdown);
 
-	--font-mono: var(--font-loskeley-mono);
+	--color-frame-gray-100: var(--frame-gray-100);
+	--color-frame-gray-200: var(--frame-gray-200);
+	--color-frame-gray-400: var(--frame-gray-400);
+	--color-frame-gray-600: var(--frame-gray-600);
 
-	--color-gray-alpha-100: var(--ds-gray-alpha-100);
-	--color-gray-alpha-200: var(--ds-gray-alpha-200);
-	--color-gray-alpha-400: var(--ds-gray-alpha-400);
-	--color-gray-alpha-600: var(--ds-gray-alpha-600);
+	--color-frame-blue: var(--frame-blue);
+	--color-frame-red: var(--frame-red);
+	--color-frame-amber: var(--frame-amber);
 
-	--color-blue-500: var(--ds-blue-500);
-	--color-blue-600: var(--ds-blue-600);
-	--color-blue-700: var(--ds-blue-700);
-	--color-blue-800: var(--ds-blue-800);
-	--color-blue-900: var(--ds-blue-900);
+	--radius-xs: calc(var(--radius-base) * 1);
+	--radius-sm: calc(var(--radius-base) * 2);
+	--radius-md: calc(var(--radius-base) * 3);
+	--radius-lg: calc(var(--radius-base) * 4);
+	--radius-xl: calc(var(--radius-base) * 6);
+	--radius-2xl: calc(var(--radius-base) * 8);
+	--radius-3xl: calc(var(--radius-base) * 12);
+	--radius-4xl: calc(var(--radius-base) * 16);
+	--radius-full: 9999px;
 
-	--color-red-600: var(--ds-red-600);
-	--color-red-700: var(--ds-red-700);
-	--color-red-800: var(--ds-red-800);
-	--color-red-900: var(--ds-red-900);
-
-	--color-green-600: var(--ds-green-600);
-	--color-green-700: var(--ds-green-700);
-
-	--color-amber-800: var(--ds-amber-800);
-	--color-orange-600: var(--ds-orange-600);
+	--shadow-xs: 0px 1px 1px -0.5px rgba(0, 0, 0, 0.06);
+	--shadow-sm: 0px 1px 1px -0.5px rgba(0, 0, 0, 0.06), 0px 3px 3px -1.5px rgba(0, 0, 0, 0.06);
+	--shadow-md:
+		0px 1px 1px -0.5px rgba(0, 0, 0, 0.06), 0px 3px 3px -1.5px rgba(0, 0, 0, 0.06),
+		0px 6px 6px -3px rgba(0, 0, 0, 0.06);
+	--shadow-lg:
+		0px 1px 1px -0.5px rgba(0, 0, 0, 0.06), 0px 3px 3px -1.5px rgba(0, 0, 0, 0.06),
+		0px 6px 6px -3px rgba(0, 0, 0, 0.06), 0px 12px 12px -6px rgba(0, 0, 0, 0.06);
+	--shadow-xl:
+		0px 1px 1px -0.5px rgba(0, 0, 0, 0.06), 0px 3px 3px -1.5px rgba(0, 0, 0, 0.06),
+		0px 6px 6px -3px rgba(0, 0, 0, 0.06), 0px 12px 12px -6px rgba(0, 0, 0, 0.06),
+		0px 24px 24px -12px rgba(0, 0, 0, 0.06);
+	--shadow-2xl:
+		0px 1px 1px -0.5px rgba(0, 0, 0, 0.06), 0px 3px 3px -1.5px rgba(0, 0, 0, 0.06),
+		0px 6px 6px -3px rgba(0, 0, 0, 0.06), 0px 12px 12px -6px rgba(0, 0, 0, 0.06),
+		0px 24px 24px -12px rgba(0, 0, 0, 0.06), 0px 48px 48px -24px rgba(0, 0, 0, 0.06);
 }
 
-::-webkit-scrollbar {
-	width: 6px;
-	height: 6px;
-}
-
-::-webkit-scrollbar-track {
-	background: var(--ds-gray-alpha-100);
-}
-
-::-webkit-scrollbar-thumb {
-	background: var(--ds-gray-alpha-200);
-	border-radius: 3px;
+@utility emoji {
+	font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji' !important;
 }
 
 @utility custom-scrollbar {
@@ -179,12 +146,12 @@ input::placeholder {
 	}
 
 	&::-webkit-scrollbar-thumb {
-		background: var(--ds-gray-alpha-200);
+		background: var(--frame-gray-200);
 		border-radius: 10px;
 	}
 
 	&::-webkit-scrollbar-thumb:hover {
-		background: var(--ds-gray-alpha-400);
+		background: var(--frame-gray-400);
 	}
 }
 
@@ -200,8 +167,8 @@ input::placeholder {
 		pointer-events: none;
 		z-index: 1;
 		box-shadow:
-			inset 0 1px 0 var(--ds-gray-alpha-200),
-			inset 0 0 0 1px var(--ds-gray-alpha-100);
+			inset 0 1px 0 var(--frame-gray-200),
+			inset 0 0 0 1px var(--frame-gray-100);
 	}
 }
 
@@ -218,7 +185,7 @@ input::placeholder {
 		z-index: 1;
 		box-shadow:
 			inset 0 0.5px 0 0 rgba(0, 0, 0, 0.2),
-			inset 0 -0.5px 0 0 var(--ds-gray-alpha-400);
+			inset 0 -0.5px 0 0 var(--frame-gray-400);
 	}
 }
 
@@ -234,7 +201,7 @@ input::placeholder {
 		pointer-events: none;
 		z-index: 1;
 		box-shadow:
-			inset 0 0.5px 0 var(--ds-gray-alpha-400),
-			inset 0 0 0 0.5px var(--ds-gray-alpha-200);
+			inset 0 0.5px 0 var(--frame-gray-400),
+			inset 0 0 0 0.5px var(--frame-gray-200);
 	}
 }

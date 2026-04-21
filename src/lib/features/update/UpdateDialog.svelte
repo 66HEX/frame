@@ -40,14 +40,14 @@
 			<div>
 				<Label variant="section" class="text-foreground">{$_('update.available')}</Label>
 
-				<p class="text-[10px] font-semibold text-gray-alpha-600">
+				<p class="text-[10px] text-frame-gray-600">
 					{$_('update.versionAvailable', { values: { version: updateStore.version } })}
 				</p>
 			</div>
 
 			{#if updateStore.body}
 				<div
-					class="markdown-content max-h-35 overflow-y-auto rounded bg-gray-alpha-100 p-3 text-xs text-gray-alpha-600"
+					class="markdown-content max-h-35 overflow-y-auto rounded bg-frame-gray-100 p-3 text-[10px] text-frame-gray-600"
 				>
 					<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 					{@html renderReleaseNotes(updateStore.body)}
@@ -55,20 +55,17 @@
 			{/if}
 
 			{#if updateStore.error}
-				<div class="text-xs text-red-700">
+				<div class="text-[10px] text-frame-red">
 					{updateStore.error}
 				</div>
 			{/if}
 
 			{#if updateStore.isInstalling}
 				<div class="space-y-1">
-					<div class="h-1 w-full overflow-hidden rounded-full bg-gray-alpha-200">
-						<div
-							class="h-full bg-blue-700 transition-all duration-300"
-							style="width: {updateStore.progress}%"
-						></div>
+					<div class="h-1 w-full overflow-hidden rounded-full bg-frame-gray-200">
+						<div class="h-full bg-frame-gray-600" style="width: {updateStore.progress}%"></div>
 					</div>
-					<p class="text-right text-[10px] text-gray-alpha-600">
+					<p class="text-right text-[10px] text-frame-gray-600">
 						{Math.round(updateStore.progress)}%
 					</p>
 				</div>

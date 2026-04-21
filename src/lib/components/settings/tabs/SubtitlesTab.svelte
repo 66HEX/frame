@@ -11,7 +11,22 @@
 	import { fontsStore } from '$lib/stores/fonts.svelte';
 
 	const POSITIONS = ['bottom', 'middle', 'top'] as const;
-	const FONT_SIZES = ['8', '10', '12', '14', '16', '18', '20', '22', '24', '28', '32', '36', '42', '48'] as const;
+	const FONT_SIZES = [
+		'8',
+		'10',
+		'12',
+		'14',
+		'16',
+		'18',
+		'20',
+		'22',
+		'24',
+		'28',
+		'32',
+		'36',
+		'42',
+		'48'
+	] as const;
 
 	let {
 		config,
@@ -106,7 +121,7 @@
 					</div>
 				{/if}
 			</div>
-			<p class="text-[10px] text-gray-alpha-600">
+			<p class="text-[10px] text-frame-gray-600">
 				{copyMode ? $_('subtitles.copyModeHint') : $_('subtitles.burnInHint')}
 			</p>
 		</div>
@@ -178,7 +193,7 @@
 					</div>
 				</div>
 
-				<p class="text-[10px] text-gray-alpha-600">{$_('subtitles.styleHint')}</p>
+				<p class="text-[10px] text-frame-gray-600">{$_('subtitles.styleHint')}</p>
 			</div>
 		</div>
 	{/if}
@@ -200,7 +215,7 @@
 								<span class="text-[10px] opacity-70">
 									#{track.index}
 								</span>
-								<span class="text-[10px] font-semibold">
+								<span class="text-[10px]">
 									{track.codec}
 								</span>
 								<div class="text-[10px]">
@@ -220,7 +235,7 @@
 							)}
 						>
 							<div
-								class="h-1.5 w-1.5 rounded-full bg-blue-700 transition-all"
+								class="h-1.5 w-1.5 rounded-full bg-frame-gray-600 transition-all"
 								style="opacity: {isSelected ? 1 : 0}; transform: scale({isSelected ? 1 : 0.5});"
 							></div>
 						</div>
@@ -231,7 +246,7 @@
 	{:else}
 		<div class="space-y-3 pt-2">
 			<Label variant="section">{$_('subtitles.sourceTracks')}</Label>
-			<p class="text-[10px] text-gray-alpha-600">
+			<p class="text-[10px] text-frame-gray-600">
 				{$_('subtitles.none')}
 			</p>
 		</div>

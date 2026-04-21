@@ -14,7 +14,7 @@
 		bind:this={ref}
 		bind:value
 		class={cn(
-			'flex w-full px-2.5 text-[10px] font-semibold transition-colors placeholder:text-gray-alpha-600 focus-visible:border-blue-700! focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50',
+			'flex h-full w-full px-2.5 text-[10px] transition-colors placeholder:text-frame-gray-600 disabled:pointer-events-none disabled:opacity-50',
 			'[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
 			className
 		)}

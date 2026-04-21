@@ -105,14 +105,16 @@
 ></button>
 
 <div
-	class="absolute top-0 right-0 bottom-0 z-70 w-80 rounded-l-xl border-l border-gray-alpha-200 bg-sidebar shadow-2xl"
+	class="absolute top-0 right-0 bottom-0 z-70 w-80 rounded-l-xl border-l border-frame-gray-200 bg-sidebar shadow-2xl"
 	transition:fly={{ x: 320, duration: 300, opacity: 1 }}
 >
-	<div class="flex items-center justify-between border-b border-gray-alpha-100 px-4 py-3">
-		<h2 class="text-[10px] font-semibold text-foreground">
+	<div
+		class="relative flex h-10 items-center justify-between px-4 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-background after:shadow-2xs after:shadow-frame-gray-100 after:content-['']"
+	>
+		<h2 class="text-[10px] text-foreground">
 			{$_('settings.title')}
 		</h2>
-		<button onclick={onClose} class="text-gray-alpha-600 transition-colors hover:text-foreground">
+		<button onclick={onClose} class="text-frame-gray-600 transition-colors hover:text-foreground">
 			<IconClose size={16} />
 		</button>
 	</div>
@@ -183,7 +185,7 @@
 					{isCheckingForUpdate ? $_('settings.checking') : $_('settings.checkForUpdates')}
 				</Button>
 				{#if checkStatus}
-					<span class="text-[10px] font-semibold text-blue-700">{checkStatus}</span>
+					<span class="text-[10px] text-foreground">{checkStatus}</span>
 				{/if}
 			</div>
 		</div>
