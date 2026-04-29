@@ -2,14 +2,11 @@ import type { ConversionConfig, CropSettings } from '$lib/types';
 import {
 	type CropRect,
 	type DragHandle,
-	MIN_CROP,
 	getAspectValue,
-	clamp,
 	clampRect,
 	transformCropRect,
-	remapDragDeltas,
 	adjustRectToRatio,
-	enforceAspect
+	applyVisualCropDrag
 } from '$lib/utils/crop';
 
 interface PreviewCropOptions {
@@ -235,65 +232,20 @@ export function createPreviewCrop({
 			return;
 		}
 
-		const normalizedDx = point.x - cropDragOrigin.startX;
-		const normalizedDy = point.y - cropDragOrigin.startY;
-
-		const { dx, dy } = remapDragDeltas(normalizedDx, normalizedDy, getRotation(), false, false);
-
 		const startRect = cropDragOrigin.startRect;
+		const width = getSourceWidth() ?? naturalWidth;
+		const height = getSourceHeight() ?? naturalHeight;
 
-		if (cropHandle === 'move') {
-			const nextX = clamp(startRect.x + dx, 0, 1 - startRect.width);
-			const nextY = clamp(startRect.y + dy, 0, 1 - startRect.height);
-			draftCrop = { x: nextX, y: nextY, width: startRect.width, height: startRect.height };
-			return;
-		}
-
-		const edges = {
-			left: startRect.x,
-			right: startRect.x + startRect.width,
-			top: startRect.y,
-			bottom: startRect.y + startRect.height
-		};
-
-		if (cropHandle.includes('w')) {
-			edges.left = clamp(startRect.x + dx, 0, edges.right - MIN_CROP);
-		}
-		if (cropHandle.includes('e')) {
-			edges.right = clamp(startRect.x + startRect.width + dx, edges.left + MIN_CROP, 1);
-		}
-		if (cropHandle.includes('n')) {
-			edges.top = clamp(startRect.y + dy, 0, edges.bottom - MIN_CROP);
-		}
-		if (cropHandle.includes('s')) {
-			edges.bottom = clamp(startRect.y + startRect.height + dy, edges.top + MIN_CROP, 1);
-		}
-
-		let nextRect: CropRect = {
-			x: edges.left,
-			y: edges.top,
-			width: edges.right - edges.left,
-			height: edges.bottom - edges.top
-		};
-
-		if (cropAspect !== 'free') {
-			const ratio = getAspectValue(cropAspect);
-			if (ratio) {
-				const width = getSourceWidth() ?? naturalWidth;
-				const height = getSourceHeight() ?? naturalHeight;
-				nextRect = enforceAspect(
-					nextRect,
-					cropHandle,
-					startRect,
-					ratio,
-					width,
-					height,
-					isSideRotation
-				);
-			}
-		}
-
-		draftCrop = clampRect(nextRect);
+		draftCrop = applyVisualCropDrag({
+			startRect,
+			handle: cropHandle,
+			startPoint: { x: cropDragOrigin.startX, y: cropDragOrigin.startY },
+			currentPoint: point,
+			aspectId: cropAspect,
+			sourceWidth: width,
+			sourceHeight: height,
+			isSideRotation
+		});
 	}
 
 	function endCropDrag() {

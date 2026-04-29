@@ -249,6 +249,79 @@ export function enforceAspect(
 	return next;
 }
 
+export function applyVisualCropDrag({
+	startRect,
+	handle,
+	startPoint,
+	currentPoint,
+	aspectId,
+	sourceWidth,
+	sourceHeight,
+	isSideRotation
+}: {
+	startRect: CropRect;
+	handle: DragHandle;
+	startPoint: { x: number; y: number };
+	currentPoint: { x: number; y: number };
+	aspectId: string;
+	sourceWidth: number;
+	sourceHeight: number;
+	isSideRotation: boolean;
+}): CropRect {
+	const dx = currentPoint.x - startPoint.x;
+	const dy = currentPoint.y - startPoint.y;
+
+	if (handle === 'move') {
+		const nextX = clamp(startRect.x + dx, 0, 1 - startRect.width);
+		const nextY = clamp(startRect.y + dy, 0, 1 - startRect.height);
+		return { x: nextX, y: nextY, width: startRect.width, height: startRect.height };
+	}
+
+	const edges = {
+		left: startRect.x,
+		right: startRect.x + startRect.width,
+		top: startRect.y,
+		bottom: startRect.y + startRect.height
+	};
+
+	if (handle.includes('w')) {
+		edges.left = clamp(startRect.x + dx, 0, edges.right - MIN_CROP);
+	}
+	if (handle.includes('e')) {
+		edges.right = clamp(startRect.x + startRect.width + dx, edges.left + MIN_CROP, 1);
+	}
+	if (handle.includes('n')) {
+		edges.top = clamp(startRect.y + dy, 0, edges.bottom - MIN_CROP);
+	}
+	if (handle.includes('s')) {
+		edges.bottom = clamp(startRect.y + startRect.height + dy, edges.top + MIN_CROP, 1);
+	}
+
+	let nextRect: CropRect = {
+		x: edges.left,
+		y: edges.top,
+		width: edges.right - edges.left,
+		height: edges.bottom - edges.top
+	};
+
+	if (aspectId !== 'free') {
+		const ratio = getAspectValue(aspectId);
+		if (ratio) {
+			nextRect = enforceAspect(
+				nextRect,
+				handle,
+				startRect,
+				ratio,
+				sourceWidth,
+				sourceHeight,
+				isSideRotation
+			);
+		}
+	}
+
+	return clampRect(nextRect);
+}
+
 export function getHandleCursor(handleId: string, isSideRotation: boolean): string {
 	if (handleId === 'n' || handleId === 's') return isSideRotation ? 'ew-resize' : 'ns-resize';
 	if (handleId === 'e' || handleId === 'w') return isSideRotation ? 'ns-resize' : 'ew-resize';

@@ -762,7 +762,7 @@ export function createPreviewRenderer() {
 				return {
 					handle,
 					point: local.point,
-					cursor: getHandleCursor(handle, local.sideRotation)
+					cursor: getHandleCursor(handle, false)
 				};
 			}
 		}

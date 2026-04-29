@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
 	type CropRect,
+	applyVisualCropDrag,
 	adjustRectToRatio,
 	clampRect,
 	enforceAspect,
@@ -95,5 +96,37 @@ describe('crop utilities', () => {
 		expect(next.x).toBe(startRect.x);
 		expect(next.y + next.height / 2).toBeCloseTo(startRect.y + startRect.height / 2, 6);
 		expect(next.width / next.height).toBeCloseTo(1, 6);
+	});
+
+	test('applyVisualCropDrag keeps drag deltas in visual space for side rotations', () => {
+		const startRect: CropRect = { x: 0.2, y: 0.2, width: 0.4, height: 0.4 };
+		const next = applyVisualCropDrag({
+			startRect,
+			handle: 'e',
+			startPoint: { x: 0.6, y: 0.4 },
+			currentPoint: { x: 0.7, y: 0.4 },
+			aspectId: 'free',
+			sourceWidth: 1920,
+			sourceHeight: 1080,
+			isSideRotation: true
+		});
+
+		expectRectClose(next, { x: 0.2, y: 0.2, width: 0.5, height: 0.4 });
+	});
+
+	test('applyVisualCropDrag moves crop directly in visual space for side rotations', () => {
+		const startRect: CropRect = { x: 0.2, y: 0.2, width: 0.4, height: 0.4 };
+		const next = applyVisualCropDrag({
+			startRect,
+			handle: 'move',
+			startPoint: { x: 0.4, y: 0.4 },
+			currentPoint: { x: 0.5, y: 0.45 },
+			aspectId: 'free',
+			sourceWidth: 1920,
+			sourceHeight: 1080,
+			isSideRotation: true
+		});
+
+		expectRectClose(next, { x: 0.3, y: 0.25, width: 0.4, height: 0.4 });
 	});
 });
