@@ -212,17 +212,19 @@
 		/>
 	{/if}
 
-	<PreviewToolbar
-		{controlsDisabled}
-		{flipHorizontal}
-		{flipVertical}
-		cropMode={crop.cropMode}
-		appliedCrop={crop.appliedCrop}
-		hasCropDimensions={crop.hasCropDimensions}
-		onRotate={crop.handleRotateToggle}
-		onToggleFlip={crop.toggleFlip}
-		onToggleCrop={crop.toggleCropMode}
-	/>
+	{#if !isAudio}
+		<PreviewToolbar
+			{controlsDisabled}
+			{flipHorizontal}
+			{flipVertical}
+			cropMode={crop.cropMode}
+			appliedCrop={crop.appliedCrop}
+			hasCropDimensions={crop.hasCropDimensions}
+			onRotate={crop.handleRotateToggle}
+			onToggleFlip={crop.toggleFlip}
+			onToggleCrop={crop.toggleCropMode}
+		/>
+	{/if}
 
 	<PreviewZoomToolbar
 		disabled={!canNavigatePreview}
