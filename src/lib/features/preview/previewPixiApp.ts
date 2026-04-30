@@ -1,3 +1,4 @@
+import 'pixi.js/unsafe-eval';
 import { Application, Container, Graphics, Sprite } from 'pixi.js';
 
 export interface PreviewPixiScene {
