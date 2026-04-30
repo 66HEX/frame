@@ -15,7 +15,8 @@
 		"size": "Dimensioni",
 		"state": "Stato",
 		"target": "Obiettivo",
-		"actions": "Azioni"
+		"actions": "Azioni",
+		"done": "Fatto"
 	},
 	"titlebar": {
 		"close": "Chiudi",
@@ -129,9 +130,6 @@
 	},
 	"video": {
 		"resolutionFramerate": "Risoluzione e frequenza dei fotogrammi",
-		"rotation": "Rotazione",
-		"flipHorizontal": "Orizzontale",
-		"flipVertical": "Verticale",
 		"width": "Larghezza",
 		"height": "Altezza",
 		"scalingAlgorithm": "Algoritmo di ridimensionamento",
@@ -246,15 +244,31 @@
 		"conversionFailed": "Conversione non riuscita"
 	},
 	"trim": {
+		"label": "Ritaglio",
 		"startTime": "Ora di inizio",
 		"endTime": "Ora di fine",
 		"duration": "Durata"
 	},
 	"crop": {
-		"enter": "Raccolto",
 		"apply": "Applicare",
 		"reset": "Reimposta",
 		"free": "Gratuito"
+	},
+	"toolbar": {
+		"rotate": "Ruota",
+		"flip-horizontal": "Capovolgi orizzontalmente",
+		"flip-vertical": "Capovolgi verticalmente",
+		"crop": "Raccolto",
+		"overlay": "Sovrapposizione"
+	},
+	"preview": {
+		"replace": "Sostituisci l'immagine di sovrapposizione",
+		"decrease": "Ridurre le dimensioni dell'immagine sovrapposta",
+		"increase": "Aumenta le dimensioni dell'immagine sovrapposta",
+		"opacity": "Opacità della sovrapposizione",
+		"remove": "Rimuovi l'immagine sovrapposta",
+		"zoom-in": "Ingrandisci",
+		"zoom-out": "Riduci"
 	},
 	"encodingSpeed": {
 		"ultrafast": "Ultraveloce",

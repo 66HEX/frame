@@ -9,6 +9,7 @@
 		type SourceMetadata
 	} from '$lib/types';
 	import { _ } from '$lib/i18n';
+	import Tooltip from '$lib/components/ui/Tooltip.svelte';
 
 	import SourceTab from './tabs/SourceTab.svelte';
 	import OutputTab from './tabs/OutputTab.svelte';
@@ -125,15 +126,16 @@
 		<div class="flex w-full items-center justify-start gap-1">
 			{#each visibleTabs as tabId (tabId)}
 				{@const Icon = icons[tabId]}
-				<Button
-					variant={activeTab === tabId ? 'default' : 'ghost'}
-					size="icon"
-					title={$_(`tabs.${tabId}`)}
-					class={cn('size-6')}
-					onclick={() => (activeTab = tabId)}
-				>
-					<Icon size={16} />
-				</Button>
+				<Tooltip content={$_(`tabs.${tabId}`)}>
+					<Button
+						variant={activeTab === tabId ? 'default' : 'ghost'}
+						size="icon"
+						class={cn('size-6')}
+						onclick={() => (activeTab = tabId)}
+					>
+						<Icon size={16} />
+					</Button>
+				</Tooltip>
 			{/each}
 		</div>
 	</div>

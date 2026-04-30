@@ -194,16 +194,15 @@
 					{#if isCompatible}
 						<Tooltip content={$_('presets.applyToAll')}>
 							<Button
-								variant="secondary"
-								size="none"
-								class="size-5 shrink-0"
+								variant="ghost"
+								size="icon-sm"
 								onclick={(event) => {
 									event.stopPropagation();
 									handleApplyToAll(preset);
 								}}
 								{disabled}
 							>
-								<IconListChecks size={12} />
+								<IconListChecks size={16} />
 							</Button>
 						</Tooltip>
 					{/if}

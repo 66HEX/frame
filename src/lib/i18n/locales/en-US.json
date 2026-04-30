@@ -15,7 +15,8 @@
 		"size": "Size",
 		"state": "State",
 		"target": "Target",
-		"actions": "Actions"
+		"actions": "Actions",
+		"done": "Done"
 	},
 	"titlebar": {
 		"close": "Close",
@@ -129,9 +130,6 @@
 	},
 	"video": {
 		"resolutionFramerate": "Resolution & Framerate",
-		"rotation": "Rotation",
-		"flipHorizontal": "Horizontal",
-		"flipVertical": "Vertical",
 		"width": "Width",
 		"height": "Height",
 		"scalingAlgorithm": "Scaling Algorithm",
@@ -246,15 +244,31 @@
 		"conversionFailed": "Conversion Failed"
 	},
 	"trim": {
+		"label": "Trim",
 		"startTime": "Start Time",
 		"endTime": "End Time",
 		"duration": "Duration"
 	},
 	"crop": {
-		"enter": "Crop",
 		"apply": "Apply",
 		"reset": "Reset",
 		"free": "Free"
+	},
+	"toolbar": {
+		"rotate": "Rotate",
+		"flip-horizontal": "Flip Horizontal",
+		"flip-vertical": "Flip Vertical",
+		"crop": "Crop",
+		"overlay": "Overlay"
+	},
+	"preview": {
+		"replace": "Replace overlay image",
+		"decrease": "Decrease overlay image size",
+		"increase": "Increase overlay image size",
+		"opacity": "Overlay opacity",
+		"remove": "Remove overlay image",
+		"zoom-in": "Zoom In",
+		"zoom-out": "Zoom Out"
 	},
 	"encodingSpeed": {
 		"ultrafast": "Ultrafast",

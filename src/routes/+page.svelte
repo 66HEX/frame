@@ -8,7 +8,7 @@
 	import { FileList, EmptySelection } from '$lib/components/file-list';
 	import SettingsPanel from '$lib/components/settings/SettingsPanel.svelte';
 	import AppSettingsSheet from '$lib/components/AppSettingsSheet.svelte';
-	import PreviewPanel from '$lib/components/PreviewPanel.svelte';
+	import { PreviewPanel } from '$lib/components/preview';
 	import { _ } from '$lib/i18n';
 
 	import { initCapabilities } from '$lib/stores/capabilities.svelte';
@@ -154,14 +154,18 @@
 									<PreviewPanel
 										filePath={selectedFile.path}
 										mediaKind={selectedFile.metadata?.mediaKind}
+										metadataStatus={selectedFile.metadataStatus}
 										initialStartTime={selectedFile.config.startTime}
 										initialEndTime={selectedFile.config.endTime}
 										rotation={selectedFile.config.rotation}
 										flipHorizontal={selectedFile.config.flipHorizontal}
 										flipVertical={selectedFile.config.flipVertical}
+										processingMode={selectedFile.config.processingMode}
+										container={selectedFile.config.container}
 										onSave={fileListManager.handleSaveTrim}
 										onUpdateConfig={fileListManager.updateSelectedConfig}
 										initialCrop={selectedFile.config.crop}
+										initialOverlay={selectedFile.config.overlay}
 										sourceWidth={selectedFile.metadata?.width}
 										sourceHeight={selectedFile.metadata?.height}
 										controlsDisabled={selectedFileLocked}

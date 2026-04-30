@@ -5,7 +5,9 @@ use crate::conversion::codec::{
     audio_codec_supports_vbr,
 };
 use crate::conversion::error::ConversionError;
-use crate::conversion::filters::{build_audio_filters, build_video_filters};
+use crate::conversion::filters::{
+    build_audio_filters, build_overlay_filter_complex, build_video_filters, has_overlay,
+};
 use crate::conversion::media_rules::{
     container_supports_audio, container_supports_subtitles, is_audio_codec_allowed,
     is_audio_stream_codec_allowed, is_image_container, is_subtitle_codec_allowed,
@@ -164,6 +166,13 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
     args.push("-i".to_string());
     args.push(input.to_string());
 
+    if has_overlay(config)
+        && let Some(overlay) = &config.overlay
+    {
+        args.push("-i".to_string());
+        args.push(overlay.path.clone());
+    }
+
     if let Some(end_str) = &config.end_time
         && !end_str.is_empty()
     {
@@ -205,6 +214,7 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
     let is_video_only = is_video_only_container(&config.container);
     let is_image_output = is_image_container(&config.container);
     let is_gif_output = config.container.eq_ignore_ascii_case("gif");
+    let use_overlay = has_overlay(config) && !is_audio_only && !is_gif_output;
     let has_burn_subtitles = config
         .subtitle_burn_path
         .as_ref()
@@ -279,14 +289,23 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
             args.push(config.pixel_format.trim().to_string());
         }
 
-        let video_filters = build_video_filters(config, true);
-        if !video_filters.is_empty() {
-            args.push("-vf".to_string());
-            args.push(video_filters.join(","));
+        if use_overlay {
+            args.push("-filter_complex".to_string());
+            args.push(build_overlay_filter_complex(config));
+        } else {
+            let video_filters = build_video_filters(config, true);
+            if !video_filters.is_empty() {
+                args.push("-vf".to_string());
+                args.push(video_filters.join(","));
+            }
         }
 
         args.push("-map".to_string());
-        args.push("0:v:0".to_string());
+        args.push(if use_overlay {
+            "[vout]".to_string()
+        } else {
+            "0:v:0".to_string()
+        });
         args.push("-frames:v".to_string());
         args.push("1".to_string());
         args.push("-update".to_string());
@@ -298,15 +317,24 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
             args.push(config.pixel_format.trim().to_string());
         }
 
-        let video_filters = build_video_filters(config, true);
-        if !video_filters.is_empty() {
-            args.push("-vf".to_string());
-            args.push(video_filters.join(","));
+        if use_overlay {
+            args.push("-filter_complex".to_string());
+            args.push(build_overlay_filter_complex(config));
+        } else {
+            let video_filters = build_video_filters(config, true);
+            if !video_filters.is_empty() {
+                args.push("-vf".to_string());
+                args.push(video_filters.join(","));
+            }
         }
 
         add_fps_args(&mut args, config);
         args.push("-map".to_string());
-        args.push("0:v:0".to_string());
+        args.push(if use_overlay {
+            "[vout]".to_string()
+        } else {
+            "0:v:0".to_string()
+        });
 
         if config.selected_audio_tracks.is_empty() {
             args.push("-map".to_string());
@@ -650,6 +678,29 @@ pub fn validate_task_input(
         ));
     }
 
+    if has_overlay(config) {
+        let overlay = config.overlay.as_ref().expect("overlay checked above");
+        let overlay_path = Path::new(&overlay.path);
+        if !overlay_path.exists() {
+            return Err(ConversionError::InvalidInput(format!(
+                "Overlay image does not exist: {}",
+                overlay.path
+            )));
+        }
+
+        if is_audio_only {
+            return Err(ConversionError::InvalidInput(
+                "Overlay is not available for audio-only outputs".to_string(),
+            ));
+        }
+
+        if config.container.eq_ignore_ascii_case("gif") {
+            return Err(ConversionError::InvalidInput(
+                "Overlay is not available for GIF output yet".to_string(),
+            ));
+        }
+    }
+
     if !is_copy_mode
         && has_custom_pixel_format(config)
         && !is_video_pixel_format_allowed(
@@ -690,6 +741,12 @@ pub fn validate_task_input(
         {
             return Err(ConversionError::InvalidInput(
                 "Burn-in subtitles are unavailable in stream copy mode".to_string(),
+            ));
+        }
+
+        if has_overlay(config) {
+            return Err(ConversionError::InvalidInput(
+                "Overlay requires re-encoding".to_string(),
             ));
         }
 

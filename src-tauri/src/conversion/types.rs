@@ -115,6 +115,8 @@ pub struct ConversionConfig {
     #[serde(default)]
     pub crop: Option<CropConfig>,
     #[serde(default)]
+    pub overlay: Option<OverlayConfig>,
+    #[serde(default)]
     pub nvenc_spatial_aq: bool,
     #[serde(default)]
     pub nvenc_temporal_aq: bool,
@@ -194,6 +196,18 @@ pub struct CropConfig {
     pub source_height: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aspect_ratio: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct OverlayConfig {
+    pub enabled: bool,
+    pub path: String,
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub opacity: f64,
+    pub anchor: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]

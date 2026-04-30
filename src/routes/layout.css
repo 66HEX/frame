@@ -3,8 +3,8 @@
 @layer base {
 	@font-face {
 		font-family: 'LoskeleyMono';
-		src: url('../lib/assets/fonts/LoskeleyMono/IoskeleyMono-SemiBold.ttf') format('truetype');
-		font-weight: 600;
+		src: url('../lib/assets/fonts/LoskeleyMono/IoskeleyMono-Black.woff2') format('woff2');
+		font-weight: 800;
 		font-style: normal;
 		font-display: swap;
 	}
@@ -203,5 +203,11 @@
 		box-shadow:
 			inset 0 0.5px 0 var(--frame-gray-400),
 			inset 0 0 0 0.5px var(--frame-gray-200);
+	}
+}
+
+@layer base {
+	body {
+		@apply antialiased;
 	}
 }

@@ -40,6 +40,18 @@ export interface CropSettings {
 	aspectRatio?: string | null;
 }
 
+export type OverlayAnchor = 'custom';
+
+export interface OverlaySettings {
+	enabled: boolean;
+	path: string;
+	x: number;
+	y: number;
+	width: number;
+	opacity: number;
+	anchor: OverlayAnchor;
+}
+
 export interface ConversionConfig {
 	processingMode?: 'reencode' | 'copy';
 	container: string;
@@ -85,6 +97,7 @@ export interface ConversionConfig {
 		| 'yuv422p10le'
 		| 'yuv444p10le';
 	crop?: CropSettings | null;
+	overlay?: OverlaySettings | null;
 	nvencSpatialAq: boolean;
 	nvencTemporalAq: boolean;
 	videotoolboxAllowSw: boolean;

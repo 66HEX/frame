@@ -1,6 +1,6 @@
 {
 	"name": "frame",
-	"version": "0.28.0",
+	"version": "0.29.0",
 	"private": true,
 	"type": "module",
 	"scripts": {
@@ -10,6 +10,7 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "eslint .",
+		"test": "bun test",
 		"format": "prettier --write .",
 		"i18n:extract": "node scripts/i18n-extract.mjs",
 		"i18n:check": "node scripts/i18n-check.mjs",
@@ -40,6 +41,7 @@
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
 		"marked": "^17.0.1",
+		"pixi.js": "^8.18.1",
 		"shiki": "^3.22.0",
 		"svelte-i18n": "^4.0.1",
 		"tailwind-merge": "^3.4.0",

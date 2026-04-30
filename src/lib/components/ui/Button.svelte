@@ -18,13 +18,16 @@
 					destructive:
 						'bg-frame-gray-100 button-highlight text-shadow text-frame-red disabled:opacity-50 hover:bg-frame-gray-200 disabled:bg-frame-gray-100 disabled:text-frame-red/50 ',
 					'titlebar-destructive':
-						'text-frame-gray-600 hover:bg-frame-red hover:text-foreground disabled:opacity-50'
+						'text-frame-gray-600 hover:bg-frame-red hover:text-foreground disabled:opacity-50',
+					'ghost-destructive':
+						'text-frame-red disabled:opacity-50 hover:bg-frame-gray-100 disabled:bg-frame-gray-100 disabled:text-frame-red/50 '
 				},
 				size: {
 					default: 'h-7.5 px-2.5',
 					sm: 'h-6 px-2',
 					xs: 'h-6 px-2',
 					icon: 'h-7.5 w-7.5',
+					'icon-sm': 'h-6 w-6',
 					'icon-large': 'h-10 w-10',
 					none: 'p-0'
 				}

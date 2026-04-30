@@ -15,7 +15,8 @@
 		"size": "尺寸",
 		"state": "状态",
 		"target": "目标",
-		"actions": "操作"
+		"actions": "操作",
+		"done": "完成"
 	},
 	"titlebar": {
 		"close": "关闭",
@@ -129,9 +130,6 @@
 	},
 	"video": {
 		"resolutionFramerate": "分辨率与帧率",
-		"rotation": "旋转",
-		"flipHorizontal": "水平翻转",
-		"flipVertical": "垂直翻转",
 		"width": "宽度",
 		"height": "高度",
 		"scalingAlgorithm": "缩放算法",
@@ -246,15 +244,31 @@
 		"conversionFailed": "转换失败"
 	},
 	"trim": {
+		"label": "修剪",
 		"startTime": "开始时间",
 		"endTime": "结束时间",
 		"duration": "时长"
 	},
 	"crop": {
-		"enter": "裁剪",
 		"apply": "应用",
 		"reset": "重置",
 		"free": "自由"
+	},
+	"toolbar": {
+		"rotate": "旋转",
+		"flip-horizontal": "水平翻转",
+		"flip-vertical": "垂直翻转",
+		"crop": "裁剪",
+		"overlay": "叠加层"
+	},
+	"preview": {
+		"replace": "替换覆盖图像",
+		"decrease": "缩小叠加图像的大小",
+		"increase": "增大叠加图像的大小",
+		"opacity": "叠加层不透明度",
+		"remove": "移除覆盖图像",
+		"zoom-in": "放大",
+		"zoom-out": "缩小"
 	},
 	"encodingSpeed": {
 		"ultrafast": "最快",

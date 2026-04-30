@@ -90,27 +90,29 @@
 		<div class="flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
 			{#if item.status === FileStatus.CONVERTING}
 				<Tooltip content={$_('common.pause')}>
-					<button
+					<Button
 						onclick={(e) => {
 							e.stopPropagation();
 							onPause?.(item.id);
 						}}
-						class="text-frame-gray-600 transition-colors hover:text-foreground"
+						variant="ghost"
+						size="icon-sm"
 					>
 						<IconPause size={16} fill="currentColor" color="none" />
-					</button>
+					</Button>
 				</Tooltip>
 			{:else if item.status === FileStatus.PAUSED}
 				<Tooltip content={$_('common.resume')}>
-					<button
+					<Button
 						onclick={(e) => {
 							e.stopPropagation();
 							onResume?.(item.id);
 						}}
-						class="text-frame-gray-600 transition-colors hover:text-foreground"
+						variant="ghost"
+						size="icon-sm"
 					>
 						<IconPlay size={16} color="currentColor" />
-					</button>
+					</Button>
 				</Tooltip>
 			{/if}
 
@@ -120,12 +122,11 @@
 						e.stopPropagation();
 						onRemove(item.id);
 					}}
-					variant="destructive"
-					class="size-5 shrink-0"
-					size="none"
+					variant="ghost-destructive"
+					size="icon-sm"
 					disabled={item.status === FileStatus.CONVERTING}
 				>
-					<IconTrash size={12} />
+					<IconTrash size={16} />
 				</Button>
 			</Tooltip>
 		</div>

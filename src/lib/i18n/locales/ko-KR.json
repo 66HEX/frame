@@ -15,7 +15,8 @@
 		"size": "크기",
 		"state": "주",
 		"target": "대상",
-		"actions": "행동"
+		"actions": "행동",
+		"done": "완료"
 	},
 	"titlebar": {
 		"close": "닫기",
@@ -129,9 +130,6 @@
 	},
 	"video": {
 		"resolutionFramerate": "해상도 및 프레임 속도",
-		"rotation": "회전",
-		"flipHorizontal": "수평",
-		"flipVertical": "수직",
 		"width": "너비",
 		"height": "키",
 		"scalingAlgorithm": "확장 알고리즘",
@@ -246,15 +244,31 @@
 		"conversionFailed": "변환 실패"
 	},
 	"trim": {
+		"label": "트림",
 		"startTime": "시작 시간",
 		"endTime": "종말",
 		"duration": "기간"
 	},
 	"crop": {
-		"enter": "작물",
 		"apply": "지원하다",
 		"reset": "재설정",
 		"free": "무료"
+	},
+	"toolbar": {
+		"rotate": "회전",
+		"flip-horizontal": "수평 반전",
+		"flip-vertical": "세로 회전",
+		"crop": "자르기",
+		"overlay": "오버레이"
+	},
+	"preview": {
+		"replace": "오버레이 이미지 교체",
+		"decrease": "오버레이 이미지 크기 줄이기",
+		"increase": "오버레이 이미지 크기 늘리기",
+		"opacity": "오버레이 투명도",
+		"remove": "오버레이 이미지 제거",
+		"zoom-in": "확대",
+		"zoom-out": "축소"
 	},
 	"encodingSpeed": {
 		"ultrafast": "초고속",

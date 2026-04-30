@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-04-30
+
+### Added
+
+- **Pixi Preview Renderer:** Added a Pixi.js-backed preview renderer for video/image presentation, including WebGPU preference, explicit frame rendering for paused/seeked video frames, and HiDPI canvas density capped at `2x`.
+- **Modular Preview Architecture:** Split the monolithic preview panel into focused preview components and Svelte controllers for rendering, playback, crop state, toolbar actions, and trim timeline handling.
+- **Preview Canvas Navigation:** Added preview-only zoom and pan controls for video/image canvas inspection, including wheel zoom, drag panning, double-click reset, and a dedicated bottom-right zoom toolbar.
+- **Preview Image Overlay:** Added image overlay controls for video previews, including PNG/JPG/WebP selection, drag positioning, corner resizing, opacity adjustment, replacement/removal actions, and localized toolbar labels.
+- **Overlay Export Pipeline:** Added FFmpeg overlay composition for re-encoded video and image outputs, with validation for missing overlay files, stream-copy mode, audio-only outputs, and GIF output.
+- **Trim Timeline Label Localization:** Added a localized trim timeline label across all supported UI dictionaries.
+
+### Changed
+
+- **Preview Timeline Layout:** Reworked trim controls into a compact minimal timeline paired with timecode inputs, including direct seek support, hover/current-time indicators, and disabled image-state handling.
+- **Preview Crop/Transform Controls:** Moved rotation, flip, crop, crop-aspect, zoom, and overlay controls into localized icon toolbars around the preview surface while keeping preview transforms synchronized with persisted settings.
+- **Preview Media Pipeline:** Switched video/image preview rendering from DOM media transforms to a Pixi canvas scene, while keeping audio preview on a hidden native audio element.
+- **Overlay Bounds:** Clamped overlay scaling by the rendered source and target frame aspect ratios so oversized square/tall overlays stay inside widescreen video frames in both preview and export.
+- **Preview Action Buttons:** Updated file-row, trim, crop, transform, and zoom actions to use shared button variants and tooltip treatment for more consistent preview/workspace controls.
+
 ## [0.28.0] - 2026-04-21
 
 ### Added

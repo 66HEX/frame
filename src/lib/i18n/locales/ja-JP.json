@@ -15,7 +15,8 @@
 		"size": "サイズ",
 		"state": "州",
 		"target": "ターゲット",
-		"actions": "アクション"
+		"actions": "アクション",
+		"done": "完了"
 	},
 	"titlebar": {
 		"close": "閉じる",
@@ -129,9 +130,6 @@
 	},
 	"video": {
 		"resolutionFramerate": "解像度とフレームレート",
-		"rotation": "回転",
-		"flipHorizontal": "水平",
-		"flipVertical": "垂直",
 		"width": "幅",
 		"height": "身長",
 		"scalingAlgorithm": "スケーリングアルゴリズム",
@@ -246,15 +244,31 @@
 		"conversionFailed": "変換に失敗しました"
 	},
 	"trim": {
+		"label": "トリム",
 		"startTime": "開始時刻",
 		"endTime": "終末",
 		"duration": "期間"
 	},
 	"crop": {
-		"enter": "作物",
 		"apply": "適用する",
 		"reset": "リセット",
 		"free": "無料"
+	},
+	"toolbar": {
+		"rotate": "回転",
+		"flip-horizontal": "水平反転",
+		"flip-vertical": "縦向きに反転",
+		"crop": "切り取り",
+		"overlay": "オーバーレイ"
+	},
+	"preview": {
+		"replace": "オーバーレイ画像を差し替える",
+		"decrease": "オーバーレイ画像のサイズを縮小する",
+		"increase": "オーバーレイ画像のサイズを大きくする",
+		"opacity": "オーバーレイの不透明度",
+		"remove": "オーバーレイ画像を削除する",
+		"zoom-in": "拡大",
+		"zoom-out": "ズームアウト"
 	},
 	"encodingSpeed": {
 		"ultrafast": "超高速",

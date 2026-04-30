@@ -148,6 +148,35 @@ pub fn build_video_filters(config: &ConversionConfig, include_scale: bool) -> Ve
     filters
 }
 
+pub fn has_overlay(config: &ConversionConfig) -> bool {
+    config
+        .overlay
+        .as_ref()
+        .is_some_and(|overlay| overlay.enabled && !overlay.path.trim().is_empty())
+}
+
+pub fn build_overlay_filter_complex(config: &ConversionConfig) -> String {
+    let filters = build_video_filters(config, true);
+    let base_chain = if filters.is_empty() {
+        "[0:v:0]null[base]".to_string()
+    } else {
+        format!("[0:v:0]{}[base]", filters.join(","))
+    };
+
+    let Some(overlay) = &config.overlay else {
+        return base_chain;
+    };
+
+    let x = overlay.x.clamp(0.0, 1.0);
+    let y = overlay.y.clamp(0.0, 1.0);
+    let width = overlay.width.clamp(0.03, 0.8);
+    let opacity = overlay.opacity.clamp(0.0, 1.0);
+
+    format!(
+        "{base_chain};[base]split[base_ref][base_out];[1:v:0]format=rgba,colorchannelmixer=aa={opacity:.3}[overlay_src];[overlay_src][base_ref]scale=w='min(rw*{width:.6},rh*iw/ih)':h=-1[overlay_scaled];[base_out][overlay_scaled]overlay=x='min(max(main_w*{x:.6}-overlay_w/2,0),main_w-overlay_w)':y='min(max(main_h*{y:.6}-overlay_h/2,0),main_h-overlay_h)':format=auto[vout]"
+    )
+}
+
 pub fn build_audio_filters(config: &ConversionConfig) -> Vec<String> {
     let mut filters = Vec::new();
 
@@ -166,7 +195,7 @@ pub fn build_audio_filters(config: &ConversionConfig) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::conversion::types::{CropConfig, MetadataConfig};
+    use crate::conversion::types::{CropConfig, MetadataConfig, OverlayConfig};
 
     fn default_config() -> ConversionConfig {
         ConversionConfig {
@@ -206,6 +235,7 @@ mod tests {
             flip_vertical: false,
             ml_upscale: None,
             crop: None,
+            overlay: None,
             nvenc_spatial_aq: false,
             nvenc_temporal_aq: false,
             videotoolbox_allow_sw: false,
@@ -256,6 +286,34 @@ mod tests {
         });
         let filters = build_video_filters(&config, true);
         assert_eq!(filters, vec!["crop=100:200:10:20"]);
+    }
+
+    #[test]
+    fn test_overlay_filter_complex() {
+        let mut config = default_config();
+        config.resolution = "720p".to_string();
+        config.overlay = Some(OverlayConfig {
+            enabled: true,
+            path: "/tmp/logo.png".to_string(),
+            x: 0.9,
+            y: 0.85,
+            width: 0.2,
+            opacity: 0.75,
+            anchor: "custom".to_string(),
+        });
+
+        let filter = build_overlay_filter_complex(&config);
+
+        assert!(filter.contains("[0:v:0]scale=-2:720:flags=lanczos[base]"));
+        assert!(filter.contains("[1:v:0]format=rgba,colorchannelmixer=aa=0.750"));
+        assert!(filter.contains("[base]split[base_ref][base_out]"));
+        assert!(filter.contains("[overlay_src][base_ref]scale=w='min(rw*0.200000,rh*iw/ih)':h=-1"));
+        assert!(
+            filter.contains(
+                "overlay=x='min(max(main_w*0.900000-overlay_w/2,0),main_w-overlay_w)':y='min(max(main_h*0.850000-overlay_h/2,0),main_h-overlay_h)'"
+            )
+        );
+        assert!(filter.ends_with("[vout]"));
     }
 
     #[test]

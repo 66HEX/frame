@@ -34,7 +34,8 @@ export function normalizeConversionConfig(
 		selectedAudioTracks: [...(config.selectedAudioTracks ?? [])],
 		selectedSubtitleTracks: [...(config.selectedSubtitleTracks ?? [])],
 		metadata: { ...config.metadata },
-		crop: config.crop ? { ...config.crop } : config.crop
+		crop: config.crop ? { ...config.crop } : config.crop,
+		overlay: config.overlay ? { ...config.overlay } : config.overlay
 	};
 
 	const requestedPixelFormat =
@@ -124,6 +125,7 @@ export function normalizeConversionConfig(
 		next.flipHorizontal = false;
 		next.flipVertical = false;
 		next.crop = null;
+		next.overlay = null;
 		next.mlUpscale = 'none';
 		next.hwDecode = false;
 		next.nvencSpatialAq = false;
@@ -138,6 +140,7 @@ export function normalizeConversionConfig(
 		next.selectedAudioTracks = [];
 		next.selectedSubtitleTracks = [];
 		next.subtitleBurnPath = undefined;
+		next.overlay = null;
 		next.audioNormalize = false;
 		next.audioVolume = 100;
 		next.metadata = {
@@ -152,6 +155,7 @@ export function normalizeConversionConfig(
 		next.mlUpscale = 'none';
 		next.selectedSubtitleTracks = [];
 		next.subtitleBurnPath = undefined;
+		next.overlay = null;
 	}
 
 	if (!supportsAudio) {
@@ -173,6 +177,7 @@ export function normalizeConversionConfig(
 		next.nvencSpatialAq = false;
 		next.nvencTemporalAq = false;
 		next.videotoolboxAllowSw = false;
+		next.overlay = null;
 	}
 
 	if (!isCopyMode && !isAudioContainer && !isVideoCodecAllowed(next.container, next.videoCodec)) {

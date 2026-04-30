@@ -15,7 +15,8 @@
 		"size": "Taille",
 		"state": "État",
 		"target": "Cible",
-		"actions": "Actions"
+		"actions": "Actions",
+		"done": "C'est fait"
 	},
 	"titlebar": {
 		"close": "Fermer",
@@ -129,9 +130,6 @@
 	},
 	"video": {
 		"resolutionFramerate": "Résolution et fréquence d'images",
-		"rotation": "Rotation",
-		"flipHorizontal": "Horizontal",
-		"flipVertical": "Vertical",
 		"width": "Largeur",
 		"height": "Hauteur",
 		"scalingAlgorithm": "Algorithme de mise à l'échelle",
@@ -246,15 +244,31 @@
 		"conversionFailed": "Conversion échouée"
 	},
 	"trim": {
+		"label": "Découpe",
 		"startTime": "Heure de début",
 		"endTime": "Heure de fin",
 		"duration": "Durée"
 	},
 	"crop": {
-		"enter": "Récolte",
 		"apply": "Appliquer",
 		"reset": "Réinitialiser",
 		"free": "Gratuit"
+	},
+	"toolbar": {
+		"rotate": "Pivoter",
+		"flip-horizontal": "Retourner horizontalement",
+		"flip-vertical": "Retourner verticalement",
+		"crop": "Recadrer",
+		"overlay": "Superposition"
+	},
+	"preview": {
+		"replace": "Remplacer l'image de superposition",
+		"decrease": "Réduire la taille de l'image de superposition",
+		"increase": "Augmenter la taille de l'image de superposition",
+		"opacity": "Opacité de la superposition",
+		"remove": "Supprimer l'image de superposition",
+		"zoom-in": "Agrandir",
+		"zoom-out": "Réduire"
 	},
 	"encodingSpeed": {
 		"ultrafast": "Ultra-rapide",

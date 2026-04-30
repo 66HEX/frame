@@ -60,6 +60,7 @@ mod conversion_tests {
             flip_vertical: false,
             ml_upscale: None,
             crop: None,
+            overlay: None,
             nvenc_spatial_aq: false,
             nvenc_temporal_aq: false,
             videotoolbox_allow_sw: false,
@@ -1154,7 +1155,9 @@ mod utils_tests {
 #[cfg(test)]
 mod scenario_tests {
     use crate::conversion::args::build_ffmpeg_args;
-    use crate::conversion::types::{ConversionConfig, CropConfig, MetadataConfig, MetadataMode};
+    use crate::conversion::types::{
+        ConversionConfig, CropConfig, MetadataConfig, MetadataMode, OverlayConfig,
+    };
 
     fn base_config() -> ConversionConfig {
         ConversionConfig {
@@ -1194,6 +1197,7 @@ mod scenario_tests {
             flip_vertical: false,
             ml_upscale: None,
             crop: None,
+            overlay: None,
             nvenc_spatial_aq: false,
             nvenc_temporal_aq: false,
             videotoolbox_allow_sw: false,
@@ -1203,6 +1207,36 @@ mod scenario_tests {
             gif_dither: "sierra2_4a".into(),
             gif_loop: 0,
         }
+    }
+
+    fn contains_arg_pair(args: &[String], first: &str, second: &str) -> bool {
+        args.windows(2)
+            .any(|window| window[0] == first && window[1] == second)
+    }
+
+    #[test]
+    fn overlay_uses_filter_complex_and_extra_input() {
+        let mut config = base_config();
+        config.overlay = Some(OverlayConfig {
+            enabled: true,
+            path: "/tmp/logo.png".into(),
+            x: 0.85,
+            y: 0.9,
+            width: 0.18,
+            opacity: 0.8,
+            anchor: "custom".into(),
+        });
+
+        let args = build_ffmpeg_args("input.mp4", "output.mp4", &config);
+
+        assert!(contains_arg_pair(&args, "-i", "input.mp4"));
+        assert!(contains_arg_pair(&args, "-i", "/tmp/logo.png"));
+        assert!(contains_arg_pair(&args, "-map", "[vout]"));
+        assert!(args.iter().any(|arg| arg == "-filter_complex"));
+        assert!(
+            args.iter()
+                .any(|arg| arg.contains("scale=w='min(rw*0.180000,rh*iw/ih)':h=-1"))
+        );
     }
 
     #[test]
@@ -1457,8 +1491,7 @@ mod scenario_tests {
     }
 
     fn arg_pair(args: &[String], first: &str, second: &str) -> bool {
-        args.windows(2)
-            .any(|w| w[0] == first && w[1] == second)
+        args.windows(2).any(|w| w[0] == first && w[1] == second)
     }
 
     #[test]
@@ -1570,6 +1603,7 @@ mod hwaccel_tests {
             flip_vertical: false,
             ml_upscale: None,
             crop: None,
+            overlay: None,
             nvenc_spatial_aq: false,
             nvenc_temporal_aq: false,
             videotoolbox_allow_sw: false,

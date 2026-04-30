@@ -20,6 +20,7 @@ export { default as IconLayoutList } from './components/IconLayoutList.svelte';
 export { default as IconRotateCw } from './components/IconRotateCw.svelte';
 export { default as IconSettings } from './components/IconSettings.svelte';
 export { default as IconSquare } from './components/IconSquare.svelte';
+export { default as IconSpinner } from './components/IconSpinner.svelte';
 export { default as IconTags } from './components/IconTags.svelte';
 export { default as IconTerminal } from './components/IconTerminal.svelte';
 export { default as IconTrash } from './components/IconTrash.svelte';
