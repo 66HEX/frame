@@ -169,12 +169,12 @@
 						defaultEstimatedItemHeight={24}
 					>
 						{#snippet renderItem(item)}
-							<div class="group -mx-1 flex rounded px-1 py-0.5 text-[10px] hover:bg-frame-gray-100">
+							<div class="group -mx-1 flex cursor-text rounded px-1 py-0.5 text-[10px] hover:bg-frame-gray-100">
 								<span
 									class="mr-3 w-8 shrink-0 pt-[0.5px] text-right text-[10px] text-frame-gray-400 select-none"
 									>{item.index}</span
 								>
-								<span class="log-line break-all whitespace-nowrap">
+								<span class="log-line break-all whitespace-nowrap select-text">
 									{#if highlighter}
 										<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 										{@html highlightLogLineSync(highlighter, item.line)}
