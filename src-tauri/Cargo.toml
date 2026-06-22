@@ -14,6 +14,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+frame-core = { path = "../frame-core" }
 tauri = { version = "2.9.5", features = ["protocol-asset", "macos-private-api"] }
 tauri-plugin-shell = "2.3.4"
 tauri-plugin-opener = "2.5.3"

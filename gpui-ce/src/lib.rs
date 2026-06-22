@@ -2,6 +2,7 @@
 
 pub mod assets;
 pub mod file_queue;
+pub mod settings;
 pub mod theme;
 
 use file_queue::FileQueue;
@@ -29,6 +30,10 @@ pub const PREVIEW_ROW_SPAN: u16 = 8;
 pub const FILE_LIST_ROW_SPAN: u16 = 4;
 pub const PANEL_HEADER_HEIGHT: f32 = TITLEBAR_HEIGHT;
 pub const FILE_ROW_HEIGHT: f32 = 40.0;
+pub const SETTINGS_PANEL_PADDING: f32 = 16.0;
+pub const SETTINGS_TAB_BUTTON_SIZE: f32 = 24.0;
+pub const SETTINGS_TAB_ICON_SIZE: f32 = 16.0;
+pub const SETTINGS_CONTROL_HEIGHT: f32 = 30.0;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ActiveView {
@@ -182,6 +187,21 @@ mod tests {
         #[test]
         fn titlebar_segment_matches_original_thirty_pixel_control() {
             assert_eq!(TITLEBAR_SEGMENT_HEIGHT, 30.0);
+        }
+
+        #[test]
+        fn settings_tab_button_matches_original_icon_button_size() {
+            assert_eq!(SETTINGS_TAB_BUTTON_SIZE, 24.0);
+        }
+
+        #[test]
+        fn settings_panel_padding_matches_original_content_padding() {
+            assert_eq!(SETTINGS_PANEL_PADDING, CONTENT_PADDING);
+        }
+
+        #[test]
+        fn settings_controls_match_original_default_button_height() {
+            assert_eq!(SETTINGS_CONTROL_HEIGHT, 30.0);
         }
     }
 }

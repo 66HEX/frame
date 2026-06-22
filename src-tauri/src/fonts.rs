@@ -5,6 +5,6 @@ use font_kit::source::SystemSource;
 pub fn list_system_fonts() -> Vec<String> {
     let source = SystemSource::new();
     let mut families = source.all_families().unwrap_or_default();
-    families.sort_unstable_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+    families.sort_unstable_by_key(|family| family.to_lowercase());
     families
 }

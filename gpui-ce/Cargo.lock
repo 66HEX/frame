@@ -1767,9 +1767,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "frame-core"
+version = "0.1.0"
+dependencies = [
+ "regex",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "frame-gpui-ce"
 version = "0.1.0"
 dependencies = [
+ "frame-core",
  "gpui",
  "gpui_platform",
 ]

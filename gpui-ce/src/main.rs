@@ -1,16 +1,25 @@
 use frame_gpui_ce::{
     ActiveView, CONTENT_PADDING, FILE_LIST_ROW_SPAN, FILE_ROW_HEIGHT, FrameAppState,
     LEFT_COLUMN_SPAN, LEFT_GRID_ROWS, PANEL_HEADER_HEIGHT, PREVIEW_ROW_SPAN, RIGHT_COLUMN_SPAN,
-    TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_BUTTON_HEIGHT, TITLEBAR_DIVIDER_HEIGHT, TITLEBAR_HEIGHT,
-    TITLEBAR_ICON_BUTTON_SIZE, TITLEBAR_ICON_SIZE, TITLEBAR_LOGO_SIZE, TITLEBAR_NAV_BUTTON_HEIGHT,
-    TITLEBAR_SEGMENT_HEIGHT, TITLEBAR_TOP_PADDING, TITLEBAR_TRAFFIC_LIGHT_SIZE, WINDOW_MIN_HEIGHT,
-    WINDOW_MIN_WIDTH, WORKSPACE_COLUMNS, WORKSPACE_GAP,
+    SETTINGS_CONTROL_HEIGHT, SETTINGS_PANEL_PADDING, SETTINGS_TAB_BUTTON_SIZE,
+    SETTINGS_TAB_ICON_SIZE, TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_BUTTON_HEIGHT,
+    TITLEBAR_DIVIDER_HEIGHT, TITLEBAR_HEIGHT, TITLEBAR_ICON_BUTTON_SIZE, TITLEBAR_ICON_SIZE,
+    TITLEBAR_LOGO_SIZE, TITLEBAR_NAV_BUTTON_HEIGHT, TITLEBAR_SEGMENT_HEIGHT, TITLEBAR_TOP_PADDING,
+    TITLEBAR_TRAFFIC_LIGHT_SIZE, WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH, WORKSPACE_COLUMNS,
+    WORKSPACE_GAP,
     assets::{self, FrameAssets},
     file_queue::{
         BatchSelectionState, FileItem, FileQueue, FileStateTone, RowActionAvailability,
         format_file_size,
     },
-    format_total_size, theme,
+    format_total_size,
+    settings::{
+        ConversionConfig, SettingsTab, SourceInfoSection, SourceMetadata, apply_output_container,
+        apply_processing_mode, normalize_output_config, output_container_options,
+        output_processing_mode_options, resolve_active_settings_tab, source_info_sections,
+        visible_settings_tabs,
+    },
+    theme,
 };
 use gpui::{
     App, Bounds, BoxShadow, ClickEvent, Context, InteractiveElement, IntoElement, KeyBinding, Menu,
@@ -30,6 +39,10 @@ struct FrameRoot {
     file_queue: FileQueue,
     is_processing: bool,
     is_settings_open: bool,
+    settings_active_tab: SettingsTab,
+    conversion_config: ConversionConfig,
+    source_metadata: Option<SourceMetadata>,
+    output_name: String,
 }
 
 impl FrameRoot {
@@ -39,6 +52,10 @@ impl FrameRoot {
             file_queue: FileQueue::new(),
             is_processing: false,
             is_settings_open: false,
+            settings_active_tab: SettingsTab::Source,
+            conversion_config: ConversionConfig::default(),
+            source_metadata: None,
+            output_name: String::new(),
         }
     }
 
@@ -50,9 +67,24 @@ impl FrameRoot {
 impl Render for FrameRoot {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let state = self.app_state();
+        let source_metadata = self.source_metadata.clone();
+        normalize_output_config(&mut self.conversion_config, source_metadata.as_ref());
+        self.settings_active_tab = resolve_active_settings_tab(
+            self.settings_active_tab,
+            &self.conversion_config,
+            source_metadata.as_ref(),
+        );
         let content = div().flex_1().p(px(CONTENT_PADDING));
         let content = match state.active_view {
-            ActiveView::Workspace => content.child(workspace_view(&self.file_queue, cx)),
+            ActiveView::Workspace => content.child(workspace_view(
+                &self.file_queue,
+                self.settings_active_tab,
+                &self.conversion_config,
+                source_metadata.as_ref(),
+                self.file_queue.selected_file_locked(),
+                &self.output_name,
+                cx,
+            )),
             ActiveView::Logs => content.child(logs_view()),
         };
 
@@ -424,7 +456,15 @@ fn button_highlight_shadows() -> Vec<BoxShadow> {
     ]
 }
 
-fn workspace_view(file_queue: &FileQueue, cx: &mut Context<FrameRoot>) -> gpui::Div {
+fn workspace_view(
+    file_queue: &FileQueue,
+    active_settings_tab: SettingsTab,
+    config: &ConversionConfig,
+    metadata: Option<&SourceMetadata>,
+    settings_disabled: bool,
+    output_name: &str,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
     div()
         .grid()
         .grid_cols(WORKSPACE_COLUMNS)
@@ -446,15 +486,443 @@ fn workspace_view(file_queue: &FileQueue, cx: &mut Context<FrameRoot>) -> gpui::
                 .child(file_list_panel(file_queue, cx).row_span(FILE_LIST_ROW_SPAN)),
         )
         .child(
-            panel("SETTINGS")
-                .col_span(RIGHT_COLUMN_SPAN)
-                .items_center()
-                .justify_center(),
+            settings_panel(
+                active_settings_tab,
+                config,
+                metadata,
+                settings_disabled,
+                output_name,
+                cx,
+            )
+            .col_span(RIGHT_COLUMN_SPAN),
         )
 }
 
 fn logs_view() -> gpui::Div {
     panel("LOGS").size_full().items_center().justify_center()
+}
+
+fn settings_panel(
+    active_tab: SettingsTab,
+    config: &ConversionConfig,
+    metadata: Option<&SourceMetadata>,
+    settings_disabled: bool,
+    output_name: &str,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    let active_tab = resolve_active_settings_tab(active_tab, config, metadata);
+    let mut tab_rail = div().flex().items_center().justify_start().gap_1();
+    for tab in visible_settings_tabs(config, metadata) {
+        tab_rail = tab_rail.child(settings_tab_button(tab, active_tab == tab, cx));
+    }
+
+    div()
+        .flex()
+        .flex_col()
+        .overflow_hidden()
+        .card_surface()
+        .child(
+            div()
+                .h(px(PANEL_HEADER_HEIGHT))
+                .w_full()
+                .flex()
+                .items_center()
+                .justify_between()
+                .px_4()
+                .border_b_1()
+                .border_color(color(theme::FRAME_GRAY_100))
+                .child(tab_rail),
+        )
+        .child(
+            div()
+                .id("settings-panel-body")
+                .flex_1()
+                .flex()
+                .flex_col()
+                .overflow_y_scroll()
+                .p(px(SETTINGS_PANEL_PADDING))
+                .child(settings_tab_content(
+                    active_tab,
+                    config,
+                    metadata,
+                    settings_disabled,
+                    output_name,
+                    cx,
+                )),
+        )
+}
+
+fn settings_tab_button(
+    tab: SettingsTab,
+    selected: bool,
+    cx: &mut Context<FrameRoot>,
+) -> impl IntoElement {
+    let icon_color = if selected {
+        color(theme::FOREGROUND)
+    } else {
+        color(theme::FRAME_GRAY_600)
+    };
+
+    div()
+        .id(format!("settings-tab-{}", tab.id()))
+        .w(px(SETTINGS_TAB_BUTTON_SIZE))
+        .h(px(SETTINGS_TAB_BUTTON_SIZE))
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded(px(theme::RADIUS_SM))
+        .bg(if selected {
+            color(theme::FRAME_GRAY_400)
+        } else {
+            color(theme::TRANSPARENT)
+        })
+        .when(selected, |this| this.shadow(button_highlight_shadows()))
+        .hover(|style| style.bg(color(theme::FRAME_GRAY_200)).cursor_pointer())
+        .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+            root.settings_active_tab = tab;
+            cx.stop_propagation();
+            cx.notify();
+        }))
+        .child(icon_svg(
+            settings_tab_icon(tab),
+            SETTINGS_TAB_ICON_SIZE,
+            icon_color,
+        ))
+}
+
+fn settings_tab_content(
+    tab: SettingsTab,
+    config: &ConversionConfig,
+    metadata: Option<&SourceMetadata>,
+    settings_disabled: bool,
+    output_name: &str,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    let content = div()
+        .flex()
+        .flex_col()
+        .gap_4()
+        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_color(color(theme::FRAME_GRAY_600));
+
+    match tab {
+        SettingsTab::Source => content.child(settings_source_tab(metadata)),
+        SettingsTab::Output => content.child(settings_output_tab(
+            config,
+            metadata,
+            settings_disabled,
+            output_name,
+            cx,
+        )),
+        SettingsTab::Video => {
+            content.child(settings_section("VIDEO").child(settings_value_row("STATUS", "Ready")))
+        }
+        SettingsTab::Images => {
+            content.child(settings_section("IMAGES").child(settings_value_row("STATUS", "Ready")))
+        }
+        SettingsTab::Audio => {
+            content.child(settings_section("AUDIO").child(settings_value_row("STATUS", "Ready")))
+        }
+        SettingsTab::Subtitles => content
+            .child(settings_section("SUBTITLES").child(settings_value_row("STATUS", "Ready"))),
+        SettingsTab::Metadata => {
+            content.child(settings_section("METADATA").child(settings_value_row("STATUS", "Ready")))
+        }
+        SettingsTab::Presets => {
+            content.child(settings_section("PRESETS").child(settings_value_row("STATUS", "Ready")))
+        }
+    }
+}
+
+fn settings_section(label: &'static str) -> gpui::Div {
+    div()
+        .flex()
+        .flex_col()
+        .gap_3()
+        .child(settings_section_label(label))
+}
+
+fn settings_source_tab(metadata: Option<&SourceMetadata>) -> gpui::Div {
+    let Some(metadata) = metadata else {
+        return div()
+            .text_size(px(theme::TEXT_LABEL_SIZE))
+            .text_color(color(theme::FRAME_GRAY_600))
+            .child("Metadata unavailable.");
+    };
+
+    let sections = source_info_sections(metadata);
+    if sections.is_empty() {
+        return div()
+            .text_size(px(theme::TEXT_LABEL_SIZE))
+            .text_color(color(theme::FRAME_GRAY_600))
+            .child("Metadata unavailable.");
+    }
+
+    let mut content = div().flex().flex_col().gap_6();
+    for section in sections {
+        content = match section {
+            SourceInfoSection::Rows { title, rows } => {
+                content.child(settings_section(title).child(settings_source_rows(rows)))
+            }
+            SourceInfoSection::Tracks { title, tracks } => {
+                content.child(settings_section(title).child(settings_source_tracks(tracks)))
+            }
+        };
+    }
+    content
+}
+
+fn settings_source_rows(rows: Vec<frame_gpui_ce::settings::SourceInfoRow>) -> gpui::Div {
+    let mut grid = div().flex().flex_col().gap_2();
+    for row in rows {
+        grid = grid.child(settings_value_row(row.label, row.value));
+    }
+    grid
+}
+
+fn settings_source_tracks(tracks: Vec<frame_gpui_ce::settings::SourceTrackSection>) -> gpui::Div {
+    let mut list = div().flex().flex_col().gap_4();
+    for track in tracks {
+        list = list.child(
+            div()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(settings_track_header(track.label))
+                .child(settings_source_rows(track.rows)),
+        );
+    }
+    list
+}
+
+fn settings_track_header(label: String) -> gpui::Div {
+    div()
+        .flex()
+        .items_center()
+        .gap_2()
+        .text_color(color(theme::FRAME_GRAY_600))
+        .child(label)
+        .child(
+            div()
+                .h(px(1.0))
+                .flex_1()
+                .bg(color(theme::BACKGROUND))
+                .shadow(input_highlight_shadows()),
+        )
+}
+
+fn settings_section_label(label: &'static str) -> gpui::Div {
+    div()
+        .w_full()
+        .flex()
+        .flex_col()
+        .gap_1()
+        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_color(color(theme::FRAME_GRAY_600))
+        .child(label)
+        .child(
+            div()
+                .h(px(1.0))
+                .w_full()
+                .bg(color(theme::BACKGROUND))
+                .shadow(input_highlight_shadows()),
+        )
+}
+
+fn settings_output_tab(
+    config: &ConversionConfig,
+    metadata: Option<&SourceMetadata>,
+    settings_disabled: bool,
+    output_name: &str,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    div()
+        .flex()
+        .flex_col()
+        .gap_4()
+        .child(
+            settings_section("PROCESSING MODE")
+                .child(settings_processing_mode_grid(config, metadata, settings_disabled, cx))
+                .child(settings_hint_text(config.processing_mode.hint())),
+        )
+        .child(
+            settings_section("OUTPUT NAME")
+                .child(settings_output_name_field(output_name, settings_disabled))
+                .child(settings_hint_text(
+                    "Stored next to the original file. Extension follows the selected container automatically.",
+                )),
+        )
+        .child(
+            settings_section("OUTPUT CONTAINER").child(settings_container_grid(
+                config,
+                metadata,
+                settings_disabled,
+                cx,
+            )),
+        )
+}
+
+fn settings_processing_mode_grid(
+    config: &ConversionConfig,
+    metadata: Option<&SourceMetadata>,
+    settings_disabled: bool,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    let mut grid = div().grid().grid_cols(2).gap_2();
+    for option in output_processing_mode_options(config, metadata, settings_disabled) {
+        let mode = option.mode;
+        let is_enabled = !option.is_disabled;
+        grid = grid.child(
+            settings_choice_button(option.label, option.is_selected, is_enabled)
+                .id(format!("output-mode-{}", option.mode.id()))
+                .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+                    cx.stop_propagation();
+                    if !is_enabled {
+                        return;
+                    }
+
+                    let metadata = root.source_metadata.clone();
+                    if apply_processing_mode(&mut root.conversion_config, metadata.as_ref(), mode) {
+                        root.settings_active_tab = resolve_active_settings_tab(
+                            root.settings_active_tab,
+                            &root.conversion_config,
+                            metadata.as_ref(),
+                        );
+                        cx.notify();
+                    }
+                })),
+        );
+    }
+    grid
+}
+
+fn settings_container_grid(
+    config: &ConversionConfig,
+    metadata: Option<&SourceMetadata>,
+    settings_disabled: bool,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    let mut grid = div().grid().grid_cols(2).gap_2();
+    for option in output_container_options(config, metadata, settings_disabled) {
+        let container = option.container;
+        let is_enabled = !option.is_disabled;
+        grid = grid.child(
+            settings_choice_button(container.to_uppercase(), option.is_selected, is_enabled)
+                .id(format!("output-container-{container}"))
+                .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+                    cx.stop_propagation();
+                    if !is_enabled {
+                        return;
+                    }
+
+                    let metadata = root.source_metadata.clone();
+                    let changed = apply_output_container(&mut root.conversion_config, &container)
+                        | normalize_output_config(&mut root.conversion_config, metadata.as_ref());
+                    if changed {
+                        root.settings_active_tab = resolve_active_settings_tab(
+                            root.settings_active_tab,
+                            &root.conversion_config,
+                            metadata.as_ref(),
+                        );
+                        cx.notify();
+                    }
+                })),
+        );
+    }
+    grid
+}
+
+fn settings_choice_button(label: impl Into<String>, selected: bool, enabled: bool) -> gpui::Div {
+    let base_background = if selected {
+        theme::FRAME_GRAY_400
+    } else {
+        theme::FRAME_GRAY_100
+    };
+
+    div()
+        .h(px(SETTINGS_CONTROL_HEIGHT))
+        .w_full()
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded(px(theme::RADIUS_SM))
+        .px(px(10.0))
+        .bg(color(if enabled {
+            base_background
+        } else {
+            base_background.with_alpha(0.50)
+        }))
+        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_color(if enabled {
+            color(theme::FOREGROUND)
+        } else {
+            color(theme::FOREGROUND.with_alpha(0.50))
+        })
+        .shadow(button_highlight_shadows())
+        .when(enabled, |this| {
+            this.hover(|style| style.bg(color(theme::FRAME_GRAY_200)).cursor_pointer())
+        })
+        .child(label.into())
+}
+
+fn settings_output_name_field(output_name: &str, disabled: bool) -> gpui::Div {
+    let value = if output_name.is_empty() {
+        "my_render_final"
+    } else {
+        output_name
+    }
+    .to_string();
+
+    div()
+        .h(px(SETTINGS_CONTROL_HEIGHT))
+        .w_full()
+        .flex()
+        .items_center()
+        .rounded(px(theme::RADIUS_SM))
+        .bg(color(theme::BACKGROUND))
+        .px(px(10.0))
+        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_color(if output_name.is_empty() || disabled {
+            color(theme::FRAME_GRAY_600)
+        } else {
+            color(theme::FOREGROUND)
+        })
+        .shadow(input_highlight_shadows())
+        .child(value)
+}
+
+fn settings_hint_text(text: &'static str) -> gpui::Div {
+    div()
+        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_color(color(theme::FRAME_GRAY_600))
+        .child(text)
+}
+
+fn settings_value_row(label: &'static str, value: impl Into<String>) -> gpui::Div {
+    div()
+        .grid()
+        .grid_cols(2)
+        .gap_4()
+        .child(div().text_color(color(theme::FRAME_GRAY_600)).child(label))
+        .child(
+            div()
+                .text_right()
+                .text_color(color(theme::FOREGROUND))
+                .child(value.into()),
+        )
+}
+
+fn settings_tab_icon(tab: SettingsTab) -> &'static str {
+    match tab {
+        SettingsTab::Source => assets::ICON_FILE_UP,
+        SettingsTab::Output => assets::ICON_FILE_DOWN,
+        SettingsTab::Video => assets::ICON_FILE_VIDEO,
+        SettingsTab::Images => assets::ICON_FILE_IMAGE,
+        SettingsTab::Audio => assets::ICON_MUSIC,
+        SettingsTab::Subtitles => assets::ICON_CAPTIONS,
+        SettingsTab::Metadata => assets::ICON_TAGS,
+        SettingsTab::Presets => assets::ICON_BOOKMARK,
+    }
 }
 
 fn file_list_panel(queue: &FileQueue, cx: &mut Context<FrameRoot>) -> gpui::Div {

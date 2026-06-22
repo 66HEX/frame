@@ -1133,6 +1133,7 @@ name = "frame"
 version = "0.29.2"
 dependencies = [
  "font-kit",
+ "frame-core",
  "libc",
  "regex",
  "serde",
@@ -1153,6 +1154,16 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "windows 0.62.2",
+]
+
+[[package]]
+name = "frame-core"
+version = "0.1.0"
+dependencies = [
+ "regex",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

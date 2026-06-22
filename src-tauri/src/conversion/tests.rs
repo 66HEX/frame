@@ -11,7 +11,9 @@ mod conversion_tests {
     use crate::conversion::utils::parse_time;
     use std::fs;
     use std::path::PathBuf;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static TEMP_INPUT_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     fn contains_args(args: &[String], expected: &[&str]) -> bool {
         expected.iter().all(|e| args.iter().any(|a| a == e))
@@ -72,12 +74,10 @@ mod conversion_tests {
         }
     }
 
-    fn create_temp_input_file() -> std::path::PathBuf {
-        let ts = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let path = std::env::temp_dir().join(format!("frame-validate-{ts}.tmp"));
+    fn create_temp_input_file() -> PathBuf {
+        let id = TEMP_INPUT_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let path =
+            std::env::temp_dir().join(format!("frame-validate-{}-{id}.tmp", std::process::id()));
         fs::write(&path, b"test").unwrap();
         path
     }
