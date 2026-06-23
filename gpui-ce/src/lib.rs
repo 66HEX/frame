@@ -4,6 +4,7 @@ pub mod assets;
 pub mod conversion_events;
 pub mod file_queue;
 pub mod settings;
+pub mod source_metadata;
 pub mod theme;
 
 use file_queue::FileQueue;

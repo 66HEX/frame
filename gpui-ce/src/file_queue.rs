@@ -1,5 +1,7 @@
 //! File queue state shared by Frame workspace, titlebar counters, and conversion reducers.
 
+use std::path::Path;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FileStatus {
     Idle,
@@ -97,6 +99,11 @@ impl FileItem {
             is_selected_for_conversion: true,
             conversion_error: None,
         }
+    }
+
+    #[must_use]
+    pub fn from_os_path(id: impl Into<String>, path: &Path) -> Self {
+        Self::from_path(id, path.to_string_lossy(), file_size_bytes(path))
     }
 
     #[must_use]
@@ -234,6 +241,15 @@ impl FileQueue {
         }
     }
 
+    pub fn add_files(&mut self, files: impl IntoIterator<Item = FileItem>) -> usize {
+        let mut added_count = 0;
+        for file in files {
+            self.add_file(file);
+            added_count += 1;
+        }
+        added_count
+    }
+
     pub fn remove_file(&mut self, id: &str) -> Option<FileItem> {
         let index = self.files.iter().position(|file| file.id == id)?;
         let removed = self.files.remove(index);
@@ -344,6 +360,14 @@ impl FileQueue {
 }
 
 #[must_use]
+pub fn file_size_bytes(path: &Path) -> u64 {
+    path.metadata()
+        .ok()
+        .filter(std::fs::Metadata::is_file)
+        .map_or(0, |metadata| metadata.len())
+}
+
+#[must_use]
 pub fn file_name_from_path(path: &str) -> &str {
     path.rsplit(['/', '\\'])
         .next()
@@ -438,6 +462,7 @@ mod tests {
 
     mod file_item {
         use super::*;
+        use std::path::PathBuf;
 
         #[test]
         fn from_path_derives_name_from_unix_path() {
@@ -458,6 +483,26 @@ mod tests {
             let file = FileItem::from_path("1", "/tmp/video.mp4", 10);
 
             assert!(file.is_selected_for_conversion);
+        }
+
+        #[test]
+        fn from_os_path_reads_size_from_existing_file() {
+            let path = temp_file_path("size-source.mp4");
+            std::fs::write(&path, [1_u8, 2, 3]).expect("test file should be written");
+
+            let file = FileItem::from_os_path("1", &path);
+
+            std::fs::remove_file(&path).expect("test file should be removed");
+            assert_eq!(file.size_bytes, 3);
+        }
+
+        #[test]
+        fn from_os_path_uses_zero_size_when_metadata_is_unavailable() {
+            let path = temp_file_path("missing-source.mp4");
+
+            let file = FileItem::from_os_path("1", &path);
+
+            assert_eq!(file.size_bytes, 0);
         }
 
         #[test]
@@ -516,6 +561,10 @@ mod tests {
                     can_delete: true,
                 }
             );
+        }
+
+        fn temp_file_path(name: &str) -> PathBuf {
+            std::env::temp_dir().join(format!("frame-gpui-ce-{}-{name}", std::process::id()))
         }
     }
 
@@ -592,6 +641,43 @@ mod tests {
             queue.add_file(sample_file("second", "/tmp/two.mp4", 1));
 
             assert_eq!(queue.selected_file_id(), Some("first"));
+        }
+
+        #[test]
+        fn add_files_returns_added_count() {
+            let mut queue = FileQueue::new();
+
+            let added_count = queue.add_files([
+                sample_file("first", "/tmp/one.mp4", 1),
+                sample_file("second", "/tmp/two.mp4", 1),
+            ]);
+
+            assert_eq!(added_count, 2);
+        }
+
+        #[test]
+        fn add_files_selects_first_import_when_queue_was_empty() {
+            let mut queue = FileQueue::new();
+
+            queue.add_files([
+                sample_file("first", "/tmp/one.mp4", 1),
+                sample_file("second", "/tmp/two.mp4", 1),
+            ]);
+
+            assert_eq!(queue.selected_file_id(), Some("first"));
+        }
+
+        #[test]
+        fn add_files_preserves_existing_selection() {
+            let mut queue = FileQueue::new();
+            queue.add_file(sample_file("existing", "/tmp/existing.mp4", 1));
+
+            queue.add_files([
+                sample_file("first", "/tmp/one.mp4", 1),
+                sample_file("second", "/tmp/two.mp4", 1),
+            ]);
+
+            assert_eq!(queue.selected_file_id(), Some("existing"));
         }
 
         #[test]

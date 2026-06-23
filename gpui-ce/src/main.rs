@@ -21,15 +21,19 @@ use frame_gpui_ce::{
         output_processing_mode_options, resolve_active_settings_tab, source_info_sections,
         visible_settings_tabs,
     },
+    source_metadata::{
+        MetadataStatus, SourceMetadataEntry, SourceMetadataStore, probe_source_metadata,
+    },
     theme, visual_fixture_from_env_value,
 };
 use gpui::{
-    App, Bounds, BoxShadow, ClickEvent, Context, InteractiveElement, IntoElement, KeyBinding, Menu,
-    MenuItem, Render, Rgba, SharedString, StatefulInteractiveElement, TitlebarOptions,
-    UniformListScrollHandle, Window, WindowBackgroundAppearance, WindowBounds, WindowControlArea,
-    WindowDecorations, WindowOptions, actions, div, hsla, point, prelude::*, px, size, svg,
-    uniform_list,
+    App, Bounds, BoxShadow, ClickEvent, Context, ExternalPaths, InteractiveElement, IntoElement,
+    KeyBinding, Menu, MenuItem, PathPromptOptions, Render, Rgba, SharedString,
+    StatefulInteractiveElement, TitlebarOptions, UniformListScrollHandle, Window,
+    WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowDecorations, WindowOptions,
+    actions, div, hsla, point, prelude::*, px, size, svg, uniform_list,
 };
+use std::path::PathBuf;
 
 actions!(frame_gpui_ce, [Quit]);
 
@@ -49,8 +53,20 @@ struct FrameRoot {
     is_settings_open: bool,
     settings_active_tab: SettingsTab,
     conversion_config: ConversionConfig,
-    source_metadata: Option<SourceMetadata>,
+    source_metadata: SourceMetadataStore,
     output_name: String,
+    next_file_sequence: u64,
+}
+
+#[derive(Clone, Copy)]
+struct SettingsRenderState<'a> {
+    active_tab: SettingsTab,
+    config: &'a ConversionConfig,
+    metadata: Option<&'a SourceMetadata>,
+    metadata_status: MetadataStatus,
+    metadata_error: Option<&'a str>,
+    settings_disabled: bool,
+    output_name: &'a str,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -73,8 +89,9 @@ impl FrameRoot {
             is_settings_open: false,
             settings_active_tab: SettingsTab::Source,
             conversion_config: ConversionConfig::default(),
-            source_metadata: None,
+            source_metadata: SourceMetadataStore::default(),
             output_name: String::new(),
+            next_file_sequence: 0,
         };
 
         root.apply_visual_fixture(visual_fixture_from_env_value(
@@ -117,6 +134,135 @@ impl FrameRoot {
         FrameAppState::from_file_queue(self.active_view, self.is_processing, &self.file_queue)
     }
 
+    fn prompt_add_source(&mut self, cx: &mut Context<Self>) {
+        let receiver = cx.prompt_for_paths(PathPromptOptions {
+            files: true,
+            directories: false,
+            multiple: true,
+            prompt: Some("Add Source".into()),
+        });
+
+        cx.spawn(async move |this, cx| {
+            let paths = match receiver.await {
+                Ok(Ok(Some(paths))) => paths,
+                Ok(Ok(None)) | Err(_) => return,
+                Ok(Err(error)) => {
+                    eprintln!("Failed to open file picker: {error}");
+                    return;
+                }
+            };
+            if paths.is_empty() {
+                return;
+            }
+
+            this.update(cx, |root, cx| root.import_source_paths(paths, cx))
+                .ok();
+        })
+        .detach();
+    }
+
+    fn import_source_paths(&mut self, paths: Vec<PathBuf>, cx: &mut Context<Self>) {
+        let imports = self.allocate_file_imports(paths);
+        if imports.is_empty() {
+            return;
+        }
+
+        cx.spawn(async move |this, cx| {
+            let files = cx
+                .background_spawn(async move {
+                    imports
+                        .into_iter()
+                        .map(|(id, path)| FileItem::from_os_path(id, &path))
+                        .collect::<Vec<_>>()
+                })
+                .await;
+            let probe_targets = files
+                .iter()
+                .map(|file| (file.id.clone(), file.path.clone()))
+                .collect::<Vec<_>>();
+
+            this.update(cx, |root, cx| {
+                if root.file_queue.add_files(files) > 0 {
+                    for (file_id, file_path) in probe_targets {
+                        root.queue_source_metadata_probe(file_id, file_path, cx);
+                    }
+                    cx.notify();
+                }
+            })
+            .ok();
+        })
+        .detach();
+    }
+
+    fn allocate_file_imports(&mut self, paths: Vec<PathBuf>) -> Vec<(String, PathBuf)> {
+        paths
+            .into_iter()
+            .map(|path| {
+                let id = self.next_file_id();
+                (id, path)
+            })
+            .collect()
+    }
+
+    fn next_file_id(&mut self) -> String {
+        self.next_file_sequence += 1;
+        format!("file-{}", self.next_file_sequence)
+    }
+
+    fn selected_source_metadata_entry(&self) -> SourceMetadataEntry {
+        self.source_metadata.selected_entry(&self.file_queue)
+    }
+
+    fn selected_source_metadata(&self) -> Option<SourceMetadata> {
+        self.file_queue
+            .selected_file_id()
+            .and_then(|id| self.source_metadata.metadata_for(id))
+            .cloned()
+    }
+
+    fn queue_source_metadata_probe(
+        &mut self,
+        file_id: String,
+        file_path: String,
+        cx: &mut Context<Self>,
+    ) {
+        self.source_metadata.mark_loading(file_id.clone());
+        cx.notify();
+
+        cx.spawn(async move |this, cx| {
+            let result = cx
+                .background_spawn(async move { probe_source_metadata(&file_path) })
+                .await;
+
+            this.update(cx, |root, cx| {
+                match result {
+                    Ok(metadata) => {
+                        root.source_metadata.mark_ready(file_id.clone(), metadata);
+                        if root.file_queue.selected_file_id() == Some(file_id.as_str()) {
+                            let selected_metadata = root.selected_source_metadata();
+                            normalize_output_config(
+                                &mut root.conversion_config,
+                                selected_metadata.as_ref(),
+                            );
+                            root.settings_active_tab = resolve_active_settings_tab(
+                                root.settings_active_tab,
+                                &root.conversion_config,
+                                selected_metadata.as_ref(),
+                            );
+                        }
+                    }
+                    Err(error) => {
+                        root.source_metadata
+                            .mark_error(file_id.clone(), error.to_string());
+                    }
+                }
+                cx.notify();
+            })
+            .ok();
+        })
+        .detach();
+    }
+
     fn update_log_scroll_target(&mut self) {
         if self.active_view != ActiveView::Logs {
             return;
@@ -146,7 +292,8 @@ impl FrameRoot {
 impl Render for FrameRoot {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let state = self.app_state();
-        let source_metadata = self.source_metadata.clone();
+        let source_metadata_entry = self.selected_source_metadata_entry();
+        let source_metadata = source_metadata_entry.metadata.clone();
         normalize_output_config(&mut self.conversion_config, source_metadata.as_ref());
         self.settings_active_tab = resolve_active_settings_tab(
             self.settings_active_tab,
@@ -160,11 +307,15 @@ impl Render for FrameRoot {
         let content = match state.active_view {
             ActiveView::Workspace => content.child(workspace_view(
                 &self.file_queue,
-                self.settings_active_tab,
-                &self.conversion_config,
-                source_metadata.as_ref(),
-                self.file_queue.selected_file_locked(),
-                &self.output_name,
+                SettingsRenderState {
+                    active_tab: self.settings_active_tab,
+                    config: &self.conversion_config,
+                    metadata: source_metadata.as_ref(),
+                    metadata_status: source_metadata_entry.status,
+                    metadata_error: source_metadata_entry.error.as_deref(),
+                    settings_disabled: self.file_queue.selected_file_locked(),
+                    output_name: &self.output_name,
+                },
                 cx,
             )),
             ActiveView::Logs => content.child(logs_view(
@@ -183,6 +334,10 @@ impl Render for FrameRoot {
             .bg(color(theme::BACKGROUND))
             .text_color(color(theme::FOREGROUND))
             .font_family(assets::FRAME_FONT_FAMILY)
+            .on_drop(cx.listener(|root, paths: &ExternalPaths, _window, cx| {
+                cx.stop_propagation();
+                root.import_source_paths(paths.paths().to_vec(), cx);
+            }))
             .child(titlebar(state, cx))
             .child(content)
     }
@@ -234,9 +389,12 @@ fn titlebar(state: FrameAppState, cx: &mut Context<FrameRoot>) -> impl IntoEleme
                         true,
                     )
                     .id("titlebar-add-source")
-                    .on_click(cx.listener(|_, _: &ClickEvent, _window, cx| {
-                        cx.stop_propagation();
-                    })),
+                    .on_click(cx.listener(
+                        |root, _: &ClickEvent, _window, cx| {
+                            cx.stop_propagation();
+                            root.prompt_add_source(cx);
+                        },
+                    )),
                 )
                 .child(action_button(
                     assets::ICON_PLAY,
@@ -546,11 +704,7 @@ fn button_highlight_shadows() -> Vec<BoxShadow> {
 
 fn workspace_view(
     file_queue: &FileQueue,
-    active_settings_tab: SettingsTab,
-    config: &ConversionConfig,
-    metadata: Option<&SourceMetadata>,
-    settings_disabled: bool,
-    output_name: &str,
+    settings: SettingsRenderState<'_>,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     div()
@@ -573,17 +727,7 @@ fn workspace_view(
                 )
                 .child(file_list_panel(file_queue, cx).row_span(FILE_LIST_ROW_SPAN)),
         )
-        .child(
-            settings_panel(
-                active_settings_tab,
-                config,
-                metadata,
-                settings_disabled,
-                output_name,
-                cx,
-            )
-            .col_span(RIGHT_COLUMN_SPAN),
-        )
+        .child(settings_panel(settings, cx).col_span(RIGHT_COLUMN_SPAN))
 }
 
 fn logs_view(
@@ -777,17 +921,11 @@ fn logs_empty_state(message: &'static str) -> gpui::Div {
         .child(message)
 }
 
-fn settings_panel(
-    active_tab: SettingsTab,
-    config: &ConversionConfig,
-    metadata: Option<&SourceMetadata>,
-    settings_disabled: bool,
-    output_name: &str,
-    cx: &mut Context<FrameRoot>,
-) -> gpui::Div {
-    let active_tab = resolve_active_settings_tab(active_tab, config, metadata);
+fn settings_panel(settings: SettingsRenderState<'_>, cx: &mut Context<FrameRoot>) -> gpui::Div {
+    let active_tab =
+        resolve_active_settings_tab(settings.active_tab, settings.config, settings.metadata);
     let mut tab_rail = div().flex().items_center().justify_start().gap_1();
-    for tab in visible_settings_tabs(config, metadata) {
+    for tab in visible_settings_tabs(settings.config, settings.metadata) {
         tab_rail = tab_rail.child(settings_tab_button(tab, active_tab == tab, cx));
     }
 
@@ -816,14 +954,7 @@ fn settings_panel(
                 .flex_col()
                 .overflow_y_scroll()
                 .p(px(SETTINGS_PANEL_PADDING))
-                .child(settings_tab_content(
-                    active_tab,
-                    config,
-                    metadata,
-                    settings_disabled,
-                    output_name,
-                    cx,
-                )),
+                .child(settings_tab_content(active_tab, settings, cx)),
         )
 }
 
@@ -867,10 +998,7 @@ fn settings_tab_button(
 
 fn settings_tab_content(
     tab: SettingsTab,
-    config: &ConversionConfig,
-    metadata: Option<&SourceMetadata>,
-    settings_disabled: bool,
-    output_name: &str,
+    settings: SettingsRenderState<'_>,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let content = div()
@@ -881,12 +1009,16 @@ fn settings_tab_content(
         .text_color(color(theme::FRAME_GRAY_600));
 
     match tab {
-        SettingsTab::Source => content.child(settings_source_tab(metadata)),
+        SettingsTab::Source => content.child(settings_source_tab(
+            settings.metadata,
+            settings.metadata_status,
+            settings.metadata_error,
+        )),
         SettingsTab::Output => content.child(settings_output_tab(
-            config,
-            metadata,
-            settings_disabled,
-            output_name,
+            settings.config,
+            settings.metadata,
+            settings.settings_disabled,
+            settings.output_name,
             cx,
         )),
         SettingsTab::Video => {
@@ -917,7 +1049,38 @@ fn settings_section(label: &'static str) -> gpui::Div {
         .child(settings_section_label(label))
 }
 
-fn settings_source_tab(metadata: Option<&SourceMetadata>) -> gpui::Div {
+fn settings_source_tab(
+    metadata: Option<&SourceMetadata>,
+    status: MetadataStatus,
+    error: Option<&str>,
+) -> gpui::Div {
+    match status {
+        MetadataStatus::Loading => {
+            return div()
+                .text_size(px(theme::TEXT_LABEL_SIZE))
+                .text_color(color(theme::FRAME_GRAY_600))
+                .child("Analyzing source...");
+        }
+        MetadataStatus::Error => {
+            let mut error_view = div()
+                .flex()
+                .flex_col()
+                .gap_1()
+                .text_size(px(theme::TEXT_LABEL_SIZE))
+                .text_color(color(theme::FRAME_RED))
+                .child("Failed to read source metadata.");
+            if let Some(error) = error {
+                error_view = error_view.child(
+                    div()
+                        .text_color(color(theme::FRAME_GRAY_600))
+                        .child(error.to_string()),
+                );
+            }
+            return error_view;
+        }
+        MetadataStatus::Idle | MetadataStatus::Ready => {}
+    }
+
     let Some(metadata) = metadata else {
         return div()
             .text_size(px(theme::TEXT_LABEL_SIZE))
@@ -1056,7 +1219,7 @@ fn settings_processing_mode_grid(
                         return;
                     }
 
-                    let metadata = root.source_metadata.clone();
+                    let metadata = root.selected_source_metadata();
                     if apply_processing_mode(&mut root.conversion_config, metadata.as_ref(), mode) {
                         root.settings_active_tab = resolve_active_settings_tab(
                             root.settings_active_tab,
@@ -1090,7 +1253,7 @@ fn settings_container_grid(
                         return;
                     }
 
-                    let metadata = root.source_metadata.clone();
+                    let metadata = root.selected_source_metadata();
                     let changed = apply_output_container(&mut root.conversion_config, &container)
                         | normalize_output_config(&mut root.conversion_config, metadata.as_ref());
                     if changed {
@@ -1206,6 +1369,13 @@ fn file_list_panel(queue: &FileQueue, cx: &mut Context<FrameRoot>) -> gpui::Div 
         .flex_col()
         .overflow_hidden()
         .card_surface()
+        .drag_over::<ExternalPaths>(|style, _paths, _window, _cx| {
+            style
+                .border_1()
+                .border_dashed()
+                .border_color(color(theme::FRAME_GRAY_600))
+                .shadow(drop_target_shadows())
+        })
         .child(file_list_header(queue.batch_selection_state(), cx))
         .child(file_list_body(queue, cx))
 }
@@ -1447,6 +1617,7 @@ fn row_actions_cell(
                 .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
                     cx.stop_propagation();
                     if root.file_queue.remove_interactive_file(&id).is_some() {
+                        root.source_metadata.remove(&id);
                         cx.notify();
                     }
                 })),
@@ -1608,6 +1779,18 @@ fn card_surface_shadows() -> Vec<BoxShadow> {
     ]
 }
 
+fn drop_target_shadows() -> Vec<BoxShadow> {
+    let mut shadows = card_surface_shadows();
+    shadows.push(BoxShadow {
+        color: color(theme::FRAME_GRAY_600.with_alpha(0.55)).into(),
+        offset: point(px(0.0), px(0.0)),
+        blur_radius: px(0.0),
+        spread_radius: px(1.0),
+        inset: true,
+    });
+    shadows
+}
+
 fn color(token: theme::RgbaToken) -> Rgba {
     Rgba {
         r: token.red,
@@ -1660,4 +1843,45 @@ fn main() {
 
             init_app(cx, "Frame");
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod frame_root_imports {
+        use super::*;
+
+        #[test]
+        fn allocate_file_imports_assigns_incrementing_ids() {
+            let mut root = FrameRoot::new();
+
+            let imports = root.allocate_file_imports(vec![
+                PathBuf::from("/tmp/one.mp4"),
+                PathBuf::from("/tmp/two.mp4"),
+            ]);
+
+            assert_eq!(imports[0].0, "file-1");
+            assert_eq!(imports[1].0, "file-2");
+        }
+
+        #[test]
+        fn allocate_file_imports_continues_after_previous_batch() {
+            let mut root = FrameRoot::new();
+            root.allocate_file_imports(vec![PathBuf::from("/tmp/one.mp4")]);
+
+            let imports = root.allocate_file_imports(vec![PathBuf::from("/tmp/two.mp4")]);
+
+            assert_eq!(imports[0].0, "file-2");
+        }
+
+        #[test]
+        fn allocate_file_imports_returns_empty_for_empty_drop() {
+            let mut root = FrameRoot::new();
+
+            let imports = root.allocate_file_imports(Vec::new());
+
+            assert!(imports.is_empty());
+        }
+    }
 }
