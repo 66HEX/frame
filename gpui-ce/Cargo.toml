@@ -11,6 +11,9 @@ frame-core = { path = "../frame-core" }
 gpui = { package = "gpui", git = "https://github.com/gpui-ce/gpui-ce" }
 gpui_platform = { git = "https://github.com/gpui-ce/gpui-ce", features = ["font-kit"] }
 
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSButton", "NSControl", "NSResponder", "NSView", "NSWindow"] }
 raw-window-handle = "0.6"

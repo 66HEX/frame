@@ -2,6 +2,7 @@
 
 pub mod assets;
 pub mod conversion_events;
+pub mod conversion_runner;
 pub mod file_queue;
 pub mod preview;
 pub mod settings;
@@ -65,6 +66,7 @@ pub fn active_view_from_env_value(value: Option<&str>) -> ActiveView {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum VisualFixture {
+    AppSettings,
     LogsActive,
     PreviewCrop,
     PreviewReady,
@@ -73,6 +75,7 @@ pub enum VisualFixture {
 #[must_use]
 pub fn visual_fixture_from_env_value(value: Option<&str>) -> Option<VisualFixture> {
     match value.map(str::trim).map(str::to_ascii_lowercase).as_deref() {
+        Some("app-settings") => Some(VisualFixture::AppSettings),
         Some("logs-active") => Some(VisualFixture::LogsActive),
         Some("preview-crop") => Some(VisualFixture::PreviewCrop),
         Some("preview-ready") => Some(VisualFixture::PreviewReady),
@@ -202,6 +205,14 @@ mod tests {
 
     mod visual_fixture_env {
         use super::*;
+
+        #[test]
+        fn app_settings_value_enables_settings_fixture() {
+            assert_eq!(
+                visual_fixture_from_env_value(Some("app-settings")),
+                Some(VisualFixture::AppSettings)
+            );
+        }
 
         #[test]
         fn logs_active_value_enables_logs_fixture() {

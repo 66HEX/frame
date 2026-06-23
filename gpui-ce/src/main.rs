@@ -1,4 +1,5 @@
 use frame_core::events::ConversionEvent;
+use frame_core::types::DEFAULT_MAX_CONCURRENCY;
 use frame_gpui_ce::{
     ActiveView, CONTENT_PADDING, FILE_LIST_ROW_SPAN, FILE_ROW_HEIGHT, FrameAppState,
     LEFT_COLUMN_SPAN, LEFT_GRID_ROWS, PANEL_HEADER_HEIGHT, PREVIEW_PANEL_PADDING,
@@ -13,7 +14,10 @@ use frame_gpui_ce::{
     TITLEBAR_TRAFFIC_LIGHT_STROKE_WIDTH, VisualFixture, WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH,
     WORKSPACE_COLUMNS, WORKSPACE_GAP, active_view_from_env_value,
     assets::{self, FrameAssets},
-    conversion_events::{ActiveLogFile, ConversionEventState, LogLine},
+    conversion_events::{ActiveLogFile, ConversionEventState, LogLine, all_conversions_settled},
+    conversion_runner::{
+        ConversionProcessController, conversion_task_from_file, run_conversion_batch_with_control,
+    },
     file_queue::{
         BatchSelectionState, FileItem, FileQueue, FileStateTone, FileStatus, RowActionAvailability,
         format_file_size,
@@ -48,7 +52,11 @@ use gpui::{
 use objc2_app_kit::{NSView, NSWindowButton};
 #[cfg(target_os = "macos")]
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-use std::path::PathBuf;
+use std::{
+    path::{Path, PathBuf},
+    sync::mpsc::{self, TryRecvError},
+    time::Duration,
+};
 
 actions!(frame_gpui_ce, [Quit]);
 
@@ -81,7 +89,11 @@ struct FrameRoot {
     is_processing: bool,
     is_settings_open: bool,
     settings_active_tab: SettingsTab,
+    max_concurrency: usize,
+    max_concurrency_draft: String,
+    max_concurrency_error: Option<String>,
     source_metadata: SourceMetadataStore,
+    conversion_processes: ConversionProcessController,
     preview_crop_file_id: Option<String>,
     preview_crop_mode: bool,
     preview_draft_crop: Option<CropRect>,
@@ -128,7 +140,11 @@ impl FrameRoot {
             is_processing: false,
             is_settings_open: false,
             settings_active_tab: SettingsTab::Source,
+            max_concurrency: DEFAULT_MAX_CONCURRENCY,
+            max_concurrency_draft: DEFAULT_MAX_CONCURRENCY.to_string(),
+            max_concurrency_error: None,
             source_metadata: SourceMetadataStore::default(),
+            conversion_processes: ConversionProcessController::default(),
             preview_crop_file_id: None,
             preview_crop_mode: false,
             preview_draft_crop: None,
@@ -146,6 +162,7 @@ impl FrameRoot {
 
     fn apply_visual_fixture(&mut self, fixture: Option<VisualFixture>) {
         match fixture {
+            Some(VisualFixture::AppSettings) => self.open_app_settings(),
             Some(VisualFixture::LogsActive) => self.apply_logs_active_fixture(),
             Some(VisualFixture::PreviewCrop) => self.apply_preview_crop_fixture(),
             Some(VisualFixture::PreviewReady) => self.apply_preview_ready_fixture(),
@@ -279,6 +296,266 @@ impl FrameRoot {
             .ok();
         })
         .detach();
+    }
+
+    fn prompt_output_name(&mut self, cx: &mut Context<Self>) {
+        let Some(file) = self.file_queue.selected_file().cloned() else {
+            return;
+        };
+        if file.locks_settings() {
+            return;
+        }
+
+        let source_path = PathBuf::from(&file.path);
+        let directory = source_path
+            .parent()
+            .map_or_else(|| PathBuf::from("."), Path::to_path_buf);
+        let suggested_name = suggested_output_file_name(&file.output_name, &file.config.container);
+        let receiver = cx.prompt_for_new_path(&directory, Some(&suggested_name));
+
+        cx.spawn(async move |this, cx| {
+            let path = match receiver.await {
+                Ok(Ok(Some(path))) => path,
+                Ok(Ok(None)) | Err(_) => return,
+                Ok(Err(error)) => {
+                    eprintln!("Failed to open output name picker: {error}");
+                    return;
+                }
+            };
+            let Some(file_name) = path
+                .file_name()
+                .and_then(|file_name| file_name.to_str())
+                .map(str::to_string)
+            else {
+                return;
+            };
+
+            this.update(cx, |root, cx| {
+                if root.file_queue.update_selected_output_name(&file_name) {
+                    cx.notify();
+                }
+            })
+            .ok();
+        })
+        .detach();
+    }
+
+    fn queue_selected_conversion_tasks(&mut self) -> Vec<frame_core::types::ConversionTask> {
+        self.file_queue
+            .queue_selected_pending_conversions()
+            .iter()
+            .map(conversion_task_from_file)
+            .collect()
+    }
+
+    fn start_selected_conversions(&mut self, cx: &mut Context<Self>) {
+        if self.is_processing {
+            return;
+        }
+
+        let tasks = self.queue_selected_conversion_tasks();
+        if tasks.is_empty() {
+            return;
+        }
+
+        self.is_processing = true;
+        self.spawn_conversion_batch(tasks, cx);
+        cx.notify();
+    }
+
+    fn spawn_conversion_batch(
+        &mut self,
+        tasks: Vec<frame_core::types::ConversionTask>,
+        cx: &mut Context<Self>,
+    ) {
+        let (tx, rx) = mpsc::channel();
+        let controller = self.conversion_processes.clone();
+
+        cx.background_spawn(async move {
+            let result = run_conversion_batch_with_control(tasks, controller, |event| {
+                let _ = tx.send(event);
+            });
+            if let Err(error) = result {
+                eprintln!("Conversion batch failed: {error}");
+            }
+        })
+        .detach();
+
+        cx.spawn(async move |this, cx| {
+            loop {
+                let mut is_disconnected = false;
+                loop {
+                    match rx.try_recv() {
+                        Ok(event) => {
+                            if this
+                                .update(cx, |root, cx| {
+                                    root.apply_conversion_event(event);
+                                    cx.notify();
+                                })
+                                .is_err()
+                            {
+                                return;
+                            }
+                        }
+                        Err(TryRecvError::Empty) => break,
+                        Err(TryRecvError::Disconnected) => {
+                            is_disconnected = true;
+                            break;
+                        }
+                    }
+                }
+
+                if is_disconnected {
+                    this.update(cx, |root, cx| {
+                        root.is_processing = !all_conversions_settled(&root.file_queue);
+                        cx.notify();
+                    })
+                    .ok();
+                    return;
+                }
+
+                cx.background_executor()
+                    .timer(Duration::from_millis(50))
+                    .await;
+            }
+        })
+        .detach();
+    }
+
+    fn open_app_settings(&mut self) {
+        self.is_settings_open = true;
+        self.max_concurrency_draft = self.max_concurrency.to_string();
+        self.max_concurrency_error = None;
+    }
+
+    fn close_app_settings(&mut self) {
+        self.is_settings_open = false;
+        self.max_concurrency_error = None;
+    }
+
+    fn increment_max_concurrency_draft(&mut self) -> bool {
+        let value = self
+            .parsed_max_concurrency_draft()
+            .unwrap_or(self.max_concurrency);
+        self.max_concurrency_draft = value.saturating_add(1).to_string();
+        self.max_concurrency_error = None;
+        true
+    }
+
+    fn decrement_max_concurrency_draft(&mut self) -> bool {
+        let value = self
+            .parsed_max_concurrency_draft()
+            .unwrap_or(self.max_concurrency);
+        let next = value.saturating_sub(1).max(1);
+        self.max_concurrency_draft = next.to_string();
+        self.max_concurrency_error = None;
+        true
+    }
+
+    fn apply_max_concurrency_draft(&mut self) -> bool {
+        let Some(value) = self.parsed_max_concurrency_draft() else {
+            self.max_concurrency_error =
+                Some("Enter a whole number greater than zero.".to_string());
+            return false;
+        };
+
+        match self.conversion_processes.update_max_concurrency(value) {
+            Ok(()) => {
+                self.max_concurrency = value;
+                self.max_concurrency_draft = value.to_string();
+                self.max_concurrency_error = None;
+                true
+            }
+            Err(error) => {
+                self.max_concurrency_error = Some(error.to_string());
+                false
+            }
+        }
+    }
+
+    fn parsed_max_concurrency_draft(&self) -> Option<usize> {
+        let trimmed = self.max_concurrency_draft.trim();
+        let value = trimmed.parse::<usize>().ok()?;
+        (value > 0).then_some(value)
+    }
+
+    fn pause_conversion_task(&mut self, id: &str) -> bool {
+        if !self
+            .file_queue
+            .file_by_id(id)
+            .is_some_and(|file| file.status == FileStatus::Converting)
+        {
+            return false;
+        }
+
+        match self.conversion_processes.pause_task(id) {
+            Ok(()) => self.file_queue.pause_file(id),
+            Err(error) => {
+                self.log_conversion_control_error(id, "pause", &error);
+                false
+            }
+        }
+    }
+
+    fn resume_conversion_task(&mut self, id: &str) -> bool {
+        if !self
+            .file_queue
+            .file_by_id(id)
+            .is_some_and(|file| file.status == FileStatus::Paused)
+        {
+            return false;
+        }
+
+        match self.conversion_processes.resume_task(id) {
+            Ok(()) => self.file_queue.resume_file(id),
+            Err(error) => {
+                self.log_conversion_control_error(id, "resume", &error);
+                false
+            }
+        }
+    }
+
+    fn remove_file_from_queue(&mut self, id: &str) -> bool {
+        let Some(status) = self.file_queue.file_by_id(id).map(|file| file.status) else {
+            return false;
+        };
+
+        if status.can_be_cancelled_before_removal()
+            && let Err(error) = self.conversion_processes.cancel_task(id)
+        {
+            self.log_conversion_control_error(id, "cancel", &error);
+            return false;
+        }
+
+        let removed = self.file_queue.remove_file(id).is_some();
+        if removed {
+            self.source_metadata.remove(id);
+            self.conversion_events.remove_logs(id);
+            self.is_processing = !all_conversions_settled(&self.file_queue);
+        }
+
+        removed
+    }
+
+    fn log_conversion_control_error(
+        &mut self,
+        id: &str,
+        action: &str,
+        error: &frame_core::error::ConversionError,
+    ) {
+        self.conversion_events.apply_conversion_event(
+            &mut self.file_queue,
+            ConversionEvent::log(
+                id.to_string(),
+                format!("[ERROR] Failed to {action}: {error}"),
+            ),
+        );
+    }
+
+    fn apply_conversion_event(&mut self, event: ConversionEvent) {
+        self.conversion_events
+            .apply_conversion_event(&mut self.file_queue, event);
+        self.is_processing = !all_conversions_settled(&self.file_queue);
     }
 
     fn allocate_file_imports(&mut self, paths: Vec<PathBuf>) -> Vec<(String, PathBuf)> {
@@ -757,6 +1034,16 @@ impl FrameRoot {
     }
 }
 
+fn suggested_output_file_name(output_name: &str, container: &str) -> String {
+    let mut suggested = PathBuf::from(output_name);
+    suggested.set_extension(container);
+    suggested
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty())
+        .map_or_else(|| format!("output_converted.{container}"), str::to_string)
+}
+
 impl Render for FrameRoot {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if !self.native_titlebar_controls_hidden {
@@ -807,8 +1094,9 @@ impl Render for FrameRoot {
             )),
         };
 
-        div()
+        let mut root = div()
             .size_full()
+            .relative()
             .flex()
             .flex_col()
             .overflow_hidden()
@@ -821,7 +1109,18 @@ impl Render for FrameRoot {
                 root.import_source_paths(paths.paths().to_vec(), cx);
             }))
             .child(titlebar(state, cx))
-            .child(content)
+            .child(content);
+
+        if self.is_settings_open {
+            root = root.child(app_settings_sheet(
+                self.max_concurrency,
+                &self.max_concurrency_draft,
+                self.max_concurrency_error.as_deref(),
+                cx,
+            ));
+        }
+
+        root
     }
 }
 
@@ -859,7 +1158,11 @@ fn titlebar(state: FrameAppState, cx: &mut Context<FrameRoot>) -> impl IntoEleme
                     action_button(assets::ICON_SETTINGS, None, ButtonVariant::Secondary, true)
                         .id("titlebar-settings")
                         .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
-                            root.is_settings_open = !root.is_settings_open;
+                            if root.is_settings_open {
+                                root.close_app_settings();
+                            } else {
+                                root.open_app_settings();
+                            }
                             cx.notify();
                         })),
                 )
@@ -878,17 +1181,215 @@ fn titlebar(state: FrameAppState, cx: &mut Context<FrameRoot>) -> impl IntoEleme
                         },
                     )),
                 )
-                .child(action_button(
-                    assets::ICON_PLAY,
-                    Some(if state.is_processing {
-                        "PROCESSING"
-                    } else {
-                        "START"
-                    }),
-                    ButtonVariant::Default,
-                    state.can_start_conversion(),
-                )),
+                .child(
+                    action_button(
+                        assets::ICON_PLAY,
+                        Some(if state.is_processing {
+                            "PROCESSING"
+                        } else {
+                            "START"
+                        }),
+                        ButtonVariant::Default,
+                        state.can_start_conversion(),
+                    )
+                    .id("titlebar-start")
+                    .on_click(cx.listener(
+                        move |root, _: &ClickEvent, _window, cx| {
+                            cx.stop_propagation();
+                            if state.can_start_conversion() {
+                                root.start_selected_conversions(cx);
+                            }
+                        },
+                    )),
+                ),
         )
+}
+
+fn app_settings_sheet(
+    current_max_concurrency: usize,
+    draft_max_concurrency: &str,
+    error: Option<&str>,
+    cx: &mut Context<FrameRoot>,
+) -> impl IntoElement {
+    let draft_is_dirty = draft_max_concurrency.trim() != current_max_concurrency.to_string();
+
+    div()
+        .id("app-settings-sheet")
+        .absolute()
+        .inset_0()
+        .child(
+            div()
+                .id("app-settings-backdrop")
+                .absolute()
+                .inset_0()
+                .bg(color(theme::BACKGROUND.with_alpha(0.60)))
+                .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+                    cx.stop_propagation();
+                    root.close_app_settings();
+                    cx.notify();
+                })),
+        )
+        .child(
+            div()
+                .id("app-settings-panel")
+                .absolute()
+                .top_0()
+                .right_0()
+                .bottom_0()
+                .w(px(320.0))
+                .flex()
+                .flex_col()
+                .rounded(px(theme::RADIUS_LG))
+                .bg(color(theme::SIDEBAR))
+                .shadow(card_surface_shadows())
+                .on_click(cx.listener(|_, _: &ClickEvent, _window, cx| {
+                    cx.stop_propagation();
+                }))
+                .child(
+                    div()
+                        .h(px(PANEL_HEADER_HEIGHT))
+                        .w_full()
+                        .relative()
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .px_4()
+                        .text_size(px(theme::TEXT_LABEL_SIZE))
+                        .text_color(color(theme::FOREGROUND))
+                        .child("SETTINGS")
+                        .child(
+                            app_settings_icon_button("app-settings-close", "X", true).on_click(
+                                cx.listener(|root, _: &ClickEvent, _window, cx| {
+                                    cx.stop_propagation();
+                                    root.close_app_settings();
+                                    cx.notify();
+                                }),
+                            ),
+                        )
+                        .child(panel_bottom_separator()),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap_4()
+                        .p_4()
+                        .text_size(px(theme::TEXT_LABEL_SIZE))
+                        .child(
+                            settings_section("MAX CONCURRENCY")
+                                .child(app_settings_concurrency_control(
+                                    draft_max_concurrency,
+                                    draft_is_dirty,
+                                    cx,
+                                ))
+                                .child(settings_hint_text(
+                                    "Controls how many queued conversions can run at the same time.",
+                                )),
+                        )
+                        .when_some(error.map(str::to_string), |this, error| {
+                            this.child(
+                                div()
+                                    .id("app-settings-max-concurrency-error")
+                                    .text_color(color(theme::FRAME_RED))
+                                    .child(error),
+                            )
+                        }),
+                ),
+        )
+}
+
+fn app_settings_concurrency_control(
+    draft_max_concurrency: &str,
+    can_apply: bool,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    div()
+        .flex()
+        .items_center()
+        .gap_2()
+        .child(
+            app_settings_icon_button("app-settings-max-concurrency-minus", "-", true).on_click(
+                cx.listener(|root, _: &ClickEvent, _window, cx| {
+                    cx.stop_propagation();
+                    if root.decrement_max_concurrency_draft() {
+                        cx.notify();
+                    }
+                }),
+            ),
+        )
+        .child(
+            div()
+                .id("app-settings-max-concurrency-value")
+                .h(px(SETTINGS_CONTROL_HEIGHT))
+                .flex_1()
+                .flex()
+                .items_center()
+                .justify_center()
+                .rounded(px(theme::RADIUS_SM))
+                .bg(color(theme::BACKGROUND))
+                .px(px(10.0))
+                .text_color(color(theme::FOREGROUND))
+                .shadow(input_highlight_shadows())
+                .child(draft_max_concurrency.to_string()),
+        )
+        .child(
+            app_settings_icon_button("app-settings-max-concurrency-plus", "+", true).on_click(
+                cx.listener(|root, _: &ClickEvent, _window, cx| {
+                    cx.stop_propagation();
+                    if root.increment_max_concurrency_draft() {
+                        cx.notify();
+                    }
+                }),
+            ),
+        )
+        .child(app_settings_apply_button(can_apply).on_click(cx.listener(
+            move |root, _: &ClickEvent, _window, cx| {
+                cx.stop_propagation();
+                if can_apply && root.apply_max_concurrency_draft() {
+                    cx.notify();
+                }
+            },
+        )))
+}
+
+fn app_settings_icon_button(
+    id: &'static str,
+    label: &'static str,
+    enabled: bool,
+) -> gpui::Stateful<gpui::Div> {
+    let colors = button_colors(ButtonVariant::Ghost, false, enabled);
+
+    div()
+        .id(id)
+        .w(px(SETTINGS_CONTROL_HEIGHT))
+        .h(px(SETTINGS_CONTROL_HEIGHT))
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded(px(theme::RADIUS_SM))
+        .bg(color(colors.background))
+        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_color(color(colors.foreground))
+        .opacity(colors.opacity)
+        .when(enabled, |this| {
+            this.hover(move |style| {
+                style
+                    .bg(color(colors.hover_background))
+                    .text_color(color(colors.hover_foreground))
+                    .cursor_pointer()
+            })
+            .active(move |style| style.bg(color(colors.active_background)))
+        })
+        .child(label)
+}
+
+fn app_settings_apply_button(enabled: bool) -> gpui::Stateful<gpui::Div> {
+    settings_choice_button(
+        "app-settings-max-concurrency-apply",
+        "APPLY",
+        false,
+        enabled,
+    )
 }
 
 fn macos_window_controls(cx: &mut Context<FrameRoot>) -> gpui::Div {
@@ -2949,14 +3450,23 @@ fn settings_output_tab(
         .gap_4()
         .child(
             settings_section("PROCESSING MODE")
-                .child(settings_processing_mode_grid(config, metadata, settings_disabled, cx))
+                .child(settings_processing_mode_grid(
+                    config,
+                    metadata,
+                    settings_disabled,
+                    cx,
+                ))
                 .child(settings_hint_text(config.processing_mode.hint())),
         )
         .child(
             settings_section("OUTPUT NAME")
-                .child(settings_output_name_field(output_name, settings_disabled))
+                .child(settings_output_name_field(
+                    output_name,
+                    settings_disabled,
+                    cx,
+                ))
                 .child(settings_hint_text(
-                    "Stored next to the original file. Extension follows the selected container automatically.",
+                    "Click to choose a file name. Output stays next to the original file.",
                 )),
         )
         .child(
@@ -3079,7 +3589,11 @@ fn settings_choice_button(
         .child(label)
 }
 
-fn settings_output_name_field(output_name: &str, disabled: bool) -> gpui::Div {
+fn settings_output_name_field(
+    output_name: &str,
+    disabled: bool,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
     let value = if output_name.is_empty() {
         "my_render_final"
     } else {
@@ -3088,6 +3602,7 @@ fn settings_output_name_field(output_name: &str, disabled: bool) -> gpui::Div {
     .to_string();
 
     div()
+        .id("settings-output-name-field")
         .h(px(SETTINGS_CONTROL_HEIGHT))
         .w_full()
         .flex()
@@ -3102,6 +3617,14 @@ fn settings_output_name_field(output_name: &str, disabled: bool) -> gpui::Div {
             color(theme::FOREGROUND)
         })
         .shadow(input_highlight_shadows())
+        .when(!disabled, |this| {
+            this.cursor_pointer()
+                .hover(|style| style.bg(color(theme::FRAME_GRAY_100)))
+        })
+        .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+            cx.stop_propagation();
+            root.prompt_output_name(cx);
+        }))
         .child(value)
 }
 
@@ -3365,7 +3888,7 @@ fn row_actions_cell(
                 .id(element_id("file-row-action-pause", &id))
                 .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
                     cx.stop_propagation();
-                    if root.file_queue.pause_file(&id) {
+                    if root.pause_conversion_task(&id) {
                         cx.notify();
                     }
                 })),
@@ -3378,7 +3901,7 @@ fn row_actions_cell(
                 .id(element_id("file-row-action-resume", &id))
                 .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
                     cx.stop_propagation();
-                    if root.file_queue.resume_file(&id) {
+                    if root.resume_conversion_task(&id) {
                         cx.notify();
                     }
                 })),
@@ -3392,8 +3915,7 @@ fn row_actions_cell(
                 .id(element_id("file-row-action-delete", &id))
                 .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
                     cx.stop_propagation();
-                    if root.file_queue.remove_interactive_file(&id).is_some() {
-                        root.source_metadata.remove(&id);
+                    if root.remove_file_from_queue(&id) {
                         cx.notify();
                     }
                 })),
@@ -3716,6 +4238,147 @@ mod tests {
             let imports = root.allocate_file_imports(Vec::new());
 
             assert!(imports.is_empty());
+        }
+    }
+
+    mod frame_root_conversion {
+        use super::*;
+
+        #[test]
+        fn suggested_output_file_name_replaces_any_existing_extension() {
+            assert_eq!(suggested_output_file_name("final.mov", "mp4"), "final.mp4");
+        }
+
+        #[test]
+        fn queue_selected_conversion_tasks_marks_pending_file_as_queued() {
+            let mut root = FrameRoot::new();
+            root.file_queue
+                .add_file(FileItem::from_path("first", "/tmp/one.mp4", 1));
+            root.file_queue
+                .add_file(FileItem::from_path("second", "/tmp/two.mp4", 1));
+            root.file_queue.toggle_batch("second", false);
+
+            let tasks = root.queue_selected_conversion_tasks();
+
+            assert_eq!(
+                tasks
+                    .iter()
+                    .map(|task| task.id.as_str())
+                    .collect::<Vec<_>>(),
+                ["first"]
+            );
+            assert_eq!(
+                root.file_queue.file_by_id("first").map(|file| file.status),
+                Some(FileStatus::Queued)
+            );
+            assert_eq!(tasks[0].output_name.as_deref(), Some("one_converted"));
+        }
+
+        #[test]
+        fn apply_conversion_event_updates_processing_state_from_queue() {
+            let mut root = FrameRoot::new();
+            root.file_queue
+                .add_file(FileItem::from_path("first", "/tmp/one.mp4", 1));
+            root.queue_selected_conversion_tasks();
+            root.is_processing = true;
+
+            root.apply_conversion_event(ConversionEvent::completed("first", "/tmp/one.mp4"));
+
+            assert!(!root.is_processing);
+            assert_eq!(
+                root.file_queue.file_by_id("first").map(|file| file.status),
+                Some(FileStatus::Completed)
+            );
+        }
+
+        #[test]
+        fn remove_file_from_queue_cancels_and_removes_paused_file() {
+            let mut root = FrameRoot::new();
+            root.file_queue
+                .add_file(FileItem::from_path("first", "/tmp/one.mp4", 1));
+            root.file_queue
+                .update_status("first", FileStatus::Paused, 30);
+            root.conversion_events.apply_conversion_event(
+                &mut root.file_queue,
+                ConversionEvent::log("first", "line"),
+            );
+
+            assert!(root.remove_file_from_queue("first"));
+
+            assert!(root.file_queue.file_by_id("first").is_none());
+            assert!(root.conversion_events.logs_for("first").is_empty());
+        }
+
+        #[test]
+        fn pause_conversion_task_keeps_status_when_process_is_missing() {
+            let mut root = FrameRoot::new();
+            root.file_queue
+                .add_file(FileItem::from_path("first", "/tmp/one.mp4", 1));
+            root.file_queue
+                .update_status("first", FileStatus::Converting, 30);
+
+            assert!(!root.pause_conversion_task("first"));
+
+            assert_eq!(
+                root.file_queue.file_by_id("first").map(|file| file.status),
+                Some(FileStatus::Converting)
+            );
+            assert!(
+                root.conversion_events
+                    .logs_for("first")
+                    .iter()
+                    .any(|line| line.contains("Failed to pause"))
+            );
+        }
+
+        #[test]
+        fn max_concurrency_defaults_to_shared_backend_limit() {
+            let root = FrameRoot::new();
+
+            assert_eq!(root.max_concurrency, DEFAULT_MAX_CONCURRENCY);
+            assert_eq!(
+                root.conversion_processes
+                    .current_max_concurrency()
+                    .expect("max concurrency should be readable"),
+                DEFAULT_MAX_CONCURRENCY
+            );
+        }
+
+        #[test]
+        fn apply_max_concurrency_draft_updates_live_controller_limit() {
+            let mut root = FrameRoot::new();
+            root.max_concurrency_draft = "4".to_string();
+
+            assert!(root.apply_max_concurrency_draft());
+
+            assert_eq!(root.max_concurrency, 4);
+            assert_eq!(
+                root.conversion_processes
+                    .current_max_concurrency()
+                    .expect("max concurrency should be readable"),
+                4
+            );
+        }
+
+        #[test]
+        fn apply_max_concurrency_draft_rejects_zero() {
+            let mut root = FrameRoot::new();
+            root.max_concurrency_draft = "0".to_string();
+
+            assert!(!root.apply_max_concurrency_draft());
+
+            assert_eq!(root.max_concurrency, DEFAULT_MAX_CONCURRENCY);
+            assert!(root.max_concurrency_error.is_some());
+        }
+
+        #[test]
+        fn max_concurrency_stepper_never_decrements_below_one() {
+            let mut root = FrameRoot::new();
+            root.max_concurrency_draft = "1".to_string();
+
+            root.decrement_max_concurrency_draft();
+
+            assert_eq!(root.max_concurrency_draft, "1");
         }
     }
 
@@ -4083,6 +4746,16 @@ mod tests {
 
     mod visual_fixtures {
         use super::*;
+
+        #[test]
+        fn app_settings_fixture_opens_runtime_settings_sheet() {
+            let mut root = FrameRoot::new();
+
+            root.apply_visual_fixture(Some(VisualFixture::AppSettings));
+
+            assert!(root.is_settings_open);
+            assert_eq!(root.max_concurrency_draft, root.max_concurrency.to_string());
+        }
 
         #[test]
         fn preview_ready_fixture_seeds_selected_video_metadata() {

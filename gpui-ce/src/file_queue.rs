@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use crate::settings::ConversionConfig;
+use crate::settings::{ConversionConfig, sanitize_output_name};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FileStatus {
@@ -32,7 +32,7 @@ impl FileStatus {
 
     #[must_use]
     pub const fn is_actionable_for_conversion(self) -> bool {
-        !matches!(self, Self::Completed)
+        matches!(self, Self::Idle | Self::Error)
     }
 
     #[must_use]
@@ -368,6 +368,43 @@ impl FileQueue {
             false
         }
     }
+
+    pub fn update_selected_output_name(&mut self, value: &str) -> bool {
+        let Some(file) = self.selected_file_mut() else {
+            return false;
+        };
+
+        let sanitized = sanitize_output_name(value);
+        let next_output_name = if sanitized.is_empty() {
+            derive_output_name(&file.name)
+        } else {
+            sanitized
+        };
+
+        if file.output_name == next_output_name {
+            return false;
+        }
+
+        file.output_name = next_output_name;
+        true
+    }
+
+    pub fn queue_selected_pending_conversions(&mut self) -> Vec<FileItem> {
+        let mut pending_files = Vec::new();
+
+        for file in &mut self.files {
+            if !file.is_selected_for_conversion || !file.status.is_actionable_for_conversion() {
+                continue;
+            }
+
+            file.status = FileStatus::Queued;
+            file.progress_percent = 0;
+            file.conversion_error = None;
+            pending_files.push(file.clone());
+        }
+
+        pending_files
+    }
 }
 
 #[must_use]
@@ -466,8 +503,27 @@ mod tests {
         }
 
         #[test]
+        fn only_idle_and_error_files_are_actionable_for_conversion() {
+            assert!(FileStatus::Idle.is_actionable_for_conversion());
+            assert!(FileStatus::Error.is_actionable_for_conversion());
+            assert!(!FileStatus::Queued.is_actionable_for_conversion());
+            assert!(!FileStatus::Converting.is_actionable_for_conversion());
+            assert!(!FileStatus::Paused.is_actionable_for_conversion());
+        }
+
+        #[test]
         fn converting_files_are_not_removed_directly_from_list() {
             assert!(!FileStatus::Converting.can_be_removed_from_list());
+        }
+
+        #[test]
+        fn queued_and_paused_files_can_be_removed_through_cancel_control() {
+            assert!(FileStatus::Queued.can_be_removed_from_list());
+            assert!(!FileStatus::Converting.can_be_removed_from_list());
+            assert!(FileStatus::Paused.can_be_removed_from_list());
+            assert!(FileStatus::Idle.can_be_removed_from_list());
+            assert!(FileStatus::Completed.can_be_removed_from_list());
+            assert!(FileStatus::Error.can_be_removed_from_list());
         }
     }
 
@@ -567,7 +623,7 @@ mod tests {
         }
 
         #[test]
-        fn paused_row_can_resume_and_delete() {
+        fn paused_row_can_resume_and_delete_through_cancel_control() {
             let mut file = FileItem::from_path("1", "/tmp/video.mp4", 10);
             file.status = FileStatus::Paused;
 
@@ -745,10 +801,20 @@ mod tests {
         }
 
         #[test]
-        fn remove_interactive_file_removes_paused_file_after_cancel_path() {
+        fn remove_interactive_file_allows_paused_file_after_cancel_control_exists() {
             let mut queue = FileQueue::new();
             queue.add_file(sample_file("first", "/tmp/one.mp4", 1));
             queue.update_status("first", FileStatus::Paused, 20);
+
+            assert!(queue.remove_interactive_file("first").is_some());
+            assert!(queue.files().is_empty());
+        }
+
+        #[test]
+        fn remove_interactive_file_allows_queued_file_after_cancel_control_exists() {
+            let mut queue = FileQueue::new();
+            queue.add_file(sample_file("first", "/tmp/one.mp4", 1));
+            queue.update_status("first", FileStatus::Queued, 0);
 
             assert!(queue.remove_interactive_file("first").is_some());
             assert!(queue.files().is_empty());
@@ -814,6 +880,15 @@ mod tests {
             let mut queue = FileQueue::new();
             queue.add_file(sample_file("first", "/tmp/one.mp4", 10));
             queue.update_status("first", FileStatus::Completed, 100);
+
+            assert!(!queue.has_actionable_files());
+        }
+
+        #[test]
+        fn has_actionable_files_ignores_processing_files() {
+            let mut queue = FileQueue::new();
+            queue.add_file(sample_file("first", "/tmp/one.mp4", 10));
+            queue.update_status("first", FileStatus::Converting, 30);
 
             assert!(!queue.has_actionable_files());
         }
@@ -962,6 +1037,65 @@ mod tests {
                     .file_by_id("first")
                     .and_then(|file| file.conversion_error.as_deref()),
                 None
+            );
+        }
+
+        #[test]
+        fn update_selected_output_name_sanitizes_path_segments() {
+            let mut queue = FileQueue::new();
+            queue.add_file(sample_file("first", "/tmp/one.mp4", 10));
+
+            assert!(queue.update_selected_output_name("/tmp/export/final.mov"));
+
+            assert_eq!(
+                queue.selected_file().map(|file| file.output_name.as_str()),
+                Some("final.mov")
+            );
+        }
+
+        #[test]
+        fn update_selected_output_name_resets_empty_value_to_default() {
+            let mut queue = FileQueue::new();
+            queue.add_file(sample_file("first", "/tmp/one.mp4", 10));
+            queue.update_selected_output_name("custom");
+
+            assert!(queue.update_selected_output_name(".."));
+
+            assert_eq!(
+                queue.selected_file().map(|file| file.output_name.as_str()),
+                Some("one_converted")
+            );
+        }
+
+        #[test]
+        fn queue_selected_pending_conversions_marks_only_selected_pending_files() {
+            let mut queue = FileQueue::new();
+            queue.add_file(sample_file("first", "/tmp/one.mp4", 10));
+            queue.add_file(sample_file("second", "/tmp/two.mp4", 10));
+            queue.add_file(sample_file("third", "/tmp/three.mp4", 10));
+            queue.toggle_batch("second", false);
+            queue.update_status("third", FileStatus::Completed, 100);
+
+            let pending = queue.queue_selected_pending_conversions();
+
+            assert_eq!(
+                pending
+                    .iter()
+                    .map(|file| file.id.as_str())
+                    .collect::<Vec<_>>(),
+                ["first"]
+            );
+            assert_eq!(
+                queue.file_by_id("first").map(|file| file.status),
+                Some(FileStatus::Queued)
+            );
+            assert_eq!(
+                queue.file_by_id("second").map(|file| file.status),
+                Some(FileStatus::Idle)
+            );
+            assert_eq!(
+                queue.file_by_id("third").map(|file| file.status),
+                Some(FileStatus::Completed)
             );
         }
 

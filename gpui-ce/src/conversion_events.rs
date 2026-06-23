@@ -47,6 +47,13 @@ impl ConversionEventState {
         self.logs.get(id).map_or(&[], Vec::as_slice)
     }
 
+    pub fn remove_logs(&mut self, id: &str) {
+        self.logs.remove(id);
+        if self.selected_log_file_id.as_deref() == Some(id) {
+            self.selected_log_file_id = None;
+        }
+    }
+
     #[must_use]
     pub fn log_lines_for(&self, id: &str) -> Vec<LogLine> {
         self.log_line_window_for(id, 0..self.logs_for(id).len())
@@ -137,7 +144,9 @@ impl ConversionEventState {
                 queue.update_error(&payload.id, payload.error);
             }
             ConversionEvent::Log(payload) => {
-                self.logs.entry(payload.id).or_default().push(payload.line);
+                if queue.file_by_id(&payload.id).is_some() {
+                    self.logs.entry(payload.id).or_default().push(payload.line);
+                }
             }
             ConversionEvent::Cancelled(payload) => {
                 queue.update_status(&payload.id, FileStatus::Idle, 0);
@@ -291,6 +300,28 @@ mod tests {
                 }
             ]
         );
+    }
+
+    #[test]
+    fn apply_conversion_event_log_ignores_removed_files() {
+        let mut queue = FileQueue::new();
+        let mut state = ConversionEventState::new();
+
+        state.apply_conversion_event(&mut queue, ConversionEvent::log("task-1", "late line"));
+
+        assert!(state.logs_for("task-1").is_empty());
+    }
+
+    #[test]
+    fn remove_logs_clears_selected_log_target() {
+        let mut queue = queue_with_file(FileStatus::Converting);
+        let mut state = ConversionEventState::new();
+        state.apply_conversion_event(&mut queue, ConversionEvent::log("task-1", "line"));
+        state.select_log_file(&queue, "task-1");
+
+        state.remove_logs("task-1");
+
+        assert_eq!(state.selected_log_file_id(), None);
     }
 
     #[test]
