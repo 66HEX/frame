@@ -4,7 +4,8 @@ use std::borrow::Cow;
 
 use gpui::{App, AssetSource, Result, SharedString};
 
-pub const FRAME_FONT_FAMILY: &str = "Ioskeley Mono";
+pub const FRAME_FONT_FAMILY: &str = "Ioskeley Mono Heavy";
+pub const FRAME_FONT_ALIAS: &str = "LoskeleyMono";
 pub const FRAME_FONT_PATH: &str = "fonts/IoskeleyMono-Black.woff2";
 pub const ICON_FRAME: &str = "icons/frame.svg";
 pub const ICON_LAYOUT_LIST: &str = "icons/layout-list.svg";
@@ -169,8 +170,13 @@ mod tests {
         }
 
         #[test]
-        fn frame_font_family_matches_bundled_font_name_table() {
-            assert_eq!(FRAME_FONT_FAMILY, "Ioskeley Mono");
+        fn frame_font_family_matches_bundled_font_name_table_family() {
+            assert_eq!(FRAME_FONT_FAMILY, "Ioskeley Mono Heavy");
+        }
+
+        #[test]
+        fn frame_font_alias_matches_original_css_family() {
+            assert_eq!(FRAME_FONT_ALIAS, "LoskeleyMono");
         }
     }
 }

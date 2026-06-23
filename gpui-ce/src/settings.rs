@@ -97,6 +97,12 @@ pub struct ConversionConfig {
     pub processing_mode: ProcessingMode,
     pub container: String,
     pub audio_codec: String,
+    pub start_time: Option<String>,
+    pub end_time: Option<String>,
+    pub rotation: String,
+    pub flip_horizontal: bool,
+    pub flip_vertical: bool,
+    pub crop: Option<CropSettings>,
     pub selected_audio_tracks: Vec<u32>,
     pub selected_subtitle_tracks: Vec<u32>,
 }
@@ -107,10 +113,28 @@ impl Default for ConversionConfig {
             processing_mode: ProcessingMode::Reencode,
             container: "mp4".to_string(),
             audio_codec: media_rules::default_audio_codec_for_container("mp4").to_string(),
+            start_time: None,
+            end_time: None,
+            rotation: "0".to_string(),
+            flip_horizontal: false,
+            flip_vertical: false,
+            crop: None,
             selected_audio_tracks: Vec::new(),
             selected_subtitle_tracks: Vec::new(),
         }
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CropSettings {
+    pub enabled: bool,
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+    pub source_width: Option<u32>,
+    pub source_height: Option<u32>,
+    pub aspect_ratio: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -583,6 +607,27 @@ pub fn apply_output_container(config: &mut ConversionConfig, container: &str) ->
     changed
 }
 
+pub fn apply_trim_times(
+    config: &mut ConversionConfig,
+    start_time: Option<String>,
+    end_time: Option<String>,
+) -> bool {
+    let start_time = normalize_optional_timecode(start_time);
+    let end_time = normalize_optional_timecode(end_time);
+    let changed = config.start_time != start_time || config.end_time != end_time;
+
+    config.start_time = start_time;
+    config.end_time = end_time;
+
+    changed
+}
+
+fn normalize_optional_timecode(value: Option<String>) -> Option<String> {
+    value
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
 pub fn normalize_output_config(
     config: &mut ConversionConfig,
     metadata: Option<&SourceMetadata>,
@@ -599,6 +644,15 @@ pub fn normalize_output_config(
         && !is_gif_container(&config.container)
     {
         config.container = "png".to_string();
+    }
+
+    if source_kind == SourceKind::Image {
+        config.start_time = None;
+        config.end_time = None;
+    }
+
+    if source_kind == SourceKind::Audio || is_audio_only_container(&config.container) {
+        config.crop = None;
     }
 
     if (source_kind == SourceKind::Image || is_gif_container(&config.container))
@@ -1140,6 +1194,71 @@ mod tests {
         use super::*;
 
         #[test]
+        fn default_config_has_no_trim_times() {
+            let config = ConversionConfig::default();
+
+            assert_eq!(config.start_time, None);
+            assert_eq!(config.end_time, None);
+        }
+
+        #[test]
+        fn default_config_has_neutral_transform_and_no_crop() {
+            let config = ConversionConfig::default();
+
+            assert_eq!(config.rotation, "0");
+            assert!(!config.flip_horizontal);
+            assert!(!config.flip_vertical);
+            assert_eq!(config.crop, None);
+        }
+
+        #[test]
+        fn apply_trim_times_stores_trim_bounds() {
+            let mut config = ConversionConfig::default();
+
+            assert!(apply_trim_times(
+                &mut config,
+                Some(" 00:00:05.000 ".to_string()),
+                Some("00:00:30.250".to_string())
+            ));
+
+            assert_eq!(config.start_time.as_deref(), Some("00:00:05.000"));
+            assert_eq!(config.end_time.as_deref(), Some("00:00:30.250"));
+        }
+
+        #[test]
+        fn apply_trim_times_clears_blank_trim_bounds() {
+            let mut config = ConversionConfig {
+                start_time: Some("00:00:05.000".to_string()),
+                end_time: Some("00:00:30.250".to_string()),
+                ..ConversionConfig::default()
+            };
+
+            assert!(apply_trim_times(
+                &mut config,
+                Some(" ".to_string()),
+                Some(String::new())
+            ));
+
+            assert_eq!(config.start_time, None);
+            assert_eq!(config.end_time, None);
+        }
+
+        #[test]
+        fn apply_trim_times_reports_no_change_for_same_bounds() {
+            let mut config = ConversionConfig {
+                start_time: Some("00:00:05.000".to_string()),
+                end_time: Some("00:00:30.250".to_string()),
+                ..ConversionConfig::default()
+            };
+
+            assert!(!apply_trim_times(
+                &mut config,
+                Some("00:00:05.000".to_string()),
+                Some("00:00:30.250".to_string())
+            ));
+        }
+
+        #[test]
         fn normalize_output_config_forces_audio_sources_to_audio_container() {
             let metadata = SourceMetadata {
                 media_kind: Some(SourceKind::Audio),
@@ -1163,6 +1282,67 @@ mod tests {
             normalize_output_config(&mut config, Some(&metadata));
 
             assert_eq!(config.container, "png");
+        }
+
+        #[test]
+        fn normalize_output_config_clears_trim_for_image_sources() {
+            let metadata = SourceMetadata {
+                media_kind: Some(SourceKind::Image),
+                ..SourceMetadata::default()
+            };
+            let mut config = ConversionConfig {
+                start_time: Some("00:00:05.000".to_string()),
+                end_time: Some("00:00:30.250".to_string()),
+                ..ConversionConfig::default()
+            };
+
+            assert!(normalize_output_config(&mut config, Some(&metadata)));
+
+            assert_eq!(config.start_time, None);
+            assert_eq!(config.end_time, None);
+        }
+
+        #[test]
+        fn normalize_output_config_preserves_trim_for_video_sources() {
+            let metadata = SourceMetadata {
+                media_kind: Some(SourceKind::Video),
+                ..SourceMetadata::default()
+            };
+            let mut config = ConversionConfig {
+                start_time: Some("00:00:05.000".to_string()),
+                end_time: Some("00:00:30.250".to_string()),
+                ..ConversionConfig::default()
+            };
+
+            normalize_output_config(&mut config, Some(&metadata));
+
+            assert_eq!(config.start_time.as_deref(), Some("00:00:05.000"));
+            assert_eq!(config.end_time.as_deref(), Some("00:00:30.250"));
+        }
+
+        #[test]
+        fn normalize_output_config_clears_crop_for_audio_sources() {
+            let metadata = SourceMetadata {
+                media_kind: Some(SourceKind::Audio),
+                ..SourceMetadata::default()
+            };
+            let mut config = ConversionConfig {
+                crop: Some(CropSettings {
+                    enabled: true,
+                    x: 100,
+                    y: 100,
+                    width: 200,
+                    height: 200,
+                    source_width: Some(1920),
+                    source_height: Some(1080),
+                    aspect_ratio: None,
+                }),
+                ..ConversionConfig::default()
+            };
+
+            assert!(normalize_output_config(&mut config, Some(&metadata)));
+
+            assert_eq!(config.crop, None);
         }
 
         #[test]

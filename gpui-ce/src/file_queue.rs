@@ -2,6 +2,8 @@
 
 use std::path::Path;
 
+use crate::settings::ConversionConfig;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FileStatus {
     Idle,
@@ -77,6 +79,7 @@ pub struct FileItem {
     pub progress_percent: u8,
     pub original_format: String,
     pub output_name: String,
+    pub config: ConversionConfig,
     pub path: String,
     pub is_selected_for_conversion: bool,
     pub conversion_error: Option<String>,
@@ -91,6 +94,7 @@ impl FileItem {
             id: id.into(),
             original_format: original_format_from_name(&name).to_string(),
             output_name: derive_output_name(&name),
+            config: ConversionConfig::default(),
             name,
             size_bytes,
             status: FileStatus::Idle,
@@ -174,6 +178,13 @@ impl FileQueue {
         self.selected_file_id
             .as_deref()
             .and_then(|id| self.files.iter().find(|file| file.id == id))
+    }
+
+    pub fn selected_file_mut(&mut self) -> Option<&mut FileItem> {
+        let selected_file_id = self.selected_file_id.as_deref()?;
+        self.files
+            .iter_mut()
+            .find(|file| file.id == selected_file_id)
     }
 
     #[must_use]
@@ -486,6 +497,13 @@ mod tests {
         }
 
         #[test]
+        fn from_path_initializes_per_file_conversion_config() {
+            let file = FileItem::from_path("1", "/tmp/video.mp4", 10);
+
+            assert_eq!(file.config, ConversionConfig::default());
+        }
+
+        #[test]
         fn from_os_path_reads_size_from_existing_file() {
             let path = temp_file_path("size-source.mp4");
             std::fs::write(&path, [1_u8, 2, 3]).expect("test file should be written");
@@ -641,6 +659,33 @@ mod tests {
             queue.add_file(sample_file("second", "/tmp/two.mp4", 1));
 
             assert_eq!(queue.selected_file_id(), Some("first"));
+        }
+
+        #[test]
+        fn selected_file_mut_updates_selected_file_only() {
+            let mut queue = FileQueue::new();
+            queue.add_file(sample_file("first", "/tmp/one.mp4", 1));
+            queue.add_file(sample_file("second", "/tmp/two.mp4", 1));
+            queue.select_existing_file("second");
+
+            queue
+                .selected_file_mut()
+                .expect("selected file should exist")
+                .config
+                .container = "webm".to_string();
+
+            assert_eq!(
+                queue
+                    .file_by_id("first")
+                    .map(|file| file.config.container.as_str()),
+                Some("mp4")
+            );
+            assert_eq!(
+                queue
+                    .file_by_id("second")
+                    .map(|file| file.config.container.as_str()),
+                Some("webm")
+            );
         }
 
         #[test]

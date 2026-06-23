@@ -19,13 +19,15 @@ use frame_gpui_ce::{
     },
     format_total_size,
     preview::{
-        MediaSnapshot, MetadataStatus as PreviewMetadataStatus, PreviewControlAvailability,
-        PreviewControlInput, PreviewMediaKind, PreviewPlaybackState, SourceMediaKind, format_time,
-        parse_time_to_seconds, preview_control_availability,
+        ASPECT_OPTIONS, CropRect, DragHandle, MediaSnapshot,
+        MetadataStatus as PreviewMetadataStatus, Point as PreviewPoint, PreviewControlAvailability,
+        PreviewControlInput, PreviewMediaKind, PreviewPlaybackState, PreviewRotation,
+        SourceMediaKind, TimelineDragTarget, adjust_rect_to_ratio, aspect_value, clamp_rect,
+        format_time, parse_time_to_seconds, preview_control_availability, transform_crop_rect,
     },
     settings::{
-        ConversionConfig, SettingsTab, SourceInfoSection, SourceKind, SourceMetadata,
-        apply_output_container, apply_processing_mode, normalize_output_config,
+        ConversionConfig, CropSettings, SettingsTab, SourceInfoSection, SourceKind, SourceMetadata,
+        apply_output_container, apply_processing_mode, apply_trim_times, normalize_output_config,
         output_container_options, output_processing_mode_options, resolve_active_settings_tab,
         source_info_sections, visible_settings_tabs,
     },
@@ -35,11 +37,11 @@ use frame_gpui_ce::{
     theme, visual_fixture_from_env_value,
 };
 use gpui::{
-    App, Bounds, BoxShadow, ClickEvent, Context, ExternalPaths, FontWeight, InteractiveElement,
-    IntoElement, KeyBinding, Menu, MenuItem, PathPromptOptions, Pixels, Render, Rgba, SharedString,
-    StatefulInteractiveElement, UniformListScrollHandle, Window, WindowBackgroundAppearance,
-    WindowBounds, WindowControlArea, WindowDecorations, WindowOptions, actions, div, hsla, point,
-    prelude::*, px, size, svg, uniform_list,
+    App, Bounds, BoxShadow, ClickEvent, Context, DragMoveEvent, ExternalPaths, FontWeight,
+    InteractiveElement, IntoElement, KeyBinding, Menu, MenuItem, PathPromptOptions, Pixels, Render,
+    Rgba, SharedString, StatefulInteractiveElement, TitlebarOptions, UniformListScrollHandle,
+    Window, WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowDecorations,
+    WindowOptions, actions, div, hsla, point, prelude::*, px, relative, size, svg, uniform_list,
 };
 use std::path::PathBuf;
 
@@ -50,6 +52,12 @@ const FILE_LIST_ACTION_BUTTON_SIZE: f32 = 24.0;
 const FILE_LIST_CHECKBOX_SIZE: f32 = 12.0;
 const LOG_LINE_NUMBER_WIDTH: f32 = 32.0;
 const LOG_LINE_HEIGHT: f32 = 24.0;
+const HIDDEN_NATIVE_TRAFFIC_LIGHT_X: f32 = -100.0;
+const HIDDEN_NATIVE_TRAFFIC_LIGHT_Y: f32 = 1000.0;
+const DEFAULT_CROP_X: f64 = 0.1;
+const DEFAULT_CROP_Y: f64 = 0.1;
+const DEFAULT_CROP_SIZE: f64 = 0.8;
+const CROP_HANDLE_SIZE: f32 = 10.0;
 
 struct FrameRoot {
     active_view: ActiveView,
@@ -60,10 +68,20 @@ struct FrameRoot {
     is_processing: bool,
     is_settings_open: bool,
     settings_active_tab: SettingsTab,
-    conversion_config: ConversionConfig,
     source_metadata: SourceMetadataStore,
-    output_name: String,
+    preview_crop_file_id: Option<String>,
+    preview_crop_mode: bool,
+    preview_draft_crop: Option<CropRect>,
+    preview_crop_aspect: String,
+    preview_crop_drag: Option<PreviewCropDragState>,
     next_file_sequence: u64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct PreviewCropDragState {
+    handle: DragHandle,
+    start_rect: CropRect,
+    start_point: PreviewPoint,
 }
 
 #[derive(Clone, Copy)]
@@ -96,9 +114,12 @@ impl FrameRoot {
             is_processing: false,
             is_settings_open: false,
             settings_active_tab: SettingsTab::Source,
-            conversion_config: ConversionConfig::default(),
             source_metadata: SourceMetadataStore::default(),
-            output_name: String::new(),
+            preview_crop_file_id: None,
+            preview_crop_mode: false,
+            preview_draft_crop: None,
+            preview_crop_aspect: "free".to_string(),
+            preview_crop_drag: None,
             next_file_sequence: 0,
         };
 
@@ -257,6 +278,394 @@ impl FrameRoot {
             .cloned()
     }
 
+    fn selected_config(&self) -> Option<&ConversionConfig> {
+        self.file_queue.selected_file().map(|file| &file.config)
+    }
+
+    fn update_selected_config(
+        &mut self,
+        update: impl FnOnce(&mut ConversionConfig) -> bool,
+    ) -> bool {
+        self.file_queue
+            .selected_file_mut()
+            .is_some_and(|file| update(&mut file.config))
+    }
+
+    fn normalize_selected_config(&mut self, metadata: Option<&SourceMetadata>) -> bool {
+        self.update_selected_config(|config| normalize_output_config(config, metadata))
+    }
+
+    fn sync_preview_crop_for_selection(
+        &mut self,
+        selected_file_id: Option<&str>,
+        selected_config: &ConversionConfig,
+    ) {
+        if self.preview_crop_file_id.as_deref() != selected_file_id {
+            self.preview_crop_file_id = selected_file_id.map(str::to_string);
+            self.preview_crop_mode = false;
+            self.preview_draft_crop = None;
+            self.preview_crop_drag = None;
+        }
+
+        if !self.preview_crop_mode {
+            self.preview_crop_aspect = selected_config
+                .crop
+                .as_ref()
+                .and_then(|crop| crop.aspect_ratio.clone())
+                .unwrap_or_else(|| "free".to_string());
+            self.preview_draft_crop = None;
+            self.preview_crop_drag = None;
+        }
+    }
+
+    fn preview_crop_render_state(
+        &self,
+        metadata: Option<&SourceMetadata>,
+        config: &ConversionConfig,
+    ) -> PreviewCropRenderState {
+        PreviewCropRenderState {
+            crop_mode: self.preview_crop_mode,
+            draft_crop: self.preview_draft_crop,
+            applied_crop: crop_rect_from_settings(config.crop.as_ref(), config),
+            crop_aspect: self.preview_crop_aspect.clone(),
+            has_crop_dimensions: preview_crop_source_dimensions(metadata, &config.rotation)
+                .is_some(),
+            rotation: config.rotation.clone(),
+            flip_horizontal: config.flip_horizontal,
+            flip_vertical: config.flip_vertical,
+        }
+    }
+
+    fn toggle_selected_crop_mode(&mut self) -> bool {
+        let metadata = self.selected_source_metadata();
+        let Some(config) = self.selected_config() else {
+            return false;
+        };
+        if !preview_crop_controls_enabled(
+            metadata.as_ref(),
+            config,
+            self.file_queue.selected_file_locked(),
+        ) {
+            return false;
+        }
+
+        let applied_crop = crop_rect_from_settings(config.crop.as_ref(), config);
+        let crop_aspect = config
+            .crop
+            .as_ref()
+            .and_then(|crop| crop.aspect_ratio.clone())
+            .unwrap_or_else(|| "free".to_string());
+
+        if self.preview_crop_mode {
+            self.preview_crop_mode = false;
+            self.preview_draft_crop = None;
+            self.preview_crop_drag = None;
+            return true;
+        }
+
+        self.preview_crop_mode = true;
+        self.preview_draft_crop = Some(applied_crop.unwrap_or_else(default_crop_rect));
+        self.preview_crop_aspect = crop_aspect;
+        true
+    }
+
+    fn select_preview_crop_aspect(&mut self, aspect_id: &str) -> bool {
+        if !self.preview_crop_mode || !is_known_crop_aspect(aspect_id) {
+            return false;
+        }
+
+        let metadata = self.selected_source_metadata();
+        let Some(config) = self.selected_config() else {
+            return false;
+        };
+        let Some(dimensions) = preview_crop_source_dimensions(metadata.as_ref(), &config.rotation)
+        else {
+            return false;
+        };
+        let is_side_rotation = is_side_rotation(&config.rotation);
+
+        let previous_aspect = self.preview_crop_aspect.clone();
+        let previous_rect = self.preview_draft_crop;
+        self.preview_crop_aspect = aspect_id.to_string();
+        if let Some(rect) = self.preview_draft_crop {
+            self.preview_draft_crop = Some(if let Some(ratio) = aspect_value(aspect_id) {
+                clamp_rect(adjust_rect_to_ratio(
+                    rect,
+                    ratio,
+                    f64::from(dimensions.width),
+                    f64::from(dimensions.height),
+                    is_side_rotation,
+                ))
+            } else {
+                clamp_rect(rect)
+            });
+        }
+
+        previous_aspect != self.preview_crop_aspect || previous_rect != self.preview_draft_crop
+    }
+
+    fn reset_preview_crop_selection(&mut self) -> bool {
+        if !self.preview_crop_mode {
+            return false;
+        }
+
+        let previous_rect = self.preview_draft_crop;
+        let previous_aspect = self.preview_crop_aspect.clone();
+        self.preview_draft_crop = Some(if self.preview_draft_crop.is_some() {
+            full_crop_rect()
+        } else {
+            default_crop_rect()
+        });
+        self.preview_crop_aspect = "free".to_string();
+        previous_rect != self.preview_draft_crop || previous_aspect != self.preview_crop_aspect
+    }
+
+    fn apply_selected_crop(&mut self) -> bool {
+        if !self.preview_crop_mode {
+            return false;
+        }
+        let Some(draft_crop) = self.preview_draft_crop else {
+            return false;
+        };
+
+        let metadata = self.selected_source_metadata();
+        let Some(config) = self.selected_config() else {
+            return false;
+        };
+        if preview_crop_source_dimensions(metadata.as_ref(), &config.rotation).is_none() {
+            return false;
+        }
+
+        let next_crop = if crop_rect_is_full(draft_crop) {
+            None
+        } else {
+            crop_settings_from_rect(
+                draft_crop,
+                &self.preview_crop_aspect,
+                &config.rotation,
+                config.flip_horizontal,
+                config.flip_vertical,
+                metadata.as_ref(),
+            )
+        };
+        let cleared_crop = next_crop.is_none();
+
+        let changed = self.update_selected_config(|config| {
+            let changed = config.crop != next_crop;
+            config.crop = next_crop;
+            changed
+        });
+        self.preview_crop_mode = false;
+        self.preview_draft_crop = None;
+        self.preview_crop_drag = None;
+        if cleared_crop {
+            self.preview_crop_aspect = "free".to_string();
+        }
+        changed
+    }
+
+    fn rotate_selected_preview(&mut self) -> bool {
+        let metadata = self.selected_source_metadata();
+        let Some(config) = self.selected_config() else {
+            return false;
+        };
+        if !preview_transform_controls_enabled(
+            metadata.as_ref(),
+            config,
+            self.file_queue.selected_file_locked(),
+        ) {
+            return false;
+        }
+
+        let next_rotation = next_rotation(&config.rotation);
+        let applied_crop = crop_rect_from_settings(config.crop.as_ref(), config);
+        let aspect_id = crop_aspect_id(config.crop.as_ref()).to_string();
+        let flip_horizontal = config.flip_horizontal;
+        let flip_vertical = config.flip_vertical;
+        let next_crop = applied_crop.and_then(|rect| {
+            crop_settings_from_rect(
+                rect,
+                &aspect_id,
+                &next_rotation,
+                flip_horizontal,
+                flip_vertical,
+                metadata.as_ref(),
+            )
+        });
+
+        self.update_selected_config(|config| {
+            let changed = config.rotation != next_rotation
+                || (applied_crop.is_some() && config.crop != next_crop);
+            config.rotation = next_rotation;
+            if applied_crop.is_some() {
+                config.crop = next_crop;
+            }
+            changed
+        })
+    }
+
+    fn toggle_selected_flip(&mut self, axis: FlipAxis) -> bool {
+        let metadata = self.selected_source_metadata();
+        let Some(config) = self.selected_config() else {
+            return false;
+        };
+        if !preview_transform_controls_enabled(
+            metadata.as_ref(),
+            config,
+            self.file_queue.selected_file_locked(),
+        ) {
+            return false;
+        }
+
+        let next_flip_horizontal = if axis == FlipAxis::Horizontal {
+            !config.flip_horizontal
+        } else {
+            config.flip_horizontal
+        };
+        let next_flip_vertical = if axis == FlipAxis::Vertical {
+            !config.flip_vertical
+        } else {
+            config.flip_vertical
+        };
+        let applied_crop = crop_rect_from_settings(config.crop.as_ref(), config);
+        let aspect_id = crop_aspect_id(config.crop.as_ref()).to_string();
+        let rotation = config.rotation.clone();
+        let next_crop = applied_crop.and_then(|rect| {
+            crop_settings_from_rect(
+                rect,
+                &aspect_id,
+                &rotation,
+                next_flip_horizontal,
+                next_flip_vertical,
+                metadata.as_ref(),
+            )
+        });
+
+        self.update_selected_config(|config| {
+            let changed = config.flip_horizontal != next_flip_horizontal
+                || config.flip_vertical != next_flip_vertical
+                || (applied_crop.is_some() && config.crop != next_crop);
+            config.flip_horizontal = next_flip_horizontal;
+            config.flip_vertical = next_flip_vertical;
+            if applied_crop.is_some() {
+                config.crop = next_crop;
+            }
+            changed
+        })
+    }
+
+    fn apply_preview_crop_drag(&mut self, handle: DragHandle, point: PreviewPoint) -> bool {
+        if !self.preview_crop_mode {
+            return false;
+        }
+        let Some(current_rect) = self.preview_draft_crop else {
+            return false;
+        };
+
+        let metadata = self.selected_source_metadata();
+        let Some(config) = self.selected_config() else {
+            return false;
+        };
+        let Some(dimensions) = preview_crop_source_dimensions(metadata.as_ref(), &config.rotation)
+        else {
+            return false;
+        };
+        let is_side_rotation = is_side_rotation(&config.rotation);
+
+        let drag_state = match self.preview_crop_drag {
+            Some(state) if state.handle == handle => state,
+            _ => {
+                let state = PreviewCropDragState {
+                    handle,
+                    start_rect: current_rect,
+                    start_point: point,
+                };
+                self.preview_crop_drag = Some(state);
+                state
+            }
+        };
+
+        let next_rect = frame_gpui_ce::preview::apply_visual_crop_drag(
+            frame_gpui_ce::preview::VisualCropDrag {
+                start_rect: drag_state.start_rect,
+                handle,
+                start_point: drag_state.start_point,
+                current_point: point,
+                aspect_id: &self.preview_crop_aspect,
+                source_width: f64::from(dimensions.width),
+                source_height: f64::from(dimensions.height),
+                is_side_rotation,
+            },
+        );
+        let changed = self.preview_draft_crop != Some(next_rect);
+        self.preview_draft_crop = Some(next_rect);
+        changed
+    }
+
+    fn end_preview_crop_drag(&mut self) -> bool {
+        let had_drag = self.preview_crop_drag.is_some();
+        self.preview_crop_drag = None;
+        had_drag
+    }
+
+    fn apply_selected_trim_drag(&mut self, target: TimelineDragTarget, percent: f64) -> bool {
+        if target == TimelineDragTarget::Scrub {
+            return false;
+        }
+
+        let metadata = self.selected_source_metadata();
+        let duration_seconds = preview_duration_seconds(metadata.as_ref());
+        if duration_seconds <= 0.0 {
+            return false;
+        }
+
+        let Some(config) = self.selected_config() else {
+            return false;
+        };
+        let metadata_status = if metadata.is_some() {
+            PreviewMetadataStatus::Ready
+        } else {
+            PreviewMetadataStatus::Idle
+        };
+        let availability = preview_control_availability(PreviewControlInput {
+            metadata_status,
+            source_media_kind: preview_source_media_kind(metadata.as_ref()),
+            controls_disabled: self.file_queue.selected_file_locked(),
+            processing_mode: config.processing_mode,
+            container: Some(config.container.as_str()),
+        });
+        if availability.trim_disabled {
+            return false;
+        }
+
+        let mut playback = preview_playback_state(
+            availability.media_kind,
+            duration_seconds,
+            config.start_time.as_deref(),
+            config.end_time.as_deref(),
+        );
+        if !playback.begin_handle_drag(target) {
+            return false;
+        }
+
+        let Some(trim) = playback.drag_to_percent(percent).trim else {
+            return false;
+        };
+
+        self.update_selected_config(|config| {
+            apply_trim_times(config, trim.start_time, trim.end_time)
+        })
+    }
+
+    fn resolve_selected_settings_tab(&mut self, metadata: Option<&SourceMetadata>) {
+        let next_tab = self
+            .selected_config()
+            .map_or(SettingsTab::Source, |config| {
+                resolve_active_settings_tab(self.settings_active_tab, config, metadata)
+            });
+        self.settings_active_tab = next_tab;
+    }
+
     fn queue_source_metadata_probe(
         &mut self,
         file_id: String,
@@ -277,15 +686,8 @@ impl FrameRoot {
                         root.source_metadata.mark_ready(file_id.clone(), metadata);
                         if root.file_queue.selected_file_id() == Some(file_id.as_str()) {
                             let selected_metadata = root.selected_source_metadata();
-                            normalize_output_config(
-                                &mut root.conversion_config,
-                                selected_metadata.as_ref(),
-                            );
-                            root.settings_active_tab = resolve_active_settings_tab(
-                                root.settings_active_tab,
-                                &root.conversion_config,
-                                selected_metadata.as_ref(),
-                            );
+                            root.normalize_selected_config(selected_metadata.as_ref());
+                            root.resolve_selected_settings_tab(selected_metadata.as_ref());
                         }
                     }
                     Err(error) => {
@@ -331,28 +733,37 @@ impl Render for FrameRoot {
         let state = self.app_state();
         let source_metadata_entry = self.selected_source_metadata_entry();
         let source_metadata = source_metadata_entry.metadata.clone();
-        normalize_output_config(&mut self.conversion_config, source_metadata.as_ref());
-        self.settings_active_tab = resolve_active_settings_tab(
-            self.settings_active_tab,
-            &self.conversion_config,
-            source_metadata.as_ref(),
-        );
+        self.normalize_selected_config(source_metadata.as_ref());
+        self.resolve_selected_settings_tab(source_metadata.as_ref());
         self.conversion_events
             .ensure_selected_log_file(&self.file_queue);
         self.update_log_scroll_target();
+        let selected_file_id = self.file_queue.selected_file_id().map(str::to_string);
+        let selected_file = self.file_queue.selected_file();
+        let selected_config_snapshot =
+            selected_file.map_or_else(ConversionConfig::default, |file| file.config.clone());
+        let selected_output_name =
+            selected_file.map_or_else(String::new, |file| file.output_name.clone());
+        self.sync_preview_crop_for_selection(
+            selected_file_id.as_deref(),
+            &selected_config_snapshot,
+        );
+        let preview_crop =
+            self.preview_crop_render_state(source_metadata.as_ref(), &selected_config_snapshot);
         let content = div().flex_1().p(px(CONTENT_PADDING));
         let content = match state.active_view {
             ActiveView::Workspace => content.child(workspace_view(
                 &self.file_queue,
                 SettingsRenderState {
                     active_tab: self.settings_active_tab,
-                    config: &self.conversion_config,
+                    config: &selected_config_snapshot,
                     metadata: source_metadata.as_ref(),
                     metadata_status: source_metadata_entry.status,
                     metadata_error: source_metadata_entry.error.as_deref(),
                     settings_disabled: self.file_queue.selected_file_locked(),
-                    output_name: &self.output_name,
+                    output_name: &selected_output_name,
                 },
+                preview_crop,
                 cx,
             )),
             ActiveView::Logs => content.child(logs_view(
@@ -371,7 +782,7 @@ impl Render for FrameRoot {
             .bg(color(theme::BACKGROUND))
             .text_color(color(theme::FOREGROUND))
             .font_family(assets::FRAME_FONT_FAMILY)
-            .font_weight(FontWeight::BLACK)
+            .font_weight(FontWeight::SEMIBOLD)
             .on_drop(cx.listener(|root, paths: &ExternalPaths, _window, cx| {
                 cx.stop_propagation();
                 root.import_source_paths(paths.paths().to_vec(), cx);
@@ -639,6 +1050,7 @@ fn titlebar_segment(
 enum ButtonVariant {
     Default,
     Secondary,
+    Ghost,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -647,21 +1059,35 @@ struct ButtonColors {
     hover_background: theme::RgbaToken,
     active_background: theme::RgbaToken,
     foreground: theme::RgbaToken,
+    hover_foreground: theme::RgbaToken,
+    opacity: f32,
 }
 
 fn button_colors(variant: ButtonVariant, selected: bool, enabled: bool) -> ButtonColors {
     let active_variant = matches!(variant, ButtonVariant::Default) || selected;
     if !enabled {
-        let background = if active_variant {
-            theme::FRAME_GRAY_400.with_alpha(0.10)
+        let (background, foreground, opacity) = if active_variant {
+            (
+                theme::FRAME_GRAY_400.with_alpha(0.10),
+                theme::FOREGROUND.with_alpha(0.50),
+                1.0,
+            )
+        } else if matches!(variant, ButtonVariant::Ghost) {
+            (theme::TRANSPARENT, theme::FRAME_GRAY_600, 0.5)
         } else {
-            theme::FRAME_GRAY_100.with_alpha(0.50)
+            (
+                theme::FRAME_GRAY_100,
+                theme::FOREGROUND.with_alpha(0.50),
+                0.5,
+            )
         };
         return ButtonColors {
             background,
             hover_background: background,
             active_background: background,
-            foreground: theme::FOREGROUND.with_alpha(0.50),
+            foreground,
+            hover_foreground: foreground,
+            opacity,
         };
     }
 
@@ -669,15 +1095,28 @@ fn button_colors(variant: ButtonVariant, selected: bool, enabled: bool) -> Butto
         ButtonColors {
             background: theme::FRAME_GRAY_400,
             hover_background: theme::FRAME_GRAY_400.with_alpha(0.18),
-            active_background: theme::FRAME_GRAY_400.with_alpha(0.16),
+            active_background: theme::FRAME_GRAY_400.with_alpha(0.18),
             foreground: theme::FOREGROUND,
+            hover_foreground: theme::FOREGROUND,
+            opacity: 1.0,
+        }
+    } else if matches!(variant, ButtonVariant::Ghost) {
+        ButtonColors {
+            background: theme::TRANSPARENT,
+            hover_background: theme::FRAME_GRAY_100,
+            active_background: theme::FRAME_GRAY_100,
+            foreground: theme::FRAME_GRAY_600,
+            hover_foreground: theme::FOREGROUND,
+            opacity: 1.0,
         }
     } else {
         ButtonColors {
             background: theme::FRAME_GRAY_100,
             hover_background: theme::FRAME_GRAY_200,
-            active_background: theme::FRAME_GRAY_400.with_alpha(0.14),
+            active_background: theme::FRAME_GRAY_200,
             foreground: theme::FOREGROUND,
+            hover_foreground: theme::FOREGROUND,
+            opacity: 1.0,
         }
     }
 }
@@ -702,9 +1141,16 @@ fn action_button(
         .bg(color(colors.background))
         .shadow(button_highlight_shadows())
         .text_color(color(colors.foreground))
+        .opacity(colors.opacity)
         .when(enabled, |this| {
-            this.hover(move |style| style.bg(color(colors.hover_background)).cursor_pointer())
-        });
+            this.hover(move |style| {
+                style
+                    .bg(color(colors.hover_background))
+                    .text_color(color(colors.hover_foreground))
+                    .cursor_pointer()
+            })
+        })
+        .when(!enabled, |this| this.cursor_not_allowed());
 
     if is_icon_only {
         button.w(px(TITLEBAR_ICON_BUTTON_SIZE)).child(icon_svg(
@@ -778,6 +1224,7 @@ fn button_highlight_shadows() -> Vec<BoxShadow> {
 fn workspace_view(
     file_queue: &FileQueue,
     settings: SettingsRenderState<'_>,
+    preview_crop: PreviewCropRenderState,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     div()
@@ -792,10 +1239,25 @@ fn workspace_view(
                 .grid_rows(LEFT_GRID_ROWS)
                 .gap(px(WORKSPACE_GAP))
                 .size_full()
-                .child(preview_panel(file_queue, settings).row_span(PREVIEW_ROW_SPAN))
+                .child(
+                    preview_panel(file_queue, settings, preview_crop, cx)
+                        .row_span(PREVIEW_ROW_SPAN),
+                )
                 .child(file_list_panel(file_queue, cx).row_span(FILE_LIST_ROW_SPAN)),
         )
         .child(settings_panel(settings, cx).col_span(RIGHT_COLUMN_SPAN))
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct PreviewCropRenderState {
+    crop_mode: bool,
+    draft_crop: Option<CropRect>,
+    applied_crop: Option<CropRect>,
+    crop_aspect: String,
+    has_crop_dimensions: bool,
+    rotation: String,
+    flip_horizontal: bool,
+    flip_vertical: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -807,10 +1269,16 @@ struct PreviewShellState {
     availability: PreviewControlAvailability,
     playback: PreviewPlaybackState,
     duration_seconds: f64,
+    crop: PreviewCropRenderState,
 }
 
-fn preview_panel(file_queue: &FileQueue, settings: SettingsRenderState<'_>) -> gpui::Div {
-    let state = preview_shell_state(file_queue.selected_file(), settings);
+fn preview_panel(
+    file_queue: &FileQueue,
+    settings: SettingsRenderState<'_>,
+    preview_crop: PreviewCropRenderState,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    let state = preview_shell_state(file_queue.selected_file(), settings, preview_crop);
 
     div()
         .flex()
@@ -818,13 +1286,14 @@ fn preview_panel(file_queue: &FileQueue, settings: SettingsRenderState<'_>) -> g
         .overflow_hidden()
         .card_surface()
         .p(px(PREVIEW_PANEL_PADDING))
-        .child(preview_viewport(&state))
-        .child(preview_timeline(&state))
+        .child(preview_viewport(&state, cx))
+        .child(preview_timeline(&state, cx))
 }
 
 fn preview_shell_state(
     selected_file: Option<&FileItem>,
     settings: SettingsRenderState<'_>,
+    crop: PreviewCropRenderState,
 ) -> PreviewShellState {
     let metadata_status = preview_metadata_status(settings.metadata_status);
     let source_media_kind = preview_source_media_kind(settings.metadata);
@@ -836,7 +1305,12 @@ fn preview_shell_state(
         container: Some(settings.config.container.as_str()),
     });
     let duration_seconds = preview_duration_seconds(settings.metadata);
-    let playback = preview_playback_state(availability.media_kind, duration_seconds);
+    let playback = preview_playback_state(
+        availability.media_kind,
+        duration_seconds,
+        settings.config.start_time.as_deref(),
+        settings.config.end_time.as_deref(),
+    );
 
     PreviewShellState {
         selected_file_name: selected_file.map(|file| file.name.clone()),
@@ -846,6 +1320,7 @@ fn preview_shell_state(
         availability,
         playback,
         duration_seconds,
+        crop,
     }
 }
 
@@ -891,6 +1366,8 @@ fn preview_duration_seconds(metadata: Option<&SourceMetadata>) -> f64 {
 fn preview_playback_state(
     media_kind: PreviewMediaKind,
     duration_seconds: f64,
+    start_time: Option<&str>,
+    end_time: Option<&str>,
 ) -> PreviewPlaybackState {
     let is_image = media_kind == PreviewMediaKind::Image;
     let mut playback = PreviewPlaybackState::new(is_image);
@@ -900,12 +1377,216 @@ fn preview_playback_state(
             duration: duration_seconds,
             paused: true,
         });
+        playback.sync_initial_values(start_time, end_time);
     }
     playback
 }
 
-fn preview_viewport(state: &PreviewShellState) -> gpui::Div {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct CropSourceDimensions {
+    width: u32,
+    height: u32,
+}
+
+fn preview_transform_controls_enabled(
+    metadata: Option<&SourceMetadata>,
+    config: &ConversionConfig,
+    controls_disabled: bool,
+) -> bool {
+    let metadata_status = if metadata.is_some() {
+        PreviewMetadataStatus::Ready
+    } else {
+        PreviewMetadataStatus::Idle
+    };
+    let availability = preview_control_availability(PreviewControlInput {
+        metadata_status,
+        source_media_kind: preview_source_media_kind(metadata),
+        controls_disabled,
+        processing_mode: config.processing_mode,
+        container: Some(config.container.as_str()),
+    });
+
+    availability.media_kind != PreviewMediaKind::Unknown
+        && !availability.hide_visual_controls
+        && !controls_disabled
+}
+
+fn preview_crop_controls_enabled(
+    metadata: Option<&SourceMetadata>,
+    config: &ConversionConfig,
+    controls_disabled: bool,
+) -> bool {
+    preview_transform_controls_enabled(metadata, config, controls_disabled)
+        && preview_crop_source_dimensions(metadata, &config.rotation).is_some()
+}
+
+fn preview_crop_source_dimensions(
+    metadata: Option<&SourceMetadata>,
+    _rotation: &str,
+) -> Option<CropSourceDimensions> {
+    let metadata = metadata?;
+    let (Some(width), Some(height)) = (metadata.width, metadata.height) else {
+        return None;
+    };
+    if width == 0 || height == 0 {
+        return None;
+    }
+
+    Some(CropSourceDimensions { width, height })
+}
+
+fn crop_base_dimensions(
+    metadata: Option<&SourceMetadata>,
+    rotation: &str,
+) -> Option<CropSourceDimensions> {
+    let dimensions = preview_crop_source_dimensions(metadata, rotation)?;
+    if is_side_rotation(rotation) {
+        Some(CropSourceDimensions {
+            width: dimensions.height,
+            height: dimensions.width,
+        })
+    } else {
+        Some(dimensions)
+    }
+}
+
+fn crop_rect_from_settings(
+    crop: Option<&CropSettings>,
+    config: &ConversionConfig,
+) -> Option<CropRect> {
+    let crop = crop.filter(|crop| crop.enabled)?;
+    let (Some(source_width), Some(source_height)) = (crop.source_width, crop.source_height) else {
+        return None;
+    };
+    if source_width == 0 || source_height == 0 {
+        return None;
+    }
+
+    let raw_rect = CropRect {
+        x: f64::from(crop.x) / f64::from(source_width),
+        y: f64::from(crop.y) / f64::from(source_height),
+        width: f64::from(crop.width) / f64::from(source_width),
+        height: f64::from(crop.height) / f64::from(source_height),
+    };
+
+    Some(clamp_rect(transform_crop_rect(
+        raw_rect,
+        PreviewRotation::from(config.rotation.as_str()),
+        config.flip_horizontal,
+        config.flip_vertical,
+        true,
+    )))
+}
+
+fn crop_settings_from_rect(
+    rect: CropRect,
+    aspect_id: &str,
+    rotation: &str,
+    flip_horizontal: bool,
+    flip_vertical: bool,
+    metadata: Option<&SourceMetadata>,
+) -> Option<CropSettings> {
+    let dimensions = crop_base_dimensions(metadata, rotation)?;
+    let output_rect = clamp_rect(transform_crop_rect(
+        rect,
+        PreviewRotation::from(rotation),
+        flip_horizontal,
+        flip_vertical,
+        false,
+    ));
+
+    Some(CropSettings {
+        enabled: true,
+        x: round_unit_to_u32(output_rect.x, dimensions.width),
+        y: round_unit_to_u32(output_rect.y, dimensions.height),
+        width: round_unit_to_u32(output_rect.width, dimensions.width),
+        height: round_unit_to_u32(output_rect.height, dimensions.height),
+        source_width: Some(dimensions.width),
+        source_height: Some(dimensions.height),
+        aspect_ratio: (aspect_id != "free").then(|| aspect_id.to_string()),
+    })
+}
+
+fn round_unit_to_u32(value: f64, scale: u32) -> u32 {
+    let scaled = (value * f64::from(scale)).round();
+    if scaled <= 0.0 || !scaled.is_finite() {
+        0
+    } else if scaled >= f64::from(u32::MAX) {
+        u32::MAX
+    } else {
+        scaled as u32
+    }
+}
+
+fn default_crop_rect() -> CropRect {
+    CropRect {
+        x: DEFAULT_CROP_X,
+        y: DEFAULT_CROP_Y,
+        width: DEFAULT_CROP_SIZE,
+        height: DEFAULT_CROP_SIZE,
+    }
+}
+
+fn full_crop_rect() -> CropRect {
+    CropRect {
+        x: 0.0,
+        y: 0.0,
+        width: 1.0,
+        height: 1.0,
+    }
+}
+
+fn crop_rect_is_full(rect: CropRect) -> bool {
+    rect.x <= 0.001 && rect.y <= 0.001 && rect.width >= 0.999 && rect.height >= 0.999
+}
+
+fn crop_aspect_id(crop: Option<&CropSettings>) -> &str {
+    crop.and_then(|crop| crop.aspect_ratio.as_deref())
+        .unwrap_or("free")
+}
+
+fn is_known_crop_aspect(aspect_id: &str) -> bool {
+    ASPECT_OPTIONS.iter().any(|option| option.id == aspect_id)
+}
+
+fn next_rotation(rotation: &str) -> String {
+    match rotation {
+        "0" => "90",
+        "90" => "180",
+        "180" => "270",
+        _ => "0",
+    }
+    .to_string()
+}
+
+fn is_side_rotation(rotation: &str) -> bool {
+    matches!(rotation, "90" | "270")
+}
+
+fn normalized_point_from_bounds(
+    position: gpui::Point<Pixels>,
+    bounds: Bounds<Pixels>,
+) -> PreviewPoint {
+    let width = bounds.size.width.as_f32();
+    let height = bounds.size.height.as_f32();
+    if width <= 0.0 || height <= 0.0 {
+        return PreviewPoint { x: 0.0, y: 0.0 };
+    }
+
+    let x = ((position.x - bounds.origin.x).as_f32() / width).clamp(0.0, 1.0);
+    let y = ((position.y - bounds.origin.y).as_f32() / height).clamp(0.0, 1.0);
+    PreviewPoint {
+        x: f64::from(x),
+        y: f64::from(y),
+    }
+}
+
+fn preview_viewport(
+    state: &PreviewShellState,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
     let mut viewport = div()
+        .id("preview-viewport")
         .relative()
         .flex_1()
         .min_h_0()
@@ -917,11 +1598,31 @@ fn preview_viewport(state: &PreviewShellState) -> gpui::Div {
         .rounded(px(theme::RADIUS_MD))
         .bg(parse_hex("#000000"))
         .shadow(input_highlight_shadows())
+        .on_drag_move(cx.listener(
+            |root, event: &DragMoveEvent<PreviewCropDrag>, _window, cx| {
+                let drag = *event.drag(cx);
+                let point = normalized_point_from_bounds(event.event.position, event.bounds);
+                if root.apply_preview_crop_drag(drag.handle, point) {
+                    cx.notify();
+                }
+            },
+        ))
+        .capture_any_mouse_up(cx.listener(|root, _, _window, cx| {
+            if root.end_preview_crop_drag() {
+                cx.notify();
+            }
+        }))
         .child(preview_viewport_content(state));
+
+    if state.crop.crop_mode && state.crop.draft_crop.is_some() {
+        viewport = viewport
+            .child(preview_crop_overlay(state))
+            .child(preview_crop_aspect_bar(state, cx));
+    }
 
     if preview_visual_controls_visible(state) {
         viewport = viewport
-            .child(preview_toolbar(state))
+            .child(preview_toolbar(state, cx))
             .child(preview_zoom_toolbar(state));
     }
 
@@ -1028,8 +1729,285 @@ fn preview_visual_controls_enabled(state: &PreviewShellState) -> bool {
     preview_visual_controls_visible(state) && !state.controls_disabled
 }
 
-fn preview_toolbar(state: &PreviewShellState) -> gpui::Div {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum FlipAxis {
+    Horizontal,
+    Vertical,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct PreviewCropDrag {
+    handle: DragHandle,
+}
+
+fn preview_crop_overlay(state: &PreviewShellState) -> gpui::Div {
+    let rect = state.crop.draft_crop.unwrap_or_else(default_crop_rect);
+    let x = rect.x as f32;
+    let y = rect.y as f32;
+    let width = rect.width as f32;
+    let height = rect.height as f32;
+    let right = (x + width).min(1.0);
+    let bottom = (y + height).min(1.0);
+
+    div()
+        .absolute()
+        .inset_0()
+        .child(crop_mask_rect(0.0, 0.0, 1.0, y.clamp(0.0, 1.0)))
+        .child(crop_mask_rect(0.0, y, x.clamp(0.0, 1.0), height))
+        .child(crop_mask_rect(right, y, (1.0 - right).max(0.0), height))
+        .child(crop_mask_rect(0.0, bottom, 1.0, (1.0 - bottom).max(0.0)))
+        .child(crop_outline_rect(x, y, width, height))
+        .child(crop_vertical_guide_line(x + width / 3.0, y, height))
+        .child(crop_vertical_guide_line(x + (width * 2.0) / 3.0, y, height))
+        .child(crop_horizontal_guide_line(x, y + height / 3.0, width))
+        .child(crop_horizontal_guide_line(
+            x,
+            y + (height * 2.0) / 3.0,
+            width,
+        ))
+        .child(preview_crop_handle(DragHandle::NorthWest, x, y, state))
+        .child(preview_crop_handle(
+            DragHandle::North,
+            x + width / 2.0,
+            y,
+            state,
+        ))
+        .child(preview_crop_handle(DragHandle::NorthEast, right, y, state))
+        .child(preview_crop_handle(
+            DragHandle::East,
+            right,
+            y + height / 2.0,
+            state,
+        ))
+        .child(preview_crop_handle(
+            DragHandle::SouthEast,
+            right,
+            bottom,
+            state,
+        ))
+        .child(preview_crop_handle(
+            DragHandle::South,
+            x + width / 2.0,
+            bottom,
+            state,
+        ))
+        .child(preview_crop_handle(DragHandle::SouthWest, x, bottom, state))
+        .child(preview_crop_handle(
+            DragHandle::West,
+            x,
+            y + height / 2.0,
+            state,
+        ))
+}
+
+fn crop_mask_rect(left: f32, top: f32, width: f32, height: f32) -> gpui::Div {
+    div()
+        .absolute()
+        .left(relative(left.clamp(0.0, 1.0)))
+        .top(relative(top.clamp(0.0, 1.0)))
+        .w(relative(width.clamp(0.0, 1.0)))
+        .h(relative(height.clamp(0.0, 1.0)))
+        .bg(hsla(0.0, 0.0, 0.0, 0.55))
+}
+
+fn crop_outline_rect(left: f32, top: f32, width: f32, height: f32) -> gpui::Stateful<gpui::Div> {
+    div()
+        .id("preview-crop-move-handle")
+        .absolute()
+        .left(relative(left.clamp(0.0, 1.0)))
+        .top(relative(top.clamp(0.0, 1.0)))
+        .w(relative(width.clamp(0.0, 1.0)))
+        .h(relative(height.clamp(0.0, 1.0)))
+        .border_1()
+        .border_color(color(theme::FOREGROUND.with_alpha(0.90)))
+        .cursor_grab()
+        .on_drag(
+            PreviewCropDrag {
+                handle: DragHandle::Move,
+            },
+            |_drag, _position, _window, cx| cx.new(|_| PreviewTimelineDragPreview),
+        )
+}
+
+fn crop_vertical_guide_line(left: f32, top: f32, height: f32) -> gpui::Div {
+    div()
+        .absolute()
+        .left(relative(left.clamp(0.0, 1.0)))
+        .top(relative(top.clamp(0.0, 1.0)))
+        .w(px(1.0))
+        .h(relative(height.clamp(0.0, 1.0)))
+        .bg(color(theme::FOREGROUND.with_alpha(0.70)))
+}
+
+fn crop_horizontal_guide_line(left: f32, top: f32, width: f32) -> gpui::Div {
+    div()
+        .absolute()
+        .left(relative(left.clamp(0.0, 1.0)))
+        .top(relative(top.clamp(0.0, 1.0)))
+        .w(relative(width.clamp(0.0, 1.0)))
+        .h(px(1.0))
+        .bg(color(theme::FOREGROUND.with_alpha(0.70)))
+}
+
+fn preview_crop_handle(
+    handle: DragHandle,
+    x: f32,
+    y: f32,
+    state: &PreviewShellState,
+) -> gpui::Stateful<gpui::Div> {
+    crop_handle_cursor(
+        div()
+            .id(format!("preview-crop-handle-{}", crop_handle_id(handle)))
+            .absolute()
+            .left(relative(x.clamp(0.0, 1.0)))
+            .top(relative(y.clamp(0.0, 1.0)))
+            .ml(px(-(CROP_HANDLE_SIZE / 2.0)))
+            .mt(px(-(CROP_HANDLE_SIZE / 2.0)))
+            .w(px(CROP_HANDLE_SIZE))
+            .h(px(CROP_HANDLE_SIZE))
+            .rounded_full()
+            .border_1()
+            .border_color(hsla(0.0, 0.0, 0.0, 0.45))
+            .bg(color(theme::FOREGROUND))
+            .shadow(card_surface_shadows()),
+        handle,
+        is_side_rotation(&state.crop.rotation),
+    )
+    .on_drag(
+        PreviewCropDrag { handle },
+        |_drag, _position, _window, cx| cx.new(|_| PreviewTimelineDragPreview),
+    )
+}
+
+fn crop_handle_cursor(
+    handle: gpui::Stateful<gpui::Div>,
+    drag_handle: DragHandle,
+    is_side_rotation: bool,
+) -> gpui::Stateful<gpui::Div> {
+    match frame_gpui_ce::preview::handle_cursor(drag_handle, is_side_rotation) {
+        "ns-resize" => handle.cursor_ns_resize(),
+        "ew-resize" => handle.cursor_ew_resize(),
+        "nesw-resize" => handle.cursor_nesw_resize(),
+        "nwse-resize" => handle.cursor_nwse_resize(),
+        _ => handle.cursor_grab(),
+    }
+}
+
+fn crop_handle_id(handle: DragHandle) -> &'static str {
+    match handle {
+        DragHandle::Move => "move",
+        DragHandle::North => "n",
+        DragHandle::South => "s",
+        DragHandle::East => "e",
+        DragHandle::West => "w",
+        DragHandle::NorthEast => "ne",
+        DragHandle::NorthWest => "nw",
+        DragHandle::SouthEast => "se",
+        DragHandle::SouthWest => "sw",
+    }
+}
+
+fn preview_crop_aspect_bar(state: &PreviewShellState, cx: &mut Context<FrameRoot>) -> gpui::Div {
+    let mut bar = div()
+        .flex()
+        .items_center()
+        .gap_2()
+        .rounded(px(theme::RADIUS_MD))
+        .bg(color(theme::BACKGROUND))
+        .p(px(4.0))
+        .shadow(card_surface_shadows());
+
+    for option in ASPECT_OPTIONS {
+        let id = option.id;
+        bar = bar.child(
+            compact_text_button(option.display, state.crop.crop_aspect == id, true).on_click(
+                cx.listener(move |root, _: &ClickEvent, _window, cx| {
+                    if root.select_preview_crop_aspect(id) {
+                        cx.notify();
+                    }
+                }),
+            ),
+        );
+    }
+
+    let bar = bar
+        .child(preview_toolbar_separator().h(px(18.0)).w(px(1.0)))
+        .child(
+            compact_text_button("Reset", false, true).on_click(cx.listener(
+                |root, _: &ClickEvent, _window, cx| {
+                    if root.reset_preview_crop_selection() {
+                        cx.notify();
+                    }
+                },
+            )),
+        )
+        .child(
+            compact_text_button("Apply", false, state.crop.has_crop_dimensions).on_click(
+                cx.listener(|root, _: &ClickEvent, _window, cx| {
+                    if root.apply_selected_crop() {
+                        cx.notify();
+                    }
+                }),
+            ),
+        );
+
+    div()
+        .absolute()
+        .bottom(px(16.0))
+        .left_0()
+        .right_0()
+        .flex()
+        .justify_center()
+        .child(bar)
+}
+
+fn compact_text_button(
+    label: &'static str,
+    selected: bool,
+    enabled: bool,
+) -> gpui::Stateful<gpui::Div> {
+    let variant = if selected {
+        ButtonVariant::Default
+    } else {
+        ButtonVariant::Ghost
+    };
+    let colors = button_colors(variant, selected, enabled);
+
+    div()
+        .id(format!(
+            "preview-crop-action-{}",
+            label.to_ascii_lowercase()
+        ))
+        .h(px(PREVIEW_TIMELINE_CONTROL_HEIGHT))
+        .px(px(10.0))
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded(px(theme::RADIUS_SM))
+        .bg(if selected {
+            color(colors.background)
+        } else {
+            color(theme::TRANSPARENT)
+        })
+        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_color(color(colors.foreground))
+        .opacity(colors.opacity)
+        .when(selected, |this| this.shadow(button_highlight_shadows()))
+        .when(enabled, |this| {
+            this.hover(move |style| {
+                style
+                    .bg(color(colors.hover_background))
+                    .text_color(color(colors.hover_foreground))
+                    .cursor_pointer()
+            })
+        })
+        .when(!enabled, |this| this.cursor_not_allowed())
+        .child(label)
+}
+
+fn preview_toolbar(state: &PreviewShellState, cx: &mut Context<FrameRoot>) -> gpui::Div {
     let transform_enabled = preview_visual_controls_enabled(state);
+    let crop_enabled = transform_enabled && state.crop.has_crop_dimensions;
     let overlay_enabled = transform_enabled && state.availability.overlay_available;
 
     div()
@@ -1043,27 +2021,52 @@ fn preview_toolbar(state: &PreviewShellState) -> gpui::Div {
         .bg(color(theme::BACKGROUND))
         .p(px(4.0))
         .shadow(card_surface_shadows())
-        .child(preview_tool_button(
-            assets::ICON_ROTATE_CW,
-            false,
-            transform_enabled,
-        ))
-        .child(preview_tool_button(
-            assets::ICON_FLIP_HORIZONTAL,
-            false,
-            transform_enabled,
-        ))
-        .child(preview_tool_button(
-            assets::ICON_FLIP_VERTICAL,
-            false,
-            transform_enabled,
-        ))
+        .child(
+            preview_tool_button(assets::ICON_ROTATE_CW, false, transform_enabled).on_click(
+                cx.listener(|root, _: &ClickEvent, _window, cx| {
+                    if root.rotate_selected_preview() {
+                        cx.notify();
+                    }
+                }),
+            ),
+        )
+        .child(
+            preview_tool_button(
+                assets::ICON_FLIP_HORIZONTAL,
+                state.crop.flip_horizontal,
+                transform_enabled,
+            )
+            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+                if root.toggle_selected_flip(FlipAxis::Horizontal) {
+                    cx.notify();
+                }
+            })),
+        )
+        .child(
+            preview_tool_button(
+                assets::ICON_FLIP_VERTICAL,
+                state.crop.flip_vertical,
+                transform_enabled,
+            )
+            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+                if root.toggle_selected_flip(FlipAxis::Vertical) {
+                    cx.notify();
+                }
+            })),
+        )
         .child(preview_toolbar_separator())
-        .child(preview_tool_button(
-            assets::ICON_CROP,
-            false,
-            transform_enabled,
-        ))
+        .child(
+            preview_tool_button(
+                assets::ICON_CROP,
+                state.crop.crop_mode || state.crop.applied_crop.is_some(),
+                crop_enabled,
+            )
+            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+                if root.toggle_selected_crop_mode() {
+                    cx.notify();
+                }
+            })),
+        )
         .child(preview_tool_button(
             assets::ICON_FILE_IMAGE,
             false,
@@ -1096,15 +2099,22 @@ fn preview_toolbar_separator() -> gpui::Div {
         .shadow(horizontal_separator_shadows())
 }
 
-fn preview_tool_button(icon: &'static str, selected: bool, enabled: bool) -> gpui::Div {
-    let colors = button_colors(ButtonVariant::Secondary, selected, enabled);
-    let icon_color = if enabled {
-        color(colors.foreground)
+fn preview_tool_button(
+    icon: &'static str,
+    selected: bool,
+    enabled: bool,
+) -> gpui::Stateful<gpui::Div> {
+    let variant = if selected {
+        ButtonVariant::Default
     } else {
-        color(theme::FRAME_GRAY_400)
+        ButtonVariant::Ghost
     };
+    let colors = button_colors(variant, false, enabled);
+    let icon_color = color(colors.foreground);
+    let button_id = format!("preview-tool-{}", icon.replace(['/', '.'], "-"));
 
     div()
+        .id(button_id)
         .w(px(PREVIEW_TOOLBAR_BUTTON_SIZE))
         .h(px(PREVIEW_TOOLBAR_BUTTON_SIZE))
         .flex()
@@ -1117,15 +2127,35 @@ fn preview_tool_button(icon: &'static str, selected: bool, enabled: bool) -> gpu
             color(theme::TRANSPARENT)
         })
         .text_color(icon_color)
+        .opacity(colors.opacity)
         .when(selected, |this| this.shadow(button_highlight_shadows()))
         .when(!enabled, |this| this.cursor_not_allowed())
         .when(enabled, |this| {
-            this.hover(move |style| style.bg(color(colors.hover_background)).cursor_pointer())
+            this.hover(move |style| {
+                style
+                    .bg(color(colors.hover_background))
+                    .text_color(color(colors.hover_foreground))
+                    .cursor_pointer()
+            })
+            .active(move |style| style.bg(color(colors.active_background)))
         })
         .child(icon_svg(icon, PREVIEW_TOOLBAR_ICON_SIZE, icon_color))
 }
 
-fn preview_timeline(state: &PreviewShellState) -> gpui::Div {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct PreviewTimelineDrag {
+    target: TimelineDragTarget,
+}
+
+struct PreviewTimelineDragPreview;
+
+impl Render for PreviewTimelineDragPreview {
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+        div().w(px(0.0)).h(px(0.0))
+    }
+}
+
+fn preview_timeline(state: &PreviewShellState, cx: &mut Context<FrameRoot>) -> gpui::Div {
     let labels = preview_timeline_labels(state);
     let trim_enabled = preview_trim_enabled(state);
 
@@ -1166,7 +2196,7 @@ fn preview_timeline(state: &PreviewShellState) -> gpui::Div {
                 .flex_col()
                 .gap(px(6.0))
                 .child(preview_timeline_label("TRIM"))
-                .child(preview_timeline_track(state)),
+                .child(preview_timeline_track(state, cx)),
         )
         .child(
             div()
@@ -1247,17 +2277,46 @@ fn preview_timeline_label(label: &'static str) -> gpui::Div {
         .child(label)
 }
 
-fn preview_timeline_track(state: &PreviewShellState) -> gpui::Div {
+fn preview_timeline_track(
+    state: &PreviewShellState,
+    cx: &mut Context<FrameRoot>,
+) -> impl IntoElement {
     let enabled = preview_trim_enabled(state);
     let track_top = centered_offset(PREVIEW_TIMELINE_CONTROL_HEIGHT, PREVIEW_TRACK_HEIGHT);
     let playhead_top = centered_offset(PREVIEW_TIMELINE_CONTROL_HEIGHT, PREVIEW_PLAYHEAD_HEIGHT);
+    let start_fraction = timeline_fraction_from_percent(
+        state
+            .playback
+            .to_timeline_percent(state.playback.start_value()),
+    );
+    let end_fraction = timeline_fraction_from_percent(
+        state
+            .playback
+            .to_timeline_percent(state.playback.end_value()),
+    );
+    let playhead_fraction = timeline_fraction_from_percent(
+        state
+            .playback
+            .to_timeline_percent(state.playback.current_time()),
+    );
 
     div()
+        .id("preview-timeline-track")
         .relative()
         .h(px(PREVIEW_TIMELINE_CONTROL_HEIGHT))
         .w_full()
         .opacity(if enabled { 1.0 } else { 0.5 })
         .when(enabled, |this| this.cursor_pointer())
+        .on_drag_move(cx.listener(
+            |root, event: &DragMoveEvent<PreviewTimelineDrag>, _window, cx| {
+                let drag = *event.drag(cx);
+                let percent =
+                    timeline_slider_percent_from_bounds(event.event.position, event.bounds);
+                if root.apply_selected_trim_drag(drag.target, percent) {
+                    cx.notify();
+                }
+            },
+        ))
         .child(
             div()
                 .absolute()
@@ -1272,8 +2331,8 @@ fn preview_timeline_track(state: &PreviewShellState) -> gpui::Div {
         .child(
             div()
                 .absolute()
-                .left_0()
-                .right_0()
+                .left(relative(start_fraction))
+                .right(relative((1.0 - end_fraction).max(0.0)))
                 .top(px(track_top))
                 .h(px(PREVIEW_TRACK_HEIGHT))
                 .rounded(px(1.0))
@@ -1282,32 +2341,57 @@ fn preview_timeline_track(state: &PreviewShellState) -> gpui::Div {
         .child(
             div()
                 .absolute()
-                .left_0()
+                .left(relative(playhead_fraction))
+                .ml(px(-0.5))
                 .top(px(playhead_top))
                 .h(px(PREVIEW_PLAYHEAD_HEIGHT))
                 .w(px(1.0))
                 .bg(color(theme::FOREGROUND)),
         )
-        .child(preview_timeline_handle(true, enabled))
-        .child(preview_timeline_handle(false, enabled))
+        .child(preview_timeline_handle(
+            TimelineDragTarget::Start,
+            start_fraction,
+            enabled,
+        ))
+        .child(preview_timeline_handle(
+            TimelineDragTarget::End,
+            end_fraction,
+            enabled,
+        ))
 }
 
-fn preview_timeline_handle(is_start: bool, enabled: bool) -> gpui::Div {
+fn preview_timeline_handle(
+    target: TimelineDragTarget,
+    fraction: f32,
+    enabled: bool,
+) -> gpui::Stateful<gpui::Div> {
+    let handle_id = match target {
+        TimelineDragTarget::Start => "preview-timeline-start-handle",
+        TimelineDragTarget::End => "preview-timeline-end-handle",
+        TimelineDragTarget::Scrub => "preview-timeline-scrub-handle",
+    };
+
     let handle = div()
+        .id(handle_id)
         .absolute()
         .top_0()
+        .left(relative(fraction))
+        .ml(px(-(PREVIEW_TIMELINE_HANDLE_WIDTH / 2.0)))
         .h(px(PREVIEW_TIMELINE_CONTROL_HEIGHT))
         .w(px(PREVIEW_TIMELINE_HANDLE_WIDTH))
         .when(enabled, |this| this.cursor_ew_resize());
 
-    if is_start {
-        handle.left_0()
+    if enabled {
+        handle.on_drag(
+            PreviewTimelineDrag { target },
+            |_drag, _position, _window, cx| cx.new(|_| PreviewTimelineDragPreview),
+        )
     } else {
-        handle.right_0()
+        handle
     }
 }
 
-fn preview_play_button(state: &PreviewShellState) -> gpui::Div {
+fn preview_play_button(state: &PreviewShellState) -> impl IntoElement {
     let enabled = preview_trim_enabled(state);
     let icon = if state.playback.is_playing() {
         assets::ICON_PAUSE
@@ -1320,6 +2404,23 @@ fn preview_play_button(state: &PreviewShellState) -> gpui::Div {
 
 fn centered_offset(container: f32, child: f32) -> f32 {
     ((container - child) / 2.0).max(0.0)
+}
+
+fn timeline_fraction_from_percent(percent: f64) -> f32 {
+    (percent / 100.0).clamp(0.0, 1.0) as f32
+}
+
+fn timeline_slider_percent_from_bounds(
+    position: gpui::Point<Pixels>,
+    bounds: Bounds<Pixels>,
+) -> f64 {
+    let width = bounds.size.width.as_f32();
+    if width <= 0.0 {
+        return 0.0;
+    }
+
+    let x = (position.x - bounds.origin.x).as_f32();
+    f64::from((x / width).clamp(0.0, 1.0))
 }
 
 fn logs_view(
@@ -1813,24 +2914,26 @@ fn settings_processing_mode_grid(
         let mode = option.mode;
         let is_enabled = !option.is_disabled;
         grid = grid.child(
-            settings_choice_button(option.label, option.is_selected, is_enabled)
-                .id(format!("output-mode-{}", option.mode.id()))
-                .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
-                    cx.stop_propagation();
-                    if !is_enabled {
-                        return;
-                    }
+            settings_choice_button(
+                format!("output-mode-{}", option.mode.id()),
+                option.label,
+                option.is_selected,
+                is_enabled,
+            )
+            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+                cx.stop_propagation();
+                if !is_enabled {
+                    return;
+                }
 
-                    let metadata = root.selected_source_metadata();
-                    if apply_processing_mode(&mut root.conversion_config, metadata.as_ref(), mode) {
-                        root.settings_active_tab = resolve_active_settings_tab(
-                            root.settings_active_tab,
-                            &root.conversion_config,
-                            metadata.as_ref(),
-                        );
-                        cx.notify();
-                    }
-                })),
+                let metadata = root.selected_source_metadata();
+                if root.update_selected_config(|config| {
+                    apply_processing_mode(config, metadata.as_ref(), mode)
+                }) {
+                    root.resolve_selected_settings_tab(metadata.as_ref());
+                    cx.notify();
+                }
+            })),
         );
     }
     grid
@@ -1847,35 +2950,44 @@ fn settings_container_grid(
         let container = option.container;
         let is_enabled = !option.is_disabled;
         grid = grid.child(
-            settings_choice_button(container.to_uppercase(), option.is_selected, is_enabled)
-                .id(format!("output-container-{container}"))
-                .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
-                    cx.stop_propagation();
-                    if !is_enabled {
-                        return;
-                    }
+            settings_choice_button(
+                format!("output-container-{container}"),
+                container.to_uppercase(),
+                option.is_selected,
+                is_enabled,
+            )
+            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+                cx.stop_propagation();
+                if !is_enabled {
+                    return;
+                }
 
-                    let metadata = root.selected_source_metadata();
-                    let changed = apply_output_container(&mut root.conversion_config, &container)
-                        | normalize_output_config(&mut root.conversion_config, metadata.as_ref());
-                    if changed {
-                        root.settings_active_tab = resolve_active_settings_tab(
-                            root.settings_active_tab,
-                            &root.conversion_config,
-                            metadata.as_ref(),
-                        );
-                        cx.notify();
-                    }
-                })),
+                let metadata = root.selected_source_metadata();
+                let changed = root.update_selected_config(|config| {
+                    apply_output_container(config, &container)
+                        | normalize_output_config(config, metadata.as_ref())
+                });
+                if changed {
+                    root.resolve_selected_settings_tab(metadata.as_ref());
+                    cx.notify();
+                }
+            })),
         );
     }
     grid
 }
 
-fn settings_choice_button(label: impl Into<String>, selected: bool, enabled: bool) -> gpui::Div {
+fn settings_choice_button(
+    id: impl Into<String>,
+    label: impl Into<String>,
+    selected: bool,
+    enabled: bool,
+) -> gpui::Stateful<gpui::Div> {
     let colors = button_colors(ButtonVariant::Secondary, selected, enabled);
+    let label = label.into();
 
     div()
+        .id(id.into())
         .h(px(SETTINGS_CONTROL_HEIGHT))
         .w_full()
         .flex()
@@ -1886,11 +2998,19 @@ fn settings_choice_button(label: impl Into<String>, selected: bool, enabled: boo
         .bg(color(colors.background))
         .text_size(px(theme::TEXT_LABEL_SIZE))
         .text_color(color(colors.foreground))
+        .opacity(colors.opacity)
         .shadow(button_highlight_shadows())
         .when(enabled, |this| {
-            this.hover(move |style| style.bg(color(colors.hover_background)).cursor_pointer())
+            this.hover(move |style| {
+                style
+                    .bg(color(colors.hover_background))
+                    .text_color(color(colors.hover_foreground))
+                    .cursor_pointer()
+            })
+            .active(move |style| style.bg(color(colors.active_background)))
         })
-        .child(label.into())
+        .when(!enabled, |this| this.cursor_not_allowed())
+        .child(label)
 }
 
 fn settings_output_name_field(output_name: &str, disabled: bool) -> gpui::Div {
@@ -2313,10 +3433,11 @@ fn state_tone_color(tone: FileStateTone) -> Rgba {
 
 fn vertical_separator(height: f32) -> gpui::Div {
     div()
+        .flex()
         .h(px(height))
-        .w(px(1.0))
-        .bg(color(theme::BACKGROUND))
-        .shadow(vertical_separator_shadows())
+        .w(px(2.0))
+        .child(div().h_full().w(px(1.0)).bg(color(theme::BACKGROUND)))
+        .child(div().h_full().w(px(1.0)).bg(color(theme::FRAME_GRAY_100)))
 }
 
 fn panel_bottom_separator() -> gpui::Div {
@@ -2389,16 +3510,6 @@ fn horizontal_separator_shadows() -> Vec<BoxShadow> {
     }]
 }
 
-fn vertical_separator_shadows() -> Vec<BoxShadow> {
-    vec![BoxShadow {
-        color: color(theme::FRAME_GRAY_100).into(),
-        offset: point(px(1.0), px(0.0)),
-        blur_radius: px(0.0),
-        spread_radius: px(0.0),
-        inset: false,
-    }]
-}
-
 fn drop_target_shadows() -> Vec<BoxShadow> {
     let mut shadows = card_surface_shadows();
     shadows.push(BoxShadow {
@@ -2440,12 +3551,23 @@ fn init_app(cx: &mut App, name: impl Into<SharedString>) {
 fn frame_window_options(bounds: Bounds<Pixels>) -> WindowOptions {
     WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(bounds)),
-        titlebar: None,
+        titlebar: Some(TitlebarOptions {
+            title: None,
+            appears_transparent: true,
+            traffic_light_position: Some(hidden_native_traffic_light_position()),
+        }),
         window_min_size: Some(size(px(WINDOW_MIN_WIDTH), px(WINDOW_MIN_HEIGHT))),
         window_background: WindowBackgroundAppearance::Opaque,
         window_decorations: Some(WindowDecorations::Client),
         ..Default::default()
     }
+}
+
+fn hidden_native_traffic_light_position() -> gpui::Point<Pixels> {
+    point(
+        px(HIDDEN_NATIVE_TRAFFIC_LIGHT_X),
+        px(HIDDEN_NATIVE_TRAFFIC_LIGHT_Y),
+    )
 }
 
 fn main() {
@@ -2504,14 +3626,358 @@ mod tests {
         }
     }
 
+    mod frame_root_config {
+        use super::*;
+
+        #[test]
+        fn update_selected_config_mutates_only_selected_file() {
+            let mut root = FrameRoot::new();
+            root.file_queue
+                .add_file(FileItem::from_path("first", "/tmp/one.mp4", 1));
+            root.file_queue
+                .add_file(FileItem::from_path("second", "/tmp/two.mp4", 1));
+            root.file_queue.select_existing_file("second");
+
+            root.update_selected_config(|config| {
+                config.container = "webm".to_string();
+                true
+            });
+
+            assert_eq!(
+                root.file_queue
+                    .file_by_id("first")
+                    .map(|file| file.config.container.as_str()),
+                Some("mp4")
+            );
+            assert_eq!(
+                root.file_queue
+                    .file_by_id("second")
+                    .map(|file| file.config.container.as_str()),
+                Some("webm")
+            );
+        }
+
+        #[test]
+        fn normalize_selected_config_clears_trim_for_selected_image_only() {
+            let mut root = FrameRoot::new();
+            root.file_queue
+                .add_file(FileItem::from_path("video", "/tmp/one.mp4", 1));
+            root.file_queue
+                .add_file(FileItem::from_path("image", "/tmp/two.png", 1));
+
+            for id in ["video", "image"] {
+                root.file_queue.select_existing_file(id);
+                root.update_selected_config(|config| {
+                    config.start_time = Some("00:00:05.000".to_string());
+                    config.end_time = Some("00:00:30.000".to_string());
+                    true
+                });
+            }
+            root.file_queue.select_existing_file("image");
+
+            root.normalize_selected_config(Some(&SourceMetadata {
+                media_kind: Some(SourceKind::Image),
+                ..SourceMetadata::default()
+            }));
+
+            assert_eq!(
+                root.file_queue
+                    .file_by_id("video")
+                    .and_then(|file| file.config.start_time.as_deref()),
+                Some("00:00:05.000")
+            );
+            assert_eq!(
+                root.file_queue
+                    .file_by_id("image")
+                    .and_then(|file| file.config.start_time.as_deref()),
+                None
+            );
+        }
+
+        #[test]
+        fn apply_selected_trim_drag_updates_selected_file_start_time() {
+            let mut root = FrameRoot::new();
+            root.file_queue
+                .add_file(FileItem::from_path("video", "/tmp/one.mp4", 1));
+            root.source_metadata.mark_ready(
+                "video".to_string(),
+                SourceMetadata {
+                    media_kind: Some(SourceKind::Video),
+                    duration: Some("90.0".to_string()),
+                    ..SourceMetadata::default()
+                },
+            );
+
+            let changed = root.apply_selected_trim_drag(TimelineDragTarget::Start, 0.25);
+
+            assert!(changed);
+            assert_eq!(
+                root.file_queue
+                    .file_by_id("video")
+                    .and_then(|file| file.config.start_time.as_deref()),
+                Some("00:00:22.500")
+            );
+            assert_eq!(
+                root.file_queue
+                    .file_by_id("video")
+                    .and_then(|file| file.config.end_time.as_deref()),
+                None
+            );
+        }
+
+        #[test]
+        fn apply_selected_trim_drag_preserves_gap_when_end_moves_before_start() {
+            let mut root = FrameRoot::new();
+            root.file_queue
+                .add_file(FileItem::from_path("video", "/tmp/one.mp4", 1));
+            root.source_metadata.mark_ready(
+                "video".to_string(),
+                SourceMetadata {
+                    media_kind: Some(SourceKind::Video),
+                    duration: Some("90.0".to_string()),
+                    ..SourceMetadata::default()
+                },
+            );
+            root.update_selected_config(|config| {
+                config.start_time = Some("00:00:20.000".to_string());
+                true
+            });
+
+            let changed = root.apply_selected_trim_drag(TimelineDragTarget::End, 0.10);
+
+            assert!(changed);
+            assert_eq!(
+                root.file_queue
+                    .file_by_id("video")
+                    .and_then(|file| file.config.end_time.as_deref()),
+                Some("00:00:21.000")
+            );
+        }
+
+        #[test]
+        fn apply_selected_trim_drag_ignores_image_sources() {
+            let mut root = FrameRoot::new();
+            root.file_queue
+                .add_file(FileItem::from_path("image", "/tmp/one.png", 1));
+            root.source_metadata.mark_ready(
+                "image".to_string(),
+                SourceMetadata {
+                    media_kind: Some(SourceKind::Image),
+                    duration: Some("90.0".to_string()),
+                    ..SourceMetadata::default()
+                },
+            );
+
+            let changed = root.apply_selected_trim_drag(TimelineDragTarget::Start, 0.25);
+
+            assert!(!changed);
+            assert_eq!(
+                root.file_queue
+                    .file_by_id("image")
+                    .and_then(|file| file.config.start_time.as_deref()),
+                None
+            );
+        }
+
+        #[test]
+        fn toggle_selected_crop_mode_initializes_default_video_draft() {
+            let mut root = FrameRoot::new();
+            root.file_queue
+                .add_file(FileItem::from_path("video", "/tmp/one.mp4", 1));
+            root.source_metadata.mark_ready(
+                "video".to_string(),
+                SourceMetadata {
+                    media_kind: Some(SourceKind::Video),
+                    width: Some(1920),
+                    height: Some(1080),
+                    ..SourceMetadata::default()
+                },
+            );
+
+            let changed = root.toggle_selected_crop_mode();
+
+            assert!(changed);
+            assert!(root.preview_crop_mode);
+            assert_eq!(root.preview_draft_crop, Some(default_crop_rect()));
+            assert_eq!(root.preview_crop_aspect, "free");
+        }
+
+        #[test]
+        fn apply_selected_crop_writes_selected_file_crop_pixels() {
+            let mut root = FrameRoot::new();
+            root.file_queue
+                .add_file(FileItem::from_path("first", "/tmp/one.mp4", 1));
+            root.file_queue
+                .add_file(FileItem::from_path("second", "/tmp/two.mp4", 1));
+            root.file_queue.select_existing_file("second");
+            root.source_metadata.mark_ready(
+                "second".to_string(),
+                SourceMetadata {
+                    media_kind: Some(SourceKind::Video),
+                    width: Some(1920),
+                    height: Some(1080),
+                    ..SourceMetadata::default()
+                },
+            );
+            root.preview_crop_mode = true;
+            root.preview_draft_crop = Some(CropRect {
+                x: 0.25,
+                y: 0.25,
+                width: 0.5,
+                height: 0.5,
+            });
+            root.preview_crop_aspect = "16:9".to_string();
+
+            let changed = root.apply_selected_crop();
+
+            assert!(changed);
+            assert_eq!(
+                root.file_queue
+                    .file_by_id("first")
+                    .and_then(|file| file.config.crop.as_ref()),
+                None
+            );
+            assert_eq!(
+                root.file_queue
+                    .file_by_id("second")
+                    .and_then(|file| file.config.crop.as_ref()),
+                Some(&CropSettings {
+                    enabled: true,
+                    x: 480,
+                    y: 270,
+                    width: 960,
+                    height: 540,
+                    source_width: Some(1920),
+                    source_height: Some(1080),
+                    aspect_ratio: Some("16:9".to_string()),
+                })
+            );
+        }
+
+        #[test]
+        fn apply_selected_full_crop_clears_existing_crop() {
+            let mut root = FrameRoot::new();
+            root.file_queue
+                .add_file(FileItem::from_path("video", "/tmp/one.mp4", 1));
+            root.source_metadata.mark_ready(
+                "video".to_string(),
+                SourceMetadata {
+                    media_kind: Some(SourceKind::Video),
+                    width: Some(1920),
+                    height: Some(1080),
+                    ..SourceMetadata::default()
+                },
+            );
+            root.update_selected_config(|config| {
+                config.crop = Some(CropSettings {
+                    enabled: true,
+                    x: 100,
+                    y: 100,
+                    width: 1000,
+                    height: 600,
+                    source_width: Some(1920),
+                    source_height: Some(1080),
+                    aspect_ratio: None,
+                });
+                true
+            });
+            root.preview_crop_mode = true;
+            root.preview_draft_crop = Some(full_crop_rect());
+
+            let changed = root.apply_selected_crop();
+
+            assert!(changed);
+            assert_eq!(
+                root.file_queue
+                    .file_by_id("video")
+                    .and_then(|file| file.config.crop.as_ref()),
+                None
+            );
+        }
+
+        #[test]
+        fn rotate_and_flip_preview_update_selected_config() {
+            let mut root = FrameRoot::new();
+            root.file_queue
+                .add_file(FileItem::from_path("video", "/tmp/one.mp4", 1));
+            root.source_metadata.mark_ready(
+                "video".to_string(),
+                SourceMetadata {
+                    media_kind: Some(SourceKind::Video),
+                    width: Some(1920),
+                    height: Some(1080),
+                    ..SourceMetadata::default()
+                },
+            );
+
+            assert!(root.rotate_selected_preview());
+            assert!(root.toggle_selected_flip(FlipAxis::Horizontal));
+
+            let config = &root.file_queue.file_by_id("video").unwrap().config;
+            assert_eq!(config.rotation, "90");
+            assert!(config.flip_horizontal);
+            assert!(!config.flip_vertical);
+        }
+
+        #[test]
+        fn apply_preview_crop_drag_updates_draft_without_persisting_config() {
+            let mut root = FrameRoot::new();
+            root.file_queue
+                .add_file(FileItem::from_path("video", "/tmp/one.mp4", 1));
+            root.source_metadata.mark_ready(
+                "video".to_string(),
+                SourceMetadata {
+                    media_kind: Some(SourceKind::Video),
+                    width: Some(1920),
+                    height: Some(1080),
+                    ..SourceMetadata::default()
+                },
+            );
+            root.preview_crop_mode = true;
+            root.preview_draft_crop = Some(CropRect {
+                x: 0.10,
+                y: 0.10,
+                width: 0.50,
+                height: 0.50,
+            });
+
+            assert!(
+                !root.apply_preview_crop_drag(DragHandle::Move, PreviewPoint { x: 0.50, y: 0.50 },)
+            );
+            assert!(
+                root.apply_preview_crop_drag(DragHandle::Move, PreviewPoint { x: 0.60, y: 0.55 },)
+            );
+
+            let draft = root.preview_draft_crop.unwrap();
+            assert!((draft.x - 0.20).abs() < 0.000_001);
+            assert!((draft.y - 0.15).abs() < 0.000_001);
+            assert_eq!(draft.width, 0.50);
+            assert_eq!(draft.height, 0.50);
+            assert_eq!(
+                root.file_queue
+                    .file_by_id("video")
+                    .and_then(|file| file.config.crop.as_ref()),
+                None
+            );
+        }
+    }
+
     mod frame_window_options {
         use super::*;
 
         #[test]
         fn disables_native_titlebar_when_custom_frame_controls_are_rendered() {
             let options = frame_window_options(Bounds::default());
+            let titlebar = options
+                .titlebar
+                .as_ref()
+                .expect("custom frame still needs a transparent native titlebar host");
 
-            assert!(options.titlebar.is_none());
+            assert!(titlebar.appears_transparent);
+            assert_eq!(
+                titlebar.traffic_light_position,
+                Some(hidden_native_traffic_light_position())
+            );
         }
 
         #[test]
@@ -2560,6 +4026,7 @@ mod tests {
                 colors.hover_background,
                 theme::FRAME_GRAY_400.with_alpha(0.18)
             );
+            assert_eq!(colors.active_background, colors.hover_background);
         }
 
         #[test]
@@ -2574,6 +4041,25 @@ mod tests {
             let colors = button_colors(ButtonVariant::Default, false, false);
 
             assert_eq!(colors.background, theme::FRAME_GRAY_400.with_alpha(0.10));
+            assert_eq!(colors.opacity, 1.0);
+        }
+
+        #[test]
+        fn disabled_secondary_button_keeps_original_whole_button_opacity() {
+            let colors = button_colors(ButtonVariant::Secondary, false, false);
+
+            assert_eq!(colors.background, theme::FRAME_GRAY_100);
+            assert_eq!(colors.opacity, 0.5);
+        }
+
+        #[test]
+        fn ghost_button_matches_original_transparent_icon_button_states() {
+            let colors = button_colors(ButtonVariant::Ghost, false, true);
+
+            assert_eq!(colors.background, theme::TRANSPARENT);
+            assert_eq!(colors.hover_background, theme::FRAME_GRAY_100);
+            assert_eq!(colors.foreground, theme::FRAME_GRAY_600);
+            assert_eq!(colors.hover_foreground, theme::FOREGROUND);
         }
     }
 
@@ -2596,6 +4082,19 @@ mod tests {
             }
         }
 
+        fn crop_state() -> PreviewCropRenderState {
+            PreviewCropRenderState {
+                crop_mode: false,
+                draft_crop: None,
+                applied_crop: None,
+                crop_aspect: "free".to_string(),
+                has_crop_dimensions: false,
+                rotation: "0".to_string(),
+                flip_horizontal: false,
+                flip_vertical: false,
+            }
+        }
+
         #[test]
         fn ready_video_metadata_populates_timeline_labels() {
             let config = ConversionConfig::default();
@@ -2609,6 +4108,7 @@ mod tests {
             let state = preview_shell_state(
                 Some(&file),
                 settings_state(&config, Some(&metadata), MetadataStatus::Ready),
+                crop_state(),
             );
             let labels = preview_timeline_labels(&state);
 
@@ -2617,6 +4117,32 @@ mod tests {
             assert_eq!(labels.start, "00:00:00.000");
             assert_eq!(labels.end, "00:01:30.400");
             assert_eq!(labels.duration, "00:01:30.400");
+        }
+
+        #[test]
+        fn ready_video_metadata_uses_configured_trim_bounds() {
+            let config = ConversionConfig {
+                start_time: Some("00:00:05.000".to_string()),
+                end_time: Some("00:00:30.250".to_string()),
+                ..ConversionConfig::default()
+            };
+            let metadata = SourceMetadata {
+                media_kind: Some(SourceKind::Video),
+                duration: Some("90.4".to_string()),
+                ..SourceMetadata::default()
+            };
+            let file = FileItem::from_path("video", "/tmp/render.mov", 1024);
+
+            let state = preview_shell_state(
+                Some(&file),
+                settings_state(&config, Some(&metadata), MetadataStatus::Ready),
+                crop_state(),
+            );
+            let labels = preview_timeline_labels(&state);
+
+            assert_eq!(labels.start, "00:00:05.000");
+            assert_eq!(labels.end, "00:00:30.250");
+            assert_eq!(labels.duration, "00:00:25.250");
         }
 
         #[test]
@@ -2632,6 +4158,7 @@ mod tests {
             let state = preview_shell_state(
                 Some(&file),
                 settings_state(&config, Some(&metadata), MetadataStatus::Ready),
+                crop_state(),
             );
             let labels = preview_timeline_labels(&state);
 
@@ -2654,6 +4181,7 @@ mod tests {
             let state = preview_shell_state(
                 None,
                 settings_state(&config, Some(&metadata), MetadataStatus::Ready),
+                crop_state(),
             );
 
             assert_eq!(state.availability.media_kind, PreviewMediaKind::Audio);
@@ -2674,6 +4202,7 @@ mod tests {
             let state = preview_shell_state(
                 None,
                 settings_state(&config, Some(&metadata), MetadataStatus::Loading),
+                crop_state(),
             );
 
             assert_eq!(state.availability.media_kind, PreviewMediaKind::Unknown);
@@ -2684,6 +4213,34 @@ mod tests {
         fn centered_offset_never_returns_negative_values() {
             assert_eq!(centered_offset(30.0, 6.0), 12.0);
             assert_eq!(centered_offset(6.0, 30.0), 0.0);
+        }
+
+        #[test]
+        fn timeline_fraction_from_percent_clamps_to_track_range() {
+            assert_eq!(timeline_fraction_from_percent(-25.0), 0.0);
+            assert_eq!(timeline_fraction_from_percent(50.0), 0.5);
+            assert_eq!(timeline_fraction_from_percent(125.0), 1.0);
+        }
+
+        #[test]
+        fn timeline_slider_percent_from_bounds_clamps_pointer_to_track() {
+            let bounds = Bounds {
+                origin: point(px(10.0), px(0.0)),
+                size: size(px(100.0), px(30.0)),
+            };
+
+            assert_eq!(
+                timeline_slider_percent_from_bounds(point(px(60.0), px(0.0)), bounds),
+                0.5
+            );
+            assert_eq!(
+                timeline_slider_percent_from_bounds(point(px(-10.0), px(0.0)), bounds),
+                0.0
+            );
+            assert_eq!(
+                timeline_slider_percent_from_bounds(point(px(140.0), px(0.0)), bounds),
+                1.0
+            );
         }
     }
 }
