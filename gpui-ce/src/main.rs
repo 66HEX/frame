@@ -9,7 +9,8 @@ use frame_gpui_ce::{
     SETTINGS_TAB_ICON_SIZE, TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_BUTTON_HEIGHT,
     TITLEBAR_DIVIDER_HEIGHT, TITLEBAR_HEIGHT, TITLEBAR_ICON_BUTTON_SIZE, TITLEBAR_ICON_SIZE,
     TITLEBAR_LOGO_SIZE, TITLEBAR_NAV_BUTTON_HEIGHT, TITLEBAR_SEGMENT_HEIGHT, TITLEBAR_TOP_PADDING,
-    TITLEBAR_TRAFFIC_LIGHT_SIZE, VisualFixture, WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH,
+    TITLEBAR_TRAFFIC_LIGHT_DOT_SIZE, TITLEBAR_TRAFFIC_LIGHT_SIZE,
+    TITLEBAR_TRAFFIC_LIGHT_STROKE_WIDTH, VisualFixture, WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH,
     WORKSPACE_COLUMNS, WORKSPACE_GAP, active_view_from_env_value,
     assets::{self, FrameAssets},
     conversion_events::{ActiveLogFile, ConversionEventState, LogLine},
@@ -57,6 +58,15 @@ const FILE_LIST_CHECKBOX_SIZE: f32 = 12.0;
 const LOG_LINE_NUMBER_WIDTH: f32 = 32.0;
 const LOG_LINE_HEIGHT: f32 = 24.0;
 const TRAFFIC_LIGHT_GROUP: &str = "titlebar-traffic-lights";
+const TRAFFIC_CLOSE_FILL: &str = "#ff5f56";
+const TRAFFIC_CLOSE_BORDER: &str = "#e0443e";
+const TRAFFIC_CLOSE_SYMBOL: &str = "#4a0002";
+const TRAFFIC_MINIMIZE_FILL: &str = "#ffbd2e";
+const TRAFFIC_MINIMIZE_BORDER: &str = "#dea123";
+const TRAFFIC_MINIMIZE_SYMBOL: &str = "#5a3900";
+const TRAFFIC_ZOOM_FILL: &str = "#27c93f";
+const TRAFFIC_ZOOM_BORDER: &str = "#1aab29";
+const TRAFFIC_ZOOM_SYMBOL: &str = "#004200";
 const DEFAULT_CROP_X: f64 = 0.1;
 const DEFAULT_CROP_Y: f64 = 0.1;
 const DEFAULT_CROP_SIZE: f64 = 0.8;
@@ -889,7 +899,9 @@ fn macos_window_controls(cx: &mut Context<FrameRoot>) -> gpui::Div {
         .group(TRAFFIC_LIGHT_GROUP)
         .child(
             traffic_light(
-                assets::ICON_TRAFFIC_CLOSE_DOT,
+                TRAFFIC_CLOSE_FILL,
+                TRAFFIC_CLOSE_BORDER,
+                TRAFFIC_CLOSE_SYMBOL,
                 assets::ICON_TRAFFIC_CLOSE_SYMBOL,
             )
             .id("titlebar-close")
@@ -901,7 +913,9 @@ fn macos_window_controls(cx: &mut Context<FrameRoot>) -> gpui::Div {
         )
         .child(
             traffic_light(
-                assets::ICON_TRAFFIC_MINIMIZE_DOT,
+                TRAFFIC_MINIMIZE_FILL,
+                TRAFFIC_MINIMIZE_BORDER,
+                TRAFFIC_MINIMIZE_SYMBOL,
                 assets::ICON_TRAFFIC_MINIMIZE_SYMBOL,
             )
             .id("titlebar-minimize")
@@ -913,7 +927,9 @@ fn macos_window_controls(cx: &mut Context<FrameRoot>) -> gpui::Div {
         )
         .child(
             traffic_light(
-                assets::ICON_TRAFFIC_ZOOM_DOT,
+                TRAFFIC_ZOOM_FILL,
+                TRAFFIC_ZOOM_BORDER,
+                TRAFFIC_ZOOM_SYMBOL,
                 assets::ICON_TRAFFIC_ZOOM_SYMBOL,
             )
             .id("titlebar-zoom")
@@ -925,7 +941,12 @@ fn macos_window_controls(cx: &mut Context<FrameRoot>) -> gpui::Div {
         )
 }
 
-fn traffic_light(dot_icon: &'static str, symbol_icon: &'static str) -> gpui::Div {
+fn traffic_light(
+    fill: &'static str,
+    border: &'static str,
+    symbol_color: &'static str,
+    symbol_icon: &'static str,
+) -> gpui::Div {
     div()
         .w(px(TITLEBAR_TRAFFIC_LIGHT_SIZE))
         .h(px(TITLEBAR_TRAFFIC_LIGHT_SIZE))
@@ -936,13 +957,13 @@ fn traffic_light(dot_icon: &'static str, symbol_icon: &'static str) -> gpui::Div
         .rounded_full()
         .cursor_pointer()
         .child(
-            svg()
-                .path(dot_icon)
-                .absolute()
-                .inset_0()
-                .w(px(TITLEBAR_TRAFFIC_LIGHT_SIZE))
-                .h(px(TITLEBAR_TRAFFIC_LIGHT_SIZE))
-                .text_color(color(theme::FOREGROUND)),
+            div()
+                .w(px(TITLEBAR_TRAFFIC_LIGHT_DOT_SIZE))
+                .h(px(TITLEBAR_TRAFFIC_LIGHT_DOT_SIZE))
+                .rounded_full()
+                .bg(parse_hex(fill))
+                .border(px(TITLEBAR_TRAFFIC_LIGHT_STROKE_WIDTH))
+                .border_color(parse_hex(border)),
         )
         .child(
             svg()
@@ -953,7 +974,7 @@ fn traffic_light(dot_icon: &'static str, symbol_icon: &'static str) -> gpui::Div
                 .h(px(TITLEBAR_TRAFFIC_LIGHT_SIZE))
                 .opacity(0.0)
                 .group_hover(TRAFFIC_LIGHT_GROUP, |style| style.opacity(1.0))
-                .text_color(color(theme::FOREGROUND)),
+                .text_color(parse_hex(symbol_color)),
         )
 }
 
