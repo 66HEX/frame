@@ -29,6 +29,12 @@ pub const ICON_FLIP_VERTICAL: &str = "icons/flip-vertical.svg";
 pub const ICON_CROP: &str = "icons/crop.svg";
 pub const ICON_ZOOM_IN: &str = "icons/zoom-in.svg";
 pub const ICON_ZOOM_OUT: &str = "icons/zoom-out.svg";
+pub const ICON_TRAFFIC_CLOSE_DOT: &str = "icons/traffic-close-dot.svg";
+pub const ICON_TRAFFIC_CLOSE_SYMBOL: &str = "icons/traffic-close-symbol.svg";
+pub const ICON_TRAFFIC_MINIMIZE_DOT: &str = "icons/traffic-minimize-dot.svg";
+pub const ICON_TRAFFIC_MINIMIZE_SYMBOL: &str = "icons/traffic-minimize-symbol.svg";
+pub const ICON_TRAFFIC_ZOOM_DOT: &str = "icons/traffic-zoom-dot.svg";
+pub const ICON_TRAFFIC_ZOOM_SYMBOL: &str = "icons/traffic-zoom-symbol.svg";
 
 const FRAME_ICON_SVG: &str = include_str!("../assets/icons/frame.svg");
 const FRAME_FONT_BYTES: &[u8] =
@@ -55,6 +61,12 @@ const FLIP_VERTICAL_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" fill=
 const CROP_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 256 256"><path d="M64 24v144a24 24 0 0 0 24 24h144"/><path d="M24 64h144a24 24 0 0 1 24 24v144"/></svg>"#;
 const ZOOM_IN_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 256 256"><circle cx="112" cy="112" r="72"/><path d="M163 163l53 53"/><path d="M112 80v64"/><path d="M80 112h64"/></svg>"#;
 const ZOOM_OUT_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 256 256"><circle cx="112" cy="112" r="72"/><path d="M163 163l53 53"/><path d="M80 112h64"/></svg>"#;
+const TRAFFIC_CLOSE_DOT_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -10 20 20"><circle r="6" fill="#ff5f56" stroke="#e0443e" stroke-width="0.6"/></svg>"##;
+const TRAFFIC_CLOSE_SYMBOL_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -10 20 20"><path d="M-1.8 -1.8 L1.8 1.8 M1.8 -1.8 L-1.8 1.8" stroke="#4a0002" stroke-width="1.5" stroke-linecap="round"/></svg>"##;
+const TRAFFIC_MINIMIZE_DOT_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -10 20 20"><circle r="6" fill="#ffbd2e" stroke="#dea123" stroke-width="0.6"/></svg>"##;
+const TRAFFIC_MINIMIZE_SYMBOL_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -10 20 20"><line x1="-2.4" y1="0" x2="2.4" y2="0" stroke="#5a3900" stroke-width="1.5" stroke-linecap="round"/></svg>"##;
+const TRAFFIC_ZOOM_DOT_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -10 20 20"><circle r="6" fill="#27c93f" stroke="#1aab29" stroke-width="0.6"/></svg>"##;
+const TRAFFIC_ZOOM_SYMBOL_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -10 20 20"><g fill="#004200"><path d="M-2.1 2.1 L-2.1 -1.5 L1.5 2.1 Z"/><path d="M2.1 -2.1 L2.1 1.5 L-1.5 -2.1 Z"/></g></svg>"##;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct FrameAssets;
@@ -85,6 +97,12 @@ impl AssetSource for FrameAssets {
             ICON_CROP => Cow::Borrowed(CROP_SVG.as_bytes()),
             ICON_ZOOM_IN => Cow::Borrowed(ZOOM_IN_SVG.as_bytes()),
             ICON_ZOOM_OUT => Cow::Borrowed(ZOOM_OUT_SVG.as_bytes()),
+            ICON_TRAFFIC_CLOSE_DOT => Cow::Borrowed(TRAFFIC_CLOSE_DOT_SVG.as_bytes()),
+            ICON_TRAFFIC_CLOSE_SYMBOL => Cow::Borrowed(TRAFFIC_CLOSE_SYMBOL_SVG.as_bytes()),
+            ICON_TRAFFIC_MINIMIZE_DOT => Cow::Borrowed(TRAFFIC_MINIMIZE_DOT_SVG.as_bytes()),
+            ICON_TRAFFIC_MINIMIZE_SYMBOL => Cow::Borrowed(TRAFFIC_MINIMIZE_SYMBOL_SVG.as_bytes()),
+            ICON_TRAFFIC_ZOOM_DOT => Cow::Borrowed(TRAFFIC_ZOOM_DOT_SVG.as_bytes()),
+            ICON_TRAFFIC_ZOOM_SYMBOL => Cow::Borrowed(TRAFFIC_ZOOM_SYMBOL_SVG.as_bytes()),
             _ => return Ok(None),
         };
 
@@ -115,6 +133,12 @@ impl AssetSource for FrameAssets {
                 SharedString::from("settings.svg"),
                 SharedString::from("tags.svg"),
                 SharedString::from("terminal.svg"),
+                SharedString::from("traffic-close-dot.svg"),
+                SharedString::from("traffic-close-symbol.svg"),
+                SharedString::from("traffic-minimize-dot.svg"),
+                SharedString::from("traffic-minimize-symbol.svg"),
+                SharedString::from("traffic-zoom-dot.svg"),
+                SharedString::from("traffic-zoom-symbol.svg"),
                 SharedString::from("zoom-in.svg"),
                 SharedString::from("zoom-out.svg"),
             ],
@@ -167,6 +191,24 @@ mod tests {
 
             assert!(listed.iter().any(|name| name.as_ref() == "layout-list.svg"));
             assert!(listed.iter().any(|name| name.as_ref() == "bookmark.svg"));
+            assert!(
+                listed
+                    .iter()
+                    .any(|name| name.as_ref() == "traffic-close-dot.svg")
+            );
+        }
+
+        #[test]
+        fn traffic_light_assets_preserve_original_svg_geometry() {
+            let loaded = FrameAssets
+                .load(ICON_TRAFFIC_CLOSE_DOT)
+                .expect("asset load should not fail")
+                .expect("traffic light asset should exist");
+            let svg = std::str::from_utf8(loaded.as_ref()).expect("svg should be utf8");
+
+            assert!(svg.contains(r#"viewBox="-10 -10 20 20""#));
+            assert!(svg.contains(r#"r="6""#));
+            assert!(svg.contains(r#"stroke-width="0.6""#));
         }
 
         #[test]

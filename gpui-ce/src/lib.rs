@@ -16,6 +16,8 @@ pub const CONTENT_PADDING: f32 = 16.0;
 pub const TITLEBAR_HEIGHT: f32 = 40.0;
 pub const TITLEBAR_TOP_PADDING: f32 = 8.0;
 pub const TITLEBAR_TRAFFIC_LIGHT_SIZE: f32 = 24.0;
+pub const TITLEBAR_TRAFFIC_LIGHT_DOT_SIZE: f32 = 14.4;
+pub const TITLEBAR_TRAFFIC_LIGHT_STROKE_WIDTH: f32 = 0.72;
 pub const TITLEBAR_LOGO_SIZE: f32 = 20.0;
 pub const TITLEBAR_DIVIDER_HEIGHT: f32 = 24.0;
 pub const TITLEBAR_SEGMENT_HEIGHT: f32 = 30.0;
@@ -64,6 +66,7 @@ pub fn active_view_from_env_value(value: Option<&str>) -> ActiveView {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum VisualFixture {
     LogsActive,
+    PreviewCrop,
     PreviewReady,
 }
 
@@ -71,6 +74,7 @@ pub enum VisualFixture {
 pub fn visual_fixture_from_env_value(value: Option<&str>) -> Option<VisualFixture> {
     match value.map(str::trim).map(str::to_ascii_lowercase).as_deref() {
         Some("logs-active") => Some(VisualFixture::LogsActive),
+        Some("preview-crop") => Some(VisualFixture::PreviewCrop),
         Some("preview-ready") => Some(VisualFixture::PreviewReady),
         _ => None,
     }
@@ -216,6 +220,14 @@ mod tests {
         }
 
         #[test]
+        fn preview_crop_value_enables_workspace_crop_fixture() {
+            assert_eq!(
+                visual_fixture_from_env_value(Some("preview-crop")),
+                Some(VisualFixture::PreviewCrop)
+            );
+        }
+
+        #[test]
         fn missing_or_unknown_value_disables_visual_fixtures() {
             assert_eq!(visual_fixture_from_env_value(None), None);
             assert_eq!(visual_fixture_from_env_value(Some("workspace")), None);
@@ -262,6 +274,12 @@ mod tests {
         #[test]
         fn macos_traffic_lights_preserve_original_hit_area() {
             assert_eq!(TITLEBAR_TRAFFIC_LIGHT_SIZE, 24.0);
+        }
+
+        #[test]
+        fn macos_traffic_lights_preserve_original_svg_circle_geometry() {
+            assert_eq!(TITLEBAR_TRAFFIC_LIGHT_DOT_SIZE, 14.4);
+            assert_eq!(TITLEBAR_TRAFFIC_LIGHT_STROKE_WIDTH, 0.72);
         }
 
         #[test]

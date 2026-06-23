@@ -43,6 +43,10 @@ use gpui::{
     Window, WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowDecorations,
     WindowOptions, actions, div, hsla, point, prelude::*, px, relative, size, svg, uniform_list,
 };
+#[cfg(target_os = "macos")]
+use objc2_app_kit::{NSView, NSWindowButton};
+#[cfg(target_os = "macos")]
+use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use std::path::PathBuf;
 
 actions!(frame_gpui_ce, [Quit]);
@@ -52,8 +56,7 @@ const FILE_LIST_ACTION_BUTTON_SIZE: f32 = 24.0;
 const FILE_LIST_CHECKBOX_SIZE: f32 = 12.0;
 const LOG_LINE_NUMBER_WIDTH: f32 = 32.0;
 const LOG_LINE_HEIGHT: f32 = 24.0;
-const HIDDEN_NATIVE_TRAFFIC_LIGHT_X: f32 = -100.0;
-const HIDDEN_NATIVE_TRAFFIC_LIGHT_Y: f32 = 1000.0;
+const TRAFFIC_LIGHT_GROUP: &str = "titlebar-traffic-lights";
 const DEFAULT_CROP_X: f64 = 0.1;
 const DEFAULT_CROP_Y: f64 = 0.1;
 const DEFAULT_CROP_SIZE: f64 = 0.8;
@@ -74,6 +77,7 @@ struct FrameRoot {
     preview_draft_crop: Option<CropRect>,
     preview_crop_aspect: String,
     preview_crop_drag: Option<PreviewCropDragState>,
+    native_titlebar_controls_hidden: bool,
     next_file_sequence: u64,
 }
 
@@ -120,6 +124,7 @@ impl FrameRoot {
             preview_draft_crop: None,
             preview_crop_aspect: "free".to_string(),
             preview_crop_drag: None,
+            native_titlebar_controls_hidden: false,
             next_file_sequence: 0,
         };
 
@@ -132,6 +137,7 @@ impl FrameRoot {
     fn apply_visual_fixture(&mut self, fixture: Option<VisualFixture>) {
         match fixture {
             Some(VisualFixture::LogsActive) => self.apply_logs_active_fixture(),
+            Some(VisualFixture::PreviewCrop) => self.apply_preview_crop_fixture(),
             Some(VisualFixture::PreviewReady) => self.apply_preview_ready_fixture(),
             None => {}
         }
@@ -186,6 +192,19 @@ impl FrameRoot {
                 ..SourceMetadata::default()
             },
         );
+    }
+
+    fn apply_preview_crop_fixture(&mut self) {
+        self.apply_preview_ready_fixture();
+        self.preview_crop_file_id = Some("fixture-preview".to_string());
+        self.preview_crop_mode = true;
+        self.preview_draft_crop = Some(CropRect {
+            x: 0.18,
+            y: 0.16,
+            width: 0.64,
+            height: 0.64,
+        });
+        self.preview_crop_aspect = "1:1".to_string();
     }
 
     fn app_state(&self) -> FrameAppState {
@@ -729,7 +748,11 @@ impl FrameRoot {
 }
 
 impl Render for FrameRoot {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if !self.native_titlebar_controls_hidden {
+            self.native_titlebar_controls_hidden = hide_native_macos_titlebar_controls(window);
+        }
+
         let state = self.app_state();
         let source_metadata_entry = self.selected_source_metadata_entry();
         let source_metadata = source_metadata_entry.metadata.clone();
@@ -863,52 +886,74 @@ fn macos_window_controls(cx: &mut Context<FrameRoot>) -> gpui::Div {
         .flex()
         .items_center()
         .mr_2()
+        .group(TRAFFIC_LIGHT_GROUP)
         .child(
-            traffic_light("#ff5f56", "#e0443e")
-                .id("titlebar-close")
-                .window_control_area(WindowControlArea::Close)
-                .on_click(cx.listener(|_, _: &ClickEvent, window, cx| {
-                    cx.stop_propagation();
-                    window.remove_window();
-                })),
+            traffic_light(
+                assets::ICON_TRAFFIC_CLOSE_DOT,
+                assets::ICON_TRAFFIC_CLOSE_SYMBOL,
+            )
+            .id("titlebar-close")
+            .window_control_area(WindowControlArea::Close)
+            .on_click(cx.listener(|_, _: &ClickEvent, window, cx| {
+                cx.stop_propagation();
+                window.remove_window();
+            })),
         )
         .child(
-            traffic_light("#ffbd2e", "#dea123")
-                .id("titlebar-minimize")
-                .window_control_area(WindowControlArea::Min)
-                .on_click(cx.listener(|_, _: &ClickEvent, window, cx| {
-                    cx.stop_propagation();
-                    window.minimize_window();
-                })),
+            traffic_light(
+                assets::ICON_TRAFFIC_MINIMIZE_DOT,
+                assets::ICON_TRAFFIC_MINIMIZE_SYMBOL,
+            )
+            .id("titlebar-minimize")
+            .window_control_area(WindowControlArea::Min)
+            .on_click(cx.listener(|_, _: &ClickEvent, window, cx| {
+                cx.stop_propagation();
+                window.minimize_window();
+            })),
         )
         .child(
-            traffic_light("#27c93f", "#1aab29")
-                .id("titlebar-zoom")
-                .window_control_area(WindowControlArea::Max)
-                .on_click(cx.listener(|_, _: &ClickEvent, window, cx| {
-                    cx.stop_propagation();
-                    window.zoom_window();
-                })),
+            traffic_light(
+                assets::ICON_TRAFFIC_ZOOM_DOT,
+                assets::ICON_TRAFFIC_ZOOM_SYMBOL,
+            )
+            .id("titlebar-zoom")
+            .window_control_area(WindowControlArea::Max)
+            .on_click(cx.listener(|_, _: &ClickEvent, window, cx| {
+                cx.stop_propagation();
+                window.zoom_window();
+            })),
         )
 }
 
-fn traffic_light(fill: &'static str, border: &'static str) -> gpui::Div {
+fn traffic_light(dot_icon: &'static str, symbol_icon: &'static str) -> gpui::Div {
     div()
         .w(px(TITLEBAR_TRAFFIC_LIGHT_SIZE))
         .h(px(TITLEBAR_TRAFFIC_LIGHT_SIZE))
+        .relative()
         .flex()
         .items_center()
         .justify_center()
         .rounded_full()
         .cursor_pointer()
         .child(
-            div()
-                .w(px(12.0))
-                .h(px(12.0))
-                .rounded_full()
-                .bg(parse_hex(fill))
-                .border_1()
-                .border_color(parse_hex(border)),
+            svg()
+                .path(dot_icon)
+                .absolute()
+                .inset_0()
+                .w(px(TITLEBAR_TRAFFIC_LIGHT_SIZE))
+                .h(px(TITLEBAR_TRAFFIC_LIGHT_SIZE))
+                .text_color(color(theme::FOREGROUND)),
+        )
+        .child(
+            svg()
+                .path(symbol_icon)
+                .absolute()
+                .inset_0()
+                .w(px(TITLEBAR_TRAFFIC_LIGHT_SIZE))
+                .h(px(TITLEBAR_TRAFFIC_LIGHT_SIZE))
+                .opacity(0.0)
+                .group_hover(TRAFFIC_LIGHT_GROUP, |style| style.opacity(1.0))
+                .text_color(color(theme::FOREGROUND)),
         )
 }
 
@@ -3554,7 +3599,7 @@ fn frame_window_options(bounds: Bounds<Pixels>) -> WindowOptions {
         titlebar: Some(TitlebarOptions {
             title: None,
             appears_transparent: true,
-            traffic_light_position: Some(hidden_native_traffic_light_position()),
+            traffic_light_position: None,
         }),
         window_min_size: Some(size(px(WINDOW_MIN_WIDTH), px(WINDOW_MIN_HEIGHT))),
         window_background: WindowBackgroundAppearance::Opaque,
@@ -3563,11 +3608,38 @@ fn frame_window_options(bounds: Bounds<Pixels>) -> WindowOptions {
     }
 }
 
-fn hidden_native_traffic_light_position() -> gpui::Point<Pixels> {
-    point(
-        px(HIDDEN_NATIVE_TRAFFIC_LIGHT_X),
-        px(HIDDEN_NATIVE_TRAFFIC_LIGHT_Y),
-    )
+#[cfg(target_os = "macos")]
+fn hide_native_macos_titlebar_controls(window: &Window) -> bool {
+    let Ok(window_handle) = HasWindowHandle::window_handle(window) else {
+        return false;
+    };
+
+    let RawWindowHandle::AppKit(appkit_handle) = window_handle.as_raw() else {
+        return true;
+    };
+
+    // SAFETY: GPUI exposes a valid AppKit NSView handle for the live window.
+    let ns_view = unsafe { &*appkit_handle.ns_view.as_ptr().cast::<NSView>() };
+    let Some(ns_window) = ns_view.window() else {
+        return false;
+    };
+
+    for button_kind in [
+        NSWindowButton::CloseButton,
+        NSWindowButton::MiniaturizeButton,
+        NSWindowButton::ZoomButton,
+    ] {
+        if let Some(button) = ns_window.standardWindowButton(button_kind) {
+            button.setHidden(true);
+        }
+    }
+
+    true
+}
+
+#[cfg(not(target_os = "macos"))]
+fn hide_native_macos_titlebar_controls(_window: &Window) -> bool {
+    true
 }
 
 fn main() {
@@ -3966,18 +4038,15 @@ mod tests {
         use super::*;
 
         #[test]
-        fn disables_native_titlebar_when_custom_frame_controls_are_rendered() {
+        fn keeps_transparent_titlebar_without_positioning_native_controls() {
             let options = frame_window_options(Bounds::default());
             let titlebar = options
                 .titlebar
                 .as_ref()
-                .expect("custom frame still needs a transparent native titlebar host");
+                .expect("custom Frame controls still need a transparent native titlebar host");
 
             assert!(titlebar.appears_transparent);
-            assert_eq!(
-                titlebar.traffic_light_position,
-                Some(hidden_native_traffic_light_position())
-            );
+            assert_eq!(titlebar.traffic_light_position, None);
         }
 
         #[test]
@@ -4012,6 +4081,17 @@ mod tests {
                     .map(|metadata| metadata.source_kind()),
                 Some(SourceKind::Video)
             );
+        }
+
+        #[test]
+        fn preview_crop_fixture_enters_crop_mode() {
+            let mut root = FrameRoot::new();
+
+            root.apply_visual_fixture(Some(VisualFixture::PreviewCrop));
+
+            assert!(root.preview_crop_mode);
+            assert!(root.preview_draft_crop.is_some());
+            assert_eq!(root.preview_crop_aspect, "1:1");
         }
     }
 
