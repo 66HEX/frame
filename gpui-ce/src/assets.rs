@@ -4,7 +4,7 @@ use std::borrow::Cow;
 
 use gpui::{App, AssetSource, Result, SharedString};
 
-pub const FRAME_FONT_FAMILY: &str = "IoskeleyMono";
+pub const FRAME_FONT_FAMILY: &str = "Ioskeley Mono";
 pub const FRAME_FONT_PATH: &str = "fonts/IoskeleyMono-Black.woff2";
 pub const ICON_FRAME: &str = "icons/frame.svg";
 pub const ICON_LAYOUT_LIST: &str = "icons/layout-list.svg";
@@ -22,9 +22,9 @@ pub const ICON_SETTINGS: &str = "icons/settings.svg";
 pub const ICON_PLUS: &str = "icons/plus.svg";
 pub const ICON_PLAY: &str = "icons/play.svg";
 
-const FRAME_ICON_SVG: &str = include_str!("../../src/lib/assets/icons/frame.svg");
+const FRAME_ICON_SVG: &str = include_str!("../assets/icons/frame.svg");
 const FRAME_FONT_BYTES: &[u8] =
-    include_bytes!("../../src/lib/assets/fonts/LoskeleyMono/IoskeleyMono-Black.woff2");
+    include_bytes!("../assets/fonts/LoskeleyMono/IoskeleyMono-Black.woff2");
 
 const LAYOUT_LIST_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 256 256"><path d="M32,64a8,8,0,0,1,8-8H216a8,8,0,0,1,0,16H40A8,8,0,0,1,32,64Zm104,56H40a8,8,0,0,0,0,16h96a8,8,0,0,0,0-16Zm0,64H40a8,8,0,0,0,0,16h96a8,8,0,0,0,0-16Zm112-24a8,8,0,0,1-3.76,6.78l-64,40A8,8,0,0,1,168,200V120a8,8,0,0,1,12.24-6.78l64,40A8,8,0,0,1,248,160Zm-23.09,0L184,134.43v51.14Z"/></svg>"#;
 const TERMINAL_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 256 256"><path d="M117.31,134l-72,64a8,8,0,1,1-10.63-12L100,128,34.69,70A8,8,0,1,1,45.32,58l72,64a8,8,0,0,1,0,12ZM216,184H120a8,8,0,0,0,0,16h96a8,8,0,0,0,0-16Z"/></svg>"#;
@@ -138,6 +138,11 @@ mod tests {
 
             assert!(listed.iter().any(|name| name.as_ref() == "layout-list.svg"));
             assert!(listed.iter().any(|name| name.as_ref() == "bookmark.svg"));
+        }
+
+        #[test]
+        fn frame_font_family_matches_bundled_font_name_table() {
+            assert_eq!(FRAME_FONT_FAMILY, "Ioskeley Mono");
         }
     }
 }

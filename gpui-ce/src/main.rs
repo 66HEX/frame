@@ -27,11 +27,11 @@ use frame_gpui_ce::{
     theme, visual_fixture_from_env_value,
 };
 use gpui::{
-    App, Bounds, BoxShadow, ClickEvent, Context, ExternalPaths, InteractiveElement, IntoElement,
-    KeyBinding, Menu, MenuItem, PathPromptOptions, Render, Rgba, SharedString,
-    StatefulInteractiveElement, TitlebarOptions, UniformListScrollHandle, Window,
-    WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowDecorations, WindowOptions,
-    actions, div, hsla, point, prelude::*, px, size, svg, uniform_list,
+    App, Bounds, BoxShadow, ClickEvent, Context, ExternalPaths, FontWeight, InteractiveElement,
+    IntoElement, KeyBinding, Menu, MenuItem, PathPromptOptions, Pixels, Render, Rgba, SharedString,
+    StatefulInteractiveElement, UniformListScrollHandle, Window, WindowBackgroundAppearance,
+    WindowBounds, WindowControlArea, WindowDecorations, WindowOptions, actions, div, hsla, point,
+    prelude::*, px, size, svg, uniform_list,
 };
 use std::path::PathBuf;
 
@@ -334,6 +334,7 @@ impl Render for FrameRoot {
             .bg(color(theme::BACKGROUND))
             .text_color(color(theme::FOREGROUND))
             .font_family(assets::FRAME_FONT_FAMILY)
+            .font_weight(FontWeight::BLACK)
             .on_drop(cx.listener(|root, paths: &ExternalPaths, _window, cx| {
                 cx.stop_propagation();
                 root.import_source_paths(paths.paths().to_vec(), cx);
@@ -480,10 +481,7 @@ fn frame_logo() -> gpui::Div {
 }
 
 fn titlebar_divider() -> gpui::Div {
-    div()
-        .h(px(TITLEBAR_DIVIDER_HEIGHT))
-        .w(px(1.0))
-        .bg(color(theme::FRAME_GRAY_100))
+    vertical_separator(TITLEBAR_DIVIDER_HEIGHT)
 }
 
 fn titlebar_navigation(active_view: ActiveView, cx: &mut Context<FrameRoot>) -> gpui::Div {
@@ -549,6 +547,7 @@ fn titlebar_segment(
     selected: bool,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
+    let colors = button_colors(ButtonVariant::Secondary, selected, true);
     div()
         .h(px(TITLEBAR_NAV_BUTTON_HEIGHT))
         .flex()
@@ -561,7 +560,7 @@ fn titlebar_segment(
         })
         .px_2()
         .bg(if selected {
-            color(theme::FRAME_GRAY_400)
+            color(colors.background)
         } else {
             color(theme::TRANSPARENT)
         })
@@ -571,7 +570,14 @@ fn titlebar_segment(
             color(theme::FRAME_GRAY_600)
         })
         .when(selected, |this| this.shadow(button_highlight_shadows()))
-        .hover(|style| style.text_color(color(theme::FOREGROUND)).cursor_pointer())
+        .hover(move |style| {
+            let style = style.text_color(color(theme::FOREGROUND)).cursor_pointer();
+            if selected {
+                style.bg(color(colors.hover_background))
+            } else {
+                style
+            }
+        })
         .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
             if root.active_view != view {
                 root.active_view = view;
@@ -597,6 +603,47 @@ enum ButtonVariant {
     Secondary,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ButtonColors {
+    background: theme::RgbaToken,
+    hover_background: theme::RgbaToken,
+    active_background: theme::RgbaToken,
+    foreground: theme::RgbaToken,
+}
+
+fn button_colors(variant: ButtonVariant, selected: bool, enabled: bool) -> ButtonColors {
+    let active_variant = matches!(variant, ButtonVariant::Default) || selected;
+    if !enabled {
+        let background = if active_variant {
+            theme::FRAME_GRAY_400.with_alpha(0.10)
+        } else {
+            theme::FRAME_GRAY_100.with_alpha(0.50)
+        };
+        return ButtonColors {
+            background,
+            hover_background: background,
+            active_background: background,
+            foreground: theme::FOREGROUND.with_alpha(0.50),
+        };
+    }
+
+    if active_variant {
+        ButtonColors {
+            background: theme::FRAME_GRAY_400,
+            hover_background: theme::FRAME_GRAY_400.with_alpha(0.18),
+            active_background: theme::FRAME_GRAY_400.with_alpha(0.16),
+            foreground: theme::FOREGROUND,
+        }
+    } else {
+        ButtonColors {
+            background: theme::FRAME_GRAY_100,
+            hover_background: theme::FRAME_GRAY_200,
+            active_background: theme::FRAME_GRAY_400.with_alpha(0.14),
+            foreground: theme::FOREGROUND,
+        }
+    }
+}
+
 fn action_button(
     icon: &'static str,
     label: Option<&'static str>,
@@ -604,16 +651,8 @@ fn action_button(
     enabled: bool,
 ) -> gpui::Div {
     let is_icon_only = label.is_none();
-    let background = match (variant, enabled) {
-        (ButtonVariant::Default, true) => theme::FRAME_GRAY_400,
-        (ButtonVariant::Default, false) => theme::FRAME_GRAY_400.with_alpha(0.10),
-        (ButtonVariant::Secondary, true | false) => theme::FRAME_GRAY_100,
-    };
-    let button_icon_color = if enabled {
-        color(theme::FOREGROUND)
-    } else {
-        color(theme::FOREGROUND.with_alpha(0.50))
-    };
+    let colors = button_colors(variant, false, enabled);
+    let button_icon_color = color(colors.foreground);
 
     let button = div()
         .h(px(TITLEBAR_BUTTON_HEIGHT))
@@ -622,15 +661,11 @@ fn action_button(
         .justify_center()
         .gap_2()
         .rounded(px(theme::RADIUS_SM))
-        .bg(color(background))
+        .bg(color(colors.background))
         .shadow(button_highlight_shadows())
-        .text_color(if enabled {
-            color(theme::FOREGROUND)
-        } else {
-            color(theme::FOREGROUND.with_alpha(0.50))
-        })
+        .text_color(color(colors.foreground))
         .when(enabled, |this| {
-            this.hover(|style| style.bg(color(theme::FRAME_GRAY_200)).cursor_pointer())
+            this.hover(move |style| style.bg(color(colors.hover_background)).cursor_pointer())
         });
 
     if is_icon_only {
@@ -788,9 +823,9 @@ fn logs_tab_strip(
     div()
         .h(px(PANEL_HEADER_HEIGHT))
         .w_full()
-        .border_b_1()
-        .border_color(color(theme::BACKGROUND))
+        .relative()
         .child(tabs)
+        .child(panel_bottom_separator())
 }
 
 fn log_tab_button(
@@ -941,10 +976,10 @@ fn settings_panel(settings: SettingsRenderState<'_>, cx: &mut Context<FrameRoot>
                 .flex()
                 .items_center()
                 .justify_between()
+                .relative()
                 .px_4()
-                .border_b_1()
-                .border_color(color(theme::FRAME_GRAY_100))
-                .child(tab_rail),
+                .child(tab_rail)
+                .child(panel_bottom_separator()),
         )
         .child(
             div()
@@ -963,6 +998,7 @@ fn settings_tab_button(
     selected: bool,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
+    let colors = button_colors(ButtonVariant::Secondary, selected, true);
     let icon_color = if selected {
         color(theme::FOREGROUND)
     } else {
@@ -978,12 +1014,20 @@ fn settings_tab_button(
         .justify_center()
         .rounded(px(theme::RADIUS_SM))
         .bg(if selected {
-            color(theme::FRAME_GRAY_400)
+            color(colors.background)
         } else {
             color(theme::TRANSPARENT)
         })
         .when(selected, |this| this.shadow(button_highlight_shadows()))
-        .hover(|style| style.bg(color(theme::FRAME_GRAY_200)).cursor_pointer())
+        .hover(move |style| {
+            style
+                .bg(color(if selected {
+                    colors.hover_background
+                } else {
+                    theme::FRAME_GRAY_100
+                }))
+                .cursor_pointer()
+        })
         .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
             root.settings_active_tab = tab;
             cx.stop_propagation();
@@ -1271,11 +1315,7 @@ fn settings_container_grid(
 }
 
 fn settings_choice_button(label: impl Into<String>, selected: bool, enabled: bool) -> gpui::Div {
-    let base_background = if selected {
-        theme::FRAME_GRAY_400
-    } else {
-        theme::FRAME_GRAY_100
-    };
+    let colors = button_colors(ButtonVariant::Secondary, selected, enabled);
 
     div()
         .h(px(SETTINGS_CONTROL_HEIGHT))
@@ -1285,20 +1325,12 @@ fn settings_choice_button(label: impl Into<String>, selected: bool, enabled: boo
         .justify_center()
         .rounded(px(theme::RADIUS_SM))
         .px(px(10.0))
-        .bg(color(if enabled {
-            base_background
-        } else {
-            base_background.with_alpha(0.50)
-        }))
+        .bg(color(colors.background))
         .text_size(px(theme::TEXT_LABEL_SIZE))
-        .text_color(if enabled {
-            color(theme::FOREGROUND)
-        } else {
-            color(theme::FOREGROUND.with_alpha(0.50))
-        })
+        .text_color(color(colors.foreground))
         .shadow(button_highlight_shadows())
         .when(enabled, |this| {
-            this.hover(|style| style.bg(color(theme::FRAME_GRAY_200)).cursor_pointer())
+            this.hover(move |style| style.bg(color(colors.hover_background)).cursor_pointer())
         })
         .child(label.into())
 }
@@ -1386,9 +1418,8 @@ fn file_list_header(selection: BatchSelectionState, cx: &mut Context<FrameRoot>)
         .w_full()
         .flex()
         .items_center()
+        .relative()
         .px_4()
-        .border_b_1()
-        .border_color(color(theme::FRAME_GRAY_100))
         .child(
             div()
                 .flex_1()
@@ -1431,6 +1462,7 @@ fn file_list_header(selection: BatchSelectionState, cx: &mut Context<FrameRoot>)
                 .text_right()
                 .child("ACTIONS"),
         )
+        .child(panel_bottom_separator())
 }
 
 fn file_list_body(queue: &FileQueue, cx: &mut Context<FrameRoot>) -> impl IntoElement {
@@ -1479,9 +1511,8 @@ fn file_list_row(
         .group(group_name.clone())
         .flex()
         .items_center()
+        .relative()
         .px_4()
-        .border_b_1()
-        .border_color(color(theme::FRAME_GRAY_100))
         .bg(if is_selected {
             color(theme::FRAME_GRAY_100)
         } else {
@@ -1543,6 +1574,7 @@ fn file_list_row(
             group_name,
             cx,
         ))
+        .child(panel_bottom_separator())
 }
 
 fn header_label(label: &'static str, span: u16, align_right: bool) -> gpui::Div {
@@ -1647,7 +1679,7 @@ fn row_action_button(label: &'static str, enabled: bool) -> gpui::Div {
             color(theme::FRAME_GRAY_400)
         })
         .when(enabled, |this| {
-            this.hover(|style| style.bg(color(theme::FRAME_GRAY_200)).cursor_pointer())
+            this.hover(|style| style.bg(color(theme::FRAME_GRAY_100)).cursor_pointer())
         })
         .child(label)
 }
@@ -1721,6 +1753,25 @@ fn state_tone_color(tone: FileStateTone) -> Rgba {
     }
 }
 
+fn vertical_separator(height: f32) -> gpui::Div {
+    div()
+        .h(px(height))
+        .w(px(1.0))
+        .bg(color(theme::BACKGROUND))
+        .shadow(vertical_separator_shadows())
+}
+
+fn panel_bottom_separator() -> gpui::Div {
+    div()
+        .absolute()
+        .left_0()
+        .right_0()
+        .bottom_0()
+        .h(px(1.0))
+        .bg(color(theme::BACKGROUND))
+        .shadow(horizontal_separator_shadows())
+}
+
 fn element_id(prefix: &str, id: &str) -> String {
     format!("{prefix}-{id}")
 }
@@ -1779,6 +1830,26 @@ fn card_surface_shadows() -> Vec<BoxShadow> {
     ]
 }
 
+fn horizontal_separator_shadows() -> Vec<BoxShadow> {
+    vec![BoxShadow {
+        color: color(theme::FRAME_GRAY_100).into(),
+        offset: point(px(0.0), px(1.0)),
+        blur_radius: px(0.0),
+        spread_radius: px(0.0),
+        inset: false,
+    }]
+}
+
+fn vertical_separator_shadows() -> Vec<BoxShadow> {
+    vec![BoxShadow {
+        color: color(theme::FRAME_GRAY_100).into(),
+        offset: point(px(1.0), px(0.0)),
+        blur_radius: px(0.0),
+        spread_radius: px(0.0),
+        inset: false,
+    }]
+}
+
 fn drop_target_shadows() -> Vec<BoxShadow> {
     let mut shadows = card_surface_shadows();
     shadows.push(BoxShadow {
@@ -1817,6 +1888,17 @@ fn init_app(cx: &mut App, name: impl Into<SharedString>) {
     .detach();
 }
 
+fn frame_window_options(bounds: Bounds<Pixels>) -> WindowOptions {
+    WindowOptions {
+        window_bounds: Some(WindowBounds::Windowed(bounds)),
+        titlebar: None,
+        window_min_size: Some(size(px(WINDOW_MIN_WIDTH), px(WINDOW_MIN_HEIGHT))),
+        window_background: WindowBackgroundAppearance::Opaque,
+        window_decorations: Some(WindowDecorations::Client),
+        ..Default::default()
+    }
+}
+
 fn main() {
     gpui_platform::application()
         .with_assets(FrameAssets)
@@ -1824,21 +1906,9 @@ fn main() {
             assets::load_frame_fonts(cx).expect("failed to load Frame fonts");
             let bounds =
                 Bounds::centered(None, size(px(WINDOW_MIN_WIDTH), px(WINDOW_MIN_HEIGHT)), cx);
-            cx.open_window(
-                WindowOptions {
-                    window_bounds: Some(WindowBounds::Windowed(bounds)),
-                    titlebar: Some(TitlebarOptions {
-                        title: Some("Frame".into()),
-                        appears_transparent: true,
-                        traffic_light_position: None,
-                    }),
-                    window_min_size: Some(size(px(WINDOW_MIN_WIDTH), px(WINDOW_MIN_HEIGHT))),
-                    window_background: WindowBackgroundAppearance::Opaque,
-                    window_decorations: Some(WindowDecorations::Client),
-                    ..Default::default()
-                },
-                |_, cx| cx.new(|_| FrameRoot::new()),
-            )
+            cx.open_window(frame_window_options(bounds), |_, cx| {
+                cx.new(|_| FrameRoot::new())
+            })
             .expect("failed to open Frame GPUI window");
 
             init_app(cx, "Frame");
@@ -1882,6 +1952,55 @@ mod tests {
             let imports = root.allocate_file_imports(Vec::new());
 
             assert!(imports.is_empty());
+        }
+    }
+
+    mod frame_window_options {
+        use super::*;
+
+        #[test]
+        fn disables_native_titlebar_when_custom_frame_controls_are_rendered() {
+            let options = frame_window_options(Bounds::default());
+
+            assert!(options.titlebar.is_none());
+        }
+
+        #[test]
+        fn preserves_original_minimum_window_size() {
+            let options = frame_window_options(Bounds::default());
+
+            assert_eq!(
+                options.window_min_size,
+                Some(size(px(WINDOW_MIN_WIDTH), px(WINDOW_MIN_HEIGHT)))
+            );
+        }
+    }
+
+    mod button_state_colors {
+        use super::*;
+
+        #[test]
+        fn default_button_hover_matches_original_frame_gray_400_90() {
+            let colors = button_colors(ButtonVariant::Default, false, true);
+
+            assert_eq!(
+                colors.hover_background,
+                theme::FRAME_GRAY_400.with_alpha(0.18)
+            );
+        }
+
+        #[test]
+        fn secondary_button_hover_matches_original_frame_gray_200() {
+            let colors = button_colors(ButtonVariant::Secondary, false, true);
+
+            assert_eq!(colors.hover_background, theme::FRAME_GRAY_200);
+        }
+
+        #[test]
+        fn disabled_default_button_uses_original_half_alpha_background() {
+            let colors = button_colors(ButtonVariant::Default, false, false);
+
+            assert_eq!(colors.background, theme::FRAME_GRAY_400.with_alpha(0.10));
         }
     }
 }
