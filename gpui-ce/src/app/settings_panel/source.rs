@@ -1,0 +1,121 @@
+use super::*;
+
+pub(in crate::app) fn settings_source_tab(
+    metadata: Option<&SourceMetadata>,
+    status: MetadataStatus,
+    error: Option<&str>,
+) -> gpui::Div {
+    match status {
+        MetadataStatus::Loading => {
+            return div()
+                .text_size(px(theme::TEXT_LABEL_SIZE))
+                .text_color(color(theme::FRAME_GRAY_600))
+                .child("Analyzing source...");
+        }
+        MetadataStatus::Error => {
+            let mut error_view = div()
+                .flex()
+                .flex_col()
+                .gap_1()
+                .text_size(px(theme::TEXT_LABEL_SIZE))
+                .text_color(color(theme::FRAME_RED))
+                .child("Failed to read source metadata.");
+            if let Some(error) = error {
+                error_view = error_view.child(
+                    div()
+                        .text_color(color(theme::FRAME_GRAY_600))
+                        .child(error.to_string()),
+                );
+            }
+            return error_view;
+        }
+        MetadataStatus::Idle | MetadataStatus::Ready => {}
+    }
+
+    let Some(metadata) = metadata else {
+        return div()
+            .text_size(px(theme::TEXT_LABEL_SIZE))
+            .text_color(color(theme::FRAME_GRAY_600))
+            .child("Metadata unavailable.");
+    };
+
+    let sections = source_info_sections(metadata);
+    if sections.is_empty() {
+        return div()
+            .text_size(px(theme::TEXT_LABEL_SIZE))
+            .text_color(color(theme::FRAME_GRAY_600))
+            .child("Metadata unavailable.");
+    }
+
+    let mut content = div().flex().flex_col().gap_6();
+    for section in sections {
+        content = match section {
+            SourceInfoSection::Rows { title, rows } => {
+                content.child(settings_section(title).child(settings_source_rows(rows)))
+            }
+            SourceInfoSection::Tracks { title, tracks } => {
+                content.child(settings_section(title).child(settings_source_tracks(tracks)))
+            }
+        };
+    }
+    content
+}
+
+pub(in crate::app) fn settings_source_rows(rows: Vec<crate::settings::SourceInfoRow>) -> gpui::Div {
+    let mut grid = div().flex().flex_col().gap_2();
+    for row in rows {
+        grid = grid.child(settings_value_row(row.label, row.value));
+    }
+    grid
+}
+
+pub(in crate::app) fn settings_source_tracks(
+    tracks: Vec<crate::settings::SourceTrackSection>,
+) -> gpui::Div {
+    let mut list = div().flex().flex_col().gap_4();
+    for track in tracks {
+        list = list.child(
+            div()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(settings_track_header(track.label))
+                .child(settings_source_rows(track.rows)),
+        );
+    }
+    list
+}
+
+pub(in crate::app) fn settings_track_header(label: String) -> gpui::Div {
+    div()
+        .flex()
+        .items_center()
+        .gap_2()
+        .text_color(color(theme::FRAME_GRAY_600))
+        .child(label)
+        .child(
+            div()
+                .h(px(1.0))
+                .flex_1()
+                .bg(color(theme::BACKGROUND))
+                .shadow(horizontal_separator_shadows()),
+        )
+}
+
+pub(in crate::app) fn settings_section_label(label: &'static str) -> gpui::Div {
+    div()
+        .w_full()
+        .flex()
+        .flex_col()
+        .gap_1()
+        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_color(color(theme::FRAME_GRAY_600))
+        .child(label)
+        .child(
+            div()
+                .h(px(1.0))
+                .w_full()
+                .bg(color(theme::BACKGROUND))
+                .shadow(horizontal_separator_shadows()),
+        )
+}

@@ -41,9 +41,9 @@ pub const ICON_TRAFFIC_CLOSE_SYMBOL: &str = "icons/traffic-close-symbol.svg";
 pub const ICON_TRAFFIC_MINIMIZE_SYMBOL: &str = "icons/traffic-minimize-symbol.svg";
 pub const ICON_TRAFFIC_ZOOM_SYMBOL: &str = "icons/traffic-zoom-symbol.svg";
 
-const FRAME_ICON_SVG: &str = include_str!("../assets/icons/frame.svg");
+const FRAME_ICON_SVG: &str = include_str!("../../assets/icons/frame.svg");
 const FRAME_FONT_BYTES: &[u8] =
-    include_bytes!("../assets/fonts/LoskeleyMono/IoskeleyMono-Black.woff2");
+    include_bytes!("../../assets/fonts/LoskeleyMono/IoskeleyMono-Black.woff2");
 
 const ARROW_DOWN_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 256 256"><path d="M205.66,149.66l-72,72a8,8,0,0,1-11.32,0l-72-72a8,8,0,0,1,11.32-11.32L120,196.69V40a8,8,0,0,1,16,0V196.69l58.34-58.35a8,8,0,0,1,11.32,11.32Z"/></svg>"#;
 const LAYOUT_LIST_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 256 256"><path d="M32,64a8,8,0,0,1,8-8H216a8,8,0,0,1,0,16H40A8,8,0,0,1,32,64Zm104,56H40a8,8,0,0,0,0,16h96a8,8,0,0,0,0-16Zm0,64H40a8,8,0,0,0,0,16h96a8,8,0,0,0,0-16Zm112-24a8,8,0,0,1-3.76,6.78l-64,40A8,8,0,0,1,168,200V120a8,8,0,0,1,12.24-6.78l64,40A8,8,0,0,1,248,160Zm-23.09,0L184,134.43v51.14Z"/></svg>"#;
@@ -175,120 +175,4 @@ pub fn load_frame_fonts(cx: &mut App) -> Result<()> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    mod frame_assets {
-        use super::*;
-
-        #[test]
-        fn load_returns_frame_icon_svg() {
-            let loaded = FrameAssets
-                .load(ICON_FRAME)
-                .expect("asset load should not fail");
-
-            assert!(
-                loaded
-                    .as_deref()
-                    .is_some_and(|bytes| bytes.starts_with(b"<svg"))
-            );
-        }
-
-        #[test]
-        fn load_returns_none_for_unknown_asset() {
-            let loaded = FrameAssets
-                .load("icons/missing.svg")
-                .expect("asset load should not fail");
-
-            assert!(loaded.is_none());
-        }
-
-        #[test]
-        fn list_returns_original_frame_icon_assets() {
-            let listed = FrameAssets
-                .list("icons")
-                .expect("asset list should not fail");
-
-            for icon_name in [
-                "arrow-down.svg",
-                "bookmark.svg",
-                "captions.svg",
-                "check.svg",
-                "chevrons-up-down.svg",
-                "close.svg",
-                "crop.svg",
-                "file-down.svg",
-                "file-image.svg",
-                "file-up.svg",
-                "file-video.svg",
-                "flip-horizontal.svg",
-                "flip-vertical.svg",
-                "hard-drive.svg",
-                "layout-list.svg",
-                "list-checks.svg",
-                "minus.svg",
-                "music.svg",
-                "pause.svg",
-                "pause2.svg",
-                "play.svg",
-                "plus.svg",
-                "rotate-cw.svg",
-                "settings.svg",
-                "spinner.svg",
-                "square.svg",
-                "tags.svg",
-                "terminal.svg",
-                "trash.svg",
-            ] {
-                assert!(
-                    listed.iter().any(|name| name.as_ref() == icon_name),
-                    "{icon_name} should be listed"
-                );
-                let path = format!("icons/{icon_name}");
-                assert!(
-                    FrameAssets
-                        .load(&path)
-                        .expect("asset load should not fail")
-                        .is_some(),
-                    "{path} should load"
-                );
-            }
-        }
-
-        #[test]
-        fn preview_transform_assets_preserve_original_filled_paths() {
-            let loaded = FrameAssets
-                .load(ICON_ROTATE_CW)
-                .expect("asset load should not fail")
-                .expect("rotate asset should exist");
-            let svg = std::str::from_utf8(loaded.as_ref()).expect("svg should be utf8");
-
-            assert!(svg.contains(r#"fill="currentColor""#));
-            assert!(svg.contains("M240,56v48"));
-            assert!(!svg.contains(r#"stroke-width="18""#));
-        }
-
-        #[test]
-        fn traffic_light_symbols_preserve_original_hover_glyphs() {
-            let loaded = FrameAssets
-                .load(ICON_TRAFFIC_CLOSE_SYMBOL)
-                .expect("asset load should not fail")
-                .expect("traffic light asset should exist");
-            let svg = std::str::from_utf8(loaded.as_ref()).expect("svg should be utf8");
-
-            assert!(svg.contains(r#"viewBox="-10 -10 20 20""#));
-            assert!(svg.contains(r#"M-1.8 -1.8 L1.8 1.8 M1.8 -1.8 L-1.8 1.8"#));
-            assert!(svg.contains(r#"stroke-width="1.5""#));
-        }
-
-        #[test]
-        fn frame_font_family_matches_bundled_font_name_table_family() {
-            assert_eq!(FRAME_FONT_FAMILY, "Ioskeley Mono Heavy");
-        }
-
-        #[test]
-        fn frame_font_alias_matches_original_css_family() {
-            assert_eq!(FRAME_FONT_ALIAS, "LoskeleyMono");
-        }
-    }
-}
+mod tests;

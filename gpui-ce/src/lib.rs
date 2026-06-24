@@ -1,5 +1,6 @@
 //! Shared state and layout contracts for the native GPUI-CE rewrite of Frame.
 
+pub mod app;
 pub mod assets;
 pub mod conversion_events;
 pub mod conversion_runner;
