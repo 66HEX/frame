@@ -1,5 +1,22 @@
 use super::*;
 
+const PREVIEW_TOOLBAR_PADDING: f32 = 4.0;
+const PREVIEW_TOOLBAR_GAP: f32 = 8.0;
+const PREVIEW_TOOLBAR_SEPARATOR_HEIGHT: f32 = 1.0;
+const PREVIEW_TOOLBAR_BUTTON_COUNT: f32 = 5.0;
+const PREVIEW_TOOLBAR_GAP_COUNT: f32 = 5.0;
+
+pub(in crate::app) const fn preview_toolbar_height() -> f32 {
+    (PREVIEW_TOOLBAR_PADDING * 2.0)
+        + (PREVIEW_TOOLBAR_BUTTON_SIZE * PREVIEW_TOOLBAR_BUTTON_COUNT)
+        + PREVIEW_TOOLBAR_SEPARATOR_HEIGHT
+        + (PREVIEW_TOOLBAR_GAP * PREVIEW_TOOLBAR_GAP_COUNT)
+}
+
+pub(in crate::app) const fn preview_toolbar_center_margin() -> f32 {
+    -(preview_toolbar_height() / 2.0)
+}
+
 pub(in crate::app) fn preview_toolbar(
     state: &PreviewShellState,
     cx: &mut Context<FrameRoot>,
@@ -10,14 +27,15 @@ pub(in crate::app) fn preview_toolbar(
 
     div()
         .absolute()
-        .top(px(PREVIEW_TOOLBAR_OFFSET))
+        .top(relative(0.5))
+        .mt(px(preview_toolbar_center_margin()))
         .left(px(PREVIEW_TOOLBAR_OFFSET))
         .flex()
         .flex_col()
-        .gap_2()
+        .gap(px(PREVIEW_TOOLBAR_GAP))
         .rounded(px(theme::RADIUS_MD))
         .bg(color(theme::BACKGROUND))
-        .p(px(4.0))
+        .p(px(PREVIEW_TOOLBAR_PADDING))
         .shadow(card_surface_shadows())
         .child(
             preview_tool_button(assets::ICON_ROTATE_CW, false, transform_enabled).on_click(
@@ -91,7 +109,7 @@ pub(in crate::app) fn preview_zoom_toolbar(state: &PreviewShellState) -> gpui::D
 
 pub(in crate::app) fn preview_toolbar_separator() -> gpui::Div {
     div()
-        .h(px(1.0))
+        .h(px(PREVIEW_TOOLBAR_SEPARATOR_HEIGHT))
         .w_full()
         .bg(color(theme::BACKGROUND))
         .shadow(horizontal_separator_shadows())

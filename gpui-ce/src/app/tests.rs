@@ -1010,4 +1010,10 @@ mod visual_contract {
         assert_eq!(settings_panel::range_fraction(100, 0, 200), 0.5);
         assert_eq!(settings_panel::range_value_from_fraction(0.5, 0, 200), 100);
     }
+
+    #[test]
+    fn preview_left_toolbar_centering_uses_full_stack_height() {
+        assert_eq!(preview_panel::preview_toolbar_height(), 199.0);
+        assert_eq!(preview_panel::preview_toolbar_center_margin(), -99.5);
+    }
 }
