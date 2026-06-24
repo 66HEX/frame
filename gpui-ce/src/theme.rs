@@ -47,7 +47,7 @@ pub const RADIUS_MD: f32 = RADIUS_BASE * 3.0;
 pub const RADIUS_LG: f32 = RADIUS_BASE * 4.0;
 pub const RADIUS_XL: f32 = RADIUS_BASE * 6.0;
 
-pub const TEXT_LABEL_SIZE: f32 = 10.0;
+pub const TEXT_LABEL_SIZE: f32 = 11.0;
 pub const TEXT_ROW_SIZE: f32 = 12.0;
 pub const MIN_HIT_AREA: f32 = 40.0;
 
