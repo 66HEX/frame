@@ -75,6 +75,7 @@ pub enum VisualFixture {
     SettingsMetadata,
     SettingsPresets,
     SettingsSubtitles,
+    SettingsSubtitlesPopover,
     SettingsVideo,
 }
 
@@ -89,6 +90,7 @@ pub fn visual_fixture_from_env_value(value: Option<&str>) -> Option<VisualFixtur
         Some("settings-metadata") => Some(VisualFixture::SettingsMetadata),
         Some("settings-presets") => Some(VisualFixture::SettingsPresets),
         Some("settings-subtitles") => Some(VisualFixture::SettingsSubtitles),
+        Some("settings-subtitles-popover") => Some(VisualFixture::SettingsSubtitlesPopover),
         Some("settings-video") => Some(VisualFixture::SettingsVideo),
         _ => None,
     }
@@ -270,6 +272,14 @@ mod tests {
             assert_eq!(
                 visual_fixture_from_env_value(Some("settings-subtitles")),
                 Some(VisualFixture::SettingsSubtitles)
+            );
+        }
+
+        #[test]
+        fn settings_subtitles_popover_value_enables_subtitles_popover_fixture() {
+            assert_eq!(
+                visual_fixture_from_env_value(Some("settings-subtitles-popover")),
+                Some(VisualFixture::SettingsSubtitlesPopover)
             );
         }
 

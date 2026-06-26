@@ -108,8 +108,8 @@ use gpui::{
     Pixels, Point, PromptButton, PromptLevel, Render, Rgba, ShapedLine, SharedString,
     StatefulInteractiveElement, Style, Task, TextRun, TitlebarOptions, UTF16Selection,
     UniformListScrollHandle, Window, WindowBackgroundAppearance, WindowBounds, WindowControlArea,
-    WindowDecorations, WindowOptions, actions, div, fill, hsla, linear_color_stop, linear_gradient,
-    point, prelude::*, px, relative, size, svg, uniform_list,
+    WindowDecorations, WindowOptions, actions, deferred, div, fill, hsla, linear_color_stop,
+    linear_gradient, point, prelude::*, px, relative, size, svg, uniform_list,
 };
 #[cfg(target_os = "macos")]
 use objc2_app_kit::{NSView, NSWindowButton};

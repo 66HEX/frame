@@ -334,7 +334,7 @@ mod frame_root_conversion {
             false,
         ));
 
-        assert_eq!(root.subtitle_font_color_draft, "#ABC");
+        assert_eq!(root.subtitle_font_color_draft, "#AABBCC");
         assert_eq!(
             root.file_queue
                 .selected_file()
@@ -962,6 +962,20 @@ mod visual_fixtures {
                 .map(|metadata| metadata.subtitle_tracks.len()),
             Some(2)
         );
+    }
+
+    #[test]
+    fn settings_subtitles_popover_fixture_opens_font_color_picker() {
+        let mut root = FrameRoot::new();
+
+        root.apply_visual_fixture(Some(VisualFixture::SettingsSubtitlesPopover));
+
+        assert_eq!(root.settings_active_tab, SettingsTab::Subtitles);
+        assert_eq!(
+            root.settings_subtitle_popover,
+            Some(SettingsSubtitlePopover::FontColor)
+        );
+        assert_eq!(root.subtitle_font_color_draft, "#FFD166");
     }
 
     #[test]

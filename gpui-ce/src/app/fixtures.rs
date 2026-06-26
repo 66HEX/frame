@@ -11,6 +11,9 @@ impl FrameRoot {
             Some(VisualFixture::SettingsMetadata) => self.apply_settings_metadata_fixture(),
             Some(VisualFixture::SettingsPresets) => self.apply_settings_presets_fixture(),
             Some(VisualFixture::SettingsSubtitles) => self.apply_settings_subtitles_fixture(),
+            Some(VisualFixture::SettingsSubtitlesPopover) => {
+                self.apply_settings_subtitles_popover_fixture();
+            }
             Some(VisualFixture::SettingsVideo) => self.apply_settings_video_fixture(),
             None => {}
         }
@@ -194,6 +197,11 @@ impl FrameRoot {
             file.config.subtitle_position = Some("bottom".to_string());
             file.config.selected_subtitle_tracks = vec![2];
         }
+    }
+    pub(super) fn apply_settings_subtitles_popover_fixture(&mut self) {
+        self.apply_settings_subtitles_fixture();
+        self.settings_subtitle_popover = Some(SettingsSubtitlePopover::FontColor);
+        self.subtitle_font_color_draft = "#FFD166".to_string();
     }
     pub(super) fn apply_settings_presets_fixture(&mut self) {
         self.apply_preview_ready_fixture();

@@ -287,13 +287,17 @@ fn settings_subtitle_font_select(
             .overflow_hidden()
             .rounded(px(theme::RADIUS_SM))
             .bg(color(theme::DROPDOWN))
-            .shadow(button_highlight_shadows());
+            .shadow(button_highlight_shadows())
+            .occlude()
+            .on_mouse_down(MouseButton::Left, move |_, _window, cx| {
+                cx.stop_propagation();
+            });
         for option in options {
             let name = option.name.clone();
             let is_enabled = !option.is_disabled;
             list = list.child(settings_subtitle_font_option(option, is_enabled, name, cx));
         }
-        field = field.child(list);
+        field = field.child(deferred(list).with_priority(10));
     }
 
     field
@@ -337,7 +341,11 @@ fn settings_subtitle_font_size_select(
             .overflow_hidden()
             .rounded(px(theme::RADIUS_SM))
             .bg(color(theme::DROPDOWN))
-            .shadow(button_highlight_shadows());
+            .shadow(button_highlight_shadows())
+            .occlude()
+            .on_mouse_down(MouseButton::Left, move |_, _window, cx| {
+                cx.stop_propagation();
+            });
 
         for option in options {
             let size = option.size;
@@ -345,7 +353,7 @@ fn settings_subtitle_font_size_select(
             list = list.child(settings_subtitle_size_option(option, is_enabled, size, cx));
         }
 
-        field = field.child(list);
+        field = field.child(deferred(list).with_priority(10));
     }
 
     field
@@ -602,9 +610,12 @@ fn settings_subtitle_color_field(
         );
 
     if is_open {
-        field = field.child(settings_subtitle_color_picker(
-            target, &value, draft, focus, window, cx,
-        ));
+        field = field.child(
+            deferred(settings_subtitle_color_picker(
+                target, &value, draft, focus, window, cx,
+            ))
+            .with_priority(10),
+        );
     }
 
     field
@@ -638,6 +649,7 @@ fn settings_subtitle_color_picker(
         .bg(color(theme::DROPDOWN))
         .p_2()
         .shadow(button_highlight_shadows())
+        .occlude()
         .on_mouse_down(MouseButton::Left, move |_, _window, cx| {
             cx.stop_propagation();
         })
@@ -685,6 +697,7 @@ fn settings_subtitle_sv_square(
         .border_color(color(theme::FRAME_GRAY_200))
         .bg(hue)
         .cursor_crosshair()
+        .occlude()
         .on_mouse_down(MouseButton::Left, move |_, _window, cx| {
             cx.stop_propagation();
         })
