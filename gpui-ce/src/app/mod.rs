@@ -68,12 +68,12 @@ use crate::{
         ConversionConfig, CropSettings, DEFAULT_SUBTITLE_FONT_COLOR,
         DEFAULT_SUBTITLE_OUTLINE_COLOR, MetadataField, PresetDefinition, PresetNotice,
         PresetNoticeTone, PresetOption, ProcessingMode, SettingsTab, SourceInfoSection, SourceKind,
-        SourceMetadata, SourceTags, SubtitleFontOption, apply_audio_bitrate,
-        apply_audio_bitrate_mode, apply_audio_channels, apply_audio_codec, apply_audio_normalize,
-        apply_audio_quality, apply_audio_volume, apply_crf, apply_custom_height,
-        apply_custom_width, apply_fps, apply_gif_colors, apply_gif_dither, apply_gif_loop,
-        apply_hw_decode, apply_metadata_field, apply_metadata_mode, apply_ml_upscale,
-        apply_nvenc_spatial_aq, apply_nvenc_temporal_aq, apply_output_container,
+        SourceMetadata, SourceTags, SubtitleFontOption, SubtitleFontSizeOption,
+        apply_audio_bitrate, apply_audio_bitrate_mode, apply_audio_channels, apply_audio_codec,
+        apply_audio_normalize, apply_audio_quality, apply_audio_volume, apply_crf,
+        apply_custom_height, apply_custom_width, apply_fps, apply_gif_colors, apply_gif_dither,
+        apply_gif_loop, apply_hw_decode, apply_metadata_field, apply_metadata_mode,
+        apply_ml_upscale, apply_nvenc_spatial_aq, apply_nvenc_temporal_aq, apply_output_container,
         apply_pixel_format, apply_preset, apply_processing_mode, apply_quality, apply_resolution,
         apply_scaling_algorithm, apply_subtitle_burn_path, apply_subtitle_font_color,
         apply_subtitle_font_name, apply_subtitle_font_size, apply_subtitle_outline_color,
@@ -83,14 +83,14 @@ use crate::{
         create_custom_preset, default_presets, fps_options, gif_color_options, gif_dither_options,
         is_gif_container, is_hardware_video_codec, is_nvenc_video_codec,
         is_videotoolbox_video_codec, metadata_field_options, metadata_field_value,
-        metadata_mode_options, normalize_output_config, output_container_options,
-        output_processing_mode_options, preset_options, resolution_options,
-        resolve_active_settings_tab, sanitize_output_name, scaling_algorithm_options,
-        source_info_sections, subtitle_burn_file_label, subtitle_color_value,
-        subtitle_font_options, subtitle_font_size_options, subtitle_position_options,
-        subtitle_track_options, toggle_audio_track_selection, toggle_subtitle_track_selection,
-        video_codec_options, video_pixel_format_options, video_preset_options,
-        visible_settings_tabs,
+        metadata_mode_options, normalize_output_config, normalized_hex_color,
+        output_container_options, output_processing_mode_options, preset_options,
+        resolution_options, resolve_active_settings_tab, sanitize_output_name,
+        scaling_algorithm_options, source_info_sections, subtitle_burn_file_label,
+        subtitle_color_value, subtitle_font_options, subtitle_font_size_options,
+        subtitle_position_options, subtitle_track_options, toggle_audio_track_selection,
+        toggle_subtitle_track_selection, video_codec_options, video_pixel_format_options,
+        video_preset_options, visible_settings_tabs,
     },
     source_metadata::{
         MetadataStatus, SourceMetadataEntry, SourceMetadataStore, probe_source_metadata,
@@ -108,8 +108,8 @@ use gpui::{
     Pixels, Point, PromptButton, PromptLevel, Render, Rgba, ShapedLine, SharedString,
     StatefulInteractiveElement, Style, Task, TextRun, TitlebarOptions, UTF16Selection,
     UniformListScrollHandle, Window, WindowBackgroundAppearance, WindowBounds, WindowControlArea,
-    WindowDecorations, WindowOptions, actions, div, fill, hsla, point, prelude::*, px, relative,
-    size, svg, uniform_list,
+    WindowDecorations, WindowOptions, actions, div, fill, hsla, linear_color_stop, linear_gradient,
+    point, prelude::*, px, relative, size, svg, uniform_list,
 };
 #[cfg(target_os = "macos")]
 use objc2_app_kit::{NSView, NSWindowButton};
@@ -194,6 +194,8 @@ pub struct FrameRoot {
     settings_metadata_date_focus: Option<FocusHandle>,
     settings_metadata_comment_focus: Option<FocusHandle>,
     settings_preset_name_focus: Option<FocusHandle>,
+    settings_subtitle_font_color_focus: Option<FocusHandle>,
+    settings_subtitle_outline_color_focus: Option<FocusHandle>,
     active_text_input: Option<FrameTextInputKind>,
     max_concurrency_input: FrameTextInputRuntime,
     output_name_input: FrameTextInputRuntime,
@@ -209,6 +211,8 @@ pub struct FrameRoot {
     metadata_date_input: FrameTextInputRuntime,
     metadata_comment_input: FrameTextInputRuntime,
     preset_name_input: FrameTextInputRuntime,
+    subtitle_font_color_input: FrameTextInputRuntime,
+    subtitle_outline_color_input: FrameTextInputRuntime,
     text_input_cursor_visible: bool,
     text_input_cursor_paused: bool,
     text_input_cursor_epoch: usize,
@@ -221,6 +225,9 @@ pub struct FrameRoot {
     preset_name_draft: String,
     preset_notice: Option<PresetNotice>,
     next_custom_preset_sequence: u64,
+    settings_subtitle_popover: Option<SettingsSubtitlePopover>,
+    subtitle_font_color_draft: String,
+    subtitle_outline_color_draft: String,
     preview_crop_file_id: Option<String>,
     preview_crop_mode: bool,
     preview_draft_crop: Option<CropRect>,
@@ -235,6 +242,39 @@ struct PreviewCropDragState {
     handle: DragHandle,
     start_rect: CropRect,
     start_point: PreviewPoint,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::app) enum SettingsSubtitlePopover {
+    FontName,
+    FontSize,
+    FontColor,
+    OutlineColor,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::app) enum SettingsSubtitleColorTarget {
+    Font,
+    Outline,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(in crate::app) struct SettingsSubtitleHsv {
+    h: f64,
+    s: f64,
+    v: f64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::app) enum SettingsSubtitleColorDragKind {
+    SaturationValue,
+    Hue,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::app) struct SettingsSubtitleColorDrag {
+    target: SettingsSubtitleColorTarget,
+    kind: SettingsSubtitleColorDragKind,
 }
 
 #[derive(Clone, Copy)]
@@ -253,6 +293,10 @@ struct SettingsRenderState<'a> {
     video_bitrate_focus: Option<&'a FocusHandle>,
     gif_loop_focus: Option<&'a FocusHandle>,
     metadata_focuses: SettingsMetadataInputFocuses<'a>,
+    subtitle_color_focuses: SettingsSubtitleColorInputFocuses<'a>,
+    subtitle_popover: Option<SettingsSubtitlePopover>,
+    subtitle_font_color_draft: &'a str,
+    subtitle_outline_color_draft: &'a str,
     preset_name: &'a str,
     preset_name_focus: Option<&'a FocusHandle>,
     presets: &'a [PresetDefinition],
@@ -277,6 +321,12 @@ struct SettingsMetadataInputFocuses<'a> {
     genre: Option<&'a FocusHandle>,
     date: Option<&'a FocusHandle>,
     comment: Option<&'a FocusHandle>,
+}
+
+#[derive(Clone, Copy)]
+struct SettingsSubtitleColorInputFocuses<'a> {
+    font: Option<&'a FocusHandle>,
+    outline: Option<&'a FocusHandle>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -20,6 +20,8 @@ impl FrameRoot {
             FrameTextInputKind::MetadataDate => &self.metadata_date_input,
             FrameTextInputKind::MetadataComment => &self.metadata_comment_input,
             FrameTextInputKind::PresetName => &self.preset_name_input,
+            FrameTextInputKind::SubtitleFontColorHex => &self.subtitle_font_color_input,
+            FrameTextInputKind::SubtitleOutlineColorHex => &self.subtitle_outline_color_input,
         }
     }
 
@@ -42,6 +44,8 @@ impl FrameRoot {
             FrameTextInputKind::MetadataDate => &mut self.metadata_date_input,
             FrameTextInputKind::MetadataComment => &mut self.metadata_comment_input,
             FrameTextInputKind::PresetName => &mut self.preset_name_input,
+            FrameTextInputKind::SubtitleFontColorHex => &mut self.subtitle_font_color_input,
+            FrameTextInputKind::SubtitleOutlineColorHex => &mut self.subtitle_outline_color_input,
         }
     }
 
@@ -64,6 +68,12 @@ impl FrameRoot {
             FrameTextInputKind::MetadataDate => self.settings_metadata_date_focus.as_ref(),
             FrameTextInputKind::MetadataComment => self.settings_metadata_comment_focus.as_ref(),
             FrameTextInputKind::PresetName => self.settings_preset_name_focus.as_ref(),
+            FrameTextInputKind::SubtitleFontColorHex => {
+                self.settings_subtitle_font_color_focus.as_ref()
+            }
+            FrameTextInputKind::SubtitleOutlineColorHex => {
+                self.settings_subtitle_outline_color_focus.as_ref()
+            }
         }
     }
 
@@ -141,6 +151,16 @@ impl FrameRoot {
             .is_some_and(|focus| focus.is_focused(window))
         {
             Some(FrameTextInputKind::PresetName)
+        } else if self
+            .text_input_focus_handle(FrameTextInputKind::SubtitleFontColorHex)
+            .is_some_and(|focus| focus.is_focused(window))
+        {
+            Some(FrameTextInputKind::SubtitleFontColorHex)
+        } else if self
+            .text_input_focus_handle(FrameTextInputKind::SubtitleOutlineColorHex)
+            .is_some_and(|focus| focus.is_focused(window))
+        {
+            Some(FrameTextInputKind::SubtitleOutlineColorHex)
         } else {
             None
         }
@@ -168,7 +188,9 @@ impl FrameRoot {
             | FrameTextInputKind::MetadataAlbum
             | FrameTextInputKind::MetadataGenre
             | FrameTextInputKind::MetadataDate
-            | FrameTextInputKind::MetadataComment => self.file_queue.selected_file_locked(),
+            | FrameTextInputKind::MetadataComment
+            | FrameTextInputKind::SubtitleFontColorHex
+            | FrameTextInputKind::SubtitleOutlineColorHex => self.file_queue.selected_file_locked(),
             FrameTextInputKind::PresetName => self.file_queue.selected_file_locked(),
         }
     }
@@ -217,6 +239,10 @@ impl FrameRoot {
                 })
                 .unwrap_or_default(),
             FrameTextInputKind::PresetName => self.preset_name_draft.clone(),
+            FrameTextInputKind::SubtitleFontColorHex => self.subtitle_font_color_draft.clone(),
+            FrameTextInputKind::SubtitleOutlineColorHex => {
+                self.subtitle_outline_color_draft.clone()
+            }
         }
     }
 
@@ -314,6 +340,25 @@ impl FrameRoot {
                 let next: String = candidate.chars().filter(|ch| !ch.is_control()).collect();
                 self.preset_name_draft = next.clone();
                 self.preset_notice = None;
+                Some(next)
+            }
+            FrameTextInputKind::SubtitleFontColorHex
+            | FrameTextInputKind::SubtitleOutlineColorHex => {
+                if self.file_queue.selected_file_locked() {
+                    return None;
+                }
+                let next = sanitize_hex_draft(candidate);
+                let target = match kind {
+                    FrameTextInputKind::SubtitleFontColorHex => SettingsSubtitleColorTarget::Font,
+                    FrameTextInputKind::SubtitleOutlineColorHex => {
+                        SettingsSubtitleColorTarget::Outline
+                    }
+                    _ => unreachable!("matched subtitle color text input variants"),
+                };
+                self.set_subtitle_color_draft(target, next.clone());
+                if let Some(normalized) = normalized_hex_color(&next) {
+                    self.commit_subtitle_color(target, &normalized);
+                }
                 Some(next)
             }
         }

@@ -16,6 +16,8 @@ pub(in crate::app) enum FrameTextInputKind {
     MetadataDate,
     MetadataComment,
     PresetName,
+    SubtitleFontColorHex,
+    SubtitleOutlineColorHex,
 }
 
 pub(in crate::app) struct FrameTextInputRuntime {

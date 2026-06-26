@@ -20,7 +20,25 @@ pub(super) fn sanitize_replacement_text(kind: FrameTextInputKind, value: &str) -
         | FrameTextInputKind::MetadataDate
         | FrameTextInputKind::MetadataComment
         | FrameTextInputKind::PresetName => value.chars().filter(|ch| !ch.is_control()).collect(),
+        FrameTextInputKind::SubtitleFontColorHex | FrameTextInputKind::SubtitleOutlineColorHex => {
+            value
+                .chars()
+                .filter(|ch| *ch == '#' || ch.is_ascii_hexdigit())
+                .collect()
+        }
     }
+}
+
+pub(super) fn sanitize_hex_draft(value: &str) -> String {
+    let mut next = String::from("#");
+    next.extend(
+        value
+            .chars()
+            .filter(char::is_ascii_hexdigit)
+            .take(6)
+            .map(|ch| ch.to_ascii_uppercase()),
+    );
+    next
 }
 
 pub(super) fn clamp_text_offset(text: &str, offset: usize) -> usize {

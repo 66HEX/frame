@@ -84,6 +84,14 @@ impl Render for FrameRoot {
                     .settings_preset_name_focus
                     .get_or_insert_with(|| cx.focus_handle().tab_stop(true))
                     .clone();
+                let subtitle_font_color_focus = self
+                    .settings_subtitle_font_color_focus
+                    .get_or_insert_with(|| cx.focus_handle().tab_stop(true))
+                    .clone();
+                let subtitle_outline_color_focus = self
+                    .settings_subtitle_outline_color_focus
+                    .get_or_insert_with(|| cx.focus_handle().tab_stop(true))
+                    .clone();
                 content.child(workspace_view(
                     &self.file_queue,
                     SettingsRenderState {
@@ -108,6 +116,13 @@ impl Render for FrameRoot {
                             date: Some(&metadata_date_focus),
                             comment: Some(&metadata_comment_focus),
                         },
+                        subtitle_color_focuses: SettingsSubtitleColorInputFocuses {
+                            font: Some(&subtitle_font_color_focus),
+                            outline: Some(&subtitle_outline_color_focus),
+                        },
+                        subtitle_popover: self.settings_subtitle_popover,
+                        subtitle_font_color_draft: &self.subtitle_font_color_draft,
+                        subtitle_outline_color_draft: &self.subtitle_outline_color_draft,
                         preset_name: &self.preset_name_draft,
                         preset_name_focus: Some(&preset_name_focus),
                         presets: &self.presets,
@@ -138,6 +153,15 @@ impl Render for FrameRoot {
             .text_color(color(theme::FOREGROUND))
             .font_family(assets::FRAME_FONT_FAMILY)
             .font_weight(FontWeight::SEMIBOLD)
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|root, _event: &MouseDownEvent, _window, cx| {
+                    if root.settings_subtitle_popover.is_some() {
+                        root.close_subtitle_popover();
+                        cx.notify();
+                    }
+                }),
+            )
             .on_drop(cx.listener(|root, paths: &ExternalPaths, _window, cx| {
                 cx.stop_propagation();
                 root.import_source_paths(paths.paths().to_vec(), cx);

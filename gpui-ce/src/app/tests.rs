@@ -5,6 +5,7 @@ use super::preview_panel::{
     timeline_slider_percent_from_bounds,
 };
 use super::primitives::{ButtonVariant, button_colors};
+use super::settings_panel::{hex_to_subtitle_hsv, subtitle_hsv_to_hex};
 use super::*;
 
 mod frame_root_imports {
@@ -315,6 +316,100 @@ mod frame_root_conversion {
         ));
 
         assert_eq!(root.preset_name_draft, "Review MP4");
+    }
+
+    #[test]
+    fn subtitle_font_color_hex_input_expands_short_hex_and_updates_config() {
+        let mut root = FrameRoot::new();
+        root.file_queue
+            .add_file(FileItem::from_path("first", "/tmp/one.mp4", 1));
+        root.subtitle_font_color_draft = "#".to_string();
+        root.subtitle_font_color_input.selected_range = 1..1;
+
+        assert!(root.replace_text_input_range(
+            FrameTextInputKind::SubtitleFontColorHex,
+            None,
+            "abc",
+            None,
+            false,
+        ));
+
+        assert_eq!(root.subtitle_font_color_draft, "#ABC");
+        assert_eq!(
+            root.file_queue
+                .selected_file()
+                .and_then(|file| file.config.subtitle_font_color.as_deref()),
+            Some("#aabbcc")
+        );
+    }
+
+    #[test]
+    fn subtitle_outline_color_hex_input_keeps_incomplete_draft_without_committing() {
+        let mut root = FrameRoot::new();
+        root.file_queue
+            .add_file(FileItem::from_path("first", "/tmp/one.mp4", 1));
+        root.subtitle_outline_color_draft = "#".to_string();
+        root.subtitle_outline_color_input.selected_range = 1..1;
+
+        assert!(root.replace_text_input_range(
+            FrameTextInputKind::SubtitleOutlineColorHex,
+            None,
+            "f",
+            None,
+            false,
+        ));
+
+        assert_eq!(root.subtitle_outline_color_draft, "#F");
+        assert_eq!(
+            root.file_queue
+                .selected_file()
+                .and_then(|file| file.config.subtitle_outline_color.as_deref()),
+            None
+        );
+    }
+
+    #[test]
+    fn subtitle_color_hsv_commit_updates_selected_config_and_draft() {
+        let mut root = FrameRoot::new();
+        root.file_queue
+            .add_file(FileItem::from_path("first", "/tmp/one.mp4", 1));
+
+        assert!(root.commit_subtitle_hsv_color(
+            SettingsSubtitleColorTarget::Font,
+            SettingsSubtitleHsv {
+                h: 60.0,
+                s: 1.0,
+                v: 1.0,
+            },
+        ));
+
+        assert_eq!(root.subtitle_font_color_draft, "#FFFF00");
+        assert_eq!(
+            root.file_queue
+                .selected_file()
+                .and_then(|file| file.config.subtitle_font_color.as_deref()),
+            Some("#ffff00")
+        );
+    }
+
+    #[test]
+    fn subtitle_popover_toggle_keeps_only_one_open_panel() {
+        let mut root = FrameRoot::new();
+
+        root.toggle_subtitle_popover(SettingsSubtitlePopover::FontName);
+        assert_eq!(
+            root.settings_subtitle_popover,
+            Some(SettingsSubtitlePopover::FontName)
+        );
+
+        root.toggle_subtitle_popover(SettingsSubtitlePopover::FontSize);
+        assert_eq!(
+            root.settings_subtitle_popover,
+            Some(SettingsSubtitlePopover::FontSize)
+        );
+
+        root.toggle_subtitle_popover(SettingsSubtitlePopover::FontSize);
+        assert_eq!(root.settings_subtitle_popover, None);
     }
 
     #[test]
@@ -977,6 +1072,13 @@ mod preview_shell {
                 date: None,
                 comment: None,
             },
+            subtitle_color_focuses: SettingsSubtitleColorInputFocuses {
+                font: None,
+                outline: None,
+            },
+            subtitle_popover: None,
+            subtitle_font_color_draft: "",
+            subtitle_outline_color_draft: "",
             preset_name: "",
             preset_name_focus: None,
             presets: &[],
@@ -1145,6 +1247,17 @@ mod preview_shell {
             timeline_slider_percent_from_bounds(point(px(140.0), px(0.0)), bounds),
             1.0
         );
+    }
+
+    #[test]
+    fn subtitle_hsv_helpers_round_trip_primary_colors() {
+        assert_eq!(subtitle_hsv_to_hex(0.0, 1.0, 1.0), "#ff0000");
+        assert_eq!(subtitle_hsv_to_hex(120.0, 1.0, 1.0), "#00ff00");
+
+        let hsv = hex_to_subtitle_hsv("#00f");
+        assert_eq!(hsv.h, 240.0);
+        assert_eq!(hsv.s, 1.0);
+        assert_eq!(hsv.v, 1.0);
     }
 }
 
