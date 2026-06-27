@@ -627,6 +627,11 @@ fn settings_video_range_slider(
         fraction,
         disabled,
     )
+    .when(!disabled, |slider| {
+        slider.on_drag(drag, |_drag, _position, _window, cx| {
+            cx.new(|_| SettingsVideoRangeDragPreview)
+        })
+    })
     .on_drag_move(cx.listener(
         |root, event: &DragMoveEvent<SettingsVideoRangeDrag>, _window, cx| {
             let drag = *event.drag(cx);

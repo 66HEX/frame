@@ -187,8 +187,7 @@ pub(in crate::app) fn preview_timeline_track(
                 .top(px(track_top))
                 .h(px(PREVIEW_TRACK_HEIGHT))
                 .rounded(px(1.5))
-                .bg(color(theme::FRAME_GRAY_100))
-                .shadow(input_highlight_shadows()),
+                .bg(color(theme::FRAME_GRAY_100)),
         )
         .child(
             div()

@@ -321,6 +321,11 @@ fn settings_audio_range_slider(
         fraction,
         disabled,
     )
+    .when(!disabled, |slider| {
+        slider.on_drag(drag, |_drag, _position, _window, cx| {
+            cx.new(|_| SettingsAudioRangeDragPreview)
+        })
+    })
     .on_drag_move(cx.listener(
         |root, event: &DragMoveEvent<SettingsAudioRangeDrag>, _window, cx| {
             let drag = *event.drag(cx);

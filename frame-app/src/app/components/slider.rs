@@ -1,11 +1,13 @@
 use super::*;
 
 pub(in crate::app) const FRAME_SLIDER_VISUAL_HEIGHT: f32 = 20.0;
-pub(in crate::app) const FRAME_SLIDER_TRACK_HEIGHT: f32 = 4.0;
-pub(in crate::app) const FRAME_SLIDER_TRACK_TOP: f32 = 8.0;
-pub(in crate::app) const FRAME_SLIDER_HANDLE_WIDTH: f32 = 10.0;
-pub(in crate::app) const FRAME_SLIDER_HANDLE_HEIGHT: f32 = 14.0;
-pub(in crate::app) const FRAME_SLIDER_HANDLE_TOP: f32 = 3.0;
+pub(in crate::app) const FRAME_SLIDER_TRACK_HEIGHT: f32 = 6.0;
+pub(in crate::app) const FRAME_SLIDER_TRACK_TOP: f32 = 7.0;
+pub(in crate::app) const FRAME_SLIDER_TRACK_RADIUS: f32 = 1.5;
+pub(in crate::app) const FRAME_SLIDER_FILL_RADIUS: f32 = 1.0;
+pub(in crate::app) const FRAME_SLIDER_HANDLE_WIDTH: f32 = 20.0;
+pub(in crate::app) const FRAME_SLIDER_HANDLE_HEIGHT: f32 = FRAME_SLIDER_VISUAL_HEIGHT;
+pub(in crate::app) const FRAME_SLIDER_HANDLE_TOP: f32 = 0.0;
 
 pub(in crate::app) fn frame_slider(
     id: &'static str,
@@ -26,9 +28,8 @@ pub(in crate::app) fn frame_slider(
                 .right_0()
                 .top(px(FRAME_SLIDER_TRACK_TOP))
                 .h(px(FRAME_SLIDER_TRACK_HEIGHT))
-                .rounded(px(FRAME_SLIDER_TRACK_HEIGHT / 2.0))
-                .bg(color(theme::FRAME_GRAY_100))
-                .shadow(input_highlight_shadows()),
+                .rounded(px(FRAME_SLIDER_TRACK_RADIUS))
+                .bg(color(theme::FRAME_GRAY_100)),
         )
         .child(
             div()
@@ -37,7 +38,7 @@ pub(in crate::app) fn frame_slider(
                 .top(px(FRAME_SLIDER_TRACK_TOP))
                 .h(px(FRAME_SLIDER_TRACK_HEIGHT))
                 .w(relative(fraction.clamp(0.0, 1.0)))
-                .rounded(px(FRAME_SLIDER_TRACK_HEIGHT / 2.0))
+                .rounded(px(FRAME_SLIDER_FILL_RADIUS))
                 .bg(color(theme::FOREGROUND)),
         )
 }
@@ -55,8 +56,21 @@ pub(in crate::app) fn frame_slider_handle(
         .ml(px(-(FRAME_SLIDER_HANDLE_WIDTH / 2.0)))
         .w(px(FRAME_SLIDER_HANDLE_WIDTH))
         .h(px(FRAME_SLIDER_HANDLE_HEIGHT))
-        .rounded(px(FRAME_SLIDER_HANDLE_WIDTH / 2.0))
-        .bg(color(theme::FOREGROUND))
-        .shadow(button_highlight_shadows())
         .when(enabled, |this| this.cursor_ew_resize())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn frame_slider_track_matches_original_svelte_range_height() {
+        assert_eq!(FRAME_SLIDER_TRACK_HEIGHT, 6.0);
+    }
+
+    #[test]
+    fn frame_slider_handle_remains_hit_target_only() {
+        assert_eq!(FRAME_SLIDER_HANDLE_WIDTH, 20.0);
+        assert_eq!(FRAME_SLIDER_HANDLE_HEIGHT, FRAME_SLIDER_VISUAL_HEIGHT);
+    }
 }
