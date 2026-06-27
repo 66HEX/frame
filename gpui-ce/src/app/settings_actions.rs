@@ -47,25 +47,13 @@ impl FrameRoot {
             return;
         }
 
-        let receiver = cx.prompt_for_paths(PathPromptOptions {
-            files: true,
-            directories: false,
-            multiple: false,
-            prompt: Some("Select subtitle file".into()),
-        });
-
         cx.spawn(async move |this, cx| {
-            let paths = match receiver.await {
-                Ok(Ok(Some(paths))) => paths,
-                Ok(Ok(None)) | Err(_) => return,
-                Ok(Err(error)) => {
-                    eprintln!("Failed to open subtitle picker: {error}");
-                    return;
-                }
-            };
-            let Some(path) = paths.into_iter().next() else {
+            let Some(path) = cx.background_spawn(async { pick_subtitle_file() }).await else {
                 return;
             };
+            if !is_supported_subtitle_path(&path) {
+                return;
+            }
             let path = path.to_string_lossy().to_string();
 
             this.update(cx, |root, cx| {

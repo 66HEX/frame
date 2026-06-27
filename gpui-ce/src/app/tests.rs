@@ -42,6 +42,35 @@ mod frame_root_imports {
 
         assert!(imports.is_empty());
     }
+
+    #[test]
+    fn allocate_file_imports_skips_unsupported_source_extensions() {
+        let mut root = FrameRoot::new();
+
+        let imports = root.allocate_file_imports(vec![
+            PathBuf::from("/tmp/one.mp4"),
+            PathBuf::from("/tmp/readme.txt"),
+            PathBuf::from("/tmp/two.PNG"),
+        ]);
+
+        assert_eq!(
+            imports,
+            [
+                ("file-1".to_string(), PathBuf::from("/tmp/one.mp4")),
+                ("file-2".to_string(), PathBuf::from("/tmp/two.PNG")),
+            ]
+        );
+    }
+
+    #[test]
+    fn allocate_file_imports_does_not_advance_ids_for_unsupported_sources() {
+        let mut root = FrameRoot::new();
+        root.allocate_file_imports(vec![PathBuf::from("/tmp/readme.txt")]);
+
+        let imports = root.allocate_file_imports(vec![PathBuf::from("/tmp/clip.mov")]);
+
+        assert_eq!(imports[0].0, "file-1");
+    }
 }
 
 mod frame_root_conversion {

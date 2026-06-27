@@ -53,11 +53,13 @@ use crate::{
     conversion_runner::{
         ConversionProcessController, conversion_task_from_file, run_conversion_batch_with_control,
     },
+    file_filters::{filter_supported_source_paths, is_supported_subtitle_path},
     file_queue::{
         BatchSelectionState, FileItem, FileQueue, FileStateTone, FileStatus, RowActionAvailability,
         format_file_size,
     },
     format_total_size,
+    native_dialogs::{pick_source_files, pick_subtitle_file},
     preview::{
         ASPECT_OPTIONS, CropRect, DragHandle, MediaSnapshot,
         MetadataStatus as PreviewMetadataStatus, Point as PreviewPoint, PreviewControlAvailability,
@@ -105,12 +107,12 @@ use gpui::{
     App, Bounds, BoxShadow, ClickEvent, ClipboardItem, Context, DragMoveEvent, Element, ElementId,
     ElementInputHandler, Entity, EntityInputHandler, ExternalPaths, FocusHandle, GlobalElementId,
     InteractiveElement, IntoElement, KeyBinding, LayoutId, Menu, MenuItem, MouseButton,
-    MouseDownEvent, MouseMoveEvent, MouseUpEvent, PaintQuad, PathPromptOptions, Pixels, Point,
-    Position, PromptButton, PromptLevel, Render, Rgba, ShapedLine, SharedString,
-    StatefulInteractiveElement, Style, Task, TextRun, TitlebarOptions, UTF16Selection,
-    UniformListScrollHandle, Window, WindowBackgroundAppearance, WindowBounds, WindowControlArea,
-    WindowDecorations, WindowOptions, actions, deferred, div, fill, hsla, linear_color_stop,
-    linear_gradient, point, prelude::*, px, relative, size, svg, uniform_list,
+    MouseDownEvent, MouseMoveEvent, MouseUpEvent, PaintQuad, Pixels, Point, Position, PromptButton,
+    PromptLevel, Render, Rgba, ShapedLine, SharedString, StatefulInteractiveElement, Style, Task,
+    TextRun, TitlebarOptions, UTF16Selection, UniformListScrollHandle, Window,
+    WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowDecorations, WindowOptions,
+    actions, deferred, div, fill, hsla, linear_color_stop, linear_gradient, point, prelude::*, px,
+    relative, size, svg, uniform_list,
 };
 #[cfg(target_os = "macos")]
 use objc2_app_kit::{NSView, NSWindowButton};

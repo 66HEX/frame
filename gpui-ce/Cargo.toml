@@ -10,6 +10,7 @@ publish = false
 frame-core = { path = "../frame-core" }
 gpui = { package = "gpui", git = "https://github.com/gpui-ce/gpui-ce" }
 gpui_platform = { git = "https://github.com/gpui-ce/gpui-ce", features = ["font-kit"] }
+rfd = "0.16.0"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

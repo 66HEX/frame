@@ -2,21 +2,10 @@ use super::*;
 
 impl FrameRoot {
     pub(super) fn prompt_add_source(&mut self, cx: &mut Context<Self>) {
-        let receiver = cx.prompt_for_paths(PathPromptOptions {
-            files: true,
-            directories: false,
-            multiple: true,
-            prompt: Some("Add Source".into()),
-        });
-
         cx.spawn(async move |this, cx| {
-            let paths = match receiver.await {
-                Ok(Ok(Some(paths))) => paths,
-                Ok(Ok(None)) | Err(_) => return,
-                Ok(Err(error)) => {
-                    eprintln!("Failed to open file picker: {error}");
-                    return;
-                }
+            let paths = cx.background_spawn(async { pick_source_files() }).await;
+            let Some(paths) = paths else {
+                return;
             };
             if paths.is_empty() {
                 return;
@@ -60,7 +49,7 @@ impl FrameRoot {
         .detach();
     }
     pub(super) fn allocate_file_imports(&mut self, paths: Vec<PathBuf>) -> Vec<(String, PathBuf)> {
-        paths
+        filter_supported_source_paths(paths)
             .into_iter()
             .map(|path| {
                 let id = self.next_file_id();
