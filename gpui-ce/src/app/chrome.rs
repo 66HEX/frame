@@ -451,16 +451,24 @@ pub(super) fn titlebar_segment(
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
     let colors = button_colors(ButtonVariant::Secondary, selected, true);
+    let segment_id = match view {
+        ActiveView::Workspace => "titlebar-workspace",
+        ActiveView::Logs => "titlebar-logs",
+    };
+    let icon_color = if selected {
+        color(theme::FOREGROUND)
+    } else {
+        color(theme::FRAME_GRAY_600)
+    };
+
     div()
         .h(px(TITLEBAR_NAV_BUTTON_HEIGHT))
         .flex()
         .items_center()
         .gap_2()
         .rounded(px(theme::RADIUS_SM))
-        .id(match view {
-            ActiveView::Workspace => "titlebar-workspace",
-            ActiveView::Logs => "titlebar-logs",
-        })
+        .id(segment_id)
+        .group(segment_id)
         .px_2()
         .bg(if selected {
             color(colors.background)
@@ -492,14 +500,15 @@ pub(super) fn titlebar_segment(
             }
             cx.stop_propagation();
         }))
-        .child(icon_svg(
-            icon,
-            TITLEBAR_ICON_SIZE,
-            if selected {
-                color(theme::FOREGROUND)
-            } else {
-                color(theme::FRAME_GRAY_600)
-            },
-        ))
+        .child(
+            svg()
+                .path(icon)
+                .w(px(TITLEBAR_ICON_SIZE))
+                .h(px(TITLEBAR_ICON_SIZE))
+                .text_color(icon_color)
+                .group_hover(segment_id, |style| {
+                    style.text_color(color(theme::FOREGROUND))
+                }),
+        )
         .child(label)
 }
