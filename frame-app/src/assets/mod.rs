@@ -13,6 +13,7 @@ pub const FRAME_FONT_ALIAS: &str = "InstrumentSans";
 pub const FRAME_FONT_PATH: &str = "fonts/InstrumentSans-Variable.ttf";
 pub const FRAME_FONT_FEATURE_TAGS: [(&str, u32); 4] =
     [("liga", 1), ("ss02", 1), ("ss05", 1), ("kern", 1)];
+pub const FRAME_TABULAR_NUMBER_FONT_FEATURE_TAG: (&str, u32) = ("tnum", 1);
 pub const ICON_FRAME: &str = "icons/frame.svg";
 pub const ICON_ARROW_DOWN: &str = "icons/arrow-down.svg";
 pub const ICON_LAYOUT_LIST: &str = "icons/layout-list.svg";
@@ -183,15 +184,30 @@ pub fn frame_font_features() -> FontFeatures {
     static FEATURES: OnceLock<FontFeatures> = OnceLock::new();
 
     FEATURES
+        .get_or_init(|| font_features_from_tags(FRAME_FONT_FEATURE_TAGS))
+        .clone()
+}
+
+pub fn frame_tabular_number_font_features() -> FontFeatures {
+    static FEATURES: OnceLock<FontFeatures> = OnceLock::new();
+
+    FEATURES
         .get_or_init(|| {
-            FontFeatures(Arc::new(
+            font_features_from_tags(
                 FRAME_FONT_FEATURE_TAGS
-                    .iter()
-                    .map(|(tag, value)| ((*tag).to_string(), *value))
-                    .collect(),
-            ))
+                    .into_iter()
+                    .chain(std::iter::once(FRAME_TABULAR_NUMBER_FONT_FEATURE_TAG)),
+            )
         })
         .clone()
+}
+
+fn font_features_from_tags(tags: impl IntoIterator<Item = (&'static str, u32)>) -> FontFeatures {
+    FontFeatures(Arc::new(
+        tags.into_iter()
+            .map(|(tag, value)| (tag.to_string(), value))
+            .collect(),
+    ))
 }
 
 #[cfg(test)]

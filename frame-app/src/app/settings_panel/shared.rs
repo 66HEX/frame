@@ -17,6 +17,7 @@ pub(in crate::app) fn settings_value_badge(value: String) -> gpui::Div {
         .px(px(6.0))
         .text_size(px(theme::TEXT_LABEL_SIZE))
         .text_color(color(theme::FOREGROUND))
+        .font_features(assets::frame_tabular_number_font_features())
         .shadow(button_highlight_shadows())
         .child(value)
 }

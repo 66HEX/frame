@@ -134,6 +134,22 @@ mod frame_assets {
     }
 
     #[test]
+    fn frame_tabular_number_font_features_enable_requested_opentype_tags() {
+        let features = frame_tabular_number_font_features();
+
+        assert_eq!(
+            features.tag_value_list(),
+            [
+                ("liga".to_string(), 1),
+                ("ss02".to_string(), 1),
+                ("ss05".to_string(), 1),
+                ("kern".to_string(), 1),
+                ("tnum".to_string(), 1),
+            ]
+        );
+    }
+
+    #[test]
     fn list_returns_bundled_font_asset() {
         let listed = FrameAssets
             .list("fonts")

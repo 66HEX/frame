@@ -125,6 +125,7 @@ pub(in crate::app) fn preview_timecode_field(
                 } else {
                     color(theme::FRAME_GRAY_600)
                 })
+                .font_features(assets::frame_tabular_number_font_features())
                 .shadow(input_highlight_shadows())
                 .child(value),
         )
