@@ -5,6 +5,7 @@ const SUBTITLE_POPOVER_TRIGGER_GAP: f32 = 8.0;
 const SUBTITLE_POPOVER_TOP_OFFSET: f32 =
     SUBTITLE_FIELD_LABEL_STACK_HEIGHT + SETTINGS_CONTROL_HEIGHT + SUBTITLE_POPOVER_TRIGGER_GAP;
 const SUBTITLE_SELECT_MAX_HEIGHT: f32 = 192.0;
+const SUBTITLE_SELECT_CONTENT_PADDING: f32 = 4.0;
 const SUBTITLE_COLOR_PANEL_WIDTH: f32 = 220.0;
 const SUBTITLE_COLOR_SV_HEIGHT: f32 = 96.0;
 const SUBTITLE_COLOR_HUE_HEIGHT: f32 = 10.0;
@@ -407,8 +408,10 @@ fn settings_subtitle_font_select(
             .overflow_y_scroll()
             .rounded(px(theme::RADIUS_SM))
             .bg(color(theme::DROPDOWN))
+            .p(px(SUBTITLE_SELECT_CONTENT_PADDING))
             .shadow(button_highlight_shadows())
             .occlude()
+            .on_scroll_wheel(refresh_subtitle_select_hover_after_scroll)
             .on_mouse_down(MouseButton::Left, move |_, _window, cx| {
                 cx.stop_propagation();
             });
@@ -462,8 +465,10 @@ fn settings_subtitle_font_size_select(
             .overflow_y_scroll()
             .rounded(px(theme::RADIUS_SM))
             .bg(color(theme::DROPDOWN))
+            .p(px(SUBTITLE_SELECT_CONTENT_PADDING))
             .shadow(button_highlight_shadows())
             .occlude()
+            .on_scroll_wheel(refresh_subtitle_select_hover_after_scroll)
             .on_mouse_down(MouseButton::Left, move |_, _window, cx| {
                 cx.stop_propagation();
             });
@@ -541,6 +546,23 @@ fn settings_subtitle_select_trigger(
         ))
 }
 
+fn refresh_subtitle_select_hover_after_scroll(
+    _event: &ScrollWheelEvent,
+    window: &mut Window,
+    _cx: &mut App,
+) {
+    window.on_next_frame(|window, cx| {
+        window.dispatch_event(
+            PlatformInput::MouseMove(MouseMoveEvent {
+                position: window.mouse_position(),
+                pressed_button: None,
+                modifiers: window.modifiers(),
+            }),
+            cx,
+        );
+    });
+}
+
 fn settings_subtitle_font_option(
     option: SubtitleFontOption,
     is_enabled: bool,
@@ -612,6 +634,7 @@ fn settings_subtitle_select_option(
         .items_center()
         .justify_between()
         .gap_2()
+        .rounded(px(theme::RADIUS_XS))
         .px(px(12.0))
         .text_size(px(theme::TEXT_LABEL_SIZE))
         .text_color(color(text_color))
