@@ -110,6 +110,7 @@ impl Render for FrameRoot {
                 &self.file_queue,
                 &self.conversion_events,
                 &self.logs_scroll_handle,
+                self.logs_follow_tail,
                 cx,
             )),
         };

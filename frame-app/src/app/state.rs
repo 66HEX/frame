@@ -78,6 +78,7 @@ impl FrameRoot {
             conversion_events: ConversionEventState::new(),
             logs_scroll_handle: UniformListScrollHandle::new(),
             last_log_scroll_target: None,
+            logs_follow_tail: true,
             is_processing: false,
             settings_ui,
             max_concurrency,

@@ -133,7 +133,9 @@ mod tests {
 
     #[test]
     fn dialog_specs_capture_selection_mode() {
-        assert!(SOURCE_FILE_DIALOG_SPEC.allows_multiple);
-        assert!(!SUBTITLE_FILE_DIALOG_SPEC.allows_multiple);
+        const {
+            assert!(SOURCE_FILE_DIALOG_SPEC.allows_multiple);
+            assert!(!SUBTITLE_FILE_DIALOG_SPEC.allows_multiple);
+        }
     }
 }

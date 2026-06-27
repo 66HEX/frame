@@ -115,11 +115,11 @@ use gpui::{
     ElementInputHandler, Entity, EntityInputHandler, ExternalPaths, FocusHandle, GlobalElementId,
     InteractiveElement, IntoElement, KeyBinding, LayoutId, Menu, MenuItem, MouseButton,
     MouseDownEvent, MouseMoveEvent, MouseUpEvent, PaintQuad, Pixels, PlatformInput, Point,
-    Position, PromptButton, PromptLevel, Render, Rgba, ScrollWheelEvent, ShapedLine, SharedString,
-    StatefulInteractiveElement, Style, Task, TextRun, TitlebarOptions, UTF16Selection,
-    UniformListScrollHandle, Window, WindowBackgroundAppearance, WindowBounds, WindowControlArea,
-    WindowDecorations, WindowOptions, actions, deferred, div, fill, hsla, linear_color_stop,
-    linear_gradient, point, prelude::*, px, relative, size, svg, uniform_list,
+    Position, PromptButton, PromptLevel, Render, Rgba, ScrollStrategy, ScrollWheelEvent,
+    ShapedLine, SharedString, StatefulInteractiveElement, Style, Task, TextRun, TitlebarOptions,
+    UTF16Selection, UniformListScrollHandle, Window, WindowBackgroundAppearance, WindowBounds,
+    WindowControlArea, WindowDecorations, WindowOptions, actions, deferred, div, fill, hsla,
+    linear_color_stop, linear_gradient, point, prelude::*, px, relative, size, svg, uniform_list,
 };
 #[cfg(target_os = "macos")]
 use objc2_app_kit::{NSView, NSWindowButton};
@@ -156,6 +156,10 @@ const FILE_LIST_ACTION_BUTTON_SIZE: f32 = 24.0;
 const FILE_LIST_ACTION_ICON_SIZE: f32 = 16.0;
 const LOG_LINE_NUMBER_WIDTH: f32 = 32.0;
 const LOG_LINE_HEIGHT: f32 = 24.0;
+const LOG_SCROLL_BUTTON_OFFSET: f32 = 10.0;
+const LOG_SCROLL_BUTTON_PADDING: f32 = 4.0;
+const LOG_SCROLL_BUTTON_SIZE: f32 = 24.0;
+const LOG_SCROLL_ICON_SIZE: f32 = 16.0;
 const TRAFFIC_LIGHT_GROUP: &str = "titlebar-traffic-lights";
 const TRAFFIC_CLOSE_FILL: &str = "#ff5f56";
 const TRAFFIC_CLOSE_BORDER: &str = "#e0443e";
@@ -183,6 +187,7 @@ pub struct FrameRoot {
     conversion_events: ConversionEventState,
     logs_scroll_handle: UniformListScrollHandle,
     last_log_scroll_target: Option<LogScrollTarget>,
+    logs_follow_tail: bool,
     is_processing: bool,
     settings_ui: SettingsUiState,
     max_concurrency: usize,
