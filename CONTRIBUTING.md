@@ -61,10 +61,12 @@ To build and run Frame locally, you will need:
    cargo install cargo-bundle
    scripts/bundle-macos
    scripts/bundle-linux
+   node scripts/bundle-windows.cjs
    ```
 
    Windows app icons are embedded into the `.exe` by `frame-app/build.rs`
-   during the normal Cargo build.
+   during the normal Cargo build, and the Windows package script places the
+   FFmpeg and FFprobe runtime binaries next to the app.
 
 ## Development Workflow
 
@@ -113,6 +115,7 @@ cargo test --manifest-path frame-app/Cargo.toml
 cargo clippy --manifest-path frame-core/Cargo.toml --all-targets -- -D warnings
 cargo clippy --manifest-path frame-app/Cargo.toml --all-targets -- -D warnings
 node --check scripts/setup-ffmpeg.cjs
+node --check scripts/bundle-windows.cjs
 bash -n scripts/bundle-macos
 bash -n scripts/bundle-linux
 ```

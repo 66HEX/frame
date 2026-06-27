@@ -220,9 +220,14 @@ node scripts/setup-ffmpeg.cjs
   scripts/bundle-linux
   ```
 
-On Windows, the release binary embeds the Frame `.ico` resource during the
-normal Cargo build so Explorer and the taskbar can resolve the application
-icon.
+- **Windows zip package with bundled runtime binaries:**
+
+  ```powershell
+  node scripts/bundle-windows.cjs
+  ```
+
+  The release binary embeds the Frame `.ico` resource during the normal Cargo
+  build so Explorer and the taskbar can resolve the application icon.
 
 ## Usage
 
@@ -254,6 +259,7 @@ cargo test --manifest-path frame-app/Cargo.toml
 cargo clippy --manifest-path frame-core/Cargo.toml --all-targets -- -D warnings
 cargo clippy --manifest-path frame-app/Cargo.toml --all-targets -- -D warnings
 node --check scripts/setup-ffmpeg.cjs
+node --check scripts/bundle-windows.cjs
 bash -n scripts/bundle-macos
 bash -n scripts/bundle-linux
 ```

@@ -21,4 +21,4 @@ The app intentionally stays self-contained here: local Frame UI wrappers are bui
   FFprobe. Production package scripts copy the target platform binaries into
   the native bundle.
 
-Build output stays under `frame-app/target/` and is ignored by `frame-app/.gitignore`. macOS-specific native-window glue is limited to hiding AppKit's standard titlebar buttons so the custom Frame controls are the only visible traffic lights. Windows icons are embedded by `build.rs`; macOS packages should use `scripts/bundle-macos`, and Linux packages should use `scripts/bundle-linux` so runtime binaries and desktop metadata are installed together.
+Build output stays under `frame-app/target/` and is ignored by `frame-app/.gitignore`. macOS-specific native-window glue is limited to hiding AppKit's standard titlebar buttons so the custom Frame controls are the only visible traffic lights. Windows icons are embedded by `build.rs`; macOS packages should use `scripts/bundle-macos`, Linux packages should use `scripts/bundle-linux`, and Windows packages should use `node scripts/bundle-windows.cjs` so runtime binaries and desktop metadata are installed together where applicable.

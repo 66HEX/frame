@@ -175,4 +175,17 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn binary_candidates_include_executable_sibling_binaries_directory() {
+        let candidates = binary_candidates("ffmpeg-test");
+        let expected = env::current_exe()
+            .expect("test executable path should be available")
+            .parent()
+            .expect("test executable should have a parent directory")
+            .join(BUNDLED_BINARIES_DIR)
+            .join("ffmpeg-test");
+
+        assert!(candidates.iter().any(|candidate| candidate == &expected));
+    }
 }
