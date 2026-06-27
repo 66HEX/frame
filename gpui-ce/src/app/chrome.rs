@@ -104,6 +104,7 @@ pub(super) fn app_settings_sheet(
                 .absolute()
                 .inset_0()
                 .bg(color(theme::BACKGROUND.with_alpha(0.60)))
+                .backdrop_blur(px(4.0))
                 .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
                     cx.stop_propagation();
                     root.close_app_settings();
