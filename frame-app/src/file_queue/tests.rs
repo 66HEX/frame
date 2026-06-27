@@ -510,6 +510,41 @@ mod file_queue {
     }
 
     #[test]
+    fn selected_file_locked_keeps_paused_file_editable_like_original_ui() {
+        let mut queue = FileQueue::new();
+        queue.add_file(sample_file("first", "/tmp/one.mp4", 10));
+        queue.update_status("first", FileStatus::Paused, 30);
+
+        assert!(!queue.selected_file_locked());
+    }
+
+    #[test]
+    fn selected_file_locked_keeps_idle_file_editable() {
+        let mut queue = FileQueue::new();
+        queue.add_file(sample_file("first", "/tmp/one.mp4", 10));
+
+        assert!(!queue.selected_file_locked());
+    }
+
+    #[test]
+    fn file_status_locks_settings_for_processing_and_completed_states() {
+        let locked_statuses = [
+            FileStatus::Queued,
+            FileStatus::Converting,
+            FileStatus::Completed,
+        ];
+
+        assert!(locked_statuses.into_iter().all(FileStatus::locks_settings));
+    }
+
+    #[test]
+    fn file_status_keeps_idle_paused_and_error_editable() {
+        assert!(!FileStatus::Idle.locks_settings());
+        assert!(!FileStatus::Paused.locks_settings());
+        assert!(!FileStatus::Error.locks_settings());
+    }
+
+    #[test]
     fn update_status_clamps_progress_to_percent_range() {
         let mut queue = FileQueue::new();
         queue.add_file(sample_file("first", "/tmp/one.mp4", 10));

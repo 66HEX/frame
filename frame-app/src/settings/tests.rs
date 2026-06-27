@@ -141,6 +141,17 @@ mod output_options {
     }
 
     #[test]
+    fn processing_mode_options_disable_all_when_settings_are_locked() {
+        let options = output_processing_mode_options(
+            &ConversionConfig::default(),
+            Some(&video_metadata()),
+            true,
+        );
+
+        assert!(options.iter().all(|option| option.is_disabled));
+    }
+
+    #[test]
     fn output_container_options_disable_video_targets_for_audio_sources() {
         let options = output_container_options(
             &ConversionConfig::default(),
@@ -155,6 +166,18 @@ mod output_options {
         assert_eq!(
             mp4.disabled_reason,
             Some("Video container unavailable for audio sources")
+        );
+    }
+
+    #[test]
+    fn output_container_options_disable_all_when_settings_are_locked() {
+        let options =
+            output_container_options(&ConversionConfig::default(), Some(&video_metadata()), true);
+
+        assert!(
+            options
+                .iter()
+                .all(|option| option.disabled_reason == Some("Locked"))
         );
     }
 
@@ -839,6 +862,27 @@ mod audio_encoding_options {
 
         assert_eq!(config.audio_volume, 200);
     }
+
+    #[test]
+    fn apply_audio_normalize_updates_filter_flag() {
+        let mut config = ConversionConfig::default();
+
+        assert!(apply_audio_normalize(&mut config, true));
+
+        assert!(config.audio_normalize);
+    }
+
+    #[test]
+    fn apply_audio_normalize_rejects_stream_copy_mode() {
+        let mut config = ConversionConfig {
+            processing_mode: ProcessingMode::Copy,
+            ..ConversionConfig::default()
+        };
+
+        assert!(!apply_audio_normalize(&mut config, true));
+
+        assert!(!config.audio_normalize);
+    }
 }
 
 mod video_options {
@@ -1296,7 +1340,7 @@ mod source_info_sections {
     }
 
     #[test]
-    fn source_info_sections_for_video_include_file_and_video_sections() {
+    fn source_info_sections_for_video_include_file_and_video_rows() {
         let metadata = SourceMetadata {
             media_kind: Some(SourceKind::Video),
             duration: Some("00:00:10.50".to_string()),
@@ -1311,7 +1355,45 @@ mod source_info_sections {
 
         let sections = source_info_sections(&metadata);
 
-        assert_eq!(sections.len(), 2);
+        assert_eq!(
+            sections,
+            vec![
+                SourceInfoSection::Rows {
+                    title: "FILE INFORMATION",
+                    rows: vec![
+                        SourceInfoRow {
+                            label: "DURATION",
+                            value: "00:00:10".to_string(),
+                        },
+                        SourceInfoRow {
+                            label: "CONTAINER BITRATE",
+                            value: "2.5 Mb/s".to_string(),
+                        },
+                    ],
+                },
+                SourceInfoSection::Rows {
+                    title: "VIDEO STREAM",
+                    rows: vec![
+                        SourceInfoRow {
+                            label: "VIDEO CODEC",
+                            value: "h264".to_string(),
+                        },
+                        SourceInfoRow {
+                            label: "DIMENSIONS",
+                            value: "1920×1080".to_string(),
+                        },
+                        SourceInfoRow {
+                            label: "FRAME RATE",
+                            value: "59.94 fps".to_string(),
+                        },
+                        SourceInfoRow {
+                            label: "VIDEO BITRATE",
+                            value: "2.2 Mb/s".to_string(),
+                        },
+                    ],
+                },
+            ]
+        );
     }
 
     #[test]

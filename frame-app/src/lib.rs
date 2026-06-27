@@ -78,12 +78,18 @@ pub enum VisualFixture {
     LogsActive,
     PreviewCrop,
     PreviewReady,
+    SettingsAudio,
     SettingsImages,
     SettingsMetadata,
+    SettingsOutput,
     SettingsPresets,
+    SettingsSource,
     SettingsSubtitles,
     SettingsSubtitlesPopover,
     SettingsVideo,
+    WorkspaceAudio,
+    WorkspaceEmpty,
+    WorkspaceImage,
 }
 
 #[must_use]
@@ -93,12 +99,18 @@ pub fn visual_fixture_from_env_value(value: Option<&str>) -> Option<VisualFixtur
         Some("logs-active") => Some(VisualFixture::LogsActive),
         Some("preview-crop") => Some(VisualFixture::PreviewCrop),
         Some("preview-ready") => Some(VisualFixture::PreviewReady),
+        Some("settings-audio") => Some(VisualFixture::SettingsAudio),
         Some("settings-images") => Some(VisualFixture::SettingsImages),
         Some("settings-metadata") => Some(VisualFixture::SettingsMetadata),
+        Some("settings-output") => Some(VisualFixture::SettingsOutput),
         Some("settings-presets") => Some(VisualFixture::SettingsPresets),
+        Some("settings-source") => Some(VisualFixture::SettingsSource),
         Some("settings-subtitles") => Some(VisualFixture::SettingsSubtitles),
         Some("settings-subtitles-popover") => Some(VisualFixture::SettingsSubtitlesPopover),
         Some("settings-video") => Some(VisualFixture::SettingsVideo),
+        Some("workspace-audio") => Some(VisualFixture::WorkspaceAudio),
+        Some("workspace-empty") => Some(VisualFixture::WorkspaceEmpty),
+        Some("workspace-image") => Some(VisualFixture::WorkspaceImage),
         _ => None,
     }
 }
@@ -255,6 +267,54 @@ mod tests {
             assert_eq!(
                 visual_fixture_from_env_value(Some("preview-crop")),
                 Some(VisualFixture::PreviewCrop)
+            );
+        }
+
+        #[test]
+        fn workspace_empty_value_enables_empty_workspace_fixture() {
+            assert_eq!(
+                visual_fixture_from_env_value(Some("workspace-empty")),
+                Some(VisualFixture::WorkspaceEmpty)
+            );
+        }
+
+        #[test]
+        fn workspace_audio_value_enables_selected_audio_fixture() {
+            assert_eq!(
+                visual_fixture_from_env_value(Some("workspace-audio")),
+                Some(VisualFixture::WorkspaceAudio)
+            );
+        }
+
+        #[test]
+        fn workspace_image_value_enables_selected_image_fixture() {
+            assert_eq!(
+                visual_fixture_from_env_value(Some("workspace-image")),
+                Some(VisualFixture::WorkspaceImage)
+            );
+        }
+
+        #[test]
+        fn settings_source_value_enables_source_fixture() {
+            assert_eq!(
+                visual_fixture_from_env_value(Some("settings-source")),
+                Some(VisualFixture::SettingsSource)
+            );
+        }
+
+        #[test]
+        fn settings_output_value_enables_output_fixture() {
+            assert_eq!(
+                visual_fixture_from_env_value(Some("settings-output")),
+                Some(VisualFixture::SettingsOutput)
+            );
+        }
+
+        #[test]
+        fn settings_audio_value_enables_audio_fixture() {
+            assert_eq!(
+                visual_fixture_from_env_value(Some("settings-audio")),
+                Some(VisualFixture::SettingsAudio)
             );
         }
 

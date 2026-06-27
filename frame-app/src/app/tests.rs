@@ -1251,6 +1251,112 @@ mod visual_fixtures {
     }
 
     #[test]
+    fn workspace_empty_fixture_clears_workspace_state() {
+        let mut root = FrameRoot::new();
+        root.apply_visual_fixture(Some(VisualFixture::PreviewReady));
+
+        root.apply_visual_fixture(Some(VisualFixture::WorkspaceEmpty));
+
+        assert_eq!(root.active_view, ActiveView::Workspace);
+        assert!(root.file_queue.files().is_empty());
+        assert_eq!(
+            root.selected_source_metadata_entry().status,
+            MetadataStatus::Idle
+        );
+    }
+
+    #[test]
+    fn workspace_audio_fixture_seeds_selected_audio_source() {
+        let mut root = FrameRoot::new();
+
+        root.apply_visual_fixture(Some(VisualFixture::WorkspaceAudio));
+
+        assert_eq!(root.active_view, ActiveView::Workspace);
+        assert_eq!(
+            root.file_queue
+                .selected_file()
+                .map(|file| file.name.as_str()),
+            Some("source_mix.wav")
+        );
+        assert_eq!(
+            root.selected_source_metadata()
+                .map(|metadata| metadata.source_kind()),
+            Some(SourceKind::Audio)
+        );
+    }
+
+    #[test]
+    fn workspace_image_fixture_seeds_selected_image_source() {
+        let mut root = FrameRoot::new();
+
+        root.apply_visual_fixture(Some(VisualFixture::WorkspaceImage));
+
+        assert_eq!(root.active_view, ActiveView::Workspace);
+        assert_eq!(
+            root.selected_source_metadata()
+                .map(|metadata| metadata.source_kind()),
+            Some(SourceKind::Image)
+        );
+    }
+
+    #[test]
+    fn settings_source_fixture_opens_source_tab_with_ready_metadata() {
+        let mut root = FrameRoot::new();
+
+        root.apply_visual_fixture(Some(VisualFixture::SettingsSource));
+
+        let metadata = root
+            .selected_source_metadata()
+            .expect("source fixture should seed ready metadata");
+        assert_eq!(root.settings_ui.active_tab, SettingsTab::Source);
+        assert_eq!(
+            source_info_sections(&metadata)
+                .iter()
+                .map(|section| match section {
+                    SourceInfoSection::Rows { title, .. }
+                    | SourceInfoSection::Tracks { title, .. } => *title,
+                })
+                .collect::<Vec<_>>(),
+            ["FILE INFORMATION", "VIDEO STREAM"]
+        );
+    }
+
+    #[test]
+    fn settings_output_fixture_opens_output_tab_with_output_name() {
+        let mut root = FrameRoot::new();
+
+        root.apply_visual_fixture(Some(VisualFixture::SettingsOutput));
+
+        assert_eq!(root.settings_ui.active_tab, SettingsTab::Output);
+        assert_eq!(
+            root.file_queue
+                .selected_file()
+                .map(|file| file.output_name.as_str()),
+            Some("source_render_review.mov")
+        );
+    }
+
+    #[test]
+    fn settings_audio_fixture_opens_audio_tab_with_tracks_and_controls() {
+        let mut root = FrameRoot::new();
+
+        root.apply_visual_fixture(Some(VisualFixture::SettingsAudio));
+
+        assert_eq!(root.settings_ui.active_tab, SettingsTab::Audio);
+        assert_eq!(
+            root.selected_source_metadata()
+                .map(|metadata| metadata.audio_tracks.len()),
+            Some(2)
+        );
+        assert_eq!(
+            root.file_queue
+                .selected_file()
+                .map(|file| (file.config.audio_codec.as_str(), file.config.audio_volume)),
+            Some(("mp3", 145))
+        );
+    }
+
+    #[test]
     fn settings_metadata_fixture_opens_metadata_tab_with_source_tags() {
         let mut root = FrameRoot::new();
 
