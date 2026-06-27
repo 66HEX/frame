@@ -55,12 +55,23 @@ To build and run Frame locally, you will need:
    cargo build --manifest-path frame-app/Cargo.toml --release
    ```
 
+5. **Build native packages when needed:**
+
+   ```bash
+   cargo install cargo-bundle
+   cargo bundle --manifest-path frame-app/Cargo.toml --release
+   scripts/bundle-linux
+   ```
+
+   Windows app icons are embedded into the `.exe` by `frame-app/build.rs`
+   during the normal Cargo build.
+
 ## Development Workflow
 
 ### Project Structure
 
 - `frame-app/`: native GPUI-CE application, views, app state, dialogs, runtime
-  binary lookup, bundled assets, and package app icons.
+  binary lookup, bundled assets, native app identity, and package app icons.
 - `frame-app/src/app/`: `FrameRoot`, workspace/logs rendering, settings panels,
   preview shell, import flow, conversion actions, and UI primitives.
 - `frame-app/src/file_queue/`, `frame-app/src/settings/`, `frame-app/src/preview/`,
@@ -86,6 +97,9 @@ To build and run Frame locally, you will need:
   when adding formats, codecs, stream-copy rules, or pixel formats.
 - **Runtime Binaries:** do not commit downloaded files from
   `frame-app/resources/binaries/`.
+- **Application Icons:** keep desktop package icons under
+  `frame-app/resources/app-icons/`; iOS, Android, and Store/MSIX-specific icon
+  sets are not part of the current desktop packaging flow.
 
 ### Testing & Quality Control
 
@@ -99,6 +113,7 @@ cargo test --manifest-path frame-app/Cargo.toml
 cargo clippy --manifest-path frame-core/Cargo.toml --all-targets -- -D warnings
 cargo clippy --manifest-path frame-app/Cargo.toml --all-targets -- -D warnings
 node --check scripts/setup-ffmpeg.cjs
+bash -n scripts/bundle-linux
 ```
 
 For UI changes, add or update focused GPUI tests where practical. Visual parity

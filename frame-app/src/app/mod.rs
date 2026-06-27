@@ -48,6 +48,7 @@ use crate::{
     TITLEBAR_TRAFFIC_LIGHT_DOT_SIZE, TITLEBAR_TRAFFIC_LIGHT_SIZE,
     TITLEBAR_TRAFFIC_LIGHT_STROKE_WIDTH, VisualFixture, WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH,
     WORKSPACE_COLUMNS, WORKSPACE_GAP, active_view_from_env_value,
+    app_info::FRAME_APP_ID,
     app_persistence::{AppPersistence, AppSettings},
     assets::{self},
     conversion_events::{ActiveLogFile, ConversionEventState, LogLine, all_conversions_settled},

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=$APP_NAME
+GenericName=Media Converter
+Comment=Convert video, audio, image, subtitle, and metadata settings with FFmpeg.
+TryExec=$APP_CLI
+StartupNotify=true
+Exec=$APP_CLI
+Icon=$APP_ICON
+Categories=AudioVideo;AudioVideoEditing;Video;Graphics;
+Keywords=frame;ffmpeg;converter;video;audio;image;

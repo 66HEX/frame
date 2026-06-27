@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+target_dir="${CARGO_TARGET_DIR:-"$repo_root/frame-app/target"}"
+arch="$(uname -m)"
+archive="$target_dir/release/frame-linux-${arch}.tar.gz"
+
+if [[ "$(uname -s)" != "Linux" ]]; then
+	echo "scripts/bundle-linux must be run on Linux." >&2
+	exit 1
+fi
+
+temp_dir="$(mktemp -d)"
+
+cleanup() {
+	rm -rf "$temp_dir"
+}
+trap cleanup EXIT
+
+cargo build --manifest-path "$repo_root/frame-app/Cargo.toml" --release
+
+app_dir="$temp_dir/frame.app"
+mkdir -p \
+	"$app_dir/bin" \
+	"$app_dir/share/applications" \
+	"$app_dir/share/icons/hicolor/32x32/apps" \
+	"$app_dir/share/icons/hicolor/64x64/apps" \
+	"$app_dir/share/icons/hicolor/128x128/apps" \
+	"$app_dir/share/icons/hicolor/256x256/apps" \
+	"$app_dir/share/icons/hicolor/512x512/apps"
+
+cp "$target_dir/release/frame" "$app_dir/bin/frame"
+cp "$repo_root/frame-app/resources/app-icons/32x32.png" "$app_dir/share/icons/hicolor/32x32/apps/frame.png"
+cp "$repo_root/frame-app/resources/app-icons/64x64.png" "$app_dir/share/icons/hicolor/64x64/apps/frame.png"
+cp "$repo_root/frame-app/resources/app-icons/128x128.png" "$app_dir/share/icons/hicolor/128x128/apps/frame.png"
+cp "$repo_root/frame-app/resources/app-icons/128x128@2x.png" "$app_dir/share/icons/hicolor/256x256/apps/frame.png"
+cp "$repo_root/frame-app/resources/app-icons/icon.png" "$app_dir/share/icons/hicolor/512x512/apps/frame.png"
+
+export APP_NAME="Frame"
+export APP_CLI="frame"
+export APP_ICON="frame"
+
+if command -v envsubst >/dev/null 2>&1; then
+	envsubst < "$repo_root/frame-app/resources/frame.desktop.in" > "$app_dir/share/applications/Frame.desktop"
+else
+	sed \
+		-e "s|\\$APP_NAME|$APP_NAME|g" \
+		-e "s|\\$APP_CLI|$APP_CLI|g" \
+		-e "s|\\$APP_ICON|$APP_ICON|g" \
+		"$repo_root/frame-app/resources/frame.desktop.in" > "$app_dir/share/applications/Frame.desktop"
+fi
+chmod +x "$app_dir/share/applications/Frame.desktop"
+
+mkdir -p "$(dirname "$archive")"
+rm -f "$archive"
+tar -czf "$archive" -C "$temp_dir" frame.app
+
+echo "Created $archive"

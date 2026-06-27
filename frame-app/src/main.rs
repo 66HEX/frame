@@ -1,6 +1,7 @@
 use frame_app::{
     WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH,
     app::{FrameRoot, frame_window_options, init_app},
+    app_info::FRAME_APP_NAME,
     assets::{self, FrameAssets},
 };
 use gpui::{AppContext, Bounds, px, size};
@@ -17,6 +18,6 @@ fn main() {
             })
             .expect("failed to open Frame GPUI window");
 
-            init_app(cx, "Frame");
+            init_app(cx, FRAME_APP_NAME);
         });
 }

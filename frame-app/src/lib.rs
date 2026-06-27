@@ -1,6 +1,7 @@
 //! Shared state and layout contracts for the native GPUI-CE app.
 
 pub mod app;
+pub mod app_info;
 pub mod app_persistence;
 pub mod assets;
 pub mod conversion_events;

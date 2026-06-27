@@ -56,8 +56,29 @@ pub fn frame_window_options(bounds: Bounds<Pixels>) -> WindowOptions {
         window_min_size: Some(size(px(WINDOW_MIN_WIDTH), px(WINDOW_MIN_HEIGHT))),
         window_background: WindowBackgroundAppearance::Opaque,
         window_decorations: Some(WindowDecorations::Client),
+        app_id: Some(FRAME_APP_ID.to_owned()),
+        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
+        icon: frame_window_icon(),
         ..Default::default()
     }
+}
+
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
+fn frame_window_icon() -> Option<std::sync::Arc<image::RgbaImage>> {
+    use std::{io::Cursor, sync::LazyLock};
+
+    static APP_ICON: LazyLock<Option<std::sync::Arc<image::RgbaImage>>> = LazyLock::new(|| {
+        const BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/app_icon.png"));
+        image::ImageReader::new(Cursor::new(BYTES))
+            .with_guessed_format()
+            .ok()?
+            .decode()
+            .ok()
+            .map(image::DynamicImage::into_rgba8)
+            .map(std::sync::Arc::new)
+    });
+
+    APP_ICON.as_ref().cloned()
 }
 
 #[cfg(target_os = "macos")]

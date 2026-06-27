@@ -1090,6 +1090,13 @@ mod frame_window_options {
             Some(size(px(WINDOW_MIN_WIDTH), px(WINDOW_MIN_HEIGHT)))
         );
     }
+
+    #[test]
+    fn sets_the_frame_application_id() {
+        let options = frame_window_options(Bounds::default());
+
+        assert_eq!(options.app_id.as_deref(), Some(FRAME_APP_ID));
+    }
 }
 
 mod visual_fixtures {

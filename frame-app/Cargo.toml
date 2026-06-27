@@ -5,6 +5,7 @@ edition = "2024"
 authors = ["Marek Jozwiak <hexthecoder@gmail.com>"]
 license = "GPL-3.0-or-later"
 publish = false
+build = "build.rs"
 
 [[bin]]
 name = "frame"
@@ -23,9 +24,22 @@ thiserror = "2.0.18"
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
+[target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
+image = "0.25.10"
+
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSButton", "NSControl", "NSResponder", "NSView", "NSWindow"] }
 raw-window-handle = "0.6"
+
+[build-dependencies]
+embed-resource = "3.0.9"
+image = "0.25.10"
+
+[package.metadata.bundle]
+name = "Frame"
+identifier = "Frame"
+icon = ["resources/app-icons/icon.png"]
+osx_minimum_system_version = "10.15.7"
 
 [lints.rust]
 future-incompatible = "warn"

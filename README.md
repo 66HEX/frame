@@ -116,7 +116,8 @@ details, tier suggestions, and a launch checklist.
 - **UI:** GPUI-CE.
 - **Native Dialogs:** `rfd`, with extension filtering for supported media and
   subtitle files.
-- **Assets:** Embedded SVG icons and the bundled Instrument Sans font.
+- **Assets:** Embedded SVG icons, bundled Instrument Sans font, and native app
+  icon resources for macOS, Windows, and Linux packages.
 
 ### Conversion Core
 
@@ -204,6 +205,23 @@ node scripts/setup-ffmpeg.cjs
   cargo build --manifest-path frame-app/Cargo.toml --release
   ```
 
+- **macOS `.app` bundle:**
+
+  ```bash
+  cargo install cargo-bundle
+  cargo bundle --manifest-path frame-app/Cargo.toml --release
+  ```
+
+- **Linux tarball with `.desktop` metadata and hicolor icons:**
+
+  ```bash
+  scripts/bundle-linux
+  ```
+
+On Windows, the release binary embeds the Frame `.ico` resource during the
+normal Cargo build so Explorer and the taskbar can resolve the application
+icon.
+
 ## Usage
 
 1. **Input:** Add source files through the native file dialog or drag and drop.
@@ -234,6 +252,7 @@ cargo test --manifest-path frame-app/Cargo.toml
 cargo clippy --manifest-path frame-core/Cargo.toml --all-targets -- -D warnings
 cargo clippy --manifest-path frame-app/Cargo.toml --all-targets -- -D warnings
 node --check scripts/setup-ffmpeg.cjs
+bash -n scripts/bundle-linux
 ```
 
 ## Star History

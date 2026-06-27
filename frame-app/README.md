@@ -9,9 +9,13 @@ The app intentionally stays self-contained here: local Frame UI wrappers are bui
 ## Source Layout
 
 - `src/main.rs` is only the GPUI entrypoint.
+- `src/app_info.rs` owns app identity constants shared by runtime and package
+  metadata.
 - `src/app/` owns `FrameRoot`, window runtime, shell rendering, import/conversion/metadata workflows, and UI panels.
 - `src/app/input/`, `src/app/preview_panel/`, and `src/app/settings_panel/` split the largest GPUI UI surfaces into focused submodules.
 - `src/file_queue/`, `src/settings/`, `src/preview/`, and `src/conversion_runner/` contain tested domain logic outside rendering code.
 - `src/assets/` embeds only files from `frame-app/assets/`.
+- `resources/app-icons/` contains the native desktop package icon set consumed
+  by `build.rs`, `cargo bundle`, and Linux packaging.
 
-Build output stays under `frame-app/target/` and is ignored by `frame-app/.gitignore`. macOS-specific native-window glue is limited to hiding AppKit's standard titlebar buttons so the custom Frame controls are the only visible traffic lights.
+Build output stays under `frame-app/target/` and is ignored by `frame-app/.gitignore`. macOS-specific native-window glue is limited to hiding AppKit's standard titlebar buttons so the custom Frame controls are the only visible traffic lights. Windows icons are embedded by `build.rs`; Linux packages should use `scripts/bundle-linux` so the `.desktop` file and hicolor icons are installed together.

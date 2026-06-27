@@ -1839,9 +1839,11 @@ name = "frame-app"
 version = "0.1.0"
 dependencies = [
  "directories",
+ "embed-resource",
  "frame-core",
  "gpui",
  "gpui_platform",
+ "image",
  "libc",
  "objc2-app-kit 0.3.2",
  "raw-window-handle",
