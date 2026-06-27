@@ -25,7 +25,7 @@ jobs:
     - name: steps::setup_linux
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev pkg-config
+        sudo apt-get install -y clang libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev pkg-config
     - name: ./script/bundle-linux
       run: ./script/bundle-linux
     - name: run_bundling::upload_artifact
@@ -50,7 +50,7 @@ jobs:
     - name: steps::setup_linux
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev pkg-config
+        sudo apt-get install -y clang libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev pkg-config
     - name: ./script/bundle-linux
       run: ./script/bundle-linux
     - name: run_bundling::upload_artifact
