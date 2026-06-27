@@ -163,7 +163,7 @@ const DEFAULT_CROP_SIZE: f64 = 0.8;
 const CROP_HANDLE_SIZE: f32 = 10.0;
 const FRAME_TEXT_INPUT_CONTEXT: &str = "FrameTextInput";
 const TEXT_INPUT_CARET_WIDTH: f32 = 1.5;
-const TEXT_INPUT_CARET_HEIGHT: f32 = 14.0;
+const TEXT_INPUT_CARET_HEIGHT: f32 = theme::TEXT_INPUT_CARET_HEIGHT;
 const TEXT_INPUT_BLINK_INTERVAL: Duration = Duration::from_millis(500);
 const TEXT_INPUT_BLINK_PAUSE: Duration = Duration::from_millis(300);
 

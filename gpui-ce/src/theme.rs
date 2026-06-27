@@ -47,8 +47,21 @@ pub const RADIUS_MD: f32 = RADIUS_BASE * 3.0;
 pub const RADIUS_LG: f32 = RADIUS_BASE * 4.0;
 pub const RADIUS_XL: f32 = RADIUS_BASE * 6.0;
 
-pub const TEXT_LABEL_SIZE: f32 = 11.0;
-pub const TEXT_ROW_SIZE: f32 = 11.0;
+pub const TEXT_SCALE: f32 = 1.0;
+pub const TEXT_UI_BASE_SIZE: f32 = 10.0;
+pub const TEXT_ROW_BASE_SIZE: f32 = 12.0;
+pub const TEXT_EMOJI_BASE_SIZE: f32 = 16.0;
+pub const TEXT_MARKDOWN_BASE_SIZE: f32 = 11.0;
+pub const TEXT_MARKDOWN_LIST_BASE_SIZE: f32 = 10.0;
+pub const TEXT_INPUT_CARET_BASE_HEIGHT: f32 = 14.0;
+
+pub const TEXT_UI_SIZE: f32 = TEXT_UI_BASE_SIZE * TEXT_SCALE;
+pub const TEXT_LABEL_SIZE: f32 = TEXT_UI_SIZE;
+pub const TEXT_ROW_SIZE: f32 = TEXT_ROW_BASE_SIZE * TEXT_SCALE;
+pub const TEXT_EMOJI_SIZE: f32 = TEXT_EMOJI_BASE_SIZE * TEXT_SCALE;
+pub const TEXT_MARKDOWN_SIZE: f32 = TEXT_MARKDOWN_BASE_SIZE * TEXT_SCALE;
+pub const TEXT_MARKDOWN_LIST_SIZE: f32 = TEXT_MARKDOWN_LIST_BASE_SIZE * TEXT_SCALE;
+pub const TEXT_INPUT_CARET_HEIGHT: f32 = TEXT_INPUT_CARET_BASE_HEIGHT * TEXT_SCALE;
 pub const MIN_HIT_AREA: f32 = 40.0;
 
 #[cfg(test)]
@@ -127,6 +140,34 @@ mod tests {
         #[test]
         fn minimum_hit_area_matches_design_system_floor() {
             assert_eq!(MIN_HIT_AREA, 40.0);
+        }
+    }
+
+    mod typography_tokens {
+        use super::*;
+
+        #[test]
+        fn text_scale_defaults_to_original_svelte_size_scale() {
+            assert_eq!(TEXT_SCALE, 1.0);
+        }
+
+        #[test]
+        fn ui_text_matches_original_ten_pixel_controls() {
+            assert_eq!(TEXT_UI_SIZE, 10.0);
+            assert_eq!(TEXT_LABEL_SIZE, TEXT_UI_SIZE);
+        }
+
+        #[test]
+        fn row_text_matches_original_file_list_text_xs() {
+            assert_eq!(TEXT_ROW_SIZE, 12.0);
+        }
+
+        #[test]
+        fn auxiliary_text_tokens_match_remaining_svelte_contexts() {
+            assert_eq!(TEXT_EMOJI_SIZE, 16.0);
+            assert_eq!(TEXT_MARKDOWN_SIZE, 11.0);
+            assert_eq!(TEXT_MARKDOWN_LIST_SIZE, 10.0);
+            assert_eq!(TEXT_INPUT_CARET_HEIGHT, 14.0);
         }
     }
 }

@@ -126,7 +126,7 @@ impl AssetSource for FrameAssets {
 
     fn list(&self, path: &str) -> Result<Vec<SharedString>> {
         let assets = match path {
-            "fonts" => vec![SharedString::from("IoskeleyMono-Black.woff2")],
+            "fonts" => vec![SharedString::from("InstrumentSans-Variable.ttf")],
             "icons" => vec![
                 SharedString::from("arrow-down.svg"),
                 SharedString::from("bookmark.svg"),

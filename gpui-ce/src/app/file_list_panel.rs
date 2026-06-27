@@ -92,7 +92,7 @@ pub(super) fn file_list_body(queue: &FileQueue, cx: &mut Context<FrameRoot>) -> 
                 .flex()
                 .items_center()
                 .justify_center()
-                .text_size(px(theme::TEXT_ROW_SIZE))
+                .text_size(px(theme::TEXT_UI_SIZE))
                 .text_color(color(theme::FRAME_GRAY_600))
                 .child("DROP FILES OR USE ADD SOURCE"),
         );

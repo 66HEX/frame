@@ -153,6 +153,7 @@ impl Render for FrameRoot {
             .overflow_hidden()
             .bg(color(theme::BACKGROUND))
             .text_color(color(theme::FOREGROUND))
+            .text_size(px(theme::TEXT_UI_SIZE))
             .font_family(assets::FRAME_FONT_FAMILY)
             .font_weight(assets::FRAME_FONT_WEIGHT)
             .on_mouse_down(

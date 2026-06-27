@@ -105,16 +105,29 @@ mod frame_assets {
 
     #[test]
     fn frame_font_family_matches_bundled_font_name_table_family() {
-        assert_eq!(FRAME_FONT_FAMILY, "Ioskeley Mono");
+        assert_eq!(FRAME_FONT_FAMILY, "Instrument Sans");
     }
 
     #[test]
     fn frame_font_weight_matches_bundled_font_face_weight() {
-        assert_eq!(FRAME_FONT_WEIGHT, gpui::FontWeight::EXTRA_BOLD);
+        assert_eq!(FRAME_FONT_WEIGHT, gpui::FontWeight::NORMAL);
     }
 
     #[test]
-    fn frame_font_alias_matches_original_css_family() {
-        assert_eq!(FRAME_FONT_ALIAS, "LoskeleyMono");
+    fn frame_font_alias_matches_bundled_font_alias() {
+        assert_eq!(FRAME_FONT_ALIAS, "InstrumentSans");
+    }
+
+    #[test]
+    fn list_returns_bundled_font_asset() {
+        let listed = FrameAssets
+            .list("fonts")
+            .expect("asset list should not fail");
+
+        assert!(
+            listed
+                .iter()
+                .any(|name| name.as_ref() == "InstrumentSans-Variable.ttf")
+        );
     }
 }
