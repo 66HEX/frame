@@ -419,6 +419,38 @@ mod frame_root_conversion {
     }
 
     #[test]
+    fn subtitle_color_sv_drag_keeps_start_hue_after_white() {
+        let mut root = FrameRoot::new();
+        root.file_queue
+            .add_file(FileItem::from_path("first", "/tmp/one.mp4", 1));
+        root.set_subtitle_color_picker_bounds(
+            SettingsSubtitleColorTarget::Font,
+            SettingsSubtitleColorDragKind::SaturationValue,
+            Bounds::new(point(px(10.0), px(20.0)), size(px(100.0), px(100.0))),
+        );
+        let drag = SettingsSubtitleColorDrag {
+            target: SettingsSubtitleColorTarget::Font,
+            kind: SettingsSubtitleColorDragKind::SaturationValue,
+            base_hsv: SettingsSubtitleHsv {
+                h: 270.0,
+                s: 1.0,
+                v: 1.0,
+            },
+        };
+
+        assert!(root.commit_subtitle_color_drag_at_position(drag, point(px(10.0), px(20.0))));
+        assert!(root.commit_subtitle_color_drag_at_position(drag, point(px(110.0), px(20.0))));
+
+        assert_eq!(root.subtitle_font_color_draft, "#8000FF");
+        assert_eq!(
+            root.file_queue
+                .selected_file()
+                .and_then(|file| file.config.subtitle_font_color.as_deref()),
+            Some("#8000ff")
+        );
+    }
+
+    #[test]
     fn subtitle_popover_toggle_keeps_only_one_open_panel() {
         let mut root = FrameRoot::new();
 

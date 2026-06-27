@@ -789,6 +789,7 @@ fn settings_subtitle_sv_square(
     let drag = SettingsSubtitleColorDrag {
         target,
         kind: SettingsSubtitleColorDragKind::SaturationValue,
+        base_hsv: hsv,
     };
     let hue = subtitle_hue_color(hsv.h);
 
@@ -804,7 +805,7 @@ fn settings_subtitle_sv_square(
         .rounded(px(theme::RADIUS_SM))
         .border_1()
         .border_color(color(theme::FRAME_GRAY_200))
-        .bg(hue)
+        .bg(color(theme::FRAME_GRAY_100))
         .cursor_crosshair()
         .occlude()
         .on_mouse_down(
@@ -826,13 +827,7 @@ fn settings_subtitle_sv_square(
                 if drag.kind != SettingsSubtitleColorDragKind::SaturationValue {
                     return;
                 }
-                let hsv = subtitle_hsv_from_sv_bounds(
-                    event.event.position,
-                    event.bounds,
-                    root,
-                    drag.target,
-                );
-                if root.commit_subtitle_hsv_color(drag.target, hsv) {
+                if root.commit_subtitle_color_drag_at_position(drag, event.event.position) {
                     cx.notify();
                 }
             },
@@ -845,10 +840,21 @@ fn settings_subtitle_sv_square(
         .child(
             div()
                 .absolute()
-                .left_0()
-                .right_0()
-                .top_0()
-                .bottom_0()
+                .left(px(1.0))
+                .right(px(1.0))
+                .top(px(1.0))
+                .bottom(px(1.0))
+                .rounded(px(theme::RADIUS_XS))
+                .bg(hue),
+        )
+        .child(
+            div()
+                .absolute()
+                .left(px(1.0))
+                .right(px(1.0))
+                .top(px(1.0))
+                .bottom(px(1.0))
+                .rounded(px(theme::RADIUS_XS))
                 .bg(linear_gradient(
                     90.0,
                     linear_color_stop(hsla(0.0, 0.0, 1.0, 1.0), 0.0),
@@ -858,10 +864,11 @@ fn settings_subtitle_sv_square(
         .child(
             div()
                 .absolute()
-                .left_0()
-                .right_0()
-                .top_0()
-                .bottom_0()
+                .left(px(1.0))
+                .right(px(1.0))
+                .top(px(1.0))
+                .bottom(px(1.0))
+                .rounded(px(theme::RADIUS_XS))
                 .bg(linear_gradient(
                     0.0,
                     linear_color_stop(hsla(0.0, 0.0, 0.0, 0.0), 0.0),
@@ -901,6 +908,7 @@ fn settings_subtitle_hue_slider(
     let drag = SettingsSubtitleColorDrag {
         target,
         kind: SettingsSubtitleColorDragKind::Hue,
+        base_hsv: hsv,
     };
 
     div()
@@ -931,13 +939,7 @@ fn settings_subtitle_hue_slider(
                 if drag.kind != SettingsSubtitleColorDragKind::Hue {
                     return;
                 }
-                let hsv = subtitle_hsv_from_hue_bounds(
-                    event.event.position,
-                    event.bounds,
-                    root,
-                    drag.target,
-                );
-                if root.commit_subtitle_hsv_color(drag.target, hsv) {
+                if root.commit_subtitle_color_drag_at_position(drag, event.event.position) {
                     cx.notify();
                 }
             },
@@ -1135,15 +1137,34 @@ impl FrameRoot {
         kind: SettingsSubtitleColorDragKind,
         position: Point<Pixels>,
     ) -> bool {
+        let base_hsv = hex_to_subtitle_hsv(&self.current_subtitle_color(target));
+        self.commit_subtitle_color_with_base_hsv(target, kind, position, base_hsv)
+    }
+
+    pub(in crate::app) fn commit_subtitle_color_drag_at_position(
+        &mut self,
+        drag: SettingsSubtitleColorDrag,
+        position: Point<Pixels>,
+    ) -> bool {
+        self.commit_subtitle_color_with_base_hsv(drag.target, drag.kind, position, drag.base_hsv)
+    }
+
+    fn commit_subtitle_color_with_base_hsv(
+        &mut self,
+        target: SettingsSubtitleColorTarget,
+        kind: SettingsSubtitleColorDragKind,
+        position: Point<Pixels>,
+        base_hsv: SettingsSubtitleHsv,
+    ) -> bool {
         let Some(bounds) = self.subtitle_color_picker_bounds(target, kind) else {
             return false;
         };
         let hsv = match kind {
             SettingsSubtitleColorDragKind::SaturationValue => {
-                subtitle_hsv_from_sv_bounds(position, bounds, self, target)
+                subtitle_hsv_from_sv_bounds(position, bounds, base_hsv)
             }
             SettingsSubtitleColorDragKind::Hue => {
-                subtitle_hsv_from_hue_bounds(position, bounds, self, target)
+                subtitle_hsv_from_hue_bounds(position, bounds, base_hsv)
             }
         };
         self.commit_subtitle_hsv_color(target, hsv)
@@ -1153,10 +1174,9 @@ impl FrameRoot {
 fn subtitle_hsv_from_sv_bounds(
     position: Point<Pixels>,
     bounds: Bounds<Pixels>,
-    root: &FrameRoot,
-    target: SettingsSubtitleColorTarget,
+    base_hsv: SettingsSubtitleHsv,
 ) -> SettingsSubtitleHsv {
-    let mut hsv = hex_to_subtitle_hsv(&root.current_subtitle_color(target));
+    let mut hsv = base_hsv;
     let width = bounds.size.width.as_f32();
     let height = bounds.size.height.as_f32();
     if width > 0.0 {
@@ -1171,10 +1191,9 @@ fn subtitle_hsv_from_sv_bounds(
 fn subtitle_hsv_from_hue_bounds(
     position: Point<Pixels>,
     bounds: Bounds<Pixels>,
-    root: &FrameRoot,
-    target: SettingsSubtitleColorTarget,
+    base_hsv: SettingsSubtitleHsv,
 ) -> SettingsSubtitleHsv {
-    let mut hsv = hex_to_subtitle_hsv(&root.current_subtitle_color(target));
+    let mut hsv = base_hsv;
     let width = bounds.size.width.as_f32();
     if width > 0.0 {
         hsv.h =

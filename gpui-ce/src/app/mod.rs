@@ -271,10 +271,11 @@ pub(in crate::app) enum SettingsSubtitleColorDragKind {
     Hue,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(in crate::app) struct SettingsSubtitleColorDrag {
     target: SettingsSubtitleColorTarget,
     kind: SettingsSubtitleColorDragKind,
+    base_hsv: SettingsSubtitleHsv,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
