@@ -156,6 +156,7 @@ impl Render for FrameRoot {
             .text_size(px(theme::TEXT_UI_SIZE))
             .font_family(assets::FRAME_FONT_FAMILY)
             .font_weight(assets::FRAME_FONT_WEIGHT)
+            .font_features(assets::frame_font_features())
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|root, _event: &MouseDownEvent, _window, cx| {

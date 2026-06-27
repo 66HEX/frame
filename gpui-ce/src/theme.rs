@@ -51,7 +51,7 @@ pub const TEXT_SCALE: f32 = 1.0;
 pub const TEXT_UI_BASE_SIZE: f32 = 10.0;
 pub const TEXT_ROW_BASE_SIZE: f32 = 12.0;
 pub const TEXT_EMOJI_BASE_SIZE: f32 = 16.0;
-pub const TEXT_MARKDOWN_BASE_SIZE: f32 = 11.0;
+pub const TEXT_MARKDOWN_BASE_SIZE: f32 = 10.0;
 pub const TEXT_MARKDOWN_LIST_BASE_SIZE: f32 = 10.0;
 pub const TEXT_INPUT_CARET_BASE_HEIGHT: f32 = 14.0;
 

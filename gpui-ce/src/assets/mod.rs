@@ -1,13 +1,18 @@
 //! Bundled assets for the GPUI rewrite.
 
-use std::borrow::Cow;
+use std::{
+    borrow::Cow,
+    sync::{Arc, OnceLock},
+};
 
-use gpui::{App, AssetSource, FontWeight, Result, SharedString};
+use gpui::{App, AssetSource, FontFeatures, FontWeight, Result, SharedString};
 
 pub const FRAME_FONT_FAMILY: &str = "Instrument Sans";
 pub const FRAME_FONT_WEIGHT: FontWeight = FontWeight::NORMAL;
 pub const FRAME_FONT_ALIAS: &str = "InstrumentSans";
 pub const FRAME_FONT_PATH: &str = "fonts/InstrumentSans-Variable.ttf";
+pub const FRAME_FONT_FEATURE_TAGS: [(&str, u32); 4] =
+    [("liga", 1), ("ss02", 1), ("ss05", 1), ("kern", 1)];
 pub const ICON_FRAME: &str = "icons/frame.svg";
 pub const ICON_ARROW_DOWN: &str = "icons/arrow-down.svg";
 pub const ICON_LAYOUT_LIST: &str = "icons/layout-list.svg";
@@ -172,6 +177,21 @@ impl AssetSource for FrameAssets {
 pub fn load_frame_fonts(cx: &mut App) -> Result<()> {
     cx.text_system()
         .add_fonts(vec![Cow::Borrowed(FRAME_FONT_BYTES)])
+}
+
+pub fn frame_font_features() -> FontFeatures {
+    static FEATURES: OnceLock<FontFeatures> = OnceLock::new();
+
+    FEATURES
+        .get_or_init(|| {
+            FontFeatures(Arc::new(
+                FRAME_FONT_FEATURE_TAGS
+                    .iter()
+                    .map(|(tag, value)| ((*tag).to_string(), *value))
+                    .collect(),
+            ))
+        })
+        .clone()
 }
 
 #[cfg(test)]
