@@ -1,13 +1,18 @@
 # Contributing to Frame
 
-Thank you for your interest in contributing to **Frame**! We appreciate your help in making this media conversion utility even better.
+Thank you for your interest in contributing to **Frame**. This document covers
+the current project structure, local setup, checks, and pull request standards.
 
 ## Technical Stack
 
-- **Backend:** Rust (Tauri v2)
-- **Frontend:** Svelte 5 (TypeScript)
-- **Package Manager:** [Bun](https://bun.sh/)
-- **Core Engine:** FFmpeg & FFprobe (Sidecars)
+- **Application:** Rust native desktop app built with GPUI-CE.
+- **Core Engine:** FFmpeg and FFprobe runtime binaries.
+- **Shared Logic:** `frame-core` for conversion arguments, probing data,
+  compatibility rules, filters, and validation.
+- **Native UI:** `gpui-ce` for the application shell, GPUI views, app state,
+  dialogs, bundled assets, and runtime integration.
+- **Setup Scripts:** Node.js scripts for downloading local FFmpeg/FFprobe
+  binaries.
 
 ## Getting Started
 
@@ -15,91 +20,118 @@ Thank you for your interest in contributing to **Frame**! We appreciate your hel
 
 To build and run Frame locally, you will need:
 
-1.  **Rust:** [Install Rust](https://www.rust-lang.org/tools/install)
-2.  **Bun:** [Install Bun](https://bun.sh/)
-3.  **Tauri Dependencies:** Follow the [Tauri setup guide](https://v2.tauri.app/start/prerequisites/) for your OS.
+1. **Rust:** [Install Rust](https://www.rust-lang.org/tools/install)
+2. **Node.js 18 or newer:** used by setup scripts.
+3. **Platform toolchain:** install the C/C++ build tools and native desktop
+   libraries required by Rust and GPUI-CE for your operating system.
 
 ### Local Setup
 
-1.  **Clone the repository:**
+1. **Clone the repository:**
 
-    ```bash
-    git clone https://github.com/66HEX/frame.git
-    cd frame
-    ```
+   ```bash
+   git clone https://github.com/66HEX/frame.git
+   cd frame
+   ```
 
-2.  **Install dependencies:**
+2. **Setup FFmpeg binaries:**
 
-    ```bash
-    bun install
-    ```
+   The application looks for FFmpeg and FFprobe in `gpui-ce/resources/binaries/`
+   during local development. Download the platform-specific tools with:
 
-3.  **Setup FFmpeg binaries:**
-    The application requires FFmpeg/FFprobe sidecars in `src-tauri/binaries/`. We provide a script to fetch them:
+   ```bash
+   node scripts/setup-ffmpeg.cjs
+   ```
 
-    ```bash
-    bun run setup:ffmpeg
-    ```
+3. **Run in development mode:**
 
-4.  **Run in development mode:**
-    ```bash
-    bun tauri dev
-    ```
+   ```bash
+   cargo run --manifest-path gpui-ce/Cargo.toml
+   ```
+
+4. **Build a release binary:**
+
+   ```bash
+   cargo build --manifest-path gpui-ce/Cargo.toml --release
+   ```
 
 ## Development Workflow
 
 ### Project Structure
 
-- `src/`: Svelte 5 frontend components and stores.
-- `src-tauri/src/`: Rust backend logic (task management, FFmpeg argument building).
-- `src-tauri/capabilities/`: Tauri permission configurations.
-- `scripts/`: Build and setup scripts.
+- `gpui-ce/`: native GPUI-CE application, views, app state, dialogs, runtime
+  binary lookup, bundled assets, and package app icons.
+- `gpui-ce/src/app/`: `FrameRoot`, workspace/logs rendering, settings panels,
+  preview shell, import flow, conversion actions, and UI primitives.
+- `gpui-ce/src/file_queue/`, `gpui-ce/src/settings/`, `gpui-ce/src/preview/`,
+  and `gpui-ce/src/conversion_runner/`: tested domain logic kept outside
+  rendering code where possible.
+- `frame-core/`: shared conversion/probe logic, FFmpeg argument construction,
+  filters, media compatibility rules, and conversion event types.
+- `frame-core/media-rules.json`: source of truth for container, codec, stream,
+  and pixel format compatibility.
+- `scripts/`: setup helpers for local runtime binaries.
+- `docs/`: roadmap, backlog, architecture notes, and verification records.
+- `CHANGELOG.md`: product release history.
 
 ### Coding Standards
 
-- **Rust:** Use `cargo fmt` for formatting and `cargo clippy` for linting.
-- **Frontend:** Follow the existing Svelte 5 patterns (runes like `$state`, `$effect`). Use Prettier for formatting.
-- **FFmpeg:** When adding new FFmpeg features, ensure they are validated in `src-tauri/src/conversion.rs` and added to the `ConversionConfig` struct.
+- **Rust formatting:** run `cargo fmt` for touched crates before submitting.
+- **Rust linting:** keep `cargo clippy --all-targets -- -D warnings` clean.
+- **Architecture:** prefer existing `gpui-ce/src/app/primitives.rs` UI building
+  blocks and domain modules before adding new ad hoc rendering code.
+- **Conversion Logic:** add FFmpeg behavior in `frame-core` first, then bridge it
+  into `gpui-ce` through typed settings/configuration code.
+- **Media Compatibility:** update `frame-core/media-rules.json` and focused tests
+  when adding formats, codecs, stream-copy rules, or pixel formats.
+- **Runtime Binaries:** do not commit downloaded files from
+  `gpui-ce/resources/binaries/`.
 
 ### Testing & Quality Control
 
-Before submitting a PR, please ensure:
+Before submitting a PR, run the relevant checks:
 
-1.  **Build:** The project builds correctly: `bun tauri build --no-bundle`.
-2.  **Rust Tests:** All backend tests pass: `cd src-tauri && cargo test`.
-3.  **Type Check & Lint:** Run `bun run check` and `bun run lint` to catch frontend issues.
-4.  **i18n Guardrails:** Run `bun run i18n:check` to validate locale key sync, placeholder consistency, and key usage coverage.
-5.  **Formatting:** Ensure all code is properly formatted:
-    - For Rust: `cd src-tauri && cargo fmt`
-    - For Frontend: `bun run format`
+```bash
+cargo fmt --manifest-path frame-core/Cargo.toml --check
+cargo fmt --manifest-path gpui-ce/Cargo.toml --check
+cargo test --manifest-path frame-core/Cargo.toml
+cargo test --manifest-path gpui-ce/Cargo.toml
+cargo clippy --manifest-path frame-core/Cargo.toml --all-targets -- -D warnings
+cargo clippy --manifest-path gpui-ce/Cargo.toml --all-targets -- -D warnings
+node --check scripts/setup-ffmpeg.cjs
+```
 
-### Translation Workflow
-
-- `en-US` is the source-of-truth locale.
-- Extract currently used i18n keys from code: `bun run i18n:extract`.
-- Validate locale integrity and sync rules: `bun run i18n:check`.
-- Preview sync changes in other locales: `bun run i18n:sync`.
-- Apply sync changes (fills missing keys with TODO-marked English fallback, removes stale keys): `bun run i18n:sync:write`.
-- Configure DeepL access: export `DEEPL_API_KEY=...`.
-- Translate only new TODO/missing keys from `en-US`: `bun run i18n:translate:write`.
-- Re-translate all non-source locale keys from `en-US`: `bun run i18n:translate:rewrite`.
-- One-shot sync + auto-translate for new keys while developing: `bun run i18n:sync:auto`.
+For UI changes, add or update focused GPUI tests where practical. Visual parity
+fixtures live in the GPUI test modules and are documented in `docs/`.
 
 ## Pull Request Process
 
-1.  Create a new branch for your feature or bugfix: `git checkout -b feature/your-feature-name`.
-2.  Make your changes and commit them with descriptive messages.
-3.  Push to your fork and submit a Pull Request.
-4.  Provide a clear description of the changes and any relevant issue numbers.
+1. Create a new branch for your feature or bugfix:
+
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+2. Make focused commits with descriptive messages.
+3. Include tests or explain why a change is not practical to test.
+4. Push to your fork and submit a pull request.
+5. Provide a clear description of the behavior change, screenshots for UI work,
+   and any relevant issue numbers.
 
 ## Reporting Issues
 
-If you find a bug or have a feature request, please [open an issue](https://github.com/66HEX/frame/issues). Include as much detail as possible, such as your operating system and the FFmpeg logs (accessible via the "Logs" view in the app).
+If you find a bug or have a feature request, please
+[open an issue](https://github.com/66HEX/frame/issues). Include your operating
+system, source media details when relevant, reproduction steps, and FFmpeg logs
+from the Logs view when conversion behavior is involved.
 
 ## Financial Support
 
-If you want to support the long-term maintenance of Frame (especially code-signing for macOS and Windows builds), use [GitHub Sponsors](https://github.com/sponsors/66HEX).
+If you want to support the long-term maintenance of Frame, especially
+code-signing for macOS and Windows builds, use
+[GitHub Sponsors](https://github.com/sponsors/66HEX).
 
 ---
 
-By contributing to this project, you agree that your contributions will be licensed under the project's [LICENSE](LICENSE).
+By contributing to this project, you agree that your contributions will be
+licensed under the project's [LICENSE](LICENSE).

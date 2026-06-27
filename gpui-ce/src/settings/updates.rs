@@ -309,24 +309,6 @@ pub fn apply_scaling_algorithm(config: &mut ConversionConfig, algorithm: &str) -
     true
 }
 
-pub fn apply_ml_upscale(
-    config: &mut ConversionConfig,
-    mode: &str,
-    ml_upscale_available: bool,
-) -> bool {
-    let mode = mode.to_ascii_lowercase();
-    if !matches!(mode.as_str(), "none" | "esrgan-2x" | "esrgan-4x") {
-        return false;
-    }
-    if mode != "none" && (!ml_upscale_available || is_gif_container(&config.container)) {
-        return false;
-    }
-
-    let changed = config.ml_upscale != mode;
-    config.ml_upscale = mode;
-    changed | normalize_video_config(config, None, ml_upscale_available)
-}
-
 pub fn apply_fps(config: &mut ConversionConfig, fps: &str) -> bool {
     let valid = if is_gif_container(&config.container) {
         GIF_FPS_OPTIONS.contains(&fps)
@@ -396,7 +378,7 @@ pub fn apply_video_codec(config: &mut ConversionConfig, codec: &str) -> bool {
 
     let changed = config.video_codec != codec;
     config.video_codec = codec;
-    changed | normalize_video_config(config, None, true)
+    changed | normalize_video_config(config, None)
 }
 
 pub fn apply_pixel_format(config: &mut ConversionConfig, pixel_format: &str) -> bool {
@@ -542,7 +524,7 @@ pub fn apply_output_container(config: &mut ConversionConfig, container: &str) ->
     }
 
     normalize_audio_encoding_settings(config);
-    normalize_video_config(config, None, true);
+    normalize_video_config(config, None);
     changed
 }
 
@@ -629,7 +611,7 @@ pub fn normalize_output_config(
         config.audio_codec = default_audio_codec_for_container(&config.container).to_string();
     }
     normalize_audio_encoding_settings(config);
-    normalize_video_config(config, metadata, true);
+    normalize_video_config(config, metadata);
 
     before != *config
 }
@@ -637,7 +619,6 @@ pub fn normalize_output_config(
 pub fn normalize_video_config(
     config: &mut ConversionConfig,
     metadata: Option<&SourceMetadata>,
-    ml_upscale_available: bool,
 ) -> bool {
     let before = config.clone();
     let source_kind = source_kind_for(metadata);
@@ -657,7 +638,6 @@ pub fn normalize_video_config(
 
     if is_audio_container {
         config.pixel_format = DEFAULT_PIXEL_FORMAT.to_string();
-        config.ml_upscale = "none".to_string();
         config.selected_subtitle_tracks.clear();
         reset_subtitle_settings(config);
     }
@@ -666,7 +646,6 @@ pub fn normalize_video_config(
         config.pixel_format = DEFAULT_PIXEL_FORMAT.to_string();
         config.video_codec = "gif".to_string();
         config.video_bitrate_mode = DEFAULT_VIDEO_BITRATE_MODE.to_string();
-        config.ml_upscale = "none".to_string();
         config.hw_decode = false;
         config.nvenc_spatial_aq = false;
         config.nvenc_temporal_aq = false;
@@ -684,15 +663,6 @@ pub fn normalize_video_config(
     ) {
         config.pixel_format =
             first_allowed_video_pixel_format(&config.container, &config.video_codec).to_string();
-    }
-
-    if config.ml_upscale != "none" && (!ml_upscale_available || config.resolution != "original") {
-        if config.resolution != "original" {
-            config.resolution = "original".to_string();
-        }
-        if !ml_upscale_available {
-            config.ml_upscale = "none".to_string();
-        }
     }
 
     if !is_video_preset_allowed(&config.video_codec, &config.preset) {
@@ -759,7 +729,6 @@ fn reset_video_filter_settings(config: &mut ConversionConfig) {
     config.flip_horizontal = false;
     config.flip_vertical = false;
     config.crop = None;
-    config.ml_upscale = "none".to_string();
     config.hw_decode = false;
     config.nvenc_spatial_aq = false;
     config.nvenc_temporal_aq = false;

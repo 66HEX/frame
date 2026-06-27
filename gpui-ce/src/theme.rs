@@ -1,4 +1,4 @@
-//! Frame visual tokens ported from the original Svelte/Tailwind stylesheet.
+//! Frame native visual tokens.
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RgbaToken {
@@ -102,7 +102,7 @@ mod tests {
         use super::*;
 
         #[test]
-        fn solid_tokens_match_original_oklch_srgb_values() {
+        fn solid_tokens_match_reference_srgb_values() {
             assert_eq!(BACKGROUND, RgbaToken::from_rgb(20, 22, 26));
             assert_eq!(SIDEBAR, RgbaToken::from_rgb(32, 34, 37));
             assert_eq!(DROPDOWN, RgbaToken::from_rgb(43, 45, 48));
@@ -112,7 +112,7 @@ mod tests {
         }
 
         #[test]
-        fn translucent_frame_grays_use_white_with_original_alpha_steps() {
+        fn translucent_frame_grays_use_white_with_design_alpha_steps() {
             assert_channel_close(FRAME_GRAY_100.alpha, 0.05);
             assert_channel_close(FRAME_GRAY_200.alpha, 0.10);
             assert_channel_close(FRAME_GRAY_400.alpha, 0.20);
@@ -124,7 +124,7 @@ mod tests {
         use super::*;
 
         #[test]
-        fn large_radius_matches_tailwind_rounded_lg_from_original_radius_scale() {
+        fn large_radius_matches_design_radius_scale() {
             assert_eq!(RADIUS_LG, 14.4);
         }
 
@@ -147,23 +147,23 @@ mod tests {
         use super::*;
 
         #[test]
-        fn text_scale_defaults_to_original_svelte_size_scale() {
+        fn text_scale_defaults_to_native_size_scale() {
             assert_eq!(TEXT_SCALE, 1.0);
         }
 
         #[test]
-        fn ui_text_matches_original_ten_pixel_controls() {
+        fn ui_text_matches_ten_pixel_controls() {
             assert_eq!(TEXT_UI_SIZE, 10.0);
             assert_eq!(TEXT_LABEL_SIZE, TEXT_UI_SIZE);
         }
 
         #[test]
-        fn row_text_matches_original_file_list_text_xs() {
+        fn row_text_matches_file_list_size() {
             assert_eq!(TEXT_ROW_SIZE, 12.0);
         }
 
         #[test]
-        fn auxiliary_text_tokens_match_remaining_svelte_contexts() {
+        fn auxiliary_text_tokens_match_remaining_contexts() {
             assert_eq!(TEXT_EMOJI_SIZE, 16.0);
             assert_eq!(TEXT_MARKDOWN_SIZE, 10.0);
             assert_eq!(TEXT_MARKDOWN_LIST_SIZE, 10.0);

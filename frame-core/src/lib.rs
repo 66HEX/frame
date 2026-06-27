@@ -10,5 +10,4 @@ pub mod fonts;
 pub mod media_rules;
 pub mod probe;
 pub mod types;
-pub mod upscale;
 pub mod utils;

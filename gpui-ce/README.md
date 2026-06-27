@@ -1,10 +1,10 @@
 # Frame GPUI-CE
 
-Native GPUI-CE rewrite of Frame.
+Native GPUI-CE application for Frame.
 
-This crate owns the new application shell, GPUI views, GPUI-specific state, and bundled assets used by the native app. Shared conversion/probe logic is consumed through the `frame-core` crate; GPUI app code and bundled assets stay in this directory.
+This crate owns the application shell, GPUI views, GPUI-specific state, and bundled assets used by the native app. Shared conversion/probe logic is consumed through the `frame-core` crate; GPUI app code and bundled assets stay in this directory.
 
-The rewrite intentionally stays self-contained here: local Frame UI wrappers are built directly on GPUI-CE primitives, assets live under `gpui-ce/assets/`, and no external GPUI component library is used.
+The app intentionally stays self-contained here: local Frame UI wrappers are built directly on GPUI-CE primitives, assets live under `gpui-ce/assets/`, and no external GPUI component library is used.
 
 ## Source Layout
 

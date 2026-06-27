@@ -469,7 +469,7 @@ mod time_formatting {
     use super::*;
 
     #[test]
-    fn parse_time_to_seconds_accepts_original_hh_mm_ss_fraction() {
+    fn parse_time_to_seconds_accepts_full_hh_mm_ss_fraction() {
         assert_close(super::super::parse_time_to_seconds("01:02:03.250"), 3723.25);
     }
 
@@ -479,12 +479,12 @@ mod time_formatting {
     }
 
     #[test]
-    fn format_time_matches_original_trim_precision() {
+    fn format_time_matches_trim_precision() {
         assert_eq!(super::super::format_time(3723.25), "01:02:03.250");
     }
 
     #[test]
-    fn format_time_pads_single_digit_seconds_like_svelte() {
+    fn format_time_pads_single_digit_seconds() {
         assert_eq!(super::super::format_time(61.2), "00:01:01.200");
     }
 }

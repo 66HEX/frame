@@ -194,7 +194,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn ffprobe_json_args_match_tauri_sidecar_contract() {
+    fn ffprobe_json_args_match_probe_contract() {
         assert_eq!(
             ffprobe_json_args("/tmp/input.mp4"),
             vec![

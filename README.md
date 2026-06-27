@@ -4,24 +4,20 @@
 </div>
 
 <div align="center">
-
-[English](./README.md) | [简体中文](./readme/zh-CN.md) | [日本語](./readme/ja-JP.md) | [한국어](./readme/ko-KR.md) | [Español](./readme/es-ES.md) | [Русский](./readme/ru-RU.md) | [Français](./readme/fr-FR.md) | [Deutsch](./readme/de-DE.md) | [Italiano](./readme/it-IT.md)
-
+  <img src="https://img.shields.io/badge/GPUI--CE-native-2d3748?style=flat-square" alt="GPUI-CE" />
+  <img src="https://img.shields.io/badge/Rust-Edition_2024-black?style=flat-square&logo=rust" alt="Rust" />
+  <img src="https://img.shields.io/badge/FFmpeg-runtime-007808?style=flat-square&logo=ffmpeg" alt="FFmpeg" />
+  <img src="https://img.shields.io/badge/license-GPL--3.0-green?style=flat-square" alt="License" />
+  <a href="https://github.com/sponsors/66HEX">
+    <img src="https://img.shields.io/badge/Sponsor-GitHub-pink?style=flat-square&logo=githubsponsors" alt="GitHub Sponsors" />
+  </a>
 </div>
 
-<div align="center">
-	<img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square&logo=tauri" alt="Tauri" />
-	<img src="https://img.shields.io/badge/Svelte-v5-red?style=flat-square&logo=svelte" alt="Svelte" />
-	<img src="https://img.shields.io/badge/Rust-Edition_2024-black?style=flat-square&logo=rust" alt="Rust" />
-	<img src="https://img.shields.io/badge/TypeScript-5.9.3-blue?style=flat-square&logo=typescript" alt="TypeScript" />
-	<img src="https://img.shields.io/badge/Tailwind_CSS-v4-38bdf8?style=flat-square&logo=tailwindcss" alt="Tailwind" />
-	<img src="https://img.shields.io/badge/license-GPL--3.0-green?style=flat-square" alt="License" />
-	<a href="https://github.com/sponsors/66HEX">
-		<img src="https://img.shields.io/badge/Sponsor-GitHub-pink?style=flat-square&logo=githubsponsors" alt="GitHub Sponsors" />
-	</a>
-</div>
-
-**Frame** is a high-performance media conversion utility built on the Tauri v2 framework. It provides a native interface for FFmpeg operations, allowing for granular control over video, audio, and image conversion parameters. The application leverages a Rust-based backend for concurrent task management and process execution, coupled with a Svelte 5 frontend for configuration and state monitoring.
+**Frame** is a native media conversion utility built in Rust. It provides a
+desktop interface for FFmpeg operations, with granular control over video,
+audio, image, subtitle, and metadata settings. The application uses a GPUI-CE
+front end and a reusable Rust conversion core for FFmpeg argument generation,
+source probing, compatibility validation, task control, and progress parsing.
 
 <br />
 <div align="center">
@@ -29,15 +25,17 @@
 </div>
 <br />
 
-> [!WARNING]  
+> [!WARNING]
 > **Unsigned Application Notice**
-> Since the application is currently unsigned, your operating system will flag it:
+> Since the application is currently unsigned, your operating system may flag it:
 >
-> - **macOS:** The system will flag the app and its sidecar binaries with a quarantine attribute. To run the app, remove the attribute manually:
+> - **macOS:** The system can flag the app and bundled binaries with a quarantine
+>   attribute. To run the app, remove the attribute manually:
 >   ```bash
 >   xattr -dr com.apple.quarantine /Applications/Frame.app
 >   ```
-> - **Windows:** Windows SmartScreen may prevent the application from starting. Click **"More info"** and then **"Run anyway"** to proceed.
+> - **Windows:** Windows SmartScreen may prevent the application from starting.
+>   Click **"More info"** and then **"Run anyway"** to proceed.
 
 ## GitHub Sponsors
 
@@ -48,17 +46,24 @@ If Frame helps you, consider supporting the project on GitHub Sponsors:
 Current funding goals:
 
 - **Apple Developer Program:** `$99/year` to sign and notarize macOS builds.
-- **Microsoft code-signing certificate:** estimated `$300-$700/year` to sign Windows builds and reduce SmartScreen friction.
+- **Microsoft code-signing certificate:** estimated `$300-$700/year` to sign
+  Windows builds and reduce SmartScreen friction.
 
 Sponsor contributions are used first for these release-signing costs.
 
-See [GitHub Sponsors](https://github.com/sponsors/66HEX) for full sponsorship details, tier suggestions, and a launch checklist.
+See [GitHub Sponsors](https://github.com/sponsors/66HEX) for full sponsorship
+details, tier suggestions, and a launch checklist.
 
 ## Features
 
 ### Media Conversion Core
 
-- **Media Types:** Video, Audio, Image.
+- **Media Types:** Video, audio, and image sources.
+- **Supported Source Files:**
+  - **Video:** `mp4`, `mov`, `mkv`, `avi`, `webm`, `gif`
+  - **Audio:** `mp3`, `m4a`, `wav`, `flac`
+  - **Image:** `png`, `jpg`, `jpeg`, `webp`, `bmp`, `tif`, `tiff`, `avif`,
+    `heic`, `heif`
 - **Supported Output Formats:**
   - **Video:** `mp4`, `mkv`, `webm`, `mov`, `gif`
   - **Audio:** `mp3`, `m4a`, `wav`, `flac`
@@ -68,53 +73,74 @@ See [GitHub Sponsors](https://github.com/sponsors/66HEX) for full sponsorship de
   - `libx265` (H.265 / HEVC)
   - `vp9` (Google VP9)
   - `prores` (Apple ProRes)
-  - `libsvtav1` (Scalable Video Technology AV1)
-  - **Hardware Acceleration:** `h264_videotoolbox` (Apple Silicon), `hevc_videotoolbox` (Apple Silicon), `h264_nvenc` (NVIDIA), `hevc_nvenc` (NVIDIA), `av1_nvenc` (NVIDIA).
+  - `libsvtav1` (SVT-AV1)
+  - `gif` palette output
+  - **Hardware Acceleration:** `h264_videotoolbox`, `hevc_videotoolbox`,
+    `h264_nvenc`, `hevc_nvenc`, `av1_nvenc` when available in the configured
+    FFmpeg build.
 - **Image Encoders:** `png`, `mjpeg` (JPEG), `libwebp` (WebP), `bmp`, `tiff`.
-- **Audio Encoders:** `aac`, `ac3` (Dolby Digital), `libopus`, `mp3`, `alac` (Apple Lossless), `flac` (Free Lossless Audio Codec), `pcm_s16le` (WAV).
-- **Bitrate Control:** Constant Rate Factor (CRF) or Target Bitrate (kbps).
-- **Scaling:** Bicubic, Lanczos, Bilinear, Nearest Neighbor.
-- **Metadata Probing:** Automated extraction of stream details (codec, duration, bitrate, channel layout) via `ffprobe`.
-- **AI Upscaling:** Integrated `Real-ESRGAN` for high-quality video and image upscaling (x2, x4).
+- **Audio Encoders:** `aac`, `ac3`, `libopus`, `mp3`, `alac`, `flac`,
+  `pcm_s16le`, plus optional `libfdk_aac` when available.
+- **Bitrate Control:** CRF, target bitrate, audio VBR where supported, and
+  codec-specific presets.
+- **Video Processing:** Resolution presets, custom dimensions, FPS conversion,
+  pixel format selection, scaling, crop, rotate, flip, and image overlay.
+- **GIF Controls:** Frame rate, color count, dithering, and loop count.
+- **Audio Controls:** Codec, bitrate, VBR quality, channel layout, volume, and
+  per-track selection.
+- **Subtitles:** Stream selection, `.srt` / `.ass` / `.vtt` source filtering,
+  burn-in subtitle file selection, font, size, color, outline color, and
+  position controls.
+- **Metadata:** Preserve, clean, or replace metadata fields such as title,
+  artist, album, genre, date, and comment.
+- **Metadata Probing:** Automated source inspection through `ffprobe`.
 
 ### Architecture & Workflow
 
-- **Concurrent Processing:** Async task queue manager implemented in Rust (`tokio::mpsc`) limiting concurrent FFmpeg processes (default: 2).
-- **Real-time Telemetry:** Stream parsing of FFmpeg `stderr` for accurate progress tracking and log output.
-- **Preset Management:** Configuration persistence for reusable conversion profiles.
+- **Native UI:** GPUI-CE application shell, custom titlebar, workspace/logs
+  views, settings panels, and shared UI primitives.
+- **Shared Conversion Core:** `frame-core` owns FFmpeg arguments, media rules,
+  probing types, filter construction, and validation logic.
+- **Concurrent Processing:** Rust task controller for queueing and limiting
+  simultaneous FFmpeg processes.
+- **Real-time Telemetry:** FFmpeg progress and log events are parsed and shown
+  in the app while conversions run.
+- **Runtime Binaries:** Local development uses platform-specific FFmpeg and
+  FFprobe binaries under `gpui-ce/resources/binaries/`.
 
 ## Technical Stack
 
-### Backend (Rust / Tauri)
+### Native Application
 
-- **Core:** Tauri v2 (Rust Edition 2024).
-- **Runtime:** `tokio` (Async I/O).
+- **Language:** Rust Edition 2024.
+- **UI:** GPUI-CE.
+- **Native Dialogs:** `rfd`, with extension filtering for supported media and
+  subtitle files.
+- **Assets:** Embedded SVG icons and the bundled Instrument Sans font.
+
+### Conversion Core
+
+- **Runtime Tools:** FFmpeg and FFprobe.
 - **Serialization:** `serde`, `serde_json`.
-- **Process Management:** `tauri-plugin-shell` for sidecar execution (FFmpeg/FFprobe).
-- **System Integration:** `tauri-plugin-dialog`, `tauri-plugin-fs`.
-
-### Frontend (SvelteKit)
-
-- **Framework:** Svelte 5 (Runes API).
-- **Build System:** Vite.
-- **Styling:** Tailwind CSS v4, `clsx`, `tailwind-merge`.
-- **State Management:** Svelte 5 `$state` / `$props`.
-- **Internationalization:** Multi-language interface with automatic system language detection.
-- **Typography:** Loskeley Mono (embedded).
+- **Error Handling:** `thiserror`.
+- **Media Rules:** Shared JSON compatibility matrix consumed by Rust code.
 
 ## Installation
 
 ### Download Prebuilt Binaries
 
-The easiest way to get started is to download the latest release for your platform (macOS, Windows, or Linux) directly from GitHub.
+The easiest way to get started is to download the latest release for your
+platform directly from GitHub.
 
 [**Download Latest Release**](https://github.com/66HEX/frame/releases)
 
-> **Note:** Since the application is not yet code-signed, you may need to manually approve it in your system settings (see the warning at the top of this file).
+> **Note:** Since the application is not yet code-signed, you may need to
+> manually approve it in your system settings.
 
 ### WinGet (Windows)
 
-Frame is available in the official WinGet repository under the `66HEX.Frame` identifier.
+Frame is available in the official WinGet repository under the `66HEX.Frame`
+identifier.
 
 ```powershell
 winget install --id 66HEX.Frame -e
@@ -128,91 +154,87 @@ winget upgrade --id 66HEX.Frame -e
 
 ### Homebrew (macOS)
 
-For macOS users, you can install and update Frame easily using our custom Homebrew Tap:
+For macOS users, Frame is available through the custom Homebrew tap:
 
 ```bash
 brew tap 66HEX/frame
 brew install --cask frame
 ```
 
-### Linux System Requirements
-
-Even when using the **AppImage**, Frame relies on the system's **WebKitGTK** and **GStreamer** libraries for rendering the UI and handling media playback. Native dialogs on Linux also require **XDG Desktop Portal** integration (plus a desktop-specific backend) and `zenity` as fallback. If the application crashes upon adding a source, the video preview remains blank, or file dialogs fail to open/theme correctly, install the packages below.
-
-- **Ubuntu / Debian:**
-
-  ```bash
-  sudo apt update
-  sudo apt install libwebkit2gtk-4.1-0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-libav xdg-desktop-portal xdg-desktop-portal-gtk zenity
-  ```
-
-- **Arch Linux:**
-
-  ```bash
-  sudo pacman -S --needed webkit2gtk-4.1 gst-plugins-base gst-plugins-good gst-libav xdg-desktop-portal xdg-desktop-portal-gtk zenity
-  ```
-
-- **Fedora:**
-  ```bash
-  sudo dnf install webkit2gtk4.1 gstreamer1-plugins-base gstreamer1-plugins-good gstreamer1-libav xdg-desktop-portal xdg-desktop-portal-gtk zenity
-  ```
-
-> **KDE users:** install `xdg-desktop-portal-kde` (instead of `xdg-desktop-portal-gtk`) to get Plasma-native themed dialogs.
-
 ### Build from Source
 
-If you prefer to build the application yourself or want to contribute, follow these steps.
+If you prefer to build the application yourself or want to contribute, follow
+these steps.
 
 **1. Prerequisites**
 
 - **Rust:** [Install Rust](https://www.rust-lang.org/tools/install)
-- **Bun (or Node.js):** [Install Bun](https://bun.sh/)
-- **OS Dependencies:** Follow the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for your operating system.
+- **Node.js 18 or newer:** required for the binary setup script.
+- **Platform toolchain:** a C/C++ build toolchain and native desktop libraries
+  required by Rust and GPUI-CE on your operating system.
 
-**2. Setup Project**
-
-Clone the repository and install dependencies:
+**2. Clone the Repository**
 
 ```bash
 git clone https://github.com/66HEX/frame.git
 cd frame
-bun install
 ```
 
-**3. Setup Binaries**
+**3. Setup Runtime Binaries**
 
-Frame requires FFmpeg/FFprobe sidecar binaries and Real-ESRGAN sidecar assets for AI upscaling. We provide scripts to fetch the correct versions for your platform automatically:
+Frame requires FFmpeg and FFprobe runtime binaries. The setup script downloads
+the platform-specific tools into `gpui-ce/resources/binaries/`, which is
+intentionally ignored by git:
 
 ```bash
-bun run setup:ffmpeg
-bun run setup:upscaler
+node scripts/setup-ffmpeg.cjs
 ```
 
-**4. Build or Run**
+**4. Run or Build**
 
 - **Development:**
 
   ```bash
-  bun tauri dev
+  cargo run --manifest-path gpui-ce/Cargo.toml
   ```
 
 - **Production Build:**
+
   ```bash
-  bun tauri build
+  cargo build --manifest-path gpui-ce/Cargo.toml --release
   ```
 
 ## Usage
 
-1.  **Input:** Use the system dialog to select files.
-2.  **Configuration:**
-    - **Source:** View detected file metadata.
-    - **Output:** Select container format and output filename.
-    - **Video:** Configure codec, bitrate/CRF, resolution, and framerate.
-    - **Images:** Configure image resolution/scaling, pixel format, and optional AI upscaling.
-    - **Audio:** Select codec, bitrate, channels, and specific tracks.
-    - **Presets:** Save and load reusable conversion profiles.
-3.  **Execution:** Initiates the conversion process via the Rust backend.
-4.  **Monitoring:** View real-time logs and percentage counters in the UI.
+1. **Input:** Add source files through the native file dialog or drag and drop.
+2. **Configuration:**
+   - **Source:** View detected file, video, audio, subtitle, and metadata
+     details.
+   - **Output:** Select processing mode, container format, and output filename.
+   - **Video:** Configure codec, bitrate/CRF, resolution, scaling, pixel format,
+     framerate, and visual transforms.
+   - **Images:** Configure image output format, resolution, scaling, and pixel
+     format.
+   - **Audio:** Select codec, bitrate, channels, volume, and tracks.
+   - **Subtitles:** Select subtitle tracks or burn in external subtitle files.
+   - **Metadata:** Preserve, clean, or replace metadata fields.
+   - **Presets:** Save and load reusable conversion profiles.
+3. **Execution:** Start conversion tasks from the workspace queue.
+4. **Monitoring:** View real-time progress and FFmpeg logs in the Logs view.
+
+## Development Checks
+
+Run the main checks before submitting changes:
+
+```bash
+cargo fmt --manifest-path frame-core/Cargo.toml --check
+cargo fmt --manifest-path gpui-ce/Cargo.toml --check
+cargo test --manifest-path frame-core/Cargo.toml
+cargo test --manifest-path gpui-ce/Cargo.toml
+cargo clippy --manifest-path frame-core/Cargo.toml --all-targets -- -D warnings
+cargo clippy --manifest-path gpui-ce/Cargo.toml --all-targets -- -D warnings
+node --check scripts/setup-ffmpeg.cjs
+```
 
 ## Star History
 
@@ -224,8 +246,8 @@ bun run setup:upscaler
 
 ## Acknowledgments & Third-Party Code
 
-- **Real-ESRGAN**: Copyright (c) 2021, Xintao Wang. Licensed under [BSD 3-Clause](https://github.com/xinntao/Real-ESRGAN/blob/master/LICENSE).
 - **FFmpeg**: Licensed under [GPLv3](https://www.ffmpeg.org/legal.html).
+- **GPUI-CE**: Native Rust UI framework used by Frame.
 
 ## License
 

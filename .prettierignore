@@ -1,6 +1,0 @@
-.svelte-kit
-node_modules
-build
-dist
-src-tauri/target
-src-tauri/binaries

@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 /**
  * Fetches FFmpeg and FFprobe binaries for the current platform/architecture
- * and installs them into src-tauri/binaries.
- * Usage: node scripts/setup-binaries.cjs [--force]
+ * and installs them into gpui-ce/resources/binaries.
+ * Usage: node scripts/setup-ffmpeg.cjs [--force]
  */
 const os = require('os');
 const path = require('path');
 const fs = require('fs');
 const fsp = require('fs/promises');
+const { spawnSync } = require('child_process');
 const { Readable } = require('stream');
 const { pipeline } = require('stream/promises');
-const extract = require('extract-zip');
 
 if (typeof fetch !== 'function') {
 	console.error('This script requires Node.js 18 or newer (built-in fetch API).');
@@ -27,7 +27,7 @@ const platformArgIndex = process.argv.indexOf('--platform');
 const platformOverride = platformArgIndex !== -1 ? process.argv[platformArgIndex + 1] : null;
 
 const repoRoot = path.resolve(__dirname, '..');
-const BIN_DIR = path.join(repoRoot, 'src-tauri', 'binaries');
+const BIN_DIR = path.join(repoRoot, 'gpui-ce', 'resources', 'binaries');
 const TMP_ROOT_PREFIX = path.join(os.tmpdir(), 'frame-binaries-');
 
 const MARTIN_BASE = 'https://ffmpeg.martin-riedl.de/redirect/latest';
@@ -148,7 +148,7 @@ async function main() {
 		await safeRm(tmpDir);
 	}
 
-	console.log('All binaries are ready in src-tauri/binaries.');
+	console.log('All binaries are ready in gpui-ce/resources/binaries.');
 }
 
 async function processIndividual(entry, tmpDir) {
@@ -165,7 +165,7 @@ async function processIndividual(entry, tmpDir) {
 	console.log(`Downloading ${entry.id} from ${entry.url}...`);
 	await downloadFile(entry.url, zipPath);
 	await fsp.mkdir(extractDir, { recursive: true });
-	await extract(zipPath, { dir: extractDir });
+	extractZip(zipPath, extractDir);
 
 	const source = await findFile(extractDir, entry.expectedNames);
 	if (!source) {
@@ -200,7 +200,7 @@ async function processSharedArchive(sharedConfig, tmpDir) {
 	console.log(`Downloading Windows bundle from ${sharedConfig.url}...`);
 	await downloadFile(sharedConfig.url, zipPath);
 	await fsp.mkdir(extractDir, { recursive: true });
-	await extract(zipPath, { dir: extractDir });
+	extractZip(zipPath, extractDir);
 
 	for (const entry of entries) {
 		if (!force && (await fileExists(entry.destination))) {
@@ -233,6 +233,42 @@ async function downloadFile(url, destination) {
 		throw new Error(`Failed to download ${url}: ${response.status} ${response.statusText}`);
 	}
 	await pipeline(Readable.fromWeb(response.body), fs.createWriteStream(destination));
+}
+
+function extractZip(zipPath, destination) {
+	const result =
+		process.platform === 'win32'
+			? spawnSync(
+					'powershell.exe',
+					[
+						'-NoProfile',
+						'-ExecutionPolicy',
+						'Bypass',
+						'-Command',
+						`Expand-Archive -LiteralPath ${quotePowerShellLiteral(zipPath)} -DestinationPath ${quotePowerShellLiteral(destination)} -Force`
+					],
+					{ stdio: 'inherit' }
+				)
+			: spawnSync('unzip', ['-q', zipPath, '-d', destination], { stdio: 'inherit' });
+
+	if (result.error) {
+		throw new Error(
+			`Failed to extract archive. ${extractHelp()} Original error: ${result.error.message}`
+		);
+	}
+	if (result.status !== 0) {
+		throw new Error(`Archive extraction failed with exit code ${result.status}. ${extractHelp()}`);
+	}
+}
+
+function quotePowerShellLiteral(value) {
+	return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+function extractHelp() {
+	return process.platform === 'win32'
+		? 'Ensure PowerShell Expand-Archive is available.'
+		: 'Ensure the unzip command is installed.';
 }
 
 async function findFile(dir, expectedNames) {

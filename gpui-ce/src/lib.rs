@@ -1,4 +1,4 @@
-//! Shared state and layout contracts for the native GPUI-CE rewrite of Frame.
+//! Shared state and layout contracts for the native GPUI-CE app.
 
 pub mod app;
 pub mod assets;
@@ -8,6 +8,7 @@ pub mod file_filters;
 pub mod file_queue;
 pub mod native_dialogs;
 pub mod preview;
+pub mod runtime_binaries;
 pub mod settings;
 pub mod source_metadata;
 pub mod theme;

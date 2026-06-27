@@ -1,6 +1,5 @@
 use std::{
     collections::VecDeque,
-    env,
     io::Read,
     process::{Command, Stdio},
     sync::mpsc::{self, RecvTimeoutError},
@@ -19,6 +18,8 @@ use frame_core::{
     types::{ConversionConfig as CoreConversionConfig, ConversionTask, ProbeMetadata},
     utils::{DURATION_REGEX, TIME_REGEX, parse_time},
 };
+
+use crate::runtime_binaries::{ffmpeg_executable, ffprobe_executable};
 
 use super::controller::ConversionProcessController;
 
@@ -192,14 +193,6 @@ fn emit_cancelled_task(id: &str, emit: &mut impl FnMut(ConversionEvent)) {
         "[INFO] Task cancelled",
     ));
     emit(ConversionEvent::cancelled(id.to_string()));
-}
-
-fn ffmpeg_executable() -> String {
-    env::var("FRAME_FFMPEG_PATH").unwrap_or_else(|_| "ffmpeg".to_string())
-}
-
-fn ffprobe_executable() -> String {
-    env::var("FRAME_FFPROBE_PATH").unwrap_or_else(|_| "ffprobe".to_string())
 }
 
 fn probe_media_file(file_path: &str) -> Result<ProbeMetadata, ConversionError> {

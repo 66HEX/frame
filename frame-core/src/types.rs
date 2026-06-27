@@ -113,8 +113,6 @@ pub struct ConversionConfig {
     #[serde(default)]
     pub flip_vertical: bool,
     #[serde(default)]
-    pub ml_upscale: Option<String>,
-    #[serde(default)]
     pub crop: Option<CropConfig>,
     #[serde(default)]
     pub overlay: Option<OverlayConfig>,

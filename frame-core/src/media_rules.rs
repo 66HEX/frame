@@ -1,4 +1,4 @@
-//! Media compatibility rules shared by the Tauri backend and GPUI frontend state.
+//! Media compatibility rules shared by the conversion core and GPUI frontend state.
 
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
@@ -86,9 +86,8 @@ impl From<MediaRulesRaw> for MediaRules {
 }
 
 static MEDIA_RULES: LazyLock<MediaRules> = LazyLock::new(|| {
-    let raw: MediaRulesRaw =
-        serde_json::from_str(include_str!("../../src/lib/shared/media-rules.json"))
-            .expect("Shared media rules JSON is invalid");
+    let raw: MediaRulesRaw = serde_json::from_str(include_str!("../media-rules.json"))
+        .expect("Media rules JSON is invalid");
 
     raw.into()
 });

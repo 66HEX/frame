@@ -1,4 +1,4 @@
-//! Settings panel state and visibility rules ported from the Svelte inspector.
+//! Settings panel state and visibility rules for the native inspector.
 
 mod model;
 mod options;

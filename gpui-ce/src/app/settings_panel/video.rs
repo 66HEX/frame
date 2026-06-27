@@ -48,15 +48,6 @@ pub(in crate::app) fn settings_video_tab(
             cx,
         ));
 
-    if !is_gif_mode {
-        content = content.child(settings_video_ml_section(
-            config,
-            settings_disabled,
-            available_encoders,
-            cx,
-        ));
-    }
-
     content = content.child(settings_video_fps_section(config, settings_disabled, cx));
 
     if is_gif_mode {
@@ -125,17 +116,16 @@ pub(in crate::app) fn settings_video_resolution_section(
     window: &Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let ml_active = config.ml_upscale != "none";
     let mut section = settings_section("RESOLUTION & FRAMERATE").child(settings_resolution_grid(
         config,
-        settings_disabled || ml_active,
+        settings_disabled,
         cx,
     ));
 
     if config.resolution == "custom" {
         section = section.child(settings_custom_dimensions_grid(
             config,
-            settings_disabled || ml_active,
+            settings_disabled,
             video_width_focus,
             video_height_focus,
             window,
@@ -151,14 +141,9 @@ pub(in crate::app) fn settings_resolution_grid(
     disabled: bool,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let effective_resolution = if config.ml_upscale == "none" {
-        config.resolution.as_str()
-    } else {
-        "original"
-    };
     let mut grid = div().grid().grid_cols(2).gap_2();
     for resolution in resolution_options() {
-        let selected = effective_resolution == *resolution;
+        let selected = config.resolution == *resolution;
         let label = resolution_label(resolution);
         grid = grid.child(
             frame_choice_button(
@@ -263,44 +248,6 @@ pub(in crate::app) fn settings_video_scaling_section(
     }
 
     settings_section("SCALING ALGORITHM").child(grid)
-}
-
-pub(in crate::app) fn settings_video_ml_section(
-    config: &ConversionConfig,
-    settings_disabled: bool,
-    available_encoders: &AvailableEncoders,
-    cx: &mut Context<FrameRoot>,
-) -> gpui::Div {
-    let mut grid = div().grid().grid_cols(2).gap_2();
-    for (mode, label) in [
-        ("none", "None"),
-        ("esrgan-2x", "ESRGAN 2x"),
-        ("esrgan-4x", "ESRGAN 4x"),
-    ] {
-        let enabled = !settings_disabled && (mode == "none" || available_encoders.ml_upscale);
-        let ml_upscale_available = available_encoders.ml_upscale;
-        grid = grid.child(
-            frame_choice_button(
-                format!("video-ml-upscale-{mode}"),
-                label,
-                config.ml_upscale == mode,
-                enabled,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
-                cx.stop_propagation();
-                if !enabled {
-                    return;
-                }
-                if root.update_selected_config(|config| {
-                    apply_ml_upscale(config, mode, ml_upscale_available)
-                }) {
-                    cx.notify();
-                }
-            })),
-        );
-    }
-
-    settings_section("ML UPSCALING").child(grid)
 }
 
 pub(in crate::app) fn settings_video_fps_section(

@@ -114,7 +114,7 @@ mod tests {
     }
 
     #[test]
-    fn conversion_event_event_name_matches_existing_tauri_contract() {
+    fn conversion_event_event_name_matches_public_contract() {
         assert_eq!(
             ConversionEvent::progress("task-1", 42.0).event_name(),
             CONVERSION_PROGRESS_EVENT
@@ -142,7 +142,7 @@ mod tests {
     }
 
     #[test]
-    fn conversion_event_sink_accepts_native_events_without_tauri() {
+    fn conversion_event_sink_accepts_native_events() {
         let sink = CollectingSink::default();
 
         sink.emit_conversion_event(ConversionEvent::log("task-4", "[INFO] queued"))

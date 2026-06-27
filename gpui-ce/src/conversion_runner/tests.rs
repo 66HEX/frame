@@ -53,7 +53,6 @@ fn core_config_from_gpui_preserves_active_conversion_fields() {
         crf: 18,
         quality: 60,
         preset: "slow".to_string(),
-        ml_upscale: "esrgan-2x".to_string(),
         pixel_format: "yuv420p10le".to_string(),
         gif_colors: 128,
         gif_dither: "floyd_steinberg".to_string(),
@@ -83,7 +82,6 @@ fn core_config_from_gpui_preserves_active_conversion_fields() {
     assert_eq!(core.crf, 18);
     assert_eq!(core.quality, 60);
     assert_eq!(core.preset, "slow");
-    assert_eq!(core.ml_upscale.as_deref(), Some("esrgan-2x"));
     assert_eq!(core.pixel_format, "yuv420p10le");
     assert_eq!(core.gif_colors, 128);
     assert_eq!(core.gif_dither, "floyd_steinberg");

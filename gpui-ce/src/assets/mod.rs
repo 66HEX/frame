@@ -1,4 +1,4 @@
-//! Bundled assets for the GPUI rewrite.
+//! Bundled assets for the GPUI app.
 
 use std::{
     borrow::Cow,

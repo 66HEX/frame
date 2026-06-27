@@ -3,7 +3,6 @@ use super::*;
 pub(in crate::app) fn settings_images_tab(
     config: &ConversionConfig,
     settings_disabled: bool,
-    available_encoders: &AvailableEncoders,
     video_width_focus: Option<&FocusHandle>,
     video_height_focus: Option<&FocusHandle>,
     window: &Window,
@@ -19,12 +18,6 @@ pub(in crate::app) fn settings_images_tab(
             video_width_focus,
             video_height_focus,
             window,
-            cx,
-        ))
-        .child(settings_video_ml_section(
-            config,
-            settings_disabled,
-            available_encoders,
             cx,
         ))
         .child(settings_video_scaling_section(

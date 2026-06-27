@@ -142,7 +142,6 @@ pub(in crate::app) fn settings_tab_content(
         SettingsTab::Images => content.child(settings_images_tab(
             settings.config,
             settings.settings_disabled,
-            settings.available_encoders,
             settings.video_width_focus,
             settings.video_height_focus,
             window,

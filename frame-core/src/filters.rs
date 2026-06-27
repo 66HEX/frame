@@ -233,7 +233,6 @@ mod tests {
             rotation: "0".to_string(),
             flip_horizontal: false,
             flip_vertical: false,
-            ml_upscale: None,
             crop: None,
             overlay: None,
             nvenc_spatial_aq: false,

@@ -76,7 +76,7 @@ use crate::{
         apply_audio_normalize, apply_audio_quality, apply_audio_volume, apply_crf,
         apply_custom_height, apply_custom_width, apply_fps, apply_gif_colors, apply_gif_dither,
         apply_gif_loop, apply_hw_decode, apply_metadata_field, apply_metadata_mode,
-        apply_ml_upscale, apply_nvenc_spatial_aq, apply_nvenc_temporal_aq, apply_output_container,
+        apply_nvenc_spatial_aq, apply_nvenc_temporal_aq, apply_output_container,
         apply_pixel_format, apply_preset, apply_processing_mode, apply_quality, apply_resolution,
         apply_scaling_algorithm, apply_subtitle_burn_path, apply_subtitle_font_color,
         apply_subtitle_font_name, apply_subtitle_font_size, apply_subtitle_outline_color,

@@ -1,4 +1,4 @@
-//! File extension filters matching the original Svelte file pickers.
+//! File extension filters for native source and subtitle pickers.
 
 use std::path::{Path, PathBuf};
 

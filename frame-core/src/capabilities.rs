@@ -1,12 +1,6 @@
 use regex::Regex;
 
 const FFMPEG_ENCODER_LIST_ARGS: [&str; 1] = ["-encoders"];
-const REQUIRED_UPSCALE_MODEL_FILES: [&str; 4] = [
-    "realesr-animevideov3-x2.param",
-    "realesr-animevideov3-x2.bin",
-    "realesr-animevideov3-x4.param",
-    "realesr-animevideov3-x4.bin",
-];
 
 #[derive(serde::Serialize, Clone, Debug, Default, Eq, PartialEq)]
 #[expect(
@@ -19,7 +13,6 @@ pub struct AvailableEncoders {
     pub hevc_videotoolbox: bool,
     pub hevc_nvenc: bool,
     pub av1_nvenc: bool,
-    pub ml_upscale: bool,
     pub libfdk_aac: bool,
     pub libmp3lame: bool,
 }
@@ -30,15 +23,7 @@ pub const fn ffmpeg_encoder_list_args() -> [&'static str; 1] {
 }
 
 #[must_use]
-pub const fn required_upscale_model_files() -> &'static [&'static str] {
-    &REQUIRED_UPSCALE_MODEL_FILES
-}
-
-#[must_use]
-pub fn parse_available_encoders(
-    ffmpeg_encoders_stdout: impl AsRef<str>,
-    ml_upscale_available: bool,
-) -> AvailableEncoders {
+pub fn parse_available_encoders(ffmpeg_encoders_stdout: impl AsRef<str>) -> AvailableEncoders {
     let stdout = ffmpeg_encoders_stdout.as_ref();
 
     AvailableEncoders {
@@ -47,7 +32,6 @@ pub fn parse_available_encoders(
         hevc_videotoolbox: encoder_list_contains(stdout, "hevc_videotoolbox"),
         hevc_nvenc: encoder_list_contains(stdout, "hevc_nvenc"),
         av1_nvenc: encoder_list_contains(stdout, "av1_nvenc"),
-        ml_upscale: ml_upscale_available,
         libfdk_aac: encoder_list_contains(stdout, "libfdk_aac"),
         libmp3lame: encoder_list_contains(stdout, "libmp3lame"),
     }
@@ -68,19 +52,6 @@ mod tests {
     }
 
     #[test]
-    fn required_upscale_model_files_include_both_real_esrgan_scales() {
-        assert_eq!(
-            required_upscale_model_files(),
-            [
-                "realesr-animevideov3-x2.param",
-                "realesr-animevideov3-x2.bin",
-                "realesr-animevideov3-x4.param",
-                "realesr-animevideov3-x4.bin",
-            ]
-        );
-    }
-
-    #[test]
     fn parse_available_encoders_detects_ffmpeg_encoder_rows() {
         let stdout = "\
 Encoders:
@@ -93,7 +64,7 @@ Encoders:
  A..... libmp3lame libmp3lame MP3
 ";
 
-        let actual = parse_available_encoders(stdout, true);
+        let actual = parse_available_encoders(stdout);
 
         assert_eq!(
             actual,
@@ -103,7 +74,6 @@ Encoders:
                 hevc_videotoolbox: true,
                 hevc_nvenc: true,
                 av1_nvenc: true,
-                ml_upscale: true,
                 libfdk_aac: true,
                 libmp3lame: true,
             }
@@ -118,7 +88,7 @@ Encoders:
  A..... libmp3lame_extra should not match
 ";
 
-        let actual = parse_available_encoders(stdout, false);
+        let actual = parse_available_encoders(stdout);
 
         assert_eq!(actual, AvailableEncoders::default());
     }

@@ -926,16 +926,14 @@ mod video_options {
             container: "gif".to_string(),
             video_codec: "libx264".to_string(),
             pixel_format: "yuv420p".to_string(),
-            ml_upscale: "esrgan-2x".to_string(),
             hw_decode: true,
             ..ConversionConfig::default()
         };
 
-        assert!(normalize_video_config(&mut config, None, true));
+        assert!(normalize_video_config(&mut config, None));
 
         assert_eq!(config.video_codec, "gif");
         assert_eq!(config.pixel_format, "auto");
-        assert_eq!(config.ml_upscale, "none");
         assert!(!config.hw_decode);
     }
 
@@ -946,17 +944,15 @@ mod video_options {
             resolution: "720p".to_string(),
             fps: "30".to_string(),
             pixel_format: "yuv420p".to_string(),
-            ml_upscale: "esrgan-2x".to_string(),
             flip_horizontal: true,
             ..ConversionConfig::default()
         };
 
-        assert!(normalize_video_config(&mut config, None, true));
+        assert!(normalize_video_config(&mut config, None));
 
         assert_eq!(config.resolution, "original");
         assert_eq!(config.fps, "original");
         assert_eq!(config.pixel_format, "auto");
-        assert_eq!(config.ml_upscale, "none");
         assert!(!config.flip_horizontal);
     }
 

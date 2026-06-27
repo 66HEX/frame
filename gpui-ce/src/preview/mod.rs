@@ -1,4 +1,4 @@
-//! Preview geometry helpers for the GPUI rewrite.
+//! Preview geometry helpers for the GPUI app.
 
 mod crop;
 mod media;

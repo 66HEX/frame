@@ -650,28 +650,6 @@ pub fn validate_task_input(
         }
     }
 
-    let has_ml_upscale = config
-        .ml_upscale
-        .as_ref()
-        .is_some_and(|mode| !mode.is_empty() && mode != "none");
-
-    if let Some(mode) = config.ml_upscale.as_deref()
-        && !mode.is_empty()
-        && mode != "none"
-        && mode != "esrgan-2x"
-        && mode != "esrgan-4x"
-    {
-        return Err(ConversionError::InvalidInput(format!(
-            "Invalid ML upscale mode: {mode}"
-        )));
-    }
-
-    if (is_audio_only || is_video_only) && has_ml_upscale {
-        return Err(ConversionError::InvalidInput(
-            "ML upscaling requires an audio-capable video container".to_string(),
-        ));
-    }
-
     if (is_audio_only || is_video_only) && has_custom_pixel_format(config) {
         return Err(ConversionError::InvalidInput(
             "Pixel format override is not available for this container".to_string(),
@@ -719,12 +697,6 @@ pub fn validate_task_input(
         if is_video_only || is_image_output {
             return Err(ConversionError::InvalidInput(
                 "Stream copy mode is not available for image/video-only containers".to_string(),
-            ));
-        }
-
-        if has_ml_upscale {
-            return Err(ConversionError::InvalidInput(
-                "ML upscaling requires re-encoding mode".to_string(),
             ));
         }
 

@@ -1174,7 +1174,6 @@ mod preview_shell {
             hevc_videotoolbox: false,
             hevc_nvenc: false,
             av1_nvenc: false,
-            ml_upscale: false,
             libfdk_aac: false,
             libmp3lame: false,
         };
@@ -1403,7 +1402,7 @@ mod visual_contract {
     use super::*;
 
     #[test]
-    fn file_list_controls_match_original_svelte_sizes() {
+    fn file_list_controls_match_design_sizes() {
         assert_eq!(components::FRAME_ICON_BUTTON_SM_SIZE, 24.0);
         assert_eq!(components::FRAME_ICON_SM_SIZE, 16.0);
         assert_eq!(components::FRAME_CHECKBOX_SIZE, 14.0);

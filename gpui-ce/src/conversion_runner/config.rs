@@ -111,8 +111,6 @@ pub fn core_config_from_gpui(config: &GpuiConversionConfig) -> CoreConversionCon
         rotation: config.rotation.clone(),
         flip_horizontal: config.flip_horizontal,
         flip_vertical: config.flip_vertical,
-        ml_upscale: (!config.ml_upscale.is_empty() && config.ml_upscale != "none")
-            .then_some(config.ml_upscale.clone()),
         crop: config.crop.as_ref().map(core_crop_from_gpui),
         overlay: None,
         nvenc_spatial_aq: config.nvenc_spatial_aq,
