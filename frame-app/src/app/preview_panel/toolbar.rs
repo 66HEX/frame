@@ -1,5 +1,7 @@
 use super::*;
 
+pub(in crate::app) const PREVIEW_TOOLBAR_BACKGROUND: &str = "#1B1D21";
+
 const PREVIEW_TOOLBAR_PADDING: f32 = 4.0;
 const PREVIEW_TOOLBAR_GAP: f32 = 8.0;
 const PREVIEW_TOOLBAR_VERTICAL_SEPARATOR_HEIGHT: f32 = 18.0;
@@ -35,7 +37,7 @@ pub(in crate::app) fn preview_toolbar(
         .flex_col()
         .gap(px(PREVIEW_TOOLBAR_GAP))
         .rounded(px(theme::RADIUS_MD))
-        .bg(color(theme::BACKGROUND))
+        .bg(parse_hex(PREVIEW_TOOLBAR_BACKGROUND))
         .p(px(PREVIEW_TOOLBAR_PADDING))
         .shadow(card_surface_shadows())
         .child(
@@ -118,7 +120,7 @@ pub(in crate::app) fn preview_zoom_toolbar(
         .flex()
         .gap_2()
         .rounded(px(theme::RADIUS_MD))
-        .bg(color(theme::BACKGROUND))
+        .bg(parse_hex(PREVIEW_TOOLBAR_BACKGROUND))
         .p(px(4.0))
         .shadow(card_surface_shadows())
         .child(

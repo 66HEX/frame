@@ -188,7 +188,7 @@ pub(in crate::app) fn preview_crop_aspect_bar(
         .items_center()
         .gap_2()
         .rounded(px(theme::RADIUS_MD))
-        .bg(color(theme::BACKGROUND))
+        .bg(parse_hex(PREVIEW_TOOLBAR_BACKGROUND))
         .p(px(4.0))
         .shadow(card_surface_shadows());
 
