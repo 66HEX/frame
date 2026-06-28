@@ -1256,6 +1256,61 @@ mod frame_root_config {
     }
 
     #[test]
+    fn preview_runtime_key_ignores_presentation_only_transform_changes() {
+        let mut root = FrameRoot::new();
+        root.file_queue
+            .add_file(FileItem::from_path("video", "/tmp/one.mp4", 1));
+        root.source_metadata.mark_ready(
+            "video".to_string(),
+            SourceMetadata {
+                media_kind: Some(SourceKind::Video),
+                width: Some(1920),
+                height: Some(1080),
+                duration: Some("12.5".to_string()),
+                ..SourceMetadata::default()
+            },
+        );
+        let metadata_entry = root.source_metadata.entry_for("video");
+        let initial_request = root
+            .selected_preview_runtime_request(&metadata_entry)
+            .expect("initial request");
+
+        assert!(root.rotate_selected_preview());
+        assert!(root.toggle_selected_flip(FlipAxis::Horizontal));
+        root.preview_ui.crop_mode = true;
+        root.preview_ui.draft_crop = Some(CropRect {
+            x: 0.25,
+            y: 0.25,
+            width: 0.5,
+            height: 0.5,
+        });
+        assert!(root.apply_selected_crop());
+        let transformed_request = root
+            .selected_preview_runtime_request(&metadata_entry)
+            .expect("transformed request");
+
+        assert_eq!(transformed_request.key, initial_request.key);
+        assert_ne!(
+            transformed_request.presentation,
+            initial_request.presentation
+        );
+        assert_eq!(
+            transformed_request.config.transform,
+            PreviewTransform::default()
+        );
+        assert_eq!(transformed_request.config.crop, None);
+        assert_eq!(
+            transformed_request.presentation.crop,
+            Some(EnginePreviewCrop {
+                x: 270,
+                y: 480,
+                width: 540,
+                height: 960,
+            })
+        );
+    }
+
+    #[test]
     fn apply_preview_crop_drag_updates_draft_without_persisting_config() {
         let mut root = FrameRoot::new();
         root.file_queue

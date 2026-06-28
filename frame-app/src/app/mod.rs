@@ -84,9 +84,10 @@ use crate::{
     },
     preview_engine::{
         DEFAULT_PREVIEW_FPS, DEFAULT_PREVIEW_MAX_HEIGHT, DEFAULT_PREVIEW_MAX_WIDTH,
-        MIN_PREVIEW_DIMENSION, PreviewCommand, PreviewCrop as EnginePreviewCrop, PreviewSession,
-        PreviewSessionConfig, PreviewSourceKind as EnginePreviewSourceKind, PreviewTransform,
-        render_image_from_frame,
+        MIN_PREVIEW_DIMENSION, PreviewCommand, PreviewCrop as EnginePreviewCrop,
+        PreviewRenderPresentation, PreviewSession, PreviewSessionConfig,
+        PreviewSourceKind as EnginePreviewSourceKind, PreviewTransform,
+        render_image_from_frame_with_presentation,
     },
     settings::{
         ConversionConfig, CropSettings, DEFAULT_SUBTITLE_FONT_COLOR,
@@ -208,6 +209,7 @@ const PREVIEW_CANVAS_WHEEL_ZOOM_STEP: f64 = 1.05;
 const PREVIEW_CANVAS_MAX_PAN: f64 = 2.0;
 const PREVIEW_CANVAS_LERP_FACTOR: f64 = 0.2;
 const PREVIEW_CANVAS_SNAP_EPSILON: f64 = 0.01;
+const PREVIEW_FRAME_TICK_INTERVAL: Duration = Duration::from_millis(16);
 
 pub struct FrameRoot {
     active_view: ActiveView,
@@ -303,6 +305,8 @@ struct PreviewUiState {
     playback: PreviewPlaybackState,
     runtime_key: Option<PreviewRuntimeKey>,
     pending_runtime_key: Option<PreviewRuntimeKey>,
+    render_presentation: PreviewRenderPresentation,
+    rendered_presentation: PreviewRenderPresentation,
     session: Option<Arc<PreviewSession>>,
     render_generation: u64,
     render_image: Option<Arc<RenderImage>>,
@@ -333,6 +337,8 @@ impl Default for PreviewUiState {
             playback: PreviewPlaybackState::new(false),
             runtime_key: None,
             pending_runtime_key: None,
+            render_presentation: PreviewRenderPresentation::default(),
+            rendered_presentation: PreviewRenderPresentation::default(),
             session: None,
             render_generation: 0,
             render_image: None,
@@ -411,16 +417,13 @@ struct PreviewRuntimeKey {
     source_width: Option<u32>,
     source_height: Option<u32>,
     duration_millis: u64,
-    rotation_degrees: u16,
-    flip_horizontal: bool,
-    flip_vertical: bool,
-    crop: Option<EnginePreviewCrop>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 struct PreviewRuntimeRequest {
     key: PreviewRuntimeKey,
     config: PreviewSessionConfig,
+    presentation: PreviewRenderPresentation,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

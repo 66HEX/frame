@@ -55,6 +55,14 @@ pub struct PreviewCrop {
     pub height: u32,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct PreviewRenderPresentation {
+    pub transform: PreviewTransform,
+    pub crop: Option<PreviewCrop>,
+    pub crop_source_width: Option<u32>,
+    pub crop_source_height: Option<u32>,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct PreviewFrame {
     pub width: u32,

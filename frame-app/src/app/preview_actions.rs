@@ -14,18 +14,27 @@ impl FrameRoot {
         request: Option<PreviewRuntimeRequest>,
         cx: &mut Context<Self>,
     ) {
-        let next_key = request.as_ref().map(|request| request.key.clone());
+        let Some(request) = request else {
+            self.clear_preview_runtime();
+            self.preview_ui.render_presentation = PreviewRenderPresentation::default();
+            self.preview_ui.rendered_presentation = PreviewRenderPresentation::default();
+            return;
+        };
+
+        let presentation_changed = self.preview_ui.render_presentation != request.presentation;
+        self.preview_ui.render_presentation = request.presentation;
+
+        let next_key = Some(request.key.clone());
         if self.preview_ui.runtime_key == next_key
             || self.preview_ui.pending_runtime_key == next_key
         {
+            if presentation_changed && self.refresh_preview_render_image() {
+                cx.notify();
+            }
             return;
         }
 
         self.clear_preview_runtime();
-
-        let Some(request) = request else {
-            return;
-        };
 
         let key = request.key.clone();
         self.preview_ui.pending_runtime_key = Some(key.clone());
@@ -241,8 +250,6 @@ impl FrameRoot {
         self.preview_ui.canvas.target_pan_y = next_pan_y;
         if changed {
             self.preview_ui.canvas.auto_fit_pending = false;
-            self.preview_ui.canvas.current_pan_x = next_pan_x;
-            self.preview_ui.canvas.current_pan_y = next_pan_y;
             self.schedule_preview_frame_tick(cx);
         }
         changed
@@ -417,13 +424,19 @@ impl FrameRoot {
         let Some(latest) = session.latest_frame() else {
             return false;
         };
-        if latest.generation == self.preview_ui.render_generation {
+        if latest.generation == self.preview_ui.render_generation
+            && self.preview_ui.rendered_presentation == self.preview_ui.render_presentation
+        {
             return false;
         }
 
-        match render_image_from_frame(&latest.frame) {
+        match render_image_from_frame_with_presentation(
+            &latest.frame,
+            self.preview_ui.render_presentation,
+        ) {
             Ok(image) => {
                 self.preview_ui.render_generation = latest.generation;
+                self.preview_ui.rendered_presentation = self.preview_ui.render_presentation;
                 self.preview_ui.render_image = Some(image);
                 self.preview_ui.runtime_error = None;
                 self.apply_preview_canvas_auto_fit();
@@ -445,7 +458,7 @@ impl FrameRoot {
         cx.spawn(async move |this, cx| {
             loop {
                 cx.background_executor()
-                    .timer(Duration::from_millis(33))
+                    .timer(PREVIEW_FRAME_TICK_INTERVAL)
                     .await;
                 let keep_ticking = this
                     .update(cx, |root, cx| {
@@ -1257,6 +1270,24 @@ fn preview_runtime_request(
     let crop = include_applied_crop
         .then(|| preview_crop_from_config(&selected_file.config, source_kind))
         .flatten();
+    let presentation = PreviewRenderPresentation {
+        transform,
+        crop,
+        crop_source_width: crop.and_then(|_| {
+            selected_file
+                .config
+                .crop
+                .as_ref()
+                .and_then(|crop| crop.source_width)
+        }),
+        crop_source_height: crop.and_then(|_| {
+            selected_file
+                .config
+                .crop
+                .as_ref()
+                .and_then(|crop| crop.source_height)
+        }),
+    };
     let key = PreviewRuntimeKey {
         file_id: selected_file.id.clone(),
         path: selected_file.path.clone(),
@@ -1264,10 +1295,6 @@ fn preview_runtime_request(
         source_width,
         source_height,
         duration_millis: (duration_seconds * 1000.0).round().max(0.0) as u64,
-        rotation_degrees: transform.rotation_degrees,
-        flip_horizontal: transform.flip_horizontal,
-        flip_vertical: transform.flip_vertical,
-        crop,
     };
     let config = PreviewSessionConfig {
         file_id: key.file_id.clone(),
@@ -1279,11 +1306,15 @@ fn preview_runtime_request(
         max_width: DEFAULT_PREVIEW_MAX_WIDTH,
         max_height: DEFAULT_PREVIEW_MAX_HEIGHT,
         fps: DEFAULT_PREVIEW_FPS,
-        transform,
-        crop,
+        transform: PreviewTransform::default(),
+        crop: None,
     };
 
-    Some(PreviewRuntimeRequest { key, config })
+    Some(PreviewRuntimeRequest {
+        key,
+        config,
+        presentation,
+    })
 }
 
 fn preview_transform_from_config(config: &ConversionConfig) -> PreviewTransform {

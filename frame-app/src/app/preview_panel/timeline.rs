@@ -235,17 +235,9 @@ pub(in crate::app) fn preview_timecode_field(
             .h(px(PREVIEW_TIMELINE_CONTROL_HEIGHT))
             .flex()
             .items_center()
-            .rounded(px(theme::RADIUS_SM))
-            .bg(color(theme::BACKGROUND))
-            .px(px(10.0))
             .text_size(px(theme::TEXT_LABEL_SIZE))
-            .text_color(if enabled {
-                color(theme::FOREGROUND)
-            } else {
-                color(theme::FRAME_GRAY_600)
-            })
+            .text_color(color(theme::FOREGROUND))
             .font_features(assets::frame_tabular_number_font_features())
-            .shadow(input_highlight_shadows())
             .child(value)
             .into_any_element()
     };

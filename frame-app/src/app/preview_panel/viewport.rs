@@ -198,11 +198,11 @@ pub(in crate::app) fn preview_viewport_content(
         .text_size(px(theme::TEXT_LABEL_SIZE))
         .text_color(color(theme::FRAME_GRAY_600));
 
-    let Some(file_name) = state.selected_file_name.as_deref() else {
+    if state.selected_file_name.is_none() {
         return content
             .child("Drop files or use Add Source")
             .into_any_element();
-    };
+    }
 
     let content = match state.metadata_status {
         PreviewMetadataStatus::Idle | PreviewMetadataStatus::Loading => {
@@ -242,17 +242,7 @@ pub(in crate::app) fn preview_viewport_content(
                 return content.child("Preview unavailable").into_any_element();
             }
 
-            content
-                .child(preview_media_placeholder(state.availability.media_kind))
-                .child(
-                    div()
-                        .max_w(px(320.0))
-                        .truncate()
-                        .whitespace_nowrap()
-                        .text_color(color(theme::FOREGROUND))
-                        .child(file_name.to_string()),
-                )
-                .child(preview_media_kind_label(state.availability.media_kind))
+            content.child(preview_media_placeholder(state.availability.media_kind))
         }
     };
 
@@ -348,22 +338,11 @@ fn preview_scroll_delta_y(delta: &ScrollDelta) -> f64 {
 }
 
 pub(in crate::app) fn preview_media_placeholder(media_kind: PreviewMediaKind) -> gpui::Div {
-    div()
-        .w(px(240.0))
-        .h(px(136.0))
-        .flex()
-        .items_center()
-        .justify_center()
-        .rounded(px(theme::RADIUS_MD))
-        .border_1()
-        .border_color(color(theme::FRAME_GRAY_200))
-        .bg(color(theme::BACKGROUND))
-        .shadow(input_highlight_shadows())
-        .child(icon_svg(
-            preview_media_icon(media_kind),
-            32.0,
-            color(theme::FRAME_GRAY_600),
-        ))
+    div().flex().items_center().justify_center().child(icon_svg(
+        preview_media_icon(media_kind),
+        32.0,
+        color(theme::FRAME_GRAY_600),
+    ))
 }
 
 pub(in crate::app) fn preview_media_icon(media_kind: PreviewMediaKind) -> &'static str {
@@ -371,15 +350,6 @@ pub(in crate::app) fn preview_media_icon(media_kind: PreviewMediaKind) -> &'stat
         PreviewMediaKind::Video | PreviewMediaKind::Unknown => assets::ICON_FILE_VIDEO,
         PreviewMediaKind::Audio => assets::ICON_MUSIC,
         PreviewMediaKind::Image => assets::ICON_FILE_IMAGE,
-    }
-}
-
-pub(in crate::app) fn preview_media_kind_label(media_kind: PreviewMediaKind) -> &'static str {
-    match media_kind {
-        PreviewMediaKind::Video => "VIDEO SOURCE",
-        PreviewMediaKind::Audio => "AUDIO SOURCE",
-        PreviewMediaKind::Image => "IMAGE SOURCE",
-        PreviewMediaKind::Unknown => "UNKNOWN SOURCE",
     }
 }
 

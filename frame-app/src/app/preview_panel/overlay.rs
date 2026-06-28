@@ -221,11 +221,13 @@ pub(in crate::app) fn preview_overlay_controls(
         )
         .child(preview_toolbar_separator().h(px(18.0)).w(px(1.0)))
         .child(
-            preview_overlay_icon_button(
-                "remove",
+            frame_icon_button(
+                "preview-overlay-remove",
                 assets::ICON_TRASH,
-                ButtonVariant::Ghost,
+                FrameIconButtonVariant::DestructiveGhost,
                 enabled,
+                PREVIEW_TOOLBAR_BUTTON_SIZE,
+                PREVIEW_TOOLBAR_ICON_SIZE,
             )
             .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
                 if root.remove_selected_overlay() {
