@@ -380,6 +380,7 @@ fn preview_overlay_icon_button(
     let background = animated.background;
     let foreground = animated.foreground;
     let hover_transition = animated.hover_transition;
+    let highlighted = matches!(variant, ButtonVariant::Default);
 
     div()
         .id(button_id.clone())
@@ -392,6 +393,7 @@ fn preview_overlay_icon_button(
         .bg(background)
         .text_color(foreground)
         .opacity(colors.opacity)
+        .when(highlighted, |this| this.shadow(button_highlight_shadows()))
         .when(!enabled, |this| this.cursor_not_allowed())
         .when(enabled, |this| {
             this.hover(|style| style.cursor_pointer())

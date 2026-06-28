@@ -277,6 +277,7 @@ pub(in crate::app) fn compact_text_button_variant(
     let background = animated.background;
     let foreground = animated.foreground;
     let hover_transition = animated.hover_transition;
+    let highlighted = selected || matches!(variant, ButtonVariant::Default);
 
     div()
         .id(id)
@@ -290,7 +291,7 @@ pub(in crate::app) fn compact_text_button_variant(
         .text_size(px(theme::TEXT_LABEL_SIZE))
         .text_color(foreground)
         .opacity(colors.opacity)
-        .when(selected, |this| this.shadow(button_highlight_shadows()))
+        .when(highlighted, |this| this.shadow(button_highlight_shadows()))
         .when(enabled, |this| {
             this.hover(|style| style.cursor_pointer())
                 .active(move |style| {
