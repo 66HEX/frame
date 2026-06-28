@@ -25,6 +25,11 @@ pub fn is_supported_subtitle_path(path: &Path) -> bool {
 }
 
 #[must_use]
+pub fn is_supported_overlay_image_path(path: &Path) -> bool {
+    path_has_extension(path, IMAGE_FILE_EXTENSIONS)
+}
+
+#[must_use]
 pub fn filter_supported_source_paths(paths: Vec<PathBuf>) -> Vec<PathBuf> {
     paths
         .into_iter()
@@ -63,6 +68,12 @@ mod tests {
         assert!(is_supported_subtitle_path(Path::new("/tmp/dialogue.srt")));
         assert!(is_supported_subtitle_path(Path::new("/tmp/dialogue.ASS")));
         assert!(is_supported_subtitle_path(Path::new("/tmp/dialogue.vtt")));
+    }
+
+    #[test]
+    fn is_supported_overlay_image_path_uses_image_extensions() {
+        assert!(is_supported_overlay_image_path(Path::new("/tmp/logo.PNG")));
+        assert!(!is_supported_overlay_image_path(Path::new("/tmp/logo.mp4")));
     }
 
     #[test]

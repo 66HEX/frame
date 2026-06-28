@@ -83,11 +83,18 @@ pub(in crate::app) fn preview_toolbar(
                 }
             })),
         )
-        .child(preview_tool_button(
-            assets::ICON_FILE_IMAGE,
-            false,
-            overlay_enabled,
-        ))
+        .child(
+            preview_tool_button(
+                assets::ICON_FILE_IMAGE,
+                state.overlay.overlay_mode || state.overlay.overlay.is_some(),
+                overlay_enabled,
+            )
+            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+                if root.trigger_selected_overlay(cx) {
+                    cx.notify();
+                }
+            })),
+        )
 }
 
 pub(in crate::app) fn preview_zoom_toolbar(state: &PreviewShellState) -> gpui::Div {

@@ -40,6 +40,7 @@ fn core_config_from_gpui_preserves_active_conversion_fields() {
             source_height: Some(1080),
             aspect_ratio: Some("16:9".to_string()),
         }),
+        overlay: None,
         selected_audio_tracks: vec![1, 2],
         selected_subtitle_tracks: vec![3],
         video_codec: "libx265".to_string(),

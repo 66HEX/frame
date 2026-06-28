@@ -7,3 +7,4 @@
 /frame-core/target
 /frame-app/target
 /frame-app/resources/binaries/
+/frame-app/vendor/gstreamer/

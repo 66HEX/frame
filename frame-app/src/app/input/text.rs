@@ -12,6 +12,10 @@ pub(super) fn sanitize_replacement_text(kind: FrameTextInputKind, value: &str) -
         | FrameTextInputKind::VideoCustomHeight
         | FrameTextInputKind::VideoBitrate
         | FrameTextInputKind::GifLoop => sanitize_number_input(value),
+        FrameTextInputKind::PreviewStartTime | FrameTextInputKind::PreviewEndTime => value
+            .chars()
+            .filter(|ch| ch.is_ascii_digit() || matches!(*ch, ':' | '.' | ','))
+            .collect(),
         FrameTextInputKind::OutputName
         | FrameTextInputKind::MetadataTitle
         | FrameTextInputKind::MetadataArtist

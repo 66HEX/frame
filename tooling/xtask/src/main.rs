@@ -1,13 +1,50 @@
 use std::{
-    env, fmt, fs, io,
+    env,
+    ffi::{OsStr, OsString},
+    fmt, fs, io,
     io::{Cursor, Read},
     path::{Path, PathBuf},
     process::{Command, ExitCode, Stdio},
 };
 
+use serde::{Deserialize, Serialize};
+
 const RUN_BUNDLING_WORKFLOW_PATH: &str = ".github/workflows/run_bundling.yml";
 const MARTIN_FFMPEG_BASE_URL: &str = "https://ffmpeg.martin-riedl.de/redirect/latest";
 const WINDOWS_FFMPEG_ZIP_URL: &str = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
+const DEFAULT_GSTREAMER_VERSION: &str = "1.28.2";
+const DEFAULT_GSTREAMER_DOWNLOAD_BASE_URL: &str =
+    "https://github.com/66HEX/frame-gstreamer-mirror/releases/download";
+const MACOS_GSTREAMER_BUNDLED_RPATH: &str =
+    "@executable_path/../Frameworks/GStreamer.framework/Versions/Current/lib";
+const OPTIONAL_MACOS_GSTREAMER_PLUGINS: &[&[&str]] = &[&[
+    "Versions",
+    "Current",
+    "lib",
+    "gstreamer-1.0",
+    "libgstpython.dylib",
+]];
+const MACOS_PRUNED_RUNTIME_DIRS: &[&[&str]] = &[
+    &["Headers"],
+    &["Commands"],
+    &["Versions", "Current", "bin"],
+    &["Versions", "Current", "Commands"],
+    &["Versions", "Current", "include"],
+    &["Versions", "Current", "Headers"],
+    &["Versions", "Current", "lib", "cmake"],
+    &["Versions", "Current", "lib", "pkgconfig"],
+    &["Versions", "Current", "lib", "gstreamer-1.0", "pkgconfig"],
+    &["Versions", "Current", "share", "aclocal"],
+    &["Versions", "Current", "share", "cmake"],
+    &["Versions", "Current", "share", "gir-1.0"],
+    &["Versions", "Current", "share", "gobject-introspection-1.0"],
+    &["Versions", "Current", "share", "gstreamer-1.0", "validate"],
+];
+const MACOS_PRUNED_RUNTIME_DIR_NAMES: &[&str] = &["Headers", "include", "pkgconfig", "cmake"];
+const MACOS_PRUNED_RUNTIME_EXTENSIONS: &[&str] = &["a", "h", "pc", "gir", "typelib"];
+const MACOS_PRUNED_RUNTIME_FILE_NAMES: &[&str] = &[".gitignore"];
+const OPTIONAL_LINUX_GSTREAMER_PLUGINS: &[&str] =
+    &["libgstpython.so", "libgstxvimagesink.so", "libgstva.so"];
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -33,9 +70,13 @@ fn run_xtask() -> Result<()> {
     };
 
     match command.as_str() {
+        "build" => build_frame_app(args.collect()),
         "bundle" => bundle(args.next().as_deref()),
         "ci" => ci(),
+        "run" => run_frame_app(args.collect()),
         "setup-ffmpeg" => setup_ffmpeg(args.collect()),
+        "setup-gstreamer" => setup_gstreamer(args.collect()),
+        "stage-gstreamer" => stage_gstreamer(args.collect()),
         "workflows" => write_workflows(),
         "-h" | "--help" | "help" => {
             print_help();
@@ -51,14 +92,44 @@ fn print_help() {
 Usage: cargo xtask <command>
 
 Commands:
+  run               Run the native Frame app with the controlled GStreamer env
+  build             Build frame-app with the controlled GStreamer env
   bundle macos      Build the macOS .app and .dmg package
   bundle linux      Build the Linux tarball package
   bundle windows    Build the Windows Inno Setup installer
   setup-ffmpeg      Download FFmpeg and FFprobe runtime binaries
+  setup-gstreamer   Download/configure the controlled GStreamer runtime
+  stage-gstreamer   Copy the controlled GStreamer runtime into a native bundle
   ci                Run local formatting, tests, lints, and script checks
   workflows         Regenerate GitHub Actions workflows
 "
     );
+}
+
+fn run_frame_app(args: Vec<String>) -> Result<()> {
+    let mut cargo_args = vec![
+        "run".to_string(),
+        "--manifest-path".to_string(),
+        "frame-app/Cargo.toml".to_string(),
+    ];
+    cargo_args.extend(args);
+    run_frame_app_cargo_command("dev", cargo_args)
+}
+
+fn build_frame_app(args: Vec<String>) -> Result<()> {
+    let mut cargo_args = vec![
+        "build".to_string(),
+        "--manifest-path".to_string(),
+        "frame-app/Cargo.toml".to_string(),
+    ];
+    cargo_args.extend(args);
+    run_frame_app_cargo_command("dev", cargo_args)
+}
+
+fn run_frame_app_cargo_command(mode: &str, cargo_args: Vec<String>) -> Result<()> {
+    let manifest = prepare_host_gstreamer_manifest(mode)?;
+    let env = gstreamer_command_env(&manifest)?;
+    run_command_path_with_env("cargo", &cargo_args, &env)
 }
 
 fn bundle(platform: Option<&str>) -> Result<()> {
@@ -101,11 +172,328 @@ fn setup_ffmpeg(args: Vec<String>) -> Result<()> {
     Ok(())
 }
 
+fn setup_gstreamer(args: Vec<String>) -> Result<()> {
+    let options = SetupGstreamerOptions::parse(&args)?;
+    let platform =
+        GstreamerPlatform::parse(options.platform.as_deref().unwrap_or(host_platform()))?;
+    let arch = normalize_arch(options.arch.as_deref().unwrap_or(host_arch()))?;
+    let version = options
+        .version
+        .as_deref()
+        .unwrap_or(DEFAULT_GSTREAMER_VERSION);
+    let download_dir = options
+        .download_dir
+        .clone()
+        .unwrap_or_else(default_gstreamer_download_dir);
+
+    if options.install {
+        install_gstreamer_packages(&platform, &arch, version, &download_dir, &options)?;
+    }
+
+    let manifest = create_gstreamer_manifest(&platform, &arch, version, &download_dir, &options)?;
+    write_gstreamer_manifest(&manifest)?;
+
+    if options.print_env {
+        print_gstreamer_env(&manifest)?;
+    } else {
+        println!(
+            "Wrote GStreamer manifest: {}",
+            gstreamer_manifest_path()?.display()
+        );
+        println!(
+            "GStreamer {} ({}/{})",
+            manifest.version, manifest.platform, manifest.arch
+        );
+    }
+
+    Ok(())
+}
+
+fn prepare_host_gstreamer_manifest(mode: &str) -> Result<GstreamerManifest> {
+    if let Ok(path) = env::var("FRAME_GSTREAMER_MANIFEST") {
+        let manifest_path = PathBuf::from(path);
+        if manifest_path.exists() {
+            let manifest = read_gstreamer_manifest(&manifest_path)?;
+            write_gstreamer_manifest(&manifest)?;
+            return Ok(manifest);
+        }
+    }
+
+    let platform = GstreamerPlatform::parse(host_platform())?;
+    let arch = normalize_arch(host_arch())?;
+    let version = DEFAULT_GSTREAMER_VERSION;
+    let download_dir = default_gstreamer_download_dir();
+    let options = SetupGstreamerOptions {
+        install: false,
+        print_env: false,
+        force: false,
+        platform: Some(host_platform().to_string()),
+        arch: Some(host_arch().to_string()),
+        mode: mode.to_string(),
+        source: None,
+        version: Some(version.to_string()),
+        download_dir: Some(download_dir.clone()),
+        download_base_url: env::var("FRAME_GSTREAMER_DOWNLOAD_BASE_URL").ok(),
+    };
+
+    let manifest =
+        match create_gstreamer_manifest(&platform, &arch, version, &download_dir, &options) {
+            Ok(manifest) => manifest,
+            Err(error) => {
+                eprintln!("GStreamer runtime is not prepared for {mode}: {error}");
+                eprintln!("Preparing controlled GStreamer runtime from the Frame mirror...");
+                install_gstreamer_packages(&platform, &arch, version, &download_dir, &options)?;
+                create_gstreamer_manifest(&platform, &arch, version, &download_dir, &options)?
+            }
+        };
+
+    write_gstreamer_manifest(&manifest)?;
+    Ok(manifest)
+}
+
+fn stage_gstreamer(args: Vec<String>) -> Result<()> {
+    let options = StageGstreamerOptions::parse(&args)?;
+    let manifest_path = options
+        .manifest
+        .clone()
+        .or_else(|| env::var("FRAME_GSTREAMER_MANIFEST").ok().map(PathBuf::from))
+        .unwrap_or(gstreamer_manifest_path()?);
+    let manifest = read_gstreamer_manifest(&manifest_path)?;
+
+    match manifest.platform.as_str() {
+        "macos" => {
+            let Some(app_path) = options.app.as_deref() else {
+                return Err(XtaskError::Usage(
+                    "missing --app <path> for macOS GStreamer staging".to_string(),
+                ));
+            };
+            stage_macos_gstreamer_framework(app_path, &manifest)?;
+        }
+        "windows" => {
+            let Some(binary_dir) = options.dir.as_deref() else {
+                return Err(XtaskError::Usage(
+                    "missing --dir <path> for Windows GStreamer staging".to_string(),
+                ));
+            };
+            stage_windows_gstreamer_runtime(binary_dir, &manifest)?;
+        }
+        "linux" => {
+            let Some(binary_dir) = options.dir.as_deref() else {
+                return Err(XtaskError::Usage(
+                    "missing --dir <path> for Linux GStreamer staging".to_string(),
+                ));
+            };
+            stage_linux_gstreamer_runtime(binary_dir, &manifest, options.resources.as_deref())?;
+        }
+        other => {
+            return Err(XtaskError::Usage(format!(
+                "GStreamer staging is not implemented for `{other}`"
+            )));
+        }
+    }
+
+    Ok(())
+}
+
 #[derive(Debug, PartialEq, Eq)]
 struct SetupFfmpegOptions {
     force: bool,
     platform: Option<String>,
     arch: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct SetupGstreamerOptions {
+    install: bool,
+    print_env: bool,
+    force: bool,
+    platform: Option<String>,
+    arch: Option<String>,
+    mode: String,
+    source: Option<PathBuf>,
+    version: Option<String>,
+    download_dir: Option<PathBuf>,
+    download_base_url: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct StageGstreamerOptions {
+    app: Option<PathBuf>,
+    dir: Option<PathBuf>,
+    resources: Option<PathBuf>,
+    manifest: Option<PathBuf>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct CommandEnv {
+    values: Vec<(String, OsString)>,
+}
+
+impl CommandEnv {
+    fn set(&mut self, key: impl Into<String>, value: impl Into<OsString>) {
+        self.values.push((key.into(), value.into()));
+    }
+
+    fn apply(&self, command: &mut Command) {
+        for (key, value) in &self.values {
+            command.env(key, value);
+        }
+    }
+}
+
+impl StageGstreamerOptions {
+    fn parse(args: &[String]) -> Result<Self> {
+        let mut options = Self {
+            app: None,
+            dir: None,
+            resources: None,
+            manifest: None,
+        };
+        let mut index = 0;
+
+        while index < args.len() {
+            match args[index].as_str() {
+                "--app" => {
+                    options.app = Some(PathBuf::from(required_option_value(
+                        args, &mut index, "--app",
+                    )?));
+                }
+                "--dir" => {
+                    options.dir = Some(PathBuf::from(required_option_value(
+                        args, &mut index, "--dir",
+                    )?));
+                }
+                "--resources" => {
+                    options.resources = Some(PathBuf::from(required_option_value(
+                        args,
+                        &mut index,
+                        "--resources",
+                    )?));
+                }
+                "--manifest" => {
+                    options.manifest = Some(PathBuf::from(required_option_value(
+                        args,
+                        &mut index,
+                        "--manifest",
+                    )?));
+                }
+                "-h" | "--help" => {
+                    println!(
+                        "\
+Usage: cargo xtask stage-gstreamer [options]
+
+Options:
+  --app <path>       macOS .app bundle path
+  --dir <path>       Directory containing the app executable
+  --resources <path> Optional resource directory for Linux relocation manifests
+  --manifest <path>  Override GStreamer manifest path
+"
+                    );
+                    return Err(XtaskError::Help);
+                }
+                other => {
+                    return Err(XtaskError::Usage(format!(
+                        "unknown stage-gstreamer option `{other}`"
+                    )));
+                }
+            }
+        }
+
+        Ok(options)
+    }
+}
+
+impl SetupGstreamerOptions {
+    fn parse(args: &[String]) -> Result<Self> {
+        let mut options = Self {
+            install: false,
+            print_env: false,
+            force: false,
+            platform: None,
+            arch: None,
+            mode: "dev".to_string(),
+            source: None,
+            version: None,
+            download_dir: None,
+            download_base_url: env::var("FRAME_GSTREAMER_DOWNLOAD_BASE_URL").ok(),
+        };
+        let mut index = 0;
+
+        while index < args.len() {
+            match args[index].as_str() {
+                "--install" => {
+                    options.install = true;
+                    index += 1;
+                }
+                "--print-env" => {
+                    options.print_env = true;
+                    index += 1;
+                }
+                "--force" => {
+                    options.force = true;
+                    index += 1;
+                }
+                "--platform" => {
+                    options.platform = Some(required_option_value(args, &mut index, "--platform")?);
+                }
+                "--arch" => {
+                    options.arch = Some(required_option_value(args, &mut index, "--arch")?);
+                }
+                "--mode" => {
+                    options.mode = required_option_value(args, &mut index, "--mode")?;
+                }
+                "--source" => {
+                    options.source = Some(PathBuf::from(required_option_value(
+                        args, &mut index, "--source",
+                    )?));
+                }
+                "--version" => {
+                    options.version = Some(required_option_value(args, &mut index, "--version")?);
+                }
+                "--download-dir" => {
+                    options.download_dir = Some(PathBuf::from(required_option_value(
+                        args,
+                        &mut index,
+                        "--download-dir",
+                    )?));
+                }
+                "--download-base-url" => {
+                    options.download_base_url = Some(required_option_value(
+                        args,
+                        &mut index,
+                        "--download-base-url",
+                    )?);
+                }
+                "-h" | "--help" => {
+                    println!(
+                        "\
+Usage: cargo xtask setup-gstreamer [options]
+
+Options:
+  --install                  Download/install the controlled GStreamer runtime when needed
+  --print-env                Print shell commands for the build environment
+  --force                    Re-download/reinstall even when cached files exist
+  --platform <name>          Override platform: darwin, linux, or win32
+  --arch <name>              Override architecture: x64, x86_64, arm64, or aarch64
+  --mode <name>              Manifest mode: dev, ci, or bundle
+  --source <path>            Use an existing GStreamer root/framework
+  --version <version>        Override GStreamer version
+  --download-dir <path>      Override download/cache directory
+  --download-base-url <url>  Override mirror base URL
+"
+                    );
+                    return Err(XtaskError::Help);
+                }
+                other => {
+                    return Err(XtaskError::Usage(format!(
+                        "unknown setup-gstreamer option `{other}`"
+                    )));
+                }
+            }
+        }
+
+        Ok(options)
+    }
 }
 
 impl SetupFfmpegOptions {
@@ -288,6 +676,1351 @@ fn windows_ffmpeg_target() -> FfmpegTarget {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum GstreamerPlatform {
+    Macos,
+    Windows,
+    Linux,
+}
+
+impl GstreamerPlatform {
+    fn parse(value: &str) -> Result<Self> {
+        match value {
+            "darwin" | "macos" => Ok(Self::Macos),
+            "win32" | "windows" => Ok(Self::Windows),
+            "linux" => Ok(Self::Linux),
+            other => Err(XtaskError::Usage(format!(
+                "unsupported GStreamer platform `{other}`"
+            ))),
+        }
+    }
+
+    const fn manifest_name(self) -> &'static str {
+        match self {
+            Self::Macos => "macos",
+            Self::Windows => "windows",
+            Self::Linux => "linux",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GstreamerManifest {
+    version: String,
+    platform: String,
+    arch: String,
+    mode: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    framework_path: Option<PathBuf>,
+    root: PathBuf,
+    bin_dir: PathBuf,
+    lib_dir: PathBuf,
+    pkg_config_dir: PathBuf,
+    plugin_dir: PathBuf,
+    scanner_path: PathBuf,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    lib_triplet: Option<String>,
+}
+
+fn install_gstreamer_packages(
+    platform: &GstreamerPlatform,
+    arch: &str,
+    version: &str,
+    download_dir: &Path,
+    options: &SetupGstreamerOptions,
+) -> Result<()> {
+    match platform {
+        GstreamerPlatform::Macos => {
+            install_macos_gstreamer_packages(version, download_dir, options)
+        }
+        GstreamerPlatform::Windows => {
+            install_windows_gstreamer_package(version, arch, download_dir, options)
+        }
+        GstreamerPlatform::Linux => {
+            install_linux_gstreamer_packages(version, arch, download_dir, options)
+        }
+    }
+}
+
+fn install_macos_gstreamer_packages(
+    version: &str,
+    download_dir: &Path,
+    options: &SetupGstreamerOptions,
+) -> Result<()> {
+    fs::create_dir_all(download_dir)?;
+    for (name, label) in [
+        (
+            format!("gstreamer-1.0-{version}-universal.pkg"),
+            "GStreamer runtime",
+        ),
+        (
+            format!("gstreamer-1.0-devel-{version}-universal.pkg"),
+            "GStreamer development",
+        ),
+    ] {
+        let package_path = download_dir.join(&name);
+        download_gstreamer_package(&name, version, &package_path, options)?;
+        eprintln!("Installing {label}: {}", package_path.display());
+        run_command_path(
+            "sudo",
+            &[
+                "installer".to_string(),
+                "-pkg".to_string(),
+                package_path.display().to_string(),
+                "-target".to_string(),
+                "/".to_string(),
+            ],
+        )?;
+    }
+    Ok(())
+}
+
+fn install_windows_gstreamer_package(
+    version: &str,
+    arch: &str,
+    download_dir: &Path,
+    options: &SetupGstreamerOptions,
+) -> Result<()> {
+    if arch != "x86_64" {
+        return Err(XtaskError::Usage(format!(
+            "Windows GStreamer setup currently supports x86_64, received {arch}"
+        )));
+    }
+
+    let root = default_windows_gstreamer_root(download_dir, arch, version);
+    if !options.force && windows_gstreamer_manifest(&root, arch, &options.mode).is_ok() {
+        eprintln!("Using cached GStreamer runtime: {}", root.display());
+        return Ok(());
+    }
+
+    fs::remove_dir_all(&root).ok();
+    fs::create_dir_all(&root)?;
+    let package_dir = download_dir.join(format!("windows-{arch}-{version}"));
+    fs::create_dir_all(&package_dir)?;
+    let name = format!("gstreamer-1.0-msvc-{arch}-{version}.exe");
+    let package_path = package_dir.join(&name);
+    download_gstreamer_package(&name, version, &package_path, options)?;
+    eprintln!(
+        "Installing GStreamer runtime+development: {}",
+        package_path.display()
+    );
+    run_command_path(
+        package_path.as_os_str(),
+        &[
+            "/VERYSILENT".to_string(),
+            "/SUPPRESSMSGBOXES".to_string(),
+            "/NORESTART".to_string(),
+            "/SP-".to_string(),
+            format!("/DIR={}", root.display()),
+        ],
+    )
+}
+
+fn install_linux_gstreamer_packages(
+    version: &str,
+    arch: &str,
+    download_dir: &Path,
+    options: &SetupGstreamerOptions,
+) -> Result<()> {
+    let package_arch = linux_gstreamer_package_arch(arch)?;
+    let root = default_linux_gstreamer_root(download_dir, arch, version);
+    if !options.force && linux_gstreamer_manifest(&root, arch, &options.mode).is_ok() {
+        eprintln!("Using cached GStreamer runtime: {}", root.display());
+        return Ok(());
+    }
+
+    fs::remove_dir_all(&root).ok();
+    fs::create_dir_all(&root)?;
+    let package_dir = download_dir.join(format!("linux-{arch}-{version}"));
+    fs::create_dir_all(&package_dir)?;
+
+    for (name, label) in [
+        (
+            format!("gstreamer-1.0-linux-{package_arch}-{version}.tar.xz"),
+            "GStreamer runtime",
+        ),
+        (
+            format!("gstreamer-1.0-linux-{package_arch}-{version}-devel.tar.xz"),
+            "GStreamer development",
+        ),
+    ] {
+        let package_path = package_dir.join(&name);
+        download_gstreamer_package(&name, version, &package_path, options)?;
+        eprintln!("Extracting {label}: {}", package_path.display());
+        run_command_path(
+            "tar",
+            &[
+                "-xJf".to_string(),
+                package_path.display().to_string(),
+                "-C".to_string(),
+                root.display().to_string(),
+            ],
+        )?;
+    }
+
+    Ok(())
+}
+
+fn create_gstreamer_manifest(
+    platform: &GstreamerPlatform,
+    arch: &str,
+    version: &str,
+    download_dir: &Path,
+    options: &SetupGstreamerOptions,
+) -> Result<GstreamerManifest> {
+    match platform {
+        GstreamerPlatform::Macos => {
+            let root = options.source.clone().unwrap_or_else(|| {
+                PathBuf::from("/Library/Frameworks/GStreamer.framework/Versions/1.0")
+            });
+            macos_gstreamer_manifest(&root, arch, &options.mode)
+        }
+        GstreamerPlatform::Windows => {
+            let root = options
+                .source
+                .clone()
+                .unwrap_or_else(|| default_windows_gstreamer_root(download_dir, arch, version));
+            windows_gstreamer_manifest(&root, arch, &options.mode)
+        }
+        GstreamerPlatform::Linux => {
+            let root = options
+                .source
+                .clone()
+                .unwrap_or_else(|| default_linux_gstreamer_root(download_dir, arch, version));
+            linux_gstreamer_manifest(&root, arch, &options.mode)
+        }
+    }
+}
+
+fn macos_gstreamer_manifest(root: &Path, arch: &str, mode: &str) -> Result<GstreamerManifest> {
+    let framework_path = root
+        .parent()
+        .and_then(Path::parent)
+        .ok_or_else(|| {
+            XtaskError::Usage(format!(
+                "invalid macOS GStreamer framework root `{}`",
+                root.display()
+            ))
+        })?
+        .to_path_buf();
+    let bin_dir = root.join("bin");
+    let lib_dir = root.join("lib");
+    let pkg_config_dir = lib_dir.join("pkgconfig");
+    let plugin_dir = lib_dir.join("gstreamer-1.0");
+    let scanner_path = root
+        .join("libexec")
+        .join("gstreamer-1.0")
+        .join("gst-plugin-scanner");
+
+    require_gstreamer_manifest_paths(&[
+        (&framework_path, "GStreamer framework bundle", true),
+        (root, "GStreamer framework root", true),
+        (&bin_dir, "GStreamer bin directory", true),
+        (&lib_dir, "GStreamer lib directory", true),
+        (&pkg_config_dir, "GStreamer pkg-config directory", true),
+        (&plugin_dir, "GStreamer plugin directory", true),
+        (&scanner_path, "GStreamer plugin scanner", false),
+    ])?;
+    require_gstreamer_pc_files(&pkg_config_dir)?;
+
+    Ok(GstreamerManifest {
+        version: detect_gstreamer_version(&pkg_config_dir)?,
+        platform: GstreamerPlatform::Macos.manifest_name().to_string(),
+        arch: arch.to_string(),
+        mode: mode.to_string(),
+        framework_path: Some(framework_path),
+        root: root.to_path_buf(),
+        bin_dir,
+        lib_dir,
+        pkg_config_dir,
+        plugin_dir,
+        scanner_path,
+        lib_triplet: None,
+    })
+}
+
+fn windows_gstreamer_manifest(root: &Path, arch: &str, mode: &str) -> Result<GstreamerManifest> {
+    let bin_dir = root.join("bin");
+    let lib_dir = root.join("lib");
+    let pkg_config_dir = lib_dir.join("pkgconfig");
+    let plugin_dir = lib_dir.join("gstreamer-1.0");
+    let scanner_path = root
+        .join("libexec")
+        .join("gstreamer-1.0")
+        .join("gst-plugin-scanner.exe");
+
+    require_gstreamer_manifest_paths(&[
+        (root, "GStreamer root directory", true),
+        (&bin_dir, "GStreamer bin directory", true),
+        (&lib_dir, "GStreamer lib directory", true),
+        (&pkg_config_dir, "GStreamer pkg-config directory", true),
+        (&plugin_dir, "GStreamer plugin directory", true),
+        (&scanner_path, "GStreamer plugin scanner", false),
+    ])?;
+    require_gstreamer_pc_files(&pkg_config_dir)?;
+
+    Ok(GstreamerManifest {
+        version: detect_gstreamer_version(&pkg_config_dir)?,
+        platform: GstreamerPlatform::Windows.manifest_name().to_string(),
+        arch: arch.to_string(),
+        mode: mode.to_string(),
+        framework_path: None,
+        root: root.to_path_buf(),
+        bin_dir,
+        lib_dir,
+        pkg_config_dir,
+        plugin_dir,
+        scanner_path,
+        lib_triplet: None,
+    })
+}
+
+fn linux_gstreamer_manifest(root: &Path, arch: &str, mode: &str) -> Result<GstreamerManifest> {
+    let lib_triplet = linux_gstreamer_lib_triplet(arch)?;
+    let bin_dir = root.join("bin");
+    let lib_dir = root.join("lib").join(lib_triplet);
+    let source_pkg_config_dir = lib_dir.join("pkgconfig");
+    let pkg_config_dir = prepare_linux_gstreamer_pkg_config_dir(&source_pkg_config_dir)?;
+    let plugin_dir = lib_dir.join("gstreamer-1.0");
+    let scanner_path = root
+        .join("libexec")
+        .join("gstreamer-1.0")
+        .join("gst-plugin-scanner");
+
+    require_gstreamer_manifest_paths(&[
+        (root, "GStreamer root directory", true),
+        (&bin_dir, "GStreamer bin directory", true),
+        (&lib_dir, "GStreamer lib directory", true),
+        (
+            &source_pkg_config_dir,
+            "GStreamer source pkg-config directory",
+            true,
+        ),
+        (
+            &pkg_config_dir,
+            "Frame GStreamer pkg-config directory",
+            true,
+        ),
+        (&plugin_dir, "GStreamer plugin directory", true),
+        (&scanner_path, "GStreamer plugin scanner", false),
+    ])?;
+    require_gstreamer_pc_files(&pkg_config_dir)?;
+
+    Ok(GstreamerManifest {
+        version: detect_gstreamer_version(&pkg_config_dir)?,
+        platform: GstreamerPlatform::Linux.manifest_name().to_string(),
+        arch: arch.to_string(),
+        mode: mode.to_string(),
+        framework_path: None,
+        root: root.to_path_buf(),
+        bin_dir,
+        lib_dir,
+        pkg_config_dir,
+        plugin_dir,
+        scanner_path,
+        lib_triplet: Some(lib_triplet.to_string()),
+    })
+}
+
+fn download_gstreamer_package(
+    name: &str,
+    version: &str,
+    destination: &Path,
+    options: &SetupGstreamerOptions,
+) -> Result<()> {
+    if !options.force && destination.is_file() {
+        eprintln!("Using cached GStreamer package: {}", destination.display());
+        return Ok(());
+    }
+
+    let base_url = options
+        .download_base_url
+        .as_deref()
+        .unwrap_or(DEFAULT_GSTREAMER_DOWNLOAD_BASE_URL)
+        .trim_end_matches('/');
+    let url = format!("{base_url}/{version}/{name}");
+    eprintln!("Downloading GStreamer package: {url}");
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    download_file_to_path(&url, destination)
+}
+
+fn download_file_to_path(url: &str, destination: &Path) -> Result<()> {
+    let response = ureq::get(url)
+        .call()
+        .map_err(|source| XtaskError::Download {
+            url: url.to_string(),
+            source: Box::new(source),
+        })?;
+    let temporary_destination = destination.with_extension("download");
+    {
+        let mut file = fs::File::create(&temporary_destination)?;
+        io::copy(&mut response.into_reader(), &mut file)?;
+    }
+    fs::rename(temporary_destination, destination)?;
+    Ok(())
+}
+
+fn write_gstreamer_manifest(manifest: &GstreamerManifest) -> Result<()> {
+    let manifest_path = gstreamer_manifest_path()?;
+    if let Some(parent) = manifest_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let json = serde_json::to_string_pretty(manifest)?;
+    fs::write(manifest_path, format!("{json}\n"))?;
+    Ok(())
+}
+
+fn read_gstreamer_manifest(path: &Path) -> Result<GstreamerManifest> {
+    let content = fs::read_to_string(path).map_err(|source| {
+        XtaskError::Usage(format!(
+            "failed to read GStreamer manifest at {}: {source}",
+            path.display()
+        ))
+    })?;
+    serde_json::from_str(&content).map_err(Into::into)
+}
+
+fn stage_macos_gstreamer_framework(app_path: &Path, manifest: &GstreamerManifest) -> Result<()> {
+    let source_framework = manifest
+        .framework_path
+        .clone()
+        .unwrap_or_else(|| manifest.root.join("..").join(".."));
+    let frameworks_dir = app_path.join("Contents").join("Frameworks");
+    let destination_framework = frameworks_dir.join("GStreamer.framework");
+
+    require_gstreamer_manifest_paths(&[
+        (app_path, "macOS app bundle", true),
+        (&source_framework, "GStreamer framework source", true),
+    ])?;
+    fs::create_dir_all(&frameworks_dir)?;
+    remove_path_if_exists(&destination_framework)?;
+    run_command_path(
+        "ditto",
+        &[
+            source_framework.display().to_string(),
+            destination_framework.display().to_string(),
+        ],
+    )?;
+
+    let removed_plugins = prune_macos_optional_plugins(&destination_framework)?;
+    let pruned_paths = prune_macos_runtime_payload(&destination_framework)?;
+    let executable_path = macos_app_executable(app_path)?;
+    ensure_macos_bundled_rpath(&executable_path, manifest)?;
+    run_command_path(
+        "codesign",
+        &[
+            "--force".to_string(),
+            "--deep".to_string(),
+            "--sign".to_string(),
+            "-".to_string(),
+            app_path.display().to_string(),
+        ],
+    )?;
+
+    println!(
+        "Staged GStreamer framework: {}",
+        destination_framework.display()
+    );
+    for plugin_path in removed_plugins {
+        println!(
+            "Removed optional GStreamer plugin: {}",
+            plugin_path.display()
+        );
+    }
+    println!("Pruned macOS GStreamer runtime paths: {}", pruned_paths);
+    println!("Patched executable rpath: {}", executable_path.display());
+    Ok(())
+}
+
+fn macos_app_executable(app_path: &Path) -> Result<PathBuf> {
+    let plist_path = app_path.join("Contents").join("Info.plist");
+    let executable_name = run_command_capture_path(
+        "/usr/libexec/PlistBuddy",
+        &[
+            "-c".to_string(),
+            "Print:CFBundleExecutable".to_string(),
+            plist_path.display().to_string(),
+        ],
+    )?
+    .trim()
+    .to_string();
+
+    if executable_name.is_empty() {
+        return Err(XtaskError::Usage(format!(
+            "CFBundleExecutable not found in {}",
+            plist_path.display()
+        )));
+    }
+
+    Ok(app_path
+        .join("Contents")
+        .join("MacOS")
+        .join(executable_name))
+}
+
+fn ensure_macos_bundled_rpath(binary_path: &Path, manifest: &GstreamerManifest) -> Result<()> {
+    let rpaths = macos_binary_rpaths(binary_path)?;
+    if !rpaths
+        .iter()
+        .any(|rpath| rpath == MACOS_GSTREAMER_BUNDLED_RPATH)
+    {
+        run_command_path(
+            "install_name_tool",
+            &[
+                "-add_rpath".to_string(),
+                MACOS_GSTREAMER_BUNDLED_RPATH.to_string(),
+                binary_path.display().to_string(),
+            ],
+        )?;
+    }
+
+    let removable_rpaths = [
+        manifest.lib_dir.display().to_string(),
+        "/Library/Frameworks/GStreamer.framework/Versions/1.0/lib".to_string(),
+    ];
+    for rpath in macos_binary_rpaths(binary_path)? {
+        if !removable_rpaths.iter().any(|removable| removable == &rpath) {
+            continue;
+        }
+        run_command_path(
+            "install_name_tool",
+            &[
+                "-delete_rpath".to_string(),
+                rpath,
+                binary_path.display().to_string(),
+            ],
+        )?;
+    }
+
+    Ok(())
+}
+
+fn macos_binary_rpaths(binary_path: &Path) -> Result<Vec<String>> {
+    let output = run_command_capture_path(
+        "otool",
+        &["-l".to_string(), binary_path.display().to_string()],
+    )?;
+    let lines = output.lines().collect::<Vec<_>>();
+    let mut rpaths = Vec::new();
+
+    for (index, line) in lines.iter().enumerate() {
+        if !line.contains("cmd LC_RPATH") {
+            continue;
+        }
+
+        for inner in lines.iter().skip(index + 1).take(7).map(|line| line.trim()) {
+            let Some(path) = inner.strip_prefix("path ") else {
+                continue;
+            };
+            let Some((path, _offset)) = path.split_once(" (offset ") else {
+                continue;
+            };
+            rpaths.push(path.to_string());
+            break;
+        }
+    }
+
+    Ok(rpaths)
+}
+
+fn prune_macos_optional_plugins(destination_framework: &Path) -> Result<Vec<PathBuf>> {
+    let mut removed_plugins = Vec::new();
+    for segments in OPTIONAL_MACOS_GSTREAMER_PLUGINS {
+        let plugin_path = join_segments(destination_framework, segments);
+        if !plugin_path.exists() {
+            continue;
+        }
+        fs::remove_file(&plugin_path)?;
+        removed_plugins.push(plugin_path);
+    }
+    Ok(removed_plugins)
+}
+
+fn prune_macos_runtime_payload(destination_framework: &Path) -> Result<usize> {
+    let mut removed_paths = 0;
+
+    for segments in MACOS_PRUNED_RUNTIME_DIRS {
+        let pruned_path = join_segments(destination_framework, segments);
+        if !pruned_path.exists() {
+            continue;
+        }
+        fs::remove_dir_all(&pruned_path)?;
+        removed_paths += 1;
+    }
+
+    let current_root = destination_framework.join("Versions").join("Current");
+    removed_paths += remove_dirs_by_name(&current_root, MACOS_PRUNED_RUNTIME_DIR_NAMES)?;
+    removed_paths += remove_files_by_name(destination_framework, MACOS_PRUNED_RUNTIME_FILE_NAMES)?;
+    removed_paths += remove_files_by_extension(&current_root, MACOS_PRUNED_RUNTIME_EXTENSIONS)?;
+    removed_paths += remove_broken_symlinks(destination_framework)?;
+
+    Ok(removed_paths)
+}
+
+fn stage_windows_gstreamer_runtime(binary_dir: &Path, manifest: &GstreamerManifest) -> Result<()> {
+    let destination_runtime_root = binary_dir.join("gstreamer");
+
+    require_gstreamer_manifest_paths(&[
+        (binary_dir, "Windows binary directory", true),
+        (&manifest.root, "GStreamer runtime root", true),
+        (&manifest.bin_dir, "GStreamer runtime bin directory", true),
+        (&manifest.plugin_dir, "GStreamer plugin directory", true),
+        (&manifest.scanner_path, "GStreamer plugin scanner", false),
+    ])?;
+
+    remove_path_if_exists(&destination_runtime_root)?;
+    fs::create_dir_all(&destination_runtime_root)?;
+    for segments in [
+        &["lib", "gstreamer-1.0"][..],
+        &["libexec", "gstreamer-1.0"][..],
+    ] {
+        copy_path_recursive(
+            &join_segments(&manifest.root, segments),
+            &join_segments(&destination_runtime_root, segments),
+        )?;
+    }
+
+    for entry in fs::read_dir(&manifest.bin_dir)? {
+        let entry = entry?;
+        let source_path = entry.path();
+        let destination_path = binary_dir.join(entry.file_name());
+        copy_path_recursive(&source_path, &destination_path)?;
+    }
+
+    println!(
+        "Staged Windows GStreamer runtime: {}",
+        destination_runtime_root.display()
+    );
+    println!(
+        "Scanner path: {}",
+        destination_runtime_root
+            .join("libexec")
+            .join("gstreamer-1.0")
+            .join("gst-plugin-scanner.exe")
+            .display()
+    );
+    Ok(())
+}
+
+fn stage_linux_gstreamer_runtime(
+    binary_dir: &Path,
+    manifest: &GstreamerManifest,
+    resources_dir: Option<&Path>,
+) -> Result<()> {
+    let lib_triplet = manifest_linux_lib_triplet(manifest)?;
+    let destination_runtime_root = binary_dir.join("gstreamer");
+
+    require_gstreamer_manifest_paths(&[
+        (binary_dir, "Linux binary directory", true),
+        (&manifest.root, "GStreamer runtime root", true),
+        (&manifest.bin_dir, "GStreamer runtime bin directory", true),
+        (&manifest.lib_dir, "GStreamer runtime lib directory", true),
+        (&manifest.plugin_dir, "GStreamer plugin directory", true),
+        (&manifest.scanner_path, "GStreamer plugin scanner", false),
+    ])?;
+
+    stage_linux_runtime_tree(
+        &destination_runtime_root,
+        manifest,
+        &lib_triplet,
+        "bundled-app",
+    )?;
+    let staged_manifest = linux_staged_manifest(
+        manifest,
+        &destination_runtime_root,
+        &lib_triplet,
+        "bundled-app",
+    );
+    let removed_plugins = prune_optional_linux_plugins(&staged_manifest.plugin_dir)?;
+    patch_linux_runtime_rpaths(binary_dir, &staged_manifest, &lib_triplet)?;
+
+    println!(
+        "Staged Linux GStreamer runtime: {}",
+        destination_runtime_root.display()
+    );
+    println!("Library directory: {}", staged_manifest.lib_dir.display());
+    println!("Plugin directory: {}", staged_manifest.plugin_dir.display());
+    println!("Scanner path: {}", staged_manifest.scanner_path.display());
+    for plugin_path in removed_plugins {
+        println!(
+            "Removed optional GStreamer plugin: {}",
+            plugin_path.display()
+        );
+    }
+
+    if let Some(resources_dir) = resources_dir {
+        stage_linux_runtime_tree(resources_dir, manifest, &lib_triplet, "bundled-resource")?;
+        let resource_manifest =
+            linux_staged_manifest(manifest, resources_dir, &lib_triplet, "bundled-resource");
+        let removed_resource_plugins = prune_optional_linux_plugins(&resource_manifest.plugin_dir)?;
+        patch_elf_tree(
+            &resource_manifest.lib_dir,
+            "$ORIGIN:$ORIGIN/..:$ORIGIN/../..:$ORIGIN/../../..",
+        )?;
+        patch_elf_tree(&resource_manifest.plugin_dir, "$ORIGIN/..")?;
+        patch_elf_tree(
+            &resource_manifest.bin_dir,
+            &format!("$ORIGIN/../lib/{lib_triplet}"),
+        )?;
+        if is_elf_file(&resource_manifest.scanner_path) {
+            set_linux_rpath(
+                &resource_manifest.scanner_path,
+                &format!("$ORIGIN/../../lib/{lib_triplet}"),
+            )?;
+        }
+        println!(
+            "Staged Linux GStreamer bundle resources: {}",
+            resources_dir.display()
+        );
+        for plugin_path in removed_resource_plugins {
+            println!(
+                "Removed optional GStreamer resource plugin: {}",
+                plugin_path.display()
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn stage_linux_runtime_tree(
+    destination_root: &Path,
+    manifest: &GstreamerManifest,
+    lib_triplet: &str,
+    mode: &str,
+) -> Result<()> {
+    remove_path_if_exists(destination_root)?;
+    fs::create_dir_all(destination_root)?;
+
+    for segments in [
+        &["bin"][..],
+        &["lib", lib_triplet][..],
+        &["libexec", "gstreamer-1.0"][..],
+        &["share"][..],
+    ] {
+        let source_path = join_segments(&manifest.root, segments);
+        if !source_path.exists() {
+            continue;
+        }
+        copy_path_recursive(&source_path, &join_segments(destination_root, segments))?;
+    }
+
+    let staged_manifest = linux_staged_manifest(manifest, destination_root, lib_triplet, mode);
+    write_gstreamer_manifest_at(&destination_root.join("manifest.json"), &staged_manifest)
+}
+
+fn linux_staged_manifest(
+    manifest: &GstreamerManifest,
+    runtime_root: &Path,
+    lib_triplet: &str,
+    mode: &str,
+) -> GstreamerManifest {
+    let lib_dir = runtime_root.join("lib").join(lib_triplet);
+    GstreamerManifest {
+        version: manifest.version.clone(),
+        platform: manifest.platform.clone(),
+        arch: manifest.arch.clone(),
+        mode: mode.to_string(),
+        framework_path: None,
+        root: runtime_root.to_path_buf(),
+        bin_dir: runtime_root.join("bin"),
+        lib_dir: lib_dir.clone(),
+        pkg_config_dir: lib_dir.join("frame-pkgconfig"),
+        plugin_dir: lib_dir.join("gstreamer-1.0"),
+        scanner_path: runtime_root
+            .join("libexec")
+            .join("gstreamer-1.0")
+            .join("gst-plugin-scanner"),
+        lib_triplet: Some(lib_triplet.to_string()),
+    }
+}
+
+fn write_gstreamer_manifest_at(path: &Path, manifest: &GstreamerManifest) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let json = serde_json::to_string_pretty(manifest)?;
+    fs::write(path, format!("{json}\n"))?;
+    Ok(())
+}
+
+fn manifest_linux_lib_triplet(manifest: &GstreamerManifest) -> Result<String> {
+    if let Some(lib_triplet) = manifest.lib_triplet.as_deref() {
+        return Ok(lib_triplet.to_string());
+    }
+    manifest
+        .lib_dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(str::to_string)
+        .ok_or_else(|| {
+            XtaskError::Usage(format!(
+                "failed to infer Linux GStreamer lib triplet from {}",
+                manifest.lib_dir.display()
+            ))
+        })
+}
+
+fn prune_optional_linux_plugins(plugin_dir: &Path) -> Result<Vec<PathBuf>> {
+    let mut removed_plugins = Vec::new();
+    for plugin_name in OPTIONAL_LINUX_GSTREAMER_PLUGINS {
+        let plugin_path = plugin_dir.join(plugin_name);
+        if !plugin_path.exists() {
+            continue;
+        }
+        fs::remove_file(&plugin_path)?;
+        removed_plugins.push(plugin_path);
+    }
+    Ok(removed_plugins)
+}
+
+fn patch_linux_runtime_rpaths(
+    binary_dir: &Path,
+    manifest: &GstreamerManifest,
+    lib_triplet: &str,
+) -> Result<()> {
+    let executable_rpath = format!("$ORIGIN/gstreamer/lib/{lib_triplet}:$ORIGIN/../lib");
+    for entry in fs::read_dir(binary_dir)? {
+        let entry = entry?;
+        let file_path = entry.path();
+        if entry.file_type()?.is_file() && is_elf_file(&file_path) {
+            set_linux_rpath(&file_path, &executable_rpath)?;
+        }
+    }
+
+    patch_elf_tree(
+        &manifest.lib_dir,
+        "$ORIGIN:$ORIGIN/..:$ORIGIN/../..:$ORIGIN/../../..",
+    )?;
+    patch_elf_tree(&manifest.plugin_dir, "$ORIGIN/..")?;
+    patch_elf_tree(&manifest.bin_dir, &format!("$ORIGIN/../lib/{lib_triplet}"))?;
+    if is_elf_file(&manifest.scanner_path) {
+        set_linux_rpath(
+            &manifest.scanner_path,
+            &format!("$ORIGIN/../../lib/{lib_triplet}"),
+        )?;
+    }
+    Ok(())
+}
+
+fn patch_elf_tree(root: &Path, rpath: &str) -> Result<()> {
+    if !root.exists() {
+        return Ok(());
+    }
+    for entry in fs::read_dir(root)? {
+        let entry = entry?;
+        let entry_path = entry.path();
+        if entry.file_type()?.is_dir() {
+            patch_elf_tree(&entry_path, rpath)?;
+        } else if entry.file_type()?.is_file() && is_elf_file(&entry_path) {
+            set_linux_rpath(&entry_path, rpath)?;
+        }
+    }
+    Ok(())
+}
+
+fn set_linux_rpath(file_path: &Path, rpath: &str) -> Result<()> {
+    run_command_path(
+        "patchelf",
+        &[
+            "--force-rpath".to_string(),
+            "--set-rpath".to_string(),
+            rpath.to_string(),
+            file_path.display().to_string(),
+        ],
+    )
+}
+
+fn is_elf_file(path: &Path) -> bool {
+    let Ok(mut file) = fs::File::open(path) else {
+        return false;
+    };
+    let mut magic = [0_u8; 4];
+    file.read_exact(&mut magic).is_ok() && magic == [0x7f, b'E', b'L', b'F']
+}
+
+fn copy_path_recursive(source: &Path, destination: &Path) -> Result<()> {
+    let metadata = fs::symlink_metadata(source)?;
+    remove_path_if_exists(destination)?;
+
+    if metadata.file_type().is_symlink() {
+        copy_symlink_or_target(source, destination)?;
+        return Ok(());
+    }
+    if metadata.is_dir() {
+        fs::create_dir_all(destination)?;
+        for entry in fs::read_dir(source)? {
+            let entry = entry?;
+            copy_path_recursive(&entry.path(), &destination.join(entry.file_name()))?;
+        }
+        return Ok(());
+    }
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::copy(source, destination)?;
+    Ok(())
+}
+
+fn copy_symlink_or_target(source: &Path, destination: &Path) -> Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::symlink;
+
+        if let Some(parent) = destination.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let target = fs::read_link(source)?;
+        symlink(target, destination)?;
+        Ok(())
+    }
+
+    #[cfg(not(unix))]
+    {
+        let target = fs::canonicalize(source)?;
+        copy_path_recursive(&target, destination)
+    }
+}
+
+fn remove_path_if_exists(path: &Path) -> Result<()> {
+    let Ok(metadata) = fs::symlink_metadata(path) else {
+        return Ok(());
+    };
+
+    if metadata.is_dir() && !metadata.file_type().is_symlink() {
+        fs::remove_dir_all(path)?;
+    } else {
+        fs::remove_file(path)?;
+    }
+    Ok(())
+}
+
+fn remove_dirs_by_name(root: &Path, dir_names: &[&str]) -> Result<usize> {
+    if !root.exists() {
+        return Ok(0);
+    }
+
+    let mut removed = 0;
+    for entry in fs::read_dir(root)? {
+        let entry = entry?;
+        let entry_path = entry.path();
+        if !entry.file_type()?.is_dir() {
+            continue;
+        }
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else {
+            continue;
+        };
+        if dir_names.contains(&name) {
+            fs::remove_dir_all(&entry_path)?;
+            removed += 1;
+        } else {
+            removed += remove_dirs_by_name(&entry_path, dir_names)?;
+        }
+    }
+
+    Ok(removed)
+}
+
+fn remove_files_by_name(root: &Path, file_names: &[&str]) -> Result<usize> {
+    if !root.exists() {
+        return Ok(0);
+    }
+
+    let mut removed = 0;
+    for entry in fs::read_dir(root)? {
+        let entry = entry?;
+        let entry_path = entry.path();
+        if entry.file_type()?.is_dir() {
+            removed += remove_files_by_name(&entry_path, file_names)?;
+            continue;
+        }
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else {
+            continue;
+        };
+        if entry.file_type()?.is_file() && file_names.contains(&name) {
+            fs::remove_file(&entry_path)?;
+            removed += 1;
+        }
+    }
+
+    Ok(removed)
+}
+
+fn remove_files_by_extension(root: &Path, extensions: &[&str]) -> Result<usize> {
+    if !root.exists() {
+        return Ok(0);
+    }
+
+    let mut removed = 0;
+    for entry in fs::read_dir(root)? {
+        let entry = entry?;
+        let entry_path = entry.path();
+        if entry.file_type()?.is_dir() {
+            removed += remove_files_by_extension(&entry_path, extensions)?;
+            continue;
+        }
+        let extension = entry_path
+            .extension()
+            .and_then(|extension| extension.to_str());
+        if entry.file_type()?.is_file() && extension.is_some_and(|ext| extensions.contains(&ext)) {
+            fs::remove_file(&entry_path)?;
+            removed += 1;
+        }
+    }
+
+    Ok(removed)
+}
+
+fn remove_broken_symlinks(root: &Path) -> Result<usize> {
+    if !root.exists() {
+        return Ok(0);
+    }
+
+    let mut removed = 0;
+    for entry in fs::read_dir(root)? {
+        let entry = entry?;
+        let entry_path = entry.path();
+        let metadata = fs::symlink_metadata(&entry_path)?;
+        if metadata.file_type().is_symlink() {
+            if !entry_path.exists() {
+                fs::remove_file(&entry_path)?;
+                removed += 1;
+            }
+        } else if metadata.is_dir() {
+            removed += remove_broken_symlinks(&entry_path)?;
+        }
+    }
+
+    Ok(removed)
+}
+
+fn join_segments(root: &Path, segments: &[&str]) -> PathBuf {
+    segments
+        .iter()
+        .fold(root.to_path_buf(), |path, segment| path.join(segment))
+}
+
+fn print_gstreamer_env(manifest: &GstreamerManifest) -> Result<()> {
+    let manifest_path = gstreamer_manifest_path()?;
+    if cfg!(target_os = "windows") {
+        print_powershell_gstreamer_env(manifest, &manifest_path);
+    } else {
+        print_posix_gstreamer_env(manifest, &manifest_path);
+    }
+    Ok(())
+}
+
+fn gstreamer_command_env(manifest: &GstreamerManifest) -> Result<CommandEnv> {
+    let manifest_path = gstreamer_manifest_path()?;
+    let mut env = CommandEnv::default();
+
+    env.set("PATH", prepend_env_path("PATH", &manifest.bin_dir)?);
+    env.set(
+        "PKG_CONFIG_PATH",
+        prepend_env_path("PKG_CONFIG_PATH", &manifest.pkg_config_dir)?,
+    );
+    if manifest.platform != "linux" {
+        env.set(
+            "PKG_CONFIG_LIBDIR",
+            manifest.pkg_config_dir.as_os_str().to_os_string(),
+        );
+    }
+    env.set("FRAME_GSTREAMER_MANIFEST", manifest_path.into_os_string());
+    env.set(
+        "GST_PLUGIN_PATH_1_0",
+        manifest.plugin_dir.as_os_str().to_os_string(),
+    );
+    env.set("GST_PLUGIN_SYSTEM_PATH_1_0", OsString::new());
+    env.set(
+        "GST_PLUGIN_SCANNER_1_0",
+        manifest.scanner_path.as_os_str().to_os_string(),
+    );
+
+    let registry_dir = repo_root()?.join("target");
+    fs::create_dir_all(&registry_dir)?;
+    env.set(
+        "GST_REGISTRY",
+        registry_dir
+            .join("gstreamer-registry-xtask-ci.bin")
+            .into_os_string(),
+    );
+
+    if manifest.platform == "linux" {
+        env.set(
+            "LD_LIBRARY_PATH",
+            prepend_env_path("LD_LIBRARY_PATH", &manifest.lib_dir)?,
+        );
+        env.set(
+            "RUSTFLAGS",
+            append_env_words(
+                "RUSTFLAGS",
+                &format!(
+                    "-C link-arg=-Wl,-rpath,{} -C link-arg=-Wl,--allow-shlib-undefined",
+                    manifest.lib_dir.display()
+                ),
+            ),
+        );
+    } else if manifest.platform == "macos" {
+        env.set(
+            "DYLD_FALLBACK_LIBRARY_PATH",
+            prepend_env_path("DYLD_FALLBACK_LIBRARY_PATH", &manifest.lib_dir)?,
+        );
+        env.set(
+            "RUSTFLAGS",
+            append_env_words(
+                "RUSTFLAGS",
+                &format!("-C link-arg=-Wl,-rpath,{}", manifest.lib_dir.display()),
+            ),
+        );
+    }
+
+    Ok(env)
+}
+
+fn prepend_env_path(key: &str, path: &Path) -> Result<OsString> {
+    let mut paths = vec![path.to_path_buf()];
+    if let Some(existing) = env::var_os(key) {
+        paths.extend(env::split_paths(&existing));
+    }
+    env::join_paths(paths)
+        .map_err(|source| XtaskError::Usage(format!("failed to build {key}: {source}")))
+}
+
+fn append_env_words(key: &str, suffix: &str) -> OsString {
+    let mut value = env::var_os(key).unwrap_or_default();
+    if !value.as_os_str().is_empty() {
+        value.push(" ");
+    }
+    value.push(suffix);
+    value
+}
+
+fn print_posix_gstreamer_env(manifest: &GstreamerManifest, manifest_path: &Path) {
+    println!(
+        "export PATH=\"{}:$PATH\"",
+        shell_escape_path(&manifest.bin_dir)
+    );
+    println!(
+        "export PKG_CONFIG_PATH=\"{}:$PKG_CONFIG_PATH\"",
+        shell_escape_path(&manifest.pkg_config_dir)
+    );
+    if manifest.platform != "linux" {
+        println!(
+            "export PKG_CONFIG_LIBDIR=\"{}\"",
+            shell_escape_path(&manifest.pkg_config_dir)
+        );
+    }
+    if manifest.platform == "linux" {
+        println!(
+            "export LD_LIBRARY_PATH=\"{}:$LD_LIBRARY_PATH\"",
+            shell_escape_path(&manifest.lib_dir)
+        );
+        println!(
+            "export RUSTFLAGS=\"$RUSTFLAGS -C link-arg=-Wl,-rpath,{} -C link-arg=-Wl,--allow-shlib-undefined\"",
+            shell_escape_path(&manifest.lib_dir)
+        );
+    }
+    if manifest.platform == "macos" {
+        println!(
+            "export RUSTFLAGS=\"$RUSTFLAGS -C link-arg=-Wl,-rpath,{}\"",
+            shell_escape_path(&manifest.lib_dir)
+        );
+        println!(
+            "export DYLD_FALLBACK_LIBRARY_PATH=\"{}:$DYLD_FALLBACK_LIBRARY_PATH\"",
+            shell_escape_path(&manifest.lib_dir)
+        );
+    }
+    println!(
+        "export FRAME_GSTREAMER_MANIFEST=\"{}\"",
+        shell_escape_path(manifest_path)
+    );
+}
+
+fn print_powershell_gstreamer_env(manifest: &GstreamerManifest, manifest_path: &Path) {
+    println!(
+        "$env:PATH = \"{};$env:PATH\"",
+        powershell_escape_path(&manifest.bin_dir)
+    );
+    println!(
+        "$env:PKG_CONFIG_PATH = \"{};$env:PKG_CONFIG_PATH\"",
+        powershell_escape_path(&manifest.pkg_config_dir)
+    );
+    println!(
+        "$env:PKG_CONFIG_LIBDIR = \"{}\"",
+        powershell_escape_path(&manifest.pkg_config_dir)
+    );
+    println!(
+        "$env:FRAME_GSTREAMER_MANIFEST = \"{}\"",
+        powershell_escape_path(manifest_path)
+    );
+}
+
+fn require_gstreamer_manifest_paths(entries: &[(&Path, &str, bool)]) -> Result<()> {
+    for (path, label, is_dir) in entries {
+        if *is_dir && path.is_dir() {
+            continue;
+        }
+        if !*is_dir && path.is_file() {
+            continue;
+        }
+        return Err(XtaskError::Usage(format!(
+            "{label} not found: {}",
+            path.display()
+        )));
+    }
+    Ok(())
+}
+
+fn require_gstreamer_pc_files(pkg_config_dir: &Path) -> Result<()> {
+    for pc_file in [
+        "gstreamer-1.0.pc",
+        "gstreamer-app-1.0.pc",
+        "gstreamer-video-1.0.pc",
+        "gstreamer-pbutils-1.0.pc",
+    ] {
+        let path = pkg_config_dir.join(pc_file);
+        if !path.is_file() {
+            return Err(XtaskError::Usage(format!(
+                "GStreamer pkg-config file not found: {}",
+                path.display()
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn detect_gstreamer_version(pkg_config_dir: &Path) -> Result<String> {
+    let pc_file = pkg_config_dir.join("gstreamer-1.0.pc");
+    let content = fs::read_to_string(&pc_file)?;
+    content
+        .lines()
+        .find_map(|line| {
+            line.trim()
+                .strip_prefix("Version:")
+                .map(str::trim)
+                .map(str::to_string)
+        })
+        .ok_or_else(|| {
+            XtaskError::Usage(format!(
+                "GStreamer version not found in {}",
+                pc_file.display()
+            ))
+        })
+}
+
+fn prepare_linux_gstreamer_pkg_config_dir(source_pkg_config_dir: &Path) -> Result<PathBuf> {
+    let destination = source_pkg_config_dir
+        .parent()
+        .ok_or_else(|| {
+            XtaskError::Usage(format!(
+                "invalid Linux pkg-config dir `{}`",
+                source_pkg_config_dir.display()
+            ))
+        })?
+        .join("frame-pkgconfig");
+    fs::remove_dir_all(&destination).ok();
+    fs::create_dir_all(&destination)?;
+
+    for entry in fs::read_dir(source_pkg_config_dir)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else {
+            continue;
+        };
+        if linux_gstreamer_pkg_config_allowed(name) {
+            fs::copy(entry.path(), destination.join(name))?;
+        }
+    }
+
+    Ok(destination)
+}
+
+fn linux_gstreamer_pkg_config_allowed(name: &str) -> bool {
+    (name.starts_with("gst-") && name.ends_with(".pc"))
+        || (name.starts_with("gstreamer-") && name.ends_with(".pc"))
+        || name == "orc-0.4.pc"
+        || name == "zlib.pc"
+        || name == "libunwind.pc"
+        || (name.starts_with("libunwind-") && name.ends_with(".pc"))
+}
+
+fn default_gstreamer_download_dir() -> PathBuf {
+    repo_root()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join(".cache")
+        .join("gstreamer")
+}
+
+fn default_windows_gstreamer_root(download_dir: &Path, arch: &str, version: &str) -> PathBuf {
+    download_dir
+        .join(format!("windows-{arch}-{version}"))
+        .join("msvc")
+}
+
+fn default_linux_gstreamer_root(download_dir: &Path, arch: &str, version: &str) -> PathBuf {
+    download_dir
+        .join(format!("linux-{arch}-{version}"))
+        .join("runtime")
+}
+
+fn gstreamer_manifest_path() -> Result<PathBuf> {
+    Ok(repo_root()?
+        .join("frame-app")
+        .join("vendor")
+        .join("gstreamer")
+        .join("manifest.json"))
+}
+
+fn linux_gstreamer_package_arch(arch: &str) -> Result<&'static str> {
+    match arch {
+        "x86_64" => Ok("x86_64"),
+        "aarch64" => Ok("arm64"),
+        other => Err(XtaskError::Usage(format!(
+            "Linux GStreamer setup supports x86_64/aarch64, received {other}"
+        ))),
+    }
+}
+
+fn linux_gstreamer_lib_triplet(arch: &str) -> Result<&'static str> {
+    match arch {
+        "x86_64" => Ok("x86_64-linux-gnu"),
+        "aarch64" => Ok("aarch64-linux-gnu"),
+        other => Err(XtaskError::Usage(format!(
+            "Linux library triplet is not configured for {other}"
+        ))),
+    }
+}
+
+fn normalize_arch(value: &str) -> Result<String> {
+    match value {
+        "arm64" | "aarch64" => Ok("aarch64".to_string()),
+        "amd64" | "x64" | "x86_64" => Ok("x86_64".to_string()),
+        "x86" | "i686" => Ok("x86".to_string()),
+        other => Err(XtaskError::Usage(format!(
+            "unsupported architecture `{other}`"
+        ))),
+    }
+}
+
+fn required_option_value(args: &[String], index: &mut usize, flag: &str) -> Result<String> {
+    let Some(value) = args.get(*index + 1) else {
+        return Err(XtaskError::Usage(format!("missing value for {flag}")));
+    };
+    if value.starts_with("--") {
+        return Err(XtaskError::Usage(format!("missing value for {flag}")));
+    }
+    *index += 2;
+    Ok(value.clone())
+}
+
 fn process_ffmpeg_entry(entry: &FfmpegBinaryEntry, binary_dir: &Path, force: bool) -> Result<()> {
     let destination = binary_dir.join(&entry.destination_name);
     if !force && destination.is_file() {
@@ -462,9 +2195,12 @@ fn ci() -> Result<()> {
         "cargo",
         &["test", "--manifest-path", "frame-core/Cargo.toml"],
     )?;
-    run_command(
+    let gstreamer_manifest = prepare_host_gstreamer_manifest("ci")?;
+    let gstreamer_env = gstreamer_command_env(&gstreamer_manifest)?;
+    run_command_with_env(
         "cargo",
         &["test", "--manifest-path", "frame-app/Cargo.toml"],
+        &gstreamer_env,
     )?;
     run_command(
         "cargo",
@@ -483,7 +2219,7 @@ fn ci() -> Result<()> {
             "warnings",
         ],
     )?;
-    run_command(
+    run_command_with_env(
         "cargo",
         &[
             "clippy",
@@ -495,6 +2231,7 @@ fn ci() -> Result<()> {
             "-D",
             "warnings",
         ],
+        &gstreamer_env,
     )?;
     run_command(
         "cargo",
@@ -544,14 +2281,27 @@ fn run_script(script: &str, args: &[&str]) -> Result<()> {
 }
 
 fn run_command(program: &str, args: &[&str]) -> Result<()> {
+    run_command_inner(program, args, None)
+}
+
+fn run_command_with_env(program: &str, args: &[&str], env: &CommandEnv) -> Result<()> {
+    run_command_inner(program, args, Some(env))
+}
+
+fn run_command_inner(program: &str, args: &[&str], env: Option<&CommandEnv>) -> Result<()> {
     let root = repo_root()?;
     println!("$ {} {}", program, args.join(" "));
-    let status = Command::new(program)
+    let mut command = Command::new(program);
+    command
         .args(args)
         .current_dir(root)
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
+        .stderr(Stdio::inherit());
+    if let Some(env) = env {
+        env.apply(&mut command);
+    }
+    let status = command
         .status()
         .map_err(|source| XtaskError::CommandSpawn {
             program: program.to_string(),
@@ -566,6 +2316,104 @@ fn run_command(program: &str, args: &[&str]) -> Result<()> {
             status,
         })
     }
+}
+
+fn run_command_path(program: impl AsRef<OsStr>, args: &[String]) -> Result<()> {
+    run_command_path_inner(program, args, None)
+}
+
+fn run_command_path_with_env(
+    program: impl AsRef<OsStr>,
+    args: &[String],
+    env: &CommandEnv,
+) -> Result<()> {
+    run_command_path_inner(program, args, Some(env))
+}
+
+fn run_command_path_inner(
+    program: impl AsRef<OsStr>,
+    args: &[String],
+    env: Option<&CommandEnv>,
+) -> Result<()> {
+    let program = program.as_ref();
+    println!(
+        "$ {} {}",
+        program.to_string_lossy(),
+        args.iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>()
+            .join(" ")
+    );
+    let mut command = Command::new(program);
+    command
+        .args(args)
+        .current_dir(repo_root()?)
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit());
+    if let Some(env) = env {
+        env.apply(&mut command);
+    }
+    let status = command
+        .status()
+        .map_err(|source| XtaskError::CommandSpawn {
+            program: program.to_string_lossy().into_owned(),
+            source,
+        })?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(XtaskError::CommandFailed {
+            program: program.to_string_lossy().into_owned(),
+            status,
+        })
+    }
+}
+
+fn run_command_capture_path(program: impl AsRef<OsStr>, args: &[String]) -> Result<String> {
+    let program = program.as_ref();
+    println!(
+        "$ {} {}",
+        program.to_string_lossy(),
+        args.iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>()
+            .join(" ")
+    );
+    let output = Command::new(program)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .map_err(|source| XtaskError::CommandSpawn {
+            program: program.to_string_lossy().into_owned(),
+            source,
+        })?;
+
+    if output.status.success() {
+        return Ok(String::from_utf8_lossy(&output.stdout).into_owned());
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    Err(XtaskError::Usage(format!(
+        "`{}` failed with status {}: {}",
+        program.to_string_lossy(),
+        output.status,
+        stderr.trim()
+    )))
+}
+
+fn shell_escape_path(path: &Path) -> String {
+    path.display().to_string().replace('"', "\\\"")
+}
+
+fn powershell_escape_path(path: &Path) -> String {
+    path.display()
+        .to_string()
+        .replace('`', "``")
+        .replace('"', "`\"")
 }
 
 fn run_bundling_workflow() -> String {
@@ -623,7 +2471,7 @@ fn linux_job(arch: &str, runner: &str) -> String {
 {checkout}{rust}    - name: steps::setup_linux
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev pkg-config
+        sudo apt-get install -y clang libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev pkg-config patchelf
     - name: ./script/bundle-linux
       run: ./script/bundle-linux
     - name: run_bundling::upload_artifact
@@ -723,6 +2571,7 @@ enum XtaskError {
     Io(io::Error),
     RepoRoot,
     Usage(String),
+    Json(serde_json::Error),
     Zip(zip::result::ZipError),
 }
 
@@ -748,6 +2597,7 @@ impl fmt::Display for XtaskError {
             Self::Io(error) => write!(formatter, "{error}"),
             Self::RepoRoot => write!(formatter, "failed to resolve repository root"),
             Self::Usage(message) => write!(formatter, "{message}"),
+            Self::Json(error) => write!(formatter, "failed to process JSON: {error}"),
             Self::Zip(error) => write!(formatter, "failed to read zip archive: {error}"),
         }
     }
@@ -762,6 +2612,12 @@ impl From<io::Error> for XtaskError {
 impl From<zip::result::ZipError> for XtaskError {
     fn from(error: zip::result::ZipError) -> Self {
         Self::Zip(error)
+    }
+}
+
+impl From<serde_json::Error> for XtaskError {
+    fn from(error: serde_json::Error) -> Self {
+        Self::Json(error)
     }
 }
 

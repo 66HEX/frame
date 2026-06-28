@@ -44,6 +44,11 @@ pub const SUBTITLE_FILE_DIALOG_FILTERS: [NativeDialogFilterSpec; 1] = [NativeDia
     extensions: SUBTITLE_FILE_EXTENSIONS,
 }];
 
+pub const OVERLAY_IMAGE_DIALOG_FILTERS: [NativeDialogFilterSpec; 1] = [NativeDialogFilterSpec {
+    label: "Images",
+    extensions: IMAGE_FILE_EXTENSIONS,
+}];
+
 pub const SOURCE_FILE_DIALOG_SPEC: NativeDialogSpec = NativeDialogSpec {
     title: "Add Source",
     filters: &SOURCE_FILE_DIALOG_FILTERS,
@@ -56,6 +61,12 @@ pub const SUBTITLE_FILE_DIALOG_SPEC: NativeDialogSpec = NativeDialogSpec {
     allows_multiple: false,
 };
 
+pub const OVERLAY_IMAGE_DIALOG_SPEC: NativeDialogSpec = NativeDialogSpec {
+    title: "Select overlay image",
+    filters: &OVERLAY_IMAGE_DIALOG_FILTERS,
+    allows_multiple: false,
+};
+
 pub fn pick_source_files() -> Option<Vec<PathBuf>> {
     source_file_dialog().pick_files()
 }
@@ -64,12 +75,20 @@ pub fn pick_subtitle_file() -> Option<PathBuf> {
     subtitle_file_dialog().pick_file()
 }
 
+pub fn pick_overlay_image_file() -> Option<PathBuf> {
+    overlay_image_dialog().pick_file()
+}
+
 fn source_file_dialog() -> rfd::FileDialog {
     file_dialog_from_spec(SOURCE_FILE_DIALOG_SPEC)
 }
 
 fn subtitle_file_dialog() -> rfd::FileDialog {
     file_dialog_from_spec(SUBTITLE_FILE_DIALOG_SPEC)
+}
+
+fn overlay_image_dialog() -> rfd::FileDialog {
+    file_dialog_from_spec(OVERLAY_IMAGE_DIALOG_SPEC)
 }
 
 fn file_dialog_from_spec(spec: NativeDialogSpec) -> rfd::FileDialog {
@@ -132,10 +151,22 @@ mod tests {
     }
 
     #[test]
+    fn overlay_image_dialog_spec_matches_runtime_image_validation_extensions() {
+        assert_eq!(
+            OVERLAY_IMAGE_DIALOG_SPEC.filters,
+            [NativeDialogFilterSpec {
+                label: "Images",
+                extensions: IMAGE_FILE_EXTENSIONS,
+            }]
+        );
+    }
+
+    #[test]
     fn dialog_specs_capture_selection_mode() {
         const {
             assert!(SOURCE_FILE_DIALOG_SPEC.allows_multiple);
             assert!(!SUBTITLE_FILE_DIALOG_SPEC.allows_multiple);
+            assert!(!OVERLAY_IMAGE_DIALOG_SPEC.allows_multiple);
         }
     }
 }

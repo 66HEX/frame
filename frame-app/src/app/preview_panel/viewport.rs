@@ -35,26 +35,14 @@ pub(in crate::app) fn preview_viewport(
         .rounded(px(theme::RADIUS_MD))
         .bg(parse_hex("#000000"))
         .shadow(input_highlight_shadows())
-        .on_drag_move(cx.listener(
-            |root, event: &DragMoveEvent<PreviewCropDrag>, _window, cx| {
-                let drag = *event.drag(cx);
-                let point = normalized_point_from_bounds(event.event.position, event.bounds);
-                if root.apply_preview_crop_drag(drag.handle, point) {
-                    cx.notify();
-                }
-            },
-        ))
-        .capture_any_mouse_up(cx.listener(|root, _, _window, cx| {
-            if root.end_preview_crop_drag() {
-                cx.notify();
-            }
-        }))
-        .child(preview_viewport_content(state));
+        .child(preview_viewport_content(state, cx));
 
     if state.crop.crop_mode && state.crop.draft_crop.is_some() {
-        viewport = viewport
-            .child(preview_crop_overlay(state))
-            .child(preview_crop_aspect_bar(state, cx));
+        viewport = viewport.child(preview_crop_aspect_bar(state, cx));
+    }
+
+    if let Some(overlay_controls) = preview_overlay_controls(state, cx) {
+        viewport = viewport.child(overlay_controls);
     }
 
     if preview_visual_controls_visible(state) {
@@ -66,7 +54,20 @@ pub(in crate::app) fn preview_viewport(
     viewport
 }
 
-pub(in crate::app) fn preview_viewport_content(state: &PreviewShellState) -> gpui::Div {
+pub(in crate::app) fn preview_viewport_content(
+    state: &PreviewShellState,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    if let (Some(render_image), Some(media)) = (&state.render_image, state.media) {
+        return div()
+            .absolute()
+            .inset_0()
+            .flex()
+            .items_center()
+            .justify_center()
+            .child(preview_media_stage(state, render_image.clone(), media, cx));
+    }
+
     let content = div()
         .max_w(px(360.0))
         .flex()
@@ -102,6 +103,19 @@ pub(in crate::app) fn preview_viewport_content(state: &PreviewShellState) -> gpu
             error
         }
         PreviewMetadataStatus::Ready => {
+            if let Some(message) = state.runtime_error.as_deref() {
+                return content
+                    .text_color(color(theme::FRAME_RED))
+                    .child("Preview unavailable")
+                    .child(
+                        div()
+                            .max_w(px(320.0))
+                            .truncate()
+                            .text_color(color(theme::FRAME_GRAY_600))
+                            .child(message.to_string()),
+                    );
+            }
+
             if state.availability.media_kind == PreviewMediaKind::Unknown {
                 return content.child("Preview unavailable");
             }
@@ -119,6 +133,59 @@ pub(in crate::app) fn preview_viewport_content(state: &PreviewShellState) -> gpu
                 .child(preview_media_kind_label(state.availability.media_kind))
         }
     }
+}
+
+pub(in crate::app) fn preview_media_stage(
+    state: &PreviewShellState,
+    render_image: Arc<RenderImage>,
+    media: PreviewMediaRenderState,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    let mut stage = div()
+        .id("preview-media-stage")
+        .relative()
+        .h_full()
+        .max_w(relative(1.0))
+        .max_h(relative(1.0))
+        .aspect_ratio(media.aspect_ratio())
+        .overflow_hidden()
+        .on_drag_move(cx.listener(
+            |root, event: &DragMoveEvent<PreviewCropDrag>, _window, cx| {
+                let drag = *event.drag(cx);
+                let point = normalized_point_from_bounds(event.event.position, event.bounds);
+                if root.apply_preview_crop_drag(drag.handle, point) {
+                    cx.notify();
+                }
+            },
+        ))
+        .on_drag_move(cx.listener(
+            |root, event: &DragMoveEvent<PreviewOverlayDrag>, _window, cx| {
+                let drag = *event.drag(cx);
+                let point =
+                    overlay_drag_point_from_bounds(event.event.position, event.bounds, drag);
+                if root.apply_preview_overlay_drag(drag.handle, point) {
+                    cx.notify();
+                }
+            },
+        ))
+        .capture_any_mouse_up(cx.listener(|root, _, _window, cx| {
+            let crop_changed = root.end_preview_crop_drag();
+            let overlay_changed = root.end_preview_overlay_drag();
+            if crop_changed || overlay_changed {
+                cx.notify();
+            }
+        }))
+        .child(img(render_image).size_full().object_fit(ObjectFit::Fill));
+
+    if let Some(overlay) = preview_overlay_layer(state) {
+        stage = stage.child(overlay);
+    }
+
+    if state.crop.crop_mode && state.crop.draft_crop.is_some() {
+        stage = stage.child(preview_crop_overlay(state));
+    }
+
+    stage
 }
 
 pub(in crate::app) fn preview_media_placeholder(media_kind: PreviewMediaKind) -> gpui::Div {

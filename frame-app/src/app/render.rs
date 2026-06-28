@@ -20,6 +20,7 @@ impl Render for FrameRoot {
             selected_file.map_or_else(ConversionConfig::default, |file| file.config.clone());
         let selected_output_name =
             selected_file.map_or_else(String::new, |file| file.output_name.clone());
+        let preview_runtime_request = self.selected_preview_runtime_request(&source_metadata_entry);
         if self.text_input_ui.active.is_some() && self.focused_text_input_kind(window).is_none() {
             self.stop_text_input_cursor();
         }
@@ -27,8 +28,23 @@ impl Render for FrameRoot {
             selected_file_id.as_deref(),
             &selected_config_snapshot,
         );
+        self.sync_preview_overlay_for_selection(
+            selected_file_id.as_deref(),
+            &selected_config_snapshot,
+            cx,
+        );
+        self.sync_preview_runtime_for_selection(preview_runtime_request, cx);
+        self.sync_preview_playback_for_selection(
+            selected_file_id.as_deref(),
+            source_metadata.as_ref(),
+            &selected_config_snapshot,
+        );
         let preview_crop =
             self.preview_crop_render_state(source_metadata.as_ref(), &selected_config_snapshot);
+        let preview_overlay = self.preview_overlay_render_state();
+        let preview_playback = self.preview_playback_state();
+        let preview_render_image = self.preview_render_image();
+        let preview_runtime_error = self.preview_runtime_error();
         let content = div().flex_1().p(px(CONTENT_PADDING));
         let content = match state.active_view {
             ActiveView::Workspace => {
@@ -43,6 +59,10 @@ impl Render for FrameRoot {
                 let video_bitrate_focus =
                     self.ensure_text_input_focus(FrameTextInputKind::VideoBitrate, cx);
                 let gif_loop_focus = self.ensure_text_input_focus(FrameTextInputKind::GifLoop, cx);
+                let preview_start_time_focus =
+                    self.ensure_text_input_focus(FrameTextInputKind::PreviewStartTime, cx);
+                let preview_end_time_focus =
+                    self.ensure_text_input_focus(FrameTextInputKind::PreviewEndTime, cx);
                 let metadata_title_focus =
                     self.ensure_text_input_focus(FrameTextInputKind::MetadataTitle, cx);
                 let metadata_artist_focus =
@@ -101,7 +121,17 @@ impl Render for FrameRoot {
                         subtitle_fonts: &self.subtitle_font_families,
                         available_encoders: &self.available_encoders,
                     },
-                    preview_crop,
+                    PreviewPanelProps {
+                        crop: preview_crop,
+                        overlay: preview_overlay,
+                        timecode_focuses: PreviewTimecodeInputFocuses {
+                            start: Some(&preview_start_time_focus),
+                            end: Some(&preview_end_time_focus),
+                        },
+                        playback: preview_playback,
+                        render_image: preview_render_image,
+                        runtime_error: preview_runtime_error,
+                    },
                     window,
                     cx,
                 ))

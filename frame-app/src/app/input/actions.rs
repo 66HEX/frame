@@ -61,6 +61,8 @@ impl FrameRoot {
             | FrameTextInputKind::VideoCustomHeight
             | FrameTextInputKind::VideoBitrate
             | FrameTextInputKind::GifLoop
+            | FrameTextInputKind::PreviewStartTime
+            | FrameTextInputKind::PreviewEndTime
             | FrameTextInputKind::MetadataTitle
             | FrameTextInputKind::MetadataArtist
             | FrameTextInputKind::MetadataAlbum
@@ -102,6 +104,10 @@ impl FrameRoot {
                 .file_queue
                 .selected_file()
                 .map_or_else(String::new, |file| file.config.gif_loop.to_string()),
+            FrameTextInputKind::PreviewStartTime => {
+                format_time(self.preview_ui.playback.start_value())
+            }
+            FrameTextInputKind::PreviewEndTime => format_time(self.preview_ui.playback.end_value()),
             FrameTextInputKind::MetadataTitle
             | FrameTextInputKind::MetadataArtist
             | FrameTextInputKind::MetadataAlbum
@@ -195,6 +201,44 @@ impl FrameRoot {
                     apply_gif_loop(&mut file.config, &next);
                 })?;
                 Some(file_gif_loop_value(&self.file_queue))
+            }
+            FrameTextInputKind::PreviewStartTime | FrameTextInputKind::PreviewEndTime => {
+                if self.file_queue.selected_file_locked() {
+                    return None;
+                }
+                let normalized = normalize_timecode_text_input(candidate)?;
+                let next_start = if kind == FrameTextInputKind::PreviewStartTime {
+                    normalized.clone()
+                } else {
+                    self.file_queue
+                        .selected_file()
+                        .and_then(|file| file.config.start_time.clone())
+                };
+                let next_end = if kind == FrameTextInputKind::PreviewEndTime {
+                    normalized
+                } else {
+                    self.file_queue
+                        .selected_file()
+                        .and_then(|file| file.config.end_time.clone())
+                };
+                self.file_queue.selected_file_mut().map(|file| {
+                    apply_trim_times(&mut file.config, next_start, next_end);
+                })?;
+                if let Some(file) = self.file_queue.selected_file() {
+                    self.preview_ui.playback.sync_initial_values(
+                        file.config.start_time.as_deref(),
+                        file.config.end_time.as_deref(),
+                    );
+                }
+                Some(match kind {
+                    FrameTextInputKind::PreviewStartTime => {
+                        format_time(self.preview_ui.playback.start_value())
+                    }
+                    FrameTextInputKind::PreviewEndTime => {
+                        format_time(self.preview_ui.playback.end_value())
+                    }
+                    _ => unreachable!("matched preview timecode text input variants"),
+                })
             }
             FrameTextInputKind::MetadataTitle
             | FrameTextInputKind::MetadataArtist
@@ -732,4 +776,22 @@ fn metadata_field_for_text_input(kind: FrameTextInputKind) -> Option<MetadataFie
         FrameTextInputKind::MetadataComment => Some(MetadataField::Comment),
         _ => None,
     }
+}
+
+fn normalize_timecode_text_input(candidate: &str) -> Option<Option<String>> {
+    let trimmed = candidate.trim().replace(',', ".");
+    if trimmed.is_empty() {
+        return Some(None);
+    }
+
+    let seconds = if trimmed.contains(':') {
+        parse_time_to_seconds(&trimmed)
+    } else {
+        trimmed.parse::<f64>().ok()?
+    };
+    if !seconds.is_finite() || seconds < 0.0 {
+        return None;
+    }
+
+    Some(Some(format_time(seconds)))
 }

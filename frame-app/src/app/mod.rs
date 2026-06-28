@@ -25,11 +25,13 @@ use chrome::{app_settings_sheet, drag_drop_overlay, titlebar};
 use input::{FrameTextInputKind, FrameTextInputUiState};
 use logs_panel::logs_view;
 use preview_panel::{
-    FlipAxis, PreviewCropRenderState, crop_aspect_id, crop_rect_from_settings, crop_rect_is_full,
-    crop_settings_from_rect, default_crop_rect, full_crop_rect, is_known_crop_aspect,
-    is_side_rotation, next_rotation, preview_crop_controls_enabled, preview_crop_source_dimensions,
-    preview_duration_seconds, preview_playback_state, preview_source_media_kind,
-    preview_transform_controls_enabled,
+    FlipAxis, PreviewCropRenderState, PreviewMediaRenderState, PreviewOverlayRenderState,
+    PreviewPanelProps, PreviewTimecodeInputFocuses, crop_aspect_id, crop_rect_from_settings,
+    crop_rect_is_full, crop_settings_from_rect, default_crop_rect, full_crop_rect,
+    is_known_crop_aspect, is_side_rotation, next_rotation, preview_crop_controls_enabled,
+    preview_crop_source_dimensions, preview_duration_seconds, preview_playback_state,
+    preview_source_media_kind, preview_transform_controls_enabled,
+    timeline_slider_percent_from_bounds,
 };
 use primitives::color;
 use runtime::hide_native_macos_titlebar_controls;
@@ -62,49 +64,57 @@ use crate::{
     },
     file_filters::{
         AUDIO_FILE_EXTENSIONS, IMAGE_FILE_EXTENSIONS, filter_supported_source_paths,
-        is_supported_subtitle_path,
+        is_supported_overlay_image_path, is_supported_subtitle_path,
     },
     file_queue::{
         BatchSelectionState, FileItem, FileQueue, FileStateTone, FileStatus, RowActionAvailability,
         format_file_size,
     },
     format_total_size,
-    native_dialogs::{pick_source_files, pick_subtitle_file},
+    native_dialogs::{pick_overlay_image_file, pick_source_files, pick_subtitle_file},
     notifications::{AppNotifier, conversion_finished_notification_for_task_ids},
     preview::{
-        ASPECT_OPTIONS, CropRect, DragHandle, MediaSnapshot,
-        MetadataStatus as PreviewMetadataStatus, Point as PreviewPoint, PreviewControlAvailability,
-        PreviewControlInput, PreviewMediaKind, PreviewPlaybackState, PreviewRotation,
-        SourceMediaKind, TimelineDragTarget, adjust_rect_to_ratio, aspect_value, clamp_rect,
-        format_time, parse_time_to_seconds, preview_control_availability, transform_crop_rect,
+        ASPECT_OPTIONS, CropRect, DragHandle, MAX_OVERLAY_WIDTH, MIN_OVERLAY_WIDTH, MediaSnapshot,
+        MetadataStatus as PreviewMetadataStatus, OverlayDragHandle, OverlayDragPoint,
+        OverlayModeChange, OverlaySizeDirection, PlaybackMediaCommand, Point as PreviewPoint,
+        PreviewControlAvailability, PreviewControlInput, PreviewMediaKind, PreviewOverlay,
+        PreviewOverlayState, PreviewPlaybackState, PreviewRotation, SourceMediaKind,
+        TimelineDragTarget, adjust_rect_to_ratio, aspect_value, clamp_rect, format_time,
+        parse_time_to_seconds, preview_control_availability, transform_crop_rect,
+    },
+    preview_engine::{
+        DEFAULT_PREVIEW_FPS, DEFAULT_PREVIEW_MAX_HEIGHT, DEFAULT_PREVIEW_MAX_WIDTH,
+        MIN_PREVIEW_DIMENSION, PreviewCommand, PreviewSession, PreviewSessionConfig,
+        PreviewSourceKind as EnginePreviewSourceKind, PreviewTransform, render_image_from_frame,
     },
     settings::{
         ConversionConfig, CropSettings, DEFAULT_SUBTITLE_FONT_COLOR,
-        DEFAULT_SUBTITLE_OUTLINE_COLOR, MetadataField, PresetDefinition, PresetNotice,
-        PresetNoticeTone, PresetOption, ProcessingMode, SettingsTab, SourceInfoSection, SourceKind,
-        SourceMetadata, SourceTags, SubtitleFontOption, SubtitleFontSizeOption,
-        apply_audio_bitrate, apply_audio_bitrate_mode, apply_audio_channels, apply_audio_codec,
-        apply_audio_normalize, apply_audio_quality, apply_audio_volume, apply_crf,
-        apply_custom_height, apply_custom_width, apply_fps, apply_gif_colors, apply_gif_dither,
-        apply_gif_loop, apply_hw_decode, apply_metadata_field, apply_metadata_mode,
-        apply_nvenc_spatial_aq, apply_nvenc_temporal_aq, apply_output_container,
-        apply_pixel_format, apply_preset, apply_processing_mode, apply_quality, apply_resolution,
-        apply_scaling_algorithm, apply_subtitle_burn_path, apply_subtitle_font_color,
-        apply_subtitle_font_name, apply_subtitle_font_size, apply_subtitle_outline_color,
-        apply_subtitle_position, apply_trim_times, apply_video_bitrate, apply_video_bitrate_mode,
-        apply_video_codec, apply_video_preset, apply_videotoolbox_allow_sw, audio_channel_options,
-        audio_codec_options, audio_codec_supports_vbr, audio_quality_range, audio_track_options,
-        create_custom_preset, default_presets, fps_options, gif_color_options, gif_dither_options,
-        is_gif_container, is_hardware_video_codec, is_nvenc_video_codec,
-        is_videotoolbox_video_codec, metadata_field_options, metadata_field_value,
-        metadata_mode_options, normalize_output_config, normalized_hex_color,
-        output_container_options, output_processing_mode_options, preset_options,
-        resolution_options, resolve_active_settings_tab, sanitize_output_name,
-        scaling_algorithm_options, source_info_sections, subtitle_burn_file_label,
-        subtitle_color_value, subtitle_font_options, subtitle_font_size_options,
-        subtitle_position_options, subtitle_track_options, toggle_audio_track_selection,
-        toggle_subtitle_track_selection, video_codec_options, video_pixel_format_options,
-        video_preset_options, visible_settings_tabs,
+        DEFAULT_SUBTITLE_OUTLINE_COLOR, MetadataField, OverlaySettings, PresetDefinition,
+        PresetNotice, PresetNoticeTone, PresetOption, ProcessingMode, SettingsTab,
+        SourceInfoSection, SourceKind, SourceMetadata, SourceTags, SubtitleFontOption,
+        SubtitleFontSizeOption, apply_audio_bitrate, apply_audio_bitrate_mode,
+        apply_audio_channels, apply_audio_codec, apply_audio_normalize, apply_audio_quality,
+        apply_audio_volume, apply_crf, apply_custom_height, apply_custom_width, apply_fps,
+        apply_gif_colors, apply_gif_dither, apply_gif_loop, apply_hw_decode, apply_metadata_field,
+        apply_metadata_mode, apply_nvenc_spatial_aq, apply_nvenc_temporal_aq,
+        apply_output_container, apply_pixel_format, apply_preset, apply_processing_mode,
+        apply_quality, apply_resolution, apply_scaling_algorithm, apply_subtitle_burn_path,
+        apply_subtitle_font_color, apply_subtitle_font_name, apply_subtitle_font_size,
+        apply_subtitle_outline_color, apply_subtitle_position, apply_trim_times,
+        apply_video_bitrate, apply_video_bitrate_mode, apply_video_codec, apply_video_preset,
+        apply_videotoolbox_allow_sw, audio_channel_options, audio_codec_options,
+        audio_codec_supports_vbr, audio_quality_range, audio_track_options, create_custom_preset,
+        default_presets, fps_options, gif_color_options, gif_dither_options, is_gif_container,
+        is_hardware_video_codec, is_nvenc_video_codec, is_videotoolbox_video_codec,
+        metadata_field_options, metadata_field_value, metadata_mode_options,
+        normalize_output_config, normalized_hex_color, output_container_options,
+        output_processing_mode_options, preset_options, resolution_options,
+        resolve_active_settings_tab, sanitize_output_name, scaling_algorithm_options,
+        source_info_sections, subtitle_burn_file_label, subtitle_color_value,
+        subtitle_font_options, subtitle_font_size_options, subtitle_position_options,
+        subtitle_track_options, toggle_audio_track_selection, toggle_subtitle_track_selection,
+        video_codec_options, video_pixel_format_options, video_preset_options,
+        visible_settings_tabs,
     },
     source_metadata::{
         MetadataStatus, SourceMetadataEntry, SourceMetadataStore, probe_source_metadata,
@@ -118,12 +128,13 @@ use gpui::{
     App, Bounds, BoxShadow, ClickEvent, ClipboardItem, Context, DragMoveEvent, Element, ElementId,
     ElementInputHandler, Entity, EntityInputHandler, ExternalPaths, FocusHandle, GlobalElementId,
     InteractiveElement, IntoElement, KeyBinding, LayoutId, Menu, MenuItem, MouseButton,
-    MouseDownEvent, MouseMoveEvent, MouseUpEvent, PaintQuad, Pixels, PlatformInput, Point,
-    Position, PromptButton, PromptLevel, Render, Rgba, ScrollStrategy, ScrollWheelEvent,
-    ShapedLine, SharedString, StatefulInteractiveElement, Style, Task, TextRun, TitlebarOptions,
-    UTF16Selection, UniformListScrollHandle, Window, WindowBackgroundAppearance, WindowBounds,
-    WindowControlArea, WindowDecorations, WindowOptions, actions, deferred, div, fill, hsla,
-    linear_color_stop, linear_gradient, point, prelude::*, px, relative, size, svg, uniform_list,
+    MouseDownEvent, MouseMoveEvent, MouseUpEvent, ObjectFit, PaintQuad, Pixels, PlatformInput,
+    Point, Position, PromptButton, PromptLevel, Render, RenderImage, Rgba, ScrollStrategy,
+    ScrollWheelEvent, ShapedLine, SharedString, StatefulInteractiveElement, Style, Task, TextRun,
+    TitlebarOptions, UTF16Selection, UniformListScrollHandle, Window, WindowBackgroundAppearance,
+    WindowBounds, WindowControlArea, WindowDecorations, WindowOptions, actions, deferred, div,
+    fill, hsla, img, linear_color_stop, linear_gradient, point, prelude::*, px, relative, size,
+    svg, uniform_list,
 };
 #[cfg(target_os = "macos")]
 use objc2_app_kit::{NSView, NSWindowButton};
@@ -132,7 +143,10 @@ use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use std::{
     ops::Range,
     path::PathBuf,
-    sync::mpsc::{self, TryRecvError},
+    sync::{
+        Arc,
+        mpsc::{self, TryRecvError},
+    },
     time::Duration,
 };
 
@@ -264,6 +278,21 @@ struct PreviewUiState {
     draft_crop: Option<CropRect>,
     crop_aspect: String,
     crop_drag: Option<PreviewCropDragState>,
+    overlay_file_id: Option<String>,
+    overlay: PreviewOverlayState,
+    overlay_dimensions_key: Option<String>,
+    pending_overlay_dimensions_key: Option<String>,
+    overlay_image_dimensions: Option<PreviewOverlayImageDimensions>,
+    overlay_opacity_slider_bounds: Option<Bounds<Pixels>>,
+    playback_file_id: Option<String>,
+    playback: PreviewPlaybackState,
+    runtime_key: Option<PreviewRuntimeKey>,
+    pending_runtime_key: Option<PreviewRuntimeKey>,
+    session: Option<Arc<PreviewSession>>,
+    render_generation: u64,
+    render_image: Option<Arc<RenderImage>>,
+    runtime_error: Option<String>,
+    frame_tick_active: bool,
 }
 
 impl Default for PreviewUiState {
@@ -274,7 +303,38 @@ impl Default for PreviewUiState {
             draft_crop: None,
             crop_aspect: "free".to_string(),
             crop_drag: None,
+            overlay_file_id: None,
+            overlay: PreviewOverlayState::new(),
+            overlay_dimensions_key: None,
+            pending_overlay_dimensions_key: None,
+            overlay_image_dimensions: None,
+            overlay_opacity_slider_bounds: None,
+            playback_file_id: None,
+            playback: PreviewPlaybackState::new(false),
+            runtime_key: None,
+            pending_runtime_key: None,
+            session: None,
+            render_generation: 0,
+            render_image: None,
+            runtime_error: None,
+            frame_tick_active: false,
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::app) struct PreviewOverlayImageDimensions {
+    width: u32,
+    height: u32,
+}
+
+impl PreviewOverlayImageDimensions {
+    pub(in crate::app) fn height_over_width(self) -> f64 {
+        if self.width == 0 {
+            return 1.0;
+        }
+
+        f64::from(self.height) / f64::from(self.width)
     }
 }
 
@@ -283,6 +343,25 @@ struct PreviewCropDragState {
     handle: DragHandle,
     start_rect: CropRect,
     start_point: PreviewPoint,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct PreviewRuntimeKey {
+    file_id: String,
+    path: String,
+    source_kind: EnginePreviewSourceKind,
+    source_width: Option<u32>,
+    source_height: Option<u32>,
+    duration_millis: u64,
+    rotation_degrees: u16,
+    flip_horizontal: bool,
+    flip_vertical: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct PreviewRuntimeRequest {
+    key: PreviewRuntimeKey,
+    config: PreviewSessionConfig,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

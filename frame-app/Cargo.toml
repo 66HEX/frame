@@ -16,10 +16,16 @@ directories = "6.0.0"
 frame-core = { path = "../frame-core" }
 gpui = { package = "gpui", git = "https://github.com/gpui-ce/gpui-ce" }
 gpui_platform = { git = "https://github.com/gpui-ce/gpui-ce", features = ["font-kit"] }
+gstreamer = "0.25.2"
+gstreamer-app = "0.25.2"
+gstreamer-pbutils = "0.25.2"
+gstreamer-video = "0.25.2"
+image = "0.25.10"
 notify-rust = "4.18.0"
 rfd = "0.16.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
+smallvec = "1.15.1"
 sysinfo = "0.31.4"
 thiserror = "2.0.18"
 
@@ -28,9 +34,6 @@ libc = "0.2"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_System_LibraryLoader"] }
-
-[target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
-image = "0.25.10"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSButton", "NSControl", "NSResponder", "NSView", "NSWindow"] }

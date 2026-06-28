@@ -6,7 +6,7 @@ use super::{
 pub(super) fn workspace_view(
     file_queue: &FileQueue,
     settings: SettingsRenderState<'_>,
-    preview_crop: PreviewCropRenderState,
+    preview_props: PreviewPanelProps<'_>,
     window: &Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -23,7 +23,7 @@ pub(super) fn workspace_view(
                 .gap(px(WORKSPACE_GAP))
                 .size_full()
                 .child(
-                    preview_panel(file_queue, settings, preview_crop, cx)
+                    preview_panel(file_queue, settings, preview_props, window, cx)
                         .row_span(PREVIEW_ROW_SPAN),
                 )
                 .child(file_list_panel(file_queue, cx).row_span(FILE_LIST_ROW_SPAN)),

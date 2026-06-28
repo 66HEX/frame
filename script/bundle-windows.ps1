@@ -115,12 +115,18 @@ Invoke-Checked rustup target add $Target
 Push-Location $RepoRoot
 try {
     Invoke-Checked cargo xtask setup-ffmpeg --platform win32 --arch $Architecture
+    $gstreamerEnv = & cargo xtask setup-gstreamer --platform win32 --arch $Architecture --mode bundle --install --print-env
+    if ($LASTEXITCODE -ne 0) {
+        throw "cargo xtask setup-gstreamer exited with status $LASTEXITCODE"
+    }
+    Invoke-Expression ($gstreamerEnv -join [Environment]::NewLine)
 }
 finally {
     Pop-Location
 }
 Invoke-Checked cargo build --manifest-path "$RepoRoot\frame-app\Cargo.toml" --release --target $Target
 Prepare-BundleDirectory
+Invoke-Checked cargo xtask stage-gstreamer --dir $InnoDir
 Build-Installer
 
 if ($Install) {

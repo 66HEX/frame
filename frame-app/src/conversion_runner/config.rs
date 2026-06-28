@@ -2,7 +2,7 @@ use frame_core::{
     media_rules,
     types::{
         ConversionConfig as CoreConversionConfig, ConversionTask, CropConfig,
-        MetadataConfig as CoreMetadataConfig, MetadataMode as CoreMetadataMode,
+        MetadataConfig as CoreMetadataConfig, MetadataMode as CoreMetadataMode, OverlayConfig,
     },
 };
 
@@ -14,7 +14,7 @@ use crate::{
         DEFAULT_GIF_COLORS, DEFAULT_GIF_DITHER, DEFAULT_PIXEL_FORMAT, DEFAULT_PRESET,
         DEFAULT_RESOLUTION, DEFAULT_SCALING_ALGORITHM, DEFAULT_VIDEO_BITRATE,
         DEFAULT_VIDEO_BITRATE_MODE, DEFAULT_VIDEO_CODEC, MetadataConfig as GpuiMetadataConfig,
-        MetadataMode as GpuiMetadataMode,
+        MetadataMode as GpuiMetadataMode, OverlaySettings,
     },
 };
 
@@ -112,7 +112,7 @@ pub fn core_config_from_gpui(config: &GpuiConversionConfig) -> CoreConversionCon
         flip_horizontal: config.flip_horizontal,
         flip_vertical: config.flip_vertical,
         crop: config.crop.as_ref().map(core_crop_from_gpui),
-        overlay: None,
+        overlay: config.overlay.as_ref().map(core_overlay_from_gpui),
         nvenc_spatial_aq: config.nvenc_spatial_aq,
         nvenc_temporal_aq: config.nvenc_temporal_aq,
         videotoolbox_allow_sw: config.videotoolbox_allow_sw,
@@ -174,5 +174,17 @@ fn core_crop_from_gpui(crop: &CropSettings) -> CropConfig {
         source_width: crop.source_width.map(f64::from),
         source_height: crop.source_height.map(f64::from),
         aspect_ratio: crop.aspect_ratio.clone(),
+    }
+}
+
+fn core_overlay_from_gpui(overlay: &OverlaySettings) -> OverlayConfig {
+    OverlayConfig {
+        enabled: overlay.enabled,
+        path: overlay.path.clone(),
+        x: overlay.x,
+        y: overlay.y,
+        width: overlay.width,
+        opacity: overlay.opacity,
+        anchor: overlay.anchor.clone(),
     }
 }

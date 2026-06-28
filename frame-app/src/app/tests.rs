@@ -472,6 +472,70 @@ mod frame_root_conversion {
     }
 
     #[test]
+    fn preview_start_time_input_normalizes_seconds_to_timecode() {
+        let mut root = FrameRoot::new();
+        root.file_queue
+            .add_file(FileItem::from_path("first", "/tmp/one.mp4", 1));
+        root.preview_ui.playback =
+            preview_playback_state(PreviewMediaKind::Video, 90.0, None, None);
+        root.text_input_runtime_mut(FrameTextInputKind::PreviewStartTime)
+            .selected_range = 0..12;
+
+        assert!(root.replace_text_input_range(
+            FrameTextInputKind::PreviewStartTime,
+            None,
+            "12.5",
+            None,
+            false,
+        ));
+
+        assert_eq!(
+            root.file_queue
+                .selected_file()
+                .and_then(|file| file.config.start_time.as_deref()),
+            Some("00:00:12.500")
+        );
+        assert_eq!(
+            root.text_input_value(FrameTextInputKind::PreviewStartTime),
+            "00:00:12.500"
+        );
+    }
+
+    #[test]
+    fn preview_end_time_input_can_clear_existing_bound() {
+        let mut root = FrameRoot::new();
+        root.file_queue
+            .add_file(FileItem::from_path("first", "/tmp/one.mp4", 1));
+        root.update_selected_config(|config| {
+            config.end_time = Some("00:00:30.000".to_string());
+            true
+        });
+        root.preview_ui.playback =
+            preview_playback_state(PreviewMediaKind::Video, 90.0, None, Some("00:00:30.000"));
+        root.text_input_runtime_mut(FrameTextInputKind::PreviewEndTime)
+            .selected_range = 0..12;
+
+        assert!(root.replace_text_input_range(
+            FrameTextInputKind::PreviewEndTime,
+            None,
+            "",
+            None,
+            false,
+        ));
+
+        assert_eq!(
+            root.file_queue
+                .selected_file()
+                .and_then(|file| file.config.end_time.as_deref()),
+            None
+        );
+        assert_eq!(
+            root.text_input_value(FrameTextInputKind::PreviewEndTime),
+            "00:01:30.000"
+        );
+    }
+
+    #[test]
     fn metadata_title_input_inserts_free_text_at_selection() {
         let mut root = FrameRoot::new();
         root.file_queue
@@ -905,7 +969,7 @@ mod frame_root_config {
     }
 
     #[test]
-    fn apply_selected_trim_drag_updates_selected_file_start_time() {
+    fn apply_preview_timeline_drag_updates_selected_file_start_time() {
         let mut root = FrameRoot::new();
         root.file_queue
             .add_file(FileItem::from_path("video", "/tmp/one.mp4", 1));
@@ -917,8 +981,10 @@ mod frame_root_config {
                 ..SourceMetadata::default()
             },
         );
+        root.preview_ui.playback =
+            preview_playback_state(PreviewMediaKind::Video, 90.0, None, None);
 
-        let changed = root.apply_selected_trim_drag(TimelineDragTarget::Start, 0.25);
+        let changed = root.apply_preview_timeline_drag(TimelineDragTarget::Start, 0.25);
 
         assert!(changed);
         assert_eq!(
@@ -936,7 +1002,7 @@ mod frame_root_config {
     }
 
     #[test]
-    fn apply_selected_trim_drag_preserves_gap_when_end_moves_before_start() {
+    fn apply_preview_timeline_drag_preserves_gap_when_end_moves_before_start() {
         let mut root = FrameRoot::new();
         root.file_queue
             .add_file(FileItem::from_path("video", "/tmp/one.mp4", 1));
@@ -952,8 +1018,10 @@ mod frame_root_config {
             config.start_time = Some("00:00:20.000".to_string());
             true
         });
+        root.preview_ui.playback =
+            preview_playback_state(PreviewMediaKind::Video, 90.0, Some("00:00:20.000"), None);
 
-        let changed = root.apply_selected_trim_drag(TimelineDragTarget::End, 0.10);
+        let changed = root.apply_preview_timeline_drag(TimelineDragTarget::End, 0.10);
 
         assert!(changed);
         assert_eq!(
@@ -965,7 +1033,7 @@ mod frame_root_config {
     }
 
     #[test]
-    fn apply_selected_trim_drag_ignores_image_sources() {
+    fn apply_preview_timeline_drag_ignores_image_sources() {
         let mut root = FrameRoot::new();
         root.file_queue
             .add_file(FileItem::from_path("image", "/tmp/one.png", 1));
@@ -978,7 +1046,7 @@ mod frame_root_config {
             },
         );
 
-        let changed = root.apply_selected_trim_drag(TimelineDragTarget::Start, 0.25);
+        let changed = root.apply_preview_timeline_drag(TimelineDragTarget::Start, 0.25);
 
         assert!(!changed);
         assert_eq!(
@@ -1167,6 +1235,111 @@ mod frame_root_config {
                 .and_then(|file| file.config.crop.as_ref()),
             None
         );
+    }
+
+    #[test]
+    fn apply_preview_overlay_drag_persists_selected_file_overlay_position() {
+        let mut root = root_with_overlay();
+
+        assert!(!root.apply_preview_overlay_drag(
+            OverlayDragHandle::Move,
+            OverlayDragPoint {
+                x: 0.50,
+                y: 0.50,
+                width: Some(0.20),
+                height: Some(0.20),
+            },
+        ));
+        assert!(root.apply_preview_overlay_drag(
+            OverlayDragHandle::Move,
+            OverlayDragPoint {
+                x: 0.60,
+                y: 0.55,
+                width: Some(0.20),
+                height: Some(0.20),
+            },
+        ));
+
+        let overlay = root
+            .file_queue
+            .file_by_id("video")
+            .and_then(|file| file.config.overlay.as_ref())
+            .unwrap();
+        assert!((overlay.x - 0.60).abs() < 0.000_001);
+        assert!((overlay.y - 0.55).abs() < 0.000_001);
+        assert_eq!(overlay.anchor, "custom");
+    }
+
+    #[test]
+    fn commit_preview_overlay_opacity_at_position_persists_slider_value() {
+        let mut root = root_with_overlay();
+        root.set_preview_overlay_opacity_slider_bounds(Bounds {
+            origin: point(px(10.0), px(0.0)),
+            size: size(px(100.0), px(30.0)),
+        });
+
+        assert!(root.commit_preview_overlay_opacity_at_position(point(px(60.0), px(0.0))));
+
+        let overlay = root
+            .file_queue
+            .file_by_id("video")
+            .and_then(|file| file.config.overlay.as_ref())
+            .unwrap();
+        assert!((overlay.opacity - 0.50).abs() < 0.000_001);
+    }
+
+    #[test]
+    fn remove_selected_overlay_clears_selected_file_overlay_config() {
+        let mut root = root_with_overlay();
+
+        assert!(root.remove_selected_overlay());
+
+        assert_eq!(
+            root.file_queue
+                .file_by_id("video")
+                .and_then(|file| file.config.overlay.as_ref()),
+            None
+        );
+        assert!(root.preview_ui.overlay.overlay().is_none());
+    }
+
+    fn root_with_overlay() -> FrameRoot {
+        let mut root = FrameRoot::new();
+        root.file_queue
+            .add_file(FileItem::from_path("video", "/tmp/one.mp4", 1));
+        root.source_metadata.mark_ready(
+            "video".to_string(),
+            SourceMetadata {
+                media_kind: Some(SourceKind::Video),
+                width: Some(1920),
+                height: Some(1080),
+                ..SourceMetadata::default()
+            },
+        );
+        let overlay = PreviewOverlay {
+            enabled: true,
+            path: "/tmp/logo.png".to_string(),
+            x: 0.50,
+            y: 0.50,
+            width: 0.20,
+            opacity: 1.0,
+            anchor: "custom".to_string(),
+        };
+        root.preview_ui.overlay.sync_initial_overlay(Some(&overlay));
+        root.preview_ui.overlay.set_overlay_mode(true, false);
+        root.update_selected_config(|config| {
+            config.overlay = Some(OverlaySettings {
+                enabled: overlay.enabled,
+                path: overlay.path.clone(),
+                x: overlay.x,
+                y: overlay.y,
+                width: overlay.width,
+                opacity: overlay.opacity,
+                anchor: overlay.anchor.clone(),
+            });
+            true
+        });
+        root
     }
 }
 
@@ -1580,6 +1753,10 @@ mod preview_shell {
             Some(&file),
             settings_state(&config, Some(&metadata), MetadataStatus::Ready),
             crop_state(),
+            PreviewOverlayRenderState::empty(),
+            preview_playback_state(PreviewMediaKind::Video, 90.4, None, None),
+            None,
+            None,
         );
         let labels = preview_timeline_labels(&state);
 
@@ -1608,6 +1785,15 @@ mod preview_shell {
             Some(&file),
             settings_state(&config, Some(&metadata), MetadataStatus::Ready),
             crop_state(),
+            PreviewOverlayRenderState::empty(),
+            preview_playback_state(
+                PreviewMediaKind::Video,
+                90.4,
+                config.start_time.as_deref(),
+                config.end_time.as_deref(),
+            ),
+            None,
+            None,
         );
         let labels = preview_timeline_labels(&state);
 
@@ -1630,6 +1816,10 @@ mod preview_shell {
             Some(&file),
             settings_state(&config, Some(&metadata), MetadataStatus::Ready),
             crop_state(),
+            PreviewOverlayRenderState::empty(),
+            PreviewPlaybackState::new(false),
+            None,
+            None,
         );
         let labels = preview_timeline_labels(&state);
 
@@ -1653,6 +1843,10 @@ mod preview_shell {
             None,
             settings_state(&config, Some(&metadata), MetadataStatus::Ready),
             crop_state(),
+            PreviewOverlayRenderState::empty(),
+            PreviewPlaybackState::new(false),
+            None,
+            None,
         );
 
         assert_eq!(state.availability.media_kind, PreviewMediaKind::Audio);
@@ -1674,6 +1868,10 @@ mod preview_shell {
             None,
             settings_state(&config, Some(&metadata), MetadataStatus::Loading),
             crop_state(),
+            PreviewOverlayRenderState::empty(),
+            PreviewPlaybackState::new(false),
+            None,
+            None,
         );
 
         assert_eq!(state.availability.media_kind, PreviewMediaKind::Unknown);

@@ -15,6 +15,8 @@ impl Render for PreviewTimelineDragPreview {
 
 pub(in crate::app) fn preview_timeline(
     state: &PreviewShellState,
+    focuses: PreviewTimecodeInputFocuses<'_>,
+    window: &Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let labels = preview_timeline_labels(state);
@@ -31,22 +33,40 @@ pub(in crate::app) fn preview_timeline(
                 .flex()
                 .gap_4()
                 .child(preview_timecode_field(
-                    "START TIME",
-                    labels.start,
-                    trim_enabled,
-                    128.0,
+                    PreviewTimecodeFieldSpec {
+                        label: "START TIME",
+                        value: labels.start,
+                        enabled: trim_enabled,
+                        width: 128.0,
+                        kind: Some(FrameTextInputKind::PreviewStartTime),
+                        focus: focuses.start,
+                    },
+                    window,
+                    cx,
                 ))
                 .child(preview_timecode_field(
-                    "END TIME",
-                    labels.end,
-                    trim_enabled,
-                    128.0,
+                    PreviewTimecodeFieldSpec {
+                        label: "END TIME",
+                        value: labels.end,
+                        enabled: trim_enabled,
+                        width: 128.0,
+                        kind: Some(FrameTextInputKind::PreviewEndTime),
+                        focus: focuses.end,
+                    },
+                    window,
+                    cx,
                 ))
                 .child(preview_timecode_field(
-                    "DURATION",
-                    labels.duration,
-                    false,
-                    104.0,
+                    PreviewTimecodeFieldSpec {
+                        label: "DURATION",
+                        value: labels.duration,
+                        enabled: false,
+                        width: 104.0,
+                        kind: None,
+                        focus: None,
+                    },
+                    window,
+                    cx,
                 )),
         )
         .child(
@@ -65,7 +85,7 @@ pub(in crate::app) fn preview_timeline(
                 .flex_col()
                 .gap(px(6.0))
                 .child(preview_timeline_label(" "))
-                .child(preview_play_button(state)),
+                .child(preview_play_button(state, cx)),
         )
 }
 
@@ -99,12 +119,68 @@ pub(in crate::app) fn preview_trim_enabled(state: &PreviewShellState) -> bool {
     !state.availability.trim_disabled && state.duration_seconds > 0.0
 }
 
-pub(in crate::app) fn preview_timecode_field(
+pub(in crate::app) struct PreviewTimecodeFieldSpec<'a> {
     label: &'static str,
     value: String,
     enabled: bool,
     width: f32,
+    kind: Option<FrameTextInputKind>,
+    focus: Option<&'a FocusHandle>,
+}
+
+pub(in crate::app) fn preview_timecode_field(
+    spec: PreviewTimecodeFieldSpec<'_>,
+    window: &Window,
+    cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let PreviewTimecodeFieldSpec {
+        label,
+        value,
+        enabled,
+        width,
+        kind,
+        focus,
+    } = spec;
+    let field = if let (Some(kind), Some(focus)) = (kind, focus) {
+        frame_text_input(
+            FrameTextInputSpec {
+                id: match kind {
+                    FrameTextInputKind::PreviewStartTime => "preview-start-time",
+                    FrameTextInputKind::PreviewEndTime => "preview-end-time",
+                    _ => "preview-timecode",
+                },
+                value: &value,
+                placeholder: "--:--:--.---",
+                disabled: !enabled,
+                focus: Some(focus),
+                kind,
+            },
+            window,
+            cx,
+        )
+        .font_features(assets::frame_tabular_number_font_features())
+        .into_any_element()
+    } else {
+        div()
+            .w_full()
+            .h(px(PREVIEW_TIMELINE_CONTROL_HEIGHT))
+            .flex()
+            .items_center()
+            .rounded(px(theme::RADIUS_SM))
+            .bg(color(theme::BACKGROUND))
+            .px(px(10.0))
+            .text_size(px(theme::TEXT_LABEL_SIZE))
+            .text_color(if enabled {
+                color(theme::FOREGROUND)
+            } else {
+                color(theme::FRAME_GRAY_600)
+            })
+            .font_features(assets::frame_tabular_number_font_features())
+            .shadow(input_highlight_shadows())
+            .child(value)
+            .into_any_element()
+    };
+
     div()
         .flex()
         .flex_col()
@@ -114,20 +190,7 @@ pub(in crate::app) fn preview_timecode_field(
             div()
                 .w(px(width))
                 .h(px(PREVIEW_TIMELINE_CONTROL_HEIGHT))
-                .flex()
-                .items_center()
-                .rounded(px(theme::RADIUS_SM))
-                .bg(color(theme::BACKGROUND))
-                .px(px(10.0))
-                .text_size(px(theme::TEXT_LABEL_SIZE))
-                .text_color(if enabled {
-                    color(theme::FOREGROUND)
-                } else {
-                    color(theme::FRAME_GRAY_600)
-                })
-                .font_features(assets::frame_tabular_number_font_features())
-                .shadow(input_highlight_shadows())
-                .child(value),
+                .child(field),
         )
 }
 
@@ -169,16 +232,29 @@ pub(in crate::app) fn preview_timeline_track(
         .w_full()
         .opacity(if enabled { 1.0 } else { 0.5 })
         .when(enabled, |this| this.cursor_pointer())
+        .when(enabled, |this| {
+            this.on_drag(
+                PreviewTimelineDrag {
+                    target: TimelineDragTarget::Scrub,
+                },
+                |_drag, _position, _window, cx| cx.new(|_| PreviewTimelineDragPreview),
+            )
+        })
         .on_drag_move(cx.listener(
             |root, event: &DragMoveEvent<PreviewTimelineDrag>, _window, cx| {
                 let drag = *event.drag(cx);
                 let percent =
                     timeline_slider_percent_from_bounds(event.event.position, event.bounds);
-                if root.apply_selected_trim_drag(drag.target, percent) {
+                if root.apply_preview_timeline_drag(drag.target, percent) {
                     cx.notify();
                 }
             },
         ))
+        .capture_any_mouse_up(cx.listener(|root, _event: &MouseUpEvent, _window, cx| {
+            if root.end_preview_timeline_drag() {
+                cx.notify();
+            }
+        }))
         .child(
             div()
                 .absolute()
@@ -252,7 +328,10 @@ pub(in crate::app) fn preview_timeline_handle(
     }
 }
 
-pub(in crate::app) fn preview_play_button(state: &PreviewShellState) -> impl IntoElement {
+pub(in crate::app) fn preview_play_button(
+    state: &PreviewShellState,
+    cx: &mut Context<FrameRoot>,
+) -> impl IntoElement {
     let enabled = preview_trim_enabled(state);
     let icon = if state.playback.is_playing() {
         assets::ICON_PAUSE
@@ -260,7 +339,13 @@ pub(in crate::app) fn preview_play_button(state: &PreviewShellState) -> impl Int
         assets::ICON_PLAY
     };
 
-    preview_tool_button(icon, false, enabled)
+    preview_tool_button(icon, false, enabled).on_click(cx.listener(
+        |root, _: &ClickEvent, _window, cx| {
+            if root.toggle_preview_playback() {
+                cx.notify();
+            }
+        },
+    ))
 }
 
 pub(in crate::app) fn centered_offset(container: f32, child: f32) -> f32 {

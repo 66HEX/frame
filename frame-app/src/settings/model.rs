@@ -427,6 +427,7 @@ pub struct ConversionConfig {
     pub flip_horizontal: bool,
     pub flip_vertical: bool,
     pub crop: Option<CropSettings>,
+    pub overlay: Option<OverlaySettings>,
     pub selected_audio_tracks: Vec<u32>,
     pub selected_subtitle_tracks: Vec<u32>,
     pub resolution: String,
@@ -475,6 +476,7 @@ impl Default for ConversionConfig {
             flip_horizontal: false,
             flip_vertical: false,
             crop: None,
+            overlay: None,
             selected_audio_tracks: Vec::new(),
             selected_subtitle_tracks: Vec::new(),
             resolution: DEFAULT_RESOLUTION.to_string(),
@@ -509,6 +511,20 @@ pub struct CropSettings {
     pub source_height: Option<u32>,
     pub aspect_ratio: Option<String>,
 }
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct OverlaySettings {
+    pub enabled: bool,
+    pub path: String,
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub opacity: f64,
+    pub anchor: String,
+}
+
+impl Eq for OverlaySettings {}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OutputModeOption {
