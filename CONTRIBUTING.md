@@ -88,7 +88,6 @@ To build and run Frame locally, you will need:
   generated workflows.
 - `script/`: platform bundling entrypoints called by `xtask` and GitHub
   Actions.
-- `docs/`: roadmap, backlog, architecture notes, and verification records.
 - `CHANGELOG.md`: product release history.
 
 ### Coding Standards
@@ -116,7 +115,7 @@ cargo xtask ci
 ```
 
 For UI changes, add or update focused GPUI tests where practical. Visual parity
-fixtures live in the GPUI test modules and are documented in `docs/`.
+fixtures live in the GPUI test modules.
 
 ## Pull Request Process
 
