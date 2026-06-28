@@ -2,14 +2,14 @@ use super::*;
 
 const PREVIEW_TOOLBAR_PADDING: f32 = 4.0;
 const PREVIEW_TOOLBAR_GAP: f32 = 8.0;
-const PREVIEW_TOOLBAR_SEPARATOR_HEIGHT: f32 = 1.0;
+const PREVIEW_TOOLBAR_VERTICAL_SEPARATOR_HEIGHT: f32 = 18.0;
+const PREVIEW_TOOLBAR_VERTICAL_SEPARATOR_WIDTH: f32 = 1.0;
 const PREVIEW_TOOLBAR_BUTTON_COUNT: f32 = 5.0;
-const PREVIEW_TOOLBAR_GAP_COUNT: f32 = 5.0;
+const PREVIEW_TOOLBAR_GAP_COUNT: f32 = 4.0;
 
 pub(in crate::app) const fn preview_toolbar_height() -> f32 {
     (PREVIEW_TOOLBAR_PADDING * 2.0)
         + (PREVIEW_TOOLBAR_BUTTON_SIZE * PREVIEW_TOOLBAR_BUTTON_COUNT)
-        + PREVIEW_TOOLBAR_SEPARATOR_HEIGHT
         + (PREVIEW_TOOLBAR_GAP * PREVIEW_TOOLBAR_GAP_COUNT)
 }
 
@@ -70,7 +70,6 @@ pub(in crate::app) fn preview_toolbar(
                 }
             })),
         )
-        .child(preview_toolbar_separator())
         .child(
             preview_tool_button(
                 assets::ICON_CROP,
@@ -133,12 +132,12 @@ pub(in crate::app) fn preview_zoom_toolbar(
         )
 }
 
-pub(in crate::app) fn preview_toolbar_separator() -> gpui::Div {
+pub(in crate::app) fn preview_toolbar_vertical_separator() -> gpui::Div {
     div()
-        .h(px(PREVIEW_TOOLBAR_SEPARATOR_HEIGHT))
-        .w_full()
-        .bg(color(theme::BACKGROUND))
-        .shadow(horizontal_separator_shadows())
+        .flex_none()
+        .h(px(PREVIEW_TOOLBAR_VERTICAL_SEPARATOR_HEIGHT))
+        .w(px(PREVIEW_TOOLBAR_VERTICAL_SEPARATOR_WIDTH))
+        .bg(color(theme::FRAME_GRAY_200))
 }
 
 pub(in crate::app) fn preview_tool_button(

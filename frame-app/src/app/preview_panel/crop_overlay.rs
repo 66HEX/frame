@@ -210,7 +210,7 @@ pub(in crate::app) fn preview_crop_aspect_bar(
     }
 
     let bar = bar
-        .child(preview_toolbar_separator().h(px(18.0)).w(px(1.0)))
+        .child(preview_toolbar_vertical_separator())
         .child(
             compact_text_button("Reset", false, true).on_click(cx.listener(
                 |root, _: &ClickEvent, _window, cx| {

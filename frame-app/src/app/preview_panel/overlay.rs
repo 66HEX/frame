@@ -192,6 +192,7 @@ pub(in crate::app) fn preview_overlay_controls(
                 root.prompt_selected_overlay_image(cx);
             })),
         )
+        .child(preview_toolbar_vertical_separator())
         .child(
             preview_overlay_icon_button(
                 "decrease",
@@ -205,7 +206,6 @@ pub(in crate::app) fn preview_overlay_controls(
                 }
             })),
         )
-        .child(preview_overlay_opacity_slider(overlay.opacity, enabled, cx))
         .child(
             preview_overlay_icon_button(
                 "increase",
@@ -219,7 +219,8 @@ pub(in crate::app) fn preview_overlay_controls(
                 }
             })),
         )
-        .child(preview_toolbar_separator().h(px(18.0)).w(px(1.0)))
+        .child(preview_overlay_opacity_slider(overlay.opacity, enabled, cx))
+        .child(preview_toolbar_vertical_separator())
         .child(
             frame_icon_button(
                 "preview-overlay-remove",

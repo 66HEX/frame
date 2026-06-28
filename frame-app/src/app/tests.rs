@@ -2132,8 +2132,8 @@ mod visual_contract {
 
     #[test]
     fn preview_left_toolbar_centering_uses_full_stack_height() {
-        assert_eq!(preview_panel::preview_toolbar_height(), 199.0);
-        assert_eq!(preview_panel::preview_toolbar_center_margin(), -99.5);
+        assert_eq!(preview_panel::preview_toolbar_height(), 190.0);
+        assert_eq!(preview_panel::preview_toolbar_center_margin(), -95.0);
     }
 }
 
