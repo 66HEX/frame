@@ -25,7 +25,7 @@ jobs:
     - name: steps::setup_linux
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev pkg-config patchelf
+        sudo apt-get install -y clang libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf
     - name: ./script/bundle-linux
       run: ./script/bundle-linux
     - name: run_bundling::upload_artifact
@@ -50,7 +50,7 @@ jobs:
     - name: steps::setup_linux
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev pkg-config patchelf
+        sudo apt-get install -y clang libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf
     - name: ./script/bundle-linux
       run: ./script/bundle-linux
     - name: run_bundling::upload_artifact
@@ -82,6 +82,12 @@ jobs:
         name: Frame-x86_64.dmg
         path: target/x86_64-apple-darwin/release/Frame-x86_64.dmg
         if-no-files-found: error
+    - name: run_bundling::upload_update_artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Frame-x86_64.app.zip
+        path: target/x86_64-apple-darwin/release/Frame-x86_64.app.zip
+        if-no-files-found: error
     timeout-minutes: 60
   bundle_macos_aarch64:
     if: |-
@@ -104,6 +110,12 @@ jobs:
       with:
         name: Frame-aarch64.dmg
         path: target/aarch64-apple-darwin/release/Frame-aarch64.dmg
+        if-no-files-found: error
+    - name: run_bundling::upload_update_artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Frame-aarch64.app.zip
+        path: target/aarch64-apple-darwin/release/Frame-aarch64.app.zip
         if-no-files-found: error
     timeout-minutes: 60
   bundle_windows_x86_64:

@@ -1,4 +1,4 @@
-use super::components::frame_text_button;
+use super::components::{frame_checkbox_row, frame_text_button};
 use super::input::{FrameTextInputSpec, frame_text_input};
 use super::primitives::*;
 use super::settings_panel::{settings_hint_text, settings_section};
@@ -287,16 +287,23 @@ pub(super) fn titlebar_start_button(
     }))
 }
 
+pub(super) struct AppSettingsSheetProps<'a> {
+    pub(super) is_open: bool,
+    pub(super) current_max_concurrency: usize,
+    pub(super) draft_max_concurrency: &'a str,
+    pub(super) error: Option<&'a str>,
+    pub(super) auto_update_check: bool,
+    pub(super) update_status: &'a UpdateStatus,
+    pub(super) value_focus: &'a FocusHandle,
+}
+
 pub(super) fn app_settings_sheet(
-    is_open: bool,
-    current_max_concurrency: usize,
-    draft_max_concurrency: &str,
-    error: Option<&str>,
-    value_focus: &FocusHandle,
+    props: AppSettingsSheetProps<'_>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
-    let draft_is_dirty = draft_max_concurrency.trim() != current_max_concurrency.to_string();
+    let draft_is_dirty =
+        props.draft_max_concurrency.trim() != props.current_max_concurrency.to_string();
     let transition = window
         .use_keyed_transition(
             "app-settings-sheet-motion",
@@ -305,7 +312,7 @@ pub(super) fn app_settings_sheet(
             |_window, _cx| 0.0_f32,
         )
         .with_easing(ease_out_quint());
-    let target = motion_target(is_open);
+    let target = motion_target(props.is_open);
     if *transition.read_goal(cx) != target {
         transition.update(cx, |progress, cx| {
             *progress = target;
@@ -315,7 +322,7 @@ pub(super) fn app_settings_sheet(
     let progress = *transition.evaluate(window, cx);
     let right_inset = settings_sheet_right_inset(progress);
 
-    if !is_open && motion_is_hidden(progress) {
+    if !props.is_open && motion_is_hidden(progress) {
         cx.defer_in(window, |root, _window, cx| {
             if root.finish_app_settings_close() {
                 cx.notify();
@@ -348,7 +355,7 @@ pub(super) fn app_settings_sheet(
                 .top_2()
                 .right(px(right_inset))
                 .bottom_2()
-                .w(px(320.0))
+                .w(px(360.0))
                 .flex()
                 .flex_col()
                 .rounded(px(theme::RADIUS_LG))
@@ -392,9 +399,9 @@ pub(super) fn app_settings_sheet(
                         .child(
                             settings_section("MAX CONCURRENCY")
                                 .child(app_settings_concurrency_control(
-                                    draft_max_concurrency,
+                                    props.draft_max_concurrency,
                                     draft_is_dirty,
-                                    value_focus,
+                                    props.value_focus,
                                     window,
                                     cx,
                                 ))
@@ -402,16 +409,435 @@ pub(super) fn app_settings_sheet(
                                     "Controls how many queued conversions can run at the same time.",
                                 )),
                         )
-                        .when_some(error.map(str::to_string), |this, error| {
+                        .when_some(props.error.map(str::to_string), |this, error| {
                             this.child(
                                 div()
                                     .id("app-settings-max-concurrency-error")
                                     .text_color(color(theme::FRAME_RED))
                                     .child(error),
                             )
-                        }),
+                        })
+                        .child(app_settings_updates_section(
+                            props.auto_update_check,
+                            props.update_status,
+                            window,
+                            cx,
+                        )),
                 ),
         )
+}
+
+fn app_settings_updates_section(
+    auto_update_check: bool,
+    update_status: &UpdateStatus,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    let busy = update_status.is_busy();
+    let mut section = settings_section("UPDATES")
+        .child(
+            frame_checkbox_row(
+                "app-settings-auto-update-check",
+                "Check automatically",
+                "Frame checks for signed releases in the background.",
+                auto_update_check,
+                false,
+            )
+            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+                cx.stop_propagation();
+                if root.toggle_auto_update_check() {
+                    cx.notify();
+                }
+            })),
+        )
+        .child(update_status_label(update_status));
+
+    if let UpdateStatus::Downloading {
+        progress_percent,
+        received_bytes,
+        total_bytes,
+        ..
+    } = update_status
+    {
+        section = section.child(update_progress_bar(*progress_percent));
+        section = section.child(update_download_detail(
+            *received_bytes,
+            *total_bytes,
+            *progress_percent,
+        ));
+    }
+
+    if let Some(notes) = update_release_notes_text(update_status) {
+        section = section.child(update_release_notes_block(notes));
+    }
+
+    section.child(update_action_row(update_status, busy, window, cx))
+}
+
+fn update_status_label(status: &UpdateStatus) -> gpui::Div {
+    let tone = match status {
+        UpdateStatus::Error(_) => theme::FRAME_RED,
+        UpdateStatus::Disabled(_) => theme::FRAME_AMBER,
+        _ => theme::FRAME_GRAY_600,
+    };
+
+    div()
+        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_color(color(tone))
+        .child(update_status_text(status))
+}
+
+fn update_status_text(status: &UpdateStatus) -> String {
+    match status {
+        UpdateStatus::Idle => "No update check is running.".to_string(),
+        UpdateStatus::Checking => "Checking for updates...".to_string(),
+        UpdateStatus::UpToDate => "Frame is up to date.".to_string(),
+        UpdateStatus::Available(info) => {
+            format!("Frame {} is available.", info.version)
+        }
+        UpdateStatus::Downloading {
+            version,
+            progress_percent,
+            ..
+        } => progress_percent.map_or_else(
+            || format!("Downloading Frame {version}..."),
+            |percent| format!("Downloading Frame {version}: {percent}%"),
+        ),
+        UpdateStatus::ReadyToInstall(package) => {
+            format!("Frame {} is ready to install.", package.version)
+        }
+        UpdateStatus::Installing => "Installing update and restarting...".to_string(),
+        UpdateStatus::Disabled(explanation) => explanation.clone(),
+        UpdateStatus::Error(error) => error.clone(),
+    }
+}
+
+fn update_release_notes_text(status: &UpdateStatus) -> Option<String> {
+    let notes = match status {
+        UpdateStatus::Available(info) => info.release_notes_markdown.as_deref(),
+        _ => None,
+    }?;
+    let notes = notes.trim();
+    if notes.is_empty() {
+        return None;
+    }
+
+    const MAX_RELEASE_NOTES_CHARS: usize = 900;
+    let mut text = notes
+        .chars()
+        .take(MAX_RELEASE_NOTES_CHARS + 1)
+        .collect::<String>();
+    if text.chars().count() > MAX_RELEASE_NOTES_CHARS {
+        text = text.chars().take(MAX_RELEASE_NOTES_CHARS).collect();
+        text.push_str("...");
+    }
+    Some(text)
+}
+
+fn update_release_notes_block(notes: String) -> gpui::Stateful<gpui::Div> {
+    div()
+        .id("app-settings-update-release-notes")
+        .max_h(px(160.0))
+        .overflow_y_scroll()
+        .rounded(px(theme::RADIUS_SM))
+        .bg(color(theme::FRAME_GRAY_100))
+        .p_3()
+        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_color(color(theme::FRAME_GRAY_600))
+        .child(notes)
+}
+
+fn update_progress_bar(progress_percent: Option<u8>) -> gpui::Div {
+    let fraction = progress_percent.map_or(0.0, |percent| f32::from(percent) / 100.0);
+
+    div()
+        .h(px(6.0))
+        .w_full()
+        .overflow_hidden()
+        .rounded(px(theme::RADIUS_SM))
+        .bg(color(theme::FRAME_GRAY_100))
+        .child(
+            div()
+                .h_full()
+                .w(relative(fraction.clamp(0.0, 1.0)))
+                .rounded(px(theme::RADIUS_SM))
+                .bg(color(theme::FRAME_BLUE)),
+        )
+}
+
+fn update_download_detail(
+    received_bytes: u64,
+    total_bytes: Option<u64>,
+    progress_percent: Option<u8>,
+) -> gpui::Div {
+    let detail = match (total_bytes, progress_percent) {
+        (Some(total_bytes), Some(percent)) => format!(
+            "{} of {} ({percent}%)",
+            format_total_size(received_bytes),
+            format_total_size(total_bytes)
+        ),
+        (Some(total_bytes), None) => format!(
+            "{} of {}",
+            format_total_size(received_bytes),
+            format_total_size(total_bytes)
+        ),
+        (None, _) => format!("{} downloaded", format_total_size(received_bytes)),
+    };
+
+    div()
+        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_color(color(theme::FRAME_GRAY_600))
+        .font_features(assets::frame_tabular_number_font_features())
+        .child(detail)
+}
+
+fn update_action_row(
+    status: &UpdateStatus,
+    busy: bool,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    let mut row = div().flex().items_center().gap_2();
+    row = row.child(
+        frame_text_button(
+            "app-settings-update-check-now",
+            "CHECK NOW",
+            ButtonVariant::Secondary,
+            false,
+            !busy,
+            window,
+            cx,
+        )
+        .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+            cx.stop_propagation();
+            if !busy {
+                root.check_for_updates(true, cx);
+                cx.notify();
+            }
+        })),
+    );
+
+    match status {
+        UpdateStatus::Available(_) => row
+            .child(
+                frame_text_button(
+                    "app-settings-update-download",
+                    "DOWNLOAD",
+                    ButtonVariant::Default,
+                    false,
+                    true,
+                    window,
+                    cx,
+                )
+                .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+                    cx.stop_propagation();
+                    root.download_available_update(cx);
+                    cx.notify();
+                })),
+            )
+            .child(
+                frame_text_button(
+                    "app-settings-update-skip",
+                    "SKIP",
+                    ButtonVariant::Secondary,
+                    false,
+                    true,
+                    window,
+                    cx,
+                )
+                .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+                    cx.stop_propagation();
+                    if root.skip_available_update() {
+                        cx.notify();
+                    }
+                })),
+            ),
+        UpdateStatus::ReadyToInstall(_) => row.child(
+            frame_text_button(
+                "app-settings-update-install",
+                "INSTALL AND RESTART",
+                ButtonVariant::Default,
+                false,
+                true,
+                window,
+                cx,
+            )
+            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+                cx.stop_propagation();
+                root.install_downloaded_update(cx);
+                cx.notify();
+            })),
+        ),
+        UpdateStatus::UpToDate | UpdateStatus::Disabled(_) | UpdateStatus::Error(_) => row.child(
+            frame_text_button(
+                "app-settings-update-dismiss",
+                "DISMISS",
+                ButtonVariant::Secondary,
+                false,
+                true,
+                window,
+                cx,
+            )
+            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+                cx.stop_propagation();
+                root.dismiss_update_status();
+                cx.notify();
+            })),
+        ),
+        UpdateStatus::Idle
+        | UpdateStatus::Checking
+        | UpdateStatus::Downloading { .. }
+        | UpdateStatus::Installing => row,
+    }
+}
+
+pub(super) fn update_banner(
+    status: &UpdateStatus,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> Option<gpui::Stateful<gpui::Div>> {
+    let visible = matches!(
+        status,
+        UpdateStatus::Available(_)
+            | UpdateStatus::Downloading { .. }
+            | UpdateStatus::ReadyToInstall(_)
+            | UpdateStatus::Installing
+            | UpdateStatus::Error(_)
+    );
+    if !visible {
+        return None;
+    }
+
+    let tone = match status {
+        UpdateStatus::Error(_) => theme::FRAME_RED,
+        UpdateStatus::Available(_) | UpdateStatus::ReadyToInstall(_) => theme::FRAME_AMBER,
+        _ => theme::FRAME_BLUE,
+    };
+    let mut actions = div().flex().items_center().gap_2();
+    match status {
+        UpdateStatus::Available(_) => {
+            actions = actions
+                .child(
+                    frame_text_button(
+                        "update-banner-download",
+                        "DOWNLOAD",
+                        ButtonVariant::Default,
+                        false,
+                        true,
+                        window,
+                        cx,
+                    )
+                    .on_click(cx.listener(
+                        |root, _: &ClickEvent, _window, cx| {
+                            cx.stop_propagation();
+                            root.download_available_update(cx);
+                            cx.notify();
+                        },
+                    )),
+                )
+                .child(
+                    frame_text_button(
+                        "update-banner-skip",
+                        "SKIP",
+                        ButtonVariant::Secondary,
+                        false,
+                        true,
+                        window,
+                        cx,
+                    )
+                    .on_click(cx.listener(
+                        |root, _: &ClickEvent, _window, cx| {
+                            cx.stop_propagation();
+                            if root.skip_available_update() {
+                                cx.notify();
+                            }
+                        },
+                    )),
+                );
+        }
+        UpdateStatus::ReadyToInstall(_) => {
+            actions = actions.child(
+                frame_text_button(
+                    "update-banner-install",
+                    "INSTALL AND RESTART",
+                    ButtonVariant::Default,
+                    false,
+                    true,
+                    window,
+                    cx,
+                )
+                .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+                    cx.stop_propagation();
+                    root.install_downloaded_update(cx);
+                    cx.notify();
+                })),
+            );
+        }
+        UpdateStatus::Error(_) => {
+            actions = actions.child(
+                frame_text_button(
+                    "update-banner-dismiss",
+                    "DISMISS",
+                    ButtonVariant::Secondary,
+                    false,
+                    true,
+                    window,
+                    cx,
+                )
+                .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+                    cx.stop_propagation();
+                    root.dismiss_update_status();
+                    cx.notify();
+                })),
+            );
+        }
+        UpdateStatus::Downloading { .. } | UpdateStatus::Installing => {}
+        UpdateStatus::Idle
+        | UpdateStatus::Checking
+        | UpdateStatus::UpToDate
+        | UpdateStatus::Disabled(_) => {}
+    }
+
+    Some(
+        div()
+            .id("update-banner")
+            .absolute()
+            .left(px(16.0))
+            .right(px(16.0))
+            .bottom(px(16.0))
+            .flex()
+            .justify_center()
+            .occlude()
+            .child(
+                div()
+                    .max_w(px(560.0))
+                    .w_full()
+                    .flex()
+                    .items_center()
+                    .gap_3()
+                    .rounded(px(theme::RADIUS_LG))
+                    .bg(color(theme::SIDEBAR))
+                    .p_3()
+                    .shadow(card_surface_shadows())
+                    .child(
+                        div()
+                            .w(px(6.0))
+                            .h(px(32.0))
+                            .rounded(px(theme::RADIUS_SM))
+                            .bg(color(tone)),
+                    )
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .text_size(px(theme::TEXT_LABEL_SIZE))
+                            .text_color(color(theme::FOREGROUND))
+                            .truncate()
+                            .child(update_status_text(status)),
+                    )
+                    .child(actions),
+            ),
+    )
 }
 
 pub(super) fn app_settings_concurrency_control(

@@ -19,10 +19,13 @@ mod settings_panel;
 mod state;
 #[cfg(test)]
 mod tests;
+mod update_actions;
 mod workspace;
 pub use runtime::{frame_window_options, init_app, open_frame_window};
 
-use chrome::{app_settings_sheet, drag_drop_overlay, titlebar};
+use chrome::{
+    AppSettingsSheetProps, app_settings_sheet, drag_drop_overlay, titlebar, update_banner,
+};
 use input::{FrameTextInputKind, FrameTextInputUiState};
 use logs_panel::logs_view;
 use motion::*;
@@ -123,11 +126,16 @@ use crate::{
     source_metadata::{
         MetadataStatus, SourceMetadataEntry, SourceMetadataStore, probe_source_metadata,
     },
-    theme, visual_fixture_from_env_value,
+    theme,
+    update_runtime::{
+        build_update_client, unix_timestamp, update_check_is_due, updates_disabled_explanation,
+    },
+    visual_fixture_from_env_value,
 };
 use frame_core::capabilities::AvailableEncoders;
 use frame_core::events::ConversionEvent;
 use frame_core::types::DEFAULT_MAX_CONCURRENCY;
+use frame_updater::{DownloadProgress, UpdateChannel, UpdateCheck, UpdateInfo, UpdatePackage};
 use gpui::{
     App, Bounds, BoxShadow, ClickEvent, ClipboardItem, Context, DispatchPhase, DragMoveEvent,
     Element, ElementId, ElementInputHandler, Entity, EntityInputHandler, ExternalPaths,
@@ -239,6 +247,11 @@ pub struct FrameRoot {
     native_titlebar_controls_hidden: bool,
     next_file_sequence: u64,
     persistence: Option<AppPersistence>,
+    auto_update_check: bool,
+    update_channel: UpdateChannel,
+    skipped_update_version: Option<String>,
+    last_update_check_at: Option<u64>,
+    update_ui: UpdateUiState,
 }
 
 #[derive(Default)]
@@ -256,6 +269,39 @@ struct SettingsUiState {
     preset_name_draft: String,
     preset_notice: Option<PresetNotice>,
     next_custom_preset_sequence: u64,
+}
+
+#[derive(Clone, Debug, Default)]
+struct UpdateUiState {
+    status: UpdateStatus,
+}
+
+#[derive(Clone, Debug, Default)]
+enum UpdateStatus {
+    #[default]
+    Idle,
+    Checking,
+    UpToDate,
+    Available(Box<UpdateInfo>),
+    Downloading {
+        version: String,
+        progress_percent: Option<u8>,
+        received_bytes: u64,
+        total_bytes: Option<u64>,
+    },
+    ReadyToInstall(Box<UpdatePackage>),
+    Installing,
+    Disabled(String),
+    Error(String),
+}
+
+impl UpdateStatus {
+    fn is_busy(&self) -> bool {
+        matches!(
+            self,
+            Self::Checking | Self::Downloading { .. } | Self::Installing
+        )
+    }
 }
 
 impl Default for SettingsUiState {

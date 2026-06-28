@@ -1,4 +1,4 @@
-#define AppId "{7D37707F-5F27-47B6-82EE-207B922EC013}"
+#define AppId "{{7D37707F-5F27-47B6-82EE-207B922EC013}"
 #ifndef AppName
 #define AppName "Frame"
 #endif
@@ -45,6 +45,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "{#ResourcesDir}\Frame.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#ResourcesDir}\frame-update-helper.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#ResourcesDir}\*.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#ResourcesDir}\binaries\*"; DestDir: "{app}\binaries"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#ResourcesDir}\gstreamer\*"; DestDir: "{app}\gstreamer"; Flags: ignoreversion recursesubdirs createallsubdirs

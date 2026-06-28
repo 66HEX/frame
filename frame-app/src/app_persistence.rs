@@ -6,12 +6,13 @@ use std::{
 
 use directories::ProjectDirs;
 use frame_core::types::DEFAULT_MAX_CONCURRENCY;
+use frame_updater::UpdateChannel;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::settings::PresetDefinition;
 
-const APP_SETTINGS_VERSION: u32 = 1;
+const APP_SETTINGS_VERSION: u32 = 2;
 const SETTINGS_FILE_NAME: &str = "settings.json";
 const LEGACY_APP_SETTINGS_FILE_NAME: &str = "app-settings.dat";
 const LEGACY_PRESETS_FILE_NAME: &str = "presets.dat";
@@ -20,11 +21,22 @@ const LEGACY_PRESETS_FILE_NAME: &str = "presets.dat";
 pub struct AppSettings {
     pub max_concurrency: usize,
     pub custom_presets: Vec<PresetDefinition>,
+    pub auto_update_check: bool,
+    pub update_channel: UpdateChannel,
+    pub skipped_update_version: Option<String>,
+    pub last_update_check_at: Option<u64>,
 }
 
 impl AppSettings {
     #[must_use]
-    pub fn from_runtime(max_concurrency: usize, presets: &[PresetDefinition]) -> Self {
+    pub fn from_runtime(
+        max_concurrency: usize,
+        presets: &[PresetDefinition],
+        auto_update_check: bool,
+        update_channel: UpdateChannel,
+        skipped_update_version: Option<String>,
+        last_update_check_at: Option<u64>,
+    ) -> Self {
         Self {
             max_concurrency: valid_max_concurrency(max_concurrency),
             custom_presets: normalize_custom_presets(
@@ -34,6 +46,10 @@ impl AppSettings {
                     .cloned()
                     .collect(),
             ),
+            auto_update_check,
+            update_channel,
+            skipped_update_version,
+            last_update_check_at,
         }
     }
 }
@@ -43,6 +59,10 @@ impl Default for AppSettings {
         Self {
             max_concurrency: DEFAULT_MAX_CONCURRENCY,
             custom_presets: Vec::new(),
+            auto_update_check: true,
+            update_channel: UpdateChannel::Stable,
+            skipped_update_version: None,
+            last_update_check_at: None,
         }
     }
 }
@@ -114,6 +134,9 @@ impl AppPersistence {
                 if let Some(max_concurrency) = legacy.max_concurrency {
                     settings.max_concurrency = valid_max_concurrency(max_concurrency);
                 }
+                if let Some(auto_update_check) = legacy.auto_update_check {
+                    settings.auto_update_check = auto_update_check;
+                }
             }
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
             Err(error) => return Err(AppPersistenceError::Io(error)),
@@ -148,12 +171,17 @@ struct PersistedAppSettings {
     version: u32,
     max_concurrency: usize,
     custom_presets: Vec<PresetDefinition>,
+    auto_update_check: bool,
+    update_channel: UpdateChannel,
+    skipped_update_version: Option<String>,
+    last_update_check_at: Option<u64>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 struct LegacyAppSettings {
     max_concurrency: Option<usize>,
+    auto_update_check: Option<bool>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -168,6 +196,10 @@ impl PersistedAppSettings {
             version: APP_SETTINGS_VERSION,
             max_concurrency: valid_max_concurrency(settings.max_concurrency),
             custom_presets: normalize_custom_presets(settings.custom_presets.clone()),
+            auto_update_check: settings.auto_update_check,
+            update_channel: settings.update_channel,
+            skipped_update_version: settings.skipped_update_version.clone(),
+            last_update_check_at: settings.last_update_check_at,
         }
     }
 
@@ -175,6 +207,10 @@ impl PersistedAppSettings {
         AppSettings {
             max_concurrency: valid_max_concurrency(self.max_concurrency),
             custom_presets: normalize_custom_presets(self.custom_presets),
+            auto_update_check: self.auto_update_check,
+            update_channel: self.update_channel,
+            skipped_update_version: self.skipped_update_version,
+            last_update_check_at: self.last_update_check_at,
         }
     }
 }
@@ -185,6 +221,10 @@ impl Default for PersistedAppSettings {
             version: APP_SETTINGS_VERSION,
             max_concurrency: DEFAULT_MAX_CONCURRENCY,
             custom_presets: Vec::new(),
+            auto_update_check: true,
+            update_channel: UpdateChannel::Stable,
+            skipped_update_version: None,
+            last_update_check_at: None,
         }
     }
 }
@@ -272,6 +312,10 @@ mod tests {
                     ..ConversionConfig::default()
                 },
             )],
+            auto_update_check: false,
+            update_channel: UpdateChannel::Stable,
+            skipped_update_version: Some("0.2.0".to_string()),
+            last_update_check_at: Some(1_800_000_000),
         };
 
         persistence
@@ -362,6 +406,7 @@ mod tests {
             .expect("legacy settings should load");
 
         assert_eq!(settings.max_concurrency, 5);
+        assert!(settings.auto_update_check);
         assert_eq!(settings.custom_presets[0].id, "custom-preset-8");
         assert_eq!(settings.custom_presets[0].config.container, "mkv");
     }
@@ -382,6 +427,10 @@ mod tests {
                     ConversionConfig::default(),
                 ),
             ],
+            true,
+            UpdateChannel::Stable,
+            None,
+            Some(1_800_000_000),
         );
 
         assert_eq!(settings.custom_presets.len(), 1);

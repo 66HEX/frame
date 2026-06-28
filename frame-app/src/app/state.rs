@@ -96,6 +96,11 @@ impl FrameRoot {
             native_titlebar_controls_hidden: false,
             next_file_sequence: 0,
             persistence,
+            auto_update_check: persisted_settings.auto_update_check,
+            update_channel: persisted_settings.update_channel,
+            skipped_update_version: persisted_settings.skipped_update_version,
+            last_update_check_at: persisted_settings.last_update_check_at,
+            update_ui: UpdateUiState::default(),
         };
 
         root.apply_visual_fixture(visual_fixture_from_env_value(
@@ -131,6 +136,10 @@ impl FrameRoot {
         persistence.save(&AppSettings::from_runtime(
             self.max_concurrency,
             &self.presets,
+            self.auto_update_check,
+            self.update_channel,
+            self.skipped_update_version.clone(),
+            self.last_update_check_at,
         ))
     }
 }

@@ -200,11 +200,15 @@ impl Render for FrameRoot {
         if self.settings_ui.is_present {
             let value_focus = self.ensure_text_input_focus(FrameTextInputKind::MaxConcurrency, cx);
             root = root.child(app_settings_sheet(
-                self.settings_ui.is_open,
-                self.max_concurrency,
-                &self.settings_ui.max_concurrency_draft,
-                self.settings_ui.max_concurrency_error.as_deref(),
-                &value_focus,
+                AppSettingsSheetProps {
+                    is_open: self.settings_ui.is_open,
+                    current_max_concurrency: self.max_concurrency,
+                    draft_max_concurrency: &self.settings_ui.max_concurrency_draft,
+                    error: self.settings_ui.max_concurrency_error.as_deref(),
+                    auto_update_check: self.auto_update_check,
+                    update_status: &self.update_ui.status,
+                    value_focus: &value_focus,
+                },
                 window,
                 cx,
             ));
@@ -212,6 +216,10 @@ impl Render for FrameRoot {
 
         if self.drag_drop_ui.is_present {
             root = root.child(drag_drop_overlay(self.drag_drop_ui.is_open, window, cx));
+        }
+
+        if let Some(banner) = update_banner(&self.update_ui.status, window, cx) {
+            root = root.child(banner);
         }
 
         root

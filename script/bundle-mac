@@ -61,7 +61,8 @@ case "$target_triple" in
 		;;
 esac
 
-gstreamer_env="$(cd "$repo_root" && cargo xtask setup-gstreamer --platform darwin --arch "$arch_suffix" --mode bundle --install --print-env)"
+(cd "$repo_root" && cargo xtask setup-gstreamer --platform darwin --arch "$arch_suffix" --mode bundle --install)
+gstreamer_env="$(cd "$repo_root" && cargo xtask setup-gstreamer --platform darwin --arch "$arch_suffix" --mode bundle --print-env)"
 eval "$gstreamer_env"
 
 (cd "$repo_root" && cargo xtask setup-ffmpeg --platform darwin --arch "$arch_suffix")
@@ -71,6 +72,7 @@ rustup target add "$target_triple"
 	cd "$repo_root/frame-app"
 	cargo bundle ${build_flag} --format osx --target "$target_triple"
 )
+cargo build --manifest-path "$repo_root/frame-updater/Cargo.toml" ${build_flag} --target "$target_triple" --bin frame-update-helper
 
 app_bundle=""
 for candidate in \
@@ -88,6 +90,13 @@ if [[ -z "$app_bundle" ]]; then
 	echo "  $target_dir/$target_profile/bundle/osx/Frame.app" >&2
 	exit 1
 fi
+
+helper_binary="$target_dir/$target_triple/$target_profile/frame-update-helper"
+if [[ ! -x "$helper_binary" ]]; then
+	echo "Missing update helper binary: $helper_binary" >&2
+	exit 1
+fi
+cp "$helper_binary" "$app_bundle/Contents/MacOS/frame-update-helper"
 
 (cd "$repo_root" && cargo xtask stage-gstreamer --app "$app_bundle")
 
@@ -120,6 +129,25 @@ fi
 dmg_target_directory="$target_dir/$target_triple/$target_profile"
 dmg_source_directory="$dmg_target_directory/dmg"
 dmg_file_path="$dmg_target_directory/Frame-$arch_suffix.dmg"
+app_zip_file_path="$dmg_target_directory/Frame-$arch_suffix.app.zip"
+
+create_app_zip() {
+	rm -f "$app_zip_file_path"
+	ditto -c -k --sequesterRsrc --keepParent "$app_bundle" "$app_zip_file_path"
+}
+
+create_app_zip
+
+if [[ "$can_notarize" = true ]]; then
+	xcode_bin_dir_path="$(xcode-select -p)/usr/bin"
+	notarization_key_file="$(mktemp)"
+	echo "$APPLE_NOTARIZATION_KEY" > "$notarization_key_file"
+
+	echo "Notarizing app zip with Apple"
+	"$xcode_bin_dir_path/notarytool" submit --wait --key "$notarization_key_file" --key-id "$APPLE_NOTARIZATION_KEY_ID" --issuer "$APPLE_NOTARIZATION_ISSUER_ID" "$app_zip_file_path"
+	"$xcode_bin_dir_path/stapler" staple "$app_bundle"
+	create_app_zip
+fi
 
 rm -rf "$dmg_source_directory"
 mkdir -p "$dmg_source_directory"
@@ -135,12 +163,8 @@ hdiutil create -volname Frame -srcfolder "$dmg_source_directory" -ov -format UDZ
 rm "$dmg_source_directory/Applications"
 
 if [[ "$can_notarize" = true ]]; then
-	xcode_bin_dir_path="$(xcode-select -p)/usr/bin"
-	notarization_key_file="$(mktemp)"
-
 	echo "Code signing DMG"
 	codesign --force --timestamp --options runtime --sign "$MACOS_SIGNING_IDENTITY" "$dmg_file_path" -v
-	echo "$APPLE_NOTARIZATION_KEY" > "$notarization_key_file"
 	echo "Notarizing DMG with Apple"
 	"$xcode_bin_dir_path/notarytool" submit --wait --key "$notarization_key_file" --key-id "$APPLE_NOTARIZATION_KEY_ID" --issuer "$APPLE_NOTARIZATION_ISSUER_ID" "$dmg_file_path"
 	rm "$notarization_key_file"
@@ -156,3 +180,4 @@ if [[ "$open_result" = true ]]; then
 fi
 
 echo "Created $dmg_file_path"
+echo "Created $app_zip_file_path"

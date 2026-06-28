@@ -18,6 +18,7 @@ pub mod runtime_binaries;
 pub mod settings;
 pub mod source_metadata;
 pub mod theme;
+pub mod update_runtime;
 
 use file_queue::FileQueue;
 

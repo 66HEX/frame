@@ -69,20 +69,28 @@ if [[ "$target_triple" != "$runtime_triple" ]]; then
 fi
 
 (cd "$repo_root" && cargo xtask setup-ffmpeg --platform linux --arch "$runtime_arch")
-gstreamer_env="$(cd "$repo_root" && cargo xtask setup-gstreamer --platform linux --arch "$runtime_arch" --mode bundle --install --print-env)"
+(cd "$repo_root" && cargo xtask setup-gstreamer --platform linux --arch "$runtime_arch" --mode bundle --install)
+gstreamer_env="$(cd "$repo_root" && cargo xtask setup-gstreamer --platform linux --arch "$runtime_arch" --mode bundle --print-env)"
 eval "$gstreamer_env"
 
 export RUSTFLAGS="${RUSTFLAGS:-} -C link-args=-Wl,--disable-new-dtags,-rpath,\$ORIGIN/../lib"
 cargo build --manifest-path "$repo_root/frame-app/Cargo.toml" --release --target "$target_triple"
+cargo build --manifest-path "$repo_root/frame-updater/Cargo.toml" --release --target "$target_triple" --bin frame-update-helper
 
 binary_path="$target_dir/$target_triple/release/frame"
+helper_path="$target_dir/$target_triple/release/frame-update-helper"
 if [[ ! -x "$binary_path" ]]; then
 	echo "Missing release binary: $binary_path" >&2
+	exit 1
+fi
+if [[ ! -x "$helper_path" ]]; then
+	echo "Missing update helper binary: $helper_path" >&2
 	exit 1
 fi
 
 if command -v strip >/dev/null 2>&1; then
 	strip --strip-debug "$binary_path" || true
+	strip --strip-debug "$helper_path" || true
 fi
 
 temp_dir="$(mktemp -d)"
@@ -104,6 +112,7 @@ mkdir -p \
 	"$app_dir/share/icons/hicolor/512x512/apps"
 
 cp "$binary_path" "$app_dir/bin/frame"
+cp "$helper_path" "$app_dir/bin/frame-update-helper"
 
 find_libs() {
 	ldd "$binary_path" |

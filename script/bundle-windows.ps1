@@ -71,6 +71,7 @@ function Prepare-BundleDirectory {
     New-Item -Path "$InnoDir\binaries" -ItemType Directory -Force | Out-Null
 
     Copy-Item -Path "$ReleaseDir\frame.exe" -Destination "$InnoDir\Frame.exe" -Force
+    Copy-Item -Path "$ReleaseDir\frame-update-helper.exe" -Destination "$InnoDir\frame-update-helper.exe" -Force
     Copy-Item -Path "$RepoRoot\frame-app\resources\app-icons\icon.ico" -Destination "$InnoDir\app-icon.ico" -Force
     foreach ($binary in @("ffmpeg-$Target.exe", "ffprobe-$Target.exe")) {
         $source = "$RepoRoot\frame-app\resources\binaries\$binary"
@@ -115,7 +116,8 @@ Invoke-Checked rustup target add $Target
 Push-Location $RepoRoot
 try {
     Invoke-Checked cargo xtask setup-ffmpeg --platform win32 --arch $Architecture
-    $gstreamerEnv = & cargo xtask setup-gstreamer --platform win32 --arch $Architecture --mode bundle --install --print-env
+    Invoke-Checked cargo xtask setup-gstreamer --platform win32 --arch $Architecture --mode bundle --install
+    $gstreamerEnv = & cargo xtask setup-gstreamer --platform win32 --arch $Architecture --mode bundle --print-env
     if ($LASTEXITCODE -ne 0) {
         throw "cargo xtask setup-gstreamer exited with status $LASTEXITCODE"
     }
@@ -125,6 +127,7 @@ finally {
     Pop-Location
 }
 Invoke-Checked cargo build --manifest-path "$RepoRoot\frame-app\Cargo.toml" --release --target $Target
+Invoke-Checked cargo build --manifest-path "$RepoRoot\frame-updater\Cargo.toml" --release --target $Target --bin frame-update-helper
 Prepare-BundleDirectory
 Invoke-Checked cargo xtask stage-gstreamer --dir $InnoDir
 Build-Installer

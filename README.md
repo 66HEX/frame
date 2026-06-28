@@ -140,6 +140,17 @@ platform directly from GitHub.
 > **Note:** Since the application is not yet code-signed, you may need to
 > manually approve it in your system settings.
 
+### Automatic Updates
+
+Native release builds include a signed-manifest updater. Frame checks the latest
+GitHub Release manifest, verifies its Ed25519 signature and the SHA-256 hash of
+the selected platform asset, then installs through a small bundled helper.
+
+For release builds, set `FRAME_UPDATE_PUBLIC_KEY` when compiling the app and set
+`FRAME_UPDATE_SIGNING_KEY` in GitHub Actions for manifest signing. The generated
+`.github/workflows/release.yml` publishes `update-manifest.json` and
+`update-manifest.json.sig` with the release assets.
+
 ### WinGet (Windows)
 
 Frame is available in the official WinGet repository under the `66HEX.Frame`

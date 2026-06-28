@@ -1,0 +1,113 @@
+//! Runtime configuration for Frame update checks.
+
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use frame_updater::{
+    InstallContext, UpdateChannel, UpdateClient, UpdateClientConfig, UpdateError,
+    default_cache_dir, default_manifest_url, detect_install_context,
+};
+use semver::Version;
+
+use crate::app_info::FRAME_APP_ID;
+
+pub const AUTO_UPDATE_CHECK_INTERVAL_SECS: u64 = 24 * 60 * 60;
+const UPDATE_EXPLANATION_ENV: &str = "FRAME_UPDATE_EXPLANATION";
+const UPDATE_PUBLIC_KEY_ENV: &str = "FRAME_UPDATE_PUBLIC_KEY";
+
+pub fn build_update_client(channel: UpdateChannel) -> Result<UpdateClient, UpdateError> {
+    let public_keys = configured_public_keys();
+    if public_keys.is_empty() {
+        return Err(UpdateError::Disabled(
+            "update signing public key is not configured".to_string(),
+        ));
+    }
+
+    UpdateClient::new(UpdateClientConfig {
+        app_id: FRAME_APP_ID.to_string(),
+        current_version: current_version()?,
+        channel,
+        manifest_url: default_manifest_url(),
+        public_keys,
+        cache_dir: default_cache_dir()?,
+        install_context: detect_install_context().unwrap_or_else(|_| fallback_install_context()),
+    })
+}
+
+pub fn updates_disabled_explanation() -> Option<String> {
+    std::env::var(UPDATE_EXPLANATION_ENV)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+pub fn update_check_is_due(last_update_check_at: Option<u64>) -> bool {
+    let Some(last_update_check_at) = last_update_check_at else {
+        return true;
+    };
+    unix_timestamp().saturating_sub(last_update_check_at) >= AUTO_UPDATE_CHECK_INTERVAL_SECS
+}
+
+pub fn unix_timestamp() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |duration| duration.as_secs())
+}
+
+fn current_version() -> Result<Version, UpdateError> {
+    Version::parse(env!("CARGO_PKG_VERSION")).map_err(Into::into)
+}
+
+fn configured_public_keys() -> Vec<String> {
+    let mut keys = Vec::new();
+    if let Some(value) = option_env!("FRAME_UPDATE_PUBLIC_KEY") {
+        push_public_keys(value, &mut keys);
+    }
+    if let Ok(value) = std::env::var(UPDATE_PUBLIC_KEY_ENV) {
+        push_public_keys(&value, &mut keys);
+    }
+    keys
+}
+
+fn push_public_keys(value: &str, keys: &mut Vec<String>) {
+    keys.extend(
+        value
+            .split(',')
+            .map(str::trim)
+            .filter(|key| !key.is_empty())
+            .map(ToOwned::to_owned),
+    );
+}
+
+fn fallback_install_context() -> InstallContext {
+    let executable_path = std::env::current_exe().unwrap_or_else(|_| "frame".into());
+    let install_root = executable_path
+        .parent()
+        .map_or_else(|| ".".into(), std::path::Path::to_path_buf);
+    let helper_path = executable_path.with_file_name(if cfg!(target_os = "windows") {
+        "frame-update-helper.exe"
+    } else {
+        "frame-update-helper"
+    });
+
+    InstallContext {
+        install_root,
+        executable_path,
+        helper_path,
+        relaunch: true,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn update_check_is_due_returns_true_when_never_checked() {
+        assert!(update_check_is_due(None));
+    }
+
+    #[test]
+    fn update_check_is_due_returns_false_for_recent_check() {
+        assert!(!update_check_is_due(Some(unix_timestamp())));
+    }
+}

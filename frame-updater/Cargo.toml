@@ -1,0 +1,40 @@
+[package]
+name = "frame-updater"
+version = "0.1.0"
+edition = "2024"
+authors = ["Marek Jozwiak <hexthecoder@gmail.com>"]
+license = "GPL-3.0-or-later"
+publish = false
+
+[dependencies]
+base64 = "0.22.1"
+directories = "6.0.0"
+ed25519-dalek = "2.2.0"
+hex = "0.4.3"
+reqwest = { version = "0.12.27", default-features = false, features = ["blocking", "rustls-tls"] }
+semver = { version = "1.0.27", features = ["serde"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+sha2 = "0.10.9"
+thiserror = "2.0.18"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_System_Threading"] }
+
+[dev-dependencies]
+ed25519-dalek = { version = "2.2.0", features = ["rand_core"] }
+rand_core = { version = "0.6.4", features = ["getrandom"] }
+tempfile = "3.23.0"
+
+[lints.rust]
+future-incompatible = "warn"
+nonstandard-style = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = 10 }
+redundant_clone = { level = "deny", priority = 9 }
+clone_on_copy = { level = "deny", priority = 9 }
+needless_collect = { level = "deny", priority = 8 }

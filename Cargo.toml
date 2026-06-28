@@ -3,5 +3,6 @@ resolver = "2"
 members = [
     "frame-app",
     "frame-core",
+    "frame-updater",
     "tooling/xtask",
 ]

@@ -1,0 +1,260 @@
+# Generated from xtask::workflows::release
+# Rebuild with `cargo xtask workflows`.
+name: release
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: '1'
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish.
+        required: true
+permissions:
+  contents: write
+jobs:
+  build_linux_x86_64:
+    runs-on: ubuntu-22.04
+    env:
+      CARGO_INCREMENTAL: 0
+      FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY || secrets.FRAME_UPDATE_PUBLIC_KEY }}
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+    - name: release::check_public_key
+      run: test -n "$FRAME_UPDATE_PUBLIC_KEY"
+    - name: steps::setup_rust
+      uses: dtolnay/rust-toolchain@stable
+    - name: steps::setup_linux
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf
+    - name: ./script/bundle-linux
+      run: ./script/bundle-linux
+    - name: release::upload_linux_x86_64
+      uses: actions/upload-artifact@v4
+      with:
+        name: frame-linux-x86_64.tar.gz
+        path: target/release/frame-linux-x86_64.tar.gz
+        if-no-files-found: error
+    timeout-minutes: 60
+
+  build_linux_aarch64:
+    runs-on: ubuntu-22.04-arm
+    env:
+      CARGO_INCREMENTAL: 0
+      FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY || secrets.FRAME_UPDATE_PUBLIC_KEY }}
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+    - name: release::check_public_key
+      run: test -n "$FRAME_UPDATE_PUBLIC_KEY"
+    - name: steps::setup_rust
+      uses: dtolnay/rust-toolchain@stable
+    - name: steps::setup_linux
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf
+    - name: ./script/bundle-linux
+      run: ./script/bundle-linux
+    - name: release::upload_linux_aarch64
+      uses: actions/upload-artifact@v4
+      with:
+        name: frame-linux-aarch64.tar.gz
+        path: target/release/frame-linux-aarch64.tar.gz
+        if-no-files-found: error
+    timeout-minutes: 60
+
+  build_macos_x86_64:
+    runs-on: macos-15-intel
+    env:
+      CARGO_INCREMENTAL: 0
+      FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY || secrets.FRAME_UPDATE_PUBLIC_KEY }}
+      MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+      APPLE_NOTARIZATION_KEY: ${{ secrets.APPLE_NOTARIZATION_KEY }}
+      APPLE_NOTARIZATION_KEY_ID: ${{ secrets.APPLE_NOTARIZATION_KEY_ID }}
+      APPLE_NOTARIZATION_ISSUER_ID: ${{ secrets.APPLE_NOTARIZATION_ISSUER_ID }}
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+    - name: release::check_public_key
+      run: test -n "$FRAME_UPDATE_PUBLIC_KEY"
+    - name: release::import_macos_signing_certificate
+      uses: Apple-Actions/import-codesign-certs@v3
+      with:
+        p12-file-base64: ${{ secrets.MACOS_CERTIFICATES_P12 }}
+        p12-password: ${{ secrets.MACOS_CERTIFICATES_PASSWORD }}
+    - name: steps::setup_rust
+      uses: dtolnay/rust-toolchain@stable
+    - name: steps::install_cargo_bundle
+      run: cargo install cargo-bundle --locked
+    - name: ./script/bundle-mac
+      run: ./script/bundle-mac x86_64-apple-darwin
+    - name: release::upload_macos_x86_64_dmg
+      uses: actions/upload-artifact@v4
+      with:
+        name: Frame-x86_64.dmg
+        path: target/x86_64-apple-darwin/release/Frame-x86_64.dmg
+        if-no-files-found: error
+    - name: release::upload_macos_x86_64_update
+      uses: actions/upload-artifact@v4
+      with:
+        name: Frame-x86_64.app.zip
+        path: target/x86_64-apple-darwin/release/Frame-x86_64.app.zip
+        if-no-files-found: error
+    timeout-minutes: 90
+
+  build_macos_aarch64:
+    runs-on: macos-15
+    env:
+      CARGO_INCREMENTAL: 0
+      FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY || secrets.FRAME_UPDATE_PUBLIC_KEY }}
+      MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+      APPLE_NOTARIZATION_KEY: ${{ secrets.APPLE_NOTARIZATION_KEY }}
+      APPLE_NOTARIZATION_KEY_ID: ${{ secrets.APPLE_NOTARIZATION_KEY_ID }}
+      APPLE_NOTARIZATION_ISSUER_ID: ${{ secrets.APPLE_NOTARIZATION_ISSUER_ID }}
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+    - name: release::check_public_key
+      run: test -n "$FRAME_UPDATE_PUBLIC_KEY"
+    - name: release::import_macos_signing_certificate
+      uses: Apple-Actions/import-codesign-certs@v3
+      with:
+        p12-file-base64: ${{ secrets.MACOS_CERTIFICATES_P12 }}
+        p12-password: ${{ secrets.MACOS_CERTIFICATES_PASSWORD }}
+    - name: steps::setup_rust
+      uses: dtolnay/rust-toolchain@stable
+    - name: steps::install_cargo_bundle
+      run: cargo install cargo-bundle --locked
+    - name: ./script/bundle-mac
+      run: ./script/bundle-mac aarch64-apple-darwin
+    - name: release::upload_macos_aarch64_dmg
+      uses: actions/upload-artifact@v4
+      with:
+        name: Frame-aarch64.dmg
+        path: target/aarch64-apple-darwin/release/Frame-aarch64.dmg
+        if-no-files-found: error
+    - name: release::upload_macos_aarch64_update
+      uses: actions/upload-artifact@v4
+      with:
+        name: Frame-aarch64.app.zip
+        path: target/aarch64-apple-darwin/release/Frame-aarch64.app.zip
+        if-no-files-found: error
+    timeout-minutes: 90
+
+  build_windows_x86_64:
+    runs-on: windows-2022
+    env:
+      CARGO_INCREMENTAL: 0
+      FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY || secrets.FRAME_UPDATE_PUBLIC_KEY }}
+      WINDOWS_SIGNTOOL: ${{ secrets.WINDOWS_SIGNTOOL }}
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+    - name: release::check_public_key
+      shell: pwsh
+      run: |
+        if (-not $env:FRAME_UPDATE_PUBLIC_KEY) { throw "FRAME_UPDATE_PUBLIC_KEY is required" }
+    - name: steps::setup_rust
+      uses: dtolnay/rust-toolchain@stable
+    - name: steps::setup_inno
+      shell: pwsh
+      run: choco install innosetup --no-progress -y
+    - name: ./script/bundle-windows.ps1
+      shell: pwsh
+      run: ./script/bundle-windows.ps1 -Architecture x86_64
+    - name: release::upload_windows_x86_64
+      uses: actions/upload-artifact@v4
+      with:
+        name: Frame-x86_64.exe
+        path: target/Frame-x86_64.exe
+        if-no-files-found: error
+    timeout-minutes: 60
+
+  publish_release:
+    runs-on: ubuntu-22.04
+    needs:
+      - build_linux_x86_64
+      - build_linux_aarch64
+      - build_macos_x86_64
+      - build_macos_aarch64
+      - build_windows_x86_64
+    env:
+      FRAME_UPDATE_SIGNING_KEY: ${{ secrets.FRAME_UPDATE_SIGNING_KEY }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+    - name: release::check_signing_key
+      run: test -n "$FRAME_UPDATE_SIGNING_KEY"
+    - name: steps::setup_rust
+      uses: dtolnay/rust-toolchain@stable
+    - name: release::download_artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: target/release-artifacts
+        merge-multiple: true
+    - name: release::resolve_tag
+      id: release
+      shell: bash
+      run: |
+        tag="${GITHUB_REF_NAME}"
+        if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+          tag="${{ inputs.tag }}"
+        fi
+        version="${tag#v}"
+        echo "tag=$tag" >> "$GITHUB_OUTPUT"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+    - name: release::generate_update_manifest
+      run: |
+        cargo xtask update-manifest \
+          --version "${{ steps.release.outputs.version }}" \
+          --release-tag "${{ steps.release.outputs.tag }}" \
+          --artifact target/release-artifacts/Frame-aarch64.app.zip:macos-aarch64:macos_app_zip \
+          --artifact target/release-artifacts/Frame-x86_64.app.zip:macos-x86_64:macos_app_zip \
+          --artifact target/release-artifacts/Frame-x86_64.exe:windows-x86_64:windows_inno \
+          --artifact target/release-artifacts/frame-linux-x86_64.tar.gz:linux-x86_64:linux_managed_tar \
+          --artifact target/release-artifacts/frame-linux-aarch64.tar.gz:linux-aarch64:linux_managed_tar \
+          --out target/release/update-manifest.json
+    - name: release::sign_update_manifest
+      run: |
+        cargo xtask sign-update-manifest \
+          --manifest target/release/update-manifest.json \
+          --out target/release/update-manifest.json.sig
+    - name: release::publish_github_release
+      shell: bash
+      run: |
+        tag="${{ steps.release.outputs.tag }}"
+        assets=(
+          target/release-artifacts/Frame-aarch64.dmg
+          target/release-artifacts/Frame-aarch64.app.zip
+          target/release-artifacts/Frame-x86_64.dmg
+          target/release-artifacts/Frame-x86_64.app.zip
+          target/release-artifacts/Frame-x86_64.exe
+          target/release-artifacts/frame-linux-x86_64.tar.gz
+          target/release-artifacts/frame-linux-aarch64.tar.gz
+          target/release/update-manifest.json
+          target/release/update-manifest.json.sig
+        )
+        if gh release view "$tag" >/dev/null 2>&1; then
+          gh release upload "$tag" "${assets[@]}" --clobber
+        else
+          gh release create "$tag" "${assets[@]}" --title "Frame ${{ steps.release.outputs.version }}" --generate-notes
+        fi
+    timeout-minutes: 30

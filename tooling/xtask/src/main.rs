@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeMap,
     env,
     ffi::{OsStr, OsString},
     fmt, fs, io,
@@ -7,9 +8,14 @@ use std::{
     process::{Command, ExitCode, Stdio},
 };
 
+use frame_updater::{
+    PlatformAssetKey, UpdateAsset, UpdateAssetKind, UpdateChannel, UpdateManifest, file_sha256_hex,
+    sign_manifest_bytes,
+};
 use serde::{Deserialize, Serialize};
 
 const RUN_BUNDLING_WORKFLOW_PATH: &str = ".github/workflows/run_bundling.yml";
+const RELEASE_WORKFLOW_PATH: &str = ".github/workflows/release.yml";
 const MARTIN_FFMPEG_BASE_URL: &str = "https://ffmpeg.martin-riedl.de/redirect/latest";
 const WINDOWS_FFMPEG_ZIP_URL: &str = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
 const DEFAULT_GSTREAMER_VERSION: &str = "1.28.2";
@@ -77,6 +83,8 @@ fn run_xtask() -> Result<()> {
         "setup-ffmpeg" => setup_ffmpeg(args.collect()),
         "setup-gstreamer" => setup_gstreamer(args.collect()),
         "stage-gstreamer" => stage_gstreamer(args.collect()),
+        "update-manifest" => update_manifest(args.collect()),
+        "sign-update-manifest" => sign_update_manifest(args.collect()),
         "workflows" => write_workflows(),
         "-h" | "--help" | "help" => {
             print_help();
@@ -100,6 +108,8 @@ Commands:
   setup-ffmpeg      Download FFmpeg and FFprobe runtime binaries
   setup-gstreamer   Download/configure the controlled GStreamer runtime
   stage-gstreamer   Copy the controlled GStreamer runtime into a native bundle
+  update-manifest   Generate a signed-update manifest from release artifacts
+  sign-update-manifest Sign update-manifest.json with FRAME_UPDATE_SIGNING_KEY
   ci                Run local formatting, tests, lints, and script checks
   workflows         Regenerate GitHub Actions workflows
 "
@@ -1802,11 +1812,11 @@ fn append_env_words(key: &str, suffix: &str) -> OsString {
 
 fn print_posix_gstreamer_env(manifest: &GstreamerManifest, manifest_path: &Path) {
     println!(
-        "export PATH=\"{}:$PATH\"",
+        "export PATH=\"{}:${{PATH:-}}\"",
         shell_escape_path(&manifest.bin_dir)
     );
     println!(
-        "export PKG_CONFIG_PATH=\"{}:$PKG_CONFIG_PATH\"",
+        "export PKG_CONFIG_PATH=\"{}:${{PKG_CONFIG_PATH:-}}\"",
         shell_escape_path(&manifest.pkg_config_dir)
     );
     if manifest.platform != "linux" {
@@ -1817,21 +1827,21 @@ fn print_posix_gstreamer_env(manifest: &GstreamerManifest, manifest_path: &Path)
     }
     if manifest.platform == "linux" {
         println!(
-            "export LD_LIBRARY_PATH=\"{}:$LD_LIBRARY_PATH\"",
+            "export LD_LIBRARY_PATH=\"{}:${{LD_LIBRARY_PATH:-}}\"",
             shell_escape_path(&manifest.lib_dir)
         );
         println!(
-            "export RUSTFLAGS=\"$RUSTFLAGS -C link-arg=-Wl,-rpath,{} -C link-arg=-Wl,--allow-shlib-undefined\"",
+            "export RUSTFLAGS=\"${{RUSTFLAGS:-}} -C link-arg=-Wl,-rpath,{} -C link-arg=-Wl,--allow-shlib-undefined\"",
             shell_escape_path(&manifest.lib_dir)
         );
     }
     if manifest.platform == "macos" {
         println!(
-            "export RUSTFLAGS=\"$RUSTFLAGS -C link-arg=-Wl,-rpath,{}\"",
+            "export RUSTFLAGS=\"${{RUSTFLAGS:-}} -C link-arg=-Wl,-rpath,{}\"",
             shell_escape_path(&manifest.lib_dir)
         );
         println!(
-            "export DYLD_FALLBACK_LIBRARY_PATH=\"{}:$DYLD_FALLBACK_LIBRARY_PATH\"",
+            "export DYLD_FALLBACK_LIBRARY_PATH=\"{}:${{DYLD_FALLBACK_LIBRARY_PATH:-}}\"",
             shell_escape_path(&manifest.lib_dir)
         );
     }
@@ -2019,6 +2029,349 @@ fn required_option_value(args: &[String], index: &mut usize, flag: &str) -> Resu
     }
     *index += 2;
     Ok(value.clone())
+}
+
+fn update_manifest(args: Vec<String>) -> Result<()> {
+    let options = UpdateManifestOptions::parse(&args)?;
+    let mut assets = BTreeMap::new();
+
+    for artifact in &options.artifacts {
+        let file_name = artifact
+            .path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| {
+                XtaskError::Usage(format!(
+                    "artifact path has no file name: {}",
+                    artifact.path.display()
+                ))
+            })?
+            .to_string();
+        let metadata = fs::metadata(&artifact.path)?;
+        if !metadata.is_file() {
+            return Err(XtaskError::Usage(format!(
+                "artifact is not a file: {}",
+                artifact.path.display()
+            )));
+        }
+
+        assets.insert(
+            artifact.platform.as_str().to_string(),
+            UpdateAsset {
+                target_triple: artifact.platform.target_triple().to_string(),
+                kind: artifact.kind,
+                file_name: file_name.clone(),
+                url: options.asset_url(&file_name),
+                size_bytes: metadata.len(),
+                sha256: file_sha256_hex(&artifact.path)?,
+                installer_args: installer_args_for(artifact.kind),
+            },
+        );
+    }
+
+    let manifest = UpdateManifest {
+        schema_version: 1,
+        app_id: "Frame".to_string(),
+        channel: options.channel,
+        version: options.version,
+        published_at: options.published_at,
+        min_supported_version: options.min_supported_version,
+        release_notes_url: options.release_notes_url.or_else(|| {
+            Some(format!(
+                "https://github.com/66HEX/frame/releases/tag/{}",
+                options.release_tag
+            ))
+        }),
+        release_notes_markdown: options.release_notes_markdown,
+        assets,
+    };
+    let bytes = serde_json::to_vec_pretty(&manifest)?;
+    write_atomic(&options.out, &bytes)?;
+    println!("Created {}", options.out.display());
+
+    Ok(())
+}
+
+fn sign_update_manifest(args: Vec<String>) -> Result<()> {
+    let options = SignUpdateManifestOptions::parse(&args)?;
+    let signing_key = env::var("FRAME_UPDATE_SIGNING_KEY").map_err(|_| {
+        XtaskError::Usage(
+            "FRAME_UPDATE_SIGNING_KEY must contain the base64 Ed25519 seed".to_string(),
+        )
+    })?;
+    let manifest_bytes = fs::read(&options.manifest)?;
+    let signature = sign_manifest_bytes(&manifest_bytes, &signing_key)?;
+    write_atomic(&options.out, signature.as_bytes())?;
+    println!("Created {}", options.out.display());
+
+    Ok(())
+}
+
+#[derive(Clone, Debug, Default)]
+struct UpdateManifestOptions {
+    version: String,
+    channel: UpdateChannel,
+    release_tag: String,
+    release_notes_url: Option<String>,
+    release_notes_markdown: Option<String>,
+    published_at: Option<String>,
+    min_supported_version: Option<String>,
+    base_url: Option<String>,
+    artifacts: Vec<ReleaseArtifactSpec>,
+    out: PathBuf,
+}
+
+impl UpdateManifestOptions {
+    fn parse(args: &[String]) -> Result<Self> {
+        let mut options = Self::default();
+        let mut index = 0;
+
+        while index < args.len() {
+            match args[index].as_str() {
+                "--version" => {
+                    options.version = required_option_value(args, &mut index, "--version")?;
+                }
+                "--channel" => {
+                    options.channel =
+                        required_option_value(args, &mut index, "--channel")?.parse()?;
+                }
+                "--release-tag" => {
+                    options.release_tag = required_option_value(args, &mut index, "--release-tag")?;
+                }
+                "--release-notes-url" => {
+                    options.release_notes_url = Some(required_option_value(
+                        args,
+                        &mut index,
+                        "--release-notes-url",
+                    )?);
+                }
+                "--release-notes-markdown" => {
+                    options.release_notes_markdown = Some(required_option_value(
+                        args,
+                        &mut index,
+                        "--release-notes-markdown",
+                    )?);
+                }
+                "--published-at" => {
+                    options.published_at =
+                        Some(required_option_value(args, &mut index, "--published-at")?);
+                }
+                "--min-supported-version" => {
+                    options.min_supported_version = Some(required_option_value(
+                        args,
+                        &mut index,
+                        "--min-supported-version",
+                    )?);
+                }
+                "--base-url" => {
+                    options.base_url = Some(required_option_value(args, &mut index, "--base-url")?);
+                }
+                "--artifact" => {
+                    let spec = required_option_value(args, &mut index, "--artifact")?;
+                    options.artifacts.push(ReleaseArtifactSpec::parse(&spec)?);
+                }
+                "--out" => {
+                    options.out = PathBuf::from(required_option_value(args, &mut index, "--out")?);
+                }
+                "-h" | "--help" => {
+                    println!(
+                        "\
+Usage: cargo xtask update-manifest [options]
+
+Required:
+  --version <semver>
+  --release-tag <tag>
+  --artifact <path:platformKey:assetKind>
+  --out <path>
+
+Options:
+  --channel <stable>                  Defaults to stable
+  --base-url <url>                    Defaults to GitHub release URL for tag
+  --min-supported-version <semver>
+  --release-notes-url <url>
+  --release-notes-markdown <text>
+  --published-at <iso8601>
+"
+                    );
+                    return Err(XtaskError::Help);
+                }
+                other => {
+                    return Err(XtaskError::Usage(format!(
+                        "unknown update-manifest option `{other}`"
+                    )));
+                }
+            }
+        }
+
+        if options.version.trim().is_empty() {
+            return Err(XtaskError::Usage("missing --version".to_string()));
+        }
+        if options.release_tag.trim().is_empty() {
+            return Err(XtaskError::Usage("missing --release-tag".to_string()));
+        }
+        if options.artifacts.is_empty() {
+            return Err(XtaskError::Usage("missing --artifact".to_string()));
+        }
+        if options.out.as_os_str().is_empty() {
+            return Err(XtaskError::Usage("missing --out".to_string()));
+        }
+        semver::Version::parse(&options.version).map_err(|error| {
+            XtaskError::Usage(format!("invalid --version `{}`: {error}", options.version))
+        })?;
+        if let Some(min_supported_version) = &options.min_supported_version {
+            semver::Version::parse(min_supported_version).map_err(|error| {
+                XtaskError::Usage(format!(
+                    "invalid --min-supported-version `{min_supported_version}`: {error}"
+                ))
+            })?;
+        }
+
+        Ok(options)
+    }
+
+    fn asset_url(&self, file_name: &str) -> String {
+        let base_url = self.base_url.clone().unwrap_or_else(|| {
+            format!(
+                "https://github.com/66HEX/frame/releases/download/{}",
+                self.release_tag
+            )
+        });
+        format!("{}/{file_name}", base_url.trim_end_matches('/'))
+    }
+}
+
+#[derive(Clone, Debug)]
+struct ReleaseArtifactSpec {
+    path: PathBuf,
+    platform: PlatformAssetKey,
+    kind: UpdateAssetKind,
+}
+
+impl ReleaseArtifactSpec {
+    fn parse(value: &str) -> Result<Self> {
+        let mut parts = value.rsplitn(3, ':');
+        let kind = parts
+            .next()
+            .ok_or_else(|| XtaskError::Usage(format!("invalid artifact spec `{value}`")))?
+            .parse::<UpdateAssetKind>()?;
+        let platform = parse_platform_asset_key(
+            parts
+                .next()
+                .ok_or_else(|| XtaskError::Usage(format!("invalid artifact spec `{value}`")))?,
+        )?;
+        let path = PathBuf::from(
+            parts
+                .next()
+                .ok_or_else(|| XtaskError::Usage(format!("invalid artifact spec `{value}`")))?,
+        );
+
+        if platform.asset_kind() != kind {
+            return Err(XtaskError::Usage(format!(
+                "artifact kind `{kind}` does not match platform `{}`",
+                platform.as_str()
+            )));
+        }
+
+        Ok(Self {
+            path,
+            platform,
+            kind,
+        })
+    }
+}
+
+#[derive(Clone, Debug)]
+struct SignUpdateManifestOptions {
+    manifest: PathBuf,
+    out: PathBuf,
+}
+
+impl SignUpdateManifestOptions {
+    fn parse(args: &[String]) -> Result<Self> {
+        let mut manifest = None;
+        let mut out = None;
+        let mut index = 0;
+
+        while index < args.len() {
+            match args[index].as_str() {
+                "--manifest" => {
+                    manifest = Some(PathBuf::from(required_option_value(
+                        args,
+                        &mut index,
+                        "--manifest",
+                    )?));
+                }
+                "--out" => {
+                    out = Some(PathBuf::from(required_option_value(
+                        args, &mut index, "--out",
+                    )?));
+                }
+                "-h" | "--help" => {
+                    println!(
+                        "\
+Usage: cargo xtask sign-update-manifest --manifest <path> --out <path>
+
+Requires FRAME_UPDATE_SIGNING_KEY to contain the base64 Ed25519 seed.
+"
+                    );
+                    return Err(XtaskError::Help);
+                }
+                other => {
+                    return Err(XtaskError::Usage(format!(
+                        "unknown sign-update-manifest option `{other}`"
+                    )));
+                }
+            }
+        }
+
+        Ok(Self {
+            manifest: manifest
+                .ok_or_else(|| XtaskError::Usage("missing --manifest".to_string()))?,
+            out: out.ok_or_else(|| XtaskError::Usage("missing --out".to_string()))?,
+        })
+    }
+}
+
+fn parse_platform_asset_key(value: &str) -> Result<PlatformAssetKey> {
+    match value {
+        "macos-aarch64" => Ok(PlatformAssetKey::MacosAarch64),
+        "macos-x86_64" => Ok(PlatformAssetKey::MacosX8664),
+        "windows-x86_64" => Ok(PlatformAssetKey::WindowsX8664),
+        "linux-x86_64" => Ok(PlatformAssetKey::LinuxX8664),
+        "linux-aarch64" => Ok(PlatformAssetKey::LinuxAarch64),
+        other => Err(XtaskError::Usage(format!(
+            "unsupported platform asset key `{other}`"
+        ))),
+    }
+}
+
+fn installer_args_for(kind: UpdateAssetKind) -> Vec<String> {
+    match kind {
+        UpdateAssetKind::WindowsInno => vec![
+            "/SP-".to_string(),
+            "/VERYSILENT".to_string(),
+            "/SUPPRESSMSGBOXES".to_string(),
+            "/NORESTART".to_string(),
+        ],
+        UpdateAssetKind::MacosAppZip | UpdateAssetKind::LinuxManagedTar => Vec::new(),
+    }
+}
+
+fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let temp_path = path.with_extension("tmp");
+    fs::write(&temp_path, bytes)?;
+    match fs::rename(&temp_path, path) {
+        Ok(()) => Ok(()),
+        Err(_) if path.exists() => {
+            fs::remove_file(path)?;
+            fs::rename(&temp_path, path)?;
+            Ok(())
+        }
+        Err(error) => Err(error.into()),
+    }
 }
 
 fn process_ffmpeg_entry(entry: &FfmpegBinaryEntry, binary_dir: &Path, force: bool) -> Result<()> {
@@ -2253,11 +2606,16 @@ fn ci() -> Result<()> {
 }
 
 fn write_workflows() -> Result<()> {
-    let path = repo_root()?.join(RUN_BUNDLING_WORKFLOW_PATH);
-    let content = run_bundling_workflow();
-    fs::create_dir_all(path.parent().expect("workflow path should have a parent"))?;
-    fs::write(&path, content)?;
-    println!("Wrote {}", path.display());
+    let root = repo_root()?;
+    for (relative_path, content) in [
+        (RUN_BUNDLING_WORKFLOW_PATH, run_bundling_workflow()),
+        (RELEASE_WORKFLOW_PATH, release_workflow()),
+    ] {
+        let path = root.join(relative_path);
+        fs::create_dir_all(path.parent().expect("workflow path should have a parent"))?;
+        fs::write(&path, content)?;
+        println!("Wrote {}", path.display());
+    }
     Ok(())
 }
 
@@ -2471,7 +2829,7 @@ fn linux_job(arch: &str, runner: &str) -> String {
 {checkout}{rust}    - name: steps::setup_linux
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev pkg-config patchelf
+        sudo apt-get install -y clang libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf
     - name: ./script/bundle-linux
       run: ./script/bundle-linux
     - name: run_bundling::upload_artifact
@@ -2507,6 +2865,12 @@ fn macos_job(arch: &str, target: &str, runner: &str) -> String {
         name: Frame-{arch}.dmg
         path: target/{target}/release/Frame-{arch}.dmg
         if-no-files-found: error
+    - name: run_bundling::upload_update_artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Frame-{arch}.app.zip
+        path: target/{target}/release/Frame-{arch}.app.zip
+        if-no-files-found: error
     timeout-minutes: 60
 "#,
         if_expression = bundle_if_expression(),
@@ -2541,6 +2905,271 @@ fn windows_job(arch: &str, runner: &str) -> String {
     )
 }
 
+fn release_workflow() -> String {
+    r#"# Generated from xtask::workflows::release
+# Rebuild with `cargo xtask workflows`.
+name: release
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: '1'
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish.
+        required: true
+permissions:
+  contents: write
+jobs:
+  build_linux_x86_64:
+    runs-on: ubuntu-22.04
+    env:
+      CARGO_INCREMENTAL: 0
+      FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY || secrets.FRAME_UPDATE_PUBLIC_KEY }}
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+    - name: release::check_public_key
+      run: test -n "$FRAME_UPDATE_PUBLIC_KEY"
+    - name: steps::setup_rust
+      uses: dtolnay/rust-toolchain@stable
+    - name: steps::setup_linux
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf
+    - name: ./script/bundle-linux
+      run: ./script/bundle-linux
+    - name: release::upload_linux_x86_64
+      uses: actions/upload-artifact@v4
+      with:
+        name: frame-linux-x86_64.tar.gz
+        path: target/release/frame-linux-x86_64.tar.gz
+        if-no-files-found: error
+    timeout-minutes: 60
+
+  build_linux_aarch64:
+    runs-on: ubuntu-22.04-arm
+    env:
+      CARGO_INCREMENTAL: 0
+      FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY || secrets.FRAME_UPDATE_PUBLIC_KEY }}
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+    - name: release::check_public_key
+      run: test -n "$FRAME_UPDATE_PUBLIC_KEY"
+    - name: steps::setup_rust
+      uses: dtolnay/rust-toolchain@stable
+    - name: steps::setup_linux
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf
+    - name: ./script/bundle-linux
+      run: ./script/bundle-linux
+    - name: release::upload_linux_aarch64
+      uses: actions/upload-artifact@v4
+      with:
+        name: frame-linux-aarch64.tar.gz
+        path: target/release/frame-linux-aarch64.tar.gz
+        if-no-files-found: error
+    timeout-minutes: 60
+
+  build_macos_x86_64:
+    runs-on: macos-15-intel
+    env:
+      CARGO_INCREMENTAL: 0
+      FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY || secrets.FRAME_UPDATE_PUBLIC_KEY }}
+      MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+      APPLE_NOTARIZATION_KEY: ${{ secrets.APPLE_NOTARIZATION_KEY }}
+      APPLE_NOTARIZATION_KEY_ID: ${{ secrets.APPLE_NOTARIZATION_KEY_ID }}
+      APPLE_NOTARIZATION_ISSUER_ID: ${{ secrets.APPLE_NOTARIZATION_ISSUER_ID }}
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+    - name: release::check_public_key
+      run: test -n "$FRAME_UPDATE_PUBLIC_KEY"
+    - name: release::import_macos_signing_certificate
+      uses: Apple-Actions/import-codesign-certs@v3
+      with:
+        p12-file-base64: ${{ secrets.MACOS_CERTIFICATES_P12 }}
+        p12-password: ${{ secrets.MACOS_CERTIFICATES_PASSWORD }}
+    - name: steps::setup_rust
+      uses: dtolnay/rust-toolchain@stable
+    - name: steps::install_cargo_bundle
+      run: cargo install cargo-bundle --locked
+    - name: ./script/bundle-mac
+      run: ./script/bundle-mac x86_64-apple-darwin
+    - name: release::upload_macos_x86_64_dmg
+      uses: actions/upload-artifact@v4
+      with:
+        name: Frame-x86_64.dmg
+        path: target/x86_64-apple-darwin/release/Frame-x86_64.dmg
+        if-no-files-found: error
+    - name: release::upload_macos_x86_64_update
+      uses: actions/upload-artifact@v4
+      with:
+        name: Frame-x86_64.app.zip
+        path: target/x86_64-apple-darwin/release/Frame-x86_64.app.zip
+        if-no-files-found: error
+    timeout-minutes: 90
+
+  build_macos_aarch64:
+    runs-on: macos-15
+    env:
+      CARGO_INCREMENTAL: 0
+      FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY || secrets.FRAME_UPDATE_PUBLIC_KEY }}
+      MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+      APPLE_NOTARIZATION_KEY: ${{ secrets.APPLE_NOTARIZATION_KEY }}
+      APPLE_NOTARIZATION_KEY_ID: ${{ secrets.APPLE_NOTARIZATION_KEY_ID }}
+      APPLE_NOTARIZATION_ISSUER_ID: ${{ secrets.APPLE_NOTARIZATION_ISSUER_ID }}
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+    - name: release::check_public_key
+      run: test -n "$FRAME_UPDATE_PUBLIC_KEY"
+    - name: release::import_macos_signing_certificate
+      uses: Apple-Actions/import-codesign-certs@v3
+      with:
+        p12-file-base64: ${{ secrets.MACOS_CERTIFICATES_P12 }}
+        p12-password: ${{ secrets.MACOS_CERTIFICATES_PASSWORD }}
+    - name: steps::setup_rust
+      uses: dtolnay/rust-toolchain@stable
+    - name: steps::install_cargo_bundle
+      run: cargo install cargo-bundle --locked
+    - name: ./script/bundle-mac
+      run: ./script/bundle-mac aarch64-apple-darwin
+    - name: release::upload_macos_aarch64_dmg
+      uses: actions/upload-artifact@v4
+      with:
+        name: Frame-aarch64.dmg
+        path: target/aarch64-apple-darwin/release/Frame-aarch64.dmg
+        if-no-files-found: error
+    - name: release::upload_macos_aarch64_update
+      uses: actions/upload-artifact@v4
+      with:
+        name: Frame-aarch64.app.zip
+        path: target/aarch64-apple-darwin/release/Frame-aarch64.app.zip
+        if-no-files-found: error
+    timeout-minutes: 90
+
+  build_windows_x86_64:
+    runs-on: windows-2022
+    env:
+      CARGO_INCREMENTAL: 0
+      FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY || secrets.FRAME_UPDATE_PUBLIC_KEY }}
+      WINDOWS_SIGNTOOL: ${{ secrets.WINDOWS_SIGNTOOL }}
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+    - name: release::check_public_key
+      shell: pwsh
+      run: |
+        if (-not $env:FRAME_UPDATE_PUBLIC_KEY) { throw "FRAME_UPDATE_PUBLIC_KEY is required" }
+    - name: steps::setup_rust
+      uses: dtolnay/rust-toolchain@stable
+    - name: steps::setup_inno
+      shell: pwsh
+      run: choco install innosetup --no-progress -y
+    - name: ./script/bundle-windows.ps1
+      shell: pwsh
+      run: ./script/bundle-windows.ps1 -Architecture x86_64
+    - name: release::upload_windows_x86_64
+      uses: actions/upload-artifact@v4
+      with:
+        name: Frame-x86_64.exe
+        path: target/Frame-x86_64.exe
+        if-no-files-found: error
+    timeout-minutes: 60
+
+  publish_release:
+    runs-on: ubuntu-22.04
+    needs:
+      - build_linux_x86_64
+      - build_linux_aarch64
+      - build_macos_x86_64
+      - build_macos_aarch64
+      - build_windows_x86_64
+    env:
+      FRAME_UPDATE_SIGNING_KEY: ${{ secrets.FRAME_UPDATE_SIGNING_KEY }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+    - name: release::check_signing_key
+      run: test -n "$FRAME_UPDATE_SIGNING_KEY"
+    - name: steps::setup_rust
+      uses: dtolnay/rust-toolchain@stable
+    - name: release::download_artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: target/release-artifacts
+        merge-multiple: true
+    - name: release::resolve_tag
+      id: release
+      shell: bash
+      run: |
+        tag="${GITHUB_REF_NAME}"
+        if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+          tag="${{ inputs.tag }}"
+        fi
+        version="${tag#v}"
+        echo "tag=$tag" >> "$GITHUB_OUTPUT"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+    - name: release::generate_update_manifest
+      run: |
+        cargo xtask update-manifest \
+          --version "${{ steps.release.outputs.version }}" \
+          --release-tag "${{ steps.release.outputs.tag }}" \
+          --artifact target/release-artifacts/Frame-aarch64.app.zip:macos-aarch64:macos_app_zip \
+          --artifact target/release-artifacts/Frame-x86_64.app.zip:macos-x86_64:macos_app_zip \
+          --artifact target/release-artifacts/Frame-x86_64.exe:windows-x86_64:windows_inno \
+          --artifact target/release-artifacts/frame-linux-x86_64.tar.gz:linux-x86_64:linux_managed_tar \
+          --artifact target/release-artifacts/frame-linux-aarch64.tar.gz:linux-aarch64:linux_managed_tar \
+          --out target/release/update-manifest.json
+    - name: release::sign_update_manifest
+      run: |
+        cargo xtask sign-update-manifest \
+          --manifest target/release/update-manifest.json \
+          --out target/release/update-manifest.json.sig
+    - name: release::publish_github_release
+      shell: bash
+      run: |
+        tag="${{ steps.release.outputs.tag }}"
+        assets=(
+          target/release-artifacts/Frame-aarch64.dmg
+          target/release-artifacts/Frame-aarch64.app.zip
+          target/release-artifacts/Frame-x86_64.dmg
+          target/release-artifacts/Frame-x86_64.app.zip
+          target/release-artifacts/Frame-x86_64.exe
+          target/release-artifacts/frame-linux-x86_64.tar.gz
+          target/release-artifacts/frame-linux-aarch64.tar.gz
+          target/release/update-manifest.json
+          target/release/update-manifest.json.sig
+        )
+        if gh release view "$tag" >/dev/null 2>&1; then
+          gh release upload "$tag" "${assets[@]}" --clobber
+        else
+          gh release create "$tag" "${assets[@]}" --title "Frame ${{ steps.release.outputs.version }}" --generate-notes
+        fi
+    timeout-minutes: 30
+"#
+    .to_string()
+}
+
 fn repo_root() -> Result<PathBuf> {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     manifest_dir
@@ -2571,6 +3200,7 @@ enum XtaskError {
     Io(io::Error),
     RepoRoot,
     Usage(String),
+    Update(frame_updater::UpdateError),
     Json(serde_json::Error),
     Zip(zip::result::ZipError),
 }
@@ -2597,6 +3227,7 @@ impl fmt::Display for XtaskError {
             Self::Io(error) => write!(formatter, "{error}"),
             Self::RepoRoot => write!(formatter, "failed to resolve repository root"),
             Self::Usage(message) => write!(formatter, "{message}"),
+            Self::Update(error) => write!(formatter, "{error}"),
             Self::Json(error) => write!(formatter, "failed to process JSON: {error}"),
             Self::Zip(error) => write!(formatter, "failed to read zip archive: {error}"),
         }
@@ -2618,6 +3249,12 @@ impl From<zip::result::ZipError> for XtaskError {
 impl From<serde_json::Error> for XtaskError {
     fn from(error: serde_json::Error) -> Self {
         Self::Json(error)
+    }
+}
+
+impl From<frame_updater::UpdateError> for XtaskError {
+    fn from(error: frame_updater::UpdateError) -> Self {
+        Self::Update(error)
     }
 }
 

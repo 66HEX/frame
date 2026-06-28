@@ -323,6 +323,7 @@ mod frame_root_conversion {
                     "Review MP4".to_string(),
                     ConversionConfig::default(),
                 )],
+                ..AppSettings::default()
             })
             .expect("settings should be saved");
 
@@ -842,6 +843,7 @@ mod frame_root_conversion {
                     "Existing".to_string(),
                     ConversionConfig::default(),
                 )],
+                ..AppSettings::default()
             })
             .expect("settings should be saved");
         let mut root = FrameRoot::new_with_persistence(persistence.clone());
@@ -871,6 +873,7 @@ mod frame_root_conversion {
                     "Review MP4".to_string(),
                     ConversionConfig::default(),
                 )],
+                ..AppSettings::default()
             })
             .expect("settings should be saved");
         let mut root = FrameRoot::new_with_persistence(persistence.clone());
