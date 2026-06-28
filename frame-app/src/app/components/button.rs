@@ -70,7 +70,7 @@ pub(in crate::app) fn frame_icon_button(
             (FrameIconButtonVariant::Ghost, true) => (
                 theme::TRANSPARENT,
                 theme::FRAME_GRAY_100,
-                theme::FRAME_GRAY_100,
+                theme::FRAME_GRAY_200,
                 theme::FRAME_GRAY_600,
                 theme::FOREGROUND,
                 1.0,
@@ -102,7 +102,7 @@ pub(in crate::app) fn frame_icon_button(
             (FrameIconButtonVariant::DestructiveGhost, true) => (
                 theme::TRANSPARENT,
                 theme::FRAME_GRAY_100,
-                theme::FRAME_GRAY_100,
+                theme::FRAME_GRAY_200,
                 theme::FRAME_RED,
                 theme::FRAME_RED,
                 1.0,

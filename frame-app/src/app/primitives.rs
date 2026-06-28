@@ -58,7 +58,7 @@ pub(super) fn button_colors(variant: ButtonVariant, selected: bool, enabled: boo
         ButtonColors {
             background: theme::TRANSPARENT,
             hover_background: theme::FRAME_GRAY_100,
-            active_background: theme::FRAME_GRAY_100,
+            active_background: theme::FRAME_GRAY_200,
             foreground: theme::FRAME_GRAY_600,
             hover_foreground: theme::FOREGROUND,
             opacity: 1.0,

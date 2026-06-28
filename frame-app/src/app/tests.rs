@@ -1830,6 +1830,7 @@ mod button_state_colors {
 
         assert_eq!(colors.background, theme::TRANSPARENT);
         assert_eq!(colors.hover_background, theme::FRAME_GRAY_100);
+        assert_eq!(colors.active_background, theme::FRAME_GRAY_200);
         assert_eq!(colors.foreground, theme::FRAME_GRAY_600);
         assert_eq!(colors.hover_foreground, theme::FOREGROUND);
     }
