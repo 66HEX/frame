@@ -10,6 +10,11 @@ struct PreviewCanvasBoundsProbe {
 
 struct PreviewViewportRoundedClip;
 
+struct PreviewMediaImage {
+    render_image: Arc<RenderImage>,
+    presentation: PreviewRenderPresentation,
+}
+
 impl IntoElement for PreviewCanvasBoundsProbe {
     type Element = Self;
 
@@ -82,6 +87,120 @@ impl IntoElement for PreviewViewportRoundedClip {
 
     fn into_element(self) -> Self::Element {
         self
+    }
+}
+
+impl IntoElement for PreviewMediaImage {
+    type Element = Self;
+
+    fn into_element(self) -> Self::Element {
+        self
+    }
+}
+
+impl Element for PreviewMediaImage {
+    type RequestLayoutState = ();
+    type PrepaintState = ();
+
+    fn id(&self) -> Option<ElementId> {
+        None
+    }
+
+    fn source_location(&self) -> Option<&'static core::panic::Location<'static>> {
+        None
+    }
+
+    fn request_layout(
+        &mut self,
+        _id: Option<&GlobalElementId>,
+        _inspector_id: Option<&gpui::InspectorElementId>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> (LayoutId, Self::RequestLayoutState) {
+        let style = Style {
+            size: size(relative(1.0).into(), relative(1.0).into()),
+            flex_grow: 1.0,
+            flex_shrink: 1.0,
+            ..Style::default()
+        };
+
+        (window.request_layout(style, [], cx), ())
+    }
+
+    fn prepaint(
+        &mut self,
+        _id: Option<&GlobalElementId>,
+        _inspector_id: Option<&gpui::InspectorElementId>,
+        _bounds: Bounds<Pixels>,
+        _request_layout: &mut Self::RequestLayoutState,
+        _window: &mut Window,
+        _cx: &mut App,
+    ) -> Self::PrepaintState {
+    }
+
+    fn paint(
+        &mut self,
+        _id: Option<&GlobalElementId>,
+        _inspector_id: Option<&gpui::InspectorElementId>,
+        bounds: Bounds<Pixels>,
+        _request_layout: &mut Self::RequestLayoutState,
+        _prepaint: &mut Self::PrepaintState,
+        window: &mut Window,
+        _cx: &mut App,
+    ) {
+        let Some(frame) = preview_presented_frame(&self.render_image, self.presentation) else {
+            return;
+        };
+        let image_size = self.render_image.size(0);
+        if image_size.width.0 == 0 || image_size.height.0 == 0 {
+            return;
+        }
+
+        let visible_width = frame.visible_width as f32;
+        let visible_height = frame.visible_height as f32;
+        if visible_width <= 0.0 || visible_height <= 0.0 {
+            return;
+        }
+
+        let scale_x = bounds.size.width.as_f32() / visible_width;
+        let scale_y = bounds.size.height.as_f32() / visible_height;
+        let full_bounds = Bounds {
+            origin: point(
+                bounds.origin.x - px(frame.visible_x as f32 * scale_x),
+                bounds.origin.y - px(frame.visible_y as f32 * scale_y),
+            ),
+            size: size(
+                px(frame.full_width as f32 * scale_x),
+                px(frame.full_height as f32 * scale_y),
+            ),
+        };
+        let center = full_bounds.center();
+        let source_size = if self.presentation.transform.has_side_rotation() {
+            size(full_bounds.size.height, full_bounds.size.width)
+        } else {
+            full_bounds.size
+        };
+        let source_bounds = Bounds {
+            origin: point(
+                center.x - source_size.width / 2.0,
+                center.y - source_size.height / 2.0,
+            ),
+            size: source_size,
+        };
+        let transformation = preview_image_transformation(
+            self.presentation.transform,
+            center,
+            window.scale_factor(),
+        );
+
+        let _ = window.paint_image_transformed(
+            source_bounds,
+            Default::default(),
+            Arc::clone(&self.render_image),
+            0,
+            false,
+            transformation,
+        );
     }
 }
 
@@ -356,7 +475,7 @@ pub(in crate::app) fn preview_media_stage(
                 cx.notify();
             }
         }))
-        .child(preview_media_image(render_image));
+        .child(preview_media_image(render_image, state.presentation));
 
     if let Some(metrics) = preview_canvas_layout_metrics(
         canvas.viewport_width,
@@ -397,9 +516,56 @@ pub(in crate::app) fn preview_canvas_pan_enabled(state: &PreviewShellState) -> b
     preview_visual_controls_enabled(state) && !state.crop.crop_mode && !state.overlay.overlay_mode
 }
 
-fn preview_media_image(render_image: Arc<RenderImage>) -> gpui::Div {
-    let image = img(render_image).size_full().object_fit(ObjectFit::Fill);
-    div().absolute().inset_0().overflow_hidden().child(image)
+fn preview_media_image(
+    render_image: Arc<RenderImage>,
+    presentation: PreviewRenderPresentation,
+) -> gpui::Div {
+    div()
+        .absolute()
+        .inset_0()
+        .overflow_hidden()
+        .child(PreviewMediaImage {
+            render_image,
+            presentation,
+        })
+}
+
+fn preview_image_transformation(
+    transform: PreviewTransform,
+    center: Point<Pixels>,
+    scale_factor: f32,
+) -> TransformationMatrix {
+    let scale_x = if transform.flip_horizontal { -1.0 } else { 1.0 };
+    let scale_y = if transform.flip_vertical { -1.0 } else { 1.0 };
+
+    TransformationMatrix::unit()
+        .translate(center.scale(scale_factor))
+        .rotate(radians(f32::from(transform.rotation_degrees).to_radians()))
+        .scale(size(scale_x, scale_y))
+        .translate(center.scale(-scale_factor))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn preview_image_transformation_converts_degrees_to_radians() {
+        let transformation = preview_image_transformation(
+            PreviewTransform {
+                rotation_degrees: 90,
+                flip_horizontal: false,
+                flip_vertical: false,
+            },
+            point(px(50.0), px(25.0)),
+            1.0,
+        );
+
+        assert!((transformation.rotation_scale[0][0]).abs() < 0.000_001);
+        assert!((transformation.rotation_scale[0][1] + 1.0).abs() < 0.000_001);
+        assert!((transformation.rotation_scale[1][0] - 1.0).abs() < 0.000_001);
+        assert!((transformation.rotation_scale[1][1]).abs() < 0.000_001);
+    }
 }
 
 fn preview_viewport_rounded_clip_path(

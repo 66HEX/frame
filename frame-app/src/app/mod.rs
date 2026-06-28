@@ -91,8 +91,7 @@ use crate::{
         DEFAULT_PREVIEW_FPS, DEFAULT_PREVIEW_MAX_HEIGHT, DEFAULT_PREVIEW_MAX_WIDTH,
         MIN_PREVIEW_DIMENSION, PreviewCommand, PreviewCrop as EnginePreviewCrop,
         PreviewRenderPresentation, PreviewSession, PreviewSessionConfig,
-        PreviewSourceKind as EnginePreviewSourceKind, PreviewTransform,
-        render_image_from_frame_with_presentation,
+        PreviewSourceKind as EnginePreviewSourceKind, PreviewTransform, render_image_from_frame,
     },
     settings::{
         ConversionConfig, CropSettings, DEFAULT_SUBTITLE_FONT_COLOR,
@@ -144,10 +143,10 @@ use gpui::{
     ObjectFit, PaintQuad, PinchEvent, Pixels, PlatformInput, Point, Position, PromptButton,
     PromptLevel, Render, RenderImage, Rgba, ScrollDelta, ScrollHandle, ScrollStrategy,
     ScrollWheelEvent, ShapedLine, SharedString, StatefulInteractiveElement, Style, Task, TextRun,
-    TitlebarOptions, UTF16Selection, UniformListScrollHandle, Window, WindowBackgroundAppearance,
-    WindowBounds, WindowControlArea, WindowDecorations, WindowOptions, actions, canvas, deferred,
-    div, ease_out_quint, fill, hsla, img, linear_color_stop, linear_gradient, point, prelude::*,
-    px, relative, size, svg, uniform_list,
+    TitlebarOptions, TransformationMatrix, UTF16Selection, UniformListScrollHandle, Window,
+    WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowDecorations, WindowOptions,
+    actions, canvas, deferred, div, ease_out_quint, fill, hsla, img, linear_color_stop,
+    linear_gradient, point, prelude::*, px, radians, relative, size, svg, uniform_list,
 };
 #[cfg(target_os = "macos")]
 use objc2_app_kit::{NSView, NSWindowButton};

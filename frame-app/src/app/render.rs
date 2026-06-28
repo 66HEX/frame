@@ -47,6 +47,7 @@ impl Render for FrameRoot {
         let preview_overlay = self.preview_overlay_render_state();
         let preview_canvas = self.preview_canvas_render_state();
         let preview_playback = self.preview_playback_state();
+        let preview_presentation = self.preview_ui.render_presentation;
         let preview_render_image = self.preview_render_image();
         let preview_runtime_error = self.preview_runtime_error();
         let content = div().flex_1().p(px(CONTENT_PADDING));
@@ -141,6 +142,7 @@ impl Render for FrameRoot {
                             end: Some(&preview_end_time_focus),
                         },
                         playback: preview_playback,
+                        presentation: preview_presentation,
                         render_image: preview_render_image,
                         runtime_error: preview_runtime_error,
                     },

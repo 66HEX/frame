@@ -1,4 +1,5 @@
 use super::*;
+use crate::app::preview_panel::preview_presented_frame;
 
 impl FrameRoot {
     pub(super) fn selected_preview_runtime_request(
@@ -28,7 +29,9 @@ impl FrameRoot {
         if self.preview_ui.runtime_key == next_key
             || self.preview_ui.pending_runtime_key == next_key
         {
-            if presentation_changed && self.refresh_preview_render_image() {
+            if presentation_changed {
+                self.preview_ui.rendered_presentation = request.presentation;
+                self.apply_preview_canvas_auto_fit();
                 cx.notify();
             }
             return;
@@ -288,9 +291,12 @@ impl FrameRoot {
     }
 
     fn preview_canvas_media_dimensions(&self) -> Option<(f64, f64)> {
-        let size = self.preview_ui.render_image.as_ref()?.size(0);
-        let width = f64::from(size.width.0);
-        let height = f64::from(size.height.0);
+        let frame = preview_presented_frame(
+            self.preview_ui.render_image.as_ref()?,
+            self.preview_ui.render_presentation,
+        )?;
+        let width = f64::from(frame.visible_width);
+        let height = f64::from(frame.visible_height);
         (width > 0.0 && height > 0.0).then_some((width, height))
     }
 
@@ -435,16 +441,11 @@ impl FrameRoot {
         let Some(latest) = session.latest_frame() else {
             return false;
         };
-        if latest.generation == self.preview_ui.render_generation
-            && self.preview_ui.rendered_presentation == self.preview_ui.render_presentation
-        {
+        if latest.generation == self.preview_ui.render_generation {
             return false;
         }
 
-        match render_image_from_frame_with_presentation(
-            &latest.frame,
-            self.preview_ui.render_presentation,
-        ) {
+        match render_image_from_frame(&latest.frame) {
             Ok(image) => {
                 self.preview_ui.render_generation = latest.generation;
                 self.preview_ui.rendered_presentation = self.preview_ui.render_presentation;

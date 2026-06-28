@@ -562,7 +562,7 @@ mod tests {
         );
 
         assert!(description.contains("video/x-raw,format=BGRA"));
-        assert!(!description.contains("leaky=downstream"));
+        assert!(!description.contains("leaky-type=downstream"));
         assert!(description.contains("sync=false max-buffers=2 drop=false"));
     }
 

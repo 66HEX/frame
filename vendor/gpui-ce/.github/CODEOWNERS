@@ -1,0 +1,11 @@
+# Default code owners for gpui-ce
+* @gpui-ce/maintainers
+
+# CI/CD configuration
+/.github/ @gpui-ce/maintainers
+
+# Platform-specific code
+/crates/gpui_macos/ @gpui-ce/macos-maintainers
+/crates/gpui_linux/ @gpui-ce/linux-maintainers
+/crates/gpui_windows/ @gpui-ce/windows-maintainers
+/crates/gpui_web/ @gpui-ce/web-maintainers

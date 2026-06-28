@@ -64,68 +64,6 @@ fn render_image_from_frame_accepts_tight_bgra_frames() {
 }
 
 #[test]
-fn render_image_from_frame_applies_presentation_transform_without_reloading_source() {
-    let frame =
-        PreviewFrame::bgra(2, 1, 8, 0, vec![10, 20, 30, 255, 40, 50, 60, 255]).expect("frame");
-
-    let render_image = render_image_from_frame_with_presentation(
-        &frame,
-        PreviewRenderPresentation {
-            transform: PreviewTransform {
-                rotation_degrees: 90,
-                flip_horizontal: false,
-                flip_vertical: false,
-            },
-            crop: None,
-            crop_source_width: None,
-            crop_source_height: None,
-        },
-    )
-    .expect("render image");
-
-    assert_eq!(render_image.size(0).width.0, 1);
-    assert_eq!(render_image.size(0).height.0, 2);
-}
-
-#[test]
-fn render_image_from_frame_maps_crop_from_source_to_scaled_frame() {
-    let frame = PreviewFrame::bgra(
-        4,
-        2,
-        16,
-        0,
-        vec![
-            0, 0, 0, 255, 1, 0, 0, 255, 2, 0, 0, 255, 3, 0, 0, 255, 4, 0, 0, 255, 5, 0, 0, 255, 6,
-            0, 0, 255, 7, 0, 0, 255,
-        ],
-    )
-    .expect("frame");
-
-    let render_image = render_image_from_frame_with_presentation(
-        &frame,
-        PreviewRenderPresentation {
-            transform: PreviewTransform::default(),
-            crop: Some(PreviewCrop {
-                x: 1,
-                y: 0,
-                width: 2,
-                height: 2,
-            }),
-            crop_source_width: Some(4),
-            crop_source_height: Some(2),
-        },
-    )
-    .expect("render image");
-
-    assert_eq!(render_image.size(0).width.0, 2);
-    assert_eq!(render_image.size(0).height.0, 2);
-    assert_eq!(
-        render_image.as_bytes(0),
-        Some([1, 0, 0, 255, 2, 0, 0, 255, 5, 0, 0, 255, 6, 0, 0, 255].as_slice())
-    );
-}
-
-#[test]
 fn latest_frame_snapshot_uses_shared_frame_storage() {
     let store = LatestFrameStore::new();
     let frame = PreviewFrame::bgra(1, 1, 4, 0, vec![1, 2, 3, 4]).expect("frame");

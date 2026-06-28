@@ -1,0 +1,36 @@
+# Security audit workflow
+name: Security Audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+  pull_request:
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+  schedule:
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+jobs:
+  # cargo-audit: vulnerability scanning (advisory DB)
+  cargo-audit:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@cargo-audit
+      - uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  # cargo-deny: license compliance + advisory + duplicate detection
+  cargo-deny:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2

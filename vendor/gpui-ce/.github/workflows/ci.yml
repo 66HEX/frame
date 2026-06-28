@@ -1,0 +1,267 @@
+# Main CI workflow
+name: CI
+
+# TODO: Setup coverage using cargo-mutants, but only for minor/major version bumps (would probably take hours :() -- also our testing infra sucks
+
+on:
+  push:
+    branches: [main, 'v[0-9]+.[0-9]+.x']
+  pull_request:
+    branches: ['**']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.ref_name == 'main' && github.sha || 'anysha' }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  # Change detection
+  orchestrate:
+    runs-on: ubuntu-latest
+    outputs:
+      run_tests: ${{ steps.filter.outputs.run_tests }}
+      run_style: ${{ steps.filter.outputs.run_style }}
+      run_docs:  ${{ steps.filter.outputs.run_docs }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: ${{ github.ref == 'refs/heads/main' && 2 || 350 }}
+      - id: filter
+        run: |
+          if [ -z "$GITHUB_BASE_REF" ]; then
+            COMPARE_REV="$(git rev-parse HEAD~1)"
+          else
+            git fetch origin "$GITHUB_BASE_REF" --depth=350
+            COMPARE_REV="$(git merge-base "origin/${GITHUB_BASE_REF}" HEAD)"
+          fi
+          CHANGED_FILES="$(git diff --name-only "$COMPARE_REV" "$GITHUB_SHA")"
+
+          check_pattern() {
+            local name="$1" pattern="$2" invert="${3:-false}"
+            if [ "$invert" = "true" ]; then
+              echo "$CHANGED_FILES" | grep -qvP "$pattern" && echo "${name}=true" >> "$GITHUB_OUTPUT" || echo "${name}=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "$CHANGED_FILES" | grep -qP  "$pattern" && echo "${name}=true" >> "$GITHUB_OUTPUT" || echo "${name}=false" >> "$GITHUB_OUTPUT"
+            fi
+          }
+
+          check_pattern "run_tests" '^(docs/|\.github/(ISSUE_TEMPLATE|workflows/)|README\.md|CHANGELOG\.md)' true
+          check_pattern "run_style" '\.(rs|toml)$|rust-toolchain\.toml|\.cargo/|clippy\.toml|typos\.toml'
+          check_pattern "run_docs"  '^docs/|\.rs$'
+
+  # Formatting
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: rustfmt
+      - uses: hustcer/setup-nu@v3
+      - uses: extractions/setup-just@v2
+      - run: just fmt-check
+
+  # Clippy
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libxcb-shape0-dev libxcb-xfixes0-dev libfontconfig-dev
+      - uses: hustcer/setup-nu@v3
+      - uses: extractions/setup-just@v2
+      - run: just clippy
+
+  # Spell check
+  typos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: crate-ci/typos@v1.47.2
+        with:
+          config: typos.toml
+
+  # TOML formatting
+  taplo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: uncenter/setup-taplo@v1
+      - run: taplo fmt --check
+
+  # Unused dependencies
+  machete:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@cargo-machete
+      - uses: hustcer/setup-nu@v3
+      - uses: extractions/setup-just@v2
+      - run: just machete
+
+  # MSRV
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: 1.92.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libxcb-shape0-dev libxcb-xfixes0-dev libfontconfig-dev
+      - uses: hustcer/setup-nu@v3
+      - uses: extractions/setup-just@v2
+      - run: just msrv-check
+
+  # WASM target (nightly + atomics)
+  check-wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install nightly toolchain with rust-src and WASM target
+        run: rustup toolchain install nightly --component rust-src --target wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: hustcer/setup-nu@v3
+      - uses: extractions/setup-just@v2
+      - run: just check-wasm-atomics
+
+  # Linux build + test
+  test-linux:
+    runs-on: ubuntu-latest
+    needs: [orchestrate]
+    if: needs.orchestrate.outputs.run_tests == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: Swatinem/rust-cache@v2
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libxkbcommon-dev libwayland-dev libx11-dev \
+            libxcb-shape0-dev libxcb-xfixes0-dev \
+            libxcb-randr0-dev libxcb-xinput-dev \
+            libxkbcommon-x11-dev libegl1-mesa-dev \
+            libgles2-mesa-dev libglib2.0-dev libfontconfig-dev
+      - uses: hustcer/setup-nu@v3
+      - uses: extractions/setup-just@v2
+      - run: just build
+      - run: just test
+      - run: just test-doc
+
+  # macOS build + test
+  test-mac:
+    runs-on: macos-latest
+    needs: [orchestrate]
+    if: needs.orchestrate.outputs.run_tests == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: Swatinem/rust-cache@v2
+      - uses: hustcer/setup-nu@v3
+      - uses: extractions/setup-just@v2
+      - run: just build
+      - run: just test
+      - run: just test-doc
+
+  # Windows build + test
+  test-windows:
+    runs-on: windows-latest
+    needs: [orchestrate]
+    if: needs.orchestrate.outputs.run_tests == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: Swatinem/rust-cache@v2
+      - uses: hustcer/setup-nu@v3
+      - uses: extractions/setup-just@v2
+      - run: just build
+      - run: just test
+
+  # Examples
+  check-examples:
+    runs-on: ubuntu-latest
+    needs: [orchestrate]
+    if: needs.orchestrate.outputs.run_tests == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: Swatinem/rust-cache@v2
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libxcb-shape0-dev libxcb-xfixes0-dev libfontconfig-dev
+      - name: Add WASM target
+        run: rustup target add wasm32-unknown-unknown
+      - uses: hustcer/setup-nu@v3
+      - uses: extractions/setup-just@v2
+      - run: just check-examples
+
+  # Beta toolchain (scheduled only)
+  beta-test:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup update beta && rustup default beta
+      - uses: Swatinem/rust-cache@v2
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libxcb-shape0-dev libxcb-xfixes0-dev libfontconfig-dev
+      - uses: hustcer/setup-nu@v3
+      - uses: extractions/setup-just@v2
+      - run: just check
+      - run: just test
+
+  # Gate job
+  tests-pass:
+    if: always()
+    needs:
+      - fmt
+      - clippy
+      - typos
+      - taplo
+      - machete
+      - msrv
+      - check-wasm
+      - test-linux
+      - test-mac
+      - test-windows
+      - check-examples
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          set +e
+          EXIT_CODE=0
+          check_result() {
+            echo "* $1: $2"
+            if [[ "$2" != "skipped" && "$2" != "success" ]]; then EXIT_CODE=1; fi
+          }
+          check_result fmt            ${{ needs.fmt.result }}
+          check_result clippy         ${{ needs.clippy.result }}
+          check_result typos          ${{ needs.typos.result }}
+          check_result taplo          ${{ needs.taplo.result }}
+          check_result machete        ${{ needs.machete.result }}
+          check_result msrv           ${{ needs.msrv.result }}
+          check_result check-wasm     ${{ needs.check-wasm.result }}
+          check_result test-linux     ${{ needs.test-linux.result }}
+          check_result test-mac       ${{ needs.test-mac.result }}
+          check_result test-windows   ${{ needs.test-windows.result }}
+          check_result check-examples ${{ needs.check-examples.result }}
+          exit $EXIT_CODE

@@ -1,0 +1,105 @@
+# Publish to crates on a version tag push
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (no actual publish)'
+        required: false
+        default: 'false'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # Determine pre-release status
+  prerelease:
+    runs-on: ubuntu-latest
+    outputs:
+      value:   ${{ steps.check.outputs.value }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [[ $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "value=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=true"  >> "$GITHUB_OUTPUT"
+          fi
+
+  # Run full CI on the tag via justfile
+  verify:
+    needs: [prerelease]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libxkbcommon-dev libwayland-dev libx11-dev \
+            libxcb-shape0-dev libxcb-xfixes0-dev
+      - uses: hustcer/setup-nu@v3
+      - uses: extractions/setup-just@v2
+      - run: just fmt-check
+      - run: just clippy
+      - run: just build
+      - run: just test
+      - run: just test-doc
+
+  # Verify packages are publishable
+  verify-publish:
+    needs: [prerelease, verify]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: Swatinem/rust-cache@v2
+      - name: Dry-run publish check
+        run: |
+          for crate in crates/gpui_shared_string crates/gpui_macros crates/gpui crates/gpui_wgpu crates/gpui_tokio crates/gpui_platform; do
+            echo "Checking $crate..."
+            cargo publish --dry-run --manifest-path "$crate/Cargo.toml" 2>&1 | head -5
+          done
+
+  # Publish to crates.io
+  publish:
+    needs: [prerelease, verify-publish]
+    runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.dry_run != 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: Swatinem/rust-cache@v2
+      - uses: hustcer/setup-nu@v3
+      - uses: extractions/setup-just@v2
+      - run: just publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+  # Create GitHub Release
+  github-release:
+    needs: [prerelease, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          prerelease: ${{ needs.prerelease.outputs.value }}
+          generate_release_notes: true
+          name: ${{ needs.prerelease.outputs.version }}

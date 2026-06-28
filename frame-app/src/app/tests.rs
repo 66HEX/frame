@@ -6,15 +6,16 @@ use super::preview_actions::{
     preview_canvas_pan_limits, preview_canvas_transform_settled,
 };
 use super::preview_panel::{
-    centered_offset, preview_crop_visual_rect, preview_shell_state, preview_timeline_labels,
-    preview_trim_enabled, preview_visual_controls_visible, timeline_fraction_from_percent,
-    timeline_slider_percent_from_bounds,
+    centered_offset, preview_crop_visual_rect, preview_presented_frame, preview_shell_state,
+    preview_timeline_labels, preview_trim_enabled, preview_visual_controls_visible,
+    timeline_fraction_from_percent, timeline_slider_percent_from_bounds,
 };
 use super::primitives::{ButtonVariant, button_colors};
 use super::settings_panel::{hex_to_subtitle_hsv, subtitle_hsv_to_hex};
 use super::*;
 use crate::app_persistence::{AppPersistence, AppSettings};
 use crate::notifications::{AppNotifier, ConversionNotificationSummary};
+use crate::preview_engine::PreviewFrame;
 use std::{
     path::PathBuf,
     sync::{
@@ -1483,6 +1484,51 @@ mod frame_root_config {
     }
 
     #[test]
+    fn preview_presentation_maps_rotation_and_crop_without_rewriting_frame() {
+        let frame = PreviewFrame::bgra(
+            4,
+            2,
+            16,
+            0,
+            vec![
+                0, 0, 0, 255, 1, 0, 0, 255, 2, 0, 0, 255, 3, 0, 0, 255, 4, 0, 0, 255, 5, 0, 0, 255,
+                6, 0, 0, 255, 7, 0, 0, 255,
+            ],
+        )
+        .expect("frame");
+        let render_image = render_image_from_frame(&frame).expect("render image");
+
+        let presented = preview_presented_frame(
+            &render_image,
+            PreviewRenderPresentation {
+                transform: PreviewTransform {
+                    rotation_degrees: 90,
+                    flip_horizontal: false,
+                    flip_vertical: false,
+                },
+                crop: Some(EnginePreviewCrop {
+                    x: 0,
+                    y: 1,
+                    width: 2,
+                    height: 2,
+                }),
+                crop_source_width: Some(2),
+                crop_source_height: Some(4),
+            },
+        )
+        .expect("presented frame");
+
+        assert_eq!(render_image.size(0).width.0, 4);
+        assert_eq!(render_image.size(0).height.0, 2);
+        assert_eq!(presented.full_width, 2);
+        assert_eq!(presented.full_height, 4);
+        assert_eq!(presented.visible_x, 0);
+        assert_eq!(presented.visible_y, 1);
+        assert_eq!(presented.visible_width, 2);
+        assert_eq!(presented.visible_height, 2);
+    }
+
+    #[test]
     fn apply_preview_crop_drag_updates_draft_without_persisting_config() {
         let mut root = FrameRoot::new();
         root.file_queue
@@ -2159,6 +2205,7 @@ mod preview_shell {
             PreviewOverlayRenderState::empty(),
             PreviewCanvasRenderState::default(),
             preview_playback_state(PreviewMediaKind::Video, 90.4, None, None),
+            PreviewRenderPresentation::default(),
             None,
             None,
         );
@@ -2197,6 +2244,7 @@ mod preview_shell {
                 config.start_time.as_deref(),
                 config.end_time.as_deref(),
             ),
+            PreviewRenderPresentation::default(),
             None,
             None,
         );
@@ -2224,6 +2272,7 @@ mod preview_shell {
             PreviewOverlayRenderState::empty(),
             PreviewCanvasRenderState::default(),
             PreviewPlaybackState::new(false),
+            PreviewRenderPresentation::default(),
             None,
             None,
         );
@@ -2252,6 +2301,7 @@ mod preview_shell {
             PreviewOverlayRenderState::empty(),
             PreviewCanvasRenderState::default(),
             PreviewPlaybackState::new(false),
+            PreviewRenderPresentation::default(),
             None,
             None,
         );
@@ -2278,6 +2328,7 @@ mod preview_shell {
             PreviewOverlayRenderState::empty(),
             PreviewCanvasRenderState::default(),
             PreviewPlaybackState::new(false),
+            PreviewRenderPresentation::default(),
             None,
             None,
         );
