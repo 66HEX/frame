@@ -24,7 +24,7 @@ mod workspace;
 pub use runtime::{frame_window_options, init_app, open_frame_window};
 
 use chrome::{
-    AppSettingsSheetProps, app_settings_sheet, drag_drop_overlay, titlebar, update_banner,
+    AppSettingsSheetProps, app_settings_sheet, drag_drop_overlay, titlebar, update_dialog,
 };
 use input::{FrameTextInputKind, FrameTextInputUiState};
 use logs_panel::logs_view;
@@ -274,6 +274,9 @@ struct SettingsUiState {
 #[derive(Clone, Debug, Default)]
 struct UpdateUiState {
     status: UpdateStatus,
+    dialog_open: bool,
+    dialog_present: bool,
+    dialog_info: Option<Box<UpdateInfo>>,
 }
 
 #[derive(Clone, Debug, Default)]

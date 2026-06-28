@@ -1,6 +1,27 @@
 use super::*;
 
 impl FrameRoot {
+    pub(super) fn open_update_dialog(&mut self) -> bool {
+        let changed = !self.update_ui.dialog_open || !self.update_ui.dialog_present;
+        self.update_ui.dialog_open = true;
+        self.update_ui.dialog_present = true;
+        changed
+    }
+
+    pub(super) fn close_update_dialog(&mut self) -> bool {
+        let changed = self.update_ui.dialog_open;
+        self.update_ui.dialog_open = false;
+        changed
+    }
+
+    pub(super) fn finish_update_dialog_close(&mut self) -> bool {
+        if self.update_ui.dialog_open || !self.update_ui.dialog_present {
+            return false;
+        }
+        self.update_ui.dialog_present = false;
+        true
+    }
+
     pub(super) fn startup_update_check(&mut self, cx: &mut Context<Self>) {
         if !self.auto_update_check || !update_check_is_due(self.last_update_check_at) {
             return;
@@ -45,9 +66,13 @@ impl FrameRoot {
                         root.update_ui.status = UpdateStatus::Idle;
                     }
                     Ok(UpdateCheck::Available(info)) => {
+                        root.update_ui.dialog_info = Some(info.clone());
                         root.update_ui.status = UpdateStatus::Available(info);
+                        root.open_update_dialog();
                     }
                     Ok(UpdateCheck::UpToDate) => {
+                        root.update_ui.dialog_info = None;
+                        root.close_update_dialog();
                         root.update_ui.status = if manual {
                             UpdateStatus::UpToDate
                         } else {
@@ -55,6 +80,7 @@ impl FrameRoot {
                         };
                     }
                     Err(error) => {
+                        root.close_update_dialog();
                         root.update_ui.status = if manual {
                             UpdateStatus::Error(error.to_string())
                         } else {
@@ -79,7 +105,10 @@ impl FrameRoot {
         let UpdateStatus::Available(info) = &self.update_ui.status else {
             return;
         };
+        let cached_info = info.clone();
         let info = (**info).clone();
+        self.update_ui.dialog_info = Some(cached_info);
+        self.open_update_dialog();
         let version = info.version.to_string();
         self.update_ui.status = UpdateStatus::Downloading {
             version,
@@ -129,6 +158,7 @@ impl FrameRoot {
                     Ok(Ok(package)) => {
                         this.update(cx, |root, cx| {
                             root.update_ui.status = UpdateStatus::ReadyToInstall(Box::new(package));
+                            root.open_update_dialog();
                             cx.notify();
                         })
                         .ok();
@@ -137,6 +167,7 @@ impl FrameRoot {
                     Ok(Err(error)) => {
                         this.update(cx, |root, cx| {
                             root.update_ui.status = UpdateStatus::Error(error.to_string());
+                            root.open_update_dialog();
                             cx.notify();
                         })
                         .ok();
@@ -147,6 +178,7 @@ impl FrameRoot {
                             root.update_ui.status = UpdateStatus::Error(
                                 "update download worker disconnected".to_string(),
                             );
+                            root.open_update_dialog();
                             cx.notify();
                         })
                         .ok();
@@ -172,6 +204,7 @@ impl FrameRoot {
         };
         let package = (**package).clone();
         self.update_ui.status = UpdateStatus::Installing;
+        self.open_update_dialog();
         let channel = self.update_channel;
 
         cx.spawn(async move |this, cx| {
@@ -187,6 +220,7 @@ impl FrameRoot {
                 Ok(()) => cx.quit(),
                 Err(error) => {
                     root.update_ui.status = UpdateStatus::Error(error.to_string());
+                    root.open_update_dialog();
                     cx.notify();
                 }
             })
@@ -210,6 +244,8 @@ impl FrameRoot {
         };
         self.skipped_update_version = Some(info.version.to_string());
         self.update_ui.status = UpdateStatus::Idle;
+        self.update_ui.dialog_info = None;
+        self.close_update_dialog();
         if let Err(error) = self.persist_app_settings() {
             self.update_ui.status = UpdateStatus::Error(error.to_string());
             return false;
@@ -220,6 +256,8 @@ impl FrameRoot {
     pub(super) fn dismiss_update_status(&mut self) {
         if !self.update_ui.status.is_busy() {
             self.update_ui.status = UpdateStatus::Idle;
+            self.update_ui.dialog_info = None;
+            self.close_update_dialog();
         }
     }
 }

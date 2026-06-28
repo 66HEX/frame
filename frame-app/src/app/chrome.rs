@@ -467,10 +467,6 @@ fn app_settings_updates_section(
         ));
     }
 
-    if let Some(notes) = update_release_notes_text(update_status) {
-        section = section.child(update_release_notes_block(notes));
-    }
-
     section.child(update_action_row(update_status, busy, window, cx))
 }
 
@@ -512,17 +508,14 @@ fn update_status_text(status: &UpdateStatus) -> String {
     }
 }
 
-fn update_release_notes_text(status: &UpdateStatus) -> Option<String> {
-    let notes = match status {
-        UpdateStatus::Available(info) => info.release_notes_markdown.as_deref(),
-        _ => None,
-    }?;
+fn update_release_notes_text(info: Option<&UpdateInfo>) -> Option<String> {
+    let notes = info?.release_notes_markdown.as_deref()?;
     let notes = notes.trim();
     if notes.is_empty() {
         return None;
     }
 
-    const MAX_RELEASE_NOTES_CHARS: usize = 900;
+    const MAX_RELEASE_NOTES_CHARS: usize = 8_000;
     let mut text = notes
         .chars()
         .take(MAX_RELEASE_NOTES_CHARS + 1)
@@ -534,17 +527,85 @@ fn update_release_notes_text(status: &UpdateStatus) -> Option<String> {
     Some(text)
 }
 
-fn update_release_notes_block(notes: String) -> gpui::Stateful<gpui::Div> {
-    div()
-        .id("app-settings-update-release-notes")
-        .max_h(px(160.0))
+fn update_release_notes_block(notes: &str) -> gpui::Stateful<gpui::Div> {
+    let mut block = div()
+        .id("update-dialog-release-notes")
+        .min_h(px(180.0))
+        .max_h(px(360.0))
         .overflow_y_scroll()
         .rounded(px(theme::RADIUS_SM))
         .bg(color(theme::FRAME_GRAY_100))
-        .p_3()
+        .p_3();
+
+    for line in normalized_release_note_lines(notes) {
+        block = block.child(update_release_note_line(&line));
+    }
+
+    block
+}
+
+fn normalized_release_note_lines(notes: &str) -> Vec<String> {
+    let mut lines = notes
+        .lines()
+        .map(str::trim_end)
+        .map(ToOwned::to_owned)
+        .collect::<Vec<_>>();
+    while lines.first().is_some_and(|line| line.trim().is_empty()) {
+        lines.remove(0);
+    }
+    while lines.last().is_some_and(|line| line.trim().is_empty()) {
+        lines.pop();
+    }
+    if lines.is_empty() {
+        vec!["No release notes were published for this version.".to_string()]
+    } else {
+        lines
+    }
+}
+
+fn update_release_note_line(line: &str) -> gpui::Div {
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        return div().h(px(8.0));
+    }
+
+    let heading = trimmed.trim_start_matches('#').trim();
+    let bullet = trimmed
+        .strip_prefix("- ")
+        .or_else(|| trimmed.strip_prefix("* "))
+        .or_else(|| trimmed.strip_prefix("• "));
+    let (text, left_padding, text_color, font_weight) =
+        if !heading.is_empty() && trimmed.starts_with('#') {
+            (
+                heading.to_string(),
+                0.0,
+                theme::FOREGROUND,
+                gpui::FontWeight::MEDIUM,
+            )
+        } else if let Some(bullet) = bullet {
+            (
+                format!("• {bullet}"),
+                8.0,
+                theme::FRAME_GRAY_600,
+                gpui::FontWeight::NORMAL,
+            )
+        } else {
+            (
+                trimmed.to_string(),
+                0.0,
+                theme::FRAME_GRAY_600,
+                gpui::FontWeight::NORMAL,
+            )
+        };
+
+    div()
+        .pl(px(left_padding))
+        .pb(px(4.0))
         .text_size(px(theme::TEXT_LABEL_SIZE))
-        .text_color(color(theme::FRAME_GRAY_600))
-        .child(notes)
+        .line_height(px(16.0))
+        .text_color(color(text_color))
+        .font_weight(font_weight)
+        .child(text)
 }
 
 fn update_progress_bar(progress_percent: Option<u8>) -> gpui::Div {
@@ -691,153 +752,371 @@ fn update_action_row(
     }
 }
 
-pub(super) fn update_banner(
+pub(super) fn update_dialog(
+    is_open: bool,
+    status: &UpdateStatus,
+    info: Option<&UpdateInfo>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> impl IntoElement {
+    let transition = window
+        .use_keyed_transition(
+            "update-dialog-motion",
+            cx,
+            SETTINGS_SHEET_MOTION_DURATION,
+            |_window, _cx| 0.0_f32,
+        )
+        .with_easing(ease_out_quint());
+    set_motion_target(&transition, motion_target(is_open), cx);
+    let progress = *transition.evaluate(window, cx);
+    let panel_offset = (1.0 - progress.clamp(0.0, 1.0)) * 12.0;
+
+    if !is_open && motion_is_hidden(progress) {
+        cx.defer_in(window, |root, _window, cx| {
+            if root.finish_update_dialog_close() {
+                cx.notify();
+            }
+        });
+    }
+
+    div()
+        .id("update-dialog")
+        .absolute()
+        .inset_0()
+        .flex()
+        .items_center()
+        .justify_center()
+        .p_4()
+        .bg(color(theme::BACKGROUND.with_alpha(0.64 * progress)))
+        .backdrop_blur(px(4.0 * progress))
+        .opacity(progress)
+        .occlude()
+        .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+            cx.stop_propagation();
+            root.close_update_dialog();
+            cx.notify();
+        }))
+        .child(update_dialog_panel(panel_offset, status, info, window, cx))
+}
+
+fn update_dialog_panel(
+    panel_offset: f32,
+    status: &UpdateStatus,
+    info: Option<&UpdateInfo>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    let mut panel = div()
+        .id("update-dialog-panel")
+        .mt(px(panel_offset))
+        .w_full()
+        .max_w(px(720.0))
+        .max_h(relative(0.86))
+        .overflow_hidden()
+        .rounded(px(theme::RADIUS_LG))
+        .bg(color(theme::SIDEBAR))
+        .shadow(card_surface_shadows())
+        .occlude()
+        .on_click(cx.listener(|_, _: &ClickEvent, _window, cx| {
+            cx.stop_propagation();
+        }))
+        .child(update_dialog_header(status, window, cx))
+        .child(update_dialog_body(status, info))
+        .child(update_dialog_footer(status, window, cx));
+
+    if matches!(status, UpdateStatus::Downloading { .. }) {
+        panel = panel.child(update_dialog_download_state(status));
+    }
+
+    panel
+}
+
+fn update_dialog_header(
     status: &UpdateStatus,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
-) -> Option<gpui::Stateful<gpui::Div>> {
-    let visible = matches!(
-        status,
-        UpdateStatus::Available(_)
-            | UpdateStatus::Downloading { .. }
-            | UpdateStatus::ReadyToInstall(_)
-            | UpdateStatus::Installing
-            | UpdateStatus::Error(_)
+) -> gpui::Div {
+    div()
+        .relative()
+        .flex()
+        .items_center()
+        .justify_between()
+        .gap_4()
+        .px_4()
+        .py_3()
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .gap_1()
+                .child(
+                    div()
+                        .text_size(px(theme::TEXT_LABEL_SIZE))
+                        .text_color(color(theme::FRAME_GRAY_600))
+                        .child(update_dialog_kicker(status)),
+                )
+                .child(
+                    div()
+                        .text_size(px(16.0))
+                        .line_height(px(20.0))
+                        .font_weight(gpui::FontWeight::MEDIUM)
+                        .text_color(color(theme::FOREGROUND))
+                        .child(update_dialog_title(status)),
+                ),
+        )
+        .child(app_settings_close_button(window, cx).on_click(cx.listener(
+            |root, _: &ClickEvent, _window, cx| {
+                cx.stop_propagation();
+                root.close_update_dialog();
+                cx.notify();
+            },
+        )))
+        .child(panel_bottom_separator())
+}
+
+fn update_dialog_body(status: &UpdateStatus, info: Option<&UpdateInfo>) -> gpui::Div {
+    let notes = update_release_notes_text(info);
+    let mut body = div().flex().flex_col().gap_3().p_4().child(
+        div()
+            .text_size(px(theme::TEXT_LABEL_SIZE))
+            .line_height(px(16.0))
+            .text_color(color(theme::FRAME_GRAY_600))
+            .child(update_dialog_summary(status, notes.is_some())),
     );
-    if !visible {
-        return None;
+
+    if let Some(notes) = notes.as_deref() {
+        body = body
+            .child(
+                div()
+                    .text_size(px(theme::TEXT_LABEL_SIZE))
+                    .text_color(color(theme::FOREGROUND))
+                    .child("RELEASE NOTES"),
+            )
+            .child(update_release_notes_block(notes));
     }
 
-    let tone = match status {
-        UpdateStatus::Error(_) => theme::FRAME_RED,
-        UpdateStatus::Available(_) | UpdateStatus::ReadyToInstall(_) => theme::FRAME_AMBER,
-        _ => theme::FRAME_BLUE,
+    if let UpdateStatus::Error(error) = status {
+        body = body.child(
+            div()
+                .rounded(px(theme::RADIUS_SM))
+                .bg(color(theme::FRAME_RED.with_alpha(0.08)))
+                .p_3()
+                .text_size(px(theme::TEXT_LABEL_SIZE))
+                .line_height(px(16.0))
+                .text_color(color(theme::FRAME_RED))
+                .child(error.clone()),
+        );
+    }
+
+    body
+}
+
+fn update_dialog_download_state(status: &UpdateStatus) -> gpui::Div {
+    let UpdateStatus::Downloading {
+        progress_percent,
+        received_bytes,
+        total_bytes,
+        ..
+    } = status
+    else {
+        return div();
     };
-    let mut actions = div().flex().items_center().gap_2();
+
+    div()
+        .px_4()
+        .pb_4()
+        .flex()
+        .flex_col()
+        .gap_2()
+        .child(update_progress_bar(*progress_percent))
+        .child(update_download_detail(
+            *received_bytes,
+            *total_bytes,
+            *progress_percent,
+        ))
+}
+
+fn update_dialog_footer(
+    status: &UpdateStatus,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    div()
+        .relative()
+        .flex()
+        .items_center()
+        .justify_between()
+        .gap_3()
+        .px_4()
+        .py_3()
+        .child(
+            frame_text_button(
+                "update-dialog-later",
+                "LATER",
+                ButtonVariant::Ghost,
+                false,
+                !status.is_busy(),
+                window,
+                cx,
+            )
+            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+                cx.stop_propagation();
+                if !root.update_ui.status.is_busy() {
+                    root.close_update_dialog();
+                    cx.notify();
+                }
+            })),
+        )
+        .child(update_dialog_primary_action(status, window, cx))
+        .child(panel_top_separator())
+}
+
+fn update_dialog_primary_action(
+    status: &UpdateStatus,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
     match status {
-        UpdateStatus::Available(_) => {
-            actions = actions
-                .child(
-                    frame_text_button(
-                        "update-banner-download",
-                        "DOWNLOAD",
-                        ButtonVariant::Default,
-                        false,
-                        true,
-                        window,
-                        cx,
-                    )
-                    .on_click(cx.listener(
-                        |root, _: &ClickEvent, _window, cx| {
-                            cx.stop_propagation();
-                            root.download_available_update(cx);
-                            cx.notify();
-                        },
-                    )),
-                )
-                .child(
-                    frame_text_button(
-                        "update-banner-skip",
-                        "SKIP",
-                        ButtonVariant::Secondary,
-                        false,
-                        true,
-                        window,
-                        cx,
-                    )
-                    .on_click(cx.listener(
-                        |root, _: &ClickEvent, _window, cx| {
-                            cx.stop_propagation();
-                            if root.skip_available_update() {
-                                cx.notify();
-                            }
-                        },
-                    )),
-                );
-        }
-        UpdateStatus::ReadyToInstall(_) => {
-            actions = actions.child(
-                frame_text_button(
-                    "update-banner-install",
-                    "INSTALL AND RESTART",
-                    ButtonVariant::Default,
-                    false,
-                    true,
-                    window,
-                    cx,
-                )
-                .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
-                    cx.stop_propagation();
-                    root.install_downloaded_update(cx);
-                    cx.notify();
-                })),
-            );
-        }
-        UpdateStatus::Error(_) => {
-            actions = actions.child(
-                frame_text_button(
-                    "update-banner-dismiss",
-                    "DISMISS",
-                    ButtonVariant::Secondary,
-                    false,
-                    true,
-                    window,
-                    cx,
-                )
-                .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
-                    cx.stop_propagation();
-                    root.dismiss_update_status();
-                    cx.notify();
-                })),
-            );
-        }
-        UpdateStatus::Downloading { .. } | UpdateStatus::Installing => {}
+        UpdateStatus::Available(_) => frame_text_button(
+            "update-dialog-download",
+            "DOWNLOAD",
+            ButtonVariant::Default,
+            false,
+            true,
+            window,
+            cx,
+        )
+        .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+            cx.stop_propagation();
+            root.download_available_update(cx);
+            cx.notify();
+        })),
+        UpdateStatus::ReadyToInstall(_) => frame_text_button(
+            "update-dialog-install",
+            "INSTALL AND RESTART",
+            ButtonVariant::Default,
+            false,
+            true,
+            window,
+            cx,
+        )
+        .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+            cx.stop_propagation();
+            root.install_downloaded_update(cx);
+            cx.notify();
+        })),
+        UpdateStatus::Error(_) => frame_text_button(
+            "update-dialog-dismiss",
+            "DISMISS",
+            ButtonVariant::Secondary,
+            false,
+            true,
+            window,
+            cx,
+        )
+        .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+            cx.stop_propagation();
+            root.dismiss_update_status();
+            cx.notify();
+        })),
+        UpdateStatus::Downloading { .. } | UpdateStatus::Installing => frame_text_button(
+            "update-dialog-busy",
+            "WORKING",
+            ButtonVariant::Secondary,
+            false,
+            false,
+            window,
+            cx,
+        ),
         UpdateStatus::Idle
         | UpdateStatus::Checking
         | UpdateStatus::UpToDate
-        | UpdateStatus::Disabled(_) => {}
+        | UpdateStatus::Disabled(_) => frame_text_button(
+            "update-dialog-close",
+            "CLOSE",
+            ButtonVariant::Secondary,
+            false,
+            true,
+            window,
+            cx,
+        )
+        .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+            cx.stop_propagation();
+            root.close_update_dialog();
+            cx.notify();
+        })),
     }
+}
 
-    Some(
-        div()
-            .id("update-banner")
-            .absolute()
-            .left(px(16.0))
-            .right(px(16.0))
-            .bottom(px(16.0))
-            .flex()
-            .justify_center()
-            .occlude()
-            .child(
-                div()
-                    .max_w(px(560.0))
-                    .w_full()
-                    .flex()
-                    .items_center()
-                    .gap_3()
-                    .rounded(px(theme::RADIUS_LG))
-                    .bg(color(theme::SIDEBAR))
-                    .p_3()
-                    .shadow(card_surface_shadows())
-                    .child(
-                        div()
-                            .w(px(6.0))
-                            .h(px(32.0))
-                            .rounded(px(theme::RADIUS_SM))
-                            .bg(color(tone)),
-                    )
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .text_size(px(theme::TEXT_LABEL_SIZE))
-                            .text_color(color(theme::FOREGROUND))
-                            .truncate()
-                            .child(update_status_text(status)),
-                    )
-                    .child(actions),
-            ),
-    )
+fn update_dialog_kicker(status: &UpdateStatus) -> &'static str {
+    match status {
+        UpdateStatus::Available(_) => "UPDATE AVAILABLE",
+        UpdateStatus::Downloading { .. } => "DOWNLOADING UPDATE",
+        UpdateStatus::ReadyToInstall(_) => "READY TO INSTALL",
+        UpdateStatus::Installing => "INSTALLING UPDATE",
+        UpdateStatus::Error(_) => "UPDATE ERROR",
+        UpdateStatus::Checking => "CHECKING FOR UPDATES",
+        UpdateStatus::UpToDate => "NO UPDATE AVAILABLE",
+        UpdateStatus::Disabled(_) => "UPDATES DISABLED",
+        UpdateStatus::Idle => "UPDATES",
+    }
+}
+
+fn update_dialog_title(status: &UpdateStatus) -> String {
+    match status {
+        UpdateStatus::Available(info) => format!("Frame {} is available", info.version),
+        UpdateStatus::Downloading { version, .. } => format!("Downloading Frame {version}"),
+        UpdateStatus::ReadyToInstall(package) => {
+            format!("Frame {} is ready to install", package.version)
+        }
+        UpdateStatus::Installing => "Installing update and restarting".to_string(),
+        UpdateStatus::Error(_) => "Frame could not complete the update".to_string(),
+        UpdateStatus::Checking => "Checking for updates".to_string(),
+        UpdateStatus::UpToDate => "Frame is up to date".to_string(),
+        UpdateStatus::Disabled(explanation) => explanation.clone(),
+        UpdateStatus::Idle => "Frame updates".to_string(),
+    }
+}
+
+fn update_dialog_summary(status: &UpdateStatus, has_notes: bool) -> String {
+    match status {
+        UpdateStatus::Available(_) if has_notes => {
+            "Review what changed before installing this signed update.".to_string()
+        }
+        UpdateStatus::Available(_) => {
+            "A signed update is available, but this release did not include notes.".to_string()
+        }
+        UpdateStatus::Downloading { .. } => {
+            "Keep Frame open while the update package is downloaded and verified.".to_string()
+        }
+        UpdateStatus::ReadyToInstall(_) => {
+            "The update was downloaded and verified. Frame will restart to finish installation."
+                .to_string()
+        }
+        UpdateStatus::Installing => {
+            "Frame is handing installation to the bundled update helper.".to_string()
+        }
+        UpdateStatus::Error(_) => {
+            "The updater stopped before installation completed. You can dismiss this and try again."
+                .to_string()
+        }
+        UpdateStatus::Checking => {
+            "Frame is checking the latest signed release manifest.".to_string()
+        }
+        UpdateStatus::UpToDate => "No newer signed release is available.".to_string(),
+        UpdateStatus::Disabled(explanation) => explanation.clone(),
+        UpdateStatus::Idle => "No update check is running.".to_string(),
+    }
+}
+
+fn panel_top_separator() -> gpui::Div {
+    div()
+        .absolute()
+        .top_0()
+        .left_0()
+        .right_0()
+        .h(px(1.0))
+        .bg(color(theme::FRAME_GRAY_100))
 }
 
 pub(super) fn app_settings_concurrency_control(

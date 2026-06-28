@@ -218,8 +218,14 @@ impl Render for FrameRoot {
             root = root.child(drag_drop_overlay(self.drag_drop_ui.is_open, window, cx));
         }
 
-        if let Some(banner) = update_banner(&self.update_ui.status, window, cx) {
-            root = root.child(banner);
+        if self.update_ui.dialog_present {
+            root = root.child(update_dialog(
+                self.update_ui.dialog_open,
+                &self.update_ui.status,
+                self.update_ui.dialog_info.as_deref(),
+                window,
+                cx,
+            ));
         }
 
         root
