@@ -57,7 +57,9 @@ pub(in crate::app) fn frame_text_button(
         .text_size(px(theme::TEXT_LABEL_SIZE))
         .text_color(foreground)
         .opacity(colors.opacity)
-        .shadow(button_highlight_shadows())
+        .when(text_button_uses_highlight(variant, selected), |this| {
+            this.shadow(button_highlight_shadows())
+        })
         .when(enabled, |this| {
             this.hover(|style| style.cursor_pointer())
                 .active(move |style| style.bg(color(colors.active_background)))
@@ -70,6 +72,10 @@ pub(in crate::app) fn frame_text_button(
             button_mouse_down(enabled, window, cx);
         })
         .child(label.into())
+}
+
+fn text_button_uses_highlight(variant: ButtonVariant, selected: bool) -> bool {
+    !matches!(variant, ButtonVariant::Ghost) || selected
 }
 
 pub(in crate::app) fn frame_icon_button(
@@ -175,4 +181,24 @@ pub(in crate::app) fn frame_icon_button(
             button_mouse_down(enabled, window, cx);
         })
         .child(icon_svg(icon, icon_size, animated_foreground))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ghost_text_button_uses_no_highlight_when_unselected() {
+        assert!(!text_button_uses_highlight(ButtonVariant::Ghost, false));
+    }
+
+    #[test]
+    fn ghost_text_button_uses_highlight_when_selected() {
+        assert!(text_button_uses_highlight(ButtonVariant::Ghost, true));
+    }
+
+    #[test]
+    fn secondary_text_button_keeps_highlight() {
+        assert!(text_button_uses_highlight(ButtonVariant::Secondary, false));
+    }
 }

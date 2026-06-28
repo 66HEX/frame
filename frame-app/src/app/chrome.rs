@@ -810,7 +810,7 @@ fn update_dialog_panel(
         .id("update-dialog-panel")
         .mt(px(panel_offset))
         .w_full()
-        .max_w(px(720.0))
+        .max_w(px(640.0))
         .max_h(relative(0.86))
         .overflow_hidden()
         .rounded(px(theme::RADIUS_LG))
@@ -836,34 +836,33 @@ fn update_dialog_header(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let mut title_stack = div().flex().flex_col().gap_1();
+    if let Some(kicker) = update_dialog_kicker(status) {
+        title_stack = title_stack.child(
+            div()
+                .text_size(px(theme::TEXT_LABEL_SIZE))
+                .text_color(color(theme::FRAME_GRAY_600))
+                .child(kicker),
+        );
+    }
+    title_stack = title_stack.child(
+        div()
+            .text_size(px(theme::TEXT_LABEL_SIZE))
+            .font_weight(gpui::FontWeight::MEDIUM)
+            .text_color(color(theme::FOREGROUND))
+            .child(update_dialog_title(status).to_uppercase()),
+    );
+
     div()
         .relative()
+        .h(px(PANEL_HEADER_HEIGHT))
+        .w_full()
         .flex()
         .items_center()
         .justify_between()
         .gap_4()
         .px_4()
-        .py_3()
-        .child(
-            div()
-                .flex()
-                .flex_col()
-                .gap_1()
-                .child(
-                    div()
-                        .text_size(px(theme::TEXT_LABEL_SIZE))
-                        .text_color(color(theme::FRAME_GRAY_600))
-                        .child(update_dialog_kicker(status)),
-                )
-                .child(
-                    div()
-                        .text_size(px(16.0))
-                        .line_height(px(20.0))
-                        .font_weight(gpui::FontWeight::MEDIUM)
-                        .text_color(color(theme::FOREGROUND))
-                        .child(update_dialog_title(status)),
-                ),
-        )
+        .child(title_stack)
         .child(app_settings_close_button(window, cx).on_click(cx.listener(
             |root, _: &ClickEvent, _window, cx| {
                 cx.stop_propagation();
@@ -876,23 +875,20 @@ fn update_dialog_header(
 
 fn update_dialog_body(status: &UpdateStatus, info: Option<&UpdateInfo>) -> gpui::Div {
     let notes = update_release_notes_text(info);
-    let mut body = div().flex().flex_col().gap_3().p_4().child(
-        div()
-            .text_size(px(theme::TEXT_LABEL_SIZE))
-            .line_height(px(16.0))
-            .text_color(color(theme::FRAME_GRAY_600))
-            .child(update_dialog_summary(status, notes.is_some())),
-    );
+    let mut body = div().flex().flex_col().gap_3().p_4();
+
+    if let Some(summary) = update_dialog_summary(status, notes.is_some()) {
+        body = body.child(
+            div()
+                .text_size(px(theme::TEXT_LABEL_SIZE))
+                .line_height(px(16.0))
+                .text_color(color(theme::FRAME_GRAY_600))
+                .child(summary),
+        );
+    }
 
     if let Some(notes) = notes.as_deref() {
-        body = body
-            .child(
-                div()
-                    .text_size(px(theme::TEXT_LABEL_SIZE))
-                    .text_color(color(theme::FOREGROUND))
-                    .child("RELEASE NOTES"),
-            )
-            .child(update_release_notes_block(notes));
+        body = body.child(update_release_notes_block(notes));
     }
 
     if let UpdateStatus::Error(error) = status {
@@ -943,12 +939,13 @@ fn update_dialog_footer(
 ) -> gpui::Div {
     div()
         .relative()
+        .w_full()
         .flex()
         .items_center()
-        .justify_between()
+        .justify_end()
         .gap_3()
+        .pb_4()
         .px_4()
-        .py_3()
         .child(
             frame_text_button(
                 "update-dialog-later",
@@ -968,7 +965,6 @@ fn update_dialog_footer(
             })),
         )
         .child(update_dialog_primary_action(status, window, cx))
-        .child(panel_top_separator())
 }
 
 fn update_dialog_primary_action(
@@ -1048,17 +1044,17 @@ fn update_dialog_primary_action(
     }
 }
 
-fn update_dialog_kicker(status: &UpdateStatus) -> &'static str {
+fn update_dialog_kicker(status: &UpdateStatus) -> Option<&'static str> {
     match status {
-        UpdateStatus::Available(_) => "UPDATE AVAILABLE",
-        UpdateStatus::Downloading { .. } => "DOWNLOADING UPDATE",
-        UpdateStatus::ReadyToInstall(_) => "READY TO INSTALL",
-        UpdateStatus::Installing => "INSTALLING UPDATE",
-        UpdateStatus::Error(_) => "UPDATE ERROR",
-        UpdateStatus::Checking => "CHECKING FOR UPDATES",
-        UpdateStatus::UpToDate => "NO UPDATE AVAILABLE",
-        UpdateStatus::Disabled(_) => "UPDATES DISABLED",
-        UpdateStatus::Idle => "UPDATES",
+        UpdateStatus::Available(_) => None,
+        UpdateStatus::Downloading { .. } => Some("DOWNLOADING UPDATE"),
+        UpdateStatus::ReadyToInstall(_) => Some("READY TO INSTALL"),
+        UpdateStatus::Installing => Some("INSTALLING UPDATE"),
+        UpdateStatus::Error(_) => Some("UPDATE ERROR"),
+        UpdateStatus::Checking => Some("CHECKING FOR UPDATES"),
+        UpdateStatus::UpToDate => Some("NO UPDATE AVAILABLE"),
+        UpdateStatus::Disabled(_) => Some("UPDATES DISABLED"),
+        UpdateStatus::Idle => Some("UPDATES"),
     }
 }
 
@@ -1078,45 +1074,33 @@ fn update_dialog_title(status: &UpdateStatus) -> String {
     }
 }
 
-fn update_dialog_summary(status: &UpdateStatus, has_notes: bool) -> String {
+fn update_dialog_summary(status: &UpdateStatus, has_notes: bool) -> Option<String> {
     match status {
-        UpdateStatus::Available(_) if has_notes => {
-            "Review what changed before installing this signed update.".to_string()
-        }
-        UpdateStatus::Available(_) => {
+        UpdateStatus::Available(_) if has_notes => None,
+        UpdateStatus::Available(_) => Some(
             "A signed update is available, but this release did not include notes.".to_string()
-        }
-        UpdateStatus::Downloading { .. } => {
+        ),
+        UpdateStatus::Downloading { .. } => Some(
             "Keep Frame open while the update package is downloaded and verified.".to_string()
-        }
-        UpdateStatus::ReadyToInstall(_) => {
+        ),
+        UpdateStatus::ReadyToInstall(_) => Some(
             "The update was downloaded and verified. Frame will restart to finish installation."
                 .to_string()
-        }
-        UpdateStatus::Installing => {
+        ),
+        UpdateStatus::Installing => Some(
             "Frame is handing installation to the bundled update helper.".to_string()
-        }
-        UpdateStatus::Error(_) => {
+        ),
+        UpdateStatus::Error(_) => Some(
             "The updater stopped before installation completed. You can dismiss this and try again."
                 .to_string()
-        }
-        UpdateStatus::Checking => {
+        ),
+        UpdateStatus::Checking => Some(
             "Frame is checking the latest signed release manifest.".to_string()
-        }
-        UpdateStatus::UpToDate => "No newer signed release is available.".to_string(),
-        UpdateStatus::Disabled(explanation) => explanation.clone(),
-        UpdateStatus::Idle => "No update check is running.".to_string(),
+        ),
+        UpdateStatus::UpToDate => Some("No newer signed release is available.".to_string()),
+        UpdateStatus::Disabled(explanation) => Some(explanation.clone()),
+        UpdateStatus::Idle => Some("No update check is running.".to_string()),
     }
-}
-
-fn panel_top_separator() -> gpui::Div {
-    div()
-        .absolute()
-        .top_0()
-        .left_0()
-        .right_0()
-        .h(px(1.0))
-        .bg(color(theme::FRAME_GRAY_100))
 }
 
 pub(super) fn app_settings_concurrency_control(

@@ -97,6 +97,7 @@ pub enum VisualFixture {
     SettingsSubtitles,
     SettingsSubtitlesPopover,
     SettingsVideo,
+    UpdateAvailable,
     WorkspaceAudio,
     WorkspaceEmpty,
     WorkspaceImage,
@@ -118,6 +119,7 @@ pub fn visual_fixture_from_env_value(value: Option<&str>) -> Option<VisualFixtur
         Some("settings-subtitles") => Some(VisualFixture::SettingsSubtitles),
         Some("settings-subtitles-popover") => Some(VisualFixture::SettingsSubtitlesPopover),
         Some("settings-video") => Some(VisualFixture::SettingsVideo),
+        Some("update-available") => Some(VisualFixture::UpdateAvailable),
         Some("workspace-audio") => Some(VisualFixture::WorkspaceAudio),
         Some("workspace-empty") => Some(VisualFixture::WorkspaceEmpty),
         Some("workspace-image") => Some(VisualFixture::WorkspaceImage),
@@ -373,6 +375,14 @@ mod tests {
             assert_eq!(
                 visual_fixture_from_env_value(Some("settings-images")),
                 Some(VisualFixture::SettingsImages)
+            );
+        }
+
+        #[test]
+        fn update_available_value_enables_update_fixture() {
+            assert_eq!(
+                visual_fixture_from_env_value(Some("update-available")),
+                Some(VisualFixture::UpdateAvailable)
             );
         }
 

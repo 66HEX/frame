@@ -1771,6 +1771,24 @@ mod visual_fixtures {
     }
 
     #[test]
+    fn update_available_fixture_opens_update_dialog() {
+        let mut root = FrameRoot::new();
+
+        root.apply_visual_fixture(Some(VisualFixture::UpdateAvailable));
+
+        assert!(root.update_ui.dialog_open);
+        assert!(root.update_ui.dialog_present);
+        assert!(matches!(root.update_ui.status, UpdateStatus::Available(_)));
+        assert!(
+            root.update_ui
+                .dialog_info
+                .as_ref()
+                .and_then(|info| info.release_notes_markdown.as_deref())
+                .is_some_and(|notes| notes.contains("Frame 0.1.1"))
+        );
+    }
+
+    #[test]
     fn preview_ready_fixture_seeds_selected_video_metadata() {
         let mut root = FrameRoot::new();
 

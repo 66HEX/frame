@@ -1,5 +1,25 @@
 use super::*;
 
+use frame_updater::{PlatformAssetKey, UpdateAsset};
+use semver::Version;
+
+const UPDATE_AVAILABLE_RELEASE_NOTES: &str = r#"
+# Frame 0.1.1
+
+- Native autoupdater flow with signed manifests and platform-specific packages.
+- Animated update dialog that presents release notes before the user downloads or installs.
+- macOS, Windows, and Linux release assets generated from the release pipeline.
+- Bundled GStreamer runtime fixes for packaged builds.
+- Update helper validation for replacing installed app bundles safely.
+
+## Notes for visual review
+
+This fixture intentionally uses enough text to exercise the dialog layout, scrolling,
+button placement, and close animation. Production release notes should be carried in
+`releaseNotesMarkdown` so the user can decide based on visible changes instead of
+accepting an update blindly.
+"#;
+
 impl FrameRoot {
     pub(super) fn apply_visual_fixture(&mut self, fixture: Option<VisualFixture>) {
         match fixture {
@@ -18,12 +38,35 @@ impl FrameRoot {
                 self.apply_settings_subtitles_popover_fixture();
             }
             Some(VisualFixture::SettingsVideo) => self.apply_settings_video_fixture(),
+            Some(VisualFixture::UpdateAvailable) => self.apply_update_available_fixture(),
             Some(VisualFixture::WorkspaceAudio) => self.apply_workspace_audio_fixture(),
             Some(VisualFixture::WorkspaceEmpty) => self.apply_workspace_empty_fixture(),
             Some(VisualFixture::WorkspaceImage) => self.apply_workspace_image_fixture(),
             None => {}
         }
     }
+
+    pub(super) fn apply_update_available_fixture(&mut self) {
+        let Ok(asset_key) = PlatformAssetKey::current() else {
+            return;
+        };
+        let update = Box::new(UpdateInfo {
+            version: Version::new(0, 1, 1),
+            channel: UpdateChannel::Stable,
+            asset_key,
+            asset: update_available_fixture_asset(asset_key),
+            release_notes_url: Some(
+                "https://github.com/66HEX/frame/releases/tag/v0.1.1".to_string(),
+            ),
+            release_notes_markdown: Some(UPDATE_AVAILABLE_RELEASE_NOTES.to_string()),
+        });
+
+        self.update_ui.status = UpdateStatus::Available(update.clone());
+        self.update_ui.dialog_info = Some(update);
+        self.update_ui.dialog_open = true;
+        self.update_ui.dialog_present = true;
+    }
+
     pub(super) fn apply_workspace_empty_fixture(&mut self) {
         self.active_view = ActiveView::Workspace;
         self.file_queue = FileQueue::new();
@@ -326,5 +369,25 @@ impl FrameRoot {
                 ..SourceMetadata::default()
             },
         );
+    }
+}
+
+fn update_available_fixture_asset(asset_key: PlatformAssetKey) -> UpdateAsset {
+    let file_name = match asset_key {
+        PlatformAssetKey::MacosAarch64 | PlatformAssetKey::MacosX8664 => "Frame-fixture.app.zip",
+        PlatformAssetKey::WindowsX8664 => "Frame-fixture.exe",
+        PlatformAssetKey::LinuxX8664 | PlatformAssetKey::LinuxAarch64 => {
+            "frame-fixture-linux.tar.gz"
+        }
+    };
+
+    UpdateAsset {
+        target_triple: asset_key.target_triple().to_string(),
+        kind: asset_key.asset_kind(),
+        file_name: file_name.to_string(),
+        url: format!("https://example.com/{file_name}"),
+        size_bytes: 1,
+        sha256: "0".repeat(64),
+        installer_args: Vec::new(),
     }
 }
