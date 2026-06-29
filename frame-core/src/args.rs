@@ -6,7 +6,8 @@ use crate::codec::{
 };
 use crate::error::ConversionError;
 use crate::filters::{
-    build_audio_filters, build_overlay_filter_complex, build_video_filters, has_overlay,
+    build_audio_filters, build_encode_overlay_filter_complex, build_encode_video_filters,
+    build_overlay_filter_complex, build_video_filters, has_overlay,
 };
 use crate::media_rules::{
     container_supports_audio, container_supports_subtitles, is_audio_codec_allowed,
@@ -319,9 +320,9 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
 
         if use_overlay {
             args.push("-filter_complex".to_string());
-            args.push(build_overlay_filter_complex(config));
+            args.push(build_encode_overlay_filter_complex(config));
         } else {
-            let video_filters = build_video_filters(config, true);
+            let video_filters = build_encode_video_filters(config, true);
             if !video_filters.is_empty() {
                 args.push("-vf".to_string());
                 args.push(video_filters.join(","));
@@ -797,4 +798,78 @@ pub fn validate_task_input(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::filters::EVEN_DIMENSIONS_FILTER;
+
+    fn sample_config(container: &str, video_codec: &str) -> ConversionConfig {
+        ConversionConfig {
+            processing_mode: "reencode".to_string(),
+            container: container.to_string(),
+            video_codec: video_codec.to_string(),
+            video_bitrate_mode: "crf".to_string(),
+            video_bitrate: "5000".to_string(),
+            audio_codec: "aac".to_string(),
+            audio_bitrate: "128".to_string(),
+            audio_bitrate_mode: "bitrate".to_string(),
+            audio_quality: "4".to_string(),
+            audio_channels: "original".to_string(),
+            audio_volume: 100.0,
+            audio_normalize: false,
+            selected_audio_tracks: vec![],
+            selected_subtitle_tracks: vec![],
+            subtitle_burn_path: None,
+            subtitle_font_name: None,
+            subtitle_font_size: None,
+            subtitle_font_color: None,
+            subtitle_outline_color: None,
+            subtitle_position: None,
+            resolution: "original".to_string(),
+            custom_width: None,
+            custom_height: None,
+            scaling_algorithm: "bicubic".to_string(),
+            fps: "original".to_string(),
+            crf: 23,
+            quality: 50,
+            preset: "medium".to_string(),
+            start_time: None,
+            end_time: None,
+            metadata: MetadataConfig::default(),
+            rotation: "0".to_string(),
+            flip_horizontal: false,
+            flip_vertical: false,
+            crop: None,
+            overlay: None,
+            nvenc_spatial_aq: false,
+            nvenc_temporal_aq: false,
+            videotoolbox_allow_sw: false,
+            hw_decode: false,
+            pixel_format: "auto".to_string(),
+            gif_colors: 256,
+            gif_dither: "sierra2_4a".to_string(),
+            gif_loop: 0,
+        }
+    }
+
+    #[test]
+    fn build_ffmpeg_args_adds_even_dimensions_guard_for_default_video_reencode() {
+        let config = sample_config("mp4", "libx264");
+
+        let args = build_ffmpeg_args("input.mov", "output.mp4", &config);
+
+        let vf_index = args.iter().position(|arg| arg == "-vf").unwrap();
+        assert_eq!(args[vf_index + 1], EVEN_DIMENSIONS_FILTER);
+    }
+
+    #[test]
+    fn build_ffmpeg_args_does_not_add_even_dimensions_guard_for_image_output() {
+        let config = sample_config("png", "png");
+
+        let args = build_ffmpeg_args("input.mov", "output.png", &config);
+
+        assert!(!args.iter().any(|arg| arg == EVEN_DIMENSIONS_FILTER));
+    }
 }

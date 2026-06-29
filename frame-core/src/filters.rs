@@ -1,5 +1,7 @@
 use crate::types::{ConversionConfig, VOLUME_EPSILON};
 
+pub const EVEN_DIMENSIONS_FILTER: &str = "pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0";
+
 /// Converts a CSS hex color (`#RRGGBB`) to an ASS/SSA color string (`&H00BBGGRR`).
 fn hex_to_ass_color(hex: &str) -> Option<String> {
     let hex = hex.trim().trim_start_matches('#');
@@ -148,6 +150,12 @@ pub fn build_video_filters(config: &ConversionConfig, include_scale: bool) -> Ve
     filters
 }
 
+pub fn build_encode_video_filters(config: &ConversionConfig, include_scale: bool) -> Vec<String> {
+    let mut filters = build_video_filters(config, include_scale);
+    filters.push(EVEN_DIMENSIONS_FILTER.to_string());
+    filters
+}
+
 pub fn has_overlay(config: &ConversionConfig) -> bool {
     config
         .overlay
@@ -157,6 +165,18 @@ pub fn has_overlay(config: &ConversionConfig) -> bool {
 
 pub fn build_overlay_filter_complex(config: &ConversionConfig) -> String {
     let filters = build_video_filters(config, true);
+    build_overlay_filter_complex_with_filters(config, filters)
+}
+
+pub fn build_encode_overlay_filter_complex(config: &ConversionConfig) -> String {
+    let filters = build_encode_video_filters(config, true);
+    build_overlay_filter_complex_with_filters(config, filters)
+}
+
+fn build_overlay_filter_complex_with_filters(
+    config: &ConversionConfig,
+    filters: Vec<String>,
+) -> String {
     let base_chain = if filters.is_empty() {
         "[0:v:0]null[base]".to_string()
     } else {
@@ -254,6 +274,13 @@ mod tests {
     }
 
     #[test]
+    fn encode_video_filters_add_even_dimensions_guard_for_original_resolution() {
+        let config = default_config();
+        let filters = build_encode_video_filters(&config, true);
+        assert_eq!(filters, vec![EVEN_DIMENSIONS_FILTER]);
+    }
+
+    #[test]
     fn test_flip_filters() {
         let mut config = default_config();
         config.flip_horizontal = true;
@@ -288,6 +315,25 @@ mod tests {
     }
 
     #[test]
+    fn encode_video_filters_append_even_dimensions_guard_after_user_filters() {
+        let mut config = default_config();
+        config.crop = Some(CropConfig {
+            enabled: true,
+            x: 10.0,
+            y: 20.0,
+            width: 101.0,
+            height: 201.0,
+            source_width: None,
+            source_height: None,
+            aspect_ratio: None,
+        });
+
+        let filters = build_encode_video_filters(&config, true);
+
+        assert_eq!(filters, vec!["crop=101:201:10:20", EVEN_DIMENSIONS_FILTER]);
+    }
+
+    #[test]
     fn test_overlay_filter_complex() {
         let mut config = default_config();
         config.resolution = "720p".to_string();
@@ -313,6 +359,24 @@ mod tests {
             )
         );
         assert!(filter.ends_with("[vout]"));
+    }
+
+    #[test]
+    fn encode_overlay_filter_complex_pads_base_before_overlay() {
+        let mut config = default_config();
+        config.overlay = Some(OverlayConfig {
+            enabled: true,
+            path: "/tmp/logo.png".to_string(),
+            x: 0.5,
+            y: 0.5,
+            width: 0.2,
+            opacity: 1.0,
+            anchor: "custom".to_string(),
+        });
+
+        let filter = build_encode_overlay_filter_complex(&config);
+
+        assert!(filter.contains("[0:v:0]pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0[base]"));
     }
 
     #[test]
