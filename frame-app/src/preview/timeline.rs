@@ -1,5 +1,7 @@
 use super::crop::clamp;
 
+const PLAYBACK_END_EPSILON_SECONDS: f64 = 0.05;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TimelineDragTarget {
     Start,
@@ -235,7 +237,9 @@ impl PreviewPlaybackState {
             return PlaybackMediaCommand::none();
         }
 
-        if self.current_time >= self.end_value && self.end_value > self.start_value {
+        if playback_time_reached_end(self.current_time, self.end_value)
+            && self.end_value > self.start_value
+        {
             self.is_playing = false;
             self.current_time = self.start_value;
             return PlaybackMediaCommand::pause_and_seek(self.start_value);
@@ -254,7 +258,9 @@ impl PreviewPlaybackState {
             return PlaybackMediaCommand::pause();
         }
 
-        if self.current_time < self.start_value || self.current_time >= self.end_value {
+        if self.current_time < self.start_value
+            || playback_time_reached_end(self.current_time, self.end_value)
+        {
             self.current_time = self.start_value;
             return PlaybackMediaCommand::seek_and_play(self.start_value);
         }
@@ -448,4 +454,8 @@ pub fn format_time(seconds: f64) -> String {
 
 fn finite_or_zero(value: f64) -> f64 {
     if value.is_finite() { value } else { 0.0 }
+}
+
+fn playback_time_reached_end(current_time: f64, end_time: f64) -> bool {
+    current_time + PLAYBACK_END_EPSILON_SECONDS >= end_time
 }

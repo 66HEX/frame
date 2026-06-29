@@ -20,6 +20,7 @@ use super::{
 
 const MAX_FRAME_PACING_DELAY: Duration = Duration::from_millis(100);
 const DISCOVERER_DURATION_TIMEOUT: gst::ClockTime = gst::ClockTime::from_seconds(2);
+const FRAME_WORKER_PULL_TIMEOUT: gst::ClockTime = gst::ClockTime::from_mseconds(50);
 const SEEK_END_EPSILON: f64 = 0.001;
 const SEEK_TRANSIENT_GUARD_TIMEOUT: Duration = Duration::from_millis(800);
 const SEEK_TRANSIENT_POSITION_TOLERANCE_US: u64 = 100_000;
@@ -49,6 +50,9 @@ impl RunningPreviewPipeline {
     }
 
     pub fn resume(&self) -> Result<(), PreviewEngineError> {
+        if self.ended() {
+            self.seek(0.0, false, true)?;
+        }
         self.reset_clock();
         self.eos_reached.store(false, Ordering::SeqCst);
         self.set_audio_muted(false);
@@ -345,9 +349,8 @@ fn spawn_frame_worker(
             let mut playback_clock = PlaybackClock::new();
             while !stop_requested.load(Ordering::SeqCst) {
                 let sample_generation = clock_generation.load(Ordering::SeqCst);
-                let sample = match appsink.pull_sample() {
-                    Ok(sample) => sample,
-                    Err(_) => break,
+                let Some(sample) = appsink.try_pull_sample(FRAME_WORKER_PULL_TIMEOUT) else {
+                    continue;
                 };
 
                 let Some(frame) = frame_from_sample(&sample) else {

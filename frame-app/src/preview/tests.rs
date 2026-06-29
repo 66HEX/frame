@@ -550,6 +550,16 @@ mod preview_playback_state {
     }
 
     #[test]
+    fn handle_time_update_loops_back_when_time_is_just_before_end() {
+        let mut playback = playback_with_media(120.0);
+
+        let command = playback.handle_time_update(119.96);
+
+        assert_eq!(command, PlaybackMediaCommand::pause_and_seek(0.0));
+        assert_close(playback.current_time(), 0.0);
+    }
+
+    #[test]
     fn toggle_play_seeks_to_start_when_current_time_is_outside_trim() {
         let mut playback = playback_with_media(120.0);
         playback.sync_initial_values(Some("00:00:10.000"), Some("00:00:20.000"));
@@ -563,6 +573,20 @@ mod preview_playback_state {
         let command = playback.toggle_play();
 
         assert_eq!(command, PlaybackMediaCommand::seek_and_play(10.0));
+    }
+
+    #[test]
+    fn toggle_play_restarts_when_current_time_is_just_before_duration_end() {
+        let mut playback = playback_with_media(120.0);
+        playback.sync_media(MediaSnapshot {
+            current_time: 119.96,
+            duration: 120.0,
+            paused: true,
+        });
+
+        let command = playback.toggle_play();
+
+        assert_eq!(command, PlaybackMediaCommand::seek_and_play(0.0));
     }
 
     #[test]

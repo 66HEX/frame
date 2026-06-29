@@ -111,12 +111,17 @@ impl PreviewSession {
             || *lock(&self.duration_seconds),
             |pipeline| self.update_duration(pipeline.duration()),
         );
-        let position = pipeline
-            .as_ref()
-            .map_or(0.0, RunningPreviewPipeline::position);
+        let ended = pipeline.as_ref().is_some_and(RunningPreviewPipeline::ended);
+        let position =
+            pipeline.as_ref().map_or(
+                0.0,
+                |pipeline| {
+                    if ended { duration } else { pipeline.position() }
+                },
+            );
         let playing = pipeline
             .as_ref()
-            .is_some_and(|pipeline| !pipeline.ended() && *lock(&self.playing));
+            .is_some_and(|_| !ended && *lock(&self.playing));
 
         PreviewSessionSnapshot {
             file_id: self.config.file_id.clone(),
