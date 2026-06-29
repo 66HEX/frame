@@ -436,7 +436,7 @@ fn build_pipeline_description(
     let transform_branch = gstreamer_transform_branch(transform);
     let crop_branch = gstreamer_crop_branch(crop);
     format!(
-        "filesrc name=preview_src ! decodebin name=preview_decode force-sw-decoders=true preview_decode. ! queue max-size-buffers=8 max-size-bytes=0 max-size-time=0 ! videoconvert ! {transform_branch}{crop_branch}videoscale ! videorate drop-only=true ! video/x-raw,format=BGRA,width={},height={},framerate={}/1 ! appsink name=preview_sink emit-signals=false sync=false max-buffers=2 drop=false wait-on-eos=false {audio_branch}",
+        "filesrc name=preview_src ! decodebin name=preview_decode force-sw-decoders=true preview_decode. ! queue max-size-buffers=8 max-size-bytes=0 max-size-time=0 ! videoconvert ! {transform_branch}{crop_branch}videoscale ! videorate drop-only=true ! video/x-raw,format=BGRA,width={},height={},framerate=[1/1,{}/1] ! appsink name=preview_sink emit-signals=false sync=false max-buffers=2 drop=false wait-on-eos=false {audio_branch}",
         dimensions.width, dimensions.height, fps
     )
 }
@@ -665,6 +665,23 @@ mod tests {
         assert!(description.contains("video/x-raw,format=BGRA"));
         assert!(!description.contains("leaky-type=downstream"));
         assert!(description.contains("sync=false max-buffers=2 drop=false"));
+    }
+
+    #[test]
+    fn build_pipeline_description_caps_preview_fps_without_forcing_upsampling() {
+        let description = build_pipeline_description(
+            PreviewDimensions {
+                width: 1280,
+                height: 720,
+            },
+            30,
+            PreviewSourceKind::Video,
+            PreviewTransform::default(),
+            None,
+        );
+
+        assert!(description.contains("framerate=[1/1,30/1]"));
+        assert!(!description.contains("framerate=30/1"));
     }
 
     #[test]
