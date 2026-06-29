@@ -2,6 +2,7 @@ use super::*;
 
 pub fn init_app(cx: &mut App, name: impl Into<SharedString>) {
     cx.activate(true);
+    cx.set_text_rendering_mode(TextRenderingMode::PlatformDefault);
     cx.on_action(|_: &Quit, cx| cx.quit());
     cx.bind_keys([
         KeyBinding::new("cmd-q", Quit, None),

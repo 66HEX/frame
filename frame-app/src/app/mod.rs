@@ -142,11 +142,12 @@ use gpui::{
     LayoutId, Lerp, Menu, MenuItem, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
     ObjectFit, PaintQuad, PinchEvent, Pixels, PlatformInput, Point, Position, PromptButton,
     PromptLevel, Render, RenderImage, Rgba, ScrollDelta, ScrollHandle, ScrollStrategy,
-    ScrollWheelEvent, ShapedLine, SharedString, StatefulInteractiveElement, Style, Task, TextRun,
-    TitlebarOptions, TransformationMatrix, UTF16Selection, UniformListScrollHandle, Window,
-    WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowDecorations, WindowOptions,
-    actions, canvas, deferred, div, ease_out_quint, fill, hsla, img, linear_color_stop,
-    linear_gradient, point, prelude::*, px, radians, relative, size, svg, uniform_list,
+    ScrollWheelEvent, ShapedLine, SharedString, StatefulInteractiveElement, Style, Task,
+    TextRenderingMode, TextRun, TitlebarOptions, TransformationMatrix, UTF16Selection,
+    UniformListScrollHandle, Window, WindowBackgroundAppearance, WindowBounds, WindowControlArea,
+    WindowDecorations, WindowOptions, actions, canvas, deferred, div, ease_out_quint, fill, hsla,
+    img, linear_color_stop, linear_gradient, point, prelude::*, px, radians, relative, size, svg,
+    uniform_list,
 };
 #[cfg(target_os = "macos")]
 use objc2_app_kit::{NSView, NSWindowButton};
