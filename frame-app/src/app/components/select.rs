@@ -1,0 +1,231 @@
+use super::*;
+
+pub(in crate::app) const FRAME_SELECT_MAX_HEIGHT: f32 = 192.0;
+pub(in crate::app) const FRAME_SELECT_CONTENT_PADDING: f32 = 4.0;
+pub(in crate::app) const FRAME_SELECT_OPTION_HEIGHT: f32 = 28.0;
+pub(in crate::app) const FRAME_COLOR_SWATCH_SIZE: f32 = 14.0;
+
+pub(in crate::app) fn frame_select_trigger(
+    id: impl Into<String>,
+    display: &str,
+    enabled: bool,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    frame_select_trigger_content(
+        id,
+        div()
+            .flex_1()
+            .min_w_0()
+            .truncate()
+            .text_color(color(theme::FOREGROUND))
+            .child(display.to_string()),
+        enabled,
+        window,
+        cx,
+    )
+}
+
+pub(in crate::app) fn frame_select_trigger_content(
+    id: impl Into<String>,
+    content: impl IntoElement,
+    enabled: bool,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    let id = id.into();
+    let colors = button_colors(ButtonVariant::Secondary, false, enabled);
+    let animated = animated_button_colors(id.clone(), colors, window, cx);
+    let background = animated.background;
+    let foreground = animated.foreground;
+    let hover_transition = animated.hover_transition;
+
+    div()
+        .id(id.clone())
+        .group(id)
+        .h(px(SETTINGS_CONTROL_HEIGHT))
+        .w_full()
+        .flex()
+        .items_center()
+        .justify_between()
+        .min_w_0()
+        .rounded(px(theme::RADIUS_SM))
+        .px(px(10.0))
+        .bg(background)
+        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
+        .text_color(foreground)
+        .opacity(colors.opacity)
+        .shadow(button_highlight_shadows())
+        .when(enabled, |this| {
+            this.hover(|style| style.cursor_pointer())
+                .active(move |style| style.bg(color(colors.active_background)))
+        })
+        .when(!enabled, |this| this.cursor_not_allowed())
+        .on_hover(move |hover, _window, cx| {
+            retarget_hover_motion(&hover_transition, *hover && enabled, cx);
+        })
+        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
+            cx.stop_propagation();
+            button_mouse_down(enabled, window, cx);
+        })
+        .child(content)
+        .child(div().flex_shrink_0().child(icon_svg(
+            assets::ICON_CHEVRONS_UP_DOWN,
+            12.0,
+            foreground,
+        )))
+}
+
+pub(in crate::app) fn frame_select_popover(
+    id: &'static str,
+    top: f32,
+    progress: f32,
+    list: impl IntoElement,
+) -> gpui::Stateful<gpui::Div> {
+    div()
+        .absolute()
+        .id(id)
+        .top(px(top))
+        .left_0()
+        .right_0()
+        .max_h(px(FRAME_SELECT_MAX_HEIGHT))
+        .overflow_hidden()
+        .rounded(px(theme::RADIUS_SM))
+        .bg(color(theme::DROPDOWN))
+        .opacity(progress)
+        .shadow(button_highlight_shadows())
+        .occlude()
+        .on_mouse_down(MouseButton::Left, move |_, _window, cx| {
+            cx.stop_propagation();
+        })
+        .child(list)
+}
+
+pub(in crate::app) fn frame_select_options_list(
+    id: &'static str,
+    scroll_handle: &ScrollHandle,
+) -> gpui::Stateful<gpui::Div> {
+    div()
+        .id(id)
+        .max_h(px(FRAME_SELECT_MAX_HEIGHT))
+        .overflow_y_scroll()
+        .track_scroll(scroll_handle)
+        .p(px(FRAME_SELECT_CONTENT_PADDING))
+        .on_scroll_wheel(refresh_select_hover_after_scroll)
+}
+
+pub(in crate::app) fn frame_select_content_height(option_count: usize) -> f32 {
+    option_count as f32 * FRAME_SELECT_OPTION_HEIGHT + FRAME_SELECT_CONTENT_PADDING * 2.0
+}
+
+pub(in crate::app) fn frame_select_option(
+    id: impl Into<String>,
+    label: impl Into<String>,
+    selected: bool,
+    enabled: bool,
+) -> gpui::Stateful<gpui::Div> {
+    let label = label.into();
+    let text_color = if selected {
+        theme::FOREGROUND
+    } else {
+        theme::FRAME_GRAY_600
+    };
+
+    div()
+        .id(id.into())
+        .h(px(FRAME_SELECT_OPTION_HEIGHT))
+        .w_full()
+        .flex()
+        .items_center()
+        .justify_between()
+        .gap_2()
+        .rounded(px(theme::RADIUS_XS))
+        .px(px(12.0))
+        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
+        .text_color(color(text_color))
+        .opacity(if enabled { 1.0 } else { 0.5 })
+        .when(enabled, |this| {
+            this.hover(|style| {
+                style
+                    .bg(color(theme::FRAME_GRAY_100))
+                    .text_color(color(theme::FOREGROUND))
+                    .cursor_pointer()
+            })
+        })
+        .when(!enabled, |this| this.cursor_not_allowed())
+        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
+            cx.stop_propagation();
+            button_mouse_down(enabled, window, cx);
+        })
+        .child(div().min_w_0().truncate().child(label))
+        .when(selected, |this| {
+            this.child(icon_svg(assets::ICON_CHECK, 12.0, color(theme::FOREGROUND)))
+        })
+}
+
+pub(in crate::app) fn frame_color_select_value(value: &str) -> gpui::Div {
+    div()
+        .flex()
+        .flex_1()
+        .min_w_0()
+        .items_center()
+        .gap_2()
+        .child(frame_color_swatch(value))
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .w_full()
+                .truncate()
+                .text_color(color(theme::FOREGROUND))
+                .child(value.to_uppercase()),
+        )
+}
+
+pub(in crate::app) fn frame_color_swatch(value: &str) -> gpui::Div {
+    div()
+        .w(px(FRAME_COLOR_SWATCH_SIZE))
+        .h(px(FRAME_COLOR_SWATCH_SIZE))
+        .flex_shrink_0()
+        .rounded(px(theme::RADIUS_XS))
+        .bg(parse_hex(value))
+        .shadow(input_highlight_shadows())
+}
+
+fn refresh_select_hover_after_scroll(
+    _event: &ScrollWheelEvent,
+    window: &mut Window,
+    _cx: &mut App,
+) {
+    window.refresh();
+    window.on_next_frame(|window, cx| {
+        window.dispatch_event(
+            PlatformInput::MouseMove(MouseMoveEvent {
+                position: window.mouse_position(),
+                pressed_button: None,
+                modifiers: window.modifiers(),
+            }),
+            cx,
+        );
+    });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn frame_select_content_height_includes_vertical_padding() {
+        assert_eq!(
+            frame_select_content_height(3),
+            FRAME_SELECT_OPTION_HEIGHT * 3.0 + FRAME_SELECT_CONTENT_PADDING * 2.0
+        );
+    }
+
+    #[test]
+    fn frame_color_swatch_uses_compact_visual_size() {
+        assert_eq!(FRAME_COLOR_SWATCH_SIZE, 14.0);
+    }
+}

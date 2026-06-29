@@ -4,14 +4,6 @@ const SUBTITLE_FIELD_LABEL_STACK_HEIGHT: f32 = 20.0;
 const SUBTITLE_POPOVER_TRIGGER_GAP: f32 = 8.0;
 const SUBTITLE_POPOVER_TOP_OFFSET: f32 =
     SUBTITLE_FIELD_LABEL_STACK_HEIGHT + SETTINGS_CONTROL_HEIGHT + SUBTITLE_POPOVER_TRIGGER_GAP;
-const SUBTITLE_SELECT_MAX_HEIGHT: f32 = 192.0;
-const SUBTITLE_SELECT_CONTENT_PADDING: f32 = 4.0;
-const SUBTITLE_SELECT_OPTION_HEIGHT: f32 = 28.0;
-const SUBTITLE_COLOR_PANEL_WIDTH: f32 = 220.0;
-const SUBTITLE_COLOR_SV_HEIGHT: f32 = 96.0;
-const SUBTITLE_COLOR_HUE_HEIGHT: f32 = 10.0;
-const SUBTITLE_COLOR_HANDLE_SIZE: f32 = 12.0;
-const SUBTITLE_HUE_HANDLE_WIDTH: f32 = 6.0;
 
 struct SettingsSubtitleColorDragPreview;
 
@@ -426,26 +418,27 @@ fn settings_subtitle_font_select(
         .flex_col()
         .gap_2()
         .child(settings_field_label("FONT"))
-        .child(settings_subtitle_select_trigger(
-            "settings-subtitle-font-select",
-            display,
-            enabled,
-            popover,
-            window,
-            cx,
-        ));
+        .child(
+            frame_select_trigger(
+                "settings-subtitle-font-select",
+                display,
+                enabled,
+                window,
+                cx,
+            )
+            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+                cx.stop_propagation();
+                root.toggle_subtitle_popover(popover);
+                cx.notify();
+            })),
+        );
 
     if rendered_popover == Some(popover) && has_options {
         let progress =
             subtitle_popover_progress(popover, active_popover == Some(popover), window, cx);
-        let content_height = subtitle_select_content_height(options.len());
-        let mut list = div()
-            .id("settings-subtitle-font-options-list")
-            .max_h(px(SUBTITLE_SELECT_MAX_HEIGHT))
-            .overflow_y_scroll()
-            .track_scroll(scroll_handle)
-            .p(px(SUBTITLE_SELECT_CONTENT_PADDING))
-            .on_scroll_wheel(refresh_subtitle_select_hover_after_scroll);
+        let content_height = frame_select_content_height(options.len());
+        let mut list =
+            frame_select_options_list("settings-subtitle-font-options-list", scroll_handle);
 
         for option in options {
             let name = option.name.clone();
@@ -453,27 +446,14 @@ fn settings_subtitle_font_select(
             list = list.child(settings_subtitle_font_option(option, is_enabled, name, cx));
         }
 
-        let mut popover = div()
-            .absolute()
-            .id("settings-subtitle-font-options")
-            .top(px(
-                SUBTITLE_POPOVER_TOP_OFFSET + subtitle_popover_slide_offset(progress)
-            ))
-            .left_0()
-            .right_0()
-            .max_h(px(SUBTITLE_SELECT_MAX_HEIGHT))
-            .overflow_hidden()
-            .rounded(px(theme::RADIUS_SM))
-            .bg(color(theme::DROPDOWN))
-            .opacity(progress)
-            .shadow(button_highlight_shadows())
-            .occlude()
-            .on_mouse_down(MouseButton::Left, move |_, _window, cx| {
-                cx.stop_propagation();
-            })
-            .child(list);
+        let mut popover = frame_select_popover(
+            "settings-subtitle-font-options",
+            SUBTITLE_POPOVER_TOP_OFFSET + subtitle_popover_slide_offset(progress),
+            progress,
+            list,
+        );
 
-        if content_height > SUBTITLE_SELECT_MAX_HEIGHT {
+        if content_height > FRAME_SELECT_MAX_HEIGHT {
             popover = popover.child(frame_vertical_scrollbar(
                 "settings-subtitle-font-options-scrollbar",
                 scroll_handle.clone(),
@@ -511,26 +491,27 @@ fn settings_subtitle_font_size_select(
         .flex_col()
         .gap_2()
         .child(settings_field_label("SIZE"))
-        .child(settings_subtitle_select_trigger(
-            "settings-subtitle-font-size-select",
-            display,
-            enabled,
-            popover,
-            window,
-            cx,
-        ));
+        .child(
+            frame_select_trigger(
+                "settings-subtitle-font-size-select",
+                display,
+                enabled,
+                window,
+                cx,
+            )
+            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+                cx.stop_propagation();
+                root.toggle_subtitle_popover(popover);
+                cx.notify();
+            })),
+        );
 
     if rendered_popover == Some(popover) {
         let progress =
             subtitle_popover_progress(popover, active_popover == Some(popover), window, cx);
-        let content_height = subtitle_select_content_height(options.len());
-        let mut list = div()
-            .id("settings-subtitle-font-size-options-list")
-            .max_h(px(SUBTITLE_SELECT_MAX_HEIGHT))
-            .overflow_y_scroll()
-            .track_scroll(scroll_handle)
-            .p(px(SUBTITLE_SELECT_CONTENT_PADDING))
-            .on_scroll_wheel(refresh_subtitle_select_hover_after_scroll);
+        let content_height = frame_select_content_height(options.len());
+        let mut list =
+            frame_select_options_list("settings-subtitle-font-size-options-list", scroll_handle);
 
         for option in options {
             let size = option.size;
@@ -538,27 +519,14 @@ fn settings_subtitle_font_size_select(
             list = list.child(settings_subtitle_size_option(option, is_enabled, size, cx));
         }
 
-        let mut popover = div()
-            .absolute()
-            .id("settings-subtitle-font-size-options")
-            .top(px(
-                SUBTITLE_POPOVER_TOP_OFFSET + subtitle_popover_slide_offset(progress)
-            ))
-            .left_0()
-            .right_0()
-            .max_h(px(SUBTITLE_SELECT_MAX_HEIGHT))
-            .overflow_hidden()
-            .rounded(px(theme::RADIUS_SM))
-            .bg(color(theme::DROPDOWN))
-            .opacity(progress)
-            .shadow(button_highlight_shadows())
-            .occlude()
-            .on_mouse_down(MouseButton::Left, move |_, _window, cx| {
-                cx.stop_propagation();
-            })
-            .child(list);
+        let mut popover = frame_select_popover(
+            "settings-subtitle-font-size-options",
+            SUBTITLE_POPOVER_TOP_OFFSET + subtitle_popover_slide_offset(progress),
+            progress,
+            list,
+        );
 
-        if content_height > SUBTITLE_SELECT_MAX_HEIGHT {
+        if content_height > FRAME_SELECT_MAX_HEIGHT {
             popover = popover.child(frame_vertical_scrollbar(
                 "settings-subtitle-font-size-options-scrollbar",
                 scroll_handle.clone(),
@@ -572,90 +540,13 @@ fn settings_subtitle_font_size_select(
     field
 }
 
-fn settings_subtitle_select_trigger(
-    id: &'static str,
-    display: &str,
-    enabled: bool,
-    popover: SettingsSubtitlePopover,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
-) -> gpui::Stateful<gpui::Div> {
-    let colors = button_colors(ButtonVariant::Secondary, false, enabled);
-    let animated = animated_button_colors(id, colors, window, cx);
-    let background = animated.background;
-    let foreground = animated.foreground;
-    let hover_transition = animated.hover_transition;
-
-    div()
-        .id(id)
-        .group(id)
-        .h(px(SETTINGS_CONTROL_HEIGHT))
-        .w_full()
-        .flex()
-        .items_center()
-        .justify_between()
-        .min_w_0()
-        .rounded(px(theme::RADIUS_SM))
-        .px(px(10.0))
-        .bg(background)
-        .text_size(px(theme::TEXT_LABEL_SIZE))
-        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-        .text_color(foreground)
-        .opacity(colors.opacity)
-        .shadow(button_highlight_shadows())
-        .when(enabled, |this| {
-            this.hover(|style| style.cursor_pointer())
-                .active(move |style| style.bg(color(colors.active_background)))
-        })
-        .when(!enabled, |this| this.cursor_not_allowed())
-        .on_hover(move |hover, _window, cx| {
-            retarget_hover_motion(&hover_transition, *hover && enabled, cx);
-        })
-        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-            cx.stop_propagation();
-            button_mouse_down(enabled, window, cx);
-        })
-        .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
-            cx.stop_propagation();
-            root.toggle_subtitle_popover(popover);
-            cx.notify();
-        }))
-        .child(
-            div()
-                .flex_1()
-                .min_w_0()
-                .truncate()
-                .text_color(color(theme::FOREGROUND))
-                .child(display.to_string()),
-        )
-        .child(icon_svg(assets::ICON_CHEVRONS_UP_DOWN, 12.0, foreground))
-}
-
-fn refresh_subtitle_select_hover_after_scroll(
-    _event: &ScrollWheelEvent,
-    window: &mut Window,
-    _cx: &mut App,
-) {
-    window.refresh();
-    window.on_next_frame(|window, cx| {
-        window.dispatch_event(
-            PlatformInput::MouseMove(MouseMoveEvent {
-                position: window.mouse_position(),
-                pressed_button: None,
-                modifiers: window.modifiers(),
-            }),
-            cx,
-        );
-    });
-}
-
 fn settings_subtitle_font_option(
     option: SubtitleFontOption,
     is_enabled: bool,
     name: String,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    settings_subtitle_select_option(
+    frame_select_option(
         format!("subtitle-font-{name}"),
         option.name,
         option.is_selected,
@@ -680,7 +571,7 @@ fn settings_subtitle_size_option(
     size: &'static str,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    settings_subtitle_select_option(
+    frame_select_option(
         format!("subtitle-size-{size}"),
         option.size,
         option.is_selected,
@@ -697,10 +588,6 @@ fn settings_subtitle_size_option(
             cx.notify();
         }
     }))
-}
-
-fn subtitle_select_content_height(option_count: usize) -> f32 {
-    option_count as f32 * SUBTITLE_SELECT_OPTION_HEIGHT + SUBTITLE_SELECT_CONTENT_PADDING * 2.0
 }
 
 fn subtitle_popover_progress(
@@ -746,52 +633,6 @@ fn subtitle_popover_motion_key(popover: SettingsSubtitlePopover) -> &'static str
     }
 }
 
-fn settings_subtitle_select_option(
-    id: impl Into<String>,
-    label: impl Into<String>,
-    selected: bool,
-    enabled: bool,
-) -> gpui::Stateful<gpui::Div> {
-    let label = label.into();
-    let text_color = if selected {
-        theme::FOREGROUND
-    } else {
-        theme::FRAME_GRAY_600
-    };
-
-    div()
-        .id(id.into())
-        .h(px(SUBTITLE_SELECT_OPTION_HEIGHT))
-        .w_full()
-        .flex()
-        .items_center()
-        .justify_between()
-        .gap_2()
-        .rounded(px(theme::RADIUS_XS))
-        .px(px(12.0))
-        .text_size(px(theme::TEXT_LABEL_SIZE))
-        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-        .text_color(color(text_color))
-        .opacity(if enabled { 1.0 } else { 0.5 })
-        .when(enabled, |this| {
-            this.hover(|style| {
-                style
-                    .bg(color(theme::FRAME_GRAY_100))
-                    .text_color(color(theme::FOREGROUND))
-                    .cursor_pointer()
-            })
-        })
-        .when(!enabled, |this| this.cursor_not_allowed())
-        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-            cx.stop_propagation();
-            button_mouse_down(enabled, window, cx);
-        })
-        .child(div().min_w_0().truncate().child(label))
-        .when(selected, |this| {
-            this.child(icon_svg(assets::ICON_CHECK, 12.0, color(theme::FOREGROUND)))
-        })
-}
-
 fn settings_subtitle_color_field(
     spec: SettingsSubtitleColorFieldSpec<'_>,
     window: &mut Window,
@@ -814,11 +655,6 @@ fn settings_subtitle_color_field(
         SettingsSubtitleColorTarget::Outline => SettingsSubtitlePopover::OutlineColor,
     };
     let enabled = !disabled;
-    let colors = button_colors(ButtonVariant::Secondary, false, enabled);
-    let animated = animated_button_colors(id, colors, window, cx);
-    let background = animated.background;
-    let foreground = animated.foreground;
-    let hover_transition = animated.hover_transition;
     let click_value = value.clone();
 
     let mut field = div()
@@ -828,74 +664,15 @@ fn settings_subtitle_color_field(
         .gap_2()
         .child(settings_field_label(label))
         .child(
-            div()
-                .id(id)
-                .group(id)
-                .h(px(SETTINGS_CONTROL_HEIGHT))
-                .w_full()
-                .flex()
-                .items_center()
-                .justify_between()
-                .gap_2()
-                .rounded(px(theme::RADIUS_SM))
-                .px(px(10.0))
-                .bg(background)
-                .text_size(px(theme::TEXT_LABEL_SIZE))
-                .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-                .text_color(foreground)
-                .opacity(colors.opacity)
-                .shadow(button_highlight_shadows())
-                .when(enabled, |this| {
-                    this.hover(|style| style.cursor_pointer())
-                        .active(move |style| style.bg(color(colors.active_background)))
-                })
-                .when(!enabled, |this| this.cursor_not_allowed())
-                .on_hover(move |hover, _window, cx| {
-                    retarget_hover_motion(&hover_transition, *hover && enabled, cx);
-                })
-                .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-                    cx.stop_propagation();
-                    button_mouse_down(enabled, window, cx);
-                })
+            frame_select_trigger_content(id, frame_color_select_value(&value), enabled, window, cx)
                 .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
                     cx.stop_propagation();
                     if !enabled {
                         return;
                     }
-                    root.open_subtitle_color_popover(popover, target, &click_value);
+                    root.toggle_subtitle_color_popover(popover, target, &click_value);
                     cx.notify();
-                }))
-                .child(
-                    div()
-                        .flex()
-                        .flex_1()
-                        .min_w_0()
-                        .items_center()
-                        .gap_2()
-                        .child(
-                            div()
-                                .w(px(14.0))
-                                .h(px(14.0))
-                                .flex_shrink_0()
-                                .rounded(px(theme::RADIUS_XS))
-                                .bg(parse_hex(&value))
-                                .shadow(input_highlight_shadows()),
-                        )
-                        .child(
-                            div()
-                                .flex_1()
-                                .min_w_0()
-                                .w_full()
-                                .truncate()
-                                .text_color(color(theme::FOREGROUND))
-                                .child(value.to_uppercase()),
-                        ),
-                )
-                .child(div().flex_shrink_0().child(icon_svg(
-                    assets::ICON_CHEVRONS_UP_DOWN,
-                    12.0,
-                    foreground,
-                ))),
+                })),
         );
 
     if rendered_popover == Some(popover) {
@@ -921,35 +698,17 @@ fn settings_subtitle_color_picker(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let align_right = target == SettingsSubtitleColorTarget::Outline;
     let input_kind = match target {
         SettingsSubtitleColorTarget::Font => FrameTextInputKind::SubtitleFontColorHex,
         SettingsSubtitleColorTarget::Outline => FrameTextInputKind::SubtitleOutlineColorHex,
     };
 
-    div()
-        .absolute()
-        .top(px(
-            SUBTITLE_POPOVER_TOP_OFFSET + subtitle_popover_slide_offset(progress)
-        ))
-        .when(align_right, |this| this.right_0())
-        .when(!align_right, |this| this.left_0())
-        .w(px(SUBTITLE_COLOR_PANEL_WIDTH))
-        .flex()
-        .flex_col()
-        .gap_2()
-        .rounded(px(theme::RADIUS_SM))
-        .bg(color(theme::DROPDOWN))
-        .opacity(progress)
-        .p_2()
-        .shadow(button_highlight_shadows())
-        .occlude()
-        .on_mouse_down(MouseButton::Left, move |_, _window, cx| {
-            cx.stop_propagation();
-        })
-        .child(settings_subtitle_sv_square(target, hsv, cx))
-        .child(settings_subtitle_hue_slider(target, hsv, cx))
-        .child(frame_text_input(
+    frame_color_picker_panel(
+        SUBTITLE_POPOVER_TOP_OFFSET + subtitle_popover_slide_offset(progress),
+        progress,
+        settings_subtitle_sv_square(target, hsv, cx),
+        settings_subtitle_hue_slider(target, hsv, cx),
+        frame_text_input(
             FrameTextInputSpec {
                 id: match target {
                     SettingsSubtitleColorTarget::Font => "settings-subtitle-font-color-hex",
@@ -963,7 +722,8 @@ fn settings_subtitle_color_picker(
             },
             window,
             cx,
-        ))
+        ),
+    )
 }
 
 fn settings_subtitle_sv_square(
@@ -976,15 +736,13 @@ fn settings_subtitle_sv_square(
         kind: SettingsSubtitleColorDragKind::SaturationValue,
         base_hsv: hsv,
     };
-    let hue = subtitle_hue_color(hsv.h);
-
     div()
         .id(match target {
             SettingsSubtitleColorTarget::Font => "settings-subtitle-font-color-sv",
             SettingsSubtitleColorTarget::Outline => "settings-subtitle-outline-color-sv",
         })
         .relative()
-        .h(px(SUBTITLE_COLOR_SV_HEIGHT))
+        .h(px(FRAME_COLOR_PICKER_SV_HEIGHT))
         .w_full()
         .overflow_hidden()
         .rounded(px(theme::RADIUS_SM))
@@ -1022,64 +780,7 @@ fn settings_subtitle_sv_square(
             target,
             kind: SettingsSubtitleColorDragKind::SaturationValue,
         })
-        .child(
-            div()
-                .absolute()
-                .left(px(0.0))
-                .right(px(0.0))
-                .top(px(0.0))
-                .bottom(px(0.0))
-                .rounded(px(theme::RADIUS_XS))
-                .bg(hue),
-        )
-        .child(
-            div()
-                .absolute()
-                .left(px(0.0))
-                .right(px(0.0))
-                .top(px(0.0))
-                .bottom(px(0.0))
-                .rounded(px(theme::RADIUS_XS))
-                .bg(linear_gradient(
-                    90.0,
-                    linear_color_stop(hsla(0.0, 0.0, 1.0, 1.0), 0.0),
-                    linear_color_stop(hsla(0.0, 0.0, 1.0, 0.0), 1.0),
-                )),
-        )
-        .child(
-            div()
-                .absolute()
-                .left(px(0.0))
-                .right(px(0.0))
-                .top(px(0.0))
-                .bottom(px(0.0))
-                .rounded(px(theme::RADIUS_XS))
-                .bg(linear_gradient(
-                    0.0,
-                    linear_color_stop(hsla(0.0, 0.0, 0.0, 1.0), 0.0),
-                    linear_color_stop(hsla(0.0, 0.0, 0.0, 0.0), 1.0),
-                )),
-        )
-        .child(
-            div()
-                .absolute()
-                .left(relative(hsv.s as f32))
-                .top(relative((1.0 - hsv.v) as f32))
-                .ml(px(-(SUBTITLE_COLOR_HANDLE_SIZE / 2.0)))
-                .mt(px(-(SUBTITLE_COLOR_HANDLE_SIZE / 2.0)))
-                .w(px(SUBTITLE_COLOR_HANDLE_SIZE))
-                .h(px(SUBTITLE_COLOR_HANDLE_SIZE))
-                .rounded_full()
-                .border_1()
-                .border_color(color(theme::FOREGROUND))
-                .shadow(vec![BoxShadow {
-                    color: hsla(0.0, 0.0, 0.0, 0.35),
-                    offset: point(px(0.0), px(0.0)),
-                    blur_radius: px(0.0),
-                    spread_radius: px(1.0),
-                    inset: false,
-                }]),
-        )
+        .child(frame_color_picker_sv_canvas(hsv.h, hsv.s, hsv.v))
         .on_drag(drag, |_drag, _position, _window, cx| {
             cx.new(|_| SettingsSubtitleColorDragPreview)
         })
@@ -1102,7 +803,7 @@ fn settings_subtitle_hue_slider(
             SettingsSubtitleColorTarget::Outline => "settings-subtitle-outline-color-hue",
         })
         .relative()
-        .h(px(18.0))
+        .h(px(FRAME_COLOR_PICKER_HUE_VISUAL_HEIGHT))
         .w_full()
         .cursor_ew_resize()
         .on_mouse_down(
@@ -1134,54 +835,11 @@ fn settings_subtitle_hue_slider(
             target,
             kind: SettingsSubtitleColorDragKind::Hue,
         })
-        .child(settings_subtitle_hue_segments())
-        .child(
-            div()
-                .absolute()
-                .left(relative((hsv.h / 360.0) as f32))
-                .top(px(1.0))
-                .ml(px(-(SUBTITLE_HUE_HANDLE_WIDTH / 2.0)))
-                .h(px(16.0))
-                .w(px(SUBTITLE_HUE_HANDLE_WIDTH))
-                .rounded(px(1.5))
-                .bg(color(theme::BACKGROUND))
-                .shadow(button_highlight_shadows()),
-        )
+        .child(frame_color_picker_hue_track())
+        .child(frame_color_picker_hue_handle(hsv.h))
         .on_drag(drag, |_drag, _position, _window, cx| {
             cx.new(|_| SettingsSubtitleColorDragPreview)
         })
-}
-
-fn settings_subtitle_hue_segments() -> gpui::Div {
-    let stops = [
-        ("#ff0000", "#ffff00"),
-        ("#ffff00", "#00ff00"),
-        ("#00ff00", "#00ffff"),
-        ("#00ffff", "#0000ff"),
-        ("#0000ff", "#ff00ff"),
-        ("#ff00ff", "#ff0000"),
-    ];
-
-    let mut row = div()
-        .absolute()
-        .left_0()
-        .right_0()
-        .top(px(4.0))
-        .h(px(SUBTITLE_COLOR_HUE_HEIGHT))
-        .flex()
-        .overflow_hidden()
-        .rounded(px(theme::RADIUS_XS))
-        .shadow(input_highlight_shadows());
-
-    for (from, to) in stops {
-        row = row.child(div().flex_1().h_full().bg(linear_gradient(
-            90.0,
-            linear_color_stop(parse_hex(from), 0.0),
-            linear_color_stop(parse_hex(to), 1.0),
-        )));
-    }
-
-    row
 }
 
 impl FrameRoot {
@@ -1229,6 +887,19 @@ impl FrameRoot {
         self.subtitle_ui.rendered_popover = Some(popover);
         self.set_subtitle_color_hsv_draft(target, hex_to_subtitle_hsv(value));
         self.set_subtitle_color_draft(target, value.to_uppercase());
+    }
+
+    pub(in crate::app) fn toggle_subtitle_color_popover(
+        &mut self,
+        popover: SettingsSubtitlePopover,
+        target: SettingsSubtitleColorTarget,
+        value: &str,
+    ) {
+        if self.subtitle_ui.popover == Some(popover) {
+            self.close_subtitle_popover();
+        } else {
+            self.open_subtitle_color_popover(popover, target, value);
+        }
     }
 
     pub(in crate::app) fn set_subtitle_color_draft(
@@ -1435,10 +1106,6 @@ fn subtitle_hsv_from_hue_bounds(
     hsv
 }
 
-fn subtitle_hue_color(hue: f64) -> Rgba {
-    parse_hex(&subtitle_hsv_to_hex(hue, 1.0, 1.0))
-}
-
 pub(in crate::app) fn hex_to_subtitle_hsv(hex: &str) -> SettingsSubtitleHsv {
     let normalized =
         normalized_hex_color(hex).unwrap_or_else(|| DEFAULT_SUBTITLE_FONT_COLOR.to_string());
@@ -1473,37 +1140,7 @@ pub(in crate::app) fn hex_to_subtitle_hsv(hex: &str) -> SettingsSubtitleHsv {
 }
 
 pub(in crate::app) fn subtitle_hsv_to_hex(h: f64, s: f64, v: f64) -> String {
-    let hue = ((h % 360.0) + 360.0) % 360.0;
-    let sat = s.clamp(0.0, 1.0);
-    let val = v.clamp(0.0, 1.0);
-    let chroma = val * sat;
-    let x = chroma * (1.0 - (((hue / 60.0) % 2.0) - 1.0).abs());
-    let m = val - chroma;
-
-    let (r_prime, g_prime, b_prime) = if hue < 60.0 {
-        (chroma, x, 0.0)
-    } else if hue < 120.0 {
-        (x, chroma, 0.0)
-    } else if hue < 180.0 {
-        (0.0, chroma, x)
-    } else if hue < 240.0 {
-        (0.0, x, chroma)
-    } else if hue < 300.0 {
-        (x, 0.0, chroma)
-    } else {
-        (chroma, 0.0, x)
-    };
-
-    subtitle_rgb_to_hex(
-        (r_prime + m) * 255.0,
-        (g_prime + m) * 255.0,
-        (b_prime + m) * 255.0,
-    )
-}
-
-fn subtitle_rgb_to_hex(r: f64, g: f64, b: f64) -> String {
-    let to_byte = |channel: f64| channel.round().clamp(0.0, 255.0) as u8;
-    format!("#{:02x}{:02x}{:02x}", to_byte(r), to_byte(g), to_byte(b))
+    frame_hsv_to_hex(h, s, v)
 }
 
 fn settings_subtitle_position_grid(

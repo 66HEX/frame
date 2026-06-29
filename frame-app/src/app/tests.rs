@@ -868,6 +868,33 @@ mod frame_root_conversion {
     }
 
     #[test]
+    fn subtitle_color_popover_toggle_closes_active_picker() {
+        let mut root = FrameRoot::new();
+
+        root.toggle_subtitle_color_popover(
+            SettingsSubtitlePopover::FontColor,
+            SettingsSubtitleColorTarget::Font,
+            "#ffd166",
+        );
+        assert_eq!(
+            root.subtitle_ui.popover,
+            Some(SettingsSubtitlePopover::FontColor)
+        );
+        assert_eq!(root.subtitle_ui.font_color_draft, "#FFD166");
+
+        root.toggle_subtitle_color_popover(
+            SettingsSubtitlePopover::FontColor,
+            SettingsSubtitleColorTarget::Font,
+            "#ffd166",
+        );
+        assert_eq!(root.subtitle_ui.popover, None);
+        assert_eq!(
+            root.subtitle_ui.rendered_popover,
+            Some(SettingsSubtitlePopover::FontColor)
+        );
+    }
+
+    #[test]
     fn save_preset_from_draft_adds_custom_preset() {
         let mut root = FrameRoot::new();
         root.file_queue
