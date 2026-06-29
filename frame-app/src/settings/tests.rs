@@ -1320,18 +1320,18 @@ mod source_info_sections {
         assert_eq!(
             sections,
             vec![SourceInfoSection::Rows {
-                title: "FILE INFORMATION",
+                title: "File information",
                 rows: vec![
                     SourceInfoRow {
-                        label: "IMAGE CODEC",
+                        label: "Image codec",
                         value: "png".to_string(),
                     },
                     SourceInfoRow {
-                        label: "DIMENSIONS",
+                        label: "Dimensions",
                         value: "640×480".to_string(),
                     },
                     SourceInfoRow {
-                        label: "PIXEL FORMAT",
+                        label: "Pixel format",
                         value: "rgba".to_string(),
                     },
                 ],
@@ -1359,35 +1359,35 @@ mod source_info_sections {
             sections,
             vec![
                 SourceInfoSection::Rows {
-                    title: "FILE INFORMATION",
+                    title: "File information",
                     rows: vec![
                         SourceInfoRow {
-                            label: "DURATION",
+                            label: "Duration",
                             value: "00:00:10".to_string(),
                         },
                         SourceInfoRow {
-                            label: "CONTAINER BITRATE",
+                            label: "Container bitrate",
                             value: "2.5 Mb/s".to_string(),
                         },
                     ],
                 },
                 SourceInfoSection::Rows {
-                    title: "VIDEO STREAM",
+                    title: "Video stream",
                     rows: vec![
                         SourceInfoRow {
-                            label: "VIDEO CODEC",
+                            label: "Video codec",
                             value: "h264".to_string(),
                         },
                         SourceInfoRow {
-                            label: "DIMENSIONS",
+                            label: "Dimensions",
                             value: "1920×1080".to_string(),
                         },
                         SourceInfoRow {
-                            label: "FRAME RATE",
+                            label: "Frame rate",
                             value: "59.94 fps".to_string(),
                         },
                         SourceInfoRow {
-                            label: "VIDEO BITRATE",
+                            label: "Video bitrate",
                             value: "2.2 Mb/s".to_string(),
                         },
                     ],
@@ -1417,7 +1417,7 @@ mod source_info_sections {
             panic!("audio metadata should render audio tracks");
         };
 
-        assert_eq!(row_value(&tracks[0].rows, "SAMPLE RATE"), Some("48 kHz"));
+        assert_eq!(row_value(&tracks[0].rows, "Sample rate"), Some("48 kHz"));
     }
 }
 

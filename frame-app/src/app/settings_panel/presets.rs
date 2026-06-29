@@ -44,7 +44,7 @@ fn settings_presets_header(notice: Option<&PresetNotice>) -> gpui::Div {
     let mut header = div()
         .relative()
         .w_full()
-        .child(settings_section_label("PRESET LIBRARY"));
+        .child(settings_section_label("Preset library"));
     if let Some(notice) = notice {
         header = header.child(
             div()
@@ -56,7 +56,7 @@ fn settings_presets_header(notice: Option<&PresetNotice>) -> gpui::Div {
                     PresetNoticeTone::Success => theme::FOREGROUND,
                     PresetNoticeTone::Error => theme::FRAME_RED,
                 }))
-                .child(notice.text.clone()),
+                .child(theme::ui_text_owned(notice.text.clone())),
         );
     }
 
@@ -78,7 +78,7 @@ fn settings_presets_save_row(
             FrameTextInputSpec {
                 id: "settings-preset-name-field",
                 value: preset_name,
-                placeholder: "Preset Label",
+                placeholder: "Preset label",
                 disabled: settings_disabled,
                 focus: preset_name_focus,
                 kind: FrameTextInputKind::PresetName,
@@ -151,7 +151,7 @@ fn settings_preset_row(
                     .text_size(px(theme::TEXT_LABEL_SIZE))
                     .font_weight(theme::TEXT_WEIGHT_REGULAR)
                     .text_color(color(theme::FRAME_GRAY_600))
-                    .child(status.unwrap_or_default()),
+                    .child(theme::ui_text(status.unwrap_or_default())),
             )
             .when(option.is_compatible, |this| {
                 this.child(settings_preset_icon_button(

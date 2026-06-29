@@ -103,7 +103,7 @@ pub(in crate::app) fn preview_timeline(
                 .gap_4()
                 .child(preview_timecode_field(
                     PreviewTimecodeFieldSpec {
-                        label: "START TIME",
+                        label: "Start time",
                         value: labels.start,
                         enabled: trim_enabled,
                         width: 128.0,
@@ -115,7 +115,7 @@ pub(in crate::app) fn preview_timeline(
                 ))
                 .child(preview_timecode_field(
                     PreviewTimecodeFieldSpec {
-                        label: "END TIME",
+                        label: "End time",
                         value: labels.end,
                         enabled: trim_enabled,
                         width: 128.0,
@@ -127,7 +127,7 @@ pub(in crate::app) fn preview_timeline(
                 ))
                 .child(preview_timecode_field(
                     PreviewTimecodeFieldSpec {
-                        label: "DURATION",
+                        label: "Duration",
                         value: labels.duration,
                         enabled: false,
                         width: 104.0,
@@ -145,7 +145,7 @@ pub(in crate::app) fn preview_timeline(
                 .flex()
                 .flex_col()
                 .gap(px(6.0))
-                .child(preview_timeline_label("TRIM"))
+                .child(preview_timeline_label("Trim"))
                 .child(preview_timeline_track(state, cx)),
         )
         .child(
@@ -261,7 +261,7 @@ pub(in crate::app) fn preview_timeline_label(label: &'static str) -> gpui::Div {
         .text_size(px(theme::TEXT_LABEL_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(color(theme::FRAME_GRAY_600))
-        .child(label)
+        .child(theme::ui_text(label))
 }
 
 pub(in crate::app) fn preview_timeline_track(

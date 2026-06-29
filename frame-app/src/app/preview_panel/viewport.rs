@@ -391,18 +391,18 @@ pub(in crate::app) fn preview_viewport_content(
 
     if state.selected_file_name.is_none() {
         return content
-            .child("Drop files or use Add Source")
+            .child(theme::ui_text("Drop files or use Add Source"))
             .into_any_element();
     }
 
     let content = match state.metadata_status {
         PreviewMetadataStatus::Idle | PreviewMetadataStatus::Loading => {
-            content.child("Analyzing source...")
+            content.child(theme::ui_text("Analyzing source..."))
         }
         PreviewMetadataStatus::Error => {
             let mut error = content
                 .text_color(color(theme::FRAME_RED))
-                .child("Preview unavailable");
+                .child(theme::ui_text("Preview unavailable"));
             if let Some(message) = state.metadata_error.as_deref() {
                 error = error.child(
                     div()
@@ -418,7 +418,7 @@ pub(in crate::app) fn preview_viewport_content(
             if let Some(message) = state.runtime_error.as_deref() {
                 return content
                     .text_color(color(theme::FRAME_RED))
-                    .child("Preview unavailable")
+                    .child(theme::ui_text("Preview unavailable"))
                     .child(
                         div()
                             .max_w(px(320.0))
@@ -430,7 +430,9 @@ pub(in crate::app) fn preview_viewport_content(
             }
 
             if state.availability.media_kind == PreviewMediaKind::Unknown {
-                return content.child("Preview unavailable").into_any_element();
+                return content
+                    .child(theme::ui_text("Preview unavailable"))
+                    .into_any_element();
             }
 
             content.child(preview_media_placeholder(state.availability.media_kind))

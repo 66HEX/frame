@@ -19,7 +19,7 @@ pub(in crate::app) fn frame_select_trigger(
             .min_w_0()
             .truncate()
             .text_color(color(theme::FOREGROUND))
-            .child(display.to_string()),
+            .child(theme::ui_text(display)),
         enabled,
         window,
         cx,
@@ -125,7 +125,7 @@ pub(in crate::app) fn frame_select_option(
     selected: bool,
     enabled: bool,
 ) -> gpui::Stateful<gpui::Div> {
-    let label = label.into();
+    let label = theme::ui_text_owned(label.into());
     let text_color = if selected {
         theme::FOREGROUND
     } else {

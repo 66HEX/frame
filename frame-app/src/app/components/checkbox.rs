@@ -98,8 +98,8 @@ pub(in crate::app) fn frame_checkbox_row(
     checked: bool,
     disabled: bool,
 ) -> gpui::Stateful<gpui::Div> {
-    let label = label.into();
-    let hint = hint.into();
+    let label = theme::ui_text_owned(label.into());
+    let hint = theme::ui_text_owned(hint.into());
     let enabled = !disabled;
 
     div()

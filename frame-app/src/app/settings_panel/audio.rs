@@ -9,7 +9,7 @@ pub(in crate::app) fn settings_audio_tab(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let mut channels_section = settings_section("CHANNELS / BITRATE")
+    let mut channels_section = settings_section("Channels / bitrate")
         .child(settings_audio_channels_grid(
             config,
             settings_disabled,
@@ -34,7 +34,7 @@ pub(in crate::app) fn settings_audio_tab(
         .flex_col()
         .gap_4()
         .child(channels_section)
-        .child(settings_section("CODEC").child(settings_audio_codec_list(
+        .child(settings_section("Codec").child(settings_audio_codec_list(
             config,
             available_encoders,
             settings_disabled,
@@ -45,7 +45,7 @@ pub(in crate::app) fn settings_audio_tab(
     let track_options = audio_track_options(config, metadata, settings_disabled);
     if track_options.is_empty() {
         return content.child(
-            settings_section("SOURCE TRACKS").child(settings_hint_text("No audio tracks.")),
+            settings_section("Source tracks").child(settings_hint_text("No audio tracks.")),
         );
     }
 
@@ -54,7 +54,7 @@ pub(in crate::app) fn settings_audio_tab(
         list = list.child(settings_audio_track_button(option, window, cx));
     }
 
-    content.child(settings_section("SOURCE TRACKS").child(list))
+    content.child(settings_section("Source tracks").child(list))
 }
 
 pub(in crate::app) fn settings_audio_channels_grid(
@@ -138,7 +138,7 @@ fn settings_audio_encoding_controls(
     let mut controls = div().flex().flex_col().gap_3();
     if show_vbr_toggle {
         controls = controls
-            .child(settings_field_label("QUALITY CONTROL"))
+            .child(settings_field_label("Quality control"))
             .child(settings_audio_bitrate_mode_grid(
                 config,
                 controls_disabled,
@@ -152,18 +152,18 @@ fn settings_audio_encoding_controls(
             let value = parse_audio_value(&config.audio_quality, range.default_value)
                 .clamp(range.min, range.max);
             let lower_label = if range.lower_is_better {
-                "BEST"
+                "Best"
             } else {
-                "SMALLEST"
+                "Smallest"
             };
             let upper_label = if range.lower_is_better {
-                "SMALLEST"
+                "Smallest"
             } else {
-                "BEST"
+                "Best"
             };
             controls = controls.child(settings_audio_range_field(
                 SettingsAudioRangeSpec {
-                    label: "QUALITY LEVEL",
+                    label: "Quality level",
                     value_label: format!("Q {value}"),
                     value,
                     min: range.min,
@@ -190,13 +190,13 @@ fn settings_audio_encoding_controls(
     controls
         .child(settings_audio_range_field(
             SettingsAudioRangeSpec {
-                label: "VOLUME",
+                label: "Volume",
                 value_label: format!("{}%", config.audio_volume),
                 value: config.audio_volume,
                 min: 0,
                 max: 200,
-                lower_label: "MUTED",
-                upper_label: "MAX VOLUME",
+                lower_label: "Muted",
+                upper_label: "Max volume",
                 target: SettingsAudioRangeTarget::Volume,
             },
             controls_disabled,
@@ -256,7 +256,7 @@ fn settings_audio_bitrate_field(
         .flex()
         .flex_col()
         .gap_2()
-        .child(settings_field_label("BITRATE (KB/S)"))
+        .child(settings_field_label("Bitrate (KB/s)"))
         .child(frame_text_input(
             FrameTextInputSpec {
                 id: "settings-audio-bitrate-field",
@@ -310,8 +310,8 @@ fn settings_audio_range_field(
                 .justify_between()
                 .text_size(px(theme::TEXT_LABEL_SIZE))
                 .text_color(color(theme::FRAME_GRAY_600))
-                .child(spec.lower_label)
-                .child(spec.upper_label),
+                .child(theme::ui_text(spec.lower_label))
+                .child(theme::ui_text(spec.upper_label)),
         )
 }
 
@@ -388,7 +388,7 @@ fn settings_audio_normalize_toggle(
 ) -> gpui::Stateful<gpui::Div> {
     frame_checkbox_row(
         "settings-audio-normalize-row",
-        "NORMALIZE AUDIO",
+        "Normalize audio",
         "Smooth out loudness differences.",
         checked,
         disabled,
@@ -430,7 +430,7 @@ pub(in crate::app) fn settings_audio_codec_button(
 
     frame_list_item_with_caption(
         format!("audio-codec-{codec}"),
-        codec.to_uppercase(),
+        codec,
         caption,
         option.is_selected,
         is_enabled,

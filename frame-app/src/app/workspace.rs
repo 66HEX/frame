@@ -67,6 +67,8 @@ fn empty_settings_panel() -> gpui::Div {
                 .max_w(px(EMPTY_SETTINGS_HINT_MAX_WIDTH))
                 .text_size(px(theme::TEXT_LABEL_SIZE))
                 .text_color(color(theme::FRAME_GRAY_600))
-                .child("Select an item from the queue to access configuration"),
+                .child(theme::ui_text(
+                    "Select an item from the queue to access configuration",
+                )),
         )
 }

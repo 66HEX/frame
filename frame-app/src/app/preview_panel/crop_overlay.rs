@@ -308,5 +308,5 @@ pub(in crate::app) fn compact_text_button_variant(
         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
             button_mouse_down(enabled, window, cx);
         })
-        .child(label)
+        .child(theme::ui_text(label))
 }

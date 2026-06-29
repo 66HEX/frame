@@ -65,10 +65,10 @@ pub(super) fn file_list_header(
                         )),
                     ),
                 )
-                .child(header_label("NAME", 5, false))
-                .child(header_label("SIZE", 2, true))
-                .child(header_label("TARGET", 2, true))
-                .child(header_label("STATE", 2, true)),
+                .child(header_label("Name", 5, false))
+                .child(header_label("Size", 2, true))
+                .child(header_label("Target", 2, true))
+                .child(header_label("State", 2, true)),
         )
         .child(
             div()
@@ -78,7 +78,7 @@ pub(super) fn file_list_header(
                 .font_weight(theme::TEXT_WEIGHT_MEDIUM)
                 .text_color(color(theme::FRAME_GRAY_600))
                 .text_right()
-                .child("ACTIONS"),
+                .child(theme::ui_text("Actions")),
         )
         .child(panel_bottom_separator())
 }
@@ -103,7 +103,7 @@ pub(super) fn file_list_body(
                 .justify_center()
                 .text_size(px(theme::TEXT_UI_SIZE))
                 .text_color(color(theme::FRAME_GRAY_600))
-                .child("DROP FILES OR USE ADD SOURCE"),
+                .child(theme::ui_text("Drop files or use Add Source")),
         );
     }
 
@@ -208,7 +208,7 @@ pub(super) fn header_label(label: &'static str, span: u16, align_right: bool) ->
         .truncate()
         .font_weight(theme::TEXT_WEIGHT_MEDIUM);
     let cell = if align_right { cell.text_right() } else { cell };
-    cell.child(label)
+    cell.child(theme::ui_text(label))
 }
 
 pub(super) fn row_label(

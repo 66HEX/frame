@@ -80,7 +80,7 @@ impl Element for FrameTextInputElement {
         };
         let is_placeholder = content.is_empty();
         let display_text: SharedString = if is_placeholder {
-            self.placeholder.clone()
+            theme::ui_text(self.placeholder.as_ref()).into()
         } else {
             content.into()
         };
@@ -243,7 +243,11 @@ pub(in crate::app) fn frame_text_input(
         kind,
     } = spec;
     let is_placeholder = value.is_empty();
-    let label = if is_placeholder { placeholder } else { value }.to_string();
+    let label = if is_placeholder {
+        theme::ui_text(placeholder)
+    } else {
+        value.to_string()
+    };
     let label_color = if disabled || is_placeholder {
         theme::FRAME_GRAY_600
     } else {

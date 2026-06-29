@@ -154,7 +154,7 @@ pub(super) fn action_button(
         button
             .px(px(10.0))
             .child(icon_svg(icon, TITLEBAR_ICON_SIZE, foreground))
-            .child(label.unwrap_or_default())
+            .child(theme::ui_text(label.unwrap_or_default()))
     }
 }
 

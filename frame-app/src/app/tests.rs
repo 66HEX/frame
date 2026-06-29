@@ -1959,7 +1959,7 @@ mod visual_fixtures {
                     | SourceInfoSection::Tracks { title, .. } => *title,
                 })
                 .collect::<Vec<_>>(),
-            ["FILE INFORMATION", "VIDEO STREAM"]
+            ["File information", "Video stream"]
         );
     }
 

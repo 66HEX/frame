@@ -10,28 +10,28 @@ pub fn source_info_sections(metadata: &SourceMetadata) -> Vec<SourceInfoSection>
 
     if is_image {
         sections.push(SourceInfoSection::Rows {
-            title: "FILE INFORMATION",
+            title: "File information",
             rows: source_image_rows(metadata),
         });
     } else if has_duration_value(metadata.duration.as_deref())
         || has_bitrate_value(metadata.bitrate.as_deref())
     {
         sections.push(SourceInfoSection::Rows {
-            title: "FILE INFORMATION",
+            title: "File information",
             rows: source_file_rows(metadata),
         });
     }
 
     if metadata.video_codec.is_some() && !is_image {
         sections.push(SourceInfoSection::Rows {
-            title: "VIDEO STREAM",
+            title: "Video stream",
             rows: source_video_rows(metadata),
         });
     }
 
     if !metadata.audio_tracks.is_empty() {
         sections.push(SourceInfoSection::Tracks {
-            title: "AUDIO STREAM",
+            title: "Audio stream",
             tracks: source_audio_track_sections(&metadata.audio_tracks),
         });
     }
@@ -168,18 +168,18 @@ pub fn format_source_hz(value: Option<&str>) -> String {
 
 fn source_image_rows(metadata: &SourceMetadata) -> Vec<SourceInfoRow> {
     let mut rows = Vec::new();
-    push_optional_row(&mut rows, "IMAGE CODEC", metadata.video_codec.as_deref());
+    push_optional_row(&mut rows, "Image codec", metadata.video_codec.as_deref());
     rows.push(SourceInfoRow {
-        label: "DIMENSIONS",
+        label: "Dimensions",
         value: format_source_resolution(metadata),
     });
-    push_optional_row(&mut rows, "PIXEL FORMAT", metadata.pixel_format.as_deref());
-    push_optional_row(&mut rows, "PROFILE", metadata.profile.as_deref());
-    push_optional_row(&mut rows, "COLOR SPACE", metadata.color_space.as_deref());
-    push_optional_row(&mut rows, "COLOR RANGE", metadata.color_range.as_deref());
+    push_optional_row(&mut rows, "Pixel format", metadata.pixel_format.as_deref());
+    push_optional_row(&mut rows, "Profile", metadata.profile.as_deref());
+    push_optional_row(&mut rows, "Color space", metadata.color_space.as_deref());
+    push_optional_row(&mut rows, "Color range", metadata.color_range.as_deref());
     push_optional_row(
         &mut rows,
-        "COLOR PRIMARIES",
+        "Color primaries",
         metadata.color_primaries.as_deref(),
     );
     rows
@@ -189,13 +189,13 @@ fn source_file_rows(metadata: &SourceMetadata) -> Vec<SourceInfoRow> {
     let mut rows = Vec::new();
     if has_duration_value(metadata.duration.as_deref()) {
         rows.push(SourceInfoRow {
-            label: "DURATION",
+            label: "Duration",
             value: format_source_duration(metadata.duration.as_deref()),
         });
     }
     if has_bitrate_value(metadata.bitrate.as_deref()) {
         rows.push(SourceInfoRow {
-            label: "CONTAINER BITRATE",
+            label: "Container bitrate",
             value: format_source_container_bitrate(metadata.bitrate.as_deref()),
         });
     }
@@ -204,12 +204,12 @@ fn source_file_rows(metadata: &SourceMetadata) -> Vec<SourceInfoRow> {
 
 fn source_video_rows(metadata: &SourceMetadata) -> Vec<SourceInfoRow> {
     let mut rows = vec![SourceInfoRow {
-        label: "VIDEO CODEC",
+        label: "Video codec",
         value: display_source_value(metadata.video_codec.as_deref()),
     }];
-    push_optional_row(&mut rows, "PROFILE", metadata.profile.as_deref());
+    push_optional_row(&mut rows, "Profile", metadata.profile.as_deref());
     rows.push(SourceInfoRow {
-        label: "DIMENSIONS",
+        label: "Dimensions",
         value: format_source_resolution(metadata),
     });
     if metadata
@@ -217,16 +217,16 @@ fn source_video_rows(metadata: &SourceMetadata) -> Vec<SourceInfoRow> {
         .is_some_and(|frame_rate| frame_rate > 0.0)
     {
         rows.push(SourceInfoRow {
-            label: "FRAME RATE",
+            label: "Frame rate",
             value: format_source_frame_rate(metadata.frame_rate),
         });
     }
-    push_optional_row(&mut rows, "PIXEL FORMAT", metadata.pixel_format.as_deref());
-    push_optional_row(&mut rows, "COLOR SPACE", metadata.color_space.as_deref());
-    push_optional_row(&mut rows, "COLOR RANGE", metadata.color_range.as_deref());
+    push_optional_row(&mut rows, "Pixel format", metadata.pixel_format.as_deref());
+    push_optional_row(&mut rows, "Color space", metadata.color_space.as_deref());
+    push_optional_row(&mut rows, "Color range", metadata.color_range.as_deref());
     push_optional_row(
         &mut rows,
-        "COLOR PRIMARIES",
+        "Color primaries",
         metadata.color_primaries.as_deref(),
     );
     if metadata
@@ -234,7 +234,7 @@ fn source_video_rows(metadata: &SourceMetadata) -> Vec<SourceInfoRow> {
         .is_some_and(|bitrate| bitrate > 0.0)
     {
         rows.push(SourceInfoRow {
-            label: "VIDEO BITRATE",
+            label: "Video bitrate",
             value: format_source_bitrate_kbps(metadata.video_bitrate_kbps),
         });
     }
@@ -255,28 +255,28 @@ fn source_audio_track_sections(tracks: &[AudioTrack]) -> Vec<SourceTrackSection>
 fn source_audio_track_rows(track: &AudioTrack) -> Vec<SourceInfoRow> {
     let mut rows = vec![
         SourceInfoRow {
-            label: "CODEC",
+            label: "Codec",
             value: display_source_value(Some(&track.codec)),
         },
         SourceInfoRow {
-            label: "CHANNELS",
+            label: "Channels",
             value: display_source_value(track.channels.as_deref()),
         },
     ];
 
     if track.sample_rate.is_some() {
         rows.push(SourceInfoRow {
-            label: "SAMPLE RATE",
+            label: "Sample rate",
             value: format_source_hz(track.sample_rate.as_deref()),
         });
     }
     if track.bitrate_kbps.is_some() {
         rows.push(SourceInfoRow {
-            label: "BITRATE",
+            label: "Bitrate",
             value: format_source_bitrate_kbps(track.bitrate_kbps),
         });
     }
-    push_optional_row(&mut rows, "LANGUAGE", track.language.as_deref());
+    push_optional_row(&mut rows, "Language", track.language.as_deref());
     rows
 }
 

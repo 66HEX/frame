@@ -50,23 +50,44 @@ pub const RADIUS_LG: f32 = RADIUS_BASE * 4.0;
 pub const RADIUS_XL: f32 = RADIUS_BASE * 6.0;
 
 pub const TEXT_SCALE: f32 = 1.0;
-pub const TEXT_UI_BASE_SIZE: f32 = 10.0;
-pub const TEXT_ROW_BASE_SIZE: f32 = 12.0;
-pub const TEXT_EMOJI_BASE_SIZE: f32 = 16.0;
-pub const TEXT_MARKDOWN_BASE_SIZE: f32 = 10.0;
-pub const TEXT_MARKDOWN_LIST_BASE_SIZE: f32 = 10.0;
-pub const TEXT_INPUT_CARET_BASE_HEIGHT: f32 = 14.0;
+pub const TEXT_UI_BASE_SIZE: f32 = 11.0;
+pub const TEXT_ROW_BASE_SIZE: f32 = 13.0;
+pub const TEXT_MARKDOWN_BASE_SIZE: f32 = 11.0;
+pub const TEXT_MARKDOWN_LIST_BASE_SIZE: f32 = 11.0;
+pub const TEXT_INPUT_CARET_BASE_HEIGHT: f32 = 13.0;
 
 pub const TEXT_UI_SIZE: f32 = TEXT_UI_BASE_SIZE * TEXT_SCALE;
 pub const TEXT_LABEL_SIZE: f32 = TEXT_UI_SIZE;
 pub const TEXT_ROW_SIZE: f32 = TEXT_ROW_BASE_SIZE * TEXT_SCALE;
-pub const TEXT_EMOJI_SIZE: f32 = TEXT_EMOJI_BASE_SIZE * TEXT_SCALE;
 pub const TEXT_MARKDOWN_SIZE: f32 = TEXT_MARKDOWN_BASE_SIZE * TEXT_SCALE;
 pub const TEXT_MARKDOWN_LIST_SIZE: f32 = TEXT_MARKDOWN_LIST_BASE_SIZE * TEXT_SCALE;
 pub const TEXT_INPUT_CARET_HEIGHT: f32 = TEXT_INPUT_CARET_BASE_HEIGHT * TEXT_SCALE;
 pub const TEXT_WEIGHT_REGULAR: FontWeight = FontWeight::NORMAL;
 pub const TEXT_WEIGHT_MEDIUM: FontWeight = FontWeight::MEDIUM;
+pub const FORCE_UPPERCASE_UI_TEXT: bool = false;
 pub const MIN_HIT_AREA: f32 = 40.0;
+
+#[must_use]
+pub fn ui_text(text: &str) -> String {
+    format_ui_text(text, FORCE_UPPERCASE_UI_TEXT)
+}
+
+#[must_use]
+pub fn ui_text_owned(text: String) -> String {
+    if FORCE_UPPERCASE_UI_TEXT {
+        text.to_uppercase()
+    } else {
+        text
+    }
+}
+
+fn format_ui_text(text: &str, uppercase: bool) -> String {
+    if uppercase {
+        text.to_uppercase()
+    } else {
+        text.to_string()
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -178,6 +199,16 @@ mod tests {
         fn font_weight_tokens_expose_only_regular_and_medium_levels() {
             assert_eq!(TEXT_WEIGHT_REGULAR, FontWeight::NORMAL);
             assert_eq!(TEXT_WEIGHT_MEDIUM, FontWeight::MEDIUM);
+        }
+
+        #[test]
+        fn ui_text_preserves_natural_case_by_default() {
+            assert_eq!(ui_text("Add source"), "Add source");
+        }
+
+        #[test]
+        fn ui_text_formatter_can_force_uppercase() {
+            assert_eq!(format_ui_text("Add source", true), "ADD SOURCE");
         }
     }
 }

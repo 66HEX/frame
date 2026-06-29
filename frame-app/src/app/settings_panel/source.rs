@@ -10,7 +10,7 @@ pub(in crate::app) fn settings_source_tab(
             return div()
                 .text_size(px(theme::TEXT_LABEL_SIZE))
                 .text_color(color(theme::FRAME_GRAY_600))
-                .child("Analyzing source...");
+                .child(theme::ui_text("Analyzing source..."));
         }
         MetadataStatus::Error => {
             let mut error_view = div()
@@ -19,7 +19,7 @@ pub(in crate::app) fn settings_source_tab(
                 .gap_1()
                 .text_size(px(theme::TEXT_LABEL_SIZE))
                 .text_color(color(theme::FRAME_RED))
-                .child("Failed to read source metadata.");
+                .child(theme::ui_text("Failed to read source metadata."));
             if let Some(error) = error {
                 error_view = error_view.child(
                     div()
@@ -36,7 +36,7 @@ pub(in crate::app) fn settings_source_tab(
         return div()
             .text_size(px(theme::TEXT_LABEL_SIZE))
             .text_color(color(theme::FRAME_GRAY_600))
-            .child("Metadata unavailable.");
+            .child(theme::ui_text("Metadata unavailable."));
     };
 
     let sections = source_info_sections(metadata);
@@ -44,7 +44,7 @@ pub(in crate::app) fn settings_source_tab(
         return div()
             .text_size(px(theme::TEXT_LABEL_SIZE))
             .text_color(color(theme::FRAME_GRAY_600))
-            .child("Metadata unavailable.");
+            .child(theme::ui_text("Metadata unavailable."));
     }
 
     let mut content = div().flex().flex_col().gap_6();
@@ -93,7 +93,7 @@ pub(in crate::app) fn settings_track_header(label: String) -> gpui::Div {
         .gap_2()
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(color(theme::FRAME_GRAY_600))
-        .child(label)
+        .child(theme::ui_text_owned(label))
         .child(
             div()
                 .h(px(1.0))
@@ -112,7 +112,7 @@ pub(in crate::app) fn settings_section_label(label: &'static str) -> gpui::Div {
         .text_size(px(theme::TEXT_LABEL_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(color(theme::FRAME_GRAY_600))
-        .child(label)
+        .child(theme::ui_text(label))
         .child(
             div()
                 .h(px(1.0))

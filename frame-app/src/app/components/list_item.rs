@@ -61,8 +61,8 @@ pub(in crate::app) fn frame_list_item_with_caption(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    let title = title.into();
-    let caption = caption.into();
+    let title = theme::ui_text_owned(title.into());
+    let caption = theme::ui_text_owned(caption.into());
 
     frame_list_item(id, selected, enabled, window, cx)
         .gap_3()

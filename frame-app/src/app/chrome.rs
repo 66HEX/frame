@@ -103,7 +103,7 @@ pub(super) fn macos_titlebar(
                     action_button(
                         "titlebar-add-source",
                         assets::ICON_PLUS,
-                        Some("ADD SOURCE"),
+                        Some("Add source"),
                         ButtonVariant::Secondary,
                         true,
                         window,
@@ -121,9 +121,9 @@ pub(super) fn macos_titlebar(
                         "titlebar-start",
                         assets::ICON_PLAY,
                         Some(if state.is_processing {
-                            "PROCESSING"
+                            "Processing"
                         } else {
-                            "START"
+                            "Start"
                         }),
                         ButtonVariant::Default,
                         state.can_start_conversion(),
@@ -249,7 +249,7 @@ pub(super) fn titlebar_add_source_button(
     action_button(
         "titlebar-add-source",
         assets::ICON_PLUS,
-        Some("ADD SOURCE"),
+        Some("Add source"),
         ButtonVariant::Secondary,
         true,
         window,
@@ -270,9 +270,9 @@ pub(super) fn titlebar_start_button(
         "titlebar-start",
         assets::ICON_PLAY,
         Some(if state.is_processing {
-            "PROCESSING"
+            "Processing"
         } else {
-            "START"
+            "Start"
         }),
         ButtonVariant::Default,
         state.can_start_conversion(),
@@ -378,7 +378,7 @@ pub(super) fn app_settings_sheet(
                         .text_size(px(theme::TEXT_LABEL_SIZE))
                         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
                         .text_color(color(theme::FOREGROUND))
-                        .child("SETTINGS")
+                        .child(theme::ui_text("Settings"))
                         .child(
                             app_settings_close_button(window, cx).on_click(
                                 cx.listener(|root, _: &ClickEvent, _window, cx| {
@@ -398,7 +398,7 @@ pub(super) fn app_settings_sheet(
                         .p_4()
                         .text_size(px(theme::TEXT_LABEL_SIZE))
                         .child(
-                            settings_section("MAX CONCURRENCY")
+                            settings_section("Max concurrency")
                                 .child(app_settings_concurrency_control(
                                     props.draft_max_concurrency,
                                     draft_is_dirty,
@@ -435,7 +435,7 @@ fn app_settings_updates_section(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let busy = update_status.is_busy();
-    let mut section = settings_section("UPDATES")
+    let mut section = settings_section("Updates")
         .child(
             frame_checkbox_row(
                 "app-settings-auto-update-check",
@@ -481,7 +481,7 @@ fn update_status_label(status: &UpdateStatus) -> gpui::Div {
     div()
         .text_size(px(theme::TEXT_LABEL_SIZE))
         .text_color(color(tone))
-        .child(update_status_text(status))
+        .child(theme::ui_text_owned(update_status_text(status)))
 }
 
 fn update_status_text(status: &UpdateStatus) -> String {
@@ -663,7 +663,7 @@ fn update_action_row(
     row = row.child(
         frame_text_button(
             "app-settings-update-check-now",
-            "CHECK NOW",
+            "Check now",
             ButtonVariant::Secondary,
             false,
             !busy,
@@ -684,7 +684,7 @@ fn update_action_row(
             .child(
                 frame_text_button(
                     "app-settings-update-download",
-                    "DOWNLOAD",
+                    "Download",
                     ButtonVariant::Default,
                     false,
                     true,
@@ -700,7 +700,7 @@ fn update_action_row(
             .child(
                 frame_text_button(
                     "app-settings-update-skip",
-                    "SKIP",
+                    "Skip",
                     ButtonVariant::Secondary,
                     false,
                     true,
@@ -717,7 +717,7 @@ fn update_action_row(
         UpdateStatus::ReadyToInstall(_) => row.child(
             frame_text_button(
                 "app-settings-update-install",
-                "INSTALL AND RESTART",
+                "Install and restart",
                 ButtonVariant::Default,
                 false,
                 true,
@@ -733,7 +733,7 @@ fn update_action_row(
         UpdateStatus::UpToDate | UpdateStatus::Disabled(_) | UpdateStatus::Error(_) => row.child(
             frame_text_button(
                 "app-settings-update-dismiss",
-                "DISMISS",
+                "Dismiss",
                 ButtonVariant::Secondary,
                 false,
                 true,
@@ -844,7 +844,7 @@ fn update_dialog_header(
                 .text_size(px(theme::TEXT_LABEL_SIZE))
                 .font_weight(theme::TEXT_WEIGHT_MEDIUM)
                 .text_color(color(theme::FRAME_GRAY_600))
-                .child(kicker),
+                .child(theme::ui_text(kicker)),
         );
     }
     title_stack = title_stack.child(
@@ -852,7 +852,7 @@ fn update_dialog_header(
             .text_size(px(theme::TEXT_LABEL_SIZE))
             .font_weight(theme::TEXT_WEIGHT_MEDIUM)
             .text_color(color(theme::FOREGROUND))
-            .child(update_dialog_title(status).to_uppercase()),
+            .child(theme::ui_text_owned(update_dialog_title(status))),
     );
 
     div()
@@ -885,7 +885,7 @@ fn update_dialog_body(status: &UpdateStatus, info: Option<&UpdateInfo>) -> gpui:
                 .text_size(px(theme::TEXT_LABEL_SIZE))
                 .line_height(px(16.0))
                 .text_color(color(theme::FRAME_GRAY_600))
-                .child(summary),
+                .child(theme::ui_text_owned(summary)),
         );
     }
 
@@ -951,7 +951,7 @@ fn update_dialog_footer(
         .child(
             frame_text_button(
                 "update-dialog-later",
-                "LATER",
+                "Later",
                 ButtonVariant::Ghost,
                 false,
                 !status.is_busy(),
@@ -977,7 +977,7 @@ fn update_dialog_primary_action(
     match status {
         UpdateStatus::Available(_) => frame_text_button(
             "update-dialog-download",
-            "DOWNLOAD",
+            "Download",
             ButtonVariant::Default,
             false,
             true,
@@ -991,7 +991,7 @@ fn update_dialog_primary_action(
         })),
         UpdateStatus::ReadyToInstall(_) => frame_text_button(
             "update-dialog-install",
-            "INSTALL AND RESTART",
+            "Install and restart",
             ButtonVariant::Default,
             false,
             true,
@@ -1005,7 +1005,7 @@ fn update_dialog_primary_action(
         })),
         UpdateStatus::Error(_) => frame_text_button(
             "update-dialog-dismiss",
-            "DISMISS",
+            "Dismiss",
             ButtonVariant::Secondary,
             false,
             true,
@@ -1019,7 +1019,7 @@ fn update_dialog_primary_action(
         })),
         UpdateStatus::Downloading { .. } | UpdateStatus::Installing => frame_text_button(
             "update-dialog-busy",
-            "WORKING",
+            "Working",
             ButtonVariant::Secondary,
             false,
             false,
@@ -1031,7 +1031,7 @@ fn update_dialog_primary_action(
         | UpdateStatus::UpToDate
         | UpdateStatus::Disabled(_) => frame_text_button(
             "update-dialog-close",
-            "CLOSE",
+            "Close",
             ButtonVariant::Secondary,
             false,
             true,
@@ -1049,14 +1049,14 @@ fn update_dialog_primary_action(
 fn update_dialog_kicker(status: &UpdateStatus) -> Option<&'static str> {
     match status {
         UpdateStatus::Available(_) => None,
-        UpdateStatus::Downloading { .. } => Some("DOWNLOADING UPDATE"),
-        UpdateStatus::ReadyToInstall(_) => Some("READY TO INSTALL"),
-        UpdateStatus::Installing => Some("INSTALLING UPDATE"),
-        UpdateStatus::Error(_) => Some("UPDATE ERROR"),
-        UpdateStatus::Checking => Some("CHECKING FOR UPDATES"),
-        UpdateStatus::UpToDate => Some("NO UPDATE AVAILABLE"),
-        UpdateStatus::Disabled(_) => Some("UPDATES DISABLED"),
-        UpdateStatus::Idle => Some("UPDATES"),
+        UpdateStatus::Downloading { .. } => Some("Downloading update"),
+        UpdateStatus::ReadyToInstall(_) => Some("Ready to install"),
+        UpdateStatus::Installing => Some("Installing update"),
+        UpdateStatus::Error(_) => Some("Update error"),
+        UpdateStatus::Checking => Some("Checking for updates"),
+        UpdateStatus::UpToDate => Some("No update available"),
+        UpdateStatus::Disabled(_) => Some("Updates disabled"),
+        UpdateStatus::Idle => Some("Updates"),
     }
 }
 
@@ -1184,7 +1184,7 @@ pub(super) fn app_settings_apply_button(
 ) -> gpui::Stateful<gpui::Div> {
     frame_text_button(
         "app-settings-max-concurrency-apply",
-        "APPLY",
+        "Apply",
         ButtonVariant::Secondary,
         false,
         enabled,
@@ -1251,7 +1251,7 @@ pub(super) fn drag_drop_overlay(
                     div()
                         .text_size(px(theme::TEXT_LABEL_SIZE))
                         .text_color(color(theme::FOREGROUND))
-                        .child("IMPORT SOURCE FILES"),
+                        .child(theme::ui_text("Import source files")),
                 ),
         )
 }
@@ -1589,7 +1589,7 @@ pub(super) fn titlebar_navigation(
         .shadow(input_highlight_shadows())
         .child(titlebar_segment(
             assets::ICON_LAYOUT_LIST,
-            "WORKSPACE",
+            "Workspace",
             ActiveView::Workspace,
             active_view == ActiveView::Workspace,
             window,
@@ -1597,7 +1597,7 @@ pub(super) fn titlebar_navigation(
         ))
         .child(titlebar_segment(
             assets::ICON_TERMINAL,
-            "LOGS",
+            "Logs",
             ActiveView::Logs,
             active_view == ActiveView::Logs,
             window,
@@ -1613,11 +1613,11 @@ pub(super) fn titlebar_stats(state: FrameAppState) -> gpui::Div {
         .text_color(color(theme::FRAME_GRAY_600))
         .child(titlebar_stat(
             assets::ICON_HARD_DRIVE,
-            format!("STORAGE {}", format_total_size(state.total_size_bytes)),
+            format!("Storage {}", format_total_size(state.total_size_bytes)),
         ))
         .child(titlebar_stat(
             assets::ICON_FILE_VIDEO,
-            format!("ITEMS {}", state.file_count),
+            format!("Items {}", state.file_count),
         ))
 }
 
@@ -1631,7 +1631,7 @@ pub(super) fn titlebar_stat(icon: &'static str, label: String) -> gpui::Div {
             TITLEBAR_ICON_SIZE,
             color(theme::FRAME_GRAY_600),
         ))
-        .child(label)
+        .child(theme::ui_text_owned(label))
 }
 
 pub(super) fn titlebar_segment(
@@ -1693,7 +1693,7 @@ pub(super) fn titlebar_segment(
             cx.stop_propagation();
         }))
         .child(icon_svg(icon, TITLEBAR_ICON_SIZE, foreground))
-        .child(label)
+        .child(theme::ui_text(label))
 }
 
 #[cfg(test)]

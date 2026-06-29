@@ -14,7 +14,7 @@ pub(in crate::app) fn settings_output_tab(
         .flex_col()
         .gap_4()
         .child(
-            settings_section("PROCESSING MODE")
+            settings_section("Processing mode")
                 .child(settings_processing_mode_grid(
                     config,
                     metadata,
@@ -25,7 +25,7 @@ pub(in crate::app) fn settings_output_tab(
                 .child(settings_hint_text(config.processing_mode.hint())),
         )
         .child(
-            settings_section("OUTPUT NAME")
+            settings_section("Output name")
                 .child(settings_output_name_field(
                     output_name,
                     settings_disabled,
@@ -38,7 +38,7 @@ pub(in crate::app) fn settings_output_tab(
                 )),
         )
         .child(
-            settings_section("OUTPUT CONTAINER").child(settings_container_grid(
+            settings_section("Output container").child(settings_container_grid(
                 config,
                 metadata,
                 settings_disabled,
@@ -101,7 +101,7 @@ pub(in crate::app) fn settings_container_grid(
         grid = grid.child(
             frame_choice_button(
                 format!("output-container-{container}"),
-                container.to_uppercase(),
+                container.as_str(),
                 option.is_selected,
                 is_enabled,
                 window,

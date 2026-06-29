@@ -5,7 +5,7 @@ pub(in crate::app) fn settings_field_label(label: &'static str) -> gpui::Div {
         .text_size(px(theme::TEXT_LABEL_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(color(theme::FRAME_GRAY_600))
-        .child(label)
+        .child(theme::ui_text(label))
 }
 
 pub(in crate::app) fn settings_value_badge(value: String) -> gpui::Div {
@@ -28,7 +28,7 @@ pub(in crate::app) fn settings_hint_text(text: &'static str) -> gpui::Div {
     div()
         .text_size(px(theme::TEXT_LABEL_SIZE))
         .text_color(color(theme::FRAME_GRAY_600))
-        .child(text)
+        .child(theme::ui_text(text))
 }
 
 pub(in crate::app) fn settings_value_row(
@@ -39,7 +39,11 @@ pub(in crate::app) fn settings_value_row(
         .grid()
         .grid_cols(2)
         .gap_4()
-        .child(div().text_color(color(theme::FRAME_GRAY_600)).child(label))
+        .child(
+            div()
+                .text_color(color(theme::FRAME_GRAY_600))
+                .child(theme::ui_text(label)),
+        )
         .child(
             div()
                 .text_right()

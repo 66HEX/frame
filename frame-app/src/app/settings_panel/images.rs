@@ -66,5 +66,5 @@ fn settings_images_pixel_format_section(
         );
     }
 
-    settings_section("PIXEL FORMAT").child(list)
+    settings_section("Pixel format").child(list)
 }

@@ -9,7 +9,7 @@ pub(in crate::app) fn settings_metadata_tab(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let mut content = div().flex().flex_col().gap_4().child(
-        settings_section("METADATA MODE")
+        settings_section("Metadata mode")
             .child(settings_metadata_mode_grid(
                 config,
                 settings_disabled,
@@ -20,7 +20,7 @@ pub(in crate::app) fn settings_metadata_tab(
     );
 
     if config.metadata.mode != crate::settings::MetadataMode::Clean {
-        content = content.child(settings_section("METADATA FIELDS").child(
+        content = content.child(settings_section("Metadata fields").child(
             settings_metadata_fields(config, metadata, settings_disabled, focuses, window, cx),
         ));
     }

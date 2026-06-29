@@ -40,6 +40,7 @@ pub(in crate::app) fn frame_text_button(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let id = id.into();
+    let label = theme::ui_text_owned(label.into());
     let colors = button_colors(variant, selected, enabled);
     let animated = animated_button_colors(id.clone(), colors, window, cx);
     let background = animated.background;
@@ -72,7 +73,7 @@ pub(in crate::app) fn frame_text_button(
         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
             button_mouse_down(enabled, window, cx);
         })
-        .child(label.into())
+        .child(label)
 }
 
 fn text_button_uses_highlight(variant: ButtonVariant, selected: bool) -> bool {

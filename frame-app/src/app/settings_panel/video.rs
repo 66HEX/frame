@@ -131,7 +131,7 @@ pub(in crate::app) fn settings_video_resolution_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let mut section = settings_section("RESOLUTION & FRAMERATE").child(settings_resolution_grid(
+    let mut section = settings_section("Resolution & framerate").child(settings_resolution_grid(
         config,
         settings_disabled,
         window,
@@ -203,7 +203,7 @@ fn settings_custom_dimensions_grid(
                 .flex()
                 .flex_col()
                 .gap_1()
-                .child(settings_field_label("WIDTH"))
+                .child(settings_field_label("Width"))
                 .child(frame_text_input(
                     FrameTextInputSpec {
                         id: "settings-video-width-field",
@@ -222,7 +222,7 @@ fn settings_custom_dimensions_grid(
                 .flex()
                 .flex_col()
                 .gap_1()
-                .child(settings_field_label("HEIGHT"))
+                .child(settings_field_label("Height"))
                 .child(frame_text_input(
                     FrameTextInputSpec {
                         id: "settings-video-height-field",
@@ -269,7 +269,7 @@ pub(in crate::app) fn settings_video_scaling_section(
         );
     }
 
-    settings_section("SCALING ALGORITHM").child(grid)
+    settings_section("Scaling algorithm").child(grid)
 }
 
 pub(in crate::app) fn settings_video_fps_section(
@@ -302,7 +302,7 @@ pub(in crate::app) fn settings_video_fps_section(
         );
     }
 
-    settings_section("FRAMERATE").child(grid)
+    settings_section("Framerate").child(grid)
 }
 
 pub(in crate::app) fn settings_video_gif_colors_section(
@@ -334,7 +334,7 @@ pub(in crate::app) fn settings_video_gif_colors_section(
         );
     }
 
-    settings_section("PALETTE COLORS").child(grid)
+    settings_section("Palette colors").child(grid)
 }
 
 pub(in crate::app) fn settings_video_gif_dither_section(
@@ -368,7 +368,7 @@ pub(in crate::app) fn settings_video_gif_dither_section(
         );
     }
 
-    settings_section("DITHERING").child(list)
+    settings_section("Dithering").child(list)
 }
 
 fn settings_video_gif_loop_section(
@@ -378,7 +378,7 @@ fn settings_video_gif_loop_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("LOOP COUNT")
+    settings_section("Loop count")
         .child(frame_text_input(
             FrameTextInputSpec {
                 id: "settings-gif-loop-field",
@@ -408,7 +408,7 @@ fn settings_video_encoder_section(
         list = list.child(
             frame_list_item_with_caption(
                 format!("video-codec-{codec}"),
-                codec.to_uppercase(),
+                codec,
                 option.disabled_reason.unwrap_or(option.label).to_string(),
                 option.is_selected,
                 enabled,
@@ -427,7 +427,7 @@ fn settings_video_encoder_section(
         );
     }
 
-    settings_section("VIDEO ENCODER").child(list)
+    settings_section("Video encoder").child(list)
 }
 
 fn settings_video_pixel_format_section(
@@ -462,7 +462,7 @@ fn settings_video_pixel_format_section(
         );
     }
 
-    settings_section("PIXEL FORMAT").child(list)
+    settings_section("Pixel format").child(list)
 }
 
 fn settings_video_preset_section(
@@ -497,7 +497,7 @@ fn settings_video_preset_section(
         );
     }
 
-    settings_section("ENCODING SPEED").child(list)
+    settings_section("Encoding speed").child(list)
 }
 
 fn settings_video_quality_section(
@@ -507,7 +507,7 @@ fn settings_video_quality_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let mut section = settings_section("QUALITY CONTROL").child(settings_video_bitrate_mode_grid(
+    let mut section = settings_section("Quality control").child(settings_video_bitrate_mode_grid(
         config,
         settings_disabled,
         window,
@@ -518,9 +518,9 @@ fn settings_video_quality_section(
         let is_hardware = is_hardware_video_codec(&config.video_codec);
         section = section.child(settings_video_range_field(
             if is_hardware {
-                "ENCODING QUALITY"
+                "Encoding quality"
             } else {
-                "QUALITY FACTOR"
+                "Quality factor"
             },
             if is_hardware {
                 format!("Q {}", config.quality)
@@ -535,14 +535,14 @@ fn settings_video_quality_section(
             if is_hardware { 1 } else { 0 },
             if is_hardware { 100 } else { 51 },
             if is_hardware {
-                "LOW QUALITY"
+                "Low quality"
             } else {
-                "LOSSLESS"
+                "Lossless"
             },
             if is_hardware {
-                "BEST QUALITY"
+                "Best quality"
             } else {
-                "SMALLEST"
+                "Smallest"
             },
             if is_hardware {
                 SettingsVideoRangeTarget::Quality
@@ -559,7 +559,7 @@ fn settings_video_quality_section(
                 .flex_col()
                 .gap_2()
                 .pt(px(4.0))
-                .child(settings_field_label("TARGET BITRATE (KBPS)"))
+                .child(settings_field_label("Target bitrate (kbps)"))
                 .child(frame_text_input(
                     FrameTextInputSpec {
                         id: "settings-video-bitrate-field",
@@ -647,8 +647,8 @@ fn settings_video_range_field(
                 .justify_between()
                 .text_size(px(theme::TEXT_LABEL_SIZE))
                 .text_color(color(theme::FRAME_GRAY_600))
-                .child(lower_label)
-                .child(upper_label),
+                .child(theme::ui_text(lower_label))
+                .child(theme::ui_text(upper_label)),
         )
 }
 
@@ -721,11 +721,11 @@ fn settings_video_nvenc_section(
     disabled: bool,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("NVENC OPTIONS")
+    settings_section("NVENC options")
         .child(
             settings_video_checkbox_row(
                 "video-nvenc-spatial-aq",
-                "SPATIAL AQ",
+                "Spatial AQ",
                 "Improves detail in scenes with high complexity",
                 config.nvenc_spatial_aq,
                 disabled,
@@ -745,7 +745,7 @@ fn settings_video_nvenc_section(
         .child(
             settings_video_checkbox_row(
                 "video-nvenc-temporal-aq",
-                "TEMPORAL AQ",
+                "Temporal AQ",
                 "Stabilizes quality between frames",
                 config.nvenc_temporal_aq,
                 disabled,
@@ -769,10 +769,10 @@ fn settings_video_videotoolbox_section(
     disabled: bool,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("VIDEOTOOLBOX OPTIONS").child(
+    settings_section("VideoToolbox options").child(
         settings_video_checkbox_row(
             "video-videotoolbox-allow-sw",
-            "ALLOW SOFTWARE FALLBACK",
+            "Allow software fallback",
             "Drop back to CPU encoding if hardware fails",
             config.videotoolbox_allow_sw,
             disabled,
@@ -796,10 +796,10 @@ fn settings_video_hw_section(
     disabled: bool,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("HARDWARE ACCELERATION").child(
+    settings_section("Hardware acceleration").child(
         settings_video_checkbox_row(
             "video-hw-decode",
-            "HARDWARE DECODING",
+            "Hardware decoding",
             "Use GPU for decoding input video (faster)",
             config.hw_decode,
             disabled,

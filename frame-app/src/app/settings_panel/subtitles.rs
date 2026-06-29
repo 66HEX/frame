@@ -137,7 +137,7 @@ pub(in crate::app) fn settings_subtitles_tab(
     let copy_mode = config.processing_mode == ProcessingMode::Copy;
     let burn_in_disabled = state.settings_disabled || copy_mode;
     let content = div().flex().flex_col().gap_4().child(
-        settings_section("BURN-IN SUBTITLES")
+        settings_section("Burn-in subtitles")
             .child(settings_subtitle_burn_button(
                 config,
                 burn_in_disabled,
@@ -155,7 +155,7 @@ pub(in crate::app) fn settings_subtitles_tab(
         content
     } else {
         content.child(
-            settings_section("STYLE").child(settings_subtitle_style_controls(
+            settings_section("Style").child(settings_subtitle_style_controls(
                 SettingsSubtitleStyleState {
                     config,
                     disabled: burn_in_disabled,
@@ -179,7 +179,7 @@ pub(in crate::app) fn settings_subtitles_tab(
     let track_options = subtitle_track_options(config, state.metadata, state.settings_disabled);
     if track_options.is_empty() {
         return content
-            .child(settings_section("SOURCE TRACKS").child(settings_hint_text("No subtitles")));
+            .child(settings_section("Source tracks").child(settings_hint_text("No subtitles")));
     }
 
     let mut list = div().grid().grid_cols(1).gap_2();
@@ -187,7 +187,7 @@ pub(in crate::app) fn settings_subtitles_tab(
         list = list.child(settings_subtitle_track_button(option, window, cx));
     }
 
-    content.child(settings_section("SOURCE TRACKS").child(list))
+    content.child(settings_section("Source tracks").child(list))
 }
 
 fn settings_subtitle_burn_button(
@@ -201,8 +201,13 @@ fn settings_subtitle_burn_button(
     let background = animated.background;
     let foreground = animated.foreground;
     let hover_transition = animated.hover_transition;
-    let label = subtitle_burn_file_label(config);
     let has_path = config.subtitle_burn_path.is_some();
+    let label = subtitle_burn_file_label(config);
+    let label = if has_path {
+        label
+    } else {
+        theme::ui_text_owned(label)
+    };
 
     let button = div()
         .id("settings-subtitle-burn-file")
@@ -337,7 +342,7 @@ fn settings_subtitle_style_controls(
                 .gap_2()
                 .child(settings_subtitle_color_field(
                     SettingsSubtitleColorFieldSpec {
-                        label: "TEXT COLOR",
+                        label: "Text color",
                         id: "settings-subtitle-font-color",
                         value: subtitle_color_value(
                             state.config.subtitle_font_color.as_ref(),
@@ -356,7 +361,7 @@ fn settings_subtitle_style_controls(
                 ))
                 .child(settings_subtitle_color_field(
                     SettingsSubtitleColorFieldSpec {
-                        label: "OUTLINE COLOR",
+                        label: "Outline color",
                         id: "settings-subtitle-outline-color",
                         value: subtitle_color_value(
                             state.config.subtitle_outline_color.as_ref(),
@@ -379,7 +384,7 @@ fn settings_subtitle_style_controls(
                 .flex()
                 .flex_col()
                 .gap_2()
-                .child(settings_field_label("POSITION"))
+                .child(settings_field_label("Position"))
                 .child(settings_subtitle_position_grid(
                     state.config,
                     state.disabled,
@@ -417,7 +422,7 @@ fn settings_subtitle_font_select(
         .flex()
         .flex_col()
         .gap_2()
-        .child(settings_field_label("FONT"))
+        .child(settings_field_label("Font"))
         .child(
             frame_select_trigger(
                 "settings-subtitle-font-select",
@@ -490,7 +495,7 @@ fn settings_subtitle_font_size_select(
         .flex()
         .flex_col()
         .gap_2()
-        .child(settings_field_label("SIZE"))
+        .child(settings_field_label("Size"))
         .child(
             frame_select_trigger(
                 "settings-subtitle-font-size-select",

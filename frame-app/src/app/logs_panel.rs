@@ -61,7 +61,7 @@ pub(super) fn logs_tab_strip(
             div()
                 .text_size(px(theme::TEXT_LABEL_SIZE))
                 .text_color(color(theme::FRAME_GRAY_600))
-                .child("No active processes"),
+                .child(theme::ui_text("No active processes")),
         );
     }
 
@@ -327,7 +327,7 @@ pub(super) fn logs_empty_state(message: &'static str) -> gpui::Div {
         .justify_center()
         .text_size(px(theme::TEXT_LABEL_SIZE))
         .text_color(color(theme::FRAME_GRAY_600))
-        .child(message)
+        .child(theme::ui_text(message))
 }
 
 #[cfg(test)]
