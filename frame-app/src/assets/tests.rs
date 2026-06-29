@@ -105,27 +105,19 @@ mod frame_assets {
 
     #[test]
     fn frame_font_family_matches_bundled_font_name_table_family() {
-        assert_eq!(FRAME_FONT_FAMILY, "Instrument Sans");
+        assert_eq!(FRAME_FONT_FAMILY, "Overused Grotesk");
     }
 
     #[test]
     fn frame_font_alias_matches_bundled_font_alias() {
-        assert_eq!(FRAME_FONT_ALIAS, "InstrumentSans");
+        assert_eq!(FRAME_FONT_ALIAS, "OverusedGrotesk");
     }
 
     #[test]
     fn frame_font_features_enable_requested_opentype_tags() {
         let features = frame_font_features();
 
-        assert_eq!(
-            features.tag_value_list(),
-            [
-                ("liga".to_string(), 1),
-                ("ss02".to_string(), 1),
-                ("ss05".to_string(), 1),
-                ("kern".to_string(), 1),
-            ]
-        );
+        assert_eq!(features.tag_value_list(), [("kern".to_string(), 1)]);
     }
 
     #[test]
@@ -134,13 +126,7 @@ mod frame_assets {
 
         assert_eq!(
             features.tag_value_list(),
-            [
-                ("liga".to_string(), 1),
-                ("ss02".to_string(), 1),
-                ("ss05".to_string(), 1),
-                ("kern".to_string(), 1),
-                ("tnum".to_string(), 1),
-            ]
+            [("kern".to_string(), 1), ("tnum".to_string(), 1)]
         );
     }
 
@@ -153,8 +139,8 @@ mod frame_assets {
         assert_eq!(
             listed,
             [
-                SharedString::from("InstrumentSans-Regular.ttf"),
-                SharedString::from("InstrumentSans-Medium.ttf"),
+                SharedString::from("OverusedGrotesk-Roman.ttf"),
+                SharedString::from("OverusedGrotesk-Medium.ttf"),
             ]
         );
     }

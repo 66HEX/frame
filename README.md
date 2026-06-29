@@ -118,7 +118,7 @@ details, tier suggestions, and a launch checklist.
 - **UI:** GPUI-CE.
 - **Native Dialogs:** `rfd`, with extension filtering for supported media and
   subtitle files.
-- **Assets:** Embedded SVG icons, bundled Instrument Sans font, and native app
+- **Assets:** Embedded SVG icons, bundled Overused Grotesk font, and native app
   icon resources for macOS, Windows, and Linux packages.
 
 ### Conversion Core

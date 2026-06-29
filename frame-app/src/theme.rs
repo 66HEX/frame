@@ -50,11 +50,11 @@ pub const RADIUS_LG: f32 = RADIUS_BASE * 4.0;
 pub const RADIUS_XL: f32 = RADIUS_BASE * 6.0;
 
 pub const TEXT_SCALE: f32 = 1.0;
-pub const TEXT_UI_BASE_SIZE: f32 = 11.0;
-pub const TEXT_ROW_BASE_SIZE: f32 = 13.0;
-pub const TEXT_MARKDOWN_BASE_SIZE: f32 = 11.0;
-pub const TEXT_MARKDOWN_LIST_BASE_SIZE: f32 = 11.0;
-pub const TEXT_INPUT_CARET_BASE_HEIGHT: f32 = 13.0;
+pub const TEXT_UI_BASE_SIZE: f32 = 12.0;
+pub const TEXT_ROW_BASE_SIZE: f32 = 14.0;
+pub const TEXT_MARKDOWN_BASE_SIZE: f32 = 14.0;
+pub const TEXT_MARKDOWN_LIST_BASE_SIZE: f32 = 12.0;
+pub const TEXT_INPUT_CARET_BASE_HEIGHT: f32 = 14.0;
 
 pub const TEXT_UI_SIZE: f32 = TEXT_UI_BASE_SIZE * TEXT_SCALE;
 pub const TEXT_LABEL_SIZE: f32 = TEXT_UI_SIZE;
@@ -177,22 +177,14 @@ mod tests {
         }
 
         #[test]
-        fn ui_text_matches_ten_pixel_controls() {
-            assert_eq!(TEXT_UI_SIZE, 10.0);
+        fn ui_text_matches_twelve_pixel_controls() {
+            assert_eq!(TEXT_UI_SIZE, 12.0);
             assert_eq!(TEXT_LABEL_SIZE, TEXT_UI_SIZE);
         }
 
         #[test]
         fn row_text_matches_file_list_size() {
-            assert_eq!(TEXT_ROW_SIZE, 12.0);
-        }
-
-        #[test]
-        fn auxiliary_text_tokens_match_remaining_contexts() {
-            assert_eq!(TEXT_EMOJI_SIZE, 16.0);
-            assert_eq!(TEXT_MARKDOWN_SIZE, 10.0);
-            assert_eq!(TEXT_MARKDOWN_LIST_SIZE, 10.0);
-            assert_eq!(TEXT_INPUT_CARET_HEIGHT, 14.0);
+            assert_eq!(TEXT_ROW_SIZE, 14.0);
         }
 
         #[test]

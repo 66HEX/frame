@@ -2,6 +2,7 @@ use super::*;
 
 pub(in crate::app) const FRAME_CHECKBOX_SIZE: f32 = 14.0;
 pub(in crate::app) const FRAME_CHECK_ICON_SIZE: f32 = 12.0;
+pub(in crate::app) const FRAME_CHECKBOX_ROW_INDICATOR_OFFSET_Y: f32 = 3.0;
 const FRAME_CHECKBOX_MARK_SIZE: f32 = 8.0;
 const FRAME_SELECTION_DOT_SIZE: f32 = 12.0;
 const FRAME_SELECTION_DOT_MARK_SIZE: f32 = 6.0;
@@ -113,7 +114,10 @@ pub(in crate::app) fn frame_checkbox_row(
         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
             button_mouse_down(enabled, window, cx);
         })
-        .child(frame_checkbox_indicator(checked, false, disabled))
+        .child(
+            frame_checkbox_indicator(checked, false, disabled)
+                .mt(px(FRAME_CHECKBOX_ROW_INDICATOR_OFFSET_Y)),
+        )
         .child(
             div()
                 .flex()

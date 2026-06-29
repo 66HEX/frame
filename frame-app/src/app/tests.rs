@@ -2446,6 +2446,7 @@ mod visual_contract {
         assert_eq!(components::FRAME_ICON_SM_SIZE, 16.0);
         assert_eq!(components::FRAME_CHECKBOX_SIZE, 14.0);
         assert_eq!(components::FRAME_CHECK_ICON_SIZE, 12.0);
+        assert_eq!(components::FRAME_CHECKBOX_ROW_INDICATOR_OFFSET_Y, 3.0);
     }
 
     #[test]
