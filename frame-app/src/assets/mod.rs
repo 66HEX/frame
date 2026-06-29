@@ -5,12 +5,12 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-use gpui::{App, AssetSource, FontFeatures, FontWeight, Result, SharedString};
+use gpui::{App, AssetSource, FontFeatures, Result, SharedString};
 
 pub const FRAME_FONT_FAMILY: &str = "Instrument Sans";
-pub const FRAME_FONT_WEIGHT: FontWeight = FontWeight::NORMAL;
 pub const FRAME_FONT_ALIAS: &str = "InstrumentSans";
-pub const FRAME_FONT_PATH: &str = "fonts/InstrumentSans-Variable.ttf";
+pub const FRAME_FONT_REGULAR_PATH: &str = "fonts/InstrumentSans-Regular.ttf";
+pub const FRAME_FONT_MEDIUM_PATH: &str = "fonts/InstrumentSans-Medium.ttf";
 pub const FRAME_FONT_FEATURE_TAGS: [(&str, u32); 4] =
     [("liga", 1), ("ss02", 1), ("ss05", 1), ("kern", 1)];
 pub const FRAME_TABULAR_NUMBER_FONT_FEATURE_TAG: (&str, u32) = ("tnum", 1);
@@ -49,7 +49,10 @@ pub const ICON_TRAFFIC_MINIMIZE_SYMBOL: &str = "icons/traffic-minimize-symbol.sv
 pub const ICON_TRAFFIC_ZOOM_SYMBOL: &str = "icons/traffic-zoom-symbol.svg";
 
 const FRAME_ICON_SVG: &str = include_str!("../../assets/icons/frame.svg");
-const FRAME_FONT_BYTES: &[u8] = include_bytes!("../../assets/fonts/InstrumentSans-Variable.ttf");
+const FRAME_FONT_REGULAR_BYTES: &[u8] =
+    include_bytes!("../../assets/fonts/InstrumentSans-Regular.ttf");
+const FRAME_FONT_MEDIUM_BYTES: &[u8] =
+    include_bytes!("../../assets/fonts/InstrumentSans-Medium.ttf");
 
 const ARROW_DOWN_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 256 256"><path d="M205.66,149.66l-72,72a8,8,0,0,1-11.32,0l-72-72a8,8,0,0,1,11.32-11.32L120,196.69V40a8,8,0,0,1,16,0V196.69l58.34-58.35a8,8,0,0,1,11.32,11.32Z"/></svg>"#;
 const LAYOUT_LIST_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 256 256"><path d="M32,64a8,8,0,0,1,8-8H216a8,8,0,0,1,0,16H40A8,8,0,0,1,32,64Zm104,56H40a8,8,0,0,0,0,16h96a8,8,0,0,0,0-16Zm0,64H40a8,8,0,0,0,0,16h96a8,8,0,0,0,0-16Zm112-24a8,8,0,0,1-3.76,6.78l-64,40A8,8,0,0,1,168,200V120a8,8,0,0,1,12.24-6.78l64,40A8,8,0,0,1,248,160Zm-23.09,0L184,134.43v51.14Z"/></svg>"#;
@@ -90,7 +93,8 @@ pub struct FrameAssets;
 impl AssetSource for FrameAssets {
     fn load(&self, path: &str) -> Result<Option<Cow<'static, [u8]>>> {
         let asset = match path {
-            FRAME_FONT_PATH => Cow::Borrowed(FRAME_FONT_BYTES),
+            FRAME_FONT_REGULAR_PATH => Cow::Borrowed(FRAME_FONT_REGULAR_BYTES),
+            FRAME_FONT_MEDIUM_PATH => Cow::Borrowed(FRAME_FONT_MEDIUM_BYTES),
             ICON_FRAME => Cow::Borrowed(FRAME_ICON_SVG.as_bytes()),
             ICON_ARROW_DOWN => Cow::Borrowed(ARROW_DOWN_SVG.as_bytes()),
             ICON_LAYOUT_LIST => Cow::Borrowed(LAYOUT_LIST_SVG.as_bytes()),
@@ -132,7 +136,10 @@ impl AssetSource for FrameAssets {
 
     fn list(&self, path: &str) -> Result<Vec<SharedString>> {
         let assets = match path {
-            "fonts" => vec![SharedString::from("InstrumentSans-Variable.ttf")],
+            "fonts" => vec![
+                SharedString::from("InstrumentSans-Regular.ttf"),
+                SharedString::from("InstrumentSans-Medium.ttf"),
+            ],
             "icons" => vec![
                 SharedString::from("arrow-down.svg"),
                 SharedString::from("bookmark.svg"),
@@ -176,8 +183,14 @@ impl AssetSource for FrameAssets {
 }
 
 pub fn load_frame_fonts(cx: &mut App) -> Result<()> {
-    cx.text_system()
-        .add_fonts(vec![Cow::Borrowed(FRAME_FONT_BYTES)])
+    cx.text_system().add_fonts(frame_font_bytes())
+}
+
+pub fn frame_font_bytes() -> Vec<Cow<'static, [u8]>> {
+    vec![
+        Cow::Borrowed(FRAME_FONT_REGULAR_BYTES),
+        Cow::Borrowed(FRAME_FONT_MEDIUM_BYTES),
+    ]
 }
 
 pub fn frame_font_features() -> FontFeatures {

@@ -91,6 +91,7 @@ pub(in crate::app) fn settings_track_header(label: String) -> gpui::Div {
         .flex()
         .items_center()
         .gap_2()
+        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(color(theme::FRAME_GRAY_600))
         .child(label)
         .child(
@@ -109,6 +110,7 @@ pub(in crate::app) fn settings_section_label(label: &'static str) -> gpui::Div {
         .flex_col()
         .gap_1()
         .text_size(px(theme::TEXT_LABEL_SIZE))
+        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(color(theme::FRAME_GRAY_600))
         .child(label)
         .child(

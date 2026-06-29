@@ -92,6 +92,7 @@ pub(super) fn log_tab_button(
         .id(element_id("logs-tab", &file.id))
         .flex_none()
         .text_size(px(theme::TEXT_LABEL_SIZE))
+        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
         .hover(|style| style.cursor_pointer())
         .on_hover(move |hover, _window, cx| {

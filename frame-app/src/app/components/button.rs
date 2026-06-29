@@ -55,6 +55,7 @@ pub(in crate::app) fn frame_text_button(
         .px(px(10.0))
         .bg(background)
         .text_size(px(theme::TEXT_LABEL_SIZE))
+        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
         .opacity(colors.opacity)
         .when(text_button_uses_highlight(variant, selected), |this| {

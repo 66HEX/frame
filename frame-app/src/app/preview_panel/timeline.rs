@@ -259,6 +259,7 @@ pub(in crate::app) fn preview_timeline_label(label: &'static str) -> gpui::Div {
     div()
         .h(px(12.0))
         .text_size(px(theme::TEXT_LABEL_SIZE))
+        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(color(theme::FRAME_GRAY_600))
         .child(label)
 }

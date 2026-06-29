@@ -132,6 +132,7 @@ pub(super) fn action_button(
         .rounded(px(theme::RADIUS_SM))
         .bg(background)
         .shadow(button_highlight_shadows())
+        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
         .opacity(colors.opacity)
         .when(enabled, |this| this.hover(|style| style.cursor_pointer()))

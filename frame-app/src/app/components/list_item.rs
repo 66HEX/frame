@@ -35,6 +35,7 @@ pub(in crate::app) fn frame_list_item(
         .pl(px(mix_scalar(8.0, 12.0, selected_progress)))
         .pr(px(12.0))
         .text_size(px(theme::TEXT_LABEL_SIZE))
+        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(mix_color(
             theme::FRAME_GRAY_600,
             theme::FOREGROUND,
@@ -70,6 +71,7 @@ pub(in crate::app) fn frame_list_item_with_caption(
             div()
                 .truncate()
                 .text_size(px(theme::TEXT_LABEL_SIZE))
+                .font_weight(theme::TEXT_WEIGHT_REGULAR)
                 .text_color(color(theme::FRAME_GRAY_600))
                 .child(caption),
         )
@@ -110,6 +112,7 @@ pub(in crate::app) fn frame_track_list_item(
         .child(
             div()
                 .text_color(color(theme::FRAME_GRAY_600))
+                .font_weight(theme::TEXT_WEIGHT_REGULAR)
                 .child(index_label),
         )
         .child(div().text_color(color(theme::FOREGROUND)).child(primary));
@@ -119,6 +122,7 @@ pub(in crate::app) fn frame_track_list_item(
             this.child(
                 div()
                     .truncate()
+                    .font_weight(theme::TEXT_WEIGHT_REGULAR)
                     .text_color(color(theme::FRAME_GRAY_600))
                     .child(detail),
             )
@@ -133,6 +137,7 @@ pub(in crate::app) fn frame_track_list_item(
                 this.child(
                     div()
                         .truncate()
+                        .font_weight(theme::TEXT_WEIGHT_REGULAR)
                         .text_color(color(theme::FRAME_GRAY_600))
                         .child(detail),
                 )
@@ -152,6 +157,7 @@ pub(in crate::app) fn frame_track_list_item(
         .py(px(6.0))
         .bg(background)
         .text_size(px(theme::TEXT_LABEL_SIZE))
+        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
         .opacity(colors.opacity)
         .shadow(button_highlight_shadows())

@@ -149,6 +149,7 @@ fn settings_preset_row(
                 div()
                     .pr(px(8.0))
                     .text_size(px(theme::TEXT_LABEL_SIZE))
+                    .font_weight(theme::TEXT_WEIGHT_REGULAR)
                     .text_color(color(theme::FRAME_GRAY_600))
                     .child(status.unwrap_or_default()),
             )

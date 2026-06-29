@@ -109,11 +109,6 @@ mod frame_assets {
     }
 
     #[test]
-    fn frame_font_weight_matches_bundled_font_face_weight() {
-        assert_eq!(FRAME_FONT_WEIGHT, gpui::FontWeight::NORMAL);
-    }
-
-    #[test]
     fn frame_font_alias_matches_bundled_font_alias() {
         assert_eq!(FRAME_FONT_ALIAS, "InstrumentSans");
     }
@@ -150,15 +145,35 @@ mod frame_assets {
     }
 
     #[test]
-    fn list_returns_bundled_font_asset() {
+    fn list_returns_bundled_font_faces() {
         let listed = FrameAssets
             .list("fonts")
             .expect("asset list should not fail");
 
-        assert!(
-            listed
-                .iter()
-                .any(|name| name.as_ref() == "InstrumentSans-Variable.ttf")
+        assert_eq!(
+            listed,
+            [
+                SharedString::from("InstrumentSans-Regular.ttf"),
+                SharedString::from("InstrumentSans-Medium.ttf"),
+            ]
         );
+    }
+
+    #[test]
+    fn load_returns_each_bundled_font_face() {
+        for path in [FRAME_FONT_REGULAR_PATH, FRAME_FONT_MEDIUM_PATH] {
+            assert!(
+                FrameAssets
+                    .load(path)
+                    .expect("asset load should not fail")
+                    .is_some(),
+                "{path} should load"
+            );
+        }
+    }
+
+    #[test]
+    fn frame_font_bytes_registers_regular_and_medium_faces() {
+        assert_eq!(frame_font_bytes().len(), 2);
     }
 }

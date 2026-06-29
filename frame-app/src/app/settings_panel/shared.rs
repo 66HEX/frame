@@ -3,6 +3,7 @@ use super::*;
 pub(in crate::app) fn settings_field_label(label: &'static str) -> gpui::Div {
     div()
         .text_size(px(theme::TEXT_LABEL_SIZE))
+        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(color(theme::FRAME_GRAY_600))
         .child(label)
 }
@@ -16,6 +17,7 @@ pub(in crate::app) fn settings_value_badge(value: String) -> gpui::Div {
         .bg(color(theme::FRAME_GRAY_400))
         .px(px(6.0))
         .text_size(px(theme::TEXT_LABEL_SIZE))
+        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(color(theme::FOREGROUND))
         .font_features(assets::frame_tabular_number_font_features())
         .shadow(button_highlight_shadows())

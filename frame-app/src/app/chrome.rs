@@ -376,6 +376,7 @@ pub(super) fn app_settings_sheet(
                         .justify_between()
                         .px_4()
                         .text_size(px(theme::TEXT_LABEL_SIZE))
+                        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
                         .text_color(color(theme::FOREGROUND))
                         .child("SETTINGS")
                         .child(
@@ -580,21 +581,21 @@ fn update_release_note_line(line: &str) -> gpui::Div {
                 heading.to_string(),
                 0.0,
                 theme::FOREGROUND,
-                gpui::FontWeight::MEDIUM,
+                theme::TEXT_WEIGHT_MEDIUM,
             )
         } else if let Some(bullet) = bullet {
             (
                 format!("• {bullet}"),
                 8.0,
                 theme::FRAME_GRAY_600,
-                gpui::FontWeight::NORMAL,
+                theme::TEXT_WEIGHT_REGULAR,
             )
         } else {
             (
                 trimmed.to_string(),
                 0.0,
                 theme::FRAME_GRAY_600,
-                gpui::FontWeight::NORMAL,
+                theme::TEXT_WEIGHT_REGULAR,
             )
         };
 
@@ -841,6 +842,7 @@ fn update_dialog_header(
         title_stack = title_stack.child(
             div()
                 .text_size(px(theme::TEXT_LABEL_SIZE))
+                .font_weight(theme::TEXT_WEIGHT_MEDIUM)
                 .text_color(color(theme::FRAME_GRAY_600))
                 .child(kicker),
         );
@@ -848,7 +850,7 @@ fn update_dialog_header(
     title_stack = title_stack.child(
         div()
             .text_size(px(theme::TEXT_LABEL_SIZE))
-            .font_weight(gpui::FontWeight::MEDIUM)
+            .font_weight(theme::TEXT_WEIGHT_MEDIUM)
             .text_color(color(theme::FOREGROUND))
             .child(update_dialog_title(status).to_uppercase()),
     );
@@ -1672,6 +1674,7 @@ pub(super) fn titlebar_segment(
         .group(segment_id)
         .px_2()
         .bg(background)
+        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
         .when(selected, |this| this.shadow(button_highlight_shadows()))
         .hover(|style| style.cursor_pointer())

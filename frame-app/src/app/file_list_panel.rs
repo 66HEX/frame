@@ -75,6 +75,7 @@ pub(super) fn file_list_header(
                 .ml_4()
                 .w(px(FILE_LIST_ACTIONS_WIDTH))
                 .text_size(px(theme::TEXT_LABEL_SIZE))
+                .font_weight(theme::TEXT_WEIGHT_MEDIUM)
                 .text_color(color(theme::FRAME_GRAY_600))
                 .text_right()
                 .child("ACTIONS"),
@@ -202,7 +203,10 @@ pub(super) fn file_list_row(
 }
 
 pub(super) fn header_label(label: &'static str, span: u16, align_right: bool) -> gpui::Div {
-    let cell = div().col_span(span).truncate();
+    let cell = div()
+        .col_span(span)
+        .truncate()
+        .font_weight(theme::TEXT_WEIGHT_MEDIUM);
     let cell = if align_right { cell.text_right() } else { cell };
     cell.child(label)
 }

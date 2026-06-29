@@ -289,6 +289,7 @@ pub(in crate::app) fn compact_text_button_variant(
         .rounded(px(theme::RADIUS_SM))
         .bg(background)
         .text_size(px(theme::TEXT_LABEL_SIZE))
+        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
         .opacity(colors.opacity)
         .when(highlighted, |this| this.shadow(button_highlight_shadows()))

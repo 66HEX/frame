@@ -122,12 +122,14 @@ pub(in crate::app) fn frame_checkbox_row(
                 .child(
                     div()
                         .text_size(px(theme::TEXT_LABEL_SIZE))
+                        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
                         .text_color(color(theme::FRAME_GRAY_600))
                         .child(label),
                 )
                 .child(
                     div()
                         .text_size(px(theme::TEXT_LABEL_SIZE))
+                        .font_weight(theme::TEXT_WEIGHT_REGULAR)
                         .text_color(color(theme::FRAME_GRAY_600))
                         .child(hint),
                 ),

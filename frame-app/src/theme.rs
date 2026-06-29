@@ -1,5 +1,7 @@
 //! Frame native visual tokens.
 
+use gpui::FontWeight;
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RgbaToken {
     pub red: f32,
@@ -62,6 +64,8 @@ pub const TEXT_EMOJI_SIZE: f32 = TEXT_EMOJI_BASE_SIZE * TEXT_SCALE;
 pub const TEXT_MARKDOWN_SIZE: f32 = TEXT_MARKDOWN_BASE_SIZE * TEXT_SCALE;
 pub const TEXT_MARKDOWN_LIST_SIZE: f32 = TEXT_MARKDOWN_LIST_BASE_SIZE * TEXT_SCALE;
 pub const TEXT_INPUT_CARET_HEIGHT: f32 = TEXT_INPUT_CARET_BASE_HEIGHT * TEXT_SCALE;
+pub const TEXT_WEIGHT_REGULAR: FontWeight = FontWeight::NORMAL;
+pub const TEXT_WEIGHT_MEDIUM: FontWeight = FontWeight::MEDIUM;
 pub const MIN_HIT_AREA: f32 = 40.0;
 
 #[cfg(test)]
@@ -168,6 +172,12 @@ mod tests {
             assert_eq!(TEXT_MARKDOWN_SIZE, 10.0);
             assert_eq!(TEXT_MARKDOWN_LIST_SIZE, 10.0);
             assert_eq!(TEXT_INPUT_CARET_HEIGHT, 14.0);
+        }
+
+        #[test]
+        fn font_weight_tokens_expose_only_regular_and_medium_levels() {
+            assert_eq!(TEXT_WEIGHT_REGULAR, FontWeight::NORMAL);
+            assert_eq!(TEXT_WEIGHT_MEDIUM, FontWeight::MEDIUM);
         }
     }
 }
