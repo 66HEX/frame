@@ -1498,13 +1498,12 @@ pub(in crate::app) fn preview_canvas_initial_zoom(
     let width_scale = viewport_width / media_width;
     let height_scale = viewport_height / media_height;
     let contain_scale = width_scale.min(height_scale);
-    let cover_scale = width_scale.max(height_scale);
-    if !contain_scale.is_finite() || contain_scale <= 0.0 || !cover_scale.is_finite() {
+    if !contain_scale.is_finite() || contain_scale <= 0.0 {
         return None;
     }
 
     Some(clamp_preview_canvas_zoom(
-        (cover_scale / contain_scale) * PREVIEW_CANVAS_INITIAL_COVER_SCALE,
+        PREVIEW_CANVAS_INITIAL_CONTAIN_SCALE,
     ))
 }
 

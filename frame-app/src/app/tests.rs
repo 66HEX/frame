@@ -2418,11 +2418,18 @@ mod preview_shell {
     }
 
     #[test]
-    fn preview_canvas_initial_zoom_starts_just_below_object_cover() {
+    fn preview_canvas_initial_zoom_starts_inset_from_object_contain() {
         let zoom =
             preview_canvas_initial_zoom(1000.0, 500.0, 1920.0, 1080.0).expect("initial zoom");
 
-        assert!((zoom - 1.08).abs() < 0.000_001);
+        assert!((zoom - 0.9).abs() < 0.000_001);
+
+        let metrics = preview_canvas_layout_metrics(1000.0, 500.0, 1920.0, 1080.0, zoom, 0.0, 0.0)
+            .expect("metrics");
+        assert!(metrics.width < 1000.0);
+        assert!(metrics.height < 500.0);
+        assert!(metrics.left > 0.0);
+        assert!(metrics.top > 0.0);
     }
 
     #[test]
