@@ -79,6 +79,8 @@ impl FrameRoot {
             logs_scroll_handle: UniformListScrollHandle::new(),
             last_log_scroll_target: None,
             logs_follow_tail: true,
+            copied_log_file_id: None,
+            log_copy_feedback_epoch: 0,
             is_processing: false,
             settings_ui,
             drag_drop_ui: DragDropUiState::default(),

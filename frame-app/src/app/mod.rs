@@ -191,6 +191,7 @@ const LOG_SCROLL_BUTTON_OFFSET: f32 = 10.0;
 const LOG_SCROLL_BUTTON_PADDING: f32 = 4.0;
 const LOG_SCROLL_BUTTON_SIZE: f32 = 24.0;
 const LOG_SCROLL_ICON_SIZE: f32 = 16.0;
+const LOG_COPY_FEEDBACK_DURATION: Duration = Duration::from_millis(1_200);
 const TRAFFIC_LIGHT_GROUP: &str = "titlebar-traffic-lights";
 const TRAFFIC_CLOSE_FILL: &str = "#ff5f56";
 const TRAFFIC_CLOSE_BORDER: &str = "#e0443e";
@@ -230,6 +231,8 @@ pub struct FrameRoot {
     logs_scroll_handle: UniformListScrollHandle,
     last_log_scroll_target: Option<LogScrollTarget>,
     logs_follow_tail: bool,
+    copied_log_file_id: Option<String>,
+    log_copy_feedback_epoch: usize,
     is_processing: bool,
     settings_ui: SettingsUiState,
     drag_drop_ui: DragDropUiState,

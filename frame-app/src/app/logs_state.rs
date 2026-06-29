@@ -84,10 +84,55 @@ impl FrameRoot {
         true
     }
 
+    pub(super) fn copy_log_lines_to_clipboard(
+        &mut self,
+        file_id: &str,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let logs = self.conversion_events.logs_for(file_id);
+        if logs.is_empty() {
+            return false;
+        }
+
+        cx.write_to_clipboard(ClipboardItem::new_string(log_clipboard_text(logs)));
+        self.copied_log_file_id = Some(file_id.to_string());
+        let epoch = self.next_log_copy_feedback_epoch();
+        let copied_file_id = file_id.to_string();
+
+        cx.spawn(async move |this, cx| {
+            cx.background_executor()
+                .timer(LOG_COPY_FEEDBACK_DURATION)
+                .await;
+
+            if let Some(this) = this.upgrade() {
+                this.update(cx, move |root, cx| {
+                    if root.log_copy_feedback_epoch == epoch
+                        && root.copied_log_file_id.as_deref() == Some(copied_file_id.as_str())
+                    {
+                        root.copied_log_file_id = None;
+                        cx.notify();
+                    }
+                });
+            }
+        })
+        .detach();
+
+        true
+    }
+
+    fn next_log_copy_feedback_epoch(&mut self) -> usize {
+        self.log_copy_feedback_epoch = self.log_copy_feedback_epoch.wrapping_add(1);
+        self.log_copy_feedback_epoch
+    }
+
     fn scroll_logs_to_bottom(&self, line_count: usize) {
         self.logs_scroll_handle
             .scroll_to_item_strict(line_count.saturating_sub(1), ScrollStrategy::Bottom);
     }
+}
+
+pub(super) fn log_clipboard_text(logs: &[String]) -> String {
+    logs.join("\n")
 }
 
 #[must_use]
@@ -154,5 +199,12 @@ mod tests {
         assert!(root.scroll_selected_log_to_bottom());
 
         assert!(root.logs_follow_tail);
+    }
+
+    #[test]
+    fn log_clipboard_text_preserves_line_boundaries() {
+        let logs = vec!["first line".to_string(), "second line".to_string()];
+
+        assert_eq!(log_clipboard_text(&logs), "first line\nsecond line");
     }
 }

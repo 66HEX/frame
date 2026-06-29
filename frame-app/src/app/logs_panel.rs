@@ -1,5 +1,6 @@
 use super::components::{
-    FrameIconButtonVariant, frame_icon_button, frame_vertical_uniform_scrollbar,
+    FRAME_ICON_BUTTON_SM_SIZE, FRAME_ICON_SM_SIZE, FrameIconButtonVariant, frame_icon_button,
+    frame_vertical_uniform_scrollbar,
 };
 use super::primitives::*;
 use super::*;
@@ -9,11 +10,15 @@ pub(super) fn logs_view(
     conversion_events: &ConversionEventState,
     scroll_handle: &UniformListScrollHandle,
     follow_tail: bool,
+    copied_log_file_id: Option<&str>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let active_files = conversion_events.active_log_files(queue);
     let selected_id = conversion_events.selected_log_file_id();
+    let selected_line_count = selected_id.map_or(0, |id| conversion_events.logs_for(id).len());
+    let selected_logs_copied =
+        selected_id.is_some_and(|id| copied_log_file_id.is_some_and(|copied| copied == id));
 
     div()
         .size_full()
@@ -21,7 +26,14 @@ pub(super) fn logs_view(
         .flex_col()
         .overflow_hidden()
         .card_surface()
-        .child(logs_tab_strip(&active_files, selected_id, window, cx))
+        .child(logs_tab_strip(
+            &active_files,
+            selected_id,
+            selected_line_count,
+            selected_logs_copied,
+            window,
+            cx,
+        ))
         .child(logs_body(
             conversion_events,
             selected_id,
@@ -36,16 +48,19 @@ pub(super) fn logs_view(
 pub(super) fn logs_tab_strip(
     active_files: &[ActiveLogFile],
     selected_id: Option<&str>,
+    selected_line_count: usize,
+    selected_logs_copied: bool,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let mut tabs = div()
-        .size_full()
+        .h_full()
+        .flex_1()
+        .min_w_0()
         .flex()
         .items_center()
         .gap_6()
-        .overflow_hidden()
-        .px_4();
+        .overflow_hidden();
 
     for file in active_files {
         tabs = tabs.child(log_tab_button(
@@ -65,12 +80,26 @@ pub(super) fn logs_tab_strip(
         );
     }
 
-    div()
+    let header = div()
         .h(px(PANEL_HEADER_HEIGHT))
         .w_full()
         .relative()
+        .flex()
+        .items_center()
+        .gap_2()
+        .px_4()
         .child(tabs)
-        .child(panel_bottom_separator())
+        .when_some(selected_id, |this, selected_id| {
+            this.child(logs_copy_button(
+                selected_id,
+                selected_line_count > 0,
+                selected_logs_copied,
+                window,
+                cx,
+            ))
+        });
+
+    header.child(panel_bottom_separator())
 }
 
 pub(super) fn log_tab_button(
@@ -266,6 +295,37 @@ pub(super) fn log_scroll_to_bottom_button(
                 }
             })),
         )
+}
+
+pub(super) fn logs_copy_button(
+    file_id: &str,
+    enabled: bool,
+    copied: bool,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> impl IntoElement {
+    let file_id = file_id.to_string();
+    let icon = if copied {
+        assets::ICON_CHECK
+    } else {
+        assets::ICON_COPY
+    };
+    frame_icon_button(
+        "logs-copy",
+        icon,
+        FrameIconButtonVariant::Ghost,
+        enabled,
+        FRAME_ICON_BUTTON_SM_SIZE,
+        FRAME_ICON_SM_SIZE,
+        window,
+        cx,
+    )
+    .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        cx.stop_propagation();
+        if enabled && root.copy_log_lines_to_clipboard(&file_id, cx) {
+            cx.notify();
+        }
+    }))
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

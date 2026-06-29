@@ -19,6 +19,7 @@ pub const ICON_LAYOUT_LIST: &str = "icons/layout-list.svg";
 pub const ICON_LIST_CHECKS: &str = "icons/list-checks.svg";
 pub const ICON_TERMINAL: &str = "icons/terminal.svg";
 pub const ICON_CHECK: &str = "icons/check.svg";
+pub const ICON_COPY: &str = "icons/copy.svg";
 pub const ICON_CHEVRONS_UP_DOWN: &str = "icons/chevrons-up-down.svg";
 pub const ICON_CLOSE: &str = "icons/close.svg";
 pub const ICON_FILE_UP: &str = "icons/file-up.svg";
@@ -58,6 +59,7 @@ const LAYOUT_LIST_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox
 const LIST_CHECKS_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><path d="M11 6L21 6" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"/><path d="M11 12L21 12" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"/><path d="M11 18L21 18" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"/><path d="M3 7.39286C3 7.39286 4 8.04466 4.5 9C4.5 9 6 5.25 8 4" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/><path d="M3 18.3929C3 18.3929 4 19.0447 4.5 20C4.5 20 6 16.25 8 15" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/></svg>"#;
 const TERMINAL_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><path d="M4.00004 17C4.00004 17 9.99999 12.5811 10 11C10 9.41884 4 5 4 5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/><path d="M12 19H20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/></svg>"#;
 const CHECK_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><path d="M5 13.2592L7.58583 15.9568C8.2525 16.6523 8.58583 17.0001 9.00004 17.0001C9.41425 17.0001 9.74759 16.6523 10.4143 15.9568L19 7.00006" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/></svg>"#;
+const COPY_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><path d="M7 11V9C7 5.70017 7 4.05025 8.02513 3.02513C9.05025 2 10.7002 2 14 2C17.2998 2 18.9497 2 19.9749 3.02513C21 4.05025 21 5.70017 21 9V11C21 14.2998 21 15.9497 19.9749 16.9749C18.9497 18 17.2998 18 14 18C10.7002 18 9.05025 18 8.02513 16.9749C7 15.9497 7 14.2998 7 11Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/><path d="M3 6V15C3 18.2998 3 19.9497 4.02513 20.9749C5.05025 22 6.70017 22 10 22H17" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/></svg>"#;
 const CHEVRONS_UP_DOWN_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><path d="M7 19C7 19 10.6824 14 12 14C13.3176 14 17 19 17 19" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/><path d="M7 5.00004C7 5.00004 10.6824 9.99999 12 10C13.3176 10 17 5 17 5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/></svg>"#;
 const CLOSE_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><path d="M18 6L6.00081 17.9992M17.9992 18L6 6.00085" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/></svg>"#;
 const FILE_UP_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><path d="M4 12L4 14.5442C4 17.7892 4 19.4117 4.88607 20.5107C5.06508 20.7327 5.26731 20.9349 5.48933 21.1139C6.58831 22 8.21082 22 11.4558 22C12.1614 22 12.5141 22 12.8372 21.886C12.9044 21.8623 12.9702 21.835 13.0345 21.8043C13.3436 21.6564 13.593 21.407 14.0919 20.9081L18.8284 16.1716C19.4065 15.5935 19.6955 15.3045 19.8478 14.9369C20 14.5694 20 14.1606 20 13.3431V10C20 6.22876 20 4.34315 18.8284 3.17157C17.6569 2 15.7712 2 12 2M13 21.5V21C13 18.1716 13 16.7574 13.8787 15.8787C14.7574 15 16.1716 15 19 15H19.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/><path d="M10 5C9.41016 4.39316 7.84027 2 7 2C6.15973 2 4.58984 4.39316 4 5M7 3L7 10" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/></svg>"#;
@@ -100,6 +102,7 @@ impl AssetSource for FrameAssets {
             ICON_LIST_CHECKS => Cow::Borrowed(LIST_CHECKS_SVG.as_bytes()),
             ICON_TERMINAL => Cow::Borrowed(TERMINAL_SVG.as_bytes()),
             ICON_CHECK => Cow::Borrowed(CHECK_SVG.as_bytes()),
+            ICON_COPY => Cow::Borrowed(COPY_SVG.as_bytes()),
             ICON_CHEVRONS_UP_DOWN => Cow::Borrowed(CHEVRONS_UP_DOWN_SVG.as_bytes()),
             ICON_CLOSE => Cow::Borrowed(CLOSE_SVG.as_bytes()),
             ICON_FILE_UP => Cow::Borrowed(FILE_UP_SVG.as_bytes()),
@@ -146,6 +149,7 @@ impl AssetSource for FrameAssets {
                 SharedString::from("check.svg"),
                 SharedString::from("chevrons-up-down.svg"),
                 SharedString::from("close.svg"),
+                SharedString::from("copy.svg"),
                 SharedString::from("crop.svg"),
                 SharedString::from("file-down.svg"),
                 SharedString::from("file-image.svg"),

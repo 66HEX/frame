@@ -155,6 +155,7 @@ impl Render for FrameRoot {
                 &self.conversion_events,
                 &self.logs_scroll_handle,
                 self.logs_follow_tail,
+                self.copied_log_file_id.as_deref(),
                 window,
                 cx,
             )),
