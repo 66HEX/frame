@@ -78,16 +78,70 @@ mod frame_assets {
     }
 
     #[test]
-    fn preview_transform_assets_preserve_original_filled_paths() {
-        let loaded = FrameAssets
-            .load(ICON_ROTATE_CW)
-            .expect("asset load should not fail")
-            .expect("rotate asset should exist");
-        let svg = std::str::from_utf8(loaded.as_ref()).expect("svg should be utf8");
+    fn ui_icon_assets_use_hugeicons_stroke_style() {
+        let renderer = gpui::SvgRenderer::new(std::sync::Arc::new(FrameAssets));
 
-        assert!(svg.contains(r#"fill="currentColor""#));
-        assert!(svg.contains("M240,56v48"));
-        assert!(!svg.contains(r#"stroke-width="18""#));
+        for icon in [
+            ICON_ARROW_DOWN,
+            ICON_LAYOUT_LIST,
+            ICON_LIST_CHECKS,
+            ICON_TERMINAL,
+            ICON_CHECK,
+            ICON_CHEVRONS_UP_DOWN,
+            ICON_CLOSE,
+            ICON_FILE_UP,
+            ICON_FILE_DOWN,
+            ICON_HARD_DRIVE,
+            ICON_FILE_VIDEO,
+            ICON_FILE_IMAGE,
+            ICON_MUSIC,
+            ICON_CAPTIONS,
+            ICON_TAGS,
+            ICON_BOOKMARK,
+            ICON_SETTINGS,
+            ICON_PLUS,
+            ICON_MINUS,
+            ICON_PLAY,
+            ICON_PAUSE,
+            ICON_PAUSE_2,
+            ICON_ROTATE_CW,
+            ICON_FLIP_HORIZONTAL,
+            ICON_FLIP_VERTICAL,
+            ICON_CROP,
+            ICON_SPINNER,
+            ICON_SQUARE,
+            ICON_TRASH,
+        ] {
+            let loaded = FrameAssets
+                .load(icon)
+                .expect("asset load should not fail")
+                .expect("icon asset should exist");
+            let svg = std::str::from_utf8(loaded.as_ref()).expect("svg should be utf8");
+
+            assert!(
+                svg.contains(r#"viewBox="0 0 24 24""#),
+                "{icon} should use the Hugeicons 24px grid"
+            );
+            assert!(
+                svg.contains(r#"fill="none""#),
+                "{icon} should use stroke rendering"
+            );
+            assert!(
+                svg.contains(r#"stroke="currentColor""#),
+                "{icon} should inherit GPUI text_color"
+            );
+            assert!(
+                svg.contains(r#"stroke-width="1.5""#),
+                "{icon} should use the Hugeicons stroke weight"
+            );
+            assert!(
+                !svg.contains(r#" key=""#),
+                "{icon} should not include React-only metadata"
+            );
+            renderer
+                .render_single_frame(loaded.as_ref(), 1.0)
+                .unwrap_or_else(|error| panic!("{icon} should render: {error}"));
+        }
     }
 
     #[test]
