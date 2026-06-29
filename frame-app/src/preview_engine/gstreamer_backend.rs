@@ -1,6 +1,6 @@
 use std::{
     sync::{
-        Arc,
+        Arc, Mutex, MutexGuard,
         atomic::{AtomicBool, AtomicU64, Ordering},
     },
     thread::{self, JoinHandle},
@@ -21,6 +21,9 @@ use super::{
 const MAX_FRAME_PACING_DELAY: Duration = Duration::from_millis(100);
 const DISCOVERER_DURATION_TIMEOUT: gst::ClockTime = gst::ClockTime::from_seconds(2);
 const SEEK_END_EPSILON: f64 = 0.001;
+const SEEK_TRANSIENT_GUARD_TIMEOUT: Duration = Duration::from_millis(800);
+const SEEK_TRANSIENT_POSITION_TOLERANCE_US: u64 = 100_000;
+const SEEK_TRANSIENT_FRAME_TOLERANCE_US: u64 = 500_000;
 
 pub struct RunningPreviewPipeline {
     pipeline: gst::Pipeline,
@@ -30,6 +33,7 @@ pub struct RunningPreviewPipeline {
     pause_after_next_frame: Arc<AtomicBool>,
     eos_reached: Arc<AtomicBool>,
     clock_generation: Arc<AtomicU64>,
+    seek_guard: SeekTransientGuard,
     worker: Option<JoinHandle<()>>,
     bus_worker: Option<JoinHandle<()>>,
 }
@@ -69,6 +73,11 @@ impl RunningPreviewPipeline {
             self.set_audio_muted(true);
             self.pause_after_next_frame.store(true, Ordering::SeqCst);
         }
+        if precise {
+            self.seek_guard.set_target(seconds);
+        } else {
+            self.seek_guard.clear();
+        }
 
         let position = gst::ClockTime::from_nseconds((seconds * 1_000_000_000.0) as u64);
         let result = self
@@ -78,6 +87,7 @@ impl RunningPreviewPipeline {
 
         if result.is_err() {
             self.pause_after_next_frame.store(false, Ordering::SeqCst);
+            self.seek_guard.clear();
             return result;
         }
 
@@ -97,9 +107,11 @@ impl RunningPreviewPipeline {
 
     #[must_use]
     pub fn position(&self) -> f64 {
-        self.pipeline
+        let position = self
+            .pipeline
             .query_position::<gst::ClockTime>()
-            .map_or(0.0, |position| position.nseconds() as f64 / 1_000_000_000.0)
+            .map_or(0.0, |position| position.nseconds() as f64 / 1_000_000_000.0);
+        self.seek_guard.position_or_target(position)
     }
 
     #[must_use]
@@ -144,6 +156,80 @@ impl Drop for RunningPreviewPipeline {
     }
 }
 
+#[derive(Clone, Debug, Default)]
+struct SeekTransientGuard {
+    state: Arc<Mutex<Option<SeekTransientState>>>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct SeekTransientState {
+    target_us: u64,
+    started_at: Instant,
+}
+
+impl SeekTransientGuard {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    fn set_target(&self, seconds: f64) {
+        *lock_seek_guard(&self.state) = Some(SeekTransientState {
+            target_us: seconds_to_us(seconds),
+            started_at: Instant::now(),
+        });
+    }
+
+    fn clear(&self) {
+        *lock_seek_guard(&self.state) = None;
+    }
+
+    fn position_or_target(&self, position_seconds: f64) -> f64 {
+        let mut state = lock_seek_guard(&self.state);
+        let Some(guard) = state.as_ref() else {
+            return position_seconds;
+        };
+        if guard.started_at.elapsed() >= SEEK_TRANSIENT_GUARD_TIMEOUT {
+            *state = None;
+            return position_seconds;
+        }
+        if timestamps_are_close(
+            seconds_to_us(position_seconds),
+            guard.target_us,
+            SEEK_TRANSIENT_POSITION_TOLERANCE_US,
+        ) {
+            return position_seconds;
+        }
+        guard.target_us as f64 / 1_000_000.0
+    }
+
+    fn should_hold_frame(&self, timestamp_us: u64) -> bool {
+        self.target_for_timestamp(timestamp_us, SEEK_TRANSIENT_FRAME_TOLERANCE_US)
+            .is_some()
+    }
+
+    fn target_for_timestamp(&self, timestamp_us: u64, tolerance_us: u64) -> Option<u64> {
+        let mut state = lock_seek_guard(&self.state);
+        let guard = state.as_ref()?;
+        if guard.started_at.elapsed() >= SEEK_TRANSIENT_GUARD_TIMEOUT {
+            *state = None;
+            return None;
+        }
+        if timestamps_are_close(timestamp_us, guard.target_us, tolerance_us) {
+            *state = None;
+            return None;
+        }
+        Some(guard.target_us)
+    }
+}
+
+fn lock_seek_guard(
+    state: &Mutex<Option<SeekTransientState>>,
+) -> MutexGuard<'_, Option<SeekTransientState>> {
+    state
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 pub fn start_gstreamer_pipeline(
     config: &PreviewSessionConfig,
     frame_store: LatestFrameStore,
@@ -175,6 +261,7 @@ pub fn start_gstreamer_pipeline(
     }
     let clock_generation = Arc::new(AtomicU64::new(0));
     let eos_reached = Arc::new(AtomicBool::new(false));
+    let seek_guard = SeekTransientGuard::new();
     let bus = pipeline
         .bus()
         .ok_or_else(|| PreviewEngineError::Gstreamer("preview pipeline has no bus".to_string()))?;
@@ -199,6 +286,7 @@ pub fn start_gstreamer_pipeline(
                 Arc::clone(&stop_requested),
                 Arc::clone(&pause_after_next_frame),
                 Arc::clone(&clock_generation),
+                seek_guard.clone(),
                 pipeline.clone(),
             )
         })
@@ -221,6 +309,7 @@ pub fn start_gstreamer_pipeline(
             pause_after_next_frame,
             eos_reached,
             clock_generation,
+            seek_guard,
             worker,
             bus_worker: Some(bus_worker),
         },
@@ -247,6 +336,7 @@ fn spawn_frame_worker(
     stop_requested: Arc<AtomicBool>,
     pause_after_next_frame: Arc<AtomicBool>,
     clock_generation: Arc<AtomicU64>,
+    seek_guard: SeekTransientGuard,
     pipeline: gst::Pipeline,
 ) -> Result<JoinHandle<()>, PreviewEngineError> {
     thread::Builder::new()
@@ -263,6 +353,9 @@ fn spawn_frame_worker(
                 let Some(frame) = frame_from_sample(&sample) else {
                     continue;
                 };
+                if seek_guard.should_hold_frame(frame.timestamp_us) {
+                    continue;
+                }
                 playback_clock.pace_frame(sample_generation, frame.timestamp_us);
                 frame_store.publish(frame);
 
@@ -488,6 +581,14 @@ fn preview_seek_flags(precise: bool) -> gst::SeekFlags {
     }
 }
 
+fn seconds_to_us(seconds: f64) -> u64 {
+    (seconds.max(0.0) * 1_000_000.0) as u64
+}
+
+fn timestamps_are_close(timestamp_us: u64, target_us: u64, tolerance_us: u64) -> bool {
+    timestamp_us.abs_diff(target_us) <= tolerance_us
+}
+
 fn clamp_seek_seconds(seconds: f64, duration: f64, _fps: u32) -> Result<f64, PreviewEngineError> {
     if !seconds.is_finite() || seconds < 0.0 {
         return Err(PreviewEngineError::InvalidInput(
@@ -597,6 +698,42 @@ mod tests {
         let seconds = clamp_seek_seconds(10.0, 10.0, 30).expect("seek");
 
         assert!(seconds < 10.0);
+    }
+
+    #[test]
+    fn seek_transient_guard_holds_stale_position_and_frames_until_target_arrives() {
+        let guard = SeekTransientGuard::new();
+        guard.set_target(42.0);
+
+        assert_eq!(guard.position_or_target(0.0), 42.0);
+        assert!(guard.should_hold_frame(0));
+        assert!(!guard.should_hold_frame(42_000_000));
+        assert_eq!(guard.position_or_target(0.0), 0.0);
+    }
+
+    #[test]
+    fn seek_transient_guard_keeps_frame_guard_after_position_matches_target() {
+        let guard = SeekTransientGuard::new();
+        guard.set_target(42.0);
+
+        assert_eq!(guard.position_or_target(42.0), 42.0);
+        assert!(guard.should_hold_frame(0));
+    }
+
+    #[test]
+    fn seek_transient_guard_expires_instead_of_holding_forever() {
+        let guard = SeekTransientGuard::new();
+        guard.set_target(42.0);
+        {
+            let mut state = lock_seek_guard(&guard.state);
+            let started_at = Instant::now()
+                .checked_sub(SEEK_TRANSIENT_GUARD_TIMEOUT + Duration::from_millis(1))
+                .expect("expired instant");
+            state.as_mut().expect("guard state").started_at = started_at;
+        }
+
+        assert!(!guard.should_hold_frame(0));
+        assert_eq!(guard.position_or_target(0.0), 0.0);
     }
 
     #[test]
