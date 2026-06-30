@@ -128,6 +128,25 @@ struct SettingsSubtitleColorFieldSpec<'a> {
     hsv: SettingsSubtitleHsv,
 }
 
+struct SettingsSubtitleFontSelectState<'a> {
+    config: &'a ConversionConfig,
+    disabled: bool,
+    subtitle_fonts: &'a [String],
+    active_popover: Option<SettingsSubtitlePopover>,
+    rendered_popover: Option<SettingsSubtitlePopover>,
+    popover: SettingsSubtitlePopover,
+    scroll_handle: &'a ScrollHandle,
+}
+
+struct SettingsSubtitleFontSizeSelectState<'a> {
+    config: &'a ConversionConfig,
+    disabled: bool,
+    active_popover: Option<SettingsSubtitlePopover>,
+    rendered_popover: Option<SettingsSubtitlePopover>,
+    popover: SettingsSubtitlePopover,
+    scroll_handle: &'a ScrollHandle,
+}
+
 pub(in crate::app) fn settings_subtitles_tab(
     state: SettingsSubtitlesTabState<'_>,
     window: &mut Window,
@@ -314,23 +333,27 @@ fn settings_subtitle_style_controls(
                 .grid_cols(2)
                 .gap_2()
                 .child(settings_subtitle_font_select(
-                    state.config,
-                    state.disabled,
-                    state.subtitle_fonts,
-                    state.active_popover,
-                    state.rendered_popover,
-                    SettingsSubtitlePopover::FontName,
-                    state.font_select_scroll_handle,
+                    SettingsSubtitleFontSelectState {
+                        config: state.config,
+                        disabled: state.disabled,
+                        subtitle_fonts: state.subtitle_fonts,
+                        active_popover: state.active_popover,
+                        rendered_popover: state.rendered_popover,
+                        popover: SettingsSubtitlePopover::FontName,
+                        scroll_handle: state.font_select_scroll_handle,
+                    },
                     window,
                     cx,
                 ))
                 .child(settings_subtitle_font_size_select(
-                    state.config,
-                    state.disabled,
-                    state.active_popover,
-                    state.rendered_popover,
-                    SettingsSubtitlePopover::FontSize,
-                    state.font_size_select_scroll_handle,
+                    SettingsSubtitleFontSizeSelectState {
+                        config: state.config,
+                        disabled: state.disabled,
+                        active_popover: state.active_popover,
+                        rendered_popover: state.rendered_popover,
+                        popover: SettingsSubtitlePopover::FontSize,
+                        scroll_handle: state.font_size_select_scroll_handle,
+                    },
                     window,
                     cx,
                 )),
@@ -398,24 +421,20 @@ fn settings_subtitle_style_controls(
 }
 
 fn settings_subtitle_font_select(
-    config: &ConversionConfig,
-    disabled: bool,
-    subtitle_fonts: &[String],
-    active_popover: Option<SettingsSubtitlePopover>,
-    rendered_popover: Option<SettingsSubtitlePopover>,
-    popover: SettingsSubtitlePopover,
-    scroll_handle: &ScrollHandle,
+    state: SettingsSubtitleFontSelectState<'_>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let display = config
+    let display = state
+        .config
         .subtitle_font_name
         .as_deref()
         .filter(|font| !font.is_empty())
         .unwrap_or("Default (e.g. Arial)");
-    let options = subtitle_font_options(config, subtitle_fonts, disabled);
+    let options = subtitle_font_options(state.config, state.subtitle_fonts, state.disabled);
     let has_options = !options.is_empty();
-    let enabled = !disabled && has_options;
+    let enabled = !state.disabled && has_options;
+    let popover = state.popover;
 
     let mut field = div()
         .relative()
@@ -438,12 +457,12 @@ fn settings_subtitle_font_select(
             })),
         );
 
-    if rendered_popover == Some(popover) && has_options {
+    if state.rendered_popover == Some(popover) && has_options {
         let progress =
-            subtitle_popover_progress(popover, active_popover == Some(popover), window, cx);
+            subtitle_popover_progress(popover, state.active_popover == Some(popover), window, cx);
         let content_height = frame_select_content_height(options.len());
         let mut list =
-            frame_select_options_list("settings-subtitle-font-options-list", scroll_handle);
+            frame_select_options_list("settings-subtitle-font-options-list", state.scroll_handle);
 
         for option in options {
             let name = option.name.clone();
@@ -461,7 +480,7 @@ fn settings_subtitle_font_select(
         if content_height > FRAME_SELECT_MAX_HEIGHT {
             popover = popover.child(frame_vertical_scrollbar(
                 "settings-subtitle-font-options-scrollbar",
-                scroll_handle.clone(),
+                state.scroll_handle.clone(),
                 content_height,
             ));
         }
@@ -473,22 +492,19 @@ fn settings_subtitle_font_select(
 }
 
 fn settings_subtitle_font_size_select(
-    config: &ConversionConfig,
-    disabled: bool,
-    active_popover: Option<SettingsSubtitlePopover>,
-    rendered_popover: Option<SettingsSubtitlePopover>,
-    popover: SettingsSubtitlePopover,
-    scroll_handle: &ScrollHandle,
+    state: SettingsSubtitleFontSizeSelectState<'_>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let display = config
+    let display = state
+        .config
         .subtitle_font_size
         .as_deref()
         .filter(|size| !size.is_empty())
         .unwrap_or("Default");
-    let options = subtitle_font_size_options(config, disabled);
-    let enabled = !disabled;
+    let options = subtitle_font_size_options(state.config, state.disabled);
+    let enabled = !state.disabled;
+    let popover = state.popover;
 
     let mut field = div()
         .relative()
@@ -511,12 +527,14 @@ fn settings_subtitle_font_size_select(
             })),
         );
 
-    if rendered_popover == Some(popover) {
+    if state.rendered_popover == Some(popover) {
         let progress =
-            subtitle_popover_progress(popover, active_popover == Some(popover), window, cx);
+            subtitle_popover_progress(popover, state.active_popover == Some(popover), window, cx);
         let content_height = frame_select_content_height(options.len());
-        let mut list =
-            frame_select_options_list("settings-subtitle-font-size-options-list", scroll_handle);
+        let mut list = frame_select_options_list(
+            "settings-subtitle-font-size-options-list",
+            state.scroll_handle,
+        );
 
         for option in options {
             let size = option.size;
@@ -534,7 +552,7 @@ fn settings_subtitle_font_size_select(
         if content_height > FRAME_SELECT_MAX_HEIGHT {
             popover = popover.child(frame_vertical_scrollbar(
                 "settings-subtitle-font-size-options-scrollbar",
-                scroll_handle.clone(),
+                state.scroll_handle.clone(),
                 content_height,
             ));
         }
@@ -1198,9 +1216,11 @@ pub(in crate::app) fn settings_subtitle_track_button(
 
     frame_track_list_item(
         format!("subtitle-track-{index}"),
-        option.index_label,
-        option.codec,
-        detail,
+        FrameTrackListItemText {
+            index_label: option.index_label,
+            primary: option.codec,
+            detail,
+        },
         option.is_selected,
         is_enabled,
         FrameTrackListItemLayout::Inline,

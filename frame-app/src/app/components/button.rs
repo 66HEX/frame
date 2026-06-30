@@ -10,6 +10,12 @@ pub(in crate::app) enum FrameIconButtonVariant {
     DestructiveGhost,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(in crate::app) struct FrameIconButtonSize {
+    pub(in crate::app) button: f32,
+    pub(in crate::app) icon: f32,
+}
+
 pub(in crate::app) fn frame_choice_button(
     id: impl Into<String>,
     label: impl Into<String>,
@@ -85,8 +91,7 @@ pub(in crate::app) fn frame_icon_button(
     icon: &'static str,
     variant: FrameIconButtonVariant,
     enabled: bool,
-    size: f32,
-    icon_size: f32,
+    size: FrameIconButtonSize,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -161,9 +166,9 @@ pub(in crate::app) fn frame_icon_button(
 
     div()
         .id(id.clone())
-        .group(id.clone())
-        .w(px(size))
-        .h(px(size))
+        .group(id)
+        .w(px(size.button))
+        .h(px(size.button))
         .flex()
         .items_center()
         .justify_center()
@@ -182,7 +187,7 @@ pub(in crate::app) fn frame_icon_button(
         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
             button_mouse_down(enabled, window, cx);
         })
-        .child(icon_svg(icon, icon_size, animated_foreground))
+        .child(icon_svg(icon, size.icon, animated_foreground))
 }
 
 #[cfg(test)]

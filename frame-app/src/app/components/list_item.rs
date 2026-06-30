@@ -83,11 +83,16 @@ pub(in crate::app) enum FrameTrackListItemLayout {
     Stacked,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub(in crate::app) struct FrameTrackListItemText {
+    pub(in crate::app) index_label: String,
+    pub(in crate::app) primary: String,
+    pub(in crate::app) detail: String,
+}
+
 pub(in crate::app) fn frame_track_list_item(
     id: impl Into<String>,
-    index_label: impl Into<String>,
-    primary: impl Into<String>,
-    detail: impl Into<String>,
+    text: FrameTrackListItemText,
     selected: bool,
     enabled: bool,
     layout: FrameTrackListItemLayout,
@@ -100,9 +105,11 @@ pub(in crate::app) fn frame_track_list_item(
     let background = animated.background;
     let foreground = animated.foreground;
     let hover_transition = animated.hover_transition;
-    let index_label = index_label.into();
-    let primary = primary.into();
-    let detail = detail.into();
+    let FrameTrackListItemText {
+        index_label,
+        primary,
+        detail,
+    } = text;
 
     let label_row = div()
         .min_w_0()

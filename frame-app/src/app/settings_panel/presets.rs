@@ -198,8 +198,10 @@ fn settings_preset_icon_button(
         icon,
         variant,
         enabled,
-        FRAME_ICON_BUTTON_SM_SIZE,
-        FRAME_ICON_SM_SIZE,
+        FrameIconButtonSize {
+            button: FRAME_ICON_BUTTON_SM_SIZE,
+            icon: FRAME_ICON_SM_SIZE,
+        },
         window,
         cx,
     )

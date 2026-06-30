@@ -458,9 +458,11 @@ pub(in crate::app) fn settings_audio_track_button(
 
     frame_track_list_item(
         format!("audio-track-{index}"),
-        option.index_label,
-        option.codec,
-        option.detail,
+        FrameTrackListItemText {
+            index_label: option.index_label,
+            primary: option.codec,
+            detail: option.detail,
+        },
         option.is_selected,
         is_enabled,
         FrameTrackListItemLayout::Stacked,

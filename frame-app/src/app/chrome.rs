@@ -1321,10 +1321,12 @@ pub(super) fn windows_window_controls(
             titlebar_window_button(
                 "titlebar-windows-minimize",
                 assets::ICON_MINUS,
-                TITLEBAR_WINDOWS_WINDOW_ICON_SIZE,
-                TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
-                TITLEBAR_HEIGHT,
-                0.0,
+                TitlebarWindowButtonMetrics {
+                    icon_size: TITLEBAR_WINDOWS_WINDOW_ICON_SIZE,
+                    width: TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
+                    height: TITLEBAR_HEIGHT,
+                    radius: 0.0,
+                },
                 false,
                 window,
                 cx,
@@ -1339,10 +1341,12 @@ pub(super) fn windows_window_controls(
             titlebar_window_button(
                 "titlebar-windows-maximize",
                 assets::ICON_SQUARE,
-                TITLEBAR_WINDOWS_WINDOW_MAX_ICON_SIZE,
-                TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
-                TITLEBAR_HEIGHT,
-                0.0,
+                TitlebarWindowButtonMetrics {
+                    icon_size: TITLEBAR_WINDOWS_WINDOW_MAX_ICON_SIZE,
+                    width: TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
+                    height: TITLEBAR_HEIGHT,
+                    radius: 0.0,
+                },
                 false,
                 window,
                 cx,
@@ -1357,10 +1361,12 @@ pub(super) fn windows_window_controls(
             titlebar_window_button(
                 "titlebar-windows-close",
                 assets::ICON_CLOSE,
-                TITLEBAR_WINDOWS_WINDOW_ICON_SIZE,
-                TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
-                TITLEBAR_HEIGHT,
-                0.0,
+                TitlebarWindowButtonMetrics {
+                    icon_size: TITLEBAR_WINDOWS_WINDOW_ICON_SIZE,
+                    width: TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
+                    height: TITLEBAR_HEIGHT,
+                    radius: 0.0,
+                },
                 true,
                 window,
                 cx,
@@ -1387,10 +1393,12 @@ pub(super) fn linux_window_controls(window: &mut Window, cx: &mut Context<FrameR
             titlebar_window_button(
                 "titlebar-linux-minimize",
                 assets::ICON_MINUS,
-                TITLEBAR_ACTION_ICON_SIZE,
-                TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
-                TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
-                theme::RADIUS_SM,
+                TitlebarWindowButtonMetrics {
+                    icon_size: TITLEBAR_ACTION_ICON_SIZE,
+                    width: TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
+                    height: TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
+                    radius: theme::RADIUS_SM,
+                },
                 false,
                 window,
                 cx,
@@ -1405,10 +1413,12 @@ pub(super) fn linux_window_controls(window: &mut Window, cx: &mut Context<FrameR
             titlebar_window_button(
                 "titlebar-linux-maximize",
                 assets::ICON_SQUARE,
-                TITLEBAR_ACTION_ICON_SIZE,
-                TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
-                TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
-                theme::RADIUS_SM,
+                TitlebarWindowButtonMetrics {
+                    icon_size: TITLEBAR_ACTION_ICON_SIZE,
+                    width: TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
+                    height: TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
+                    radius: theme::RADIUS_SM,
+                },
                 false,
                 window,
                 cx,
@@ -1423,10 +1433,12 @@ pub(super) fn linux_window_controls(window: &mut Window, cx: &mut Context<FrameR
             titlebar_window_button(
                 "titlebar-linux-close",
                 assets::ICON_CLOSE,
-                TITLEBAR_ACTION_ICON_SIZE,
-                TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
-                TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
-                theme::RADIUS_SM,
+                TitlebarWindowButtonMetrics {
+                    icon_size: TITLEBAR_ACTION_ICON_SIZE,
+                    width: TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
+                    height: TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
+                    radius: theme::RADIUS_SM,
+                },
                 true,
                 window,
                 cx,
@@ -1439,13 +1451,18 @@ pub(super) fn linux_window_controls(window: &mut Window, cx: &mut Context<FrameR
         )
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) struct TitlebarWindowButtonMetrics {
+    pub(super) icon_size: f32,
+    pub(super) width: f32,
+    pub(super) height: f32,
+    pub(super) radius: f32,
+}
+
 pub(super) fn titlebar_window_button(
     id: &'static str,
     icon: &'static str,
-    icon_size: f32,
-    width: f32,
-    height: f32,
-    radius: f32,
+    metrics: TitlebarWindowButtonMetrics,
     destructive: bool,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
@@ -1477,12 +1494,12 @@ pub(super) fn titlebar_window_button(
 
     div()
         .id(id)
-        .w(px(width))
-        .h(px(height))
+        .w(px(metrics.width))
+        .h(px(metrics.height))
         .flex()
         .items_center()
         .justify_center()
-        .rounded(px(radius))
+        .rounded(px(metrics.radius))
         .bg(background)
         .text_color(icon_color)
         .hover(|style| style.cursor_pointer())
@@ -1493,7 +1510,7 @@ pub(super) fn titlebar_window_button(
         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
             button_mouse_down(true, window, cx);
         })
-        .child(icon_svg(icon, icon_size, icon_color))
+        .child(icon_svg(icon, metrics.icon_size, icon_color))
 }
 
 pub(super) fn traffic_light(

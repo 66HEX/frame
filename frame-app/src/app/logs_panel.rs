@@ -1,6 +1,6 @@
 use super::components::{
-    FRAME_ICON_BUTTON_SM_SIZE, FRAME_ICON_SM_SIZE, FrameIconButtonVariant, frame_icon_button,
-    frame_vertical_uniform_scrollbar,
+    FRAME_ICON_BUTTON_SM_SIZE, FRAME_ICON_SM_SIZE, FrameIconButtonSize, FrameIconButtonVariant,
+    frame_icon_button, frame_vertical_uniform_scrollbar,
 };
 use super::primitives::*;
 use super::*;
@@ -283,8 +283,10 @@ pub(super) fn log_scroll_to_bottom_button(
                 assets::ICON_ARROW_DOWN,
                 FrameIconButtonVariant::Ghost,
                 true,
-                LOG_SCROLL_BUTTON_SIZE,
-                LOG_SCROLL_ICON_SIZE,
+                FrameIconButtonSize {
+                    button: LOG_SCROLL_BUTTON_SIZE,
+                    icon: LOG_SCROLL_ICON_SIZE,
+                },
                 window,
                 cx,
             )
@@ -315,8 +317,10 @@ pub(super) fn logs_copy_button(
         icon,
         FrameIconButtonVariant::Ghost,
         enabled,
-        FRAME_ICON_BUTTON_SM_SIZE,
-        FRAME_ICON_SM_SIZE,
+        FrameIconButtonSize {
+            button: FRAME_ICON_BUTTON_SM_SIZE,
+            icon: FRAME_ICON_SM_SIZE,
+        },
         window,
         cx,
     )

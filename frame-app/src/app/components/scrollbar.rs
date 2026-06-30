@@ -35,7 +35,7 @@ pub(in crate::app) fn frame_vertical_scrollbar(
         scroll_handle: scroll_handle.clone(),
         content_height,
     };
-    let paint_handle = scroll_handle.clone();
+    let paint_handle = scroll_handle;
 
     div()
         .id(id.into())

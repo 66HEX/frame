@@ -341,8 +341,10 @@ pub(super) fn row_action_button(
         icon,
         variant,
         enabled,
-        FILE_LIST_ACTION_BUTTON_SIZE,
-        FILE_LIST_ACTION_ICON_SIZE,
+        FrameIconButtonSize {
+            button: FILE_LIST_ACTION_BUTTON_SIZE,
+            icon: FILE_LIST_ACTION_ICON_SIZE,
+        },
         window,
         cx,
     )

@@ -171,7 +171,7 @@ pub(in crate::app) fn preview_tool_button(
     let hover_transition = animated.hover_transition;
 
     div()
-        .id(button_id.clone())
+        .id(button_id)
         .w(px(PREVIEW_TOOLBAR_BUTTON_SIZE))
         .h(px(PREVIEW_TOOLBAR_BUTTON_SIZE))
         .flex()

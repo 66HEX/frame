@@ -113,6 +113,18 @@ pub(in crate::app) struct PreviewPanelProps<'a> {
     pub(in crate::app) runtime_error: Option<String>,
 }
 
+pub(in crate::app) struct PreviewShellStateInput<'a> {
+    pub(in crate::app) selected_file: Option<&'a FileItem>,
+    pub(in crate::app) settings: SettingsRenderState<'a>,
+    pub(in crate::app) crop: PreviewCropRenderState,
+    pub(in crate::app) overlay: PreviewOverlayRenderState,
+    pub(in crate::app) canvas: PreviewCanvasRenderState,
+    pub(in crate::app) playback: PreviewPlaybackState,
+    pub(in crate::app) presentation: PreviewRenderPresentation,
+    pub(in crate::app) render_image: Option<Arc<RenderImage>>,
+    pub(in crate::app) runtime_error: Option<String>,
+}
+
 pub(in crate::app) fn preview_panel(
     file_queue: &FileQueue,
     settings: SettingsRenderState<'_>,
@@ -120,17 +132,17 @@ pub(in crate::app) fn preview_panel(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let state = preview_shell_state(
-        file_queue.selected_file(),
+    let state = preview_shell_state(PreviewShellStateInput {
+        selected_file: file_queue.selected_file(),
         settings,
-        props.crop,
-        props.overlay,
-        props.canvas,
-        props.playback,
-        props.presentation,
-        props.render_image,
-        props.runtime_error,
-    );
+        crop: props.crop,
+        overlay: props.overlay,
+        canvas: props.canvas,
+        playback: props.playback,
+        presentation: props.presentation,
+        render_image: props.render_image,
+        runtime_error: props.runtime_error,
+    });
 
     div()
         .flex()
@@ -142,17 +154,18 @@ pub(in crate::app) fn preview_panel(
         .child(preview_timeline(&state, props.timecode_focuses, window, cx))
 }
 
-pub(in crate::app) fn preview_shell_state(
-    selected_file: Option<&FileItem>,
-    settings: SettingsRenderState<'_>,
-    crop: PreviewCropRenderState,
-    overlay: PreviewOverlayRenderState,
-    canvas: PreviewCanvasRenderState,
-    playback: PreviewPlaybackState,
-    presentation: PreviewRenderPresentation,
-    render_image: Option<Arc<RenderImage>>,
-    runtime_error: Option<String>,
-) -> PreviewShellState {
+pub(in crate::app) fn preview_shell_state(input: PreviewShellStateInput<'_>) -> PreviewShellState {
+    let PreviewShellStateInput {
+        selected_file,
+        settings,
+        crop,
+        overlay,
+        canvas,
+        playback,
+        presentation,
+        render_image,
+        runtime_error,
+    } = input;
     let metadata_status = preview_metadata_status(settings.metadata_status);
     let source_media_kind = preview_source_media_kind(settings.metadata);
     let media = preview_media_render_state(render_image.as_ref(), presentation);

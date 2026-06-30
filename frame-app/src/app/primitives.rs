@@ -123,7 +123,7 @@ pub(super) fn action_button(
 
     let button = div()
         .id(id.clone())
-        .group(id.clone())
+        .group(id)
         .h(px(TITLEBAR_BUTTON_HEIGHT))
         .flex()
         .items_center()

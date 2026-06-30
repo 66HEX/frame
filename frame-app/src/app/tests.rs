@@ -2136,6 +2136,7 @@ mod button_state_colors {
 }
 
 mod preview_shell {
+    use super::preview_panel::PreviewShellStateInput;
     use super::*;
 
     fn empty_encoders() -> &'static AvailableEncoders {
@@ -2225,17 +2226,17 @@ mod preview_shell {
         };
         let file = FileItem::from_path("video", "/tmp/render.mov", 1024);
 
-        let state = preview_shell_state(
-            Some(&file),
-            settings_state(&config, Some(&metadata), MetadataStatus::Ready),
-            crop_state(),
-            PreviewOverlayRenderState::empty(),
-            PreviewCanvasRenderState::default(),
-            preview_playback_state(PreviewMediaKind::Video, 90.4, None, None),
-            PreviewRenderPresentation::default(),
-            None,
-            None,
-        );
+        let state = preview_shell_state(PreviewShellStateInput {
+            selected_file: Some(&file),
+            settings: settings_state(&config, Some(&metadata), MetadataStatus::Ready),
+            crop: crop_state(),
+            overlay: PreviewOverlayRenderState::empty(),
+            canvas: PreviewCanvasRenderState::default(),
+            playback: preview_playback_state(PreviewMediaKind::Video, 90.4, None, None),
+            presentation: PreviewRenderPresentation::default(),
+            render_image: None,
+            runtime_error: None,
+        });
         let labels = preview_timeline_labels(&state);
 
         assert_eq!(state.availability.media_kind, PreviewMediaKind::Video);
@@ -2259,22 +2260,22 @@ mod preview_shell {
         };
         let file = FileItem::from_path("video", "/tmp/render.mov", 1024);
 
-        let state = preview_shell_state(
-            Some(&file),
-            settings_state(&config, Some(&metadata), MetadataStatus::Ready),
-            crop_state(),
-            PreviewOverlayRenderState::empty(),
-            PreviewCanvasRenderState::default(),
-            preview_playback_state(
+        let state = preview_shell_state(PreviewShellStateInput {
+            selected_file: Some(&file),
+            settings: settings_state(&config, Some(&metadata), MetadataStatus::Ready),
+            crop: crop_state(),
+            overlay: PreviewOverlayRenderState::empty(),
+            canvas: PreviewCanvasRenderState::default(),
+            playback: preview_playback_state(
                 PreviewMediaKind::Video,
                 90.4,
                 config.start_time.as_deref(),
                 config.end_time.as_deref(),
             ),
-            PreviewRenderPresentation::default(),
-            None,
-            None,
-        );
+            presentation: PreviewRenderPresentation::default(),
+            render_image: None,
+            runtime_error: None,
+        });
         let labels = preview_timeline_labels(&state);
 
         assert_eq!(labels.start, "00:00:05.000");
@@ -2292,17 +2293,17 @@ mod preview_shell {
         };
         let file = FileItem::from_path("image", "/tmp/still.png", 1024);
 
-        let state = preview_shell_state(
-            Some(&file),
-            settings_state(&config, Some(&metadata), MetadataStatus::Ready),
-            crop_state(),
-            PreviewOverlayRenderState::empty(),
-            PreviewCanvasRenderState::default(),
-            PreviewPlaybackState::new(false),
-            PreviewRenderPresentation::default(),
-            None,
-            None,
-        );
+        let state = preview_shell_state(PreviewShellStateInput {
+            selected_file: Some(&file),
+            settings: settings_state(&config, Some(&metadata), MetadataStatus::Ready),
+            crop: crop_state(),
+            overlay: PreviewOverlayRenderState::empty(),
+            canvas: PreviewCanvasRenderState::default(),
+            playback: PreviewPlaybackState::new(false),
+            presentation: PreviewRenderPresentation::default(),
+            render_image: None,
+            runtime_error: None,
+        });
         let labels = preview_timeline_labels(&state);
 
         assert_eq!(state.availability.media_kind, PreviewMediaKind::Image);
@@ -2321,17 +2322,17 @@ mod preview_shell {
             ..SourceMetadata::default()
         };
 
-        let state = preview_shell_state(
-            None,
-            settings_state(&config, Some(&metadata), MetadataStatus::Ready),
-            crop_state(),
-            PreviewOverlayRenderState::empty(),
-            PreviewCanvasRenderState::default(),
-            PreviewPlaybackState::new(false),
-            PreviewRenderPresentation::default(),
-            None,
-            None,
-        );
+        let state = preview_shell_state(PreviewShellStateInput {
+            selected_file: None,
+            settings: settings_state(&config, Some(&metadata), MetadataStatus::Ready),
+            crop: crop_state(),
+            overlay: PreviewOverlayRenderState::empty(),
+            canvas: PreviewCanvasRenderState::default(),
+            playback: PreviewPlaybackState::new(false),
+            presentation: PreviewRenderPresentation::default(),
+            render_image: None,
+            runtime_error: None,
+        });
 
         assert_eq!(state.availability.media_kind, PreviewMediaKind::Audio);
         assert!(state.availability.hide_visual_controls);
@@ -2348,17 +2349,17 @@ mod preview_shell {
             ..SourceMetadata::default()
         };
 
-        let state = preview_shell_state(
-            None,
-            settings_state(&config, Some(&metadata), MetadataStatus::Loading),
-            crop_state(),
-            PreviewOverlayRenderState::empty(),
-            PreviewCanvasRenderState::default(),
-            PreviewPlaybackState::new(false),
-            PreviewRenderPresentation::default(),
-            None,
-            None,
-        );
+        let state = preview_shell_state(PreviewShellStateInput {
+            selected_file: None,
+            settings: settings_state(&config, Some(&metadata), MetadataStatus::Loading),
+            crop: crop_state(),
+            overlay: PreviewOverlayRenderState::empty(),
+            canvas: PreviewCanvasRenderState::default(),
+            playback: PreviewPlaybackState::new(false),
+            presentation: PreviewRenderPresentation::default(),
+            render_image: None,
+            runtime_error: None,
+        });
 
         assert_eq!(state.availability.media_kind, PreviewMediaKind::Unknown);
         assert!(state.availability.trim_disabled);

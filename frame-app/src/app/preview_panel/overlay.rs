@@ -234,8 +234,10 @@ pub(in crate::app) fn preview_overlay_controls(
                 assets::ICON_TRASH,
                 FrameIconButtonVariant::DestructiveGhost,
                 enabled,
-                PREVIEW_TOOLBAR_BUTTON_SIZE,
-                PREVIEW_TOOLBAR_ICON_SIZE,
+                FrameIconButtonSize {
+                    button: PREVIEW_TOOLBAR_BUTTON_SIZE,
+                    icon: PREVIEW_TOOLBAR_ICON_SIZE,
+                },
                 window,
                 cx,
             )
@@ -383,7 +385,7 @@ fn preview_overlay_icon_button(
     let highlighted = matches!(variant, ButtonVariant::Default);
 
     div()
-        .id(button_id.clone())
+        .id(button_id)
         .w(px(PREVIEW_TOOLBAR_BUTTON_SIZE))
         .h(px(PREVIEW_TOOLBAR_BUTTON_SIZE))
         .flex()

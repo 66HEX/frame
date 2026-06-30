@@ -68,7 +68,7 @@ pub(in crate::app) fn settings_tab_button(
 
     div()
         .id(tab_id.clone())
-        .group(tab_id.clone())
+        .group(tab_id)
         .w(px(SETTINGS_TAB_BUTTON_SIZE))
         .h(px(SETTINGS_TAB_BUTTON_SIZE))
         .flex()
@@ -165,8 +165,8 @@ pub(in crate::app) fn settings_tab_content(
                 color_focuses: settings.subtitle_color_focuses,
                 active_popover: settings.subtitle_popover,
                 rendered_popover: settings.subtitle_rendered_popover,
-                font_select_scroll_handle: &settings.subtitle_font_select_scroll_handle,
-                font_size_select_scroll_handle: &settings.subtitle_font_size_select_scroll_handle,
+                font_select_scroll_handle: settings.subtitle_font_select_scroll_handle,
+                font_size_select_scroll_handle: settings.subtitle_font_size_select_scroll_handle,
                 font_color_draft: settings.subtitle_font_color_draft,
                 outline_color_draft: settings.subtitle_outline_color_draft,
                 font_color_hsv_draft: settings.subtitle_font_color_hsv_draft,

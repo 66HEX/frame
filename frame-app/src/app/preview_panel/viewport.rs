@@ -547,29 +547,6 @@ fn preview_image_transformation(
         .translate(center.scale(-scale_factor))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn preview_image_transformation_converts_degrees_to_radians() {
-        let transformation = preview_image_transformation(
-            PreviewTransform {
-                rotation_degrees: 90,
-                flip_horizontal: false,
-                flip_vertical: false,
-            },
-            point(px(50.0), px(25.0)),
-            1.0,
-        );
-
-        assert!((transformation.rotation_scale[0][0]).abs() < 0.000_001);
-        assert!((transformation.rotation_scale[0][1] + 1.0).abs() < 0.000_001);
-        assert!((transformation.rotation_scale[1][0] - 1.0).abs() < 0.000_001);
-        assert!((transformation.rotation_scale[1][1]).abs() < 0.000_001);
-    }
-}
-
 fn preview_viewport_rounded_clip_path(
     bounds: Bounds<Pixels>,
     radius: Pixels,
@@ -676,4 +653,27 @@ pub(in crate::app) fn preview_visual_controls_visible(state: &PreviewShellState)
 
 pub(in crate::app) fn preview_visual_controls_enabled(state: &PreviewShellState) -> bool {
     preview_visual_controls_visible(state) && !state.controls_disabled
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn preview_image_transformation_converts_degrees_to_radians() {
+        let transformation = preview_image_transformation(
+            PreviewTransform {
+                rotation_degrees: 90,
+                flip_horizontal: false,
+                flip_vertical: false,
+            },
+            point(px(50.0), px(25.0)),
+            1.0,
+        );
+
+        assert!((transformation.rotation_scale[0][0]).abs() < 0.000_001);
+        assert!((transformation.rotation_scale[0][1] + 1.0).abs() < 0.000_001);
+        assert!((transformation.rotation_scale[1][0] - 1.0).abs() < 0.000_001);
+        assert!((transformation.rotation_scale[1][1]).abs() < 0.000_001);
+    }
 }
