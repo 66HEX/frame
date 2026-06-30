@@ -23,7 +23,7 @@ pub fn is_image_container(container: &str) -> bool {
 }
 
 #[must_use]
-pub fn is_gif_container(container: &str) -> bool {
+pub const fn is_gif_container(container: &str) -> bool {
     media_rules::is_gif_container(container)
 }
 

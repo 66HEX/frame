@@ -339,7 +339,7 @@ fn parse_colon_duration(raw: &str) -> Option<f64> {
     }
 
     let seconds = seconds.parse::<f64>().ok()?;
-    Some(f64::from(hours) * 3600.0 + f64::from(minutes) * 60.0 + seconds)
+    Some(f64::from(hours).mul_add(3600.0, f64::from(minutes) * 60.0) + seconds)
 }
 
 fn format_seconds_as_hms(seconds: f64) -> String {

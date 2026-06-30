@@ -3,7 +3,10 @@ use super::{
         ALL_SETTINGS_TABS, ConversionConfig, ProcessingMode, SettingsTab, SourceKind,
         SourceMetadata,
     },
-    rules::*,
+    rules::{
+        container_supports_audio, container_supports_subtitles, is_audio_only_container,
+        source_kind_for,
+    },
 };
 
 #[must_use]

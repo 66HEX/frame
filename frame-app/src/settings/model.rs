@@ -389,7 +389,7 @@ impl PresetDefinition {
     }
 
     #[must_use]
-    pub fn custom(id: String, name: String, config: ConversionConfig) -> Self {
+    pub const fn custom(id: String, name: String, config: ConversionConfig) -> Self {
         Self {
             id,
             name,
@@ -399,6 +399,10 @@ impl PresetDefinition {
     }
 }
 
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "ConversionConfig is the persisted settings model and keeps booleans as stable fields."
+)]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ConversionConfig {
@@ -595,19 +599,19 @@ pub struct AudioQualityRange {
     pub default_value: u32,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SourceInfoRow {
     pub label: &'static str,
     pub value: String,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SourceTrackSection {
     pub label: String,
     pub rows: Vec<SourceInfoRow>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SourceInfoSection {
     Rows {
         title: &'static str,
@@ -658,7 +662,7 @@ pub struct AudioTrack {
     pub sample_rate: Option<String>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct SubtitleTrack {
     pub index: u32,
     pub codec: String,

@@ -13,7 +13,13 @@ use super::{
         VIDEO_PIXEL_FORMAT_DEFINITIONS, VIDEO_PRESETS, VideoCodecCapability, VideoCodecOption,
         VideoPixelFormatOption, VideoPresetOption,
     },
-    rules::*,
+    rules::{
+        is_audio_codec_allowed_for_container, is_audio_only_container,
+        is_audio_stream_codec_allowed_for_container, is_gif_container, is_image_container,
+        is_subtitle_codec_allowed_for_container, is_video_codec_allowed_for_container,
+        is_video_pixel_format_allowed_for_container, is_video_stream_codec_allowed_for_container,
+        source_kind_for,
+    },
     source_info::{audio_track_detail, display_source_value},
 };
 
@@ -330,6 +336,10 @@ pub fn metadata_field_placeholder(
 }
 
 #[must_use]
+#[expect(
+    clippy::too_many_lines,
+    reason = "Preset definitions are data declarations and are easier to compare when kept as one table."
+)]
 pub fn default_presets() -> Vec<PresetDefinition> {
     vec![
         PresetDefinition::built_in("balanced-mp4", "Balanced MP4", preset_config("mp4")),
@@ -522,17 +532,17 @@ pub fn create_custom_preset(id: String, name: &str, config: &ConversionConfig) -
 }
 
 #[must_use]
-pub fn resolution_options() -> &'static [&'static str] {
+pub const fn resolution_options() -> &'static [&'static str] {
     &RESOLUTION_OPTIONS
 }
 
 #[must_use]
-pub fn scaling_algorithm_options() -> &'static [&'static str] {
+pub const fn scaling_algorithm_options() -> &'static [&'static str] {
     &SCALING_ALGORITHM_OPTIONS
 }
 
 #[must_use]
-pub fn fps_options(is_gif: bool) -> &'static [&'static str] {
+pub const fn fps_options(is_gif: bool) -> &'static [&'static str] {
     if is_gif {
         &GIF_FPS_OPTIONS
     } else {
@@ -541,12 +551,12 @@ pub fn fps_options(is_gif: bool) -> &'static [&'static str] {
 }
 
 #[must_use]
-pub fn gif_color_options() -> &'static [u16] {
+pub const fn gif_color_options() -> &'static [u16] {
     &GIF_COLOR_OPTIONS
 }
 
 #[must_use]
-pub fn gif_dither_options() -> &'static [&'static str] {
+pub const fn gif_dither_options() -> &'static [&'static str] {
     &GIF_DITHER_OPTIONS
 }
 
@@ -861,7 +871,7 @@ fn selected_subtitle_codecs<'a>(
         .collect()
 }
 
-fn video_codec_capability_available(
+const fn video_codec_capability_available(
     available_encoders: &AvailableEncoders,
     capability: VideoCodecCapability,
 ) -> bool {
@@ -966,7 +976,6 @@ pub fn video_preset_label(preset: &str) -> &'static str {
         "veryfast" => "Very Fast",
         "faster" => "Faster",
         "fast" => "Fast",
-        "medium" => "Medium",
         "slow" => "Slow",
         "slower" => "Slower",
         "veryslow" => "Very Slow",
@@ -982,7 +991,6 @@ pub fn video_preset_caption(preset: &str) -> &'static str {
         "veryfast" => "Fast encode",
         "faster" => "Faster than default",
         "fast" => "Fast with reasonable compression",
-        "medium" => "Balanced default",
         "slow" => "Smaller file, slower encode",
         "slower" => "High compression",
         "veryslow" => "Smallest file, slowest encode",

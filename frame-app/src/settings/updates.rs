@@ -1,12 +1,27 @@
 use super::{
-    model::*,
+    model::{
+        AUDIO_CHANNEL_DEFINITIONS, AUDIO_CODEC_DEFINITIONS, AudioQualityRange, ConversionConfig,
+        DEFAULT_AUDIO_BITRATE_MODE, DEFAULT_AUDIO_CHANNELS, DEFAULT_AUDIO_QUALITY,
+        DEFAULT_AUDIO_VOLUME, DEFAULT_FPS, DEFAULT_GIF_DITHER, DEFAULT_PIXEL_FORMAT,
+        DEFAULT_RESOLUTION, DEFAULT_VIDEO_BITRATE_MODE, FPS_OPTIONS, GIF_DITHER_OPTIONS,
+        GIF_FPS_OPTIONS, MAX_AUDIO_VOLUME, MAX_GIF_COLORS, MAX_GIF_LOOP, MetadataField,
+        MetadataMode, PresetDefinition, ProcessingMode, RESOLUTION_OPTIONS,
+        SCALING_ALGORITHM_OPTIONS, SUBTITLE_FONT_SIZES, SourceKind, SourceMetadata,
+        SubtitlePosition, VIDEO_CODEC_DEFINITIONS, VIDEO_PIXEL_FORMAT_DEFINITIONS,
+    },
     options::{
         first_allowed_video_codec, first_allowed_video_pixel_format, first_allowed_video_preset,
         is_hardware_video_codec, is_nvenc_video_codec, is_video_preset_allowed,
         is_videotoolbox_video_codec, normalized_hex_color,
     },
-    rules::*,
+    rules::{
+        container_supports_audio, container_supports_subtitles, default_audio_codec_for_container,
+        is_audio_codec_allowed_for_container, is_audio_only_container, is_gif_container,
+        is_image_container, is_video_codec_allowed_for_container,
+        is_video_pixel_format_allowed_for_container, source_kind_for,
+    },
 };
+use crate::numeric::u32_to_u16;
 
 #[must_use]
 pub fn sanitize_output_name(value: &str) -> String {
@@ -357,8 +372,7 @@ pub fn apply_gif_loop(config: &mut ConversionConfig, loop_count: &str) -> bool {
         .filter(char::is_ascii_digit)
         .collect::<String>()
         .parse::<u32>()
-        .unwrap_or(0)
-        .min(u32::from(MAX_GIF_LOOP)) as u16;
+        .map_or(0, |value| u32_to_u16(value.min(u32::from(MAX_GIF_LOOP))));
 
     if config.gif_loop == parsed {
         return false;
