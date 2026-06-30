@@ -1,21 +1,28 @@
-use super::{text::*, *};
+use super::{
+    text::{
+        clamp_text_offset, clamp_text_range, next_text_boundary, previous_text_boundary,
+        sanitize_hex_draft, sanitize_number_input, sanitize_replacement_text,
+        text_range_from_utf16, text_range_to_utf16,
+    },
+    *,
+};
 
 impl FrameRoot {
-    pub(in crate::app) fn text_input_runtime(
+    pub(in crate::app) const fn text_input_runtime(
         &self,
         kind: FrameTextInputKind,
     ) -> &FrameTextInputRuntime {
         self.text_input_ui.runtimes.runtime(kind)
     }
 
-    pub(in crate::app) fn text_input_runtime_mut(
+    pub(in crate::app) const fn text_input_runtime_mut(
         &mut self,
         kind: FrameTextInputKind,
     ) -> &mut FrameTextInputRuntime {
         self.text_input_ui.runtimes.runtime_mut(kind)
     }
 
-    pub(in crate::app) fn text_input_focus_handle(
+    pub(in crate::app) const fn text_input_focus_handle(
         &self,
         kind: FrameTextInputKind,
     ) -> Option<&FocusHandle> {
@@ -25,7 +32,7 @@ impl FrameRoot {
     pub(in crate::app) fn ensure_text_input_focus(
         &mut self,
         kind: FrameTextInputKind,
-        cx: &mut Context<Self>,
+        cx: &Context<Self>,
     ) -> FocusHandle {
         self.text_input_ui
             .focuses
@@ -53,26 +60,7 @@ impl FrameRoot {
     }
 
     pub(in crate::app) fn text_input_disabled(&self, kind: FrameTextInputKind) -> bool {
-        match kind {
-            FrameTextInputKind::MaxConcurrency => false,
-            FrameTextInputKind::OutputName => self.file_queue.selected_file_locked(),
-            FrameTextInputKind::AudioBitrate => self.file_queue.selected_file_locked(),
-            FrameTextInputKind::VideoCustomWidth
-            | FrameTextInputKind::VideoCustomHeight
-            | FrameTextInputKind::VideoBitrate
-            | FrameTextInputKind::GifLoop
-            | FrameTextInputKind::PreviewStartTime
-            | FrameTextInputKind::PreviewEndTime
-            | FrameTextInputKind::MetadataTitle
-            | FrameTextInputKind::MetadataArtist
-            | FrameTextInputKind::MetadataAlbum
-            | FrameTextInputKind::MetadataGenre
-            | FrameTextInputKind::MetadataDate
-            | FrameTextInputKind::MetadataComment
-            | FrameTextInputKind::SubtitleFontColorHex
-            | FrameTextInputKind::SubtitleOutlineColorHex => self.file_queue.selected_file_locked(),
-            FrameTextInputKind::PresetName => self.file_queue.selected_file_locked(),
-        }
+        kind != FrameTextInputKind::MaxConcurrency && self.file_queue.selected_file_locked()
     }
 
     pub(in crate::app) fn text_input_value(&self, kind: FrameTextInputKind) -> String {
@@ -130,6 +118,10 @@ impl FrameRoot {
         }
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "Text input routing centralizes per-field normalization so field behavior stays auditable in one place."
+    )]
     pub(in crate::app) fn write_text_input_value(
         &mut self,
         kind: FrameTextInputKind,
@@ -139,7 +131,7 @@ impl FrameRoot {
             FrameTextInputKind::MaxConcurrency => {
                 let next = sanitize_number_input(candidate);
                 if self.settings_ui.max_concurrency_draft != next {
-                    self.settings_ui.max_concurrency_draft = next.clone();
+                    self.settings_ui.max_concurrency_draft.clone_from(&next);
                     self.settings_ui.max_concurrency_error = None;
                 }
                 Some(next)
@@ -206,7 +198,7 @@ impl FrameRoot {
                 if self.file_queue.selected_file_locked() {
                     return None;
                 }
-                let normalized = normalize_timecode_text_input(candidate)?;
+                let normalized = normalize_timecode_text_input(candidate)?.into_config_value();
                 let next_start = if kind == FrameTextInputKind::PreviewStartTime {
                     normalized.clone()
                 } else {
@@ -260,7 +252,7 @@ impl FrameRoot {
                     return None;
                 }
                 let next: String = candidate.chars().filter(|ch| !ch.is_control()).collect();
-                self.settings_ui.preset_name_draft = next.clone();
+                self.settings_ui.preset_name_draft.clone_from(&next);
                 self.settings_ui.preset_notice = None;
                 Some(next)
             }
@@ -350,6 +342,10 @@ impl FrameRoot {
         self.pause_text_input_cursor(cx);
     }
 
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "Platform input events hand optional UTF-16 ranges to this edit boundary by value."
+    )]
     pub(in crate::app) fn replace_text_input_range(
         &mut self,
         kind: FrameTextInputKind,
@@ -389,12 +385,14 @@ impl FrameRoot {
 
         let selection_start = new_selected_range_utf16
             .as_ref()
-            .map(|range| text_range_from_utf16(&replacement, range).start)
-            .unwrap_or(replacement.len());
+            .map_or(replacement.len(), |range| {
+                text_range_from_utf16(&replacement, range).start
+            });
         let selection_end = new_selected_range_utf16
             .as_ref()
-            .map(|range| text_range_from_utf16(&replacement, range).end)
-            .unwrap_or(replacement.len());
+            .map_or(replacement.len(), |range| {
+                text_range_from_utf16(&replacement, range).end
+            });
         let next_range = clamp_text_range(
             &actual,
             &((range.start + selection_start)..(range.start + selection_end)),
@@ -503,7 +501,7 @@ impl FrameRoot {
         }
     }
 
-    pub(in crate::app) fn text_input_mouse_up(
+    pub(in crate::app) const fn text_input_mouse_up(
         &mut self,
         kind: FrameTextInputKind,
         _event: &MouseUpEvent,
@@ -723,7 +721,7 @@ impl FrameRoot {
         }
     }
 
-    pub(in crate::app) fn next_text_input_cursor_epoch(&mut self) -> usize {
+    pub(in crate::app) const fn next_text_input_cursor_epoch(&mut self) -> usize {
         self.text_input_ui.cursor_epoch += 1;
         self.text_input_ui.cursor_epoch
     }
@@ -733,7 +731,7 @@ impl FrameRoot {
         self.blink_text_input_cursor(self.text_input_ui.cursor_epoch, cx);
     }
 
-    pub(in crate::app) fn stop_text_input_cursor(&mut self) {
+    pub(in crate::app) const fn stop_text_input_cursor(&mut self) {
         self.text_input_ui.active = None;
         self.text_input_ui.cursor_paused = false;
         self.text_input_ui.cursor_visible = false;
@@ -790,7 +788,7 @@ fn file_gif_loop_value(file_queue: &FileQueue) -> String {
         .map_or_else(String::new, |file| file.config.gif_loop.to_string())
 }
 
-fn metadata_field_for_text_input(kind: FrameTextInputKind) -> Option<MetadataField> {
+const fn metadata_field_for_text_input(kind: FrameTextInputKind) -> Option<MetadataField> {
     match kind {
         FrameTextInputKind::MetadataTitle => Some(MetadataField::Title),
         FrameTextInputKind::MetadataArtist => Some(MetadataField::Artist),
@@ -806,10 +804,24 @@ fn text_input_drag_scroll_amount(distance: Pixels) -> Pixels {
     distance.clamp(px(4.0), px(40.0))
 }
 
-fn normalize_timecode_text_input(candidate: &str) -> Option<Option<String>> {
+enum NormalizedTimecodeText {
+    Clear,
+    Value(String),
+}
+
+impl NormalizedTimecodeText {
+    fn into_config_value(self) -> Option<String> {
+        match self {
+            Self::Clear => None,
+            Self::Value(value) => Some(value),
+        }
+    }
+}
+
+fn normalize_timecode_text_input(candidate: &str) -> Option<NormalizedTimecodeText> {
     let trimmed = candidate.trim().replace(',', ".");
     if trimmed.is_empty() {
-        return Some(None);
+        return Some(NormalizedTimecodeText::Clear);
     }
 
     let seconds = if trimmed.contains(':') {
@@ -821,5 +833,5 @@ fn normalize_timecode_text_input(candidate: &str) -> Option<Option<String>> {
         return None;
     }
 
-    Some(Some(format_time(seconds)))
+    Some(NormalizedTimecodeText::Value(format_time(seconds)))
 }

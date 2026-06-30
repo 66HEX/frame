@@ -1,4 +1,4 @@
-use super::*;
+use super::{Bounds, FocusHandle, Pixels, Range, ShapedLine, TEXT_INPUT_CARET_WIDTH, Task, px};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::app) enum FrameTextInputKind {
@@ -121,7 +121,7 @@ pub(in crate::app) struct FrameTextInputStore {
 }
 
 impl FrameTextInputStore {
-    pub(in crate::app) fn runtime(&self, kind: FrameTextInputKind) -> &FrameTextInputRuntime {
+    pub(in crate::app) const fn runtime(&self, kind: FrameTextInputKind) -> &FrameTextInputRuntime {
         match kind {
             FrameTextInputKind::MaxConcurrency => &self.max_concurrency,
             FrameTextInputKind::OutputName => &self.output_name,
@@ -144,7 +144,7 @@ impl FrameTextInputStore {
         }
     }
 
-    pub(in crate::app) fn runtime_mut(
+    pub(in crate::app) const fn runtime_mut(
         &mut self,
         kind: FrameTextInputKind,
     ) -> &mut FrameTextInputRuntime {
@@ -194,7 +194,7 @@ pub(in crate::app) struct FrameTextInputFocusStore {
 }
 
 impl FrameTextInputFocusStore {
-    pub(in crate::app) fn focus(&self, kind: FrameTextInputKind) -> Option<&FocusHandle> {
+    pub(in crate::app) const fn focus(&self, kind: FrameTextInputKind) -> Option<&FocusHandle> {
         match kind {
             FrameTextInputKind::MaxConcurrency => self.max_concurrency.as_ref(),
             FrameTextInputKind::OutputName => self.output_name.as_ref(),
@@ -217,7 +217,7 @@ impl FrameTextInputFocusStore {
         }
     }
 
-    pub(in crate::app) fn focus_mut(
+    pub(in crate::app) const fn focus_mut(
         &mut self,
         kind: FrameTextInputKind,
     ) -> &mut Option<FocusHandle> {

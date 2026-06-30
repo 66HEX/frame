@@ -1,4 +1,8 @@
-use super::{text::*, *};
+use super::{
+    Bounds, Context, EntityInputHandler, FrameRoot, Pixels, Point, Range, SETTINGS_CONTROL_HEIGHT,
+    TEXT_INPUT_CARET_HEIGHT, UTF16Selection, Window, point, px,
+    text::{clamp_text_offset, text_offset_to_utf16, text_range_from_utf16, text_range_to_utf16},
+};
 
 impl EntityInputHandler for FrameRoot {
     fn text_for_range(

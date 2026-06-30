@@ -1,4 +1,4 @@
-use super::{text::*, *};
+use super::{text::clamp_text_range, *};
 
 pub(super) struct FrameTextInputElement {
     owner: Entity<FrameRoot>,
@@ -220,6 +220,7 @@ impl Element for FrameTextInputElement {
     }
 }
 
+#[derive(Clone, Copy)]
 pub(in crate::app) struct FrameTextInputSpec<'a> {
     pub(in crate::app) id: &'static str,
     pub(in crate::app) value: &'a str,
@@ -229,10 +230,14 @@ pub(in crate::app) struct FrameTextInputSpec<'a> {
     pub(in crate::app) kind: FrameTextInputKind,
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "The GPUI text input element keeps interaction handlers in one builder for predictable focus behavior."
+)]
 pub(in crate::app) fn frame_text_input(
     spec: FrameTextInputSpec<'_>,
     _window: &Window,
-    cx: &mut Context<FrameRoot>,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let FrameTextInputSpec {
         id,
@@ -269,8 +274,8 @@ pub(in crate::app) fn frame_text_input(
         .opacity(if disabled { 0.5 } else { 1.0 })
         .shadow(input_highlight_shadows())
         .key_context(FRAME_TEXT_INPUT_CONTEXT)
-        .when(!disabled, |this| this.cursor_text())
-        .when(disabled, |this| this.cursor_not_allowed())
+        .when(!disabled, gpui::Styled::cursor_text)
+        .when(disabled, gpui::Styled::cursor_not_allowed)
         .when(!disabled, |this| {
             this.on_action(cx.listener(FrameRoot::text_input_backspace))
                 .on_action(cx.listener(FrameRoot::text_input_delete))

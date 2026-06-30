@@ -1,4 +1,4 @@
-use super::primitives::*;
+use super::primitives::{color, input_highlight_shadows};
 use super::*;
 
 mod actions;
