@@ -52,12 +52,5 @@ icon = ["resources/app-icons/icon.png"]
 resources = ["resources/binaries"]
 osx_minimum_system_version = "10.15.7"
 
-[lints.rust]
-future-incompatible = "warn"
-nonstandard-style = "deny"
-
-[lints.clippy]
-all = { level = "deny", priority = 10 }
-redundant_clone = { level = "deny", priority = 9 }
-clone_on_copy = { level = "deny", priority = 9 }
-needless_collect = { level = "deny", priority = 8 }
+[lints]
+workspace = true

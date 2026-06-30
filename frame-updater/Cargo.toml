@@ -29,12 +29,5 @@ ed25519-dalek = { version = "2.2.0", features = ["rand_core"] }
 rand_core = { version = "0.6.4", features = ["getrandom"] }
 tempfile = "3.23.0"
 
-[lints.rust]
-future-incompatible = "warn"
-nonstandard-style = "deny"
-
-[lints.clippy]
-all = { level = "deny", priority = 10 }
-redundant_clone = { level = "deny", priority = 9 }
-clone_on_copy = { level = "deny", priority = 9 }
-needless_collect = { level = "deny", priority = 8 }
+[lints]
+workspace = true

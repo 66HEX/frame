@@ -8,6 +8,18 @@ members = [
 ]
 exclude = ["vendor/gpui-ce"]
 
+[workspace.lints.rust]
+future-incompatible = "warn"
+nonstandard-style = "deny"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = 10 }
+redundant_clone = { level = "deny", priority = 9 }
+clone_on_copy = { level = "deny", priority = 9 }
+needless_collect = { level = "deny", priority = 8 }
+pedantic = { level = "warn", priority = 3 }
+nursery = { level = "warn", priority = 3 }
+
 [patch."https://github.com/gpui-ce/gpui-ce"]
 gpui = { path = "vendor/gpui-ce/crates/gpui" }
 gpui_linux = { path = "vendor/gpui-ce/crates/gpui_linux" }
