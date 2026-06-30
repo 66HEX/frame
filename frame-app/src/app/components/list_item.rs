@@ -1,4 +1,10 @@
-use super::*;
+use super::{
+    ButtonVariant, Context, FluentBuilder, FrameRoot, InteractiveElement, MouseButton,
+    ParentElement, SETTINGS_CONTROL_HEIGHT, StatefulInteractiveElement, Styled, Window,
+    animated_button_colors, button_colors, button_highlight_shadows, button_mouse_down, color, div,
+    frame_selection_dot, hover_motion, mix_color, mix_scalar, px, retarget_hover_motion,
+    selected_motion, theme,
+};
 
 pub(in crate::app) fn frame_list_item(
     id: impl Into<String>,
@@ -42,8 +48,8 @@ pub(in crate::app) fn frame_list_item(
             emphasis_progress,
         ))
         .opacity(if enabled { 1.0 } else { 0.5 })
-        .when(enabled, |this| this.hover(|style| style.cursor_pointer()))
-        .when(!enabled, |this| this.cursor_not_allowed())
+        .when(enabled, |this| this.hover(gpui::Styled::cursor_pointer))
+        .when(!enabled, gpui::Styled::cursor_not_allowed)
         .on_hover(move |hover, _window, cx| {
             retarget_hover_motion(&hover_transition, *hover && enabled, cx);
         })
@@ -169,10 +175,10 @@ pub(in crate::app) fn frame_track_list_item(
         .opacity(colors.opacity)
         .shadow(button_highlight_shadows())
         .when(enabled, |this| {
-            this.hover(|style| style.cursor_pointer())
+            this.hover(gpui::Styled::cursor_pointer)
                 .active(move |style| style.bg(color(colors.active_background)))
         })
-        .when(!enabled, |this| this.cursor_not_allowed())
+        .when(!enabled, gpui::Styled::cursor_not_allowed)
         .on_hover(move |hover, _window, cx| {
             retarget_hover_motion(&hover_transition, *hover && enabled, cx);
         })

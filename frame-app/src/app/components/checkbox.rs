@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+    FluentBuilder, InteractiveElement, MouseButton, ParentElement, Styled, assets,
+    button_mouse_down, color, div, icon_svg, input_highlight_shadows, px, theme,
+};
 
 pub(in crate::app) const FRAME_CHECKBOX_SIZE: f32 = 14.0;
 pub(in crate::app) const FRAME_CHECK_ICON_SIZE: f32 = 12.0;
@@ -109,8 +112,8 @@ pub(in crate::app) fn frame_checkbox_row(
         .items_start()
         .gap_2()
         .opacity(if disabled { 0.5 } else { 1.0 })
-        .when(enabled, |this| this.cursor_pointer())
-        .when(!enabled, |this| this.cursor_not_allowed())
+        .when(enabled, gpui::Styled::cursor_pointer)
+        .when(!enabled, gpui::Styled::cursor_not_allowed)
         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
             button_mouse_down(enabled, window, cx);
         })

@@ -45,14 +45,14 @@ pub(in crate::app) fn frame_vertical_scrollbar(
         .bottom_0()
         .w(px(FRAME_SCROLLBAR_WIDTH))
         .cursor_default()
-        .hover(|style| style.cursor_pointer())
+        .hover(gpui::Styled::cursor_pointer)
         .on_drag(drag, |_drag, _offset, window, cx| {
             window.refresh();
             cx.new(|_| FrameScrollbarDragPreview)
         })
         .on_drag_move(
-            move |event: &DragMoveEvent<FrameScrollbarDrag>, window, _cx| {
-                let drag = event.drag(_cx);
+            move |event: &DragMoveEvent<FrameScrollbarDrag>, window, cx| {
+                let drag = event.drag(cx);
                 let y = (event.event.position.y - event.bounds.origin.y).as_f32();
                 let viewport_height = event.bounds.size.height.as_f32();
                 set_frame_vertical_scrollbar_offset(

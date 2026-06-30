@@ -1,4 +1,9 @@
-use super::*;
+use super::{
+    ButtonColors, ButtonVariant, Context, FluentBuilder, FrameRoot, InteractiveElement,
+    MouseButton, ParentElement, SETTINGS_CONTROL_HEIGHT, StatefulInteractiveElement, Styled,
+    Window, animated_button_colors, button_colors, button_highlight_shadows, button_mouse_down,
+    color, div, icon_svg, px, retarget_hover_motion, theme,
+};
 
 pub(in crate::app) const FRAME_ICON_BUTTON_SM_SIZE: f32 = 24.0;
 pub(in crate::app) const FRAME_ICON_SM_SIZE: f32 = 16.0;
@@ -69,10 +74,10 @@ pub(in crate::app) fn frame_text_button(
             this.shadow(button_highlight_shadows())
         })
         .when(enabled, |this| {
-            this.hover(|style| style.cursor_pointer())
+            this.hover(gpui::Styled::cursor_pointer)
                 .active(move |style| style.bg(color(colors.active_background)))
         })
-        .when(!enabled, |this| this.cursor_not_allowed())
+        .when(!enabled, gpui::Styled::cursor_not_allowed)
         .on_hover(move |hover, _window, cx| {
             retarget_hover_motion(&hover_transition, *hover && enabled, cx);
         })
@@ -82,7 +87,7 @@ pub(in crate::app) fn frame_text_button(
         .child(label)
 }
 
-fn text_button_uses_highlight(variant: ButtonVariant, selected: bool) -> bool {
+const fn text_button_uses_highlight(variant: ButtonVariant, selected: bool) -> bool {
     !matches!(variant, ButtonVariant::Ghost) || selected
 }
 
@@ -122,7 +127,10 @@ pub(in crate::app) fn frame_icon_button(
                 theme::FRAME_RED,
                 1.0,
             ),
-            (FrameIconButtonVariant::Destructive, false) => (
+            (
+                FrameIconButtonVariant::Destructive | FrameIconButtonVariant::DestructiveGhost,
+                false,
+            ) => (
                 theme::FRAME_GRAY_100,
                 theme::FRAME_GRAY_100,
                 theme::FRAME_GRAY_100,
@@ -136,14 +144,6 @@ pub(in crate::app) fn frame_icon_button(
                 theme::FRAME_GRAY_200,
                 theme::FRAME_RED,
                 theme::FRAME_RED,
-                1.0,
-            ),
-            (FrameIconButtonVariant::DestructiveGhost, false) => (
-                theme::FRAME_GRAY_100,
-                theme::FRAME_GRAY_100,
-                theme::FRAME_GRAY_100,
-                theme::FRAME_RED.with_alpha(0.5),
-                theme::FRAME_RED.with_alpha(0.5),
                 1.0,
             ),
         };
@@ -177,10 +177,10 @@ pub(in crate::app) fn frame_icon_button(
         .text_color(animated_foreground)
         .opacity(opacity)
         .when(enabled, |this| {
-            this.hover(|style| style.cursor_pointer())
+            this.hover(gpui::Styled::cursor_pointer)
                 .active(move |style| style.bg(color(active_background)))
         })
-        .when(!enabled, |this| this.cursor_not_allowed())
+        .when(!enabled, gpui::Styled::cursor_not_allowed)
         .on_hover(move |hover, _window, cx| {
             retarget_hover_motion(&hover_transition, *hover && enabled, cx);
         })

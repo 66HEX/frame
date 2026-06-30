@@ -1,4 +1,11 @@
-use super::*;
+use super::{
+    App, ButtonVariant, Context, FluentBuilder, FrameRoot, InteractiveElement, IntoElement,
+    MouseButton, MouseMoveEvent, ParentElement, PlatformInput, SETTINGS_CONTROL_HEIGHT,
+    ScrollHandle, ScrollWheelEvent, StatefulInteractiveElement, Styled, Window,
+    animated_button_colors, assets, button_colors, button_highlight_shadows, button_mouse_down,
+    color, div, icon_svg, input_highlight_shadows, parse_hex, px, retarget_hover_motion, theme,
+};
+use crate::numeric::usize_to_f32;
 
 pub(in crate::app) const FRAME_SELECT_MAX_HEIGHT: f32 = 192.0;
 pub(in crate::app) const FRAME_SELECT_CONTENT_PADDING: f32 = 4.0;
@@ -58,10 +65,10 @@ pub(in crate::app) fn frame_select_trigger_content(
         .opacity(colors.opacity)
         .shadow(button_highlight_shadows())
         .when(enabled, |this| {
-            this.hover(|style| style.cursor_pointer())
+            this.hover(gpui::Styled::cursor_pointer)
                 .active(move |style| style.bg(color(colors.active_background)))
         })
-        .when(!enabled, |this| this.cursor_not_allowed())
+        .when(!enabled, gpui::Styled::cursor_not_allowed)
         .on_hover(move |hover, _window, cx| {
             retarget_hover_motion(&hover_transition, *hover && enabled, cx);
         })
@@ -116,7 +123,10 @@ pub(in crate::app) fn frame_select_options_list(
 }
 
 pub(in crate::app) fn frame_select_content_height(option_count: usize) -> f32 {
-    option_count as f32 * FRAME_SELECT_OPTION_HEIGHT + FRAME_SELECT_CONTENT_PADDING * 2.0
+    usize_to_f32(option_count).mul_add(
+        FRAME_SELECT_OPTION_HEIGHT,
+        FRAME_SELECT_CONTENT_PADDING * 2.0,
+    )
 }
 
 pub(in crate::app) fn frame_select_option(
@@ -154,7 +164,7 @@ pub(in crate::app) fn frame_select_option(
                     .cursor_pointer()
             })
         })
-        .when(!enabled, |this| this.cursor_not_allowed())
+        .when(!enabled, gpui::Styled::cursor_not_allowed)
         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
             cx.stop_propagation();
             button_mouse_down(enabled, window, cx);
@@ -214,14 +224,20 @@ fn refresh_select_hover_after_scroll(
 
 #[cfg(test)]
 mod tests {
+    #![expect(
+        clippy::float_cmp,
+        reason = "Component tests compare exact deterministic layout constants."
+    )]
+
     use super::*;
 
     #[test]
     fn frame_select_content_height_includes_vertical_padding() {
-        assert_eq!(
-            frame_select_content_height(3),
-            FRAME_SELECT_OPTION_HEIGHT * 3.0 + FRAME_SELECT_CONTENT_PADDING * 2.0
+        let expected = 3.0_f32.mul_add(
+            FRAME_SELECT_OPTION_HEIGHT,
+            FRAME_SELECT_CONTENT_PADDING * 2.0,
         );
+        assert!((frame_select_content_height(3) - expected).abs() < f32::EPSILON);
     }
 
     #[test]

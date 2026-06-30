@@ -1,4 +1,6 @@
-use super::*;
+use super::{
+    FluentBuilder, InteractiveElement, ParentElement, Styled, color, div, px, relative, theme,
+};
 
 pub(in crate::app) const FRAME_SLIDER_VISUAL_HEIGHT: f32 = 20.0;
 pub(in crate::app) const FRAME_SLIDER_TRACK_HEIGHT: f32 = 6.0;
@@ -20,7 +22,7 @@ pub(in crate::app) fn frame_slider(
         .h(px(FRAME_SLIDER_VISUAL_HEIGHT))
         .w_full()
         .opacity(if disabled { 0.5 } else { 1.0 })
-        .when(!disabled, |this| this.cursor_pointer())
+        .when(!disabled, gpui::Styled::cursor_pointer)
         .child(
             div()
                 .absolute()
@@ -56,11 +58,16 @@ pub(in crate::app) fn frame_slider_handle(
         .ml(px(-(FRAME_SLIDER_HANDLE_WIDTH / 2.0)))
         .w(px(FRAME_SLIDER_HANDLE_WIDTH))
         .h(px(FRAME_SLIDER_HANDLE_HEIGHT))
-        .when(enabled, |this| this.cursor_ew_resize())
+        .when(enabled, gpui::Styled::cursor_ew_resize)
 }
 
 #[cfg(test)]
 mod tests {
+    #![expect(
+        clippy::float_cmp,
+        reason = "Component tests compare exact deterministic layout constants."
+    )]
+
     use super::*;
 
     #[test]

@@ -1,4 +1,9 @@
-use super::*;
+use super::{
+    BoxShadow, InteractiveElement, IntoElement, MouseButton, ParentElement, Rgba, Styled,
+    button_highlight_shadows, color, div, hsla, input_highlight_shadows, linear_color_stop,
+    linear_gradient, parse_hex, point, px, relative, theme,
+};
+use crate::numeric::{rounded_f64_to_u8, unit_f64_to_f32};
 
 pub(in crate::app) const FRAME_COLOR_PICKER_SV_HEIGHT: f32 = 96.0;
 pub(in crate::app) const FRAME_COLOR_PICKER_HUE_HEIGHT: f32 = 10.0;
@@ -122,7 +127,7 @@ pub(in crate::app) fn frame_color_picker_hue_track() -> gpui::Div {
 pub(in crate::app) fn frame_color_picker_hue_handle(hue: f64) -> gpui::Div {
     div()
         .absolute()
-        .left(relative((hue / 360.0).clamp(0.0, 1.0) as f32))
+        .left(relative(unit_f64_to_f32(hue / 360.0)))
         .top(px(1.0))
         .ml(px(-(FRAME_COLOR_PICKER_HUE_HANDLE_WIDTH / 2.0)))
         .h(px(16.0))
@@ -136,10 +141,10 @@ pub(in crate::app) fn frame_color_picker_hue_color(hue: f64) -> Rgba {
     parse_hex(&frame_hsv_to_hex(hue, 1.0, 1.0))
 }
 
-pub(in crate::app) fn frame_hsv_to_hex(h: f64, s: f64, v: f64) -> String {
-    let hue = ((h % 360.0) + 360.0) % 360.0;
-    let sat = s.clamp(0.0, 1.0);
-    let val = v.clamp(0.0, 1.0);
+pub(in crate::app) fn frame_hsv_to_hex(hue_degrees: f64, saturation: f64, value: f64) -> String {
+    let hue = ((hue_degrees % 360.0) + 360.0) % 360.0;
+    let sat = saturation.clamp(0.0, 1.0);
+    let val = value.clamp(0.0, 1.0);
     let chroma = val * sat;
     let x = chroma * (1.0 - (((hue / 60.0) % 2.0) - 1.0).abs());
     let m = val - chroma;
@@ -168,8 +173,8 @@ pub(in crate::app) fn frame_hsv_to_hex(h: f64, s: f64, v: f64) -> String {
 fn frame_color_picker_sv_handle(saturation: f64, value: f64) -> gpui::Div {
     div()
         .absolute()
-        .left(relative(saturation.clamp(0.0, 1.0) as f32))
-        .top(relative((1.0 - value).clamp(0.0, 1.0) as f32))
+        .left(relative(unit_f64_to_f32(saturation)))
+        .top(relative(unit_f64_to_f32(1.0 - value)))
         .ml(px(-(FRAME_COLOR_PICKER_HANDLE_SIZE / 2.0)))
         .mt(px(-(FRAME_COLOR_PICKER_HANDLE_SIZE / 2.0)))
         .w(px(FRAME_COLOR_PICKER_HANDLE_SIZE))
@@ -187,8 +192,12 @@ fn frame_color_picker_sv_handle(saturation: f64, value: f64) -> gpui::Div {
 }
 
 fn frame_rgb_to_hex(r: f64, g: f64, b: f64) -> String {
-    let to_byte = |channel: f64| channel.round().clamp(0.0, 255.0) as u8;
-    format!("#{:02x}{:02x}{:02x}", to_byte(r), to_byte(g), to_byte(b))
+    format!(
+        "#{:02x}{:02x}{:02x}",
+        rounded_f64_to_u8(r),
+        rounded_f64_to_u8(g),
+        rounded_f64_to_u8(b)
+    )
 }
 
 #[cfg(test)]
@@ -204,7 +213,7 @@ mod tests {
 
     #[test]
     fn frame_color_picker_visual_sizes_match_settings_control() {
-        assert_eq!(FRAME_COLOR_PICKER_SV_HEIGHT, 96.0);
-        assert_eq!(FRAME_COLOR_PICKER_HUE_HEIGHT, 10.0);
+        assert!((FRAME_COLOR_PICKER_SV_HEIGHT - 96.0).abs() < f32::EPSILON);
+        assert!((FRAME_COLOR_PICKER_HUE_HEIGHT - 10.0).abs() < f32::EPSILON);
     }
 }
