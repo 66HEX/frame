@@ -49,6 +49,10 @@ pub fn is_nvenc_codec(codec: &str) -> bool {
     matches!(codec, "h264_nvenc" | "hevc_nvenc" | "av1_nvenc")
 }
 
+pub fn is_svt_av1_codec(codec: &str) -> bool {
+    codec == "libsvtav1"
+}
+
 pub fn is_videotoolbox_codec(codec: &str) -> bool {
     matches!(codec, "h264_videotoolbox" | "hevc_videotoolbox")
 }
@@ -62,6 +66,22 @@ pub fn map_nvenc_preset(preset: &str) -> String {
         "ultrafast" | "superfast" | "veryfast" | "faster" => "fast".to_string(),
         "slower" | "veryslow" => "slow".to_string(),
         _ => "medium".to_string(),
+    }
+}
+
+pub fn map_svt_av1_preset(preset: &str) -> String {
+    match preset {
+        "13" | "12" | "11" | "10" | "9" | "8" | "7" | "6" | "5" | "4" | "3" | "2" | "1" | "0" => {
+            preset.to_string()
+        }
+        "ultrafast" | "superfast" => "13".to_string(),
+        "veryfast" | "faster" => "12".to_string(),
+        "fast" => "10".to_string(),
+        "medium" => "8".to_string(),
+        "slow" => "6".to_string(),
+        "slower" => "4".to_string(),
+        "veryslow" => "2".to_string(),
+        _ => "8".to_string(),
     }
 }
 
@@ -114,5 +134,27 @@ pub fn sanitize_external_tool_path(path: &Path) -> String {
     #[cfg(not(windows))]
     {
         path.to_string_lossy().into_owned()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn map_svt_av1_preset_keeps_native_numeric_values() {
+        assert_eq!(map_svt_av1_preset("12"), "12");
+    }
+
+    #[test]
+    fn map_svt_av1_preset_converts_frame_speed_labels_to_svt_values() {
+        assert_eq!(map_svt_av1_preset("ultrafast"), "13");
+        assert_eq!(map_svt_av1_preset("medium"), "8");
+        assert_eq!(map_svt_av1_preset("veryslow"), "2");
+    }
+
+    #[test]
+    fn map_svt_av1_preset_falls_back_to_medium_speed() {
+        assert_eq!(map_svt_av1_preset("unknown"), "8");
     }
 }

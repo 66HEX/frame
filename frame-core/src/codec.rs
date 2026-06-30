@@ -1,5 +1,7 @@
 use crate::types::ConversionConfig;
-use crate::utils::{is_nvenc_codec, is_videotoolbox_codec, map_nvenc_preset};
+use crate::utils::{
+    is_nvenc_codec, is_svt_av1_codec, is_videotoolbox_codec, map_nvenc_preset, map_svt_av1_preset,
+};
 
 pub fn add_video_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
     let is_still_image_codec = matches!(
@@ -8,6 +10,7 @@ pub fn add_video_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
     );
 
     let is_nvenc = is_nvenc_codec(&config.video_codec);
+    let is_svt_av1 = is_svt_av1_codec(&config.video_codec);
     let is_videotoolbox = is_videotoolbox_codec(&config.video_codec);
 
     args.push("-c:v".to_string());
@@ -42,6 +45,8 @@ pub fn add_video_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
         args.push("-preset".to_string());
         let preset_value = if is_nvenc {
             map_nvenc_preset(&config.preset)
+        } else if is_svt_av1 {
+            map_svt_av1_preset(&config.preset)
         } else {
             config.preset.clone()
         };

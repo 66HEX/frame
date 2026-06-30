@@ -1,5 +1,11 @@
 use super::*;
 use crate::settings::{CropSettings, MetadataConfig, MetadataMode, ProcessingMode};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 #[test]
 fn core_config_from_gpui_preserves_active_conversion_fields() {
@@ -289,4 +295,119 @@ fn next_batch_launch_count_respects_live_concurrency_limit() {
     assert_eq!(next_batch_launch_count(5, 1, 2), 1);
     assert_eq!(next_batch_launch_count(5, 2, 2), 0);
     assert_eq!(next_batch_launch_count(1, 0, 4), 1);
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn run_conversion_task_should_emit_completed_for_real_ffmpeg_job() {
+    let sandbox = ConversionRunnerSandbox::new("real-ffmpeg-job");
+    let input = sandbox.path("source.mp4");
+    let output_name = "runner-output.mp4";
+    let output = sandbox.path(output_name);
+    generate_runner_source(&input);
+    let task = ConversionTask {
+        id: "task-real".to_string(),
+        file_path: input.to_string_lossy().into_owned(),
+        output_name: Some(output_name.to_string()),
+        config: core_config_from_gpui(&GpuiConversionConfig::default()),
+    };
+    let mut events = Vec::new();
+
+    run_conversion_task(task, |event| events.push(event))
+        .expect("real ffmpeg conversion should succeed");
+
+    assert!(output.is_file(), "{} should be created", output.display());
+    assert!(
+        events
+            .iter()
+            .any(|event| matches!(event, ConversionEvent::Started(_))),
+        "runner should emit a Started event"
+    );
+    assert!(
+        events
+            .iter()
+            .any(|event| matches!(event, ConversionEvent::Completed(payload) if payload.output_path == output.to_string_lossy())),
+        "runner should emit a Completed event for {}",
+        output.display()
+    );
+}
+
+struct ConversionRunnerSandbox {
+    root: PathBuf,
+    keep: bool,
+}
+
+impl ConversionRunnerSandbox {
+    fn new(name: &str) -> Self {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock should be after unix epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "frame-runner-test-{}-{}-{now}",
+            std::process::id(),
+            name
+        ));
+        fs::create_dir_all(&root).expect("runner temp directory should be created");
+        Self {
+            root,
+            keep: std::env::var_os("FRAME_KEEP_MEDIA_TESTS").is_some(),
+        }
+    }
+
+    fn path(&self, name: &str) -> PathBuf {
+        self.root.join(name)
+    }
+}
+
+impl Drop for ConversionRunnerSandbox {
+    fn drop(&mut self) {
+        if self.keep {
+            eprintln!(
+                "keeping conversion runner test artifacts in {}",
+                self.root.display()
+            );
+            return;
+        }
+        let _ = fs::remove_dir_all(&self.root);
+    }
+}
+
+fn generate_runner_source(output: &Path) {
+    let status = Command::new(crate::runtime_binaries::ffmpeg_executable())
+        .args([
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=64x48:rate=12:duration=0.5",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:sample_rate=48000:duration=0.5",
+            "-shortest",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-crf",
+            "28",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "96k",
+            "-y",
+        ])
+        .arg(output)
+        .status()
+        .expect("ffmpeg should start to generate runner fixture");
+
+    assert!(
+        status.success(),
+        "ffmpeg fixture generation failed with {status}"
+    );
 }
