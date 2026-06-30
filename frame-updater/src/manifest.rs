@@ -114,6 +114,13 @@ impl FromStr for UpdateAssetKind {
 }
 
 impl UpdateManifest {
+    /// Validates this manifest for an application, channel, version, and platform.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the manifest schema, app identity, version, channel,
+    /// platform asset, asset metadata, or downgrade rules do not match the
+    /// requested update context.
     pub fn validate_for(
         &self,
         app_id: &str,

@@ -6,6 +6,13 @@ use sha2::{Digest, Sha256};
 
 use crate::UpdateError;
 
+/// Verifies a detached Ed25519 signature for update manifest bytes.
+///
+/// # Errors
+///
+/// Returns an error if no public key is configured, the signature is malformed,
+/// a configured public key is malformed, or no configured key verifies the
+/// signature.
 pub fn verify_manifest_signature(
     manifest_bytes: &[u8],
     signature_base64: &str,
@@ -31,6 +38,12 @@ pub fn verify_manifest_signature(
     }
 }
 
+/// Signs update manifest bytes with a base64-encoded Ed25519 seed key.
+///
+/// # Errors
+///
+/// Returns an error if the signing key is not valid base64 or does not decode
+/// to a 32-byte Ed25519 seed.
 pub fn sign_manifest_bytes(
     manifest_bytes: &[u8],
     signing_key_base64: &str,
@@ -47,10 +60,15 @@ pub fn sign_manifest_bytes(
     Ok(STANDARD.encode(signature.to_bytes()))
 }
 
+/// Computes a lowercase hex SHA-256 digest for a file.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be opened or read.
 pub fn file_sha256_hex(path: &Path) -> Result<String, UpdateError> {
     let mut file = File::open(path)?;
     let mut hasher = Sha256::new();
-    let mut buffer = [0_u8; 64 * 1024];
+    let mut buffer = vec![0_u8; 64 * 1024].into_boxed_slice();
 
     loop {
         let read = file.read(&mut buffer)?;

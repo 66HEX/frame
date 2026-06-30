@@ -7,14 +7,26 @@ use std::{
 
 use crate::{InstallPlan, InstallResult, UpdateError, run_install_plan};
 
-const PARENT_EXIT_TIMEOUT: Duration = Duration::from_secs(120);
+const PARENT_EXIT_TIMEOUT: Duration = Duration::from_mins(2);
 const PARENT_POLL_INTERVAL: Duration = Duration::from_millis(250);
 
+/// Runs the update helper using command-line arguments from the environment.
+///
+/// # Errors
+///
+/// Returns an error if the `--plan` argument is missing or invalid, the plan
+/// cannot be read, the install fails, or the result file cannot be written.
 pub fn run_from_env_args() -> Result<(), UpdateError> {
     let plan_path = parse_plan_path(env::args().skip(1))?;
     run_from_plan_path(&plan_path)
 }
 
+/// Runs the update helper for a specific install plan path.
+///
+/// # Errors
+///
+/// Returns an error if the plan cannot be read, the install fails, or the
+/// result file cannot be written.
 pub fn run_from_plan_path(plan_path: &Path) -> Result<(), UpdateError> {
     let plan = read_plan(plan_path)?;
     let result = run_helper(&plan);
@@ -22,6 +34,12 @@ pub fn run_from_plan_path(plan_path: &Path) -> Result<(), UpdateError> {
     result
 }
 
+/// Waits for the parent process and executes the install plan.
+///
+/// # Errors
+///
+/// Returns an error if waiting for the parent process times out or the install
+/// plan fails.
 pub fn run_helper(plan: &InstallPlan) -> Result<(), UpdateError> {
     wait_for_process_exit(plan.parent_pid)?;
     run_install_plan(plan)
@@ -96,7 +114,7 @@ fn wait_for_process_exit(pid: u32) -> Result<(), UpdateError> {
 
 #[cfg(unix)]
 fn process_exists(pid: u32) -> bool {
-    let result = unsafe { libc::kill(pid as libc::pid_t, 0) };
+    let result = unsafe { libc::kill(pid.cast_signed(), 0) };
     if result == 0 {
         return true;
     }

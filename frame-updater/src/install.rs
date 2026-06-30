@@ -68,6 +68,12 @@ impl InstallResult {
     }
 }
 
+/// Validates and applies an install plan.
+///
+/// # Errors
+///
+/// Returns an error if the plan is invalid, the package hash does not match,
+/// the platform-specific install step fails, or relaunching Frame fails.
 pub fn run_install_plan(plan: &InstallPlan) -> Result<(), UpdateError> {
     validate_install_plan(plan)?;
     verify_package_hash(plan)?;

@@ -94,6 +94,11 @@ impl DownloadProgress {
 }
 
 impl UpdateClient {
+    /// Creates an update client using the supplied runtime configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`UpdateError::Network`] if the HTTP client cannot be built.
     pub fn new(config: UpdateClientConfig) -> Result<Self, UpdateError> {
         let http = Client::builder()
             .timeout(HTTP_TIMEOUT)
@@ -108,6 +113,14 @@ impl UpdateClient {
         &self.config
     }
 
+    /// Checks the signed update manifest for the current platform.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the platform is unsupported, the manifest or
+    /// signature cannot be downloaded, the signature does not verify, the
+    /// manifest JSON is invalid, or the manifest does not match the current
+    /// application identity.
     pub fn check(&self) -> Result<UpdateCheck, UpdateError> {
         let platform = PlatformAssetKey::current()?;
         let manifest_bytes = self.fetch_bytes(&self.config.manifest_url)?;
@@ -137,6 +150,13 @@ impl UpdateClient {
         Ok(check)
     }
 
+    /// Downloads and validates the selected update package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the cache directory cannot be prepared, the package
+    /// cannot be downloaded or written, or the downloaded asset fails hash or
+    /// size validation.
     pub fn download(
         &self,
         update: &UpdateInfo,
@@ -167,7 +187,7 @@ impl UpdateClient {
         let total_bytes = response.content_length().or(Some(update.asset.size_bytes));
         let mut file = File::create(&part_path)?;
         let mut received_bytes = 0_u64;
-        let mut buffer = [0_u8; 64 * 1024];
+        let mut buffer = vec![0_u8; 64 * 1024].into_boxed_slice();
 
         loop {
             let read = response
@@ -210,6 +230,13 @@ impl UpdateClient {
         Ok(update_package(update, final_path))
     }
 
+    /// Writes an install plan for the update helper.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the cache directory cannot be created, the install
+    /// plan cannot be serialized, or the plan file cannot be written
+    /// atomically.
     pub fn write_install_plan(&self, package: &UpdatePackage) -> Result<PathBuf, UpdateError> {
         let version_dir = self.version_cache_dir(&package.version);
         fs::create_dir_all(&version_dir)?;
@@ -238,6 +265,12 @@ impl UpdateClient {
         Ok(plan_path)
     }
 
+    /// Starts the staged update helper for an install plan.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the helper cannot be staged or if spawning the
+    /// helper process fails.
     pub fn spawn_helper(&self, plan_path: &Path) -> Result<(), UpdateError> {
         let helper_path = staged_helper_path(
             &self.config.install_context.helper_path,
@@ -254,6 +287,12 @@ impl UpdateClient {
         Ok(())
     }
 
+    /// Prepares the install plan and verifies that the helper can be staged.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the install plan cannot be written or the helper
+    /// cannot be staged.
     pub fn prepare_install(&self, package: &UpdatePackage) -> Result<PathBuf, UpdateError> {
         let plan_path = self.write_install_plan(package)?;
         staged_helper_path(
@@ -305,6 +344,7 @@ impl UpdateClient {
     }
 }
 
+#[must_use]
 pub fn default_manifest_url() -> String {
     std::env::var("FRAME_UPDATE_MANIFEST_URL")
         .ok()
@@ -312,12 +352,25 @@ pub fn default_manifest_url() -> String {
         .unwrap_or_else(|| DEFAULT_MANIFEST_URL.to_string())
 }
 
+/// Returns the default update cache directory for Frame.
+///
+/// # Errors
+///
+/// Returns [`UpdateError::ConfigDirectoryUnavailable`] when the operating
+/// system does not expose a suitable user cache directory.
 pub fn default_cache_dir() -> Result<PathBuf, UpdateError> {
     ProjectDirs::from("", "", "Frame")
         .map(|dirs| dirs.cache_dir().join("updates"))
         .ok_or(UpdateError::ConfigDirectoryUnavailable)
 }
 
+/// Detects the current install root, executable path, and helper path.
+///
+/// # Errors
+///
+/// Returns an error if the current executable cannot be resolved, the install
+/// root cannot be inferred for the current platform, or the helper path cannot
+/// be derived.
 pub fn detect_install_context() -> Result<InstallContext, UpdateError> {
     let executable_path = std::env::current_exe()?;
     let install_root = detect_install_root(&executable_path)?;

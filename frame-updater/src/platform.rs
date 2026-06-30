@@ -10,6 +10,12 @@ pub enum PlatformAssetKey {
 }
 
 impl PlatformAssetKey {
+    /// Returns the update asset key for the current target platform.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`UpdateError::UnsupportedPlatform`] when Frame does not publish
+    /// update assets for the current operating system and CPU architecture.
     pub fn current() -> Result<Self, UpdateError> {
         if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
             Ok(Self::MacosAarch64)
