@@ -1,4 +1,4 @@
-//! FFprobe argument construction and metadata parsing.
+//! `FFprobe` argument construction and metadata parsing.
 
 use std::path::Path;
 
@@ -19,6 +19,11 @@ pub fn ffprobe_json_args(file_path: &str) -> Vec<String> {
     ]
 }
 
+/// Parses `ffprobe` JSON output into Frame source metadata.
+///
+/// # Errors
+///
+/// Returns [`ConversionError`] when the JSON payload cannot be deserialized.
 pub fn parse_ffprobe_stdout(
     file_path: &str,
     stdout: impl AsRef<str>,

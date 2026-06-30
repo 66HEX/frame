@@ -90,6 +90,11 @@ impl ConversionEvent {
 pub trait ConversionEventSink {
     type Error;
 
+    /// Emits a conversion event to the sink implementation.
+    ///
+    /// # Errors
+    ///
+    /// Returns the sink-specific error when the event cannot be delivered.
     fn emit_conversion_event(&self, event: ConversionEvent) -> Result<(), Self::Error>;
 }
 

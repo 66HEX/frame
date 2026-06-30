@@ -80,6 +80,12 @@ fn collect_selected_subtitle_tracks<'a>(
         .collect()
 }
 
+/// Validates whether stream-copy mode can preserve the selected source streams.
+///
+/// # Errors
+///
+/// Returns [`ConversionError`] when the selected source streams are missing or
+/// incompatible with the requested output container.
 pub fn validate_stream_copy_compatibility(
     config: &ConversionConfig,
     probe: &ProbeMetadata,
@@ -149,6 +155,7 @@ pub fn validate_stream_copy_compatibility(
     clippy::too_many_lines,
     reason = "FFmpeg command assembly stays in one place to keep ordering guarantees explicit"
 )]
+#[must_use]
 pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -> Vec<String> {
     let mut args = Vec::new();
 
@@ -479,6 +486,13 @@ pub fn build_output_path(file_path: &str, container: &str, output_name: Option<&
     clippy::too_many_lines,
     reason = "Validation intentionally mirrors UI options in one function for consistent backend guardrails"
 )]
+/// Validates a source path and conversion configuration before running `FFmpeg`.
+///
+/// # Errors
+///
+/// Returns [`ConversionError`] when the input path is invalid, trim bounds are
+/// malformed, output settings are incompatible, or referenced sidecar assets do
+/// not exist.
 pub fn validate_task_input(
     file_path: &str,
     config: &ConversionConfig,
@@ -657,8 +671,11 @@ pub fn validate_task_input(
         ));
     }
 
-    if has_overlay(config) {
-        let overlay = config.overlay.as_ref().expect("overlay checked above");
+    if let Some(overlay) = config
+        .overlay
+        .as_ref()
+        .filter(|overlay| overlay.enabled && !overlay.path.trim().is_empty())
+    {
         let overlay_path = Path::new(&overlay.path);
         if !overlay_path.exists() {
             return Err(ConversionError::InvalidInput(format!(

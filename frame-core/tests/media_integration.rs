@@ -1151,7 +1151,11 @@ fn find_on_path(tool: &str) -> Option<PathBuf> {
 }
 
 fn path_tool_names(tool: &str) -> Vec<String> {
-    if cfg!(windows) && !tool.ends_with(".exe") {
+    let has_exe_extension = Path::new(tool)
+        .extension()
+        .and_then(OsStr::to_str)
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("exe"));
+    if cfg!(windows) && !has_exe_extension {
         vec![format!("{tool}.exe"), tool.to_string()]
     } else {
         vec![tool.to_string()]

@@ -11,6 +11,7 @@ pub static DURATION_REGEX: LazyLock<Regex> =
 pub static TIME_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"time=\s*(\d+(?::\d+){0,3}(?:\.\d+)?)").unwrap());
 
+#[must_use]
 pub fn parse_frame_rate_string(value: Option<&str>) -> Option<f64> {
     let value = value?.trim();
     if value.is_empty() || value.eq_ignore_ascii_case("n/a") {
@@ -29,6 +30,7 @@ pub fn parse_frame_rate_string(value: Option<&str>) -> Option<f64> {
     }
 }
 
+#[must_use]
 pub fn parse_probe_bitrate(raw: Option<&str>) -> Option<f64> {
     let raw = raw?.trim();
     if raw.eq_ignore_ascii_case("n/a") || raw.is_empty() {
@@ -41,22 +43,27 @@ pub fn parse_probe_bitrate(raw: Option<&str>) -> Option<f64> {
     Some(numeric / 1000.0)
 }
 
+#[must_use]
 pub fn is_audio_only_container(container: &str) -> bool {
     media_rules::is_audio_only_container(container)
 }
 
+#[must_use]
 pub fn is_nvenc_codec(codec: &str) -> bool {
     matches!(codec, "h264_nvenc" | "hevc_nvenc" | "av1_nvenc")
 }
 
+#[must_use]
 pub fn is_svt_av1_codec(codec: &str) -> bool {
     codec == "libsvtav1"
 }
 
+#[must_use]
 pub fn is_videotoolbox_codec(codec: &str) -> bool {
     matches!(codec, "h264_videotoolbox" | "hevc_videotoolbox")
 }
 
+#[must_use]
 pub fn map_nvenc_preset(preset: &str) -> String {
     match preset {
         "default" => "default".to_string(),
@@ -69,6 +76,7 @@ pub fn map_nvenc_preset(preset: &str) -> String {
     }
 }
 
+#[must_use]
 pub fn map_svt_av1_preset(preset: &str) -> String {
     match preset {
         "13" | "12" | "11" | "10" | "9" | "8" | "7" | "6" | "5" | "4" | "3" | "2" | "1" | "0" => {
@@ -77,7 +85,6 @@ pub fn map_svt_av1_preset(preset: &str) -> String {
         "ultrafast" | "superfast" => "13".to_string(),
         "veryfast" | "faster" => "12".to_string(),
         "fast" => "10".to_string(),
-        "medium" => "8".to_string(),
         "slow" => "6".to_string(),
         "slower" => "4".to_string(),
         "veryslow" => "2".to_string(),
@@ -85,6 +92,7 @@ pub fn map_svt_av1_preset(preset: &str) -> String {
     }
 }
 
+#[must_use]
 pub fn parse_time(time_str: &str) -> Option<f64> {
     let parts: Vec<&str> = time_str.split(':').collect();
     match parts.len() {
@@ -104,6 +112,7 @@ pub fn parse_time(time_str: &str) -> Option<f64> {
     }
 }
 
+#[must_use]
 pub fn get_hwaccel_args(video_codec: &str) -> Vec<String> {
     if is_nvenc_codec(video_codec) {
         vec![
@@ -119,6 +128,7 @@ pub fn get_hwaccel_args(video_codec: &str) -> Vec<String> {
     }
 }
 
+#[must_use]
 pub fn sanitize_external_tool_path(path: &Path) -> String {
     #[cfg(windows)]
     {

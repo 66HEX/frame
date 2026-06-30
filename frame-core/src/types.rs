@@ -366,7 +366,7 @@ mod tests {
         assert_eq!(config.processing_mode, "reencode");
         assert_eq!(config.audio_bitrate_mode, "bitrate");
         assert_eq!(config.audio_quality, "4");
-        assert_eq!(config.audio_volume, 100.0);
+        assert!((config.audio_volume - 100.0).abs() < f64::EPSILON);
         assert_eq!(config.quality, 50);
         assert_eq!(config.rotation, "0");
         assert_eq!(config.pixel_format, "auto");

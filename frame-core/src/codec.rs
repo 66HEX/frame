@@ -101,9 +101,11 @@ pub fn add_audio_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
     }
 }
 
-/// Returns true if the encoder supports a quality-based VBR mode exposed by
-/// Frame. Native FFmpeg `aac` has an experimental `-q:a` path but produces
-/// inconsistent results, so we restrict VBR to the two well-behaved encoders.
+/// Returns true if the encoder supports Frame's quality-based VBR mode.
+///
+/// Native `FFmpeg` `aac` has an experimental `-q:a` path but produces
+/// inconsistent results, so Frame restricts VBR to well-behaved encoders.
+#[must_use]
 pub fn audio_codec_supports_vbr(codec: &str) -> bool {
     matches!(codec, "mp3" | "libmp3lame" | "libfdk_aac")
 }
@@ -134,8 +136,7 @@ fn parse_quality(raw: &str, min: u8, max: u8, fallback: u8) -> u8 {
     raw.trim()
         .parse::<u8>()
         .ok()
-        .map(|v| v.clamp(min, max))
-        .unwrap_or(fallback)
+        .map_or(fallback, |v| v.clamp(min, max))
 }
 
 pub fn add_subtitle_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {

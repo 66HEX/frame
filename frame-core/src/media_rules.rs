@@ -145,7 +145,7 @@ pub fn is_image_container(container: &str) -> bool {
 }
 
 #[must_use]
-pub fn is_gif_container(container: &str) -> bool {
+pub const fn is_gif_container(container: &str) -> bool {
     container.eq_ignore_ascii_case("gif")
 }
 

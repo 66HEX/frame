@@ -27,6 +27,7 @@ fn rounded_i32(value: f64, min_value: f64) -> i32 {
     converted
 }
 
+#[must_use]
 pub fn build_video_filters(config: &ConversionConfig, include_scale: bool) -> Vec<String> {
     let mut filters = Vec::new();
 
@@ -150,12 +151,14 @@ pub fn build_video_filters(config: &ConversionConfig, include_scale: bool) -> Ve
     filters
 }
 
+#[must_use]
 pub fn build_encode_video_filters(config: &ConversionConfig, include_scale: bool) -> Vec<String> {
     let mut filters = build_video_filters(config, include_scale);
     filters.push(EVEN_DIMENSIONS_FILTER.to_string());
     filters
 }
 
+#[must_use]
 pub fn has_overlay(config: &ConversionConfig) -> bool {
     config
         .overlay
@@ -163,19 +166,21 @@ pub fn has_overlay(config: &ConversionConfig) -> bool {
         .is_some_and(|overlay| overlay.enabled && !overlay.path.trim().is_empty())
 }
 
+#[must_use]
 pub fn build_overlay_filter_complex(config: &ConversionConfig) -> String {
     let filters = build_video_filters(config, true);
-    build_overlay_filter_complex_with_filters(config, filters)
+    build_overlay_filter_complex_with_filters(config, &filters)
 }
 
+#[must_use]
 pub fn build_encode_overlay_filter_complex(config: &ConversionConfig) -> String {
     let filters = build_encode_video_filters(config, true);
-    build_overlay_filter_complex_with_filters(config, filters)
+    build_overlay_filter_complex_with_filters(config, &filters)
 }
 
 fn build_overlay_filter_complex_with_filters(
     config: &ConversionConfig,
-    filters: Vec<String>,
+    filters: &[String],
 ) -> String {
     let base_chain = if filters.is_empty() {
         "[0:v:0]null[base]".to_string()
@@ -197,6 +202,7 @@ fn build_overlay_filter_complex_with_filters(
     )
 }
 
+#[must_use]
 pub fn build_audio_filters(config: &ConversionConfig) -> Vec<String> {
     let mut filters = Vec::new();
 
