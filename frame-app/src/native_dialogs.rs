@@ -67,14 +67,17 @@ pub const OVERLAY_IMAGE_DIALOG_SPEC: NativeDialogSpec = NativeDialogSpec {
     allows_multiple: false,
 };
 
+#[must_use]
 pub fn pick_source_files() -> Option<Vec<PathBuf>> {
     source_file_dialog().pick_files()
 }
 
+#[must_use]
 pub fn pick_subtitle_file() -> Option<PathBuf> {
     subtitle_file_dialog().pick_file()
 }
 
+#[must_use]
 pub fn pick_overlay_image_file() -> Option<PathBuf> {
     overlay_image_dialog().pick_file()
 }

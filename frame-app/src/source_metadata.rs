@@ -138,11 +138,23 @@ pub fn source_metadata_from_probe(probe: ProbeMetadata) -> SourceMetadata {
     }
 }
 
+/// Probes source metadata with the bundled ffprobe executable.
+///
+/// # Errors
+///
+/// Returns an error when ffprobe cannot be executed, exits unsuccessfully, or
+/// emits metadata that cannot be parsed.
 pub fn probe_source_metadata(file_path: &str) -> Result<SourceMetadata, ConversionError> {
     let executable = ffprobe_executable();
     probe_source_metadata_with_executable(file_path, &executable)
 }
 
+/// Probes source metadata with a specific ffprobe executable.
+///
+/// # Errors
+///
+/// Returns an error when the executable cannot be launched, exits with a
+/// non-zero status, or emits invalid probe JSON.
 pub fn probe_source_metadata_with_executable(
     file_path: &str,
     executable: &str,

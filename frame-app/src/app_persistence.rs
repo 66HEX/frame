@@ -73,6 +73,12 @@ pub struct AppPersistence {
 }
 
 impl AppPersistence {
+    /// Builds a persistence handle for Frame's platform config directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AppPersistenceError::ConfigDirectoryUnavailable`] when the
+    /// operating system does not expose a usable config directory.
     pub fn platform() -> Result<Self, AppPersistenceError> {
         let project_dirs = ProjectDirs::from("", "", "Frame")
             .ok_or(AppPersistenceError::ConfigDirectoryUnavailable)?;
@@ -93,6 +99,12 @@ impl AppPersistence {
         &self.settings_path
     }
 
+    /// Loads persisted app settings, including legacy settings files.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the settings file cannot be read, decoded, or
+    /// migrated from the legacy format.
     pub fn load(&self) -> Result<AppSettings, AppPersistenceError> {
         let bytes = match fs::read(&self.settings_path) {
             Ok(bytes) => bytes,
@@ -106,6 +118,12 @@ impl AppPersistence {
         Ok(persisted.into_app_settings())
     }
 
+    /// Saves app settings atomically to the configured settings path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the settings cannot be encoded, the config
+    /// directory cannot be created, or the temp file cannot replace the target.
     pub fn save(&self, settings: &AppSettings) -> Result<(), AppPersistenceError> {
         let persisted = PersistedAppSettings::from_app_settings(settings);
         let json = serde_json::to_vec_pretty(&persisted)?;
@@ -229,7 +247,7 @@ impl Default for PersistedAppSettings {
     }
 }
 
-fn valid_max_concurrency(value: usize) -> usize {
+const fn valid_max_concurrency(value: usize) -> usize {
     if value == 0 {
         DEFAULT_MAX_CONCURRENCY
     } else {

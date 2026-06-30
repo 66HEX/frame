@@ -19,11 +19,23 @@ pub enum CapabilityDetectionError {
     Ffmpeg(String),
 }
 
+/// Detects `FFmpeg` encoders available to the bundled runtime.
+///
+/// # Errors
+///
+/// Returns an error when `FFmpeg` cannot be executed or reports a failed encoder
+/// listing command.
 pub fn detect_available_encoders() -> Result<AvailableEncoders, CapabilityDetectionError> {
     let executable = ffmpeg_executable();
     detect_available_encoders_with_executable(&executable)
 }
 
+/// Detects `FFmpeg` encoders using a specific executable path.
+///
+/// # Errors
+///
+/// Returns an error when the executable cannot be launched or exits with a
+/// non-zero status while listing encoders.
 pub fn detect_available_encoders_with_executable(
     executable: &str,
 ) -> Result<AvailableEncoders, CapabilityDetectionError> {

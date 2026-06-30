@@ -14,6 +14,13 @@ pub const AUTO_UPDATE_CHECK_INTERVAL_SECS: u64 = 24 * 60 * 60;
 const UPDATE_EXPLANATION_ENV: &str = "FRAME_UPDATE_EXPLANATION";
 const UPDATE_PUBLIC_KEY_ENV: &str = "FRAME_UPDATE_PUBLIC_KEY";
 
+/// Builds an update client for the configured update channel.
+///
+/// # Errors
+///
+/// Returns an error when update signing keys are missing, the current app
+/// version cannot be parsed, the cache directory is unavailable, or client
+/// configuration validation fails.
 pub fn build_update_client(channel: UpdateChannel) -> Result<UpdateClient, UpdateError> {
     let public_keys = configured_public_keys();
     if public_keys.is_empty() {
@@ -33,6 +40,7 @@ pub fn build_update_client(channel: UpdateChannel) -> Result<UpdateClient, Updat
     })
 }
 
+#[must_use]
 pub fn updates_disabled_explanation() -> Option<String> {
     std::env::var(UPDATE_EXPLANATION_ENV)
         .ok()
@@ -40,6 +48,7 @@ pub fn updates_disabled_explanation() -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
+#[must_use]
 pub fn update_check_is_due(last_update_check_at: Option<u64>) -> bool {
     let Some(last_update_check_at) = last_update_check_at else {
         return true;
@@ -47,6 +56,7 @@ pub fn update_check_is_due(last_update_check_at: Option<u64>) -> bool {
     unix_timestamp().saturating_sub(last_update_check_at) >= AUTO_UPDATE_CHECK_INTERVAL_SECS
 }
 
+#[must_use]
 pub fn unix_timestamp() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)

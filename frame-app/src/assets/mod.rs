@@ -185,10 +185,16 @@ impl AssetSource for FrameAssets {
     }
 }
 
+/// Registers bundled Frame fonts with GPUI's text system.
+///
+/// # Errors
+///
+/// Returns an error when GPUI rejects one of the bundled font byte streams.
 pub fn load_frame_fonts(cx: &mut App) -> Result<()> {
     cx.text_system().add_fonts(frame_font_bytes())
 }
 
+#[must_use]
 pub fn frame_font_bytes() -> Vec<Cow<'static, [u8]>> {
     vec![
         Cow::Borrowed(FRAME_FONT_REGULAR_BYTES),

@@ -57,8 +57,10 @@ fn resolved_executable(env_value: Option<&str>, tool_name: &str, candidates: &[P
     candidates
         .iter()
         .find(|candidate| candidate.is_file())
-        .map(|candidate| path_to_string(candidate))
-        .unwrap_or_else(|| tool_name.to_string())
+        .map_or_else(
+            || tool_name.to_string(),
+            |candidate| path_to_string(candidate),
+        )
 }
 
 fn runtime_binary_file_name(tool_name: &str) -> Option<String> {
@@ -102,7 +104,7 @@ fn path_to_string(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }
 
-fn executable_extension() -> &'static str {
+const fn executable_extension() -> &'static str {
     if cfg!(target_os = "windows") {
         ".exe"
     } else {
@@ -110,7 +112,7 @@ fn executable_extension() -> &'static str {
     }
 }
 
-fn target_triple() -> Option<&'static str> {
+const fn target_triple() -> Option<&'static str> {
     SETUP_TARGET_TRIPLE
 }
 

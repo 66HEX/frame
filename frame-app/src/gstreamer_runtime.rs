@@ -1,4 +1,4 @@
-//! Controlled GStreamer runtime discovery for the native preview backend.
+//! Controlled `GStreamer` runtime discovery for the native preview backend.
 
 use std::{
     env, fs, io,
@@ -64,6 +64,12 @@ impl Default for GstreamerRuntimeManifest {
     }
 }
 
+/// Configures environment variables for a bundled `GStreamer` runtime when present.
+///
+/// # Errors
+///
+/// Returns an error when the runtime manifest cannot be loaded, validated, or
+/// its registry cache directory cannot be created.
 pub fn configure_gstreamer_runtime() -> Result<Option<GstreamerRuntimeInfo>, GstreamerRuntimeError>
 {
     let Some(manifest) = load_process_manifest()? else {
@@ -135,9 +141,9 @@ fn relocate_resource_manifest(manifest_path: &Path, manifest: &mut GstreamerRunt
 
     let runtime_root = runtime_root.to_path_buf();
     let lib_dir = runtime_root.join("lib").join(lib_triplet);
-    manifest.root = runtime_root.clone();
+    manifest.root.clone_from(&runtime_root);
     manifest.bin_dir = runtime_root.join("bin");
-    manifest.lib_dir = lib_dir.clone();
+    manifest.lib_dir.clone_from(&lib_dir);
     manifest.plugin_dir = lib_dir.join("gstreamer-1.0");
     manifest.scanner_path = runtime_root
         .join("libexec")
@@ -277,9 +283,10 @@ fn validate_manifest(manifest: &GstreamerRuntimeManifest) -> Result<(), Gstreame
 }
 
 fn registry_cache_path() -> PathBuf {
-    ProjectDirs::from("", "", "Frame")
-        .map(|dirs| dirs.cache_dir().join("gstreamer-registry.bin"))
-        .unwrap_or_else(|| env::temp_dir().join("frame-gstreamer-registry.bin"))
+    ProjectDirs::from("", "", "Frame").map_or_else(
+        || env::temp_dir().join("frame-gstreamer-registry.bin"),
+        |dirs| dirs.cache_dir().join("gstreamer-registry.bin"),
+    )
 }
 
 fn set_runtime_environment(manifest: &GstreamerRuntimeManifest, registry_path: Option<&Path>) {
