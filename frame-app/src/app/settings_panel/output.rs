@@ -1,4 +1,10 @@
-use super::*;
+use super::{
+    ClickEvent, Context, ConversionConfig, FocusHandle, FrameRoot, FrameTextInputKind,
+    FrameTextInputSpec, ParentElement, SourceMetadata, StatefulInteractiveElement, Styled, Window,
+    apply_output_container, apply_processing_mode, div, frame_choice_button, frame_text_input,
+    normalize_output_config, output_container_options, output_processing_mode_options,
+    settings_hint_text, settings_section,
+};
 
 pub(in crate::app) fn settings_output_tab(
     config: &ConversionConfig,
@@ -132,8 +138,8 @@ pub(in crate::app) fn settings_output_name_field(
     output_name: &str,
     disabled: bool,
     output_name_focus: Option<&FocusHandle>,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
+    window: &Window,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     frame_text_input(
         FrameTextInputSpec {

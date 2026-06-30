@@ -249,8 +249,8 @@ fn settings_audio_bitrate_field(
     disabled: bool,
     is_lossless: bool,
     audio_bitrate_focus: Option<&FocusHandle>,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
+    window: &Window,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Div {
     div()
         .flex()
@@ -282,7 +282,7 @@ fn settings_audio_bitrate_field(
 fn settings_audio_range_field(
     spec: SettingsAudioRangeSpec,
     disabled: bool,
-    cx: &mut Context<FrameRoot>,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Div {
     div()
         .flex()
@@ -321,7 +321,7 @@ fn settings_audio_range_slider(
     max: u32,
     disabled: bool,
     target: SettingsAudioRangeTarget,
-    cx: &mut Context<FrameRoot>,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let fraction = range_fraction(value, min, max);
     let drag = SettingsAudioRangeDrag { target, min, max };
@@ -384,7 +384,7 @@ fn settings_audio_range_handle(
 fn settings_audio_normalize_toggle(
     checked: bool,
     disabled: bool,
-    cx: &mut Context<FrameRoot>,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     frame_checkbox_row(
         "settings-audio-normalize-row",

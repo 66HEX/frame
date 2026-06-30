@@ -1,4 +1,5 @@
 use super::*;
+use crate::numeric::u32_to_u8;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum SettingsVideoRangeTarget {
@@ -190,8 +191,8 @@ fn settings_custom_dimensions_grid(
     disabled: bool,
     video_width_focus: Option<&FocusHandle>,
     video_height_focus: Option<&FocusHandle>,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
+    window: &Window,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Div {
     div()
         .grid()
@@ -375,8 +376,8 @@ fn settings_video_gif_loop_section(
     config: &ConversionConfig,
     settings_disabled: bool,
     gif_loop_focus: Option<&FocusHandle>,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
+    window: &Window,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Div {
     settings_section("Loop count")
         .child(frame_text_input(
@@ -532,7 +533,7 @@ fn settings_video_quality_section(
             } else {
                 u32::from(config.crf)
             },
-            if is_hardware { 1 } else { 0 },
+            u32::from(is_hardware),
             if is_hardware { 100 } else { 51 },
             if is_hardware {
                 "Low quality"
@@ -623,7 +624,7 @@ fn settings_video_range_field(
     upper_label: &'static str,
     target: SettingsVideoRangeTarget,
     disabled: bool,
-    cx: &mut Context<FrameRoot>,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Div {
     div()
         .flex()
@@ -658,7 +659,7 @@ fn settings_video_range_slider(
     max: u32,
     disabled: bool,
     target: SettingsVideoRangeTarget,
-    cx: &mut Context<FrameRoot>,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let fraction = range_fraction(value, min, max);
     let drag = SettingsVideoRangeDrag { target, min, max };
@@ -682,7 +683,7 @@ fn settings_video_range_slider(
             let fraction = timeline_slider_percent_from_bounds(event.event.position, event.bounds);
             let value = range_value_from_fraction(fraction, drag.min, drag.max);
             let changed = root.update_selected_config(|config| match drag.target {
-                SettingsVideoRangeTarget::Crf => apply_crf(config, value as u8),
+                SettingsVideoRangeTarget::Crf => apply_crf(config, u32_to_u8(value)),
                 SettingsVideoRangeTarget::Quality => apply_quality(config, value),
             });
             if changed {
@@ -719,7 +720,7 @@ fn settings_video_range_handle(
 fn settings_video_nvenc_section(
     config: &ConversionConfig,
     disabled: bool,
-    cx: &mut Context<FrameRoot>,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Div {
     settings_section("NVENC options")
         .child(
@@ -767,7 +768,7 @@ fn settings_video_nvenc_section(
 fn settings_video_videotoolbox_section(
     config: &ConversionConfig,
     disabled: bool,
-    cx: &mut Context<FrameRoot>,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Div {
     settings_section("VideoToolbox options").child(
         settings_video_checkbox_row(
@@ -794,7 +795,7 @@ fn settings_video_videotoolbox_section(
 fn settings_video_hw_section(
     config: &ConversionConfig,
     disabled: bool,
-    cx: &mut Context<FrameRoot>,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Div {
     settings_section("Hardware acceleration").child(
         settings_video_checkbox_row(
@@ -828,7 +829,6 @@ fn settings_video_checkbox_row(
 
 fn resolution_label(resolution: &str) -> &'static str {
     match resolution {
-        "original" => "Original",
         "custom" => "Custom",
         "1080p" => "1080p",
         "720p" => "720p",
@@ -839,7 +839,6 @@ fn resolution_label(resolution: &str) -> &'static str {
 
 fn scaling_algorithm_label(algorithm: &str) -> &'static str {
     match algorithm {
-        "bicubic" => "Bicubic",
         "lanczos" => "Lanczos",
         "bilinear" => "Bilinear",
         "nearest" => "Nearest",
@@ -857,7 +856,6 @@ fn fps_label(fps: &str) -> String {
 
 fn gif_dither_label(dither: &str) -> &'static str {
     match dither {
-        "sierra2_4a" => "Sierra2_4a",
         "floyd_steinberg" => "Floyd-Steinberg",
         "bayer" => "Bayer",
         "none" => "None",

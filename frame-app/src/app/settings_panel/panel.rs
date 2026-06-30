@@ -1,7 +1,17 @@
-use super::*;
+use super::{
+    ButtonVariant, ClickEvent, Context, FluentBuilder, FrameRoot, FrameSurface, InteractiveElement,
+    IntoElement, MouseButton, PANEL_HEADER_HEIGHT, ParentElement, SETTINGS_PANEL_PADDING,
+    SETTINGS_TAB_BUTTON_SIZE, SETTINGS_TAB_ICON_SIZE, SettingsPresetsTabState, SettingsRenderState,
+    SettingsSubtitlesTabState, SettingsTab, SettingsVideoInputFocuses, StatefulInteractiveElement,
+    Styled, Window, button_colors, button_highlight_shadows, button_mouse_down, color, div,
+    hover_motion, icon_svg, mix_color, panel_bottom_separator, px, resolve_active_settings_tab,
+    retarget_hover_motion, settings_audio_tab, settings_images_tab, settings_metadata_tab,
+    settings_output_tab, settings_presets_tab, settings_section_label, settings_source_tab,
+    settings_subtitles_tab, settings_tab_icon, settings_video_tab, theme, visible_settings_tabs,
+};
 
 pub(in crate::app) fn settings_panel(
-    settings: SettingsRenderState<'_>,
+    settings: &SettingsRenderState<'_>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -78,7 +88,7 @@ pub(in crate::app) fn settings_tab_button(
         .bg(background)
         .text_color(foreground)
         .when(selected, |this| this.shadow(button_highlight_shadows()))
-        .hover(|style| style.cursor_pointer())
+        .hover(gpui::Styled::cursor_pointer)
         .active(move |style| style.bg(color(colors.active_background)))
         .on_hover(move |hover, _window, cx| {
             retarget_hover_motion(&hover_transition, *hover, cx);
@@ -100,7 +110,7 @@ pub(in crate::app) fn settings_tab_button(
 
 pub(in crate::app) fn settings_tab_content(
     tab: SettingsTab,
-    settings: SettingsRenderState<'_>,
+    settings: &SettingsRenderState<'_>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {

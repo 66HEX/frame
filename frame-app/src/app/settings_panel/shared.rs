@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+    ParentElement, SettingsTab, Styled, assets, button_highlight_shadows, color, div, px, theme,
+};
+use crate::numeric::{rounded_f64_to_u32, u32_to_f32};
 
 pub(in crate::app) fn settings_field_label(label: &'static str) -> gpui::Div {
     div()
@@ -52,7 +55,7 @@ pub(in crate::app) fn settings_value_row(
         )
 }
 
-pub(in crate::app) fn settings_tab_icon(tab: SettingsTab) -> &'static str {
+pub(in crate::app) const fn settings_tab_icon(tab: SettingsTab) -> &'static str {
     match tab {
         SettingsTab::Source => assets::ICON_FILE_UP,
         SettingsTab::Output => assets::ICON_FILE_DOWN,
@@ -78,7 +81,7 @@ pub(in crate::app) fn range_fraction(value: u32, min: u32, max: u32) -> f32 {
         return 0.0;
     }
     let value = value.clamp(min, max) - min;
-    value as f32 / (max - min) as f32
+    u32_to_f32(value) / u32_to_f32(max - min)
 }
 
 pub(in crate::app) fn range_value_from_fraction(fraction: f64, min: u32, max: u32) -> u32 {
@@ -86,5 +89,5 @@ pub(in crate::app) fn range_value_from_fraction(fraction: f64, min: u32, max: u3
         return min;
     }
     let span = f64::from(max - min);
-    (f64::from(min) + fraction.clamp(0.0, 1.0) * span).round() as u32
+    rounded_f64_to_u32(fraction.clamp(0.0, 1.0).mul_add(span, f64::from(min)))
 }

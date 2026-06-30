@@ -84,6 +84,7 @@ impl Element for SettingsSubtitleColorBoundsProbe {
     }
 }
 
+#[derive(Clone, Copy)]
 pub(in crate::app) struct SettingsSubtitlesTabState<'a> {
     pub(in crate::app) config: &'a ConversionConfig,
     pub(in crate::app) metadata: Option<&'a SourceMetadata>,
@@ -100,6 +101,7 @@ pub(in crate::app) struct SettingsSubtitlesTabState<'a> {
     pub(in crate::app) outline_color_hsv_draft: SettingsSubtitleHsv,
 }
 
+#[derive(Clone, Copy)]
 struct SettingsSubtitleStyleState<'a> {
     config: &'a ConversionConfig,
     disabled: bool,
@@ -128,6 +130,7 @@ struct SettingsSubtitleColorFieldSpec<'a> {
     hsv: SettingsSubtitleHsv,
 }
 
+#[derive(Clone, Copy)]
 struct SettingsSubtitleFontSelectState<'a> {
     config: &'a ConversionConfig,
     disabled: bool,
@@ -138,6 +141,7 @@ struct SettingsSubtitleFontSelectState<'a> {
     scroll_handle: &'a ScrollHandle,
 }
 
+#[derive(Clone, Copy)]
 struct SettingsSubtitleFontSizeSelectState<'a> {
     config: &'a ConversionConfig,
     disabled: bool,
@@ -246,10 +250,10 @@ fn settings_subtitle_burn_button(
         .opacity(colors.opacity)
         .shadow(button_highlight_shadows())
         .when(!disabled, |this| {
-            this.hover(|style| style.cursor_pointer())
+            this.hover(gpui::Styled::cursor_pointer)
                 .active(move |style| style.bg(color(colors.active_background)))
         })
-        .when(disabled, |this| this.cursor_not_allowed())
+        .when(disabled, gpui::Styled::cursor_not_allowed)
         .on_hover(move |hover, _window, cx| {
             retarget_hover_motion(&hover_transition, *hover && !disabled, cx);
         })
@@ -296,10 +300,10 @@ fn settings_subtitle_clear_button(
         .opacity(if disabled { 0.5 } else { 1.0 })
         .shadow(button_highlight_shadows())
         .when(!disabled, |this| {
-            this.hover(|style| style.cursor_pointer())
+            this.hover(gpui::Styled::cursor_pointer)
                 .active(|style| style.bg(color(theme::FRAME_GRAY_200)))
         })
-        .when(disabled, |this| this.cursor_not_allowed())
+        .when(disabled, gpui::Styled::cursor_not_allowed)
         .on_hover(move |hover, _window, cx| {
             retarget_hover_motion(&hover_transition, *hover && !disabled, cx);
         })
@@ -567,7 +571,7 @@ fn settings_subtitle_font_option(
     option: SubtitleFontOption,
     is_enabled: bool,
     name: String,
-    cx: &mut Context<FrameRoot>,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     frame_select_option(
         format!("subtitle-font-{name}"),
@@ -592,7 +596,7 @@ fn settings_subtitle_size_option(
     option: SubtitleFontSizeOption,
     is_enabled: bool,
     size: &'static str,
-    cx: &mut Context<FrameRoot>,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     frame_select_option(
         format!("subtitle-size-{size}"),
@@ -628,12 +632,7 @@ fn subtitle_popover_progress(
         )
         .with_easing(ease_out_quint());
     let target = motion_target(is_open);
-    if *transition.read_goal(cx) != target {
-        transition.update(cx, |progress, cx| {
-            *progress = target;
-            cx.notify();
-        });
-    }
+    set_motion_target(&transition, target, cx);
     let progress = *transition.evaluate(window, cx);
 
     if !is_open && motion_is_hidden(progress) {
@@ -647,7 +646,7 @@ fn subtitle_popover_progress(
     progress
 }
 
-fn subtitle_popover_motion_key(popover: SettingsSubtitlePopover) -> &'static str {
+const fn subtitle_popover_motion_key(popover: SettingsSubtitlePopover) -> &'static str {
     match popover {
         SettingsSubtitlePopover::FontName => "settings-subtitle-font-popover-motion",
         SettingsSubtitlePopover::FontSize => "settings-subtitle-size-popover-motion",
@@ -718,8 +717,8 @@ fn settings_subtitle_color_picker(
     draft: &str,
     focus: Option<&FocusHandle>,
     progress: f32,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
+    window: &Window,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Div {
     let input_kind = match target {
         SettingsSubtitleColorTarget::Font => FrameTextInputKind::SubtitleFontColorHex,
@@ -752,7 +751,7 @@ fn settings_subtitle_color_picker(
 fn settings_subtitle_sv_square(
     target: SettingsSubtitleColorTarget,
     hsv: SettingsSubtitleHsv,
-    cx: &mut Context<FrameRoot>,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let drag = SettingsSubtitleColorDrag {
         target,
@@ -812,7 +811,7 @@ fn settings_subtitle_sv_square(
 fn settings_subtitle_hue_slider(
     target: SettingsSubtitleColorTarget,
     hsv: SettingsSubtitleHsv,
-    cx: &mut Context<FrameRoot>,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let drag = SettingsSubtitleColorDrag {
         target,
@@ -875,7 +874,7 @@ impl FrameRoot {
         }
     }
 
-    pub(in crate::app) fn close_subtitle_popover(&mut self) {
+    pub(in crate::app) const fn close_subtitle_popover(&mut self) {
         self.subtitle_ui.popover = None;
         if matches!(
             self.text_input_ui.active,
@@ -969,7 +968,10 @@ impl FrameRoot {
         true
     }
 
-    fn subtitle_color_hsv_draft(&self, target: SettingsSubtitleColorTarget) -> SettingsSubtitleHsv {
+    const fn subtitle_color_hsv_draft(
+        &self,
+        target: SettingsSubtitleColorTarget,
+    ) -> SettingsSubtitleHsv {
         match target {
             SettingsSubtitleColorTarget::Font => self.subtitle_ui.font_color_hsv_draft,
             SettingsSubtitleColorTarget::Outline => self.subtitle_ui.outline_color_hsv_draft,
@@ -1011,7 +1013,7 @@ impl FrameRoot {
         draft_changed || hsv_changed || config_changed
     }
 
-    pub(in crate::app) fn set_subtitle_color_picker_bounds(
+    pub(in crate::app) const fn set_subtitle_color_picker_bounds(
         &mut self,
         target: SettingsSubtitleColorTarget,
         kind: SettingsSubtitleColorDragKind,
@@ -1036,7 +1038,7 @@ impl FrameRoot {
         }
     }
 
-    fn subtitle_color_picker_bounds(
+    const fn subtitle_color_picker_bounds(
         &self,
         target: SettingsSubtitleColorTarget,
         kind: SettingsSubtitleColorDragKind,
@@ -1133,18 +1135,18 @@ pub(in crate::app) fn hex_to_subtitle_hsv(hex: &str) -> SettingsSubtitleHsv {
     let normalized =
         normalized_hex_color(hex).unwrap_or_else(|| DEFAULT_SUBTITLE_FONT_COLOR.to_string());
     let raw = normalized.trim_start_matches('#');
-    let r = u8::from_str_radix(&raw[0..2], 16).unwrap_or(255) as f64 / 255.0;
-    let g = u8::from_str_radix(&raw[2..4], 16).unwrap_or(255) as f64 / 255.0;
-    let b = u8::from_str_radix(&raw[4..6], 16).unwrap_or(255) as f64 / 255.0;
+    let r = f64::from(u8::from_str_radix(&raw[0..2], 16).unwrap_or(255)) / 255.0;
+    let g = f64::from(u8::from_str_radix(&raw[2..4], 16).unwrap_or(255)) / 255.0;
+    let b = f64::from(u8::from_str_radix(&raw[4..6], 16).unwrap_or(255)) / 255.0;
 
     let max = r.max(g).max(b);
     let min = r.min(g).min(b);
     let delta = max - min;
     let mut h = 0.0;
-    if delta != 0.0 {
-        if max == r {
+    if delta > f64::EPSILON {
+        if r >= g && r >= b {
             h = ((g - b) / delta) % 6.0;
-        } else if max == g {
+        } else if g >= b {
             h = (b - r) / delta + 2.0;
         } else {
             h = (r - g) / delta + 4.0;

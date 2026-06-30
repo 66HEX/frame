@@ -1,4 +1,10 @@
-use super::*;
+use super::{
+    ClickEvent, Context, ConversionConfig, FocusHandle, FrameRoot, FrameTextInputKind,
+    FrameTextInputSpec, MetadataField, ParentElement, SettingsMetadataInputFocuses, SourceMetadata,
+    StatefulInteractiveElement, Styled, Window, apply_metadata_mode, div, frame_choice_button,
+    frame_text_input, metadata_field_options, metadata_mode_options, settings_field_label,
+    settings_hint_text, settings_section,
+};
 
 pub(in crate::app) fn settings_metadata_tab(
     config: &ConversionConfig,
@@ -67,8 +73,8 @@ fn settings_metadata_fields(
     metadata: Option<&SourceMetadata>,
     settings_disabled: bool,
     focuses: SettingsMetadataInputFocuses<'_>,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
+    window: &Window,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Div {
     let mut fields = div().flex().flex_col().gap_3();
     for option in metadata_field_options(config, metadata, settings_disabled) {
@@ -99,7 +105,7 @@ fn settings_metadata_fields(
     fields
 }
 
-fn metadata_field_input_id(field: MetadataField) -> &'static str {
+const fn metadata_field_input_id(field: MetadataField) -> &'static str {
     match field {
         MetadataField::Title => "metadata-title-field",
         MetadataField::Artist => "metadata-artist-field",
@@ -110,7 +116,7 @@ fn metadata_field_input_id(field: MetadataField) -> &'static str {
     }
 }
 
-fn metadata_field_input_kind(field: MetadataField) -> FrameTextInputKind {
+const fn metadata_field_input_kind(field: MetadataField) -> FrameTextInputKind {
     match field {
         MetadataField::Title => FrameTextInputKind::MetadataTitle,
         MetadataField::Artist => FrameTextInputKind::MetadataArtist,
@@ -121,10 +127,10 @@ fn metadata_field_input_kind(field: MetadataField) -> FrameTextInputKind {
     }
 }
 
-fn metadata_field_focus<'a>(
+const fn metadata_field_focus(
     field: MetadataField,
-    focuses: SettingsMetadataInputFocuses<'a>,
-) -> Option<&'a FocusHandle> {
+    focuses: SettingsMetadataInputFocuses<'_>,
+) -> Option<&FocusHandle> {
     match field {
         MetadataField::Title => focuses.title,
         MetadataField::Artist => focuses.artist,

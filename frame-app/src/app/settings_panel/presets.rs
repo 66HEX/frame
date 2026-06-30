@@ -1,5 +1,13 @@
-use super::*;
+use super::{
+    ButtonVariant, ClickEvent, Context, ConversionConfig, FRAME_ICON_BUTTON_SM_SIZE,
+    FRAME_ICON_SM_SIZE, FluentBuilder, FocusHandle, FrameIconButtonSize, FrameIconButtonVariant,
+    FrameRoot, FrameTextInputKind, FrameTextInputSpec, ParentElement, PresetDefinition,
+    PresetNotice, PresetNoticeTone, PresetOption, SourceMetadata, StatefulInteractiveElement,
+    Styled, Window, assets, color, div, frame_icon_button, frame_list_item, frame_text_button,
+    frame_text_input, preset_options, px, settings_section_label, theme,
+};
 
+#[derive(Clone, Copy)]
 pub(in crate::app) struct SettingsPresetsTabState<'a> {
     pub(in crate::app) config: &'a ConversionConfig,
     pub(in crate::app) metadata: Option<&'a SourceMetadata>,
@@ -155,12 +163,12 @@ fn settings_preset_row(
             )
             .when(option.is_compatible, |this| {
                 this.child(settings_preset_icon_button(
-                    format!("settings-preset-apply-all-{}", apply_all_id),
+                    format!("settings-preset-apply-all-{apply_all_id}"),
                     assets::ICON_LIST_CHECKS,
                     FrameIconButtonVariant::Ghost,
                     !settings_disabled,
                     move |root, window, cx| {
-                        root.confirm_apply_preset_to_all(apply_all_id.clone(), window, cx);
+                        root.confirm_apply_preset_to_all(&apply_all_id, window, cx);
                     },
                     window,
                     cx,
@@ -168,7 +176,7 @@ fn settings_preset_row(
             })
             .when(!preset.built_in, |this| {
                 this.child(settings_preset_icon_button(
-                    format!("settings-preset-delete-{}", delete_id),
+                    format!("settings-preset-delete-{delete_id}"),
                     assets::ICON_TRASH,
                     FrameIconButtonVariant::Destructive,
                     !settings_disabled,
