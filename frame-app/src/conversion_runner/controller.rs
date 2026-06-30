@@ -37,6 +37,12 @@ impl Default for ConversionProcessState {
 }
 
 impl ConversionProcessController {
+    /// Updates the maximum number of conversion processes allowed to run at once.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `value` is zero or the controller state mutex is
+    /// poisoned.
     pub fn update_max_concurrency(&self, value: usize) -> Result<(), ConversionError> {
         if value == 0 {
             return Err(ConversionError::InvalidInput(
@@ -44,11 +50,18 @@ impl ConversionProcessController {
             ));
         }
 
-        let mut state = self.lock_state()?;
-        state.max_concurrency = value;
+        {
+            let mut state = self.lock_state()?;
+            state.max_concurrency = value;
+        }
         Ok(())
     }
 
+    /// Returns the current conversion concurrency limit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the controller state mutex is poisoned.
     pub fn current_max_concurrency(&self) -> Result<usize, ConversionError> {
         Ok(self.lock_state()?.max_concurrency.max(1))
     }
@@ -71,6 +84,12 @@ impl ConversionProcessController {
             .is_ok_and(|state| state.cancelled_tasks.contains(id))
     }
 
+    /// Records a started worker process for a conversion task.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the controller state mutex is poisoned or when a
+    /// pre-cancelled process cannot be terminated.
     pub fn register_started_process(&self, id: &str, pid: u32) -> Result<bool, ConversionError> {
         let process = ActiveConversionProcess {
             pid,
@@ -89,12 +108,23 @@ impl ConversionProcessController {
         Ok(was_cancelled)
     }
 
+    /// Removes a finished task from process tracking.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the controller state mutex is poisoned.
     pub fn finish_task(&self, id: &str) -> Result<bool, ConversionError> {
         let mut state = self.lock_state()?;
         state.active_processes.remove(id);
         Ok(state.cancelled_tasks.remove(id))
     }
 
+    /// Marks a task as cancelled and terminates its active process when present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the controller state mutex is poisoned, the active
+    /// process no longer matches the tracked process, or termination fails.
     pub fn cancel_task(&self, id: &str) -> Result<(), ConversionError> {
         let process = {
             let mut state = self.lock_state()?;
@@ -112,6 +142,12 @@ impl ConversionProcessController {
         Ok(())
     }
 
+    /// Pauses the process associated with a task.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the task is not active, the tracked process has
+    /// changed, or pausing the process fails.
     pub fn pause_task(&self, id: &str) -> Result<(), ConversionError> {
         let process = self
             .active_process(id)
@@ -120,6 +156,12 @@ impl ConversionProcessController {
         pause_process(process.pid)
     }
 
+    /// Resumes the process associated with a task.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the task is not active, the tracked process has
+    /// changed, or resuming the process fails.
     pub fn resume_task(&self, id: &str) -> Result<(), ConversionError> {
         let process = self
             .active_process(id)
@@ -128,6 +170,11 @@ impl ConversionProcessController {
         resume_process(process.pid)
     }
 
+    /// Removes and returns the cancellation marker for a task.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the controller state mutex is poisoned.
     pub fn take_cancelled(&self, id: &str) -> Result<bool, ConversionError> {
         let mut state = self.lock_state()?;
         Ok(state.cancelled_tasks.remove(id))
@@ -155,7 +202,7 @@ fn process_start_time(pid: u32) -> Option<u64> {
     let target = Pid::from_u32(pid);
     let mut system = System::new();
     system.refresh_processes(ProcessesToUpdate::Some(&[target]));
-    system.process(target).map(|process| process.start_time())
+    system.process(target).map(sysinfo::Process::start_time)
 }
 
 fn ensure_same_process(id: &str, process: ActiveConversionProcess) -> Result<(), ConversionError> {

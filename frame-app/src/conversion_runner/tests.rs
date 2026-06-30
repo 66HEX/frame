@@ -1,3 +1,8 @@
+#![expect(
+    clippy::float_cmp,
+    reason = "Conversion runner tests compare exact parsed metadata fixture values."
+)]
+
 use super::*;
 use crate::settings::{CropSettings, MetadataConfig, MetadataMode, ProcessingMode};
 use std::{
@@ -8,6 +13,10 @@ use std::{
 };
 
 #[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "This regression test intentionally keeps a full conversion config fixture in one assertion flow."
+)]
 fn core_config_from_gpui_preserves_active_conversion_fields() {
     let config = GpuiConversionConfig {
         processing_mode: ProcessingMode::Copy,
@@ -282,7 +291,7 @@ fn run_conversion_batch_with_control_accepts_empty_batches() {
     let controller = ConversionProcessController::default();
     let mut events = Vec::new();
 
-    let result = run_conversion_batch_with_control(Vec::new(), controller, |event| {
+    let result = run_conversion_batch_with_control(Vec::new(), &controller, |event| {
         events.push(event);
     });
 

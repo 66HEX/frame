@@ -29,15 +29,15 @@ impl FrameRoot {
         cx.notify();
     }
     pub(super) fn spawn_conversion_batch(
-        &mut self,
+        &self,
         tasks: Vec<frame_core::types::ConversionTask>,
-        cx: &mut Context<Self>,
+        cx: &Context<Self>,
     ) {
         let (tx, rx) = mpsc::channel();
         let controller = self.conversion_processes.clone();
 
         cx.background_spawn(async move {
-            let result = run_conversion_batch_with_control(tasks, controller, |event| {
+            let result = run_conversion_batch_with_control(tasks, &controller, |event| {
                 let _ = tx.send(event);
             });
             if let Err(error) = result {

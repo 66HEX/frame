@@ -23,6 +23,12 @@ use crate::runtime_binaries::{ffmpeg_executable, ffprobe_executable};
 
 use super::controller::ConversionProcessController;
 
+/// Runs a single conversion task with a default process controller.
+///
+/// # Errors
+///
+/// Returns an error when task validation, probing, process spawning, log
+/// reading, cancellation handling, or `FFmpeg` execution fails.
 pub fn run_conversion_task(
     task: ConversionTask,
     mut emit: impl FnMut(ConversionEvent),
@@ -30,9 +36,15 @@ pub fn run_conversion_task(
     run_conversion_task_with_control(task, &ConversionProcessController::default(), &mut emit)
 }
 
+/// Runs conversion tasks with shared process control and concurrency limits.
+///
+/// # Errors
+///
+/// Returns an error when the controller state cannot be read or the worker
+/// channel disconnects before all tasks complete.
 pub fn run_conversion_batch_with_control(
     tasks: Vec<ConversionTask>,
-    controller: ConversionProcessController,
+    controller: &ConversionProcessController,
     mut emit: impl FnMut(ConversionEvent),
 ) -> Result<(), ConversionError> {
     let mut pending = VecDeque::from(tasks);
@@ -81,6 +93,12 @@ pub fn run_conversion_batch_with_control(
     Ok(())
 }
 
+/// Runs one conversion task with an explicit process controller.
+///
+/// # Errors
+///
+/// Returns an error when task validation, probing, process spawning, process
+/// registration, log reading, cancellation handling, or `FFmpeg` execution fails.
 pub fn run_conversion_task_with_control(
     task: ConversionTask,
     controller: &ConversionProcessController,
