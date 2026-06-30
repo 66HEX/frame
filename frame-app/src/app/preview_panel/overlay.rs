@@ -1,4 +1,5 @@
 use super::*;
+use crate::numeric::{f64_to_f32, unit_f64_to_f32};
 
 const OVERLAY_HANDLE_SIZE: f32 = 10.0;
 const OVERLAY_OPACITY_SLIDER_WIDTH: f32 = 96.0;
@@ -102,10 +103,10 @@ pub(in crate::app) fn preview_overlay_layer(
     let mut layer = div()
         .id("preview-overlay-layer")
         .absolute()
-        .left(relative(left as f32))
-        .top(relative(top as f32))
-        .w(relative(width as f32))
-        .h(relative(height as f32))
+        .left(relative(unit_f64_to_f32(left)))
+        .top(relative(unit_f64_to_f32(top)))
+        .w(relative(unit_f64_to_f32(width)))
+        .h(relative(unit_f64_to_f32(height)))
         .when(state.overlay.overlay_mode, |this| {
             this.cursor_grab()
                 .border_1()
@@ -119,7 +120,7 @@ pub(in crate::app) fn preview_overlay_layer(
                 .absolute()
                 .inset_0()
                 .overflow_hidden()
-                .opacity(overlay.opacity.clamp(0.0, 1.0) as f32)
+                .opacity(unit_f64_to_f32(overlay.opacity))
                 .child(
                     img(PathBuf::from(overlay.path.clone()))
                         .size_full()
@@ -162,6 +163,10 @@ pub(in crate::app) fn preview_overlay_layer(
     Some(layer)
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "Overlay controls are a compact declarative toolbar whose layout is clearer when kept together."
+)]
 pub(in crate::app) fn preview_overlay_controls(
     state: &PreviewShellState,
     window: &mut Window,
@@ -358,7 +363,7 @@ fn overlay_handle_cursor(
     }
 }
 
-fn overlay_handle_id(handle: OverlayDragHandle) -> &'static str {
+const fn overlay_handle_id(handle: OverlayDragHandle) -> &'static str {
     match handle {
         OverlayDragHandle::Move => "move",
         OverlayDragHandle::NorthWest => "nw",
@@ -396,9 +401,9 @@ fn preview_overlay_icon_button(
         .text_color(foreground)
         .opacity(colors.opacity)
         .when(highlighted, |this| this.shadow(button_highlight_shadows()))
-        .when(!enabled, |this| this.cursor_not_allowed())
+        .when(!enabled, gpui::Styled::cursor_not_allowed)
         .when(enabled, |this| {
-            this.hover(|style| style.cursor_pointer())
+            this.hover(gpui::Styled::cursor_pointer)
                 .active(move |style| {
                     style
                         .bg(color(colors.active_background))
@@ -417,9 +422,9 @@ fn preview_overlay_icon_button(
 fn preview_overlay_opacity_slider(
     value: f64,
     enabled: bool,
-    cx: &mut Context<FrameRoot>,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    let value = value.clamp(0.0, 1.0) as f32;
+    let value = f64_to_f32(value.clamp(0.0, 1.0));
 
     frame_slider("preview-overlay-opacity-slider", value, !enabled)
         .w(px(OVERLAY_OPACITY_SLIDER_WIDTH))

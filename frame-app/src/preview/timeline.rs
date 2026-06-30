@@ -97,6 +97,10 @@ pub struct TimelineDragEnd {
     pub trim: Option<TrimSelection>,
 }
 
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "Playback state exposes independent UI capabilities and button states."
+)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct PreviewPlaybackState {
     is_image: bool,
@@ -164,7 +168,7 @@ impl PreviewPlaybackState {
         self.is_image = is_image;
     }
 
-    pub fn clear_media(&mut self) {
+    pub const fn clear_media(&mut self) {
         self.has_media = false;
         self.is_playing = false;
         self.current_time = 0.0;
@@ -301,7 +305,7 @@ impl PreviewPlaybackState {
         None
     }
 
-    pub fn begin_handle_drag(&mut self, target: TimelineDragTarget) -> bool {
+    pub const fn begin_handle_drag(&mut self, target: TimelineDragTarget) -> bool {
         if self.is_image {
             return false;
         }
@@ -440,7 +444,7 @@ pub fn parse_time_to_seconds(time: &str) -> f64 {
         return 0.0;
     };
 
-    hours * 3600.0 + minutes * 60.0 + seconds
+    hours.mul_add(3600.0, minutes * 60.0) + seconds
 }
 
 #[must_use]
@@ -452,7 +456,7 @@ pub fn format_time(seconds: f64) -> String {
     format!("{hours:02.0}:{minutes:02.0}:{seconds:06.3}")
 }
 
-fn finite_or_zero(value: f64) -> f64 {
+const fn finite_or_zero(value: f64) -> f64 {
     if value.is_finite() { value } else { 0.0 }
 }
 

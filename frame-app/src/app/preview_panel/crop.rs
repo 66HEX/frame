@@ -1,4 +1,10 @@
-use super::*;
+use super::{
+    ASPECT_OPTIONS, ConversionConfig, CropRect, CropSettings, DEFAULT_CROP_SIZE, DEFAULT_CROP_X,
+    DEFAULT_CROP_Y, PreviewControlInput, PreviewMediaKind, PreviewMetadataStatus, PreviewRotation,
+    SourceMetadata, clamp_rect, preview_control_availability, preview_source_media_kind,
+    transform_crop_rect,
+};
+use crate::numeric::rounded_f64_to_u32;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::app) struct CropSourceDimensions {
@@ -18,7 +24,7 @@ pub(in crate::app) fn preview_transform_controls_enabled(
     };
     let availability = preview_control_availability(PreviewControlInput {
         metadata_status,
-        source_media_kind: preview_source_media_kind(metadata),
+        source_media_kind: metadata.map(preview_source_media_kind),
         controls_disabled,
         processing_mode: config.processing_mode,
         container: Some(config.container.as_str()),
@@ -132,11 +138,11 @@ pub(in crate::app) fn round_unit_to_u32(value: f64, scale: u32) -> u32 {
     } else if scaled >= f64::from(u32::MAX) {
         u32::MAX
     } else {
-        scaled as u32
+        rounded_f64_to_u32(scaled)
     }
 }
 
-pub(in crate::app) fn default_crop_rect() -> CropRect {
+pub(in crate::app) const fn default_crop_rect() -> CropRect {
     CropRect {
         x: DEFAULT_CROP_X,
         y: DEFAULT_CROP_Y,
@@ -145,7 +151,7 @@ pub(in crate::app) fn default_crop_rect() -> CropRect {
     }
 }
 
-pub(in crate::app) fn full_crop_rect() -> CropRect {
+pub(in crate::app) const fn full_crop_rect() -> CropRect {
     CropRect {
         x: 0.0,
         y: 0.0,

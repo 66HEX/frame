@@ -47,7 +47,7 @@ pub struct PreviewOverlay {
     pub anchor: String,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct OverlayModeChange {
     pub changed: bool,
     pub should_deactivate_crop: bool,
@@ -121,7 +121,7 @@ impl PreviewOverlayState {
         Some(overlay)
     }
 
-    pub fn toggle_overlay_mode(&mut self, controls_disabled: bool) -> OverlayModeChange {
+    pub const fn toggle_overlay_mode(&mut self, controls_disabled: bool) -> OverlayModeChange {
         if controls_disabled || self.overlay.is_none() {
             return OverlayModeChange {
                 changed: false,
@@ -137,7 +137,11 @@ impl PreviewOverlayState {
         }
     }
 
-    pub fn set_overlay_mode(&mut self, value: bool, controls_disabled: bool) -> OverlayModeChange {
+    pub const fn set_overlay_mode(
+        &mut self,
+        value: bool,
+        controls_disabled: bool,
+    ) -> OverlayModeChange {
         if controls_disabled && value {
             return OverlayModeChange {
                 changed: false,

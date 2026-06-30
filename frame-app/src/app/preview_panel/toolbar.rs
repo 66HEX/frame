@@ -1,4 +1,11 @@
-use super::*;
+use super::{
+    ButtonVariant, ClickEvent, Context, FlipAxis, FluentBuilder, FrameRoot, InteractiveElement,
+    MouseButton, PREVIEW_TOOLBAR_BUTTON_SIZE, PREVIEW_TOOLBAR_ICON_SIZE, PREVIEW_TOOLBAR_OFFSET,
+    ParentElement, PreviewCanvasZoomDirection, PreviewShellState, StatefulInteractiveElement,
+    Styled, Window, animated_button_colors, assets, button_colors, button_highlight_shadows,
+    button_mouse_down, card_surface_shadows, color, div, icon_svg, parse_hex,
+    preview_visual_controls_enabled, px, relative, retarget_hover_motion, theme,
+};
 
 pub(in crate::app) const PREVIEW_TOOLBAR_BACKGROUND: &str = "#1B1D21";
 
@@ -182,9 +189,9 @@ pub(in crate::app) fn preview_tool_button(
         .text_color(foreground)
         .opacity(colors.opacity)
         .when(selected, |this| this.shadow(button_highlight_shadows()))
-        .when(!enabled, |this| this.cursor_not_allowed())
+        .when(!enabled, gpui::Styled::cursor_not_allowed)
         .when(enabled, |this| {
-            this.hover(|style| style.cursor_pointer())
+            this.hover(gpui::Styled::cursor_pointer)
                 .active(move |style| {
                     style
                         .bg(color(colors.active_background))

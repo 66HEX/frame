@@ -1,5 +1,10 @@
 use super::*;
+use crate::numeric::{f64_to_u32, u32_to_f32};
 
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "Preview crop render state mirrors independent toggle controls from the toolbar."
+)]
 #[derive(Clone, Debug, PartialEq)]
 pub(in crate::app) struct PreviewCropRenderState {
     pub(in crate::app) crop_mode: bool,
@@ -63,7 +68,7 @@ impl PreviewMediaRenderState {
             return 1.0;
         }
 
-        self.width as f32 / self.height as f32
+        u32_to_f32(self.width) / u32_to_f32(self.height)
     }
 }
 
@@ -115,7 +120,7 @@ pub(in crate::app) struct PreviewPanelProps<'a> {
 
 pub(in crate::app) struct PreviewShellStateInput<'a> {
     pub(in crate::app) selected_file: Option<&'a FileItem>,
-    pub(in crate::app) settings: SettingsRenderState<'a>,
+    pub(in crate::app) settings: &'a SettingsRenderState<'a>,
     pub(in crate::app) crop: PreviewCropRenderState,
     pub(in crate::app) overlay: PreviewOverlayRenderState,
     pub(in crate::app) canvas: PreviewCanvasRenderState,
@@ -127,7 +132,7 @@ pub(in crate::app) struct PreviewShellStateInput<'a> {
 
 pub(in crate::app) fn preview_panel(
     file_queue: &FileQueue,
-    settings: SettingsRenderState<'_>,
+    settings: &SettingsRenderState<'_>,
     props: PreviewPanelProps<'_>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
@@ -167,7 +172,7 @@ pub(in crate::app) fn preview_shell_state(input: PreviewShellStateInput<'_>) -> 
         runtime_error,
     } = input;
     let metadata_status = preview_metadata_status(settings.metadata_status);
-    let source_media_kind = preview_source_media_kind(settings.metadata);
+    let source_media_kind = settings.metadata.map(preview_source_media_kind);
     let media = preview_media_render_state(render_image.as_ref(), presentation);
     let availability = preview_control_availability(PreviewControlInput {
         metadata_status,
@@ -266,18 +271,24 @@ pub(in crate::app) fn preview_presented_frame(
 }
 
 fn scale_preview_crop_start(value: u32, source_extent: u32, image_extent: u32) -> u32 {
-    ((f64::from(value) / f64::from(source_extent)) * f64::from(image_extent))
-        .floor()
-        .clamp(0.0, f64::from(image_extent.saturating_sub(1))) as u32
+    f64_to_u32(
+        ((f64::from(value) / f64::from(source_extent)) * f64::from(image_extent))
+            .floor()
+            .clamp(0.0, f64::from(image_extent.saturating_sub(1))),
+    )
 }
 
 fn scale_preview_crop_end(value: u32, source_extent: u32, image_extent: u32) -> u32 {
-    ((f64::from(value) / f64::from(source_extent)) * f64::from(image_extent))
-        .ceil()
-        .clamp(1.0, f64::from(image_extent)) as u32
+    f64_to_u32(
+        ((f64::from(value) / f64::from(source_extent)) * f64::from(image_extent))
+            .ceil()
+            .clamp(1.0, f64::from(image_extent)),
+    )
 }
 
-pub(in crate::app) fn preview_metadata_status(status: MetadataStatus) -> PreviewMetadataStatus {
+pub(in crate::app) const fn preview_metadata_status(
+    status: MetadataStatus,
+) -> PreviewMetadataStatus {
     match status {
         MetadataStatus::Idle => PreviewMetadataStatus::Idle,
         MetadataStatus::Loading => PreviewMetadataStatus::Loading,
@@ -286,14 +297,12 @@ pub(in crate::app) fn preview_metadata_status(status: MetadataStatus) -> Preview
     }
 }
 
-pub(in crate::app) fn preview_source_media_kind(
-    metadata: Option<&SourceMetadata>,
-) -> Option<SourceMediaKind> {
-    metadata.map(|metadata| match metadata.source_kind() {
+pub(in crate::app) fn preview_source_media_kind(metadata: &SourceMetadata) -> SourceMediaKind {
+    match metadata.source_kind() {
         SourceKind::Video => SourceMediaKind::Video,
         SourceKind::Audio => SourceMediaKind::Audio,
         SourceKind::Image => SourceMediaKind::Image,
-    })
+    }
 }
 
 pub(in crate::app) fn preview_duration_seconds(metadata: Option<&SourceMetadata>) -> f64 {

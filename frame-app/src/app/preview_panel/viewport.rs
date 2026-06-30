@@ -1,5 +1,6 @@
 use super::*;
 use crate::app::preview_actions::preview_canvas_layout_metrics;
+use crate::numeric::{f64_to_f32, u32_to_f32, usize_to_f32};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) struct PreviewCanvasPanDrag;
@@ -156,8 +157,8 @@ impl Element for PreviewMediaImage {
             return;
         }
 
-        let visible_width = frame.visible_width as f32;
-        let visible_height = frame.visible_height as f32;
+        let visible_width = u32_to_f32(frame.visible_width);
+        let visible_height = u32_to_f32(frame.visible_height);
         if visible_width <= 0.0 || visible_height <= 0.0 {
             return;
         }
@@ -166,12 +167,12 @@ impl Element for PreviewMediaImage {
         let scale_y = bounds.size.height.as_f32() / visible_height;
         let full_bounds = Bounds {
             origin: point(
-                bounds.origin.x - px(frame.visible_x as f32 * scale_x),
-                bounds.origin.y - px(frame.visible_y as f32 * scale_y),
+                bounds.origin.x - px(u32_to_f32(frame.visible_x) * scale_x),
+                bounds.origin.y - px(u32_to_f32(frame.visible_y) * scale_y),
             ),
             size: size(
-                px(frame.full_width as f32 * scale_x),
-                px(frame.full_height as f32 * scale_y),
+                px(u32_to_f32(frame.full_width) * scale_x),
+                px(u32_to_f32(frame.full_height) * scale_y),
             ),
         };
         let center = full_bounds.center();
@@ -195,7 +196,7 @@ impl Element for PreviewMediaImage {
 
         let _ = window.paint_image_transformed(
             source_bounds,
-            Default::default(),
+            gpui::Corners::default(),
             Arc::clone(&self.render_image),
             0,
             false,
@@ -320,9 +321,13 @@ pub(in crate::app) fn preview_viewport(
     viewport
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "Preview viewport content composes the canvas, fallback, crop, and overlay layers in one render path."
+)]
 pub(in crate::app) fn preview_viewport_content(
     state: &PreviewShellState,
-    cx: &mut Context<FrameRoot>,
+    cx: &Context<FrameRoot>,
 ) -> gpui::AnyElement {
     if let (Some(render_image), Some(media)) = (&state.render_image, state.media) {
         let content = div()
@@ -446,10 +451,10 @@ pub(in crate::app) fn preview_media_stage(
     state: &PreviewShellState,
     render_image: Arc<RenderImage>,
     media: PreviewMediaRenderState,
-    cx: &mut Context<FrameRoot>,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let canvas = state.canvas;
-    let mut stage = div()
+    let mut media_stage = div()
         .id("preview-media-stage")
         .on_drag_move(cx.listener(
             |root, event: &DragMoveEvent<PreviewCropDrag>, _window, cx| {
@@ -488,14 +493,14 @@ pub(in crate::app) fn preview_media_stage(
         canvas.pan_x,
         canvas.pan_y,
     ) {
-        stage = stage
+        media_stage = media_stage
             .absolute()
-            .left(px(metrics.left as f32))
-            .top(px(metrics.top as f32))
-            .w(px(metrics.width as f32))
-            .h(px(metrics.height as f32));
+            .left(px(f64_to_f32(metrics.left)))
+            .top(px(f64_to_f32(metrics.top)))
+            .w(px(f64_to_f32(metrics.width)))
+            .h(px(f64_to_f32(metrics.height)));
     } else {
-        stage = stage
+        media_stage = media_stage
             .relative()
             .h_full()
             .max_w(relative(1.0))
@@ -504,14 +509,14 @@ pub(in crate::app) fn preview_media_stage(
     }
 
     if let Some(overlay) = preview_overlay_layer(state) {
-        stage = stage.child(overlay);
+        media_stage = media_stage.child(overlay);
     }
 
     if state.crop.crop_mode && state.crop.draft_crop.is_some() {
-        stage = stage.child(preview_crop_overlay(state));
+        media_stage = media_stage.child(preview_crop_overlay(state));
     }
 
-    stage
+    media_stage
 }
 
 pub(in crate::app) fn preview_canvas_pan_enabled(state: &PreviewShellState) -> bool {
@@ -613,11 +618,11 @@ fn preview_viewport_corner_cutout(
 
     builder.move_to(point(px(outer.0), px(outer.1)));
     for index in 0..=SEGMENTS {
-        let progress = index as f32 / SEGMENTS as f32;
-        let angle = start_angle + (end_angle - start_angle) * progress;
+        let progress = usize_to_f32(index) / usize_to_f32(SEGMENTS);
+        let angle = (end_angle - start_angle).mul_add(progress, start_angle);
         builder.line_to(point(
-            px(center.0 + angle.cos() * radius),
-            px(center.1 + angle.sin() * radius),
+            px(angle.cos().mul_add(radius, center.0)),
+            px(angle.sin().mul_add(radius, center.1)),
         ));
     }
     builder.close();
@@ -638,7 +643,7 @@ pub(in crate::app) fn preview_media_placeholder(media_kind: PreviewMediaKind) ->
     ))
 }
 
-pub(in crate::app) fn preview_media_icon(media_kind: PreviewMediaKind) -> &'static str {
+pub(in crate::app) const fn preview_media_icon(media_kind: PreviewMediaKind) -> &'static str {
     match media_kind {
         PreviewMediaKind::Video | PreviewMediaKind::Unknown => assets::ICON_FILE_VIDEO,
         PreviewMediaKind::Audio => assets::ICON_MUSIC,

@@ -1,4 +1,5 @@
 use super::*;
+use crate::numeric::unit_f64_to_f32;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::app) enum FlipAxis {
@@ -13,10 +14,10 @@ pub(super) struct PreviewCropDrag {
 
 pub(in crate::app) fn preview_crop_overlay(state: &PreviewShellState) -> gpui::Div {
     let rect = preview_crop_visual_rect(&state.crop);
-    let x = rect.x as f32;
-    let y = rect.y as f32;
-    let width = rect.width as f32;
-    let height = rect.height as f32;
+    let x = unit_f64_to_f32(rect.x);
+    let y = unit_f64_to_f32(rect.y);
+    let width = unit_f64_to_f32(rect.width);
+    let height = unit_f64_to_f32(rect.height);
     let right = (x + width).min(1.0);
     let bottom = (y + height).min(1.0);
 
@@ -160,11 +161,11 @@ pub(in crate::app) fn crop_handle_cursor(
     }
 }
 
-pub(in crate::app) fn crop_handle_screen_cursor(drag_handle: DragHandle) -> &'static str {
+pub(in crate::app) const fn crop_handle_screen_cursor(drag_handle: DragHandle) -> &'static str {
     crate::preview::handle_cursor(drag_handle, false)
 }
 
-pub(in crate::app) fn crop_handle_id(handle: DragHandle) -> &'static str {
+pub(in crate::app) const fn crop_handle_id(handle: DragHandle) -> &'static str {
     match handle {
         DragHandle::Move => "move",
         DragHandle::North => "n",
@@ -294,14 +295,14 @@ pub(in crate::app) fn compact_text_button_variant(
         .opacity(colors.opacity)
         .when(highlighted, |this| this.shadow(button_highlight_shadows()))
         .when(enabled, |this| {
-            this.hover(|style| style.cursor_pointer())
+            this.hover(gpui::Styled::cursor_pointer)
                 .active(move |style| {
                     style
                         .bg(color(colors.active_background))
                         .text_color(color(colors.hover_foreground))
                 })
         })
-        .when(!enabled, |this| this.cursor_not_allowed())
+        .when(!enabled, gpui::Styled::cursor_not_allowed)
         .on_hover(move |hover, _window, cx| {
             retarget_hover_motion(&hover_transition, *hover && enabled, cx);
         })

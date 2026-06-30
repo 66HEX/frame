@@ -1,3 +1,8 @@
+#![expect(
+    clippy::float_cmp,
+    reason = "Preview model tests compare exact deterministic geometry values."
+)]
+
 use super::*;
 
 fn assert_rect_close(actual: CropRect, expected: CropRect) {

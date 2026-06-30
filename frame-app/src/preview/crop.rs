@@ -108,7 +108,7 @@ pub fn aspect_value(id: &str) -> Option<f64> {
 }
 
 #[must_use]
-pub fn clamp(value: f64, min: f64, max: f64) -> f64 {
+pub const fn clamp(value: f64, min: f64, max: f64) -> f64 {
     value.min(max).max(min)
 }
 
@@ -410,7 +410,7 @@ pub fn apply_visual_crop_drag(drag: VisualCropDrag<'_>) -> CropRect {
 }
 
 #[must_use]
-pub fn handle_cursor(handle: DragHandle, is_side_rotation: bool) -> &'static str {
+pub const fn handle_cursor(handle: DragHandle, is_side_rotation: bool) -> &'static str {
     match handle {
         DragHandle::North | DragHandle::South => {
             if is_side_rotation {

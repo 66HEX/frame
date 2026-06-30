@@ -1,5 +1,6 @@
 use super::*;
 use crate::app::preview_panel::preview_presented_frame;
+use crate::numeric::rounded_f64_to_u64;
 
 impl FrameRoot {
     pub(super) fn selected_preview_runtime_request(
@@ -117,7 +118,7 @@ impl FrameRoot {
     pub(super) fn zoom_preview_canvas(
         &mut self,
         direction: PreviewCanvasZoomDirection,
-        cx: &mut Context<Self>,
+        cx: &Context<Self>,
     ) -> bool {
         let multiplier = match direction {
             PreviewCanvasZoomDirection::In => PREVIEW_CANVAS_ZOOM_STEP,
@@ -151,7 +152,7 @@ impl FrameRoot {
         &mut self,
         position: Point<Pixels>,
         multiplier: f64,
-        cx: &mut Context<Self>,
+        cx: &Context<Self>,
     ) -> bool {
         if !multiplier.is_finite() || multiplier <= 0.0 {
             return false;
@@ -186,8 +187,10 @@ impl FrameRoot {
         let pointer_x = f64::from((position.x - bounds.origin.x).as_f32()) - (viewport_width / 2.0);
         let pointer_y =
             f64::from((position.y - bounds.origin.y).as_f32()) - (viewport_height / 2.0);
-        let target_pan_x = pointer_x - ((pointer_x - self.preview_ui.canvas.target_pan_x) * ratio);
-        let target_pan_y = pointer_y - ((pointer_y - self.preview_ui.canvas.target_pan_y) * ratio);
+        let target_pan_x =
+            (pointer_x - self.preview_ui.canvas.target_pan_x).mul_add(-ratio, pointer_x);
+        let target_pan_y =
+            (pointer_y - self.preview_ui.canvas.target_pan_y).mul_add(-ratio, pointer_y);
         let (target_pan_x, target_pan_y) =
             self.clamp_preview_canvas_pan_for_state(target_pan_x, target_pan_y, next_zoom);
 
@@ -203,7 +206,7 @@ impl FrameRoot {
         &mut self,
         position: Point<Pixels>,
         delta_y: f64,
-        cx: &mut Context<Self>,
+        cx: &Context<Self>,
     ) -> bool {
         if !delta_y.is_finite() || delta_y.abs() <= f64::EPSILON {
             return false;
@@ -220,23 +223,22 @@ impl FrameRoot {
         &mut self,
         position: Point<Pixels>,
         bounds: Bounds<Pixels>,
-        cx: &mut Context<Self>,
+        cx: &Context<Self>,
     ) -> bool {
         if bounds.size.width.as_f32() <= 0.0 || bounds.size.height.as_f32() <= 0.0 {
             return false;
         }
 
-        let drag_state = match self.preview_ui.canvas_pan_drag {
-            Some(state) => state,
-            None => {
-                let state = PreviewCanvasPanDragState {
-                    start_position: position,
-                    start_pan_x: self.preview_ui.canvas.target_pan_x,
-                    start_pan_y: self.preview_ui.canvas.target_pan_y,
-                };
-                self.preview_ui.canvas_pan_drag = Some(state);
-                state
-            }
+        let drag_state = if let Some(state) = self.preview_ui.canvas_pan_drag {
+            state
+        } else {
+            let state = PreviewCanvasPanDragState {
+                start_position: position,
+                start_pan_x: self.preview_ui.canvas.target_pan_x,
+                start_pan_y: self.preview_ui.canvas.target_pan_y,
+            };
+            self.preview_ui.canvas_pan_drag = Some(state);
+            state
         };
 
         let delta_x = f64::from((position.x - drag_state.start_position.x).as_f32());
@@ -258,7 +260,7 @@ impl FrameRoot {
         changed
     }
 
-    pub(super) fn end_preview_canvas_pan_drag(&mut self) -> bool {
+    pub(super) const fn end_preview_canvas_pan_drag(&mut self) -> bool {
         let had_drag = self.preview_ui.canvas_pan_drag.is_some();
         self.preview_ui.canvas_pan_drag = None;
         had_drag
@@ -373,7 +375,7 @@ impl FrameRoot {
             } else {
                 PreviewMetadataStatus::Idle
             },
-            source_media_kind: preview_source_media_kind(metadata),
+            source_media_kind: metadata.map(preview_source_media_kind),
             controls_disabled: self.file_queue.selected_file_locked(),
             processing_mode: config.processing_mode,
             container: Some(config.container.as_str()),
@@ -461,7 +463,7 @@ impl FrameRoot {
         }
     }
 
-    fn schedule_preview_frame_tick(&mut self, cx: &mut Context<Self>) {
+    fn schedule_preview_frame_tick(&mut self, cx: &Context<Self>) {
         if self.preview_ui.frame_tick_active {
             return;
         }
@@ -546,7 +548,7 @@ impl FrameRoot {
         &mut self,
         selected_file_id: Option<&str>,
         selected_config: &ConversionConfig,
-        cx: &mut Context<Self>,
+        cx: &Context<Self>,
     ) {
         if self.preview_ui.overlay_file_id.as_deref() != selected_file_id {
             self.preview_ui.overlay_file_id = selected_file_id.map(str::to_string);
@@ -572,7 +574,7 @@ impl FrameRoot {
         }
     }
 
-    pub(super) fn trigger_selected_overlay(&mut self, cx: &mut Context<Self>) -> bool {
+    pub(super) fn trigger_selected_overlay(&mut self, cx: &Context<Self>) -> bool {
         if !self.selected_preview_overlay_controls_enabled() {
             return false;
         }
@@ -589,7 +591,7 @@ impl FrameRoot {
         self.apply_preview_overlay_mode_change(change)
     }
 
-    pub(super) fn prompt_selected_overlay_image(&mut self, cx: &mut Context<Self>) {
+    pub(super) fn prompt_selected_overlay_image(&self, cx: &Context<Self>) {
         if !self.selected_preview_overlay_controls_enabled() {
             return;
         }
@@ -688,7 +690,7 @@ impl FrameRoot {
         self.commit_preview_overlay(Some(overlay))
     }
 
-    pub(in crate::app) fn set_preview_overlay_opacity_slider_bounds(
+    pub(in crate::app) const fn set_preview_overlay_opacity_slider_bounds(
         &mut self,
         bounds: Bounds<Pixels>,
     ) {
@@ -752,7 +754,7 @@ impl FrameRoot {
         overlay_ratio * media_ratio
     }
 
-    fn apply_preview_overlay_mode_change(&mut self, change: OverlayModeChange) -> bool {
+    const fn apply_preview_overlay_mode_change(&mut self, change: OverlayModeChange) -> bool {
         if change.should_deactivate_crop {
             self.preview_ui.crop_mode = false;
             self.preview_ui.draft_crop = None;
@@ -781,7 +783,7 @@ impl FrameRoot {
             } else {
                 PreviewMetadataStatus::Idle
             },
-            source_media_kind: preview_source_media_kind(metadata.as_ref()),
+            source_media_kind: metadata.as_ref().map(preview_source_media_kind),
             controls_disabled: self.file_queue.selected_file_locked(),
             processing_mode: config.processing_mode,
             container: Some(config.container.as_str()),
@@ -790,7 +792,7 @@ impl FrameRoot {
         availability.overlay_available && !self.file_queue.selected_file_locked()
     }
 
-    fn sync_preview_overlay_dimensions(&mut self, cx: &mut Context<Self>) {
+    fn sync_preview_overlay_dimensions(&mut self, cx: &Context<Self>) {
         let Some(path) = self
             .preview_ui
             .overlay
@@ -893,31 +895,32 @@ impl FrameRoot {
         let previous_rect = self.preview_ui.draft_crop;
         self.preview_ui.crop_aspect = aspect_id.to_string();
         if let Some(rect) = self.preview_ui.draft_crop {
-            self.preview_ui.draft_crop = Some(if let Some(ratio) = aspect_value(aspect_id) {
-                let visual_rect = clamp_rect(transform_crop_rect(
-                    rect,
-                    preview_rotation,
-                    flip_horizontal,
-                    flip_vertical,
-                    false,
-                ));
-                let adjusted_visual_rect = clamp_rect(adjust_rect_to_ratio(
-                    visual_rect,
-                    ratio,
-                    f64::from(dimensions.width),
-                    f64::from(dimensions.height),
-                    false,
-                ));
-                clamp_rect(transform_crop_rect(
-                    adjusted_visual_rect,
-                    preview_rotation,
-                    flip_horizontal,
-                    flip_vertical,
-                    true,
-                ))
-            } else {
-                clamp_rect(rect)
-            });
+            self.preview_ui.draft_crop = Some(aspect_value(aspect_id).map_or_else(
+                || clamp_rect(rect),
+                |ratio| {
+                    let visual_rect = clamp_rect(transform_crop_rect(
+                        rect,
+                        preview_rotation,
+                        flip_horizontal,
+                        flip_vertical,
+                        false,
+                    ));
+                    let adjusted_visual_rect = clamp_rect(adjust_rect_to_ratio(
+                        visual_rect,
+                        ratio,
+                        f64::from(dimensions.width),
+                        f64::from(dimensions.height),
+                        false,
+                    ));
+                    clamp_rect(transform_crop_rect(
+                        adjusted_visual_rect,
+                        preview_rotation,
+                        flip_horizontal,
+                        flip_vertical,
+                        true,
+                    ))
+                },
+            ));
         }
 
         previous_aspect != self.preview_ui.crop_aspect
@@ -1140,7 +1143,7 @@ impl FrameRoot {
         self.preview_ui.draft_crop = Some(next_rect);
         changed
     }
-    pub(super) fn end_preview_crop_drag(&mut self) -> bool {
+    pub(super) const fn end_preview_crop_drag(&mut self) -> bool {
         let had_drag = self.preview_ui.crop_drag.is_some();
         self.preview_ui.crop_drag = None;
         had_drag
@@ -1181,7 +1184,10 @@ impl FrameRoot {
         true
     }
 
-    pub(in crate::app) fn set_preview_timeline_track_bounds(&mut self, bounds: Bounds<Pixels>) {
+    pub(in crate::app) const fn set_preview_timeline_track_bounds(
+        &mut self,
+        bounds: Bounds<Pixels>,
+    ) {
         self.preview_ui.timeline_track_bounds = Some(bounds);
     }
 
@@ -1263,7 +1269,10 @@ impl FrameRoot {
         self.apply_preview_command_to_local_state(command)
     }
 
-    fn apply_preview_command_to_local_state(&mut self, command: PlaybackMediaCommand) -> bool {
+    const fn apply_preview_command_to_local_state(
+        &mut self,
+        command: PlaybackMediaCommand,
+    ) -> bool {
         if command.pause {
             self.preview_ui.playback.handle_pause();
         }
@@ -1284,7 +1293,7 @@ impl FrameRoot {
             } else {
                 PreviewMetadataStatus::Idle
             },
-            source_media_kind: preview_source_media_kind(metadata.as_ref()),
+            source_media_kind: metadata.as_ref().map(preview_source_media_kind),
             controls_disabled: self.file_queue.selected_file_locked(),
             processing_mode: config.processing_mode,
             container: Some(config.container.as_str()),
@@ -1343,7 +1352,7 @@ fn preview_runtime_request(
         source_kind,
         source_width,
         source_height,
-        duration_millis: (duration_seconds * 1000.0).round().max(0.0) as u64,
+        duration_millis: rounded_f64_to_u64(duration_seconds * 1000.0),
     };
     let config = PreviewSessionConfig {
         file_id: key.file_id.clone(),
@@ -1432,7 +1441,10 @@ fn load_preview_overlay_image_dimensions(path: PathBuf) -> Option<PreviewOverlay
     Some(PreviewOverlayImageDimensions { width, height })
 }
 
-fn valid_preview_dimensions(width: Option<u32>, height: Option<u32>) -> (Option<u32>, Option<u32>) {
+const fn valid_preview_dimensions(
+    width: Option<u32>,
+    height: Option<u32>,
+) -> (Option<u32>, Option<u32>) {
     match (width, height) {
         (Some(width), Some(height))
             if width >= MIN_PREVIEW_DIMENSION && height >= MIN_PREVIEW_DIMENSION =>
@@ -1443,7 +1455,7 @@ fn valid_preview_dimensions(width: Option<u32>, height: Option<u32>) -> (Option<
     }
 }
 
-pub(in crate::app) fn clamp_preview_canvas_zoom(value: f64) -> f64 {
+pub(in crate::app) const fn clamp_preview_canvas_zoom(value: f64) -> f64 {
     value.clamp(PREVIEW_CANVAS_MIN_ZOOM, PREVIEW_CANVAS_MAX_ZOOM)
 }
 
@@ -1530,7 +1542,7 @@ pub(in crate::app) fn preview_canvas_pan_limits(
 }
 
 pub(in crate::app) fn lerp_preview_canvas_value(current: f64, target: f64) -> f64 {
-    current + (target - current) * PREVIEW_CANVAS_LERP_FACTOR
+    (target - current).mul_add(PREVIEW_CANVAS_LERP_FACTOR, current)
 }
 
 pub(in crate::app) fn preview_canvas_transform_settled(

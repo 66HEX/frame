@@ -26,7 +26,7 @@ pub enum PreviewMediaKind {
     Image,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PreviewControlInput<'a> {
     pub metadata_status: MetadataStatus,
     pub source_media_kind: Option<SourceMediaKind>,

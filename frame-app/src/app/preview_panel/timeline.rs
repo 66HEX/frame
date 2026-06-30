@@ -1,4 +1,5 @@
 use super::*;
+use crate::numeric::unit_f64_to_f32;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct PreviewTimelineDrag {
@@ -199,8 +200,8 @@ pub(in crate::app) struct PreviewTimecodeFieldSpec<'a> {
 
 pub(in crate::app) fn preview_timecode_field(
     spec: PreviewTimecodeFieldSpec<'_>,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
+    window: &Window,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Div {
     let PreviewTimecodeFieldSpec {
         label,
@@ -266,7 +267,7 @@ pub(in crate::app) fn preview_timeline_label(label: &'static str) -> gpui::Div {
 
 pub(in crate::app) fn preview_timeline_track(
     state: &PreviewShellState,
-    cx: &mut Context<FrameRoot>,
+    cx: &Context<FrameRoot>,
 ) -> impl IntoElement {
     let enabled = preview_trim_enabled(state);
     let track_top = centered_offset(PREVIEW_TIMELINE_CONTROL_HEIGHT, PREVIEW_TRACK_HEIGHT);
@@ -293,7 +294,7 @@ pub(in crate::app) fn preview_timeline_track(
         .h(px(PREVIEW_TIMELINE_CONTROL_HEIGHT))
         .w_full()
         .opacity(if enabled { 1.0 } else { 0.5 })
-        .when(enabled, |this| this.cursor_pointer())
+        .when(enabled, gpui::Styled::cursor_pointer)
         .on_mouse_down(
             MouseButton::Left,
             cx.listener(|root, event: &MouseDownEvent, _window, cx| {
@@ -390,7 +391,7 @@ pub(in crate::app) fn preview_timeline_handle(
         .on_mouse_down(MouseButton::Left, |_event, _window, cx| {
             cx.stop_propagation();
         })
-        .when(enabled, |this| this.cursor_ew_resize());
+        .when(enabled, gpui::Styled::cursor_ew_resize);
 
     if enabled {
         handle.on_drag(
@@ -428,7 +429,7 @@ pub(in crate::app) fn centered_offset(container: f32, child: f32) -> f32 {
 }
 
 pub(in crate::app) fn timeline_fraction_from_percent(percent: f64) -> f32 {
-    (percent / 100.0).clamp(0.0, 1.0) as f32
+    unit_f64_to_f32(percent / 100.0)
 }
 
 pub(in crate::app) fn timeline_slider_percent_from_bounds(
