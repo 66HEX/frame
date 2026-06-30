@@ -59,8 +59,7 @@ type Result<T> = std::result::Result<T, XtaskError>;
 
 fn main() -> ExitCode {
     match run_xtask() {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(XtaskError::Help) => ExitCode::SUCCESS,
+        Ok(()) | Err(XtaskError::Help) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("{error}");
             ExitCode::FAILURE
@@ -80,11 +79,26 @@ fn run_xtask() -> Result<()> {
         "bundle" => bundle(args.next().as_deref()),
         "ci" => ci(),
         "run" => run_frame_app(args.collect()),
-        "setup-ffmpeg" => setup_ffmpeg(args.collect()),
-        "setup-gstreamer" => setup_gstreamer(args.collect()),
-        "stage-gstreamer" => stage_gstreamer(args.collect()),
-        "update-manifest" => update_manifest(args.collect()),
-        "sign-update-manifest" => sign_update_manifest(args.collect()),
+        "setup-ffmpeg" => {
+            let args = args.collect::<Vec<_>>();
+            setup_ffmpeg(&args)
+        }
+        "setup-gstreamer" => {
+            let args = args.collect::<Vec<_>>();
+            setup_gstreamer(&args)
+        }
+        "stage-gstreamer" => {
+            let args = args.collect::<Vec<_>>();
+            stage_gstreamer(&args)
+        }
+        "update-manifest" => {
+            let args = args.collect::<Vec<_>>();
+            update_manifest(&args)
+        }
+        "sign-update-manifest" => {
+            let args = args.collect::<Vec<_>>();
+            sign_update_manifest(&args)
+        }
         "workflows" => write_workflows(),
         "-h" | "--help" | "help" => {
             print_help();
@@ -123,7 +137,7 @@ fn run_frame_app(args: Vec<String>) -> Result<()> {
         "frame-app/Cargo.toml".to_string(),
     ];
     cargo_args.extend(args);
-    run_frame_app_cargo_command("dev", cargo_args)
+    run_frame_app_cargo_command("dev", &cargo_args)
 }
 
 fn build_frame_app(args: Vec<String>) -> Result<()> {
@@ -133,13 +147,13 @@ fn build_frame_app(args: Vec<String>) -> Result<()> {
         "frame-app/Cargo.toml".to_string(),
     ];
     cargo_args.extend(args);
-    run_frame_app_cargo_command("dev", cargo_args)
+    run_frame_app_cargo_command("dev", &cargo_args)
 }
 
-fn run_frame_app_cargo_command(mode: &str, cargo_args: Vec<String>) -> Result<()> {
+fn run_frame_app_cargo_command(mode: &str, cargo_args: &[String]) -> Result<()> {
     let manifest = prepare_host_gstreamer_manifest(mode)?;
     let env = gstreamer_command_env(&manifest)?;
-    run_command_path_with_env("cargo", &cargo_args, &env)
+    run_command_path_with_env("cargo", cargo_args, &env)
 }
 
 fn bundle(platform: Option<&str>) -> Result<()> {
@@ -156,10 +170,13 @@ fn bundle(platform: Option<&str>) -> Result<()> {
     }
 }
 
-fn setup_ffmpeg(args: Vec<String>) -> Result<()> {
-    let options = SetupFfmpegOptions::parse(&args)?;
+fn setup_ffmpeg(args: &[String]) -> Result<()> {
+    let options = SetupFfmpegOptions::parse(args)?;
     let target = ffmpeg_target_for(
-        options.platform.as_deref().unwrap_or(host_platform()),
+        options
+            .platform
+            .as_deref()
+            .unwrap_or_else(|| host_platform()),
         options.arch.as_deref().unwrap_or(host_arch()),
     )?;
     let binary_dir = repo_root()?.join("frame-app/resources/binaries");
@@ -182,10 +199,14 @@ fn setup_ffmpeg(args: Vec<String>) -> Result<()> {
     Ok(())
 }
 
-fn setup_gstreamer(args: Vec<String>) -> Result<()> {
-    let options = SetupGstreamerOptions::parse(&args)?;
-    let platform =
-        GstreamerPlatform::parse(options.platform.as_deref().unwrap_or(host_platform()))?;
+fn setup_gstreamer(args: &[String]) -> Result<()> {
+    let options = SetupGstreamerOptions::parse(args)?;
+    let platform = GstreamerPlatform::parse(
+        options
+            .platform
+            .as_deref()
+            .unwrap_or_else(|| host_platform()),
+    )?;
     let arch = normalize_arch(options.arch.as_deref().unwrap_or(host_arch()))?;
     let version = options
         .version
@@ -197,10 +218,10 @@ fn setup_gstreamer(args: Vec<String>) -> Result<()> {
         .unwrap_or_else(default_gstreamer_download_dir);
 
     if options.install {
-        install_gstreamer_packages(&platform, &arch, version, &download_dir, &options)?;
+        install_gstreamer_packages(platform, &arch, version, &download_dir, &options)?;
     }
 
-    let manifest = create_gstreamer_manifest(&platform, &arch, version, &download_dir, &options)?;
+    let manifest = create_gstreamer_manifest(platform, &arch, version, &download_dir, &options)?;
     write_gstreamer_manifest(&manifest)?;
 
     if options.print_env {
@@ -247,13 +268,13 @@ fn prepare_host_gstreamer_manifest(mode: &str) -> Result<GstreamerManifest> {
     };
 
     let manifest =
-        match create_gstreamer_manifest(&platform, &arch, version, &download_dir, &options) {
+        match create_gstreamer_manifest(platform, &arch, version, &download_dir, &options) {
             Ok(manifest) => manifest,
             Err(error) => {
                 eprintln!("GStreamer runtime is not prepared for {mode}: {error}");
                 eprintln!("Preparing controlled GStreamer runtime from the Frame mirror...");
-                install_gstreamer_packages(&platform, &arch, version, &download_dir, &options)?;
-                create_gstreamer_manifest(&platform, &arch, version, &download_dir, &options)?
+                install_gstreamer_packages(platform, &arch, version, &download_dir, &options)?;
+                create_gstreamer_manifest(platform, &arch, version, &download_dir, &options)?
             }
         };
 
@@ -261,8 +282,8 @@ fn prepare_host_gstreamer_manifest(mode: &str) -> Result<GstreamerManifest> {
     Ok(manifest)
 }
 
-fn stage_gstreamer(args: Vec<String>) -> Result<()> {
-    let options = StageGstreamerOptions::parse(&args)?;
+fn stage_gstreamer(args: &[String]) -> Result<()> {
+    let options = StageGstreamerOptions::parse(args)?;
     let manifest_path = options
         .manifest
         .clone()
@@ -587,7 +608,7 @@ enum FfmpegTarget {
 }
 
 impl FfmpegTarget {
-    fn label(&self) -> &'static str {
+    const fn label(&self) -> &'static str {
         match self {
             Self::Individual { label, .. } | Self::SharedArchive { label, .. } => label,
         }
@@ -734,7 +755,7 @@ struct GstreamerManifest {
 }
 
 fn install_gstreamer_packages(
-    platform: &GstreamerPlatform,
+    platform: GstreamerPlatform,
     arch: &str,
     version: &str,
     download_dir: &Path,
@@ -873,7 +894,7 @@ fn install_linux_gstreamer_packages(
 }
 
 fn create_gstreamer_manifest(
-    platform: &GstreamerPlatform,
+    platform: GstreamerPlatform,
     arch: &str,
     version: &str,
     download_dir: &Path,
@@ -1140,7 +1161,7 @@ fn stage_macos_gstreamer_framework(app_path: &Path, manifest: &GstreamerManifest
             plugin_path.display()
         );
     }
-    println!("Pruned macOS GStreamer runtime paths: {}", pruned_paths);
+    println!("Pruned macOS GStreamer runtime paths: {pruned_paths}");
     println!("Patched executable rpath: {}", executable_path.display());
     Ok(())
 }
@@ -1954,12 +1975,16 @@ fn prepare_linux_gstreamer_pkg_config_dir(source_pkg_config_dir: &Path) -> Resul
 }
 
 fn linux_gstreamer_pkg_config_allowed(name: &str) -> bool {
-    (name.starts_with("gst-") && name.ends_with(".pc"))
-        || (name.starts_with("gstreamer-") && name.ends_with(".pc"))
-        || name == "orc-0.4.pc"
-        || name == "zlib.pc"
-        || name == "libunwind.pc"
-        || (name.starts_with("libunwind-") && name.ends_with(".pc"))
+    let is_pc = name
+        .rsplit_once('.')
+        .is_some_and(|(_, extension)| extension.eq_ignore_ascii_case("pc"));
+    let has_allowed_prefix = name.starts_with("gst-")
+        || name.starts_with("gstreamer-")
+        || name.starts_with("libunwind-");
+    (is_pc && has_allowed_prefix)
+        || name.eq_ignore_ascii_case("orc-0.4.pc")
+        || name.eq_ignore_ascii_case("zlib.pc")
+        || name.eq_ignore_ascii_case("libunwind.pc")
 }
 
 fn default_gstreamer_download_dir() -> PathBuf {
@@ -2031,8 +2056,8 @@ fn required_option_value(args: &[String], index: &mut usize, flag: &str) -> Resu
     Ok(value.clone())
 }
 
-fn update_manifest(args: Vec<String>) -> Result<()> {
-    let options = UpdateManifestOptions::parse(&args)?;
+fn update_manifest(args: &[String]) -> Result<()> {
+    let options = UpdateManifestOptions::parse(args)?;
     let mut assets = BTreeMap::new();
 
     for artifact in &options.artifacts {
@@ -2092,8 +2117,8 @@ fn update_manifest(args: Vec<String>) -> Result<()> {
     Ok(())
 }
 
-fn sign_update_manifest(args: Vec<String>) -> Result<()> {
-    let options = SignUpdateManifestOptions::parse(&args)?;
+fn sign_update_manifest(args: &[String]) -> Result<()> {
+    let options = SignUpdateManifestOptions::parse(args)?;
     let signing_key = env::var("FRAME_UPDATE_SIGNING_KEY").map_err(|_| {
         XtaskError::Usage(
             "FRAME_UPDATE_SIGNING_KEY must contain the base64 Ed25519 seed".to_string(),
@@ -2522,7 +2547,7 @@ fn host_platform() -> &'static str {
     }
 }
 
-fn host_arch() -> &'static str {
+const fn host_arch() -> &'static str {
     env::consts::ARCH
 }
 
@@ -2620,13 +2645,18 @@ fn write_workflows() -> Result<()> {
 }
 
 fn run_script(script: &str, args: &[&str]) -> Result<()> {
-    if script.ends_with(".ps1") && !cfg!(target_os = "windows") {
+    let is_powershell_script = Path::new(script)
+        .extension()
+        .and_then(OsStr::to_str)
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("ps1"));
+
+    if is_powershell_script && !cfg!(target_os = "windows") {
         return Err(XtaskError::Usage(
             "Windows bundles must be built on Windows.".to_string(),
         ));
     }
 
-    if cfg!(target_os = "windows") && script.ends_with(".ps1") {
+    if cfg!(target_os = "windows") && is_powershell_script {
         let mut command_args = vec!["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script];
         command_args.extend_from_slice(args);
         run_command("powershell.exe", &command_args)
@@ -2801,25 +2831,25 @@ on:
     format!("{header}jobs:\n{jobs}")
 }
 
-fn bundle_if_expression() -> &'static str {
+const fn bundle_if_expression() -> &'static str {
     "      (github.event.action == 'labeled' && github.event.label.name == 'run-bundling') ||\n      (github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'run-bundling'))"
 }
 
-fn checkout_step() -> &'static str {
-    r#"    - name: steps::checkout_repo
+const fn checkout_step() -> &'static str {
+    r"    - name: steps::checkout_repo
       uses: actions/checkout@v4
-"#
+"
 }
 
-fn setup_rust_step() -> &'static str {
-    r#"    - name: steps::setup_rust
+const fn setup_rust_step() -> &'static str {
+    r"    - name: steps::setup_rust
       uses: dtolnay/rust-toolchain@stable
-"#
+"
 }
 
 fn linux_job(arch: &str, runner: &str) -> String {
     format!(
-        r#"  bundle_linux_{arch}:
+        r"  bundle_linux_{arch}:
     if: |-
 {if_expression}
     runs-on: {runner}
@@ -2839,7 +2869,7 @@ fn linux_job(arch: &str, runner: &str) -> String {
         path: target/release/frame-linux-{arch}.tar.gz
         if-no-files-found: error
     timeout-minutes: 60
-"#,
+",
         if_expression = bundle_if_expression(),
         checkout = checkout_step(),
         rust = setup_rust_step(),
@@ -2848,7 +2878,7 @@ fn linux_job(arch: &str, runner: &str) -> String {
 
 fn macos_job(arch: &str, target: &str, runner: &str) -> String {
     format!(
-        r#"  bundle_macos_{arch}:
+        r"  bundle_macos_{arch}:
     if: |-
 {if_expression}
     runs-on: {runner}
@@ -2872,7 +2902,7 @@ fn macos_job(arch: &str, target: &str, runner: &str) -> String {
         path: target/{target}/release/Frame-{arch}.app.zip
         if-no-files-found: error
     timeout-minutes: 60
-"#,
+",
         if_expression = bundle_if_expression(),
         checkout = checkout_step(),
         rust = setup_rust_step(),
@@ -2881,7 +2911,7 @@ fn macos_job(arch: &str, target: &str, runner: &str) -> String {
 
 fn windows_job(arch: &str, runner: &str) -> String {
     format!(
-        r#"  bundle_windows_{arch}:
+        r"  bundle_windows_{arch}:
     if: |-
 {if_expression}
     runs-on: {runner}
@@ -2898,13 +2928,17 @@ fn windows_job(arch: &str, runner: &str) -> String {
         path: target/Frame-{arch}.exe
         if-no-files-found: error
     timeout-minutes: 60
-"#,
+",
         if_expression = bundle_if_expression(),
         checkout = checkout_step(),
         rust = setup_rust_step(),
     )
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "The generated GitHub Actions workflow is kept as one raw template for easier diffing against YAML output."
+)]
 fn release_workflow() -> String {
     r#"# Generated from xtask::workflows::release
 # Rebuild with `cargo xtask workflows`.
