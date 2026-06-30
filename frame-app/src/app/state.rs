@@ -1,10 +1,12 @@
 use super::*;
 
 impl FrameRoot {
+    #[must_use]
     pub fn new() -> Self {
         Self::new_inner(None, AppSettings::default(), AppNotifier::disabled())
     }
 
+    #[must_use]
     pub fn new_with_platform_persistence() -> Self {
         let notifier = AppNotifier::system();
         match AppPersistence::platform() {

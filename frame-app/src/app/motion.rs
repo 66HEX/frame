@@ -1,4 +1,4 @@
-use super::*;
+use super::{App, Duration, ElementId, Lerp, Rgba, Window, color, ease_out_quint, theme};
 
 pub(super) const SETTINGS_SHEET_MOTION_DURATION: Duration = Duration::from_millis(200);
 pub(super) const SUBTITLE_POPOVER_MOTION_DURATION: Duration = Duration::from_millis(140);
@@ -10,17 +10,21 @@ const SETTINGS_SHEET_SLIDE_DISTANCE: f32 = 24.0;
 const SETTINGS_SHEET_EDGE_INSET: f32 = 8.0;
 const SUBTITLE_POPOVER_SLIDE_DISTANCE: f32 = 4.0;
 
-pub(super) fn motion_target(is_open: bool) -> f32 {
+pub(super) const fn motion_target(is_open: bool) -> f32 {
     if is_open { 1.0 } else { 0.0 }
 }
 
 pub(super) fn set_motion_target(transition: &gpui::Transition<f32>, target: f32, cx: &mut App) {
-    if *transition.read_goal(cx) != target {
+    if motion_target_changed(*transition.read_goal(cx), target) {
         transition.update(cx, |progress, cx| {
             *progress = target;
             cx.notify();
         });
     }
+}
+
+fn motion_target_changed(current: f32, target: f32) -> bool {
+    (current - target).abs() > f32::EPSILON
 }
 
 pub(super) fn retarget_hover_motion(

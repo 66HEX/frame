@@ -1,3 +1,8 @@
+#![expect(
+    clippy::float_cmp,
+    reason = "App state tests compare exact deterministic layout and timeline values."
+)]
+
 use super::input::{
     should_capture_text_input_drag, should_handle_text_input, text_input_scroll_x_for_cursor,
 };
@@ -2225,10 +2230,11 @@ mod preview_shell {
             ..SourceMetadata::default()
         };
         let file = FileItem::from_path("video", "/tmp/render.mov", 1024);
+        let settings = settings_state(&config, Some(&metadata), MetadataStatus::Ready);
 
         let state = preview_shell_state(PreviewShellStateInput {
             selected_file: Some(&file),
-            settings: settings_state(&config, Some(&metadata), MetadataStatus::Ready),
+            settings: &settings,
             crop: crop_state(),
             overlay: PreviewOverlayRenderState::empty(),
             canvas: PreviewCanvasRenderState::default(),
@@ -2259,10 +2265,11 @@ mod preview_shell {
             ..SourceMetadata::default()
         };
         let file = FileItem::from_path("video", "/tmp/render.mov", 1024);
+        let settings = settings_state(&config, Some(&metadata), MetadataStatus::Ready);
 
         let state = preview_shell_state(PreviewShellStateInput {
             selected_file: Some(&file),
-            settings: settings_state(&config, Some(&metadata), MetadataStatus::Ready),
+            settings: &settings,
             crop: crop_state(),
             overlay: PreviewOverlayRenderState::empty(),
             canvas: PreviewCanvasRenderState::default(),
@@ -2292,10 +2299,11 @@ mod preview_shell {
             ..SourceMetadata::default()
         };
         let file = FileItem::from_path("image", "/tmp/still.png", 1024);
+        let settings = settings_state(&config, Some(&metadata), MetadataStatus::Ready);
 
         let state = preview_shell_state(PreviewShellStateInput {
             selected_file: Some(&file),
-            settings: settings_state(&config, Some(&metadata), MetadataStatus::Ready),
+            settings: &settings,
             crop: crop_state(),
             overlay: PreviewOverlayRenderState::empty(),
             canvas: PreviewCanvasRenderState::default(),
@@ -2321,10 +2329,11 @@ mod preview_shell {
             duration: Some("00:00:12.500".to_string()),
             ..SourceMetadata::default()
         };
+        let settings = settings_state(&config, Some(&metadata), MetadataStatus::Ready);
 
         let state = preview_shell_state(PreviewShellStateInput {
             selected_file: None,
-            settings: settings_state(&config, Some(&metadata), MetadataStatus::Ready),
+            settings: &settings,
             crop: crop_state(),
             overlay: PreviewOverlayRenderState::empty(),
             canvas: PreviewCanvasRenderState::default(),
@@ -2348,10 +2357,11 @@ mod preview_shell {
             duration: Some("90.0".to_string()),
             ..SourceMetadata::default()
         };
+        let settings = settings_state(&config, Some(&metadata), MetadataStatus::Loading);
 
         let state = preview_shell_state(PreviewShellStateInput {
             selected_file: None,
-            settings: settings_state(&config, Some(&metadata), MetadataStatus::Loading),
+            settings: &settings,
             crop: crop_state(),
             overlay: PreviewOverlayRenderState::empty(),
             canvas: PreviewCanvasRenderState::default(),

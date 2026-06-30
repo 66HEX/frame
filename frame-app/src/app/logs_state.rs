@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+    ActiveView, ClipboardItem, Context, FrameRoot, LOG_COPY_FEEDBACK_DURATION, LogScrollTarget,
+    ScrollStrategy,
+};
 
 impl FrameRoot {
     pub(super) fn update_log_scroll_target(&mut self) {
@@ -87,7 +90,7 @@ impl FrameRoot {
     pub(super) fn copy_log_lines_to_clipboard(
         &mut self,
         file_id: &str,
-        cx: &mut Context<Self>,
+        cx: &Context<Self>,
     ) -> bool {
         let logs = self.conversion_events.logs_for(file_id);
         if logs.is_empty() {
@@ -120,7 +123,7 @@ impl FrameRoot {
         true
     }
 
-    fn next_log_copy_feedback_epoch(&mut self) -> usize {
+    const fn next_log_copy_feedback_epoch(&mut self) -> usize {
         self.log_copy_feedback_epoch = self.log_copy_feedback_epoch.wrapping_add(1);
         self.log_copy_feedback_epoch
     }
@@ -144,6 +147,7 @@ pub(super) fn should_follow_logs_tail_after_scroll_position(scrolled_to_end: Opt
 mod tests {
     use super::*;
     use crate::file_queue::FileItem;
+    use frame_core::events::ConversionEvent;
 
     fn root_with_logs(line_count: usize) -> FrameRoot {
         let mut root = FrameRoot::new();

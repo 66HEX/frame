@@ -1,4 +1,8 @@
-use super::*;
+use super::{
+    Context, FILE_LIST_ROW_SPAN, FileQueue, FrameRoot, LEFT_COLUMN_SPAN, LEFT_GRID_ROWS,
+    PREVIEW_ROW_SPAN, ParentElement, PreviewPanelProps, RIGHT_COLUMN_SPAN, SettingsRenderState,
+    Styled, WORKSPACE_COLUMNS, WORKSPACE_GAP, Window, color, div, px, theme,
+};
 use super::{
     file_list_panel::file_list_panel, preview_panel::preview_panel, primitives::FrameSurface,
     settings_panel::settings_panel,
@@ -9,7 +13,7 @@ const EMPTY_SETTINGS_PANEL_PADDING: f32 = 32.0;
 
 pub(super) fn workspace_view(
     file_queue: &FileQueue,
-    settings: SettingsRenderState<'_>,
+    settings: &SettingsRenderState<'_>,
     preview_props: PreviewPanelProps<'_>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
@@ -39,7 +43,7 @@ pub(super) fn workspace_view(
 
 fn settings_panel_for_selection(
     file_queue: &FileQueue,
-    settings: SettingsRenderState<'_>,
+    settings: &SettingsRenderState<'_>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {

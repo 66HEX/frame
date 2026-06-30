@@ -19,7 +19,7 @@ impl FrameRoot {
         }
     }
 
-    pub(super) fn finish_app_settings_close(&mut self) -> bool {
+    pub(super) const fn finish_app_settings_close(&mut self) -> bool {
         if self.settings_ui.is_open || !self.settings_ui.is_present {
             return false;
         }
@@ -57,7 +57,7 @@ impl FrameRoot {
         (value > 0).then_some(value)
     }
 
-    pub(super) fn prompt_subtitle_burn_file(&mut self, cx: &mut Context<Self>) {
+    pub(super) fn prompt_subtitle_burn_file(&self, cx: &Context<Self>) {
         if self.file_queue.selected_file_locked() {
             return;
         }
@@ -182,8 +182,8 @@ impl FrameRoot {
     }
 
     pub(super) fn confirm_apply_preset_to_all(
-        &mut self,
-        preset_id: String,
+        &self,
+        preset_id: &str,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {

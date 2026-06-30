@@ -1,20 +1,20 @@
 use super::*;
 
 impl FrameRoot {
-    pub(super) fn open_update_dialog(&mut self) -> bool {
+    pub(super) const fn open_update_dialog(&mut self) -> bool {
         let changed = !self.update_ui.dialog_open || !self.update_ui.dialog_present;
         self.update_ui.dialog_open = true;
         self.update_ui.dialog_present = true;
         changed
     }
 
-    pub(super) fn close_update_dialog(&mut self) -> bool {
+    pub(super) const fn close_update_dialog(&mut self) -> bool {
         let changed = self.update_ui.dialog_open;
         self.update_ui.dialog_open = false;
         changed
     }
 
-    pub(super) fn finish_update_dialog_close(&mut self) -> bool {
+    pub(super) const fn finish_update_dialog_close(&mut self) -> bool {
         if self.update_ui.dialog_open || !self.update_ui.dialog_present {
             return false;
         }
@@ -98,7 +98,7 @@ impl FrameRoot {
         .detach();
     }
 
-    pub(super) fn download_available_update(&mut self, cx: &mut Context<Self>) {
+    pub(super) fn download_available_update(&mut self, cx: &Context<Self>) {
         if self.update_ui.status.is_busy() {
             return;
         }
@@ -195,7 +195,7 @@ impl FrameRoot {
         .detach();
     }
 
-    pub(super) fn install_downloaded_update(&mut self, cx: &mut Context<Self>) {
+    pub(super) fn install_downloaded_update(&mut self, cx: &Context<Self>) {
         if self.update_ui.status.is_busy() {
             return;
         }

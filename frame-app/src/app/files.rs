@@ -77,20 +77,20 @@ impl Element for FileDropLifecycleProbe {
 }
 
 impl FrameRoot {
-    pub(super) fn open_drag_drop_overlay(&mut self) -> bool {
+    pub(super) const fn open_drag_drop_overlay(&mut self) -> bool {
         let changed = !self.drag_drop_ui.is_open || !self.drag_drop_ui.is_present;
         self.drag_drop_ui.is_open = true;
         self.drag_drop_ui.is_present = true;
         changed
     }
 
-    pub(super) fn close_drag_drop_overlay(&mut self) -> bool {
+    pub(super) const fn close_drag_drop_overlay(&mut self) -> bool {
         let changed = self.drag_drop_ui.is_open;
         self.drag_drop_ui.is_open = false;
         changed
     }
 
-    pub(super) fn finish_drag_drop_overlay_close(&mut self) -> bool {
+    pub(super) const fn finish_drag_drop_overlay_close(&mut self) -> bool {
         if self.drag_drop_ui.is_open || !self.drag_drop_ui.is_present {
             return false;
         }
@@ -99,7 +99,7 @@ impl FrameRoot {
         true
     }
 
-    pub(super) fn prompt_add_source(&mut self, cx: &mut Context<Self>) {
+    pub(super) fn prompt_add_source(cx: &Context<Self>) {
         cx.spawn(async move |this, cx| {
             let paths = cx.background_spawn(async { pick_source_files() }).await;
             let Some(paths) = paths else {
@@ -114,7 +114,7 @@ impl FrameRoot {
         })
         .detach();
     }
-    pub(super) fn import_source_paths(&mut self, paths: Vec<PathBuf>, cx: &mut Context<Self>) {
+    pub(super) fn import_source_paths(&mut self, paths: Vec<PathBuf>, cx: &Context<Self>) {
         let imports = self.allocate_file_imports(paths);
         if imports.is_empty() {
             return;

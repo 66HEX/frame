@@ -28,7 +28,11 @@ use chrome::{
 };
 use input::{FrameTextInputKind, FrameTextInputUiState};
 use logs_panel::logs_view;
-use motion::*;
+use motion::{
+    SETTINGS_SHEET_MOTION_DURATION, SUBTITLE_POPOVER_MOTION_DURATION, hover_motion, mix_color,
+    mix_scalar, motion_is_hidden, motion_target, retarget_hover_motion, selected_motion,
+    set_motion_target, settings_sheet_right_inset, subtitle_popover_slide_offset,
+};
 use preview_panel::{
     FlipAxis, PreviewCanvasRenderState, PreviewCropRenderState, PreviewMediaRenderState,
     PreviewOverlayRenderState, PreviewPanelProps, PreviewTimecodeInputFocuses, crop_aspect_id,
@@ -224,6 +228,10 @@ const PREVIEW_CANVAS_PAN_SNAP_EPSILON: f64 = 0.01;
 const PREVIEW_CANVAS_ZOOM_SNAP_EPSILON: f64 = PREVIEW_CANVAS_PAN_SNAP_EPSILON / 10_000.0;
 const PREVIEW_FRAME_TICK_INTERVAL: Duration = Duration::from_millis(16);
 
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "Root UI state keeps independent boolean flags for GPUI render and input paths."
+)]
 pub struct FrameRoot {
     active_view: ActiveView,
     file_queue: FileQueue,
@@ -302,7 +310,7 @@ enum UpdateStatus {
 }
 
 impl UpdateStatus {
-    fn is_busy(&self) -> bool {
+    const fn is_busy(&self) -> bool {
         matches!(
             self,
             Self::Checking | Self::Downloading { .. } | Self::Installing
@@ -444,6 +452,10 @@ impl Default for PreviewCanvasState {
     }
 }
 
+#[expect(
+    clippy::struct_field_names,
+    reason = "Drag state fields intentionally share the start prefix to distinguish initial values from live pan values."
+)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct PreviewCanvasPanDragState {
     start_position: Point<Pixels>,

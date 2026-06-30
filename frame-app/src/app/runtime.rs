@@ -46,6 +46,11 @@ pub fn init_app(cx: &mut App, name: impl Into<SharedString>) {
     .detach();
 }
 
+/// Opens Frame's main application window.
+///
+/// # Panics
+///
+/// Panics when GPUI cannot create the main window.
 pub fn open_frame_window(cx: &mut App) {
     let bounds = Bounds::centered(None, size(px(WINDOW_MIN_WIDTH), px(WINDOW_MIN_HEIGHT)), cx);
     cx.open_window(frame_window_options(bounds), |_, cx| {
@@ -59,6 +64,7 @@ pub fn open_frame_window(cx: &mut App) {
     .expect("failed to open Frame GPUI window");
 }
 
+#[must_use]
 pub fn frame_window_options(bounds: Bounds<Pixels>) -> WindowOptions {
     WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(bounds)),

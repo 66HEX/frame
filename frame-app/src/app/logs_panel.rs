@@ -2,8 +2,19 @@ use super::components::{
     FRAME_ICON_BUTTON_SM_SIZE, FRAME_ICON_SM_SIZE, FrameIconButtonSize, FrameIconButtonVariant,
     frame_icon_button, frame_vertical_uniform_scrollbar,
 };
-use super::primitives::*;
-use super::*;
+use super::primitives::{
+    FrameSurface, button_mouse_down, card_surface_shadows, color, element_id,
+    panel_bottom_separator,
+};
+use super::{
+    ActiveLogFile, ClickEvent, Context, ConversionEventState, FileQueue, FluentBuilder, FrameRoot,
+    InteractiveElement, IntoElement, LOG_LINE_HEIGHT, LOG_LINE_NUMBER_WIDTH,
+    LOG_SCROLL_BUTTON_OFFSET, LOG_SCROLL_BUTTON_PADDING, LOG_SCROLL_BUTTON_SIZE,
+    LOG_SCROLL_ICON_SIZE, Lerp, LogLine, MouseButton, PANEL_HEADER_HEIGHT, ParentElement,
+    ScrollWheelEvent, StatefulInteractiveElement, Styled, UniformListScrollHandle, Window, assets,
+    div, hover_motion, px, retarget_hover_motion, theme, uniform_list,
+};
+use crate::numeric::usize_to_f32;
 
 pub(super) fn logs_view(
     queue: &FileQueue,
@@ -123,7 +134,7 @@ pub(super) fn log_tab_button(
         .text_size(px(theme::TEXT_LABEL_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
-        .hover(|style| style.cursor_pointer())
+        .hover(gpui::Styled::cursor_pointer)
         .on_hover(move |hover, _window, cx| {
             retarget_hover_motion(&hover_transition, *hover && !selected, cx);
         })
@@ -181,7 +192,7 @@ pub(super) fn log_lines_list(
     selected_id: &str,
     line_count: usize,
     scroll_handle: &UniformListScrollHandle,
-    cx: &mut Context<FrameRoot>,
+    cx: &Context<FrameRoot>,
 ) -> impl IntoElement {
     let selected_id = selected_id.to_string();
     let list_id = element_id("logs-line-list", &selected_id);
@@ -218,7 +229,7 @@ pub(super) fn log_lines_list(
         .child(frame_vertical_uniform_scrollbar(
             "logs-line-list-scrollbar",
             scroll_handle,
-            line_count as f32 * LOG_LINE_HEIGHT,
+            usize_to_f32(line_count) * LOG_LINE_HEIGHT,
         ))
 }
 

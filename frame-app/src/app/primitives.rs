@@ -1,4 +1,10 @@
-use super::*;
+use super::{
+    App, BoxShadow, Context, ElementId, FluentBuilder, FrameRoot, InteractiveElement, IntoElement,
+    MouseButton, ParentElement, Rgba, StatefulInteractiveElement, Styled,
+    TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_BUTTON_HEIGHT, TITLEBAR_ICON_BUTTON_SIZE,
+    TITLEBAR_ICON_SIZE, Window, div, hover_motion, hsla, mix_color, point, px,
+    retarget_hover_motion, svg, theme,
+};
 
 #[derive(Clone, Copy)]
 pub(super) enum ButtonVariant {
@@ -23,7 +29,11 @@ pub(super) struct AnimatedButtonColors {
     pub(super) hover_transition: gpui::Transition<f32>,
 }
 
-pub(super) fn button_colors(variant: ButtonVariant, selected: bool, enabled: bool) -> ButtonColors {
+pub(super) const fn button_colors(
+    variant: ButtonVariant,
+    selected: bool,
+    enabled: bool,
+) -> ButtonColors {
     let active_variant = matches!(variant, ButtonVariant::Default) || selected;
     if !enabled {
         let (background, foreground, opacity) = if active_variant {
@@ -135,8 +145,8 @@ pub(super) fn action_button(
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
         .opacity(colors.opacity)
-        .when(enabled, |this| this.hover(|style| style.cursor_pointer()))
-        .when(!enabled, |this| this.cursor_not_allowed())
+        .when(enabled, |this| this.hover(gpui::Styled::cursor_pointer))
+        .when(!enabled, gpui::Styled::cursor_not_allowed)
         .on_hover(move |hover, _window, cx| {
             retarget_hover_motion(&hover_transition, *hover && enabled, cx);
         })
@@ -304,7 +314,7 @@ pub(super) fn drop_target_shadows() -> Vec<BoxShadow> {
     shadows
 }
 
-pub(super) fn color(token: theme::RgbaToken) -> Rgba {
+pub(super) const fn color(token: theme::RgbaToken) -> Rgba {
     Rgba {
         r: token.red,
         g: token.green,

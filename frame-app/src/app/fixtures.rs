@@ -3,7 +3,7 @@ use super::*;
 use frame_updater::{PlatformAssetKey, UpdateAsset};
 use semver::Version;
 
-const UPDATE_AVAILABLE_RELEASE_NOTES: &str = r#"
+const UPDATE_AVAILABLE_RELEASE_NOTES: &str = r"
 # Frame 0.1.1
 
 - Native autoupdater flow with signed manifests and platform-specific packages.
@@ -18,7 +18,7 @@ This fixture intentionally uses enough text to exercise the dialog layout, scrol
 button placement, and close animation. Production release notes should be carried in
 `releaseNotesMarkdown` so the user can decide based on visible changes instead of
 accepting an update blindly.
-"#;
+";
 
 impl FrameRoot {
     pub(super) fn apply_visual_fixture(&mut self, fixture: Option<VisualFixture>) {

@@ -1,8 +1,32 @@
 use super::components::{frame_checkbox_row, frame_text_button};
 use super::input::{FrameTextInputSpec, frame_text_input};
-use super::primitives::*;
+use super::primitives::{
+    ButtonColors, ButtonVariant, action_button, animated_button_colors, button_colors,
+    button_highlight_shadows, button_mouse_down, card_surface_shadows, color, icon_svg,
+    input_highlight_shadows, panel_bottom_separator, parse_hex, vertical_separator,
+};
 use super::settings_panel::{settings_hint_text, settings_section};
-use super::*;
+use super::{
+    ActiveView, ClickEvent, Context, ExternalPaths, FILE_LIST_ACTION_ICON_SIZE, FluentBuilder,
+    FocusHandle, FrameAppState, FrameRoot, FrameTextInputKind, InteractiveElement, IntoElement,
+    LEFT_COLUMN_SPAN, MouseButton, PANEL_HEADER_HEIGHT, ParentElement, RIGHT_COLUMN_SPAN,
+    SETTINGS_CONTROL_HEIGHT, SETTINGS_SHEET_MOTION_DURATION, StatefulInteractiveElement, Styled,
+    TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_DIVIDER_HEIGHT, TITLEBAR_HEIGHT, TITLEBAR_ICON_SIZE,
+    TITLEBAR_LINUX_WINDOW_BUTTON_SIZE, TITLEBAR_LINUX_WINDOW_CONTROLS_GAP,
+    TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X, TITLEBAR_LOGO_SIZE, TITLEBAR_NAV_BUTTON_HEIGHT,
+    TITLEBAR_PLATFORM_DIVIDER_HEIGHT, TITLEBAR_SEGMENT_HEIGHT, TITLEBAR_TOP_PADDING,
+    TITLEBAR_TRAFFIC_LIGHT_DOT_SIZE, TITLEBAR_TRAFFIC_LIGHT_SIZE,
+    TITLEBAR_TRAFFIC_LIGHT_STROKE_WIDTH, TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
+    TITLEBAR_WINDOWS_WINDOW_ICON_SIZE, TITLEBAR_WINDOWS_WINDOW_MAX_ICON_SIZE, TRAFFIC_CLOSE_BORDER,
+    TRAFFIC_CLOSE_FILL, TRAFFIC_CLOSE_SYMBOL, TRAFFIC_LIGHT_GROUP, TRAFFIC_MINIMIZE_BORDER,
+    TRAFFIC_MINIMIZE_FILL, TRAFFIC_MINIMIZE_SYMBOL, TRAFFIC_ZOOM_BORDER, TRAFFIC_ZOOM_FILL,
+    TRAFFIC_ZOOM_SYMBOL, UpdateInfo, UpdateStatus, WORKSPACE_COLUMNS, WORKSPACE_GAP, Window,
+    WindowControlArea, assets, div, ease_out_quint, format_total_size, hover_motion, mix_color,
+    motion_is_hidden, motion_target, px, relative, retarget_hover_motion, set_motion_target,
+    settings_sheet_right_inset, svg, theme,
+};
+
+const MAX_RELEASE_NOTES_CHARS: usize = 8_000;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum FrameTitlebarPlatform {
@@ -110,9 +134,9 @@ pub(super) fn macos_titlebar(
                         cx,
                     )
                     .on_click(cx.listener(
-                        |root, _: &ClickEvent, _window, cx| {
+                        |_root, _: &ClickEvent, _window, cx| {
                             cx.stop_propagation();
-                            root.prompt_add_source(cx);
+                            FrameRoot::prompt_add_source(cx);
                         },
                     )),
                 )
@@ -255,9 +279,9 @@ pub(super) fn titlebar_add_source_button(
         window,
         cx,
     )
-    .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+    .on_click(cx.listener(|_root, _: &ClickEvent, _window, cx| {
         cx.stop_propagation();
-        root.prompt_add_source(cx);
+        FrameRoot::prompt_add_source(cx);
     }))
 }
 
@@ -287,6 +311,7 @@ pub(super) fn titlebar_start_button(
     }))
 }
 
+#[derive(Clone, Copy)]
 pub(super) struct AppSettingsSheetProps<'a> {
     pub(super) is_open: bool,
     pub(super) current_max_concurrency: usize,
@@ -297,6 +322,10 @@ pub(super) struct AppSettingsSheetProps<'a> {
     pub(super) value_focus: &'a FocusHandle,
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "The settings sheet is a declarative GPUI layout kept together to preserve visual structure."
+)]
 pub(super) fn app_settings_sheet(
     props: AppSettingsSheetProps<'_>,
     window: &mut Window,
@@ -313,12 +342,7 @@ pub(super) fn app_settings_sheet(
         )
         .with_easing(ease_out_quint());
     let target = motion_target(props.is_open);
-    if *transition.read_goal(cx) != target {
-        transition.update(cx, |progress, cx| {
-            *progress = target;
-            cx.notify();
-        });
-    }
+    set_motion_target(&transition, target, cx);
     let progress = *transition.evaluate(window, cx);
     let right_inset = settings_sheet_right_inset(progress);
 
@@ -516,7 +540,6 @@ fn update_release_notes_text(info: Option<&UpdateInfo>) -> Option<String> {
         return None;
     }
 
-    const MAX_RELEASE_NOTES_CHARS: usize = 8_000;
     let mut text = notes
         .chars()
         .take(MAX_RELEASE_NOTES_CHARS + 1)
@@ -1046,7 +1069,7 @@ fn update_dialog_primary_action(
     }
 }
 
-fn update_dialog_kicker(status: &UpdateStatus) -> Option<&'static str> {
+const fn update_dialog_kicker(status: &UpdateStatus) -> Option<&'static str> {
     match status {
         UpdateStatus::Available(_) => None,
         UpdateStatus::Downloading { .. } => Some("Downloading update"),
@@ -1162,7 +1185,7 @@ pub(super) fn app_settings_close_button(
         .rounded(px(theme::RADIUS_SM))
         .bg(background)
         .text_color(foreground)
-        .hover(|style| style.cursor_pointer())
+        .hover(gpui::Styled::cursor_pointer)
         .active(move |style| style.bg(color(colors.active_background)))
         .on_hover(move |hover, _window, cx| {
             retarget_hover_motion(&hover_transition, *hover, cx);
@@ -1256,7 +1279,7 @@ pub(super) fn drag_drop_overlay(
         )
 }
 
-pub(super) fn macos_window_controls(cx: &mut Context<FrameRoot>) -> gpui::Div {
+pub(super) fn macos_window_controls(cx: &Context<FrameRoot>) -> gpui::Div {
     div()
         .flex()
         .items_center()
@@ -1502,7 +1525,7 @@ pub(super) fn titlebar_window_button(
         .rounded(px(metrics.radius))
         .bg(background)
         .text_color(icon_color)
-        .hover(|style| style.cursor_pointer())
+        .hover(gpui::Styled::cursor_pointer)
         .active(move |style| style.bg(color(active_background)))
         .on_hover(move |hover, _window, cx| {
             retarget_hover_motion(&hover_transition, *hover, cx);
@@ -1694,7 +1717,7 @@ pub(super) fn titlebar_segment(
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
         .when(selected, |this| this.shadow(button_highlight_shadows()))
-        .hover(|style| style.cursor_pointer())
+        .hover(gpui::Styled::cursor_pointer)
         .active(move |style| style.bg(color(colors.active_background)))
         .on_hover(move |hover, _window, cx| {
             retarget_hover_motion(&hover_transition, *hover, cx);

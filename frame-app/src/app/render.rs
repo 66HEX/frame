@@ -2,6 +2,10 @@ use super::files::FileDropLifecycleProbe;
 use super::*;
 
 impl Render for FrameRoot {
+    #[expect(
+        clippy::too_many_lines,
+        reason = "The root GPUI render function assembles the full application shell from a single state snapshot."
+    )]
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if !self.native_titlebar_controls_hidden {
             self.native_titlebar_controls_hidden = hide_native_macos_titlebar_controls(window);
@@ -86,53 +90,52 @@ impl Render for FrameRoot {
                     self.ensure_text_input_focus(FrameTextInputKind::SubtitleFontColorHex, cx);
                 let subtitle_outline_color_focus =
                     self.ensure_text_input_focus(FrameTextInputKind::SubtitleOutlineColorHex, cx);
+                let settings = SettingsRenderState {
+                    active_tab: self.settings_ui.active_tab,
+                    config: &selected_config_snapshot,
+                    metadata: source_metadata.as_ref(),
+                    metadata_status: source_metadata_entry.status,
+                    metadata_error: source_metadata_entry.error.as_deref(),
+                    settings_disabled: self.file_queue.selected_file_locked(),
+                    output_name: &selected_output_name,
+                    output_name_focus: Some(&output_name_focus),
+                    audio_bitrate_focus: Some(&audio_bitrate_focus),
+                    video_width_focus: Some(&video_width_focus),
+                    video_height_focus: Some(&video_height_focus),
+                    video_bitrate_focus: Some(&video_bitrate_focus),
+                    gif_loop_focus: Some(&gif_loop_focus),
+                    metadata_focuses: SettingsMetadataInputFocuses {
+                        title: Some(&metadata_title_focus),
+                        artist: Some(&metadata_artist_focus),
+                        album: Some(&metadata_album_focus),
+                        genre: Some(&metadata_genre_focus),
+                        date: Some(&metadata_date_focus),
+                        comment: Some(&metadata_comment_focus),
+                    },
+                    subtitle_color_focuses: SettingsSubtitleColorInputFocuses {
+                        font: Some(&subtitle_font_color_focus),
+                        outline: Some(&subtitle_outline_color_focus),
+                    },
+                    subtitle_popover: self.subtitle_ui.popover,
+                    subtitle_rendered_popover: self.subtitle_ui.rendered_popover,
+                    subtitle_font_select_scroll_handle: &self.subtitle_ui.font_select_scroll_handle,
+                    subtitle_font_size_select_scroll_handle: &self
+                        .subtitle_ui
+                        .font_size_select_scroll_handle,
+                    subtitle_font_color_draft: &self.subtitle_ui.font_color_draft,
+                    subtitle_outline_color_draft: &self.subtitle_ui.outline_color_draft,
+                    subtitle_font_color_hsv_draft: self.subtitle_ui.font_color_hsv_draft,
+                    subtitle_outline_color_hsv_draft: self.subtitle_ui.outline_color_hsv_draft,
+                    preset_name: &self.settings_ui.preset_name_draft,
+                    preset_name_focus: Some(&preset_name_focus),
+                    presets: &self.presets,
+                    preset_notice: self.settings_ui.preset_notice.as_ref(),
+                    subtitle_fonts: &self.subtitle_font_families,
+                    available_encoders: &self.available_encoders,
+                };
                 content.child(workspace_view(
                     &self.file_queue,
-                    SettingsRenderState {
-                        active_tab: self.settings_ui.active_tab,
-                        config: &selected_config_snapshot,
-                        metadata: source_metadata.as_ref(),
-                        metadata_status: source_metadata_entry.status,
-                        metadata_error: source_metadata_entry.error.as_deref(),
-                        settings_disabled: self.file_queue.selected_file_locked(),
-                        output_name: &selected_output_name,
-                        output_name_focus: Some(&output_name_focus),
-                        audio_bitrate_focus: Some(&audio_bitrate_focus),
-                        video_width_focus: Some(&video_width_focus),
-                        video_height_focus: Some(&video_height_focus),
-                        video_bitrate_focus: Some(&video_bitrate_focus),
-                        gif_loop_focus: Some(&gif_loop_focus),
-                        metadata_focuses: SettingsMetadataInputFocuses {
-                            title: Some(&metadata_title_focus),
-                            artist: Some(&metadata_artist_focus),
-                            album: Some(&metadata_album_focus),
-                            genre: Some(&metadata_genre_focus),
-                            date: Some(&metadata_date_focus),
-                            comment: Some(&metadata_comment_focus),
-                        },
-                        subtitle_color_focuses: SettingsSubtitleColorInputFocuses {
-                            font: Some(&subtitle_font_color_focus),
-                            outline: Some(&subtitle_outline_color_focus),
-                        },
-                        subtitle_popover: self.subtitle_ui.popover,
-                        subtitle_rendered_popover: self.subtitle_ui.rendered_popover,
-                        subtitle_font_select_scroll_handle: &self
-                            .subtitle_ui
-                            .font_select_scroll_handle,
-                        subtitle_font_size_select_scroll_handle: &self
-                            .subtitle_ui
-                            .font_size_select_scroll_handle,
-                        subtitle_font_color_draft: &self.subtitle_ui.font_color_draft,
-                        subtitle_outline_color_draft: &self.subtitle_ui.outline_color_draft,
-                        subtitle_font_color_hsv_draft: self.subtitle_ui.font_color_hsv_draft,
-                        subtitle_outline_color_hsv_draft: self.subtitle_ui.outline_color_hsv_draft,
-                        preset_name: &self.settings_ui.preset_name_draft,
-                        preset_name_focus: Some(&preset_name_focus),
-                        presets: &self.presets,
-                        preset_notice: self.settings_ui.preset_notice.as_ref(),
-                        subtitle_fonts: &self.subtitle_font_families,
-                        available_encoders: &self.available_encoders,
-                    },
+                    &settings,
                     PreviewPanelProps {
                         canvas: preview_canvas,
                         crop: preview_crop,

@@ -1,5 +1,19 @@
-use super::*;
-use super::{components::*, primitives::*};
+use super::{
+    BatchSelectionState, ClickEvent, Context, ExternalPaths, FILE_LIST_ACTION_BUTTON_SIZE,
+    FILE_LIST_ACTION_ICON_SIZE, FILE_LIST_ACTIONS_WIDTH, FILE_ROW_HEIGHT, FileItem, FileQueue,
+    FileStateTone, FluentBuilder, FrameRoot, InteractiveElement, IntoElement, MouseButton,
+    PANEL_HEADER_HEIGHT, ParentElement, Rgba, RowActionAvailability, StatefulInteractiveElement,
+    Styled, WORKSPACE_GAP, Window, assets, div, format_file_size, px, theme,
+};
+use super::{
+    components::{
+        FrameIconButtonSize, FrameIconButtonVariant, frame_checkbox_hit_area, frame_icon_button,
+    },
+    primitives::{
+        FrameSurface, button_mouse_down, color, drop_target_shadows, element_id,
+        panel_bottom_separator,
+    },
+};
 
 pub(super) fn file_list_panel(
     queue: &FileQueue,
@@ -24,7 +38,7 @@ pub(super) fn file_list_panel(
 
 pub(super) fn file_list_header(
     selection: BatchSelectionState,
-    cx: &mut Context<FrameRoot>,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Div {
     div()
         .h(px(PANEL_HEADER_HEIGHT))
@@ -51,7 +65,7 @@ pub(super) fn file_list_header(
                             FILE_ROW_HEIGHT,
                         )
                         .id("file-list-header-checkbox")
-                        .when(selection.is_enabled, |this| this.cursor_pointer())
+                        .when(selection.is_enabled, gpui::Styled::cursor_pointer)
                         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
                             button_mouse_down(selection.is_enabled, window, cx);
                         })
@@ -352,7 +366,7 @@ pub(super) fn row_action_button(
 pub(super) fn row_checkbox_control(
     file_id: String,
     is_checked: bool,
-    cx: &mut Context<FrameRoot>,
+    cx: &Context<FrameRoot>,
 ) -> impl IntoElement {
     frame_checkbox_hit_area(is_checked, false, true, FILE_ROW_HEIGHT)
         .id(element_id("file-row-checkbox", &file_id))
@@ -368,7 +382,7 @@ pub(super) fn row_checkbox_control(
         }))
 }
 
-pub(super) fn state_tone_color(tone: FileStateTone) -> Rgba {
+pub(super) const fn state_tone_color(tone: FileStateTone) -> Rgba {
     match tone {
         FileStateTone::Foreground => color(theme::FOREGROUND),
         FileStateTone::Muted => color(theme::FRAME_GRAY_600),
