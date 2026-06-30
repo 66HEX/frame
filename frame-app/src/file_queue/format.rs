@@ -1,5 +1,9 @@
 use std::path::Path;
 
+use crate::numeric::u64_to_f64;
+
+const FILE_SIZE_UNITS: [&str; 4] = ["B", "KB", "MB", "GB"];
+
 #[must_use]
 pub fn file_size_bytes(path: &Path) -> u64 {
     path.metadata()
@@ -48,15 +52,18 @@ pub fn format_file_size(bytes: u64) -> String {
         return "0 B".to_string();
     }
 
-    const UNITS: [&str; 4] = ["B", "KB", "MB", "GB"];
-    let mut value = bytes as f64;
+    let mut value = u64_to_f64(bytes);
     let mut unit_index = 0;
-    while value >= 1024.0 && unit_index < UNITS.len() - 1 {
+    while value >= 1024.0 && unit_index < FILE_SIZE_UNITS.len() - 1 {
         value /= 1024.0;
         unit_index += 1;
     }
 
-    format!("{} {}", trim_two_decimal_places(value), UNITS[unit_index])
+    format!(
+        "{} {}",
+        trim_two_decimal_places(value),
+        FILE_SIZE_UNITS[unit_index]
+    )
 }
 
 fn trim_two_decimal_places(value: f64) -> String {

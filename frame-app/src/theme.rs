@@ -91,6 +91,11 @@ fn format_ui_text(text: &str, uppercase: bool) -> String {
 
 #[cfg(test)]
 mod tests {
+    #![expect(
+        clippy::float_cmp,
+        reason = "Theme tests compare exact color channel constants."
+    )]
+
     use super::*;
 
     fn assert_channel_close(actual: f32, expected: f32) {

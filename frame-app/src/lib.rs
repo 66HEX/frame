@@ -12,6 +12,7 @@ pub mod file_queue;
 pub mod gstreamer_runtime;
 pub mod native_dialogs;
 pub mod notifications;
+pub(crate) mod numeric;
 pub mod preview;
 pub mod preview_engine;
 pub mod runtime_binaries;
@@ -21,6 +22,7 @@ pub mod theme;
 pub mod update_runtime;
 
 use file_queue::FileQueue;
+use numeric::u64_to_f64;
 
 pub const WINDOW_MIN_WIDTH: f32 = 1200.0;
 pub const WINDOW_MIN_HEIGHT: f32 = 800.0;
@@ -179,7 +181,7 @@ pub fn format_total_size(bytes: u64) -> String {
         return "0 KB".to_string();
     }
 
-    let mb = bytes as f64 / (1024.0 * 1024.0);
+    let mb = u64_to_f64(bytes) / (1024.0 * 1024.0);
     if mb > 1000.0 {
         format!("{:.2} GB", mb / 1024.0)
     } else {
@@ -189,6 +191,11 @@ pub fn format_total_size(bytes: u64) -> String {
 
 #[cfg(test)]
 mod tests {
+    #![expect(
+        clippy::float_cmp,
+        reason = "Layout tests compare exact public sizing constants."
+    )]
+
     use super::*;
 
     mod frame_app_state {
