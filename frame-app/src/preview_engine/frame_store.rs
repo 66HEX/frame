@@ -18,7 +18,7 @@ struct LatestFrameState {
     last_publish: Option<Instant>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LatestFrameSnapshot {
     pub generation: u64,
     pub frame: Arc<PreviewFrame>,
@@ -31,6 +31,7 @@ impl LatestFrameStore {
         Self::default()
     }
 
+    #[must_use]
     pub fn publish(&self, frame: PreviewFrame) -> LatestFrameSnapshot {
         let mut state = lock_state(&self.inner);
         if state.latest.is_some() {
@@ -51,7 +52,7 @@ impl LatestFrameStore {
     #[must_use]
     pub fn latest(&self) -> Option<LatestFrameSnapshot> {
         let state = lock_state(&self.inner);
-        let frame = state.latest.as_ref().cloned()?;
+        let frame = state.latest.clone()?;
         Some(LatestFrameSnapshot {
             generation: state.generation,
             frame,
@@ -75,5 +76,5 @@ impl LatestFrameStore {
 fn lock_state(state: &Mutex<LatestFrameState>) -> MutexGuard<'_, LatestFrameState> {
     state
         .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
 }

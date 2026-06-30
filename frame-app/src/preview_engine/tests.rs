@@ -1,3 +1,8 @@
+#![expect(
+    clippy::float_cmp,
+    reason = "Preview engine tests compare exact deterministic timestamps and dimensions."
+)]
+
 use std::{path::PathBuf, sync::Arc};
 
 use super::*;
@@ -44,7 +49,7 @@ fn latest_frame_store_keeps_only_newest_frame() {
     let first = PreviewFrame::bgra(1, 1, 4, 0, vec![1, 2, 3, 4]).expect("first frame");
     let second = PreviewFrame::bgra(1, 1, 4, 33_333, vec![5, 6, 7, 8]).expect("second frame");
 
-    store.publish(first);
+    let _ = store.publish(first);
     let latest = store.publish(second);
 
     assert_eq!(latest.generation, 2);

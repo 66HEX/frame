@@ -6,6 +6,12 @@ use smallvec::SmallVec;
 
 use super::{PreviewEngineError, PreviewFrame, PreviewPixelFormat};
 
+/// Converts a preview frame into a GPUI render image.
+///
+/// # Errors
+///
+/// Returns an error when the frame is not BGRA, its stride is unsupported, or
+/// the byte buffer does not match the declared image dimensions.
 pub fn render_image_from_frame(
     frame: &PreviewFrame,
 ) -> Result<Arc<RenderImage>, PreviewEngineError> {

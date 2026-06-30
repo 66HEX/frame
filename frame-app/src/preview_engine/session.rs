@@ -17,6 +17,12 @@ pub struct PreviewSession {
 }
 
 impl PreviewSession {
+    /// Starts a preview session for an image, video, or audio source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the config is invalid, image loading fails, or the
+    /// `GStreamer` preview pipeline cannot be started.
     pub fn start(config: PreviewSessionConfig) -> Result<Self, PreviewEngineError> {
         config.validate()?;
         let frame_store = LatestFrameStore::new();
@@ -25,7 +31,7 @@ impl PreviewSession {
             PreviewSourceKind::Image => {
                 let frame = load_still_image_frame(&config.path, config.transform, config.crop)?;
                 let dimensions = frame.dimensions();
-                frame_store.publish(frame);
+                let _ = frame_store.publish(frame);
                 Ok(Self {
                     config,
                     dimensions,
@@ -53,6 +59,7 @@ impl PreviewSession {
     }
 
     #[cfg(test)]
+    #[must_use]
     pub fn new_for_test(config: PreviewSessionConfig) -> Self {
         let frame_store = LatestFrameStore::new();
         Self {
@@ -76,29 +83,46 @@ impl PreviewSession {
         self.frame_store.clone()
     }
 
+    /// Sends a playback command to the running preview pipeline.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the underlying pipeline command fails.
+    #[expect(
+        clippy::significant_drop_tightening,
+        reason = "The pipeline mutex guard must live across the selected GStreamer command."
+    )]
     pub fn command(&self, command: PreviewCommand) -> Result<(), PreviewEngineError> {
-        let pipeline = lock(&self.pipeline);
-        let Some(pipeline) = pipeline.as_ref() else {
-            return Ok(());
+        let next_playing = {
+            let pipeline = lock(&self.pipeline);
+            let Some(pipeline) = pipeline.as_ref() else {
+                return Ok(());
+            };
+
+            match command {
+                PreviewCommand::Play => {
+                    pipeline.resume()?;
+                    Some(true)
+                }
+                PreviewCommand::Pause => {
+                    pipeline.pause()?;
+                    Some(false)
+                }
+                PreviewCommand::SeekFast(seconds) => {
+                    let was_playing = *lock(&self.playing);
+                    pipeline.seek(seconds, !was_playing, false)?;
+                    None
+                }
+                PreviewCommand::SeekPrecise(seconds) => {
+                    let was_playing = *lock(&self.playing);
+                    pipeline.seek(seconds, !was_playing, true)?;
+                    None
+                }
+            }
         };
 
-        match command {
-            PreviewCommand::Play => {
-                pipeline.resume()?;
-                *lock(&self.playing) = true;
-            }
-            PreviewCommand::Pause => {
-                pipeline.pause()?;
-                *lock(&self.playing) = false;
-            }
-            PreviewCommand::SeekFast(seconds) => {
-                let was_playing = *lock(&self.playing);
-                pipeline.seek(seconds, !was_playing, false)?;
-            }
-            PreviewCommand::SeekPrecise(seconds) => {
-                let was_playing = *lock(&self.playing);
-                pipeline.seek(seconds, !was_playing, true)?;
-            }
+        if let Some(playing) = next_playing {
+            *lock(&self.playing) = playing;
         }
 
         Ok(())
@@ -106,22 +130,24 @@ impl PreviewSession {
 
     #[must_use]
     pub fn snapshot(&self) -> PreviewSessionSnapshot {
-        let pipeline = lock(&self.pipeline);
-        let duration = pipeline.as_ref().map_or_else(
+        let pipeline_snapshot = {
+            let pipeline = lock(&self.pipeline);
+            pipeline
+                .as_ref()
+                .map(|pipeline| (pipeline.duration(), pipeline.ended(), pipeline.position()))
+        };
+        let duration = pipeline_snapshot.map_or_else(
             || *lock(&self.duration_seconds),
-            |pipeline| self.update_duration(pipeline.duration()),
+            |(duration, _, _)| self.update_duration(duration),
         );
-        let ended = pipeline.as_ref().is_some_and(RunningPreviewPipeline::ended);
-        let position =
-            pipeline.as_ref().map_or(
-                0.0,
-                |pipeline| {
-                    if ended { duration } else { pipeline.position() }
-                },
-            );
-        let playing = pipeline
-            .as_ref()
-            .is_some_and(|_| !ended && *lock(&self.playing));
+        let ended = pipeline_snapshot.is_some_and(|(_, ended, _)| ended);
+        let position = pipeline_snapshot.map_or(
+            0.0,
+            |(_, ended, position)| {
+                if ended { duration } else { position }
+            },
+        );
+        let playing = pipeline_snapshot.is_some_and(|_| !ended && *lock(&self.playing));
 
         PreviewSessionSnapshot {
             file_id: self.config.file_id.clone(),
@@ -138,7 +164,8 @@ impl PreviewSession {
     }
 
     pub fn stop(&self) {
-        if let Some(mut pipeline) = lock(&self.pipeline).take() {
+        let pipeline = { lock(&self.pipeline).take() };
+        if let Some(mut pipeline) = pipeline {
             pipeline.stop();
         }
         *lock(&self.playing) = false;
@@ -156,7 +183,8 @@ impl PreviewSession {
 
 impl Drop for PreviewSession {
     fn drop(&mut self) {
-        if let Some(mut pipeline) = lock(&self.pipeline).take() {
+        let pipeline = { lock(&self.pipeline).take() };
+        if let Some(mut pipeline) = pipeline {
             pipeline.stop();
         }
     }
@@ -165,5 +193,5 @@ impl Drop for PreviewSession {
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex
         .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
 }

@@ -7,11 +7,14 @@ use std::{
     time::{Duration, Instant},
 };
 
+use gst::MessageView;
 use gstreamer as gst;
 use gstreamer::prelude::*;
 use gstreamer_app as gst_app;
 use gstreamer_pbutils as gst_pbutils;
 use gstreamer_video as gst_video;
+
+use crate::numeric::{f64_to_u64, u64_to_f64};
 
 use super::{
     LatestFrameStore, PreviewDimensions, PreviewEngineError, PreviewFrame, PreviewSessionConfig,
@@ -40,6 +43,11 @@ pub struct RunningPreviewPipeline {
 }
 
 impl RunningPreviewPipeline {
+    /// Pauses the `GStreamer` playback pipeline.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `GStreamer` rejects the paused state transition.
     pub fn pause(&self) -> Result<(), PreviewEngineError> {
         self.reset_clock();
         self.set_audio_muted(true);
@@ -49,6 +57,12 @@ impl RunningPreviewPipeline {
             .map_err(|err| PreviewEngineError::Gstreamer(format!("failed to pause: {err:?}")))
     }
 
+    /// Resumes the `GStreamer` playback pipeline.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when seeking back from end-of-stream or switching to
+    /// the playing state fails.
     pub fn resume(&self) -> Result<(), PreviewEngineError> {
         if self.ended() {
             self.seek(0.0, false, true)?;
@@ -62,6 +76,12 @@ impl RunningPreviewPipeline {
             .map_err(|err| PreviewEngineError::Gstreamer(format!("failed to resume: {err:?}")))
     }
 
+    /// Seeks the pipeline to a preview timestamp in seconds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the target timestamp cannot be clamped for the
+    /// current media or `GStreamer` rejects the seek/state transition.
     pub fn seek(
         &self,
         seconds: f64,
@@ -83,7 +103,7 @@ impl RunningPreviewPipeline {
             self.seek_guard.clear();
         }
 
-        let position = gst::ClockTime::from_nseconds((seconds * 1_000_000_000.0) as u64);
+        let position = gst::ClockTime::from_nseconds(f64_to_u64(seconds * 1_000_000_000.0));
         let result = self
             .pipeline
             .seek_simple(preview_seek_flags(precise), position)
@@ -114,7 +134,9 @@ impl RunningPreviewPipeline {
         let position = self
             .pipeline
             .query_position::<gst::ClockTime>()
-            .map_or(0.0, |position| position.nseconds() as f64 / 1_000_000_000.0);
+            .map_or(0.0, |position| {
+                u64_to_f64(position.nseconds()) / 1_000_000_000.0
+            });
         self.seek_guard.position_or_target(position)
     }
 
@@ -122,7 +144,9 @@ impl RunningPreviewPipeline {
     pub fn duration(&self) -> f64 {
         self.pipeline
             .query_duration::<gst::ClockTime>()
-            .map_or(0.0, |duration| duration.nseconds() as f64 / 1_000_000_000.0)
+            .map_or(0.0, |duration| {
+                u64_to_f64(duration.nseconds()) / 1_000_000_000.0
+            })
     }
 
     #[must_use]
@@ -187,23 +211,30 @@ impl SeekTransientGuard {
         *lock_seek_guard(&self.state) = None;
     }
 
+    #[expect(
+        clippy::significant_drop_tightening,
+        reason = "The seek guard mutex must cover timeout checks and possible guard clearing."
+    )]
     fn position_or_target(&self, position_seconds: f64) -> f64 {
-        let mut state = lock_seek_guard(&self.state);
-        let Some(guard) = state.as_ref() else {
-            return position_seconds;
+        let target_us = {
+            let mut state = lock_seek_guard(&self.state);
+            let Some(guard) = state.as_ref() else {
+                return position_seconds;
+            };
+            if guard.started_at.elapsed() >= SEEK_TRANSIENT_GUARD_TIMEOUT {
+                *state = None;
+                return position_seconds;
+            }
+            if timestamps_are_close(
+                seconds_to_us(position_seconds),
+                guard.target_us,
+                SEEK_TRANSIENT_POSITION_TOLERANCE_US,
+            ) {
+                return position_seconds;
+            }
+            guard.target_us
         };
-        if guard.started_at.elapsed() >= SEEK_TRANSIENT_GUARD_TIMEOUT {
-            *state = None;
-            return position_seconds;
-        }
-        if timestamps_are_close(
-            seconds_to_us(position_seconds),
-            guard.target_us,
-            SEEK_TRANSIENT_POSITION_TOLERANCE_US,
-        ) {
-            return position_seconds;
-        }
-        guard.target_us as f64 / 1_000_000.0
+        u64_to_f64(target_us) / 1_000_000.0
     }
 
     fn should_hold_frame(&self, timestamp_us: u64) -> bool {
@@ -211,18 +242,25 @@ impl SeekTransientGuard {
             .is_some()
     }
 
+    #[expect(
+        clippy::significant_drop_tightening,
+        reason = "The seek guard mutex must cover timestamp checks and possible guard clearing."
+    )]
     fn target_for_timestamp(&self, timestamp_us: u64, tolerance_us: u64) -> Option<u64> {
         let mut state = lock_seek_guard(&self.state);
-        let guard = state.as_ref()?;
-        if guard.started_at.elapsed() >= SEEK_TRANSIENT_GUARD_TIMEOUT {
-            *state = None;
-            return None;
-        }
-        if timestamps_are_close(timestamp_us, guard.target_us, tolerance_us) {
-            *state = None;
-            return None;
-        }
-        Some(guard.target_us)
+        let target_us = {
+            let guard = state.as_ref()?;
+            if guard.started_at.elapsed() >= SEEK_TRANSIENT_GUARD_TIMEOUT {
+                *state = None;
+                return None;
+            }
+            if timestamps_are_close(timestamp_us, guard.target_us, tolerance_us) {
+                *state = None;
+                return None;
+            }
+            guard.target_us
+        };
+        Some(target_us)
     }
 }
 
@@ -231,9 +269,15 @@ fn lock_seek_guard(
 ) -> MutexGuard<'_, Option<SeekTransientState>> {
     state
         .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
+/// Starts a `GStreamer` pipeline and frame worker for preview playback.
+///
+/// # Errors
+///
+/// Returns an error when `GStreamer` cannot initialize, the pipeline cannot be
+/// built, media discovery fails, or required pipeline elements are missing.
 pub fn start_gstreamer_pipeline(
     config: &PreviewSessionConfig,
     frame_store: LatestFrameStore,
@@ -299,7 +343,9 @@ pub fn start_gstreamer_pipeline(
     let duration = normalize_duration(
         pipeline
             .query_duration::<gst::ClockTime>()
-            .map_or(0.0, |duration| duration.nseconds() as f64 / 1_000_000_000.0),
+            .map_or(0.0, |duration| {
+                u64_to_f64(duration.nseconds()) / 1_000_000_000.0
+            }),
     )
     .or_else(|| discover_file_duration(&config.path.to_string_lossy()))
     .unwrap_or(config.duration_seconds);
@@ -322,6 +368,7 @@ pub fn start_gstreamer_pipeline(
     ))
 }
 
+#[must_use]
 pub fn discover_file_duration(file_path: &str) -> Option<f64> {
     gst::init().ok()?;
     let uri = gst::glib::filename_to_uri(file_path, None).ok()?;
@@ -330,7 +377,7 @@ pub fn discover_file_duration(file_path: &str) -> Option<f64> {
         .discover_uri(uri.as_str())
         .ok()
         .and_then(|info| info.duration())
-        .map(|duration| duration.nseconds() as f64 / 1_000_000_000.0)
+        .map(|duration| u64_to_f64(duration.nseconds()) / 1_000_000_000.0)
         .filter(|duration| duration.is_finite() && *duration > 0.0)
 }
 
@@ -360,7 +407,7 @@ fn spawn_frame_worker(
                     continue;
                 }
                 playback_clock.pace_frame(sample_generation, frame.timestamp_us);
-                frame_store.publish(frame);
+                let _ = frame_store.publish(frame);
 
                 if pause_after_next_frame.swap(false, Ordering::SeqCst) {
                     let _ = pipeline.set_state(gst::State::Paused);
@@ -383,7 +430,6 @@ fn spawn_bus_worker(
                     continue;
                 };
 
-                use gst::MessageView;
                 match message.view() {
                     MessageView::Error(_) => break,
                     MessageView::Eos(_) => {
@@ -543,7 +589,12 @@ impl PlaybackClock {
         let target_elapsed = Duration::from_micros(pts_delta_us);
         let actual_elapsed = self.base_instant.elapsed();
         if target_elapsed > actual_elapsed {
-            thread::sleep((target_elapsed - actual_elapsed).min(MAX_FRAME_PACING_DELAY));
+            thread::sleep(
+                target_elapsed
+                    .checked_sub(actual_elapsed)
+                    .unwrap()
+                    .min(MAX_FRAME_PACING_DELAY),
+            );
         }
     }
 
@@ -585,10 +636,10 @@ fn preview_seek_flags(precise: bool) -> gst::SeekFlags {
 }
 
 fn seconds_to_us(seconds: f64) -> u64 {
-    (seconds.max(0.0) * 1_000_000.0) as u64
+    f64_to_u64(seconds.max(0.0) * 1_000_000.0)
 }
 
-fn timestamps_are_close(timestamp_us: u64, target_us: u64, tolerance_us: u64) -> bool {
+const fn timestamps_are_close(timestamp_us: u64, target_us: u64, tolerance_us: u64) -> bool {
     timestamp_us.abs_diff(target_us) <= tolerance_us
 }
 
@@ -615,7 +666,7 @@ fn drain_bus_error_details(bus: &gst::Bus) -> String {
             MessageView::Error(err) => {
                 details.push(format!(
                     " error from {:?}: {} ({:?})",
-                    err.src().map(|src| src.path_string()),
+                    err.src().map(gstreamer::prelude::GstObjectExt::path_string),
                     err.error(),
                     err.debug()
                 ));
@@ -623,7 +674,9 @@ fn drain_bus_error_details(bus: &gst::Bus) -> String {
             MessageView::Warning(warning) => {
                 details.push(format!(
                     " warning from {:?}: {} ({:?})",
-                    warning.src().map(|src| src.path_string()),
+                    warning
+                        .src()
+                        .map(gstreamer::prelude::GstObjectExt::path_string),
                     warning.error(),
                     warning.debug()
                 ));
@@ -649,6 +702,11 @@ fn normalize_duration(duration: f64) -> Option<f64> {
 
 #[cfg(test)]
 mod tests {
+    #![expect(
+        clippy::float_cmp,
+        reason = "GStreamer backend tests compare exact deterministic timestamp conversions."
+    )]
+
     use super::*;
     use std::path::PathBuf;
 

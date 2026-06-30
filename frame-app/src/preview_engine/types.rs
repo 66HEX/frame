@@ -1,5 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
+use crate::numeric::rounded_f64_to_u32;
+
 use super::PreviewEngineError;
 
 pub const DEFAULT_PREVIEW_MAX_WIDTH: u32 = 1280;
@@ -63,7 +65,7 @@ pub struct PreviewRenderPresentation {
     pub crop_source_height: Option<u32>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PreviewFrame {
     pub width: u32,
     pub height: u32,
@@ -74,6 +76,12 @@ pub struct PreviewFrame {
 }
 
 impl PreviewFrame {
+    /// Creates a BGRA preview frame after validating its memory layout.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when dimensions, stride, or byte length do not describe
+    /// a supported BGRA frame.
     pub fn bgra(
         width: u32,
         height: u32,
@@ -98,7 +106,7 @@ impl PreviewFrame {
     }
 
     #[must_use]
-    pub fn dimensions(&self) -> PreviewDimensions {
+    pub const fn dimensions(&self) -> PreviewDimensions {
         PreviewDimensions {
             width: self.width,
             height: self.height,
@@ -122,6 +130,12 @@ pub struct PreviewSessionConfig {
 }
 
 impl PreviewSessionConfig {
+    /// Validates that the preview session can be started.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when required identifiers, paths, dimensions, frame
+    /// rate, or crop rectangles are invalid.
     pub fn validate(&self) -> Result<(), PreviewEngineError> {
         if self.file_id.trim().is_empty() {
             return Err(PreviewEngineError::InvalidInput(
@@ -213,22 +227,24 @@ impl PreviewSessionConfig {
             return fit_dimensions(crop.width, crop.height, self.max_width, self.max_height);
         }
 
-        match self.transformed_source_dimensions() {
-            Some(dimensions) => fit_dimensions(
-                dimensions.width,
-                dimensions.height,
-                self.max_width,
-                self.max_height,
-            ),
-            _ => PreviewDimensions {
+        self.transformed_source_dimensions().map_or_else(
+            || PreviewDimensions {
                 width: even_dimension(self.max_width),
                 height: even_dimension(self.max_height),
             },
-        }
+            |dimensions| {
+                fit_dimensions(
+                    dimensions.width,
+                    dimensions.height,
+                    self.max_width,
+                    self.max_height,
+                )
+            },
+        )
     }
 
     #[must_use]
-    pub fn transformed_source_dimensions(&self) -> Option<PreviewDimensions> {
+    pub const fn transformed_source_dimensions(&self) -> Option<PreviewDimensions> {
         let (Some(width), Some(height)) = (self.source_width, self.source_height) else {
             return None;
         };
@@ -251,7 +267,7 @@ pub struct PreviewPlaybackSnapshot {
     pub playing: bool,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PreviewSessionStatus {
     Loading,
     Ready,
@@ -283,13 +299,13 @@ pub fn fit_dimensions(
     max_width: u32,
     max_height: u32,
 ) -> PreviewDimensions {
-    let width_scale = max_width as f64 / source_width as f64;
-    let height_scale = max_height as f64 / source_height as f64;
+    let width_scale = f64::from(max_width) / f64::from(source_width);
+    let height_scale = f64::from(max_height) / f64::from(source_height);
     let scale = width_scale.min(height_scale).min(1.0);
 
     PreviewDimensions {
-        width: even_dimension((source_width as f64 * scale).round() as u32),
-        height: even_dimension((source_height as f64 * scale).round() as u32),
+        width: even_dimension(rounded_f64_to_u32(f64::from(source_width) * scale)),
+        height: even_dimension(rounded_f64_to_u32(f64::from(source_height) * scale)),
     }
 }
 
