@@ -576,6 +576,57 @@ pub enum WindowControlArea {
     Min,
 }
 
+fn hit_test_window_control_area(
+    hit_test: &HitTest,
+    window_control_hitboxes: &[(WindowControlArea, Hitbox)],
+) -> Option<WindowControlArea> {
+    let hitbox_id = hit_test.ids.first()?;
+    window_control_hitboxes
+        .iter()
+        .find_map(|(area, hitbox)| (hitbox.id == *hitbox_id).then_some(*area))
+}
+
+#[cfg(test)]
+mod window_control_hit_test_tests {
+    use super::*;
+
+    fn hitbox(id: u64) -> Hitbox {
+        Hitbox {
+            id: HitboxId(id),
+            bounds: Bounds::default(),
+            content_mask: ContentMask::default(),
+            behavior: HitboxBehavior::Normal,
+        }
+    }
+
+    fn hit_test(ids: &[u64]) -> HitTest {
+        let mut hit_test = HitTest::default();
+        hit_test.ids.extend(ids.iter().copied().map(HitboxId));
+        hit_test.hover_hitbox_count = hit_test.ids.len();
+        hit_test
+    }
+
+    #[test]
+    fn topmost_regular_hitbox_suppresses_window_control_area_behind_it() {
+        let controls = [(WindowControlArea::Drag, hitbox(1))];
+
+        assert_eq!(hit_test_window_control_area(&hit_test(&[2, 1]), &controls), None);
+    }
+
+    #[test]
+    fn topmost_window_control_hitbox_returns_its_area() {
+        let controls = [
+            (WindowControlArea::Drag, hitbox(1)),
+            (WindowControlArea::Close, hitbox(2)),
+        ];
+
+        assert_eq!(
+            hit_test_window_control_area(&hit_test(&[2, 1]), &controls),
+            Some(WindowControlArea::Close)
+        );
+    }
+}
+
 /// An identifier for a [Hitbox] which also includes [HitboxBehavior].
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct HitboxId(u64);
@@ -1589,12 +1640,10 @@ impl Window {
             Box::new(move || {
                 handle
                     .update(&mut cx, |_, window, _cx| {
-                        for (area, hitbox) in &window.rendered_frame.window_control_hitboxes {
-                            if window.mouse_hit_test.ids.contains(&hitbox.id) {
-                                return Some(*area);
-                            }
-                        }
-                        None
+                        hit_test_window_control_area(
+                            &window.mouse_hit_test,
+                            &window.rendered_frame.window_control_hitboxes,
+                        )
                     })
                     .log_err()
                     .unwrap_or(None)
