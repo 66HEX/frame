@@ -15,7 +15,7 @@ use super::preview_panel::{
     preview_timeline_labels, preview_trim_enabled, preview_visual_controls_visible,
     timeline_fraction_from_percent, timeline_slider_percent_from_bounds,
 };
-use super::primitives::{ButtonVariant, button_colors};
+use super::primitives::{ButtonVariant, button_colors, frame_highlight_px};
 use super::settings_panel::{hex_to_subtitle_hsv, subtitle_hsv_to_hex};
 use super::*;
 use crate::app_persistence::{AppPersistence, AppSettings};
@@ -2137,6 +2137,17 @@ mod button_state_colors {
         assert_eq!(colors.active_background, theme::FRAME_GRAY_200);
         assert_eq!(colors.foreground, theme::FRAME_GRAY_600);
         assert_eq!(colors.hover_foreground, theme::FOREGROUND);
+    }
+}
+
+mod surface_highlights {
+    use super::*;
+
+    #[test]
+    fn frame_highlight_width_matches_platform_renderer() {
+        let expected = if cfg!(target_os = "macos") { 0.5 } else { 1.0 };
+
+        assert_eq!(frame_highlight_px(), expected);
     }
 }
 

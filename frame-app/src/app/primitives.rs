@@ -185,18 +185,24 @@ pub(super) fn parse_hex(hex: &str) -> Rgba {
     color(theme::RgbaToken::from_rgb(red, green, blue))
 }
 
+pub(super) const fn frame_highlight_px() -> f32 {
+    if cfg!(target_os = "macos") { 0.5 } else { 1.0 }
+}
+
 pub(super) fn input_highlight_shadows() -> Vec<BoxShadow> {
+    let highlight_px = frame_highlight_px();
+
     vec![
         BoxShadow {
             color: hsla(0.0, 0.0, 0.0, 0.20),
-            offset: point(px(0.0), px(0.5)),
+            offset: point(px(0.0), px(highlight_px)),
             blur_radius: px(0.0),
             spread_radius: px(0.0),
             inset: true,
         },
         BoxShadow {
             color: color(theme::FRAME_GRAY_400).into(),
-            offset: point(px(0.0), px(-0.5)),
+            offset: point(px(0.0), px(-highlight_px)),
             blur_radius: px(0.0),
             spread_radius: px(0.0),
             inset: true,
@@ -205,10 +211,12 @@ pub(super) fn input_highlight_shadows() -> Vec<BoxShadow> {
 }
 
 pub(super) fn button_highlight_shadows() -> Vec<BoxShadow> {
+    let highlight_px = frame_highlight_px();
+
     vec![
         BoxShadow {
             color: color(theme::FRAME_GRAY_400).into(),
-            offset: point(px(0.0), px(0.5)),
+            offset: point(px(0.0), px(highlight_px)),
             blur_radius: px(0.0),
             spread_radius: px(0.0),
             inset: true,
@@ -217,7 +225,7 @@ pub(super) fn button_highlight_shadows() -> Vec<BoxShadow> {
             color: color(theme::FRAME_GRAY_200).into(),
             offset: point(px(0.0), px(0.0)),
             blur_radius: px(0.0),
-            spread_radius: px(0.5),
+            spread_radius: px(highlight_px),
             inset: true,
         },
     ]
@@ -260,6 +268,8 @@ impl FrameSurface for gpui::Div {
 }
 
 pub(super) fn card_surface_shadows() -> Vec<BoxShadow> {
+    let highlight_px = frame_highlight_px();
+
     vec![
         BoxShadow {
             color: hsla(0.0, 0.0, 0.0, 0.10),
@@ -277,7 +287,7 @@ pub(super) fn card_surface_shadows() -> Vec<BoxShadow> {
         },
         BoxShadow {
             color: color(theme::FRAME_GRAY_200).into(),
-            offset: point(px(0.0), px(1.0)),
+            offset: point(px(0.0), px(highlight_px)),
             blur_radius: px(0.0),
             spread_radius: px(0.0),
             inset: true,
@@ -286,7 +296,7 @@ pub(super) fn card_surface_shadows() -> Vec<BoxShadow> {
             color: color(theme::FRAME_GRAY_100).into(),
             offset: point(px(0.0), px(0.0)),
             blur_radius: px(0.0),
-            spread_radius: px(1.0),
+            spread_radius: px(highlight_px),
             inset: true,
         },
     ]
@@ -308,7 +318,7 @@ pub(super) fn drop_target_shadows() -> Vec<BoxShadow> {
         color: color(theme::FRAME_GRAY_600.with_alpha(0.55)).into(),
         offset: point(px(0.0), px(0.0)),
         blur_radius: px(0.0),
-        spread_radius: px(1.0),
+        spread_radius: px(frame_highlight_px()),
         inset: true,
     });
     shadows
