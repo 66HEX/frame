@@ -80,7 +80,10 @@ use crate::{
         format_file_size,
     },
     format_total_size,
-    native_dialogs::{pick_overlay_image_file, pick_source_files, pick_subtitle_file},
+    native_dialogs::{
+        overlay_image_dialog, pick_overlay_image_file, pick_source_files, pick_subtitle_file,
+        source_file_dialog, subtitle_file_dialog,
+    },
     notifications::{AppNotifier, conversion_finished_notification_for_task_ids},
     preview::{
         ASPECT_OPTIONS, CropRect, DragHandle, MAX_OVERLAY_WIDTH, MIN_OVERLAY_WIDTH, MediaSnapshot,

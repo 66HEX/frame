@@ -57,13 +57,14 @@ impl FrameRoot {
         (value > 0).then_some(value)
     }
 
-    pub(super) fn prompt_subtitle_burn_file(&self, cx: &Context<Self>) {
+    pub(super) fn prompt_subtitle_burn_file(&self, window: &Window, cx: &Context<Self>) {
         if self.file_queue.selected_file_locked() {
             return;
         }
 
+        let dialog = subtitle_file_dialog(window);
         cx.spawn(async move |this, cx| {
-            let Some(path) = cx.background_spawn(async { pick_subtitle_file() }).await else {
+            let Some(path) = pick_subtitle_file(dialog).await else {
                 return;
             };
             if !is_supported_subtitle_path(&path) {

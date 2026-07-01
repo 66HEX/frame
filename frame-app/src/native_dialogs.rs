@@ -6,6 +6,8 @@ use crate::file_filters::{
     AUDIO_FILE_EXTENSIONS, IMAGE_FILE_EXTENSIONS, SOURCE_FILE_EXTENSIONS, SUBTITLE_FILE_EXTENSIONS,
     VIDEO_FILE_EXTENSIONS,
 };
+use gpui::Window;
+use rfd::{AsyncFileDialog, FileHandle};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct NativeDialogFilterSpec {
@@ -67,39 +69,50 @@ pub const OVERLAY_IMAGE_DIALOG_SPEC: NativeDialogSpec = NativeDialogSpec {
     allows_multiple: false,
 };
 
-#[must_use]
-pub fn pick_source_files() -> Option<Vec<PathBuf>> {
-    source_file_dialog().pick_files()
+pub async fn pick_source_files(dialog: AsyncFileDialog) -> Option<Vec<PathBuf>> {
+    dialog.pick_files().await.map(file_handles_to_paths)
+}
+
+pub async fn pick_subtitle_file(dialog: AsyncFileDialog) -> Option<PathBuf> {
+    dialog.pick_file().await.map(file_handle_to_path)
+}
+
+pub async fn pick_overlay_image_file(dialog: AsyncFileDialog) -> Option<PathBuf> {
+    dialog.pick_file().await.map(file_handle_to_path)
 }
 
 #[must_use]
-pub fn pick_subtitle_file() -> Option<PathBuf> {
-    subtitle_file_dialog().pick_file()
+pub fn source_file_dialog(parent: &Window) -> AsyncFileDialog {
+    file_dialog_from_spec(SOURCE_FILE_DIALOG_SPEC).set_parent(parent)
 }
 
 #[must_use]
-pub fn pick_overlay_image_file() -> Option<PathBuf> {
-    overlay_image_dialog().pick_file()
+pub fn subtitle_file_dialog(parent: &Window) -> AsyncFileDialog {
+    file_dialog_from_spec(SUBTITLE_FILE_DIALOG_SPEC).set_parent(parent)
 }
 
-fn source_file_dialog() -> rfd::FileDialog {
-    file_dialog_from_spec(SOURCE_FILE_DIALOG_SPEC)
+#[must_use]
+pub fn overlay_image_dialog(parent: &Window) -> AsyncFileDialog {
+    file_dialog_from_spec(OVERLAY_IMAGE_DIALOG_SPEC).set_parent(parent)
 }
 
-fn subtitle_file_dialog() -> rfd::FileDialog {
-    file_dialog_from_spec(SUBTITLE_FILE_DIALOG_SPEC)
-}
-
-fn overlay_image_dialog() -> rfd::FileDialog {
-    file_dialog_from_spec(OVERLAY_IMAGE_DIALOG_SPEC)
-}
-
-fn file_dialog_from_spec(spec: NativeDialogSpec) -> rfd::FileDialog {
-    let mut dialog = rfd::FileDialog::new().set_title(spec.title);
+fn file_dialog_from_spec(spec: NativeDialogSpec) -> AsyncFileDialog {
+    let mut dialog = AsyncFileDialog::new().set_title(spec.title);
     for filter in spec.filters {
         dialog = dialog.add_filter(filter.label, filter.extensions);
     }
     dialog
+}
+
+fn file_handles_to_paths(handles: Vec<FileHandle>) -> Vec<PathBuf> {
+    handles
+        .into_iter()
+        .map(|handle| file_handle_to_path(handle))
+        .collect()
+}
+
+fn file_handle_to_path(handle: FileHandle) -> PathBuf {
+    handle.path().to_path_buf()
 }
 
 #[cfg(test)]

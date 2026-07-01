@@ -105,8 +105,8 @@ pub(in crate::app) fn preview_toolbar(
                 window,
                 cx,
             )
-            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
-                if root.trigger_selected_overlay(cx) {
+            .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
+                if root.trigger_selected_overlay(window, cx) {
                     cx.notify();
                 }
             })),

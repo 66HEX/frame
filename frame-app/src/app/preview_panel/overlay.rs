@@ -196,8 +196,8 @@ pub(in crate::app) fn preview_overlay_controls(
                 window,
                 cx,
             )
-            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
-                root.prompt_selected_overlay_image(cx);
+            .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
+                root.prompt_selected_overlay_image(window, cx);
             })),
         )
         .child(preview_toolbar_vertical_separator())

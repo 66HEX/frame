@@ -99,9 +99,10 @@ impl FrameRoot {
         true
     }
 
-    pub(super) fn prompt_add_source(cx: &Context<Self>) {
+    pub(super) fn prompt_add_source(window: &Window, cx: &Context<Self>) {
+        let dialog = source_file_dialog(window);
         cx.spawn(async move |this, cx| {
-            let paths = cx.background_spawn(async { pick_source_files() }).await;
+            let paths = pick_source_files(dialog).await;
             let Some(paths) = paths else {
                 return;
             };

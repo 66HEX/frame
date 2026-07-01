@@ -574,13 +574,13 @@ impl FrameRoot {
         }
     }
 
-    pub(super) fn trigger_selected_overlay(&mut self, cx: &Context<Self>) -> bool {
+    pub(super) fn trigger_selected_overlay(&mut self, window: &Window, cx: &Context<Self>) -> bool {
         if !self.selected_preview_overlay_controls_enabled() {
             return false;
         }
 
         if self.preview_ui.overlay.overlay().is_none() {
-            self.prompt_selected_overlay_image(cx);
+            self.prompt_selected_overlay_image(window, cx);
             return false;
         }
 
@@ -591,25 +591,25 @@ impl FrameRoot {
         self.apply_preview_overlay_mode_change(change)
     }
 
-    pub(super) fn prompt_selected_overlay_image(&self, cx: &Context<Self>) {
+    pub(super) fn prompt_selected_overlay_image(&self, window: &Window, cx: &Context<Self>) {
         if !self.selected_preview_overlay_controls_enabled() {
             return;
         }
 
+        let dialog = overlay_image_dialog(window);
         cx.spawn(async move |this, cx| {
-            let Some((path, dimensions)) = cx
-                .background_spawn(async {
-                    let path = pick_overlay_image_file()?;
-                    if !is_supported_overlay_image_path(&path) {
-                        return None;
-                    }
-                    let dimensions = load_preview_overlay_image_dimensions(path.clone());
-                    Some((path, dimensions))
-                })
-                .await
-            else {
+            let Some(path) = pick_overlay_image_file(dialog).await else {
                 return;
             };
+            if !is_supported_overlay_image_path(&path) {
+                return;
+            };
+            let dimensions = cx
+                .background_spawn({
+                    let path = path.clone();
+                    async move { load_preview_overlay_image_dimensions(path) }
+                })
+                .await;
             let path = path.to_string_lossy().to_string();
 
             this.update(cx, move |root, cx| {

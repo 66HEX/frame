@@ -260,12 +260,12 @@ fn settings_subtitle_burn_button(
         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
             button_mouse_down(!disabled, window, cx);
         })
-        .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
             cx.stop_propagation();
             if disabled {
                 return;
             }
-            root.prompt_subtitle_burn_file(cx);
+            root.prompt_subtitle_burn_file(window, cx);
         }))
         .child(div().truncate().child(label));
 

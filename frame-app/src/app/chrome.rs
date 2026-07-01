@@ -134,9 +134,9 @@ pub(super) fn macos_titlebar(
                         cx,
                     )
                     .on_click(cx.listener(
-                        |_root, _: &ClickEvent, _window, cx| {
+                        |_root, _: &ClickEvent, window, cx| {
                             cx.stop_propagation();
-                            FrameRoot::prompt_add_source(cx);
+                            FrameRoot::prompt_add_source(window, cx);
                         },
                     )),
                 )
@@ -279,9 +279,9 @@ pub(super) fn titlebar_add_source_button(
         window,
         cx,
     )
-    .on_click(cx.listener(|_root, _: &ClickEvent, _window, cx| {
+    .on_click(cx.listener(|_root, _: &ClickEvent, window, cx| {
         cx.stop_propagation();
-        FrameRoot::prompt_add_source(cx);
+        FrameRoot::prompt_add_source(window, cx);
     }))
 }
 
