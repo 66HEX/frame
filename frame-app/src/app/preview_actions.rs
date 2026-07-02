@@ -1,6 +1,11 @@
 use super::*;
 use crate::app::preview_panel::preview_presented_frame;
+use crate::conversion_runner::core_config_from_gpui;
 use crate::numeric::rounded_f64_to_u64;
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+};
 
 impl FrameRoot {
     pub(super) fn selected_preview_runtime_request(
@@ -1324,28 +1329,12 @@ fn preview_runtime_request(
     let source_kind = engine_source_kind(metadata);
     let duration_seconds = preview_duration_seconds(Some(metadata));
     let (source_width, source_height) = valid_preview_dimensions(metadata.width, metadata.height);
-    let transform = preview_transform_from_config(&selected_file.config);
-    let crop = include_applied_crop
-        .then(|| preview_crop_from_config(&selected_file.config, source_kind))
-        .flatten();
-    let presentation = PreviewRenderPresentation {
-        transform,
-        crop,
-        crop_source_width: crop.and_then(|_| {
-            selected_file
-                .config
-                .crop
-                .as_ref()
-                .and_then(|crop| crop.source_width)
-        }),
-        crop_source_height: crop.and_then(|_| {
-            selected_file
-                .config
-                .crop
-                .as_ref()
-                .and_then(|crop| crop.source_height)
-        }),
-    };
+    let mut preview_config = selected_file.config.clone();
+    if !include_applied_crop {
+        preview_config.crop = None;
+    }
+    let core_config = core_config_from_gpui(&preview_config);
+    let presentation = PreviewRenderPresentation::default();
     let key = PreviewRuntimeKey {
         file_id: selected_file.id.clone(),
         path: selected_file.path.clone(),
@@ -1353,6 +1342,7 @@ fn preview_runtime_request(
         source_width,
         source_height,
         duration_millis: rounded_f64_to_u64(duration_seconds * 1000.0),
+        visual_hash: preview_visual_hash(&preview_config),
     };
     let config = PreviewSessionConfig {
         file_id: key.file_id.clone(),
@@ -1364,8 +1354,7 @@ fn preview_runtime_request(
         max_width: DEFAULT_PREVIEW_MAX_WIDTH,
         max_height: DEFAULT_PREVIEW_MAX_HEIGHT,
         fps: DEFAULT_PREVIEW_FPS,
-        transform: PreviewTransform::default(),
-        crop: None,
+        conversion_config: core_config,
     };
 
     Some(PreviewRuntimeRequest {
@@ -1375,29 +1364,60 @@ fn preview_runtime_request(
     })
 }
 
-fn preview_transform_from_config(config: &ConversionConfig) -> PreviewTransform {
-    PreviewTransform {
-        rotation_degrees: config.rotation.parse::<u16>().unwrap_or(0),
-        flip_horizontal: config.flip_horizontal,
-        flip_vertical: config.flip_vertical,
-    }
+fn preview_visual_hash(config: &ConversionConfig) -> u64 {
+    let mut state = DefaultHasher::new();
+    config.rotation.hash(&mut state);
+    config.flip_horizontal.hash(&mut state);
+    config.flip_vertical.hash(&mut state);
+    config.resolution.hash(&mut state);
+    config.custom_width.hash(&mut state);
+    config.custom_height.hash(&mut state);
+    config.scaling_algorithm.hash(&mut state);
+    config.fps.hash(&mut state);
+    config.start_time.hash(&mut state);
+    config.end_time.hash(&mut state);
+    hash_crop(config.crop.as_ref(), &mut state);
+    config.subtitle_burn_path.hash(&mut state);
+    config.subtitle_font_name.hash(&mut state);
+    config.subtitle_font_size.hash(&mut state);
+    config.subtitle_font_color.hash(&mut state);
+    config.subtitle_outline_color.hash(&mut state);
+    config.subtitle_position.hash(&mut state);
+    hash_overlay(config.overlay.as_ref(), &mut state);
+    config.gif_colors.hash(&mut state);
+    config.gif_dither.hash(&mut state);
+    state.finish()
 }
 
-fn preview_crop_from_config(
-    config: &ConversionConfig,
-    source_kind: EnginePreviewSourceKind,
-) -> Option<EnginePreviewCrop> {
-    if source_kind == EnginePreviewSourceKind::Audio {
-        return None;
-    }
+fn hash_crop(crop: Option<&CropSettings>, state: &mut DefaultHasher) {
+    let Some(crop) = crop else {
+        false.hash(state);
+        return;
+    };
 
-    let crop = config.crop.as_ref()?;
-    (crop.enabled && crop.width > 0 && crop.height > 0).then_some(EnginePreviewCrop {
-        x: crop.x,
-        y: crop.y,
-        width: crop.width,
-        height: crop.height,
-    })
+    crop.enabled.hash(state);
+    crop.x.hash(state);
+    crop.y.hash(state);
+    crop.width.hash(state);
+    crop.height.hash(state);
+    crop.source_width.hash(state);
+    crop.source_height.hash(state);
+    crop.aspect_ratio.hash(state);
+}
+
+fn hash_overlay(overlay: Option<&OverlaySettings>, state: &mut DefaultHasher) {
+    let Some(overlay) = overlay else {
+        false.hash(state);
+        return;
+    };
+
+    overlay.enabled.hash(state);
+    overlay.path.hash(state);
+    overlay.x.to_bits().hash(state);
+    overlay.y.to_bits().hash(state);
+    overlay.width.to_bits().hash(state);
+    overlay.opacity.to_bits().hash(state);
+    overlay.anchor.hash(state);
 }
 
 fn engine_source_kind(metadata: &SourceMetadata) -> EnginePreviewSourceKind {

@@ -20,7 +20,7 @@ use super::settings_panel::{hex_to_subtitle_hsv, subtitle_hsv_to_hex};
 use super::*;
 use crate::app_persistence::{AppPersistence, AppSettings};
 use crate::notifications::{AppNotifier, ConversionNotificationSummary};
-use crate::preview_engine::PreviewFrame;
+use crate::preview_engine::{PreviewCrop as EnginePreviewCrop, PreviewFrame};
 use std::{
     path::PathBuf,
     sync::{
@@ -1461,7 +1461,7 @@ mod frame_root_config {
     }
 
     #[test]
-    fn preview_runtime_key_ignores_presentation_only_transform_changes() {
+    fn preview_runtime_key_tracks_visual_config_but_ignores_encoder_quality() {
         let mut root = FrameRoot::new();
         root.file_queue
             .add_file(FileItem::from_path("video", "/tmp/one.mp4", 1));
@@ -1480,6 +1480,16 @@ mod frame_root_config {
             .selected_preview_runtime_request(&metadata_entry)
             .expect("initial request");
 
+        root.update_selected_config(|config| {
+            config.crf = 18;
+            true
+        });
+        let quality_request = root
+            .selected_preview_runtime_request(&metadata_entry)
+            .expect("quality request");
+
+        assert_eq!(quality_request.key, initial_request.key);
+
         assert!(root.rotate_selected_preview());
         assert!(root.toggle_selected_flip(FlipAxis::Horizontal));
         root.preview_ui.crop_mode = true;
@@ -1494,24 +1504,20 @@ mod frame_root_config {
             .selected_preview_runtime_request(&metadata_entry)
             .expect("transformed request");
 
-        assert_eq!(transformed_request.key, initial_request.key);
-        assert_ne!(
+        assert_ne!(transformed_request.key, initial_request.key);
+        assert_eq!(
             transformed_request.presentation,
-            initial_request.presentation
+            PreviewRenderPresentation::default()
         );
-        assert_eq!(
-            transformed_request.config.transform,
-            PreviewTransform::default()
-        );
-        assert_eq!(transformed_request.config.crop, None);
-        assert_eq!(
-            transformed_request.presentation.crop,
-            Some(EnginePreviewCrop {
-                x: 270,
-                y: 480,
-                width: 540,
-                height: 960,
-            })
+        assert_eq!(transformed_request.config.conversion_config.rotation, "90");
+        assert!(transformed_request.config.conversion_config.flip_horizontal);
+        assert!(
+            transformed_request
+                .config
+                .conversion_config
+                .crop
+                .as_ref()
+                .is_some_and(|crop| crop.enabled)
         );
     }
 

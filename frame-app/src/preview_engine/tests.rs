@@ -3,9 +3,13 @@
     reason = "Preview engine tests compare exact deterministic timestamps and dimensions."
 )]
 
-use std::{path::PathBuf, sync::Arc};
+use std::{path::PathBuf, process::Command, sync::Arc, thread, time::Duration};
 
 use super::*;
+
+fn default_core_config() -> frame_core::types::ConversionConfig {
+    crate::conversion_runner::core_config_from_gpui(&crate::settings::ConversionConfig::default())
+}
 
 #[test]
 fn fit_dimensions_preserves_aspect_and_even_dimensions() {
@@ -32,8 +36,7 @@ fn session_config_rejects_unpaired_source_dimensions() {
         max_width: DEFAULT_PREVIEW_MAX_WIDTH,
         max_height: DEFAULT_PREVIEW_MAX_HEIGHT,
         fps: DEFAULT_PREVIEW_FPS,
-        transform: PreviewTransform::default(),
-        crop: None,
+        conversion_config: default_core_config(),
     };
 
     let error = config
@@ -80,49 +83,6 @@ fn latest_frame_snapshot_uses_shared_frame_storage() {
 }
 
 #[test]
-fn load_still_image_frame_converts_rgba_to_bgra_without_alpha_unpremultiply() {
-    let mut path = std::env::temp_dir();
-    path.push(format!("frame-preview-alpha-{}.png", std::process::id()));
-    let rgba = image::RgbaImage::from_pixel(1, 1, image::Rgba([64, 32, 16, 128]));
-    rgba.save(&path).expect("write test png");
-
-    let frame =
-        load_still_image_frame(&path, PreviewTransform::default(), None).expect("load still frame");
-    let _ = std::fs::remove_file(&path);
-
-    assert_eq!(frame.bytes(), &[16, 32, 64, 128]);
-}
-
-#[test]
-fn image_preview_session_publishes_first_frame() {
-    let path = temp_preview_png("session", image::Rgba([8, 16, 24, 255]));
-    let config = PreviewSessionConfig {
-        file_id: "image-1".to_string(),
-        path: path.clone(),
-        source_kind: PreviewSourceKind::Image,
-        source_width: None,
-        source_height: None,
-        duration_seconds: 0.0,
-        max_width: DEFAULT_PREVIEW_MAX_WIDTH,
-        max_height: DEFAULT_PREVIEW_MAX_HEIGHT,
-        fps: DEFAULT_PREVIEW_FPS,
-        transform: PreviewTransform::default(),
-        crop: None,
-    };
-
-    let session = PreviewSession::start(config).expect("session");
-    let _ = std::fs::remove_file(&path);
-
-    let snapshot = session.snapshot();
-    assert_eq!(snapshot.status, PreviewSessionStatus::Ready);
-    assert_eq!(snapshot.frame_generation, 1);
-    assert_eq!(
-        session.latest_frame().expect("latest frame").frame.bytes(),
-        &[24, 16, 8, 255]
-    );
-}
-
-#[test]
 fn test_preview_session_command_is_noop_without_pipeline() {
     let config = PreviewSessionConfig {
         file_id: "test-1".to_string(),
@@ -134,8 +94,7 @@ fn test_preview_session_command_is_noop_without_pipeline() {
         max_width: DEFAULT_PREVIEW_MAX_WIDTH,
         max_height: DEFAULT_PREVIEW_MAX_HEIGHT,
         fps: DEFAULT_PREVIEW_FPS,
-        transform: PreviewTransform::default(),
-        crop: None,
+        conversion_config: default_core_config(),
     };
     let session = PreviewSession::new_for_test(config);
 
@@ -146,11 +105,87 @@ fn test_preview_session_command_is_noop_without_pipeline() {
     assert_eq!(session.snapshot().playback.duration_seconds, 12.5);
 }
 
-fn temp_preview_png(label: &str, pixel: image::Rgba<u8>) -> PathBuf {
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn ffmpeg_preview_session_publishes_first_video_frame() {
+    let path = temp_preview_video("first-frame");
+    let config = real_video_preview_config(path.clone());
+
+    let session = PreviewSession::start(config).expect("session");
+    let _ = std::fs::remove_file(&path);
+
+    let frame = session.latest_frame().expect("latest frame").frame;
+    session.stop();
+
+    assert_eq!(
+        frame.dimensions(),
+        PreviewDimensions {
+            width: 320,
+            height: 180
+        }
+    );
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn ffmpeg_preview_session_can_play_pause_and_seek() {
+    let path = temp_preview_video("playback");
+    let config = real_video_preview_config(path.clone());
+
+    let session = PreviewSession::start(config).expect("session");
+    session.command(PreviewCommand::Play).expect("play");
+    thread::sleep(Duration::from_millis(450));
+    session.command(PreviewCommand::Pause).expect("pause");
+    let played_position = session.snapshot().playback.position_seconds;
+
+    session
+        .command(PreviewCommand::SeekPrecise(1.0))
+        .expect("seek");
+    let seek_position = session.snapshot().playback.position_seconds;
+    let _ = std::fs::remove_file(&path);
+    session.stop();
+
+    assert!(played_position > 0.0);
+    assert!(seek_position >= 0.99);
+}
+
+fn real_video_preview_config(path: PathBuf) -> PreviewSessionConfig {
+    PreviewSessionConfig {
+        file_id: "video-real".to_string(),
+        path,
+        source_kind: PreviewSourceKind::Video,
+        source_width: Some(160),
+        source_height: Some(90),
+        duration_seconds: 2.0,
+        max_width: 320,
+        max_height: 180,
+        fps: DEFAULT_PREVIEW_FPS,
+        conversion_config: default_core_config(),
+    }
+}
+
+fn temp_preview_video(label: &str) -> PathBuf {
     let mut path = std::env::temp_dir();
-    path.push(format!("frame-preview-{label}-{}.png", std::process::id()));
-    image::RgbaImage::from_pixel(1, 1, pixel)
-        .save(&path)
-        .expect("write test png");
+    path.push(format!("frame-preview-{label}-{}.mp4", std::process::id()));
+    let status = Command::new(crate::runtime_binaries::ffmpeg_executable())
+        .args([
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=160x90:rate=30:duration=2",
+            "-pix_fmt",
+            "yuv420p",
+            path.to_string_lossy().as_ref(),
+        ])
+        .status()
+        .expect("spawn ffmpeg");
+    assert!(
+        status.success(),
+        "ffmpeg fixture generation failed: {status}"
+    );
     path
 }

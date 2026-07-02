@@ -1,5 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
+use frame_core::types::ConversionConfig as CoreConversionConfig;
+
 use crate::numeric::rounded_f64_to_u32;
 
 use super::PreviewEngineError;
@@ -114,7 +116,7 @@ impl PreviewFrame {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct PreviewSessionConfig {
     pub file_id: String,
     pub path: PathBuf,
@@ -125,8 +127,7 @@ pub struct PreviewSessionConfig {
     pub max_width: u32,
     pub max_height: u32,
     pub fps: u32,
-    pub transform: PreviewTransform,
-    pub crop: Option<PreviewCrop>,
+    pub conversion_config: CoreConversionConfig,
 }
 
 impl PreviewSessionConfig {
@@ -160,15 +161,6 @@ impl PreviewSessionConfig {
             MAX_PREVIEW_DIMENSION,
         )?;
         validate_range("fps", self.fps, MIN_PREVIEW_FPS, MAX_PREVIEW_FPS)?;
-        if !matches!(self.transform.rotation_degrees, 0 | 90 | 180 | 270) {
-            return Err(PreviewEngineError::InvalidInput(
-                "preview rotation must be 0, 90, 180, or 270 degrees".to_string(),
-            ));
-        }
-        if let Some(crop) = self.crop {
-            validate_range("crop_width", crop.width, 1, MAX_PREVIEW_DIMENSION * 8)?;
-            validate_range("crop_height", crop.height, 1, MAX_PREVIEW_DIMENSION * 8)?;
-        }
 
         match (self.source_width, self.source_height) {
             (Some(width), Some(height)) => {
@@ -184,33 +176,8 @@ impl PreviewSessionConfig {
                     MIN_PREVIEW_DIMENSION,
                     MAX_PREVIEW_DIMENSION * 8,
                 )?;
-                if let Some(crop) = self.crop {
-                    let source = if self.transform.has_side_rotation() {
-                        PreviewDimensions {
-                            width: height,
-                            height: width,
-                        }
-                    } else {
-                        PreviewDimensions { width, height }
-                    };
-                    let crop_right = crop.x.checked_add(crop.width);
-                    let crop_bottom = crop.y.checked_add(crop.height);
-                    if crop_right.is_none_or(|right| right > source.width)
-                        || crop_bottom.is_none_or(|bottom| bottom > source.height)
-                    {
-                        return Err(PreviewEngineError::InvalidInput(
-                            "preview crop must fit inside transformed source dimensions"
-                                .to_string(),
-                        ));
-                    }
-                }
             }
-            (None, None) if self.crop.is_none() => {}
-            (None, None) => {
-                return Err(PreviewEngineError::InvalidInput(
-                    "preview crop requires source_width and source_height".to_string(),
-                ));
-            }
+            (None, None) => {}
             _ => {
                 return Err(PreviewEngineError::InvalidInput(
                     "source_width and source_height must be provided together".to_string(),
@@ -223,40 +190,10 @@ impl PreviewSessionConfig {
 
     #[must_use]
     pub fn target_dimensions(&self) -> PreviewDimensions {
-        if let Some(crop) = self.crop {
-            return fit_dimensions(crop.width, crop.height, self.max_width, self.max_height);
+        PreviewDimensions {
+            width: even_dimension(self.max_width),
+            height: even_dimension(self.max_height),
         }
-
-        self.transformed_source_dimensions().map_or_else(
-            || PreviewDimensions {
-                width: even_dimension(self.max_width),
-                height: even_dimension(self.max_height),
-            },
-            |dimensions| {
-                fit_dimensions(
-                    dimensions.width,
-                    dimensions.height,
-                    self.max_width,
-                    self.max_height,
-                )
-            },
-        )
-    }
-
-    #[must_use]
-    pub const fn transformed_source_dimensions(&self) -> Option<PreviewDimensions> {
-        let (Some(width), Some(height)) = (self.source_width, self.source_height) else {
-            return None;
-        };
-
-        Some(if self.transform.has_side_rotation() {
-            PreviewDimensions {
-                width: height,
-                height: width,
-            }
-        } else {
-            PreviewDimensions { width, height }
-        })
     }
 }
 

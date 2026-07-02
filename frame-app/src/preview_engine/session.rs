@@ -3,7 +3,7 @@ use std::sync::{Mutex, MutexGuard};
 use super::{
     LatestFrameSnapshot, LatestFrameStore, PreviewCommand, PreviewDimensions, PreviewEngineError,
     PreviewPlaybackSnapshot, PreviewSessionConfig, PreviewSessionSnapshot, PreviewSessionStatus,
-    PreviewSourceKind, RunningPreviewPipeline, load_still_image_frame, start_gstreamer_pipeline,
+    PreviewSourceKind, RunningPreviewProcess, start_ffmpeg_preview_process,
 };
 
 pub struct PreviewSession {
@@ -11,7 +11,7 @@ pub struct PreviewSession {
     dimensions: PreviewDimensions,
     duration_seconds: Mutex<f64>,
     frame_store: LatestFrameStore,
-    pipeline: Mutex<Option<RunningPreviewPipeline>>,
+    pipeline: Mutex<Option<RunningPreviewProcess>>,
     playing: Mutex<bool>,
     status: Mutex<PreviewSessionStatus>,
 }
@@ -21,30 +21,16 @@ impl PreviewSession {
     ///
     /// # Errors
     ///
-    /// Returns an error when the config is invalid, image loading fails, or the
-    /// `GStreamer` preview pipeline cannot be started.
+    /// Returns an error when the config is invalid or the `FFmpeg` preview
+    /// process cannot render the initial frame.
     pub fn start(config: PreviewSessionConfig) -> Result<Self, PreviewEngineError> {
         config.validate()?;
         let frame_store = LatestFrameStore::new();
 
         match config.source_kind {
-            PreviewSourceKind::Image => {
-                let frame = load_still_image_frame(&config.path, config.transform, config.crop)?;
-                let dimensions = frame.dimensions();
-                let _ = frame_store.publish(frame);
-                Ok(Self {
-                    config,
-                    dimensions,
-                    duration_seconds: Mutex::new(0.0),
-                    frame_store,
-                    pipeline: Mutex::new(None),
-                    playing: Mutex::new(false),
-                    status: Mutex::new(PreviewSessionStatus::Ready),
-                })
-            }
-            PreviewSourceKind::Video | PreviewSourceKind::Audio => {
+            PreviewSourceKind::Image | PreviewSourceKind::Video | PreviewSourceKind::Audio => {
                 let (pipeline, dimensions, duration_seconds) =
-                    start_gstreamer_pipeline(&config, frame_store.clone())?;
+                    start_ffmpeg_preview_process(&config, frame_store.clone())?;
                 Ok(Self {
                     config,
                     dimensions,
@@ -90,7 +76,7 @@ impl PreviewSession {
     /// Returns an error when the underlying pipeline command fails.
     #[expect(
         clippy::significant_drop_tightening,
-        reason = "The pipeline mutex guard must live across the selected GStreamer command."
+        reason = "The pipeline mutex guard must live across the selected FFmpeg process command."
     )]
     pub fn command(&self, command: PreviewCommand) -> Result<(), PreviewEngineError> {
         let next_playing = {

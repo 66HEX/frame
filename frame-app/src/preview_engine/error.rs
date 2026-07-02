@@ -14,6 +14,8 @@ pub enum PreviewEngineError {
     },
     #[error("Unsupported preview frame layout: {0}")]
     UnsupportedFrameLayout(String),
-    #[error("GStreamer preview error: {0}")]
-    Gstreamer(String),
+    #[error("FFmpeg preview error: {0}")]
+    Ffmpeg(String),
+    #[error("Preview IO error: {0}")]
+    Io(#[from] std::io::Error),
 }
