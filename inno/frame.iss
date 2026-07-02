@@ -48,7 +48,6 @@ Source: "{#ResourcesDir}\Frame.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#ResourcesDir}\frame-update-helper.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#ResourcesDir}\*.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#ResourcesDir}\binaries\*"; DestDir: "{app}\binaries"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "{#ResourcesDir}\gstreamer\*"; DestDir: "{app}\gstreamer"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\Frame"; Filename: "{app}\Frame.exe"

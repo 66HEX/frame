@@ -69,9 +69,6 @@ if [[ "$target_triple" != "$runtime_triple" ]]; then
 fi
 
 (cd "$repo_root" && cargo xtask setup-ffmpeg --platform linux --arch "$runtime_arch")
-(cd "$repo_root" && cargo xtask setup-gstreamer --platform linux --arch "$runtime_arch" --mode bundle --install)
-gstreamer_env="$(cd "$repo_root" && cargo xtask setup-gstreamer --platform linux --arch "$runtime_arch" --mode bundle --print-env)"
-eval "$gstreamer_env"
 
 export RUSTFLAGS="${RUSTFLAGS:-} -C link-args=-Wl,--disable-new-dtags,-rpath,\$ORIGIN/../lib"
 cargo build --manifest-path "$repo_root/frame-app/Cargo.toml" --release --target "$target_triple"
@@ -134,8 +131,6 @@ for binary in "ffmpeg-$runtime_triple" "ffprobe-$runtime_triple"; do
 	fi
 	cp "$source" "$app_dir/bin/binaries/$binary"
 done
-
-(cd "$repo_root" && cargo xtask stage-gstreamer --dir "$app_dir/bin")
 
 cp "$repo_root/frame-app/resources/app-icons/32x32.png" "$app_dir/share/icons/hicolor/32x32/apps/frame.png"
 cp "$repo_root/frame-app/resources/app-icons/64x64.png" "$app_dir/share/icons/hicolor/64x64/apps/frame.png"

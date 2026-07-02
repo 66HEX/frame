@@ -9,7 +9,6 @@ pub mod conversion_events;
 pub mod conversion_runner;
 pub mod file_filters;
 pub mod file_queue;
-pub mod gstreamer_runtime;
 pub mod native_dialogs;
 pub mod notifications;
 pub(crate) mod numeric;

@@ -17,10 +17,6 @@ frame-core = { path = "../frame-core" }
 frame-updater = { path = "../frame-updater" }
 gpui = { package = "gpui", git = "https://github.com/gpui-ce/gpui-ce" }
 gpui_platform = { git = "https://github.com/gpui-ce/gpui-ce", features = ["font-kit"] }
-gstreamer = "0.25.2"
-gstreamer-app = "0.25.2"
-gstreamer-pbutils = "0.25.2"
-gstreamer-video = "0.25.2"
 image = "0.25.10"
 notify-rust = "4.18.0"
 rfd = "0.16.0"

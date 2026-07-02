@@ -61,10 +61,6 @@ case "$target_triple" in
 		;;
 esac
 
-(cd "$repo_root" && cargo xtask setup-gstreamer --platform darwin --arch "$arch_suffix" --mode bundle --install)
-gstreamer_env="$(cd "$repo_root" && cargo xtask setup-gstreamer --platform darwin --arch "$arch_suffix" --mode bundle --print-env)"
-eval "$gstreamer_env"
-
 (cd "$repo_root" && cargo xtask setup-ffmpeg --platform darwin --arch "$arch_suffix")
 rustup target add "$target_triple"
 
@@ -97,8 +93,6 @@ if [[ ! -x "$helper_binary" ]]; then
 	exit 1
 fi
 cp "$helper_binary" "$app_bundle/Contents/MacOS/frame-update-helper"
-
-(cd "$repo_root" && cargo xtask stage-gstreamer --app "$app_bundle")
 
 resource_dir="$app_bundle/Contents/Resources/resources/binaries"
 for binary in "ffmpeg-$target_triple" "ffprobe-$target_triple"; do
