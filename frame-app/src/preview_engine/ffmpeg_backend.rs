@@ -10,8 +10,12 @@ use std::{
     time::Instant,
 };
 
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use frame_core::{
-    preview::{PreviewFfmpegOptions, PreviewFfmpegPlan, build_ffmpeg_preview_args},
+    preview::{
+        PreviewAudioFfmpegOptions, PreviewFfmpegOptions, PreviewFfmpegPlan,
+        build_ffmpeg_preview_args, build_ffmpeg_preview_audio_args,
+    },
     utils::parse_time,
 };
 
@@ -27,12 +31,15 @@ use super::{
 
 const STDERR_RING_LINES: usize = 24;
 const SEEK_END_EPSILON: f64 = 0.001;
+const AUDIO_BUFFER_SECONDS: usize = 3;
+const AUDIO_READ_BUFFER_BYTES: usize = 8192;
 
 pub struct RunningPreviewProcess {
     config: PreviewSessionConfig,
     frame_store: LatestFrameStore,
     executable: String,
     process: Mutex<RunningProcessState>,
+    audio_process: Mutex<RunningProcessState>,
     playback: Arc<Mutex<FfmpegPlaybackState>>,
     stderr: Arc<Mutex<VecDeque<String>>>,
 }
@@ -70,6 +77,141 @@ struct FrameStreamSpec {
     base_seconds: f64,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct AudioOutputSpec {
+    sample_rate: u32,
+    channels: u16,
+}
+
+struct AudioPreviewOutput {
+    _stream: cpal::Stream,
+    buffer: Arc<Mutex<AudioSampleBuffer>>,
+}
+
+struct AudioSampleBuffer {
+    samples: VecDeque<f32>,
+    capacity: usize,
+}
+
+impl AudioOutputSpec {
+    fn default_output() -> Result<Self, PreviewEngineError> {
+        let host = cpal::default_host();
+        let device = host.default_output_device().ok_or_else(|| {
+            PreviewEngineError::Audio("no default audio output device available".to_string())
+        })?;
+        let supported_config = device.default_output_config().map_err(|err| {
+            PreviewEngineError::Audio(format!("failed to read default output config: {err}"))
+        })?;
+        let config = supported_config.config();
+        Ok(Self {
+            sample_rate: config.sample_rate.0,
+            channels: config.channels,
+        })
+    }
+}
+
+impl AudioPreviewOutput {
+    fn new() -> Result<Self, PreviewEngineError> {
+        let host = cpal::default_host();
+        let device = host.default_output_device().ok_or_else(|| {
+            PreviewEngineError::Audio("no default audio output device available".to_string())
+        })?;
+        let supported_config = device.default_output_config().map_err(|err| {
+            PreviewEngineError::Audio(format!("failed to read default output config: {err}"))
+        })?;
+        let sample_format = supported_config.sample_format();
+        let config = supported_config.config();
+        let channels = config.channels;
+        let sample_rate = config.sample_rate.0;
+        let capacity = usize::try_from(sample_rate)
+            .unwrap_or(48_000)
+            .saturating_mul(usize::from(channels))
+            .saturating_mul(AUDIO_BUFFER_SECONDS);
+        let buffer = Arc::new(Mutex::new(AudioSampleBuffer {
+            samples: VecDeque::with_capacity(capacity),
+            capacity,
+        }));
+        let err_fn = |err| eprintln!("frame preview audio stream error: {err}");
+
+        let stream = match sample_format {
+            cpal::SampleFormat::F32 => {
+                let buffer = Arc::clone(&buffer);
+                device
+                    .build_output_stream(
+                        &config,
+                        move |data: &mut [f32], _| fill_audio_output_f32(data, &buffer),
+                        err_fn,
+                        None,
+                    )
+                    .map_err(|err| {
+                        PreviewEngineError::Audio(format!(
+                            "failed to build f32 output stream: {err}"
+                        ))
+                    })?
+            }
+            cpal::SampleFormat::F64 => {
+                let buffer = Arc::clone(&buffer);
+                device
+                    .build_output_stream(
+                        &config,
+                        move |data: &mut [f64], _| fill_audio_output_f64(data, &buffer),
+                        err_fn,
+                        None,
+                    )
+                    .map_err(|err| {
+                        PreviewEngineError::Audio(format!(
+                            "failed to build f64 output stream: {err}"
+                        ))
+                    })?
+            }
+            cpal::SampleFormat::I16 => {
+                let buffer = Arc::clone(&buffer);
+                device
+                    .build_output_stream(
+                        &config,
+                        move |data: &mut [i16], _| fill_audio_output_i16(data, &buffer),
+                        err_fn,
+                        None,
+                    )
+                    .map_err(|err| {
+                        PreviewEngineError::Audio(format!(
+                            "failed to build i16 output stream: {err}"
+                        ))
+                    })?
+            }
+            cpal::SampleFormat::U16 => {
+                let buffer = Arc::clone(&buffer);
+                device
+                    .build_output_stream(
+                        &config,
+                        move |data: &mut [u16], _| fill_audio_output_u16(data, &buffer),
+                        err_fn,
+                        None,
+                    )
+                    .map_err(|err| {
+                        PreviewEngineError::Audio(format!(
+                            "failed to build u16 output stream: {err}"
+                        ))
+                    })?
+            }
+            format => {
+                return Err(PreviewEngineError::Audio(format!(
+                    "unsupported output sample format: {format:?}"
+                )));
+            }
+        };
+
+        stream.play().map_err(|err| {
+            PreviewEngineError::Audio(format!("failed to start output stream: {err}"))
+        })?;
+
+        Ok(Self {
+            _stream: stream,
+            buffer,
+        })
+    }
+}
+
 impl RunningPreviewProcess {
     /// Pauses preview playback by terminating the active `FFmpeg` process.
     ///
@@ -77,7 +219,7 @@ impl RunningPreviewProcess {
     ///
     /// Returns an error when the process cannot be terminated or reaped.
     pub fn pause(&self) -> Result<(), PreviewEngineError> {
-        self.stop_running_process()?;
+        self.stop_running_processes()?;
         lock_playback(&self.playback).playing = false;
         Ok(())
     }
@@ -89,10 +231,6 @@ impl RunningPreviewProcess {
     ///
     /// Returns an error when `FFmpeg` cannot be spawned.
     pub fn resume(&self) -> Result<(), PreviewEngineError> {
-        if self.config.source_kind == PreviewSourceKind::Audio {
-            return Ok(());
-        }
-
         let seconds = {
             let playback = lock_playback(&self.playback);
             if playback.ended {
@@ -116,14 +254,19 @@ impl RunningPreviewProcess {
         render_seek_frame_when_paused: bool,
         precise: bool,
     ) -> Result<(), PreviewEngineError> {
-        if self.config.source_kind == PreviewSourceKind::Audio {
-            return Ok(());
-        }
-
         let seconds = clamp_seek_seconds(seconds, self.duration())?;
         if render_seek_frame_when_paused {
-            self.stop_running_process()?;
-            self.render_single_frame(seconds, precise)?;
+            self.stop_running_processes()?;
+            if self.has_visual_stream() {
+                self.render_single_frame(seconds, precise)?;
+            } else {
+                let mut playback = lock_playback(&self.playback);
+                playback.base_seconds = seconds;
+                playback.last_frame_seconds = seconds;
+                playback.started_at = Instant::now();
+                playback.playing = false;
+                playback.ended = false;
+            }
             lock_playback(&self.playback).playing = false;
             return Ok(());
         }
@@ -133,10 +276,11 @@ impl RunningPreviewProcess {
 
     #[must_use]
     pub fn position(&self) -> f64 {
-        self.reap_finished_process();
+        self.reap_finished_processes();
         let playback = lock_playback(&self.playback);
         if playback.playing {
-            playback.last_frame_seconds.max(playback.base_seconds)
+            let clock_seconds = playback.base_seconds + playback.started_at.elapsed().as_secs_f64();
+            clock_seconds.max(playback.last_frame_seconds)
         } else {
             playback.last_frame_seconds
         }
@@ -149,12 +293,12 @@ impl RunningPreviewProcess {
 
     #[must_use]
     pub fn ended(&self) -> bool {
-        self.reap_finished_process();
+        self.reap_finished_processes();
         lock_playback(&self.playback).ended
     }
 
     pub fn stop(&mut self) {
-        let _ = self.stop_running_process();
+        let _ = self.stop_running_processes();
     }
 
     fn new(
@@ -168,6 +312,7 @@ impl RunningPreviewProcess {
             frame_store,
             executable,
             process: Mutex::new(RunningProcessState::default()),
+            audio_process: Mutex::new(RunningProcessState::default()),
             playback: Arc::new(Mutex::new(FfmpegPlaybackState {
                 base_seconds: start_seconds,
                 last_frame_seconds: start_seconds,
@@ -198,7 +343,19 @@ impl RunningPreviewProcess {
     }
 
     fn start_streaming(&self, seconds: f64, precise: bool) -> Result<(), PreviewEngineError> {
-        self.stop_running_process()?;
+        self.stop_running_processes()?;
+        if !self.has_visual_stream() {
+            self.start_audio_streaming(seconds, precise, true)?;
+            let mut playback = lock_playback(&self.playback);
+            playback.base_seconds = seconds;
+            playback.last_frame_seconds = seconds;
+            playback.started_at = Instant::now();
+            playback.playing = true;
+            playback.ended = false;
+            drop(playback);
+            return Ok(());
+        }
+
         let plan = preview_plan(&self.config, seconds, true, precise)?;
         let mut child = Command::new(&self.executable)
             .args(&plan.args)
@@ -251,42 +408,115 @@ impl RunningPreviewProcess {
             stop_requested: Some(stop_requested),
         };
         drop(state);
+
+        if self.config.has_audio
+            && let Err(error) = self.start_audio_streaming(seconds, precise, false)
+        {
+            push_stderr_line(&self.stderr, format!("audio preview disabled: {error}"));
+        }
+
         Ok(())
     }
 
-    fn stop_running_process(&self) -> Result<(), PreviewEngineError> {
-        let handles = self.take_process_handles();
-        if let Some(stop_requested) = &handles.stop_requested {
-            stop_requested.store(true, Ordering::SeqCst);
+    const fn has_visual_stream(&self) -> bool {
+        matches!(
+            self.config.source_kind,
+            PreviewSourceKind::Video | PreviewSourceKind::Image
+        )
+    }
+
+    fn start_audio_streaming(
+        &self,
+        seconds: f64,
+        precise: bool,
+        mark_ended_on_eof: bool,
+    ) -> Result<(), PreviewEngineError> {
+        if !self.config.has_audio {
+            return Ok(());
         }
-        if let Some(mut child) = handles.child {
-            if child.try_wait().map_err(PreviewEngineError::Io)?.is_none() {
-                child.kill().map_err(PreviewEngineError::Io)?;
-            }
-            let _ = child.wait();
-        }
-        join_worker(handles.stdout_worker);
-        join_worker(handles.stderr_worker);
+
+        self.stop_audio_process()?;
+        let output_spec = AudioOutputSpec::default_output()?;
+        let plan = preview_audio_plan(&self.config, seconds, true, precise, output_spec)?;
+        let mut child = Command::new(&self.executable)
+            .args(&plan.args)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|err| {
+                PreviewEngineError::Ffmpeg(format!("failed to start audio preview: {err}"))
+            })?;
+
+        let stdout = child.stdout.take().ok_or_else(|| {
+            PreviewEngineError::Ffmpeg("ffmpeg audio stdout was not captured".to_string())
+        })?;
+        let stderr = child.stderr.take().ok_or_else(|| {
+            PreviewEngineError::Ffmpeg("ffmpeg audio stderr was not captured".to_string())
+        })?;
+        let stop_requested = Arc::new(AtomicBool::new(false));
+        let stdout_worker = spawn_audio_stdout_worker(
+            stdout,
+            Arc::clone(&self.stderr),
+            Arc::clone(&self.playback),
+            Arc::clone(&stop_requested),
+            mark_ended_on_eof,
+        )?;
+        let stderr_worker = spawn_stderr_worker(
+            stderr,
+            Arc::clone(&self.stderr),
+            Arc::clone(&stop_requested),
+        )?;
+
+        let mut state = lock_process(&self.audio_process);
+        *state = RunningProcessState {
+            child: Some(child),
+            stdout_worker: Some(stdout_worker),
+            stderr_worker: Some(stderr_worker),
+            stop_requested: Some(stop_requested),
+        };
+        drop(state);
         Ok(())
     }
 
-    fn take_process_handles(&self) -> ProcessHandles {
-        let mut state = lock_process(&self.process);
-        ProcessHandles {
-            child: state.child.take(),
-            stdout_worker: state.stdout_worker.take(),
-            stderr_worker: state.stderr_worker.take(),
-            stop_requested: state.stop_requested.take(),
-        }
+    fn stop_running_processes(&self) -> Result<(), PreviewEngineError> {
+        self.stop_video_process()?;
+        self.stop_audio_process()?;
+        Ok(())
     }
 
-    fn reap_finished_process(&self) {
-        let mut state = lock_process(&self.process);
+    fn stop_video_process(&self) -> Result<(), PreviewEngineError> {
+        let handles = take_process_handles(&self.process);
+        stop_process_handles(handles)
+    }
+
+    fn stop_audio_process(&self) -> Result<(), PreviewEngineError> {
+        let handles = take_process_handles(&self.audio_process);
+        stop_process_handles(handles)
+    }
+
+    fn reap_finished_processes(&self) {
+        let video_finished = self.reap_finished_process(&self.process, true);
+        if video_finished {
+            let _ = self.stop_audio_process();
+        }
+        self.reap_finished_process(
+            &self.audio_process,
+            self.config.source_kind == PreviewSourceKind::Audio,
+        );
+    }
+
+    fn reap_finished_process(
+        &self,
+        process: &Mutex<RunningProcessState>,
+        mark_ended: bool,
+    ) -> bool {
+        let mut state = lock_process(process);
         let Some(child) = state.child.as_mut() else {
-            return;
+            return false;
         };
         let Ok(Some(_status)) = child.try_wait() else {
-            return;
+            return false;
         };
 
         state.child = None;
@@ -297,15 +527,43 @@ impl RunningPreviewProcess {
 
         join_worker(stdout_worker);
         join_worker(stderr_worker);
-        let mut playback = lock_playback(&self.playback);
-        playback.playing = false;
-        playback.ended = true;
+        if mark_ended {
+            let mut playback = lock_playback(&self.playback);
+            playback.playing = false;
+            playback.ended = true;
+        }
+        true
+    }
+}
+
+fn stop_process_handles(handles: ProcessHandles) -> Result<(), PreviewEngineError> {
+    if let Some(stop_requested) = &handles.stop_requested {
+        stop_requested.store(true, Ordering::SeqCst);
+    }
+    if let Some(mut child) = handles.child {
+        if child.try_wait().map_err(PreviewEngineError::Io)?.is_none() {
+            child.kill().map_err(PreviewEngineError::Io)?;
+        }
+        let _ = child.wait();
+    }
+    join_worker(handles.stdout_worker);
+    join_worker(handles.stderr_worker);
+    Ok(())
+}
+
+fn take_process_handles(process: &Mutex<RunningProcessState>) -> ProcessHandles {
+    let mut state = lock_process(process);
+    ProcessHandles {
+        child: state.child.take(),
+        stdout_worker: state.stdout_worker.take(),
+        stderr_worker: state.stderr_worker.take(),
+        stop_requested: state.stop_requested.take(),
     }
 }
 
 impl Drop for RunningPreviewProcess {
     fn drop(&mut self) {
-        let _ = self.stop_running_process();
+        let _ = self.stop_running_processes();
     }
 }
 
@@ -429,6 +687,76 @@ fn spawn_stdout_worker(
         .map_err(|err| PreviewEngineError::Ffmpeg(format!("failed to spawn stdout worker: {err}")))
 }
 
+fn spawn_audio_stdout_worker(
+    mut stdout: impl Read + Send + 'static,
+    stderr_lines: Arc<Mutex<VecDeque<String>>>,
+    playback: Arc<Mutex<FfmpegPlaybackState>>,
+    stop_requested: Arc<AtomicBool>,
+    mark_ended_on_eof: bool,
+) -> Result<JoinHandle<()>, PreviewEngineError> {
+    thread::Builder::new()
+        .name("frame-preview-ffmpeg-audio-stdout".to_string())
+        .spawn(move || {
+            let output = match AudioPreviewOutput::new() {
+                Ok(output) => Some(output),
+                Err(error) => {
+                    push_stderr_line(
+                        &stderr_lines,
+                        format!("audio preview output disabled: {error}"),
+                    );
+                    None
+                }
+            };
+            let mut read_buffer = [0_u8; AUDIO_READ_BUFFER_BYTES];
+            let mut pending = Vec::new();
+
+            loop {
+                if stop_requested.load(Ordering::SeqCst) {
+                    break;
+                }
+
+                match stdout.read(&mut read_buffer) {
+                    Ok(0) => break,
+                    Ok(bytes_read) => {
+                        pending.extend_from_slice(&read_buffer[..bytes_read]);
+                        let complete_len = pending.len() - (pending.len() % 4);
+                        if complete_len == 0 {
+                            continue;
+                        }
+
+                        let mut samples = Vec::with_capacity(complete_len / 4);
+                        for bytes in pending[..complete_len].chunks_exact(4) {
+                            samples
+                                .push(f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]));
+                        }
+                        if let Some(output) = &output {
+                            push_audio_samples(&output.buffer, &samples);
+                        }
+                        pending.drain(..complete_len);
+                    }
+                    Err(error)
+                        if matches!(
+                            error.kind(),
+                            ErrorKind::UnexpectedEof | ErrorKind::BrokenPipe
+                        ) =>
+                    {
+                        break;
+                    }
+                    Err(_) => break,
+                }
+            }
+
+            if mark_ended_on_eof && !stop_requested.load(Ordering::SeqCst) {
+                let mut playback = lock_playback(&playback);
+                playback.playing = false;
+                playback.ended = true;
+            }
+        })
+        .map_err(|err| {
+            PreviewEngineError::Ffmpeg(format!("failed to spawn audio stdout worker: {err}"))
+        })
+}
+
 fn spawn_stderr_worker(
     stderr: impl Read + Send + 'static,
     lines: Arc<Mutex<VecDeque<String>>>,
@@ -449,6 +777,64 @@ fn spawn_stderr_worker(
             }
         })
         .map_err(|err| PreviewEngineError::Ffmpeg(format!("failed to spawn stderr worker: {err}")))
+}
+
+fn fill_audio_output_f32(data: &mut [f32], buffer: &Arc<Mutex<AudioSampleBuffer>>) {
+    let mut buffer = lock_audio_buffer(buffer);
+    for sample in data {
+        *sample = buffer.samples.pop_front().unwrap_or(0.0);
+    }
+}
+
+fn fill_audio_output_f64(data: &mut [f64], buffer: &Arc<Mutex<AudioSampleBuffer>>) {
+    let mut buffer = lock_audio_buffer(buffer);
+    for sample in data {
+        *sample = f64::from(buffer.samples.pop_front().unwrap_or(0.0));
+    }
+}
+
+fn fill_audio_output_i16(data: &mut [i16], buffer: &Arc<Mutex<AudioSampleBuffer>>) {
+    let mut buffer = lock_audio_buffer(buffer);
+    for sample in data {
+        *sample = f32_to_i16(buffer.samples.pop_front().unwrap_or(0.0));
+    }
+}
+
+fn fill_audio_output_u16(data: &mut [u16], buffer: &Arc<Mutex<AudioSampleBuffer>>) {
+    let mut buffer = lock_audio_buffer(buffer);
+    for sample in data {
+        *sample = f32_to_u16(buffer.samples.pop_front().unwrap_or(0.0));
+    }
+}
+
+fn push_audio_samples(buffer: &Arc<Mutex<AudioSampleBuffer>>, samples: &[f32]) {
+    let mut buffer = lock_audio_buffer(buffer);
+    for sample in samples {
+        if buffer.samples.len() >= buffer.capacity {
+            let _ = buffer.samples.pop_front();
+        }
+        buffer.samples.push_back(sample.clamp(-1.0, 1.0));
+    }
+}
+
+fn f32_to_i16(sample: f32) -> i16 {
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "audio samples are clamped to the i16 range before conversion"
+    )]
+    let converted = (sample.clamp(-1.0, 1.0) * f32::from(i16::MAX)).round() as i16;
+    converted
+}
+
+fn f32_to_u16(sample: f32) -> u16 {
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "audio samples are clamped to the u16 range before conversion"
+    )]
+    let converted =
+        (sample.clamp(-1.0, 1.0).mul_add(0.5, 0.5) * f32::from(u16::MAX)).round() as u16;
+    converted
 }
 
 fn preview_plan(
@@ -473,6 +859,31 @@ fn preview_plan(
             realtime,
             precise_seek: precise,
             source_is_image: config.source_kind == PreviewSourceKind::Image,
+        },
+    )
+    .map_err(|err| PreviewEngineError::Ffmpeg(err.to_string()))
+}
+
+fn preview_audio_plan(
+    config: &PreviewSessionConfig,
+    seconds: f64,
+    realtime: bool,
+    precise: bool,
+    output: AudioOutputSpec,
+) -> Result<frame_core::preview::PreviewAudioFfmpegPlan, PreviewEngineError> {
+    let end_seconds = parsed_time(config.conversion_config.end_time.as_deref())
+        .filter(|end_seconds| *end_seconds > seconds);
+    build_ffmpeg_preview_audio_args(
+        config.path.to_string_lossy().as_ref(),
+        &config.conversion_config,
+        &PreviewAudioFfmpegOptions {
+            start_seconds: seconds,
+            end_seconds,
+            sample_rate: output.sample_rate,
+            channels: output.channels,
+            realtime,
+            precise_seek: precise,
+            selected_track: config.selected_audio_track,
         },
     )
     .map_err(|err| PreviewEngineError::Ffmpeg(err.to_string()))
@@ -555,6 +966,12 @@ fn lock_stderr(lines: &Mutex<VecDeque<String>>) -> MutexGuard<'_, VecDeque<Strin
         .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
+fn lock_audio_buffer(buffer: &Mutex<AudioSampleBuffer>) -> MutexGuard<'_, AudioSampleBuffer> {
+    buffer
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -568,6 +985,8 @@ mod tests {
             source_kind: PreviewSourceKind::Video,
             source_width: Some(1920),
             source_height: Some(1080),
+            has_audio: false,
+            selected_audio_track: None,
             duration_seconds: 12.5,
             max_width: 1280,
             max_height: 720,
@@ -599,6 +1018,32 @@ mod tests {
         let plan = preview_plan(&config, 2.0, true, true).expect("plan");
 
         assert!(plan.args.windows(2).any(|args| args == ["-t", "8.000"]));
+    }
+
+    #[test]
+    fn preview_audio_plan_streams_selected_track_as_device_pcm() {
+        let mut config = preview_config();
+        config.has_audio = true;
+        config.selected_audio_track = Some(2);
+        config.conversion_config.end_time = Some("00:00:05.000".to_string());
+
+        let plan = preview_audio_plan(
+            &config,
+            1.0,
+            true,
+            true,
+            AudioOutputSpec {
+                sample_rate: 44_100,
+                channels: 2,
+            },
+        )
+        .expect("audio plan");
+
+        assert!(plan.args.windows(2).any(|args| args == ["-map", "0:2"]));
+        assert!(plan.args.windows(2).any(|args| args == ["-t", "4.000"]));
+        assert!(plan.args.windows(2).any(|args| args == ["-ar", "44100"]));
+        assert!(plan.args.windows(2).any(|args| args == ["-ac", "2"]));
+        assert!(plan.args.windows(2).any(|args| args == ["-f", "f32le"]));
     }
 
     #[test]

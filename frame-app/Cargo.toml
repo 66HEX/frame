@@ -12,6 +12,7 @@ name = "frame"
 path = "src/main.rs"
 
 [dependencies]
+cpal = "0.15.3"
 directories = "6.0.0"
 frame-core = { path = "../frame-core" }
 frame-updater = { path = "../frame-updater" }

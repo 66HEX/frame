@@ -1472,6 +1472,16 @@ mod frame_root_config {
                 width: Some(1920),
                 height: Some(1080),
                 duration: Some("12.5".to_string()),
+                audio_codec: Some("aac".to_string()),
+                audio_tracks: vec![crate::settings::AudioTrack {
+                    index: 1,
+                    codec: "aac".to_string(),
+                    channels: Some("2".to_string()),
+                    language: None,
+                    label: None,
+                    bitrate_kbps: None,
+                    sample_rate: Some("48000".to_string()),
+                }],
                 ..SourceMetadata::default()
             },
         );
@@ -1489,6 +1499,16 @@ mod frame_root_config {
             .expect("quality request");
 
         assert_eq!(quality_request.key, initial_request.key);
+
+        root.update_selected_config(|config| {
+            config.audio_volume = 80;
+            true
+        });
+        let audio_request = root
+            .selected_preview_runtime_request(&metadata_entry)
+            .expect("audio request");
+
+        assert_ne!(audio_request.key, initial_request.key);
 
         assert!(root.rotate_selected_preview());
         assert!(root.toggle_selected_flip(FlipAxis::Horizontal));

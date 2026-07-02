@@ -508,6 +508,7 @@ struct PreviewRuntimeKey {
     source_height: Option<u32>,
     duration_millis: u64,
     visual_hash: u64,
+    audio_hash: u64,
 }
 
 #[derive(Clone, Debug)]

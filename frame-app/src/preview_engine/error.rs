@@ -16,6 +16,8 @@ pub enum PreviewEngineError {
     UnsupportedFrameLayout(String),
     #[error("FFmpeg preview error: {0}")]
     Ffmpeg(String),
+    #[error("Preview audio error: {0}")]
+    Audio(String),
     #[error("Preview IO error: {0}")]
     Io(#[from] std::io::Error),
 }

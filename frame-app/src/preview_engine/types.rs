@@ -123,6 +123,8 @@ pub struct PreviewSessionConfig {
     pub source_kind: PreviewSourceKind,
     pub source_width: Option<u32>,
     pub source_height: Option<u32>,
+    pub has_audio: bool,
+    pub selected_audio_track: Option<u32>,
     pub duration_seconds: f64,
     pub max_width: u32,
     pub max_height: u32,
@@ -161,6 +163,11 @@ impl PreviewSessionConfig {
             MAX_PREVIEW_DIMENSION,
         )?;
         validate_range("fps", self.fps, MIN_PREVIEW_FPS, MAX_PREVIEW_FPS)?;
+        if self.source_kind == PreviewSourceKind::Audio && !self.has_audio {
+            return Err(PreviewEngineError::InvalidInput(
+                "Audio preview sources must declare an audio stream".to_string(),
+            ));
+        }
 
         match (self.source_width, self.source_height) {
             (Some(width), Some(height)) => {
