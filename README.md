@@ -106,9 +106,8 @@ details, tier suggestions, and a launch checklist.
 - **Real-time Telemetry:** FFmpeg progress and log events are parsed and shown
   in the app while conversions run.
 - **Runtime Binaries:** Local development uses platform-specific FFmpeg and
-  FFprobe binaries under `frame-app/resources/binaries/`, plus a controlled
-  GStreamer runtime for native preview. Native bundles include those runtimes
-  and detect encoder capabilities from the bundled FFmpeg at startup.
+  FFprobe binaries under `frame-app/resources/binaries/`. Native bundles include
+  those tools and detect encoder capabilities from the bundled FFmpeg at startup.
 
 ## Technical Stack
 
@@ -123,7 +122,7 @@ details, tier suggestions, and a launch checklist.
 
 ### Conversion Core
 
-- **Runtime Tools:** FFmpeg, FFprobe, and GStreamer.
+- **Runtime Tools:** FFmpeg and FFprobe.
 - **Serialization:** `serde`, `serde_json`.
 - **Error Handling:** `thiserror`.
 - **Media Rules:** Shared JSON compatibility matrix consumed by Rust code.
@@ -195,13 +194,12 @@ cd frame
 
 **3. Setup Runtime Binaries**
 
-Frame requires FFmpeg, FFprobe, and GStreamer runtime binaries. Release and
-development tasks download the platform-specific tools into ignored local
-runtime paths. To prepare them manually:
+Frame requires FFmpeg and FFprobe runtime binaries. Release and development
+tasks download the platform-specific tools into ignored local runtime paths. To
+prepare them manually:
 
 ```bash
 cargo xtask setup-ffmpeg
-cargo xtask setup-gstreamer --install
 ```
 
 **4. Run or Build**

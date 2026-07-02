@@ -6,7 +6,7 @@ the current project structure, local setup, checks, and pull request standards.
 ## Technical Stack
 
 - **Application:** Rust native desktop app built with GPUI-CE.
-- **Core Engine:** FFmpeg, FFprobe, and GStreamer runtime binaries.
+- **Core Engine:** FFmpeg and FFprobe runtime binaries.
 - **Shared Logic:** `frame-core` for conversion arguments, probing data,
   compatibility rules, filters, and validation.
 - **Native UI:** `frame-app` for the application shell, GPUI views, app state,
@@ -41,7 +41,6 @@ To build and run Frame locally, you will need:
 
    ```bash
    cargo xtask setup-ffmpeg
-   cargo xtask setup-gstreamer --install
    ```
 
 3. **Run in development mode:**
@@ -67,7 +66,7 @@ To build and run Frame locally, you will need:
 
    Windows app icons are embedded into the `.exe` by `frame-app/build.rs`
    during the normal Cargo build, and the Windows package script places the
-   FFmpeg, FFprobe, and GStreamer runtime files next to the app.
+   FFmpeg and FFprobe runtime files next to the app.
 
 ## Development Workflow
 

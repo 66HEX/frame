@@ -9,7 +9,7 @@ const UPDATE_AVAILABLE_RELEASE_NOTES: &str = r"
 - Native autoupdater flow with signed manifests and platform-specific packages.
 - Animated update dialog that presents release notes before the user downloads or installs.
 - macOS, Windows, and Linux release assets generated from the release pipeline.
-- Bundled GStreamer runtime fixes for packaged builds.
+- FFmpeg-backed preview fixes for packaged builds.
 - Update helper validation for replacing installed app bundles safely.
 
 ## Notes for visual review

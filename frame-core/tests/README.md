@@ -19,10 +19,6 @@ cargo test --locked -p frame-core --test media_integration -- --ignored --test-t
 Run the application runner smoke test:
 
 ```sh
-export GSTREAMER_ROOT=/Library/Frameworks/GStreamer.framework/Versions/1.0
-export PKG_CONFIG_PATH="$GSTREAMER_ROOT/lib/pkgconfig"
-export DYLD_LIBRARY_PATH="$GSTREAMER_ROOT/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
-export PATH="$GSTREAMER_ROOT/bin:$PATH"
 cargo test --locked -p frame-app \
   conversion_runner::tests::run_conversion_task_should_emit_completed_for_real_ffmpeg_job \
   -- --ignored --test-threads=1
