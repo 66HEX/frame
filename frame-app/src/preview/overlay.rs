@@ -56,7 +56,8 @@ pub struct OverlayModeChange {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PreviewOverlayState {
     overlay_mode: bool,
-    overlay: Option<PreviewOverlay>,
+    committed_overlay: Option<PreviewOverlay>,
+    draft_overlay: Option<PreviewOverlay>,
     drag_origin: Option<OverlayDragOrigin>,
 }
 
@@ -72,7 +73,8 @@ impl PreviewOverlayState {
     pub const fn new() -> Self {
         Self {
             overlay_mode: false,
-            overlay: None,
+            committed_overlay: None,
+            draft_overlay: None,
             drag_origin: None,
         }
     }
@@ -84,7 +86,30 @@ impl PreviewOverlayState {
 
     #[must_use]
     pub const fn overlay(&self) -> Option<&PreviewOverlay> {
-        self.overlay.as_ref()
+        if self.overlay_mode {
+            self.draft_overlay.as_ref()
+        } else {
+            self.committed_overlay.as_ref()
+        }
+    }
+
+    #[must_use]
+    pub const fn committed_overlay(&self) -> Option<&PreviewOverlay> {
+        self.committed_overlay.as_ref()
+    }
+
+    #[must_use]
+    pub const fn render_overlay(&self) -> Option<&PreviewOverlay> {
+        if self.overlay_mode {
+            self.draft_overlay.as_ref()
+        } else {
+            None
+        }
+    }
+
+    #[must_use]
+    pub const fn has_overlay(&self) -> bool {
+        self.committed_overlay.is_some() || self.draft_overlay.is_some()
     }
 
     #[must_use]
@@ -93,15 +118,16 @@ impl PreviewOverlayState {
     }
 
     pub fn sync_initial_overlay(&mut self, initial_overlay: Option<&PreviewOverlay>) {
-        if self.drag_origin.is_some() {
+        if self.drag_origin.is_some() || self.overlay_mode {
             return;
         }
 
-        self.overlay = initial_overlay
+        self.committed_overlay = initial_overlay
             .filter(|overlay| overlay.enabled && !overlay.path.is_empty())
             .map(normalize_overlay);
+        self.draft_overlay = None;
 
-        if self.overlay.is_none() {
+        if self.committed_overlay.is_none() {
             self.overlay_mode = false;
         }
     }
@@ -117,12 +143,13 @@ impl PreviewOverlayState {
 
         let overlay = create_default_overlay(path);
         self.overlay_mode = true;
-        self.overlay = Some(overlay.clone());
+        self.draft_overlay = Some(overlay.clone());
+        self.drag_origin = None;
         Some(overlay)
     }
 
-    pub const fn toggle_overlay_mode(&mut self, controls_disabled: bool) -> OverlayModeChange {
-        if controls_disabled || self.overlay.is_none() {
+    pub fn toggle_overlay_mode(&mut self, controls_disabled: bool) -> OverlayModeChange {
+        if controls_disabled || !self.has_overlay() {
             return OverlayModeChange {
                 changed: false,
                 should_deactivate_crop: false,
@@ -130,18 +157,21 @@ impl PreviewOverlayState {
         }
 
         let should_deactivate_crop = !self.overlay_mode;
-        self.overlay_mode = !self.overlay_mode;
+        if self.overlay_mode {
+            self.overlay_mode = false;
+            self.draft_overlay = None;
+            self.drag_origin = None;
+        } else {
+            self.overlay_mode = true;
+            self.draft_overlay = self.committed_overlay.clone();
+        }
         OverlayModeChange {
             changed: true,
             should_deactivate_crop,
         }
     }
 
-    pub const fn set_overlay_mode(
-        &mut self,
-        value: bool,
-        controls_disabled: bool,
-    ) -> OverlayModeChange {
+    pub fn set_overlay_mode(&mut self, value: bool, controls_disabled: bool) -> OverlayModeChange {
         if controls_disabled && value {
             return OverlayModeChange {
                 changed: false,
@@ -149,13 +179,38 @@ impl PreviewOverlayState {
             };
         }
 
-        let next_mode = value && self.overlay.is_some();
+        let next_mode = value && self.has_overlay();
         let changed = self.overlay_mode != next_mode;
-        self.overlay_mode = next_mode;
+        if next_mode {
+            self.overlay_mode = true;
+            if self.draft_overlay.is_none() {
+                self.draft_overlay = self.committed_overlay.clone();
+            }
+        } else {
+            self.overlay_mode = false;
+            self.draft_overlay = None;
+            self.drag_origin = None;
+        }
         OverlayModeChange {
             changed,
             should_deactivate_crop: value,
         }
+    }
+
+    pub fn apply_overlay_edit(&mut self) -> Option<Option<PreviewOverlay>> {
+        if !self.overlay_mode {
+            return None;
+        }
+
+        let next_overlay = self
+            .draft_overlay
+            .take()
+            .filter(|overlay| overlay.enabled && !overlay.path.is_empty())
+            .map(|overlay| normalize_overlay(&overlay));
+        self.committed_overlay.clone_from(&next_overlay);
+        self.overlay_mode = false;
+        self.drag_origin = None;
+        Some(next_overlay)
     }
 
     pub fn begin_overlay_drag(
@@ -164,7 +219,7 @@ impl PreviewOverlayState {
         point: OverlayDragPoint,
         controls_disabled: bool,
     ) -> bool {
-        let Some(overlay) = &self.overlay else {
+        let Some(overlay) = &self.draft_overlay else {
             return false;
         };
         if !self.overlay_mode || controls_disabled {
@@ -185,7 +240,7 @@ impl PreviewOverlayState {
         let Some(drag_origin) = &self.drag_origin else {
             return None;
         };
-        self.overlay.as_ref()?;
+        self.draft_overlay.as_ref()?;
 
         let next_overlay = match drag_origin.handle {
             OverlayDragHandle::Move => {
@@ -259,7 +314,7 @@ impl PreviewOverlayState {
             }
         };
 
-        self.overlay = Some(next_overlay.clone());
+        self.draft_overlay = Some(next_overlay.clone());
         Some(next_overlay)
     }
 
@@ -272,7 +327,11 @@ impl PreviewOverlayState {
             return None;
         }
 
-        let overlay = self.overlay.as_mut()?;
+        if !self.overlay_mode {
+            return None;
+        }
+
+        let overlay = self.draft_overlay.as_mut()?;
         overlay.opacity = clamp(value, 0.0, 1.0);
         Some(overlay.clone())
     }
@@ -287,7 +346,11 @@ impl PreviewOverlayState {
             return None;
         }
 
-        let overlay = self.overlay.as_mut()?;
+        if !self.overlay_mode {
+            return None;
+        }
+
+        let overlay = self.draft_overlay.as_mut()?;
         let height_ratio_for_width = height_ratio.unwrap_or(1.0);
         let width = clamp_overlay_width(overlay.width + direction.step(), height_ratio_for_width);
         let height = width * height_ratio.unwrap_or(1.0);
@@ -305,7 +368,9 @@ impl PreviewOverlayState {
         }
 
         self.overlay_mode = false;
-        self.overlay = None;
+        self.committed_overlay = None;
+        self.draft_overlay = None;
+        self.drag_origin = None;
         Some(None)
     }
 

@@ -1700,10 +1700,10 @@ mod frame_root_config {
     }
 
     #[test]
-    fn apply_preview_overlay_drag_persists_selected_file_overlay_position() {
+    fn apply_preview_overlay_drag_updates_draft_until_done_persists_position() {
         let mut root = root_with_overlay();
 
-        assert!(!root.apply_preview_overlay_drag(
+        assert!(root.apply_preview_overlay_drag(
             OverlayDragHandle::Move,
             OverlayDragPoint {
                 x: 0.50,
@@ -1722,6 +1722,19 @@ mod frame_root_config {
             },
         ));
 
+        let committed_overlay = root
+            .file_queue
+            .file_by_id("video")
+            .and_then(|file| file.config.overlay.as_ref())
+            .unwrap();
+        assert!((committed_overlay.x - 0.50).abs() < 0.000_001);
+        assert!((committed_overlay.y - 0.50).abs() < 0.000_001);
+
+        let draft = root.preview_ui.overlay.overlay().unwrap();
+        assert!((draft.x - 0.60).abs() < 0.000_001);
+        assert!((draft.y - 0.55).abs() < 0.000_001);
+
+        assert!(root.set_selected_overlay_mode(false));
         let overlay = root
             .file_queue
             .file_by_id("video")
@@ -1733,7 +1746,7 @@ mod frame_root_config {
     }
 
     #[test]
-    fn commit_preview_overlay_opacity_at_position_persists_slider_value() {
+    fn commit_preview_overlay_opacity_at_position_updates_draft_until_done() {
         let mut root = root_with_overlay();
         root.set_preview_overlay_opacity_slider_bounds(Bounds {
             origin: point(px(10.0), px(0.0)),
@@ -1742,6 +1755,17 @@ mod frame_root_config {
 
         assert!(root.commit_preview_overlay_opacity_at_position(point(px(60.0), px(0.0))));
 
+        let committed_overlay = root
+            .file_queue
+            .file_by_id("video")
+            .and_then(|file| file.config.overlay.as_ref())
+            .unwrap();
+        assert!((committed_overlay.opacity - 1.0).abs() < 0.000_001);
+
+        let draft = root.preview_ui.overlay.overlay().unwrap();
+        assert!((draft.opacity - 0.50).abs() < 0.000_001);
+
+        assert!(root.set_selected_overlay_mode(false));
         let overlay = root
             .file_queue
             .file_by_id("video")

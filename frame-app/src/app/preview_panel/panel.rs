@@ -85,6 +85,7 @@ pub(in crate::app) struct PreviewPresentedFrame {
 #[derive(Clone, Debug, PartialEq)]
 pub(in crate::app) struct PreviewOverlayRenderState {
     pub(in crate::app) overlay_mode: bool,
+    pub(in crate::app) has_overlay: bool,
     pub(in crate::app) overlay: Option<PreviewOverlay>,
     pub(in crate::app) image_dimensions: Option<PreviewOverlayImageDimensions>,
 }
@@ -95,6 +96,7 @@ impl PreviewOverlayRenderState {
     pub(in crate::app) const fn empty() -> Self {
         Self {
             overlay_mode: false,
+            has_overlay: false,
             overlay: None,
             image_dimensions: None,
         }

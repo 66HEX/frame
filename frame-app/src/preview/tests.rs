@@ -835,7 +835,15 @@ mod preview_overlay_state {
     #[test]
     fn sync_initial_overlay_discards_disabled_or_empty_overlay() {
         let mut state = PreviewOverlayState::new();
-        state.set_overlay_from_path("/tmp/logo.png", false);
+        state.sync_initial_overlay(Some(&PreviewOverlay {
+            enabled: true,
+            path: "/tmp/logo.png".to_string(),
+            x: 0.5,
+            y: 0.5,
+            width: 0.2,
+            opacity: 1.0,
+            anchor: "custom".to_string(),
+        }));
 
         state.sync_initial_overlay(Some(&PreviewOverlay {
             enabled: false,
@@ -892,8 +900,7 @@ mod preview_overlay_state {
 
     #[test]
     fn toggle_overlay_mode_requests_crop_deactivation_when_enabling() {
-        let mut state = state_with_overlay();
-        state.set_overlay_mode(false, false);
+        let mut state = state_with_committed_overlay();
 
         let change = state.toggle_overlay_mode(false);
 
@@ -1070,6 +1077,7 @@ mod preview_overlay_state {
             opacity: 1.0,
             anchor: "custom".to_string(),
         }));
+        state.set_overlay_mode(true, false);
 
         let overlay = state
             .nudge_size(OverlaySizeDirection::Increase, Some(1.0), false)
@@ -1111,6 +1119,20 @@ mod preview_overlay_state {
     fn state_with_overlay() -> PreviewOverlayState {
         let mut state = PreviewOverlayState::new();
         state.set_overlay_from_path("/tmp/logo.png", false);
+        state
+    }
+
+    fn state_with_committed_overlay() -> PreviewOverlayState {
+        let mut state = PreviewOverlayState::new();
+        state.sync_initial_overlay(Some(&PreviewOverlay {
+            enabled: true,
+            path: "/tmp/logo.png".to_string(),
+            x: 0.5,
+            y: 0.5,
+            width: 0.18,
+            opacity: 1.0,
+            anchor: "custom".to_string(),
+        }));
         state
     }
 }

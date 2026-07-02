@@ -100,7 +100,7 @@ pub(in crate::app) fn preview_toolbar(
         .child(
             preview_tool_button(
                 assets::ICON_FILE_IMAGE,
-                state.overlay.overlay_mode || state.overlay.overlay.is_some(),
+                state.overlay.overlay_mode || state.overlay.has_overlay,
                 overlay_enabled,
                 window,
                 cx,

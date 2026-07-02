@@ -13,7 +13,12 @@ impl FrameRoot {
         metadata_entry: &SourceMetadataEntry,
     ) -> Option<PreviewRuntimeRequest> {
         let selected_file = self.file_queue.selected_file()?;
-        preview_runtime_request(selected_file, metadata_entry, !self.preview_ui.crop_mode)
+        preview_runtime_request(
+            selected_file,
+            metadata_entry,
+            !self.preview_ui.crop_mode,
+            !self.preview_ui.overlay.overlay_mode(),
+        )
     }
 
     pub(super) fn sync_preview_runtime_for_selection(
@@ -574,7 +579,8 @@ impl FrameRoot {
     pub(super) fn preview_overlay_render_state(&self) -> PreviewOverlayRenderState {
         PreviewOverlayRenderState {
             overlay_mode: self.preview_ui.overlay.overlay_mode(),
-            overlay: self.preview_ui.overlay.overlay().cloned(),
+            has_overlay: self.preview_ui.overlay.has_overlay(),
+            overlay: self.preview_ui.overlay.render_overlay().cloned(),
             image_dimensions: self.preview_ui.overlay_image_dimensions,
         }
     }
@@ -587,6 +593,10 @@ impl FrameRoot {
         if self.preview_ui.overlay.overlay().is_none() {
             self.prompt_selected_overlay_image(window, cx);
             return false;
+        }
+
+        if self.preview_ui.overlay.overlay_mode() {
+            return self.set_selected_overlay_mode(false);
         }
 
         let change = self
@@ -636,9 +646,8 @@ impl FrameRoot {
                 root.preview_ui.pending_overlay_dimensions_key = None;
                 root.preview_ui.overlay_image_dimensions = dimensions;
 
-                if root.commit_preview_overlay(Some(overlay)) {
-                    cx.notify();
-                }
+                let _ = overlay;
+                cx.notify();
             })
             .ok();
         })
@@ -646,6 +655,15 @@ impl FrameRoot {
     }
 
     pub(super) fn set_selected_overlay_mode(&mut self, value: bool) -> bool {
+        if !value {
+            let was_editing = self.preview_ui.overlay.overlay_mode();
+            let Some(next_overlay) = self.preview_ui.overlay.apply_overlay_edit() else {
+                return false;
+            };
+            let committed = self.commit_preview_overlay(next_overlay);
+            return was_editing || committed;
+        }
+
         let change = self
             .preview_ui
             .overlay
@@ -680,7 +698,8 @@ impl FrameRoot {
             return false;
         };
 
-        self.commit_preview_overlay(Some(overlay))
+        let _ = overlay;
+        true
     }
 
     pub(super) fn set_selected_overlay_opacity(&mut self, value: f64) -> bool {
@@ -692,7 +711,8 @@ impl FrameRoot {
             return false;
         };
 
-        self.commit_preview_overlay(Some(overlay))
+        let _ = overlay;
+        true
     }
 
     pub(in crate::app) const fn set_preview_overlay_opacity_slider_bounds(
@@ -735,7 +755,8 @@ impl FrameRoot {
         let Some(overlay) = self.preview_ui.overlay.update_overlay_drag(point) else {
             return false;
         };
-        self.commit_preview_overlay(Some(overlay))
+        let _ = overlay;
+        true
     }
 
     pub(super) fn end_preview_overlay_drag(&mut self) -> bool {
@@ -1320,6 +1341,7 @@ fn preview_runtime_request(
     selected_file: &FileItem,
     metadata_entry: &SourceMetadataEntry,
     include_applied_crop: bool,
+    include_committed_overlay: bool,
 ) -> Option<PreviewRuntimeRequest> {
     if metadata_entry.status != MetadataStatus::Ready {
         return None;
@@ -1332,6 +1354,9 @@ fn preview_runtime_request(
     let mut preview_config = selected_file.config.clone();
     if !include_applied_crop {
         preview_config.crop = None;
+    }
+    if !include_committed_overlay {
+        preview_config.overlay = None;
     }
     let core_config = core_config_from_gpui(&preview_config);
     let presentation = PreviewRenderPresentation::default();
