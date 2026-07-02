@@ -1542,6 +1542,28 @@ mod frame_root_config {
     }
 
     #[test]
+    fn preview_runtime_key_reconfigures_only_same_source_identity() {
+        let current = PreviewRuntimeKey {
+            file_id: "video".to_string(),
+            path: "/tmp/one.mp4".to_string(),
+            source_kind: EnginePreviewSourceKind::Video,
+            source_width: Some(1920),
+            source_height: Some(1080),
+            duration_millis: 12_500,
+            visual_hash: 1,
+            audio_hash: 1,
+        };
+        let mut next = current.clone();
+        next.visual_hash = 2;
+        next.audio_hash = 3;
+
+        assert!(current.can_reconfigure_to(&next));
+
+        next.path = "/tmp/two.mp4".to_string();
+        assert!(!current.can_reconfigure_to(&next));
+    }
+
+    #[test]
     fn preview_presentation_maps_rotation_and_crop_without_rewriting_frame() {
         let frame = PreviewFrame::bgra(
             4,

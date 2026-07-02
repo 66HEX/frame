@@ -48,6 +48,52 @@ impl FrameRoot {
             return;
         }
 
+        if self.preview_ui.pending_runtime_key.is_some() {
+            return;
+        }
+
+        if let (Some(session), Some(current_key)) = (
+            self.preview_ui.session.clone(),
+            self.preview_ui.runtime_key.as_ref(),
+        ) && current_key.can_reconfigure_to(&request.key)
+        {
+            let key = request.key.clone();
+            self.preview_ui.pending_runtime_key = Some(key.clone());
+            cx.spawn(async move |this, cx| {
+                let config = request.config;
+                let result = cx
+                    .background_spawn({
+                        let session = Arc::clone(&session);
+                        async move { session.reconfigure(config) }
+                    })
+                    .await;
+
+                this.update(cx, move |root, cx| {
+                    if root.preview_ui.pending_runtime_key.as_ref() != Some(&key) {
+                        return;
+                    }
+
+                    root.preview_ui.pending_runtime_key = None;
+                    match result {
+                        Ok(()) => {
+                            root.preview_ui.runtime_key = Some(key);
+                            root.preview_ui.session = Some(session);
+                            root.preview_ui.runtime_error = None;
+                            root.refresh_preview_render_image();
+                            root.schedule_preview_frame_tick(cx);
+                        }
+                        Err(error) => {
+                            root.preview_ui.runtime_error = Some(error.to_string());
+                        }
+                    }
+                    cx.notify();
+                })
+                .ok();
+            })
+            .detach();
+            return;
+        }
+
         self.clear_preview_runtime();
 
         let key = request.key.clone();

@@ -511,6 +511,17 @@ struct PreviewRuntimeKey {
     audio_hash: u64,
 }
 
+impl PreviewRuntimeKey {
+    fn can_reconfigure_to(&self, next: &Self) -> bool {
+        self.file_id == next.file_id
+            && self.path == next.path
+            && self.source_kind == next.source_kind
+            && self.source_width == next.source_width
+            && self.source_height == next.source_height
+            && self.duration_millis == next.duration_millis
+    }
+}
+
 #[derive(Clone, Debug)]
 struct PreviewRuntimeRequest {
     key: PreviewRuntimeKey,

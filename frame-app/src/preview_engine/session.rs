@@ -7,8 +7,8 @@ use super::{
 };
 
 pub struct PreviewSession {
-    config: PreviewSessionConfig,
-    dimensions: PreviewDimensions,
+    config: Mutex<PreviewSessionConfig>,
+    dimensions: Mutex<PreviewDimensions>,
     duration_seconds: Mutex<f64>,
     frame_store: LatestFrameStore,
     pipeline: Mutex<Option<RunningPreviewProcess>>,
@@ -32,8 +32,8 @@ impl PreviewSession {
                 let (pipeline, dimensions, duration_seconds) =
                     start_ffmpeg_preview_process(&config, frame_store.clone())?;
                 Ok(Self {
-                    config,
-                    dimensions,
+                    config: Mutex::new(config),
+                    dimensions: Mutex::new(dimensions),
                     duration_seconds: Mutex::new(duration_seconds),
                     frame_store,
                     pipeline: Mutex::new(Some(pipeline)),
@@ -49,14 +49,45 @@ impl PreviewSession {
     pub fn new_for_test(config: PreviewSessionConfig) -> Self {
         let frame_store = LatestFrameStore::new();
         Self {
-            dimensions: config.target_dimensions(),
+            dimensions: Mutex::new(config.target_dimensions()),
             duration_seconds: Mutex::new(config.duration_seconds),
-            config,
+            config: Mutex::new(config),
             frame_store,
             pipeline: Mutex::new(None),
             playing: Mutex::new(false),
             status: Mutex::new(PreviewSessionStatus::Ready),
         }
+    }
+
+    /// Rebuilds the preview pipeline in-place while keeping the existing frame
+    /// store alive until the replacement process has produced its first frame.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the replacement config is invalid or the
+    /// replacement `FFmpeg` process cannot be started.
+    #[expect(
+        clippy::significant_drop_tightening,
+        reason = "The pipeline mutex guard must live across the in-place FFmpeg reconfiguration."
+    )]
+    pub fn reconfigure(&self, config: PreviewSessionConfig) -> Result<(), PreviewEngineError> {
+        config.validate()?;
+        let dimensions = {
+            let mut pipeline_guard = lock(&self.pipeline);
+            let playing = *lock(&self.playing);
+            let Some(pipeline) = pipeline_guard.as_mut() else {
+                let (pipeline, dimensions, _) =
+                    start_ffmpeg_preview_process(&config, self.frame_store.clone())?;
+                *pipeline_guard = Some(pipeline);
+                self.store_reconfigured_state(config, dimensions);
+                return Ok(());
+            };
+            let seconds = pipeline.position();
+            pipeline.reconfigure(config.clone(), seconds, playing, true)?
+        };
+
+        self.store_reconfigured_state(config, dimensions);
+        Ok(())
     }
 
     #[must_use]
@@ -135,10 +166,11 @@ impl PreviewSession {
         );
         let playing = pipeline_snapshot.is_some_and(|_| !ended && *lock(&self.playing));
 
+        let config = lock(&self.config);
         PreviewSessionSnapshot {
-            file_id: self.config.file_id.clone(),
-            source_kind: self.config.source_kind,
-            dimensions: self.dimensions,
+            file_id: config.file_id.clone(),
+            source_kind: config.source_kind,
+            dimensions: *lock(&self.dimensions),
             status: lock(&self.status).clone(),
             playback: PreviewPlaybackSnapshot {
                 position_seconds: position,
@@ -164,6 +196,17 @@ impl PreviewSession {
         } else {
             *lock(&self.duration_seconds)
         }
+    }
+
+    fn store_reconfigured_state(
+        &self,
+        config: PreviewSessionConfig,
+        dimensions: PreviewDimensions,
+    ) {
+        let duration_seconds = config.duration_seconds;
+        *lock(&self.config) = config;
+        *lock(&self.dimensions) = dimensions;
+        *lock(&self.duration_seconds) = duration_seconds;
     }
 }
 

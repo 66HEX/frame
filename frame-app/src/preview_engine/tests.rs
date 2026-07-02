@@ -153,6 +153,29 @@ fn ffmpeg_preview_session_can_play_pause_and_seek() {
     assert!(seek_position >= 0.99);
 }
 
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn ffmpeg_preview_session_reconfigure_preserves_playback_position() {
+    let path = temp_preview_video("reconfigure");
+    let config = real_video_preview_config(path.clone());
+
+    let session = PreviewSession::start(config.clone()).expect("session");
+    session.command(PreviewCommand::Play).expect("play");
+    thread::sleep(Duration::from_millis(350));
+    let before = session.snapshot().playback;
+    let mut next_config = config;
+    next_config.conversion_config.flip_horizontal = true;
+
+    session.reconfigure(next_config).expect("reconfigure");
+    let after = session.snapshot().playback;
+    let _ = std::fs::remove_file(&path);
+    session.stop();
+
+    assert!(before.position_seconds > 0.0);
+    assert!(after.position_seconds >= before.position_seconds);
+    assert!(after.playing);
+}
+
 fn real_video_preview_config(path: PathBuf) -> PreviewSessionConfig {
     PreviewSessionConfig {
         file_id: "video-real".to_string(),

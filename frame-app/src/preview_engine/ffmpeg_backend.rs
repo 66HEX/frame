@@ -68,6 +68,14 @@ struct ProcessHandles {
     stop_requested: Option<Arc<AtomicBool>>,
 }
 
+struct SpawnedVideoStream {
+    child: Child,
+    stdout: Box<dyn Read + Send>,
+    stderr_worker: JoinHandle<()>,
+    stop_requested: Arc<AtomicBool>,
+    spec: FrameStreamSpec,
+}
+
 #[derive(Clone, Copy, Debug)]
 struct FrameStreamSpec {
     width: u32,
@@ -75,6 +83,7 @@ struct FrameStreamSpec {
     fps: u32,
     frame_bytes: usize,
     base_seconds: f64,
+    first_frame_index: u64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -301,6 +310,61 @@ impl RunningPreviewProcess {
         let _ = self.stop_running_processes();
     }
 
+    /// Rebuilds the `FFmpeg` preview command for a new conversion config while
+    /// preserving the current source timestamp whenever possible.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the replacement preview process cannot render its
+    /// first frame or cannot be started.
+    pub fn reconfigure(
+        &mut self,
+        config: PreviewSessionConfig,
+        seconds: f64,
+        playing: bool,
+        precise: bool,
+    ) -> Result<PreviewDimensions, PreviewEngineError> {
+        let seconds = clamp_seek_seconds(seconds, config.duration_seconds)?;
+        let dimensions = if matches!(
+            config.source_kind,
+            PreviewSourceKind::Video | PreviewSourceKind::Image
+        ) {
+            if playing && config.source_kind == PreviewSourceKind::Video {
+                self.start_video_streaming_with_config(&config, seconds, precise, true)?
+            } else {
+                let frame =
+                    decode_single_preview_frame(&self.executable, &config, seconds, precise)?;
+                let dimensions = frame.dimensions();
+                self.stop_running_processes()?;
+                let _ = self.frame_store.publish(frame);
+                let mut playback = lock_playback(&self.playback);
+                playback.base_seconds = seconds;
+                playback.last_frame_seconds = seconds;
+                playback.started_at = Instant::now();
+                playback.playing = false;
+                playback.ended = false;
+                dimensions
+            }
+        } else {
+            self.stop_running_processes()?;
+            self.config = config.clone();
+            if playing {
+                self.start_audio_streaming(seconds, precise, true)?;
+            }
+            let mut playback = lock_playback(&self.playback);
+            playback.base_seconds = seconds;
+            playback.last_frame_seconds = seconds;
+            playback.started_at = Instant::now();
+            playback.playing = playing;
+            playback.ended = false;
+            drop(playback);
+            config.target_dimensions()
+        };
+
+        self.config = config;
+        Ok(dimensions)
+    }
+
     fn new(
         config: PreviewSessionConfig,
         frame_store: LatestFrameStore,
@@ -343,8 +407,8 @@ impl RunningPreviewProcess {
     }
 
     fn start_streaming(&self, seconds: f64, precise: bool) -> Result<(), PreviewEngineError> {
-        self.stop_running_processes()?;
         if !self.has_visual_stream() {
+            self.stop_running_processes()?;
             self.start_audio_streaming(seconds, precise, true)?;
             let mut playback = lock_playback(&self.playback);
             playback.base_seconds = seconds;
@@ -356,7 +420,114 @@ impl RunningPreviewProcess {
             return Ok(());
         }
 
-        let plan = preview_plan(&self.config, seconds, true, precise)?;
+        let buffered = has_running_child(&self.process);
+        self.start_video_streaming_with_config(&self.config, seconds, precise, buffered)?;
+        Ok(())
+    }
+
+    fn start_video_streaming_with_config(
+        &self,
+        config: &PreviewSessionConfig,
+        seconds: f64,
+        precise: bool,
+        buffered: bool,
+    ) -> Result<PreviewDimensions, PreviewEngineError> {
+        let mut stream = self.spawn_video_stream(config, seconds, precise)?;
+
+        let first_frame = if buffered {
+            match read_stream_frame(&mut stream.stdout, &stream.spec, stream.spec.base_seconds) {
+                Ok(frame) => Some(frame),
+                Err(error) => {
+                    let _ = stop_spawned_video_stream(stream);
+                    return Err(error);
+                }
+            }
+        } else {
+            None
+        };
+
+        let stop_result = if buffered {
+            self.stop_video_process()
+        } else {
+            self.stop_running_processes()
+        };
+        if let Err(error) = stop_result {
+            let _ = stop_spawned_video_stream(stream);
+            return Err(error);
+        }
+
+        let dimensions = PreviewDimensions {
+            width: stream.spec.width,
+            height: stream.spec.height,
+        };
+        let mut stdout_spec = stream.spec;
+        if first_frame.is_some() {
+            stdout_spec.first_frame_index = 1;
+        }
+        let stdout_worker = match spawn_stdout_worker(
+            stream.stdout,
+            self.frame_store.clone(),
+            Arc::clone(&self.playback),
+            Arc::clone(&stream.stop_requested),
+            stdout_spec,
+        ) {
+            Ok(worker) => worker,
+            Err(error) => {
+                let handles = ProcessHandles {
+                    child: Some(stream.child),
+                    stdout_worker: None,
+                    stderr_worker: Some(stream.stderr_worker),
+                    stop_requested: Some(stream.stop_requested),
+                };
+                let _ = stop_process_handles(handles);
+                return Err(error);
+            }
+        };
+
+        let mut state = lock_process(&self.process);
+        *state = RunningProcessState {
+            child: Some(stream.child),
+            stdout_worker: Some(stdout_worker),
+            stderr_worker: Some(stream.stderr_worker),
+            stop_requested: Some(stream.stop_requested),
+        };
+        drop(state);
+
+        let mut playback = lock_playback(&self.playback);
+        playback.base_seconds = seconds;
+        playback.last_frame_seconds = seconds;
+        playback.started_at = Instant::now();
+        playback.playing = true;
+        playback.ended = false;
+        drop(playback);
+
+        if let Some(frame) = first_frame {
+            let _ = self.frame_store.publish(frame);
+        }
+
+        if config.has_audio {
+            if let Err(error) =
+                self.start_audio_streaming_with_config(config, seconds, precise, false)
+            {
+                push_stderr_line(&self.stderr, format!("audio preview disabled: {error}"));
+            }
+        } else if let Err(error) = self.stop_audio_process() {
+            push_stderr_line(
+                &self.stderr,
+                format!("audio preview cleanup failed: {error}"),
+            );
+        }
+
+        Ok(dimensions)
+    }
+
+    fn spawn_video_stream(
+        &self,
+        config: &PreviewSessionConfig,
+        seconds: f64,
+        precise: bool,
+    ) -> Result<SpawnedVideoStream, PreviewEngineError> {
+        let plan = preview_plan(config, seconds, true, precise)?;
         let mut child = Command::new(&self.executable)
             .args(&plan.args)
             .stdin(Stdio::null())
@@ -372,50 +543,36 @@ impl RunningPreviewProcess {
             PreviewEngineError::Ffmpeg("ffmpeg stderr was not captured".to_string())
         })?;
         let stop_requested = Arc::new(AtomicBool::new(false));
-        let stdout_worker = spawn_stdout_worker(
-            stdout,
-            self.frame_store.clone(),
-            Arc::clone(&self.playback),
+        let stderr_worker = match spawn_stderr_worker(
+            stderr,
+            Arc::clone(&self.stderr),
             Arc::clone(&stop_requested),
-            FrameStreamSpec {
+        ) {
+            Ok(worker) => worker,
+            Err(error) => {
+                stop_requested.store(true, Ordering::SeqCst);
+                if child.try_wait().map_err(PreviewEngineError::Io)?.is_none() {
+                    child.kill().map_err(PreviewEngineError::Io)?;
+                }
+                let _ = child.wait();
+                return Err(error);
+            }
+        };
+
+        Ok(SpawnedVideoStream {
+            child,
+            stdout: Box::new(stdout),
+            stderr_worker,
+            stop_requested,
+            spec: FrameStreamSpec {
                 width: plan.width,
                 height: plan.height,
                 fps: plan.fps,
                 frame_bytes: plan.frame_bytes,
                 base_seconds: seconds,
+                first_frame_index: 0,
             },
-        )?;
-        let stderr_worker = spawn_stderr_worker(
-            stderr,
-            Arc::clone(&self.stderr),
-            Arc::clone(&stop_requested),
-        )?;
-
-        {
-            let mut playback = lock_playback(&self.playback);
-            playback.base_seconds = seconds;
-            playback.last_frame_seconds = seconds;
-            playback.started_at = Instant::now();
-            playback.playing = true;
-            playback.ended = false;
-        }
-
-        let mut state = lock_process(&self.process);
-        *state = RunningProcessState {
-            child: Some(child),
-            stdout_worker: Some(stdout_worker),
-            stderr_worker: Some(stderr_worker),
-            stop_requested: Some(stop_requested),
-        };
-        drop(state);
-
-        if self.config.has_audio
-            && let Err(error) = self.start_audio_streaming(seconds, precise, false)
-        {
-            push_stderr_line(&self.stderr, format!("audio preview disabled: {error}"));
-        }
-
-        Ok(())
+        })
     }
 
     const fn has_visual_stream(&self) -> bool {
@@ -431,13 +588,23 @@ impl RunningPreviewProcess {
         precise: bool,
         mark_ended_on_eof: bool,
     ) -> Result<(), PreviewEngineError> {
-        if !self.config.has_audio {
+        self.start_audio_streaming_with_config(&self.config, seconds, precise, mark_ended_on_eof)
+    }
+
+    fn start_audio_streaming_with_config(
+        &self,
+        config: &PreviewSessionConfig,
+        seconds: f64,
+        precise: bool,
+        mark_ended_on_eof: bool,
+    ) -> Result<(), PreviewEngineError> {
+        if !config.has_audio {
             return Ok(());
         }
 
         self.stop_audio_process()?;
         let output_spec = AudioOutputSpec::default_output()?;
-        let plan = preview_audio_plan(&self.config, seconds, true, precise, output_spec)?;
+        let plan = preview_audio_plan(config, seconds, true, precise, output_spec)?;
         let mut child = Command::new(&self.executable)
             .args(&plan.args)
             .stdin(Stdio::null())
@@ -551,6 +718,15 @@ fn stop_process_handles(handles: ProcessHandles) -> Result<(), PreviewEngineErro
     Ok(())
 }
 
+fn stop_spawned_video_stream(stream: SpawnedVideoStream) -> Result<(), PreviewEngineError> {
+    stop_process_handles(ProcessHandles {
+        child: Some(stream.child),
+        stdout_worker: None,
+        stderr_worker: Some(stream.stderr_worker),
+        stop_requested: Some(stream.stop_requested),
+    })
+}
+
 fn take_process_handles(process: &Mutex<RunningProcessState>) -> ProcessHandles {
     let mut state = lock_process(process);
     ProcessHandles {
@@ -559,6 +735,10 @@ fn take_process_handles(process: &Mutex<RunningProcessState>) -> ProcessHandles 
         stderr_worker: state.stderr_worker.take(),
         stop_requested: state.stop_requested.take(),
     }
+}
+
+fn has_running_child(process: &Mutex<RunningProcessState>) -> bool {
+    lock_process(process).child.is_some()
 }
 
 impl Drop for RunningPreviewProcess {
@@ -632,6 +812,24 @@ fn decode_single_preview_frame(
     )
 }
 
+fn read_stream_frame(
+    stdout: &mut dyn Read,
+    spec: &FrameStreamSpec,
+    timestamp_seconds: f64,
+) -> Result<PreviewFrame, PreviewEngineError> {
+    let mut payload = vec![0_u8; spec.frame_bytes];
+    stdout.read_exact(&mut payload).map_err(|error| {
+        PreviewEngineError::Ffmpeg(format!("failed to read first preview frame: {error}"))
+    })?;
+    PreviewFrame::bgra(
+        spec.width,
+        spec.height,
+        spec.width.saturating_mul(4),
+        seconds_to_us(timestamp_seconds),
+        payload,
+    )
+}
+
 fn spawn_stdout_worker(
     mut stdout: impl Read + Send + 'static,
     frame_store: LatestFrameStore,
@@ -642,7 +840,7 @@ fn spawn_stdout_worker(
     thread::Builder::new()
         .name("frame-preview-ffmpeg-stdout".to_string())
         .spawn(move || {
-            let mut frame_index = 0_u64;
+            let mut frame_index = spec.first_frame_index;
             loop {
                 if stop_requested.load(Ordering::SeqCst) {
                     break;
