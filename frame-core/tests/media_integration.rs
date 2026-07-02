@@ -10,6 +10,7 @@ use std::{
 
 use frame_core::{
     args::{build_ffmpeg_args, validate_stream_copy_compatibility, validate_task_input},
+    preview::{PreviewFfmpegOptions, build_ffmpeg_preview_args},
     probe::{ffprobe_json_args, parse_ffprobe_stdout},
     types::{
         ConversionConfig, CropConfig, MetadataConfig, MetadataMode, OverlayConfig, ProbeMetadata,
@@ -708,6 +709,64 @@ fn subtitle_burn_should_encode_video_when_srt_is_present() -> TestResult {
     Ok(())
 }
 
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn preview_subtitle_burn_should_use_source_time_after_seek() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("preview_subtitle_seek")?;
+    let input = sandbox.path("source.mp4");
+    let subtitle = sandbox.path("delayed.srt");
+
+    generate_black_h264_source(&tools, &input, 2.0, 160, 90)?;
+    write_delayed_srt(&subtitle)?;
+
+    let mut config = video_config("mp4", "libx264", "aac");
+    config.subtitle_burn_path = Some(path_arg(&subtitle));
+    config.subtitle_font_size = Some("24".to_string());
+    config.subtitle_font_color = Some("#ffffff".to_string());
+    config.subtitle_outline_color = Some("#000000".to_string());
+    config.subtitle_position = Some("middle".to_string());
+
+    let plan = build_ffmpeg_preview_args(
+        &path_arg(&input),
+        &config,
+        &PreviewFfmpegOptions {
+            start_seconds: 1.0,
+            end_seconds: Some(1.2),
+            source_width: Some(160),
+            source_height: Some(90),
+            max_width: 160,
+            max_height: 90,
+            fps: 1,
+            realtime: false,
+            precise_seek: true,
+            source_is_image: false,
+        },
+    )
+    .map_err(|error| error.to_string())?;
+
+    let mut args = plan.args.clone();
+    let insert_at = args.len().saturating_sub(1);
+    args.insert(insert_at, "-frames:v".to_string());
+    args.insert(insert_at + 1, "1".to_string());
+    let output = run_tool_output(&tools.ffmpeg, &args)?;
+    if output.len() < plan.frame_bytes {
+        return Err(format!(
+            "preview frame was too short: got {}, expected at least {}",
+            output.len(),
+            plan.frame_bytes
+        ));
+    }
+
+    let visible_pixels = count_visible_bgra_pixels(&output[..plan.frame_bytes]);
+    if visible_pixels < 50 {
+        return Err(format!(
+            "seeked preview did not render delayed subtitle; visible pixel count was {visible_pixels}"
+        ));
+    }
+    Ok(())
+}
+
 fn convert(
     tools: &Toolchain,
     input: &Path,
@@ -940,6 +999,38 @@ fn generate_subtitled_source(tools: &Toolchain, output: &Path, subtitle: &Path) 
     )
 }
 
+fn generate_black_h264_source(
+    tools: &Toolchain,
+    output: &Path,
+    duration: f64,
+    width: u32,
+    height: u32,
+) -> TestResult {
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            &format!("color=c=black:size={width}x{height}:rate=12:duration={duration:.3}"),
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-crf",
+            "28",
+            "-pix_fmt",
+            "yuv420p",
+            "-an",
+            "-y",
+            &path_arg(output),
+        ]),
+    )
+}
+
 fn generate_odd_h264_source(tools: &Toolchain, output: &Path) -> TestResult {
     run_tool(
         &tools.ffmpeg,
@@ -1085,6 +1176,18 @@ fn write_srt(path: &Path) -> TestResult {
         "1\n00:00:00,000 --> 00:00:00,900\nFrame subtitle integration\n",
     )
     .map_err(|error| format!("failed to write {}: {error}", path.display()))
+}
+
+fn write_delayed_srt(path: &Path) -> TestResult {
+    fs::write(path, "1\n00:00:01,000 --> 00:00:01,900\nVISIBLE\n")
+        .map_err(|error| format!("failed to write {}: {error}", path.display()))
+}
+
+fn count_visible_bgra_pixels(bytes: &[u8]) -> usize {
+    bytes
+        .chunks_exact(4)
+        .filter(|pixel| pixel[0] > 35 || pixel[1] > 35 || pixel[2] > 35)
+        .count()
 }
 
 fn assert_color_near(actual: Rgb, expected: Rgb, tolerance: u8, label: &str) -> TestResult {

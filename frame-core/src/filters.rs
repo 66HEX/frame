@@ -10,7 +10,7 @@ pub enum VisualFilterBase {
     Image,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum VisualFilterProfile {
     ExportVideo,
     ExportImage,
@@ -19,6 +19,7 @@ pub enum VisualFilterProfile {
         width: u32,
         height: u32,
         fps: u32,
+        source_time_seconds: f64,
     },
 }
 
@@ -191,11 +192,13 @@ pub fn build_visual_filter_chain(
             width,
             height,
             fps,
+            source_time_seconds,
         } => {
             let mut filters = match base {
                 VisualFilterBase::Video => build_encode_video_filters(config, true),
                 VisualFilterBase::Image => build_video_filters(config, true),
             };
+            apply_preview_subtitle_timebase(&mut filters, source_time_seconds);
             filters.extend(preview_low_res_filters(width, height, fps));
             filters
         }
@@ -220,7 +223,8 @@ pub fn build_visual_filter_complex(
             width,
             height,
             fps,
-        } => build_preview_filter_complex(config, base, width, height, fps),
+            source_time_seconds,
+        } => build_preview_filter_complex(config, base, width, height, fps, source_time_seconds),
     }
 }
 
@@ -282,11 +286,13 @@ fn build_preview_filter_complex(
     width: u32,
     height: u32,
     fps: u32,
+    source_time_seconds: f64,
 ) -> String {
-    let base_filters = match base {
+    let mut base_filters = match base {
         VisualFilterBase::Video => build_encode_video_filters(config, true),
         VisualFilterBase::Image => build_video_filters(config, true),
     };
+    apply_preview_subtitle_timebase(&mut base_filters, source_time_seconds);
     let preview_filters = preview_low_res_filters(width, height, fps);
     let preview_chain = preview_filters.join(",");
 
@@ -299,6 +305,23 @@ fn build_preview_filter_complex(
         filters.extend(preview_filters);
         labeled_filter_chain(&filters, PREVIEW_OUTPUT_LABEL)
     }
+}
+
+fn apply_preview_subtitle_timebase(filters: &mut Vec<String>, source_time_seconds: f64) {
+    if !source_time_seconds.is_finite() || source_time_seconds <= 0.0 {
+        return;
+    }
+
+    let Some(subtitle_index) = filters
+        .iter()
+        .position(|filter| filter.starts_with("subtitles="))
+    else {
+        return;
+    };
+
+    let offset = format_preview_seconds(source_time_seconds);
+    filters.insert(subtitle_index, format!("setpts=PTS+{offset}/TB"));
+    filters.insert(subtitle_index + 2, format!("setpts=PTS-{offset}/TB"));
 }
 
 fn labeled_filter_chain(filters: &[String], output_label: &str) -> String {
@@ -316,6 +339,10 @@ fn preview_low_res_filters(width: u32, height: u32, fps: u32) -> Vec<String> {
         format!("fps={fps}"),
         "format=bgra".to_string(),
     ]
+}
+
+fn format_preview_seconds(seconds: f64) -> String {
+    format!("{seconds:.3}")
 }
 
 #[must_use]
@@ -508,6 +535,56 @@ mod tests {
         let filter = build_encode_overlay_filter_complex(&config);
 
         assert!(filter.contains("[0:v:0]pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0[base]"));
+    }
+
+    #[test]
+    fn preview_low_res_filters_rebase_subtitle_timestamps_for_seeked_video() {
+        let mut config = default_config();
+        config.subtitle_burn_path = Some("/tmp/sub.srt".to_string());
+
+        let filters = build_visual_filter_chain(
+            &config,
+            VisualFilterProfile::PreviewLowRes {
+                base: VisualFilterBase::Video,
+                width: 640,
+                height: 360,
+                fps: 24,
+                source_time_seconds: 10.0,
+            },
+        );
+
+        assert_eq!(
+            filters,
+            vec![
+                "setpts=PTS+10.000/TB",
+                "subtitles='/tmp/sub.srt'",
+                "setpts=PTS-10.000/TB",
+                EVEN_DIMENSIONS_FILTER,
+                "scale=640:360",
+                "setsar=1",
+                "fps=24",
+                "format=bgra",
+            ]
+        );
+    }
+
+    #[test]
+    fn preview_low_res_filters_keep_subtitle_timestamps_for_zero_start() {
+        let mut config = default_config();
+        config.subtitle_burn_path = Some("/tmp/sub.srt".to_string());
+
+        let filters = build_visual_filter_chain(
+            &config,
+            VisualFilterProfile::PreviewLowRes {
+                base: VisualFilterBase::Video,
+                width: 640,
+                height: 360,
+                fps: 24,
+                source_time_seconds: 0.0,
+            },
+        );
+
+        assert!(!filters.iter().any(|filter| filter.starts_with("setpts=")));
     }
 
     #[test]

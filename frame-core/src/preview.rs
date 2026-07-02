@@ -85,6 +85,7 @@ pub fn build_ffmpeg_preview_args(
             width: geometry.preview_width,
             height: geometry.preview_height,
             fps,
+            source_time_seconds: options.start_seconds,
         },
     );
 
@@ -657,6 +658,20 @@ mod tests {
                 .iter()
                 .any(|arg| arg.contains("subtitles='C\\:/Media/John\\'s \\[cut\\]\\,final.srt'"))
         );
+    }
+
+    #[test]
+    fn build_ffmpeg_preview_args_rebases_subtitle_timebase_to_source_seek() {
+        let mut config = default_config();
+        config.subtitle_burn_path = Some("/tmp/sub.srt".to_string());
+        let mut options = default_options();
+        options.start_seconds = 10.0;
+
+        let plan = build_ffmpeg_preview_args("input.mp4", &config, &options).expect("preview args");
+
+        assert!(plan.args.iter().any(|arg| {
+            arg.contains("setpts=PTS+10.000/TB,subtitles='/tmp/sub.srt',setpts=PTS-10.000/TB")
+        }));
     }
 
     #[test]
