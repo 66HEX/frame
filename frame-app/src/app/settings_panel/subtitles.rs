@@ -218,6 +218,31 @@ fn settings_subtitle_burn_button(
     disabled: bool,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    let has_path = config.subtitle_burn_path.is_some();
+
+    div()
+        .flex()
+        .items_center()
+        .gap_2()
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .child(settings_subtitle_load_button(config, disabled, window, cx)),
+        )
+        .child(settings_subtitle_clear_button(
+            disabled || !has_path,
+            window,
+            cx,
+        ))
+}
+
+fn settings_subtitle_load_button(
+    config: &ConversionConfig,
+    disabled: bool,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let colors = button_colors(ButtonVariant::Secondary, false, !disabled);
     let animated = animated_button_colors("settings-subtitle-burn-file", colors, window, cx);
@@ -232,9 +257,8 @@ fn settings_subtitle_burn_button(
         theme::ui_text_owned(label)
     };
 
-    let button = div()
+    div()
         .id("settings-subtitle-burn-file")
-        .relative()
         .h(px(SETTINGS_CONTROL_HEIGHT))
         .w_full()
         .flex()
@@ -242,7 +266,6 @@ fn settings_subtitle_burn_button(
         .justify_center()
         .rounded(px(theme::RADIUS_SM))
         .px(px(10.0))
-        .when(has_path, |this| this.pr(px(32.0)))
         .bg(background)
         .text_size(px(theme::TEXT_LABEL_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
@@ -267,13 +290,7 @@ fn settings_subtitle_burn_button(
             }
             root.prompt_subtitle_burn_file(window, cx);
         }))
-        .child(div().truncate().child(label));
-
-    if has_path {
-        button.child(settings_subtitle_clear_button(disabled, window, cx))
-    } else {
-        button
-    }
+        .child(div().truncate().child(label))
 }
 
 fn settings_subtitle_clear_button(
@@ -281,45 +298,27 @@ fn settings_subtitle_clear_button(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    let hover_transition = hover_motion("settings-subtitle-clear-file-hover", window, cx);
-    let hover_progress = *hover_transition.evaluate(window, cx);
-    let background = mix_color(theme::FRAME_GRAY_100, theme::FRAME_GRAY_200, hover_progress);
-
-    div()
-        .id("settings-subtitle-clear-file")
-        .absolute()
-        .right(px(12.0))
-        .w(px(20.0))
-        .h(px(20.0))
-        .flex()
-        .items_center()
-        .justify_center()
-        .rounded(px(theme::RADIUS_SM))
-        .bg(background)
-        .text_color(color(theme::FRAME_RED))
-        .opacity(if disabled { 0.5 } else { 1.0 })
-        .shadow(button_highlight_shadows())
-        .when(!disabled, |this| {
-            this.hover(gpui::Styled::cursor_pointer)
-                .active(|style| style.bg(color(theme::FRAME_GRAY_200)))
-        })
-        .when(disabled, gpui::Styled::cursor_not_allowed)
-        .on_hover(move |hover, _window, cx| {
-            retarget_hover_motion(&hover_transition, *hover && !disabled, cx);
-        })
-        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-            button_mouse_down(!disabled, window, cx);
-        })
-        .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
-            cx.stop_propagation();
-            if disabled {
-                return;
-            }
-            if root.update_selected_config(|config| apply_subtitle_burn_path(config, None)) {
-                cx.notify();
-            }
-        }))
-        .child(icon_svg(assets::ICON_CLOSE, 12.0, color(theme::FRAME_RED)))
+    frame_icon_button(
+        "settings-subtitle-clear-file",
+        assets::ICON_TRASH,
+        FrameIconButtonVariant::DestructiveGhost,
+        !disabled,
+        FrameIconButtonSize {
+            button: SETTINGS_CONTROL_HEIGHT,
+            icon: FRAME_ICON_SM_SIZE,
+        },
+        window,
+        cx,
+    )
+    .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        cx.stop_propagation();
+        if disabled {
+            return;
+        }
+        if root.update_selected_config(|config| apply_subtitle_burn_path(config, None)) {
+            cx.notify();
+        }
+    }))
 }
 
 fn settings_subtitle_style_controls(
