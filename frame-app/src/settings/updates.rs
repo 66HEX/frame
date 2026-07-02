@@ -2,10 +2,14 @@ use super::{
     model::{
         AUDIO_CHANNEL_DEFINITIONS, AUDIO_CODEC_DEFINITIONS, AudioQualityRange, ConversionConfig,
         DEFAULT_AUDIO_BITRATE_MODE, DEFAULT_AUDIO_CHANNELS, DEFAULT_AUDIO_QUALITY,
-        DEFAULT_AUDIO_VOLUME, DEFAULT_FPS, DEFAULT_GIF_DITHER, DEFAULT_PIXEL_FORMAT,
-        DEFAULT_RESOLUTION, DEFAULT_VIDEO_BITRATE_MODE, FPS_OPTIONS, GIF_DITHER_OPTIONS,
-        GIF_FPS_OPTIONS, MAX_AUDIO_VOLUME, MAX_GIF_COLORS, MAX_GIF_LOOP, MetadataField,
-        MetadataMode, PresetDefinition, ProcessingMode, RESOLUTION_OPTIONS,
+        DEFAULT_AUDIO_VOLUME, DEFAULT_FPS, DEFAULT_GIF_DITHER, DEFAULT_IMAGE_JPEG_HUFFMAN,
+        DEFAULT_IMAGE_PNG_PREDICTION, DEFAULT_IMAGE_TIFF_COMPRESSION, DEFAULT_IMAGE_WEBP_PRESET,
+        DEFAULT_PIXEL_FORMAT, DEFAULT_RESOLUTION, DEFAULT_VIDEO_BITRATE_MODE, FPS_OPTIONS,
+        GIF_DITHER_OPTIONS, GIF_FPS_OPTIONS, IMAGE_JPEG_HUFFMAN_OPTIONS,
+        IMAGE_PNG_PREDICTION_OPTIONS, IMAGE_TIFF_COMPRESSION_OPTIONS, IMAGE_WEBP_PRESET_OPTIONS,
+        MAX_AUDIO_VOLUME, MAX_GIF_COLORS, MAX_GIF_LOOP, MAX_IMAGE_JPEG_QUALITY,
+        MAX_IMAGE_PNG_COMPRESSION, MAX_IMAGE_WEBP_COMPRESSION, MAX_IMAGE_WEBP_QUALITY,
+        MetadataField, MetadataMode, PresetDefinition, ProcessingMode, RESOLUTION_OPTIONS,
         SCALING_ALGORITHM_OPTIONS, SUBTITLE_FONT_SIZES, SourceKind, SourceMetadata,
         SubtitlePosition, VIDEO_CODEC_DEFINITIONS, VIDEO_PIXEL_FORMAT_DEFINITIONS,
     },
@@ -473,6 +477,111 @@ pub fn apply_quality(config: &mut ConversionConfig, quality: u32) -> bool {
     true
 }
 
+pub fn apply_image_jpeg_quality(config: &mut ConversionConfig, quality: u32) -> bool {
+    let quality = quality.clamp(1, MAX_IMAGE_JPEG_QUALITY);
+    if config.image_jpeg_quality == quality {
+        return false;
+    }
+
+    config.image_jpeg_quality = quality;
+    true
+}
+
+pub fn apply_image_jpeg_huffman(config: &mut ConversionConfig, huffman: &str) -> bool {
+    let huffman = huffman.to_ascii_lowercase();
+    if !image_option_is_known(&IMAGE_JPEG_HUFFMAN_OPTIONS, &huffman) {
+        return false;
+    }
+
+    if config.image_jpeg_huffman == huffman {
+        return false;
+    }
+
+    config.image_jpeg_huffman = huffman;
+    true
+}
+
+pub const fn apply_image_webp_lossless(config: &mut ConversionConfig, enabled: bool) -> bool {
+    if config.image_webp_lossless == enabled {
+        return false;
+    }
+
+    config.image_webp_lossless = enabled;
+    true
+}
+
+pub fn apply_image_webp_quality(config: &mut ConversionConfig, quality: u32) -> bool {
+    let quality = quality.min(MAX_IMAGE_WEBP_QUALITY);
+    if config.image_webp_quality == quality {
+        return false;
+    }
+
+    config.image_webp_quality = quality;
+    true
+}
+
+pub fn apply_image_webp_compression(config: &mut ConversionConfig, compression: u32) -> bool {
+    let compression = compression.min(MAX_IMAGE_WEBP_COMPRESSION);
+    if config.image_webp_compression == compression {
+        return false;
+    }
+
+    config.image_webp_compression = compression;
+    true
+}
+
+pub fn apply_image_webp_preset(config: &mut ConversionConfig, preset: &str) -> bool {
+    let preset = preset.to_ascii_lowercase();
+    if !image_option_is_known(&IMAGE_WEBP_PRESET_OPTIONS, &preset) {
+        return false;
+    }
+
+    if config.image_webp_preset == preset {
+        return false;
+    }
+
+    config.image_webp_preset = preset;
+    true
+}
+
+pub fn apply_image_png_compression(config: &mut ConversionConfig, compression: u32) -> bool {
+    let compression = compression.min(MAX_IMAGE_PNG_COMPRESSION);
+    if config.image_png_compression == compression {
+        return false;
+    }
+
+    config.image_png_compression = compression;
+    true
+}
+
+pub fn apply_image_png_prediction(config: &mut ConversionConfig, prediction: &str) -> bool {
+    let prediction = prediction.to_ascii_lowercase();
+    if !image_option_is_known(&IMAGE_PNG_PREDICTION_OPTIONS, &prediction) {
+        return false;
+    }
+
+    if config.image_png_prediction == prediction {
+        return false;
+    }
+
+    config.image_png_prediction = prediction;
+    true
+}
+
+pub fn apply_image_tiff_compression(config: &mut ConversionConfig, compression: &str) -> bool {
+    let compression = compression.to_ascii_lowercase();
+    if !image_option_is_known(&IMAGE_TIFF_COMPRESSION_OPTIONS, &compression) {
+        return false;
+    }
+
+    if config.image_tiff_compression == compression {
+        return false;
+    }
+
+    config.image_tiff_compression = compression;
+    true
+}
+
 pub fn apply_nvenc_spatial_aq(config: &mut ConversionConfig, enabled: bool) -> bool {
     if !is_nvenc_video_codec(&config.video_codec) || config.nvenc_spatial_aq == enabled {
         return false;
@@ -694,6 +803,8 @@ pub fn normalize_video_config(
         config.hw_decode = false;
     }
 
+    normalize_image_encoding_settings(config);
+
     config.gif_colors = config.gif_colors.clamp(2, MAX_GIF_COLORS);
     if !GIF_DITHER_OPTIONS.contains(&config.gif_dither.as_str()) {
         config.gif_dither = DEFAULT_GIF_DITHER.to_string();
@@ -715,6 +826,33 @@ fn normalize_audio_encoding_settings(config: &mut ConversionConfig) {
 
     config.audio_quality = normalized_audio_quality(&config.audio_codec, &config.audio_quality);
     config.audio_volume = config.audio_volume.min(MAX_AUDIO_VOLUME);
+}
+
+fn normalize_image_encoding_settings(config: &mut ConversionConfig) {
+    config.image_jpeg_quality = config.image_jpeg_quality.clamp(1, MAX_IMAGE_JPEG_QUALITY);
+    if !image_option_is_known(&IMAGE_JPEG_HUFFMAN_OPTIONS, &config.image_jpeg_huffman) {
+        config.image_jpeg_huffman = DEFAULT_IMAGE_JPEG_HUFFMAN.to_string();
+    }
+
+    config.image_webp_quality = config.image_webp_quality.min(MAX_IMAGE_WEBP_QUALITY);
+    config.image_webp_compression = config
+        .image_webp_compression
+        .min(MAX_IMAGE_WEBP_COMPRESSION);
+    if !image_option_is_known(&IMAGE_WEBP_PRESET_OPTIONS, &config.image_webp_preset) {
+        config.image_webp_preset = DEFAULT_IMAGE_WEBP_PRESET.to_string();
+    }
+
+    config.image_png_compression = config.image_png_compression.min(MAX_IMAGE_PNG_COMPRESSION);
+    if !image_option_is_known(&IMAGE_PNG_PREDICTION_OPTIONS, &config.image_png_prediction) {
+        config.image_png_prediction = DEFAULT_IMAGE_PNG_PREDICTION.to_string();
+    }
+
+    if !image_option_is_known(
+        &IMAGE_TIFF_COMPRESSION_OPTIONS,
+        &config.image_tiff_compression,
+    ) {
+        config.image_tiff_compression = DEFAULT_IMAGE_TIFF_COMPRESSION.to_string();
+    }
 }
 
 fn reset_audio_filter_settings(config: &mut ConversionConfig) {
@@ -820,6 +958,15 @@ fn is_known_pixel_format(pixel_format: &str) -> bool {
     VIDEO_PIXEL_FORMAT_DEFINITIONS
         .iter()
         .any(|definition| definition.id == pixel_format)
+}
+
+fn image_option_is_known(
+    definitions: &[super::model::ImageEncodingOptionDefinition],
+    value: &str,
+) -> bool {
+    definitions
+        .iter()
+        .any(|definition| definition.id.eq_ignore_ascii_case(value))
 }
 
 fn sanitized_optional_number(value: &str) -> Option<String> {

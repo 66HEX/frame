@@ -603,7 +603,7 @@ impl FrameRoot {
             };
             if !is_supported_overlay_image_path(&path) {
                 return;
-            };
+            }
             let dimensions = cx
                 .background_spawn({
                     let path = path.clone();

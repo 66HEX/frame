@@ -11,6 +11,14 @@ pub const DEFAULT_CRF: u8 = 23;
 pub const DEFAULT_QUALITY: u32 = 50;
 pub const DEFAULT_PRESET: &str = "medium";
 pub const DEFAULT_PIXEL_FORMAT: &str = "auto";
+pub const DEFAULT_IMAGE_JPEG_QUALITY: u32 = 85;
+pub const DEFAULT_IMAGE_JPEG_HUFFMAN: &str = "optimal";
+pub const DEFAULT_IMAGE_WEBP_QUALITY: u32 = 75;
+pub const DEFAULT_IMAGE_WEBP_COMPRESSION: u32 = 4;
+pub const DEFAULT_IMAGE_WEBP_PRESET: &str = "default";
+pub const DEFAULT_IMAGE_PNG_COMPRESSION: u32 = 9;
+pub const DEFAULT_IMAGE_PNG_PREDICTION: &str = "paeth";
+pub const DEFAULT_IMAGE_TIFF_COMPRESSION: &str = "packbits";
 pub const DEFAULT_GIF_COLORS: u16 = 256;
 pub const DEFAULT_GIF_DITHER: &str = "sierra2_4a";
 pub const DEFAULT_GIF_LOOP: u16 = 0;
@@ -26,6 +34,10 @@ pub const DEFAULT_SUBTITLE_POSITION: SubtitlePosition = SubtitlePosition::Bottom
 pub(super) const MAX_AUDIO_VOLUME: u32 = 200;
 pub(super) const MAX_GIF_LOOP: u16 = 65_535;
 pub(super) const MAX_GIF_COLORS: u16 = 256;
+pub(super) const MAX_IMAGE_JPEG_QUALITY: u32 = 100;
+pub(super) const MAX_IMAGE_WEBP_QUALITY: u32 = 100;
+pub(super) const MAX_IMAGE_WEBP_COMPRESSION: u32 = 6;
+pub(super) const MAX_IMAGE_PNG_COMPRESSION: u32 = 9;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SettingsTab {
@@ -443,6 +455,15 @@ pub struct ConversionConfig {
     pub quality: u32,
     pub preset: String,
     pub pixel_format: String,
+    pub image_jpeg_quality: u32,
+    pub image_jpeg_huffman: String,
+    pub image_webp_lossless: bool,
+    pub image_webp_quality: u32,
+    pub image_webp_compression: u32,
+    pub image_webp_preset: String,
+    pub image_png_compression: u32,
+    pub image_png_prediction: String,
+    pub image_tiff_compression: String,
     pub gif_colors: u16,
     pub gif_dither: String,
     pub gif_loop: u16,
@@ -492,6 +513,15 @@ impl Default for ConversionConfig {
             quality: DEFAULT_QUALITY,
             preset: DEFAULT_PRESET.to_string(),
             pixel_format: DEFAULT_PIXEL_FORMAT.to_string(),
+            image_jpeg_quality: DEFAULT_IMAGE_JPEG_QUALITY,
+            image_jpeg_huffman: DEFAULT_IMAGE_JPEG_HUFFMAN.to_string(),
+            image_webp_lossless: false,
+            image_webp_quality: DEFAULT_IMAGE_WEBP_QUALITY,
+            image_webp_compression: DEFAULT_IMAGE_WEBP_COMPRESSION,
+            image_webp_preset: DEFAULT_IMAGE_WEBP_PRESET.to_string(),
+            image_png_compression: DEFAULT_IMAGE_PNG_COMPRESSION,
+            image_png_prediction: DEFAULT_IMAGE_PNG_PREDICTION.to_string(),
+            image_tiff_compression: DEFAULT_IMAGE_TIFF_COMPRESSION.to_string(),
             gif_colors: DEFAULT_GIF_COLORS,
             gif_dither: DEFAULT_GIF_DITHER.to_string(),
             gif_loop: DEFAULT_GIF_LOOP,
@@ -585,6 +615,15 @@ pub struct VideoPixelFormatOption {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct VideoPresetOption {
     pub preset: &'static str,
+    pub label: &'static str,
+    pub caption: &'static str,
+    pub is_selected: bool,
+    pub is_disabled: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ImageEncodingOption {
+    pub id: &'static str,
     pub label: &'static str,
     pub caption: &'static str,
     pub is_selected: bool,
@@ -894,6 +933,115 @@ pub(super) const VIDEO_PIXEL_FORMAT_DEFINITIONS: [VideoPixelFormatDefinition; 7]
     VideoPixelFormatDefinition {
         id: "yuv444p10le",
         label: "YUV 4:4:4 (10-bit)",
+    },
+];
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct ImageEncodingOptionDefinition {
+    pub(super) id: &'static str,
+    pub(super) label: &'static str,
+    pub(super) caption: &'static str,
+}
+
+pub(super) const IMAGE_JPEG_HUFFMAN_OPTIONS: [ImageEncodingOptionDefinition; 2] = [
+    ImageEncodingOptionDefinition {
+        id: "optimal",
+        label: "Optimized",
+        caption: "Smaller files, slower encode",
+    },
+    ImageEncodingOptionDefinition {
+        id: "default",
+        label: "Default",
+        caption: "Fast standard tables",
+    },
+];
+
+pub(super) const IMAGE_WEBP_PRESET_OPTIONS: [ImageEncodingOptionDefinition; 6] = [
+    ImageEncodingOptionDefinition {
+        id: "default",
+        label: "Default",
+        caption: "Balanced encoder defaults",
+    },
+    ImageEncodingOptionDefinition {
+        id: "picture",
+        label: "Picture",
+        caption: "Portraits and indoor shots",
+    },
+    ImageEncodingOptionDefinition {
+        id: "photo",
+        label: "Photo",
+        caption: "Natural outdoor images",
+    },
+    ImageEncodingOptionDefinition {
+        id: "drawing",
+        label: "Drawing",
+        caption: "Lines and high contrast",
+    },
+    ImageEncodingOptionDefinition {
+        id: "icon",
+        label: "Icon",
+        caption: "Small colorful graphics",
+    },
+    ImageEncodingOptionDefinition {
+        id: "text",
+        label: "Text",
+        caption: "Text-like imagery",
+    },
+];
+
+pub(super) const IMAGE_PNG_PREDICTION_OPTIONS: [ImageEncodingOptionDefinition; 6] = [
+    ImageEncodingOptionDefinition {
+        id: "paeth",
+        label: "Paeth",
+        caption: "PNG default",
+    },
+    ImageEncodingOptionDefinition {
+        id: "mixed",
+        label: "Mixed",
+        caption: "Adaptive prediction",
+    },
+    ImageEncodingOptionDefinition {
+        id: "sub",
+        label: "Sub",
+        caption: "Horizontal predictor",
+    },
+    ImageEncodingOptionDefinition {
+        id: "up",
+        label: "Up",
+        caption: "Vertical predictor",
+    },
+    ImageEncodingOptionDefinition {
+        id: "avg",
+        label: "Average",
+        caption: "Average predictor",
+    },
+    ImageEncodingOptionDefinition {
+        id: "none",
+        label: "None",
+        caption: "No prediction",
+    },
+];
+
+pub(super) const IMAGE_TIFF_COMPRESSION_OPTIONS: [ImageEncodingOptionDefinition; 4] = [
+    ImageEncodingOptionDefinition {
+        id: "packbits",
+        label: "PackBits",
+        caption: "Fast lossless default",
+    },
+    ImageEncodingOptionDefinition {
+        id: "lzw",
+        label: "LZW",
+        caption: "Broad lossless support",
+    },
+    ImageEncodingOptionDefinition {
+        id: "deflate",
+        label: "Deflate",
+        caption: "Smaller lossless output",
+    },
+    ImageEncodingOptionDefinition {
+        id: "raw",
+        label: "Raw",
+        caption: "Uncompressed pixels",
     },
 ];
 

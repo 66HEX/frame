@@ -126,6 +126,24 @@ pub struct ConversionConfig {
     pub hw_decode: bool,
     #[serde(default = "default_pixel_format")]
     pub pixel_format: String,
+    #[serde(default = "default_image_jpeg_quality")]
+    pub image_jpeg_quality: u32,
+    #[serde(default = "default_image_jpeg_huffman")]
+    pub image_jpeg_huffman: String,
+    #[serde(default)]
+    pub image_webp_lossless: bool,
+    #[serde(default = "default_image_webp_quality")]
+    pub image_webp_quality: u32,
+    #[serde(default = "default_image_webp_compression")]
+    pub image_webp_compression: u32,
+    #[serde(default = "default_image_webp_preset")]
+    pub image_webp_preset: String,
+    #[serde(default = "default_image_png_compression")]
+    pub image_png_compression: u32,
+    #[serde(default = "default_image_png_prediction")]
+    pub image_png_prediction: String,
+    #[serde(default = "default_image_tiff_compression")]
+    pub image_tiff_compression: String,
     #[serde(default = "default_gif_colors")]
     pub gif_colors: u16,
     #[serde(default = "default_gif_dither")]
@@ -168,6 +186,38 @@ const fn default_hw_decode() -> bool {
 
 fn default_pixel_format() -> String {
     "auto".to_string()
+}
+
+const fn default_image_jpeg_quality() -> u32 {
+    85
+}
+
+fn default_image_jpeg_huffman() -> String {
+    "optimal".to_string()
+}
+
+const fn default_image_webp_quality() -> u32 {
+    75
+}
+
+const fn default_image_webp_compression() -> u32 {
+    4
+}
+
+fn default_image_webp_preset() -> String {
+    "default".to_string()
+}
+
+const fn default_image_png_compression() -> u32 {
+    9
+}
+
+fn default_image_png_prediction() -> String {
+    "paeth".to_string()
+}
+
+fn default_image_tiff_compression() -> String {
+    "packbits".to_string()
 }
 
 const fn default_gif_colors() -> u16 {
@@ -370,6 +420,15 @@ mod tests {
         assert_eq!(config.quality, 50);
         assert_eq!(config.rotation, "0");
         assert_eq!(config.pixel_format, "auto");
+        assert_eq!(config.image_jpeg_quality, 85);
+        assert_eq!(config.image_jpeg_huffman, "optimal");
+        assert!(!config.image_webp_lossless);
+        assert_eq!(config.image_webp_quality, 75);
+        assert_eq!(config.image_webp_compression, 4);
+        assert_eq!(config.image_webp_preset, "default");
+        assert_eq!(config.image_png_compression, 9);
+        assert_eq!(config.image_png_prediction, "paeth");
+        assert_eq!(config.image_tiff_compression, "packbits");
         assert_eq!(config.gif_colors, 256);
         assert_eq!(config.gif_dither, "sierra2_4a");
         assert_eq!(config.gif_loop, 0);
@@ -383,6 +442,9 @@ mod tests {
 
         assert_eq!(serialized["processingMode"], "reencode");
         assert_eq!(serialized["audioBitrateMode"], "bitrate");
+        assert_eq!(serialized["imageJpegQuality"], 85);
+        assert_eq!(serialized["imageWebpPreset"], "default");
+        assert_eq!(serialized["imagePngPrediction"], "paeth");
         assert_eq!(serialized["metadata"]["mode"], "preserve");
         assert!(serialized.get("processing_mode").is_none());
     }

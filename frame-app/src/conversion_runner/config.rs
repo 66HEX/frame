@@ -40,37 +40,13 @@ pub fn core_config_from_gpui(config: &GpuiConversionConfig) -> CoreConversionCon
         } else {
             config.video_codec.clone()
         },
-        video_bitrate_mode: if config.video_bitrate_mode.is_empty() {
-            DEFAULT_VIDEO_BITRATE_MODE.to_string()
-        } else {
-            config.video_bitrate_mode.clone()
-        },
-        video_bitrate: if config.video_bitrate.is_empty() {
-            DEFAULT_VIDEO_BITRATE.to_string()
-        } else {
-            config.video_bitrate.clone()
-        },
+        video_bitrate_mode: non_empty_or(&config.video_bitrate_mode, DEFAULT_VIDEO_BITRATE_MODE),
+        video_bitrate: non_empty_or(&config.video_bitrate, DEFAULT_VIDEO_BITRATE),
         audio_codec: config.audio_codec.clone(),
-        audio_bitrate: if config.audio_bitrate.is_empty() {
-            DEFAULT_AUDIO_BITRATE.to_string()
-        } else {
-            config.audio_bitrate.clone()
-        },
-        audio_bitrate_mode: if config.audio_bitrate_mode.is_empty() {
-            DEFAULT_AUDIO_BITRATE_MODE.to_string()
-        } else {
-            config.audio_bitrate_mode.clone()
-        },
-        audio_quality: if config.audio_quality.is_empty() {
-            DEFAULT_AUDIO_QUALITY.to_string()
-        } else {
-            config.audio_quality.clone()
-        },
-        audio_channels: if config.audio_channels.is_empty() {
-            DEFAULT_AUDIO_CHANNELS.to_string()
-        } else {
-            config.audio_channels.clone()
-        },
+        audio_bitrate: non_empty_or(&config.audio_bitrate, DEFAULT_AUDIO_BITRATE),
+        audio_bitrate_mode: non_empty_or(&config.audio_bitrate_mode, DEFAULT_AUDIO_BITRATE_MODE),
+        audio_quality: non_empty_or(&config.audio_quality, DEFAULT_AUDIO_QUALITY),
+        audio_channels: non_empty_or(&config.audio_channels, DEFAULT_AUDIO_CHANNELS),
         audio_volume: f64::from(config.audio_volume.min(200)),
         audio_normalize: config.audio_normalize,
         selected_audio_tracks: config.selected_audio_tracks.clone(),
@@ -81,30 +57,14 @@ pub fn core_config_from_gpui(config: &GpuiConversionConfig) -> CoreConversionCon
         subtitle_font_color: config.subtitle_font_color.clone(),
         subtitle_outline_color: config.subtitle_outline_color.clone(),
         subtitle_position: config.subtitle_position.clone(),
-        resolution: if config.resolution.is_empty() {
-            DEFAULT_RESOLUTION.to_string()
-        } else {
-            config.resolution.clone()
-        },
+        resolution: non_empty_or(&config.resolution, DEFAULT_RESOLUTION),
         custom_width: config.custom_width.clone(),
         custom_height: config.custom_height.clone(),
-        scaling_algorithm: if config.scaling_algorithm.is_empty() {
-            DEFAULT_SCALING_ALGORITHM.to_string()
-        } else {
-            config.scaling_algorithm.clone()
-        },
-        fps: if config.fps.is_empty() {
-            DEFAULT_FPS.to_string()
-        } else {
-            config.fps.clone()
-        },
+        scaling_algorithm: non_empty_or(&config.scaling_algorithm, DEFAULT_SCALING_ALGORITHM),
+        fps: non_empty_or(&config.fps, DEFAULT_FPS),
         crf: config.crf.min(51),
         quality: config.quality.clamp(1, 100),
-        preset: if config.preset.is_empty() {
-            DEFAULT_PRESET.to_string()
-        } else {
-            config.preset.clone()
-        },
+        preset: non_empty_or(&config.preset, DEFAULT_PRESET),
         start_time: config.start_time.clone(),
         end_time: config.end_time.clone(),
         metadata: core_metadata_from_gpui(&config.metadata),
@@ -117,18 +77,27 @@ pub fn core_config_from_gpui(config: &GpuiConversionConfig) -> CoreConversionCon
         nvenc_temporal_aq: config.nvenc_temporal_aq,
         videotoolbox_allow_sw: config.videotoolbox_allow_sw,
         hw_decode: config.hw_decode,
-        pixel_format: if config.pixel_format.is_empty() {
-            DEFAULT_PIXEL_FORMAT.to_string()
-        } else {
-            config.pixel_format.clone()
-        },
+        pixel_format: non_empty_or(&config.pixel_format, DEFAULT_PIXEL_FORMAT),
+        image_jpeg_quality: config.image_jpeg_quality.clamp(1, 100),
+        image_jpeg_huffman: config.image_jpeg_huffman.clone(),
+        image_webp_lossless: config.image_webp_lossless,
+        image_webp_quality: config.image_webp_quality.min(100),
+        image_webp_compression: config.image_webp_compression.min(6),
+        image_webp_preset: config.image_webp_preset.clone(),
+        image_png_compression: config.image_png_compression.min(9),
+        image_png_prediction: config.image_png_prediction.clone(),
+        image_tiff_compression: config.image_tiff_compression.clone(),
         gif_colors: config.gif_colors.clamp(2, DEFAULT_GIF_COLORS),
-        gif_dither: if config.gif_dither.is_empty() {
-            DEFAULT_GIF_DITHER.to_string()
-        } else {
-            config.gif_dither.clone()
-        },
+        gif_dither: non_empty_or(&config.gif_dither, DEFAULT_GIF_DITHER),
         gif_loop: config.gif_loop,
+    }
+}
+
+fn non_empty_or(value: &str, fallback: &str) -> String {
+    if value.is_empty() {
+        fallback.to_string()
+    } else {
+        value.to_string()
     }
 }
 

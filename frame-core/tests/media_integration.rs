@@ -745,7 +745,8 @@ fn video_config(container: &str, video_codec: &str, audio_codec: &str) -> Conver
 
 fn image_config(container: &str, video_codec: &str) -> ConversionConfig {
     let mut config = base_config(container, video_codec);
-    config.quality = 85;
+    config.image_jpeg_quality = 85;
+    config.image_webp_quality = 85;
     config
 }
 
@@ -798,6 +799,15 @@ fn base_config(container: &str, video_codec: &str) -> ConversionConfig {
         videotoolbox_allow_sw: false,
         hw_decode: false,
         pixel_format: "auto".to_string(),
+        image_jpeg_quality: 85,
+        image_jpeg_huffman: "optimal".to_string(),
+        image_webp_lossless: false,
+        image_webp_quality: 75,
+        image_webp_compression: 4,
+        image_webp_preset: "default".to_string(),
+        image_png_compression: 9,
+        image_png_prediction: "paeth".to_string(),
+        image_tiff_compression: "packbits".to_string(),
         gif_colors: 256,
         gif_dither: "sierra2_4a".to_string(),
         gif_loop: 0,

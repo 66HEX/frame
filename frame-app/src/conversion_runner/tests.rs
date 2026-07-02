@@ -70,6 +70,15 @@ fn core_config_from_gpui_preserves_active_conversion_fields() {
         quality: 60,
         preset: "slow".to_string(),
         pixel_format: "yuv420p10le".to_string(),
+        image_jpeg_quality: 92,
+        image_jpeg_huffman: "optimal".to_string(),
+        image_webp_lossless: true,
+        image_webp_quality: 88,
+        image_webp_compression: 6,
+        image_webp_preset: "photo".to_string(),
+        image_png_compression: 8,
+        image_png_prediction: "mixed".to_string(),
+        image_tiff_compression: "deflate".to_string(),
         gif_colors: 128,
         gif_dither: "floyd_steinberg".to_string(),
         gif_loop: 3,
@@ -99,6 +108,15 @@ fn core_config_from_gpui_preserves_active_conversion_fields() {
     assert_eq!(core.quality, 60);
     assert_eq!(core.preset, "slow");
     assert_eq!(core.pixel_format, "yuv420p10le");
+    assert_eq!(core.image_jpeg_quality, 92);
+    assert_eq!(core.image_jpeg_huffman, "optimal");
+    assert!(core.image_webp_lossless);
+    assert_eq!(core.image_webp_quality, 88);
+    assert_eq!(core.image_webp_compression, 6);
+    assert_eq!(core.image_webp_preset, "photo");
+    assert_eq!(core.image_png_compression, 8);
+    assert_eq!(core.image_png_prediction, "mixed");
+    assert_eq!(core.image_tiff_compression, "deflate");
     assert_eq!(core.gif_colors, 128);
     assert_eq!(core.gif_dither, "floyd_steinberg");
     assert_eq!(core.gif_loop, 3);
@@ -341,6 +359,44 @@ fn run_conversion_task_should_emit_completed_for_real_ffmpeg_job() {
     );
 }
 
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn run_conversion_task_should_emit_completed_for_real_image_encoding_job() {
+    let sandbox = ConversionRunnerSandbox::new("real-image-encoding-job");
+    let input = sandbox.path("source.png");
+    let output_name = "runner-output.webp";
+    let output = sandbox.path(output_name);
+    generate_runner_image_source(&input);
+    let config = GpuiConversionConfig {
+        container: "webp".to_string(),
+        video_codec: "libwebp".to_string(),
+        image_webp_lossless: true,
+        image_webp_quality: 90,
+        image_webp_compression: 6,
+        image_webp_preset: "photo".to_string(),
+        ..GpuiConversionConfig::default()
+    };
+    let task = ConversionTask {
+        id: "task-image-real".to_string(),
+        file_path: input.to_string_lossy().into_owned(),
+        output_name: Some(output_name.to_string()),
+        config: core_config_from_gpui(&config),
+    };
+    let mut events = Vec::new();
+
+    run_conversion_task(task, |event| events.push(event))
+        .expect("real ffmpeg image conversion should succeed");
+
+    assert!(output.is_file(), "{} should be created", output.display());
+    assert!(
+        events
+            .iter()
+            .any(|event| matches!(event, ConversionEvent::Completed(payload) if payload.output_path == output.to_string_lossy())),
+        "runner should emit a Completed event for {}",
+        output.display()
+    );
+}
+
 struct ConversionRunnerSandbox {
     root: PathBuf,
     keep: bool,
@@ -418,5 +474,31 @@ fn generate_runner_source(output: &Path) {
     assert!(
         status.success(),
         "ffmpeg fixture generation failed with {status}"
+    );
+}
+
+fn generate_runner_image_source(output: &Path) {
+    let status = Command::new(crate::runtime_binaries::ffmpeg_executable())
+        .args([
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=64x48:rate=1",
+            "-frames:v",
+            "1",
+            "-update",
+            "1",
+            "-y",
+        ])
+        .arg(output)
+        .status()
+        .expect("ffmpeg should start to generate image fixture");
+
+    assert!(
+        status.success(),
+        "ffmpeg image fixture generation failed with {status}"
     );
 }

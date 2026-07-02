@@ -70,15 +70,19 @@ pub const OVERLAY_IMAGE_DIALOG_SPEC: NativeDialogSpec = NativeDialogSpec {
 };
 
 pub async fn pick_source_files(dialog: AsyncFileDialog) -> Option<Vec<PathBuf>> {
-    dialog.pick_files().await.map(file_handles_to_paths)
+    dialog
+        .pick_files()
+        .await
+        .as_deref()
+        .map(file_handles_to_paths)
 }
 
 pub async fn pick_subtitle_file(dialog: AsyncFileDialog) -> Option<PathBuf> {
-    dialog.pick_file().await.map(file_handle_to_path)
+    dialog.pick_file().await.as_ref().map(file_handle_to_path)
 }
 
 pub async fn pick_overlay_image_file(dialog: AsyncFileDialog) -> Option<PathBuf> {
-    dialog.pick_file().await.map(file_handle_to_path)
+    dialog.pick_file().await.as_ref().map(file_handle_to_path)
 }
 
 #[must_use]
@@ -104,14 +108,11 @@ fn file_dialog_from_spec(spec: NativeDialogSpec) -> AsyncFileDialog {
     dialog
 }
 
-fn file_handles_to_paths(handles: Vec<FileHandle>) -> Vec<PathBuf> {
-    handles
-        .into_iter()
-        .map(|handle| file_handle_to_path(handle))
-        .collect()
+fn file_handles_to_paths(handles: &[FileHandle]) -> Vec<PathBuf> {
+    handles.iter().map(file_handle_to_path).collect()
 }
 
-fn file_handle_to_path(handle: FileHandle) -> PathBuf {
+fn file_handle_to_path(handle: &FileHandle) -> PathBuf {
     handle.path().to_path_buf()
 }
 

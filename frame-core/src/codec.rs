@@ -17,10 +17,7 @@ pub fn add_video_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
     args.push(config.video_codec.clone());
 
     if is_still_image_codec {
-        if config.video_codec == "mjpeg" || config.video_codec == "libwebp" {
-            args.push("-q:v".to_string());
-            args.push(config.quality.to_string());
-        }
+        add_still_image_codec_args(args, config);
         return;
     }
 
@@ -67,6 +64,82 @@ pub fn add_video_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
     if is_videotoolbox && config.videotoolbox_allow_sw {
         args.push("-allow_sw".to_string());
         args.push("1".to_string());
+    }
+}
+
+fn add_still_image_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
+    match config.video_codec.as_str() {
+        "mjpeg" => {
+            args.push("-q:v".to_string());
+            args.push(jpeg_quality_to_qscale(config.image_jpeg_quality).to_string());
+            args.push("-huffman".to_string());
+            args.push(normalize_jpeg_huffman(&config.image_jpeg_huffman).to_string());
+        }
+        "libwebp" => {
+            args.push("-lossless".to_string());
+            args.push(if config.image_webp_lossless { "1" } else { "0" }.to_string());
+            args.push("-quality".to_string());
+            args.push(config.image_webp_quality.min(100).to_string());
+            args.push("-compression_level".to_string());
+            args.push(config.image_webp_compression.min(6).to_string());
+            args.push("-preset".to_string());
+            args.push(normalize_webp_preset(&config.image_webp_preset).to_string());
+        }
+        "png" => {
+            args.push("-compression_level".to_string());
+            args.push(config.image_png_compression.min(9).to_string());
+            args.push("-pred".to_string());
+            args.push(normalize_png_prediction(&config.image_png_prediction).to_string());
+        }
+        "tiff" => {
+            args.push("-compression_algo".to_string());
+            args.push(normalize_tiff_compression(&config.image_tiff_compression).to_string());
+        }
+        _ => {}
+    }
+}
+
+#[must_use]
+pub fn jpeg_quality_to_qscale(quality: u32) -> u32 {
+    let quality = quality.clamp(1, 100);
+    2 + ((100 - quality) * 29 + 49) / 99
+}
+
+fn normalize_jpeg_huffman(value: &str) -> &'static str {
+    match value {
+        "default" => "default",
+        _ => "optimal",
+    }
+}
+
+fn normalize_webp_preset(value: &str) -> &'static str {
+    match value {
+        "picture" => "picture",
+        "photo" => "photo",
+        "drawing" => "drawing",
+        "icon" => "icon",
+        "text" => "text",
+        _ => "default",
+    }
+}
+
+fn normalize_png_prediction(value: &str) -> &'static str {
+    match value {
+        "none" => "none",
+        "sub" => "sub",
+        "up" => "up",
+        "avg" => "avg",
+        "mixed" => "mixed",
+        _ => "paeth",
+    }
+}
+
+fn normalize_tiff_compression(value: &str) -> &'static str {
+    match value {
+        "raw" => "raw",
+        "lzw" => "lzw",
+        "deflate" => "deflate",
+        _ => "packbits",
     }
 }
 
@@ -157,5 +230,20 @@ pub fn add_fps_args(args: &mut Vec<String>, config: &ConversionConfig) {
     if config.fps != "original" {
         args.push("-r".to_string());
         args.push(config.fps.clone());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn jpeg_quality_to_qscale_maps_best_quality_to_low_quantizer() {
+        assert_eq!(jpeg_quality_to_qscale(100), 2);
+    }
+
+    #[test]
+    fn jpeg_quality_to_qscale_maps_lowest_quality_to_high_quantizer() {
+        assert_eq!(jpeg_quality_to_qscale(1), 31);
     }
 }

@@ -4,11 +4,13 @@ use super::{
     model::{
         AUDIO_CHANNEL_DEFINITIONS, AUDIO_CODEC_DEFINITIONS, AudioChannelOption, AudioCodecOption,
         AudioTrackOption, ConversionConfig, FPS_OPTIONS, GIF_COLOR_OPTIONS, GIF_DITHER_OPTIONS,
-        GIF_FPS_OPTIONS, METADATA_FIELDS, METADATA_MODES, MetadataConfig, MetadataField,
-        MetadataFieldOption, MetadataMode, MetadataModeOption, OPTIONAL_AUDIO_CODEC_DEFINITIONS,
-        OutputContainerOption, OutputModeOption, PresetDefinition, PresetOption, ProcessingMode,
-        RESOLUTION_OPTIONS, SCALING_ALGORITHM_OPTIONS, SUBTITLE_FONT_SIZES, SUBTITLE_POSITIONS,
-        SourceKind, SourceMetadata, SubtitleFontOption, SubtitleFontSizeOption, SubtitlePosition,
+        GIF_FPS_OPTIONS, IMAGE_JPEG_HUFFMAN_OPTIONS, IMAGE_PNG_PREDICTION_OPTIONS,
+        IMAGE_TIFF_COMPRESSION_OPTIONS, IMAGE_WEBP_PRESET_OPTIONS, ImageEncodingOption,
+        METADATA_FIELDS, METADATA_MODES, MetadataConfig, MetadataField, MetadataFieldOption,
+        MetadataMode, MetadataModeOption, OPTIONAL_AUDIO_CODEC_DEFINITIONS, OutputContainerOption,
+        OutputModeOption, PresetDefinition, PresetOption, ProcessingMode, RESOLUTION_OPTIONS,
+        SCALING_ALGORITHM_OPTIONS, SUBTITLE_FONT_SIZES, SUBTITLE_POSITIONS, SourceKind,
+        SourceMetadata, SubtitleFontOption, SubtitleFontSizeOption, SubtitlePosition,
         SubtitlePositionOption, SubtitleTrackOption, VIDEO_CODEC_DEFINITIONS,
         VIDEO_PIXEL_FORMAT_DEFINITIONS, VIDEO_PRESETS, VideoCodecCapability, VideoCodecOption,
         VideoPixelFormatOption, VideoPresetOption,
@@ -558,6 +560,71 @@ pub const fn gif_color_options() -> &'static [u16] {
 #[must_use]
 pub const fn gif_dither_options() -> &'static [&'static str] {
     &GIF_DITHER_OPTIONS
+}
+
+#[must_use]
+pub fn image_jpeg_huffman_options(
+    config: &ConversionConfig,
+    disabled: bool,
+) -> Vec<ImageEncodingOption> {
+    image_encoding_options(
+        &IMAGE_JPEG_HUFFMAN_OPTIONS,
+        &config.image_jpeg_huffman,
+        disabled,
+    )
+}
+
+#[must_use]
+pub fn image_webp_preset_options(
+    config: &ConversionConfig,
+    disabled: bool,
+) -> Vec<ImageEncodingOption> {
+    image_encoding_options(
+        &IMAGE_WEBP_PRESET_OPTIONS,
+        &config.image_webp_preset,
+        disabled,
+    )
+}
+
+#[must_use]
+pub fn image_png_prediction_options(
+    config: &ConversionConfig,
+    disabled: bool,
+) -> Vec<ImageEncodingOption> {
+    image_encoding_options(
+        &IMAGE_PNG_PREDICTION_OPTIONS,
+        &config.image_png_prediction,
+        disabled,
+    )
+}
+
+#[must_use]
+pub fn image_tiff_compression_options(
+    config: &ConversionConfig,
+    disabled: bool,
+) -> Vec<ImageEncodingOption> {
+    image_encoding_options(
+        &IMAGE_TIFF_COMPRESSION_OPTIONS,
+        &config.image_tiff_compression,
+        disabled,
+    )
+}
+
+fn image_encoding_options(
+    definitions: &[super::model::ImageEncodingOptionDefinition],
+    selected_id: &str,
+    disabled: bool,
+) -> Vec<ImageEncodingOption> {
+    definitions
+        .iter()
+        .map(|definition| ImageEncodingOption {
+            id: definition.id,
+            label: definition.label,
+            caption: definition.caption,
+            is_selected: selected_id == definition.id,
+            is_disabled: disabled,
+        })
+        .collect()
 }
 
 #[must_use]

@@ -814,6 +814,83 @@ pub fn validate_task_input(
         }
     }
 
+    if is_image_output {
+        validate_image_encoding_settings(config)?;
+    }
+
+    Ok(())
+}
+
+fn validate_image_encoding_settings(config: &ConversionConfig) -> Result<(), ConversionError> {
+    match config.video_codec.as_str() {
+        "mjpeg" => {
+            if !(1..=100).contains(&config.image_jpeg_quality) {
+                return Err(ConversionError::InvalidInput(format!(
+                    "JPEG quality must be between 1 and 100: {}",
+                    config.image_jpeg_quality
+                )));
+            }
+            if !matches!(config.image_jpeg_huffman.as_str(), "default" | "optimal") {
+                return Err(ConversionError::InvalidInput(format!(
+                    "Invalid JPEG Huffman mode: {}",
+                    config.image_jpeg_huffman
+                )));
+            }
+        }
+        "libwebp" => {
+            if config.image_webp_quality > 100 {
+                return Err(ConversionError::InvalidInput(format!(
+                    "WebP quality must be between 0 and 100: {}",
+                    config.image_webp_quality
+                )));
+            }
+            if config.image_webp_compression > 6 {
+                return Err(ConversionError::InvalidInput(format!(
+                    "WebP compression effort must be between 0 and 6: {}",
+                    config.image_webp_compression
+                )));
+            }
+            if !matches!(
+                config.image_webp_preset.as_str(),
+                "default" | "picture" | "photo" | "drawing" | "icon" | "text"
+            ) {
+                return Err(ConversionError::InvalidInput(format!(
+                    "Invalid WebP preset: {}",
+                    config.image_webp_preset
+                )));
+            }
+        }
+        "png" => {
+            if config.image_png_compression > 9 {
+                return Err(ConversionError::InvalidInput(format!(
+                    "PNG compression level must be between 0 and 9: {}",
+                    config.image_png_compression
+                )));
+            }
+            if !matches!(
+                config.image_png_prediction.as_str(),
+                "none" | "sub" | "up" | "avg" | "paeth" | "mixed"
+            ) {
+                return Err(ConversionError::InvalidInput(format!(
+                    "Invalid PNG prediction mode: {}",
+                    config.image_png_prediction
+                )));
+            }
+        }
+        "tiff"
+            if !matches!(
+                config.image_tiff_compression.as_str(),
+                "packbits" | "raw" | "lzw" | "deflate"
+            ) =>
+        {
+            return Err(ConversionError::InvalidInput(format!(
+                "Invalid TIFF compression mode: {}",
+                config.image_tiff_compression
+            )));
+        }
+        _ => {}
+    }
+
     Ok(())
 }
 
@@ -821,6 +898,11 @@ pub fn validate_task_input(
 mod tests {
     use super::*;
     use crate::filters::EVEN_DIMENSIONS_FILTER;
+    use std::{
+        fs,
+        path::PathBuf,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
     fn sample_config(container: &str, video_codec: &str) -> ConversionConfig {
         ConversionConfig {
@@ -865,6 +947,15 @@ mod tests {
             videotoolbox_allow_sw: false,
             hw_decode: false,
             pixel_format: "auto".to_string(),
+            image_jpeg_quality: 85,
+            image_jpeg_huffman: "optimal".to_string(),
+            image_webp_lossless: false,
+            image_webp_quality: 75,
+            image_webp_compression: 4,
+            image_webp_preset: "default".to_string(),
+            image_png_compression: 9,
+            image_png_prediction: "paeth".to_string(),
+            image_tiff_compression: "packbits".to_string(),
             gif_colors: 256,
             gif_dither: "sierra2_4a".to_string(),
             gif_loop: 0,
@@ -888,5 +979,85 @@ mod tests {
         let args = build_ffmpeg_args("input.mov", "output.png", &config);
 
         assert!(!args.iter().any(|arg| arg == EVEN_DIMENSIONS_FILTER));
+    }
+
+    #[test]
+    fn build_ffmpeg_args_adds_png_compression_options() {
+        let mut config = sample_config("png", "png");
+        config.image_png_compression = 3;
+        config.image_png_prediction = "mixed".to_string();
+
+        let args = build_ffmpeg_args("input.mov", "output.png", &config);
+
+        assert!(args_contains_pair(&args, "-compression_level", "3"));
+        assert!(args_contains_pair(&args, "-pred", "mixed"));
+    }
+
+    #[test]
+    fn build_ffmpeg_args_adds_jpeg_quality_and_huffman_options() {
+        let mut config = sample_config("jpg", "mjpeg");
+        config.image_jpeg_quality = 100;
+        config.image_jpeg_huffman = "default".to_string();
+
+        let args = build_ffmpeg_args("input.mov", "output.jpg", &config);
+
+        assert!(args_contains_pair(&args, "-q:v", "2"));
+        assert!(args_contains_pair(&args, "-huffman", "default"));
+    }
+
+    #[test]
+    fn build_ffmpeg_args_adds_webp_quality_and_compression_options() {
+        let mut config = sample_config("webp", "libwebp");
+        config.image_webp_lossless = true;
+        config.image_webp_quality = 88;
+        config.image_webp_compression = 6;
+        config.image_webp_preset = "photo".to_string();
+
+        let args = build_ffmpeg_args("input.mov", "output.webp", &config);
+
+        assert!(args_contains_pair(&args, "-lossless", "1"));
+        assert!(args_contains_pair(&args, "-quality", "88"));
+        assert!(args_contains_pair(&args, "-compression_level", "6"));
+        assert!(args_contains_pair(&args, "-preset", "photo"));
+    }
+
+    #[test]
+    fn build_ffmpeg_args_adds_tiff_compression_option() {
+        let mut config = sample_config("tiff", "tiff");
+        config.image_tiff_compression = "deflate".to_string();
+
+        let args = build_ffmpeg_args("input.mov", "output.tiff", &config);
+
+        assert!(args_contains_pair(&args, "-compression_algo", "deflate"));
+    }
+
+    #[test]
+    fn validate_task_input_rejects_invalid_webp_compression_level() {
+        let path = temporary_input_file("invalid-webp-compression");
+        let mut config = sample_config("webp", "libwebp");
+        config.image_webp_compression = 7;
+
+        let error = validate_task_input(&path.to_string_lossy(), &config)
+            .expect_err("invalid webp compression should be rejected");
+
+        let _ = fs::remove_file(path);
+        assert!(error.to_string().contains("WebP compression effort"));
+    }
+
+    fn args_contains_pair(args: &[String], key: &str, value: &str) -> bool {
+        args.windows(2)
+            .any(|window| window[0] == key && window[1] == value)
+    }
+
+    fn temporary_input_file(name: &str) -> PathBuf {
+        let path = std::env::temp_dir().join(format!(
+            "frame-core-{name}-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system clock should be after unix epoch")
+                .as_nanos()
+        ));
+        fs::write(&path, b"").expect("temporary input should be written");
+        path
     }
 }
