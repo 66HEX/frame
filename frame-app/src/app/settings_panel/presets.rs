@@ -178,7 +178,7 @@ fn settings_preset_row(
                 this.child(settings_preset_icon_button(
                     format!("settings-preset-delete-{delete_id}"),
                     assets::ICON_TRASH,
-                    FrameIconButtonVariant::Destructive,
+                    FrameIconButtonVariant::DestructiveGhost,
                     !settings_disabled,
                     move |root, _window, cx| {
                         if root.delete_preset(&delete_id) {

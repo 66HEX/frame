@@ -11,7 +11,6 @@ pub(in crate::app) const FRAME_ICON_SM_SIZE: f32 = 16.0;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::app) enum FrameIconButtonVariant {
     Ghost,
-    Destructive,
     DestructiveGhost,
 }
 
@@ -119,18 +118,7 @@ pub(in crate::app) fn frame_icon_button(
                 theme::FRAME_GRAY_600,
                 0.5,
             ),
-            (FrameIconButtonVariant::Destructive, true) => (
-                theme::FRAME_GRAY_100,
-                theme::FRAME_GRAY_200,
-                theme::FRAME_GRAY_200,
-                theme::FRAME_RED,
-                theme::FRAME_RED,
-                1.0,
-            ),
-            (
-                FrameIconButtonVariant::Destructive | FrameIconButtonVariant::DestructiveGhost,
-                false,
-            ) => (
+            (FrameIconButtonVariant::DestructiveGhost, false) => (
                 theme::FRAME_GRAY_100,
                 theme::FRAME_GRAY_100,
                 theme::FRAME_GRAY_100,
