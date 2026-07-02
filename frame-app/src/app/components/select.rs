@@ -77,11 +77,11 @@ pub(in crate::app) fn frame_select_trigger_content(
             button_mouse_down(enabled, window, cx);
         })
         .child(content)
-        .child(div().flex_shrink_0().child(icon_svg(
-            assets::ICON_CHEVRONS_UP_DOWN,
-            12.0,
-            foreground,
-        )))
+        .child(
+            div()
+                .flex_shrink_0()
+                .child(icon_svg(assets::ICON_UNFOLD_MORE, 12.0, foreground)),
+        )
 }
 
 pub(in crate::app) fn frame_select_popover(

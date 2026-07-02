@@ -36,7 +36,6 @@ mod frame_assets {
             "bookmark.svg",
             "captions.svg",
             "check.svg",
-            "chevrons-up-down.svg",
             "close.svg",
             "copy.svg",
             "crop.svg",
@@ -62,6 +61,7 @@ mod frame_assets {
             "tags.svg",
             "terminal.svg",
             "trash.svg",
+            "unfold-more.svg",
         ] {
             assert!(
                 listed.iter().any(|name| name.as_ref() == icon_name),
@@ -89,7 +89,7 @@ mod frame_assets {
             ICON_TERMINAL,
             ICON_CHECK,
             ICON_COPY,
-            ICON_CHEVRONS_UP_DOWN,
+            ICON_UNFOLD_MORE,
             ICON_CLOSE,
             ICON_FILE_UP,
             ICON_FILE_DOWN,
