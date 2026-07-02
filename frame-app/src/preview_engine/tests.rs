@@ -120,8 +120,8 @@ fn ffmpeg_preview_session_publishes_first_video_frame() {
     assert_eq!(
         frame.dimensions(),
         PreviewDimensions {
-            width: 320,
-            height: 180
+            width: 160,
+            height: 90
         }
     );
 }

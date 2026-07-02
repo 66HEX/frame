@@ -311,8 +311,7 @@ fn labeled_filter_chain(filters: &[String], output_label: &str) -> String {
 
 fn preview_low_res_filters(width: u32, height: u32, fps: u32) -> Vec<String> {
     vec![
-        format!("scale={width}:{height}:force_original_aspect_ratio=decrease"),
-        format!("pad={width}:{height}:(ow-iw)/2:(oh-ih)/2"),
+        format!("scale={width}:{height}"),
         "setsar=1".to_string(),
         format!("fps={fps}"),
         "format=bgra".to_string(),

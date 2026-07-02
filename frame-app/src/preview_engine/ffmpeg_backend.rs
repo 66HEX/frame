@@ -179,8 +179,13 @@ impl RunningPreviewProcess {
         }
     }
 
-    fn render_single_frame(&self, seconds: f64, precise: bool) -> Result<(), PreviewEngineError> {
+    fn render_single_frame(
+        &self,
+        seconds: f64,
+        precise: bool,
+    ) -> Result<PreviewDimensions, PreviewEngineError> {
         let frame = decode_single_preview_frame(&self.executable, &self.config, seconds, precise)?;
+        let dimensions = frame.dimensions();
         let _ = self.frame_store.publish(frame);
         let mut playback = lock_playback(&self.playback);
         playback.base_seconds = seconds;
@@ -189,7 +194,7 @@ impl RunningPreviewProcess {
         playback.playing = false;
         playback.ended = false;
         drop(playback);
-        Ok(())
+        Ok(dimensions)
     }
 
     fn start_streaming(&self, seconds: f64, precise: bool) -> Result<(), PreviewEngineError> {
@@ -316,14 +321,16 @@ pub fn start_ffmpeg_preview_process(
 ) -> Result<(RunningPreviewProcess, PreviewDimensions, f64), PreviewEngineError> {
     let executable = ffmpeg_executable();
     let process = RunningPreviewProcess::new(config.clone(), frame_store, executable);
-    if matches!(
+    let dimensions = if matches!(
         config.source_kind,
         PreviewSourceKind::Video | PreviewSourceKind::Image
     ) {
-        process.render_single_frame(initial_start_seconds(config), true)?;
-    }
+        process.render_single_frame(initial_start_seconds(config), true)?
+    } else {
+        config.target_dimensions()
+    };
 
-    Ok((process, config.target_dimensions(), config.duration_seconds))
+    Ok((process, dimensions, config.duration_seconds))
 }
 
 fn decode_single_preview_frame(
@@ -458,8 +465,10 @@ fn preview_plan(
         &PreviewFfmpegOptions {
             start_seconds: seconds,
             end_seconds,
-            target_width: config.target_dimensions().width,
-            target_height: config.target_dimensions().height,
+            source_width: config.source_width,
+            source_height: config.source_height,
+            max_width: config.max_width,
+            max_height: config.max_height,
             fps: config.fps,
             realtime,
             precise_seek: precise,
