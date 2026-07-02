@@ -1,6 +1,26 @@
 use crate::types::{ConversionConfig, VOLUME_EPSILON};
 
 pub const EVEN_DIMENSIONS_FILTER: &str = "pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0";
+pub const PREVIEW_OUTPUT_LABEL: &str = "preview_v";
+pub const VIDEO_OUTPUT_LABEL: &str = "vout";
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum VisualFilterBase {
+    Video,
+    Image,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum VisualFilterProfile {
+    ExportVideo,
+    ExportImage,
+    PreviewLowRes {
+        base: VisualFilterBase,
+        width: u32,
+        height: u32,
+        fps: u32,
+    },
+}
 
 /// Converts a CSS hex color (`#RRGGBB`) to an ASS/SSA color string (`&H00BBGGRR`).
 fn hex_to_ass_color(hex: &str) -> Option<String> {
@@ -159,6 +179,52 @@ pub fn build_encode_video_filters(config: &ConversionConfig, include_scale: bool
 }
 
 #[must_use]
+pub fn build_visual_filter_chain(
+    config: &ConversionConfig,
+    profile: VisualFilterProfile,
+) -> Vec<String> {
+    match profile {
+        VisualFilterProfile::ExportVideo => build_encode_video_filters(config, true),
+        VisualFilterProfile::ExportImage => build_video_filters(config, true),
+        VisualFilterProfile::PreviewLowRes {
+            base,
+            width,
+            height,
+            fps,
+        } => {
+            let mut filters = match base {
+                VisualFilterBase::Video => build_encode_video_filters(config, true),
+                VisualFilterBase::Image => build_video_filters(config, true),
+            };
+            filters.extend(preview_low_res_filters(width, height, fps));
+            filters
+        }
+    }
+}
+
+#[must_use]
+pub fn build_visual_filter_complex(
+    config: &ConversionConfig,
+    profile: VisualFilterProfile,
+) -> String {
+    match profile {
+        VisualFilterProfile::ExportVideo | VisualFilterProfile::ExportImage => {
+            build_export_filter_complex(
+                config,
+                &build_visual_filter_chain(config, profile),
+                VIDEO_OUTPUT_LABEL,
+            )
+        }
+        VisualFilterProfile::PreviewLowRes {
+            base,
+            width,
+            height,
+            fps,
+        } => build_preview_filter_complex(config, base, width, height, fps),
+    }
+}
+
+#[must_use]
 pub fn has_overlay(config: &ConversionConfig) -> bool {
     config
         .overlay
@@ -169,37 +235,88 @@ pub fn has_overlay(config: &ConversionConfig) -> bool {
 #[must_use]
 pub fn build_overlay_filter_complex(config: &ConversionConfig) -> String {
     let filters = build_video_filters(config, true);
-    build_overlay_filter_complex_with_filters(config, &filters)
+    build_overlay_filter_complex_with_filters(config, &filters, VIDEO_OUTPUT_LABEL)
 }
 
 #[must_use]
 pub fn build_encode_overlay_filter_complex(config: &ConversionConfig) -> String {
     let filters = build_encode_video_filters(config, true);
-    build_overlay_filter_complex_with_filters(config, &filters)
+    build_overlay_filter_complex_with_filters(config, &filters, VIDEO_OUTPUT_LABEL)
 }
 
 fn build_overlay_filter_complex_with_filters(
     config: &ConversionConfig,
     filters: &[String],
+    output_label: &str,
 ) -> String {
-    let base_chain = if filters.is_empty() {
-        "[0:v:0]null[base]".to_string()
-    } else {
-        format!("[0:v:0]{}[base]", filters.join(","))
-    };
-
     let Some(overlay) = &config.overlay else {
-        return base_chain;
+        return labeled_filter_chain(filters, output_label);
     };
 
+    let base_chain = labeled_filter_chain(filters, "base");
     let x = overlay.x.clamp(0.0, 1.0);
     let y = overlay.y.clamp(0.0, 1.0);
     let width = overlay.width.clamp(0.03, 0.8);
     let opacity = overlay.opacity.clamp(0.0, 1.0);
 
     format!(
-        "{base_chain};[base]split[base_ref][base_out];[1:v:0]format=rgba,colorchannelmixer=aa={opacity:.3}[overlay_src];[overlay_src][base_ref]scale=w='min(rw*{width:.6},rh*iw/ih)':h=-1[overlay_scaled];[base_out][overlay_scaled]overlay=x='min(max(main_w*{x:.6}-overlay_w/2,0),main_w-overlay_w)':y='min(max(main_h*{y:.6}-overlay_h/2,0),main_h-overlay_h)':format=auto[vout]"
+        "{base_chain};[base]split[base_ref][base_out];[1:v:0]format=rgba,colorchannelmixer=aa={opacity:.3}[overlay_src];[overlay_src][base_ref]scale=w='min(rw*{width:.6},rh*iw/ih)':h=-1[overlay_scaled];[base_out][overlay_scaled]overlay=x='min(max(main_w*{x:.6}-overlay_w/2,0),main_w-overlay_w)':y='min(max(main_h*{y:.6}-overlay_h/2,0),main_h-overlay_h)':format=auto[{output_label}]"
     )
+}
+
+fn build_export_filter_complex(
+    config: &ConversionConfig,
+    filters: &[String],
+    output_label: &str,
+) -> String {
+    if has_overlay(config) {
+        build_overlay_filter_complex_with_filters(config, filters, output_label)
+    } else {
+        labeled_filter_chain(filters, output_label)
+    }
+}
+
+fn build_preview_filter_complex(
+    config: &ConversionConfig,
+    base: VisualFilterBase,
+    width: u32,
+    height: u32,
+    fps: u32,
+) -> String {
+    let base_filters = match base {
+        VisualFilterBase::Video => build_encode_video_filters(config, true),
+        VisualFilterBase::Image => build_video_filters(config, true),
+    };
+    let preview_filters = preview_low_res_filters(width, height, fps);
+    let preview_chain = preview_filters.join(",");
+
+    if has_overlay(config) {
+        let graph =
+            build_overlay_filter_complex_with_filters(config, &base_filters, "preview_export");
+        format!("{graph};[preview_export]{preview_chain}[{PREVIEW_OUTPUT_LABEL}]")
+    } else {
+        let mut filters = base_filters;
+        filters.extend(preview_filters);
+        labeled_filter_chain(&filters, PREVIEW_OUTPUT_LABEL)
+    }
+}
+
+fn labeled_filter_chain(filters: &[String], output_label: &str) -> String {
+    if filters.is_empty() {
+        format!("[0:v:0]null[{output_label}]")
+    } else {
+        format!("[0:v:0]{}[{output_label}]", filters.join(","))
+    }
+}
+
+fn preview_low_res_filters(width: u32, height: u32, fps: u32) -> Vec<String> {
+    vec![
+        format!("scale={width}:{height}:force_original_aspect_ratio=decrease"),
+        format!("pad={width}:{height}:(ow-iw)/2:(oh-ih)/2"),
+        "setsar=1".to_string(),
+        format!("fps={fps}"),
+        "format=bgra".to_string(),
+    ]
 }
 
 #[must_use]
