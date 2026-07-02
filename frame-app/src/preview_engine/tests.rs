@@ -58,8 +58,23 @@ fn latest_frame_store_keeps_only_newest_frame() {
     let latest = store.publish(second);
 
     assert_eq!(latest.generation, 2);
-    assert_eq!(latest.dropped_frames, 1);
+    assert_eq!(latest.stats.published_frames, 2);
+    assert_eq!(latest.stats.overwritten_before_present, 1);
     assert_eq!(latest.frame.bytes(), &[5, 6, 7, 8]);
+}
+
+#[test]
+fn latest_frame_store_does_not_count_presented_frames_as_overwritten() {
+    let store = LatestFrameStore::new();
+    let first = PreviewFrame::bgra(1, 1, 4, 0, vec![1, 2, 3, 4]).expect("first frame");
+    let second = PreviewFrame::bgra(1, 1, 4, 33_333, vec![5, 6, 7, 8]).expect("second frame");
+
+    let first = store.publish(first);
+    store.mark_presented(first.generation);
+    let latest = store.publish(second);
+
+    assert_eq!(latest.stats.presented_frames, 1);
+    assert_eq!(latest.stats.overwritten_before_present, 0);
 }
 
 #[test]

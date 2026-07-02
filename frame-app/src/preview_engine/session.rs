@@ -100,6 +100,10 @@ impl PreviewSession {
         self.frame_store.clone()
     }
 
+    pub fn mark_frame_presented(&self, generation: u64) {
+        self.frame_store.mark_presented(generation);
+    }
+
     /// Sends a playback command to the running preview pipeline.
     ///
     /// # Errors
@@ -178,6 +182,7 @@ impl PreviewSession {
                 playing,
             },
             frame_generation: self.frame_store.generation(),
+            frame_stats: self.frame_store.stats(),
         }
     }
 

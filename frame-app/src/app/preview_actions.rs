@@ -9,16 +9,70 @@ use std::{
 
 impl FrameRoot {
     pub(super) fn selected_preview_runtime_request(
-        &self,
+        &mut self,
         metadata_entry: &SourceMetadataEntry,
     ) -> Option<PreviewRuntimeRequest> {
+        let selected_file_id = self.file_queue.selected_file()?.id.clone();
+        let preview_dimensions = self.selected_preview_runtime_dimensions(&selected_file_id);
         let selected_file = self.file_queue.selected_file()?;
         preview_runtime_request(
             selected_file,
             metadata_entry,
             !self.preview_ui.crop_mode,
             !self.preview_ui.overlay.overlay_mode(),
+            preview_dimensions,
         )
+    }
+
+    fn selected_preview_runtime_dimensions(
+        &mut self,
+        selected_file_id: &str,
+    ) -> PreviewRuntimeDimensions {
+        let live_dimensions = preview_runtime_dimensions(
+            self.preview_ui.canvas_bounds,
+            self.preview_ui.canvas.target_zoom,
+        );
+        let playing_selected_file = self.preview_ui.playback.is_playing()
+            && self.preview_ui.playback_file_id.as_deref() == Some(selected_file_id);
+        let active_dimensions = self.preview_ui.active_preview_dimensions;
+        match active_dimensions {
+            Some(dimensions) if playing_selected_file => return dimensions,
+            Some(dimensions)
+                if dimensions != live_dimensions && self.preview_dimension_update_deferred() =>
+            {
+                return dimensions;
+            }
+            _ => {}
+        }
+
+        self.preview_ui.active_preview_dimensions = Some(live_dimensions);
+        live_dimensions
+    }
+
+    fn preview_dimension_update_deferred(&mut self) -> bool {
+        self.preview_canvas_transform_animating() || self.preview_dimensions_debounce_active()
+    }
+
+    fn preview_canvas_transform_animating(&self) -> bool {
+        !preview_canvas_transform_settled(
+            self.preview_ui.canvas.current_zoom,
+            self.preview_ui.canvas.target_zoom,
+            self.preview_ui.canvas.current_pan_x,
+            self.preview_ui.canvas.target_pan_x,
+            self.preview_ui.canvas.current_pan_y,
+            self.preview_ui.canvas.target_pan_y,
+        )
+    }
+
+    fn preview_dimensions_debounce_active(&mut self) -> bool {
+        let Some(deadline) = self.preview_ui.preview_dimensions_debounce_until else {
+            return false;
+        };
+        if Instant::now() < deadline {
+            return true;
+        }
+        self.preview_ui.preview_dimensions_debounce_until = None;
+        false
     }
 
     pub(super) fn sync_preview_runtime_for_selection(
@@ -322,10 +376,21 @@ impl FrameRoot {
         had_drag
     }
 
-    pub(in crate::app) fn set_preview_canvas_bounds(&mut self, bounds: Bounds<Pixels>) -> bool {
+    pub(in crate::app) fn set_preview_canvas_bounds(
+        &mut self,
+        bounds: Bounds<Pixels>,
+        cx: &Context<Self>,
+    ) -> bool {
         let previous_bounds = self.preview_ui.canvas_bounds;
+        let bounds_changed = previous_bounds != Some(bounds);
         self.preview_ui.canvas_bounds = Some(bounds);
-        previous_bounds != Some(bounds) && self.apply_preview_canvas_auto_fit()
+        if bounds_changed {
+            self.preview_ui.preview_dimensions_debounce_until =
+                Some(Instant::now() + PREVIEW_DIMENSION_DEBOUNCE_INTERVAL);
+            self.schedule_preview_frame_tick(cx);
+        }
+        let auto_fit_changed = self.apply_preview_canvas_auto_fit();
+        bounds_changed || auto_fit_changed
     }
 
     fn clamp_preview_canvas_pan_for_state(&self, pan_x: f64, pan_y: f64, zoom: f64) -> (f64, f64) {
@@ -485,6 +550,8 @@ impl FrameRoot {
         if let Some(session) = self.preview_ui.session.take() {
             session.stop();
         }
+        self.preview_ui.active_preview_dimensions = None;
+        self.preview_ui.preview_dimensions_debounce_until = None;
         self.preview_ui.runtime_key = None;
         self.preview_ui.pending_runtime_key = None;
         self.preview_ui.render_generation = 0;
@@ -505,6 +572,7 @@ impl FrameRoot {
 
         match render_image_from_frame(&latest.frame) {
             Ok(image) => {
+                session.mark_frame_presented(latest.generation);
                 self.preview_ui.render_generation = latest.generation;
                 self.preview_ui.rendered_presentation = self.preview_ui.render_presentation;
                 self.preview_ui.render_image = Some(image);
@@ -533,9 +601,13 @@ impl FrameRoot {
                 let keep_ticking = this
                     .update(cx, |root, cx| {
                         let canvas_changed = root.tick_preview_canvas_animation();
+                        let preview_dimensions_ready = root.tick_preview_dimensions_debounce();
                         if root.preview_ui.session.is_none() {
-                            if canvas_changed {
+                            if canvas_changed || preview_dimensions_ready {
                                 cx.notify();
+                                return true;
+                            }
+                            if root.preview_dimensions_debounce_pending() {
                                 return true;
                             }
                             root.preview_ui.frame_tick_active = false;
@@ -545,6 +617,7 @@ impl FrameRoot {
                         if root.refresh_preview_render_image()
                             || root.preview_ui.playback.is_playing()
                             || canvas_changed
+                            || preview_dimensions_ready
                         {
                             cx.notify();
                         }
@@ -558,6 +631,23 @@ impl FrameRoot {
             }
         })
         .detach();
+    }
+
+    fn tick_preview_dimensions_debounce(&mut self) -> bool {
+        let Some(deadline) = self.preview_ui.preview_dimensions_debounce_until else {
+            return false;
+        };
+        if Instant::now() < deadline {
+            return false;
+        }
+        self.preview_ui.preview_dimensions_debounce_until = None;
+        true
+    }
+
+    fn preview_dimensions_debounce_pending(&self) -> bool {
+        self.preview_ui
+            .preview_dimensions_debounce_until
+            .is_some_and(|deadline| Instant::now() < deadline)
     }
 
     pub(super) fn sync_preview_crop_for_selection(
@@ -1388,6 +1478,7 @@ fn preview_runtime_request(
     metadata_entry: &SourceMetadataEntry,
     include_applied_crop: bool,
     include_committed_overlay: bool,
+    preview_dimensions: PreviewRuntimeDimensions,
 ) -> Option<PreviewRuntimeRequest> {
     if metadata_entry.status != MetadataStatus::Ready {
         return None;
@@ -1415,6 +1506,7 @@ fn preview_runtime_request(
         source_width,
         source_height,
         duration_millis: rounded_f64_to_u64(duration_seconds * 1000.0),
+        preview_dimensions,
         visual_hash: preview_visual_hash(&preview_config),
         audio_hash: preview_audio_hash(&preview_config, has_audio, selected_audio_track),
     };
@@ -1427,8 +1519,8 @@ fn preview_runtime_request(
         has_audio,
         selected_audio_track,
         duration_seconds,
-        max_width: DEFAULT_PREVIEW_MAX_WIDTH,
-        max_height: DEFAULT_PREVIEW_MAX_HEIGHT,
+        max_width: preview_dimensions.max_width,
+        max_height: preview_dimensions.max_height,
         fps: DEFAULT_PREVIEW_FPS,
         conversion_config: core_config,
     };
@@ -1438,6 +1530,55 @@ fn preview_runtime_request(
         config,
         presentation,
     })
+}
+
+pub(super) fn preview_runtime_dimensions(
+    canvas_bounds: Option<Bounds<Pixels>>,
+    target_zoom: f64,
+) -> PreviewRuntimeDimensions {
+    let Some(bounds) = canvas_bounds else {
+        return default_preview_runtime_dimensions();
+    };
+    let canvas_width = f64::from(bounds.size.width.as_f32());
+    let canvas_height = f64::from(bounds.size.height.as_f32());
+    if canvas_width <= 0.0 || canvas_height <= 0.0 {
+        return default_preview_runtime_dimensions();
+    }
+
+    let zoom = if target_zoom.is_finite() {
+        target_zoom.max(1.0)
+    } else {
+        1.0
+    };
+    PreviewRuntimeDimensions {
+        max_width: quantized_preview_dimension(canvas_width * zoom * PREVIEW_ADAPTIVE_SCALE)
+            .clamp(PREVIEW_MIN_ADAPTIVE_WIDTH, DEFAULT_PREVIEW_MAX_WIDTH),
+        max_height: quantized_preview_dimension(canvas_height * zoom * PREVIEW_ADAPTIVE_SCALE)
+            .clamp(PREVIEW_MIN_ADAPTIVE_HEIGHT, DEFAULT_PREVIEW_MAX_HEIGHT),
+    }
+}
+
+const fn default_preview_runtime_dimensions() -> PreviewRuntimeDimensions {
+    PreviewRuntimeDimensions {
+        max_width: DEFAULT_PREVIEW_MAX_WIDTH,
+        max_height: DEFAULT_PREVIEW_MAX_HEIGHT,
+    }
+}
+
+fn quantized_preview_dimension(value: f64) -> u32 {
+    if !value.is_finite() || value <= 0.0 {
+        return 0;
+    }
+    let quantum = f64::from(PREVIEW_DIMENSION_QUANTUM);
+    let quantized = (value / quantum).ceil() * quantum;
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "preview dimensions are finite and clamped before use"
+    )]
+    {
+        quantized.min(f64::from(u32::MAX)) as u32
+    }
 }
 
 fn preview_visual_hash(config: &ConversionConfig) -> u64 {

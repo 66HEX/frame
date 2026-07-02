@@ -14,15 +14,23 @@ pub struct LatestFrameStore {
 struct LatestFrameState {
     generation: u64,
     latest: Option<Arc<PreviewFrame>>,
-    dropped_frames: u64,
+    last_presented_generation: u64,
+    stats: PreviewFrameStats,
     last_publish: Option<Instant>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PreviewFrameStats {
+    pub published_frames: u64,
+    pub presented_frames: u64,
+    pub overwritten_before_present: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LatestFrameSnapshot {
     pub generation: u64,
     pub frame: Arc<PreviewFrame>,
-    pub dropped_frames: u64,
+    pub stats: PreviewFrameStats,
 }
 
 impl LatestFrameStore {
@@ -34,10 +42,12 @@ impl LatestFrameStore {
     #[must_use]
     pub fn publish(&self, frame: PreviewFrame) -> LatestFrameSnapshot {
         let mut state = lock_state(&self.inner);
-        if state.latest.is_some() {
-            state.dropped_frames = state.dropped_frames.saturating_add(1);
+        if state.latest.is_some() && state.last_presented_generation < state.generation {
+            state.stats.overwritten_before_present =
+                state.stats.overwritten_before_present.saturating_add(1);
         }
         state.generation = state.generation.saturating_add(1);
+        state.stats.published_frames = state.stats.published_frames.saturating_add(1);
         state.last_publish = Some(Instant::now());
         let frame = Arc::new(frame);
         state.latest = Some(Arc::clone(&frame));
@@ -45,7 +55,7 @@ impl LatestFrameStore {
         LatestFrameSnapshot {
             generation: state.generation,
             frame,
-            dropped_frames: state.dropped_frames,
+            stats: state.stats,
         }
     }
 
@@ -56,7 +66,7 @@ impl LatestFrameStore {
         Some(LatestFrameSnapshot {
             generation: state.generation,
             frame,
-            dropped_frames: state.dropped_frames,
+            stats: state.stats,
         })
     }
 
@@ -65,10 +75,28 @@ impl LatestFrameStore {
         lock_state(&self.inner).generation
     }
 
+    #[must_use]
+    pub fn stats(&self) -> PreviewFrameStats {
+        lock_state(&self.inner).stats
+    }
+
+    pub fn mark_presented(&self, generation: u64) {
+        let mut state = lock_state(&self.inner);
+        if generation == 0
+            || generation > state.generation
+            || generation <= state.last_presented_generation
+        {
+            return;
+        }
+        state.last_presented_generation = generation;
+        state.stats.presented_frames = state.stats.presented_frames.saturating_add(1);
+    }
+
     pub fn clear(&self) {
         let mut state = lock_state(&self.inner);
         state.generation = state.generation.saturating_add(1);
         state.latest = None;
+        state.last_presented_generation = state.generation;
         state.last_publish = None;
     }
 }

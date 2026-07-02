@@ -171,7 +171,7 @@ use std::{
         Arc,
         mpsc::{self, TryRecvError},
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 actions!(
@@ -233,6 +233,11 @@ const PREVIEW_CANVAS_MAX_PAN: f64 = 2.0;
 const PREVIEW_CANVAS_LERP_FACTOR: f64 = 0.2;
 const PREVIEW_CANVAS_PAN_SNAP_EPSILON: f64 = 0.01;
 const PREVIEW_CANVAS_ZOOM_SNAP_EPSILON: f64 = PREVIEW_CANVAS_PAN_SNAP_EPSILON / 10_000.0;
+const PREVIEW_ADAPTIVE_SCALE: f64 = 1.15;
+const PREVIEW_DIMENSION_QUANTUM: u32 = 64;
+const PREVIEW_MIN_ADAPTIVE_WIDTH: u32 = 640;
+const PREVIEW_MIN_ADAPTIVE_HEIGHT: u32 = 360;
+const PREVIEW_DIMENSION_DEBOUNCE_INTERVAL: Duration = Duration::from_millis(120);
 const PREVIEW_FRAME_TICK_INTERVAL: Duration = Duration::from_millis(16);
 
 #[expect(
@@ -389,6 +394,8 @@ struct PreviewUiState {
     timeline_track_bounds: Option<Bounds<Pixels>>,
     playback_file_id: Option<String>,
     playback: PreviewPlaybackState,
+    active_preview_dimensions: Option<PreviewRuntimeDimensions>,
+    preview_dimensions_debounce_until: Option<Instant>,
     runtime_key: Option<PreviewRuntimeKey>,
     pending_runtime_key: Option<PreviewRuntimeKey>,
     render_presentation: PreviewRenderPresentation,
@@ -421,6 +428,8 @@ impl Default for PreviewUiState {
             timeline_track_bounds: None,
             playback_file_id: None,
             playback: PreviewPlaybackState::new(false),
+            active_preview_dimensions: None,
+            preview_dimensions_debounce_until: None,
             runtime_key: None,
             pending_runtime_key: None,
             render_presentation: PreviewRenderPresentation::default(),
@@ -507,6 +516,7 @@ struct PreviewRuntimeKey {
     source_width: Option<u32>,
     source_height: Option<u32>,
     duration_millis: u64,
+    preview_dimensions: PreviewRuntimeDimensions,
     visual_hash: u64,
     audio_hash: u64,
 }
@@ -520,6 +530,12 @@ impl PreviewRuntimeKey {
             && self.source_height == next.source_height
             && self.duration_millis == next.duration_millis
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct PreviewRuntimeDimensions {
+    max_width: u32,
+    max_height: u32,
 }
 
 #[derive(Clone, Debug)]

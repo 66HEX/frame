@@ -334,9 +334,9 @@ fn labeled_filter_chain(filters: &[String], output_label: &str) -> String {
 
 fn preview_low_res_filters(width: u32, height: u32, fps: u32) -> Vec<String> {
     vec![
+        format!("fps={fps}"),
         format!("scale={width}:{height}"),
         "setsar=1".to_string(),
-        format!("fps={fps}"),
         "format=bgra".to_string(),
     ]
 }
@@ -560,12 +560,39 @@ mod tests {
                 "subtitles='/tmp/sub.srt'",
                 "setpts=PTS-10.000/TB",
                 EVEN_DIMENSIONS_FILTER,
+                "fps=24",
                 "scale=640:360",
                 "setsar=1",
-                "fps=24",
                 "format=bgra",
             ]
         );
+    }
+
+    #[test]
+    fn preview_low_res_filter_complex_keeps_overlay_before_fps_and_scale() {
+        let mut config = default_config();
+        config.overlay = Some(OverlayConfig {
+            enabled: true,
+            path: "/tmp/logo.png".to_string(),
+            x: 0.5,
+            y: 0.5,
+            width: 0.2,
+            opacity: 1.0,
+            anchor: "custom".to_string(),
+        });
+
+        let filter = build_visual_filter_complex(
+            &config,
+            VisualFilterProfile::PreviewLowRes {
+                base: VisualFilterBase::Video,
+                width: 640,
+                height: 360,
+                fps: 24,
+                source_time_seconds: 0.0,
+            },
+        );
+
+        assert!(filter.contains("[preview_export]fps=24,scale=640:360"));
     }
 
     #[test]

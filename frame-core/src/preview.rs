@@ -641,7 +641,7 @@ mod tests {
         assert!(
             plan.args
                 .iter()
-                .any(|arg| arg.contains("[preview_export]scale=1280:720"))
+                .any(|arg| arg.contains("[preview_export]fps=30,scale=1280:720"))
         );
     }
 

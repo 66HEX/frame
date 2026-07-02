@@ -64,7 +64,7 @@ impl Element for PreviewCanvasBoundsProbe {
         cx: &mut App,
     ) -> Self::PrepaintState {
         self.owner.update(cx, |root, cx| {
-            if root.set_preview_canvas_bounds(bounds) {
+            if root.set_preview_canvas_bounds(bounds, cx) {
                 cx.notify();
             }
         });

@@ -4,7 +4,7 @@ use frame_core::types::ConversionConfig as CoreConversionConfig;
 
 use crate::numeric::rounded_f64_to_u32;
 
-use super::PreviewEngineError;
+use super::{PreviewEngineError, PreviewFrameStats};
 
 pub const DEFAULT_PREVIEW_MAX_WIDTH: u32 = 1280;
 pub const DEFAULT_PREVIEW_MAX_HEIGHT: u32 = 720;
@@ -226,6 +226,7 @@ pub struct PreviewSessionSnapshot {
     pub status: PreviewSessionStatus,
     pub playback: PreviewPlaybackSnapshot,
     pub frame_generation: u64,
+    pub frame_stats: PreviewFrameStats,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
