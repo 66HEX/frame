@@ -630,7 +630,9 @@ fn preview_viewport_corner_cutout(
 
 fn preview_scroll_delta_y(delta: &ScrollDelta) -> f64 {
     match delta {
-        ScrollDelta::Pixels(point) => f64::from(point.y.as_f32()),
+        ScrollDelta::Pixels(point) => {
+            f64::from(point.y.as_f32()) / PREVIEW_CANVAS_WHEEL_PIXEL_DELTA_PER_STEP
+        }
         ScrollDelta::Lines(point) => f64::from(point.y),
     }
 }

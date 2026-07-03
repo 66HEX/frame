@@ -54,14 +54,7 @@ impl FrameRoot {
     }
 
     fn preview_canvas_transform_animating(&self) -> bool {
-        !preview_canvas_transform_settled(
-            self.preview_ui.canvas.current_zoom,
-            self.preview_ui.canvas.target_zoom,
-            self.preview_ui.canvas.current_pan_x,
-            self.preview_ui.canvas.target_pan_x,
-            self.preview_ui.canvas.current_pan_y,
-            self.preview_ui.canvas.target_pan_y,
-        )
+        !self.preview_canvas_transform_visually_settled()
     }
 
     fn preview_dimensions_debounce_active(&mut self) -> bool {
@@ -318,13 +311,8 @@ impl FrameRoot {
         delta_y: f64,
         cx: &Context<Self>,
     ) -> bool {
-        if !delta_y.is_finite() || delta_y.abs() <= f64::EPSILON {
+        let Some(multiplier) = preview_canvas_wheel_zoom_multiplier(delta_y) else {
             return false;
-        }
-        let multiplier = if delta_y < 0.0 {
-            PREVIEW_CANVAS_WHEEL_ZOOM_STEP
-        } else {
-            1.0 / PREVIEW_CANVAS_WHEEL_ZOOM_STEP
         };
         self.zoom_preview_canvas_at_position(position, multiplier, cx)
     }
@@ -344,8 +332,8 @@ impl FrameRoot {
         } else {
             let state = PreviewCanvasPanDragState {
                 start_position: position,
-                start_pan_x: self.preview_ui.canvas.target_pan_x,
-                start_pan_y: self.preview_ui.canvas.target_pan_y,
+                start_pan_x: self.preview_ui.canvas.current_pan_x,
+                start_pan_y: self.preview_ui.canvas.current_pan_y,
             };
             self.preview_ui.canvas_pan_drag = Some(state);
             state
@@ -453,15 +441,8 @@ impl FrameRoot {
     }
 
     pub(super) fn tick_preview_canvas_animation(&mut self) -> bool {
-        if preview_canvas_transform_settled(
-            self.preview_ui.canvas.current_zoom,
-            self.preview_ui.canvas.target_zoom,
-            self.preview_ui.canvas.current_pan_x,
-            self.preview_ui.canvas.target_pan_x,
-            self.preview_ui.canvas.current_pan_y,
-            self.preview_ui.canvas.target_pan_y,
-        ) {
-            return false;
+        if self.preview_canvas_transform_visually_settled() {
+            return self.settle_preview_canvas_animation();
         }
 
         let next_zoom = lerp_preview_canvas_value(
@@ -482,6 +463,56 @@ impl FrameRoot {
         self.preview_ui.canvas.current_pan_y = next_pan_y;
 
         true
+    }
+
+    fn preview_canvas_transform_visually_settled(&self) -> bool {
+        let fallback = || {
+            preview_canvas_transform_settled(
+                self.preview_ui.canvas.current_zoom,
+                self.preview_ui.canvas.target_zoom,
+                self.preview_ui.canvas.current_pan_x,
+                self.preview_ui.canvas.target_pan_x,
+                self.preview_ui.canvas.current_pan_y,
+                self.preview_ui.canvas.target_pan_y,
+            )
+        };
+
+        let Some(bounds) = self.preview_ui.canvas_bounds else {
+            return fallback();
+        };
+        let Some((media_width, media_height)) = self.preview_canvas_media_dimensions() else {
+            return fallback();
+        };
+
+        preview_canvas_transform_visual_delta(
+            f64::from(bounds.size.width.as_f32()),
+            f64::from(bounds.size.height.as_f32()),
+            media_width,
+            media_height,
+            self.preview_ui.canvas.current_zoom,
+            self.preview_ui.canvas.target_zoom,
+            self.preview_ui.canvas.current_pan_x,
+            self.preview_ui.canvas.target_pan_x,
+            self.preview_ui.canvas.current_pan_y,
+            self.preview_ui.canvas.target_pan_y,
+        )
+        .is_some_and(|delta| delta <= PREVIEW_CANVAS_VISUAL_SETTLE_EPSILON)
+    }
+
+    fn settle_preview_canvas_animation(&mut self) -> bool {
+        let changed = (self.preview_ui.canvas.current_zoom - self.preview_ui.canvas.target_zoom)
+            .abs()
+            > f64::EPSILON
+            || (self.preview_ui.canvas.current_pan_x - self.preview_ui.canvas.target_pan_x).abs()
+                > f64::EPSILON
+            || (self.preview_ui.canvas.current_pan_y - self.preview_ui.canvas.target_pan_y).abs()
+                > f64::EPSILON;
+
+        self.preview_ui.canvas.current_zoom = self.preview_ui.canvas.target_zoom;
+        self.preview_ui.canvas.current_pan_x = self.preview_ui.canvas.target_pan_x;
+        self.preview_ui.canvas.current_pan_y = self.preview_ui.canvas.target_pan_y;
+
+        changed
     }
 
     pub(super) fn sync_preview_playback_for_selection(
@@ -1802,6 +1833,67 @@ pub(in crate::app) fn preview_canvas_pan_limits(
 
 pub(in crate::app) fn lerp_preview_canvas_value(current: f64, target: f64) -> f64 {
     (target - current).mul_add(PREVIEW_CANVAS_LERP_FACTOR, current)
+}
+
+pub(in crate::app) fn preview_canvas_wheel_zoom_multiplier(delta_y: f64) -> Option<f64> {
+    if !delta_y.is_finite() {
+        return None;
+    }
+
+    let magnitude = delta_y.abs();
+    if magnitude <= PREVIEW_CANVAS_WHEEL_DEADZONE {
+        return None;
+    }
+
+    let steps =
+        (magnitude - PREVIEW_CANVAS_WHEEL_DEADZONE).min(PREVIEW_CANVAS_WHEEL_MAX_STEPS_PER_EVENT);
+    let exponent = if delta_y < 0.0 { steps } else { -steps };
+    let multiplier = PREVIEW_CANVAS_WHEEL_ZOOM_STEP.powf(exponent);
+    (multiplier.is_finite() && multiplier > 0.0).then_some(multiplier)
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Canvas transform metrics are scalar layout values kept explicit for focused tests."
+)]
+pub(in crate::app) fn preview_canvas_transform_visual_delta(
+    viewport_width: f64,
+    viewport_height: f64,
+    media_width: f64,
+    media_height: f64,
+    current_zoom: f64,
+    target_zoom: f64,
+    current_pan_x: f64,
+    target_pan_x: f64,
+    current_pan_y: f64,
+    target_pan_y: f64,
+) -> Option<f64> {
+    let current = preview_canvas_layout_metrics(
+        viewport_width,
+        viewport_height,
+        media_width,
+        media_height,
+        current_zoom,
+        current_pan_x,
+        current_pan_y,
+    )?;
+    let target = preview_canvas_layout_metrics(
+        viewport_width,
+        viewport_height,
+        media_width,
+        media_height,
+        target_zoom,
+        target_pan_x,
+        target_pan_y,
+    )?;
+
+    Some(
+        (target.left - current.left)
+            .abs()
+            .max((target.top - current.top).abs())
+            .max((target.width - current.width).abs())
+            .max((target.height - current.height).abs()),
+    )
 }
 
 pub(in crate::app) fn preview_canvas_transform_settled(

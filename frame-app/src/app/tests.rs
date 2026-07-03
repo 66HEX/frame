@@ -8,7 +8,9 @@ use super::input::{
 };
 use super::preview_actions::{
     lerp_preview_canvas_value, preview_canvas_initial_zoom, preview_canvas_layout_metrics,
-    preview_canvas_pan_limits, preview_canvas_transform_settled, preview_runtime_dimensions,
+    preview_canvas_pan_limits, preview_canvas_transform_settled,
+    preview_canvas_transform_visual_delta, preview_canvas_wheel_zoom_multiplier,
+    preview_runtime_dimensions,
 };
 use super::preview_panel::{
     centered_offset, preview_crop_visual_rect, preview_presented_frame, preview_shell_state,
@@ -1080,6 +1082,20 @@ mod frame_root_config {
         Bounds::new(point(px(0.0), px(0.0)), size(px(width), px(height)))
     }
 
+    fn root_with_preview_canvas_media(width: u32, height: u32) -> FrameRoot {
+        let mut root = FrameRoot::new();
+        let row_bytes = width.checked_mul(4).expect("row bytes");
+        let data_len = usize::try_from(row_bytes.checked_mul(height).expect("data length"))
+            .expect("data length usize");
+        let frame = PreviewFrame::bgra(width, height, row_bytes, 0, vec![0; data_len])
+            .expect("preview frame");
+        root.preview_ui.render_image = Some(render_image_from_frame(&frame).expect("render image"));
+        root.preview_ui.render_presentation = PreviewRenderPresentation::default();
+        root.preview_ui.canvas_bounds = Some(preview_test_bounds(1000.0, 500.0));
+        root.preview_ui.canvas.auto_fit_pending = false;
+        root
+    }
+
     fn seed_ready_video(root: &mut FrameRoot, id: &str, path: &str) {
         root.file_queue.add_file(FileItem::from_path(id, path, 1));
         root.source_metadata.mark_ready(
@@ -2069,6 +2085,36 @@ mod frame_root_config {
     }
 
     #[test]
+    fn preview_canvas_wheel_zoom_multiplier_ignores_tail_micro_delta() {
+        let multiplier = preview_canvas_wheel_zoom_multiplier(0.06);
+
+        assert_eq!(multiplier, None);
+    }
+
+    #[test]
+    fn preview_canvas_wheel_zoom_multiplier_scales_with_delta_magnitude() {
+        let small = preview_canvas_wheel_zoom_multiplier(-0.50).expect("small multiplier");
+        let large = preview_canvas_wheel_zoom_multiplier(-2.00).expect("large multiplier");
+
+        assert!(large > small && small > 1.0);
+    }
+
+    #[test]
+    fn preview_canvas_wheel_zoom_multiplier_zooms_out_for_positive_delta() {
+        let multiplier = preview_canvas_wheel_zoom_multiplier(1.00).expect("multiplier");
+
+        assert!(multiplier < 1.0);
+    }
+
+    #[test]
+    fn preview_canvas_wheel_zoom_multiplier_caps_extreme_delta() {
+        let capped = preview_canvas_wheel_zoom_multiplier(-100.0).expect("capped multiplier");
+        let expected = PREVIEW_CANVAS_WHEEL_ZOOM_STEP.powi(8);
+
+        assert!((capped - expected).abs() < 0.000_001);
+    }
+
+    #[test]
     fn preview_canvas_transform_waits_for_all_axes_to_settle() {
         assert!(!preview_canvas_transform_settled(
             1.0, 1.000_01, 10.0, 10.005, -10.0, -10.005,
@@ -2081,6 +2127,16 @@ mod frame_root_config {
             -10.0,
             -10.005,
         ));
+    }
+
+    #[test]
+    fn preview_canvas_transform_visual_delta_measures_rendered_bounds() {
+        let delta = preview_canvas_transform_visual_delta(
+            1000.0, 500.0, 16.0, 9.0, 1.0, 1.000_4, 0.0, 0.20, 0.0, -0.20,
+        )
+        .expect("visual delta");
+
+        assert!(delta < PREVIEW_CANVAS_VISUAL_SETTLE_EPSILON);
     }
 
     #[test]
@@ -2097,6 +2153,71 @@ mod frame_root_config {
         assert!(root.preview_ui.canvas.current_zoom > 1.0);
         assert!(root.preview_ui.canvas.current_pan_x > 10.0);
         assert!(root.preview_ui.canvas.current_pan_y < -10.0);
+    }
+
+    #[test]
+    fn tick_preview_canvas_animation_settles_subpixel_visual_motion() {
+        let mut root = root_with_preview_canvas_media(16, 9);
+        root.preview_ui.canvas.current_zoom = 1.0;
+        root.preview_ui.canvas.target_zoom = 1.000_4;
+        root.preview_ui.canvas.current_pan_x = 0.0;
+        root.preview_ui.canvas.target_pan_x = 0.20;
+        root.preview_ui.canvas.current_pan_y = 0.0;
+        root.preview_ui.canvas.target_pan_y = -0.20;
+
+        assert!(root.tick_preview_canvas_animation());
+        assert_eq!(
+            root.preview_ui.canvas.current_zoom,
+            root.preview_ui.canvas.target_zoom
+        );
+        assert_eq!(
+            root.preview_ui.canvas.current_pan_x,
+            root.preview_ui.canvas.target_pan_x
+        );
+        assert_eq!(
+            root.preview_ui.canvas.current_pan_y,
+            root.preview_ui.canvas.target_pan_y
+        );
+    }
+
+    #[test]
+    fn tick_preview_canvas_animation_keeps_visible_motion_lerping() {
+        let mut root = root_with_preview_canvas_media(16, 9);
+        root.preview_ui.canvas.current_zoom = 1.0;
+        root.preview_ui.canvas.target_zoom = 1.01;
+        root.preview_ui.canvas.current_pan_x = 0.0;
+        root.preview_ui.canvas.target_pan_x = 2.0;
+
+        assert!(root.tick_preview_canvas_animation());
+        assert_ne!(
+            root.preview_ui.canvas.current_zoom,
+            root.preview_ui.canvas.target_zoom
+        );
+    }
+
+    #[test]
+    fn tick_preview_canvas_animation_settles_exactly_inside_visual_epsilon() {
+        let mut root = FrameRoot::new();
+        root.preview_ui.canvas.current_zoom = 1.0;
+        root.preview_ui.canvas.target_zoom = 1.000_000_5;
+        root.preview_ui.canvas.current_pan_x = 10.0;
+        root.preview_ui.canvas.target_pan_x = 10.005;
+        root.preview_ui.canvas.current_pan_y = -10.0;
+        root.preview_ui.canvas.target_pan_y = -10.005;
+
+        assert!(root.tick_preview_canvas_animation());
+        assert_eq!(
+            root.preview_ui.canvas.current_zoom,
+            root.preview_ui.canvas.target_zoom
+        );
+        assert_eq!(
+            root.preview_ui.canvas.current_pan_x,
+            root.preview_ui.canvas.target_pan_x
+        );
+        assert_eq!(
+            root.preview_ui.canvas.current_pan_y,
+            root.preview_ui.canvas.target_pan_y
+        );
     }
 
     #[test]
