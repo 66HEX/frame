@@ -1476,6 +1476,9 @@ pub struct WindowOptions {
     /// The appearance of the window background.
     pub window_background: WindowBackgroundAppearance,
 
+    /// Shape options for a client-side decorated outer window frame.
+    pub client_side_frame: Option<ClientSideFrameOptions>,
+
     /// Application identifier of the window. Can by used by desktop environments to group applications together.
     pub app_id: Option<String>,
 
@@ -1543,8 +1546,16 @@ pub struct WindowParams {
     pub display_id: Option<DisplayId>,
 
     pub window_min_size: Option<Size<Pixels>>,
+    pub client_side_frame: Option<ClientSideFrameOptions>,
     #[cfg(target_os = "macos")]
     pub tabbing_identifier: Option<String>,
+}
+
+/// Shape options for the native-like outer frame of a client-side decorated window.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ClientSideFrameOptions {
+    /// Radius of the outer client frame corners.
+    pub corner_radius: Pixels,
 }
 
 /// Represents the status of how a window should be opened.
@@ -1599,12 +1610,23 @@ impl Default for WindowOptions {
             is_minimizable: true,
             display_id: None,
             window_background: WindowBackgroundAppearance::default(),
+            client_side_frame: None,
             icon: None,
             app_id: None,
             window_min_size: None,
             window_decorations: None,
             tabbing_identifier: None,
         }
+    }
+}
+
+#[cfg(test)]
+mod window_options_tests {
+    use super::*;
+
+    #[test]
+    fn client_side_frame_defaults_to_none() {
+        assert_eq!(WindowOptions::default().client_side_frame, None);
     }
 }
 

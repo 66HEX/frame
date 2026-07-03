@@ -2,11 +2,13 @@ use anyhow::{Context as _, anyhow};
 use x11rb::connection::RequestConnection;
 
 use crate::linux::X11ClientStatePtr;
+use crate::linux::window_controls::should_start_window_move;
 use gpui::{
-    AnyWindowHandle, Bounds, Decorations, DevicePixels, ForegroundExecutor, GpuSpecs, Modifiers,
-    Pixels, PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow,
-    Point, PromptButton, PromptLevel, RequestFrameOptions, ResizeEdge, ScaledPixels, Scene, Size,
-    Tiling, WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControlArea,
+    AnyWindowHandle, Bounds, ClientSideFrameOptions, Decorations, DevicePixels,
+    DispatchEventResult, ForegroundExecutor, GpuSpecs, Modifiers, MouseButton, Pixels,
+    PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow, Point,
+    PromptButton, PromptLevel, RequestFrameOptions, ResizeEdge, ScaledPixels, Scene, Size, Tiling,
+    WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControlArea,
     WindowDecorations, WindowKind, WindowParams, px,
 };
 use gpui_wgpu::{CompositorGpuHint, WgpuRenderer, WgpuSurfaceConfig};
@@ -244,6 +246,7 @@ unsafe impl Sync for RawWindow {}
 pub struct Callbacks {
     request_frame: Option<Box<dyn FnMut(RequestFrameOptions)>>,
     input: Option<Box<dyn FnMut(PlatformInput) -> gpui::DispatchEventResult>>,
+    hit_test_window_control: Option<Box<dyn FnMut() -> Option<WindowControlArea>>>,
     active_status_change: Option<Box<dyn FnMut(bool)>>,
     hovered_status_change: Option<Box<dyn FnMut(bool)>>,
     resize: Option<Box<dyn FnMut(Size<Pixels>, f32)>>,
@@ -273,6 +276,7 @@ pub struct X11WindowState {
     input_handler: Option<PlatformInputHandler>,
     appearance: WindowAppearance,
     background_appearance: WindowBackgroundAppearance,
+    client_side_frame: Option<ClientSideFrameOptions>,
     maximized_vertical: bool,
     maximized_horizontal: bool,
     hidden: bool,
@@ -280,6 +284,7 @@ pub struct X11WindowState {
     hovered: bool,
     pub(crate) force_render_after_recovery: bool,
     fullscreen: bool,
+    is_movable: bool,
     client_side_decorations_supported: bool,
     decorations: WindowDecorations,
     edge_constraints: Option<EdgeConstraints>,
@@ -291,6 +296,21 @@ pub struct X11WindowState {
 impl X11WindowState {
     fn is_transparent(&self) -> bool {
         self.background_appearance != WindowBackgroundAppearance::Opaque
+            || self.client_frame_corner_radius().is_some()
+    }
+
+    fn client_frame_corner_radius(&self) -> Option<ScaledPixels> {
+        if self.decorations == WindowDecorations::Client {
+            self.client_side_frame
+                .map(|frame| ScaledPixels(f32::from(frame.corner_radius) * self.scale_factor))
+        } else {
+            None
+        }
+    }
+
+    fn update_client_frame_clip(&mut self) {
+        self.renderer
+            .set_client_frame_corner_radius(self.client_frame_corner_radius());
     }
 }
 
@@ -798,10 +818,12 @@ impl X11WindowState {
                 hovered: false,
                 force_render_after_recovery: false,
                 fullscreen: false,
+                is_movable: params.is_movable,
                 maximized_vertical: false,
                 maximized_horizontal: false,
                 hidden: false,
                 appearance,
+                client_side_frame: params.client_side_frame,
                 handle,
                 background_appearance: WindowBackgroundAppearance::Opaque,
                 destroyed: false,
@@ -1145,31 +1167,79 @@ impl X11WindowStatePtr {
         }
     }
 
-    pub fn handle_input(&self, input: PlatformInput) {
+    pub fn handle_input(&self, input: PlatformInput) -> DispatchEventResult {
         if self.is_blocked() {
-            return;
+            return DispatchEventResult::default();
         }
+        let key_down = match &input {
+            PlatformInput::KeyDown(event) => Some(event.clone()),
+            _ => None,
+        };
         let callback = self.callbacks.borrow_mut().input.take();
         if let Some(mut fun) = callback {
-            let result = fun(input.clone());
+            let result = fun(input);
             self.callbacks.borrow_mut().input = Some(fun);
             if !result.propagate {
-                return;
+                return result;
             }
-        }
-        if let PlatformInput::KeyDown(event) = input {
-            // only allow shift modifier when inserting text
-            if event.keystroke.modifiers.is_subset_of(&Modifiers::shift()) {
-                let mut state = self.state.borrow_mut();
-                if let Some(mut input_handler) = state.input_handler.take() {
-                    if let Some(key_char) = &event.keystroke.key_char {
-                        drop(state);
-                        input_handler.replace_text_in_range(None, key_char);
-                        state = self.state.borrow_mut();
+
+            if let Some(event) = key_down {
+                // only allow shift modifier when inserting text
+                if event.keystroke.modifiers.is_subset_of(&Modifiers::shift()) {
+                    let mut state = self.state.borrow_mut();
+                    if let Some(mut input_handler) = state.input_handler.take() {
+                        if let Some(key_char) = &event.keystroke.key_char {
+                            drop(state);
+                            input_handler.replace_text_in_range(None, key_char);
+                            state = self.state.borrow_mut();
+                        }
+                        state.input_handler = Some(input_handler);
                     }
-                    state.input_handler = Some(input_handler);
                 }
             }
+
+            result
+        } else {
+            DispatchEventResult::default()
+        }
+    }
+
+    fn hit_test_window_control(&self) -> Option<WindowControlArea> {
+        let callback = self.callbacks.borrow_mut().hit_test_window_control.take();
+        if let Some(mut callback) = callback {
+            let area = callback();
+            self.callbacks
+                .borrow_mut()
+                .hit_test_window_control
+                .replace(callback);
+            area
+        } else {
+            None
+        }
+    }
+
+    pub fn handle_window_control_mouse_down(
+        &self,
+        button: MouseButton,
+        result: DispatchEventResult,
+    ) {
+        let (is_movable, is_fullscreen) = {
+            let state = self.state.borrow();
+            (state.is_movable, state.fullscreen)
+        };
+        if !should_start_window_move(
+            button,
+            result.clone(),
+            Some(WindowControlArea::Drag),
+            is_movable,
+            is_fullscreen,
+        ) {
+            return;
+        }
+
+        let area = self.hit_test_window_control();
+        if should_start_window_move(button, result, area, is_movable, is_fullscreen) {
+            X11Window(self.clone()).start_window_move();
         }
     }
 
@@ -1556,6 +1626,7 @@ impl PlatformWindow for X11Window {
     fn set_background_appearance(&self, background_appearance: WindowBackgroundAppearance) {
         let mut state = self.0.state.borrow_mut();
         state.background_appearance = background_appearance;
+        state.update_client_frame_clip();
         let transparent = state.is_transparent();
         state.renderer.update_transparency(transparent);
     }
@@ -1661,7 +1732,8 @@ impl PlatformWindow for X11Window {
         self.0.callbacks.borrow_mut().close = Some(callback);
     }
 
-    fn on_hit_test_window_control(&self, _callback: Box<dyn FnMut() -> Option<WindowControlArea>>) {
+    fn on_hit_test_window_control(&self, callback: Box<dyn FnMut() -> Option<WindowControlArea>>) {
+        self.0.callbacks.borrow_mut().hit_test_window_control = Some(callback);
     }
 
     fn on_appearance_changed(&self, callback: Box<dyn FnMut()>) {
@@ -1868,11 +1940,13 @@ impl PlatformWindow for X11Window {
         match decorations {
             WindowDecorations::Server => {
                 state.decorations = WindowDecorations::Server;
+                state.update_client_frame_clip();
                 let is_transparent = state.is_transparent();
                 state.renderer.update_transparency(is_transparent);
             }
             WindowDecorations::Client => {
                 state.decorations = WindowDecorations::Client;
+                state.update_client_frame_clip();
                 let is_transparent = state.is_transparent();
                 state.renderer.update_transparency(is_transparent);
             }

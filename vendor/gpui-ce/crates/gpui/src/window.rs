@@ -1316,6 +1316,7 @@ impl Window {
             is_minimizable,
             display_id,
             window_background,
+            client_side_frame,
             app_id,
             window_min_size,
             window_decorations,
@@ -1342,6 +1343,7 @@ impl Window {
                 show,
                 display_id,
                 window_min_size,
+                client_side_frame,
                 icon,
                 #[cfg(target_os = "macos")]
                 tabbing_identifier,

@@ -1382,8 +1382,7 @@ struct BlurParams {
     // 1.0 = clip the composite to the rounded rect (backdrop); 0.0 = let the blurred result fade
     // out on its own (content `filter` bleeds past the element box like CSS).
     clip_rounded: f32,
-    // 1.0 = snapped 2:1 box downsample (anchor the half-res grid to a fixed 2px grid at the origin
-    // so a stationary element blurs identically at every window size); 0.0 = 1:1 copy (scene blit).
+    // 1.0 = snapped 2:1 box downsample / half-res composite; 0.0 = 1:1 copy/composite.
     downsample: f32,
 }
 
@@ -1457,12 +1456,10 @@ fn fs_blur_composite(input: BlurVarying) -> @location(0) vec4<f32> {
         return vec4<f32>(0.0);
     }
 
-    // Sample the half-res blur by screen position, using the SAME fixed 2:1 grid the snapped
-    // downsample wrote (anchored at the origin, independent of viewport parity). `2*floor(W/2)` is
-    // the source span the half-res texture covers; dividing by it maps screen pixel p to half-res
-    // texel p/2 at every window size, so the composite stays put rather than wobbling on resize.
+    // Half-res blur composites use the SAME fixed 2:1 grid the snapped downsample wrote. Final
+    // client-frame clipping samples a full-res scene texture, so it uses the viewport directly.
     let blur_span = 2.0 * floor(globals.viewport_size * 0.5);
-    let uv = input.position.xy / blur_span;
+    let uv = select(input.position.xy / globals.viewport_size, input.position.xy / blur_span, blur_locals.downsample > 0.5);
     let blurred = textureSampleLevel(t_blur, s_blur, uv, 0.0);
 
     let corner_radii = Corners(

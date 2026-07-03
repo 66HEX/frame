@@ -83,9 +83,7 @@ struct BlurParams {
     /// 0.0 to let the blurred result fade out on its own (content `filter` — it bleeds past the
     /// element bounds like CSS, so the fade isn't sharply truncated at the box edge).
     clip_rounded: f32,
-    /// 1.0 = snapped 2:1 box downsample (anchor the half-res grid to a fixed 2px grid at the
-    /// origin, so a stationary element blurs identically at every window size); 0.0 = 1:1 copy
-    /// (the scene blit, which must not downsample). Downsample pass only.
+    /// 1.0 = snapped 2:1 downsample / half-res composite; 0.0 = full-res copy/composite.
     downsample: f32,
 }
 
@@ -254,6 +252,8 @@ pub struct WgpuRenderer {
     adapter_info: wgpu::AdapterInfo,
     transparent_alpha_mode: wgpu::CompositeAlphaMode,
     opaque_alpha_mode: wgpu::CompositeAlphaMode,
+    client_frame_corner_radius: Option<ScaledPixels>,
+    warned_transparent_alpha_unavailable: bool,
     max_texture_size: u32,
     last_error: Arc<Mutex<Option<String>>>,
     failed_frame_count: u32,
@@ -423,6 +423,13 @@ impl WgpuRenderer {
         } else {
             opaque_alpha_mode
         };
+        let warned_transparent_alpha_unavailable =
+            config.transparent && alpha_mode == wgpu::CompositeAlphaMode::Opaque;
+        if warned_transparent_alpha_unavailable {
+            warn!(
+                "Requested a transparent WGPU surface, but the surface only provided opaque alpha mode"
+            );
+        }
 
         let device = Arc::clone(&context.device);
         let max_texture_size = device.limits().max_texture_dimension_2d;
@@ -630,6 +637,8 @@ impl WgpuRenderer {
             adapter_info,
             transparent_alpha_mode,
             opaque_alpha_mode,
+            client_frame_corner_radius: None,
+            warned_transparent_alpha_unavailable,
             max_texture_size,
             last_error,
             failed_frame_count: 0,
@@ -1306,6 +1315,15 @@ impl WgpuRenderer {
         } else {
             self.opaque_alpha_mode
         };
+        if transparent
+            && new_alpha_mode == wgpu::CompositeAlphaMode::Opaque
+            && !self.warned_transparent_alpha_unavailable
+        {
+            warn!(
+                "Requested a transparent WGPU surface, but the surface only provided opaque alpha mode"
+            );
+            self.warned_transparent_alpha_unavailable = true;
+        }
 
         if new_alpha_mode != self.surface_config.alpha_mode {
             self.surface_config.alpha_mode = new_alpha_mode;
@@ -1324,6 +1342,13 @@ impl WgpuRenderer {
                 path_sample_count,
                 dual_source_blending,
             );
+        }
+    }
+
+    pub fn set_client_frame_corner_radius(&mut self, corner_radius: Option<ScaledPixels>) {
+        if self.client_frame_corner_radius != corner_radius {
+            self.client_frame_corner_radius = corner_radius;
+            self.needs_redraw = true;
         }
     }
 
@@ -1431,8 +1456,10 @@ impl WgpuRenderer {
 
         // Blur is the only thing that needs the offscreen scene texture; allocate it (and the
         // ping/pong/group targets) lazily so non-blurring apps pay no extra VRAM or blit.
-        let use_offscreen =
-            !scene.backdrop_filters.is_empty() || !scene.filter_boundaries.is_empty();
+        let use_client_frame_clip = self.client_frame_corner_radius.is_some();
+        let use_offscreen = use_client_frame_clip
+            || !scene.backdrop_filters.is_empty()
+            || !scene.filter_boundaries.is_empty();
         if use_offscreen {
             self.ensure_blur_textures();
         }
@@ -1747,7 +1774,16 @@ impl WgpuRenderer {
             // Present the offscreen scene by copying it into the swapchain texture. Skipped when
             // rendering went straight to the swapchain (no filters this frame).
             if let Some(scene_color_view) = &scene_color_view {
-                self.blit_to_frame(&mut encoder, scene_color_view, &frame_view);
+                if let Some(corner_radius) = self.client_frame_corner_radius {
+                    self.clip_scene_to_frame(
+                        &mut encoder,
+                        scene_color_view,
+                        &frame_view,
+                        corner_radius,
+                    );
+                } else {
+                    self.blit_to_frame(&mut encoder, scene_color_view, &frame_view);
+                }
             }
 
             self.resources()
@@ -2110,6 +2146,7 @@ impl WgpuRenderer {
             corner_radii,
             opacity,
             clip_rounded: if clip_rounded { 1.0 } else { 0.0 },
+            downsample: 1.0,
             ..Default::default()
         };
         let bind_group = self.make_blur_bind_group(params, &ping);
@@ -2186,6 +2223,58 @@ impl WgpuRenderer {
         pass.set_bind_group(0, &resources.globals_bind_group, &[]);
         pass.set_bind_group(1, &bind_group, &[]);
         pass.draw(0..3, 0..1);
+    }
+
+    /// Composite the offscreen scene into a rounded client-frame shape.
+    fn clip_scene_to_frame(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        source: &wgpu::TextureView,
+        frame_view: &wgpu::TextureView,
+        corner_radius: ScaledPixels,
+    ) {
+        let bounds = Bounds {
+            origin: Point {
+                x: ScaledPixels(0.0),
+                y: ScaledPixels(0.0),
+            },
+            size: Size {
+                width: ScaledPixels(self.surface_config.width as f32),
+                height: ScaledPixels(self.surface_config.height as f32),
+            },
+        };
+        let radius = corner_radius.0;
+        let bind_group = self.make_blur_bind_group(
+            BlurParams {
+                bounds: bounds.into(),
+                content_mask: bounds.into(),
+                corner_radii: [radius, radius, radius, radius],
+                opacity: 1.0,
+                clip_rounded: 1.0,
+                downsample: 0.0,
+                ..Default::default()
+            },
+            source,
+        );
+        let resources = self.resources();
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("client_frame_clip"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: frame_view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                    store: wgpu::StoreOp::Store,
+                },
+                depth_slice: None,
+            })],
+            depth_stencil_attachment: None,
+            ..Default::default()
+        });
+        pass.set_pipeline(&resources.pipelines.blur_composite);
+        pass.set_bind_group(0, &resources.globals_bind_group, &[]);
+        pass.set_bind_group(1, &bind_group, &[]);
+        pass.draw(0..4, 0..1);
     }
 
     fn draw_polychrome_sprites(
@@ -2594,6 +2683,8 @@ impl WgpuRenderer {
         let gpu_context = Rc::clone(gpu_context);
         let ctx_ref = gpu_context.borrow();
         let context = ctx_ref.as_ref().expect("context should exist");
+        let client_frame_corner_radius = self.client_frame_corner_radius;
+        let warned_transparent_alpha_unavailable = self.warned_transparent_alpha_unavailable;
 
         self.resources = None;
         self.atlas.handle_device_lost(context);
@@ -2608,6 +2699,8 @@ impl WgpuRenderer {
             extra_reqs,
             self.atlas.clone(),
         )?;
+        self.client_frame_corner_radius = client_frame_corner_radius;
+        self.warned_transparent_alpha_unavailable |= warned_transparent_alpha_unavailable;
 
         log::info!("GPU recovery complete");
         Ok(())

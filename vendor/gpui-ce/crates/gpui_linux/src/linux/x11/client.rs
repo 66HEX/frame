@@ -1174,13 +1174,16 @@ impl X11Client {
                         let current_count = state.current_count;
 
                         drop(state);
-                        window.handle_input(PlatformInput::MouseDown(gpui::MouseDownEvent {
-                            button,
-                            position,
-                            modifiers,
-                            click_count: current_count,
-                            first_mouse: false,
-                        }));
+                        let result = window.handle_input(PlatformInput::MouseDown(
+                            gpui::MouseDownEvent {
+                                button,
+                                position,
+                                modifiers,
+                                click_count: current_count,
+                                first_mouse: false,
+                            },
+                        ));
+                        window.handle_window_control_mouse_down(button, result);
                     }
                     Some(ButtonOrScroll::Scroll(direction)) => {
                         drop(state);
