@@ -76,15 +76,19 @@ jobs:
     - name: steps::setup_linux
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang curl desktop-file-utils file libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf
+        sudo apt-get install -y clang curl desktop-file-utils file flatpak flatpak-builder libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf
     - name: steps::setup_appimagetool
       run: |
         curl -L --fail -o /tmp/appimagetool.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-aarch64.AppImage
         chmod +x /tmp/appimagetool.AppImage
+    - name: steps::setup_flatpak
+      run: |
+        flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+        flatpak install --user -y --noninteractive flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
     - name: ./script/bundle-linux
       env:
         APPIMAGETOOL: /tmp/appimagetool.AppImage
-      run: ./script/bundle-linux --tarball --appimage
+      run: ./script/bundle-linux --tarball --appimage --flatpak
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@v4
       with:
@@ -97,8 +101,14 @@ jobs:
         name: Frame-aarch64.AppImage
         path: target/release/Frame-aarch64.AppImage
         if-no-files-found: error
+    - name: run_bundling::upload_flatpak_artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Frame-aarch64.flatpak
+        path: target/release/Frame-aarch64.flatpak
+        if-no-files-found: error
 
-    timeout-minutes: 60
+    timeout-minutes: 90
   bundle_macos_x86_64:
     if: |-
       github.event_name == 'workflow_dispatch' ||

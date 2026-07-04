@@ -1065,37 +1065,23 @@ const fn setup_rust_step() -> &'static str {
 
 fn linux_job(arch: &str, runner: &str) -> String {
     let appimagetool_arch = arch;
-    let linux_packages = if arch == "x86_64" {
-        "clang curl desktop-file-utils file flatpak flatpak-builder libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf"
-    } else {
-        "clang curl desktop-file-utils file libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf"
-    };
-    let flatpak_setup = if arch == "x86_64" {
-        r"    - name: steps::setup_flatpak
+    let linux_packages = "clang curl desktop-file-utils file flatpak flatpak-builder libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf";
+    let flatpak_setup = r"    - name: steps::setup_flatpak
       run: |
         flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
         flatpak install --user -y --noninteractive flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
-"
-    } else {
-        ""
-    };
-    let bundle_args = if arch == "x86_64" {
-        "--tarball --appimage --flatpak"
-    } else {
-        "--tarball --appimage"
-    };
-    let flatpak_upload = if arch == "x86_64" {
+";
+    let bundle_args = "--tarball --appimage --flatpak";
+    let flatpak_upload = format!(
         r"    - name: run_bundling::upload_flatpak_artifact
       uses: actions/upload-artifact@v4
       with:
-        name: Frame-x86_64.flatpak
-        path: target/release/Frame-x86_64.flatpak
+        name: Frame-{arch}.flatpak
+        path: target/release/Frame-{arch}.flatpak
         if-no-files-found: error
 "
-    } else {
-        ""
-    };
-    let timeout_minutes = if arch == "x86_64" { 90 } else { 60 };
+    );
+    let timeout_minutes = 90;
 
     format!(
         r"  bundle_linux_{arch}:
