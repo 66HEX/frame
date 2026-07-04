@@ -30,3 +30,10 @@ gpui_shared_string = { path = "vendor/gpui-ce/crates/gpui_shared_string" }
 gpui_web = { path = "vendor/gpui-ce/crates/gpui_web" }
 gpui_wgpu = { path = "vendor/gpui-ce/crates/gpui_wgpu" }
 gpui_windows = { path = "vendor/gpui-ce/crates/gpui_windows" }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
