@@ -1,3 +1,4 @@
+mod accessibility;
 mod chrome;
 mod components;
 mod conversion;
@@ -23,6 +24,7 @@ mod update_actions;
 mod workspace;
 pub use runtime::{frame_window_options, init_app, open_frame_window};
 
+use accessibility::FrameFocusRegistry;
 use chrome::{
     AppSettingsSheetProps, app_settings_sheet, drag_drop_overlay, titlebar, update_dialog,
 };
@@ -250,6 +252,7 @@ const PREVIEW_FRAME_TICK_INTERVAL: Duration = Duration::from_millis(16);
 )]
 pub struct FrameRoot {
     active_view: ActiveView,
+    focus_registry: FrameFocusRegistry,
     file_queue: FileQueue,
     conversion_events: ConversionEventState,
     logs_scroll_handle: UniformListScrollHandle,

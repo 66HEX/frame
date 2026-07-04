@@ -76,6 +76,7 @@ impl FrameRoot {
             active_view: active_view_from_env_value(
                 std::env::var("FRAME_GPUI_INITIAL_VIEW").ok().as_deref(),
             ),
+            focus_registry: FrameFocusRegistry::default(),
             file_queue: FileQueue::new(),
             conversion_events: ConversionEventState::new(),
             logs_scroll_handle: UniformListScrollHandle::new(),
