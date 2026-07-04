@@ -913,13 +913,18 @@ fn update_action_row(
     }
 }
 
+#[derive(Clone, Copy)]
+pub(super) struct UpdateDialogView<'a> {
+    pub(super) status: &'a UpdateStatus,
+    pub(super) info: Option<&'a UpdateInfo>,
+    pub(super) release_notes_scroll_handle: &'a ScrollHandle,
+    pub(super) panel_focus: &'a FocusHandle,
+    pub(super) close_focus: &'a FocusHandle,
+}
+
 pub(super) fn update_dialog(
     is_open: bool,
-    status: &UpdateStatus,
-    info: Option<&UpdateInfo>,
-    release_notes_scroll_handle: &ScrollHandle,
-    panel_focus: &FocusHandle,
-    close_focus: &FocusHandle,
+    view: UpdateDialogView<'_>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
@@ -982,33 +987,20 @@ pub(super) fn update_dialog(
                 cx.notify();
             }
         }))
-        .child(update_dialog_panel(
-            panel_offset,
-            status,
-            info,
-            release_notes_scroll_handle,
-            panel_focus,
-            close_focus,
-            window,
-            cx,
-        ))
+        .child(update_dialog_panel(panel_offset, view, window, cx))
 }
 
 fn update_dialog_panel(
     panel_offset: f32,
-    status: &UpdateStatus,
-    info: Option<&UpdateInfo>,
-    release_notes_scroll_handle: &ScrollHandle,
-    panel_focus: &FocusHandle,
-    close_focus: &FocusHandle,
+    view: UpdateDialogView<'_>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let mut panel = div()
         .id("update-dialog-panel")
         .role(gpui::Role::AlertDialog)
-        .aria_label(update_dialog_title(status))
-        .track_focus(panel_focus)
+        .aria_label(update_dialog_title(view.status))
+        .track_focus(view.panel_focus)
         .tab_stop(false)
         .mt(px(panel_offset))
         .w_full()
@@ -1022,16 +1014,21 @@ fn update_dialog_panel(
         .on_click(cx.listener(|_, _: &ClickEvent, _window, cx| {
             cx.stop_propagation();
         }))
-        .child(update_dialog_header(status, close_focus, window, cx))
-        .child(update_dialog_body(
-            status,
-            info,
-            release_notes_scroll_handle,
+        .child(update_dialog_header(
+            view.status,
+            view.close_focus,
+            window,
+            cx,
         ))
-        .child(update_dialog_footer(status, window, cx));
+        .child(update_dialog_body(
+            view.status,
+            view.info,
+            view.release_notes_scroll_handle,
+        ))
+        .child(update_dialog_footer(view.status, window, cx));
 
-    if matches!(status, UpdateStatus::Downloading { .. }) {
-        panel = panel.child(update_dialog_download_state(status));
+    if matches!(view.status, UpdateStatus::Downloading { .. }) {
+        panel = panel.child(update_dialog_download_state(view.status));
     }
 
     panel

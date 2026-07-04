@@ -4,6 +4,7 @@ use super::preview_panel::{
     PreviewEditToolbarFocus, PreviewEditToolbarFocuses, PreviewToolFocuses, PreviewViewportFocuses,
 };
 use super::*;
+use crate::app::chrome::UpdateDialogView;
 
 impl Render for FrameRoot {
     #[expect(
@@ -653,11 +654,13 @@ impl Render for FrameRoot {
             }
             root = root.child(update_dialog(
                 self.update_ui.dialog_open,
-                &self.update_ui.status,
-                self.update_ui.dialog_info.as_deref(),
-                &self.update_ui.release_notes_scroll_handle,
-                &panel_focus,
-                &close_focus,
+                UpdateDialogView {
+                    status: &self.update_ui.status,
+                    info: self.update_ui.dialog_info.as_deref(),
+                    release_notes_scroll_handle: &self.update_ui.release_notes_scroll_handle,
+                    panel_focus: &panel_focus,
+                    close_focus: &close_focus,
+                },
                 window,
                 cx,
             ));

@@ -3,7 +3,7 @@ use super::*;
 use frame_updater::{PlatformAssetKey, UpdateAsset};
 use semver::Version;
 
-const UPDATE_AVAILABLE_RELEASE_NOTES: &str = r#"
+const UPDATE_AVAILABLE_RELEASE_NOTES: &str = r"
 # Frame 0.30.0
 
 ### Added
@@ -30,7 +30,7 @@ const UPDATE_AVAILABLE_RELEASE_NOTES: &str = r#"
 - **FFmpeg Log Syntax Highlighting:** Removed the previous web-based FFmpeg log syntax highlighting from the Logs view during the native GPUI rewrite.
 - **ML Upscaling Runtime:** Removed the bundled RealESRGAN model assets and Tauri upscaling worker path from the production app.
 - **Legacy App Icon Sets:** Removed unused Tauri mobile/store icon resources, keeping the desktop package icon set consumed by the native bundle scripts.
-"#;
+";
 
 impl FrameRoot {
     pub(super) fn apply_visual_fixture(&mut self, fixture: Option<VisualFixture>) {

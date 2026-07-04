@@ -580,7 +580,7 @@ fn preview_canvas_layout_ready(canvas: PreviewCanvasRenderState) -> bool {
     canvas.viewport_width > 0.0 && canvas.viewport_height > 0.0
 }
 
-fn preview_waiting_for_visual_render(state: &PreviewShellState) -> bool {
+const fn preview_waiting_for_visual_render(state: &PreviewShellState) -> bool {
     state.render_image.is_none()
         && matches!(
             state.availability.media_kind,

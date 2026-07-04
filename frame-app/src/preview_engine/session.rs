@@ -1,5 +1,6 @@
 use std::sync::{Mutex, MutexGuard};
 
+use super::metrics::PreviewRuntimeMetricsStore;
 use super::{
     LatestFrameSnapshot, LatestFrameStore, PreviewCommand, PreviewDimensions, PreviewEngineError,
     PreviewPlaybackSnapshot, PreviewSessionConfig, PreviewSessionSnapshot, PreviewSessionStatus,
@@ -11,6 +12,7 @@ pub struct PreviewSession {
     dimensions: Mutex<PreviewDimensions>,
     duration_seconds: Mutex<f64>,
     frame_store: LatestFrameStore,
+    metrics: PreviewRuntimeMetricsStore,
     pipeline: Mutex<Option<RunningPreviewProcess>>,
     playing: Mutex<bool>,
     status: Mutex<PreviewSessionStatus>,
@@ -26,16 +28,18 @@ impl PreviewSession {
     pub fn start(config: PreviewSessionConfig) -> Result<Self, PreviewEngineError> {
         config.validate()?;
         let frame_store = LatestFrameStore::new();
+        let metrics = PreviewRuntimeMetricsStore::new();
 
         match config.source_kind {
             PreviewSourceKind::Image | PreviewSourceKind::Video | PreviewSourceKind::Audio => {
                 let (pipeline, dimensions, duration_seconds) =
-                    start_ffmpeg_preview_process(&config, frame_store.clone())?;
+                    start_ffmpeg_preview_process(&config, frame_store.clone(), metrics.clone())?;
                 Ok(Self {
                     config: Mutex::new(config),
                     dimensions: Mutex::new(dimensions),
                     duration_seconds: Mutex::new(duration_seconds),
                     frame_store,
+                    metrics,
                     pipeline: Mutex::new(Some(pipeline)),
                     playing: Mutex::new(false),
                     status: Mutex::new(PreviewSessionStatus::Ready),
@@ -48,11 +52,13 @@ impl PreviewSession {
     #[must_use]
     pub fn new_for_test(config: PreviewSessionConfig) -> Self {
         let frame_store = LatestFrameStore::new();
+        let metrics = PreviewRuntimeMetricsStore::new();
         Self {
             dimensions: Mutex::new(config.target_dimensions()),
             duration_seconds: Mutex::new(config.duration_seconds),
             config: Mutex::new(config),
             frame_store,
+            metrics,
             pipeline: Mutex::new(None),
             playing: Mutex::new(false),
             status: Mutex::new(PreviewSessionStatus::Ready),
@@ -76,8 +82,11 @@ impl PreviewSession {
             let mut pipeline_guard = lock(&self.pipeline);
             let playing = *lock(&self.playing);
             let Some(pipeline) = pipeline_guard.as_mut() else {
-                let (pipeline, dimensions, _) =
-                    start_ffmpeg_preview_process(&config, self.frame_store.clone())?;
+                let (pipeline, dimensions, _) = start_ffmpeg_preview_process(
+                    &config,
+                    self.frame_store.clone(),
+                    self.metrics.clone(),
+                )?;
                 *pipeline_guard = Some(pipeline);
                 self.store_reconfigured_state(config, dimensions);
                 return Ok(());
@@ -102,6 +111,11 @@ impl PreviewSession {
 
     pub fn mark_frame_presented(&self, generation: u64) {
         self.frame_store.mark_presented(generation);
+        self.metrics.record_frame_presented();
+    }
+
+    pub fn mark_render_image_converted(&self) {
+        self.metrics.record_render_image_converted();
     }
 
     /// Sends a playback command to the running preview pipeline.
@@ -183,6 +197,7 @@ impl PreviewSession {
             },
             frame_generation: self.frame_store.generation(),
             frame_stats: self.frame_store.stats(),
+            runtime_metrics: self.metrics.snapshot(),
         }
     }
 

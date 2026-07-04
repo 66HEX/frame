@@ -209,13 +209,13 @@ mod tests {
     fn frame_scrollbar_content_height_prefers_measured_scroll_extent() {
         let content_height = frame_scrollbar_measured_content_height(420.0, 360.0, 640.0);
 
-        assert_eq!(content_height, 1000.0);
+        assert!((content_height - 1000.0).abs() <= f32::EPSILON);
     }
 
     #[test]
     fn frame_scrollbar_content_height_uses_fallback_before_measurement() {
         let content_height = frame_scrollbar_measured_content_height(420.0, 360.0, 0.0);
 
-        assert_eq!(content_height, 420.0);
+        assert!((content_height - 420.0).abs() <= f32::EPSILON);
     }
 }

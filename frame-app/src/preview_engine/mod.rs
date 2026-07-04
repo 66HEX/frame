@@ -3,6 +3,7 @@
 mod error;
 mod ffmpeg_backend;
 mod frame_store;
+mod metrics;
 mod renderer;
 mod session;
 #[cfg(test)]
@@ -12,6 +13,7 @@ mod types;
 pub use error::*;
 pub use ffmpeg_backend::*;
 pub use frame_store::*;
+pub use metrics::PreviewRuntimeMetrics;
 pub use renderer::*;
 pub use session::*;
 pub use types::*;

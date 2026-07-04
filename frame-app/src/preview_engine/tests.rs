@@ -3,7 +3,13 @@
     reason = "Preview engine tests compare exact deterministic timestamps and dimensions."
 )]
 
-use std::{path::PathBuf, process::Command, sync::Arc, thread, time::Duration};
+use std::{
+    path::PathBuf,
+    process::Command,
+    sync::Arc,
+    thread,
+    time::{Duration, Instant},
+};
 
 use super::*;
 
@@ -125,6 +131,29 @@ fn test_preview_session_command_is_noop_without_pipeline() {
 }
 
 #[test]
+fn test_preview_session_snapshot_exposes_runtime_metrics() {
+    let config = PreviewSessionConfig {
+        file_id: "test-metrics".to_string(),
+        path: PathBuf::from("/tmp/test.mp4"),
+        source_kind: PreviewSourceKind::Video,
+        source_width: Some(1920),
+        source_height: Some(1080),
+        has_audio: false,
+        selected_audio_track: None,
+        duration_seconds: 12.5,
+        max_width: DEFAULT_PREVIEW_MAX_WIDTH,
+        max_height: DEFAULT_PREVIEW_MAX_HEIGHT,
+        fps: DEFAULT_PREVIEW_FPS,
+        conversion_config: default_core_config(),
+    };
+    let session = PreviewSession::new_for_test(config);
+
+    let snapshot = session.snapshot();
+
+    assert_eq!(snapshot.runtime_metrics.video_frames_published, 0);
+}
+
+#[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 fn ffmpeg_preview_session_publishes_first_video_frame() {
     let path = temp_preview_video("first-frame");
@@ -191,6 +220,41 @@ fn ffmpeg_preview_session_reconfigure_preserves_playback_position() {
     assert!(after.playing);
 }
 
+#[test]
+#[ignore = "requires FFmpeg plus a default audio output device; run with --ignored"]
+fn ffmpeg_preview_session_collects_audio_video_metrics_for_sync_fixture() {
+    let path = temp_preview_av_sync_video("av-sync");
+    let config = real_av_preview_config(path.clone());
+
+    let session = PreviewSession::start(config).expect("session");
+    session.command(PreviewCommand::Play).expect("play");
+    let playback_started_at = Instant::now();
+    thread::sleep(Duration::from_millis(650));
+    let snapshot = session.snapshot();
+    let playback_elapsed_seconds = playback_started_at.elapsed().as_secs_f64();
+    let _ = std::fs::remove_file(&path);
+    session.stop();
+
+    assert!(snapshot.runtime_metrics.video_process_spawns >= 1);
+    assert!(snapshot.runtime_metrics.audio_process_spawns >= 1);
+    assert!(snapshot.runtime_metrics.video_frames_published >= 1);
+    assert!(snapshot.runtime_metrics.audio_pcm_chunks >= 1);
+    assert!(
+        snapshot
+            .runtime_metrics
+            .first_video_frame_published_ms
+            .is_some_and(|elapsed_ms| elapsed_ms <= 250),
+        "first video frame should publish quickly after play when audio prewarm is ready: {:?}",
+        snapshot.runtime_metrics.first_video_frame_published_ms
+    );
+    assert!(
+        snapshot.playback.position_seconds <= playback_elapsed_seconds + 0.150,
+        "video playback advanced too far ahead of wall clock: position={:.3}s elapsed={:.3}s",
+        snapshot.playback.position_seconds,
+        playback_elapsed_seconds
+    );
+}
+
 fn real_video_preview_config(path: PathBuf) -> PreviewSessionConfig {
     PreviewSessionConfig {
         file_id: "video-real".to_string(),
@@ -199,6 +263,23 @@ fn real_video_preview_config(path: PathBuf) -> PreviewSessionConfig {
         source_width: Some(160),
         source_height: Some(90),
         has_audio: false,
+        selected_audio_track: None,
+        duration_seconds: 2.0,
+        max_width: 320,
+        max_height: 180,
+        fps: DEFAULT_PREVIEW_FPS,
+        conversion_config: default_core_config(),
+    }
+}
+
+fn real_av_preview_config(path: PathBuf) -> PreviewSessionConfig {
+    PreviewSessionConfig {
+        file_id: "video-av-real".to_string(),
+        path,
+        source_kind: PreviewSourceKind::Video,
+        source_width: Some(160),
+        source_height: Some(90),
+        has_audio: true,
         selected_audio_track: None,
         duration_seconds: 2.0,
         max_width: 320,
@@ -230,6 +311,43 @@ fn temp_preview_video(label: &str) -> PathBuf {
     assert!(
         status.success(),
         "ffmpeg fixture generation failed: {status}"
+    );
+    path
+}
+
+fn temp_preview_av_sync_video(label: &str) -> PathBuf {
+    let mut path = std::env::temp_dir();
+    path.push(format!("frame-preview-{label}-{}.mp4", std::process::id()));
+    let status = Command::new(crate::runtime_binaries::ffmpeg_executable())
+        .args([
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=black:s=160x90:r=30:d=2",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=880:sample_rate=48000:d=2",
+            "-vf",
+            "drawbox=x=0:y=0:w=iw:h=ih:color=white:t=fill:enable='between(t,0.5,0.6)'",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-shortest",
+            path.to_string_lossy().as_ref(),
+        ])
+        .status()
+        .expect("spawn ffmpeg");
+    assert!(
+        status.success(),
+        "ffmpeg av fixture generation failed: {status}"
     );
     path
 }

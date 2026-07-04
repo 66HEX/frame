@@ -627,6 +627,7 @@ impl FrameRoot {
 
         match render_image_from_frame(&latest.frame) {
             Ok(image) => {
+                session.mark_render_image_converted();
                 session.mark_frame_presented(latest.generation);
                 self.preview_ui.render_generation = latest.generation;
                 self.preview_ui.rendered_presentation = self.preview_ui.render_presentation;
