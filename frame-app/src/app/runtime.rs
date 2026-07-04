@@ -85,14 +85,14 @@ pub fn frame_window_options(bounds: Bounds<Pixels>) -> WindowOptions {
 }
 
 #[cfg(target_os = "linux")]
-fn linux_client_side_frame() -> Option<ClientSideFrameOptions> {
+const fn linux_client_side_frame() -> Option<ClientSideFrameOptions> {
     Some(ClientSideFrameOptions {
         corner_radius: px(theme::RADIUS_LG),
     })
 }
 
 #[cfg(not(target_os = "linux"))]
-fn linux_client_side_frame() -> Option<ClientSideFrameOptions> {
+const fn linux_client_side_frame() -> Option<ClientSideFrameOptions> {
     None
 }
 
