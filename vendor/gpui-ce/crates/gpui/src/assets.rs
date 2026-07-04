@@ -43,6 +43,8 @@ pub struct RenderImageParams {
 pub struct RenderImage {
     /// The ID associated with this image
     pub id: ImageId,
+    /// Monotonic content version for renderers that can update an existing atlas tile.
+    pub(crate) content_version: u64,
     /// The scale factor of this image on render.
     pub(crate) scale_factor: f32,
     data: SmallVec<[Frame; 1]>,
@@ -59,13 +61,33 @@ impl Eq for RenderImage {}
 impl RenderImage {
     /// Create a new image from the given data.
     pub fn new(data: impl Into<SmallVec<[Frame; 1]>>) -> Self {
+        Self::new_with_id(Self::new_image_id(), 0, data)
+    }
+
+    /// Create a new image id that can be reused across content versions.
+    pub fn new_image_id() -> ImageId {
         static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
+        ImageId(NEXT_ID.fetch_add(1, SeqCst))
+    }
+
+    /// Create a new image with an explicit id and content version.
+    pub fn new_with_id(
+        id: ImageId,
+        content_version: u64,
+        data: impl Into<SmallVec<[Frame; 1]>>,
+    ) -> Self {
         Self {
-            id: ImageId(NEXT_ID.fetch_add(1, SeqCst)),
+            id,
+            content_version,
             scale_factor: 1.0,
             data: data.into(),
         }
+    }
+
+    /// Get the content version associated with this image.
+    pub fn content_version(&self) -> u64 {
+        self.content_version
     }
 
     /// Convert this image into a byte slice.

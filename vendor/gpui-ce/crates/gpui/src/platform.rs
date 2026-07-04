@@ -1071,6 +1071,16 @@ pub trait PlatformAtlas {
         key: &AtlasKey,
         build: &mut dyn FnMut() -> Result<Option<(Size<DevicePixels>, Cow<'a, [u8]>)>>,
     ) -> Result<Option<AtlasTile>>;
+
+    fn get_or_update_with<'a>(
+        &self,
+        key: &AtlasKey,
+        _content_version: u64,
+        build: &mut dyn FnMut() -> Result<Option<(Size<DevicePixels>, Cow<'a, [u8]>)>>,
+    ) -> Result<Option<AtlasTile>> {
+        self.get_or_insert_with(key, build)
+    }
+
     fn remove(&self, key: &AtlasKey);
 }
 

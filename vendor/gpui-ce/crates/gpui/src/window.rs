@@ -4227,7 +4227,7 @@ impl Window {
 
         let tile = self
             .sprite_atlas
-            .get_or_insert_with(&params.into(), &mut || {
+            .get_or_update_with(&params.into(), data.content_version(), &mut || {
                 Ok(Some((
                     data.size(frame_index),
                     Cow::Borrowed(
