@@ -7,15 +7,16 @@ use super::input::{
     should_capture_text_input_drag, should_handle_text_input, text_input_scroll_x_for_cursor,
 };
 use super::preview_actions::{
-    lerp_preview_canvas_value, preview_canvas_initial_zoom, preview_canvas_layout_metrics,
-    preview_canvas_pan_limits, preview_canvas_transform_settled,
+    lerp_preview_canvas_value, preview_canvas_initial_zoom, preview_canvas_keyboard_pan_delta,
+    preview_canvas_layout_metrics, preview_canvas_pan_limits, preview_canvas_transform_settled,
     preview_canvas_transform_visual_delta, preview_canvas_wheel_zoom_multiplier,
-    preview_runtime_dimensions,
+    preview_crop_keyboard_delta, preview_overlay_keyboard_delta, preview_runtime_dimensions,
 };
 use super::preview_panel::{
     centered_offset, preview_crop_visual_rect, preview_presented_frame, preview_shell_state,
     preview_timeline_labels, preview_trim_enabled, preview_visual_controls_visible,
-    timeline_fraction_from_percent, timeline_slider_percent_from_bounds,
+    timeline_fraction_from_percent, timeline_keyboard_time_for_key,
+    timeline_slider_percent_from_bounds,
 };
 use super::primitives::{ButtonVariant, button_colors, frame_highlight_px};
 use super::settings_panel::{hex_to_subtitle_hsv, subtitle_hsv_to_hex};
@@ -2749,6 +2750,7 @@ mod preview_shell {
                 date: None,
                 comment: None,
             },
+            subtitle_focuses: SettingsSubtitleFocuses::default(),
             subtitle_color_focuses: SettingsSubtitleColorInputFocuses {
                 font: None,
                 outline: None,
@@ -3050,6 +3052,64 @@ mod visual_contract {
     fn audio_slider_helpers_map_values_to_original_range() {
         assert_eq!(settings_panel::range_fraction(100, 0, 200), 0.5);
         assert_eq!(settings_panel::range_value_from_fraction(0.5, 0, 200), 100);
+        assert_eq!(
+            settings_panel::range_value_for_key(100, 0, 200, "right"),
+            Some(101)
+        );
+        assert_eq!(
+            settings_panel::range_value_for_key(100, 0, 200, "pageup"),
+            Some(80)
+        );
+        assert_eq!(
+            settings_panel::range_value_for_key(100, 0, 200, "home"),
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn timeline_keyboard_helper_maps_standard_slider_keys() {
+        assert_eq!(
+            timeline_keyboard_time_for_key(30.0, 60.0, "right"),
+            Some(30.6)
+        );
+        assert_eq!(
+            timeline_keyboard_time_for_key(30.0, 60.0, "pageup"),
+            Some(24.0)
+        );
+        assert_eq!(
+            timeline_keyboard_time_for_key(30.0, 60.0, "end"),
+            Some(60.0)
+        );
+        assert_eq!(timeline_keyboard_time_for_key(30.0, 0.0, "right"), None);
+    }
+
+    #[test]
+    fn preview_keyboard_delta_helpers_ignore_irrelevant_keys() {
+        assert_eq!(
+            preview_canvas_keyboard_pan_delta("right"),
+            Some(PreviewPoint { x: 24.0, y: 0.0 })
+        );
+        assert_eq!(preview_canvas_keyboard_pan_delta("enter"), None);
+        assert_eq!(
+            preview_crop_keyboard_delta(DragHandle::North, "up", false),
+            Some(PreviewPoint { x: 0.0, y: -0.01 })
+        );
+        assert_eq!(
+            preview_crop_keyboard_delta(DragHandle::North, "left", false),
+            None
+        );
+        assert_eq!(
+            preview_overlay_keyboard_delta("down", false),
+            Some(PreviewPoint { x: 0.0, y: 0.01 })
+        );
+        assert_eq!(
+            preview_crop_keyboard_delta(DragHandle::North, "up", true),
+            Some(PreviewPoint { x: 0.0, y: -0.05 })
+        );
+        assert_eq!(
+            preview_overlay_keyboard_delta("down", true),
+            Some(PreviewPoint { x: 0.0, y: 0.05 })
+        );
     }
 
     #[test]
