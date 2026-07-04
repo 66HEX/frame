@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-07-04
+
+### Added
+
+- **Native GPUI Application:** Rebuilt Frame as a Rust-native GPUI-CE desktop app, replacing the previous Tauri/Svelte shell while keeping the main workspace, preview, settings, queue, and logs workflows in a single native application.
+- **Rust Workspace Architecture:** Added dedicated `frame-app`, `frame-core`, and `frame-updater` crates so FFmpeg argument generation, media probing, compatibility rules, queue control, and update logic can be tested and shipped outside the UI layer.
+- **Native Packaging Pipeline:** Added Rust-based release tooling, macOS/Linux/Windows bundle scripts, Linux desktop metadata, Windows resource embedding, and generated GitHub Actions workflows for building release artifacts.
+- **Signed Update System:** Added a signed-manifest updater with platform-specific assets, SHA-256 verification, Ed25519 manifest signatures, install planning, and a bundled update helper for replacing installed builds.
+- **GPUI Preview and Editing Surface:** Added a native preview panel with crop, transform, trim timeline, overlay controls, zoom handling, and FFmpeg-backed frame extraction for video, image, and audio workflows.
+- **Native Settings and Metadata Panels:** Added GPUI settings surfaces for source details, output selection, video, audio, images, subtitles, metadata, and presets using the shared media compatibility model.
+
+### Changed
+
+- **Application Runtime:** Moved the production app from a webview-based Tauri runtime to a native Rust/GPUI runtime, reducing the JavaScript frontend boundary and making Rust the primary application layer.
+- **Conversion Flow:** Reworked import, queue, progress, cancellation, pause/resume, logging, and notification handling around native Rust state and process controllers while preserving FFmpeg-based conversion behavior.
+- **Media Compatibility:** Centralized container, codec, stream, pixel-format, image, subtitle, and metadata rules in `frame-core` so UI option availability and conversion validation use the same Rust model.
+- **Documentation:** Updated the project documentation around the GPUI-CE stack, Rust workspace layout, native packaging scripts, bundled FFmpeg runtime setup, and signed update manifest flow.
+
+### Removed
+
+- **Tauri/Svelte Application Shell:** Removed the previous `src-tauri` backend, SvelteKit frontend, Tauri capabilities/configuration, webview services, stores, components, routes, and JavaScript build toolchain.
+- **Frontend Localization System:** Removed the previous Svelte-era locale dictionaries and i18n extraction/sync guardrail scripts.
+- **Legacy Web Preview Pipeline:** Removed the Pixi/WebGPU web preview implementation in favor of the GPUI/FFmpeg-backed native preview implementation.
+- **FFmpeg Log Syntax Highlighting:** Removed the previous web-based FFmpeg log syntax highlighting from the Logs view during the native GPUI rewrite.
+- **ML Upscaling Runtime:** Removed the bundled RealESRGAN model assets and Tauri upscaling worker path from the production app.
+- **Legacy App Icon Sets:** Removed unused Tauri mobile/store icon resources, keeping the desktop package icon set consumed by the native bundle scripts.
+
 ## [0.29.2] - 2026-05-01
 
 ### Fixed
@@ -749,7 +776,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.29.1...HEAD
+[Unreleased]: https://github.com/66HEX/frame/compare/0.30.0...HEAD
+[0.30.0]: https://github.com/66HEX/frame/compare/0.29.2...0.30.0
+[0.29.2]: https://github.com/66HEX/frame/compare/0.29.1...0.29.2
 [0.29.1]: https://github.com/66HEX/frame/compare/0.29.0...0.29.1
 [0.29.0]: https://github.com/66HEX/frame/compare/0.28.0...0.29.0
 [0.28.0]: https://github.com/66HEX/frame/compare/0.27.0...0.28.0
