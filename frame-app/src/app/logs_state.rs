@@ -8,12 +8,14 @@ impl FrameRoot {
         if self.active_view != ActiveView::Logs {
             self.logs_follow_tail = true;
             self.last_log_scroll_target = None;
+            self.logs_keyboard_scroll_top = 0;
             return;
         }
 
         let Some(file_id) = self.conversion_events.selected_log_file_id() else {
             self.logs_follow_tail = true;
             self.last_log_scroll_target = None;
+            self.logs_keyboard_scroll_top = 0;
             return;
         };
 
@@ -27,6 +29,7 @@ impl FrameRoot {
             .is_none_or(|previous| previous.file_id != target.file_id);
         if target_file_changed {
             self.logs_follow_tail = true;
+            self.logs_keyboard_scroll_top = 0;
         }
 
         if target.line_count == 0 {
@@ -36,6 +39,7 @@ impl FrameRoot {
 
         if self.logs_follow_tail && self.last_log_scroll_target.as_ref() != Some(&target) {
             self.scroll_logs_to_bottom(target.line_count);
+            self.logs_keyboard_scroll_top = target.line_count.saturating_sub(1);
             self.last_log_scroll_target = Some(target);
             return;
         }
@@ -79,6 +83,7 @@ impl FrameRoot {
         }
 
         self.logs_follow_tail = true;
+        self.logs_keyboard_scroll_top = line_count.saturating_sub(1);
         self.scroll_logs_to_bottom(line_count);
         self.last_log_scroll_target = Some(LogScrollTarget {
             file_id: file_id.to_string(),

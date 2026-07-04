@@ -304,12 +304,58 @@ mod file_queue {
     }
 
     #[test]
-    fn remove_file_clears_selection_when_selected_file_is_removed() {
+    fn remove_file_selects_next_file_when_selected_file_is_removed() {
+        let mut queue = FileQueue::new();
+        queue.add_file(sample_file("first", "/tmp/one.mp4", 1));
+        queue.add_file(sample_file("second", "/tmp/two.mp4", 1));
+        queue.remove_file("first");
+
+        assert_eq!(queue.selected_file_id(), Some("second"));
+    }
+
+    #[test]
+    fn remove_file_selects_previous_file_when_removed_file_was_last() {
+        let mut queue = FileQueue::new();
+        queue.add_file(sample_file("first", "/tmp/one.mp4", 1));
+        queue.add_file(sample_file("second", "/tmp/two.mp4", 1));
+        queue.select_existing_file("second");
+        queue.remove_file("second");
+
+        assert_eq!(queue.selected_file_id(), Some("first"));
+    }
+
+    #[test]
+    fn remove_file_clears_selection_when_queue_becomes_empty() {
         let mut queue = FileQueue::new();
         queue.add_file(sample_file("first", "/tmp/one.mp4", 1));
         queue.remove_file("first");
 
         assert_eq!(queue.selected_file_id(), None);
+    }
+
+    #[test]
+    fn select_next_file_moves_selection_forward() {
+        let mut queue = FileQueue::new();
+        queue.add_files([
+            sample_file("first", "/tmp/one.mp4", 1),
+            sample_file("second", "/tmp/two.mp4", 1),
+        ]);
+
+        assert!(queue.select_next_file());
+        assert_eq!(queue.selected_file_id(), Some("second"));
+    }
+
+    #[test]
+    fn select_previous_file_moves_selection_backward() {
+        let mut queue = FileQueue::new();
+        queue.add_files([
+            sample_file("first", "/tmp/one.mp4", 1),
+            sample_file("second", "/tmp/two.mp4", 1),
+        ]);
+        queue.select_existing_file("second");
+
+        assert!(queue.select_previous_file());
+        assert_eq!(queue.selected_file_id(), Some("first"));
     }
 
     #[test]

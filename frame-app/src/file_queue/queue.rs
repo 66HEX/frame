@@ -127,7 +127,11 @@ impl FileQueue {
         let index = self.files.iter().position(|file| file.id == id)?;
         let removed = self.files.remove(index);
         if self.selected_file_id.as_deref() == Some(id) {
-            self.selected_file_id = None;
+            self.selected_file_id = self
+                .files
+                .get(index)
+                .or_else(|| index.checked_sub(1).and_then(|index| self.files.get(index)))
+                .map(|file| file.id.clone());
         }
         Some(removed)
     }
@@ -152,6 +156,60 @@ impl FileQueue {
         } else {
             false
         }
+    }
+
+    pub fn select_first_file(&mut self) -> bool {
+        let Some(file) = self.files.first() else {
+            return false;
+        };
+        if self.selected_file_id.as_deref() == Some(file.id.as_str()) {
+            return false;
+        }
+        self.selected_file_id = Some(file.id.clone());
+        true
+    }
+
+    pub fn select_last_file(&mut self) -> bool {
+        let Some(file) = self.files.last() else {
+            return false;
+        };
+        if self.selected_file_id.as_deref() == Some(file.id.as_str()) {
+            return false;
+        }
+        self.selected_file_id = Some(file.id.clone());
+        true
+    }
+
+    pub fn select_next_file(&mut self) -> bool {
+        let Some(index) = self.selected_index() else {
+            return self.select_first_file();
+        };
+        let Some(file) = self.files.get(index + 1) else {
+            return false;
+        };
+        self.selected_file_id = Some(file.id.clone());
+        true
+    }
+
+    pub fn select_previous_file(&mut self) -> bool {
+        let Some(index) = self.selected_index() else {
+            return self.select_last_file();
+        };
+        let Some(previous_index) = index.checked_sub(1) else {
+            return false;
+        };
+        let Some(file) = self.files.get(previous_index) else {
+            return false;
+        };
+        self.selected_file_id = Some(file.id.clone());
+        true
+    }
+
+    fn selected_index(&self) -> Option<usize> {
+        let selected_file_id = self.selected_file_id.as_deref()?;
+        self.files
+            .iter()
+            .position(|file| file.id == selected_file_id)
     }
 
     pub fn toggle_batch(&mut self, id: &str, is_checked: bool) {

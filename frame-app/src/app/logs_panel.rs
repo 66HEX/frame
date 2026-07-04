@@ -1,3 +1,4 @@
+use super::accessibility::focus_visible_ring;
 use super::components::{
     FRAME_ICON_BUTTON_SM_SIZE, FRAME_ICON_SM_SIZE, FrameIconButtonSize, FrameIconButtonVariant,
     frame_icon_button, frame_vertical_uniform_scrollbar,
@@ -11,8 +12,8 @@ use super::{
     InteractiveElement, IntoElement, LOG_LINE_HEIGHT, LOG_LINE_NUMBER_WIDTH,
     LOG_SCROLL_BUTTON_OFFSET, LOG_SCROLL_BUTTON_PADDING, LOG_SCROLL_BUTTON_SIZE,
     LOG_SCROLL_ICON_SIZE, Lerp, LogLine, MouseButton, PANEL_HEADER_HEIGHT, ParentElement,
-    ScrollWheelEvent, StatefulInteractiveElement, Styled, UniformListScrollHandle, Window, assets,
-    div, hover_motion, px, retarget_hover_motion, theme, uniform_list,
+    ScrollStrategy, ScrollWheelEvent, StatefulInteractiveElement, Styled, UniformListScrollHandle,
+    Window, assets, div, hover_motion, px, retarget_hover_motion, theme, uniform_list,
 };
 use crate::numeric::usize_to_f32;
 
@@ -65,6 +66,9 @@ pub(super) fn logs_tab_strip(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let mut tabs = div()
+        .id("logs-tab-list")
+        .role(gpui::Role::TabList)
+        .aria_label("Log files")
         .h_full()
         .flex_1()
         .min_w_0()
@@ -73,10 +77,15 @@ pub(super) fn logs_tab_strip(
         .gap_6()
         .overflow_hidden();
 
+    let tab_ids = active_files
+        .iter()
+        .map(|file| file.id.clone())
+        .collect::<Vec<_>>();
     for file in active_files {
         tabs = tabs.child(log_tab_button(
             file,
             selected_id.is_some_and(|id| id == file.id),
+            &tab_ids,
             window,
             cx,
         ));
@@ -116,10 +125,13 @@ pub(super) fn logs_tab_strip(
 pub(super) fn log_tab_button(
     file: &ActiveLogFile,
     selected: bool,
+    active_file_ids: &[String],
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
     let file_id = file.id.clone();
+    let key_file_id = file.id.clone();
+    let keyboard_file_ids = active_file_ids.to_vec();
     let hover_transition = hover_motion(element_id("logs-tab-hover", &file.id), window, cx);
     let hover_progress = *hover_transition.evaluate(window, cx);
     let foreground = if selected {
@@ -130,6 +142,12 @@ pub(super) fn log_tab_button(
 
     div()
         .id(element_id("logs-tab", &file.id))
+        .role(gpui::Role::Tab)
+        .aria_label(file.name.clone())
+        .aria_selected(selected)
+        .focusable()
+        .tab_stop(true)
+        .focus_visible(focus_visible_ring)
         .flex_none()
         .text_size(px(theme::TEXT_LABEL_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
@@ -147,6 +165,21 @@ pub(super) fn log_tab_button(
             }
             cx.stop_propagation();
         }))
+        .on_key_down(
+            cx.listener(move |root, event: &gpui::KeyDownEvent, _window, cx| {
+                let Some(next_id) = log_tab_id_for_key(
+                    key_file_id.as_str(),
+                    &keyboard_file_ids,
+                    event.keystroke.key.as_str(),
+                ) else {
+                    return;
+                };
+                if root.select_log_file_for_logs_view(next_id) {
+                    cx.notify();
+                }
+                cx.stop_propagation();
+            }),
+        )
         .child(file.name.clone())
 }
 
@@ -196,13 +229,15 @@ pub(super) fn log_lines_list(
 ) -> impl IntoElement {
     let selected_id = selected_id.to_string();
     let list_id = element_id("logs-line-list", &selected_id);
+    let key_scroll_handle = scroll_handle.clone();
+    let processor_selected_id = selected_id.clone();
 
     let list = uniform_list(
         list_id,
         line_count,
         cx.processor(move |root, range, _window, _cx| {
             root.conversion_events
-                .log_line_window_for(&selected_id, range)
+                .log_line_window_for(&processor_selected_id, range)
                 .into_iter()
                 .map(log_line_row)
                 .collect()
@@ -224,13 +259,109 @@ pub(super) fn log_lines_list(
 
     div()
         .relative()
+        .id(element_id("logs-scroll-area", &selected_id))
+        .role(gpui::Role::Log)
+        .aria_label("Conversion log output")
+        .focusable()
+        .tab_stop(true)
+        .focus_visible(focus_visible_ring)
         .size_full()
+        .on_key_down(
+            cx.listener(move |root, event: &gpui::KeyDownEvent, _window, cx| {
+                let Some(target) = log_scroll_target_for_key(
+                    root.logs_keyboard_scroll_top,
+                    line_count,
+                    event.keystroke.key.as_str(),
+                ) else {
+                    return;
+                };
+                key_scroll_handle.scroll_to_item_strict(target, ScrollStrategy::Top);
+                root.logs_keyboard_scroll_top = target;
+                root.logs_follow_tail = target + 1 >= line_count;
+                cx.stop_propagation();
+                cx.notify();
+            }),
+        )
         .child(list)
         .child(frame_vertical_uniform_scrollbar(
             "logs-line-list-scrollbar",
             scroll_handle,
             usize_to_f32(line_count) * LOG_LINE_HEIGHT,
         ))
+}
+
+fn log_tab_id_for_key<'a>(
+    current_id: &str,
+    active_file_ids: &'a [String],
+    key: &str,
+) -> Option<&'a str> {
+    let current_index = active_file_ids.iter().position(|id| id == current_id)?;
+    match key {
+        "left" => Some(if current_index == 0 {
+            active_file_ids.last()?.as_str()
+        } else {
+            active_file_ids[current_index - 1].as_str()
+        }),
+        "right" => Some(active_file_ids[(current_index + 1) % active_file_ids.len()].as_str()),
+        "home" => active_file_ids.first().map(String::as_str),
+        "end" => active_file_ids.last().map(String::as_str),
+        _ => None,
+    }
+}
+
+fn log_scroll_target_for_key(current_top: usize, line_count: usize, key: &str) -> Option<usize> {
+    if line_count == 0 {
+        return None;
+    }
+    match key {
+        "pageup" => Some(current_top.saturating_sub(10)),
+        "pagedown" => Some((current_top + 10).min(line_count - 1)),
+        "home" => Some(0),
+        "end" => Some(line_count - 1),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod keyboard_tests {
+    use super::*;
+
+    fn log_ids() -> Vec<String> {
+        vec![
+            "first".to_string(),
+            "second".to_string(),
+            "third".to_string(),
+        ]
+    }
+
+    #[test]
+    fn log_tab_id_for_key_wraps_left_from_first_tab() {
+        let ids = log_ids();
+
+        assert_eq!(log_tab_id_for_key("first", &ids, "left"), Some("third"));
+    }
+
+    #[test]
+    fn log_tab_id_for_key_wraps_right_from_last_tab() {
+        let ids = log_ids();
+
+        assert_eq!(log_tab_id_for_key("third", &ids, "right"), Some("first"));
+    }
+
+    #[test]
+    fn log_scroll_target_for_key_moves_page_down_by_ten_lines() {
+        assert_eq!(log_scroll_target_for_key(3, 30, "pagedown"), Some(13));
+    }
+
+    #[test]
+    fn log_scroll_target_for_key_clamps_page_up_to_start() {
+        assert_eq!(log_scroll_target_for_key(3, 30, "pageup"), Some(0));
+    }
+
+    #[test]
+    fn log_scroll_target_for_key_moves_end_to_last_line() {
+        assert_eq!(log_scroll_target_for_key(3, 30, "end"), Some(29));
+    }
 }
 
 pub(super) fn log_line_row(line: LogLine) -> impl IntoElement {
@@ -292,6 +423,7 @@ pub(super) fn log_scroll_to_bottom_button(
             frame_icon_button(
                 "logs-scroll-to-bottom",
                 assets::ICON_ARROW_DOWN,
+                "Scroll logs to bottom",
                 FrameIconButtonVariant::Ghost,
                 true,
                 FrameIconButtonSize {
@@ -326,6 +458,7 @@ pub(super) fn logs_copy_button(
     frame_icon_button(
         "logs-copy",
         icon,
+        if copied { "Logs copied" } else { "Copy logs" },
         FrameIconButtonVariant::Ghost,
         enabled,
         FrameIconButtonSize {

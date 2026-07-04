@@ -6,8 +6,9 @@ use super::{
     Styled, WORKSPACE_GAP, Window, assets, div, format_file_size, px, theme,
 };
 use super::{
+    accessibility::apply_accessible_checkbox,
     components::{
-        FrameIconButtonSize, FrameIconButtonVariant, frame_checkbox_hit_area, frame_icon_button,
+        FrameIconButtonSize, FrameIconButtonVariant, frame_checkbox_indicator, frame_icon_button,
     },
     primitives::{
         FrameSurface, button_mouse_down, color, drop_target_shadows, element_id,
@@ -40,6 +41,50 @@ pub(super) fn file_list_header(
     selection: BatchSelectionState,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
+    let selection_enabled = selection.is_enabled;
+    let header_checkbox = div()
+        .id("file-list-header-checkbox-hit-area")
+        .w(px(theme::MIN_HIT_AREA))
+        .h(px(FILE_ROW_HEIGHT))
+        .flex()
+        .items_center()
+        .justify_start()
+        .when(selection_enabled, gpui::Styled::cursor_pointer)
+        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
+            button_mouse_down(selection_enabled, window, cx);
+        })
+        .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+            cx.stop_propagation();
+            if selection_enabled && !root.file_queue.files().is_empty() {
+                root.file_queue.toggle_all_batch_selection();
+                cx.notify();
+            }
+        }))
+        .child(apply_accessible_checkbox(
+            frame_checkbox_indicator(
+                selection.is_checked,
+                selection.is_indeterminate,
+                !selection_enabled,
+            )
+            .id("file-list-header-checkbox")
+            .on_key_down(cx.listener(
+                move |root, event: &gpui::KeyDownEvent, _window, cx| {
+                    if !matches!(event.keystroke.key.as_str(), "space" | "enter") {
+                        return;
+                    }
+                    cx.stop_propagation();
+                    if selection_enabled && !root.file_queue.files().is_empty() {
+                        root.file_queue.toggle_all_batch_selection();
+                        cx.notify();
+                    }
+                },
+            )),
+            "Select all files for conversion",
+            selection_enabled,
+            selection.is_checked,
+            selection.is_indeterminate,
+        ));
+
     div()
         .h(px(PANEL_HEADER_HEIGHT))
         .w_full()
@@ -57,27 +102,11 @@ pub(super) fn file_list_header(
                 .text_size(px(theme::TEXT_LABEL_SIZE))
                 .text_color(color(theme::FRAME_GRAY_600))
                 .child(
-                    div().col_span(1).flex().items_center().child(
-                        frame_checkbox_hit_area(
-                            selection.is_checked,
-                            selection.is_indeterminate,
-                            selection.is_enabled,
-                            FILE_ROW_HEIGHT,
-                        )
-                        .id("file-list-header-checkbox")
-                        .when(selection.is_enabled, gpui::Styled::cursor_pointer)
-                        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-                            button_mouse_down(selection.is_enabled, window, cx);
-                        })
-                        .on_click(cx.listener(
-                            |root, _: &ClickEvent, _window, cx| {
-                                if !root.file_queue.files().is_empty() {
-                                    root.file_queue.toggle_all_batch_selection();
-                                    cx.notify();
-                                }
-                            },
-                        )),
-                    ),
+                    div()
+                        .col_span(1)
+                        .flex()
+                        .items_center()
+                        .child(header_checkbox),
                 )
                 .child(header_label("Name", 5, false))
                 .child(header_label("Size", 2, true))
@@ -104,6 +133,8 @@ pub(super) fn file_list_body(
 ) -> impl IntoElement {
     let body = div()
         .id("file-list-body")
+        .role(gpui::Role::List)
+        .aria_label("File queue")
         .flex_1()
         .flex()
         .flex_col()
@@ -141,11 +172,21 @@ pub(super) fn file_list_row(
 ) -> impl IntoElement {
     let group_name = format!("file-list-row-{}", file.id);
     let select_id = file.id.clone();
+    let row_accessible_label = format!(
+        "{}, {}, {}, {}",
+        file.name,
+        format_file_size(file.size_bytes),
+        file.original_format,
+        file.row_state_label()
+    );
 
     div()
         .h(px(FILE_ROW_HEIGHT))
         .w_full()
         .id(element_id("file-list-row", &select_id))
+        .role(gpui::Role::ListItem)
+        .aria_label(row_accessible_label)
+        .aria_selected(is_selected)
         .group(group_name.clone())
         .flex()
         .items_center()
@@ -176,7 +217,8 @@ pub(super) fn file_list_row(
                         .flex()
                         .items_center()
                         .child(row_checkbox_control(
-                            file.id.clone(),
+                            file.id.as_str(),
+                            file.name.as_str(),
                             file.is_selected_for_conversion,
                             cx,
                         )),
@@ -258,6 +300,9 @@ pub(super) fn row_actions_cell(
         .gap_2()
         .opacity(0.0)
         .group_hover(group_name, |style| style.opacity(1.0))
+        .focusable()
+        .tab_stop(false)
+        .contains_focus(|style| style.opacity(1.0))
         .on_click(cx.listener(|_, _: &ClickEvent, _window, cx| {
             cx.stop_propagation();
         }));
@@ -268,6 +313,7 @@ pub(super) fn row_actions_cell(
             row_action_button(
                 element_id("file-row-action-pause", &id),
                 assets::ICON_PAUSE,
+                "Pause conversion",
                 true,
                 RowActionTone::Normal,
                 window,
@@ -287,6 +333,7 @@ pub(super) fn row_actions_cell(
             row_action_button(
                 element_id("file-row-action-resume", &id),
                 assets::ICON_PLAY,
+                "Resume conversion",
                 true,
                 RowActionTone::Normal,
                 window,
@@ -307,6 +354,7 @@ pub(super) fn row_actions_cell(
             row_action_button(
                 element_id("file-row-action-delete", &id),
                 assets::ICON_TRASH,
+                "Remove file",
                 true,
                 RowActionTone::Destructive,
                 window,
@@ -323,6 +371,7 @@ pub(super) fn row_actions_cell(
         cell.child(row_action_button(
             element_id("file-row-action-delete-disabled", &file_id),
             assets::ICON_TRASH,
+            "Remove file",
             false,
             RowActionTone::Destructive,
             window,
@@ -340,6 +389,7 @@ pub(super) enum RowActionTone {
 pub(super) fn row_action_button(
     id: String,
     icon: &'static str,
+    label: &'static str,
     enabled: bool,
     tone: RowActionTone,
     window: &mut Window,
@@ -353,6 +403,7 @@ pub(super) fn row_action_button(
     frame_icon_button(
         id,
         icon,
+        label,
         variant,
         enabled,
         FrameIconButtonSize {
@@ -364,22 +415,55 @@ pub(super) fn row_action_button(
     )
 }
 pub(super) fn row_checkbox_control(
-    file_id: String,
+    file_id: &str,
+    file_name: &str,
     is_checked: bool,
     cx: &Context<FrameRoot>,
 ) -> impl IntoElement {
-    frame_checkbox_hit_area(is_checked, false, true, FILE_ROW_HEIGHT)
-        .id(element_id("file-row-checkbox", &file_id))
+    let label = format!("Select {file_name} for conversion");
+    let click_id = file_id.to_string();
+    let key_id = file_id.to_string();
+
+    div()
+        .id(element_id("file-row-checkbox-hit-area", file_id))
+        .w(px(theme::MIN_HIT_AREA))
+        .h(px(FILE_ROW_HEIGHT))
+        .flex()
+        .items_center()
+        .justify_start()
         .cursor_pointer()
         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
             button_mouse_down(true, window, cx);
         })
         .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
             cx.stop_propagation();
-            if root.file_queue.toggle_batch_selection(&file_id).is_some() {
+            let mut changed = root.file_queue.select_existing_file(&click_id);
+            changed |= root.file_queue.toggle_batch_selection(&click_id).is_some();
+            if changed {
                 cx.notify();
             }
         }))
+        .child(apply_accessible_checkbox(
+            frame_checkbox_indicator(is_checked, false, false)
+                .id(element_id("file-row-checkbox", file_id))
+                .on_key_down(
+                    cx.listener(move |root, event: &gpui::KeyDownEvent, _window, cx| {
+                        if !matches!(event.keystroke.key.as_str(), "space" | "enter") {
+                            return;
+                        }
+                        cx.stop_propagation();
+                        let mut changed = root.file_queue.select_existing_file(&key_id);
+                        changed |= root.file_queue.toggle_batch_selection(&key_id).is_some();
+                        if changed {
+                            cx.notify();
+                        }
+                    }),
+                ),
+            label,
+            true,
+            is_checked,
+            false,
+        ))
 }
 
 pub(super) const fn state_tone_color(tone: FileStateTone) -> Rgba {
