@@ -448,7 +448,7 @@ impl DirectXRenderer {
                 }
                 ctx.OMSetRenderTargets(Some(slice::from_ref(&scene_rtv)), None);
             }
-            self.active_render_target = scene_rtv.clone();
+            self.active_render_target = scene_rtv;
         } else {
             self.active_render_target = swapchain_rtv.clone();
         }

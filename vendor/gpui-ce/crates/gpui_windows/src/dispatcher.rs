@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::Context;
-use util::ResultExt;
+use ::util::ResultExt;
 use windows::{
     System::Threading::{
         ThreadPool, ThreadPoolTimer, TimerElapsedHandler, WorkItemHandler, WorkItemPriority,

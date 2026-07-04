@@ -1,6 +1,8 @@
+use anyhow::{Context as _, Result};
 use collections::FxHashMap;
 use etagere::BucketedAtlasAllocator;
 use parking_lot::Mutex;
+use std::borrow::Cow;
 use windows::Win32::Graphics::{
     Direct3D11::{
         D3D11_BIND_SHADER_RESOURCE, D3D11_BOX, D3D11_TEXTURE2D_DESC, D3D11_USAGE_DEFAULT,
@@ -23,6 +25,7 @@ struct DirectXAtlasState {
     polychrome_textures: AtlasTextureList<DirectXAtlasTexture>,
     subpixel_textures: AtlasTextureList<DirectXAtlasTexture>,
     tiles_by_key: FxHashMap<AtlasKey, AtlasTile>,
+    content_versions_by_key: FxHashMap<AtlasKey, u64>,
 }
 
 struct DirectXAtlasTexture {
@@ -43,6 +46,7 @@ impl DirectXAtlas {
             polychrome_textures: Default::default(),
             subpixel_textures: Default::default(),
             tiles_by_key: Default::default(),
+            content_versions_by_key: Default::default(),
         }))
     }
 
@@ -67,6 +71,7 @@ impl DirectXAtlas {
         lock.polychrome_textures = AtlasTextureList::default();
         lock.subpixel_textures = AtlasTextureList::default();
         lock.tiles_by_key.clear();
+        lock.content_versions_by_key.clear();
     }
 }
 
@@ -74,10 +79,8 @@ impl PlatformAtlas for DirectXAtlas {
     fn get_or_insert_with<'a>(
         &self,
         key: &AtlasKey,
-        build: &mut dyn FnMut() -> anyhow::Result<
-            Option<(Size<DevicePixels>, std::borrow::Cow<'a, [u8]>)>,
-        >,
-    ) -> anyhow::Result<Option<AtlasTile>> {
+        build: &mut dyn FnMut() -> Result<Option<(Size<DevicePixels>, Cow<'a, [u8]>)>>,
+    ) -> Result<Option<AtlasTile>> {
         let mut lock = self.0.lock();
         if let Some(tile) = lock.tiles_by_key.get(key) {
             Ok(Some(*tile))
@@ -87,7 +90,7 @@ impl PlatformAtlas for DirectXAtlas {
             };
             let tile = lock
                 .allocate(size, key.texture_kind())
-                .ok_or_else(|| anyhow::anyhow!("failed to allocate"))?;
+                .context("failed to allocate")?;
             let texture = lock.texture(tile.texture_id);
             texture.upload(&lock.device_context, tile.bounds, &bytes);
             lock.tiles_by_key.insert(key.clone(), tile);
@@ -95,17 +98,72 @@ impl PlatformAtlas for DirectXAtlas {
         }
     }
 
+    fn get_or_update_with<'a>(
+        &self,
+        key: &AtlasKey,
+        content_version: u64,
+        build: &mut dyn FnMut() -> Result<Option<(Size<DevicePixels>, Cow<'a, [u8]>)>>,
+    ) -> Result<Option<AtlasTile>> {
+        let mut lock = self.0.lock();
+        if let Some(tile) = lock.tiles_by_key.get(key).copied() {
+            if lock.content_versions_by_key.get(key).copied() == Some(content_version) {
+                return Ok(Some(tile));
+            }
+
+            let Some((size, bytes)) = build()? else {
+                return Ok(None);
+            };
+            if tile.bounds.size == size {
+                let texture = lock.texture(tile.texture_id);
+                texture.upload(&lock.device_context, tile.bounds, &bytes);
+                lock.content_versions_by_key
+                    .insert(key.clone(), content_version);
+                return Ok(Some(tile));
+            }
+
+            lock.remove_key(key);
+            let tile = lock
+                .allocate(size, key.texture_kind())
+                .context("failed to allocate")?;
+            let texture = lock.texture(tile.texture_id);
+            texture.upload(&lock.device_context, tile.bounds, &bytes);
+            lock.tiles_by_key.insert(key.clone(), tile);
+            lock.content_versions_by_key
+                .insert(key.clone(), content_version);
+            return Ok(Some(tile));
+        }
+
+        let Some((size, bytes)) = build()? else {
+            return Ok(None);
+        };
+        let tile = lock
+            .allocate(size, key.texture_kind())
+            .context("failed to allocate")?;
+        let texture = lock.texture(tile.texture_id);
+        texture.upload(&lock.device_context, tile.bounds, &bytes);
+        lock.tiles_by_key.insert(key.clone(), tile);
+        lock.content_versions_by_key
+            .insert(key.clone(), content_version);
+        Ok(Some(tile))
+    }
+
     fn remove(&self, key: &AtlasKey) {
         let mut lock = self.0.lock();
+        lock.remove_key(key);
+    }
+}
 
-        let Some(id) = lock.tiles_by_key.remove(key).map(|tile| tile.texture_id) else {
+impl DirectXAtlasState {
+    fn remove_key(&mut self, key: &AtlasKey) {
+        self.content_versions_by_key.remove(key);
+        let Some(id) = self.tiles_by_key.remove(key).map(|tile| tile.texture_id) else {
             return;
         };
 
         let textures = match id.kind {
-            AtlasTextureKind::Monochrome => &mut lock.monochrome_textures,
-            AtlasTextureKind::Polychrome => &mut lock.polychrome_textures,
-            AtlasTextureKind::Subpixel => &mut lock.subpixel_textures,
+            AtlasTextureKind::Monochrome => &mut self.monochrome_textures,
+            AtlasTextureKind::Polychrome => &mut self.polychrome_textures,
+            AtlasTextureKind::Subpixel => &mut self.subpixel_textures,
         };
 
         let Some(texture_slot) = textures.textures.get_mut(id.index as usize) else {
@@ -121,9 +179,7 @@ impl PlatformAtlas for DirectXAtlas {
             }
         }
     }
-}
 
-impl DirectXAtlasState {
     fn allocate(
         &mut self,
         size: Size<DevicePixels>,
