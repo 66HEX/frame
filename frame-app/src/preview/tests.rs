@@ -669,28 +669,30 @@ mod preview_playback_state {
     }
 
     #[test]
-    fn drag_start_handle_uses_one_second_gap_before_end() {
+    fn drag_start_handle_uses_one_second_gap_before_end_without_media_command() {
         let mut playback = playback_with_media(120.0);
         playback.sync_initial_values(None, Some("00:00:20.000"));
         assert!(playback.begin_handle_drag(TimelineDragTarget::Start));
 
         let update = playback.drag_to_percent(0.5);
 
-        assert_eq!(update.command, PlaybackMediaCommand::seek(19.0));
+        assert_eq!(update.command, PlaybackMediaCommand::none());
         assert_close(playback.start_value(), 19.0);
+        assert_close(playback.current_time(), 19.0);
         assert!(update.trim.is_some());
     }
 
     #[test]
-    fn drag_end_handle_uses_one_second_gap_after_start() {
+    fn drag_end_handle_uses_one_second_gap_after_start_without_media_command() {
         let mut playback = playback_with_media(120.0);
         playback.sync_initial_values(Some("00:00:30.000"), None);
         assert!(playback.begin_handle_drag(TimelineDragTarget::End));
 
         let update = playback.drag_to_percent(0.1);
 
-        assert_eq!(update.command, PlaybackMediaCommand::seek(31.0));
+        assert_eq!(update.command, PlaybackMediaCommand::none());
         assert_close(playback.end_value(), 31.0);
+        assert_close(playback.current_time(), 31.0);
     }
 
     #[test]
@@ -739,14 +741,14 @@ mod preview_playback_state {
     }
 
     #[test]
-    fn end_drag_commits_trim_when_handle_was_dragged() {
+    fn end_drag_commits_trim_and_seeks_once_when_handle_was_dragged() {
         let mut playback = playback_with_media(120.0);
         playback.begin_handle_drag(TimelineDragTarget::End);
         let _ = playback.drag_to_percent(0.5);
 
         let end = playback.end_drag();
 
-        assert_eq!(end.command, PlaybackMediaCommand::none());
+        assert_eq!(end.command, PlaybackMediaCommand::seek(60.0));
         assert_eq!(
             end.trim,
             Some(TrimSelection {

@@ -2,6 +2,7 @@ use super::*;
 use crate::app::preview_panel::preview_presented_frame;
 use crate::conversion_runner::core_config_from_gpui;
 use crate::numeric::rounded_f64_to_u64;
+use crate::preview_engine::PreviewEngineError;
 use std::{
     collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
@@ -544,6 +545,7 @@ impl FrameRoot {
         selected_file_id: Option<&str>,
         metadata: Option<&SourceMetadata>,
         config: &ConversionConfig,
+        cx: &Context<Self>,
     ) {
         let media_kind = preview_control_availability(PreviewControlInput {
             metadata_status: if metadata.is_some() {
@@ -594,7 +596,7 @@ impl FrameRoot {
             .preview_ui
             .playback
             .handle_time_update(self.preview_ui.playback.current_time());
-        self.apply_preview_media_command(command, true);
+        self.apply_preview_media_command(command, true, Some(cx));
     }
 
     pub(super) fn preview_playback_state(&self) -> PreviewPlaybackState {
@@ -1470,8 +1472,7 @@ impl FrameRoot {
 
         if self.preview_ui.playback.dragging().is_none() {
             if target == TimelineDragTarget::Scrub {
-                let command = self.preview_ui.playback.seek_to_percent(percent);
-                self.apply_preview_media_command(command, false);
+                let _ = self.preview_ui.playback.seek_to_percent(percent);
                 return true;
             }
 
@@ -1479,19 +1480,12 @@ impl FrameRoot {
                 return false;
             }
             if self.preview_ui.playback.is_playing() {
-                self.apply_preview_media_command(PlaybackMediaCommand::pause(), true);
+                self.apply_preview_command_to_local_state(PlaybackMediaCommand::pause());
             }
         }
 
         let update = self.preview_ui.playback.drag_to_percent(percent);
-        self.apply_preview_media_command(update.command, false);
-
-        if let Some(trim) = update.trim {
-            return self.update_selected_config(|config| {
-                apply_trim_times(config, trim.start_time, trim.end_time)
-            });
-        }
-
+        self.apply_preview_command_to_local_state(update.command);
         true
     }
 
@@ -1502,9 +1496,26 @@ impl FrameRoot {
         self.preview_ui.timeline_track_bounds = Some(bounds);
     }
 
+    #[cfg(test)]
     pub(super) fn commit_preview_timeline_seek_at_position(
         &mut self,
         position: Point<Pixels>,
+    ) -> bool {
+        self.commit_preview_timeline_seek_at_position_internal(position, None)
+    }
+
+    pub(super) fn commit_preview_timeline_seek_at_position_with_context(
+        &mut self,
+        position: Point<Pixels>,
+        cx: &Context<Self>,
+    ) -> bool {
+        self.commit_preview_timeline_seek_at_position_internal(position, Some(cx))
+    }
+
+    fn commit_preview_timeline_seek_at_position_internal(
+        &mut self,
+        position: Point<Pixels>,
+        cx: Option<&Context<Self>>,
     ) -> bool {
         let Some(bounds) = self.preview_ui.timeline_track_bounds else {
             return false;
@@ -1515,16 +1526,25 @@ impl FrameRoot {
 
         let percent = timeline_slider_percent_from_bounds(position, bounds);
         let command = self.preview_ui.playback.seek_once_to_percent(percent);
-        self.apply_preview_media_command(command, true)
+        self.apply_preview_media_command(command, true, cx)
     }
 
+    #[cfg(test)]
     pub(super) fn end_preview_timeline_drag(&mut self) -> bool {
+        self.end_preview_timeline_drag_internal(None)
+    }
+
+    pub(super) fn end_preview_timeline_drag_with_context(&mut self, cx: &Context<Self>) -> bool {
+        self.end_preview_timeline_drag_internal(Some(cx))
+    }
+
+    fn end_preview_timeline_drag_internal(&mut self, cx: Option<&Context<Self>>) -> bool {
         if self.preview_ui.playback.dragging().is_none() {
             return false;
         }
 
         let end = self.preview_ui.playback.end_drag();
-        let mut changed = self.apply_preview_media_command(end.command, true);
+        let mut changed = self.apply_preview_media_command(end.command, true, cx);
         if let Some(trim) = end.trim {
             changed |= self.update_selected_config(|config| {
                 apply_trim_times(config, trim.start_time, trim.end_time)
@@ -1533,10 +1553,20 @@ impl FrameRoot {
         changed
     }
 
-    pub(super) fn adjust_preview_timeline_from_keyboard(
+    pub(super) fn adjust_preview_timeline_from_keyboard_with_context(
         &mut self,
         target: TimelineDragTarget,
         key: &str,
+        cx: &Context<Self>,
+    ) -> bool {
+        self.adjust_preview_timeline_from_keyboard_internal(target, key, Some(cx))
+    }
+
+    fn adjust_preview_timeline_from_keyboard_internal(
+        &mut self,
+        target: TimelineDragTarget,
+        key: &str,
+        cx: Option<&Context<Self>>,
     ) -> bool {
         if !self.preview_timeline_enabled() {
             return false;
@@ -1555,54 +1585,79 @@ impl FrameRoot {
 
         if target == TimelineDragTarget::Scrub {
             let command = self.preview_ui.playback.seek_once_to_percent(percent);
-            return self.apply_preview_media_command(command, true);
+            return self.apply_preview_media_command(command, true, cx);
         }
 
-        self.apply_preview_timeline_drag(target, percent) | self.end_preview_timeline_drag()
+        self.apply_preview_timeline_drag(target, percent)
+            | self.end_preview_timeline_drag_internal(cx)
     }
 
-    pub(super) fn toggle_preview_playback(&mut self) -> bool {
+    pub(super) fn toggle_preview_playback_with_context(&mut self, cx: &Context<Self>) -> bool {
+        self.toggle_preview_playback_internal(Some(cx))
+    }
+
+    fn toggle_preview_playback_internal(&mut self, cx: Option<&Context<Self>>) -> bool {
         if !self.preview_timeline_enabled() {
             return false;
         }
 
         let command = self.preview_ui.playback.toggle_play();
-        self.apply_preview_media_command(command, true)
+        self.apply_preview_media_command(command, true, cx)
     }
 
     fn apply_preview_media_command(
         &mut self,
         command: PlaybackMediaCommand,
         precise_seek: bool,
+        cx: Option<&Context<Self>>,
     ) -> bool {
         let Some(session) = self.preview_ui.session.clone() else {
             return self.apply_preview_command_to_local_state(command);
         };
 
-        if command.pause
-            && let Err(error) = session.command(PreviewCommand::Pause)
-        {
-            self.preview_ui.runtime_error = Some(error.to_string());
-            return false;
-        }
+        let commands = preview_commands_from_playback(command, precise_seek);
+        if !commands.is_empty() {
+            if let Some(cx) = cx {
+                self.preview_ui.media_command_generation =
+                    self.preview_ui.media_command_generation.saturating_add(1);
+                let command_generation = self.preview_ui.media_command_generation;
+                cx.spawn(async move |this, cx| {
+                    let result = cx
+                        .background_spawn(async move {
+                            for command in commands {
+                                session.command(command)?;
+                            }
+                            Ok::<(), PreviewEngineError>(())
+                        })
+                        .await;
 
-        if let Some(seconds) = command.seek_to {
-            let preview_command = if precise_seek {
-                PreviewCommand::SeekPrecise(seconds)
+                    this.update(cx, move |root, cx| {
+                        if root.preview_ui.media_command_generation != command_generation {
+                            return;
+                        }
+                        match result {
+                            Ok(()) => {
+                                root.preview_ui.runtime_error = None;
+                                root.schedule_preview_frame_tick(cx);
+                            }
+                            Err(error) => {
+                                root.preview_ui.runtime_error = Some(error.to_string());
+                            }
+                        }
+                        cx.notify();
+                    })
+                    .ok();
+                })
+                .detach();
             } else {
-                PreviewCommand::SeekFast(seconds)
-            };
-            if let Err(error) = session.command(preview_command) {
-                self.preview_ui.runtime_error = Some(error.to_string());
-                return false;
+                for command in commands {
+                    if let Err(error) = session.command(command) {
+                        self.preview_ui.runtime_error = Some(error.to_string());
+                        return false;
+                    }
+                }
+                self.preview_ui.runtime_error = None;
             }
-        }
-
-        if command.play
-            && let Err(error) = session.command(PreviewCommand::Play)
-        {
-            self.preview_ui.runtime_error = Some(error.to_string());
-            return false;
         }
 
         self.apply_preview_command_to_local_state(command)
@@ -1648,6 +1703,27 @@ impl FrameRoot {
             });
         self.settings_ui.active_tab = next_tab;
     }
+}
+
+fn preview_commands_from_playback(
+    command: PlaybackMediaCommand,
+    precise_seek: bool,
+) -> Vec<PreviewCommand> {
+    let mut commands = Vec::with_capacity(3);
+    if command.pause {
+        commands.push(PreviewCommand::Pause);
+    }
+    if let Some(seconds) = command.seek_to {
+        commands.push(if precise_seek {
+            PreviewCommand::SeekPrecise(seconds)
+        } else {
+            PreviewCommand::SeekFast(seconds)
+        });
+    }
+    if command.play {
+        commands.push(PreviewCommand::Play);
+    }
+    commands
 }
 
 fn preview_runtime_request(
@@ -1768,8 +1844,6 @@ fn preview_visual_hash(config: &ConversionConfig) -> u64 {
     config.custom_height.hash(&mut state);
     config.scaling_algorithm.hash(&mut state);
     config.fps.hash(&mut state);
-    config.start_time.hash(&mut state);
-    config.end_time.hash(&mut state);
     hash_crop(config.crop.as_ref(), &mut state);
     config.subtitle_burn_path.hash(&mut state);
     config.subtitle_font_name.hash(&mut state);

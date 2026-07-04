@@ -305,7 +305,7 @@ pub(in crate::app) fn preview_timeline_track(
         .on_mouse_down(
             MouseButton::Left,
             cx.listener(|root, event: &MouseDownEvent, _window, cx| {
-                if root.commit_preview_timeline_seek_at_position(event.position) {
+                if root.commit_preview_timeline_seek_at_position_with_context(event.position, cx) {
                     cx.notify();
                 }
             }),
@@ -329,7 +329,7 @@ pub(in crate::app) fn preview_timeline_track(
             },
         ))
         .capture_any_mouse_up(cx.listener(|root, _event: &MouseUpEvent, _window, cx| {
-            if root.end_preview_timeline_drag() {
+            if root.end_preview_timeline_drag_with_context(cx) {
                 cx.notify();
             }
         }));
@@ -348,14 +348,22 @@ pub(in crate::app) fn preview_timeline_track(
     )
     .on_a11y_action(gpui::AccessibleAction::Increment, move |_, _window, cx| {
         owner.update(cx, |root, cx| {
-            if root.adjust_preview_timeline_from_keyboard(TimelineDragTarget::Scrub, "right") {
+            if root.adjust_preview_timeline_from_keyboard_with_context(
+                TimelineDragTarget::Scrub,
+                "right",
+                cx,
+            ) {
                 cx.notify();
             }
         });
     })
     .on_a11y_action(gpui::AccessibleAction::Decrement, move |_, _window, cx| {
         decrement_owner.update(cx, |root, cx| {
-            if root.adjust_preview_timeline_from_keyboard(TimelineDragTarget::Scrub, "left") {
+            if root.adjust_preview_timeline_from_keyboard_with_context(
+                TimelineDragTarget::Scrub,
+                "left",
+                cx,
+            ) {
                 cx.notify();
             }
         });
@@ -365,9 +373,10 @@ pub(in crate::app) fn preview_timeline_track(
             if !timeline_keyboard_key_is_handled(event.keystroke.key.as_str()) {
                 return;
             }
-            if root.adjust_preview_timeline_from_keyboard(
+            if root.adjust_preview_timeline_from_keyboard_with_context(
                 TimelineDragTarget::Scrub,
                 event.keystroke.key.as_str(),
+                cx,
             ) {
                 cx.notify();
             }
@@ -474,14 +483,14 @@ pub(in crate::app) fn preview_timeline_handle(
     )
     .on_a11y_action(gpui::AccessibleAction::Increment, move |_, _window, cx| {
         owner.update(cx, |root, cx| {
-            if root.adjust_preview_timeline_from_keyboard(target, "right") {
+            if root.adjust_preview_timeline_from_keyboard_with_context(target, "right", cx) {
                 cx.notify();
             }
         });
     })
     .on_a11y_action(gpui::AccessibleAction::Decrement, move |_, _window, cx| {
         decrement_owner.update(cx, |root, cx| {
-            if root.adjust_preview_timeline_from_keyboard(target, "left") {
+            if root.adjust_preview_timeline_from_keyboard_with_context(target, "left", cx) {
                 cx.notify();
             }
         });
@@ -491,7 +500,11 @@ pub(in crate::app) fn preview_timeline_handle(
             if !timeline_keyboard_key_is_handled(event.keystroke.key.as_str()) {
                 return;
             }
-            if root.adjust_preview_timeline_from_keyboard(target, event.keystroke.key.as_str()) {
+            if root.adjust_preview_timeline_from_keyboard_with_context(
+                target,
+                event.keystroke.key.as_str(),
+                cx,
+            ) {
                 cx.notify();
             }
             cx.stop_propagation();
@@ -525,7 +538,7 @@ pub(in crate::app) fn preview_play_button(
         cx,
     )
     .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
-        if root.toggle_preview_playback() {
+        if root.toggle_preview_playback_with_context(cx) {
             cx.notify();
         }
     }))

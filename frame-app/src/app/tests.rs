@@ -1177,7 +1177,7 @@ mod frame_root_config {
     }
 
     #[test]
-    fn apply_preview_timeline_drag_updates_selected_file_start_time() {
+    fn apply_preview_timeline_drag_updates_playback_start_without_committing_config() {
         let mut root = FrameRoot::new();
         root.file_queue
             .add_file(FileItem::from_path("video", "/tmp/one.mp4", 1));
@@ -1195,17 +1195,27 @@ mod frame_root_config {
         let changed = root.apply_preview_timeline_drag(TimelineDragTarget::Start, 0.25);
 
         assert!(changed);
+        assert!((root.preview_ui.playback.start_value() - 22.5).abs() < 0.000_001);
+        assert!((root.preview_ui.playback.current_time() - 22.5).abs() < 0.000_001);
         assert_eq!(
             root.file_queue
                 .file_by_id("video")
                 .and_then(|file| file.config.start_time.as_deref()),
-            Some("00:00:22.500")
+            None
         );
         assert_eq!(
             root.file_queue
                 .file_by_id("video")
                 .and_then(|file| file.config.end_time.as_deref()),
             None
+        );
+
+        assert!(root.end_preview_timeline_drag());
+        assert_eq!(
+            root.file_queue
+                .file_by_id("video")
+                .and_then(|file| file.config.start_time.as_deref()),
+            Some("00:00:22.500")
         );
     }
 
@@ -1229,6 +1239,15 @@ mod frame_root_config {
         assert!(root.apply_preview_timeline_drag(TimelineDragTarget::End, 0.75));
 
         assert!(!root.preview_ui.playback.is_playing());
+        assert!((root.preview_ui.playback.end_value() - 67.5).abs() < 0.000_001);
+        assert_eq!(
+            root.file_queue
+                .file_by_id("video")
+                .and_then(|file| file.config.end_time.as_deref()),
+            None
+        );
+
+        assert!(root.end_preview_timeline_drag());
         assert_eq!(
             root.file_queue
                 .file_by_id("video")
@@ -1260,6 +1279,15 @@ mod frame_root_config {
         let changed = root.apply_preview_timeline_drag(TimelineDragTarget::End, 0.10);
 
         assert!(changed);
+        assert!((root.preview_ui.playback.end_value() - 21.0).abs() < 0.000_001);
+        assert_eq!(
+            root.file_queue
+                .file_by_id("video")
+                .and_then(|file| file.config.end_time.as_deref()),
+            None
+        );
+
+        assert!(root.end_preview_timeline_drag());
         assert_eq!(
             root.file_queue
                 .file_by_id("video")
@@ -1534,6 +1562,25 @@ mod frame_root_config {
             .expect("quality request");
 
         assert_eq!(quality_request.key, initial_request.key);
+
+        root.update_selected_config(|config| {
+            config.start_time = Some("00:00:02.000".to_string());
+            config.end_time = Some("00:00:08.000".to_string());
+            true
+        });
+        let trim_request = root
+            .selected_preview_runtime_request(&metadata_entry)
+            .expect("trim request");
+
+        assert_eq!(trim_request.key, initial_request.key);
+        assert_eq!(
+            trim_request.config.conversion_config.start_time.as_deref(),
+            Some("00:00:02.000")
+        );
+        assert_eq!(
+            trim_request.config.conversion_config.end_time.as_deref(),
+            Some("00:00:08.000")
+        );
 
         root.update_selected_config(|config| {
             config.audio_volume = 80;

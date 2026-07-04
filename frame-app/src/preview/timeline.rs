@@ -111,7 +111,7 @@ pub struct PreviewPlaybackState {
     start_value: f64,
     end_value: f64,
     dragging: Option<TimelineDragTarget>,
-    was_playing_before_scrub: bool,
+    was_playing_before_drag: bool,
     previous_initial_start: Option<String>,
     previous_initial_end: Option<String>,
 }
@@ -128,7 +128,7 @@ impl PreviewPlaybackState {
             start_value: 0.0,
             end_value: 0.0,
             dragging: None,
-            was_playing_before_scrub: false,
+            was_playing_before_drag: false,
             previous_initial_start: None,
             previous_initial_end: None,
         }
@@ -311,6 +311,7 @@ impl PreviewPlaybackState {
         }
 
         self.dragging = Some(target);
+        self.was_playing_before_drag = self.is_playing;
         true
     }
 
@@ -323,7 +324,7 @@ impl PreviewPlaybackState {
         let time = self.time_from_slider_percent(percent);
         self.current_time = time;
         self.dragging = Some(TimelineDragTarget::Scrub);
-        self.was_playing_before_scrub = self.is_playing;
+        self.was_playing_before_drag = self.is_playing;
 
         if self.is_playing {
             PlaybackMediaCommand::pause_and_seek(time)
@@ -370,15 +371,17 @@ impl PreviewPlaybackState {
             }
             TimelineDragTarget::Start => {
                 self.start_value = time.min(self.end_value - 1.0);
+                self.current_time = self.start_value;
                 TimelineDragUpdate {
-                    command: PlaybackMediaCommand::seek(self.start_value),
+                    command: PlaybackMediaCommand::none(),
                     trim: self.commit_trim_values(),
                 }
             }
             TimelineDragTarget::End => {
                 self.end_value = time.max(self.start_value + 1.0);
+                self.current_time = self.end_value;
                 TimelineDragUpdate {
-                    command: PlaybackMediaCommand::seek(self.end_value),
+                    command: PlaybackMediaCommand::none(),
                     trim: self.commit_trim_values(),
                 }
             }
@@ -387,26 +390,39 @@ impl PreviewPlaybackState {
 
     #[must_use]
     pub fn end_drag(&mut self) -> TimelineDragEnd {
-        let command = if self.dragging == Some(TimelineDragTarget::Scrub) {
-            if self.was_playing_before_scrub {
-                PlaybackMediaCommand::seek_and_play(self.current_time)
-            } else {
-                PlaybackMediaCommand::seek(self.current_time)
+        let dragging = self.dragging;
+        let command = match dragging {
+            Some(TimelineDragTarget::Scrub) => {
+                if self.was_playing_before_drag {
+                    PlaybackMediaCommand::seek_and_play(self.current_time)
+                } else {
+                    PlaybackMediaCommand::seek(self.current_time)
+                }
             }
-        } else {
-            PlaybackMediaCommand::none()
+            Some(TimelineDragTarget::Start) => {
+                if self.was_playing_before_drag {
+                    PlaybackMediaCommand::pause_and_seek(self.start_value)
+                } else {
+                    PlaybackMediaCommand::seek(self.start_value)
+                }
+            }
+            Some(TimelineDragTarget::End) => {
+                if self.was_playing_before_drag {
+                    PlaybackMediaCommand::pause_and_seek(self.end_value)
+                } else {
+                    PlaybackMediaCommand::seek(self.end_value)
+                }
+            }
+            None => PlaybackMediaCommand::none(),
         };
-        let trim = if self
-            .dragging
-            .is_some_and(|target| target != TimelineDragTarget::Scrub)
-        {
+        let trim = if dragging.is_some_and(|target| target != TimelineDragTarget::Scrub) {
             self.commit_trim_values()
         } else {
             None
         };
 
         self.dragging = None;
-        self.was_playing_before_scrub = false;
+        self.was_playing_before_drag = false;
 
         TimelineDragEnd { command, trim }
     }

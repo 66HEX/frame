@@ -59,6 +59,7 @@ impl Render for FrameRoot {
             selected_file_id.as_deref(),
             source_metadata.as_ref(),
             &selected_config_snapshot,
+            cx,
         );
         self.sync_preview_canvas_auto_fit();
         let preview_crop =
