@@ -24,7 +24,7 @@ mod update_actions;
 mod workspace;
 pub use runtime::{frame_window_options, init_app, open_frame_window};
 
-use accessibility::FrameFocusRegistry;
+use accessibility::{FrameFocusKey, FrameFocusRegistry};
 use chrome::{
     AppSettingsSheetProps, app_settings_sheet, drag_drop_overlay, titlebar, update_dialog,
 };
@@ -42,7 +42,7 @@ use preview_panel::{
     default_crop_rect, full_crop_rect, is_known_crop_aspect, next_rotation,
     preview_crop_controls_enabled, preview_crop_source_dimensions, preview_duration_seconds,
     preview_playback_state, preview_source_media_kind, preview_transform_controls_enabled,
-    timeline_slider_percent_from_bounds,
+    timeline_keyboard_time_for_key, timeline_slider_percent_from_bounds,
 };
 use primitives::color;
 use runtime::hide_native_macos_titlebar_controls;
@@ -257,6 +257,7 @@ pub struct FrameRoot {
     conversion_events: ConversionEventState,
     logs_scroll_handle: UniformListScrollHandle,
     last_log_scroll_target: Option<LogScrollTarget>,
+    logs_keyboard_scroll_top: usize,
     logs_follow_tail: bool,
     copied_log_file_id: Option<String>,
     log_copy_feedback_epoch: usize,
@@ -610,6 +611,7 @@ struct SettingsRenderState<'a> {
     video_bitrate_focus: Option<&'a FocusHandle>,
     gif_loop_focus: Option<&'a FocusHandle>,
     metadata_focuses: SettingsMetadataInputFocuses<'a>,
+    subtitle_focuses: SettingsSubtitleFocuses<'a>,
     subtitle_color_focuses: SettingsSubtitleColorInputFocuses<'a>,
     subtitle_popover: Option<SettingsSubtitlePopover>,
     subtitle_rendered_popover: Option<SettingsSubtitlePopover>,
@@ -649,6 +651,31 @@ struct SettingsMetadataInputFocuses<'a> {
 struct SettingsSubtitleColorInputFocuses<'a> {
     font: Option<&'a FocusHandle>,
     outline: Option<&'a FocusHandle>,
+}
+
+#[derive(Clone, Copy, Default)]
+struct SettingsSubtitleFocuses<'a> {
+    burn_file: Option<&'a FocusHandle>,
+    font_select: SettingsSubtitleSelectFocuses<'a>,
+    font_size_select: SettingsSubtitleSelectFocuses<'a>,
+    font_color: SettingsSubtitleColorPopoverFocuses<'a>,
+    outline_color: SettingsSubtitleColorPopoverFocuses<'a>,
+}
+
+#[derive(Clone, Copy, Default)]
+struct SettingsSubtitleSelectFocuses<'a> {
+    trigger: Option<&'a FocusHandle>,
+    panel: Option<&'a FocusHandle>,
+    first_option: Option<&'a FocusHandle>,
+    last_option: Option<&'a FocusHandle>,
+}
+
+#[derive(Clone, Copy, Default)]
+struct SettingsSubtitleColorPopoverFocuses<'a> {
+    trigger: Option<&'a FocusHandle>,
+    panel: Option<&'a FocusHandle>,
+    sv: Option<&'a FocusHandle>,
+    hue: Option<&'a FocusHandle>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

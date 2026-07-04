@@ -81,6 +81,7 @@ impl FrameRoot {
             conversion_events: ConversionEventState::new(),
             logs_scroll_handle: UniformListScrollHandle::new(),
             last_log_scroll_target: None,
+            logs_keyboard_scroll_top: 0,
             logs_follow_tail: true,
             copied_log_file_id: None,
             log_copy_feedback_epoch: 0,
