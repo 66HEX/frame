@@ -4,6 +4,7 @@ use super::accessibility::{
 };
 use super::components::{
     frame_checkbox_row_with_focus, frame_text_button, frame_text_button_with_focus,
+    frame_vertical_scrollbar,
 };
 use super::input::{FrameTextInputSpec, frame_text_input};
 use super::primitives::{
@@ -16,23 +17,31 @@ use super::{
     ActiveView, ClickEvent, Context, ExternalPaths, FILE_LIST_ACTION_ICON_SIZE, FluentBuilder,
     FocusHandle, FrameAppState, FrameRoot, FrameTextInputKind, InteractiveElement, IntoElement,
     LEFT_COLUMN_SPAN, MouseButton, PANEL_HEADER_HEIGHT, ParentElement, RIGHT_COLUMN_SPAN,
-    SETTINGS_CONTROL_HEIGHT, SETTINGS_SHEET_MOTION_DURATION, StatefulInteractiveElement, Styled,
-    TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_DIVIDER_HEIGHT, TITLEBAR_HEIGHT, TITLEBAR_ICON_SIZE,
-    TITLEBAR_LINUX_WINDOW_BUTTON_SIZE, TITLEBAR_LINUX_WINDOW_CONTROLS_GAP,
-    TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X, TITLEBAR_LOGO_SIZE, TITLEBAR_NAV_BUTTON_HEIGHT,
-    TITLEBAR_PLATFORM_DIVIDER_HEIGHT, TITLEBAR_SEGMENT_HEIGHT, TITLEBAR_TOP_PADDING,
-    TITLEBAR_TRAFFIC_LIGHT_DOT_SIZE, TITLEBAR_TRAFFIC_LIGHT_SIZE,
-    TITLEBAR_TRAFFIC_LIGHT_STROKE_WIDTH, TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
-    TITLEBAR_WINDOWS_WINDOW_ICON_SIZE, TITLEBAR_WINDOWS_WINDOW_MAX_ICON_SIZE, TRAFFIC_CLOSE_BORDER,
-    TRAFFIC_CLOSE_FILL, TRAFFIC_CLOSE_SYMBOL, TRAFFIC_LIGHT_GROUP, TRAFFIC_MINIMIZE_BORDER,
-    TRAFFIC_MINIMIZE_FILL, TRAFFIC_MINIMIZE_SYMBOL, TRAFFIC_ZOOM_BORDER, TRAFFIC_ZOOM_FILL,
-    TRAFFIC_ZOOM_SYMBOL, UpdateInfo, UpdateStatus, WORKSPACE_COLUMNS, WORKSPACE_GAP, Window,
-    WindowControlArea, assets, div, ease_out_quint, format_total_size, hover_motion, mix_color,
-    motion_is_hidden, motion_target, px, relative, retarget_hover_motion, set_motion_target,
+    SETTINGS_CONTROL_HEIGHT, SETTINGS_SHEET_MOTION_DURATION, ScrollHandle,
+    StatefulInteractiveElement, Styled, TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_DIVIDER_HEIGHT,
+    TITLEBAR_HEIGHT, TITLEBAR_ICON_SIZE, TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
+    TITLEBAR_LINUX_WINDOW_CONTROLS_GAP, TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X,
+    TITLEBAR_LOGO_SIZE, TITLEBAR_NAV_BUTTON_HEIGHT, TITLEBAR_PLATFORM_DIVIDER_HEIGHT,
+    TITLEBAR_SEGMENT_HEIGHT, TITLEBAR_TOP_PADDING, TITLEBAR_TRAFFIC_LIGHT_DOT_SIZE,
+    TITLEBAR_TRAFFIC_LIGHT_SIZE, TITLEBAR_TRAFFIC_LIGHT_STROKE_WIDTH,
+    TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH, TITLEBAR_WINDOWS_WINDOW_ICON_SIZE,
+    TITLEBAR_WINDOWS_WINDOW_MAX_ICON_SIZE, TRAFFIC_CLOSE_BORDER, TRAFFIC_CLOSE_FILL,
+    TRAFFIC_CLOSE_SYMBOL, TRAFFIC_LIGHT_GROUP, TRAFFIC_MINIMIZE_BORDER, TRAFFIC_MINIMIZE_FILL,
+    TRAFFIC_MINIMIZE_SYMBOL, TRAFFIC_ZOOM_BORDER, TRAFFIC_ZOOM_FILL, TRAFFIC_ZOOM_SYMBOL,
+    UpdateInfo, UpdateStatus, WORKSPACE_COLUMNS, WORKSPACE_GAP, Window, WindowControlArea, assets,
+    div, ease_out_quint, format_total_size, hover_motion, mix_color, motion_is_hidden,
+    motion_target, px, relative, retarget_hover_motion, set_motion_target,
     settings_sheet_right_inset, svg, theme,
 };
+use gpui::{HighlightStyle, StyledText};
 
 const MAX_RELEASE_NOTES_CHARS: usize = 8_000;
+const UPDATE_RELEASE_NOTES_MAX_HEIGHT: f32 = 360.0;
+const UPDATE_RELEASE_NOTES_MIN_HEIGHT: f32 = 180.0;
+const UPDATE_RELEASE_NOTES_PADDING_Y: f32 = 24.0;
+const UPDATE_RELEASE_NOTES_LINE_HEIGHT: f32 = 16.0;
+const UPDATE_RELEASE_NOTES_LINE_PADDING_BOTTOM: f32 = 4.0;
+const UPDATE_RELEASE_NOTES_BLANK_LINE_HEIGHT: f32 = 8.0;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum FrameTitlebarPlatform {
@@ -587,21 +596,50 @@ fn update_release_notes_text(info: Option<&UpdateInfo>) -> Option<String> {
     Some(text)
 }
 
-fn update_release_notes_block(notes: &str) -> gpui::Stateful<gpui::Div> {
-    let mut block = div()
-        .id("update-dialog-release-notes")
-        .min_h(px(180.0))
-        .max_h(px(360.0))
+fn update_release_notes_block(
+    notes: &str,
+    scroll_handle: &ScrollHandle,
+) -> gpui::Stateful<gpui::Div> {
+    let lines = normalized_release_note_lines(notes);
+    let content_height = update_release_notes_content_height(&lines);
+    let mut content = div()
+        .id("update-dialog-release-notes-content")
+        .min_h(px(UPDATE_RELEASE_NOTES_MIN_HEIGHT))
+        .max_h(px(UPDATE_RELEASE_NOTES_MAX_HEIGHT))
         .overflow_y_scroll()
-        .rounded(px(theme::RADIUS_SM))
-        .bg(color(theme::FRAME_GRAY_100))
-        .p_3();
+        .track_scroll(scroll_handle)
+        .p_3()
+        .pr_5();
 
-    for line in normalized_release_note_lines(notes) {
-        block = block.child(update_release_note_line(&line));
+    for line in lines {
+        content = content.child(update_release_note_line(&line));
     }
 
-    block
+    div()
+        .id("update-dialog-release-notes")
+        .relative()
+        .min_h(px(UPDATE_RELEASE_NOTES_MIN_HEIGHT))
+        .max_h(px(UPDATE_RELEASE_NOTES_MAX_HEIGHT))
+        .overflow_hidden()
+        .rounded(px(theme::RADIUS_SM))
+        .bg(color(theme::FRAME_GRAY_100))
+        .child(content)
+        .child(frame_vertical_scrollbar(
+            "update-dialog-release-notes-scrollbar",
+            scroll_handle.clone(),
+            content_height,
+        ))
+}
+
+fn update_release_notes_content_height(lines: &[String]) -> f32 {
+    UPDATE_RELEASE_NOTES_PADDING_Y
+        + lines.iter().fold(0.0, |height, line| {
+            if line.trim().is_empty() {
+                height + UPDATE_RELEASE_NOTES_BLANK_LINE_HEIGHT
+            } else {
+                height + UPDATE_RELEASE_NOTES_LINE_HEIGHT + UPDATE_RELEASE_NOTES_LINE_PADDING_BOTTOM
+            }
+        })
 }
 
 fn normalized_release_note_lines(notes: &str) -> Vec<String> {
@@ -657,15 +695,60 @@ fn update_release_note_line(line: &str) -> gpui::Div {
                 theme::TEXT_WEIGHT_REGULAR,
             )
         };
+    let (text, highlights) = parse_update_release_note_emphasis(&text);
 
-    div()
+    let mut line = div()
         .pl(px(left_padding))
         .pb(px(4.0))
         .text_size(px(theme::TEXT_LABEL_SIZE))
         .line_height(px(16.0))
         .text_color(color(text_color))
-        .font_weight(font_weight)
-        .child(text)
+        .font_weight(font_weight);
+
+    if highlights.is_empty() {
+        line = line.child(text);
+    } else {
+        line = line.child(StyledText::new(text).with_highlights(highlights));
+    }
+
+    line
+}
+
+fn parse_update_release_note_emphasis(
+    input: &str,
+) -> (String, Vec<(std::ops::Range<usize>, HighlightStyle)>) {
+    let mut text = String::with_capacity(input.len());
+    let mut highlights = Vec::new();
+    let mut rest = input;
+    let highlight_style = HighlightStyle {
+        color: Some(color(theme::FOREGROUND).into()),
+        font_weight: Some(theme::TEXT_WEIGHT_MEDIUM),
+        ..HighlightStyle::default()
+    };
+
+    loop {
+        let Some(start) = rest.find("**") else {
+            text.push_str(rest);
+            break;
+        };
+        text.push_str(&rest[..start]);
+
+        let after_start = &rest[start + 2..];
+        let Some(end) = after_start.find("**") else {
+            text.push_str(&rest[start..]);
+            break;
+        };
+
+        let highlight_start = text.len();
+        text.push_str(&after_start[..end]);
+        let highlight_end = text.len();
+        if highlight_start < highlight_end {
+            highlights.push((highlight_start..highlight_end, highlight_style));
+        }
+        rest = &after_start[end + 2..];
+    }
+
+    (text, highlights)
 }
 
 fn update_progress_bar(progress_percent: Option<u8>) -> gpui::Stateful<gpui::Div> {
@@ -834,6 +917,7 @@ pub(super) fn update_dialog(
     is_open: bool,
     status: &UpdateStatus,
     info: Option<&UpdateInfo>,
+    release_notes_scroll_handle: &ScrollHandle,
     panel_focus: &FocusHandle,
     close_focus: &FocusHandle,
     window: &mut Window,
@@ -902,6 +986,7 @@ pub(super) fn update_dialog(
             panel_offset,
             status,
             info,
+            release_notes_scroll_handle,
             panel_focus,
             close_focus,
             window,
@@ -913,6 +998,7 @@ fn update_dialog_panel(
     panel_offset: f32,
     status: &UpdateStatus,
     info: Option<&UpdateInfo>,
+    release_notes_scroll_handle: &ScrollHandle,
     panel_focus: &FocusHandle,
     close_focus: &FocusHandle,
     window: &mut Window,
@@ -937,7 +1023,11 @@ fn update_dialog_panel(
             cx.stop_propagation();
         }))
         .child(update_dialog_header(status, close_focus, window, cx))
-        .child(update_dialog_body(status, info))
+        .child(update_dialog_body(
+            status,
+            info,
+            release_notes_scroll_handle,
+        ))
         .child(update_dialog_footer(status, window, cx));
 
     if matches!(status, UpdateStatus::Downloading { .. }) {
@@ -999,7 +1089,11 @@ fn update_dialog_header(
         .child(panel_bottom_separator())
 }
 
-fn update_dialog_body(status: &UpdateStatus, info: Option<&UpdateInfo>) -> gpui::Div {
+fn update_dialog_body(
+    status: &UpdateStatus,
+    info: Option<&UpdateInfo>,
+    release_notes_scroll_handle: &ScrollHandle,
+) -> gpui::Div {
     let notes = update_release_notes_text(info);
     let mut body = div().flex().flex_col().gap_3().p_4();
 
@@ -1014,7 +1108,10 @@ fn update_dialog_body(status: &UpdateStatus, info: Option<&UpdateInfo>) -> gpui:
     }
 
     if let Some(notes) = notes.as_deref() {
-        body = body.child(update_release_notes_block(notes));
+        body = body.child(update_release_notes_block(
+            notes,
+            release_notes_scroll_handle,
+        ));
     }
 
     if let UpdateStatus::Error(error) = status {
@@ -1103,11 +1200,12 @@ fn update_dialog_primary_action(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     match status {
-        UpdateStatus::Available(_) => frame_text_button(
+        UpdateStatus::Available(_) => action_button(
             "update-dialog-download",
+            assets::ICON_DOWNLOAD_02,
+            Some("Download"),
             "Download",
             ButtonVariant::Default,
-            false,
             true,
             window,
             cx,
@@ -1943,5 +2041,26 @@ mod tests {
         };
 
         assert!(titlebar_shows_workspace_controls(state));
+    }
+
+    #[test]
+    fn release_note_emphasis_strips_markers_and_highlights_range() {
+        let (text, highlights) =
+            parse_update_release_note_emphasis("• **Native GPUI Application:** Rebuilt Frame");
+
+        assert_eq!(text, "• Native GPUI Application: Rebuilt Frame");
+        assert_eq!(highlights.len(), 1);
+        assert_eq!(&text[highlights[0].0.clone()], "Native GPUI Application:");
+        assert_eq!(highlights[0].1.color, Some(color(theme::FOREGROUND).into()));
+        assert_eq!(highlights[0].1.font_weight, Some(theme::TEXT_WEIGHT_MEDIUM));
+    }
+
+    #[test]
+    fn release_note_emphasis_keeps_unclosed_markers_literal() {
+        let (text, highlights) =
+            parse_update_release_note_emphasis("• **Native GPUI Application: Rebuilt Frame");
+
+        assert_eq!(text, "• **Native GPUI Application: Rebuilt Frame");
+        assert!(highlights.is_empty());
     }
 }

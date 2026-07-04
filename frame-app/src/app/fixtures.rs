@@ -3,22 +3,34 @@ use super::*;
 use frame_updater::{PlatformAssetKey, UpdateAsset};
 use semver::Version;
 
-const UPDATE_AVAILABLE_RELEASE_NOTES: &str = r"
-# Frame 0.1.1
+const UPDATE_AVAILABLE_RELEASE_NOTES: &str = r#"
+# Frame 0.30.0
 
-- Native autoupdater flow with signed manifests and platform-specific packages.
-- Animated update dialog that presents release notes before the user downloads or installs.
-- macOS, Windows, and Linux release assets generated from the release pipeline.
-- FFmpeg-backed preview fixes for packaged builds.
-- Update helper validation for replacing installed app bundles safely.
+### Added
 
-## Notes for visual review
+- **Native GPUI Application:** Rebuilt Frame as a Rust-native GPUI-CE desktop app, replacing the previous Tauri/Svelte shell while keeping the main workspace, preview, settings, queue, and logs workflows in a single native application.
+- **Rust Workspace Architecture:** Added dedicated `frame-app`, `frame-core`, and `frame-updater` crates so FFmpeg argument generation, media probing, compatibility rules, queue control, and update logic can be tested and shipped outside the UI layer.
+- **Native Packaging Pipeline:** Added Rust-based release tooling, macOS/Linux/Windows bundle scripts, Linux desktop metadata, Windows resource embedding, and generated GitHub Actions workflows for building release artifacts.
+- **Signed Update System:** Added a signed-manifest updater with platform-specific assets, SHA-256 verification, Ed25519 manifest signatures, install planning, and a bundled update helper for replacing installed builds.
+- **GPUI Preview and Editing Surface:** Added a native preview panel with crop, transform, trim timeline, overlay controls, zoom handling, and FFmpeg-backed frame extraction for video, image, and audio workflows.
+- **Native Settings and Metadata Panels:** Added GPUI settings surfaces for source details, output selection, video, audio, images, subtitles, metadata, and presets using the shared media compatibility model.
 
-This fixture intentionally uses enough text to exercise the dialog layout, scrolling,
-button placement, and close animation. Production release notes should be carried in
-`releaseNotesMarkdown` so the user can decide based on visible changes instead of
-accepting an update blindly.
-";
+### Changed
+
+- **Application Runtime:** Moved the production app from a webview-based Tauri runtime to a native Rust/GPUI runtime, reducing the JavaScript frontend boundary and making Rust the primary application layer.
+- **Conversion Flow:** Reworked import, queue, progress, cancellation, pause/resume, logging, and notification handling around native Rust state and process controllers while preserving FFmpeg-based conversion behavior.
+- **Media Compatibility:** Centralized container, codec, stream, pixel-format, image, subtitle, and metadata rules in `frame-core` so UI option availability and conversion validation use the same Rust model.
+- **Documentation:** Updated the project documentation around the GPUI-CE stack, Rust workspace layout, native packaging scripts, bundled FFmpeg runtime setup, and signed update manifest flow.
+
+### Removed
+
+- **Tauri/Svelte Application Shell:** Removed the previous `src-tauri` backend, SvelteKit frontend, Tauri capabilities/configuration, webview services, stores, components, routes, and JavaScript build toolchain.
+- **Frontend Localization System:** Removed the previous Svelte-era locale dictionaries and i18n extraction/sync guardrail scripts.
+- **Legacy Web Preview Pipeline:** Removed the Pixi/WebGPU web preview implementation in favor of the GPUI/FFmpeg-backed native preview implementation.
+- **FFmpeg Log Syntax Highlighting:** Removed the previous web-based FFmpeg log syntax highlighting from the Logs view during the native GPUI rewrite.
+- **ML Upscaling Runtime:** Removed the bundled RealESRGAN model assets and Tauri upscaling worker path from the production app.
+- **Legacy App Icon Sets:** Removed unused Tauri mobile/store icon resources, keeping the desktop package icon set consumed by the native bundle scripts.
+"#;
 
 impl FrameRoot {
     pub(super) fn apply_visual_fixture(&mut self, fixture: Option<VisualFixture>) {
@@ -51,12 +63,12 @@ impl FrameRoot {
             return;
         };
         let update = Box::new(UpdateInfo {
-            version: Version::new(0, 1, 1),
+            version: Version::new(0, 30, 0),
             channel: UpdateChannel::Stable,
             asset_key,
             asset: update_available_fixture_asset(asset_key),
             release_notes_url: Some(
-                "https://github.com/66HEX/frame/releases/tag/v0.1.1".to_string(),
+                "https://github.com/66HEX/frame/releases/tag/v0.30.0".to_string(),
             ),
             release_notes_markdown: Some(UPDATE_AVAILABLE_RELEASE_NOTES.to_string()),
         });

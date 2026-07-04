@@ -655,6 +655,7 @@ impl Render for FrameRoot {
                 self.update_ui.dialog_open,
                 &self.update_ui.status,
                 self.update_ui.dialog_info.as_deref(),
+                &self.update_ui.release_notes_scroll_handle,
                 &panel_focus,
                 &close_focus,
                 window,

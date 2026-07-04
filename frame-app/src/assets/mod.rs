@@ -22,6 +22,7 @@ pub const ICON_CHECK: &str = "icons/check.svg";
 pub const ICON_COPY: &str = "icons/copy.svg";
 pub const ICON_UNFOLD_MORE: &str = "icons/unfold-more.svg";
 pub const ICON_CLOSE: &str = "icons/close.svg";
+pub const ICON_DOWNLOAD_02: &str = "icons/download-02.svg";
 pub const ICON_FILE_UP: &str = "icons/file-up.svg";
 pub const ICON_FILE_DOWN: &str = "icons/file-down.svg";
 pub const ICON_FILE_IMPORT: &str = "icons/file-import.svg";
@@ -64,6 +65,7 @@ const CHECK_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 
 const COPY_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><path d="M7 11V9C7 5.70017 7 4.05025 8.02513 3.02513C9.05025 2 10.7002 2 14 2C17.2998 2 18.9497 2 19.9749 3.02513C21 4.05025 21 5.70017 21 9V11C21 14.2998 21 15.9497 19.9749 16.9749C18.9497 18 17.2998 18 14 18C10.7002 18 9.05025 18 8.02513 16.9749C7 15.9497 7 14.2998 7 11Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/><path d="M3 6V15C3 18.2998 3 19.9497 4.02513 20.9749C5.05025 22 6.70017 22 10 22H17" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/></svg>"#;
 const UNFOLD_MORE_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><path d="M18 14C18 14 13.5811 19 12 19C10.4188 19 6 14 6 14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/><path d="M18 9.99996C18 9.99996 13.5811 5.00001 12 5C10.4188 4.99999 6 10 6 10" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/></svg>"#;
 const CLOSE_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><path d="M18 6L6.00081 17.9992M17.9992 18L6 6.00085" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/></svg>"#;
+const DOWNLOAD_02_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path d="M16 12s-2.946 4-4 4s-4-4-4-4m4 3.5V3"/><path d="M17 8a4 4 0 0 1 4 4v2.5c0 2.335 0 3.502-.472 4.386a4 4 0 0 1-1.642 1.642C18.002 21 16.835 21 14.5 21h-5c-2.334 0-3.502 0-4.386-.473a4 4 0 0 1-1.641-1.641C3 18.002 3 16.835 3 14.5v-2.501A4 4 0 0 1 6.998 8H7"/></g></svg>"#;
 const FILE_UP_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><path d="M4 12L4 14.5442C4 17.7892 4 19.4117 4.88607 20.5107C5.06508 20.7327 5.26731 20.9349 5.48933 21.1139C6.58831 22 8.21082 22 11.4558 22C12.1614 22 12.5141 22 12.8372 21.886C12.9044 21.8623 12.9702 21.835 13.0345 21.8043C13.3436 21.6564 13.593 21.407 14.0919 20.9081L18.8284 16.1716C19.4065 15.5935 19.6955 15.3045 19.8478 14.9369C20 14.5694 20 14.1606 20 13.3431V10C20 6.22876 20 4.34315 18.8284 3.17157C17.6569 2 15.7712 2 12 2M13 21.5V21C13 18.1716 13 16.7574 13.8787 15.8787C14.7574 15 16.1716 15 19 15H19.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/><path d="M10 5C9.41016 4.39316 7.84027 2 7 2C6.15973 2 4.58984 4.39316 4 5M7 3L7 10" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/></svg>"#;
 const FILE_DOWN_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><path d="M4 7C4.58984 7.60684 6.15973 10 7 10C7.84027 10 9.41016 7.60684 10 7M7 9L7 2" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/><path d="M4 13L4 14.5442C4 17.7892 4 19.4117 4.88607 20.5107C5.06508 20.7327 5.26731 20.9349 5.48933 21.1139C6.58831 22 8.21082 22 11.4558 22C12.1614 22 12.5141 22 12.8372 21.886C12.9044 21.8623 12.9702 21.835 13.0345 21.8043C13.3436 21.6564 13.593 21.407 14.0919 20.9081L18.8284 16.1716C19.4065 15.5935 19.6955 15.3045 19.8478 14.9369C20 14.5694 20 14.1606 20 13.3431V10C20 6.22876 20 4.34315 18.8284 3.17157C17.6569 2 15.7712 2 12 2M13 21.5V21C13 18.1716 13 16.7574 13.8787 15.8787C14.7574 15 16.1716 15 19 15H19.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/></svg>"#;
 const FILE_IMPORT_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path d="M20 15.006V10.66c0-.818 0-1.227-.152-1.595s-.441-.657-1.02-1.235l-4.736-4.739c-.499-.499-.748-.748-1.058-.896a2 2 0 0 0-.197-.082C12.514 2 12.161 2 11.456 2c-3.245 0-4.868 0-5.967.886a4 4 0 0 0-.603.604C4 4.59 4 6.213 4 9.46v4.545c0 3.773 0 5.66 1.172 6.832C6.115 21.78 7.52 21.964 10 22m3-19.5V3c0 2.83 0 4.245.879 5.124c.878.879 2.293.879 5.121.879h.5"/><path d="M15 22c-.607-.59-3-2.16-3-3s2.393-2.41 3-3m-2 3h7"/></g></svg>"#;
@@ -109,6 +111,7 @@ impl AssetSource for FrameAssets {
             ICON_COPY => Cow::Borrowed(COPY_SVG.as_bytes()),
             ICON_UNFOLD_MORE => Cow::Borrowed(UNFOLD_MORE_SVG.as_bytes()),
             ICON_CLOSE => Cow::Borrowed(CLOSE_SVG.as_bytes()),
+            ICON_DOWNLOAD_02 => Cow::Borrowed(DOWNLOAD_02_SVG.as_bytes()),
             ICON_FILE_UP => Cow::Borrowed(FILE_UP_SVG.as_bytes()),
             ICON_FILE_DOWN => Cow::Borrowed(FILE_DOWN_SVG.as_bytes()),
             ICON_FILE_IMPORT => Cow::Borrowed(FILE_IMPORT_SVG.as_bytes()),
@@ -156,6 +159,7 @@ impl AssetSource for FrameAssets {
                 SharedString::from("close.svg"),
                 SharedString::from("copy.svg"),
                 SharedString::from("crop.svg"),
+                SharedString::from("download-02.svg"),
                 SharedString::from("file-down.svg"),
                 SharedString::from("file-image.svg"),
                 SharedString::from("file-import.svg"),

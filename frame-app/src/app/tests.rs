@@ -2414,7 +2414,7 @@ mod visual_fixtures {
                 .dialog_info
                 .as_ref()
                 .and_then(|info| info.release_notes_markdown.as_deref())
-                .is_some_and(|notes| notes.contains("Frame 0.1.1"))
+                .is_some_and(|notes| notes.contains("Native GPUI Application"))
         );
     }
 

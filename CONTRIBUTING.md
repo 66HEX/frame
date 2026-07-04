@@ -114,7 +114,8 @@ cargo xtask ci
 ```
 
 For UI changes, add or update focused GPUI tests where practical. Visual parity
-fixtures live in the GPUI test modules.
+fixtures live in the GPUI test modules. Runtime visual fixture names and review
+scenarios are listed in [Visual Fixtures](CONTRIBUTING_VISUAL_FIXTURES.md).
 
 ## Pull Request Process
 

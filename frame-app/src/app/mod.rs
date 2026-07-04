@@ -302,12 +302,25 @@ struct SettingsUiState {
     next_custom_preset_sequence: u64,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 struct UpdateUiState {
     status: UpdateStatus,
     dialog_open: bool,
     dialog_present: bool,
     dialog_info: Option<Box<UpdateInfo>>,
+    release_notes_scroll_handle: ScrollHandle,
+}
+
+impl Default for UpdateUiState {
+    fn default() -> Self {
+        Self {
+            status: UpdateStatus::default(),
+            dialog_open: false,
+            dialog_present: false,
+            dialog_info: None,
+            release_notes_scroll_handle: ScrollHandle::new(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default)]

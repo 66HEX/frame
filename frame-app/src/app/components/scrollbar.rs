@@ -55,9 +55,14 @@ pub(in crate::app) fn frame_vertical_scrollbar(
                 let drag = event.drag(cx);
                 let y = (event.event.position.y - event.bounds.origin.y).as_f32();
                 let viewport_height = event.bounds.size.height.as_f32();
-                set_frame_vertical_scrollbar_offset(
+                let content_height = frame_scrollbar_content_height(
                     &drag.scroll_handle,
                     drag.content_height,
+                    viewport_height,
+                );
+                set_frame_vertical_scrollbar_offset(
+                    &drag.scroll_handle,
+                    content_height,
                     viewport_height,
                     y,
                 );
@@ -67,8 +72,14 @@ pub(in crate::app) fn frame_vertical_scrollbar(
         .child(
             canvas(
                 move |bounds, _window, _cx| {
+                    let viewport_height = bounds.size.height.as_f32();
+                    let content_height = frame_scrollbar_content_height(
+                        &paint_handle,
+                        content_height,
+                        viewport_height,
+                    );
                     frame_vertical_scrollbar_metrics(
-                        bounds.size.height.as_f32(),
+                        viewport_height,
                         content_height,
                         paint_handle.offset().y.as_f32(),
                     )
@@ -107,6 +118,30 @@ pub(in crate::app) fn frame_vertical_scrollbar(
             )
             .size_full(),
         )
+}
+
+fn frame_scrollbar_content_height(
+    scroll_handle: &ScrollHandle,
+    fallback_content_height: f32,
+    viewport_height: f32,
+) -> f32 {
+    frame_scrollbar_measured_content_height(
+        fallback_content_height,
+        viewport_height,
+        scroll_handle.max_offset().y.as_f32(),
+    )
+}
+
+fn frame_scrollbar_measured_content_height(
+    fallback_content_height: f32,
+    viewport_height: f32,
+    measured_scroll_max: f32,
+) -> f32 {
+    if measured_scroll_max > 0.0 {
+        viewport_height + measured_scroll_max
+    } else {
+        fallback_content_height
+    }
 }
 
 pub(in crate::app) fn frame_vertical_uniform_scrollbar(
@@ -164,4 +199,23 @@ fn set_frame_vertical_scrollbar_offset(
     let progress = ((pointer_y - thumb_center) / max_thumb_top).clamp(0.0, 1.0);
     let current_offset = scroll_handle.offset();
     scroll_handle.set_offset(point(current_offset.x, px(-(progress * max_offset_y))));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn frame_scrollbar_content_height_prefers_measured_scroll_extent() {
+        let content_height = frame_scrollbar_measured_content_height(420.0, 360.0, 640.0);
+
+        assert_eq!(content_height, 1000.0);
+    }
+
+    #[test]
+    fn frame_scrollbar_content_height_uses_fallback_before_measurement() {
+        let content_height = frame_scrollbar_measured_content_height(420.0, 360.0, 0.0);
+
+        assert_eq!(content_height, 420.0);
+    }
 }
