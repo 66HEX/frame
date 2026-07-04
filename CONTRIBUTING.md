@@ -25,6 +25,92 @@ To build and run Frame locally, you will need:
 2. **Platform toolchain:** install the C/C++ build tools and native desktop
    libraries required by Rust and GPUI-CE for your operating system.
 
+### System Dependencies
+
+These dependencies are needed when building Frame from source. Release artifacts
+such as AppImage, Flatpak, DMG, and the Windows installer have their own bundled
+runtime layout.
+
+#### macOS
+
+Install Xcode Command Line Tools:
+
+```bash
+xcode-select --install
+```
+
+No additional Homebrew packages are required for normal local development.
+`cargo xtask setup-ffmpeg` downloads the FFmpeg and FFprobe binaries used by the
+app during development.
+
+#### Linux
+
+Linux builds need a C/C++ toolchain plus native desktop, font, X11/XKB, Wayland,
+and audio development libraries. The package names differ by distribution.
+
+Ubuntu/Debian:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y build-essential clang pkg-config \
+  libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev \
+  libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev \
+  libxcb-xfixes0-dev libwayland-dev libasound2-dev libpulse-dev libdrm-dev
+```
+
+Fedora:
+
+```bash
+sudo dnf install gcc gcc-c++ clang pkg-config \
+  fontconfig-devel freetype-devel libX11-devel libxkbcommon-devel \
+  libxkbcommon-x11-devel libxcb-devel wayland-devel alsa-lib-devel \
+  pulseaudio-libs-devel libdrm-devel
+```
+
+Arch Linux:
+
+```bash
+sudo pacman -S --needed base-devel clang pkgconf \
+  fontconfig freetype2 libx11 libxkbcommon libxkbcommon-x11 libxcb wayland \
+  alsa-lib libpulse libdrm
+```
+
+Linux packaging commands need a few extra tools:
+
+```bash
+# Ubuntu/Debian
+sudo apt-get install -y curl desktop-file-utils file patchelf flatpak flatpak-builder
+
+# Fedora
+sudo dnf install curl desktop-file-utils file patchelf flatpak flatpak-builder
+
+# Arch Linux
+sudo pacman -S --needed curl desktop-file-utils file patchelf flatpak flatpak-builder
+```
+
+The Flatpak bundle also expects the Flathub runtime and SDK:
+
+```bash
+flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
+```
+
+#### Windows
+
+Install:
+
+1. Rust with the MSVC toolchain.
+2. Visual Studio 2022 Build Tools with the **Desktop development with C++**
+   workload, including MSVC and the Windows SDK.
+3. PowerShell for running the packaging script.
+
+Windows installer packaging also requires Inno Setup 6. Install it manually or
+with Chocolatey:
+
+```powershell
+choco install innosetup --no-progress -y
+```
+
 ### Local Setup
 
 1. **Clone the repository:**

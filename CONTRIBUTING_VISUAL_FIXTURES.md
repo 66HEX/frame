@@ -23,7 +23,7 @@ and intentionally override only the state they need for the target scenario.
 | Fixture | Visual scenario | What it is useful for checking |
 | --- | --- | --- |
 | `app-settings` | Runtime app settings sheet | Settings modal layout, concurrency draft value, modal focus treatment, close action, and app-level settings spacing. |
-| `logs-active` | Logs tab with an active FFmpeg conversion | Log tab navigation, active file state, FFmpeg log syntax highlighting, progress line wrapping, monospaced text rendering, and scroll density. |
+| `logs-active` | Logs tab with an active FFmpeg conversion | Log tab navigation, active file state, plain FFmpeg log rendering, progress line wrapping, monospaced text rendering, and scroll density. |
 | `preview-ready` | Workspace with a selected ready video source | Preview panel shell, selected video metadata, timeline controls, toolbar visibility, empty frame handling, and source video state. |
 | `preview-crop` | Preview panel with crop mode enabled | Crop aspect bar, crop overlay geometry, crop handles, preview toolbar coexistence, and canvas framing while editing crop bounds. |
 | `settings-source` | Source settings tab with ready video metadata | File information rows, video stream metadata rows, source tab spacing, and selected source summary. |
