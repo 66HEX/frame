@@ -386,7 +386,7 @@ pub(in crate::app) fn preview_viewport_content(
             content
         };
 
-        return content
+        let content = content
             .on_pinch(cx.listener(|root, event: &PinchEvent, _window, cx| {
                 let multiplier = 1.0 + f64::from(event.delta);
                 if root.zoom_preview_canvas_at_position(event.position, multiplier, cx) {
@@ -416,9 +416,15 @@ pub(in crate::app) fn preview_viewport_content(
                     cx.notify();
                 }
             }))
-            .child(PreviewCanvasBoundsProbe { owner: cx.entity() })
-            .child(preview_media_stage(state, render_image.clone(), media, cx))
-            .into_any_element();
+            .child(PreviewCanvasBoundsProbe { owner: cx.entity() });
+
+        if preview_canvas_layout_ready(state.canvas) {
+            return content
+                .child(preview_media_stage(state, render_image.clone(), media, cx))
+                .into_any_element();
+        }
+
+        return content.into_any_element();
     }
 
     let content = div()
@@ -475,6 +481,10 @@ pub(in crate::app) fn preview_viewport_content(
                             .child(message.to_string()),
                     )
                     .into_any_element();
+            }
+
+            if preview_waiting_for_visual_render(state) {
+                return div().into_any_element();
             }
 
             if state.availability.media_kind == PreviewMediaKind::Unknown {
@@ -564,6 +574,18 @@ pub(in crate::app) fn preview_media_stage(
 
 pub(in crate::app) fn preview_canvas_pan_enabled(state: &PreviewShellState) -> bool {
     preview_visual_controls_enabled(state) && !state.crop.crop_mode && !state.overlay.overlay_mode
+}
+
+fn preview_canvas_layout_ready(canvas: PreviewCanvasRenderState) -> bool {
+    canvas.viewport_width > 0.0 && canvas.viewport_height > 0.0
+}
+
+fn preview_waiting_for_visual_render(state: &PreviewShellState) -> bool {
+    state.render_image.is_none()
+        && matches!(
+            state.availability.media_kind,
+            PreviewMediaKind::Video | PreviewMediaKind::Image
+        )
 }
 
 fn preview_media_image(
@@ -725,5 +747,63 @@ mod tests {
         assert!((transformation.rotation_scale[0][1] + 1.0).abs() < 0.000_001);
         assert!((transformation.rotation_scale[1][0] - 1.0).abs() < 0.000_001);
         assert!((transformation.rotation_scale[1][1]).abs() < 0.000_001);
+    }
+
+    #[test]
+    fn preview_canvas_layout_ready_requires_measured_viewport() {
+        assert!(!preview_canvas_layout_ready(
+            PreviewCanvasRenderState::default()
+        ));
+
+        assert!(preview_canvas_layout_ready(PreviewCanvasRenderState {
+            viewport_width: 640.0,
+            viewport_height: 360.0,
+            ..PreviewCanvasRenderState::default()
+        }));
+    }
+
+    #[test]
+    fn preview_waiting_for_visual_render_only_hides_visual_media_without_frame() {
+        let mut state = PreviewShellState {
+            selected_file_name: Some("sample.mov".to_string()),
+            metadata_status: PreviewMetadataStatus::Ready,
+            metadata_error: None,
+            controls_disabled: false,
+            availability: PreviewControlAvailability {
+                media_kind: PreviewMediaKind::Video,
+                hide_visual_controls: false,
+                trim_disabled: false,
+                overlay_available: true,
+            },
+            playback: PreviewPlaybackState::new(false),
+            duration_seconds: 1.0,
+            canvas: PreviewCanvasRenderState::default(),
+            crop: PreviewCropRenderState {
+                crop_mode: false,
+                draft_crop: None,
+                applied_crop: None,
+                crop_aspect: "free".to_string(),
+                has_crop_dimensions: false,
+                rotation: "0".to_string(),
+                flip_horizontal: false,
+                flip_vertical: false,
+            },
+            overlay: PreviewOverlayRenderState {
+                overlay_mode: false,
+                has_overlay: false,
+                overlay: None,
+                image_dimensions: None,
+            },
+            presentation: PreviewRenderPresentation::default(),
+            media: None,
+            render_image: None,
+            runtime_error: None,
+        };
+
+        assert!(preview_waiting_for_visual_render(&state));
+
+        state.availability.media_kind = PreviewMediaKind::Audio;
+
+        assert!(!preview_waiting_for_visual_render(&state));
     }
 }
