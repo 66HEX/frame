@@ -90,6 +90,7 @@ pub(in crate::app) struct SettingsSubtitlesTabState<'a> {
     pub(in crate::app) metadata: Option<&'a SourceMetadata>,
     pub(in crate::app) settings_disabled: bool,
     pub(in crate::app) subtitle_fonts: &'a [String],
+    pub(in crate::app) focuses: SettingsSubtitleFocuses<'a>,
     pub(in crate::app) color_focuses: SettingsSubtitleColorInputFocuses<'a>,
     pub(in crate::app) active_popover: Option<SettingsSubtitlePopover>,
     pub(in crate::app) rendered_popover: Option<SettingsSubtitlePopover>,
@@ -106,6 +107,7 @@ struct SettingsSubtitleStyleState<'a> {
     config: &'a ConversionConfig,
     disabled: bool,
     subtitle_fonts: &'a [String],
+    focuses: SettingsSubtitleFocuses<'a>,
     color_focuses: SettingsSubtitleColorInputFocuses<'a>,
     active_popover: Option<SettingsSubtitlePopover>,
     rendered_popover: Option<SettingsSubtitlePopover>,
@@ -123,6 +125,7 @@ struct SettingsSubtitleColorFieldSpec<'a> {
     value: String,
     disabled: bool,
     target: SettingsSubtitleColorTarget,
+    popover_focuses: SettingsSubtitleColorPopoverFocuses<'a>,
     focus: Option<&'a FocusHandle>,
     active_popover: Option<SettingsSubtitlePopover>,
     rendered_popover: Option<SettingsSubtitlePopover>,
@@ -139,6 +142,7 @@ struct SettingsSubtitleFontSelectState<'a> {
     rendered_popover: Option<SettingsSubtitlePopover>,
     popover: SettingsSubtitlePopover,
     scroll_handle: &'a ScrollHandle,
+    focuses: SettingsSubtitleSelectFocuses<'a>,
 }
 
 #[derive(Clone, Copy)]
@@ -149,8 +153,13 @@ struct SettingsSubtitleFontSizeSelectState<'a> {
     rendered_popover: Option<SettingsSubtitlePopover>,
     popover: SettingsSubtitlePopover,
     scroll_handle: &'a ScrollHandle,
+    focuses: SettingsSubtitleSelectFocuses<'a>,
 }
 
+#[expect(
+    clippy::large_types_passed_by_value,
+    reason = "Tab render state is a short-lived bundle of references and copyable focus handles consumed during render."
+)]
 pub(in crate::app) fn settings_subtitles_tab(
     state: SettingsSubtitlesTabState<'_>,
     window: &mut Window,
@@ -164,6 +173,7 @@ pub(in crate::app) fn settings_subtitles_tab(
             .child(settings_subtitle_burn_button(
                 config,
                 burn_in_disabled,
+                state.focuses.burn_file,
                 window,
                 cx,
             ))
@@ -183,6 +193,7 @@ pub(in crate::app) fn settings_subtitles_tab(
                     config,
                     disabled: burn_in_disabled,
                     subtitle_fonts: state.subtitle_fonts,
+                    focuses: state.focuses,
                     color_focuses: state.color_focuses,
                     active_popover: state.active_popover,
                     rendered_popover: state.rendered_popover,
@@ -216,6 +227,7 @@ pub(in crate::app) fn settings_subtitles_tab(
 fn settings_subtitle_burn_button(
     config: &ConversionConfig,
     disabled: bool,
+    burn_file_focus: Option<&FocusHandle>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -229,7 +241,13 @@ fn settings_subtitle_burn_button(
             div()
                 .flex_1()
                 .min_w_0()
-                .child(settings_subtitle_load_button(config, disabled, window, cx)),
+                .child(settings_subtitle_load_button(
+                    config,
+                    disabled,
+                    burn_file_focus,
+                    window,
+                    cx,
+                )),
         )
         .child(settings_subtitle_clear_button(
             disabled || !has_path,
@@ -241,6 +259,7 @@ fn settings_subtitle_burn_button(
 fn settings_subtitle_load_button(
     config: &ConversionConfig,
     disabled: bool,
+    focus: Option<&FocusHandle>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -251,13 +270,13 @@ fn settings_subtitle_load_button(
     let hover_transition = animated.hover_transition;
     let has_path = config.subtitle_burn_path.is_some();
     let label = subtitle_burn_file_label(config);
-    let label = if has_path {
-        label
+    let display_label = if has_path {
+        label.clone()
     } else {
-        theme::ui_text_owned(label)
+        theme::ui_text_owned(label.clone())
     };
 
-    div()
+    let button = div()
         .id("settings-subtitle-burn-file")
         .h(px(SETTINGS_CONTROL_HEIGHT))
         .w_full()
@@ -290,7 +309,13 @@ fn settings_subtitle_load_button(
             }
             root.prompt_subtitle_burn_file(window, cx);
         }))
-        .child(div().truncate().child(label))
+        .child(div().truncate().child(display_label));
+
+    if let Some(focus) = focus {
+        apply_accessible_button_with_focus(button, label, !disabled, focus)
+    } else {
+        apply_accessible_button(button, label, !disabled)
+    }
 }
 
 fn settings_subtitle_clear_button(
@@ -301,6 +326,7 @@ fn settings_subtitle_clear_button(
     frame_icon_button(
         "settings-subtitle-clear-file",
         assets::ICON_TRASH,
+        "Clear subtitle file",
         FrameIconButtonVariant::DestructiveGhost,
         !disabled,
         FrameIconButtonSize {
@@ -321,6 +347,10 @@ fn settings_subtitle_clear_button(
     }))
 }
 
+#[expect(
+    clippy::large_types_passed_by_value,
+    reason = "Style render state is a short-lived bundle of references and copyable focus handles consumed during render."
+)]
 fn settings_subtitle_style_controls(
     state: SettingsSubtitleStyleState<'_>,
     window: &mut Window,
@@ -344,6 +374,7 @@ fn settings_subtitle_style_controls(
                         rendered_popover: state.rendered_popover,
                         popover: SettingsSubtitlePopover::FontName,
                         scroll_handle: state.font_select_scroll_handle,
+                        focuses: state.focuses.font_select,
                     },
                     window,
                     cx,
@@ -356,6 +387,7 @@ fn settings_subtitle_style_controls(
                         rendered_popover: state.rendered_popover,
                         popover: SettingsSubtitlePopover::FontSize,
                         scroll_handle: state.font_size_select_scroll_handle,
+                        focuses: state.focuses.font_size_select,
                     },
                     window,
                     cx,
@@ -376,6 +408,7 @@ fn settings_subtitle_style_controls(
                         ),
                         disabled: state.disabled,
                         target: SettingsSubtitleColorTarget::Font,
+                        popover_focuses: state.focuses.font_color,
                         focus: state.color_focuses.font,
                         active_popover: state.active_popover,
                         rendered_popover: state.rendered_popover,
@@ -395,6 +428,7 @@ fn settings_subtitle_style_controls(
                         ),
                         disabled: state.disabled,
                         target: SettingsSubtitleColorTarget::Outline,
+                        popover_focuses: state.focuses.outline_color,
                         focus: state.color_focuses.outline,
                         active_popover: state.active_popover,
                         rendered_popover: state.rendered_popover,
@@ -423,6 +457,133 @@ fn settings_subtitle_style_controls(
         ))
 }
 
+fn focus_optional(focus: Option<&FocusHandle>, window: &mut Window, cx: &mut Context<FrameRoot>) {
+    if let Some(focus) = focus {
+        focus.focus(window, cx);
+    }
+}
+
+fn defer_focus_optional(focus: Option<FocusHandle>, window: &Window, cx: &mut Context<FrameRoot>) {
+    if let Some(focus) = focus {
+        cx.defer_in(window, move |_root, window, cx| {
+            focus.focus(window, cx);
+        });
+    }
+}
+
+const fn subtitle_select_option_focus(
+    index: usize,
+    option_count: usize,
+    focuses: SettingsSubtitleSelectFocuses<'_>,
+) -> Option<&FocusHandle> {
+    if index == 0 {
+        focuses.first_option
+    } else if index + 1 == option_count {
+        focuses.last_option
+    } else {
+        None
+    }
+}
+
+const fn subtitle_select_last_focus(
+    option_count: usize,
+    focuses: SettingsSubtitleSelectFocuses<'_>,
+) -> Option<&FocusHandle> {
+    if option_count <= 1 {
+        focuses.first_option
+    } else {
+        focuses.last_option
+    }
+}
+
+fn focus_subtitle_select_initial_target(
+    key: &str,
+    option_count: usize,
+    first_focus: Option<&FocusHandle>,
+    last_focus: Option<&FocusHandle>,
+    scroll_handle: &ScrollHandle,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) {
+    if option_count == 0 {
+        return;
+    }
+    let target_index = if matches!(key, "up" | "end") {
+        option_count.saturating_sub(1)
+    } else {
+        0
+    };
+    scroll_handle.scroll_to_item(target_index);
+    if target_index == 0 {
+        focus_optional(first_focus, window, cx);
+    } else {
+        focus_optional(last_focus.or(first_focus), window, cx);
+    }
+}
+
+fn apply_subtitle_select_popover_focus_trap(
+    popover: gpui::Stateful<gpui::Div>,
+    focuses: SettingsSubtitleSelectFocuses<'_>,
+    option_count: usize,
+    cx: &Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    let Some(panel_focus) = focuses.panel else {
+        return popover;
+    };
+    let Some(first_focus) = focuses.first_option else {
+        return popover;
+    };
+    let Some(last_focus) = subtitle_select_last_focus(option_count, focuses) else {
+        return popover;
+    };
+
+    let first_focus = first_focus.clone();
+    let last_focus = last_focus.clone();
+    popover
+        .track_focus(panel_focus)
+        .tab_stop(false)
+        .on_key_down(
+            cx.listener(move |_root, event: &gpui::KeyDownEvent, window, cx| {
+                handle_modal_tab_navigation(event, &first_focus, &last_focus, window, cx);
+            }),
+        )
+}
+
+#[derive(Clone, Copy)]
+struct SubtitleSelectFocusTarget<'a> {
+    current_index: usize,
+    target_index: usize,
+    first_focus: Option<&'a FocusHandle>,
+    last_focus: Option<&'a FocusHandle>,
+    scroll_handle: &'a ScrollHandle,
+}
+
+fn focus_subtitle_select_target(
+    key: &str,
+    target: SubtitleSelectFocusTarget<'_>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) {
+    target.scroll_handle.scroll_to_item(target.target_index);
+    match key {
+        "home" => focus_optional(target.first_focus, window, cx),
+        "end" => focus_optional(target.last_focus, window, cx),
+        "down" if target.target_index <= target.current_index => {
+            focus_optional(target.first_focus, window, cx);
+        }
+        "up" if target.target_index >= target.current_index => {
+            focus_optional(target.last_focus, window, cx);
+        }
+        "down" => window.focus_next(cx),
+        "up" => window.focus_prev(cx),
+        _ => {}
+    }
+}
+
+#[expect(
+    clippy::too_many_lines,
+    reason = "Subtitle font select keeps trigger, keyboard handling, popover, and scrollbar together for one GPUI control."
+)]
 fn settings_subtitle_font_select(
     state: SettingsSubtitleFontSelectState<'_>,
     window: &mut Window,
@@ -438,6 +599,32 @@ fn settings_subtitle_font_select(
     let has_options = !options.is_empty();
     let enabled = !state.disabled && has_options;
     let popover = state.popover;
+    let trigger = if let Some(focus) = state.focuses.trigger {
+        frame_select_trigger_with_focus(
+            "settings-subtitle-font-select",
+            "Subtitle font",
+            display,
+            enabled,
+            state.rendered_popover == Some(popover),
+            focus,
+            window,
+            cx,
+        )
+    } else {
+        frame_select_trigger(
+            "settings-subtitle-font-select",
+            "Subtitle font",
+            display,
+            enabled,
+            state.rendered_popover == Some(popover),
+            window,
+            cx,
+        )
+    };
+    let key_first_option_focus = state.focuses.first_option.cloned();
+    let key_last_option_focus = subtitle_select_last_focus(options.len(), state.focuses).cloned();
+    let key_scroll_handle = state.scroll_handle.clone();
+    let option_count = options.len();
 
     let mut field = div()
         .relative()
@@ -446,18 +633,70 @@ fn settings_subtitle_font_select(
         .gap_2()
         .child(settings_field_label("Font"))
         .child(
-            frame_select_trigger(
-                "settings-subtitle-font-select",
-                display,
-                enabled,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
-                cx.stop_propagation();
-                root.toggle_subtitle_popover(popover);
-                cx.notify();
-            })),
+            trigger
+                .on_click(cx.listener(move |root, event: &ClickEvent, _window, cx| {
+                    cx.stop_propagation();
+                    if event.is_keyboard() {
+                        return;
+                    }
+                    root.toggle_subtitle_popover(popover);
+                    cx.notify();
+                }))
+                .on_key_down(
+                    cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+                        if !enabled {
+                            return;
+                        }
+                        match event.keystroke.key.as_str() {
+                            "down" | "up" if root.subtitle_ui.popover == Some(popover) => {
+                                cx.stop_propagation();
+                                focus_subtitle_select_initial_target(
+                                    event.keystroke.key.as_str(),
+                                    option_count,
+                                    key_first_option_focus.as_ref(),
+                                    key_last_option_focus.as_ref(),
+                                    &key_scroll_handle,
+                                    window,
+                                    cx,
+                                );
+                            }
+                            "down" | "up" | "home" | "end" => {
+                                cx.stop_propagation();
+                                root.subtitle_ui.popover = Some(popover);
+                                root.subtitle_ui.rendered_popover = Some(popover);
+                                focus_subtitle_select_initial_target(
+                                    event.keystroke.key.as_str(),
+                                    option_count,
+                                    key_first_option_focus.as_ref(),
+                                    key_last_option_focus.as_ref(),
+                                    &key_scroll_handle,
+                                    window,
+                                    cx,
+                                );
+                                cx.notify();
+                            }
+                            "enter" | "space" if root.subtitle_ui.popover == Some(popover) => {
+                                cx.stop_propagation();
+                                root.close_subtitle_popover();
+                                cx.notify();
+                            }
+                            "enter" | "space" => {
+                                cx.stop_propagation();
+                                root.subtitle_ui.popover = Some(popover);
+                                root.subtitle_ui.rendered_popover = Some(popover);
+                                key_scroll_handle.scroll_to_item(0);
+                                defer_focus_optional(key_first_option_focus.clone(), window, cx);
+                                cx.notify();
+                            }
+                            "escape" => {
+                                cx.stop_propagation();
+                                root.close_subtitle_popover();
+                                cx.notify();
+                            }
+                            _ => {}
+                        }
+                    }),
+                ),
         );
 
     if state.rendered_popover == Some(popover) && has_options {
@@ -467,10 +706,24 @@ fn settings_subtitle_font_select(
         let mut list =
             frame_select_options_list("settings-subtitle-font-options-list", state.scroll_handle);
 
-        for option in options {
+        let option_count = options.len();
+        let option_keyboard_options = options.clone();
+        for (index, option) in options.into_iter().enumerate() {
             let name = option.name.clone();
             let is_enabled = !option.is_disabled;
-            list = list.child(settings_subtitle_font_option(option, is_enabled, name, cx));
+            let option_focus = subtitle_select_option_focus(index, option_count, state.focuses);
+            list = list.child(settings_subtitle_font_option(
+                option,
+                is_enabled,
+                name,
+                option_keyboard_options.clone(),
+                index,
+                option_count,
+                option_focus,
+                state.focuses,
+                state.scroll_handle,
+                cx,
+            ));
         }
 
         let mut popover = frame_select_popover(
@@ -479,6 +732,8 @@ fn settings_subtitle_font_select(
             progress,
             list,
         );
+        popover =
+            apply_subtitle_select_popover_focus_trap(popover, state.focuses, option_count, cx);
 
         if content_height > FRAME_SELECT_MAX_HEIGHT {
             popover = popover.child(frame_vertical_scrollbar(
@@ -494,6 +749,10 @@ fn settings_subtitle_font_select(
     field
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "Subtitle font size select keeps trigger, keyboard handling, popover, and scrollbar together for one GPUI control."
+)]
 fn settings_subtitle_font_size_select(
     state: SettingsSubtitleFontSizeSelectState<'_>,
     window: &mut Window,
@@ -508,6 +767,32 @@ fn settings_subtitle_font_size_select(
     let options = subtitle_font_size_options(state.config, state.disabled);
     let enabled = !state.disabled;
     let popover = state.popover;
+    let trigger = if let Some(focus) = state.focuses.trigger {
+        frame_select_trigger_with_focus(
+            "settings-subtitle-font-size-select",
+            "Subtitle font size",
+            display,
+            enabled,
+            state.rendered_popover == Some(popover),
+            focus,
+            window,
+            cx,
+        )
+    } else {
+        frame_select_trigger(
+            "settings-subtitle-font-size-select",
+            "Subtitle font size",
+            display,
+            enabled,
+            state.rendered_popover == Some(popover),
+            window,
+            cx,
+        )
+    };
+    let key_first_option_focus = state.focuses.first_option.cloned();
+    let key_last_option_focus = subtitle_select_last_focus(options.len(), state.focuses).cloned();
+    let key_scroll_handle = state.scroll_handle.clone();
+    let option_count = options.len();
 
     let mut field = div()
         .relative()
@@ -516,18 +801,70 @@ fn settings_subtitle_font_size_select(
         .gap_2()
         .child(settings_field_label("Size"))
         .child(
-            frame_select_trigger(
-                "settings-subtitle-font-size-select",
-                display,
-                enabled,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
-                cx.stop_propagation();
-                root.toggle_subtitle_popover(popover);
-                cx.notify();
-            })),
+            trigger
+                .on_click(cx.listener(move |root, event: &ClickEvent, _window, cx| {
+                    cx.stop_propagation();
+                    if event.is_keyboard() {
+                        return;
+                    }
+                    root.toggle_subtitle_popover(popover);
+                    cx.notify();
+                }))
+                .on_key_down(
+                    cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+                        if !enabled {
+                            return;
+                        }
+                        match event.keystroke.key.as_str() {
+                            "down" | "up" if root.subtitle_ui.popover == Some(popover) => {
+                                cx.stop_propagation();
+                                focus_subtitle_select_initial_target(
+                                    event.keystroke.key.as_str(),
+                                    option_count,
+                                    key_first_option_focus.as_ref(),
+                                    key_last_option_focus.as_ref(),
+                                    &key_scroll_handle,
+                                    window,
+                                    cx,
+                                );
+                            }
+                            "down" | "up" | "home" | "end" => {
+                                cx.stop_propagation();
+                                root.subtitle_ui.popover = Some(popover);
+                                root.subtitle_ui.rendered_popover = Some(popover);
+                                focus_subtitle_select_initial_target(
+                                    event.keystroke.key.as_str(),
+                                    option_count,
+                                    key_first_option_focus.as_ref(),
+                                    key_last_option_focus.as_ref(),
+                                    &key_scroll_handle,
+                                    window,
+                                    cx,
+                                );
+                                cx.notify();
+                            }
+                            "enter" | "space" if root.subtitle_ui.popover == Some(popover) => {
+                                cx.stop_propagation();
+                                root.close_subtitle_popover();
+                                cx.notify();
+                            }
+                            "enter" | "space" => {
+                                cx.stop_propagation();
+                                root.subtitle_ui.popover = Some(popover);
+                                root.subtitle_ui.rendered_popover = Some(popover);
+                                key_scroll_handle.scroll_to_item(0);
+                                defer_focus_optional(key_first_option_focus.clone(), window, cx);
+                                cx.notify();
+                            }
+                            "escape" => {
+                                cx.stop_propagation();
+                                root.close_subtitle_popover();
+                                cx.notify();
+                            }
+                            _ => {}
+                        }
+                    }),
+                ),
         );
 
     if state.rendered_popover == Some(popover) {
@@ -539,10 +876,24 @@ fn settings_subtitle_font_size_select(
             state.scroll_handle,
         );
 
-        for option in options {
+        let option_count = options.len();
+        let option_keyboard_options = options.to_vec();
+        for (index, option) in options.into_iter().enumerate() {
             let size = option.size;
             let is_enabled = !option.is_disabled;
-            list = list.child(settings_subtitle_size_option(option, is_enabled, size, cx));
+            let option_focus = subtitle_select_option_focus(index, option_count, state.focuses);
+            list = list.child(settings_subtitle_size_option(
+                option,
+                is_enabled,
+                size,
+                option_keyboard_options.clone(),
+                index,
+                option_count,
+                option_focus,
+                state.focuses,
+                state.scroll_handle,
+                cx,
+            ));
         }
 
         let mut popover = frame_select_popover(
@@ -551,6 +902,8 @@ fn settings_subtitle_font_size_select(
             progress,
             list,
         );
+        popover =
+            apply_subtitle_select_popover_focus_trap(popover, state.focuses, option_count, cx);
 
         if content_height > FRAME_SELECT_MAX_HEIGHT {
             popover = popover.child(frame_vertical_scrollbar(
@@ -566,54 +919,215 @@ fn settings_subtitle_font_size_select(
     field
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Font options need option state, list navigation context, optional focus, and render context."
+)]
 fn settings_subtitle_font_option(
     option: SubtitleFontOption,
     is_enabled: bool,
     name: String,
+    keyboard_options: Vec<SubtitleFontOption>,
+    index: usize,
+    option_count: usize,
+    focus: Option<&FocusHandle>,
+    focuses: SettingsSubtitleSelectFocuses<'_>,
+    scroll_handle: &ScrollHandle,
     cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    frame_select_option(
-        format!("subtitle-font-{name}"),
-        option.name,
-        option.is_selected,
-        is_enabled,
-    )
-    .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
-        cx.stop_propagation();
-        if !is_enabled {
-            return;
-        }
-        let changed = root.update_selected_config(|config| apply_subtitle_font_name(config, &name));
-        root.close_subtitle_popover();
-        if changed {
-            cx.notify();
-        }
-    }))
+    let click_name = name.clone();
+    let key_name = name;
+    let trigger_focus_for_click = focuses.trigger.cloned();
+    let trigger_focus_for_key = focuses.trigger.cloned();
+    let first_focus_for_key = focuses.first_option.cloned();
+    let last_focus_for_key = subtitle_select_last_focus(option_count, focuses).cloned();
+    let scroll_handle_for_key = scroll_handle.clone();
+    let option = if let Some(focus) = focus {
+        frame_select_option_with_focus(
+            format!("subtitle-font-{click_name}"),
+            option.name,
+            option.is_selected,
+            is_enabled,
+            focus,
+        )
+    } else {
+        frame_select_option(
+            format!("subtitle-font-{click_name}"),
+            option.name,
+            option.is_selected,
+            is_enabled,
+        )
+    };
+    option
+        .on_click(cx.listener(move |root, event: &ClickEvent, window, cx| {
+            cx.stop_propagation();
+            if event.is_keyboard() {
+                return;
+            }
+            if !is_enabled {
+                return;
+            }
+            let changed =
+                root.update_selected_config(|config| apply_subtitle_font_name(config, &click_name));
+            root.close_subtitle_popover();
+            focus_optional(trigger_focus_for_click.as_ref(), window, cx);
+            if changed {
+                cx.notify();
+            }
+        }))
+        .on_key_down(
+            cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+                let key = event.keystroke.key.as_str();
+                match key {
+                    "enter" | "space" if is_enabled => {
+                        cx.stop_propagation();
+                        let changed = root.update_selected_config(|config| {
+                            apply_subtitle_font_name(config, &key_name)
+                        });
+                        root.close_subtitle_popover();
+                        defer_focus_optional(trigger_focus_for_key.clone(), window, cx);
+                        if changed {
+                            cx.notify();
+                        }
+                    }
+                    "up" | "down" | "home" | "end" if is_enabled => {
+                        let target_index = subtitle_select_target_index(
+                            keyboard_options.len(),
+                            Some(index),
+                            key,
+                            |index| !keyboard_options[index].is_disabled,
+                        );
+                        if let Some(target_index) = target_index {
+                            focus_subtitle_select_target(
+                                key,
+                                SubtitleSelectFocusTarget {
+                                    current_index: index,
+                                    target_index,
+                                    first_focus: first_focus_for_key.as_ref(),
+                                    last_focus: last_focus_for_key.as_ref(),
+                                    scroll_handle: &scroll_handle_for_key,
+                                },
+                                window,
+                                cx,
+                            );
+                        }
+                        cx.stop_propagation();
+                    }
+                    "escape" => {
+                        cx.stop_propagation();
+                        root.close_subtitle_popover();
+                        focus_optional(trigger_focus_for_key.as_ref(), window, cx);
+                        cx.notify();
+                    }
+                    _ => {}
+                }
+            }),
+        )
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    clippy::option_if_let_else,
+    reason = "Size options mirror the font option builder and preserve the explicit focus wiring."
+)]
 fn settings_subtitle_size_option(
     option: SubtitleFontSizeOption,
     is_enabled: bool,
     size: &'static str,
+    keyboard_options: Vec<SubtitleFontSizeOption>,
+    index: usize,
+    option_count: usize,
+    focus: Option<&FocusHandle>,
+    focuses: SettingsSubtitleSelectFocuses<'_>,
+    scroll_handle: &ScrollHandle,
     cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    frame_select_option(
-        format!("subtitle-size-{size}"),
-        option.size,
-        option.is_selected,
-        is_enabled,
-    )
-    .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
-        cx.stop_propagation();
-        if !is_enabled {
-            return;
-        }
-        let changed = root.update_selected_config(|config| apply_subtitle_font_size(config, size));
-        root.close_subtitle_popover();
-        if changed {
-            cx.notify();
-        }
-    }))
+    let trigger_focus_for_click = focuses.trigger.cloned();
+    let trigger_focus_for_key = focuses.trigger.cloned();
+    let first_focus_for_key = focuses.first_option.cloned();
+    let last_focus_for_key = subtitle_select_last_focus(option_count, focuses).cloned();
+    let scroll_handle_for_key = scroll_handle.clone();
+    let option = if let Some(focus) = focus {
+        frame_select_option_with_focus(
+            format!("subtitle-size-{size}"),
+            option.size,
+            option.is_selected,
+            is_enabled,
+            focus,
+        )
+    } else {
+        frame_select_option(
+            format!("subtitle-size-{size}"),
+            option.size,
+            option.is_selected,
+            is_enabled,
+        )
+    };
+    option
+        .on_click(cx.listener(move |root, event: &ClickEvent, window, cx| {
+            cx.stop_propagation();
+            if event.is_keyboard() {
+                return;
+            }
+            if !is_enabled {
+                return;
+            }
+            let changed =
+                root.update_selected_config(|config| apply_subtitle_font_size(config, size));
+            root.close_subtitle_popover();
+            focus_optional(trigger_focus_for_click.as_ref(), window, cx);
+            if changed {
+                cx.notify();
+            }
+        }))
+        .on_key_down(
+            cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+                let key = event.keystroke.key.as_str();
+                match key {
+                    "enter" | "space" if is_enabled => {
+                        cx.stop_propagation();
+                        let changed = root.update_selected_config(|config| {
+                            apply_subtitle_font_size(config, size)
+                        });
+                        root.close_subtitle_popover();
+                        defer_focus_optional(trigger_focus_for_key.clone(), window, cx);
+                        if changed {
+                            cx.notify();
+                        }
+                    }
+                    "up" | "down" | "home" | "end" if is_enabled => {
+                        let target_index = subtitle_select_target_index(
+                            keyboard_options.len(),
+                            Some(index),
+                            key,
+                            |index| !keyboard_options[index].is_disabled,
+                        );
+                        if let Some(target_index) = target_index {
+                            focus_subtitle_select_target(
+                                key,
+                                SubtitleSelectFocusTarget {
+                                    current_index: index,
+                                    target_index,
+                                    first_focus: first_focus_for_key.as_ref(),
+                                    last_focus: last_focus_for_key.as_ref(),
+                                    scroll_handle: &scroll_handle_for_key,
+                                },
+                                window,
+                                cx,
+                            );
+                        }
+                        cx.stop_propagation();
+                    }
+                    "escape" => {
+                        cx.stop_propagation();
+                        root.close_subtitle_popover();
+                        focus_optional(trigger_focus_for_key.as_ref(), window, cx);
+                        cx.notify();
+                    }
+                    _ => {}
+                }
+            }),
+        )
 }
 
 fn subtitle_popover_progress(
@@ -654,6 +1168,10 @@ const fn subtitle_popover_motion_key(popover: SettingsSubtitlePopover) -> &'stat
     }
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "The color field keeps trigger behavior, draft color setup, and popover mounting together."
+)]
 fn settings_subtitle_color_field(
     spec: SettingsSubtitleColorFieldSpec<'_>,
     window: &mut Window,
@@ -665,6 +1183,7 @@ fn settings_subtitle_color_field(
         value,
         disabled,
         target,
+        popover_focuses,
         focus,
         active_popover,
         rendered_popover,
@@ -677,6 +1196,32 @@ fn settings_subtitle_color_field(
     };
     let enabled = !disabled;
     let click_value = value.clone();
+    let key_value = value.clone();
+    let trigger_content = frame_color_select_value(&value);
+    let trigger = if let Some(focus) = popover_focuses.trigger {
+        frame_select_trigger_content_with_focus(
+            id,
+            label,
+            trigger_content,
+            enabled,
+            rendered_popover == Some(popover),
+            focus,
+            window,
+            cx,
+        )
+    } else {
+        frame_select_trigger_content(
+            id,
+            label,
+            trigger_content,
+            enabled,
+            rendered_popover == Some(popover),
+            window,
+            cx,
+        )
+    };
+    let click_first_focus = popover_focuses.sv.cloned();
+    let key_first_focus = popover_focuses.sv.cloned();
 
     let mut field = div()
         .relative()
@@ -685,15 +1230,53 @@ fn settings_subtitle_color_field(
         .gap_2()
         .child(settings_field_label(label))
         .child(
-            frame_select_trigger_content(id, frame_color_select_value(&value), enabled, window, cx)
-                .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+            trigger
+                .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
                     cx.stop_propagation();
                     if !enabled {
                         return;
                     }
                     root.toggle_subtitle_color_popover(popover, target, &click_value);
+                    if root.subtitle_ui.popover == Some(popover)
+                        && let Some(focus) = click_first_focus.as_ref()
+                    {
+                        focus.focus(window, cx);
+                    }
                     cx.notify();
-                })),
+                }))
+                .on_key_down(
+                    cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+                        if !enabled {
+                            return;
+                        }
+                        match event.keystroke.key.as_str() {
+                            "down" | "up" => {
+                                root.open_subtitle_color_popover(popover, target, &key_value);
+                                if let Some(focus) = key_first_focus.as_ref() {
+                                    focus.focus(window, cx);
+                                }
+                                cx.stop_propagation();
+                                cx.notify();
+                            }
+                            "enter" | "space" => {
+                                root.toggle_subtitle_color_popover(popover, target, &key_value);
+                                if root.subtitle_ui.popover == Some(popover)
+                                    && let Some(focus) = key_first_focus.as_ref()
+                                {
+                                    focus.focus(window, cx);
+                                }
+                                cx.stop_propagation();
+                                cx.notify();
+                            }
+                            "escape" => {
+                                root.close_subtitle_popover();
+                                cx.stop_propagation();
+                                cx.notify();
+                            }
+                            _ => {}
+                        }
+                    }),
+                ),
         );
 
     if rendered_popover == Some(popover) {
@@ -701,7 +1284,14 @@ fn settings_subtitle_color_field(
             subtitle_popover_progress(popover, active_popover == Some(popover), window, cx);
         field = field.child(
             deferred(settings_subtitle_color_picker(
-                target, hsv, draft, focus, progress, window, cx,
+                target,
+                hsv,
+                draft,
+                focus,
+                popover_focuses,
+                progress,
+                window,
+                cx,
             ))
             .with_priority(10),
         );
@@ -710,25 +1300,34 @@ fn settings_subtitle_color_field(
     field
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "The color picker needs color state, input focus, popover focus handles, animation progress, and render context."
+)]
 fn settings_subtitle_color_picker(
     target: SettingsSubtitleColorTarget,
     hsv: SettingsSubtitleHsv,
     draft: &str,
     focus: Option<&FocusHandle>,
+    popover_focuses: SettingsSubtitleColorPopoverFocuses<'_>,
     progress: f32,
     window: &Window,
     cx: &Context<FrameRoot>,
-) -> gpui::Div {
+) -> gpui::Stateful<gpui::Div> {
     let input_kind = match target {
         SettingsSubtitleColorTarget::Font => FrameTextInputKind::SubtitleFontColorHex,
         SettingsSubtitleColorTarget::Outline => FrameTextInputKind::SubtitleOutlineColorHex,
     };
 
-    frame_color_picker_panel(
+    let panel_id = match target {
+        SettingsSubtitleColorTarget::Font => "settings-subtitle-font-color-picker",
+        SettingsSubtitleColorTarget::Outline => "settings-subtitle-outline-color-picker",
+    };
+    let panel = frame_color_picker_panel(
         SUBTITLE_POPOVER_TOP_OFFSET + subtitle_popover_slide_offset(progress),
         progress,
-        settings_subtitle_sv_square(target, hsv, cx),
-        settings_subtitle_hue_slider(target, hsv, cx),
+        settings_subtitle_sv_square(target, hsv, popover_focuses.sv, cx),
+        settings_subtitle_hue_slider(target, hsv, popover_focuses.hue, cx),
         frame_text_input(
             FrameTextInputSpec {
                 id: match target {
@@ -745,11 +1344,45 @@ fn settings_subtitle_color_picker(
             cx,
         ),
     )
+    .id(panel_id);
+
+    let Some(panel_focus) = popover_focuses.panel else {
+        return panel;
+    };
+    let Some(first_focus) = popover_focuses.sv else {
+        return panel;
+    };
+    let Some(last_focus) = focus else {
+        return panel;
+    };
+
+    let first_focus = first_focus.clone();
+    let last_focus = last_focus.clone();
+    let trigger_focus = popover_focuses.trigger.cloned();
+    panel
+        .track_focus(panel_focus)
+        .tab_stop(false)
+        .on_key_down(
+            cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+                if handle_modal_tab_navigation(event, &first_focus, &last_focus, window, cx) {
+                    return;
+                }
+                if event.keystroke.key.as_str() == "escape" {
+                    root.close_subtitle_popover();
+                    if let Some(focus) = trigger_focus.as_ref() {
+                        focus.focus(window, cx);
+                    }
+                    cx.stop_propagation();
+                    cx.notify();
+                }
+            }),
+        )
 }
 
 fn settings_subtitle_sv_square(
     target: SettingsSubtitleColorTarget,
     hsv: SettingsSubtitleHsv,
+    focus: Option<&FocusHandle>,
     cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let drag = SettingsSubtitleColorDrag {
@@ -757,11 +1390,14 @@ fn settings_subtitle_sv_square(
         kind: SettingsSubtitleColorDragKind::SaturationValue,
         base_hsv: hsv,
     };
-    div()
+    let square = div()
         .id(match target {
             SettingsSubtitleColorTarget::Font => "settings-subtitle-font-color-sv",
             SettingsSubtitleColorTarget::Outline => "settings-subtitle-outline-color-sv",
         })
+        .role(gpui::Role::ColorWell)
+        .aria_label(settings_subtitle_sv_label(target))
+        .aria_value(settings_subtitle_sv_value(hsv))
         .relative()
         .h(px(FRAME_COLOR_PICKER_SV_HEIGHT))
         .w_full()
@@ -805,11 +1441,40 @@ fn settings_subtitle_sv_square(
         .on_drag(drag, |_drag, _position, _window, cx| {
             cx.new(|_| SettingsSubtitleColorDragPreview)
         })
+        .on_key_down(
+            cx.listener(move |root, event: &gpui::KeyDownEvent, _window, cx| {
+                let Some(next_hsv) = subtitle_sv_hsv_for_key(hsv, event.keystroke.key.as_str())
+                else {
+                    return;
+                };
+                if root.commit_subtitle_hsv_color(target, next_hsv) {
+                    cx.notify();
+                }
+                cx.stop_propagation();
+            }),
+        );
+
+    if let Some(focus) = focus {
+        square
+            .track_focus(focus)
+            .tab_stop(true)
+            .focus_visible(focus_visible_ring)
+    } else {
+        square
+            .focusable()
+            .tab_stop(true)
+            .focus_visible(focus_visible_ring)
+    }
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "The hue slider combines pointer, accessibility increment/decrement, and keyboard behavior for one control."
+)]
 fn settings_subtitle_hue_slider(
     target: SettingsSubtitleColorTarget,
     hsv: SettingsSubtitleHsv,
+    focus: Option<&FocusHandle>,
     cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let drag = SettingsSubtitleColorDrag {
@@ -817,8 +1482,10 @@ fn settings_subtitle_hue_slider(
         kind: SettingsSubtitleColorDragKind::Hue,
         base_hsv: hsv,
     };
+    let owner = cx.entity();
+    let decrement_owner = owner.clone();
 
-    div()
+    let slider = div()
         .id(match target {
             SettingsSubtitleColorTarget::Font => "settings-subtitle-font-color-hue",
             SettingsSubtitleColorTarget::Outline => "settings-subtitle-outline-color-hue",
@@ -860,7 +1527,151 @@ fn settings_subtitle_hue_slider(
         .child(frame_color_picker_hue_handle(hsv.h))
         .on_drag(drag, |_drag, _position, _window, cx| {
             cx.new(|_| SettingsSubtitleColorDragPreview)
+        });
+
+    let slider = if let Some(focus) = focus {
+        apply_accessible_slider_with_focus(
+            slider,
+            settings_subtitle_hue_label(target),
+            true,
+            hsv.h,
+            0.0,
+            360.0,
+            format!("{:.0} degrees", hsv.h.round()),
+            focus,
+        )
+    } else {
+        apply_accessible_slider(
+            slider,
+            settings_subtitle_hue_label(target),
+            true,
+            hsv.h,
+            0.0,
+            360.0,
+            format!("{:.0} degrees", hsv.h.round()),
+        )
+    };
+
+    slider
+        .on_a11y_action(gpui::AccessibleAction::Increment, move |_, _window, cx| {
+            owner.update(cx, move |root, cx| {
+                if let Some(next_hsv) = subtitle_hue_hsv_for_key(hsv, "right")
+                    && root.commit_subtitle_hsv_color(target, next_hsv)
+                {
+                    cx.notify();
+                }
+            });
         })
+        .on_a11y_action(gpui::AccessibleAction::Decrement, move |_, _window, cx| {
+            decrement_owner.update(cx, move |root, cx| {
+                if let Some(next_hsv) = subtitle_hue_hsv_for_key(hsv, "left")
+                    && root.commit_subtitle_hsv_color(target, next_hsv)
+                {
+                    cx.notify();
+                }
+            });
+        })
+        .on_key_down(
+            cx.listener(move |root, event: &gpui::KeyDownEvent, _window, cx| {
+                let Some(next_hsv) = subtitle_hue_hsv_for_key(hsv, event.keystroke.key.as_str())
+                else {
+                    return;
+                };
+                if root.commit_subtitle_hsv_color(target, next_hsv) {
+                    cx.notify();
+                }
+                cx.stop_propagation();
+            }),
+        )
+}
+
+const fn settings_subtitle_sv_label(target: SettingsSubtitleColorTarget) -> &'static str {
+    match target {
+        SettingsSubtitleColorTarget::Font => "Subtitle font color saturation and brightness",
+        SettingsSubtitleColorTarget::Outline => "Subtitle outline color saturation and brightness",
+    }
+}
+
+const fn settings_subtitle_hue_label(target: SettingsSubtitleColorTarget) -> &'static str {
+    match target {
+        SettingsSubtitleColorTarget::Font => "Subtitle font color hue",
+        SettingsSubtitleColorTarget::Outline => "Subtitle outline color hue",
+    }
+}
+
+fn settings_subtitle_sv_value(hsv: SettingsSubtitleHsv) -> String {
+    format!(
+        "Saturation {:.0}%, brightness {:.0}%",
+        hsv.s * 100.0,
+        hsv.v * 100.0
+    )
+}
+
+fn subtitle_sv_hsv_for_key(hsv: SettingsSubtitleHsv, key: &str) -> Option<SettingsSubtitleHsv> {
+    let mut next = hsv;
+    match key {
+        "left" => next.s -= 0.01,
+        "right" => next.s += 0.01,
+        "down" => next.v -= 0.01,
+        "up" => next.v += 0.01,
+        "pageup" => next.v += 0.10,
+        "pagedown" => next.v -= 0.10,
+        "home" => {
+            next.s = 0.0;
+            next.v = 0.0;
+        }
+        "end" => {
+            next.s = 1.0;
+            next.v = 1.0;
+        }
+        _ => return None,
+    }
+    next.s = next.s.clamp(0.0, 1.0);
+    next.v = next.v.clamp(0.0, 1.0);
+    Some(next)
+}
+
+fn subtitle_hue_hsv_for_key(hsv: SettingsSubtitleHsv, key: &str) -> Option<SettingsSubtitleHsv> {
+    let mut next = hsv;
+    let hue = match key {
+        "left" | "down" => hsv.h - 1.0,
+        "right" | "up" => hsv.h + 1.0,
+        "pageup" => hsv.h - 15.0,
+        "pagedown" => hsv.h + 15.0,
+        "home" => 0.0,
+        "end" => 360.0,
+        _ => return None,
+    };
+    next.h = hue.clamp(0.0, 360.0);
+    Some(next)
+}
+
+fn subtitle_select_target_index(
+    len: usize,
+    selected_index: Option<usize>,
+    key: &str,
+    is_enabled: impl Fn(usize) -> bool,
+) -> Option<usize> {
+    if len == 0 {
+        return None;
+    }
+    match key {
+        "home" => (0..len).find(|index| is_enabled(*index)),
+        "end" => (0..len).rev().find(|index| is_enabled(*index)),
+        "down" => {
+            let start = selected_index.unwrap_or(len - 1);
+            (1..=len)
+                .map(|offset| (start + offset) % len)
+                .find(|index| is_enabled(*index))
+        }
+        "up" => {
+            let start = selected_index.unwrap_or(0);
+            (1..=len)
+                .map(|offset| (start + len - offset) % len)
+                .find(|index| is_enabled(*index))
+        }
+        _ => None,
+    }
 }
 
 impl FrameRoot {
@@ -1237,4 +2048,77 @@ pub(in crate::app) fn settings_subtitle_track_button(
             cx.notify();
         }
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn subtitle_font_keyboard_selection_skips_disabled_options() {
+        let options = [
+            SubtitleFontOption {
+                name: "Alpha".to_string(),
+                is_selected: true,
+                is_disabled: false,
+            },
+            SubtitleFontOption {
+                name: "Beta".to_string(),
+                is_selected: false,
+                is_disabled: true,
+            },
+            SubtitleFontOption {
+                name: "Gamma".to_string(),
+                is_selected: false,
+                is_disabled: false,
+            },
+        ];
+
+        let down_index = subtitle_select_target_index(options.len(), Some(0), "down", |index| {
+            !options[index].is_disabled
+        });
+        let up_index = subtitle_select_target_index(options.len(), Some(0), "up", |index| {
+            !options[index].is_disabled
+        });
+
+        assert_eq!(
+            down_index.map(|index| options[index].name.as_str()),
+            Some("Gamma")
+        );
+        assert_eq!(
+            up_index.map(|index| options[index].name.as_str()),
+            Some("Gamma")
+        );
+    }
+
+    #[test]
+    fn subtitle_font_size_keyboard_selection_supports_home_and_end() {
+        let options = [
+            SubtitleFontSizeOption {
+                size: "12",
+                is_selected: false,
+                is_disabled: true,
+            },
+            SubtitleFontSizeOption {
+                size: "14",
+                is_selected: true,
+                is_disabled: false,
+            },
+            SubtitleFontSizeOption {
+                size: "16",
+                is_selected: false,
+                is_disabled: false,
+            },
+        ];
+
+        let home_index = subtitle_select_target_index(options.len(), Some(1), "home", |index| {
+            !options[index].is_disabled
+        });
+        let end_index = subtitle_select_target_index(options.len(), Some(1), "end", |index| {
+            !options[index].is_disabled
+        });
+
+        assert_eq!(home_index.map(|index| options[index].size), Some("14"));
+        assert_eq!(end_index.map(|index| options[index].size), Some("16"));
+    }
 }
