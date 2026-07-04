@@ -526,6 +526,18 @@ pub trait Styled: Sized {
         self
     }
 
+    /// Sets the width of the non-layout-affecting ring painted outside the element.
+    fn ring_width(mut self, width: impl Into<AbsoluteLength>) -> Self {
+        self.style().ring_width = Some(width.into());
+        self
+    }
+
+    /// Sets the color of the non-layout-affecting ring painted outside the element.
+    fn ring_color(mut self, color: impl Into<Hsla>) -> Self {
+        self.style().ring_color = Some(color.into());
+        self
+    }
+
     /// Returns a mutable reference to the text style that has been configured on this element.
     fn text_style(&mut self) -> &mut TextStyleRefinement {
         let style: &mut StyleRefinement = self.style();

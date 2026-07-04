@@ -280,6 +280,12 @@ pub struct Style {
     /// The border style of this element
     pub border_style: BorderStyle,
 
+    /// Width of the non-layout-affecting ring painted outside this element.
+    pub ring_width: Option<AbsoluteLength>,
+
+    /// Color of the non-layout-affecting ring painted outside this element.
+    pub ring_color: Option<Hsla>,
+
     /// The radius of the corners of this element
     #[refineable]
     pub corner_radii: Corners<AbsoluteLength>,
@@ -783,10 +789,42 @@ impl Style {
             });
         }
 
+        self.paint_ring(bounds, corner_radii, rem_size, window);
+
         #[cfg(debug_assertions)]
         if self.debug_below {
             cx.remove_global::<DebugBelow>();
         }
+    }
+
+    fn paint_ring(
+        &self,
+        bounds: Bounds<Pixels>,
+        corner_radii: Corners<Pixels>,
+        rem_size: Pixels,
+        window: &mut Window,
+    ) {
+        let (Some(ring_width), Some(ring_color)) = (self.ring_width, self.ring_color) else {
+            return;
+        };
+        let ring_width = ring_width.to_pixels(rem_size);
+        if ring_width.0 <= 0.0 || ring_color.is_transparent() {
+            return;
+        }
+
+        window.paint_quad(quad(
+            bounds.dilate(ring_width),
+            Corners {
+                top_left: corner_radii.top_left + ring_width,
+                top_right: corner_radii.top_right + ring_width,
+                bottom_right: corner_radii.bottom_right + ring_width,
+                bottom_left: corner_radii.bottom_left + ring_width,
+            },
+            black().alpha(0.0),
+            ring_width,
+            ring_color,
+            self.border_style,
+        ));
     }
 
     fn is_border_visible(&self) -> bool {
@@ -832,6 +870,8 @@ impl Default for Style {
             background: None,
             border_color: None,
             border_style: BorderStyle::default(),
+            ring_width: None,
+            ring_color: None,
             corner_radii: Corners::default(),
             box_shadow: Default::default(),
             filter: Default::default(),
@@ -1555,5 +1595,18 @@ mod tests {
             Some(FontWeight::SEMIBOLD),
             style.text_style().unwrap().font_weight
         );
+    }
+
+    #[perf]
+    fn test_ring_style_refinement() {
+        let mut style = Style::default();
+        style.refine(
+            &StyleRefinement::default()
+                .ring_width(px(3.0))
+                .ring_color(blue()),
+        );
+
+        assert_eq!(Some(AbsoluteLength::from(px(3.0))), style.ring_width);
+        assert_eq!(Some(blue()), style.ring_color);
     }
 }

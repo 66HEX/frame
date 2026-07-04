@@ -1159,6 +1159,17 @@ pub trait InteractiveElement: Sized {
         self
     }
 
+    /// Set the given styles to be applied when this element contains the focused element.
+    /// Requires that the element is focusable. Elements can be made focusable using [`InteractiveElement::track_focus`].
+    fn contains_focus(mut self, f: impl FnOnce(StyleRefinement) -> StyleRefinement) -> Self
+    where
+        Self: Sized,
+    {
+        self.interactivity().contains_focus_style =
+            Some(Box::new(f(StyleRefinement::default())));
+        self
+    }
+
     /// Set the given styles to be applied when this element is focused via keyboard navigation.
     /// This is similar to CSS's `:focus-visible` pseudo-class - it only applies when the element
     /// is focused AND the user is navigating via keyboard (not mouse clicks).
@@ -1193,6 +1204,24 @@ pub trait StatefulInteractiveElement: InteractiveElement {
         self
     }
 
+    /// Set the accessible description for this element.
+    fn aria_description(mut self, description: impl Into<String>) -> Self {
+        self.interactivity().aria_description = Some(description.into());
+        self
+    }
+
+    /// Set the disabled state for this element.
+    fn aria_disabled(mut self, disabled: bool) -> Self {
+        self.interactivity().aria_disabled = Some(disabled);
+        self
+    }
+
+    /// Set the invalid state for this element.
+    fn aria_invalid(mut self, invalid: bool) -> Self {
+        self.interactivity().aria_invalid = invalid.then_some(accesskit::Invalid::True);
+        self
+    }
+
     /// Set the selected state for this element.
     fn aria_selected(mut self, selected: bool) -> Self {
         self.interactivity().aria_selected = Some(selected);
@@ -1214,6 +1243,12 @@ pub trait StatefulInteractiveElement: InteractiveElement {
     /// Set the numeric value for this element.
     fn aria_numeric_value(mut self, value: f64) -> Self {
         self.interactivity().aria_numeric_value = Some(value);
+        self
+    }
+
+    /// Set the text value for this element.
+    fn aria_value(mut self, value: impl Into<String>) -> Self {
+        self.interactivity().aria_value = Some(value.into());
         self
     }
 
@@ -1807,6 +1842,7 @@ pub struct Interactivity {
     pub base_style: Box<StyleRefinement>,
     pub(crate) focus_style: Option<Box<StyleRefinement>>,
     pub(crate) in_focus_style: Option<Box<StyleRefinement>>,
+    pub(crate) contains_focus_style: Option<Box<StyleRefinement>>,
     pub(crate) focus_visible_style: Option<Box<StyleRefinement>>,
     pub(crate) hover_style: Option<Box<StyleRefinement>>,
     pub(crate) group_hover_style: Option<GroupStyle>,
@@ -1844,10 +1880,14 @@ pub struct Interactivity {
         Vec<(accesskit::Action, crate::window::a11y::A11yActionListener)>,
     pub(crate) override_role: Option<accesskit::Role>,
     pub(crate) aria_label: Option<SharedString>,
+    pub(crate) aria_description: Option<String>,
+    pub(crate) aria_disabled: Option<bool>,
+    pub(crate) aria_invalid: Option<accesskit::Invalid>,
     pub(crate) aria_selected: Option<bool>,
     pub(crate) aria_expanded: Option<bool>,
     pub(crate) aria_toggled: Option<accesskit::Toggled>,
     pub(crate) aria_numeric_value: Option<f64>,
+    pub(crate) aria_value: Option<String>,
     pub(crate) aria_min_numeric_value: Option<f64>,
     pub(crate) aria_max_numeric_value: Option<f64>,
     pub(crate) aria_orientation: Option<accesskit::Orientation>,
@@ -2928,6 +2968,12 @@ impl Interactivity {
                 style.refine(in_focus_style);
             }
 
+            if let Some(contains_focus_style) = self.contains_focus_style.as_ref()
+                && focus_handle.contains_focused(window, cx)
+            {
+                style.refine(contains_focus_style);
+            }
+
             if let Some(focus_style) = self.focus_style.as_ref()
                 && focus_handle.is_focused(window)
             {
@@ -3037,6 +3083,15 @@ impl Interactivity {
         if let Some(label) = &self.aria_label {
             node.set_label(label.to_string());
         }
+        if let Some(description) = &self.aria_description {
+            node.set_description(description.clone());
+        }
+        if self.aria_disabled == Some(true) {
+            node.set_disabled();
+        }
+        if let Some(invalid) = self.aria_invalid {
+            node.set_invalid(invalid);
+        }
         if let Some(selected) = self.aria_selected {
             node.set_selected(selected);
         }
@@ -3048,6 +3103,9 @@ impl Interactivity {
         }
         if let Some(value) = self.aria_numeric_value {
             node.set_numeric_value(value);
+        }
+        if let Some(value) = &self.aria_value {
+            node.set_value(value.clone());
         }
         if let Some(value) = self.aria_min_numeric_value {
             node.set_min_numeric_value(value);
@@ -3821,6 +3879,25 @@ mod tests {
     use super::*;
     use crate::{AppContext as _, Context, InputEvent, MouseMoveEvent, TestAppContext};
     use std::rc::Weak;
+
+    #[test]
+    fn interactivity_writes_extended_a11y_metadata() {
+        let interactivity = Interactivity {
+            aria_description: Some("Explains the field".to_string()),
+            aria_disabled: Some(true),
+            aria_invalid: Some(accesskit::Invalid::True),
+            aria_value: Some("42".to_string()),
+            ..Default::default()
+        };
+        let mut node = accesskit::Node::new(accesskit::Role::TextInput);
+
+        interactivity.write_a11y_info(&mut node);
+
+        assert_eq!(node.description(), Some("Explains the field"));
+        assert!(node.is_disabled());
+        assert_eq!(node.invalid(), Some(accesskit::Invalid::True));
+        assert_eq!(node.value(), Some("42"));
+    }
 
     struct TestTooltipView;
 
