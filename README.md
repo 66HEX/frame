@@ -27,10 +27,12 @@ source probing, compatibility validation, task control, and progress parsing.
 
 > [!WARNING]
 > **Unsigned Application Notice**
-> Since the application is currently unsigned, your operating system may flag it:
+> Since the application is currently not Developer ID or certificate signed, your
+> operating system may flag it:
 >
-> - **macOS:** The system can flag the app and bundled binaries with a quarantine
->   attribute. To run the app, remove the attribute manually:
+> - **macOS:** Release artifacts are ad-hoc signed but not notarized. The system
+>   can flag the app and bundled binaries with a quarantine attribute. To run the
+>   app, remove the attribute manually after installing it:
 >   ```bash
 >   xattr -dr com.apple.quarantine /Applications/Frame.app
 >   ```

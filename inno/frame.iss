@@ -46,7 +46,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 Source: "{#ResourcesDir}\Frame.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#ResourcesDir}\frame-update-helper.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#ResourcesDir}\*.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#ResourcesDir}\*.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "{#ResourcesDir}\binaries\*"; DestDir: "{app}\binaries"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]

@@ -130,6 +130,9 @@ jobs:
       uses: actions/checkout@v4
     - name: steps::setup_rust
       uses: dtolnay/rust-toolchain@stable
+    - name: steps::setup_inno
+      shell: pwsh
+      run: choco install innosetup --no-progress -y
     - name: ./script/bundle-windows.ps1
       shell: pwsh
       run: ./script/bundle-windows.ps1 -Architecture x86_64

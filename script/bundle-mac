@@ -105,7 +105,11 @@ done
 if [[ -n "${MACOS_SIGNING_IDENTITY:-}" ]]; then
 	echo "Code signing application bundle"
 	codesign --force --deep --timestamp --options runtime --sign "$MACOS_SIGNING_IDENTITY" "$app_bundle" -v
+else
+	echo "Ad-hoc signing application bundle"
+	codesign --force --deep --sign - "$app_bundle" -v
 fi
+codesign --verify --deep --strict --verbose=2 "$app_bundle"
 
 if [[ "$target_profile" = "debug" ]]; then
 	echo "Debug build detected - skipping DMG creation."

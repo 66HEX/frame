@@ -1125,7 +1125,10 @@ fn windows_job(arch: &str, runner: &str) -> String {
     env:
       CARGO_INCREMENTAL: 0
     steps:
-{checkout}{rust}    - name: ./script/bundle-windows.ps1
+{checkout}{rust}    - name: steps::setup_inno
+      shell: pwsh
+      run: choco install innosetup --no-progress -y
+    - name: ./script/bundle-windows.ps1
       shell: pwsh
       run: ./script/bundle-windows.ps1 -Architecture {arch}
     - name: run_bundling::upload_artifact
