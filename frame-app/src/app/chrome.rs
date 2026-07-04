@@ -90,7 +90,7 @@ pub(super) fn macos_titlebar(
 ) -> gpui::Div {
     let show_workspace_controls = titlebar_shows_workspace_controls(state);
 
-    div()
+    titlebar_drag_surface()
         .h(px(TITLEBAR_HEIGHT))
         .w_full()
         .flex()
@@ -98,7 +98,6 @@ pub(super) fn macos_titlebar(
         .justify_between()
         .px_4()
         .pt(px(TITLEBAR_TOP_PADDING))
-        .window_control_area(WindowControlArea::Drag)
         .text_size(px(theme::TEXT_LABEL_SIZE))
         .child(
             div()
@@ -134,12 +133,11 @@ pub(super) fn windows_titlebar(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    div()
+    titlebar_drag_surface()
         .relative()
         .h(px(TITLEBAR_HEIGHT))
         .w_full()
         .flex_none()
-        .window_control_area(WindowControlArea::Drag)
         .text_size(px(theme::TEXT_LABEL_SIZE))
         .child(platform_titlebar_content(state, window, cx))
         .child(windows_window_controls(window, cx))
@@ -150,15 +148,20 @@ pub(super) fn linux_titlebar(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    div()
+    titlebar_drag_surface()
         .relative()
         .h(px(TITLEBAR_HEIGHT))
         .w_full()
         .flex_none()
-        .window_control_area(WindowControlArea::Drag)
         .text_size(px(theme::TEXT_LABEL_SIZE))
         .child(platform_titlebar_content(state, window, cx))
         .child(linux_window_controls(window, cx))
+}
+
+fn titlebar_drag_surface() -> gpui::Div {
+    // The root view has a full-window focus hitbox for keyboard navigation.
+    // Keep it out of titlebar mouse dispatch so it cannot prevent native window moves.
+    div().window_control_area(WindowControlArea::Drag).occlude()
 }
 
 pub(super) fn platform_titlebar_content(
