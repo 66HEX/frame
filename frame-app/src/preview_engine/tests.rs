@@ -17,6 +17,10 @@ fn default_core_config() -> frame_core::types::ConversionConfig {
     crate::conversion_runner::core_config_from_gpui(&crate::settings::ConversionConfig::default())
 }
 
+fn rendered_test_frame(timestamp_us: u64, bytes: Vec<u8>) -> PreviewRenderedFrame {
+    rendered_frame_from_bgra_payload(1, 1, 4, timestamp_us, bytes).expect("rendered frame")
+}
+
 #[test]
 fn fit_dimensions_preserves_aspect_and_even_dimensions() {
     let dimensions = fit_dimensions(1920, 1080, 1280, 720);
@@ -57,8 +61,8 @@ fn session_config_rejects_unpaired_source_dimensions() {
 #[test]
 fn latest_frame_store_keeps_only_newest_frame() {
     let store = LatestFrameStore::new();
-    let first = PreviewFrame::bgra(1, 1, 4, 0, vec![1, 2, 3, 4]).expect("first frame");
-    let second = PreviewFrame::bgra(1, 1, 4, 33_333, vec![5, 6, 7, 8]).expect("second frame");
+    let first = rendered_test_frame(0, vec![1, 2, 3, 4]);
+    let second = rendered_test_frame(33_333, vec![5, 6, 7, 8]);
 
     let _ = store.publish(first);
     let latest = store.publish(second);
@@ -66,14 +70,17 @@ fn latest_frame_store_keeps_only_newest_frame() {
     assert_eq!(latest.generation, 2);
     assert_eq!(latest.stats.published_frames, 2);
     assert_eq!(latest.stats.overwritten_before_present, 1);
-    assert_eq!(latest.frame.bytes(), &[5, 6, 7, 8]);
+    assert_eq!(
+        latest.frame.render_image().as_bytes(0),
+        Some([5, 6, 7, 8].as_slice())
+    );
 }
 
 #[test]
 fn latest_frame_store_does_not_count_presented_frames_as_overwritten() {
     let store = LatestFrameStore::new();
-    let first = PreviewFrame::bgra(1, 1, 4, 0, vec![1, 2, 3, 4]).expect("first frame");
-    let second = PreviewFrame::bgra(1, 1, 4, 33_333, vec![5, 6, 7, 8]).expect("second frame");
+    let first = rendered_test_frame(0, vec![1, 2, 3, 4]);
+    let second = rendered_test_frame(33_333, vec![5, 6, 7, 8]);
 
     let first = store.publish(first);
     store.mark_presented(first.generation);
@@ -95,14 +102,84 @@ fn render_image_from_frame_accepts_tight_bgra_frames() {
 }
 
 #[test]
+fn rendered_frame_from_bgra_payload_reuses_tight_allocation() {
+    let payload = vec![3, 2, 1, 255];
+    let payload_ptr = payload.as_ptr();
+
+    let frame = rendered_frame_from_bgra_payload(1, 1, 4, 0, payload).expect("rendered frame");
+    let render_image = frame.render_image();
+    let rendered_bytes = render_image.as_bytes(0).expect("rendered bytes");
+
+    assert_eq!(rendered_bytes, &[3, 2, 1, 255]);
+    assert_eq!(rendered_bytes.as_ptr(), payload_ptr);
+}
+
+#[test]
+fn rendered_frame_from_bgra_payload_compacts_padded_rows() {
+    let frame = rendered_frame_from_bgra_payload(
+        1,
+        2,
+        8,
+        0,
+        vec![1, 2, 3, 4, 99, 99, 99, 99, 5, 6, 7, 8, 88, 88, 88, 88],
+    )
+    .expect("rendered frame");
+    let render_image = frame.render_image();
+
+    assert_eq!(
+        render_image.as_bytes(0),
+        Some([1, 2, 3, 4, 5, 6, 7, 8].as_slice())
+    );
+}
+
+#[test]
+fn rendered_frame_from_bgra_payload_can_reuse_image_identity_with_new_version() {
+    let image_id = gpui::RenderImage::new_image_id();
+    let first = rendered_frame_from_bgra_payload_with_image_id(
+        1,
+        1,
+        4,
+        0,
+        Some((image_id, 1)),
+        vec![1, 2, 3, 4],
+    )
+    .expect("first frame");
+    let second = rendered_frame_from_bgra_payload_with_image_id(
+        1,
+        1,
+        4,
+        33_333,
+        Some((image_id, 2)),
+        vec![5, 6, 7, 8],
+    )
+    .expect("second frame");
+
+    assert_eq!(first.render_image().id, second.render_image().id);
+    assert_eq!(first.render_image().content_version(), 1);
+    assert_eq!(second.render_image().content_version(), 2);
+}
+
+#[test]
 fn latest_frame_snapshot_uses_shared_frame_storage() {
     let store = LatestFrameStore::new();
-    let frame = PreviewFrame::bgra(1, 1, 4, 0, vec![1, 2, 3, 4]).expect("frame");
+    let frame = rendered_test_frame(0, vec![1, 2, 3, 4]);
 
     let published = store.publish(frame);
     let latest = store.latest().expect("latest frame");
 
     assert!(Arc::ptr_eq(&published.frame, &latest.frame));
+}
+
+#[test]
+fn latest_frame_store_reports_unpresented_frame_backpressure() {
+    let store = LatestFrameStore::new();
+    let first = store.publish(rendered_test_frame(0, vec![1, 2, 3, 4]));
+
+    assert!(store.has_unpresented_frame());
+
+    store.mark_presented(first.generation);
+
+    assert!(!store.has_unpresented_frame());
 }
 
 #[test]

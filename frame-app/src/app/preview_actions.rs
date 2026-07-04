@@ -75,7 +75,7 @@ impl FrameRoot {
         cx: &mut Context<Self>,
     ) {
         let Some(request) = request else {
-            self.clear_preview_runtime();
+            self.clear_preview_runtime(cx);
             self.preview_ui.render_presentation = PreviewRenderPresentation::default();
             self.preview_ui.rendered_presentation = PreviewRenderPresentation::default();
             return;
@@ -127,7 +127,7 @@ impl FrameRoot {
                             root.preview_ui.runtime_key = Some(key);
                             root.preview_ui.session = Some(session);
                             root.preview_ui.runtime_error = None;
-                            root.refresh_preview_render_image();
+                            root.refresh_preview_render_image(cx);
                             root.schedule_preview_frame_tick(cx);
                         }
                         Err(error) => {
@@ -142,7 +142,7 @@ impl FrameRoot {
             return;
         }
 
-        self.clear_preview_runtime();
+        self.clear_preview_runtime(cx);
 
         let key = request.key.clone();
         self.preview_ui.pending_runtime_key = Some(key.clone());
@@ -166,7 +166,7 @@ impl FrameRoot {
                         root.preview_ui.runtime_key = Some(key);
                         root.preview_ui.session = Some(session);
                         root.preview_ui.runtime_error = None;
-                        root.refresh_preview_render_image();
+                        root.refresh_preview_render_image(cx);
                         root.schedule_preview_frame_tick(cx);
                     }
                     Err(error) => {
@@ -603,20 +603,22 @@ impl FrameRoot {
         self.preview_ui.playback.clone()
     }
 
-    fn clear_preview_runtime(&mut self) {
+    fn clear_preview_runtime(&mut self, cx: &mut Context<Self>) {
         if let Some(session) = self.preview_ui.session.take() {
             session.stop();
+        }
+        if let Some(image) = self.preview_ui.render_image.take() {
+            cx.drop_image(image, None);
         }
         self.preview_ui.active_preview_dimensions = None;
         self.preview_ui.preview_dimensions_debounce_until = None;
         self.preview_ui.runtime_key = None;
         self.preview_ui.pending_runtime_key = None;
         self.preview_ui.render_generation = 0;
-        self.preview_ui.render_image = None;
         self.preview_ui.runtime_error = None;
     }
 
-    fn refresh_preview_render_image(&mut self) -> bool {
+    fn refresh_preview_render_image(&mut self, cx: &mut Context<Self>) -> bool {
         let Some(session) = &self.preview_ui.session else {
             return false;
         };
@@ -627,22 +629,23 @@ impl FrameRoot {
             return false;
         }
 
-        match render_image_from_frame(&latest.frame) {
-            Ok(image) => {
-                session.mark_render_image_converted();
-                session.mark_frame_presented(latest.generation);
-                self.preview_ui.render_generation = latest.generation;
-                self.preview_ui.rendered_presentation = self.preview_ui.render_presentation;
-                self.preview_ui.render_image = Some(image);
-                self.preview_ui.runtime_error = None;
-                self.apply_preview_canvas_auto_fit();
-                true
-            }
-            Err(error) => {
-                self.preview_ui.runtime_error = Some(error.to_string());
-                false
+        let image = latest.frame.render_image();
+        if let Some(previous) = self.preview_ui.render_image.replace(image) {
+            let drop_previous = self
+                .preview_ui
+                .render_image
+                .as_ref()
+                .is_none_or(|current| current.id != previous.id);
+            if drop_previous {
+                cx.drop_image(previous, None);
             }
         }
+        session.mark_frame_presented(latest.generation);
+        self.preview_ui.render_generation = latest.generation;
+        self.preview_ui.rendered_presentation = self.preview_ui.render_presentation;
+        self.preview_ui.runtime_error = None;
+        self.apply_preview_canvas_auto_fit();
+        true
     }
 
     fn schedule_preview_frame_tick(&mut self, cx: &Context<Self>) {
@@ -672,7 +675,7 @@ impl FrameRoot {
                             return false;
                         }
 
-                        if root.refresh_preview_render_image()
+                        if root.refresh_preview_render_image(cx)
                             || root.preview_ui.playback.is_playing()
                             || canvas_changed
                             || preview_dimensions_ready

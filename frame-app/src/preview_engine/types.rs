@@ -1,6 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use frame_core::types::ConversionConfig as CoreConversionConfig;
+use gpui::RenderImage;
 
 use crate::numeric::rounded_f64_to_u32;
 
@@ -75,6 +76,60 @@ pub struct PreviewFrame {
     pub timestamp_us: u64,
     pub pixel_format: PreviewPixelFormat,
     data: Arc<[u8]>,
+}
+
+#[derive(Clone, Debug)]
+pub struct PreviewRenderedFrame {
+    pub width: u32,
+    pub height: u32,
+    pub timestamp_us: u64,
+    pub byte_len: usize,
+    render_image: Arc<RenderImage>,
+}
+
+impl PartialEq for PreviewRenderedFrame {
+    fn eq(&self, other: &Self) -> bool {
+        self.width == other.width
+            && self.height == other.height
+            && self.timestamp_us == other.timestamp_us
+            && self.byte_len == other.byte_len
+            && self.render_image.id == other.render_image.id
+            && self.render_image.content_version() == other.render_image.content_version()
+    }
+}
+
+impl Eq for PreviewRenderedFrame {}
+
+impl PreviewRenderedFrame {
+    #[must_use]
+    pub const fn new(
+        width: u32,
+        height: u32,
+        timestamp_us: u64,
+        byte_len: usize,
+        render_image: Arc<RenderImage>,
+    ) -> Self {
+        Self {
+            width,
+            height,
+            timestamp_us,
+            byte_len,
+            render_image,
+        }
+    }
+
+    #[must_use]
+    pub fn render_image(&self) -> Arc<RenderImage> {
+        Arc::clone(&self.render_image)
+    }
+
+    #[must_use]
+    pub const fn dimensions(&self) -> PreviewDimensions {
+        PreviewDimensions {
+            width: self.width,
+            height: self.height,
+        }
+    }
 }
 
 impl PreviewFrame {
@@ -274,7 +329,7 @@ fn validate_range(name: &str, value: u32, min: u32, max: u32) -> Result<(), Prev
     )))
 }
 
-fn validate_frame_layout(
+pub(super) fn validate_frame_layout(
     width: u32,
     height: u32,
     stride: u32,

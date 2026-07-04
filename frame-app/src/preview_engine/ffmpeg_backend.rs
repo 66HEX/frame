@@ -4,7 +4,7 @@ use std::{
     process::{Child, Command, Stdio},
     sync::{
         Arc, Mutex, MutexGuard,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         mpsc,
     },
     thread::{self, JoinHandle},
@@ -19,6 +19,7 @@ use frame_core::{
     },
     utils::parse_time,
 };
+use gpui::{ImageId, RenderImage};
 
 use crate::{
     numeric::{f64_to_u64, u64_to_f64},
@@ -27,8 +28,8 @@ use crate::{
 
 use super::metrics::{PreviewRuntimeMetricsStore, log_preview_runtime_metrics};
 use super::{
-    LatestFrameStore, PreviewDimensions, PreviewEngineError, PreviewFrame, PreviewSessionConfig,
-    PreviewSourceKind,
+    LatestFrameStore, PreviewDimensions, PreviewEngineError, PreviewRenderedFrame,
+    PreviewSessionConfig, PreviewSourceKind, rendered_frame_from_bgra_payload_with_image_id,
 };
 
 const STDERR_RING_LINES: usize = 24;
@@ -49,6 +50,8 @@ pub struct RunningPreviewProcess {
     audio_process: Mutex<RunningProcessState>,
     pending_audio_start: Mutex<Option<PendingAudioStart>>,
     playback: Arc<Mutex<PreviewPlaybackClock>>,
+    render_image_id: ImageId,
+    render_image_version: Arc<AtomicU64>,
     stderr: Arc<Mutex<VecDeque<String>>>,
 }
 
@@ -97,6 +100,18 @@ struct FrameStreamSpec {
     spawned_at: Instant,
 }
 
+struct DecodedPreviewFrame {
+    frame: PreviewRenderedFrame,
+    read_elapsed: Duration,
+    render_elapsed: Duration,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct RenderImageIdentity {
+    image_id: ImageId,
+    content_version: u64,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct AudioOutputSpec {
     sample_rate: u32,
@@ -122,6 +137,16 @@ struct AudioStdoutWorkerConfig {
     generation: u64,
     prebuffer_samples: usize,
     ready_tx: mpsc::Sender<AudioStartStatus>,
+}
+
+struct VideoStdoutWorkerConfig {
+    frame_store: LatestFrameStore,
+    playback: Arc<Mutex<PreviewPlaybackClock>>,
+    metrics: PreviewRuntimeMetricsStore,
+    stop_requested: Arc<AtomicBool>,
+    render_image_id: ImageId,
+    render_image_version: Arc<AtomicU64>,
+    spec: FrameStreamSpec,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -480,12 +505,22 @@ impl RunningPreviewProcess {
                 self.start_video_streaming_with_config(&config, seconds, precise)?
             } else {
                 let started_at = Instant::now();
-                let frame =
-                    decode_single_preview_frame(&self.executable, &config, seconds, precise)?;
-                let dimensions = frame.dimensions();
+                let frame = decode_single_preview_frame(
+                    &self.executable,
+                    &config,
+                    seconds,
+                    precise,
+                    self.next_render_image_identity(),
+                )?;
+                let dimensions = frame.frame.dimensions();
                 self.stop_running_processes()?;
                 let generation = self.prepare_playback_generation_at(seconds, started_at);
-                self.publish_frame_for_generation(frame, generation);
+                self.metrics.record_video_frame_read(
+                    generation,
+                    frame.frame.byte_len,
+                    frame.read_elapsed,
+                );
+                self.publish_frame_for_generation(frame.frame, frame.render_elapsed, generation);
                 self.park_playback_generation(generation, seconds);
                 self.prewarm_audio_for_generation(&config, seconds, precise, generation);
                 dimensions
@@ -535,7 +570,16 @@ impl RunningPreviewProcess {
                 playing: false,
                 ended: false,
             })),
+            render_image_id: RenderImage::new_image_id(),
+            render_image_version: Arc::new(AtomicU64::new(1)),
             stderr: Arc::new(Mutex::new(VecDeque::with_capacity(STDERR_RING_LINES))),
+        }
+    }
+
+    fn next_render_image_identity(&self) -> RenderImageIdentity {
+        RenderImageIdentity {
+            image_id: self.render_image_id,
+            content_version: self.render_image_version.fetch_add(1, Ordering::Relaxed),
         }
     }
 
@@ -545,11 +589,18 @@ impl RunningPreviewProcess {
         precise: bool,
     ) -> Result<PreviewDimensions, PreviewEngineError> {
         let started_at = Instant::now();
-        let frame = decode_single_preview_frame(&self.executable, &self.config, seconds, precise)?;
-        let dimensions = frame.dimensions();
+        let frame = decode_single_preview_frame(
+            &self.executable,
+            &self.config,
+            seconds,
+            precise,
+            self.next_render_image_identity(),
+        )?;
+        let dimensions = frame.frame.dimensions();
         let generation = self.prepare_playback_generation_at(seconds, started_at);
-        self.metrics.record_video_frame_read(generation);
-        self.publish_frame_for_generation(frame, generation);
+        self.metrics
+            .record_video_frame_read(generation, frame.frame.byte_len, frame.read_elapsed);
+        self.publish_frame_for_generation(frame.frame, frame.render_elapsed, generation);
         self.park_playback_generation(generation, seconds);
         self.prewarm_audio_for_generation(&self.config, seconds, precise, generation);
         Ok(dimensions)
@@ -596,10 +647,17 @@ impl RunningPreviewProcess {
         lock_playback(&self.playback).generation_matches(generation)
     }
 
-    fn publish_frame_for_generation(&self, frame: PreviewFrame, generation: u64) {
+    fn publish_frame_for_generation(
+        &self,
+        frame: PreviewRenderedFrame,
+        render_elapsed: Duration,
+        generation: u64,
+    ) {
         if !self.playback_generation_matches(generation) {
             return;
         }
+        self.metrics
+            .record_render_image_converted(generation, frame.byte_len, render_elapsed);
         let _ = self.frame_store.publish(frame);
         self.metrics.record_video_frame_published(generation);
     }
@@ -622,6 +680,10 @@ impl RunningPreviewProcess {
         Ok(())
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "Video startup coordinates FFmpeg spawn, audio prewarm, first-frame readiness, and worker handoff in one transaction."
+    )]
     fn start_video_streaming_with_config(
         &self,
         config: &PreviewSessionConfig,
@@ -642,7 +704,12 @@ impl RunningPreviewProcess {
             }
         };
 
-        let first_frame = match read_stream_frame(&mut stream.stdout, &stream.spec, seconds) {
+        let first_frame = match read_stream_frame(
+            &mut stream.stdout,
+            &stream.spec,
+            seconds,
+            self.next_render_image_identity(),
+        ) {
             Ok(frame) => frame,
             Err(error) => {
                 let _ = stop_spawned_video_stream(stream);
@@ -650,8 +717,13 @@ impl RunningPreviewProcess {
                 return Err(error);
             }
         };
+        let first_frame_read_elapsed = stream
+            .spec
+            .spawned_at
+            .elapsed()
+            .saturating_sub(first_frame.render_elapsed);
         let first_frame_read_ms =
-            u64::try_from(stream.spec.spawned_at.elapsed().as_millis()).unwrap_or(u64::MAX);
+            u64::try_from(first_frame_read_elapsed.as_millis()).unwrap_or(u64::MAX);
 
         if let Some(pending_audio) = pending_audio {
             match self.finish_audio_start(pending_audio) {
@@ -681,11 +753,15 @@ impl RunningPreviewProcess {
         stdout_spec.generation = generation;
         let stdout_worker = match spawn_stdout_worker(
             stream.stdout,
-            self.frame_store.clone(),
-            Arc::clone(&self.playback),
-            self.metrics.clone(),
-            Arc::clone(&stream.stop_requested),
-            stdout_spec,
+            VideoStdoutWorkerConfig {
+                frame_store: self.frame_store.clone(),
+                playback: Arc::clone(&self.playback),
+                metrics: self.metrics.clone(),
+                stop_requested: Arc::clone(&stream.stop_requested),
+                render_image_id: self.render_image_id,
+                render_image_version: Arc::clone(&self.render_image_version),
+                spec: stdout_spec,
+            },
         ) {
             Ok(worker) => worker,
             Err(error) => {
@@ -712,8 +788,16 @@ impl RunningPreviewProcess {
 
         self.metrics
             .record_video_first_frame_read_duration(generation, first_frame_read_ms);
-        self.metrics.record_video_frame_read(generation);
-        self.publish_frame_for_generation(first_frame, generation);
+        self.metrics.record_video_frame_read(
+            generation,
+            first_frame.frame.byte_len,
+            first_frame.read_elapsed,
+        );
+        self.publish_frame_for_generation(
+            first_frame.frame,
+            first_frame.render_elapsed,
+            generation,
+        );
 
         self.start_playback_generation(generation, seconds);
         Ok(dimensions)
@@ -1134,10 +1218,12 @@ fn decode_single_preview_frame(
     config: &PreviewSessionConfig,
     seconds: f64,
     precise: bool,
-) -> Result<PreviewFrame, PreviewEngineError> {
+    image_identity: RenderImageIdentity,
+) -> Result<DecodedPreviewFrame, PreviewEngineError> {
     let plan = preview_plan(config, seconds, false, precise)?;
     let mut args = plan.args.clone();
     insert_frame_limit(&mut args, 1);
+    let read_started = Instant::now();
     let output = Command::new(executable)
         .args(&args)
         .stdin(Stdio::null())
@@ -1163,13 +1249,16 @@ fn decode_single_preview_frame(
 
     let mut payload = output.stdout;
     payload.truncate(plan.frame_bytes);
+    let read_elapsed = read_started.elapsed();
 
-    PreviewFrame::bgra(
+    rendered_preview_frame_from_payload(
         plan.width,
         plan.height,
         plan.width.saturating_mul(4),
         seconds_to_us(seconds),
         payload,
+        read_elapsed,
+        image_identity,
     )
 }
 
@@ -1177,18 +1266,49 @@ fn read_stream_frame(
     stdout: &mut dyn Read,
     spec: &FrameStreamSpec,
     timestamp_seconds: f64,
-) -> Result<PreviewFrame, PreviewEngineError> {
+    image_identity: RenderImageIdentity,
+) -> Result<DecodedPreviewFrame, PreviewEngineError> {
     let mut payload = vec![0_u8; spec.frame_bytes];
+    let read_started = Instant::now();
     stdout.read_exact(&mut payload).map_err(|error| {
         PreviewEngineError::Ffmpeg(format!("failed to read first preview frame: {error}"))
     })?;
-    PreviewFrame::bgra(
+    let read_elapsed = read_started.elapsed();
+    rendered_preview_frame_from_payload(
         spec.width,
         spec.height,
         spec.width.saturating_mul(4),
         seconds_to_us(timestamp_seconds),
         payload,
+        read_elapsed,
+        image_identity,
     )
+}
+
+fn rendered_preview_frame_from_payload(
+    width: u32,
+    height: u32,
+    stride: u32,
+    timestamp_us: u64,
+    payload: Vec<u8>,
+    read_elapsed: Duration,
+    image_identity: RenderImageIdentity,
+) -> Result<DecodedPreviewFrame, PreviewEngineError> {
+    let render_started = Instant::now();
+    let frame = rendered_frame_from_bgra_payload_with_image_id(
+        width,
+        height,
+        stride,
+        timestamp_us,
+        Some((image_identity.image_id, image_identity.content_version)),
+        payload,
+    )?;
+    let render_elapsed = render_started.elapsed();
+    Ok(DecodedPreviewFrame {
+        frame,
+        read_elapsed,
+        render_elapsed,
+    })
 }
 
 fn clock_generation_matches(playback: &Arc<Mutex<PreviewPlaybackClock>>, generation: u64) -> bool {
@@ -1281,15 +1401,20 @@ fn update_last_frame_seconds(
 
 fn spawn_stdout_worker(
     mut stdout: impl Read + Send + 'static,
-    frame_store: LatestFrameStore,
-    playback: Arc<Mutex<PreviewPlaybackClock>>,
-    metrics: PreviewRuntimeMetricsStore,
-    stop_requested: Arc<AtomicBool>,
-    spec: FrameStreamSpec,
+    config: VideoStdoutWorkerConfig,
 ) -> Result<JoinHandle<()>, PreviewEngineError> {
     thread::Builder::new()
         .name("frame-preview-ffmpeg-stdout".to_string())
         .spawn(move || {
+            let VideoStdoutWorkerConfig {
+                frame_store,
+                playback,
+                metrics,
+                stop_requested,
+                render_image_id,
+                render_image_version,
+                spec,
+            } = config;
             let mut frame_index = spec.first_frame_index;
             loop {
                 if stop_requested.load(Ordering::SeqCst) {
@@ -1308,22 +1433,51 @@ fn spawn_stdout_worker(
                     PlaybackStreamState::Waiting => continue,
                 }
                 let mut payload = vec![0_u8; spec.frame_bytes];
+                let read_started = Instant::now();
                 match stdout.read_exact(&mut payload) {
                     Ok(()) => {
-                        metrics.record_video_frame_read(spec.generation);
-                        let Ok(frame) = PreviewFrame::bgra(
+                        let read_elapsed = read_started.elapsed();
+                        metrics.record_video_frame_read(
+                            spec.generation,
+                            spec.frame_bytes,
+                            read_elapsed,
+                        );
+                        if frame_store.has_unpresented_frame() {
+                            if update_last_frame_seconds(
+                                &playback,
+                                spec.generation,
+                                timestamp_seconds,
+                            ) {
+                                metrics.record_video_frame_dropped(spec.generation);
+                            }
+                            frame_index = frame_index.saturating_add(1);
+                            continue;
+                        }
+
+                        let Ok(frame) = rendered_preview_frame_from_payload(
                             spec.width,
                             spec.height,
                             spec.width.saturating_mul(4),
                             seconds_to_us(timestamp_seconds),
                             payload,
+                            read_elapsed,
+                            RenderImageIdentity {
+                                image_id: render_image_id,
+                                content_version: render_image_version
+                                    .fetch_add(1, Ordering::Relaxed),
+                            },
                         ) else {
                             frame_index = frame_index.saturating_add(1);
                             continue;
                         };
                         if update_last_frame_seconds(&playback, spec.generation, timestamp_seconds)
                         {
-                            let _ = frame_store.publish(frame);
+                            metrics.record_render_image_converted(
+                                spec.generation,
+                                frame.frame.byte_len,
+                                frame.render_elapsed,
+                            );
+                            let _ = frame_store.publish(frame.frame);
                             metrics.record_video_frame_published(spec.generation);
                         }
                         frame_index = frame_index.saturating_add(1);
@@ -1351,6 +1505,10 @@ fn spawn_stdout_worker(
         .map_err(|err| PreviewEngineError::Ffmpeg(format!("failed to spawn stdout worker: {err}")))
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "Audio stdout worker coordinates PCM buffering, prebuffer readiness, and CPAL start state."
+)]
 fn spawn_audio_stdout_worker(
     mut stdout: impl Read + Send + 'static,
     config: AudioStdoutWorkerConfig,
@@ -1397,9 +1555,11 @@ fn spawn_audio_stdout_worker(
                         if let Some(output) = &output {
                             let samples =
                                 push_audio_sample_bytes(&output.buffer, &pending[..complete_len]);
-                            config
-                                .metrics
-                                .record_audio_pcm_chunk(config.generation, samples);
+                            config.metrics.record_audio_pcm_chunk(
+                                config.generation,
+                                complete_len,
+                                samples,
+                            );
                             queued_for_prebuffer = queued_for_prebuffer.saturating_add(samples);
                             if !ready_sent && queued_for_prebuffer >= config.prebuffer_samples {
                                 let _ = config.ready_tx.send(AudioStartStatus::Ready);
@@ -1426,9 +1586,11 @@ fn spawn_audio_stdout_worker(
                                 output_started = true;
                             }
                         } else {
-                            config
-                                .metrics
-                                .record_audio_pcm_chunk(config.generation, complete_len / 4);
+                            config.metrics.record_audio_pcm_chunk(
+                                config.generation,
+                                complete_len,
+                                complete_len / 4,
+                            );
                         }
                         pending.drain(..complete_len);
                     }

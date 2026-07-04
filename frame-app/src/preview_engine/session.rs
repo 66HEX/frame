@@ -114,10 +114,6 @@ impl PreviewSession {
         self.metrics.record_frame_presented();
     }
 
-    pub fn mark_render_image_converted(&self) {
-        self.metrics.record_render_image_converted();
-    }
-
     /// Sends a playback command to the running preview pipeline.
     ///
     /// # Errors

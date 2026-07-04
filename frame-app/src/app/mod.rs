@@ -100,7 +100,6 @@ use crate::{
         DEFAULT_PREVIEW_FPS, DEFAULT_PREVIEW_MAX_HEIGHT, DEFAULT_PREVIEW_MAX_WIDTH,
         MIN_PREVIEW_DIMENSION, PreviewCommand, PreviewRenderPresentation, PreviewSession,
         PreviewSessionConfig, PreviewSourceKind as EnginePreviewSourceKind, PreviewTransform,
-        render_image_from_frame,
     },
     settings::{
         ConversionConfig, CropSettings, DEFAULT_SUBTITLE_FONT_COLOR,

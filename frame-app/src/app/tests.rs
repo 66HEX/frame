@@ -23,7 +23,9 @@ use super::settings_panel::{hex_to_subtitle_hsv, subtitle_hsv_to_hex};
 use super::*;
 use crate::app_persistence::{AppPersistence, AppSettings};
 use crate::notifications::{AppNotifier, ConversionNotificationSummary};
-use crate::preview_engine::{PreviewCrop as EnginePreviewCrop, PreviewFrame};
+use crate::preview_engine::{
+    PreviewCrop as EnginePreviewCrop, PreviewFrame, render_image_from_frame,
+};
 use std::{
     path::PathBuf,
     sync::{

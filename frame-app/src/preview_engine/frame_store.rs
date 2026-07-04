@@ -3,7 +3,7 @@ use std::{
     time::Instant,
 };
 
-use super::PreviewFrame;
+use super::PreviewRenderedFrame;
 
 #[derive(Clone, Debug, Default)]
 pub struct LatestFrameStore {
@@ -13,7 +13,7 @@ pub struct LatestFrameStore {
 #[derive(Debug, Default)]
 struct LatestFrameState {
     generation: u64,
-    latest: Option<Arc<PreviewFrame>>,
+    latest: Option<Arc<PreviewRenderedFrame>>,
     last_presented_generation: u64,
     stats: PreviewFrameStats,
     last_publish: Option<Instant>,
@@ -29,7 +29,7 @@ pub struct PreviewFrameStats {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LatestFrameSnapshot {
     pub generation: u64,
-    pub frame: Arc<PreviewFrame>,
+    pub frame: Arc<PreviewRenderedFrame>,
     pub stats: PreviewFrameStats,
 }
 
@@ -40,7 +40,7 @@ impl LatestFrameStore {
     }
 
     #[must_use]
-    pub fn publish(&self, frame: PreviewFrame) -> LatestFrameSnapshot {
+    pub fn publish(&self, frame: PreviewRenderedFrame) -> LatestFrameSnapshot {
         let mut state = lock_state(&self.inner);
         if state.latest.is_some() && state.last_presented_generation < state.generation {
             state.stats.overwritten_before_present =
@@ -78,6 +78,12 @@ impl LatestFrameStore {
     #[must_use]
     pub fn stats(&self) -> PreviewFrameStats {
         lock_state(&self.inner).stats
+    }
+
+    #[must_use]
+    pub fn has_unpresented_frame(&self) -> bool {
+        let state = lock_state(&self.inner);
+        state.latest.is_some() && state.last_presented_generation < state.generation
     }
 
     pub fn mark_presented(&self, generation: u64) {

@@ -1,6 +1,6 @@
 use std::{
     sync::{Arc, Mutex, MutexGuard, OnceLock},
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -9,10 +9,16 @@ pub struct PreviewRuntimeMetrics {
     pub video_process_spawns: u64,
     pub audio_process_spawns: u64,
     pub video_frames_read: u64,
+    pub video_frame_bytes_read: u64,
+    pub video_frame_read_total_us: u64,
     pub video_frames_published: u64,
+    pub video_frames_dropped: u64,
     pub render_image_conversions: u64,
+    pub render_image_bytes: u64,
+    pub render_image_conversion_total_us: u64,
     pub rendered_frames_presented: u64,
     pub audio_pcm_chunks: u64,
+    pub audio_pcm_bytes_read: u64,
     pub audio_samples_queued: u64,
     pub audio_output_callbacks: u64,
     pub audio_output_underruns: u64,
@@ -67,12 +73,25 @@ impl PreviewRuntimeMetricsStore {
         state.metrics.audio_process_spawns = state.metrics.audio_process_spawns.saturating_add(1);
     }
 
-    pub(super) fn record_video_frame_read(&self, generation: u64) {
+    pub(super) fn record_video_frame_read(
+        &self,
+        generation: u64,
+        bytes: usize,
+        read_elapsed: Duration,
+    ) {
         let mut state = lock_metrics(&self.inner);
         if state.metrics.playback_generation != generation {
             return;
         }
         state.metrics.video_frames_read = state.metrics.video_frames_read.saturating_add(1);
+        state.metrics.video_frame_bytes_read = state
+            .metrics
+            .video_frame_bytes_read
+            .saturating_add(u64::try_from(bytes).unwrap_or(u64::MAX));
+        state.metrics.video_frame_read_total_us = state
+            .metrics
+            .video_frame_read_total_us
+            .saturating_add(duration_us(read_elapsed));
         set_first_elapsed_ms(
             state.generation_started_at,
             &mut state.metrics.first_video_frame_read_ms,
@@ -102,10 +121,34 @@ impl PreviewRuntimeMetricsStore {
         );
     }
 
-    pub(super) fn record_render_image_converted(&self) {
+    pub(super) fn record_video_frame_dropped(&self, generation: u64) {
         let mut state = lock_metrics(&self.inner);
+        if state.metrics.playback_generation != generation {
+            return;
+        }
+        state.metrics.video_frames_dropped = state.metrics.video_frames_dropped.saturating_add(1);
+    }
+
+    pub(super) fn record_render_image_converted(
+        &self,
+        generation: u64,
+        bytes: usize,
+        elapsed: Duration,
+    ) {
+        let mut state = lock_metrics(&self.inner);
+        if state.metrics.playback_generation != generation {
+            return;
+        }
         state.metrics.render_image_conversions =
             state.metrics.render_image_conversions.saturating_add(1);
+        state.metrics.render_image_bytes = state
+            .metrics
+            .render_image_bytes
+            .saturating_add(u64::try_from(bytes).unwrap_or(u64::MAX));
+        state.metrics.render_image_conversion_total_us = state
+            .metrics
+            .render_image_conversion_total_us
+            .saturating_add(duration_us(elapsed));
         set_first_elapsed_ms(
             state.generation_started_at,
             &mut state.metrics.first_render_image_ms,
@@ -122,12 +165,16 @@ impl PreviewRuntimeMetricsStore {
         );
     }
 
-    pub(super) fn record_audio_pcm_chunk(&self, generation: u64, samples: usize) {
+    pub(super) fn record_audio_pcm_chunk(&self, generation: u64, bytes: usize, samples: usize) {
         let mut state = lock_metrics(&self.inner);
         if state.metrics.playback_generation != generation {
             return;
         }
         state.metrics.audio_pcm_chunks = state.metrics.audio_pcm_chunks.saturating_add(1);
+        state.metrics.audio_pcm_bytes_read = state
+            .metrics
+            .audio_pcm_bytes_read
+            .saturating_add(u64::try_from(bytes).unwrap_or(u64::MAX));
         state.metrics.audio_samples_queued = state
             .metrics
             .audio_samples_queued
@@ -173,15 +220,21 @@ pub(super) fn log_preview_runtime_metrics(label: &str, metrics: PreviewRuntimeMe
     }
 
     eprintln!(
-        "frame preview metrics [{label}]: generation={} video_spawns={} audio_spawns={} frames_read={} frames_published={} render_conversions={} presented={} audio_chunks={} audio_samples={} audio_callbacks={} audio_underruns={} first_video_read_ms={:?} first_video_published_ms={:?} first_audio_pcm_ms={:?} first_audio_callback_ms={:?} first_render_ms={:?} first_presented_ms={:?}",
+        "frame preview metrics [{label}]: generation={} video_spawns={} audio_spawns={} frames_read={} frame_bytes={} read_total_us={} frames_published={} frames_dropped={} render_conversions={} render_bytes={} render_total_us={} presented={} audio_chunks={} audio_bytes={} audio_samples={} audio_callbacks={} audio_underruns={} first_video_read_ms={:?} first_video_published_ms={:?} first_audio_pcm_ms={:?} first_audio_callback_ms={:?} first_render_ms={:?} first_presented_ms={:?}",
         metrics.playback_generation,
         metrics.video_process_spawns,
         metrics.audio_process_spawns,
         metrics.video_frames_read,
+        metrics.video_frame_bytes_read,
+        metrics.video_frame_read_total_us,
         metrics.video_frames_published,
+        metrics.video_frames_dropped,
         metrics.render_image_conversions,
+        metrics.render_image_bytes,
+        metrics.render_image_conversion_total_us,
         metrics.rendered_frames_presented,
         metrics.audio_pcm_chunks,
+        metrics.audio_pcm_bytes_read,
         metrics.audio_samples_queued,
         metrics.audio_output_callbacks,
         metrics.audio_output_underruns,
@@ -203,6 +256,10 @@ fn set_first_elapsed_ms(started_at: Option<Instant>, slot: &mut Option<u64>) {
 
 fn elapsed_ms(started_at: Instant) -> u64 {
     u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX)
+}
+
+fn duration_us(duration: Duration) -> u64 {
+    u64::try_from(duration.as_micros()).unwrap_or(u64::MAX)
 }
 
 fn lock_metrics(
