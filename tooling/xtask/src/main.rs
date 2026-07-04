@@ -41,7 +41,10 @@ fn run_xtask() -> Result<()> {
 
     match command.as_str() {
         "build" => build_frame_app(args.collect()),
-        "bundle" => bundle(args.next().as_deref()),
+        "bundle" => {
+            let args = args.collect::<Vec<_>>();
+            bundle(&args)
+        }
         "ci" => ci(),
         "run" => run_frame_app(args.collect()),
         "setup-ffmpeg" => {
@@ -75,6 +78,7 @@ Commands:
   build             Build frame-app
   bundle macos      Build the macOS .app and .dmg package
   bundle linux      Build the Linux tarball package
+  bundle linux --all Build Linux tarball, AppImage, and Flatpak test packages
   bundle windows    Build the Windows Inno Setup installer
   setup-ffmpeg      Download FFmpeg and FFprobe runtime binaries
   update-manifest   Generate a signed-update manifest from release artifacts
@@ -105,17 +109,21 @@ fn build_frame_app(args: Vec<String>) -> Result<()> {
     run_command_path("cargo", &cargo_args)
 }
 
-fn bundle(platform: Option<&str>) -> Result<()> {
-    match platform {
-        Some("macos" | "mac" | "darwin") => run_script("./script/bundle-mac", &[]),
-        Some("linux") => run_script("./script/bundle-linux", &[]),
-        Some("windows" | "win") => run_script("./script/bundle-windows.ps1", &[]),
-        Some(other) => Err(XtaskError::Usage(format!(
+fn bundle(args: &[String]) -> Result<()> {
+    let Some(platform) = args.first() else {
+        return Err(XtaskError::Usage(
+            "missing bundle platform: expected macos, linux, or windows".to_string(),
+        ));
+    };
+    let script_args = args.iter().skip(1).map(String::as_str).collect::<Vec<_>>();
+
+    match platform.as_str() {
+        "macos" | "mac" | "darwin" => run_script("./script/bundle-mac", &script_args),
+        "linux" => run_script("./script/bundle-linux", &script_args),
+        "windows" | "win" => run_script("./script/bundle-windows.ps1", &script_args),
+        other => Err(XtaskError::Usage(format!(
             "unknown bundle platform `{other}`"
         ))),
-        None => Err(XtaskError::Usage(
-            "missing bundle platform: expected macos, linux, or windows".to_string(),
-        )),
     }
 }
 
@@ -1020,6 +1028,7 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: '1'
 on:
+  workflow_dispatch:
   pull_request:
     types:
       - labeled
@@ -1039,7 +1048,7 @@ on:
 }
 
 const fn bundle_if_expression() -> &'static str {
-    "      (github.event.action == 'labeled' && github.event.label.name == 'run-bundling') ||\n      (github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'run-bundling'))"
+    "      github.event_name == 'workflow_dispatch' ||\n      (github.event.action == 'labeled' && github.event.label.name == 'run-bundling') ||\n      (github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'run-bundling'))"
 }
 
 const fn checkout_step() -> &'static str {
@@ -1055,6 +1064,39 @@ const fn setup_rust_step() -> &'static str {
 }
 
 fn linux_job(arch: &str, runner: &str) -> String {
+    let appimagetool_arch = arch;
+    let linux_packages = if arch == "x86_64" {
+        "clang curl desktop-file-utils file flatpak flatpak-builder libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf"
+    } else {
+        "clang curl desktop-file-utils file libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf"
+    };
+    let flatpak_setup = if arch == "x86_64" {
+        r"    - name: steps::setup_flatpak
+      run: |
+        flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+        flatpak install --user -y --noninteractive flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
+"
+    } else {
+        ""
+    };
+    let bundle_args = if arch == "x86_64" {
+        "--tarball --appimage --flatpak"
+    } else {
+        "--tarball --appimage"
+    };
+    let flatpak_upload = if arch == "x86_64" {
+        r"    - name: run_bundling::upload_flatpak_artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Frame-x86_64.flatpak
+        path: target/release/Frame-x86_64.flatpak
+        if-no-files-found: error
+"
+    } else {
+        ""
+    };
+    let timeout_minutes = if arch == "x86_64" { 90 } else { 60 };
+
     format!(
         r"  bundle_linux_{arch}:
     if: |-
@@ -1066,20 +1108,39 @@ fn linux_job(arch: &str, runner: &str) -> String {
 {checkout}{rust}    - name: steps::setup_linux
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf
-    - name: ./script/bundle-linux
-      run: ./script/bundle-linux
+        sudo apt-get install -y {linux_packages}
+    - name: steps::setup_appimagetool
+      run: |
+        curl -L --fail -o /tmp/appimagetool.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-{appimagetool_arch}.AppImage
+        chmod +x /tmp/appimagetool.AppImage
+{flatpak_setup}    - name: ./script/bundle-linux
+      env:
+        APPIMAGETOOL: /tmp/appimagetool.AppImage
+      run: ./script/bundle-linux {bundle_args}
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@v4
       with:
         name: frame-linux-{arch}.tar.gz
         path: target/release/frame-linux-{arch}.tar.gz
         if-no-files-found: error
-    timeout-minutes: 60
+    - name: run_bundling::upload_appimage_artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Frame-{arch}.AppImage
+        path: target/release/Frame-{arch}.AppImage
+        if-no-files-found: error
+{flatpak_upload}
+    timeout-minutes: {timeout_minutes}
 ",
         if_expression = bundle_if_expression(),
         checkout = checkout_step(),
         rust = setup_rust_step(),
+        appimagetool_arch = appimagetool_arch,
+        linux_packages = linux_packages,
+        flatpak_setup = flatpak_setup,
+        bundle_args = bundle_args,
+        flatpak_upload = flatpak_upload,
+        timeout_minutes = timeout_minutes,
     )
 }
 

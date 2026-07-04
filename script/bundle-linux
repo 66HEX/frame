@@ -8,15 +8,46 @@ target_dir="${CARGO_TARGET_DIR:-"$repo_root/target"}"
 help_info() {
 	echo "
 Usage: ${0##*/} [options]
-Build a release .tar.gz for Linux.
+Build Linux release packages.
 
 Options:
+  --tarball      Build the managed frame-linux-<arch>.tar.gz package.
+  --appimage     Build the Frame-<arch>.AppImage package.
+  --flatpak      Build the Frame-<arch>.flatpak local devel bundle.
+  --all          Build every Linux package supported by this host.
   -h, --help     Display this help and exit.
 "
 }
 
+want_tarball=false
+want_appimage=false
+want_flatpak=false
+format_selected=false
+
 while [[ $# -gt 0 ]]; do
 	case "$1" in
+		--tarball)
+			want_tarball=true
+			format_selected=true
+			shift
+			;;
+		--appimage)
+			want_appimage=true
+			format_selected=true
+			shift
+			;;
+		--flatpak)
+			want_flatpak=true
+			format_selected=true
+			shift
+			;;
+		--all)
+			want_tarball=true
+			want_appimage=true
+			want_flatpak=true
+			format_selected=true
+			shift
+			;;
 		-h | --help)
 			help_info
 			exit 0
@@ -37,6 +68,14 @@ while [[ $# -gt 0 ]]; do
 			;;
 	esac
 done
+
+if [[ "$format_selected" == false ]]; then
+	want_tarball=true
+fi
+
+if [[ "$want_flatpak" == true ]]; then
+	want_tarball=true
+fi
 
 if [[ "$(uname -s)" != "Linux" ]]; then
 	echo "script/bundle-linux must be run on Linux." >&2
@@ -139,24 +178,146 @@ cp "$repo_root/frame-app/resources/app-icons/128x128@2x.png" "$app_dir/share/ico
 cp "$repo_root/frame-app/resources/app-icons/icon.png" "$app_dir/share/icons/hicolor/512x512/apps/frame.png"
 cp "$repo_root/LICENSE" "$app_dir/licenses.md"
 
-export APP_NAME="Frame"
-export APP_CLI="frame"
-export APP_ICON="frame"
+render_desktop() {
+	local output="$1"
+	local app_name="$2"
+	local app_cli="$3"
+	local app_icon="$4"
 
-if command -v envsubst >/dev/null 2>&1; then
-	envsubst < "$repo_root/frame-app/resources/frame.desktop.in" > "$app_dir/share/applications/Frame.desktop"
-else
-	sed \
-		-e "s|\\$APP_NAME|$APP_NAME|g" \
-		-e "s|\\$APP_CLI|$APP_CLI|g" \
-		-e "s|\\$APP_ICON|$APP_ICON|g" \
-		"$repo_root/frame-app/resources/frame.desktop.in" > "$app_dir/share/applications/Frame.desktop"
+	APP_NAME="$app_name" APP_CLI="$app_cli" APP_ICON="$app_icon" \
+		envsubst < "$repo_root/frame-app/resources/frame.desktop.in" > "$output"
+}
+
+if ! command -v envsubst >/dev/null 2>&1; then
+	render_desktop() {
+		local output="$1"
+		local app_name="$2"
+		local app_cli="$3"
+		local app_icon="$4"
+
+		sed \
+			-e "s|\\$APP_NAME|$app_name|g" \
+			-e "s|\\$APP_CLI|$app_cli|g" \
+			-e "s|\\$APP_ICON|$app_icon|g" \
+			"$repo_root/frame-app/resources/frame.desktop.in" > "$output"
+	}
 fi
+
+render_desktop "$app_dir/share/applications/Frame.desktop" "Frame" "frame" "frame"
 chmod +x "$app_dir/share/applications/Frame.desktop"
 
 archive="$target_dir/release/frame-linux-$runtime_arch.tar.gz"
 mkdir -p "$(dirname "$archive")"
-rm -f "$archive"
-tar -czvf "$archive" -C "$temp_dir" frame.app
 
-echo "Created $archive"
+create_tarball() {
+	rm -f "$archive"
+	tar -czvf "$archive" -C "$temp_dir" frame.app
+	echo "Created $archive"
+}
+
+copy_managed_layout_to_appdir() {
+	local appimage_dir="$1"
+
+	mkdir -p \
+		"$appimage_dir/usr/bin" \
+		"$appimage_dir/usr/lib" \
+		"$appimage_dir/usr/share/applications" \
+		"$appimage_dir/usr/share/icons/hicolor"
+
+	cp -a "$app_dir/bin/." "$appimage_dir/usr/bin/"
+	if [[ -d "$app_dir/lib" ]]; then
+		cp -a "$app_dir/lib/." "$appimage_dir/usr/lib/"
+	fi
+	cp -a "$app_dir/share/icons/hicolor/." "$appimage_dir/usr/share/icons/hicolor/"
+	cp "$repo_root/LICENSE" "$appimage_dir/usr/share/licenses.md"
+
+	render_desktop "$appimage_dir/Frame.desktop" "Frame" "AppRun" "frame"
+	render_desktop "$appimage_dir/usr/share/applications/Frame.desktop" "Frame" "frame" "frame"
+	chmod +x "$appimage_dir/Frame.desktop" "$appimage_dir/usr/share/applications/Frame.desktop"
+
+	cp "$repo_root/frame-app/resources/app-icons/icon.png" "$appimage_dir/frame.png"
+	ln -sf frame.png "$appimage_dir/.DirIcon"
+
+	cat > "$appimage_dir/AppRun" <<'APPRUN'
+#!/usr/bin/env bash
+set -euo pipefail
+
+appdir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export LD_LIBRARY_PATH="$appdir/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+exec "$appdir/usr/bin/frame" "$@"
+APPRUN
+	chmod +x "$appimage_dir/AppRun"
+}
+
+create_appimage() {
+	local appimagetool="${APPIMAGETOOL:-appimagetool}"
+	if ! command -v "$appimagetool" >/dev/null 2>&1; then
+		echo "Missing appimagetool. Set APPIMAGETOOL=/path/to/appimagetool or install it in PATH." >&2
+		exit 1
+	fi
+
+	local appimage_dir="$temp_dir/Frame.AppDir"
+	local output="$target_dir/release/Frame-$runtime_arch.AppImage"
+	rm -rf "$appimage_dir" "$output"
+	copy_managed_layout_to_appdir "$appimage_dir"
+	ARCH="$runtime_arch" APPIMAGE_EXTRACT_AND_RUN=1 "$appimagetool" "$appimage_dir" "$output"
+	chmod +x "$output"
+	echo "Created $output"
+}
+
+sed_escape_replacement() {
+	printf '%s' "$1" | sed -e 's/[&|]/\\&/g'
+}
+
+create_flatpak_bundle() {
+	if ! command -v flatpak-builder >/dev/null 2>&1; then
+		echo "Missing flatpak-builder. Install flatpak-builder before using --flatpak." >&2
+		exit 1
+	fi
+	if ! command -v flatpak >/dev/null 2>&1; then
+		echo "Missing flatpak. Install flatpak before using --flatpak." >&2
+		exit 1
+	fi
+
+	local template="$repo_root/packaging/flatpak/io.github._66HEX.Frame.Devel.yml.in"
+	if [[ ! -f "$template" ]]; then
+		echo "Missing Flatpak manifest template: $template" >&2
+		exit 1
+	fi
+	if [[ ! -f "$archive" ]]; then
+		create_tarball
+	fi
+
+	local runtime_version="${FRAME_FLATPAK_RUNTIME_VERSION:-24.08}"
+	local source_archive
+	source_archive="$(cd "$(dirname "$archive")" && pwd)/$(basename "$archive")"
+	local manifest="$temp_dir/io.github._66HEX.Frame.Devel.yml"
+	sed \
+		-e "s|@@FRAME_FLATPAK_SOURCE_TARBALL@@|$(sed_escape_replacement "$source_archive")|g" \
+		-e "s|@@FRAME_FLATPAK_RUNTIME_VERSION@@|$(sed_escape_replacement "$runtime_version")|g" \
+		"$template" > "$manifest"
+
+	local flatpak_repo="$target_dir/release/flatpak-repo-$runtime_arch"
+	local flatpak_build_dir="$target_dir/release/flatpak-build-$runtime_arch"
+	local output="$target_dir/release/Frame-$runtime_arch.flatpak"
+	rm -rf "$flatpak_repo" "$flatpak_build_dir" "$output"
+
+	flatpak-builder --user --force-clean --repo="$flatpak_repo" "$flatpak_build_dir" "$manifest"
+	flatpak build-bundle \
+		--runtime-repo=https://flathub.org/repo/flathub.flatpakrepo \
+		"$flatpak_repo" \
+		"$output" \
+		io.github._66HEX.Frame.Devel \
+		devel
+	echo "Created $output"
+}
+
+if [[ "$want_tarball" == true ]]; then
+	create_tarball
+fi
+if [[ "$want_appimage" == true ]]; then
+	create_appimage
+fi
+if [[ "$want_flatpak" == true ]]; then
+	create_flatpak_bundle
+fi

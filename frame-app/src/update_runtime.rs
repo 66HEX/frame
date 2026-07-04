@@ -1,6 +1,9 @@
 //! Runtime configuration for Frame update checks.
 
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    path::Path,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use frame_updater::{
     InstallContext, UpdateChannel, UpdateClient, UpdateClientConfig, UpdateError,
@@ -13,6 +16,7 @@ use crate::app_info::FRAME_APP_ID;
 pub const AUTO_UPDATE_CHECK_INTERVAL_SECS: u64 = 24 * 60 * 60;
 const UPDATE_EXPLANATION_ENV: &str = "FRAME_UPDATE_EXPLANATION";
 const UPDATE_PUBLIC_KEY_ENV: &str = "FRAME_UPDATE_PUBLIC_KEY";
+const FLATPAK_INFO_PATH: &str = "/.flatpak-info";
 
 /// Builds an update client for the configured update channel.
 ///
@@ -42,10 +46,19 @@ pub fn build_update_client(channel: UpdateChannel) -> Result<UpdateClient, Updat
 
 #[must_use]
 pub fn updates_disabled_explanation() -> Option<String> {
-    std::env::var(UPDATE_EXPLANATION_ENV)
+    if let Some(explanation) = std::env::var(UPDATE_EXPLANATION_ENV)
         .ok()
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
+    {
+        return Some(explanation);
+    }
+
+    package_manager_update_explanation(
+        std::env::var_os("APPIMAGE").is_some(),
+        std::env::var_os("FLATPAK_ID").is_some(),
+        Path::new(FLATPAK_INFO_PATH).is_file(),
+    )
 }
 
 #[must_use]
@@ -88,6 +101,26 @@ fn push_public_keys(value: &str, keys: &mut Vec<String>) {
     );
 }
 
+fn package_manager_update_explanation(
+    appimage_runtime: bool,
+    flatpak_runtime: bool,
+    flatpak_info_exists: bool,
+) -> Option<String> {
+    if flatpak_runtime || flatpak_info_exists {
+        Some(
+            "This Flatpak build is managed by Flatpak. Install updates through Flatpak or Flathub."
+                .to_string(),
+        )
+    } else if appimage_runtime {
+        Some(
+            "This AppImage build is updated manually. Download the latest AppImage from GitHub Releases."
+                .to_string(),
+        )
+    } else {
+        None
+    }
+}
+
 fn fallback_install_context() -> InstallContext {
     let executable_path = std::env::current_exe().unwrap_or_else(|_| "frame".into());
     let install_root = executable_path
@@ -119,5 +152,38 @@ mod tests {
     #[test]
     fn update_check_is_due_returns_false_for_recent_check() {
         assert!(!update_check_is_due(Some(unix_timestamp())));
+    }
+
+    #[test]
+    fn package_manager_update_explanation_detects_appimage() {
+        assert_eq!(
+            package_manager_update_explanation(true, false, false),
+            Some(
+                "This AppImage build is updated manually. Download the latest AppImage from GitHub Releases."
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn package_manager_update_explanation_detects_flatpak() {
+        assert_eq!(
+            package_manager_update_explanation(false, true, false),
+            Some(
+                "This Flatpak build is managed by Flatpak. Install updates through Flatpak or Flathub."
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn package_manager_update_explanation_prefers_flatpak_over_appimage() {
+        assert_eq!(
+            package_manager_update_explanation(true, false, true),
+            Some(
+                "This Flatpak build is managed by Flatpak. Install updates through Flatpak or Flathub."
+                    .to_string()
+            )
+        );
     }
 }

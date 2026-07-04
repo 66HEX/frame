@@ -1,0 +1,30 @@
+app-id: io.github._66HEX.Frame.Devel
+runtime: org.freedesktop.Platform
+runtime-version: '@@FRAME_FLATPAK_RUNTIME_VERSION@@'
+sdk: org.freedesktop.Sdk
+command: frame
+branch: devel
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --socket=pulseaudio
+  - --device=dri
+  - --filesystem=home
+  - --talk-name=org.freedesktop.Notifications
+modules:
+  - name: frame
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 frame.app/bin/frame /app/bin/frame
+      - install -Dm755 frame.app/bin/frame-update-helper /app/bin/frame-update-helper
+      - mkdir -p /app/bin/binaries /app/lib
+      - cp -a frame.app/bin/binaries/. /app/bin/binaries/
+      - if [ -d frame.app/lib ]; then cp -a frame.app/lib/. /app/lib/; fi
+      - install -Dm644 frame.app/licenses.md /app/share/licenses/frame/licenses.md
+      - install -Dm644 frame.app/share/applications/Frame.desktop /app/share/applications/io.github._66HEX.Frame.Devel.desktop
+      - sed -i 's/^Icon=.*/Icon=io.github._66HEX.Frame.Devel/' /app/share/applications/io.github._66HEX.Frame.Devel.desktop
+      - for size in 32x32 64x64 128x128 256x256 512x512; do install -Dm644 frame.app/share/icons/hicolor/$size/apps/frame.png /app/share/icons/hicolor/$size/apps/io.github._66HEX.Frame.Devel.png; done
+    sources:
+      - type: archive
+        path: '@@FRAME_FLATPAK_SOURCE_TARBALL@@'
