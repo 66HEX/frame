@@ -99,7 +99,7 @@ pub(super) fn welcome_view(window: &mut Window, cx: &mut Context<FrameRoot>) -> 
                         .child(
                             action_button(
                                 "welcome-open-file",
-                                assets::ICON_FILE_UP,
+                                assets::ICON_FILE_IMPORT,
                                 Some("Open File"),
                                 "Open file",
                                 ButtonVariant::Default,
@@ -117,7 +117,7 @@ pub(super) fn welcome_view(window: &mut Window, cx: &mut Context<FrameRoot>) -> 
                         .child(
                             action_button(
                                 "welcome-open-folder",
-                                assets::ICON_HARD_DRIVE,
+                                assets::ICON_FOLDER_IMPORT,
                                 Some("Open Folder"),
                                 "Open folder",
                                 ButtonVariant::Secondary,
