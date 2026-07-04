@@ -28,3 +28,4 @@ modules:
     sources:
       - type: archive
         path: '@@FRAME_FLATPAK_SOURCE_TARBALL@@'
+        strip-components: 0
