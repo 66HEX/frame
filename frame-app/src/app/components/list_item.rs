@@ -1,25 +1,27 @@
 use super::{
     ButtonVariant, Context, FluentBuilder, FrameRoot, InteractiveElement, MouseButton,
     ParentElement, SETTINGS_CONTROL_HEIGHT, StatefulInteractiveElement, Styled, Window,
-    animated_button_colors, button_colors, button_highlight_shadows, button_mouse_down, color, div,
-    frame_selection_dot, hover_motion, mix_color, mix_scalar, px, retarget_hover_motion,
-    selected_motion, theme,
+    animated_button_colors, apply_accessible_toggle_button, button_colors,
+    button_highlight_shadows, button_mouse_down, color, div, frame_selection_dot, hover_motion,
+    mix_color, mix_scalar, px, retarget_hover_motion, selected_motion, theme,
 };
 
 pub(in crate::app) fn frame_list_item(
     id: impl Into<String>,
+    label: impl Into<String>,
     selected: bool,
     enabled: bool,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let id = id.into();
+    let label = label.into();
     let selected_progress = selected_motion(format!("{id}-selected"), selected, window, cx);
     let hover_transition = hover_motion(format!("{id}-hover"), window, cx);
     let hover_progress = *hover_transition.evaluate(window, cx);
     let emphasis_progress = selected_progress.max(hover_progress);
 
-    div()
+    let item = div()
         .id(id)
         .h(px(SETTINGS_CONTROL_HEIGHT))
         .w_full()
@@ -55,7 +57,9 @@ pub(in crate::app) fn frame_list_item(
         })
         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
             button_mouse_down(enabled, window, cx);
-        })
+        });
+
+    apply_accessible_toggle_button(item, label, enabled, selected)
 }
 
 pub(in crate::app) fn frame_list_item_with_caption(
@@ -67,12 +71,17 @@ pub(in crate::app) fn frame_list_item_with_caption(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    let title = theme::ui_text_owned(title.into());
+    let title = title.into();
+    let display_title = theme::ui_text_owned(title.clone());
     let caption = theme::ui_text_owned(caption.into());
 
-    frame_list_item(id, selected, enabled, window, cx)
+    frame_list_item(id, title, selected, enabled, window, cx)
         .gap_3()
-        .child(div().text_color(color(theme::FOREGROUND)).child(title))
+        .child(
+            div()
+                .text_color(color(theme::FOREGROUND))
+                .child(display_title),
+        )
         .child(
             div()
                 .truncate()
@@ -116,6 +125,11 @@ pub(in crate::app) fn frame_track_list_item(
         primary,
         detail,
     } = text;
+    let accessible_label = if detail.is_empty() {
+        primary.clone()
+    } else {
+        format!("{primary}, {detail}")
+    };
 
     let label_row = div()
         .min_w_0()
@@ -157,7 +171,7 @@ pub(in crate::app) fn frame_track_list_item(
             }),
     };
 
-    div()
+    let item = div()
         .id(id)
         .min_h(px(SETTINGS_CONTROL_HEIGHT))
         .w_full()
@@ -186,5 +200,7 @@ pub(in crate::app) fn frame_track_list_item(
             button_mouse_down(enabled, window, cx);
         })
         .child(content)
-        .child(frame_selection_dot(selected))
+        .child(frame_selection_dot(selected));
+
+    apply_accessible_toggle_button(item, accessible_label, enabled, selected)
 }

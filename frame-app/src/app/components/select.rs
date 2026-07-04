@@ -2,10 +2,14 @@ use super::{
     App, ButtonVariant, Context, FluentBuilder, FrameRoot, InteractiveElement, IntoElement,
     MouseButton, MouseMoveEvent, ParentElement, PlatformInput, SETTINGS_CONTROL_HEIGHT,
     ScrollHandle, ScrollWheelEvent, StatefulInteractiveElement, Styled, Window,
-    animated_button_colors, assets, button_colors, button_highlight_shadows, button_mouse_down,
-    color, div, icon_svg, input_highlight_shadows, parse_hex, px, retarget_hover_motion, theme,
+    animated_button_colors, apply_accessible_select_option,
+    apply_accessible_select_option_with_focus, apply_accessible_select_trigger,
+    apply_accessible_select_trigger_with_focus, assets, button_colors, button_highlight_shadows,
+    button_mouse_down, color, div, icon_svg, input_highlight_shadows, parse_hex, px,
+    retarget_hover_motion, theme,
 };
 use crate::numeric::usize_to_f32;
+use gpui::FocusHandle;
 
 pub(in crate::app) const FRAME_SELECT_MAX_HEIGHT: f32 = 192.0;
 pub(in crate::app) const FRAME_SELECT_CONTENT_PADDING: f32 = 4.0;
@@ -14,13 +18,16 @@ pub(in crate::app) const FRAME_COLOR_SWATCH_SIZE: f32 = 14.0;
 
 pub(in crate::app) fn frame_select_trigger(
     id: impl Into<String>,
+    label: impl Into<String>,
     display: &str,
     enabled: bool,
+    expanded: bool,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     frame_select_trigger_content(
         id,
+        label,
         div()
             .flex_1()
             .min_w_0()
@@ -28,6 +35,38 @@ pub(in crate::app) fn frame_select_trigger(
             .text_color(color(theme::FOREGROUND))
             .child(theme::ui_text(display)),
         enabled,
+        expanded,
+        window,
+        cx,
+    )
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Select triggers need explicit labels, state, rendering context, and a focus handle."
+)]
+pub(in crate::app) fn frame_select_trigger_with_focus(
+    id: impl Into<String>,
+    label: impl Into<String>,
+    display: &str,
+    enabled: bool,
+    expanded: bool,
+    focus: &FocusHandle,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    frame_select_trigger_content_inner(
+        id,
+        label,
+        div()
+            .flex_1()
+            .min_w_0()
+            .truncate()
+            .text_color(color(theme::FOREGROUND))
+            .child(theme::ui_text(display)),
+        enabled,
+        expanded,
+        Some(focus),
         window,
         cx,
     )
@@ -35,19 +74,65 @@ pub(in crate::app) fn frame_select_trigger(
 
 pub(in crate::app) fn frame_select_trigger_content(
     id: impl Into<String>,
+    label: impl Into<String>,
     content: impl IntoElement,
     enabled: bool,
+    expanded: bool,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    frame_select_trigger_content_inner(id, label, content, enabled, expanded, None, window, cx)
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Select triggers need optional explicit focus handles while preserving the existing visual builder."
+)]
+pub(in crate::app) fn frame_select_trigger_content_with_focus(
+    id: impl Into<String>,
+    label: impl Into<String>,
+    content: impl IntoElement,
+    enabled: bool,
+    expanded: bool,
+    focus: &FocusHandle,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    frame_select_trigger_content_inner(
+        id,
+        label,
+        content,
+        enabled,
+        expanded,
+        Some(focus),
+        window,
+        cx,
+    )
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "The shared select trigger builder preserves the existing visual contract and optionally wires a focus handle."
+)]
+fn frame_select_trigger_content_inner(
+    id: impl Into<String>,
+    label: impl Into<String>,
+    content: impl IntoElement,
+    enabled: bool,
+    expanded: bool,
+    focus: Option<&FocusHandle>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let id = id.into();
+    let label = label.into();
     let colors = button_colors(ButtonVariant::Secondary, false, enabled);
     let animated = animated_button_colors(id.clone(), colors, window, cx);
     let background = animated.background;
     let foreground = animated.foreground;
     let hover_transition = animated.hover_transition;
 
-    div()
+    let trigger = div()
         .id(id.clone())
         .group(id)
         .h(px(SETTINGS_CONTROL_HEIGHT))
@@ -81,7 +166,13 @@ pub(in crate::app) fn frame_select_trigger_content(
             div()
                 .flex_shrink_0()
                 .child(icon_svg(assets::ICON_UNFOLD_MORE, 12.0, foreground)),
-        )
+        );
+
+    if let Some(focus) = focus {
+        apply_accessible_select_trigger_with_focus(trigger, label, enabled, expanded, focus)
+    } else {
+        apply_accessible_select_trigger(trigger, label, enabled, expanded)
+    }
 }
 
 pub(in crate::app) fn frame_select_popover(
@@ -115,6 +206,7 @@ pub(in crate::app) fn frame_select_options_list(
 ) -> gpui::Stateful<gpui::Div> {
     div()
         .id(id)
+        .role(gpui::Role::ListBox)
         .max_h(px(FRAME_SELECT_MAX_HEIGHT))
         .overflow_y_scroll()
         .track_scroll(scroll_handle)
@@ -135,14 +227,35 @@ pub(in crate::app) fn frame_select_option(
     selected: bool,
     enabled: bool,
 ) -> gpui::Stateful<gpui::Div> {
-    let label = theme::ui_text_owned(label.into());
+    frame_select_option_inner(id, label, selected, enabled, None)
+}
+
+pub(in crate::app) fn frame_select_option_with_focus(
+    id: impl Into<String>,
+    label: impl Into<String>,
+    selected: bool,
+    enabled: bool,
+    focus: &FocusHandle,
+) -> gpui::Stateful<gpui::Div> {
+    frame_select_option_inner(id, label, selected, enabled, Some(focus))
+}
+
+fn frame_select_option_inner(
+    id: impl Into<String>,
+    label: impl Into<String>,
+    selected: bool,
+    enabled: bool,
+    focus: Option<&FocusHandle>,
+) -> gpui::Stateful<gpui::Div> {
+    let label = label.into();
+    let display_label = theme::ui_text_owned(label.clone());
     let text_color = if selected {
         theme::FOREGROUND
     } else {
         theme::FRAME_GRAY_600
     };
 
-    div()
+    let option = div()
         .id(id.into())
         .h(px(FRAME_SELECT_OPTION_HEIGHT))
         .w_full()
@@ -169,10 +282,16 @@ pub(in crate::app) fn frame_select_option(
             cx.stop_propagation();
             button_mouse_down(enabled, window, cx);
         })
-        .child(div().min_w_0().truncate().child(label))
+        .child(div().min_w_0().truncate().child(display_label))
         .when(selected, |this| {
             this.child(icon_svg(assets::ICON_CHECK, 12.0, color(theme::FOREGROUND)))
-        })
+        });
+
+    if let Some(focus) = focus {
+        apply_accessible_select_option_with_focus(option, label, enabled, selected, focus)
+    } else {
+        apply_accessible_select_option(option, label, enabled, selected)
+    }
 }
 
 pub(in crate::app) fn frame_color_select_value(value: &str) -> gpui::Div {

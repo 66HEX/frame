@@ -1,4 +1,4 @@
-use super::{text::clamp_text_range, *};
+use super::{super::accessibility::apply_accessible_text_input, text::clamp_text_range, *};
 
 pub(super) struct FrameTextInputElement {
     owner: Entity<FrameRoot>,
@@ -331,16 +331,17 @@ pub(in crate::app) fn frame_text_input(
         });
 
     if let Some(focus) = focus {
-        field = field.track_focus(focus).child(FrameTextInputElement {
+        let focus = focus.clone().tab_stop(!disabled);
+        field = field.track_focus(&focus).child(FrameTextInputElement {
             owner: cx.entity(),
             kind,
             placeholder: SharedString::from(placeholder),
             disabled,
-            focus_handle: focus.clone(),
+            focus_handle: focus,
         });
     } else {
         field = field.child(div().w_full().min_w_0().truncate().child(label));
     }
 
-    field
+    apply_accessible_text_input(field, kind.accessibility_label(), !disabled, value)
 }

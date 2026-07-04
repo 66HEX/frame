@@ -1,9 +1,11 @@
 use super::{
     ButtonColors, ButtonVariant, Context, FluentBuilder, FrameRoot, InteractiveElement,
     MouseButton, ParentElement, SETTINGS_CONTROL_HEIGHT, StatefulInteractiveElement, Styled,
-    Window, animated_button_colors, button_colors, button_highlight_shadows, button_mouse_down,
+    Window, animated_button_colors, apply_accessible_button, apply_accessible_button_with_focus,
+    apply_accessible_toggle_button, button_colors, button_highlight_shadows, button_mouse_down,
     color, div, icon_svg, px, retarget_hover_motion, theme,
 };
+use gpui::FocusHandle;
 
 pub(in crate::app) const FRAME_ICON_BUTTON_SM_SIZE: f32 = 24.0;
 pub(in crate::app) const FRAME_ICON_SM_SIZE: f32 = 16.0;
@@ -28,16 +30,22 @@ pub(in crate::app) fn frame_choice_button(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    frame_text_button(
-        id,
+    let label = label.into();
+    apply_accessible_toggle_button(
+        frame_text_button(
+            id,
+            label.clone(),
+            ButtonVariant::Secondary,
+            selected,
+            enabled,
+            window,
+            cx,
+        )
+        .w_full(),
         label,
-        ButtonVariant::Secondary,
-        selected,
         enabled,
-        window,
-        cx,
+        selected,
     )
-    .w_full()
 }
 
 pub(in crate::app) fn frame_text_button(
@@ -49,14 +57,58 @@ pub(in crate::app) fn frame_text_button(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
+    frame_text_button_inner(id, label, variant, selected, enabled, None, window, cx)
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Focused buttons mirror the existing explicit button builder and add only the focus handle."
+)]
+pub(in crate::app) fn frame_text_button_with_focus(
+    id: impl Into<String>,
+    label: impl Into<String>,
+    variant: ButtonVariant,
+    selected: bool,
+    enabled: bool,
+    focus: &FocusHandle,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    frame_text_button_inner(
+        id,
+        label,
+        variant,
+        selected,
+        enabled,
+        Some(focus),
+        window,
+        cx,
+    )
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "The shared implementation preserves the existing explicit button builder contract."
+)]
+fn frame_text_button_inner(
+    id: impl Into<String>,
+    label: impl Into<String>,
+    variant: ButtonVariant,
+    selected: bool,
+    enabled: bool,
+    focus: Option<&FocusHandle>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
     let id = id.into();
-    let label = theme::ui_text_owned(label.into());
+    let label = label.into();
+    let display_label = theme::ui_text_owned(label.clone());
     let colors = button_colors(variant, selected, enabled);
     let animated = animated_button_colors(id.clone(), colors, window, cx);
     let background = animated.background;
     let foreground = animated.foreground;
     let hover_transition = animated.hover_transition;
-    div()
+    let button = div()
         .id(id)
         .h(px(SETTINGS_CONTROL_HEIGHT))
         .flex()
@@ -83,16 +135,27 @@ pub(in crate::app) fn frame_text_button(
         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
             button_mouse_down(enabled, window, cx);
         })
-        .child(label)
+        .child(display_label);
+
+    if let Some(focus) = focus {
+        apply_accessible_button_with_focus(button, label, enabled, focus)
+    } else {
+        apply_accessible_button(button, label, enabled)
+    }
 }
 
 const fn text_button_uses_highlight(variant: ButtonVariant, selected: bool) -> bool {
     !matches!(variant, ButtonVariant::Ghost) || selected
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Icon buttons need explicit a11y labels plus the existing visual button contract."
+)]
 pub(in crate::app) fn frame_icon_button(
     id: impl Into<String>,
     icon: &'static str,
+    label: impl Into<String>,
     variant: FrameIconButtonVariant,
     enabled: bool,
     size: FrameIconButtonSize,
@@ -100,6 +163,7 @@ pub(in crate::app) fn frame_icon_button(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let id = id.into();
+    let label = label.into();
     let (background, hover_background, active_background, foreground, hover_foreground, opacity) =
         match (variant, enabled) {
             (FrameIconButtonVariant::Ghost, true) => (
@@ -152,7 +216,7 @@ pub(in crate::app) fn frame_icon_button(
     let animated_foreground = animated.foreground;
     let hover_transition = animated.hover_transition;
 
-    div()
+    let button = div()
         .id(id.clone())
         .group(id)
         .w(px(size.button))
@@ -175,7 +239,9 @@ pub(in crate::app) fn frame_icon_button(
         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
             button_mouse_down(enabled, window, cx);
         })
-        .child(icon_svg(icon, size.icon, animated_foreground))
+        .child(icon_svg(icon, size.icon, animated_foreground));
+
+    apply_accessible_button(button, label, enabled)
 }
 
 #[cfg(test)]

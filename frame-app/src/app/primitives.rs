@@ -2,8 +2,8 @@ use super::{
     App, BoxShadow, Context, ElementId, FluentBuilder, FrameRoot, InteractiveElement, IntoElement,
     MouseButton, ParentElement, Rgba, StatefulInteractiveElement, Styled,
     TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_BUTTON_HEIGHT, TITLEBAR_ICON_BUTTON_SIZE,
-    TITLEBAR_ICON_SIZE, Window, div, hover_motion, hsla, mix_color, point, px,
-    retarget_hover_motion, svg, theme,
+    TITLEBAR_ICON_SIZE, Window, accessibility::apply_accessible_button, div, hover_motion, hsla,
+    mix_color, point, px, retarget_hover_motion, svg, theme,
 };
 
 #[derive(Clone, Copy)]
@@ -114,16 +114,22 @@ pub(super) fn button_mouse_down(enabled: bool, window: &mut Window, cx: &mut App
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Titlebar action buttons need explicit a11y labels plus the existing visual contract."
+)]
 pub(super) fn action_button(
     id: impl Into<String>,
     icon: &'static str,
     label: Option<&'static str>,
+    accessibility_label: impl Into<String>,
     variant: ButtonVariant,
     enabled: bool,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let id = id.into();
+    let accessibility_label = accessibility_label.into();
     let is_icon_only = label.is_none();
     let colors = button_colors(variant, false, enabled);
     let animated = animated_button_colors(id.clone(), colors, window, cx);
@@ -154,7 +160,7 @@ pub(super) fn action_button(
             button_mouse_down(enabled, window, cx);
         });
 
-    if is_icon_only {
+    let button = if is_icon_only {
         button.w(px(TITLEBAR_ICON_BUTTON_SIZE)).child(icon_svg(
             icon,
             TITLEBAR_ACTION_ICON_SIZE,
@@ -165,7 +171,9 @@ pub(super) fn action_button(
             .px(px(10.0))
             .child(icon_svg(icon, TITLEBAR_ICON_SIZE, foreground))
             .child(theme::ui_text(label.unwrap_or_default()))
-    }
+    };
+
+    apply_accessible_button(button, accessibility_label, enabled)
 }
 
 pub(super) fn icon_svg(path: &'static str, size: f32, icon_color: Rgba) -> impl IntoElement {

@@ -1,5 +1,6 @@
 use super::{
-    FluentBuilder, InteractiveElement, ParentElement, Styled, color, div, px, relative, theme,
+    FluentBuilder, InteractiveElement, ParentElement, Styled, apply_accessible_slider, color, div,
+    px, relative, theme,
 };
 
 pub(in crate::app) const FRAME_SLIDER_VISUAL_HEIGHT: f32 = 20.0;
@@ -13,14 +14,19 @@ pub(in crate::app) const FRAME_SLIDER_HANDLE_TOP: f32 = 0.0;
 
 pub(in crate::app) fn frame_slider(
     id: &'static str,
+    label: impl Into<String>,
     fraction: f32,
     disabled: bool,
 ) -> gpui::Stateful<gpui::Div> {
-    div()
+    let label = label.into();
+    let clamped_fraction = fraction.clamp(0.0, 1.0);
+    let value_percent = f64::from(clamped_fraction) * 100.0;
+    let slider = div()
         .id(id)
         .relative()
         .h(px(FRAME_SLIDER_VISUAL_HEIGHT))
         .w_full()
+        .rounded(px(theme::RADIUS_SM))
         .opacity(if disabled { 0.5 } else { 1.0 })
         .when(!disabled, gpui::Styled::cursor_pointer)
         .child(
@@ -39,10 +45,20 @@ pub(in crate::app) fn frame_slider(
                 .left_0()
                 .top(px(FRAME_SLIDER_TRACK_TOP))
                 .h(px(FRAME_SLIDER_TRACK_HEIGHT))
-                .w(relative(fraction.clamp(0.0, 1.0)))
+                .w(relative(clamped_fraction))
                 .rounded(px(FRAME_SLIDER_FILL_RADIUS))
                 .bg(color(theme::FOREGROUND)),
-        )
+        );
+
+    apply_accessible_slider(
+        slider,
+        label,
+        !disabled,
+        value_percent,
+        0.0,
+        100.0,
+        format!("{value_percent:.0}%"),
+    )
 }
 
 pub(in crate::app) fn frame_slider_handle(

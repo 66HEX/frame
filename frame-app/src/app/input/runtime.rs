@@ -43,6 +43,29 @@ impl FrameTextInputKind {
         Self::SubtitleFontColorHex,
         Self::SubtitleOutlineColorHex,
     ];
+
+    pub(in crate::app) const fn accessibility_label(self) -> &'static str {
+        match self {
+            Self::MaxConcurrency => "Maximum concurrent conversions",
+            Self::OutputName => "Output name",
+            Self::AudioBitrate => "Audio bitrate",
+            Self::VideoCustomWidth => "Video width",
+            Self::VideoCustomHeight => "Video height",
+            Self::VideoBitrate => "Video bitrate",
+            Self::GifLoop => "GIF loop count",
+            Self::PreviewStartTime => "Preview start time",
+            Self::PreviewEndTime => "Preview end time",
+            Self::MetadataTitle => "Metadata title",
+            Self::MetadataArtist => "Metadata artist",
+            Self::MetadataAlbum => "Metadata album",
+            Self::MetadataGenre => "Metadata genre",
+            Self::MetadataDate => "Metadata date",
+            Self::MetadataComment => "Metadata comment",
+            Self::PresetName => "Preset name",
+            Self::SubtitleFontColorHex => "Subtitle font color",
+            Self::SubtitleOutlineColorHex => "Subtitle outline color",
+        }
+    }
 }
 
 pub(in crate::app) struct FrameTextInputRuntime {

@@ -1,3 +1,10 @@
+pub(in crate::app) use super::accessibility::{
+    apply_accessible_button, apply_accessible_button_with_focus, apply_accessible_checkbox,
+    apply_accessible_checkbox_with_focus, apply_accessible_select_option,
+    apply_accessible_select_option_with_focus, apply_accessible_select_trigger,
+    apply_accessible_select_trigger_with_focus, apply_accessible_slider,
+    apply_accessible_toggle_button,
+};
 use super::{
     primitives::{
         ButtonColors, ButtonVariant, animated_button_colors, button_colors,
