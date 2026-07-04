@@ -1,3 +1,4 @@
+use super::super::accessibility::focus_visible_ring;
 use super::{
     ButtonVariant, ClickEvent, Context, FluentBuilder, FrameRoot, FrameSurface, InteractiveElement,
     IntoElement, MouseButton, PANEL_HEADER_HEIGHT, ParentElement, SETTINGS_PANEL_PADDING,
@@ -17,9 +18,23 @@ pub(in crate::app) fn settings_panel(
 ) -> gpui::Div {
     let active_tab =
         resolve_active_settings_tab(settings.active_tab, settings.config, settings.metadata);
-    let mut tab_rail = div().flex().items_center().justify_start().gap_1();
-    for tab in visible_settings_tabs(settings.config, settings.metadata) {
-        tab_rail = tab_rail.child(settings_tab_button(tab, active_tab == tab, window, cx));
+    let visible_tabs = visible_settings_tabs(settings.config, settings.metadata);
+    let mut tab_rail = div()
+        .id("settings-tab-list")
+        .role(gpui::Role::TabList)
+        .aria_label("Settings sections")
+        .flex()
+        .items_center()
+        .justify_start()
+        .gap_1();
+    for tab in &visible_tabs {
+        tab_rail = tab_rail.child(settings_tab_button(
+            *tab,
+            active_tab == *tab,
+            &visible_tabs,
+            window,
+            cx,
+        ));
     }
 
     div()
@@ -54,6 +69,7 @@ pub(in crate::app) fn settings_panel(
 pub(in crate::app) fn settings_tab_button(
     tab: SettingsTab,
     selected: bool,
+    visible_tabs: &[SettingsTab],
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
@@ -75,9 +91,16 @@ pub(in crate::app) fn settings_tab_button(
         theme::FOREGROUND,
         hover_progress,
     );
+    let keyboard_tabs = visible_tabs.to_vec();
 
     div()
         .id(tab_id.clone())
+        .role(gpui::Role::Tab)
+        .aria_label(tab.label())
+        .aria_selected(selected)
+        .focusable()
+        .tab_stop(true)
+        .focus_visible(focus_visible_ring)
         .group(tab_id)
         .w(px(SETTINGS_TAB_BUTTON_SIZE))
         .h(px(SETTINGS_TAB_BUTTON_SIZE))
@@ -101,11 +124,42 @@ pub(in crate::app) fn settings_tab_button(
             cx.stop_propagation();
             cx.notify();
         }))
+        .on_key_down(
+            cx.listener(move |root, event: &gpui::KeyDownEvent, _window, cx| {
+                let Some(next_tab) =
+                    settings_tab_for_key(tab, &keyboard_tabs, event.keystroke.key.as_str())
+                else {
+                    return;
+                };
+                root.settings_ui.active_tab = next_tab;
+                cx.stop_propagation();
+                cx.notify();
+            }),
+        )
         .child(icon_svg(
             settings_tab_icon(tab),
             SETTINGS_TAB_ICON_SIZE,
             foreground,
         ))
+}
+
+fn settings_tab_for_key(
+    current: SettingsTab,
+    visible_tabs: &[SettingsTab],
+    key: &str,
+) -> Option<SettingsTab> {
+    let current_index = visible_tabs.iter().position(|tab| *tab == current)?;
+    match key {
+        "left" => Some(if current_index == 0 {
+            *visible_tabs.last()?
+        } else {
+            visible_tabs[current_index - 1]
+        }),
+        "right" => Some(visible_tabs[(current_index + 1) % visible_tabs.len()]),
+        "home" => visible_tabs.first().copied(),
+        "end" => visible_tabs.last().copied(),
+        _ => None,
+    }
 }
 
 pub(in crate::app) fn settings_tab_content(
@@ -172,6 +226,7 @@ pub(in crate::app) fn settings_tab_content(
                 metadata: settings.metadata,
                 settings_disabled: settings.settings_disabled,
                 subtitle_fonts: settings.subtitle_fonts,
+                focuses: settings.subtitle_focuses,
                 color_focuses: settings.subtitle_color_focuses,
                 active_popover: settings.subtitle_popover,
                 rendered_popover: settings.subtitle_rendered_popover,
@@ -215,4 +270,51 @@ pub(in crate::app) fn settings_section(label: &'static str) -> gpui::Div {
         .flex_col()
         .gap_3()
         .child(settings_section_label(label))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TABS: &[SettingsTab] = &[SettingsTab::Source, SettingsTab::Output, SettingsTab::Video];
+
+    #[test]
+    fn settings_tab_for_key_wraps_left_from_first_tab() {
+        assert_eq!(
+            settings_tab_for_key(SettingsTab::Source, TABS, "left"),
+            Some(SettingsTab::Video)
+        );
+    }
+
+    #[test]
+    fn settings_tab_for_key_wraps_right_from_last_tab() {
+        assert_eq!(
+            settings_tab_for_key(SettingsTab::Video, TABS, "right"),
+            Some(SettingsTab::Source)
+        );
+    }
+
+    #[test]
+    fn settings_tab_for_key_moves_home_to_first_tab() {
+        assert_eq!(
+            settings_tab_for_key(SettingsTab::Output, TABS, "home"),
+            Some(SettingsTab::Source)
+        );
+    }
+
+    #[test]
+    fn settings_tab_for_key_moves_end_to_last_tab() {
+        assert_eq!(
+            settings_tab_for_key(SettingsTab::Output, TABS, "end"),
+            Some(SettingsTab::Video)
+        );
+    }
+
+    #[test]
+    fn settings_tab_for_key_ignores_other_keys() {
+        assert_eq!(
+            settings_tab_for_key(SettingsTab::Output, TABS, "space"),
+            None
+        );
+    }
 }

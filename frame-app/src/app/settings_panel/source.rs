@@ -1,23 +1,27 @@
 use super::{
-    MetadataStatus, ParentElement, SourceInfoSection, SourceMetadata, Styled, color, div,
-    horizontal_separator_shadows, px, settings_section, settings_value_row, source_info_sections,
-    theme,
+    InteractiveElement, IntoElement, MetadataStatus, ParentElement, SourceInfoSection,
+    SourceMetadata, StatefulInteractiveElement, Styled, color, div, horizontal_separator_shadows,
+    px, settings_section, settings_value_row, source_info_sections, theme,
 };
 
 pub(in crate::app) fn settings_source_tab(
     metadata: Option<&SourceMetadata>,
     status: MetadataStatus,
     error: Option<&str>,
-) -> gpui::Div {
+) -> gpui::AnyElement {
     match status {
         MetadataStatus::Loading => {
             return div()
                 .text_size(px(theme::TEXT_LABEL_SIZE))
                 .text_color(color(theme::FRAME_GRAY_600))
-                .child(theme::ui_text("Analyzing source..."));
+                .child(theme::ui_text("Analyzing source..."))
+                .into_any_element();
         }
         MetadataStatus::Error => {
             let mut error_view = div()
+                .id("settings-source-metadata-error")
+                .role(gpui::Role::Alert)
+                .aria_label("Failed to read source metadata.")
                 .flex()
                 .flex_col()
                 .gap_1()
@@ -31,7 +35,7 @@ pub(in crate::app) fn settings_source_tab(
                         .child(error.to_string()),
                 );
             }
-            return error_view;
+            return error_view.into_any_element();
         }
         MetadataStatus::Idle | MetadataStatus::Ready => {}
     }
@@ -40,7 +44,8 @@ pub(in crate::app) fn settings_source_tab(
         return div()
             .text_size(px(theme::TEXT_LABEL_SIZE))
             .text_color(color(theme::FRAME_GRAY_600))
-            .child(theme::ui_text("Metadata unavailable."));
+            .child(theme::ui_text("Metadata unavailable."))
+            .into_any_element();
     };
 
     let sections = source_info_sections(metadata);
@@ -48,7 +53,8 @@ pub(in crate::app) fn settings_source_tab(
         return div()
             .text_size(px(theme::TEXT_LABEL_SIZE))
             .text_color(color(theme::FRAME_GRAY_600))
-            .child(theme::ui_text("Metadata unavailable."));
+            .child(theme::ui_text("Metadata unavailable."))
+            .into_any_element();
     }
 
     let mut content = div().flex().flex_col().gap_6();
@@ -62,7 +68,7 @@ pub(in crate::app) fn settings_source_tab(
             }
         };
     }
-    content
+    content.into_any_element()
 }
 
 pub(in crate::app) fn settings_source_rows(rows: Vec<crate::settings::SourceInfoRow>) -> gpui::Div {

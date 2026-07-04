@@ -1,10 +1,11 @@
 use super::{
     ButtonVariant, ClickEvent, Context, ConversionConfig, FRAME_ICON_BUTTON_SM_SIZE,
     FRAME_ICON_SM_SIZE, FluentBuilder, FocusHandle, FrameIconButtonSize, FrameIconButtonVariant,
-    FrameRoot, FrameTextInputKind, FrameTextInputSpec, ParentElement, PresetDefinition,
-    PresetNotice, PresetNoticeTone, PresetOption, SourceMetadata, StatefulInteractiveElement,
-    Styled, Window, assets, color, div, frame_icon_button, frame_list_item, frame_text_button,
-    frame_text_input, preset_options, px, settings_section_label, theme,
+    FrameRoot, FrameTextInputKind, FrameTextInputSpec, InteractiveElement, ParentElement,
+    PresetDefinition, PresetNotice, PresetNoticeTone, PresetOption, SourceMetadata,
+    StatefulInteractiveElement, Styled, Window, assets, color, div, frame_icon_button,
+    frame_list_item, frame_text_button, frame_text_input, preset_options, px,
+    settings_section_label, theme,
 };
 
 #[derive(Clone, Copy)]
@@ -56,9 +57,15 @@ fn settings_presets_header(notice: Option<&PresetNotice>) -> gpui::Div {
     if let Some(notice) = notice {
         header = header.child(
             div()
+                .id("settings-presets-notice")
                 .absolute()
                 .top_0()
                 .right_0()
+                .role(match notice.tone {
+                    PresetNoticeTone::Success => gpui::Role::Status,
+                    PresetNoticeTone::Error => gpui::Role::Alert,
+                })
+                .aria_label(notice.text.clone())
                 .text_size(px(theme::TEXT_LABEL_SIZE))
                 .text_color(color(match notice.tone {
                     PresetNoticeTone::Success => theme::FOREGROUND,
@@ -135,6 +142,7 @@ fn settings_preset_row(
 
     frame_list_item(
         format!("preset-{}", preset.id),
+        preset.name.clone(),
         selected,
         is_enabled,
         window,
@@ -165,6 +173,7 @@ fn settings_preset_row(
                 this.child(settings_preset_icon_button(
                     format!("settings-preset-apply-all-{apply_all_id}"),
                     assets::ICON_LIST_CHECKS,
+                    "Apply preset to all files",
                     FrameIconButtonVariant::Ghost,
                     !settings_disabled,
                     move |root, window, cx| {
@@ -178,6 +187,7 @@ fn settings_preset_row(
                 this.child(settings_preset_icon_button(
                     format!("settings-preset-delete-{delete_id}"),
                     assets::ICON_TRASH,
+                    "Delete preset",
                     FrameIconButtonVariant::DestructiveGhost,
                     !settings_disabled,
                     move |root, _window, cx| {
@@ -192,9 +202,14 @@ fn settings_preset_row(
     )
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Preset icon actions need explicit a11y labels plus the existing visual button contract."
+)]
 fn settings_preset_icon_button(
     id: String,
     icon: &'static str,
+    label: &'static str,
     variant: FrameIconButtonVariant,
     enabled: bool,
     action: impl Fn(&mut FrameRoot, &mut Window, &mut Context<FrameRoot>) + 'static,
@@ -204,6 +219,7 @@ fn settings_preset_icon_button(
     frame_icon_button(
         id,
         icon,
+        label,
         variant,
         enabled,
         FrameIconButtonSize {

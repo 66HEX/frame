@@ -6,10 +6,10 @@ use super::{
     apply_image_webp_preset, apply_image_webp_quality, apply_pixel_format, color, div,
     frame_choice_button, frame_list_item_with_caption, frame_slider, frame_slider_handle,
     image_jpeg_huffman_options, image_png_prediction_options, image_tiff_compression_options,
-    image_webp_preset_options, px, range_fraction, range_value_from_fraction, settings_field_label,
-    settings_hint_text, settings_section, settings_value_badge, settings_video_resolution_section,
-    settings_video_scaling_section, theme, timeline_slider_percent_from_bounds,
-    video_pixel_format_options,
+    image_webp_preset_options, px, range_fraction, range_value_for_key, range_value_from_fraction,
+    settings_field_label, settings_hint_text, settings_section, settings_value_badge,
+    settings_video_resolution_section, settings_video_scaling_section, theme,
+    timeline_slider_percent_from_bounds, video_pixel_format_options,
 };
 use gpui::{AppContext, InteractiveElement, prelude::FluentBuilder};
 
@@ -344,39 +344,89 @@ fn settings_image_range_slider(
 ) -> gpui::Stateful<gpui::Div> {
     let fraction = range_fraction(value, min, max);
     let drag = SettingsImageRangeDrag { target, min, max };
+    let owner = cx.entity();
+    let decrement_owner = owner.clone();
 
-    frame_slider(settings_image_range_slider_id(target), fraction, disabled)
-        .when(!disabled, |slider| {
-            slider.on_drag(drag, |_drag, _position, _window, cx| {
-                cx.new(|_| SettingsImageRangeDragPreview)
-            })
+    frame_slider(
+        settings_image_range_slider_id(target),
+        settings_image_range_slider_label(target),
+        fraction,
+        disabled,
+    )
+    .on_a11y_action(gpui::AccessibleAction::Increment, move |_, _window, cx| {
+        if disabled {
+            return;
+        }
+        owner.update(cx, move |root, cx| {
+            if let Some(value) = range_value_for_key(value, min, max, "right")
+                && root.update_selected_config(|config| {
+                    apply_settings_image_range_value(config, target, value)
+                })
+            {
+                cx.notify();
+            }
+        });
+    })
+    .on_a11y_action(gpui::AccessibleAction::Decrement, move |_, _window, cx| {
+        if disabled {
+            return;
+        }
+        decrement_owner.update(cx, move |root, cx| {
+            if let Some(value) = range_value_for_key(value, min, max, "left")
+                && root.update_selected_config(|config| {
+                    apply_settings_image_range_value(config, target, value)
+                })
+            {
+                cx.notify();
+            }
+        });
+    })
+    .when(!disabled, |slider| {
+        slider.on_drag(drag, |_drag, _position, _window, cx| {
+            cx.new(|_| SettingsImageRangeDragPreview)
         })
-        .on_drag_move(cx.listener(
-            |root, event: &DragMoveEvent<SettingsImageRangeDrag>, _window, cx| {
-                let drag = *event.drag(cx);
-                let fraction =
-                    timeline_slider_percent_from_bounds(event.event.position, event.bounds);
-                let value = range_value_from_fraction(fraction, drag.min, drag.max);
-                let changed = root.update_selected_config(|config| match drag.target {
-                    SettingsImageRangeTarget::JpegQuality => {
-                        apply_image_jpeg_quality(config, value)
-                    }
-                    SettingsImageRangeTarget::WebpQuality => {
-                        apply_image_webp_quality(config, value)
-                    }
-                    SettingsImageRangeTarget::WebpCompression => {
-                        apply_image_webp_compression(config, value)
-                    }
-                    SettingsImageRangeTarget::PngCompression => {
-                        apply_image_png_compression(config, value)
-                    }
-                });
-                if changed {
-                    cx.notify();
-                }
-            },
-        ))
-        .child(settings_image_range_handle(fraction, drag, !disabled))
+    })
+    .on_drag_move(cx.listener(
+        |root, event: &DragMoveEvent<SettingsImageRangeDrag>, _window, cx| {
+            let drag = *event.drag(cx);
+            let fraction = timeline_slider_percent_from_bounds(event.event.position, event.bounds);
+            let value = range_value_from_fraction(fraction, drag.min, drag.max);
+            let changed = root.update_selected_config(|config| {
+                apply_settings_image_range_value(config, drag.target, value)
+            });
+            if changed {
+                cx.notify();
+            }
+        },
+    ))
+    .on_key_down(
+        cx.listener(move |root, event: &gpui::KeyDownEvent, _window, cx| {
+            let Some(value) = range_value_for_key(value, min, max, event.keystroke.key.as_str())
+            else {
+                return;
+            };
+            if root.update_selected_config(|config| {
+                apply_settings_image_range_value(config, target, value)
+            }) {
+                cx.notify();
+            }
+            cx.stop_propagation();
+        }),
+    )
+    .child(settings_image_range_handle(fraction, drag, !disabled))
+}
+
+fn apply_settings_image_range_value(
+    config: &mut ConversionConfig,
+    target: SettingsImageRangeTarget,
+    value: u32,
+) -> bool {
+    match target {
+        SettingsImageRangeTarget::JpegQuality => apply_image_jpeg_quality(config, value),
+        SettingsImageRangeTarget::WebpQuality => apply_image_webp_quality(config, value),
+        SettingsImageRangeTarget::WebpCompression => apply_image_webp_compression(config, value),
+        SettingsImageRangeTarget::PngCompression => apply_image_png_compression(config, value),
+    }
 }
 
 fn settings_image_range_handle(
@@ -405,6 +455,15 @@ const fn settings_image_range_slider_id(target: SettingsImageRangeTarget) -> &'s
         SettingsImageRangeTarget::WebpQuality => "settings-image-webp-quality-slider",
         SettingsImageRangeTarget::WebpCompression => "settings-image-webp-compression-slider",
         SettingsImageRangeTarget::PngCompression => "settings-image-png-compression-slider",
+    }
+}
+
+const fn settings_image_range_slider_label(target: SettingsImageRangeTarget) -> &'static str {
+    match target {
+        SettingsImageRangeTarget::JpegQuality => "JPEG quality",
+        SettingsImageRangeTarget::WebpQuality => "WebP quality",
+        SettingsImageRangeTarget::WebpCompression => "WebP compression",
+        SettingsImageRangeTarget::PngCompression => "PNG compression",
     }
 }
 

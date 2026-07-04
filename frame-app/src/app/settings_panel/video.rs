@@ -663,15 +663,49 @@ fn settings_video_range_slider(
 ) -> gpui::Stateful<gpui::Div> {
     let fraction = range_fraction(value, min, max);
     let drag = SettingsVideoRangeDrag { target, min, max };
+    let owner = cx.entity();
+    let decrement_owner = owner.clone();
 
     frame_slider(
         match target {
             SettingsVideoRangeTarget::Crf => "settings-video-crf-slider",
             SettingsVideoRangeTarget::Quality => "settings-video-quality-slider",
         },
+        match target {
+            SettingsVideoRangeTarget::Crf => "Video CRF",
+            SettingsVideoRangeTarget::Quality => "Video quality",
+        },
         fraction,
         disabled,
     )
+    .on_a11y_action(gpui::AccessibleAction::Increment, move |_, _window, cx| {
+        if disabled {
+            return;
+        }
+        owner.update(cx, move |root, cx| {
+            if let Some(value) = range_value_for_key(value, min, max, "right")
+                && root.update_selected_config(|config| {
+                    apply_settings_video_range_value(config, target, value)
+                })
+            {
+                cx.notify();
+            }
+        });
+    })
+    .on_a11y_action(gpui::AccessibleAction::Decrement, move |_, _window, cx| {
+        if disabled {
+            return;
+        }
+        decrement_owner.update(cx, move |root, cx| {
+            if let Some(value) = range_value_for_key(value, min, max, "left")
+                && root.update_selected_config(|config| {
+                    apply_settings_video_range_value(config, target, value)
+                })
+            {
+                cx.notify();
+            }
+        });
+    })
     .when(!disabled, |slider| {
         slider.on_drag(drag, |_drag, _position, _window, cx| {
             cx.new(|_| SettingsVideoRangeDragPreview)
@@ -682,16 +716,40 @@ fn settings_video_range_slider(
             let drag = *event.drag(cx);
             let fraction = timeline_slider_percent_from_bounds(event.event.position, event.bounds);
             let value = range_value_from_fraction(fraction, drag.min, drag.max);
-            let changed = root.update_selected_config(|config| match drag.target {
-                SettingsVideoRangeTarget::Crf => apply_crf(config, u32_to_u8(value)),
-                SettingsVideoRangeTarget::Quality => apply_quality(config, value),
+            let changed = root.update_selected_config(|config| {
+                apply_settings_video_range_value(config, drag.target, value)
             });
             if changed {
                 cx.notify();
             }
         },
     ))
+    .on_key_down(
+        cx.listener(move |root, event: &gpui::KeyDownEvent, _window, cx| {
+            let Some(value) = range_value_for_key(value, min, max, event.keystroke.key.as_str())
+            else {
+                return;
+            };
+            if root.update_selected_config(|config| {
+                apply_settings_video_range_value(config, target, value)
+            }) {
+                cx.notify();
+            }
+            cx.stop_propagation();
+        }),
+    )
     .child(settings_video_range_handle(fraction, drag, !disabled))
+}
+
+fn apply_settings_video_range_value(
+    config: &mut ConversionConfig,
+    target: SettingsVideoRangeTarget,
+    value: u32,
+) -> bool {
+    match target {
+        SettingsVideoRangeTarget::Crf => apply_crf(config, u32_to_u8(value)),
+        SettingsVideoRangeTarget::Quality => apply_quality(config, value),
+    }
 }
 
 fn settings_video_range_handle(
@@ -723,16 +781,14 @@ fn settings_video_nvenc_section(
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
     settings_section("NVENC options")
-        .child(
-            settings_video_checkbox_row(
-                "video-nvenc-spatial-aq",
-                "Spatial AQ",
-                "Improves detail in scenes with high complexity",
-                config.nvenc_spatial_aq,
-                disabled,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
-                cx.stop_propagation();
+        .child(settings_video_checkbox_row(
+            "video-nvenc-spatial-aq",
+            "Spatial AQ",
+            "Improves detail in scenes with high complexity",
+            config.nvenc_spatial_aq,
+            disabled,
+            cx,
+            move |root, _event, _window, cx| {
                 if disabled {
                     return;
                 }
@@ -741,18 +797,16 @@ fn settings_video_nvenc_section(
                 }) {
                     cx.notify();
                 }
-            })),
-        )
-        .child(
-            settings_video_checkbox_row(
-                "video-nvenc-temporal-aq",
-                "Temporal AQ",
-                "Stabilizes quality between frames",
-                config.nvenc_temporal_aq,
-                disabled,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
-                cx.stop_propagation();
+            },
+        ))
+        .child(settings_video_checkbox_row(
+            "video-nvenc-temporal-aq",
+            "Temporal AQ",
+            "Stabilizes quality between frames",
+            config.nvenc_temporal_aq,
+            disabled,
+            cx,
+            move |root, _event, _window, cx| {
                 if disabled {
                     return;
                 }
@@ -761,8 +815,8 @@ fn settings_video_nvenc_section(
                 }) {
                     cx.notify();
                 }
-            })),
-        )
+            },
+        ))
 }
 
 fn settings_video_videotoolbox_section(
@@ -770,16 +824,14 @@ fn settings_video_videotoolbox_section(
     disabled: bool,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("VideoToolbox options").child(
-        settings_video_checkbox_row(
-            "video-videotoolbox-allow-sw",
-            "Allow software fallback",
-            "Drop back to CPU encoding if hardware fails",
-            config.videotoolbox_allow_sw,
-            disabled,
-        )
-        .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
-            cx.stop_propagation();
+    settings_section("VideoToolbox options").child(settings_video_checkbox_row(
+        "video-videotoolbox-allow-sw",
+        "Allow software fallback",
+        "Drop back to CPU encoding if hardware fails",
+        config.videotoolbox_allow_sw,
+        disabled,
+        cx,
+        move |root, _event, _window, cx| {
             if disabled {
                 return;
             }
@@ -788,8 +840,8 @@ fn settings_video_videotoolbox_section(
             }) {
                 cx.notify();
             }
-        })),
-    )
+        },
+    ))
 }
 
 fn settings_video_hw_section(
@@ -797,24 +849,22 @@ fn settings_video_hw_section(
     disabled: bool,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("Hardware acceleration").child(
-        settings_video_checkbox_row(
-            "video-hw-decode",
-            "Hardware decoding",
-            "Use GPU for decoding input video (faster)",
-            config.hw_decode,
-            disabled,
-        )
-        .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
-            cx.stop_propagation();
+    settings_section("Hardware acceleration").child(settings_video_checkbox_row(
+        "video-hw-decode",
+        "Hardware decoding",
+        "Use GPU for decoding input video (faster)",
+        config.hw_decode,
+        disabled,
+        cx,
+        move |root, _event, _window, cx| {
             if disabled {
                 return;
             }
             if root.update_selected_config(|config| apply_hw_decode(config, !config.hw_decode)) {
                 cx.notify();
             }
-        })),
-    )
+        },
+    ))
 }
 
 fn settings_video_checkbox_row(
@@ -823,8 +873,10 @@ fn settings_video_checkbox_row(
     hint: &'static str,
     checked: bool,
     disabled: bool,
+    cx: &Context<FrameRoot>,
+    action: impl Fn(&mut FrameRoot, &ClickEvent, &mut Window, &mut Context<FrameRoot>) + 'static,
 ) -> gpui::Stateful<gpui::Div> {
-    frame_checkbox_row(id, label, hint, checked, disabled)
+    frame_checkbox_row(id, label, hint, checked, disabled, cx, action)
 }
 
 fn resolution_label(resolution: &str) -> &'static str {

@@ -91,3 +91,28 @@ pub(in crate::app) fn range_value_from_fraction(fraction: f64, min: u32, max: u3
     let span = f64::from(max - min);
     rounded_f64_to_u32(fraction.clamp(0.0, 1.0).mul_add(span, f64::from(min)))
 }
+
+pub(in crate::app) fn range_value_for_key(
+    value: u32,
+    min: u32,
+    max: u32,
+    key: &str,
+) -> Option<u32> {
+    if max <= min {
+        return None;
+    }
+
+    let value = value.clamp(min, max);
+    let page_step = ((max - min) / 10).max(1);
+    let next = match key {
+        "left" | "down" => value.saturating_sub(1),
+        "right" | "up" => value.saturating_add(1),
+        "pageup" => value.saturating_sub(page_step),
+        "pagedown" => value.saturating_add(page_step),
+        "home" => min,
+        "end" => max,
+        _ => return None,
+    };
+
+    Some(next.clamp(min, max))
+}
