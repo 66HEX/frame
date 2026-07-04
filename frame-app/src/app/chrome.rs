@@ -1,4 +1,10 @@
-use super::components::{frame_checkbox_row, frame_text_button};
+use super::accessibility::{
+    apply_accessible_button, apply_accessible_button_with_focus, focus_visible_ring,
+    handle_modal_tab_navigation,
+};
+use super::components::{
+    frame_checkbox_row_with_focus, frame_text_button, frame_text_button_with_focus,
+};
 use super::input::{FrameTextInputSpec, frame_text_input};
 use super::primitives::{
     ButtonColors, ButtonVariant, action_button, animated_button_colors, button_colors,
@@ -107,6 +113,7 @@ pub(super) fn macos_titlebar(
                         "titlebar-settings",
                         assets::ICON_SETTINGS,
                         None,
+                        "Settings",
                         ButtonVariant::Secondary,
                         true,
                         window,
@@ -128,6 +135,7 @@ pub(super) fn macos_titlebar(
                         "titlebar-add-source",
                         assets::ICON_PLUS,
                         Some("Add source"),
+                        "Add source",
                         ButtonVariant::Secondary,
                         true,
                         window,
@@ -149,6 +157,11 @@ pub(super) fn macos_titlebar(
                         } else {
                             "Start"
                         }),
+                        if state.is_processing {
+                            "Processing"
+                        } else {
+                            "Start conversion"
+                        },
                         ButtonVariant::Default,
                         state.can_start_conversion(),
                         window,
@@ -251,6 +264,7 @@ pub(super) fn titlebar_settings_button(
         "titlebar-settings",
         assets::ICON_SETTINGS,
         None,
+        "Settings",
         ButtonVariant::Secondary,
         true,
         window,
@@ -274,6 +288,7 @@ pub(super) fn titlebar_add_source_button(
         "titlebar-add-source",
         assets::ICON_PLUS,
         Some("Add source"),
+        "Add source",
         ButtonVariant::Secondary,
         true,
         window,
@@ -298,6 +313,11 @@ pub(super) fn titlebar_start_button(
         } else {
             "Start"
         }),
+        if state.is_processing {
+            "Processing"
+        } else {
+            "Start conversion"
+        },
         ButtonVariant::Default,
         state.can_start_conversion(),
         window,
@@ -320,6 +340,15 @@ pub(super) struct AppSettingsSheetProps<'a> {
     pub(super) auto_update_check: bool,
     pub(super) update_status: &'a UpdateStatus,
     pub(super) value_focus: &'a FocusHandle,
+    pub(super) auto_update_focus: &'a FocusHandle,
+    pub(super) check_now_focus: &'a FocusHandle,
+    pub(super) download_focus: &'a FocusHandle,
+    pub(super) skip_focus: &'a FocusHandle,
+    pub(super) install_focus: &'a FocusHandle,
+    pub(super) dismiss_focus: &'a FocusHandle,
+    pub(super) panel_focus: &'a FocusHandle,
+    pub(super) close_focus: &'a FocusHandle,
+    pub(super) last_focus: &'a FocusHandle,
 }
 
 #[expect(
@@ -345,6 +374,8 @@ pub(super) fn app_settings_sheet(
     set_motion_target(&transition, target, cx);
     let progress = *transition.evaluate(window, cx);
     let right_inset = settings_sheet_right_inset(progress);
+    let first_focus = props.close_focus.clone();
+    let last_focus = props.last_focus.clone();
 
     if !props.is_open && motion_is_hidden(progress) {
         cx.defer_in(window, |root, _window, cx| {
@@ -358,6 +389,22 @@ pub(super) fn app_settings_sheet(
         .id("app-settings-sheet")
         .absolute()
         .inset_0()
+        .on_key_down(cx.listener(
+            move |root, event: &gpui::KeyDownEvent, window, cx| {
+                match event.keystroke.key.as_str() {
+                    "escape" => {
+                        root.close_app_settings();
+                        root.restore_focus_after_settings_close(window, cx);
+                        cx.stop_propagation();
+                        cx.notify();
+                    }
+                    "tab" => {
+                        handle_modal_tab_navigation(event, &first_focus, &last_focus, window, cx);
+                    }
+                    _ => {}
+                }
+            },
+        ))
         .child(
             div()
                 .id("app-settings-backdrop")
@@ -366,15 +413,20 @@ pub(super) fn app_settings_sheet(
                 .bg(color(theme::BACKGROUND.with_alpha(0.60 * progress)))
                 .backdrop_blur(px(4.0 * progress))
                 .occlude()
-                .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+                .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
                     cx.stop_propagation();
                     root.close_app_settings();
+                    root.restore_focus_after_settings_close(window, cx);
                     cx.notify();
                 })),
         )
         .child(
             div()
                 .id("app-settings-panel")
+                .role(gpui::Role::Dialog)
+                .aria_label("Settings")
+                .track_focus(props.panel_focus)
+                .tab_stop(false)
                 .absolute()
                 .top_2()
                 .right(px(right_inset))
@@ -404,10 +456,18 @@ pub(super) fn app_settings_sheet(
                         .text_color(color(theme::FOREGROUND))
                         .child(theme::ui_text("Settings"))
                         .child(
-                            app_settings_close_button(window, cx).on_click(
-                                cx.listener(|root, _: &ClickEvent, _window, cx| {
+                            app_settings_close_button(
+                                "app-settings-close",
+                                "Close settings",
+                                props.close_focus,
+                                window,
+                                cx,
+                            )
+                            .on_click(
+                                cx.listener(|root, _: &ClickEvent, window, cx| {
                                     cx.stop_propagation();
                                     root.close_app_settings();
+                                    root.restore_focus_after_settings_close(window, cx);
                                     cx.notify();
                                 }),
                             ),
@@ -426,6 +486,7 @@ pub(super) fn app_settings_sheet(
                                 .child(app_settings_concurrency_control(
                                     props.draft_max_concurrency,
                                     draft_is_dirty,
+                                    props.error,
                                     props.value_focus,
                                     window,
                                     cx,
@@ -438,6 +499,8 @@ pub(super) fn app_settings_sheet(
                             this.child(
                                 div()
                                     .id("app-settings-max-concurrency-error")
+                                    .role(gpui::Role::Alert)
+                                    .aria_label(error.clone())
                                     .text_color(color(theme::FRAME_RED))
                                     .child(error),
                             )
@@ -445,6 +508,14 @@ pub(super) fn app_settings_sheet(
                         .child(app_settings_updates_section(
                             props.auto_update_check,
                             props.update_status,
+                            AppSettingsUpdateFocuses {
+                                auto_update: props.auto_update_focus,
+                                check_now: props.check_now_focus,
+                                download: props.download_focus,
+                                skip: props.skip_focus,
+                                install: props.install_focus,
+                                dismiss: props.dismiss_focus,
+                            },
                             window,
                             cx,
                         )),
@@ -452,29 +523,39 @@ pub(super) fn app_settings_sheet(
         )
 }
 
+#[derive(Clone, Copy)]
+struct AppSettingsUpdateFocuses<'a> {
+    auto_update: &'a FocusHandle,
+    check_now: &'a FocusHandle,
+    download: &'a FocusHandle,
+    skip: &'a FocusHandle,
+    install: &'a FocusHandle,
+    dismiss: &'a FocusHandle,
+}
+
 fn app_settings_updates_section(
     auto_update_check: bool,
     update_status: &UpdateStatus,
+    focuses: AppSettingsUpdateFocuses<'_>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let busy = update_status.is_busy();
     let mut section = settings_section("Updates")
-        .child(
-            frame_checkbox_row(
-                "app-settings-auto-update-check",
-                "Check automatically",
-                "Frame checks for signed releases in the background.",
-                auto_update_check,
-                false,
-            )
-            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
-                cx.stop_propagation();
+        .child(frame_checkbox_row_with_focus(
+            "app-settings-auto-update-check",
+            "Check automatically",
+            "Frame checks for signed releases in the background.",
+            auto_update_check,
+            false,
+            focuses.auto_update,
+            cx,
+            |root, _event, _window, cx| {
                 if root.toggle_auto_update_check() {
                     cx.notify();
                 }
-            })),
-        )
+            },
+        ))
         .child(update_status_label(update_status));
 
     if let UpdateStatus::Downloading {
@@ -492,20 +573,24 @@ fn app_settings_updates_section(
         ));
     }
 
-    section.child(update_action_row(update_status, busy, window, cx))
+    section.child(update_action_row(update_status, busy, focuses, window, cx))
 }
 
-fn update_status_label(status: &UpdateStatus) -> gpui::Div {
+fn update_status_label(status: &UpdateStatus) -> gpui::Stateful<gpui::Div> {
     let tone = match status {
         UpdateStatus::Error(_) => theme::FRAME_RED,
         UpdateStatus::Disabled(_) => theme::FRAME_AMBER,
         _ => theme::FRAME_GRAY_600,
     };
+    let text = update_status_text(status);
 
     div()
+        .id("app-settings-update-status")
+        .role(gpui::Role::Status)
+        .aria_label(text.clone())
         .text_size(px(theme::TEXT_LABEL_SIZE))
         .text_color(color(tone))
-        .child(theme::ui_text_owned(update_status_text(status)))
+        .child(theme::ui_text_owned(text))
 }
 
 fn update_status_text(status: &UpdateStatus) -> String {
@@ -632,10 +717,22 @@ fn update_release_note_line(line: &str) -> gpui::Div {
         .child(text)
 }
 
-fn update_progress_bar(progress_percent: Option<u8>) -> gpui::Div {
+fn update_progress_bar(progress_percent: Option<u8>) -> gpui::Stateful<gpui::Div> {
     let fraction = progress_percent.map_or(0.0, |percent| f32::from(percent) / 100.0);
+    let numeric_percent = progress_percent.map_or(0.0, f64::from);
+    let value_text = progress_percent.map_or_else(
+        || "Download progress unknown".to_string(),
+        |percent| format!("{percent}%"),
+    );
 
     div()
+        .id("app-settings-update-progress")
+        .role(gpui::Role::ProgressIndicator)
+        .aria_label("Update download progress")
+        .aria_numeric_value(numeric_percent)
+        .aria_min_numeric_value(0.0)
+        .aria_max_numeric_value(100.0)
+        .aria_value(value_text)
         .h(px(6.0))
         .w_full()
         .overflow_hidden()
@@ -679,17 +776,19 @@ fn update_download_detail(
 fn update_action_row(
     status: &UpdateStatus,
     busy: bool,
+    focuses: AppSettingsUpdateFocuses<'_>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let mut row = div().flex().items_center().gap_2();
     row = row.child(
-        frame_text_button(
+        frame_text_button_with_focus(
             "app-settings-update-check-now",
             "Check now",
             ButtonVariant::Secondary,
             false,
             !busy,
+            focuses.check_now,
             window,
             cx,
         )
@@ -705,12 +804,13 @@ fn update_action_row(
     match status {
         UpdateStatus::Available(_) => row
             .child(
-                frame_text_button(
+                frame_text_button_with_focus(
                     "app-settings-update-download",
                     "Download",
                     ButtonVariant::Default,
                     false,
                     true,
+                    focuses.download,
                     window,
                     cx,
                 )
@@ -721,12 +821,13 @@ fn update_action_row(
                 })),
             )
             .child(
-                frame_text_button(
+                frame_text_button_with_focus(
                     "app-settings-update-skip",
                     "Skip",
                     ButtonVariant::Secondary,
                     false,
                     true,
+                    focuses.skip,
                     window,
                     cx,
                 )
@@ -738,12 +839,13 @@ fn update_action_row(
                 })),
             ),
         UpdateStatus::ReadyToInstall(_) => row.child(
-            frame_text_button(
+            frame_text_button_with_focus(
                 "app-settings-update-install",
                 "Install and restart",
                 ButtonVariant::Default,
                 false,
                 true,
+                focuses.install,
                 window,
                 cx,
             )
@@ -754,12 +856,13 @@ fn update_action_row(
             })),
         ),
         UpdateStatus::UpToDate | UpdateStatus::Disabled(_) | UpdateStatus::Error(_) => row.child(
-            frame_text_button(
+            frame_text_button_with_focus(
                 "app-settings-update-dismiss",
                 "Dismiss",
                 ButtonVariant::Secondary,
                 false,
                 true,
+                focuses.dismiss,
                 window,
                 cx,
             )
@@ -780,6 +883,8 @@ pub(super) fn update_dialog(
     is_open: bool,
     status: &UpdateStatus,
     info: Option<&UpdateInfo>,
+    panel_focus: &FocusHandle,
+    close_focus: &FocusHandle,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
@@ -815,23 +920,59 @@ pub(super) fn update_dialog(
         .backdrop_blur(px(4.0 * progress))
         .opacity(progress)
         .occlude()
-        .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
-            cx.stop_propagation();
-            root.close_update_dialog();
-            cx.notify();
+        .on_key_down(cx.listener(|root, event: &gpui::KeyDownEvent, window, cx| {
+            match event.keystroke.key.as_str() {
+                "escape" if !root.update_ui.status.is_busy() => {
+                    root.close_update_dialog();
+                    root.restore_focus_after_update_dialog_close(window, cx);
+                    cx.stop_propagation();
+                    cx.notify();
+                }
+                "tab" => {
+                    if event.keystroke.modifiers.shift {
+                        window.focus_prev(cx);
+                    } else {
+                        window.focus_next(cx);
+                    }
+                    cx.stop_propagation();
+                }
+                _ => {}
+            }
         }))
-        .child(update_dialog_panel(panel_offset, status, info, window, cx))
+        .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
+            cx.stop_propagation();
+            if !root.update_ui.status.is_busy() {
+                root.close_update_dialog();
+                root.restore_focus_after_update_dialog_close(window, cx);
+                cx.notify();
+            }
+        }))
+        .child(update_dialog_panel(
+            panel_offset,
+            status,
+            info,
+            panel_focus,
+            close_focus,
+            window,
+            cx,
+        ))
 }
 
 fn update_dialog_panel(
     panel_offset: f32,
     status: &UpdateStatus,
     info: Option<&UpdateInfo>,
+    panel_focus: &FocusHandle,
+    close_focus: &FocusHandle,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let mut panel = div()
         .id("update-dialog-panel")
+        .role(gpui::Role::AlertDialog)
+        .aria_label(update_dialog_title(status))
+        .track_focus(panel_focus)
+        .tab_stop(false)
         .mt(px(panel_offset))
         .w_full()
         .max_w(px(640.0))
@@ -844,7 +985,7 @@ fn update_dialog_panel(
         .on_click(cx.listener(|_, _: &ClickEvent, _window, cx| {
             cx.stop_propagation();
         }))
-        .child(update_dialog_header(status, window, cx))
+        .child(update_dialog_header(status, close_focus, window, cx))
         .child(update_dialog_body(status, info))
         .child(update_dialog_footer(status, window, cx));
 
@@ -857,6 +998,7 @@ fn update_dialog_panel(
 
 fn update_dialog_header(
     status: &UpdateStatus,
+    close_focus: &FocusHandle,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -888,13 +1030,21 @@ fn update_dialog_header(
         .gap_4()
         .px_4()
         .child(title_stack)
-        .child(app_settings_close_button(window, cx).on_click(cx.listener(
-            |root, _: &ClickEvent, _window, cx| {
+        .child(
+            app_settings_close_button(
+                "update-dialog-close",
+                "Close update dialog",
+                close_focus,
+                window,
+                cx,
+            )
+            .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
                 cx.stop_propagation();
                 root.close_update_dialog();
+                root.restore_focus_after_update_dialog_close(window, cx);
                 cx.notify();
-            },
-        )))
+            })),
+        )
         .child(panel_bottom_separator())
 }
 
@@ -919,6 +1069,9 @@ fn update_dialog_body(status: &UpdateStatus, info: Option<&UpdateInfo>) -> gpui:
     if let UpdateStatus::Error(error) = status {
         body = body.child(
             div()
+                .id("update-dialog-error-alert")
+                .role(gpui::Role::Alert)
+                .aria_label(error.clone())
                 .rounded(px(theme::RADIUS_SM))
                 .bg(color(theme::FRAME_RED.with_alpha(0.08)))
                 .p_3()
@@ -981,10 +1134,11 @@ fn update_dialog_footer(
                 window,
                 cx,
             )
-            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+            .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
                 cx.stop_propagation();
                 if !root.update_ui.status.is_busy() {
                     root.close_update_dialog();
+                    root.restore_focus_after_update_dialog_close(window, cx);
                     cx.notify();
                 }
             })),
@@ -1035,9 +1189,10 @@ fn update_dialog_primary_action(
             window,
             cx,
         )
-        .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+        .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
             cx.stop_propagation();
             root.dismiss_update_status();
+            root.restore_focus_after_update_dialog_close(window, cx);
             cx.notify();
         })),
         UpdateStatus::Downloading { .. } | UpdateStatus::Installing => frame_text_button(
@@ -1061,9 +1216,10 @@ fn update_dialog_primary_action(
             window,
             cx,
         )
-        .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+        .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
             cx.stop_propagation();
             root.close_update_dialog();
+            root.restore_focus_after_update_dialog_close(window, cx);
             cx.notify();
         })),
     }
@@ -1131,26 +1287,32 @@ fn update_dialog_summary(status: &UpdateStatus, has_notes: bool) -> Option<Strin
 pub(super) fn app_settings_concurrency_control(
     draft_max_concurrency: &str,
     can_apply: bool,
+    error: Option<&str>,
     value_focus: &FocusHandle,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let input = frame_text_input(
+        FrameTextInputSpec {
+            id: "app-settings-max-concurrency-value",
+            value: draft_max_concurrency,
+            placeholder: "2",
+            disabled: false,
+            focus: Some(value_focus),
+            kind: FrameTextInputKind::MaxConcurrency,
+        },
+        window,
+        cx,
+    )
+    .when_some(error.map(str::to_string), |this, error| {
+        this.aria_invalid(true).aria_description(error)
+    });
+
     div()
         .flex()
         .items_center()
         .gap_2()
-        .child(div().flex_1().min_w_0().child(frame_text_input(
-            FrameTextInputSpec {
-                id: "app-settings-max-concurrency-value",
-                value: draft_max_concurrency,
-                placeholder: "2",
-                disabled: false,
-                focus: Some(value_focus),
-                kind: FrameTextInputKind::MaxConcurrency,
-            },
-            window,
-            cx,
-        )))
+        .child(div().flex_1().min_w_0().child(input))
         .child(
             app_settings_apply_button(can_apply, window, cx).on_click(cx.listener(
                 move |root, _: &ClickEvent, _window, cx| {
@@ -1164,19 +1326,21 @@ pub(super) fn app_settings_concurrency_control(
 }
 
 pub(super) fn app_settings_close_button(
+    id: &'static str,
+    label: &'static str,
+    focus: &FocusHandle,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let colors = button_colors(ButtonVariant::Ghost, false, true);
-    let close_id = "app-settings-close";
-    let animated = animated_button_colors(close_id, colors, window, cx);
+    let animated = animated_button_colors(id, colors, window, cx);
     let background = animated.background;
     let foreground = animated.foreground;
     let hover_transition = animated.hover_transition;
 
-    div()
-        .id(close_id)
-        .group(close_id)
+    let button = div()
+        .id(id)
+        .group(id)
         .w(px(SETTINGS_CONTROL_HEIGHT))
         .h(px(SETTINGS_CONTROL_HEIGHT))
         .flex()
@@ -1197,7 +1361,9 @@ pub(super) fn app_settings_close_button(
             assets::ICON_CLOSE,
             FILE_LIST_ACTION_ICON_SIZE,
             foreground,
-        ))
+        ));
+
+    apply_accessible_button_with_focus(button, label, true, focus)
 }
 
 pub(super) fn app_settings_apply_button(
@@ -1344,6 +1510,7 @@ pub(super) fn windows_window_controls(
             titlebar_window_button(
                 "titlebar-windows-minimize",
                 assets::ICON_MINUS,
+                "Minimize window",
                 TitlebarWindowButtonMetrics {
                     icon_size: TITLEBAR_WINDOWS_WINDOW_ICON_SIZE,
                     width: TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
@@ -1364,6 +1531,7 @@ pub(super) fn windows_window_controls(
             titlebar_window_button(
                 "titlebar-windows-maximize",
                 assets::ICON_SQUARE,
+                "Maximize window",
                 TitlebarWindowButtonMetrics {
                     icon_size: TITLEBAR_WINDOWS_WINDOW_MAX_ICON_SIZE,
                     width: TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
@@ -1384,6 +1552,7 @@ pub(super) fn windows_window_controls(
             titlebar_window_button(
                 "titlebar-windows-close",
                 assets::ICON_CLOSE,
+                "Close window",
                 TitlebarWindowButtonMetrics {
                     icon_size: TITLEBAR_WINDOWS_WINDOW_ICON_SIZE,
                     width: TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
@@ -1416,6 +1585,7 @@ pub(super) fn linux_window_controls(window: &mut Window, cx: &mut Context<FrameR
             titlebar_window_button(
                 "titlebar-linux-minimize",
                 assets::ICON_MINUS,
+                "Minimize window",
                 TitlebarWindowButtonMetrics {
                     icon_size: TITLEBAR_ACTION_ICON_SIZE,
                     width: TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
@@ -1436,6 +1606,7 @@ pub(super) fn linux_window_controls(window: &mut Window, cx: &mut Context<FrameR
             titlebar_window_button(
                 "titlebar-linux-maximize",
                 assets::ICON_SQUARE,
+                "Maximize window",
                 TitlebarWindowButtonMetrics {
                     icon_size: TITLEBAR_ACTION_ICON_SIZE,
                     width: TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
@@ -1456,6 +1627,7 @@ pub(super) fn linux_window_controls(window: &mut Window, cx: &mut Context<FrameR
             titlebar_window_button(
                 "titlebar-linux-close",
                 assets::ICON_CLOSE,
+                "Close window",
                 TitlebarWindowButtonMetrics {
                     icon_size: TITLEBAR_ACTION_ICON_SIZE,
                     width: TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
@@ -1485,6 +1657,7 @@ pub(super) struct TitlebarWindowButtonMetrics {
 pub(super) fn titlebar_window_button(
     id: &'static str,
     icon: &'static str,
+    label: &'static str,
     metrics: TitlebarWindowButtonMetrics,
     destructive: bool,
     window: &mut Window,
@@ -1515,7 +1688,7 @@ pub(super) fn titlebar_window_button(
     let icon_color = animated.foreground;
     let hover_transition = animated.hover_transition;
 
-    div()
+    let button = div()
         .id(id)
         .w(px(metrics.width))
         .h(px(metrics.height))
@@ -1533,7 +1706,9 @@ pub(super) fn titlebar_window_button(
         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
             button_mouse_down(true, window, cx);
         })
-        .child(icon_svg(icon, metrics.icon_size, icon_color))
+        .child(icon_svg(icon, metrics.icon_size, icon_color));
+
+    apply_accessible_button(button, label, true)
 }
 
 pub(super) fn traffic_light(
@@ -1616,8 +1791,11 @@ pub(super) fn titlebar_navigation(
     active_view: ActiveView,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
-) -> gpui::Div {
+) -> gpui::Stateful<gpui::Div> {
     div()
+        .id("titlebar-main-view-tabs")
+        .role(gpui::Role::TabList)
+        .aria_label("Main view")
         .h(px(TITLEBAR_SEGMENT_HEIGHT))
         .flex()
         .items_center()
@@ -1705,12 +1883,18 @@ pub(super) fn titlebar_segment(
     );
 
     div()
+        .id(segment_id)
         .h(px(TITLEBAR_NAV_BUTTON_HEIGHT))
+        .role(gpui::Role::Tab)
+        .aria_label(label)
+        .aria_selected(selected)
+        .focusable()
+        .tab_stop(true)
+        .focus_visible(focus_visible_ring)
         .flex()
         .items_center()
         .gap_2()
         .rounded(px(theme::RADIUS_SM))
-        .id(segment_id)
         .group(segment_id)
         .px_2()
         .bg(background)
@@ -1732,8 +1916,33 @@ pub(super) fn titlebar_segment(
             }
             cx.stop_propagation();
         }))
+        .on_key_down(
+            cx.listener(move |root, event: &gpui::KeyDownEvent, _window, cx| {
+                let Some(next_view) = titlebar_view_for_key(view, event.keystroke.key.as_str())
+                else {
+                    return;
+                };
+                if root.active_view != next_view {
+                    root.active_view = next_view;
+                    cx.notify();
+                }
+                cx.stop_propagation();
+            }),
+        )
         .child(icon_svg(icon, TITLEBAR_ICON_SIZE, foreground))
         .child(theme::ui_text(label))
+}
+
+fn titlebar_view_for_key(current: ActiveView, key: &str) -> Option<ActiveView> {
+    match key {
+        "left" | "right" | "up" | "down" => Some(match current {
+            ActiveView::Workspace => ActiveView::Logs,
+            ActiveView::Logs => ActiveView::Workspace,
+        }),
+        "home" => Some(ActiveView::Workspace),
+        "end" => Some(ActiveView::Logs),
+        _ => None,
+    }
 }
 
 #[cfg(test)]
@@ -1751,5 +1960,22 @@ mod tests {
         };
 
         assert_eq!(FrameTitlebarPlatform::current(), expected);
+    }
+
+    #[test]
+    fn titlebar_view_for_key_switches_between_main_tabs() {
+        assert_eq!(
+            titlebar_view_for_key(ActiveView::Workspace, "right"),
+            Some(ActiveView::Logs)
+        );
+        assert_eq!(
+            titlebar_view_for_key(ActiveView::Logs, "left"),
+            Some(ActiveView::Workspace)
+        );
+        assert_eq!(
+            titlebar_view_for_key(ActiveView::Logs, "home"),
+            Some(ActiveView::Workspace)
+        );
+        assert_eq!(titlebar_view_for_key(ActiveView::Logs, "space"), None);
     }
 }
