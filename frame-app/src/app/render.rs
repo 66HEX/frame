@@ -170,8 +170,14 @@ impl Render for FrameRoot {
             overlay_toolbar_first_focus.focus(window, cx);
         }
         let content = div().flex_1().p(px(CONTENT_PADDING));
-        let content = match state.active_view {
-            ActiveView::Workspace => {
+        let active_content_view = if state.file_count == 0 {
+            None
+        } else {
+            Some(state.active_view)
+        };
+        let content = match active_content_view {
+            None => content.child(welcome_view(window, cx)),
+            Some(ActiveView::Workspace) => {
                 let output_name_focus =
                     self.ensure_text_input_focus(FrameTextInputKind::OutputName, cx);
                 let audio_bitrate_focus =
@@ -485,7 +491,7 @@ impl Render for FrameRoot {
                     cx,
                 ))
             }
-            ActiveView::Logs => content.child(logs_view(
+            Some(ActiveView::Logs) => content.child(logs_view(
                 &self.file_queue,
                 &self.conversion_events,
                 &self.logs_scroll_handle,
@@ -529,7 +535,7 @@ impl Render for FrameRoot {
             .on_drop(cx.listener(|root, paths: &ExternalPaths, _window, cx| {
                 cx.stop_propagation();
                 root.close_drag_drop_overlay();
-                root.import_source_paths(paths.paths().to_vec(), cx);
+                Self::import_source_paths(paths.paths().to_vec(), cx);
                 cx.notify();
             }))
             .on_drag_move(cx.listener(

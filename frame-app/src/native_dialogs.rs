@@ -57,6 +57,12 @@ pub const SOURCE_FILE_DIALOG_SPEC: NativeDialogSpec = NativeDialogSpec {
     allows_multiple: true,
 };
 
+pub const SOURCE_FOLDER_DIALOG_SPEC: NativeDialogSpec = NativeDialogSpec {
+    title: "Open Folder",
+    filters: &[],
+    allows_multiple: false,
+};
+
 pub const SUBTITLE_FILE_DIALOG_SPEC: NativeDialogSpec = NativeDialogSpec {
     title: "Select subtitle file",
     filters: &SUBTITLE_FILE_DIALOG_FILTERS,
@@ -77,6 +83,10 @@ pub async fn pick_source_files(dialog: AsyncFileDialog) -> Option<Vec<PathBuf>> 
         .map(file_handles_to_paths)
 }
 
+pub async fn pick_source_folder(dialog: AsyncFileDialog) -> Option<PathBuf> {
+    dialog.pick_folder().await.as_ref().map(file_handle_to_path)
+}
+
 pub async fn pick_subtitle_file(dialog: AsyncFileDialog) -> Option<PathBuf> {
     dialog.pick_file().await.as_ref().map(file_handle_to_path)
 }
@@ -88,6 +98,11 @@ pub async fn pick_overlay_image_file(dialog: AsyncFileDialog) -> Option<PathBuf>
 #[must_use]
 pub fn source_file_dialog(parent: &Window) -> AsyncFileDialog {
     file_dialog_from_spec(SOURCE_FILE_DIALOG_SPEC).set_parent(parent)
+}
+
+#[must_use]
+pub fn source_folder_dialog(parent: &Window) -> AsyncFileDialog {
+    file_dialog_from_spec(SOURCE_FOLDER_DIALOG_SPEC).set_parent(parent)
 }
 
 #[must_use]
@@ -182,8 +197,21 @@ mod tests {
     fn dialog_specs_capture_selection_mode() {
         const {
             assert!(SOURCE_FILE_DIALOG_SPEC.allows_multiple);
+            assert!(!SOURCE_FOLDER_DIALOG_SPEC.allows_multiple);
             assert!(!SUBTITLE_FILE_DIALOG_SPEC.allows_multiple);
             assert!(!OVERLAY_IMAGE_DIALOG_SPEC.allows_multiple);
         }
+    }
+
+    #[test]
+    fn source_folder_dialog_spec_uses_folder_selection_title_without_filters() {
+        assert_eq!(
+            SOURCE_FOLDER_DIALOG_SPEC,
+            NativeDialogSpec {
+                title: "Open Folder",
+                filters: &[],
+                allows_multiple: false,
+            }
+        );
     }
 }

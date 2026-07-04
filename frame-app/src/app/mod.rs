@@ -46,7 +46,7 @@ use preview_panel::{
 };
 use primitives::color;
 use runtime::hide_native_macos_titlebar_controls;
-use workspace::workspace_view;
+use workspace::{welcome_view, workspace_view};
 
 use crate::{
     ActiveView, CONTENT_PADDING, FILE_LIST_ROW_SPAN, FILE_ROW_HEIGHT, FrameAppState,
@@ -74,8 +74,8 @@ use crate::{
         ConversionProcessController, conversion_task_from_file, run_conversion_batch_with_control,
     },
     file_filters::{
-        AUDIO_FILE_EXTENSIONS, IMAGE_FILE_EXTENSIONS, filter_supported_source_paths,
-        is_supported_overlay_image_path, is_supported_subtitle_path,
+        AUDIO_FILE_EXTENSIONS, IMAGE_FILE_EXTENSIONS, discover_supported_source_paths,
+        filter_supported_source_paths, is_supported_overlay_image_path, is_supported_subtitle_path,
     },
     file_queue::{
         BatchSelectionState, FileItem, FileQueue, FileStateTone, FileStatus, RowActionAvailability,
@@ -83,8 +83,8 @@ use crate::{
     },
     format_total_size,
     native_dialogs::{
-        overlay_image_dialog, pick_overlay_image_file, pick_source_files, pick_subtitle_file,
-        source_file_dialog, subtitle_file_dialog,
+        overlay_image_dialog, pick_overlay_image_file, pick_source_files, pick_source_folder,
+        pick_subtitle_file, source_file_dialog, source_folder_dialog, subtitle_file_dialog,
     },
     notifications::{AppNotifier, conversion_finished_notification_for_task_ids},
     preview::{

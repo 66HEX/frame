@@ -37,6 +37,48 @@ pub fn filter_supported_source_paths(paths: Vec<PathBuf>) -> Vec<PathBuf> {
         .collect()
 }
 
+#[must_use]
+pub fn discover_supported_source_paths(paths: Vec<PathBuf>) -> Vec<PathBuf> {
+    paths
+        .into_iter()
+        .flat_map(discover_supported_source_path)
+        .collect()
+}
+
+fn discover_supported_source_path(path: PathBuf) -> Vec<PathBuf> {
+    if path.is_dir() {
+        return supported_source_paths_in_directory(&path);
+    }
+
+    filter_supported_source_paths(vec![path])
+}
+
+fn supported_source_paths_in_directory(root: &Path) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    collect_supported_source_paths_in_directory(root, &mut paths);
+    paths.sort();
+    paths
+}
+
+fn collect_supported_source_paths_in_directory(root: &Path, paths: &mut Vec<PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(root) else {
+        return;
+    };
+
+    for entry in entries.filter_map(Result::ok) {
+        let path = entry.path();
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
+
+        if file_type.is_dir() {
+            collect_supported_source_paths_in_directory(&path, paths);
+        } else if file_type.is_file() && is_supported_source_path(&path) {
+            paths.push(path);
+        }
+    }
+}
+
 fn path_has_extension(path: &Path, allowed_extensions: &[&str]) -> bool {
     path.extension()
         .and_then(|extension| extension.to_str())
@@ -91,6 +133,35 @@ mod tests {
     }
 
     #[test]
+    fn discover_supported_source_paths_preserves_supported_file_inputs() {
+        let paths = discover_supported_source_paths(vec![
+            PathBuf::from("/tmp/one.mp4"),
+            PathBuf::from("/tmp/readme.txt"),
+            PathBuf::from("/tmp/two.PNG"),
+        ]);
+
+        assert_eq!(
+            paths,
+            [PathBuf::from("/tmp/one.mp4"), PathBuf::from("/tmp/two.PNG")]
+        );
+    }
+
+    #[test]
+    fn discover_supported_source_paths_expands_directories_recursively() {
+        let root = unique_test_dir("recursive-discovery");
+        let nested = root.join("nested");
+        std::fs::create_dir_all(&nested).expect("test media directory should be created");
+        std::fs::write(root.join("clip.mp4"), b"").expect("test video should be written");
+        std::fs::write(root.join("notes.txt"), b"").expect("test text file should be written");
+        std::fs::write(nested.join("still.PNG"), b"").expect("test image should be written");
+
+        let paths = discover_supported_source_paths(vec![root.clone()]);
+
+        std::fs::remove_dir_all(&root).expect("test media directory should be removed");
+        assert_eq!(paths, [root.join("clip.mp4"), nested.join("still.PNG")]);
+    }
+
+    #[test]
     fn source_file_extensions_match_original_dialog_groups() {
         let grouped = VIDEO_FILE_EXTENSIONS
             .iter()
@@ -100,5 +171,16 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(SOURCE_FILE_EXTENSIONS, grouped);
+    }
+
+    fn unique_test_dir(name: &str) -> PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |duration| duration.as_nanos());
+
+        std::env::temp_dir().join(format!(
+            "frame-file-filter-{name}-{}-{nanos}",
+            std::process::id()
+        ))
     }
 }

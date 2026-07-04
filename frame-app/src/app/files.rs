@@ -110,18 +110,43 @@ impl FrameRoot {
                 return;
             }
 
-            this.update(cx, |root, cx| root.import_source_paths(paths, cx))
+            this.update(cx, |_root, cx| Self::import_source_paths(paths, cx))
                 .ok();
         })
         .detach();
     }
-    pub(super) fn import_source_paths(&mut self, paths: Vec<PathBuf>, cx: &Context<Self>) {
-        let imports = self.allocate_file_imports(paths);
-        if imports.is_empty() {
+
+    pub(super) fn prompt_add_source_folder(window: &Window, cx: &Context<Self>) {
+        let dialog = source_folder_dialog(window);
+        cx.spawn(async move |this, cx| {
+            let Some(path) = pick_source_folder(dialog).await else {
+                return;
+            };
+
+            this.update(cx, |_root, cx| {
+                Self::import_source_paths(vec![path], cx);
+            })
+            .ok();
+        })
+        .detach();
+    }
+
+    pub(super) fn import_source_paths(paths: Vec<PathBuf>, cx: &Context<Self>) {
+        if paths.is_empty() {
             return;
         }
 
         cx.spawn(async move |this, cx| {
+            let paths = cx
+                .background_spawn(async move { discover_supported_source_paths(paths) })
+                .await;
+            let Ok(imports) = this.update(cx, |root, _cx| root.allocate_file_imports(paths)) else {
+                return;
+            };
+            if imports.is_empty() {
+                return;
+            }
+
             let files = cx
                 .background_spawn(async move {
                     imports

@@ -79,6 +79,8 @@ pub(super) fn macos_titlebar(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let show_workspace_controls = titlebar_shows_workspace_controls(state);
+
     div()
         .h(px(TITLEBAR_HEIGHT))
         .w_full()
@@ -96,11 +98,13 @@ pub(super) fn macos_titlebar(
                 .mt_2()
                 .gap_6()
                 .child(macos_window_controls(cx))
-                .child(frame_logo())
-                .child(titlebar_divider())
-                .child(titlebar_navigation(state.active_view, window, cx))
-                .child(titlebar_divider())
-                .child(titlebar_stats(state)),
+                .when(show_workspace_controls, |this| {
+                    this.child(frame_logo())
+                        .child(titlebar_divider())
+                        .child(titlebar_navigation(state.active_view, window, cx))
+                        .child(titlebar_divider())
+                        .child(titlebar_stats(state))
+                }),
         )
         .child(
             div()
@@ -108,74 +112,11 @@ pub(super) fn macos_titlebar(
                 .items_center()
                 .mt_2()
                 .gap_2()
-                .child(
-                    action_button(
-                        "titlebar-settings",
-                        assets::ICON_SETTINGS,
-                        None,
-                        "Settings",
-                        ButtonVariant::Secondary,
-                        true,
-                        window,
-                        cx,
-                    )
-                    .on_click(cx.listener(
-                        |root, _: &ClickEvent, _window, cx| {
-                            if root.settings_ui.is_open {
-                                root.close_app_settings();
-                            } else {
-                                root.open_app_settings();
-                            }
-                            cx.notify();
-                        },
-                    )),
-                )
-                .child(
-                    action_button(
-                        "titlebar-add-source",
-                        assets::ICON_PLUS,
-                        Some("Add source"),
-                        "Add source",
-                        ButtonVariant::Secondary,
-                        true,
-                        window,
-                        cx,
-                    )
-                    .on_click(cx.listener(
-                        |_root, _: &ClickEvent, window, cx| {
-                            cx.stop_propagation();
-                            FrameRoot::prompt_add_source(window, cx);
-                        },
-                    )),
-                )
-                .child(
-                    action_button(
-                        "titlebar-start",
-                        assets::ICON_PLAY,
-                        Some(if state.is_processing {
-                            "Processing"
-                        } else {
-                            "Start"
-                        }),
-                        if state.is_processing {
-                            "Processing"
-                        } else {
-                            "Start conversion"
-                        },
-                        ButtonVariant::Default,
-                        state.can_start_conversion(),
-                        window,
-                        cx,
-                    )
-                    .on_click(cx.listener(
-                        move |root, _: &ClickEvent, _window, cx| {
-                            cx.stop_propagation();
-                            if state.can_start_conversion() {
-                                root.start_selected_conversions(cx);
-                            }
-                        },
-                    )),
-                ),
+                .child(titlebar_settings_button(window, cx))
+                .when(show_workspace_controls, |this| {
+                    this.child(titlebar_add_source_button(window, cx))
+                        .child(titlebar_start_button(state, window, cx))
+                }),
         )
 }
 
@@ -216,6 +157,8 @@ pub(super) fn platform_titlebar_content(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let show_workspace_controls = titlebar_shows_workspace_controls(state);
+
     div()
         .absolute()
         .inset_0()
@@ -236,11 +179,13 @@ pub(super) fn platform_titlebar_content(
                         .flex()
                         .items_center()
                         .gap_6()
-                        .child(platform_frame_logo())
-                        .child(platform_titlebar_divider())
-                        .child(titlebar_navigation(state.active_view, window, cx))
-                        .child(platform_titlebar_divider())
-                        .child(titlebar_stats(state)),
+                        .when(show_workspace_controls, |this| {
+                            this.child(platform_frame_logo())
+                                .child(platform_titlebar_divider())
+                                .child(titlebar_navigation(state.active_view, window, cx))
+                                .child(platform_titlebar_divider())
+                                .child(titlebar_stats(state))
+                        }),
                 )
                 .child(
                     div()
@@ -250,10 +195,16 @@ pub(super) fn platform_titlebar_content(
                         .items_center()
                         .gap_2()
                         .child(titlebar_settings_button(window, cx))
-                        .child(titlebar_add_source_button(window, cx))
-                        .child(titlebar_start_button(state, window, cx)),
+                        .when(show_workspace_controls, |this| {
+                            this.child(titlebar_add_source_button(window, cx))
+                                .child(titlebar_start_button(state, window, cx))
+                        }),
                 ),
         )
+}
+
+const fn titlebar_shows_workspace_controls(state: FrameAppState) -> bool {
+    state.file_count > 0
 }
 
 pub(super) fn titlebar_settings_button(
@@ -1421,7 +1372,7 @@ pub(super) fn drag_drop_overlay(
         .on_drop(cx.listener(|root, paths: &ExternalPaths, _window, cx| {
             cx.stop_propagation();
             root.close_drag_drop_overlay();
-            root.import_source_paths(paths.paths().to_vec(), cx);
+            FrameRoot::import_source_paths(paths.paths().to_vec(), cx);
             cx.notify();
         }))
         .child(
@@ -1977,5 +1928,20 @@ mod tests {
             Some(ActiveView::Workspace)
         );
         assert_eq!(titlebar_view_for_key(ActiveView::Logs, "space"), None);
+    }
+
+    #[test]
+    fn titlebar_workspace_controls_are_hidden_without_files() {
+        assert!(!titlebar_shows_workspace_controls(FrameAppState::default()));
+    }
+
+    #[test]
+    fn titlebar_workspace_controls_are_visible_with_files() {
+        let state = FrameAppState {
+            file_count: 1,
+            ..FrameAppState::default()
+        };
+
+        assert!(titlebar_shows_workspace_controls(state));
     }
 }
