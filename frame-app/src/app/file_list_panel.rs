@@ -470,6 +470,7 @@ pub(super) const fn state_tone_color(tone: FileStateTone) -> Rgba {
     match tone {
         FileStateTone::Foreground => color(theme::FOREGROUND),
         FileStateTone::Muted => color(theme::FRAME_GRAY_600),
+        FileStateTone::Blue => color(theme::FRAME_BLUE),
         FileStateTone::Amber => color(theme::FRAME_AMBER),
         FileStateTone::Red => color(theme::FRAME_RED),
     }

@@ -117,7 +117,7 @@ mod file_item {
         file.status = FileStatus::Completed;
 
         assert_eq!(file.row_state_label(), "ready");
-        assert_eq!(file.row_state_tone(), FileStateTone::Foreground);
+        assert_eq!(file.row_state_tone(), FileStateTone::Blue);
     }
 
     #[test]

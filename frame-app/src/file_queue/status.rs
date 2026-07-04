@@ -46,6 +46,7 @@ impl FileStatus {
 pub enum FileStateTone {
     Foreground,
     Muted,
+    Blue,
     Amber,
     Red,
 }

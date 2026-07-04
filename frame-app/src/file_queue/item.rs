@@ -69,7 +69,7 @@ impl FileItem {
     pub const fn row_state_tone(&self) -> FileStateTone {
         match self.status {
             FileStatus::Converting => FileStateTone::Amber,
-            FileStatus::Completed => FileStateTone::Foreground,
+            FileStatus::Completed => FileStateTone::Blue,
             FileStatus::Error => FileStateTone::Red,
             FileStatus::Idle | FileStatus::Queued | FileStatus::Paused => FileStateTone::Muted,
         }
