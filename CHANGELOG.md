@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Signed Update System:** Added a signed-manifest updater with platform-specific assets, SHA-256 verification, Ed25519 manifest signatures, install planning, and a bundled update helper for replacing installed builds.
 - **GPUI Preview and Editing Surface:** Added a native preview panel with crop, transform, trim timeline, overlay controls, zoom handling, and FFmpeg-backed frame extraction for video, image, and audio workflows.
 - **Native Settings and Metadata Panels:** Added GPUI settings surfaces for source details, output selection, video, audio, images, subtitles, metadata, and presets using the shared media compatibility model.
+- **Image Encoding Controls:** Added format-specific still-image encoding controls for JPEG, WebP, PNG, and TIFF, including JPEG quality/Huffman mode, WebP lossy/lossless mode, quality/compression/presets, PNG compression/prediction, and TIFF compression selection with Rust-side validation and FFmpeg argument mapping.
 
 ### Changed
 
