@@ -121,9 +121,9 @@ pub(super) fn macos_titlebar(
                 .items_center()
                 .mt_2()
                 .gap_2()
-                .child(titlebar_settings_button(window, cx))
                 .when(show_workspace_controls, |this| {
-                    this.child(titlebar_add_source_button(window, cx))
+                    this.child(titlebar_settings_button(window, cx))
+                        .child(titlebar_add_source_button(window, cx))
                         .child(titlebar_start_button(state, window, cx))
                 }),
         )
@@ -203,9 +203,9 @@ pub(super) fn platform_titlebar_content(
                         .flex()
                         .items_center()
                         .gap_2()
-                        .child(titlebar_settings_button(window, cx))
                         .when(show_workspace_controls, |this| {
-                            this.child(titlebar_add_source_button(window, cx))
+                            this.child(titlebar_settings_button(window, cx))
+                                .child(titlebar_add_source_button(window, cx))
                                 .child(titlebar_start_button(state, window, cx))
                         }),
                 ),
@@ -1754,7 +1754,7 @@ pub(super) fn titlebar_window_button(
         })
         .child(icon_svg(icon, metrics.icon_size, icon_color));
 
-    apply_accessible_button(button, label, true)
+    apply_accessible_button(button, label, true).tab_stop(false)
 }
 
 pub(super) fn traffic_light(
