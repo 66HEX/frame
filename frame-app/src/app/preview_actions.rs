@@ -364,6 +364,30 @@ impl FrameRoot {
         had_drag
     }
 
+    pub(super) fn adjust_preview_canvas_pan_from_keyboard(
+        &mut self,
+        key: &str,
+        cx: &Context<Self>,
+    ) -> bool {
+        let Some(delta) = preview_canvas_keyboard_pan_delta(key) else {
+            return false;
+        };
+        let (next_pan_x, next_pan_y) = self.clamp_preview_canvas_pan_for_state(
+            self.preview_ui.canvas.target_pan_x + delta.x,
+            self.preview_ui.canvas.target_pan_y + delta.y,
+            self.preview_ui.canvas.target_zoom,
+        );
+        let changed = (next_pan_x - self.preview_ui.canvas.target_pan_x).abs() > f64::EPSILON
+            || (next_pan_y - self.preview_ui.canvas.target_pan_y).abs() > f64::EPSILON;
+        self.preview_ui.canvas.target_pan_x = next_pan_x;
+        self.preview_ui.canvas.target_pan_y = next_pan_y;
+        if changed {
+            self.preview_ui.canvas.auto_fit_pending = false;
+            self.schedule_preview_frame_tick(cx);
+        }
+        true
+    }
+
     pub(in crate::app) fn set_preview_canvas_bounds(
         &mut self,
         bounds: Bounds<Pixels>,
@@ -932,6 +956,37 @@ impl FrameRoot {
         was_dragging
     }
 
+    pub(super) fn adjust_preview_overlay_from_keyboard_with_step(
+        &mut self,
+        handle: OverlayDragHandle,
+        key: &str,
+        media: Option<PreviewMediaRenderState>,
+        large_step: bool,
+    ) -> bool {
+        if !self.selected_preview_overlay_controls_enabled() {
+            return false;
+        }
+        let Some(delta) = preview_overlay_keyboard_delta(key, large_step) else {
+            return false;
+        };
+        let Some(overlay) = self.preview_ui.overlay.overlay().cloned() else {
+            return false;
+        };
+
+        let height = overlay.width * self.preview_overlay_height_ratio(media);
+        let start_point = preview_overlay_keyboard_start_point(handle, &overlay, height);
+        let current_point = OverlayDragPoint {
+            x: start_point.x + delta.x,
+            y: start_point.y + delta.y,
+            width: start_point.width,
+            height: start_point.height,
+        };
+
+        let mut changed = self.apply_preview_overlay_drag(handle, start_point);
+        changed |= self.apply_preview_overlay_drag(handle, current_point);
+        changed | self.end_preview_overlay_drag()
+    }
+
     fn preview_overlay_height_ratio(&self, media: Option<PreviewMediaRenderState>) -> f64 {
         let overlay_ratio = self
             .preview_ui
@@ -1165,7 +1220,7 @@ impl FrameRoot {
         };
         let cleared_crop = next_crop.is_none();
 
-        let changed = self.update_selected_config(|config| {
+        let _config_changed = self.update_selected_config(|config| {
             let changed = config.crop != next_crop;
             config.crop = next_crop;
             changed
@@ -1176,7 +1231,7 @@ impl FrameRoot {
         if cleared_crop {
             self.preview_ui.crop_aspect = "free".to_string();
         }
-        changed
+        true
     }
     pub(super) fn rotate_selected_preview(&mut self) -> bool {
         let metadata = self.selected_source_metadata();
@@ -1341,6 +1396,68 @@ impl FrameRoot {
         self.preview_ui.crop_drag = None;
         had_drag
     }
+
+    pub(super) fn adjust_preview_crop_from_keyboard_with_step(
+        &mut self,
+        handle: DragHandle,
+        key: &str,
+        large_step: bool,
+    ) -> bool {
+        if !self.preview_ui.crop_mode {
+            return false;
+        }
+        let Some(current_rect) = self.preview_ui.draft_crop else {
+            return false;
+        };
+        let Some(delta) = preview_crop_keyboard_delta(handle, key, large_step) else {
+            return false;
+        };
+
+        let metadata = self.selected_source_metadata();
+        let Some(config) = self.selected_config() else {
+            return false;
+        };
+        let rotation = config.rotation.clone();
+        let flip_horizontal = config.flip_horizontal;
+        let flip_vertical = config.flip_vertical;
+        let Some(dimensions) = crop_base_dimensions(metadata.as_ref(), &rotation) else {
+            return false;
+        };
+        let preview_rotation = PreviewRotation::from(rotation.as_str());
+        let visual_rect = clamp_rect(transform_crop_rect(
+            current_rect,
+            preview_rotation,
+            flip_horizontal,
+            flip_vertical,
+            false,
+        ));
+        let visual_next_rect =
+            crate::preview::apply_visual_crop_drag(crate::preview::VisualCropDrag {
+                start_rect: visual_rect,
+                handle,
+                start_point: PreviewPoint { x: 0.0, y: 0.0 },
+                current_point: delta,
+                aspect_id: &self.preview_ui.crop_aspect,
+                source_width: f64::from(dimensions.width),
+                source_height: f64::from(dimensions.height),
+                is_side_rotation: false,
+            });
+        let next_rect = if visual_next_rect == visual_rect {
+            current_rect
+        } else {
+            clamp_rect(transform_crop_rect(
+                visual_next_rect,
+                preview_rotation,
+                flip_horizontal,
+                flip_vertical,
+                true,
+            ))
+        };
+        let changed = self.preview_ui.draft_crop != Some(next_rect);
+        self.preview_ui.draft_crop = Some(next_rect);
+        changed
+    }
+
     pub(super) fn apply_preview_timeline_drag(
         &mut self,
         target: TimelineDragTarget,
@@ -1413,6 +1530,34 @@ impl FrameRoot {
             });
         }
         changed
+    }
+
+    pub(super) fn adjust_preview_timeline_from_keyboard(
+        &mut self,
+        target: TimelineDragTarget,
+        key: &str,
+    ) -> bool {
+        if !self.preview_timeline_enabled() {
+            return false;
+        }
+
+        let duration = self.preview_ui.playback.duration();
+        let current_time = match target {
+            TimelineDragTarget::Start => self.preview_ui.playback.start_value(),
+            TimelineDragTarget::End => self.preview_ui.playback.end_value(),
+            TimelineDragTarget::Scrub => self.preview_ui.playback.current_time(),
+        };
+        let Some(next_time) = timeline_keyboard_time_for_key(current_time, duration, key) else {
+            return false;
+        };
+        let percent = next_time / duration;
+
+        if target == TimelineDragTarget::Scrub {
+            let command = self.preview_ui.playback.seek_once_to_percent(percent);
+            return self.apply_preview_media_command(command, true);
+        }
+
+        self.apply_preview_timeline_drag(target, percent) | self.end_preview_timeline_drag()
     }
 
     pub(super) fn toggle_preview_playback(&mut self) -> bool {
@@ -1829,6 +1974,115 @@ pub(in crate::app) fn preview_canvas_pan_limits(
         (viewport_width * PREVIEW_CANVAS_MAX_PAN).max(metrics.width) / 2.0,
         (viewport_height * PREVIEW_CANVAS_MAX_PAN).max(metrics.height) / 2.0,
     ))
+}
+
+const PREVIEW_KEYBOARD_NUDGE: f64 = 0.01;
+const PREVIEW_KEYBOARD_LARGE_NUDGE: f64 = 0.05;
+
+pub(in crate::app) fn preview_crop_keyboard_delta(
+    handle: DragHandle,
+    key: &str,
+    large_step: bool,
+) -> Option<PreviewPoint> {
+    let step = if large_step {
+        PREVIEW_KEYBOARD_LARGE_NUDGE
+    } else {
+        PREVIEW_KEYBOARD_NUDGE
+    };
+    let horizontal = matches!(
+        handle,
+        DragHandle::Move
+            | DragHandle::East
+            | DragHandle::West
+            | DragHandle::NorthEast
+            | DragHandle::NorthWest
+            | DragHandle::SouthEast
+            | DragHandle::SouthWest
+    );
+    let vertical = matches!(
+        handle,
+        DragHandle::Move
+            | DragHandle::North
+            | DragHandle::South
+            | DragHandle::NorthEast
+            | DragHandle::NorthWest
+            | DragHandle::SouthEast
+            | DragHandle::SouthWest
+    );
+
+    match key {
+        "left" if horizontal => Some(PreviewPoint { x: -step, y: 0.0 }),
+        "right" if horizontal => Some(PreviewPoint { x: step, y: 0.0 }),
+        "up" if vertical => Some(PreviewPoint { x: 0.0, y: -step }),
+        "down" if vertical => Some(PreviewPoint { x: 0.0, y: step }),
+        _ => None,
+    }
+}
+
+pub(in crate::app) fn preview_overlay_keyboard_delta(
+    key: &str,
+    large_step: bool,
+) -> Option<PreviewPoint> {
+    let step = if large_step {
+        PREVIEW_KEYBOARD_LARGE_NUDGE
+    } else {
+        PREVIEW_KEYBOARD_NUDGE
+    };
+    match key {
+        "left" => Some(PreviewPoint { x: -step, y: 0.0 }),
+        "right" => Some(PreviewPoint { x: step, y: 0.0 }),
+        "up" => Some(PreviewPoint { x: 0.0, y: -step }),
+        "down" => Some(PreviewPoint { x: 0.0, y: step }),
+        _ => None,
+    }
+}
+
+pub(in crate::app) fn preview_canvas_keyboard_pan_delta(key: &str) -> Option<PreviewPoint> {
+    const PAN_STEP: f64 = 24.0;
+    match key {
+        "left" => Some(PreviewPoint {
+            x: -PAN_STEP,
+            y: 0.0,
+        }),
+        "right" => Some(PreviewPoint {
+            x: PAN_STEP,
+            y: 0.0,
+        }),
+        "up" => Some(PreviewPoint {
+            x: 0.0,
+            y: -PAN_STEP,
+        }),
+        "down" => Some(PreviewPoint {
+            x: 0.0,
+            y: PAN_STEP,
+        }),
+        _ => None,
+    }
+}
+
+fn preview_overlay_keyboard_start_point(
+    handle: OverlayDragHandle,
+    overlay: &PreviewOverlay,
+    height: f64,
+) -> OverlayDragPoint {
+    let left = overlay.x - overlay.width / 2.0;
+    let right = overlay.x + overlay.width / 2.0;
+    let top = overlay.y - height / 2.0;
+    let bottom = overlay.y + height / 2.0;
+    let (x, y) = match handle {
+        OverlayDragHandle::Move => (overlay.x, overlay.y),
+        OverlayDragHandle::NorthWest => (left, top),
+        OverlayDragHandle::NorthEast => (right, top),
+        OverlayDragHandle::SouthEast => (right, bottom),
+        OverlayDragHandle::SouthWest => (left, bottom),
+    };
+
+    OverlayDragPoint {
+        x,
+        y,
+        width: Some(overlay.width),
+        height: Some(height),
+    }
 }
 
 pub(in crate::app) fn lerp_preview_canvas_value(current: f64, target: f64) -> f64 {

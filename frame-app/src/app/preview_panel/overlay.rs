@@ -83,8 +83,13 @@ impl Element for PreviewOverlayOpacityBoundsProbe {
     }
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "Overlay layer composes image, handles, drag behavior, and keyboard/a11y actions in one GPUI builder."
+)]
 pub(in crate::app) fn preview_overlay_layer(
     state: &PreviewShellState,
+    cx: &Context<FrameRoot>,
 ) -> Option<gpui::Stateful<gpui::Div>> {
     let overlay = state.overlay.overlay.as_ref()?;
     if !overlay.enabled || overlay.path.is_empty() {
@@ -129,6 +134,43 @@ pub(in crate::app) fn preview_overlay_layer(
         );
 
     if state.overlay.overlay_mode {
+        let media = state.media;
+        layer = apply_accessible_button(layer, "Move overlay image", true)
+            .aria_description(overlay_keyboard_description())
+            .on_key_down(
+                cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+                    let key = event.keystroke.key.as_str();
+                    let changed =
+                        match key {
+                            "enter" | "escape" => {
+                                let changed = root.set_selected_overlay_mode(false);
+                                root.focus_registered_control("preview-tool-overlay", window, cx);
+                                changed
+                            }
+                            "delete" | "backspace" => {
+                                let changed = root.remove_selected_overlay();
+                                root.focus_registered_control("preview-tool-overlay", window, cx);
+                                changed
+                            }
+                            "+" | "=" | "plus" => root
+                                .nudge_selected_overlay_size(OverlaySizeDirection::Increase, media),
+                            "-" | "minus" => root
+                                .nudge_selected_overlay_size(OverlaySizeDirection::Decrease, media),
+                            _ => root.adjust_preview_overlay_from_keyboard_with_step(
+                                OverlayDragHandle::Move,
+                                key,
+                                media,
+                                event.keystroke.modifiers.shift,
+                            ),
+                        };
+                    if changed {
+                        cx.notify();
+                    }
+                    if overlay_keyboard_key_is_handled(key) {
+                        cx.stop_propagation();
+                    }
+                }),
+            );
         layer = layer
             .child(preview_overlay_handle(
                 OverlayDragHandle::NorthWest,
@@ -136,6 +178,8 @@ pub(in crate::app) fn preview_overlay_layer(
                 0.0,
                 width,
                 height,
+                state.media,
+                cx,
             ))
             .child(preview_overlay_handle(
                 OverlayDragHandle::NorthEast,
@@ -143,6 +187,8 @@ pub(in crate::app) fn preview_overlay_layer(
                 0.0,
                 width,
                 height,
+                state.media,
+                cx,
             ))
             .child(preview_overlay_handle(
                 OverlayDragHandle::SouthEast,
@@ -150,6 +196,8 @@ pub(in crate::app) fn preview_overlay_layer(
                 1.0,
                 width,
                 height,
+                state.media,
+                cx,
             ))
             .child(preview_overlay_handle(
                 OverlayDragHandle::SouthWest,
@@ -157,6 +205,8 @@ pub(in crate::app) fn preview_overlay_layer(
                 1.0,
                 width,
                 height,
+                state.media,
+                cx,
             ));
     }
 
@@ -169,6 +219,7 @@ pub(in crate::app) fn preview_overlay_layer(
 )]
 pub(in crate::app) fn preview_overlay_controls(
     state: &PreviewShellState,
+    focuses: PreviewEditToolbarFocus<'_>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> Option<gpui::Div> {
@@ -178,8 +229,13 @@ pub(in crate::app) fn preview_overlay_controls(
     }
     let enabled = preview_visual_controls_enabled(state);
     let media = state.media;
+    let first_focus = focuses.first.clone();
+    let last_focus = focuses.last.clone();
 
     let bar = div()
+        .id("preview-overlay-toolbar")
+        .track_focus(focuses.panel)
+        .tab_stop(false)
         .flex()
         .items_center()
         .gap_2()
@@ -187,12 +243,19 @@ pub(in crate::app) fn preview_overlay_controls(
         .bg(parse_hex(PREVIEW_TOOLBAR_BACKGROUND))
         .p(px(4.0))
         .shadow(card_surface_shadows())
+        .on_key_down(
+            cx.listener(move |_root, event: &gpui::KeyDownEvent, window, cx| {
+                handle_modal_tab_navigation(event, &first_focus, &last_focus, window, cx);
+            }),
+        )
         .child(
-            preview_overlay_icon_button(
+            preview_overlay_icon_button_with_focus(
                 "replace",
                 assets::ICON_FILE_IMAGE,
+                "Replace overlay image",
                 ButtonVariant::Ghost,
                 enabled,
+                focuses.first,
                 window,
                 cx,
             )
@@ -205,6 +268,7 @@ pub(in crate::app) fn preview_overlay_controls(
             preview_overlay_icon_button(
                 "decrease",
                 assets::ICON_MINUS,
+                "Decrease overlay size",
                 ButtonVariant::Ghost,
                 enabled,
                 window,
@@ -220,6 +284,7 @@ pub(in crate::app) fn preview_overlay_controls(
             preview_overlay_icon_button(
                 "increase",
                 assets::ICON_PLUS,
+                "Increase overlay size",
                 ButtonVariant::Ghost,
                 enabled,
                 window,
@@ -237,6 +302,7 @@ pub(in crate::app) fn preview_overlay_controls(
             frame_icon_button(
                 "preview-overlay-remove",
                 assets::ICON_TRASH,
+                "Remove overlay",
                 FrameIconButtonVariant::DestructiveGhost,
                 enabled,
                 FrameIconButtonSize {
@@ -246,23 +312,27 @@ pub(in crate::app) fn preview_overlay_controls(
                 window,
                 cx,
             )
-            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+            .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
                 if root.remove_selected_overlay() {
+                    root.focus_registered_control("preview-tool-overlay", window, cx);
                     cx.notify();
                 }
             })),
         )
         .child(
-            preview_overlay_icon_button(
+            preview_overlay_icon_button_with_focus(
                 "done",
                 assets::ICON_CHECK,
+                "Done editing overlay",
                 ButtonVariant::Default,
                 enabled,
+                focuses.last,
                 window,
                 cx,
             )
-            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+            .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
                 if root.set_selected_overlay_mode(false) {
+                    root.focus_registered_control("preview-tool-overlay", window, cx);
                     cx.notify();
                 }
             })),
@@ -321,8 +391,10 @@ fn preview_overlay_handle(
     y: f32,
     width: f64,
     height: f64,
+    media: Option<PreviewMediaRenderState>,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    overlay_handle_cursor(
+    let handle_element = overlay_handle_cursor(
         div()
             .id(format!(
                 "preview-overlay-handle-{}",
@@ -349,7 +421,45 @@ fn preview_overlay_handle(
             height,
         },
         |_drag, _position, _window, cx| cx.new(|_| PreviewTimelineDragPreview),
-    )
+    );
+
+    apply_accessible_button(handle_element, overlay_handle_label(handle), true)
+        .aria_description(overlay_keyboard_description())
+        .on_key_down(
+            cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+                let key = event.keystroke.key.as_str();
+                let changed = match key {
+                    "enter" | "escape" => {
+                        let changed = root.set_selected_overlay_mode(false);
+                        root.focus_registered_control("preview-tool-overlay", window, cx);
+                        changed
+                    }
+                    "delete" | "backspace" => {
+                        let changed = root.remove_selected_overlay();
+                        root.focus_registered_control("preview-tool-overlay", window, cx);
+                        changed
+                    }
+                    "+" | "=" | "plus" => {
+                        root.nudge_selected_overlay_size(OverlaySizeDirection::Increase, media)
+                    }
+                    "-" | "minus" => {
+                        root.nudge_selected_overlay_size(OverlaySizeDirection::Decrease, media)
+                    }
+                    _ => root.adjust_preview_overlay_from_keyboard_with_step(
+                        handle,
+                        key,
+                        media,
+                        event.keystroke.modifiers.shift,
+                    ),
+                };
+                if changed {
+                    cx.notify();
+                }
+                if overlay_keyboard_key_is_handled(key) {
+                    cx.stop_propagation();
+                }
+            }),
+        )
 }
 
 fn overlay_handle_cursor(
@@ -373,11 +483,79 @@ const fn overlay_handle_id(handle: OverlayDragHandle) -> &'static str {
     }
 }
 
+const fn overlay_handle_label(handle: OverlayDragHandle) -> &'static str {
+    match handle {
+        OverlayDragHandle::Move => "Move overlay image",
+        OverlayDragHandle::NorthWest => "Resize overlay top left corner",
+        OverlayDragHandle::NorthEast => "Resize overlay top right corner",
+        OverlayDragHandle::SouthEast => "Resize overlay bottom right corner",
+        OverlayDragHandle::SouthWest => "Resize overlay bottom left corner",
+    }
+}
+
+fn overlay_keyboard_key_is_handled(key: &str) -> bool {
+    matches!(
+        key,
+        "left"
+            | "right"
+            | "up"
+            | "down"
+            | "enter"
+            | "escape"
+            | "delete"
+            | "backspace"
+            | "+"
+            | "="
+            | "plus"
+            | "-"
+            | "minus"
+    )
+}
+
+const fn overlay_keyboard_description() -> &'static str {
+    "Use arrow keys to move or resize the overlay. Hold Shift for a larger step. Press plus or minus to resize, Enter or Escape to finish, or Delete to remove."
+}
+
 fn preview_overlay_icon_button(
     id: &'static str,
     icon: &'static str,
+    label: &'static str,
     variant: ButtonVariant,
     enabled: bool,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    preview_overlay_icon_button_inner(id, icon, label, variant, enabled, None, window, cx)
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Overlay toolbar buttons need explicit focus handles for focus trapping."
+)]
+fn preview_overlay_icon_button_with_focus(
+    id: &'static str,
+    icon: &'static str,
+    label: &'static str,
+    variant: ButtonVariant,
+    enabled: bool,
+    focus: &FocusHandle,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    preview_overlay_icon_button_inner(id, icon, label, variant, enabled, Some(focus), window, cx)
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Overlay toolbar buttons need optional explicit focus handles."
+)]
+fn preview_overlay_icon_button_inner(
+    id: &'static str,
+    icon: &'static str,
+    label: &'static str,
+    variant: ButtonVariant,
+    enabled: bool,
+    focus: Option<&FocusHandle>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -389,7 +567,7 @@ fn preview_overlay_icon_button(
     let hover_transition = animated.hover_transition;
     let highlighted = matches!(variant, ButtonVariant::Default);
 
-    div()
+    let button = div()
         .id(button_id)
         .w(px(PREVIEW_TOOLBAR_BUTTON_SIZE))
         .h(px(PREVIEW_TOOLBAR_BUTTON_SIZE))
@@ -416,7 +594,13 @@ fn preview_overlay_icon_button(
         .child(icon_svg(icon, PREVIEW_TOOLBAR_ICON_SIZE, foreground))
         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
             button_mouse_down(enabled, window, cx);
-        })
+        });
+
+    if let Some(focus) = focus {
+        apply_accessible_button_with_focus(button, label, enabled, focus)
+    } else {
+        apply_accessible_button(button, label, enabled)
+    }
 }
 
 fn preview_overlay_opacity_slider(
@@ -425,37 +609,94 @@ fn preview_overlay_opacity_slider(
     cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let value = f64_to_f32(value.clamp(0.0, 1.0));
+    let owner = cx.entity();
+    let decrement_owner = owner.clone();
 
-    frame_slider("preview-overlay-opacity-slider", value, !enabled)
-        .w(px(OVERLAY_OPACITY_SLIDER_WIDTH))
-        .on_mouse_down(
-            MouseButton::Left,
-            cx.listener(|root, event: &MouseDownEvent, _window, cx| {
-                cx.stop_propagation();
-                if root.commit_preview_overlay_opacity_at_position(event.position) {
-                    cx.notify();
-                }
-            }),
+    frame_slider(
+        "preview-overlay-opacity-slider",
+        "Overlay opacity",
+        value,
+        !enabled,
+    )
+    .w(px(OVERLAY_OPACITY_SLIDER_WIDTH))
+    .on_a11y_action(gpui::AccessibleAction::Increment, move |_, _window, cx| {
+        if !enabled {
+            return;
+        }
+        owner.update(cx, move |root, cx| {
+            if let Some(next_opacity) = overlay_opacity_for_key(f64::from(value), "right")
+                && root.set_selected_overlay_opacity(next_opacity)
+            {
+                cx.notify();
+            }
+        });
+    })
+    .on_a11y_action(gpui::AccessibleAction::Decrement, move |_, _window, cx| {
+        if !enabled {
+            return;
+        }
+        decrement_owner.update(cx, move |root, cx| {
+            if let Some(next_opacity) = overlay_opacity_for_key(f64::from(value), "left")
+                && root.set_selected_overlay_opacity(next_opacity)
+            {
+                cx.notify();
+            }
+        });
+    })
+    .on_mouse_down(
+        MouseButton::Left,
+        cx.listener(|root, event: &MouseDownEvent, _window, cx| {
+            cx.stop_propagation();
+            if root.commit_preview_overlay_opacity_at_position(event.position) {
+                cx.notify();
+            }
+        }),
+    )
+    .on_key_down(
+        cx.listener(move |root, event: &gpui::KeyDownEvent, _window, cx| {
+            let Some(next_opacity) =
+                overlay_opacity_for_key(f64::from(value), event.keystroke.key.as_str())
+            else {
+                return;
+            };
+            if root.set_selected_overlay_opacity(next_opacity) {
+                cx.notify();
+            }
+            cx.stop_propagation();
+        }),
+    )
+    .when(enabled, |this| {
+        this.cursor_ew_resize().on_drag(
+            PreviewOverlayOpacityDrag,
+            |_drag, _position, _window, cx| cx.new(|_| PreviewTimelineDragPreview),
         )
-        .when(enabled, |this| {
-            this.cursor_ew_resize().on_drag(
-                PreviewOverlayOpacityDrag,
-                |_drag, _position, _window, cx| cx.new(|_| PreviewTimelineDragPreview),
-            )
-        })
-        .on_drag_move(cx.listener(
-            |root, event: &DragMoveEvent<PreviewOverlayOpacityDrag>, _window, cx| {
-                let opacity =
-                    timeline_slider_percent_from_bounds(event.event.position, event.bounds);
-                if root.set_selected_overlay_opacity(opacity) {
-                    cx.notify();
-                }
-            },
-        ))
-        .child(frame_slider_handle(
-            "preview-overlay-opacity-handle",
-            value,
-            enabled,
-        ))
-        .child(PreviewOverlayOpacityBoundsProbe { owner: cx.entity() })
+    })
+    .on_drag_move(cx.listener(
+        |root, event: &DragMoveEvent<PreviewOverlayOpacityDrag>, _window, cx| {
+            let opacity = timeline_slider_percent_from_bounds(event.event.position, event.bounds);
+            if root.set_selected_overlay_opacity(opacity) {
+                cx.notify();
+            }
+        },
+    ))
+    .child(frame_slider_handle(
+        "preview-overlay-opacity-handle",
+        value,
+        enabled,
+    ))
+    .child(PreviewOverlayOpacityBoundsProbe { owner: cx.entity() })
+}
+
+pub(in crate::app) fn overlay_opacity_for_key(value: f64, key: &str) -> Option<f64> {
+    let next = match key {
+        "left" | "down" => value - 0.01,
+        "right" | "up" => value + 0.01,
+        "pageup" => value - 0.10,
+        "pagedown" => value + 0.10,
+        "home" => 0.0,
+        "end" => 1.0,
+        _ => return None,
+    };
+
+    Some(next.clamp(0.0, 1.0))
 }

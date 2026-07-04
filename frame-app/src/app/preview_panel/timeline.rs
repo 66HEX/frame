@@ -265,11 +265,17 @@ pub(in crate::app) fn preview_timeline_label(label: &'static str) -> gpui::Div {
         .child(theme::ui_text(label))
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "Timeline track composes scrub, trim handles, a11y metadata, and drag/key handling together."
+)]
 pub(in crate::app) fn preview_timeline_track(
     state: &PreviewShellState,
     cx: &Context<FrameRoot>,
 ) -> impl IntoElement {
     let enabled = preview_trim_enabled(state);
+    let duration = state.playback.duration();
+    let current_time = state.playback.current_time();
     let track_top = centered_offset(PREVIEW_TIMELINE_CONTROL_HEIGHT, PREVIEW_TRACK_HEIGHT);
     let playhead_top = centered_offset(PREVIEW_TIMELINE_CONTROL_HEIGHT, PREVIEW_PLAYHEAD_HEIGHT);
     let start_fraction = timeline_fraction_from_percent(
@@ -288,11 +294,12 @@ pub(in crate::app) fn preview_timeline_track(
             .to_timeline_percent(state.playback.current_time()),
     );
 
-    div()
+    let track = div()
         .id("preview-timeline-track")
         .relative()
         .h(px(PREVIEW_TIMELINE_CONTROL_HEIGHT))
         .w_full()
+        .rounded(px(theme::RADIUS_SM))
         .opacity(if enabled { 1.0 } else { 0.5 })
         .when(enabled, gpui::Styled::cursor_pointer)
         .on_mouse_down(
@@ -325,59 +332,109 @@ pub(in crate::app) fn preview_timeline_track(
             if root.end_preview_timeline_drag() {
                 cx.notify();
             }
-        }))
-        .child(
-            div()
-                .absolute()
-                .left_0()
-                .right_0()
-                .top(px(track_top))
-                .h(px(PREVIEW_TRACK_HEIGHT))
-                .rounded(px(1.5))
-                .bg(color(theme::FRAME_GRAY_100)),
-        )
-        .child(
-            div()
-                .absolute()
-                .left(relative(start_fraction))
-                .right(relative((1.0 - end_fraction).max(0.0)))
-                .top(px(track_top))
-                .h(px(PREVIEW_TRACK_HEIGHT))
-                .rounded(px(1.0))
-                .bg(color(theme::FOREGROUND)),
-        )
-        .child(PreviewTimelineTrackBoundsProbe { owner: cx.entity() })
-        .child(
-            div()
-                .absolute()
-                .left(relative(playhead_fraction))
-                .ml(px(-0.5))
-                .top(px(playhead_top))
-                .h(px(PREVIEW_PLAYHEAD_HEIGHT))
-                .w(px(1.0))
-                .bg(color(theme::FOREGROUND)),
-        )
-        .child(preview_timeline_handle(
-            TimelineDragTarget::Start,
-            start_fraction,
-            enabled,
-        ))
-        .child(preview_timeline_handle(
-            TimelineDragTarget::End,
-            end_fraction,
-            enabled,
-        ))
+        }));
+
+    let owner = cx.entity();
+    let decrement_owner = owner.clone();
+
+    apply_accessible_slider(
+        track,
+        "Preview position",
+        enabled,
+        current_time,
+        0.0,
+        duration,
+        format_time(current_time),
+    )
+    .on_a11y_action(gpui::AccessibleAction::Increment, move |_, _window, cx| {
+        owner.update(cx, |root, cx| {
+            if root.adjust_preview_timeline_from_keyboard(TimelineDragTarget::Scrub, "right") {
+                cx.notify();
+            }
+        });
+    })
+    .on_a11y_action(gpui::AccessibleAction::Decrement, move |_, _window, cx| {
+        decrement_owner.update(cx, |root, cx| {
+            if root.adjust_preview_timeline_from_keyboard(TimelineDragTarget::Scrub, "left") {
+                cx.notify();
+            }
+        });
+    })
+    .on_key_down(
+        cx.listener(|root, event: &gpui::KeyDownEvent, _window, cx| {
+            if !timeline_keyboard_key_is_handled(event.keystroke.key.as_str()) {
+                return;
+            }
+            if root.adjust_preview_timeline_from_keyboard(
+                TimelineDragTarget::Scrub,
+                event.keystroke.key.as_str(),
+            ) {
+                cx.notify();
+            }
+            cx.stop_propagation();
+        }),
+    )
+    .child(
+        div()
+            .absolute()
+            .left_0()
+            .right_0()
+            .top(px(track_top))
+            .h(px(PREVIEW_TRACK_HEIGHT))
+            .rounded(px(1.5))
+            .bg(color(theme::FRAME_GRAY_100)),
+    )
+    .child(
+        div()
+            .absolute()
+            .left(relative(start_fraction))
+            .right(relative((1.0 - end_fraction).max(0.0)))
+            .top(px(track_top))
+            .h(px(PREVIEW_TRACK_HEIGHT))
+            .rounded(px(1.0))
+            .bg(color(theme::FOREGROUND)),
+    )
+    .child(PreviewTimelineTrackBoundsProbe { owner: cx.entity() })
+    .child(
+        div()
+            .absolute()
+            .left(relative(playhead_fraction))
+            .ml(px(-0.5))
+            .top(px(playhead_top))
+            .h(px(PREVIEW_PLAYHEAD_HEIGHT))
+            .w(px(1.0))
+            .bg(color(theme::FOREGROUND)),
+    )
+    .child(preview_timeline_handle(
+        TimelineDragTarget::Start,
+        start_fraction,
+        enabled,
+        state.playback.start_value(),
+        duration,
+        cx,
+    ))
+    .child(preview_timeline_handle(
+        TimelineDragTarget::End,
+        end_fraction,
+        enabled,
+        state.playback.end_value(),
+        duration,
+        cx,
+    ))
 }
 
 pub(in crate::app) fn preview_timeline_handle(
     target: TimelineDragTarget,
     fraction: f32,
     enabled: bool,
+    value: f64,
+    duration: f64,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    let handle_id = match target {
-        TimelineDragTarget::Start => "preview-timeline-start-handle",
-        TimelineDragTarget::End => "preview-timeline-end-handle",
-        TimelineDragTarget::Scrub => "preview-timeline-scrub-handle",
+    let (handle_id, label) = match target {
+        TimelineDragTarget::Start => ("preview-timeline-start-handle", "Trim start"),
+        TimelineDragTarget::End => ("preview-timeline-end-handle", "Trim end"),
+        TimelineDragTarget::Scrub => ("preview-timeline-scrub-handle", "Preview position"),
     };
 
     let handle = div()
@@ -388,19 +445,58 @@ pub(in crate::app) fn preview_timeline_handle(
         .ml(px(-(PREVIEW_TIMELINE_HANDLE_WIDTH / 2.0)))
         .h(px(PREVIEW_TIMELINE_CONTROL_HEIGHT))
         .w(px(PREVIEW_TIMELINE_HANDLE_WIDTH))
+        .rounded(px(theme::RADIUS_SM))
         .on_mouse_down(MouseButton::Left, |_event, _window, cx| {
             cx.stop_propagation();
         })
         .when(enabled, gpui::Styled::cursor_ew_resize);
 
-    if enabled {
+    let handle = if enabled {
         handle.on_drag(
             PreviewTimelineDrag { target },
             |_drag, _position, _window, cx| cx.new(|_| PreviewTimelineDragPreview),
         )
     } else {
         handle
-    }
+    };
+
+    let owner = cx.entity();
+    let decrement_owner = owner.clone();
+
+    apply_accessible_slider(
+        handle,
+        label,
+        enabled,
+        value,
+        0.0,
+        duration,
+        format_time(value),
+    )
+    .on_a11y_action(gpui::AccessibleAction::Increment, move |_, _window, cx| {
+        owner.update(cx, |root, cx| {
+            if root.adjust_preview_timeline_from_keyboard(target, "right") {
+                cx.notify();
+            }
+        });
+    })
+    .on_a11y_action(gpui::AccessibleAction::Decrement, move |_, _window, cx| {
+        decrement_owner.update(cx, |root, cx| {
+            if root.adjust_preview_timeline_from_keyboard(target, "left") {
+                cx.notify();
+            }
+        });
+    })
+    .on_key_down(
+        cx.listener(move |root, event: &gpui::KeyDownEvent, _window, cx| {
+            if !timeline_keyboard_key_is_handled(event.keystroke.key.as_str()) {
+                return;
+            }
+            if root.adjust_preview_timeline_from_keyboard(target, event.keystroke.key.as_str()) {
+                cx.notify();
+            }
+            cx.stop_propagation();
+        }),
+    )
 }
 
 pub(in crate::app) fn preview_play_button(
@@ -415,13 +511,24 @@ pub(in crate::app) fn preview_play_button(
         assets::ICON_PLAY
     };
 
-    preview_tool_button(icon, false, enabled, window, cx).on_click(cx.listener(
-        |root, _: &ClickEvent, _window, cx| {
-            if root.toggle_preview_playback() {
-                cx.notify();
-            }
+    preview_tool_button(
+        "preview-playback-toggle",
+        icon,
+        if state.playback.is_playing() {
+            "Pause preview"
+        } else {
+            "Play preview"
         },
-    ))
+        false,
+        enabled,
+        window,
+        cx,
+    )
+    .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+        if root.toggle_preview_playback() {
+            cx.notify();
+        }
+    }))
 }
 
 pub(in crate::app) fn centered_offset(container: f32, child: f32) -> f32 {
@@ -443,4 +550,35 @@ pub(in crate::app) fn timeline_slider_percent_from_bounds(
 
     let x = (position.x - bounds.origin.x).as_f32();
     f64::from((x / width).clamp(0.0, 1.0))
+}
+
+pub(in crate::app) fn timeline_keyboard_time_for_key(
+    current_time: f64,
+    duration: f64,
+    key: &str,
+) -> Option<f64> {
+    if !duration.is_finite() || duration <= 0.0 {
+        return None;
+    }
+
+    let small_step = (duration / 100.0).clamp(0.1, 1.0);
+    let large_step = (duration / 10.0).clamp(1.0, 10.0);
+    let next = match key {
+        "left" | "down" => current_time - small_step,
+        "right" | "up" => current_time + small_step,
+        "pageup" => current_time - large_step,
+        "pagedown" => current_time + large_step,
+        "home" => 0.0,
+        "end" => duration,
+        _ => return None,
+    };
+
+    Some(next.clamp(0.0, duration))
+}
+
+pub(in crate::app) fn timeline_keyboard_key_is_handled(key: &str) -> bool {
+    matches!(
+        key,
+        "left" | "down" | "right" | "up" | "pageup" | "pagedown" | "home" | "end"
+    )
 }

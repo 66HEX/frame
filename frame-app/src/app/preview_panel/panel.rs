@@ -113,11 +113,38 @@ pub(in crate::app) struct PreviewPanelProps<'a> {
     pub(in crate::app) canvas: PreviewCanvasRenderState,
     pub(in crate::app) crop: PreviewCropRenderState,
     pub(in crate::app) overlay: PreviewOverlayRenderState,
+    pub(in crate::app) viewport_focuses: PreviewViewportFocuses<'a>,
     pub(in crate::app) timecode_focuses: PreviewTimecodeInputFocuses<'a>,
     pub(in crate::app) playback: PreviewPlaybackState,
     pub(in crate::app) presentation: PreviewRenderPresentation,
     pub(in crate::app) render_image: Option<Arc<RenderImage>>,
     pub(in crate::app) runtime_error: Option<String>,
+}
+
+#[derive(Clone, Copy)]
+pub(in crate::app) struct PreviewViewportFocuses<'a> {
+    pub(in crate::app) viewport: &'a FocusHandle,
+    pub(in crate::app) tools: PreviewToolFocuses<'a>,
+    pub(in crate::app) edit_toolbars: PreviewEditToolbarFocuses<'a>,
+}
+
+#[derive(Clone, Copy)]
+pub(in crate::app) struct PreviewToolFocuses<'a> {
+    pub(in crate::app) crop: &'a FocusHandle,
+    pub(in crate::app) overlay: &'a FocusHandle,
+}
+
+#[derive(Clone, Copy)]
+pub(in crate::app) struct PreviewEditToolbarFocus<'a> {
+    pub(in crate::app) panel: &'a FocusHandle,
+    pub(in crate::app) first: &'a FocusHandle,
+    pub(in crate::app) last: &'a FocusHandle,
+}
+
+#[derive(Clone, Copy)]
+pub(in crate::app) struct PreviewEditToolbarFocuses<'a> {
+    pub(in crate::app) crop: PreviewEditToolbarFocus<'a>,
+    pub(in crate::app) overlay: PreviewEditToolbarFocus<'a>,
 }
 
 pub(in crate::app) struct PreviewShellStateInput<'a> {
@@ -157,7 +184,7 @@ pub(in crate::app) fn preview_panel(
         .overflow_hidden()
         .card_surface()
         .p(px(PREVIEW_PANEL_PADDING))
-        .child(preview_viewport(&state, window, cx))
+        .child(preview_viewport(&state, props.viewport_focuses, window, cx))
         .child(preview_timeline(&state, props.timecode_focuses, window, cx))
 }
 

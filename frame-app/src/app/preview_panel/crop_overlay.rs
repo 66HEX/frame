@@ -12,7 +12,10 @@ pub(super) struct PreviewCropDrag {
     pub(super) handle: DragHandle,
 }
 
-pub(in crate::app) fn preview_crop_overlay(state: &PreviewShellState) -> gpui::Div {
+pub(in crate::app) fn preview_crop_overlay(
+    state: &PreviewShellState,
+    cx: &Context<FrameRoot>,
+) -> gpui::Div {
     let rect = preview_crop_visual_rect(&state.crop);
     let x = unit_f64_to_f32(rect.x);
     let y = unit_f64_to_f32(rect.y);
@@ -28,7 +31,7 @@ pub(in crate::app) fn preview_crop_overlay(state: &PreviewShellState) -> gpui::D
         .child(crop_mask_rect(0.0, y, x.clamp(0.0, 1.0), height))
         .child(crop_mask_rect(right, y, (1.0 - right).max(0.0), height))
         .child(crop_mask_rect(0.0, bottom, 1.0, (1.0 - bottom).max(0.0)))
-        .child(crop_outline_rect(x, y, width, height))
+        .child(crop_outline_rect(x, y, width, height, cx))
         .child(crop_vertical_guide_line(x + width / 3.0, y, height))
         .child(crop_vertical_guide_line(x + (width * 2.0) / 3.0, y, height))
         .child(crop_horizontal_guide_line(x, y + height / 3.0, width))
@@ -37,22 +40,39 @@ pub(in crate::app) fn preview_crop_overlay(state: &PreviewShellState) -> gpui::D
             y + (height * 2.0) / 3.0,
             width,
         ))
-        .child(preview_crop_handle(DragHandle::NorthWest, x, y))
-        .child(preview_crop_handle(DragHandle::North, x + width / 2.0, y))
-        .child(preview_crop_handle(DragHandle::NorthEast, right, y))
+        .child(preview_crop_handle(DragHandle::NorthWest, x, y, cx))
+        .child(preview_crop_handle(
+            DragHandle::North,
+            x + width / 2.0,
+            y,
+            cx,
+        ))
+        .child(preview_crop_handle(DragHandle::NorthEast, right, y, cx))
         .child(preview_crop_handle(
             DragHandle::East,
             right,
             y + height / 2.0,
+            cx,
         ))
-        .child(preview_crop_handle(DragHandle::SouthEast, right, bottom))
+        .child(preview_crop_handle(
+            DragHandle::SouthEast,
+            right,
+            bottom,
+            cx,
+        ))
         .child(preview_crop_handle(
             DragHandle::South,
             x + width / 2.0,
             bottom,
+            cx,
         ))
-        .child(preview_crop_handle(DragHandle::SouthWest, x, bottom))
-        .child(preview_crop_handle(DragHandle::West, x, y + height / 2.0))
+        .child(preview_crop_handle(DragHandle::SouthWest, x, bottom, cx))
+        .child(preview_crop_handle(
+            DragHandle::West,
+            x,
+            y + height / 2.0,
+            cx,
+        ))
 }
 
 pub(in crate::app) fn preview_crop_visual_rect(state: &PreviewCropRenderState) -> CropRect {
@@ -81,8 +101,9 @@ pub(in crate::app) fn crop_outline_rect(
     top: f32,
     width: f32,
     height: f32,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    div()
+    let outline = div()
         .id("preview-crop-move-handle")
         .absolute()
         .left(relative(left.clamp(0.0, 1.0)))
@@ -97,7 +118,39 @@ pub(in crate::app) fn crop_outline_rect(
                 handle: DragHandle::Move,
             },
             |_drag, _position, _window, cx| cx.new(|_| PreviewTimelineDragPreview),
-        )
+        );
+
+    apply_accessible_button(outline, crop_handle_label(DragHandle::Move), true)
+        .aria_description(crop_keyboard_description())
+        .on_key_down(cx.listener(|root, event: &gpui::KeyDownEvent, window, cx| {
+            let key = event.keystroke.key.as_str();
+            let changed = match key {
+                "enter" => {
+                    let changed = root.apply_selected_crop();
+                    root.focus_registered_control("preview-tool-crop", window, cx);
+                    changed
+                }
+                "escape" => {
+                    let changed = root.toggle_selected_crop_mode();
+                    root.focus_registered_control("preview-tool-crop", window, cx);
+                    changed
+                }
+                "delete" | "backspace" => root.reset_preview_crop_selection(),
+                _ => root.adjust_preview_crop_from_keyboard_with_step(
+                    DragHandle::Move,
+                    key,
+                    event.keystroke.modifiers.shift,
+                ),
+            };
+            if changed {
+                cx.notify();
+            }
+            if crop_keyboard_key_is_handled(DragHandle::Move, key)
+                || matches!(key, "enter" | "escape" | "delete" | "backspace")
+            {
+                cx.stop_propagation();
+            }
+        }))
 }
 
 pub(in crate::app) fn crop_vertical_guide_line(left: f32, top: f32, height: f32) -> gpui::Div {
@@ -124,8 +177,9 @@ pub(in crate::app) fn preview_crop_handle(
     handle: DragHandle,
     x: f32,
     y: f32,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    crop_handle_cursor(
+    let handle_element = crop_handle_cursor(
         div()
             .id(format!("preview-crop-handle-{}", crop_handle_id(handle)))
             .absolute()
@@ -145,7 +199,41 @@ pub(in crate::app) fn preview_crop_handle(
     .on_drag(
         PreviewCropDrag { handle },
         |_drag, _position, _window, cx| cx.new(|_| PreviewTimelineDragPreview),
-    )
+    );
+
+    apply_accessible_button(handle_element, crop_handle_label(handle), true)
+        .aria_description(crop_keyboard_description())
+        .on_key_down(
+            cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+                let key = event.keystroke.key.as_str();
+                let changed = match key {
+                    "enter" => {
+                        let changed = root.apply_selected_crop();
+                        root.focus_registered_control("preview-tool-crop", window, cx);
+                        changed
+                    }
+                    "escape" => {
+                        let changed = root.toggle_selected_crop_mode();
+                        root.focus_registered_control("preview-tool-crop", window, cx);
+                        changed
+                    }
+                    "delete" | "backspace" => root.reset_preview_crop_selection(),
+                    _ => root.adjust_preview_crop_from_keyboard_with_step(
+                        handle,
+                        key,
+                        event.keystroke.modifiers.shift,
+                    ),
+                };
+                if changed {
+                    cx.notify();
+                }
+                if crop_keyboard_key_is_handled(handle, key)
+                    || matches!(key, "enter" | "escape" | "delete" | "backspace")
+                {
+                    cx.stop_propagation();
+                }
+            }),
+        )
 }
 
 pub(in crate::app) fn crop_handle_cursor(
@@ -179,23 +267,86 @@ pub(in crate::app) const fn crop_handle_id(handle: DragHandle) -> &'static str {
     }
 }
 
+pub(in crate::app) const fn crop_handle_label(handle: DragHandle) -> &'static str {
+    match handle {
+        DragHandle::Move => "Move crop selection",
+        DragHandle::North => "Resize crop top edge",
+        DragHandle::South => "Resize crop bottom edge",
+        DragHandle::East => "Resize crop right edge",
+        DragHandle::West => "Resize crop left edge",
+        DragHandle::NorthEast => "Resize crop top right corner",
+        DragHandle::NorthWest => "Resize crop top left corner",
+        DragHandle::SouthEast => "Resize crop bottom right corner",
+        DragHandle::SouthWest => "Resize crop bottom left corner",
+    }
+}
+
+fn crop_keyboard_key_is_handled(handle: DragHandle, key: &str) -> bool {
+    let horizontal = matches!(
+        handle,
+        DragHandle::Move
+            | DragHandle::East
+            | DragHandle::West
+            | DragHandle::NorthEast
+            | DragHandle::NorthWest
+            | DragHandle::SouthEast
+            | DragHandle::SouthWest
+    );
+    let vertical = matches!(
+        handle,
+        DragHandle::Move
+            | DragHandle::North
+            | DragHandle::South
+            | DragHandle::NorthEast
+            | DragHandle::NorthWest
+            | DragHandle::SouthEast
+            | DragHandle::SouthWest
+    );
+
+    matches!(key, "left" | "right") && horizontal || matches!(key, "up" | "down") && vertical
+}
+
+const fn crop_keyboard_description() -> &'static str {
+    "Use arrow keys to adjust the crop. Hold Shift for a larger step. Press Enter to apply, Escape to exit, or Delete to reset."
+}
+
 pub(in crate::app) fn preview_crop_aspect_bar(
     state: &PreviewShellState,
+    focuses: PreviewEditToolbarFocus<'_>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let first_focus = focuses.first.clone();
+    let last_focus = focuses.last.clone();
     let mut bar = div()
+        .id("preview-crop-toolbar")
+        .track_focus(focuses.panel)
+        .tab_stop(false)
         .flex()
         .items_center()
         .gap_2()
         .rounded(px(theme::RADIUS_MD))
         .bg(parse_hex(PREVIEW_TOOLBAR_BACKGROUND))
         .p(px(4.0))
-        .shadow(card_surface_shadows());
+        .shadow(card_surface_shadows())
+        .on_key_down(
+            cx.listener(move |_root, event: &gpui::KeyDownEvent, window, cx| {
+                handle_modal_tab_navigation(event, &first_focus, &last_focus, window, cx);
+            }),
+        );
 
     for option in ASPECT_OPTIONS {
         let id = option.id;
-        bar = bar.child(
+        let button = if id == "free" {
+            compact_text_button_with_focus(
+                option.display,
+                state.crop.crop_aspect == id,
+                true,
+                focuses.first,
+                window,
+                cx,
+            )
+        } else {
             compact_text_button(
                 option.display,
                 state.crop.crop_aspect == id,
@@ -203,7 +354,9 @@ pub(in crate::app) fn preview_crop_aspect_bar(
                 window,
                 cx,
             )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        };
+        bar = bar.child(
+            button.on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
                 if root.select_preview_crop_aspect(id) {
                     cx.notify();
                 }
@@ -223,16 +376,18 @@ pub(in crate::app) fn preview_crop_aspect_bar(
             )),
         )
         .child(
-            compact_text_button_variant(
+            compact_text_button_variant_inner(
                 "Apply",
                 ButtonVariant::Default,
                 false,
                 state.crop.has_crop_dimensions,
+                Some(focuses.last),
                 window,
                 cx,
             )
-            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+            .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
                 if root.apply_selected_crop() {
+                    root.focus_registered_control("preview-tool-crop", window, cx);
                     cx.notify();
                 }
             })),
@@ -264,11 +419,40 @@ pub(in crate::app) fn compact_text_button(
     compact_text_button_variant(label, variant, selected, enabled, window, cx)
 }
 
+pub(in crate::app) fn compact_text_button_with_focus(
+    label: &'static str,
+    selected: bool,
+    enabled: bool,
+    focus: &FocusHandle,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    let variant = if selected {
+        ButtonVariant::Default
+    } else {
+        ButtonVariant::Ghost
+    };
+
+    compact_text_button_variant_inner(label, variant, selected, enabled, Some(focus), window, cx)
+}
+
 pub(in crate::app) fn compact_text_button_variant(
     label: &'static str,
     variant: ButtonVariant,
     selected: bool,
     enabled: bool,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    compact_text_button_variant_inner(label, variant, selected, enabled, None, window, cx)
+}
+
+fn compact_text_button_variant_inner(
+    label: &'static str,
+    variant: ButtonVariant,
+    selected: bool,
+    enabled: bool,
+    focus: Option<&FocusHandle>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -280,7 +464,7 @@ pub(in crate::app) fn compact_text_button_variant(
     let hover_transition = animated.hover_transition;
     let highlighted = selected || matches!(variant, ButtonVariant::Default);
 
-    div()
+    let button = div()
         .id(id)
         .h(px(PREVIEW_TIMELINE_CONTROL_HEIGHT))
         .px(px(10.0))
@@ -309,5 +493,18 @@ pub(in crate::app) fn compact_text_button_variant(
         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
             button_mouse_down(enabled, window, cx);
         })
-        .child(theme::ui_text(label))
+        .child(theme::ui_text(label));
+
+    if let Some(focus) = focus {
+        let button = apply_accessible_button_with_focus(button, label, enabled, focus);
+        if selected {
+            button.aria_toggled(gpui::Toggled::True)
+        } else {
+            button
+        }
+    } else if selected {
+        apply_accessible_toggle_button(button, label, enabled, true)
+    } else {
+        apply_accessible_button(button, label, enabled)
+    }
 }

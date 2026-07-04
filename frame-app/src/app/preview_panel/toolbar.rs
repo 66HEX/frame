@@ -1,11 +1,13 @@
 use super::{
     ButtonVariant, ClickEvent, Context, FlipAxis, FluentBuilder, FrameRoot, InteractiveElement,
     MouseButton, PREVIEW_TOOLBAR_BUTTON_SIZE, PREVIEW_TOOLBAR_ICON_SIZE, PREVIEW_TOOLBAR_OFFSET,
-    ParentElement, PreviewCanvasZoomDirection, PreviewShellState, StatefulInteractiveElement,
-    Styled, Window, animated_button_colors, assets, button_colors, button_highlight_shadows,
-    button_mouse_down, card_surface_shadows, color, div, icon_svg, parse_hex,
-    preview_visual_controls_enabled, px, relative, retarget_hover_motion, theme,
+    ParentElement, PreviewCanvasZoomDirection, PreviewShellState, PreviewToolFocuses,
+    StatefulInteractiveElement, Styled, Window, animated_button_colors, apply_accessible_button,
+    apply_accessible_button_with_focus, apply_accessible_toggle_button, assets, button_colors,
+    button_highlight_shadows, button_mouse_down, card_surface_shadows, color, div, icon_svg,
+    parse_hex, preview_visual_controls_enabled, px, relative, retarget_hover_motion, theme,
 };
+use gpui::FocusHandle;
 
 pub(in crate::app) const PREVIEW_TOOLBAR_BACKGROUND: &str = "#1B1D21";
 
@@ -28,6 +30,7 @@ pub(in crate::app) const fn preview_toolbar_center_margin() -> f32 {
 
 pub(in crate::app) fn preview_toolbar(
     state: &PreviewShellState,
+    focuses: PreviewToolFocuses<'_>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -48,16 +51,26 @@ pub(in crate::app) fn preview_toolbar(
         .p(px(PREVIEW_TOOLBAR_PADDING))
         .shadow(card_surface_shadows())
         .child(
-            preview_tool_button(assets::ICON_ROTATE_CW, false, transform_enabled, window, cx)
-                .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
-                    if root.rotate_selected_preview() {
-                        cx.notify();
-                    }
-                })),
+            preview_tool_button(
+                "preview-tool-rotate",
+                assets::ICON_ROTATE_CW,
+                "Rotate preview",
+                false,
+                transform_enabled,
+                window,
+                cx,
+            )
+            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+                if root.rotate_selected_preview() {
+                    cx.notify();
+                }
+            })),
         )
         .child(
             preview_tool_button(
+                "preview-tool-flip-horizontal",
                 assets::ICON_FLIP_HORIZONTAL,
+                "Flip horizontally",
                 state.crop.flip_horizontal,
                 transform_enabled,
                 window,
@@ -71,7 +84,9 @@ pub(in crate::app) fn preview_toolbar(
         )
         .child(
             preview_tool_button(
+                "preview-tool-flip-vertical",
                 assets::ICON_FLIP_VERTICAL,
+                "Flip vertically",
                 state.crop.flip_vertical,
                 transform_enabled,
                 window,
@@ -84,10 +99,13 @@ pub(in crate::app) fn preview_toolbar(
             })),
         )
         .child(
-            preview_tool_button(
+            preview_tool_button_with_focus(
+                "preview-tool-crop",
                 assets::ICON_CROP,
+                "Crop",
                 state.crop.crop_mode || state.crop.applied_crop.is_some(),
                 crop_enabled,
+                focuses.crop,
                 window,
                 cx,
             )
@@ -98,10 +116,13 @@ pub(in crate::app) fn preview_toolbar(
             })),
         )
         .child(
-            preview_tool_button(
+            preview_tool_button_with_focus(
+                "preview-tool-overlay",
                 assets::ICON_FILE_IMAGE,
+                "Overlay image",
                 state.overlay.overlay_mode || state.overlay.has_overlay,
                 overlay_enabled,
+                focuses.overlay,
                 window,
                 cx,
             )
@@ -131,22 +152,36 @@ pub(in crate::app) fn preview_zoom_toolbar(
         .p(px(4.0))
         .shadow(card_surface_shadows())
         .child(
-            preview_tool_button(assets::ICON_MINUS, false, enabled, window, cx).on_click(
-                cx.listener(|root, _: &ClickEvent, _window, cx| {
-                    if root.zoom_preview_canvas(PreviewCanvasZoomDirection::Out, cx) {
-                        cx.notify();
-                    }
-                }),
-            ),
+            preview_tool_button(
+                "preview-zoom-out",
+                assets::ICON_MINUS,
+                "Zoom out",
+                false,
+                enabled,
+                window,
+                cx,
+            )
+            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+                if root.zoom_preview_canvas(PreviewCanvasZoomDirection::Out, cx) {
+                    cx.notify();
+                }
+            })),
         )
         .child(
-            preview_tool_button(assets::ICON_PLUS, false, enabled, window, cx).on_click(
-                cx.listener(|root, _: &ClickEvent, _window, cx| {
-                    if root.zoom_preview_canvas(PreviewCanvasZoomDirection::In, cx) {
-                        cx.notify();
-                    }
-                }),
-            ),
+            preview_tool_button(
+                "preview-zoom-in",
+                assets::ICON_PLUS,
+                "Zoom in",
+                false,
+                enabled,
+                window,
+                cx,
+            )
+            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+                if root.zoom_preview_canvas(PreviewCanvasZoomDirection::In, cx) {
+                    cx.notify();
+                }
+            })),
         )
 }
 
@@ -159,9 +194,45 @@ pub(in crate::app) fn preview_toolbar_vertical_separator() -> gpui::Div {
 }
 
 pub(in crate::app) fn preview_tool_button(
+    id: impl Into<String>,
     icon: &'static str,
+    label: impl Into<String>,
     selected: bool,
     enabled: bool,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    preview_tool_button_inner(id, icon, label, selected, enabled, None, window, cx)
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Preview tool buttons need explicit focus handles for modal focus restoration."
+)]
+pub(in crate::app) fn preview_tool_button_with_focus(
+    id: impl Into<String>,
+    icon: &'static str,
+    label: impl Into<String>,
+    selected: bool,
+    enabled: bool,
+    focus: &FocusHandle,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    preview_tool_button_inner(id, icon, label, selected, enabled, Some(focus), window, cx)
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "The shared tool button builder preserves the existing visual contract and optionally wires a focus handle."
+)]
+fn preview_tool_button_inner(
+    id: impl Into<String>,
+    icon: &'static str,
+    label: impl Into<String>,
+    selected: bool,
+    enabled: bool,
+    focus: Option<&FocusHandle>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -170,14 +241,15 @@ pub(in crate::app) fn preview_tool_button(
     } else {
         ButtonVariant::Ghost
     };
+    let button_id = id.into();
+    let label = label.into();
     let colors = button_colors(variant, selected, enabled);
-    let button_id = format!("preview-tool-{}", icon.replace(['/', '.'], "-"));
     let animated = animated_button_colors(button_id.clone(), colors, window, cx);
     let background = animated.background;
     let foreground = animated.foreground;
     let hover_transition = animated.hover_transition;
 
-    div()
+    let button = div()
         .id(button_id)
         .w(px(PREVIEW_TOOLBAR_BUTTON_SIZE))
         .h(px(PREVIEW_TOOLBAR_BUTTON_SIZE))
@@ -204,5 +276,18 @@ pub(in crate::app) fn preview_tool_button(
         .child(icon_svg(icon, PREVIEW_TOOLBAR_ICON_SIZE, foreground))
         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
             button_mouse_down(enabled, window, cx);
-        })
+        });
+
+    if let Some(focus) = focus {
+        let button = apply_accessible_button_with_focus(button, label, enabled, focus);
+        if selected {
+            button.aria_toggled(gpui::Toggled::True)
+        } else {
+            button
+        }
+    } else if selected {
+        apply_accessible_toggle_button(button, label, enabled, true)
+    } else {
+        apply_accessible_button(button, label, enabled)
+    }
 }

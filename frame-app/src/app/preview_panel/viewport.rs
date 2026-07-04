@@ -1,5 +1,7 @@
 use super::*;
-use crate::app::preview_actions::preview_canvas_layout_metrics;
+use crate::app::preview_actions::{
+    preview_canvas_keyboard_pan_delta, preview_canvas_layout_metrics,
+};
 use crate::numeric::{f64_to_f32, u32_to_f32, usize_to_f32};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -282,9 +284,11 @@ pub(in crate::app) fn normalized_point_from_bounds(
 
 pub(in crate::app) fn preview_viewport(
     state: &PreviewShellState,
+    focuses: PreviewViewportFocuses<'_>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
+    let pan_enabled = preview_canvas_pan_enabled(state);
     let mut viewport = div()
         .id("preview-viewport")
         .relative()
@@ -298,23 +302,57 @@ pub(in crate::app) fn preview_viewport(
         .rounded(px(theme::RADIUS_MD))
         .bg(parse_hex("#14161A"))
         .shadow(input_highlight_shadows())
+        .track_focus(focuses.viewport)
+        .tab_stop(pan_enabled)
         .child(preview_viewport_content(state, cx));
+
+    if pan_enabled {
+        let viewport_focus = focuses.viewport.clone();
+        viewport = viewport
+            .role(gpui::Role::Pane)
+            .aria_label("Preview canvas")
+            .aria_description("Use arrow keys to pan the zoomed preview.")
+            .focus_visible(focus_visible_ring)
+            .cursor_grab()
+            .on_key_down(
+                cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+                    if !viewport_focus.is_focused(window) {
+                        return;
+                    }
+                    if root
+                        .adjust_preview_canvas_pan_from_keyboard(event.keystroke.key.as_str(), cx)
+                    {
+                        cx.notify();
+                    }
+                    if preview_canvas_keyboard_pan_delta(event.keystroke.key.as_str()).is_some() {
+                        cx.stop_propagation();
+                    }
+                }),
+            );
+    }
 
     if state.render_image.is_some() && state.media.is_some() {
         viewport = viewport.child(PreviewViewportRoundedClip);
     }
 
     if state.crop.crop_mode && state.crop.draft_crop.is_some() {
-        viewport = viewport.child(preview_crop_aspect_bar(state, window, cx));
+        viewport = viewport.child(preview_crop_aspect_bar(
+            state,
+            focuses.edit_toolbars.crop,
+            window,
+            cx,
+        ));
     }
 
-    if let Some(overlay_controls) = preview_overlay_controls(state, window, cx) {
+    if let Some(overlay_controls) =
+        preview_overlay_controls(state, focuses.edit_toolbars.overlay, window, cx)
+    {
         viewport = viewport.child(overlay_controls);
     }
 
     if preview_visual_controls_visible(state) {
         viewport = viewport
-            .child(preview_toolbar(state, window, cx))
+            .child(preview_toolbar(state, focuses.tools, window, cx))
             .child(preview_zoom_toolbar(state, window, cx));
     }
 
@@ -384,6 +422,7 @@ pub(in crate::app) fn preview_viewport_content(
     }
 
     let content = div()
+        .id("preview-empty-state")
         .max_w(px(360.0))
         .flex()
         .flex_col()
@@ -406,6 +445,8 @@ pub(in crate::app) fn preview_viewport_content(
         }
         PreviewMetadataStatus::Error => {
             let mut error = content
+                .role(gpui::Role::Alert)
+                .aria_label("Preview unavailable")
                 .text_color(color(theme::FRAME_RED))
                 .child(theme::ui_text("Preview unavailable"));
             if let Some(message) = state.metadata_error.as_deref() {
@@ -422,6 +463,8 @@ pub(in crate::app) fn preview_viewport_content(
         PreviewMetadataStatus::Ready => {
             if let Some(message) = state.runtime_error.as_deref() {
                 return content
+                    .role(gpui::Role::Alert)
+                    .aria_label("Preview unavailable")
                     .text_color(color(theme::FRAME_RED))
                     .child(theme::ui_text("Preview unavailable"))
                     .child(
@@ -508,12 +551,12 @@ pub(in crate::app) fn preview_media_stage(
             .aspect_ratio(media.aspect_ratio());
     }
 
-    if let Some(overlay) = preview_overlay_layer(state) {
+    if let Some(overlay) = preview_overlay_layer(state, cx) {
         media_stage = media_stage.child(overlay);
     }
 
     if state.crop.crop_mode && state.crop.draft_crop.is_some() {
-        media_stage = media_stage.child(preview_crop_overlay(state));
+        media_stage = media_stage.child(preview_crop_overlay(state, cx));
     }
 
     media_stage
