@@ -118,7 +118,7 @@ jobs:
     timeout-minutes: 90
 
   build_macos_x86_64:
-    runs-on: macos-15-intel
+    runs-on: macos-26-intel
     env:
       CARGO_INCREMENTAL: 0
       FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY || secrets.FRAME_UPDATE_PUBLIC_KEY }}
@@ -162,7 +162,7 @@ jobs:
     timeout-minutes: 90
 
   build_macos_aarch64:
-    runs-on: macos-15
+    runs-on: macos-26
     env:
       CARGO_INCREMENTAL: 0
       FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY || secrets.FRAME_UPDATE_PUBLIC_KEY }}

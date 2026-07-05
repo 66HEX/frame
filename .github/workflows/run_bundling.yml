@@ -114,7 +114,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event.action == 'labeled' && github.event.label.name == 'run-bundling') ||
       (github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'run-bundling'))
-    runs-on: macos-15-intel
+    runs-on: macos-26-intel
     env:
       CARGO_INCREMENTAL: 0
     steps:
@@ -144,7 +144,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event.action == 'labeled' && github.event.label.name == 'run-bundling') ||
       (github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'run-bundling'))
-    runs-on: macos-15
+    runs-on: macos-26
     env:
       CARGO_INCREMENTAL: 0
     steps:

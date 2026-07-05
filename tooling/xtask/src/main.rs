@@ -1038,8 +1038,8 @@ on:
     let jobs = [
         linux_job("x86_64", "ubuntu-22.04"),
         linux_job("aarch64", "ubuntu-22.04-arm"),
-        macos_job("x86_64", "x86_64-apple-darwin", "macos-15-intel"),
-        macos_job("aarch64", "aarch64-apple-darwin", "macos-15"),
+        macos_job("x86_64", "x86_64-apple-darwin", "macos-26-intel"),
+        macos_job("aarch64", "aarch64-apple-darwin", "macos-26"),
         windows_job("x86_64", "windows-2022"),
     ]
     .join("");
@@ -1317,7 +1317,7 @@ jobs:
     timeout-minutes: 90
 
   build_macos_x86_64:
-    runs-on: macos-15-intel
+    runs-on: macos-26-intel
     env:
       CARGO_INCREMENTAL: 0
       FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY || secrets.FRAME_UPDATE_PUBLIC_KEY }}
@@ -1361,7 +1361,7 @@ jobs:
     timeout-minutes: 90
 
   build_macos_aarch64:
-    runs-on: macos-15
+    runs-on: macos-26
     env:
       CARGO_INCREMENTAL: 0
       FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY || secrets.FRAME_UPDATE_PUBLIC_KEY }}
