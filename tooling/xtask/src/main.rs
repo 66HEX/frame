@@ -1206,11 +1206,12 @@ env:
 on:
   push:
     tags:
-      - 'v*'
+      - '[0-9]*.[0-9]*.[0-9]*'
+      - '!*-*'
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag to publish.
+        description: Release tag to publish, without a v prefix.
         required: true
 permissions:
   contents: write
@@ -1277,6 +1278,8 @@ jobs:
       CARGO_INCREMENTAL: 0
       FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY || secrets.FRAME_UPDATE_PUBLIC_KEY }}
       MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+      MACOS_CERTIFICATES_P12: ${{ secrets.MACOS_CERTIFICATES_P12 }}
+      MACOS_CERTIFICATES_PASSWORD: ${{ secrets.MACOS_CERTIFICATES_PASSWORD }}
       APPLE_NOTARIZATION_KEY: ${{ secrets.APPLE_NOTARIZATION_KEY }}
       APPLE_NOTARIZATION_KEY_ID: ${{ secrets.APPLE_NOTARIZATION_KEY_ID }}
       APPLE_NOTARIZATION_ISSUER_ID: ${{ secrets.APPLE_NOTARIZATION_ISSUER_ID }}
@@ -1288,10 +1291,11 @@ jobs:
     - name: release::check_public_key
       run: test -n "$FRAME_UPDATE_PUBLIC_KEY"
     - name: release::import_macos_signing_certificate
+      if: env.MACOS_SIGNING_IDENTITY != '' && env.MACOS_CERTIFICATES_P12 != '' && env.MACOS_CERTIFICATES_PASSWORD != ''
       uses: Apple-Actions/import-codesign-certs@v3
       with:
-        p12-file-base64: ${{ secrets.MACOS_CERTIFICATES_P12 }}
-        p12-password: ${{ secrets.MACOS_CERTIFICATES_PASSWORD }}
+        p12-file-base64: ${{ env.MACOS_CERTIFICATES_P12 }}
+        p12-password: ${{ env.MACOS_CERTIFICATES_PASSWORD }}
     - name: steps::setup_rust
       uses: dtolnay/rust-toolchain@stable
     - name: steps::install_cargo_bundle
@@ -1318,6 +1322,8 @@ jobs:
       CARGO_INCREMENTAL: 0
       FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY || secrets.FRAME_UPDATE_PUBLIC_KEY }}
       MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+      MACOS_CERTIFICATES_P12: ${{ secrets.MACOS_CERTIFICATES_P12 }}
+      MACOS_CERTIFICATES_PASSWORD: ${{ secrets.MACOS_CERTIFICATES_PASSWORD }}
       APPLE_NOTARIZATION_KEY: ${{ secrets.APPLE_NOTARIZATION_KEY }}
       APPLE_NOTARIZATION_KEY_ID: ${{ secrets.APPLE_NOTARIZATION_KEY_ID }}
       APPLE_NOTARIZATION_ISSUER_ID: ${{ secrets.APPLE_NOTARIZATION_ISSUER_ID }}
@@ -1329,10 +1335,11 @@ jobs:
     - name: release::check_public_key
       run: test -n "$FRAME_UPDATE_PUBLIC_KEY"
     - name: release::import_macos_signing_certificate
+      if: env.MACOS_SIGNING_IDENTITY != '' && env.MACOS_CERTIFICATES_P12 != '' && env.MACOS_CERTIFICATES_PASSWORD != ''
       uses: Apple-Actions/import-codesign-certs@v3
       with:
-        p12-file-base64: ${{ secrets.MACOS_CERTIFICATES_P12 }}
-        p12-password: ${{ secrets.MACOS_CERTIFICATES_PASSWORD }}
+        p12-file-base64: ${{ env.MACOS_CERTIFICATES_P12 }}
+        p12-password: ${{ env.MACOS_CERTIFICATES_PASSWORD }}
     - name: steps::setup_rust
       uses: dtolnay/rust-toolchain@stable
     - name: steps::install_cargo_bundle
@@ -1395,6 +1402,7 @@ jobs:
     env:
       FRAME_UPDATE_SIGNING_KEY: ${{ secrets.FRAME_UPDATE_SIGNING_KEY }}
       GH_TOKEN: ${{ github.token }}
+      TAURI_BRIDGE_RELEASE_TAG: '0.29.3'
     steps:
     - name: steps::checkout_repo
       uses: actions/checkout@v4
@@ -1417,9 +1425,36 @@ jobs:
         if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
           tag="${{ inputs.tag }}"
         fi
-        version="${tag#v}"
+        if [[ "$tag" == v* ]]; then
+          echo "::error::Release tags must not use a v prefix: $tag" >&2
+          exit 1
+        fi
+        if [[ ! "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "::error::Release tag must be semver without a v prefix: $tag" >&2
+          exit 1
+        fi
+        version="$tag"
         echo "tag=$tag" >> "$GITHUB_OUTPUT"
         echo "version=$version" >> "$GITHUB_OUTPUT"
+    - name: release::extract_release_notes
+      shell: bash
+      run: |
+        mkdir -p target/release
+        version="${{ steps.release.outputs.version }}"
+        awk -v ver="[$version]" '/^## / { if (p) { exit }; if ($2 == ver) { p=1; next } } p' CHANGELOG.md > target/release/release-notes.md
+        if [[ ! -s target/release/release-notes.md ]]; then
+          echo "::error::CHANGELOG.md has no release notes section for [$version]" >&2
+          exit 1
+        fi
+    - name: release::download_tauri_latest_json
+      run: |
+        mkdir -p target/release
+        gh release download "$TAURI_BRIDGE_RELEASE_TAG" \
+          --repo 66HEX/frame \
+          --pattern latest.json \
+          --dir target/release \
+          --clobber
+        test -s target/release/latest.json
     - name: release::generate_update_manifest
       run: |
         cargo xtask update-manifest \
@@ -1430,6 +1465,7 @@ jobs:
           --artifact target/release-artifacts/Frame-x86_64.exe:windows-x86_64:windows_inno \
           --artifact target/release-artifacts/frame-linux-x86_64.tar.gz:linux-x86_64:linux_managed_tar \
           --artifact target/release-artifacts/frame-linux-aarch64.tar.gz:linux-aarch64:linux_managed_tar \
+          --release-notes-markdown "$(< target/release/release-notes.md)" \
           --out target/release/update-manifest.json
     - name: release::sign_update_manifest
       run: |
@@ -1448,14 +1484,127 @@ jobs:
           target/release-artifacts/Frame-x86_64.exe
           target/release-artifacts/frame-linux-x86_64.tar.gz
           target/release-artifacts/frame-linux-aarch64.tar.gz
+          target/release/latest.json
           target/release/update-manifest.json
           target/release/update-manifest.json.sig
         )
         if gh release view "$tag" >/dev/null 2>&1; then
+          gh release edit "$tag" --title "Frame ${{ steps.release.outputs.version }}" --notes-file target/release/release-notes.md
           gh release upload "$tag" "${assets[@]}" --clobber
         else
-          gh release create "$tag" "${assets[@]}" --title "Frame ${{ steps.release.outputs.version }}" --generate-notes
+          gh release create "$tag" "${assets[@]}" --title "Frame ${{ steps.release.outputs.version }}" --notes-file target/release/release-notes.md
         fi
+    timeout-minutes: 30
+
+  update_homebrew_tap:
+    runs-on: ubuntu-22.04
+    needs: publish_release
+    steps:
+    - name: release::resolve_tag
+      id: release
+      shell: bash
+      run: |
+        tag="${GITHUB_REF_NAME}"
+        if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+          tag="${{ inputs.tag }}"
+        fi
+        echo "tag=$tag" >> "$GITHUB_OUTPUT"
+    - name: release::download_macos_dmgs
+      id: hashes
+      env:
+        GH_TOKEN: ${{ github.token }}
+        VERSION: ${{ steps.release.outputs.tag }}
+      shell: bash
+      run: |
+        mkdir -p target/homebrew
+        gh release download "$VERSION" --repo 66HEX/frame --pattern Frame-aarch64.dmg --dir target/homebrew --clobber
+        gh release download "$VERSION" --repo 66HEX/frame --pattern Frame-x86_64.dmg --dir target/homebrew --clobber
+        echo "HASH_ARM=$(sha256sum target/homebrew/Frame-aarch64.dmg | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+        echo "HASH_INTEL=$(sha256sum target/homebrew/Frame-x86_64.dmg | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+    - name: release::checkout_tap
+      uses: actions/checkout@v4
+      with:
+        repository: 66HEX/homebrew-frame
+        token: ${{ secrets.TAP_GITHUB_TOKEN }}
+        path: tap
+    - name: release::update_cask
+      working-directory: tap
+      env:
+        VERSION: ${{ steps.release.outputs.tag }}
+        HASH_ARM: ${{ steps.hashes.outputs.HASH_ARM }}
+        HASH_INTEL: ${{ steps.hashes.outputs.HASH_INTEL }}
+      shell: bash
+      run: |
+        mkdir -p Casks
+        cat <<EOF > Casks/frame.rb
+        cask "frame" do
+          arch arm: "aarch64", intel: "x86_64"
+
+          version "$VERSION"
+          sha256 arm:   "$HASH_ARM",
+                 intel: "$HASH_INTEL"
+
+          url "https://github.com/66HEX/frame/releases/download/#{version}/Frame-#{arch}.dmg"
+          name "Frame"
+          desc "High-performance media conversion utility"
+          homepage "https://github.com/66HEX/frame"
+
+          auto_updates true
+
+          app "Frame.app"
+
+          zap trash: [
+            "~/Library/Application Support/com.66hex.frame",
+            "~/Library/Caches/com.66hex.frame",
+            "~/Library/Preferences/com.66hex.frame.plist",
+            "~/Library/Saved Application State/com.66hex.frame.savedState",
+          ]
+
+          caveats <<~EOS
+            Frame is not notarized. On first launch, you may need to:
+            1. Right-click the app and select "Open".
+            2. Click "Open" in the security dialog.
+
+            Alternatively, you can run:
+              xattr -dr com.apple.quarantine /Applications/Frame.app
+          EOS
+        end
+        EOF
+
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add Casks/frame.rb
+        if git diff --staged --quiet; then
+          echo "No Homebrew cask changes to publish."
+        else
+          git commit -m "Update Frame to $VERSION"
+          git push
+        fi
+    timeout-minutes: 20
+
+  publish_winget:
+    runs-on: windows-latest
+    needs: publish_release
+    steps:
+    - name: release::resolve_tag
+      id: release
+      shell: bash
+      run: |
+        tag="${GITHUB_REF_NAME}"
+        if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+          tag="${{ inputs.tag }}"
+        fi
+        echo "tag=$tag" >> "$GITHUB_OUTPUT"
+    - name: release::publish_winget
+      uses: vedantmgoyal9/winget-releaser@v2
+      with:
+        identifier: 66HEX.Frame
+        version: ${{ steps.release.outputs.tag }}
+        installers-regex: '^Frame-x86_64\.exe$'
+        release-repository: frame
+        release-tag: ${{ steps.release.outputs.tag }}
+        release-notes-url: https://github.com/66HEX/frame/releases/tag/${{ steps.release.outputs.tag }}
+        token: ${{ secrets.WINGET_ACC_TOKEN }}
     timeout-minutes: 30
 "#
     .to_string()
@@ -1623,5 +1772,30 @@ mod tests {
             "ffmpeg-master-latest-win64-gpl/bin/ffprobe.exe",
             &["ffprobe.exe"],
         ));
+    }
+
+    #[test]
+    fn release_workflow_extracts_release_notes_from_changelog() {
+        let workflow = release_workflow();
+
+        assert!(workflow.contains("release::extract_release_notes"));
+        assert!(workflow.contains("CHANGELOG.md > target/release/release-notes.md"));
+    }
+
+    #[test]
+    fn release_workflow_uses_changelog_notes_for_update_manifest() {
+        let workflow = release_workflow();
+
+        assert!(
+            workflow.contains("--release-notes-markdown \"$(< target/release/release-notes.md)\"")
+        );
+    }
+
+    #[test]
+    fn release_workflow_uses_changelog_notes_for_github_release() {
+        let workflow = release_workflow();
+
+        assert!(workflow.contains("--notes-file target/release/release-notes.md"));
+        assert!(!workflow.contains("--generate-notes"));
     }
 }
