@@ -470,17 +470,30 @@ impl FrameRoot {
             return self.settle_preview_canvas_animation();
         }
 
-        let next_zoom = lerp_preview_canvas_value(
+        let now = Instant::now();
+        let elapsed = self
+            .preview_ui
+            .canvas
+            .last_animation_tick
+            .map_or(PREVIEW_FRAME_TICK_INTERVAL, |last_tick| {
+                now.saturating_duration_since(last_tick)
+            });
+        self.preview_ui.canvas.last_animation_tick = Some(now);
+
+        let next_zoom = lerp_preview_canvas_value_for_elapsed(
             self.preview_ui.canvas.current_zoom,
             self.preview_ui.canvas.target_zoom,
+            elapsed,
         );
-        let next_pan_x = lerp_preview_canvas_value(
+        let next_pan_x = lerp_preview_canvas_value_for_elapsed(
             self.preview_ui.canvas.current_pan_x,
             self.preview_ui.canvas.target_pan_x,
+            elapsed,
         );
-        let next_pan_y = lerp_preview_canvas_value(
+        let next_pan_y = lerp_preview_canvas_value_for_elapsed(
             self.preview_ui.canvas.current_pan_y,
             self.preview_ui.canvas.target_pan_y,
+            elapsed,
         );
 
         self.preview_ui.canvas.current_zoom = next_zoom;
@@ -536,6 +549,7 @@ impl FrameRoot {
         self.preview_ui.canvas.current_zoom = self.preview_ui.canvas.target_zoom;
         self.preview_ui.canvas.current_pan_x = self.preview_ui.canvas.target_pan_x;
         self.preview_ui.canvas.current_pan_y = self.preview_ui.canvas.target_pan_y;
+        self.preview_ui.canvas.last_animation_tick = None;
 
         changed
     }
@@ -2371,8 +2385,29 @@ fn preview_overlay_keyboard_start_point(
     }
 }
 
+#[cfg(test)]
 pub(in crate::app) fn lerp_preview_canvas_value(current: f64, target: f64) -> f64 {
-    (target - current).mul_add(PREVIEW_CANVAS_LERP_FACTOR, current)
+    lerp_preview_canvas_value_for_elapsed(current, target, PREVIEW_FRAME_TICK_INTERVAL)
+}
+
+pub(in crate::app) fn lerp_preview_canvas_value_for_elapsed(
+    current: f64,
+    target: f64,
+    elapsed: Duration,
+) -> f64 {
+    let tick_seconds = PREVIEW_FRAME_TICK_INTERVAL.as_secs_f64();
+    let elapsed_ticks = if tick_seconds > 0.0 {
+        elapsed.as_secs_f64() / tick_seconds
+    } else {
+        1.0
+    };
+    let factor = if elapsed_ticks.is_finite() && elapsed_ticks > 0.0 {
+        1.0 - (1.0 - PREVIEW_CANVAS_LERP_FACTOR).powf(elapsed_ticks)
+    } else {
+        PREVIEW_CANVAS_LERP_FACTOR
+    };
+    let factor = factor.clamp(PREVIEW_CANVAS_LERP_FACTOR, 1.0);
+    (target - current).mul_add(factor, current)
 }
 
 pub(in crate::app) fn preview_canvas_wheel_zoom_multiplier(delta_y: f64) -> Option<f64> {

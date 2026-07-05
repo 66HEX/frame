@@ -579,6 +579,7 @@ struct PreviewCanvasState {
     target_pan_x: f64,
     target_pan_y: f64,
     auto_fit_pending: bool,
+    last_animation_tick: Option<Instant>,
 }
 
 impl Default for PreviewCanvasState {
@@ -591,6 +592,7 @@ impl Default for PreviewCanvasState {
             target_pan_x: 0.0,
             target_pan_y: 0.0,
             auto_fit_pending: true,
+            last_animation_tick: None,
         }
     }
 }

@@ -7,10 +7,11 @@ use super::input::{
     should_capture_text_input_drag, should_handle_text_input, text_input_scroll_x_for_cursor,
 };
 use super::preview_actions::{
-    lerp_preview_canvas_value, preview_canvas_initial_zoom, preview_canvas_keyboard_pan_delta,
-    preview_canvas_layout_metrics, preview_canvas_pan_limits, preview_canvas_transform_settled,
-    preview_canvas_transform_visual_delta, preview_canvas_wheel_zoom_multiplier,
-    preview_crop_keyboard_delta, preview_overlay_keyboard_delta, preview_runtime_dimensions,
+    lerp_preview_canvas_value, lerp_preview_canvas_value_for_elapsed, preview_canvas_initial_zoom,
+    preview_canvas_keyboard_pan_delta, preview_canvas_layout_metrics, preview_canvas_pan_limits,
+    preview_canvas_transform_settled, preview_canvas_transform_visual_delta,
+    preview_canvas_wheel_zoom_multiplier, preview_crop_keyboard_delta,
+    preview_overlay_keyboard_delta, preview_runtime_dimensions,
 };
 use super::preview_panel::{
     centered_offset, preview_crop_visual_rect, preview_presented_frame, preview_shell_state,
@@ -32,7 +33,7 @@ use std::{
         Mutex,
         atomic::{AtomicU64, Ordering},
     },
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 static TEST_SETTINGS_PATH_SEQUENCE: AtomicU64 = AtomicU64::new(0);
@@ -2377,6 +2378,16 @@ mod frame_root_config {
         let next = lerp_preview_canvas_value(1.0, 2.0);
 
         assert!(next > 1.0 && next < 2.0);
+    }
+
+    #[test]
+    fn lerp_preview_canvas_value_uses_elapsed_time() {
+        let normal = lerp_preview_canvas_value_for_elapsed(0.0, 100.0, Duration::from_millis(16));
+        let delayed = lerp_preview_canvas_value_for_elapsed(0.0, 100.0, Duration::from_millis(64));
+
+        assert!((normal - 20.0).abs() < 0.000_001);
+        assert!(delayed > normal);
+        assert!(delayed < 100.0);
     }
 
     #[test]
