@@ -562,6 +562,7 @@ impl FrameRoot {
         let duration_seconds = preview_duration_seconds(metadata);
 
         if self.preview_ui.playback_file_id.as_deref() != selected_file_id {
+            self.preview_ui.trim_preview_seek.reset();
             self.preview_ui.playback_file_id = selected_file_id.map(str::to_string);
             self.preview_ui.playback = preview_playback_state(
                 media_kind,
@@ -581,7 +582,7 @@ impl FrameRoot {
 
         if let Some(session) = &self.preview_ui.session {
             let snapshot = session.snapshot();
-            if self.preview_ui.playback.dragging().is_none() {
+            if !self.preview_media_snapshot_sync_blocked() {
                 self.preview_ui.playback.sync_media(MediaSnapshot {
                     current_time: snapshot.playback.position_seconds,
                     duration: snapshot.playback.duration_seconds,
@@ -603,6 +604,11 @@ impl FrameRoot {
         self.preview_ui.playback.clone()
     }
 
+    pub(super) const fn preview_media_snapshot_sync_blocked(&self) -> bool {
+        self.preview_ui.playback.dragging().is_some()
+            || self.preview_ui.trim_preview_seek.is_active()
+    }
+
     fn clear_preview_runtime(&mut self, cx: &mut Context<Self>) {
         if let Some(session) = self.preview_ui.session.take() {
             session.stop();
@@ -614,6 +620,7 @@ impl FrameRoot {
         self.preview_ui.preview_dimensions_debounce_until = None;
         self.preview_ui.runtime_key = None;
         self.preview_ui.pending_runtime_key = None;
+        self.preview_ui.trim_preview_seek.reset();
         self.preview_ui.render_generation = 0;
         self.preview_ui.runtime_error = None;
     }
@@ -1469,6 +1476,24 @@ impl FrameRoot {
         target: TimelineDragTarget,
         percent: f64,
     ) -> bool {
+        self.apply_preview_timeline_drag_internal(target, percent, None)
+    }
+
+    pub(super) fn apply_preview_timeline_drag_with_context(
+        &mut self,
+        target: TimelineDragTarget,
+        percent: f64,
+        cx: &Context<Self>,
+    ) -> bool {
+        self.apply_preview_timeline_drag_internal(target, percent, Some(cx))
+    }
+
+    fn apply_preview_timeline_drag_internal(
+        &mut self,
+        target: TimelineDragTarget,
+        percent: f64,
+        cx: Option<&Context<Self>>,
+    ) -> bool {
         if !self.preview_timeline_enabled() {
             return false;
         }
@@ -1482,13 +1507,25 @@ impl FrameRoot {
             if !self.preview_ui.playback.begin_handle_drag(target) {
                 return false;
             }
-            if self.preview_ui.playback.is_playing() {
-                self.apply_preview_command_to_local_state(PlaybackMediaCommand::pause());
+            let was_playing = self.preview_ui.playback.is_playing();
+            if self.trim_preview_seek_available() {
+                self.preview_ui
+                    .trim_preview_seek
+                    .begin_drag(self.preview_ui.playback.current_time());
+                if was_playing {
+                    self.preview_ui.trim_preview_seek.pause_before_next_seek();
+                }
+            }
+            if was_playing {
+                self.apply_preview_media_command(PlaybackMediaCommand::pause(), true, cx);
             }
         }
 
         let update = self.preview_ui.playback.drag_to_percent(percent);
         self.apply_preview_command_to_local_state(update.command);
+        if let Some(preview_seek_to) = update.preview_seek_to {
+            self.queue_trim_preview_seek(preview_seek_to, cx);
+        }
         true
     }
 
@@ -1546,12 +1583,20 @@ impl FrameRoot {
             return false;
         }
 
+        let was_trim_drag = self
+            .preview_ui
+            .playback
+            .dragging()
+            .is_some_and(|target| target != TimelineDragTarget::Scrub);
         let end = self.preview_ui.playback.end_drag();
         let mut changed = self.apply_preview_media_command(end.command, true, cx);
         if let Some(trim) = end.trim {
             changed |= self.update_selected_config(|config| {
                 apply_trim_times(config, trim.start_time, trim.end_time)
             });
+        }
+        if was_trim_drag {
+            changed |= self.finish_trim_preview_seek(cx);
         }
         changed
     }
@@ -1606,6 +1651,142 @@ impl FrameRoot {
 
         let command = self.preview_ui.playback.toggle_play();
         self.apply_preview_media_command(command, true, cx)
+    }
+
+    fn trim_preview_seek_available(&self) -> bool {
+        self.preview_ui.session.is_some()
+            && self.selected_source_metadata().is_some_and(|metadata| {
+                preview_source_media_kind(&metadata) == SourceMediaKind::Video
+            })
+    }
+
+    fn queue_trim_preview_seek(&mut self, seconds: f64, cx: Option<&Context<Self>>) -> bool {
+        if !seconds.is_finite() || !self.trim_preview_seek_available() {
+            return false;
+        }
+
+        self.preview_ui.trim_preview_seek.queue(seconds);
+        if let Some(cx) = cx {
+            self.start_trim_preview_seek_worker(cx);
+        }
+        true
+    }
+
+    fn finish_trim_preview_seek(&mut self, cx: Option<&Context<Self>>) -> bool {
+        if !self.preview_ui.trim_preview_seek.finish() {
+            return false;
+        }
+        if let Some(cx) = cx {
+            self.start_trim_preview_seek_worker(cx);
+        }
+        true
+    }
+
+    fn start_trim_preview_seek_worker(&mut self, cx: &Context<Self>) {
+        if self.preview_ui.trim_preview_seek.worker_active {
+            return;
+        }
+        let Some(session) = self.preview_ui.session.clone() else {
+            return;
+        };
+
+        self.preview_ui.trim_preview_seek.worker_active = true;
+        let generation = self.preview_ui.trim_preview_seek.generation;
+        cx.spawn(async move |this, cx| {
+            loop {
+                let request = this
+                    .update(cx, |root, _cx| root.take_next_trim_preview_seek(generation))
+                    .ok()
+                    .flatten();
+                let Some(request) = request else {
+                    let should_continue = this
+                        .update(cx, move |root, _cx| {
+                            if root.preview_ui.trim_preview_seek.generation != generation {
+                                return false;
+                            }
+                            if root.preview_ui.trim_preview_seek.pending_seconds.is_some() {
+                                return true;
+                            }
+                            root.preview_ui.trim_preview_seek.worker_active = false;
+                            false
+                        })
+                        .unwrap_or(false);
+                    if should_continue {
+                        continue;
+                    }
+                    break;
+                };
+
+                let result = cx
+                    .background_spawn({
+                        let session = Arc::clone(&session);
+                        async move {
+                            if request.pause_first {
+                                session.command(PreviewCommand::Pause)?;
+                            }
+                            session.command(PreviewCommand::SeekPrecise(request.seconds))
+                        }
+                    })
+                    .await;
+
+                let should_stop = this
+                    .update(cx, move |root, cx| {
+                        root.finish_trim_preview_seek_request(
+                            generation,
+                            request.seconds,
+                            result,
+                            cx,
+                        )
+                    })
+                    .unwrap_or(true);
+                if should_stop {
+                    break;
+                }
+
+                cx.background_executor()
+                    .timer(TRIM_PREVIEW_SEEK_INTERVAL)
+                    .await;
+            }
+        })
+        .detach();
+    }
+
+    fn take_next_trim_preview_seek(&mut self, generation: u64) -> Option<TrimPreviewSeekRequest> {
+        let trim_preview_seek = &mut self.preview_ui.trim_preview_seek;
+        if trim_preview_seek.generation != generation {
+            return None;
+        }
+        trim_preview_seek.take_next()
+    }
+
+    fn finish_trim_preview_seek_request(
+        &mut self,
+        generation: u64,
+        seconds: f64,
+        result: Result<(), PreviewEngineError>,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let trim_preview_seek = &mut self.preview_ui.trim_preview_seek;
+        if trim_preview_seek.generation != generation {
+            return true;
+        }
+
+        match result {
+            Ok(()) => {
+                self.preview_ui.runtime_error = None;
+                self.schedule_preview_frame_tick(cx);
+            }
+            Err(error) => {
+                self.preview_ui.runtime_error = Some(error.to_string());
+            }
+        }
+        cx.notify();
+
+        if self.preview_ui.trim_preview_seek.complete_restore(seconds) {
+            return true;
+        }
+
+        false
     }
 
     fn apply_preview_media_command(

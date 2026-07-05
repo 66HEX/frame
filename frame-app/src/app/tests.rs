@@ -1113,6 +1113,105 @@ mod frame_root_config {
         );
     }
 
+    fn test_video_preview_session(file_id: &str) -> std::sync::Arc<PreviewSession> {
+        std::sync::Arc::new(PreviewSession::new_for_test(PreviewSessionConfig {
+            file_id: file_id.to_string(),
+            path: PathBuf::from("/tmp/one.mp4"),
+            source_kind: EnginePreviewSourceKind::Video,
+            source_width: Some(1920),
+            source_height: Some(1080),
+            has_audio: false,
+            selected_audio_track: None,
+            duration_seconds: 90.0,
+            max_width: DEFAULT_PREVIEW_MAX_WIDTH,
+            max_height: DEFAULT_PREVIEW_MAX_HEIGHT,
+            fps: DEFAULT_PREVIEW_FPS,
+            conversion_config: crate::conversion_runner::core_config_from_gpui(
+                &ConversionConfig::default(),
+            ),
+        }))
+    }
+
+    #[test]
+    fn trim_preview_seek_state_overwrites_pending_without_starting_worker() {
+        let mut state = TrimPreviewSeekState::default();
+
+        state.queue(10.0);
+        state.queue(20.0);
+
+        assert_eq!(state.pending_seconds, Some(20.0));
+        assert!(!state.worker_active);
+    }
+
+    #[test]
+    fn trim_preview_seek_state_skips_duplicate_pending_within_epsilon() {
+        let mut state = TrimPreviewSeekState {
+            last_sent_seconds: Some(10.0),
+            ..Default::default()
+        };
+        state.queue(10.0 + (TRIM_PREVIEW_SEEK_EPSILON_SECONDS / 2.0));
+
+        assert_eq!(state.take_next(), None);
+        assert_eq!(state.pending_seconds, None);
+    }
+
+    #[test]
+    fn trim_preview_seek_state_finishes_with_restore_and_clears_after_completion() {
+        let mut state = TrimPreviewSeekState::default();
+        state.begin_drag(30.0);
+        state.queue(60.0);
+
+        assert!(state.finish());
+        assert_eq!(
+            state.take_next(),
+            Some(TrimPreviewSeekRequest {
+                seconds: 30.0,
+                pause_first: false,
+            })
+        );
+        assert!(state.complete_restore(30.0));
+
+        assert_eq!(
+            state,
+            TrimPreviewSeekState {
+                generation: 1,
+                ..Default::default()
+            }
+        );
+    }
+
+    #[test]
+    fn trim_preview_seek_state_marks_only_next_request_for_pause() {
+        let mut state = TrimPreviewSeekState::default();
+        state.pause_before_next_seek();
+        state.queue(10.0);
+
+        assert_eq!(
+            state.take_next(),
+            Some(TrimPreviewSeekRequest {
+                seconds: 10.0,
+                pause_first: true,
+            })
+        );
+
+        state.queue(20.0);
+        assert_eq!(
+            state.take_next(),
+            Some(TrimPreviewSeekRequest {
+                seconds: 20.0,
+                pause_first: false,
+            })
+        );
+    }
+
+    #[test]
+    fn preview_media_snapshot_sync_is_blocked_while_trim_preview_is_active() {
+        let mut root = FrameRoot::new();
+        root.preview_ui.trim_preview_seek.begin_drag(30.0);
+
+        assert!(root.preview_media_snapshot_sync_blocked());
+    }
+
     #[test]
     fn update_selected_config_mutates_only_selected_file() {
         let mut root = FrameRoot::new();
@@ -1193,12 +1292,18 @@ mod frame_root_config {
         );
         root.preview_ui.playback =
             preview_playback_state(PreviewMediaKind::Video, 90.0, None, None);
+        root.preview_ui.session = Some(test_video_preview_session("video"));
 
         let changed = root.apply_preview_timeline_drag(TimelineDragTarget::Start, 0.25);
 
         assert!(changed);
         assert!((root.preview_ui.playback.start_value() - 22.5).abs() < 0.000_001);
-        assert!((root.preview_ui.playback.current_time() - 22.5).abs() < 0.000_001);
+        assert!((root.preview_ui.playback.current_time() - 0.0).abs() < 0.000_001);
+        assert_eq!(root.preview_ui.trim_preview_seek.restore_seconds, Some(0.0));
+        assert_eq!(
+            root.preview_ui.trim_preview_seek.pending_seconds,
+            Some(22.5)
+        );
         assert_eq!(
             root.file_queue
                 .file_by_id("video")
@@ -1236,12 +1341,27 @@ mod frame_root_config {
         );
         root.preview_ui.playback =
             preview_playback_state(PreviewMediaKind::Video, 90.0, None, None);
-        root.preview_ui.playback.handle_play();
+        root.preview_ui.session = Some(test_video_preview_session("video"));
+        root.preview_ui.playback.sync_media(MediaSnapshot {
+            current_time: 30.0,
+            duration: 90.0,
+            paused: false,
+        });
 
         assert!(root.apply_preview_timeline_drag(TimelineDragTarget::End, 0.75));
 
         assert!(!root.preview_ui.playback.is_playing());
         assert!((root.preview_ui.playback.end_value() - 67.5).abs() < 0.000_001);
+        assert!((root.preview_ui.playback.current_time() - 30.0).abs() < 0.000_001);
+        assert_eq!(
+            root.preview_ui.trim_preview_seek.restore_seconds,
+            Some(30.0)
+        );
+        assert_eq!(
+            root.preview_ui.trim_preview_seek.pending_seconds,
+            Some(67.5)
+        );
+        assert!(root.preview_ui.trim_preview_seek.pause_before_next_seek);
         assert_eq!(
             root.file_queue
                 .file_by_id("video")
@@ -1250,6 +1370,11 @@ mod frame_root_config {
         );
 
         assert!(root.end_preview_timeline_drag());
+        assert_eq!(
+            root.preview_ui.trim_preview_seek.pending_seconds,
+            Some(30.0)
+        );
+        assert!(root.preview_ui.trim_preview_seek.finish_after_restore);
         assert_eq!(
             root.file_queue
                 .file_by_id("video")

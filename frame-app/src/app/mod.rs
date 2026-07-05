@@ -244,6 +244,8 @@ const PREVIEW_MIN_ADAPTIVE_WIDTH: u32 = 640;
 const PREVIEW_MIN_ADAPTIVE_HEIGHT: u32 = 360;
 const PREVIEW_DIMENSION_DEBOUNCE_INTERVAL: Duration = Duration::from_millis(120);
 const PREVIEW_FRAME_TICK_INTERVAL: Duration = Duration::from_millis(16);
+const TRIM_PREVIEW_SEEK_INTERVAL: Duration = Duration::from_millis(50);
+const TRIM_PREVIEW_SEEK_EPSILON_SECONDS: f64 = 1.0 / 240.0;
 
 #[expect(
     clippy::struct_excessive_bools,
@@ -421,6 +423,7 @@ struct PreviewUiState {
     render_presentation: PreviewRenderPresentation,
     rendered_presentation: PreviewRenderPresentation,
     session: Option<Arc<PreviewSession>>,
+    trim_preview_seek: TrimPreviewSeekState,
     media_command_generation: u64,
     render_generation: u64,
     render_image: Option<Arc<RenderImage>>,
@@ -456,12 +459,114 @@ impl Default for PreviewUiState {
             render_presentation: PreviewRenderPresentation::default(),
             rendered_presentation: PreviewRenderPresentation::default(),
             session: None,
+            trim_preview_seek: TrimPreviewSeekState::default(),
             media_command_generation: 0,
             render_generation: 0,
             render_image: None,
             runtime_error: None,
             frame_tick_active: false,
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct TrimPreviewSeekState {
+    restore_seconds: Option<f64>,
+    pending_seconds: Option<f64>,
+    last_sent_seconds: Option<f64>,
+    worker_active: bool,
+    pause_before_next_seek: bool,
+    finish_after_restore: bool,
+    generation: u64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct TrimPreviewSeekRequest {
+    seconds: f64,
+    pause_first: bool,
+}
+
+impl TrimPreviewSeekState {
+    const fn is_active(&self) -> bool {
+        self.restore_seconds.is_some()
+            || self.pending_seconds.is_some()
+            || self.worker_active
+            || self.finish_after_restore
+    }
+
+    fn reset(&mut self) {
+        let next_generation = self.generation.saturating_add(1);
+        *self = Self {
+            generation: next_generation,
+            ..Self::default()
+        };
+    }
+
+    fn begin_drag(&mut self, restore_seconds: f64) {
+        if self.finish_after_restore {
+            self.reset();
+        }
+        self.restore_seconds.get_or_insert(restore_seconds);
+        self.finish_after_restore = false;
+    }
+
+    const fn pause_before_next_seek(&mut self) {
+        self.pause_before_next_seek = true;
+    }
+
+    const fn queue(&mut self, seconds: f64) {
+        self.pending_seconds = Some(seconds);
+    }
+
+    fn take_next(&mut self) -> Option<TrimPreviewSeekRequest> {
+        loop {
+            let seconds = self.pending_seconds.take()?;
+            let is_restore = self.finish_after_restore
+                && self
+                    .restore_seconds
+                    .is_some_and(|restore| Self::seconds_match(restore, seconds));
+            if !is_restore
+                && self
+                    .last_sent_seconds
+                    .is_some_and(|last| Self::seconds_match(last, seconds))
+            {
+                continue;
+            }
+
+            self.last_sent_seconds = Some(seconds);
+            let request = TrimPreviewSeekRequest {
+                seconds,
+                pause_first: self.pause_before_next_seek,
+            };
+            self.pause_before_next_seek = false;
+            return Some(request);
+        }
+    }
+
+    fn finish(&mut self) -> bool {
+        let Some(restore_seconds) = self.restore_seconds else {
+            self.reset();
+            return false;
+        };
+        self.pending_seconds = Some(restore_seconds);
+        self.finish_after_restore = true;
+        true
+    }
+
+    fn complete_restore(&mut self, seconds: f64) -> bool {
+        if self.finish_after_restore
+            && self
+                .restore_seconds
+                .is_some_and(|restore| Self::seconds_match(restore, seconds))
+        {
+            self.reset();
+            return true;
+        }
+        false
+    }
+
+    fn seconds_match(first: f64, second: f64) -> bool {
+        (first - second).abs() < TRIM_PREVIEW_SEEK_EPSILON_SECONDS
     }
 }
 

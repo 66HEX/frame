@@ -89,6 +89,7 @@ pub struct TrimSelection {
 pub struct TimelineDragUpdate {
     pub command: PlaybackMediaCommand,
     pub trim: Option<TrimSelection>,
+    pub preview_seek_to: Option<f64>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -241,7 +242,8 @@ impl PreviewPlaybackState {
             return PlaybackMediaCommand::none();
         }
 
-        if playback_time_reached_end(self.current_time, self.end_value)
+        if self.is_playing
+            && playback_time_reached_end(self.current_time, self.end_value)
             && self.end_value > self.start_value
         {
             self.is_playing = false;
@@ -350,6 +352,7 @@ impl PreviewPlaybackState {
             return TimelineDragUpdate {
                 command: PlaybackMediaCommand::none(),
                 trim: None,
+                preview_seek_to: None,
             };
         }
 
@@ -357,6 +360,7 @@ impl PreviewPlaybackState {
             return TimelineDragUpdate {
                 command: PlaybackMediaCommand::none(),
                 trim: None,
+                preview_seek_to: None,
             };
         };
 
@@ -367,22 +371,23 @@ impl PreviewPlaybackState {
                 TimelineDragUpdate {
                     command: PlaybackMediaCommand::seek(time),
                     trim: None,
+                    preview_seek_to: None,
                 }
             }
             TimelineDragTarget::Start => {
                 self.start_value = time.min(self.end_value - 1.0);
-                self.current_time = self.start_value;
                 TimelineDragUpdate {
                     command: PlaybackMediaCommand::none(),
                     trim: self.commit_trim_values(),
+                    preview_seek_to: Some(self.start_value),
                 }
             }
             TimelineDragTarget::End => {
                 self.end_value = time.max(self.start_value + 1.0);
-                self.current_time = self.end_value;
                 TimelineDragUpdate {
                     command: PlaybackMediaCommand::none(),
                     trim: self.commit_trim_values(),
+                    preview_seek_to: Some(self.end_value),
                 }
             }
         }
@@ -399,19 +404,8 @@ impl PreviewPlaybackState {
                     PlaybackMediaCommand::seek(self.current_time)
                 }
             }
-            Some(TimelineDragTarget::Start) => {
-                if self.was_playing_before_drag {
-                    PlaybackMediaCommand::pause_and_seek(self.start_value)
-                } else {
-                    PlaybackMediaCommand::seek(self.start_value)
-                }
-            }
-            Some(TimelineDragTarget::End) => {
-                if self.was_playing_before_drag {
-                    PlaybackMediaCommand::pause_and_seek(self.end_value)
-                } else {
-                    PlaybackMediaCommand::seek(self.end_value)
-                }
+            Some(TimelineDragTarget::Start | TimelineDragTarget::End) => {
+                PlaybackMediaCommand::none()
             }
             None => PlaybackMediaCommand::none(),
         };

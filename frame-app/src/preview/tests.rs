@@ -547,6 +547,7 @@ mod preview_playback_state {
     fn handle_time_update_loops_back_to_trim_start_at_end() {
         let mut playback = playback_with_media(120.0);
         playback.sync_initial_values(Some("00:00:10.000"), Some("00:00:20.000"));
+        playback.handle_play();
 
         let command = playback.handle_time_update(20.0);
 
@@ -557,11 +558,23 @@ mod preview_playback_state {
     #[test]
     fn handle_time_update_loops_back_when_time_is_just_before_end() {
         let mut playback = playback_with_media(120.0);
+        playback.handle_play();
 
         let command = playback.handle_time_update(119.96);
 
         assert_eq!(command, PlaybackMediaCommand::pause_and_seek(0.0));
         assert_close(playback.current_time(), 0.0);
+    }
+
+    #[test]
+    fn handle_time_update_keeps_paused_playhead_at_trim_end() {
+        let mut playback = playback_with_media(120.0);
+        playback.sync_initial_values(Some("00:00:10.000"), Some("00:00:20.000"));
+
+        let command = playback.handle_time_update(20.0);
+
+        assert_eq!(command, PlaybackMediaCommand::none());
+        assert_close(playback.current_time(), 20.0);
     }
 
     #[test]
@@ -669,7 +682,7 @@ mod preview_playback_state {
     }
 
     #[test]
-    fn drag_start_handle_uses_one_second_gap_before_end_without_media_command() {
+    fn drag_start_handle_uses_one_second_gap_before_end_without_moving_playhead() {
         let mut playback = playback_with_media(120.0);
         playback.sync_initial_values(None, Some("00:00:20.000"));
         assert!(playback.begin_handle_drag(TimelineDragTarget::Start));
@@ -678,12 +691,13 @@ mod preview_playback_state {
 
         assert_eq!(update.command, PlaybackMediaCommand::none());
         assert_close(playback.start_value(), 19.0);
-        assert_close(playback.current_time(), 19.0);
+        assert_close(playback.current_time(), 0.0);
+        assert_eq!(update.preview_seek_to, Some(19.0));
         assert!(update.trim.is_some());
     }
 
     #[test]
-    fn drag_end_handle_uses_one_second_gap_after_start_without_media_command() {
+    fn drag_end_handle_uses_one_second_gap_after_start_without_moving_playhead() {
         let mut playback = playback_with_media(120.0);
         playback.sync_initial_values(Some("00:00:30.000"), None);
         assert!(playback.begin_handle_drag(TimelineDragTarget::End));
@@ -692,7 +706,64 @@ mod preview_playback_state {
 
         assert_eq!(update.command, PlaybackMediaCommand::none());
         assert_close(playback.end_value(), 31.0);
-        assert_close(playback.current_time(), 31.0);
+        assert_close(playback.current_time(), 0.0);
+        assert_eq!(update.preview_seek_to, Some(31.0));
+    }
+
+    #[test]
+    fn drag_start_handle_started_while_playing_preserves_playhead() {
+        let mut playback = playback_with_media(120.0);
+        playback.sync_media(MediaSnapshot {
+            current_time: 42.0,
+            duration: 120.0,
+            paused: false,
+        });
+        assert!(playback.begin_handle_drag(TimelineDragTarget::Start));
+        playback.handle_pause();
+
+        let update = playback.drag_to_percent(0.25);
+        let end = playback.end_drag();
+
+        assert_eq!(update.command, PlaybackMediaCommand::none());
+        assert_close(playback.start_value(), 30.0);
+        assert_close(playback.current_time(), 42.0);
+        assert_eq!(update.preview_seek_to, Some(30.0));
+        assert_eq!(end.command, PlaybackMediaCommand::none());
+        assert_eq!(
+            end.trim,
+            Some(TrimSelection {
+                start_time: Some("00:00:30.000".to_string()),
+                end_time: None,
+            })
+        );
+    }
+
+    #[test]
+    fn drag_end_handle_started_while_playing_preserves_playhead() {
+        let mut playback = playback_with_media(120.0);
+        playback.sync_media(MediaSnapshot {
+            current_time: 42.0,
+            duration: 120.0,
+            paused: false,
+        });
+        assert!(playback.begin_handle_drag(TimelineDragTarget::End));
+        playback.handle_pause();
+
+        let update = playback.drag_to_percent(0.5);
+        let end = playback.end_drag();
+
+        assert_eq!(update.command, PlaybackMediaCommand::none());
+        assert_close(playback.end_value(), 60.0);
+        assert_close(playback.current_time(), 42.0);
+        assert_eq!(update.preview_seek_to, Some(60.0));
+        assert_eq!(end.command, PlaybackMediaCommand::none());
+        assert_eq!(
+            end.trim,
+            Some(TrimSelection {
+                start_time: None,
+                end_time: Some("00:01:00.000".to_string()),
+            })
+        );
     }
 
     #[test]
@@ -720,6 +791,17 @@ mod preview_playback_state {
     }
 
     #[test]
+    fn drag_scrub_does_not_request_trim_preview_seek() {
+        let mut playback = playback_with_media(120.0);
+        let _ = playback.seek_to_percent(0.25);
+
+        let update = playback.drag_to_percent(0.5);
+
+        assert_eq!(update.command, PlaybackMediaCommand::seek(60.0));
+        assert_eq!(update.preview_seek_to, None);
+    }
+
+    #[test]
     fn end_drag_commits_precise_seek_when_scrub_started_paused() {
         let mut playback = playback_with_media(120.0);
         let _ = playback.seek_to_percent(0.25);
@@ -741,14 +823,15 @@ mod preview_playback_state {
     }
 
     #[test]
-    fn end_drag_commits_trim_and_seeks_once_when_handle_was_dragged() {
+    fn end_drag_commits_trim_without_seeking_when_handle_was_dragged() {
         let mut playback = playback_with_media(120.0);
         playback.begin_handle_drag(TimelineDragTarget::End);
         let _ = playback.drag_to_percent(0.5);
 
         let end = playback.end_drag();
 
-        assert_eq!(end.command, PlaybackMediaCommand::seek(60.0));
+        assert_eq!(end.command, PlaybackMediaCommand::none());
+        assert_close(playback.current_time(), 0.0);
         assert_eq!(
             end.trim,
             Some(TrimSelection {

@@ -323,7 +323,7 @@ pub(in crate::app) fn preview_timeline_track(
                 let drag = *event.drag(cx);
                 let percent =
                     timeline_slider_percent_from_bounds(event.event.position, event.bounds);
-                if root.apply_preview_timeline_drag(drag.target, percent) {
+                if root.apply_preview_timeline_drag_with_context(drag.target, percent, cx) {
                     cx.notify();
                 }
             },
