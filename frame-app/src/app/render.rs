@@ -669,6 +669,58 @@ impl Render for FrameRoot {
 
         self.finish_accessibility_frame(window, cx, Some(&app_root_focus));
 
-        root
+        linux_window_frame(root, window)
     }
+}
+
+#[cfg(target_os = "linux")]
+fn linux_window_frame(root: gpui::Stateful<gpui::Div>, window: &Window) -> impl IntoElement {
+    let should_draw_frame = matches!(
+        window.window_decorations(),
+        gpui::Decorations::Client { tiling }
+            if !(tiling.top || tiling.right || tiling.bottom || tiling.left)
+    );
+
+    if !should_draw_frame {
+        return div().size_full().child(root);
+    }
+
+    div().size_full().p(px(LINUX_WINDOW_FRAME_INSET)).child(
+        root.rounded(px(theme::RADIUS_LG))
+            .border_1()
+            .border_color(color(theme::FRAME_GRAY_200))
+            .shadow(linux_window_frame_shadows()),
+    )
+}
+
+#[cfg(not(target_os = "linux"))]
+fn linux_window_frame(root: gpui::Stateful<gpui::Div>, _window: &Window) -> impl IntoElement {
+    root
+}
+
+#[cfg(target_os = "linux")]
+fn linux_window_frame_shadows() -> Vec<BoxShadow> {
+    vec![
+        BoxShadow {
+            color: hsla(0.0, 0.0, 0.0, 0.28),
+            offset: point(px(0.0), px(8.0)),
+            blur_radius: px(8.0),
+            spread_radius: px(-7.0),
+            inset: false,
+        },
+        BoxShadow {
+            color: hsla(0.0, 0.0, 0.0, 0.18),
+            offset: point(px(0.0), px(3.0)),
+            blur_radius: px(5.0),
+            spread_radius: px(-3.0),
+            inset: false,
+        },
+        BoxShadow {
+            color: color(theme::FRAME_GRAY_200).into(),
+            offset: point(px(0.0), px(0.0)),
+            blur_radius: px(0.0),
+            spread_radius: px(1.0),
+            inset: true,
+        },
+    ]
 }

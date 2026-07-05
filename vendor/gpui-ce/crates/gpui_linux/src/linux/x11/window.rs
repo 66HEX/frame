@@ -300,7 +300,14 @@ impl X11WindowState {
     }
 
     fn client_frame_corner_radius(&self) -> Option<ScaledPixels> {
-        if self.decorations == WindowDecorations::Client {
+        let is_tiled = self.edge_constraints.as_ref().is_some_and(|edges| {
+            edges.top_tiled || edges.right_tiled || edges.bottom_tiled || edges.left_tiled
+        });
+        let is_floating = !self.fullscreen
+            && !self.maximized_vertical
+            && !self.maximized_horizontal
+            && !is_tiled;
+        if self.decorations == WindowDecorations::Client && is_floating {
             self.client_side_frame
                 .map(|frame| ScaledPixels(f32::from(frame.corner_radius) * self.scale_factor))
         } else {

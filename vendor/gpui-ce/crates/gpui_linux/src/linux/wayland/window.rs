@@ -431,7 +431,10 @@ impl WaylandWindowState {
     }
 
     fn client_frame_corner_radius(&self) -> Option<ScaledPixels> {
-        if self.decorations == WindowDecorations::Client {
+        let is_floating = !self.fullscreen
+            && !self.maximized
+            && !(self.tiling.top || self.tiling.right || self.tiling.bottom || self.tiling.left);
+        if self.decorations == WindowDecorations::Client && is_floating {
             self.client_side_frame
                 .map(|frame| ScaledPixels(f32::from(frame.corner_radius) * self.scale))
         } else {
