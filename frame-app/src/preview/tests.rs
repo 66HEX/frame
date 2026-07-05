@@ -791,14 +791,15 @@ mod preview_playback_state {
     }
 
     #[test]
-    fn drag_scrub_does_not_request_trim_preview_seek() {
+    fn drag_scrub_requests_preview_seek_without_trim() {
         let mut playback = playback_with_media(120.0);
         let _ = playback.seek_to_percent(0.25);
 
         let update = playback.drag_to_percent(0.5);
 
         assert_eq!(update.command, PlaybackMediaCommand::seek(60.0));
-        assert_eq!(update.preview_seek_to, None);
+        assert_eq!(update.preview_seek_to, Some(60.0));
+        assert_eq!(update.trim, None);
     }
 
     #[test]

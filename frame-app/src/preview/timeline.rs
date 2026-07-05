@@ -371,7 +371,7 @@ impl PreviewPlaybackState {
                 TimelineDragUpdate {
                     command: PlaybackMediaCommand::seek(time),
                     trim: None,
-                    preview_seek_to: None,
+                    preview_seek_to: Some(time),
                 }
             }
             TimelineDragTarget::Start => {

@@ -1500,7 +1500,15 @@ impl FrameRoot {
 
         if self.preview_ui.playback.dragging().is_none() {
             if target == TimelineDragTarget::Scrub {
-                let _ = self.preview_ui.playback.seek_to_percent(percent);
+                self.cancel_trim_preview_seek();
+                let command = self.preview_ui.playback.seek_to_percent(percent);
+                if command.pause && self.trim_preview_seek_available() {
+                    self.preview_ui.trim_preview_seek.pause_before_next_seek();
+                }
+                self.apply_preview_command_to_local_state(command);
+                if let Some(preview_seek_to) = command.seek_to {
+                    self.queue_trim_preview_seek(preview_seek_to, cx);
+                }
                 return true;
             }
 
@@ -1565,6 +1573,7 @@ impl FrameRoot {
         }
 
         let percent = timeline_slider_percent_from_bounds(position, bounds);
+        self.cancel_trim_preview_seek();
         let command = self.preview_ui.playback.seek_once_to_percent(percent);
         self.apply_preview_media_command(command, true, cx)
     }
@@ -1632,6 +1641,7 @@ impl FrameRoot {
         let percent = next_time / duration;
 
         if target == TimelineDragTarget::Scrub {
+            self.cancel_trim_preview_seek();
             let command = self.preview_ui.playback.seek_once_to_percent(percent);
             return self.apply_preview_media_command(command, true, cx);
         }
@@ -1682,6 +1692,14 @@ impl FrameRoot {
         true
     }
 
+    fn cancel_trim_preview_seek(&mut self) -> bool {
+        if !self.preview_ui.trim_preview_seek.is_active() {
+            return false;
+        }
+        self.preview_ui.trim_preview_seek.reset();
+        true
+    }
+
     fn start_trim_preview_seek_worker(&mut self, cx: &Context<Self>) {
         if self.preview_ui.trim_preview_seek.worker_active {
             return;
@@ -1716,6 +1734,15 @@ impl FrameRoot {
                     }
                     break;
                 };
+
+                let generation_matches = this
+                    .update(cx, move |root, _cx| {
+                        root.preview_ui.trim_preview_seek.generation == generation
+                    })
+                    .unwrap_or(false);
+                if !generation_matches {
+                    break;
+                }
 
                 let result = cx
                     .background_spawn({
