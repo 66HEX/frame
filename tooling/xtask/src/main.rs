@@ -1233,16 +1233,38 @@ jobs:
     - name: steps::setup_linux
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf
+        sudo apt-get install -y clang curl desktop-file-utils file flatpak flatpak-builder libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf
+    - name: steps::setup_appimagetool
+      run: |
+        curl -L --fail -o /tmp/appimagetool.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+        chmod +x /tmp/appimagetool.AppImage
+    - name: steps::setup_flatpak
+      run: |
+        flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+        flatpak install --user -y --noninteractive flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
     - name: ./script/bundle-linux
-      run: ./script/bundle-linux
+      env:
+        APPIMAGETOOL: /tmp/appimagetool.AppImage
+      run: ./script/bundle-linux --tarball --appimage --flatpak
     - name: release::upload_linux_x86_64
       uses: actions/upload-artifact@v4
       with:
         name: frame-linux-x86_64.tar.gz
         path: target/release/frame-linux-x86_64.tar.gz
         if-no-files-found: error
-    timeout-minutes: 60
+    - name: release::upload_linux_x86_64_appimage
+      uses: actions/upload-artifact@v4
+      with:
+        name: Frame-x86_64.AppImage
+        path: target/release/Frame-x86_64.AppImage
+        if-no-files-found: error
+    - name: release::upload_linux_x86_64_flatpak
+      uses: actions/upload-artifact@v4
+      with:
+        name: Frame-x86_64.flatpak
+        path: target/release/Frame-x86_64.flatpak
+        if-no-files-found: error
+    timeout-minutes: 90
 
   build_linux_aarch64:
     runs-on: ubuntu-22.04-arm
@@ -1261,16 +1283,38 @@ jobs:
     - name: steps::setup_linux
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf
+        sudo apt-get install -y clang curl desktop-file-utils file flatpak flatpak-builder libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf
+    - name: steps::setup_appimagetool
+      run: |
+        curl -L --fail -o /tmp/appimagetool.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-aarch64.AppImage
+        chmod +x /tmp/appimagetool.AppImage
+    - name: steps::setup_flatpak
+      run: |
+        flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+        flatpak install --user -y --noninteractive flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
     - name: ./script/bundle-linux
-      run: ./script/bundle-linux
+      env:
+        APPIMAGETOOL: /tmp/appimagetool.AppImage
+      run: ./script/bundle-linux --tarball --appimage --flatpak
     - name: release::upload_linux_aarch64
       uses: actions/upload-artifact@v4
       with:
         name: frame-linux-aarch64.tar.gz
         path: target/release/frame-linux-aarch64.tar.gz
         if-no-files-found: error
-    timeout-minutes: 60
+    - name: release::upload_linux_aarch64_appimage
+      uses: actions/upload-artifact@v4
+      with:
+        name: Frame-aarch64.AppImage
+        path: target/release/Frame-aarch64.AppImage
+        if-no-files-found: error
+    - name: release::upload_linux_aarch64_flatpak
+      uses: actions/upload-artifact@v4
+      with:
+        name: Frame-aarch64.flatpak
+        path: target/release/Frame-aarch64.flatpak
+        if-no-files-found: error
+    timeout-minutes: 90
 
   build_macos_x86_64:
     runs-on: macos-15-intel
@@ -1484,6 +1528,10 @@ jobs:
           target/release-artifacts/Frame-x86_64.exe
           target/release-artifacts/frame-linux-x86_64.tar.gz
           target/release-artifacts/frame-linux-aarch64.tar.gz
+          target/release-artifacts/Frame-x86_64.AppImage
+          target/release-artifacts/Frame-aarch64.AppImage
+          target/release-artifacts/Frame-x86_64.flatpak
+          target/release-artifacts/Frame-aarch64.flatpak
           target/release/latest.json
           target/release/update-manifest.json
           target/release/update-manifest.json.sig
@@ -1797,5 +1845,25 @@ mod tests {
 
         assert!(workflow.contains("--notes-file target/release/release-notes.md"));
         assert!(!workflow.contains("--generate-notes"));
+    }
+
+    #[test]
+    fn release_workflow_publishes_manual_linux_assets() {
+        let workflow = release_workflow();
+
+        assert!(workflow.contains("target/release-artifacts/Frame-x86_64.AppImage"));
+        assert!(workflow.contains("target/release-artifacts/Frame-aarch64.AppImage"));
+        assert!(workflow.contains("target/release-artifacts/Frame-x86_64.flatpak"));
+        assert!(workflow.contains("target/release-artifacts/Frame-aarch64.flatpak"));
+    }
+
+    #[test]
+    fn release_workflow_keeps_manual_linux_assets_out_of_update_manifest() {
+        let workflow = release_workflow();
+
+        assert!(!workflow.contains(":linux-x86_64:linux_appimage"));
+        assert!(!workflow.contains(":linux-aarch64:linux_appimage"));
+        assert!(!workflow.contains(":linux-x86_64:flatpak"));
+        assert!(!workflow.contains(":linux-aarch64:flatpak"));
     }
 }
