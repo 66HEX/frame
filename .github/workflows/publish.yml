@@ -177,6 +177,7 @@ jobs:
           tauriScript: 'bun tauri'
 
   update-tap:
+    if: false
     needs: publish-tauri
     runs-on: ubuntu-latest
     steps:
@@ -282,6 +283,7 @@ jobs:
           fi
 
   publish-winget:
+    if: false
     needs: publish-tauri
     runs-on: windows-latest
     steps:

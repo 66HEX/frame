@@ -5,8 +5,7 @@
 	import Label from '$lib/components/ui/Label.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Tooltip from '$lib/components/ui/Tooltip.svelte';
-	import { checkForAppUpdate } from '$lib/services/update';
-	import { updateStore } from '$lib/stores/update.svelte';
+	import { showMigrationNotice } from '$lib/features/update';
 	import Checkbox from './ui/Checkbox.svelte';
 	import { loadAutoUpdateCheck, persistAutoUpdateCheck } from '$lib/services/settings';
 	import { onMount } from 'svelte';
@@ -73,17 +72,8 @@
 		isCheckingForUpdate = true;
 		checkStatus = '';
 		try {
-			const result = await checkForAppUpdate();
-			if (result.available) {
-				updateStore.isAvailable = true;
-				updateStore.version = result.version || '';
-				updateStore.body = result.body || '';
-				updateStore.updateObject = result.updateObject;
-				updateStore.showDialog = true;
-				checkStatus = $_('settings.updateAvailable');
-			} else {
-				checkStatus = $_('settings.latestVersion');
-			}
+			showMigrationNotice();
+			checkStatus = $_('settings.updateAvailable');
 		} catch (error) {
 			console.error('Manual update check failed', error);
 			checkStatus = $_('settings.errorChecking');

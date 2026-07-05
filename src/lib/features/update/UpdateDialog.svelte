@@ -38,10 +38,10 @@
 			class="card-highlight flex w-100 flex-col gap-4 rounded-lg bg-sidebar p-3 shadow-2xl"
 		>
 			<div>
-				<Label variant="section" class="text-foreground">{$_('update.available')}</Label>
+				<Label variant="section" class="text-foreground">{$_('update.migrationTitle')}</Label>
 
 				<p class="text-[10px] text-frame-gray-600">
-					{$_('update.versionAvailable', { values: { version: updateStore.version } })}
+					{$_('update.migrationSubtitle', { values: { version: updateStore.version } })}
 				</p>
 			</div>
 
@@ -50,7 +50,14 @@
 					class="markdown-content max-h-35 overflow-y-auto rounded bg-frame-gray-100 p-3 text-[10px] text-frame-gray-600"
 				>
 					<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-					{@html renderReleaseNotes(updateStore.body)}
+					{@html renderReleaseNotes(updateStore.body || $_('update.migrationBody'))}
+				</div>
+			{:else}
+				<div
+					class="markdown-content max-h-35 overflow-y-auto rounded bg-frame-gray-100 p-3 text-[10px] text-frame-gray-600"
+				>
+					<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+					{@html renderReleaseNotes($_('update.migrationBody'))}
 				</div>
 			{/if}
 
@@ -72,7 +79,7 @@
 			{:else}
 				<div class="flex justify-end gap-2">
 					<Button variant="ghost" onclick={onCancel}>{$_('update.later')}</Button>
-					<Button onclick={onUpdate}>{$_('update.updateNow')}</Button>
+					<Button onclick={onUpdate}>{$_('update.openDownload')}</Button>
 				</div>
 			{/if}
 		</div>

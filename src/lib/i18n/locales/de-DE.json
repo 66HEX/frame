@@ -234,7 +234,11 @@
 		"available": "Update verfügbar",
 		"versionAvailable": "Version {version} ist verfügbar.",
 		"later": "Später",
-		"updateNow": "Jetzt aktualisieren"
+		"updateNow": "Jetzt aktualisieren",
+		"migrationTitle": "Frame 0.30.0 Migration",
+		"migrationSubtitle": "Version {version} is a new GPUI app and must be installed manually.",
+		"migrationBody": "Frame has moved to a new native GPUI app.\n\nThis is the final Tauri bridge release. It cannot install the new app automatically.\n\nTo migrate:\n\n1. Uninstall this Tauri version of Frame.\n2. Install Frame 0.30.0 from GitHub Releases, Homebrew, or WinGet.\n3. On Linux, use the managed tarball, AppImage, or Flatpak. GPUI 0.30.0 does not ship a DEB package.",
+		"openDownload": "Open Download Page"
 	},
 	"notifications": {
 		"conversionFinishedTitle": "Warteschlange beendet",

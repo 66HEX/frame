@@ -1,42 +1,41 @@
 import { updateStore } from '$lib/stores/update.svelte';
-import { checkForAppUpdate, installAppUpdate } from '$lib/services/update';
-import { loadAutoUpdateCheck } from '$lib/services/settings';
+import { openUrl } from '@tauri-apps/plugin-opener';
+
+const GPUI_RELEASE_URL = 'https://github.com/66HEX/frame/releases/tag/0.30.0';
+const GPUI_VERSION = '0.30.0';
+const MIGRATION_NOTICE = `Frame has moved to a new native GPUI app.
+
+This is the final Tauri bridge release. It cannot install the new app automatically.
+
+To migrate:
+
+1. Uninstall this Tauri version of Frame.
+2. Install Frame ${GPUI_VERSION} from GitHub Releases, Homebrew, or WinGet.
+3. On Linux, use the managed tarball, AppImage, or Flatpak. GPUI ${GPUI_VERSION} does not ship a DEB package.`;
+
+export function showMigrationNotice() {
+	updateStore.isAvailable = true;
+	updateStore.version = GPUI_VERSION;
+	updateStore.body = MIGRATION_NOTICE;
+	updateStore.updateObject = null;
+	updateStore.error = null;
+	updateStore.isInstalling = false;
+	updateStore.progress = 0;
+	updateStore.showDialog = true;
+}
 
 export function createAppUpdateManager() {
-	async function initUpdateCheck() {
-		const shouldCheck = await loadAutoUpdateCheck();
-		if (!shouldCheck) return;
-
-		try {
-			updateStore.isChecking = true;
-			const result = await checkForAppUpdate();
-			if (result.available) {
-				updateStore.isAvailable = true;
-				updateStore.version = result.version || '';
-				updateStore.body = result.body || '';
-				updateStore.updateObject = result.updateObject;
-				updateStore.showDialog = true;
-			}
-		} catch (e) {
-			console.error('Update check failed', e);
-		} finally {
-			updateStore.isChecking = false;
-		}
+	function initUpdateCheck() {
+		showMigrationNotice();
 	}
 
 	async function handleUpdate() {
-		if (!updateStore.updateObject) return;
-
 		try {
-			updateStore.isInstalling = true;
 			updateStore.error = null;
-			await installAppUpdate(updateStore.updateObject, (progress) => {
-				updateStore.progress = progress;
-			});
+			await openUrl(GPUI_RELEASE_URL);
 		} catch (e) {
-			console.error('Update installation error:', e);
+			console.error('Failed to open GPUI release page:', e);
 			updateStore.error = e instanceof Error ? e.message : String(e);
-			updateStore.isInstalling = false;
 		}
 	}
 
@@ -46,6 +45,7 @@ export function createAppUpdateManager() {
 
 	return {
 		initUpdateCheck,
+		showMigrationNotice,
 		handleUpdate,
 		handleCancelUpdate
 	};

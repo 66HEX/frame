@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.3] - 2026-07-05
+
+### Changed
+
+- **GPUI Migration Bridge:** Converted the final Tauri release into a bridge that tells users to uninstall the old Tauri app and install Frame 0.30.0 manually from GitHub Releases, Homebrew, WinGet, or the Linux tarball/AppImage/Flatpak channels.
+- **Release Automation:** Kept the legacy Tauri bundle targets, including DEB when emitted by the old workflow, but disabled Homebrew and WinGet publishing for the bridge release so those channels can move directly to GPUI 0.30.0.
+
 ## [0.29.2] - 2026-05-01
 
 ### Fixed
