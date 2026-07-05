@@ -30,8 +30,13 @@ pub const CONTENT_PADDING: f32 = 16.0;
 pub const TITLEBAR_HEIGHT: f32 = 40.0;
 pub const TITLEBAR_TOP_PADDING: f32 = 8.0;
 pub const TITLEBAR_TRAFFIC_LIGHT_SIZE: f32 = 24.0;
-pub const TITLEBAR_TRAFFIC_LIGHT_DOT_SIZE: f32 = 14.4;
-pub const TITLEBAR_TRAFFIC_LIGHT_STROKE_WIDTH: f32 = 0.72;
+pub const TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_INSET: f32 = 4.8;
+pub const TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_X: f32 =
+    CONTENT_PADDING + TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_INSET;
+pub const TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_Y: f32 =
+    TITLEBAR_HEIGHT - TITLEBAR_TRAFFIC_LIGHT_SIZE + TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_INSET;
+pub const TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_PLACEHOLDER_WIDTH: f32 =
+    TITLEBAR_TRAFFIC_LIGHT_SIZE * 3.0;
 pub const TITLEBAR_LOGO_SIZE: f32 = 20.0;
 pub const TITLEBAR_DIVIDER_HEIGHT: f32 = 24.0;
 pub const TITLEBAR_SEGMENT_HEIGHT: f32 = 30.0;
@@ -443,9 +448,14 @@ mod tests {
         }
 
         #[test]
-        fn macos_traffic_lights_preserve_original_svg_circle_geometry() {
-            assert_eq!(TITLEBAR_TRAFFIC_LIGHT_DOT_SIZE, 14.4);
-            assert_eq!(TITLEBAR_TRAFFIC_LIGHT_STROKE_WIDTH, 0.72);
+        fn macos_native_traffic_lights_preserve_original_visual_origin() {
+            assert_eq!(TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_X, 20.8);
+            assert_eq!(TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_Y, 20.8);
+        }
+
+        #[test]
+        fn macos_native_traffic_lights_preserve_original_layout_slot() {
+            assert_eq!(TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_PLACEHOLDER_WIDTH, 72.0);
         }
 
         #[test]

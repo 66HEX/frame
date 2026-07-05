@@ -71,7 +71,10 @@ pub fn frame_window_options(bounds: Bounds<Pixels>) -> WindowOptions {
         titlebar: Some(TitlebarOptions {
             title: None,
             appears_transparent: true,
-            traffic_light_position: None,
+            traffic_light_position: Some(point(
+                px(TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_X),
+                px(TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_Y),
+            )),
         }),
         window_min_size: Some(size(px(WINDOW_MIN_WIDTH), px(WINDOW_MIN_HEIGHT))),
         window_background: WindowBackgroundAppearance::Opaque,
@@ -112,38 +115,4 @@ fn frame_window_icon() -> Option<std::sync::Arc<image::RgbaImage>> {
     });
 
     APP_ICON.as_ref().cloned()
-}
-
-#[cfg(target_os = "macos")]
-pub(super) fn hide_native_macos_titlebar_controls(window: &Window) -> bool {
-    let Ok(window_handle) = HasWindowHandle::window_handle(window) else {
-        return false;
-    };
-
-    let RawWindowHandle::AppKit(appkit_handle) = window_handle.as_raw() else {
-        return true;
-    };
-
-    // SAFETY: GPUI exposes a valid AppKit NSView handle for the live window.
-    let ns_view = unsafe { &*appkit_handle.ns_view.as_ptr().cast::<NSView>() };
-    let Some(ns_window) = ns_view.window() else {
-        return false;
-    };
-
-    for button_kind in [
-        NSWindowButton::CloseButton,
-        NSWindowButton::MiniaturizeButton,
-        NSWindowButton::ZoomButton,
-    ] {
-        if let Some(button) = ns_window.standardWindowButton(button_kind) {
-            button.setHidden(true);
-        }
-    }
-
-    true
-}
-
-#[cfg(not(target_os = "macos"))]
-pub(super) fn hide_native_macos_titlebar_controls(_window: &Window) -> bool {
-    true
 }

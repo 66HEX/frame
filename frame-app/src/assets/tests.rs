@@ -153,19 +153,6 @@ mod frame_assets {
     }
 
     #[test]
-    fn traffic_light_symbols_preserve_original_hover_glyphs() {
-        let loaded = FrameAssets
-            .load(ICON_TRAFFIC_CLOSE_SYMBOL)
-            .expect("asset load should not fail")
-            .expect("traffic light asset should exist");
-        let svg = std::str::from_utf8(loaded.as_ref()).expect("svg should be utf8");
-
-        assert!(svg.contains(r#"viewBox="-10 -10 20 20""#));
-        assert!(svg.contains("M-1.8 -1.8 L1.8 1.8 M1.8 -1.8 L-1.8 1.8"));
-        assert!(svg.contains(r#"stroke-width="1.5""#));
-    }
-
-    #[test]
     fn frame_font_family_matches_bundled_font_name_table_family() {
         assert_eq!(FRAME_FONT_FAMILY, "Overused Grotesk");
     }

@@ -2660,15 +2660,21 @@ mod frame_window_options {
     use super::*;
 
     #[test]
-    fn keeps_transparent_titlebar_without_positioning_native_controls() {
+    fn keeps_transparent_titlebar_with_native_controls_in_frame_slot() {
         let options = frame_window_options(Bounds::default());
         let titlebar = options
             .titlebar
             .as_ref()
-            .expect("custom Frame controls still need a transparent native titlebar host");
+            .expect("Frame keeps a transparent native titlebar host for macOS controls");
 
         assert!(titlebar.appears_transparent);
-        assert_eq!(titlebar.traffic_light_position, None);
+        assert_eq!(
+            titlebar.traffic_light_position,
+            Some(point(
+                px(TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_X),
+                px(TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_Y),
+            ))
+        );
     }
 
     #[test]

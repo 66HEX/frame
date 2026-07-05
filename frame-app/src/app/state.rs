@@ -99,7 +99,6 @@ impl FrameRoot {
             presets,
             subtitle_ui: SubtitleUiState::default(),
             preview_ui: PreviewUiState::default(),
-            native_titlebar_controls_hidden: false,
             next_file_sequence: 0,
             persistence,
             auto_update_check: persisted_settings.auto_update_check,

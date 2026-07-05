@@ -22,10 +22,6 @@ impl Render for FrameRoot {
             app_root_focus.focus(window, cx);
         }
 
-        if !self.native_titlebar_controls_hidden {
-            self.native_titlebar_controls_hidden = hide_native_macos_titlebar_controls(window);
-        }
-
         let state = self.app_state();
         let source_metadata_entry = self.selected_source_metadata_entry();
         let source_metadata = source_metadata_entry.metadata.clone();

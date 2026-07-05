@@ -47,9 +47,6 @@ pub const ICON_CROP: &str = "icons/crop.svg";
 pub const ICON_SPINNER: &str = "icons/spinner.svg";
 pub const ICON_SQUARE: &str = "icons/square.svg";
 pub const ICON_TRASH: &str = "icons/trash.svg";
-pub const ICON_TRAFFIC_CLOSE_SYMBOL: &str = "icons/traffic-close-symbol.svg";
-pub const ICON_TRAFFIC_MINIMIZE_SYMBOL: &str = "icons/traffic-minimize-symbol.svg";
-pub const ICON_TRAFFIC_ZOOM_SYMBOL: &str = "icons/traffic-zoom-symbol.svg";
 
 const FRAME_ICON_SVG: &str = include_str!("../../assets/icons/frame.svg");
 const FRAME_FONT_REGULAR_BYTES: &[u8] =
@@ -90,9 +87,6 @@ const CROP_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2
 const SPINNER_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><path d="M12 3V6" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"/><path d="M12 18V21" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"/><path d="M21 12L18 12" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"/><path d="M6 12L3 12" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"/><path d="M18.3635 5.63672L16.2422 7.75804" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"/><path d="M7.75804 16.2422L5.63672 18.3635" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"/><path d="M18.3635 18.3635L16.2422 16.2422" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"/><path d="M7.75804 7.75804L5.63672 5.63672" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"/></svg>"#;
 const SQUARE_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><path d="M2.5 12C2.5 7.52166 2.5 5.28249 3.89124 3.89124C5.28249 2.5 7.52166 2.5 12 2.5C16.4783 2.5 18.7175 2.5 20.1088 3.89124C21.5 5.28249 21.5 7.52166 21.5 12C21.5 16.4783 21.5 18.7175 20.1088 20.1088C18.7175 21.5 16.4783 21.5 12 21.5C7.52166 21.5 5.28249 21.5 3.89124 20.1088C2.5 18.7175 2.5 16.4783 2.5 12Z" stroke="currentColor" stroke-width="1.5"/></svg>"#;
 const TRASH_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><path d="M19.5 5.5L18.8803 15.5251C18.7219 18.0864 18.6428 19.3671 18.0008 20.2879C17.6833 20.7431 17.2747 21.1273 16.8007 21.416C15.8421 22 14.559 22 11.9927 22C9.42312 22 8.1383 22 7.17905 21.4149C6.7048 21.1257 6.296 20.7408 5.97868 20.2848C5.33688 19.3626 5.25945 18.0801 5.10461 15.5152L4.5 5.5" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"/><path d="M3 5.5H21M16.0557 5.5L15.3731 4.09173C14.9196 3.15626 14.6928 2.68852 14.3017 2.39681C14.215 2.3321 14.1231 2.27454 14.027 2.2247C13.5939 2 13.0741 2 12.0345 2C10.9688 2 10.436 2 9.99568 2.23412C9.8981 2.28601 9.80498 2.3459 9.71729 2.41317C9.32164 2.7167 9.10063 3.20155 8.65861 4.17126L8.05292 5.5" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"/><path d="M9.5 16.5L9.5 10.5" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"/><path d="M14.5 16.5L14.5 10.5" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"/></svg>"#;
-const TRAFFIC_CLOSE_SYMBOL_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -10 20 20"><path d="M-1.8 -1.8 L1.8 1.8 M1.8 -1.8 L-1.8 1.8" stroke="#4a0002" stroke-width="1.5" stroke-linecap="round"/></svg>"##;
-const TRAFFIC_MINIMIZE_SYMBOL_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -10 20 20"><line x1="-2.4" y1="0" x2="2.4" y2="0" stroke="#5a3900" stroke-width="1.5" stroke-linecap="round"/></svg>"##;
-const TRAFFIC_ZOOM_SYMBOL_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -10 20 20"><g fill="#004200"><path d="M-2.1 2.1 L-2.1 -1.5 L1.5 2.1 Z"/><path d="M2.1 -2.1 L2.1 1.5 L-1.5 -2.1 Z"/></g></svg>"##;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct FrameAssets;
@@ -136,9 +130,6 @@ impl AssetSource for FrameAssets {
             ICON_SPINNER => Cow::Borrowed(SPINNER_SVG.as_bytes()),
             ICON_SQUARE => Cow::Borrowed(SQUARE_SVG.as_bytes()),
             ICON_TRASH => Cow::Borrowed(TRASH_SVG.as_bytes()),
-            ICON_TRAFFIC_CLOSE_SYMBOL => Cow::Borrowed(TRAFFIC_CLOSE_SYMBOL_SVG.as_bytes()),
-            ICON_TRAFFIC_MINIMIZE_SYMBOL => Cow::Borrowed(TRAFFIC_MINIMIZE_SYMBOL_SVG.as_bytes()),
-            ICON_TRAFFIC_ZOOM_SYMBOL => Cow::Borrowed(TRAFFIC_ZOOM_SYMBOL_SVG.as_bytes()),
             _ => return Ok(None),
         };
 
@@ -186,9 +177,6 @@ impl AssetSource for FrameAssets {
                 SharedString::from("terminal.svg"),
                 SharedString::from("trash.svg"),
                 SharedString::from("unfold-more.svg"),
-                SharedString::from("traffic-close-symbol.svg"),
-                SharedString::from("traffic-minimize-symbol.svg"),
-                SharedString::from("traffic-zoom-symbol.svg"),
             ],
             _ => Vec::new(),
         };

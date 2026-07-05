@@ -10,7 +10,7 @@ use super::input::{FrameTextInputSpec, frame_text_input};
 use super::primitives::{
     ButtonColors, ButtonVariant, action_button, animated_button_colors, button_colors,
     button_highlight_shadows, button_mouse_down, card_surface_shadows, color, icon_svg,
-    input_highlight_shadows, panel_bottom_separator, parse_hex, vertical_separator,
+    input_highlight_shadows, panel_bottom_separator, vertical_separator,
 };
 use super::settings_panel::{settings_hint_text, settings_section};
 use super::{
@@ -21,17 +21,13 @@ use super::{
     StatefulInteractiveElement, Styled, TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_DIVIDER_HEIGHT,
     TITLEBAR_HEIGHT, TITLEBAR_ICON_SIZE, TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
     TITLEBAR_LINUX_WINDOW_CONTROLS_GAP, TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X,
-    TITLEBAR_LOGO_SIZE, TITLEBAR_NAV_BUTTON_HEIGHT, TITLEBAR_PLATFORM_DIVIDER_HEIGHT,
-    TITLEBAR_SEGMENT_HEIGHT, TITLEBAR_TOP_PADDING, TITLEBAR_TRAFFIC_LIGHT_DOT_SIZE,
-    TITLEBAR_TRAFFIC_LIGHT_SIZE, TITLEBAR_TRAFFIC_LIGHT_STROKE_WIDTH,
-    TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH, TITLEBAR_WINDOWS_WINDOW_ICON_SIZE,
-    TITLEBAR_WINDOWS_WINDOW_MAX_ICON_SIZE, TRAFFIC_CLOSE_BORDER, TRAFFIC_CLOSE_FILL,
-    TRAFFIC_CLOSE_SYMBOL, TRAFFIC_LIGHT_GROUP, TRAFFIC_MINIMIZE_BORDER, TRAFFIC_MINIMIZE_FILL,
-    TRAFFIC_MINIMIZE_SYMBOL, TRAFFIC_ZOOM_BORDER, TRAFFIC_ZOOM_FILL, TRAFFIC_ZOOM_SYMBOL,
-    UpdateInfo, UpdateStatus, WORKSPACE_COLUMNS, WORKSPACE_GAP, Window, WindowControlArea, assets,
-    div, ease_out_quint, format_total_size, hover_motion, mix_color, motion_is_hidden,
-    motion_target, px, relative, retarget_hover_motion, set_motion_target,
-    settings_sheet_right_inset, svg, theme,
+    TITLEBAR_LOGO_SIZE, TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_PLACEHOLDER_WIDTH,
+    TITLEBAR_NAV_BUTTON_HEIGHT, TITLEBAR_PLATFORM_DIVIDER_HEIGHT, TITLEBAR_SEGMENT_HEIGHT,
+    TITLEBAR_TOP_PADDING, TITLEBAR_TRAFFIC_LIGHT_SIZE, TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
+    TITLEBAR_WINDOWS_WINDOW_ICON_SIZE, TITLEBAR_WINDOWS_WINDOW_MAX_ICON_SIZE, UpdateInfo,
+    UpdateStatus, WORKSPACE_COLUMNS, WORKSPACE_GAP, Window, WindowControlArea, assets, div,
+    ease_out_quint, format_total_size, hover_motion, mix_color, motion_is_hidden, motion_target,
+    px, relative, retarget_hover_motion, set_motion_target, settings_sheet_right_inset, svg, theme,
 };
 use gpui::{HighlightStyle, StyledText};
 
@@ -105,7 +101,7 @@ pub(super) fn macos_titlebar(
                 .items_center()
                 .mt_2()
                 .gap_6()
-                .child(macos_window_controls(cx))
+                .child(macos_native_window_controls_placeholder())
                 .when(show_workspace_controls, |this| {
                     this.child(frame_logo())
                         .child(titlebar_divider())
@@ -1494,54 +1490,11 @@ pub(super) fn drag_drop_overlay(
         )
 }
 
-pub(super) fn macos_window_controls(cx: &Context<FrameRoot>) -> gpui::Div {
+pub(super) fn macos_native_window_controls_placeholder() -> gpui::Div {
     div()
-        .flex()
-        .items_center()
+        .w(px(TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_PLACEHOLDER_WIDTH))
+        .h(px(TITLEBAR_TRAFFIC_LIGHT_SIZE))
         .mr_2()
-        .group(TRAFFIC_LIGHT_GROUP)
-        .child(
-            traffic_light(
-                TRAFFIC_CLOSE_FILL,
-                TRAFFIC_CLOSE_BORDER,
-                TRAFFIC_CLOSE_SYMBOL,
-                assets::ICON_TRAFFIC_CLOSE_SYMBOL,
-            )
-            .id("titlebar-close")
-            .window_control_area(WindowControlArea::Close)
-            .on_click(cx.listener(|_, _: &ClickEvent, window, cx| {
-                cx.stop_propagation();
-                window.remove_window();
-            })),
-        )
-        .child(
-            traffic_light(
-                TRAFFIC_MINIMIZE_FILL,
-                TRAFFIC_MINIMIZE_BORDER,
-                TRAFFIC_MINIMIZE_SYMBOL,
-                assets::ICON_TRAFFIC_MINIMIZE_SYMBOL,
-            )
-            .id("titlebar-minimize")
-            .window_control_area(WindowControlArea::Min)
-            .on_click(cx.listener(|_, _: &ClickEvent, window, cx| {
-                cx.stop_propagation();
-                window.minimize_window();
-            })),
-        )
-        .child(
-            traffic_light(
-                TRAFFIC_ZOOM_FILL,
-                TRAFFIC_ZOOM_BORDER,
-                TRAFFIC_ZOOM_SYMBOL,
-                assets::ICON_TRAFFIC_ZOOM_SYMBOL,
-            )
-            .id("titlebar-zoom")
-            .window_control_area(WindowControlArea::Max)
-            .on_click(cx.listener(|_, _: &ClickEvent, window, cx| {
-                cx.stop_propagation();
-                window.zoom_window();
-            })),
-        )
 }
 
 pub(super) fn windows_window_controls(
@@ -1758,43 +1711,6 @@ pub(super) fn titlebar_window_button(
         .child(icon_svg(icon, metrics.icon_size, icon_color));
 
     apply_accessible_button(button, label, true).tab_stop(false)
-}
-
-pub(super) fn traffic_light(
-    fill: &'static str,
-    border: &'static str,
-    symbol_color: &'static str,
-    symbol_icon: &'static str,
-) -> gpui::Div {
-    div()
-        .w(px(TITLEBAR_TRAFFIC_LIGHT_SIZE))
-        .h(px(TITLEBAR_TRAFFIC_LIGHT_SIZE))
-        .relative()
-        .flex()
-        .items_center()
-        .justify_center()
-        .rounded_full()
-        .cursor_pointer()
-        .child(
-            div()
-                .w(px(TITLEBAR_TRAFFIC_LIGHT_DOT_SIZE))
-                .h(px(TITLEBAR_TRAFFIC_LIGHT_DOT_SIZE))
-                .rounded_full()
-                .bg(parse_hex(fill))
-                .border(px(TITLEBAR_TRAFFIC_LIGHT_STROKE_WIDTH))
-                .border_color(parse_hex(border)),
-        )
-        .child(
-            svg()
-                .path(symbol_icon)
-                .absolute()
-                .inset_0()
-                .w(px(TITLEBAR_TRAFFIC_LIGHT_SIZE))
-                .h(px(TITLEBAR_TRAFFIC_LIGHT_SIZE))
-                .opacity(0.0)
-                .group_hover(TRAFFIC_LIGHT_GROUP, |style| style.opacity(1.0))
-                .text_color(parse_hex(symbol_color)),
-        )
 }
 
 pub(super) fn frame_logo() -> gpui::Div {

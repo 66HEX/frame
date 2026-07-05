@@ -45,23 +45,25 @@ use preview_panel::{
     timeline_keyboard_time_for_key, timeline_slider_percent_from_bounds,
 };
 use primitives::color;
-use runtime::hide_native_macos_titlebar_controls;
 use workspace::{welcome_view, workspace_view};
 
+#[cfg(target_os = "linux")]
+use crate::LINUX_WINDOW_FRAME_INSET;
 use crate::{
     ActiveView, CONTENT_PADDING, FILE_LIST_ROW_SPAN, FILE_ROW_HEIGHT, FrameAppState,
-    LEFT_COLUMN_SPAN, LEFT_GRID_ROWS, LINUX_WINDOW_FRAME_INSET, PANEL_HEADER_HEIGHT,
-    PREVIEW_PANEL_PADDING, PREVIEW_PLAYHEAD_HEIGHT, PREVIEW_ROW_SPAN,
-    PREVIEW_TIMELINE_CONTROL_HEIGHT, PREVIEW_TIMELINE_HANDLE_WIDTH, PREVIEW_TIMELINE_TOP_MARGIN,
-    PREVIEW_TOOLBAR_BUTTON_SIZE, PREVIEW_TOOLBAR_ICON_SIZE, PREVIEW_TOOLBAR_OFFSET,
-    PREVIEW_TRACK_HEIGHT, RIGHT_COLUMN_SPAN, SETTINGS_CONTROL_HEIGHT, SETTINGS_PANEL_PADDING,
-    SETTINGS_TAB_BUTTON_SIZE, SETTINGS_TAB_ICON_SIZE, TITLEBAR_ACTION_ICON_SIZE,
-    TITLEBAR_BUTTON_HEIGHT, TITLEBAR_DIVIDER_HEIGHT, TITLEBAR_HEIGHT, TITLEBAR_ICON_BUTTON_SIZE,
-    TITLEBAR_ICON_SIZE, TITLEBAR_LINUX_WINDOW_BUTTON_SIZE, TITLEBAR_LINUX_WINDOW_CONTROLS_GAP,
-    TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X, TITLEBAR_LOGO_SIZE, TITLEBAR_NAV_BUTTON_HEIGHT,
+    LEFT_COLUMN_SPAN, LEFT_GRID_ROWS, PANEL_HEADER_HEIGHT, PREVIEW_PANEL_PADDING,
+    PREVIEW_PLAYHEAD_HEIGHT, PREVIEW_ROW_SPAN, PREVIEW_TIMELINE_CONTROL_HEIGHT,
+    PREVIEW_TIMELINE_HANDLE_WIDTH, PREVIEW_TIMELINE_TOP_MARGIN, PREVIEW_TOOLBAR_BUTTON_SIZE,
+    PREVIEW_TOOLBAR_ICON_SIZE, PREVIEW_TOOLBAR_OFFSET, PREVIEW_TRACK_HEIGHT, RIGHT_COLUMN_SPAN,
+    SETTINGS_CONTROL_HEIGHT, SETTINGS_PANEL_PADDING, SETTINGS_TAB_BUTTON_SIZE,
+    SETTINGS_TAB_ICON_SIZE, TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_BUTTON_HEIGHT,
+    TITLEBAR_DIVIDER_HEIGHT, TITLEBAR_HEIGHT, TITLEBAR_ICON_BUTTON_SIZE, TITLEBAR_ICON_SIZE,
+    TITLEBAR_LINUX_WINDOW_BUTTON_SIZE, TITLEBAR_LINUX_WINDOW_CONTROLS_GAP,
+    TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X, TITLEBAR_LOGO_SIZE,
+    TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_PLACEHOLDER_WIDTH, TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_X,
+    TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_Y, TITLEBAR_NAV_BUTTON_HEIGHT,
     TITLEBAR_PLATFORM_DIVIDER_HEIGHT, TITLEBAR_SEGMENT_HEIGHT, TITLEBAR_TOP_PADDING,
-    TITLEBAR_TRAFFIC_LIGHT_DOT_SIZE, TITLEBAR_TRAFFIC_LIGHT_SIZE,
-    TITLEBAR_TRAFFIC_LIGHT_STROKE_WIDTH, TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
+    TITLEBAR_TRAFFIC_LIGHT_SIZE, TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
     TITLEBAR_WINDOWS_WINDOW_ICON_SIZE, TITLEBAR_WINDOWS_WINDOW_MAX_ICON_SIZE, VisualFixture,
     WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH, WORKSPACE_COLUMNS, WORKSPACE_GAP,
     active_view_from_env_value,
@@ -161,10 +163,6 @@ use gpui::{
     actions, canvas, deferred, div, ease_out_quint, fill, hsla, img, linear_color_stop,
     linear_gradient, point, prelude::*, px, radians, relative, size, svg, uniform_list,
 };
-#[cfg(target_os = "macos")]
-use objc2_app_kit::{NSView, NSWindowButton};
-#[cfg(target_os = "macos")]
-use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use std::{
     ops::Range,
     path::PathBuf,
@@ -204,16 +202,6 @@ const LOG_SCROLL_BUTTON_PADDING: f32 = 4.0;
 const LOG_SCROLL_BUTTON_SIZE: f32 = 24.0;
 const LOG_SCROLL_ICON_SIZE: f32 = 16.0;
 const LOG_COPY_FEEDBACK_DURATION: Duration = Duration::from_millis(1_200);
-const TRAFFIC_LIGHT_GROUP: &str = "titlebar-traffic-lights";
-const TRAFFIC_CLOSE_FILL: &str = "#ff5f56";
-const TRAFFIC_CLOSE_BORDER: &str = "#e0443e";
-const TRAFFIC_CLOSE_SYMBOL: &str = "#4a0002";
-const TRAFFIC_MINIMIZE_FILL: &str = "#ffbd2e";
-const TRAFFIC_MINIMIZE_BORDER: &str = "#dea123";
-const TRAFFIC_MINIMIZE_SYMBOL: &str = "#5a3900";
-const TRAFFIC_ZOOM_FILL: &str = "#27c93f";
-const TRAFFIC_ZOOM_BORDER: &str = "#1aab29";
-const TRAFFIC_ZOOM_SYMBOL: &str = "#004200";
 const ROOT_DROP_GROUP: &str = "frame-root-drop-target";
 const DEFAULT_CROP_X: f64 = 0.1;
 const DEFAULT_CROP_Y: f64 = 0.1;
@@ -247,10 +235,6 @@ const PREVIEW_FRAME_TICK_INTERVAL: Duration = Duration::from_millis(16);
 const TRIM_PREVIEW_SEEK_INTERVAL: Duration = Duration::from_millis(50);
 const TRIM_PREVIEW_SEEK_EPSILON_SECONDS: f64 = 1.0 / 240.0;
 
-#[expect(
-    clippy::struct_excessive_bools,
-    reason = "Root UI state keeps independent boolean flags for GPUI render and input paths."
-)]
 pub struct FrameRoot {
     active_view: ActiveView,
     focus_registry: FrameFocusRegistry,
@@ -276,7 +260,6 @@ pub struct FrameRoot {
     presets: Vec<PresetDefinition>,
     subtitle_ui: SubtitleUiState,
     preview_ui: PreviewUiState,
-    native_titlebar_controls_hidden: bool,
     next_file_sequence: u64,
     persistence: Option<AppPersistence>,
     auto_update_check: bool,
