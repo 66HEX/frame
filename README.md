@@ -274,11 +274,13 @@ cargo xtask ci
 
 ## Star History
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=66HEX/frame&type=timeline&theme=dark" />
-  <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=66HEX/frame&type=timeline" />
-  <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=66HEX/frame&type=timeline" />
-</picture>
+<a href="https://www.star-history.com/?repos=66HEX%2Fframe&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=66HEX/frame&type=date&theme=dark&legend=top-left&sealed_token=qQ6hXCFpFbLB0xQ3VJWBpqgd-1jWExYh5y8PjqpU_0neCRaXvspFp3hJVBWGu2bE8OFZNI3XkEOY_jXujwlg62x69RUZXxVTdCFMG-dc9-vEkFW5PmLD6yZ26l8w3zNRAyTRisu5PC1Bk5UY_k7P-YUkwvSwXbTQg8MXFhjeTGJS9FPo8OsSIlmS_6en" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=66HEX/frame&type=date&legend=top-left&sealed_token=qQ6hXCFpFbLB0xQ3VJWBpqgd-1jWExYh5y8PjqpU_0neCRaXvspFp3hJVBWGu2bE8OFZNI3XkEOY_jXujwlg62x69RUZXxVTdCFMG-dc9-vEkFW5PmLD6yZ26l8w3zNRAyTRisu5PC1Bk5UY_k7P-YUkwvSwXbTQg8MXFhjeTGJS9FPo8OsSIlmS_6en" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=66HEX/frame&type=date&legend=top-left&sealed_token=qQ6hXCFpFbLB0xQ3VJWBpqgd-1jWExYh5y8PjqpU_0neCRaXvspFp3hJVBWGu2bE8OFZNI3XkEOY_jXujwlg62x69RUZXxVTdCFMG-dc9-vEkFW5PmLD6yZ26l8w3zNRAyTRisu5PC1Bk5UY_k7P-YUkwvSwXbTQg8MXFhjeTGJS9FPo8OsSIlmS_6en" />
+ </picture>
+</a>
 
 ## Acknowledgments & Third-Party Code
 
