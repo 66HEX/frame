@@ -12,10 +12,10 @@ use frame_updater::{
     PlatformAssetKey, UpdateAsset, UpdateAssetKind, UpdateChannel, UpdateManifest, file_sha256_hex,
     sign_manifest_bytes,
 };
+use sha2::{Digest, Sha256};
 const RUN_BUNDLING_WORKFLOW_PATH: &str = ".github/workflows/run_bundling.yml";
 const RELEASE_WORKFLOW_PATH: &str = ".github/workflows/release.yml";
-const MARTIN_FFMPEG_BASE_URL: &str = "https://ffmpeg.martin-riedl.de/redirect/latest";
-const WINDOWS_FFMPEG_ZIP_URL: &str = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
+const FFMPEG_VERSION: &str = "8.1.2";
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -139,16 +139,21 @@ fn setup_ffmpeg(args: &[String]) -> Result<()> {
     let binary_dir = repo_root()?.join("frame-app/resources/binaries");
 
     fs::create_dir_all(&binary_dir)?;
-    println!("Detected {}. Preparing FFmpeg binaries...", target.label());
+    println!(
+        "Detected {}. Preparing FFmpeg {FFMPEG_VERSION} binaries...",
+        target.label()
+    );
 
     match target {
         FfmpegTarget::Individual { binaries, .. } => {
             for entry in binaries {
-                process_ffmpeg_entry(&entry, &binary_dir, options.force)?;
+                process_ffmpeg_entry(entry, &binary_dir, options.force)?;
             }
         }
-        FfmpegTarget::SharedArchive { url, entries, .. } => {
-            process_ffmpeg_shared_archive(&url, &entries, &binary_dir, options.force)?;
+        FfmpegTarget::SharedArchive {
+            archive, entries, ..
+        } => {
+            process_ffmpeg_shared_archive(archive, entries, &binary_dir, options.force)?;
         }
     }
 
@@ -224,22 +229,29 @@ Options:
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct FfmpegBinaryEntry {
     id: &'static str,
-    url: Option<String>,
+    archive: Option<FfmpegArchive>,
     expected_names: &'static [&'static str],
-    destination_name: String,
+    destination_name: &'static str,
+    sha256: &'static str,
     make_executable: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct FfmpegArchive {
+    url: &'static str,
+    sha256: &'static str,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum FfmpegTarget {
     Individual {
         label: &'static str,
-        binaries: Vec<FfmpegBinaryEntry>,
+        binaries: &'static [FfmpegBinaryEntry],
     },
     SharedArchive {
         label: &'static str,
-        url: String,
-        entries: Vec<FfmpegBinaryEntry>,
+        archive: FfmpegArchive,
+        entries: &'static [FfmpegBinaryEntry],
     },
 }
 
@@ -251,36 +263,145 @@ impl FfmpegTarget {
     }
 }
 
+const MACOS_X86_64_BINARIES: &[FfmpegBinaryEntry] = &[
+    FfmpegBinaryEntry {
+        id: "ffmpeg",
+        archive: Some(FfmpegArchive {
+            url: "https://ffmpeg.martin-riedl.de/download/macos/amd64/1783018342_8.1.2/ffmpeg.zip",
+            sha256: "a52ef43883f44c219766d4b3bdde4e635b35465d0b704c01c3a0566b59775df9",
+        }),
+        expected_names: &["ffmpeg"],
+        destination_name: "ffmpeg-x86_64-apple-darwin",
+        sha256: "1ca59dda73668c59898a0b305afd8a88817a989187f222ec62d64e775d614d23",
+        make_executable: true,
+    },
+    FfmpegBinaryEntry {
+        id: "ffprobe",
+        archive: Some(FfmpegArchive {
+            url: "https://ffmpeg.martin-riedl.de/download/macos/amd64/1783018342_8.1.2/ffprobe.zip",
+            sha256: "5408ca588c8c72b0dde3afe676d0a7acf25ef97e55ae6eba5c7bede1cda42695",
+        }),
+        expected_names: &["ffprobe"],
+        destination_name: "ffprobe-x86_64-apple-darwin",
+        sha256: "bdb6aff0f1f414382effd97040f7862dc85e67996ac296cb4288beed0e06498f",
+        make_executable: true,
+    },
+];
+
+const MACOS_AARCH64_BINARIES: &[FfmpegBinaryEntry] = &[
+    FfmpegBinaryEntry {
+        id: "ffmpeg",
+        archive: Some(FfmpegArchive {
+            url: "https://ffmpeg.martin-riedl.de/download/macos/arm64/1783011502_8.1.2/ffmpeg.zip",
+            sha256: "ef1aa60006c7b77ce170c1608c08d8e4ba1c30c5746f2ac986ded932d0ac2c3c",
+        }),
+        expected_names: &["ffmpeg"],
+        destination_name: "ffmpeg-aarch64-apple-darwin",
+        sha256: "eaf91238e104dd0e262bc6510e25061855cc99a6955a721b0ac99660d58c473d",
+        make_executable: true,
+    },
+    FfmpegBinaryEntry {
+        id: "ffprobe",
+        archive: Some(FfmpegArchive {
+            url: "https://ffmpeg.martin-riedl.de/download/macos/arm64/1783011502_8.1.2/ffprobe.zip",
+            sha256: "c39787f4af7a3932502d2d48db6f6feaaa836b48a73ef78c32cc3285df61dfaf",
+        }),
+        expected_names: &["ffprobe"],
+        destination_name: "ffprobe-aarch64-apple-darwin",
+        sha256: "ed9dc5871914b466b96b402c9ec0ba68ce4f836e72faa464b1b4e279835bd4a6",
+        make_executable: true,
+    },
+];
+
+const LINUX_X86_64_BINARIES: &[FfmpegBinaryEntry] = &[
+    FfmpegBinaryEntry {
+        id: "ffmpeg",
+        archive: Some(FfmpegArchive {
+            url: "https://ffmpeg.martin-riedl.de/download/linux/amd64/1783011670_8.1.2/ffmpeg.zip",
+            sha256: "56452c0bfc4ee0325cd615d62f46ba8264f62eed34f727c2224c6c84fa7b8719",
+        }),
+        expected_names: &["ffmpeg"],
+        destination_name: "ffmpeg-x86_64-unknown-linux-gnu",
+        sha256: "bea0dfb96f7223b1be497cf11ccda9ddd9a39103b948b342bb6db1c60a56be12",
+        make_executable: true,
+    },
+    FfmpegBinaryEntry {
+        id: "ffprobe",
+        archive: Some(FfmpegArchive {
+            url: "https://ffmpeg.martin-riedl.de/download/linux/amd64/1783011670_8.1.2/ffprobe.zip",
+            sha256: "c6f2d36e98f9a4445fad0b0be539f4c4faf13fd502116bf131becd53f56cd390",
+        }),
+        expected_names: &["ffprobe"],
+        destination_name: "ffprobe-x86_64-unknown-linux-gnu",
+        sha256: "f0a9c3c87d45fe323ae893fe9820150a46f5af9fc5f75066712097f160befac5",
+        make_executable: true,
+    },
+];
+
+const LINUX_AARCH64_BINARIES: &[FfmpegBinaryEntry] = &[
+    FfmpegBinaryEntry {
+        id: "ffmpeg",
+        archive: Some(FfmpegArchive {
+            url: "https://ffmpeg.martin-riedl.de/download/linux/arm64/1783010599_8.1.2/ffmpeg.zip",
+            sha256: "ab9e16864b6bf4ae7e13bbdbdc29621be11a5c547c57af8d4250e9fa2f5e6461",
+        }),
+        expected_names: &["ffmpeg"],
+        destination_name: "ffmpeg-aarch64-unknown-linux-gnu",
+        sha256: "93a3684e7467d33881f8fa39e3b8408248d4f95fb2e9f6b18383edcdbd70f163",
+        make_executable: true,
+    },
+    FfmpegBinaryEntry {
+        id: "ffprobe",
+        archive: Some(FfmpegArchive {
+            url: "https://ffmpeg.martin-riedl.de/download/linux/arm64/1783010599_8.1.2/ffprobe.zip",
+            sha256: "fb78317b81cdeb614533be59e489019b754afd199670666af28f0e9574be395b",
+        }),
+        expected_names: &["ffprobe"],
+        destination_name: "ffprobe-aarch64-unknown-linux-gnu",
+        sha256: "7a4103c64cd78c7c634a5610ea3ae5dd3a97b3714cc831407c668decf6a34c6d",
+        make_executable: true,
+    },
+];
+
+const WINDOWS_X86_64_ARCHIVE: FfmpegArchive = FfmpegArchive {
+    url: "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-06-28-13-24/ffmpeg-n8.1.2-win64-gpl-8.1.zip",
+    sha256: "dd247ae801e42777eb8d8b0a0c322f78862c265dad5749f9859cc379665e279e",
+};
+
+const WINDOWS_X86_64_BINARIES: &[FfmpegBinaryEntry] = &[
+    FfmpegBinaryEntry {
+        id: "ffmpeg",
+        archive: None,
+        expected_names: &["ffmpeg.exe"],
+        destination_name: "ffmpeg-x86_64-pc-windows-msvc.exe",
+        sha256: "bc4a55f7e5b6ff537890e20f4a178dd6d614073c38612b29c37df665f3170df5",
+        make_executable: false,
+    },
+    FfmpegBinaryEntry {
+        id: "ffprobe",
+        archive: None,
+        expected_names: &["ffprobe.exe"],
+        destination_name: "ffprobe-x86_64-pc-windows-msvc.exe",
+        sha256: "d08266eac436dc44f00d6e15a15aa3e3eab9e6bd408f9ab49657d32687510670",
+        make_executable: false,
+    },
+];
+
 fn ffmpeg_target_for(platform: &str, arch: &str) -> Result<FfmpegTarget> {
     match (platform, arch) {
-        ("darwin", "x64" | "x86_64") => Ok(martin_ffmpeg_target(
-            "macOS (Intel)",
-            "macos",
-            "amd64",
-            "x86_64",
-            "apple-darwin",
-        )),
+        ("darwin", "x64" | "x86_64") => {
+            Ok(martin_ffmpeg_target("macOS (Intel)", MACOS_X86_64_BINARIES))
+        }
         ("darwin", "arm64" | "aarch64") => Ok(martin_ffmpeg_target(
             "macOS (Apple Silicon)",
-            "macos",
-            "arm64",
-            "aarch64",
-            "apple-darwin",
+            MACOS_AARCH64_BINARIES,
         )),
-        ("linux", "x64" | "x86_64" | "amd64") => Ok(martin_ffmpeg_target(
-            "Linux x86_64",
-            "linux",
-            "amd64",
-            "x86_64",
-            "unknown-linux-gnu",
-        )),
-        ("linux", "arm64" | "aarch64") => Ok(martin_ffmpeg_target(
-            "Linux ARM64",
-            "linux",
-            "arm64",
-            "aarch64",
-            "unknown-linux-gnu",
-        )),
+        ("linux", "x64" | "x86_64" | "amd64") => {
+            Ok(martin_ffmpeg_target("Linux x86_64", LINUX_X86_64_BINARIES))
+        }
+        ("linux", "arm64" | "aarch64") => {
+            Ok(martin_ffmpeg_target("Linux ARM64", LINUX_AARCH64_BINARIES))
+        }
         ("win32" | "windows", "x64" | "x86_64") => Ok(windows_ffmpeg_target()),
         _ => Err(XtaskError::Usage(format!(
             "unsupported platform or architecture: {platform}/{arch}"
@@ -288,58 +409,18 @@ fn ffmpeg_target_for(platform: &str, arch: &str) -> Result<FfmpegTarget> {
     }
 }
 
-fn martin_ffmpeg_target(
+const fn martin_ffmpeg_target(
     label: &'static str,
-    os_segment: &str,
-    download_segment: &str,
-    arch_label: &str,
-    suffix: &str,
+    binaries: &'static [FfmpegBinaryEntry],
 ) -> FfmpegTarget {
-    FfmpegTarget::Individual {
-        label,
-        binaries: vec![
-            FfmpegBinaryEntry {
-                id: "ffmpeg",
-                url: Some(format!(
-                    "{MARTIN_FFMPEG_BASE_URL}/{os_segment}/{download_segment}/release/ffmpeg.zip"
-                )),
-                expected_names: &["ffmpeg"],
-                destination_name: format!("ffmpeg-{arch_label}-{suffix}"),
-                make_executable: true,
-            },
-            FfmpegBinaryEntry {
-                id: "ffprobe",
-                url: Some(format!(
-                    "{MARTIN_FFMPEG_BASE_URL}/{os_segment}/{download_segment}/release/ffprobe.zip"
-                )),
-                expected_names: &["ffprobe"],
-                destination_name: format!("ffprobe-{arch_label}-{suffix}"),
-                make_executable: true,
-            },
-        ],
-    }
+    FfmpegTarget::Individual { label, binaries }
 }
 
-fn windows_ffmpeg_target() -> FfmpegTarget {
+const fn windows_ffmpeg_target() -> FfmpegTarget {
     FfmpegTarget::SharedArchive {
         label: "Windows x86_64",
-        url: WINDOWS_FFMPEG_ZIP_URL.to_string(),
-        entries: vec![
-            FfmpegBinaryEntry {
-                id: "ffmpeg",
-                url: None,
-                expected_names: &["ffmpeg.exe"],
-                destination_name: "ffmpeg-x86_64-pc-windows-msvc.exe".to_string(),
-                make_executable: false,
-            },
-            FfmpegBinaryEntry {
-                id: "ffprobe",
-                url: None,
-                expected_names: &["ffprobe.exe"],
-                destination_name: "ffprobe-x86_64-pc-windows-msvc.exe".to_string(),
-                make_executable: false,
-            },
-        ],
+        archive: WINDOWS_X86_64_ARCHIVE,
+        entries: WINDOWS_X86_64_BINARIES,
     }
 }
 
@@ -698,62 +779,83 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
 }
 
 fn process_ffmpeg_entry(entry: &FfmpegBinaryEntry, binary_dir: &Path, force: bool) -> Result<()> {
-    let destination = binary_dir.join(&entry.destination_name);
-    if !force && destination.is_file() {
-        println!(
-            "Skipping {} (already exists). Use --force to re-download.",
-            entry.destination_name
-        );
+    let destination = binary_dir.join(entry.destination_name);
+    if !ffmpeg_binary_needs_download(entry, &destination, force)? {
         return Ok(());
     }
 
-    let Some(url) = entry.url.as_deref() else {
+    let Some(archive) = entry.archive else {
         return Err(XtaskError::Usage(format!(
             "missing download URL for {}",
             entry.id
         )));
     };
 
-    println!("Downloading {} from {url}...", entry.id);
-    let archive = download_file(url)?;
-    extract_expected_file(&archive, entry, &destination)
+    println!("Downloading {} from {}...", entry.id, archive.url);
+    let archive_bytes = download_file(archive.url)?;
+    verify_bytes_sha256(&archive_bytes, archive.sha256, archive.url)?;
+    extract_expected_file(&archive_bytes, entry, &destination)
 }
 
 fn process_ffmpeg_shared_archive(
-    url: &str,
+    archive: FfmpegArchive,
     entries: &[FfmpegBinaryEntry],
     binary_dir: &Path,
     force: bool,
 ) -> Result<()> {
     let destinations = entries
         .iter()
-        .map(|entry| binary_dir.join(&entry.destination_name))
+        .map(|entry| binary_dir.join(entry.destination_name))
         .collect::<Vec<_>>();
-    let needs_download = force
-        || destinations
-            .iter()
-            .any(|destination| !destination.is_file());
+    let needs_download = entries
+        .iter()
+        .zip(&destinations)
+        .map(|(entry, destination)| ffmpeg_binary_needs_download(entry, destination, force))
+        .collect::<Result<Vec<_>>>()?;
 
-    if !needs_download {
-        println!("Windows binaries already present. Use --force to refresh.");
+    if !needs_download.iter().any(|needs_download| *needs_download) {
         return Ok(());
     }
 
-    println!("Downloading Windows bundle from {url}...");
-    let archive = download_file(url)?;
+    println!("Downloading Windows bundle from {}...", archive.url);
+    let archive_bytes = download_file(archive.url)?;
+    verify_bytes_sha256(&archive_bytes, archive.sha256, archive.url)?;
 
-    for (entry, destination) in entries.iter().zip(destinations.iter()) {
-        if !force && destination.is_file() {
-            println!(
-                "Skipping {} (already exists). Use --force to re-download.",
-                entry.destination_name
-            );
+    for ((entry, destination), needs_download) in
+        entries.iter().zip(&destinations).zip(needs_download)
+    {
+        if !needs_download {
             continue;
         }
-        extract_expected_file(&archive, entry, destination)?;
+        extract_expected_file(&archive_bytes, entry, destination)?;
     }
 
     Ok(())
+}
+
+fn ffmpeg_binary_needs_download(
+    entry: &FfmpegBinaryEntry,
+    destination: &Path,
+    force: bool,
+) -> Result<bool> {
+    if force || !destination.is_file() {
+        return Ok(true);
+    }
+
+    let actual = file_sha256_hex(destination)?;
+    if actual == entry.sha256 {
+        if entry.make_executable {
+            make_file_executable(destination)?;
+        }
+        println!("Verified cached {} (SHA-256).", entry.destination_name);
+        Ok(false)
+    } else {
+        println!(
+            "Cached {} has an unexpected SHA-256; downloading it again.",
+            entry.destination_name
+        );
+        Ok(true)
+    }
 }
 
 fn download_file(url: &str) -> Result<Vec<u8>> {
@@ -768,6 +870,28 @@ fn download_file(url: &str) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
+fn verify_bytes_sha256(bytes: &[u8], expected: &str, subject: &str) -> Result<()> {
+    let actual = format!("{:x}", Sha256::digest(bytes));
+    verify_sha256(&actual, expected, subject)
+}
+
+fn verify_file_sha256(path: &Path, expected: &str) -> Result<()> {
+    let actual = file_sha256_hex(path)?;
+    verify_sha256(&actual, expected, &path.display().to_string())
+}
+
+fn verify_sha256(actual: &str, expected: &str, subject: &str) -> Result<()> {
+    if actual == expected {
+        Ok(())
+    } else {
+        Err(XtaskError::HashMismatch {
+            subject: subject.to_string(),
+            expected: expected.to_string(),
+            actual: actual.to_string(),
+        })
+    }
+}
+
 fn extract_expected_file(
     archive_bytes: &[u8],
     entry: &FfmpegBinaryEntry,
@@ -779,7 +903,7 @@ fn extract_expected_file(
     for index in 0..archive.len() {
         let mut file = archive.by_index(index)?;
         if file.is_file() && archive_entry_name_matches(file.name(), entry.expected_names) {
-            write_archive_file(&mut file, destination, entry.make_executable)?;
+            write_archive_file(&mut file, destination, entry.sha256, entry.make_executable)?;
             println!("Placed {}.", entry.destination_name);
             return Ok(());
         }
@@ -798,6 +922,7 @@ fn archive_entry_name_matches(name: &str, expected_names: &[&str]) -> bool {
 fn write_archive_file(
     reader: &mut impl Read,
     destination: &Path,
+    expected_sha256: &str,
     make_executable: bool,
 ) -> Result<()> {
     let Some(file_name) = destination.file_name().and_then(|name| name.to_str()) else {
@@ -811,6 +936,11 @@ fn write_archive_file(
     {
         let mut output = fs::File::create(&temporary_destination)?;
         io::copy(reader, &mut output)?;
+    }
+
+    if let Err(error) = verify_file_sha256(&temporary_destination, expected_sha256) {
+        let _ = fs::remove_file(&temporary_destination);
+        return Err(error);
     }
 
     if make_executable {
@@ -1684,6 +1814,11 @@ enum XtaskError {
         url: String,
         source: Box<ureq::Error>,
     },
+    HashMismatch {
+        subject: String,
+        expected: String,
+        actual: String,
+    },
     Help,
     Io(io::Error),
     RepoRoot,
@@ -1711,6 +1846,14 @@ impl fmt::Display for XtaskError {
             Self::Download { url, source } => {
                 write!(formatter, "failed to download `{url}`: {source}")
             }
+            Self::HashMismatch {
+                subject,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "SHA-256 mismatch for `{subject}`: expected {expected}, got {actual}"
+            ),
             Self::Help => Ok(()),
             Self::Io(error) => write!(formatter, "{error}"),
             Self::RepoRoot => write!(formatter, "failed to resolve repository root"),
@@ -1782,7 +1925,7 @@ mod tests {
 
         let names = binaries
             .iter()
-            .map(|entry| entry.destination_name.as_str())
+            .map(|entry| entry.destination_name)
             .collect::<Vec<_>>();
         assert_eq!(
             names,
@@ -1803,7 +1946,7 @@ mod tests {
 
         let names = entries
             .iter()
-            .map(|entry| entry.destination_name.as_str())
+            .map(|entry| entry.destination_name)
             .collect::<Vec<_>>();
         assert_eq!(
             names,
@@ -1817,9 +1960,117 @@ mod tests {
     #[test]
     fn archive_entry_name_matches_nested_zip_paths() {
         assert!(archive_entry_name_matches(
-            "ffmpeg-master-latest-win64-gpl/bin/ffprobe.exe",
+            "ffmpeg-n8.1.2-win64-gpl-8.1/bin/ffprobe.exe",
             &["ffprobe.exe"],
         ));
+    }
+
+    #[test]
+    fn verify_bytes_sha256_accepts_matching_digest() {
+        let result = verify_bytes_sha256(
+            b"abc",
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            "test bytes",
+        );
+
+        assert!(result.is_ok(), "unexpected error: {result:?}");
+    }
+
+    #[test]
+    fn verify_bytes_sha256_rejects_mismatched_digest() {
+        let error = verify_bytes_sha256(b"abc", &"0".repeat(64), "test bytes").unwrap_err();
+
+        assert!(matches!(error, XtaskError::HashMismatch { .. }));
+    }
+
+    #[test]
+    fn ffmpeg_binary_needs_download_accepts_verified_cache() {
+        let directory = tempfile::tempdir().unwrap();
+        let destination = directory.path().join("ffmpeg");
+        fs::write(&destination, b"abc").unwrap();
+        let entry =
+            test_ffmpeg_entry("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+
+        let needs_download = ffmpeg_binary_needs_download(&entry, &destination, false).unwrap();
+
+        assert!(!needs_download);
+    }
+
+    #[test]
+    fn ffmpeg_binary_needs_download_rejects_corrupt_cache() {
+        let directory = tempfile::tempdir().unwrap();
+        let destination = directory.path().join("ffmpeg");
+        fs::write(&destination, b"corrupt").unwrap();
+        let entry =
+            test_ffmpeg_entry("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+
+        let needs_download = ffmpeg_binary_needs_download(&entry, &destination, false).unwrap();
+
+        assert!(needs_download);
+    }
+
+    #[test]
+    fn write_archive_file_preserves_destination_on_hash_mismatch() {
+        let directory = tempfile::tempdir().unwrap();
+        let destination = directory.path().join("ffmpeg");
+        fs::write(&destination, b"verified binary").unwrap();
+        let mut downloaded = Cursor::new(b"corrupt binary");
+
+        let result = write_archive_file(&mut downloaded, &destination, &"0".repeat(64), false);
+
+        assert!(
+            result.is_err() && fs::read(destination).unwrap() == b"verified binary",
+            "a rejected download must not replace the existing binary"
+        );
+    }
+
+    #[test]
+    fn all_ffmpeg_sources_are_pinned_to_version_8_1_2() {
+        let individual_archives = [
+            MACOS_X86_64_BINARIES,
+            MACOS_AARCH64_BINARIES,
+            LINUX_X86_64_BINARIES,
+            LINUX_AARCH64_BINARIES,
+        ]
+        .into_iter()
+        .flat_map(|entries| entries.iter().filter_map(|entry| entry.archive));
+        let archives = individual_archives.chain([WINDOWS_X86_64_ARCHIVE]);
+
+        assert!(archives.into_iter().all(|archive| {
+            archive.url.contains(FFMPEG_VERSION)
+                && !archive.url.contains("latest")
+                && is_sha256(archive.sha256)
+        }));
+    }
+
+    #[test]
+    fn all_ffmpeg_binaries_have_pinned_sha256() {
+        let binaries = [
+            MACOS_X86_64_BINARIES,
+            MACOS_AARCH64_BINARIES,
+            LINUX_X86_64_BINARIES,
+            LINUX_AARCH64_BINARIES,
+            WINDOWS_X86_64_BINARIES,
+        ]
+        .into_iter()
+        .flatten();
+
+        assert!(binaries.into_iter().all(|entry| is_sha256(entry.sha256)));
+    }
+
+    fn is_sha256(value: &str) -> bool {
+        value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+    }
+
+    fn test_ffmpeg_entry(sha256: &'static str) -> FfmpegBinaryEntry {
+        FfmpegBinaryEntry {
+            id: "ffmpeg",
+            archive: None,
+            expected_names: &["ffmpeg"],
+            destination_name: "ffmpeg",
+            sha256,
+            make_executable: false,
+        }
     }
 
     #[test]
