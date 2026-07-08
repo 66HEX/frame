@@ -27,6 +27,16 @@ pub const DEFAULT_AUDIO_BITRATE_MODE: &str = "bitrate";
 pub const DEFAULT_AUDIO_QUALITY: &str = "4";
 pub const DEFAULT_AUDIO_CHANNELS: &str = "original";
 pub const DEFAULT_AUDIO_VOLUME: u32 = 100;
+pub const DEFAULT_VIDEO_FILTER_TEMPERATURE: u32 = 6500;
+pub const DEFAULT_VIDEO_FILTER_SHARPEN: u32 = 25;
+pub const DEFAULT_VIDEO_FILTER_BLUR: u32 = 20;
+pub const DEFAULT_VIDEO_FILTER_DEBAND: u32 = 25;
+pub const DEFAULT_VIDEO_FILTER_VIGNETTE: u32 = 35;
+pub const DEFAULT_AUDIO_FILTER_LIMITER: i32 = -1;
+pub const DEFAULT_AUDIO_FILTER_HIGH_PASS: u32 = 80;
+pub const DEFAULT_AUDIO_FILTER_LOW_PASS: u32 = 16_000;
+pub const DEFAULT_AUDIO_FILTER_NOISE_REDUCTION: u32 = 12;
+pub const DEFAULT_AUDIO_FILTER_DE_ESSER: u32 = 35;
 pub const DEFAULT_METADATA_MODE: MetadataMode = MetadataMode::Preserve;
 pub const DEFAULT_SUBTITLE_FONT_COLOR: &str = "#ffffff";
 pub const DEFAULT_SUBTITLE_OUTLINE_COLOR: &str = "#000000";
@@ -44,8 +54,10 @@ pub enum SettingsTab {
     Source,
     Output,
     Video,
+    VideoFilters,
     Images,
     Audio,
+    AudioFilters,
     Subtitles,
     Metadata,
     Presets,
@@ -58,8 +70,10 @@ impl SettingsTab {
             Self::Source => "Source",
             Self::Output => "Output",
             Self::Video => "Video",
+            Self::VideoFilters => "Video Filters",
             Self::Images => "Images",
             Self::Audio => "Audio",
+            Self::AudioFilters => "Audio Filters",
             Self::Subtitles => "Subtitles",
             Self::Metadata => "Metadata",
             Self::Presets => "Presets",
@@ -72,8 +86,10 @@ impl SettingsTab {
             Self::Source => "source",
             Self::Output => "output",
             Self::Video => "video",
+            Self::VideoFilters => "video-filters",
             Self::Images => "images",
             Self::Audio => "audio",
+            Self::AudioFilters => "audio-filters",
             Self::Subtitles => "subtitles",
             Self::Metadata => "metadata",
             Self::Presets => "presets",
@@ -81,16 +97,192 @@ impl SettingsTab {
     }
 }
 
-pub const ALL_SETTINGS_TABS: [SettingsTab; 8] = [
+pub const ALL_SETTINGS_TABS: [SettingsTab; 10] = [
     SettingsTab::Source,
     SettingsTab::Output,
     SettingsTab::Video,
+    SettingsTab::VideoFilters,
     SettingsTab::Images,
     SettingsTab::Audio,
+    SettingsTab::AudioFilters,
     SettingsTab::Subtitles,
     SettingsTab::Metadata,
     SettingsTab::Presets,
 ];
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct FilterValue<T> {
+    pub enabled: bool,
+    pub value: T,
+}
+
+impl<T: Default> Default for FilterValue<T> {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            value: T::default(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FilterStrength {
+    Low,
+    #[default]
+    Medium,
+    High,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DeinterlaceMode {
+    #[default]
+    Off,
+    Auto,
+    On,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct VideoColorFiltersConfig {
+    pub brightness: FilterValue<i32>,
+    pub contrast: FilterValue<u32>,
+    pub saturation: FilterValue<u32>,
+    pub gamma: FilterValue<u32>,
+}
+
+impl Default for VideoColorFiltersConfig {
+    fn default() -> Self {
+        Self {
+            brightness: FilterValue {
+                enabled: false,
+                value: 0,
+            },
+            contrast: FilterValue {
+                enabled: false,
+                value: 100,
+            },
+            saturation: FilterValue {
+                enabled: false,
+                value: 100,
+            },
+            gamma: FilterValue {
+                enabled: false,
+                value: 100,
+            },
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct VideoFiltersConfig {
+    pub color: VideoColorFiltersConfig,
+    pub hue: FilterValue<i32>,
+    pub temperature: FilterValue<u32>,
+    pub sharpen: FilterValue<u32>,
+    pub gaussian_blur: FilterValue<u32>,
+    pub denoise_enabled: bool,
+    pub denoise_strength: FilterStrength,
+    pub deband: FilterValue<u32>,
+    pub vignette: FilterValue<u32>,
+    pub grayscale: bool,
+    pub deinterlace: DeinterlaceMode,
+}
+
+impl Default for VideoFiltersConfig {
+    fn default() -> Self {
+        Self {
+            color: VideoColorFiltersConfig::default(),
+            hue: FilterValue {
+                enabled: false,
+                value: 0,
+            },
+            temperature: FilterValue {
+                enabled: false,
+                value: DEFAULT_VIDEO_FILTER_TEMPERATURE,
+            },
+            sharpen: FilterValue {
+                enabled: false,
+                value: DEFAULT_VIDEO_FILTER_SHARPEN,
+            },
+            gaussian_blur: FilterValue {
+                enabled: false,
+                value: DEFAULT_VIDEO_FILTER_BLUR,
+            },
+            denoise_enabled: false,
+            denoise_strength: FilterStrength::Medium,
+            deband: FilterValue {
+                enabled: false,
+                value: DEFAULT_VIDEO_FILTER_DEBAND,
+            },
+            vignette: FilterValue {
+                enabled: false,
+                value: DEFAULT_VIDEO_FILTER_VIGNETTE,
+            },
+            grayscale: false,
+            deinterlace: DeinterlaceMode::Off,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct AudioFiltersConfig {
+    pub compressor_enabled: bool,
+    pub compressor_strength: FilterStrength,
+    pub limiter: FilterValue<i32>,
+    pub bass: FilterValue<i32>,
+    pub treble: FilterValue<i32>,
+    pub high_pass: FilterValue<u32>,
+    pub low_pass: FilterValue<u32>,
+    pub noise_reduction: FilterValue<u32>,
+    pub de_esser: FilterValue<u32>,
+    pub stereo_width: FilterValue<u32>,
+}
+
+impl Default for AudioFiltersConfig {
+    fn default() -> Self {
+        Self {
+            compressor_enabled: false,
+            compressor_strength: FilterStrength::Medium,
+            limiter: FilterValue {
+                enabled: false,
+                value: DEFAULT_AUDIO_FILTER_LIMITER,
+            },
+            bass: FilterValue {
+                enabled: false,
+                value: 0,
+            },
+            treble: FilterValue {
+                enabled: false,
+                value: 0,
+            },
+            high_pass: FilterValue {
+                enabled: false,
+                value: DEFAULT_AUDIO_FILTER_HIGH_PASS,
+            },
+            low_pass: FilterValue {
+                enabled: false,
+                value: DEFAULT_AUDIO_FILTER_LOW_PASS,
+            },
+            noise_reduction: FilterValue {
+                enabled: false,
+                value: DEFAULT_AUDIO_FILTER_NOISE_REDUCTION,
+            },
+            de_esser: FilterValue {
+                enabled: false,
+                value: DEFAULT_AUDIO_FILTER_DE_ESSER,
+            },
+            stereo_width: FilterValue {
+                enabled: false,
+                value: DEFAULT_AUDIO_VOLUME,
+            },
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -430,6 +622,8 @@ pub struct ConversionConfig {
     pub audio_channels: String,
     pub audio_volume: u32,
     pub audio_normalize: bool,
+    pub video_filters: VideoFiltersConfig,
+    pub audio_filters: AudioFiltersConfig,
     pub start_time: Option<String>,
     pub end_time: Option<String>,
     pub metadata: MetadataConfig,
@@ -488,6 +682,8 @@ impl Default for ConversionConfig {
             audio_channels: DEFAULT_AUDIO_CHANNELS.to_string(),
             audio_volume: DEFAULT_AUDIO_VOLUME,
             audio_normalize: false,
+            video_filters: VideoFiltersConfig::default(),
+            audio_filters: AudioFiltersConfig::default(),
             start_time: None,
             end_time: None,
             metadata: MetadataConfig::default(),

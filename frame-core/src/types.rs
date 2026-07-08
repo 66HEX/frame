@@ -5,6 +5,219 @@ use serde::{Deserialize, Serialize};
 pub const DEFAULT_MAX_CONCURRENCY: usize = 2;
 pub const VOLUME_EPSILON: f64 = 0.01;
 
+/// A persisted filter parameter that preserves its draft value while disabled.
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, Eq, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct FilterValue<T> {
+    /// Whether the filter parameter participates in the generated `FFmpeg` chain.
+    pub enabled: bool,
+    /// The UI-domain value. Core maps it to `FFmpeg` units during chain building.
+    pub value: T,
+}
+
+impl<T: Default> Default for FilterValue<T> {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            value: T::default(),
+        }
+    }
+}
+
+/// Shared low/medium/high strength selector for choice-based filters.
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, Default, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum FilterStrength {
+    /// Lowest processing amount.
+    Low,
+    /// Balanced default processing amount.
+    #[default]
+    Medium,
+    /// Highest processing amount.
+    High,
+}
+
+/// Deinterlace behavior for video sources.
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, Default, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum DeinterlaceMode {
+    /// Do not emit a deinterlace filter.
+    #[default]
+    Off,
+    /// Deinterlace frames marked as interlaced.
+    Auto,
+    /// Deinterlace all frames.
+    On,
+}
+
+/// Color adjustment filters that are emitted as one combined `FFmpeg` `eq` filter.
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, Eq, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct VideoColorFiltersConfig {
+    /// Brightness percentage in the UI range -100..100.
+    pub brightness: FilterValue<i32>,
+    /// Contrast percentage in the UI range 0..200.
+    pub contrast: FilterValue<u32>,
+    /// Saturation percentage in the UI range 0..300.
+    pub saturation: FilterValue<u32>,
+    /// Gamma percentage in the UI range 10..300.
+    pub gamma: FilterValue<u32>,
+}
+
+impl Default for VideoColorFiltersConfig {
+    fn default() -> Self {
+        Self {
+            brightness: FilterValue {
+                enabled: false,
+                value: 0,
+            },
+            contrast: FilterValue {
+                enabled: false,
+                value: 100,
+            },
+            saturation: FilterValue {
+                enabled: false,
+                value: 100,
+            },
+            gamma: FilterValue {
+                enabled: false,
+                value: 100,
+            },
+        }
+    }
+}
+
+/// Video and image filter configuration in stable UI units.
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, Eq, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct VideoFiltersConfig {
+    /// Combined brightness/contrast/saturation/gamma adjustment group.
+    pub color: VideoColorFiltersConfig,
+    /// Hue rotation in degrees, -180..180.
+    pub hue: FilterValue<i32>,
+    /// Color temperature in Kelvin, 2000..12000.
+    pub temperature: FilterValue<u32>,
+    /// Sharpen amount, 0..100.
+    pub sharpen: FilterValue<u32>,
+    /// Gaussian blur amount, 0..100.
+    pub gaussian_blur: FilterValue<u32>,
+    /// Enables `hqdn3d` with a fixed strength preset.
+    pub denoise_enabled: bool,
+    /// Denoise strength preset.
+    pub denoise_strength: FilterStrength,
+    /// Deband amount, 0..100.
+    pub deband: FilterValue<u32>,
+    /// Vignette amount, 0..100.
+    pub vignette: FilterValue<u32>,
+    /// Enables grayscale conversion.
+    pub grayscale: bool,
+    /// Deinterlace mode for video sources.
+    pub deinterlace: DeinterlaceMode,
+}
+
+impl Default for VideoFiltersConfig {
+    fn default() -> Self {
+        Self {
+            color: VideoColorFiltersConfig::default(),
+            hue: FilterValue {
+                enabled: false,
+                value: 0,
+            },
+            temperature: FilterValue {
+                enabled: false,
+                value: 6500,
+            },
+            sharpen: FilterValue {
+                enabled: false,
+                value: 25,
+            },
+            gaussian_blur: FilterValue {
+                enabled: false,
+                value: 20,
+            },
+            denoise_enabled: false,
+            denoise_strength: FilterStrength::Medium,
+            deband: FilterValue {
+                enabled: false,
+                value: 25,
+            },
+            vignette: FilterValue {
+                enabled: false,
+                value: 35,
+            },
+            grayscale: false,
+            deinterlace: DeinterlaceMode::Off,
+        }
+    }
+}
+
+/// Audio filter configuration in stable UI units.
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, Eq, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct AudioFiltersConfig {
+    /// Enables `acompressor` with a fixed strength preset.
+    pub compressor_enabled: bool,
+    /// Compressor strength preset.
+    pub compressor_strength: FilterStrength,
+    /// Limiter ceiling in dB, -12..0.
+    pub limiter: FilterValue<i32>,
+    /// Bass gain in dB, -20..20.
+    pub bass: FilterValue<i32>,
+    /// Treble gain in dB, -20..20.
+    pub treble: FilterValue<i32>,
+    /// High-pass cutoff in Hz, 20..2000.
+    pub high_pass: FilterValue<u32>,
+    /// Low-pass cutoff in Hz, 1000..20000.
+    pub low_pass: FilterValue<u32>,
+    /// FFT noise reduction amount in dB, 1..30.
+    pub noise_reduction: FilterValue<u32>,
+    /// De-esser intensity, 0..100.
+    pub de_esser: FilterValue<u32>,
+    /// Stereo side width, 0..200.
+    pub stereo_width: FilterValue<u32>,
+}
+
+impl Default for AudioFiltersConfig {
+    fn default() -> Self {
+        Self {
+            compressor_enabled: false,
+            compressor_strength: FilterStrength::Medium,
+            limiter: FilterValue {
+                enabled: false,
+                value: -1,
+            },
+            bass: FilterValue {
+                enabled: false,
+                value: 0,
+            },
+            treble: FilterValue {
+                enabled: false,
+                value: 0,
+            },
+            high_pass: FilterValue {
+                enabled: false,
+                value: 80,
+            },
+            low_pass: FilterValue {
+                enabled: false,
+                value: 16_000,
+            },
+            noise_reduction: FilterValue {
+                enabled: false,
+                value: 12,
+            },
+            de_esser: FilterValue {
+                enabled: false,
+                value: 35,
+            },
+            stereo_width: FilterValue {
+                enabled: false,
+                value: 100,
+            },
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct AudioTrack {
@@ -80,6 +293,10 @@ pub struct ConversionConfig {
     pub audio_volume: f64,
     #[serde(default)]
     pub audio_normalize: bool,
+    #[serde(default)]
+    pub video_filters: VideoFiltersConfig,
+    #[serde(default)]
+    pub audio_filters: AudioFiltersConfig,
     pub selected_audio_tracks: Vec<u32>,
     pub selected_subtitle_tracks: Vec<u32>,
     pub subtitle_burn_path: Option<String>,

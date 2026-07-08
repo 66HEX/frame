@@ -1,20 +1,28 @@
 use frame_core::{
     media_rules,
     types::{
-        ConversionConfig as CoreConversionConfig, ConversionTask, CropConfig,
+        AudioFiltersConfig as CoreAudioFiltersConfig, ConversionConfig as CoreConversionConfig,
+        ConversionTask, CropConfig, DeinterlaceMode as CoreDeinterlaceMode,
+        FilterStrength as CoreFilterStrength, FilterValue as CoreFilterValue,
         MetadataConfig as CoreMetadataConfig, MetadataMode as CoreMetadataMode, OverlayConfig,
+        VideoColorFiltersConfig as CoreVideoColorFiltersConfig,
+        VideoFiltersConfig as CoreVideoFiltersConfig,
     },
 };
 
 use crate::{
     file_queue::FileItem,
     settings::{
-        ConversionConfig as GpuiConversionConfig, CropSettings, DEFAULT_AUDIO_BITRATE,
-        DEFAULT_AUDIO_BITRATE_MODE, DEFAULT_AUDIO_CHANNELS, DEFAULT_AUDIO_QUALITY, DEFAULT_FPS,
-        DEFAULT_GIF_COLORS, DEFAULT_GIF_DITHER, DEFAULT_PIXEL_FORMAT, DEFAULT_PRESET,
-        DEFAULT_RESOLUTION, DEFAULT_SCALING_ALGORITHM, DEFAULT_VIDEO_BITRATE,
-        DEFAULT_VIDEO_BITRATE_MODE, DEFAULT_VIDEO_CODEC, MetadataConfig as GpuiMetadataConfig,
+        AudioFiltersConfig as GpuiAudioFiltersConfig, ConversionConfig as GpuiConversionConfig,
+        CropSettings, DEFAULT_AUDIO_BITRATE, DEFAULT_AUDIO_BITRATE_MODE, DEFAULT_AUDIO_CHANNELS,
+        DEFAULT_AUDIO_QUALITY, DEFAULT_FPS, DEFAULT_GIF_COLORS, DEFAULT_GIF_DITHER,
+        DEFAULT_PIXEL_FORMAT, DEFAULT_PRESET, DEFAULT_RESOLUTION, DEFAULT_SCALING_ALGORITHM,
+        DEFAULT_VIDEO_BITRATE, DEFAULT_VIDEO_BITRATE_MODE, DEFAULT_VIDEO_CODEC,
+        DeinterlaceMode as GpuiDeinterlaceMode, FilterStrength as GpuiFilterStrength,
+        FilterValue as GpuiFilterValue, MetadataConfig as GpuiMetadataConfig,
         MetadataMode as GpuiMetadataMode, OverlaySettings,
+        VideoColorFiltersConfig as GpuiVideoColorFiltersConfig,
+        VideoFiltersConfig as GpuiVideoFiltersConfig,
     },
 };
 
@@ -49,6 +57,8 @@ pub fn core_config_from_gpui(config: &GpuiConversionConfig) -> CoreConversionCon
         audio_channels: non_empty_or(&config.audio_channels, DEFAULT_AUDIO_CHANNELS),
         audio_volume: f64::from(config.audio_volume.min(200)),
         audio_normalize: config.audio_normalize,
+        video_filters: core_video_filters_from_gpui(&config.video_filters),
+        audio_filters: core_audio_filters_from_gpui(&config.audio_filters),
         selected_audio_tracks: config.selected_audio_tracks.clone(),
         selected_subtitle_tracks: config.selected_subtitle_tracks.clone(),
         subtitle_burn_path: config.subtitle_burn_path.clone(),
@@ -90,6 +100,73 @@ pub fn core_config_from_gpui(config: &GpuiConversionConfig) -> CoreConversionCon
         gif_colors: config.gif_colors.clamp(2, DEFAULT_GIF_COLORS),
         gif_dither: non_empty_or(&config.gif_dither, DEFAULT_GIF_DITHER),
         gif_loop: config.gif_loop,
+    }
+}
+
+#[must_use]
+pub fn core_video_filters_from_gpui(filters: &GpuiVideoFiltersConfig) -> CoreVideoFiltersConfig {
+    CoreVideoFiltersConfig {
+        color: core_video_color_filters_from_gpui(&filters.color),
+        hue: core_filter_value_from_gpui(filters.hue),
+        temperature: core_filter_value_from_gpui(filters.temperature),
+        sharpen: core_filter_value_from_gpui(filters.sharpen),
+        gaussian_blur: core_filter_value_from_gpui(filters.gaussian_blur),
+        denoise_enabled: filters.denoise_enabled,
+        denoise_strength: core_filter_strength_from_gpui(filters.denoise_strength),
+        deband: core_filter_value_from_gpui(filters.deband),
+        vignette: core_filter_value_from_gpui(filters.vignette),
+        grayscale: filters.grayscale,
+        deinterlace: core_deinterlace_mode_from_gpui(filters.deinterlace),
+    }
+}
+
+fn core_video_color_filters_from_gpui(
+    filters: &GpuiVideoColorFiltersConfig,
+) -> CoreVideoColorFiltersConfig {
+    CoreVideoColorFiltersConfig {
+        brightness: core_filter_value_from_gpui(filters.brightness),
+        contrast: core_filter_value_from_gpui(filters.contrast),
+        saturation: core_filter_value_from_gpui(filters.saturation),
+        gamma: core_filter_value_from_gpui(filters.gamma),
+    }
+}
+
+#[must_use]
+pub fn core_audio_filters_from_gpui(filters: &GpuiAudioFiltersConfig) -> CoreAudioFiltersConfig {
+    CoreAudioFiltersConfig {
+        compressor_enabled: filters.compressor_enabled,
+        compressor_strength: core_filter_strength_from_gpui(filters.compressor_strength),
+        limiter: core_filter_value_from_gpui(filters.limiter),
+        bass: core_filter_value_from_gpui(filters.bass),
+        treble: core_filter_value_from_gpui(filters.treble),
+        high_pass: core_filter_value_from_gpui(filters.high_pass),
+        low_pass: core_filter_value_from_gpui(filters.low_pass),
+        noise_reduction: core_filter_value_from_gpui(filters.noise_reduction),
+        de_esser: core_filter_value_from_gpui(filters.de_esser),
+        stereo_width: core_filter_value_from_gpui(filters.stereo_width),
+    }
+}
+
+fn core_filter_value_from_gpui<T>(value: GpuiFilterValue<T>) -> CoreFilterValue<T> {
+    CoreFilterValue {
+        enabled: value.enabled,
+        value: value.value,
+    }
+}
+
+const fn core_filter_strength_from_gpui(strength: GpuiFilterStrength) -> CoreFilterStrength {
+    match strength {
+        GpuiFilterStrength::Low => CoreFilterStrength::Low,
+        GpuiFilterStrength::Medium => CoreFilterStrength::Medium,
+        GpuiFilterStrength::High => CoreFilterStrength::High,
+    }
+}
+
+const fn core_deinterlace_mode_from_gpui(mode: GpuiDeinterlaceMode) -> CoreDeinterlaceMode {
+    match mode {
+        GpuiDeinterlaceMode::Off => CoreDeinterlaceMode::Off,
+        GpuiDeinterlaceMode::Auto => CoreDeinterlaceMode::Auto,
+        GpuiDeinterlaceMode::On => CoreDeinterlaceMode::On,
     }
 }
 

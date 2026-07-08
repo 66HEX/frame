@@ -9,6 +9,7 @@ use crate::filters::{
     build_audio_filters, build_encode_overlay_filter_complex, build_encode_video_filters,
     build_overlay_filter_complex, build_video_filters, has_overlay,
 };
+use crate::media_filters::validate_media_filters;
 use crate::media_rules::{
     all_containers, container_supports_audio, container_supports_subtitles, is_audio_codec_allowed,
     is_audio_stream_codec_allowed, is_image_container, is_subtitle_codec_allowed,
@@ -533,6 +534,7 @@ pub fn validate_task_input(
             "Invalid processing mode: {processing_mode}"
         )));
     }
+    validate_media_filters(config)?;
     let is_copy_mode = processing_mode == "copy";
 
     if let Some(start) = start_time
@@ -925,6 +927,8 @@ mod tests {
             audio_channels: "original".to_string(),
             audio_volume: 100.0,
             audio_normalize: false,
+            video_filters: crate::types::VideoFiltersConfig::default(),
+            audio_filters: crate::types::AudioFiltersConfig::default(),
             selected_audio_tracks: vec![],
             selected_subtitle_tracks: vec![],
             subtitle_burn_path: None,

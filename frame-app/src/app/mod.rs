@@ -70,7 +70,7 @@ use crate::{
     app_info::FRAME_APP_ID,
     app_persistence::{AppPersistence, AppSettings},
     assets::{self},
-    capabilities::detect_available_encoders,
+    capabilities::{detect_available_encoders, detect_available_filters},
     conversion_events::{ActiveLogFile, ConversionEventState, LogLine, all_conversions_settled},
     conversion_runner::{
         ConversionProcessController, conversion_task_from_file, run_conversion_batch_with_control,
@@ -145,7 +145,7 @@ use crate::{
     },
     visual_fixture_from_env_value,
 };
-use frame_core::capabilities::AvailableEncoders;
+use frame_core::capabilities::{AvailableEncoders, AvailableFilters};
 use frame_core::events::ConversionEvent;
 use frame_core::types::DEFAULT_MAX_CONCURRENCY;
 use frame_updater::{DownloadProgress, UpdateChannel, UpdateCheck, UpdateInfo, UpdatePackage};
@@ -231,6 +231,7 @@ const PREVIEW_DIMENSION_QUANTUM: u32 = 64;
 const PREVIEW_MIN_ADAPTIVE_WIDTH: u32 = 640;
 const PREVIEW_MIN_ADAPTIVE_HEIGHT: u32 = 360;
 const PREVIEW_DIMENSION_DEBOUNCE_INTERVAL: Duration = Duration::from_millis(120);
+const PREVIEW_FILTER_DEBOUNCE_INTERVAL: Duration = Duration::from_millis(120);
 const PREVIEW_FRAME_TICK_INTERVAL: Duration = Duration::from_millis(16);
 const TRIM_PREVIEW_SEEK_INTERVAL: Duration = Duration::from_millis(50);
 const TRIM_PREVIEW_SEEK_EPSILON_SECONDS: f64 = 1.0 / 240.0;
@@ -255,6 +256,7 @@ pub struct FrameRoot {
     source_metadata: SourceMetadataStore,
     conversion_processes: ConversionProcessController,
     available_encoders: AvailableEncoders,
+    available_filters: AvailableFilters,
     active_conversion_task_ids: Vec<String>,
     notifier: AppNotifier,
     subtitle_font_families: Vec<String>,
@@ -410,6 +412,7 @@ struct PreviewUiState {
     playback: PreviewPlaybackState,
     active_preview_dimensions: Option<PreviewRuntimeDimensions>,
     preview_dimensions_debounce_until: Option<Instant>,
+    filter_preview_debounce_until: Option<Instant>,
     runtime_key: Option<PreviewRuntimeKey>,
     pending_runtime_key: Option<PreviewRuntimeKey>,
     render_presentation: PreviewRenderPresentation,
@@ -446,6 +449,7 @@ impl Default for PreviewUiState {
             playback: PreviewPlaybackState::new(false),
             active_preview_dimensions: None,
             preview_dimensions_debounce_until: None,
+            filter_preview_debounce_until: None,
             runtime_key: None,
             pending_runtime_key: None,
             render_presentation: PreviewRenderPresentation::default(),
@@ -741,6 +745,7 @@ struct SettingsRenderState<'a> {
     preset_notice: Option<&'a PresetNotice>,
     subtitle_fonts: &'a [String],
     available_encoders: &'a AvailableEncoders,
+    available_filters: &'a AvailableFilters,
 }
 
 #[derive(Clone, Copy)]

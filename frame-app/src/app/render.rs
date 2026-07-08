@@ -450,6 +450,7 @@ impl Render for FrameRoot {
                     preset_notice: self.settings_ui.preset_notice.as_ref(),
                     subtitle_fonts: &self.subtitle_font_families,
                     available_encoders: &self.available_encoders,
+                    available_filters: &self.available_filters,
                 };
                 content.child(workspace_view(
                     &self.file_queue,

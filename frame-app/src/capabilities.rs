@@ -6,7 +6,8 @@ use std::{
 };
 
 use frame_core::capabilities::{
-    AvailableEncoders, ffmpeg_encoder_list_args, parse_available_encoders,
+    AvailableEncoders, AvailableFilters, ffmpeg_encoder_list_args, ffmpeg_filter_list_args,
+    parse_available_encoders, parse_available_filters,
 };
 
 use crate::runtime_binaries::ffmpeg_executable;
@@ -47,6 +48,34 @@ pub fn detect_available_encoders_with_executable(
     available_encoders_from_output(output.status.success(), &output.stdout, &output.stderr)
 }
 
+/// Detects `FFmpeg` filters available to the bundled runtime.
+///
+/// # Errors
+///
+/// Returns an error when `FFmpeg` cannot be executed or reports a failed filter
+/// listing command.
+pub fn detect_available_filters() -> Result<AvailableFilters, CapabilityDetectionError> {
+    let executable = ffmpeg_executable();
+    detect_available_filters_with_executable(&executable)
+}
+
+/// Detects `FFmpeg` filters using a specific executable path.
+///
+/// # Errors
+///
+/// Returns an error when the executable cannot be launched or exits with a
+/// non-zero status while listing filters.
+pub fn detect_available_filters_with_executable(
+    executable: &str,
+) -> Result<AvailableFilters, CapabilityDetectionError> {
+    let output = Command::new(executable)
+        .args(ffmpeg_filter_list_args())
+        .stdin(Stdio::null())
+        .output()?;
+
+    available_filters_from_output(output.status.success(), &output.stdout, &output.stderr)
+}
+
 fn available_encoders_from_output(
     success: bool,
     stdout: &[u8],
@@ -65,6 +94,24 @@ fn available_encoders_from_output(
     Ok(parse_available_encoders(String::from_utf8_lossy(stdout)))
 }
 
+fn available_filters_from_output(
+    success: bool,
+    stdout: &[u8],
+    stderr: &[u8],
+) -> Result<AvailableFilters, CapabilityDetectionError> {
+    if !success {
+        let message = String::from_utf8_lossy(stderr);
+        let message = message.trim();
+        return Err(CapabilityDetectionError::Ffmpeg(if message.is_empty() {
+            "unknown ffmpeg filter detection failure".to_string()
+        } else {
+            message.to_string()
+        }));
+    }
+
+    Ok(parse_available_filters(String::from_utf8_lossy(stdout)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -79,6 +126,17 @@ mod tests {
 
         assert!(actual.h264_videotoolbox);
         assert!(actual.libmp3lame);
+    }
+
+    #[test]
+    fn available_filters_from_output_parses_successful_ffmpeg_stdout() {
+        let stdout = b"Filters:\n TSC eq V->V Adjust brightness\n ... deesser A->A De-ess\n";
+
+        let actual = available_filters_from_output(true, stdout, b"")
+            .expect("successful ffmpeg filter output should parse");
+
+        assert!(actual.eq);
+        assert!(actual.deesser);
     }
 
     #[test]

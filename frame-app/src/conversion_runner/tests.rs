@@ -4,7 +4,10 @@
 )]
 
 use super::*;
-use crate::settings::{CropSettings, MetadataConfig, MetadataMode, ProcessingMode};
+use crate::settings::{
+    AudioFiltersConfig, CropSettings, DeinterlaceMode, FilterStrength, FilterValue, MetadataConfig,
+    MetadataMode, ProcessingMode, VideoColorFiltersConfig, VideoFiltersConfig,
+};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -28,6 +31,90 @@ fn core_config_from_gpui_preserves_active_conversion_fields() {
         audio_channels: "stereo".to_string(),
         audio_volume: 125,
         audio_normalize: true,
+        video_filters: VideoFiltersConfig {
+            color: VideoColorFiltersConfig {
+                brightness: FilterValue {
+                    enabled: true,
+                    value: 15,
+                },
+                contrast: FilterValue {
+                    enabled: true,
+                    value: 120,
+                },
+                saturation: FilterValue {
+                    enabled: true,
+                    value: 80,
+                },
+                gamma: FilterValue {
+                    enabled: true,
+                    value: 110,
+                },
+            },
+            hue: FilterValue {
+                enabled: true,
+                value: -30,
+            },
+            temperature: FilterValue {
+                enabled: true,
+                value: 4200,
+            },
+            sharpen: FilterValue {
+                enabled: true,
+                value: 40,
+            },
+            gaussian_blur: FilterValue {
+                enabled: true,
+                value: 10,
+            },
+            denoise_enabled: true,
+            denoise_strength: FilterStrength::High,
+            deband: FilterValue {
+                enabled: true,
+                value: 50,
+            },
+            vignette: FilterValue {
+                enabled: true,
+                value: 35,
+            },
+            grayscale: true,
+            deinterlace: DeinterlaceMode::Auto,
+        },
+        audio_filters: AudioFiltersConfig {
+            compressor_enabled: true,
+            compressor_strength: FilterStrength::Low,
+            limiter: FilterValue {
+                enabled: true,
+                value: -3,
+            },
+            bass: FilterValue {
+                enabled: true,
+                value: 6,
+            },
+            treble: FilterValue {
+                enabled: true,
+                value: -4,
+            },
+            high_pass: FilterValue {
+                enabled: true,
+                value: 120,
+            },
+            low_pass: FilterValue {
+                enabled: true,
+                value: 15_000,
+            },
+            noise_reduction: FilterValue {
+                enabled: true,
+                value: 10,
+            },
+            de_esser: FilterValue {
+                enabled: true,
+                value: 45,
+            },
+            stereo_width: FilterValue {
+                enabled: true,
+                value: 125,
+            },
+        },
         start_time: Some("00:00:05.000".to_string()),
         end_time: Some("00:00:15.000".to_string()),
         metadata: MetadataConfig {

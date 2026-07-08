@@ -829,6 +829,8 @@ fn base_config(container: &str, video_codec: &str) -> ConversionConfig {
         audio_channels: "original".to_string(),
         audio_volume: 100.0,
         audio_normalize: false,
+        video_filters: frame_core::types::VideoFiltersConfig::default(),
+        audio_filters: frame_core::types::AudioFiltersConfig::default(),
         selected_audio_tracks: Vec::new(),
         selected_subtitle_tracks: Vec::new(),
         subtitle_burn_path: None,

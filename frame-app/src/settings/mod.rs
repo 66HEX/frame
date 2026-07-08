@@ -1,5 +1,6 @@
 //! Settings panel state and visibility rules for the native inspector.
 
+mod filter_updates;
 mod model;
 mod options;
 mod rules;
@@ -9,6 +10,7 @@ mod tabs;
 mod tests;
 mod updates;
 
+pub use filter_updates::*;
 pub use model::*;
 pub use options::*;
 pub use rules::*;

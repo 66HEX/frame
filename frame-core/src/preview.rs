@@ -533,6 +533,8 @@ mod tests {
             audio_channels: "original".to_string(),
             audio_volume: 100.0,
             audio_normalize: false,
+            video_filters: crate::types::VideoFiltersConfig::default(),
+            audio_filters: crate::types::AudioFiltersConfig::default(),
             selected_audio_tracks: vec![],
             selected_subtitle_tracks: vec![],
             subtitle_burn_path: None,
@@ -766,7 +768,7 @@ mod tests {
         assert!(
             plan.args
                 .windows(2)
-                .any(|args| args == ["-af", "volume=0.50"])
+                .any(|args| args == ["-af", "volume=0.500"])
         );
         assert_eq!(plan.args.last(), Some(&"pipe:1".to_string()));
     }

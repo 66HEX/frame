@@ -18,13 +18,21 @@ impl FrameRoot {
     pub fn load_runtime_capabilities(&mut self, cx: &mut Context<Self>) {
         cx.spawn(async move |this, cx| {
             let detected = cx
-                .background_spawn(async { detect_available_encoders() })
+                .background_spawn(async {
+                    (detect_available_encoders(), detect_available_filters())
+                })
                 .await;
 
             this.update(cx, |root, cx| {
-                match detected {
+                match detected.0 {
                     Ok(encoders) => root.available_encoders = encoders,
-                    Err(error) => eprintln!("Failed to detect FFmpeg capabilities: {error}"),
+                    Err(error) => {
+                        eprintln!("Failed to detect FFmpeg encoder capabilities: {error}");
+                    }
+                }
+                match detected.1 {
+                    Ok(filters) => root.available_filters = filters,
+                    Err(error) => eprintln!("Failed to detect FFmpeg filter capabilities: {error}"),
                 }
                 cx.notify();
             })
@@ -94,6 +102,7 @@ impl FrameRoot {
             source_metadata: SourceMetadataStore::default(),
             conversion_processes,
             available_encoders: AvailableEncoders::default(),
+            available_filters: AvailableFilters::default(),
             active_conversion_task_ids: Vec::new(),
             notifier,
             subtitle_font_families: frame_core::fonts::list_system_font_families(),

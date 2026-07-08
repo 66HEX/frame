@@ -703,6 +703,7 @@ pub fn normalize_output_config(
 
     if source_kind == SourceKind::Audio || is_audio_only_container(&config.container) {
         config.crop = None;
+        reset_video_filter_settings(config);
         reset_subtitle_settings(config);
     }
 
@@ -720,7 +721,7 @@ pub fn normalize_output_config(
 
     if !container_supports_audio(&config.container) {
         config.selected_audio_tracks.clear();
-        config.audio_normalize = false;
+        reset_audio_filter_settings(config);
     }
 
     if !container_supports_subtitles(&config.container) {
@@ -756,12 +757,14 @@ pub fn normalize_video_config(
         config.processing_mode = ProcessingMode::Reencode;
         config.selected_audio_tracks.clear();
         config.selected_subtitle_tracks.clear();
+        config.video_filters.deinterlace = super::model::DeinterlaceMode::Off;
         reset_subtitle_settings(config);
     }
 
     if is_audio_container {
         config.pixel_format = DEFAULT_PIXEL_FORMAT.to_string();
         config.selected_subtitle_tracks.clear();
+        reset_video_filter_settings(config);
         reset_subtitle_settings(config);
     }
 
@@ -858,7 +861,7 @@ fn normalize_image_encoding_settings(config: &mut ConversionConfig) {
 fn reset_audio_filter_settings(config: &mut ConversionConfig) {
     config.audio_normalize = false;
     config.audio_volume = DEFAULT_AUDIO_VOLUME;
-    config.audio_bitrate_mode = DEFAULT_AUDIO_BITRATE_MODE.to_string();
+    config.audio_filters = super::model::AudioFiltersConfig::default();
 }
 
 fn reset_subtitle_settings(config: &mut ConversionConfig) {
@@ -885,6 +888,7 @@ fn reset_video_filter_settings(config: &mut ConversionConfig) {
     config.nvenc_spatial_aq = false;
     config.nvenc_temporal_aq = false;
     config.videotoolbox_allow_sw = false;
+    config.video_filters = super::model::VideoFiltersConfig::default();
 }
 
 fn apply_subtitle_color(target: &mut Option<String>, color: &str) -> bool {

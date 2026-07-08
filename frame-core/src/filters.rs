@@ -1,4 +1,10 @@
-use crate::types::{ConversionConfig, VOLUME_EPSILON};
+use crate::{
+    media_filters::{
+        build_audio_effect_filters, build_video_post_scale_filters, build_video_pre_scale_filters,
+    },
+    media_rules::is_image_container,
+    types::ConversionConfig,
+};
 
 pub const EVEN_DIMENSIONS_FILTER: &str = "pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0";
 pub const PREVIEW_OUTPUT_LABEL: &str = "preview_v";
@@ -51,6 +57,7 @@ fn rounded_i32(value: f64, min_value: f64) -> i32 {
 #[must_use]
 pub fn build_video_filters(config: &ConversionConfig, include_scale: bool) -> Vec<String> {
     let mut filters = Vec::new();
+    let is_image = is_image_container(&config.container);
 
     if config.flip_horizontal {
         filters.push("hflip".to_string());
@@ -75,6 +82,17 @@ pub fn build_video_filters(config: &ConversionConfig, include_scale: bool) -> Ve
         let crop_y = rounded_i32(crop.y, 0.0);
         filters.push(format!("crop={crop_width}:{crop_height}:{crop_x}:{crop_y}"));
     }
+
+    filters.extend(build_video_pre_scale_filters(
+        &config.video_filters,
+        is_image,
+    ));
+
+    if include_scale && (config.resolution != "original" || config.resolution == "custom") {
+        filters.push(build_resolution_scale_filter(config));
+    }
+
+    filters.extend(build_video_post_scale_filters(&config.video_filters));
 
     if let Some(burn_path) = &config.subtitle_burn_path
         && !burn_path.is_empty()
@@ -136,40 +154,42 @@ pub fn build_video_filters(config: &ConversionConfig, include_scale: bool) -> Ve
         }
     }
 
-    if include_scale && (config.resolution != "original" || config.resolution == "custom") {
-        let algorithm = match config.scaling_algorithm.as_str() {
-            "lanczos" => ":flags=lanczos",
-            "bilinear" => ":flags=bilinear",
-            "nearest" => ":flags=neighbor",
-            "bicubic" => ":flags=bicubic",
-            _ => "",
-        };
+    filters
+}
 
-        let scale_filter = if config.resolution == "custom" {
-            let w = config.custom_width.as_deref().unwrap_or("-1");
-            let h = config.custom_height.as_deref().unwrap_or("-1");
-            if w != "-1" && h != "-1" {
-                format!(
-                    "scale={w}:{h}:force_original_aspect_ratio=decrease{algorithm},pad={w}:{h}:(ow-iw)/2:(oh-ih)/2"
-                )
-            } else if w == "-1" && h == "-1" {
-                "scale=-1:-1".to_string()
-            } else {
-                format!("scale={w}:{h}{algorithm}")
-            }
-        } else {
-            match config.resolution.as_str() {
-                "1080p" => format!("scale=-2:1080{algorithm}"),
-                "720p" => format!("scale=-2:720{algorithm}"),
-                "480p" => format!("scale=-2:480{algorithm}"),
-                _ => "scale=-1:-1".to_string(),
-            }
-        };
+fn build_resolution_scale_filter(config: &ConversionConfig) -> String {
+    let algorithm = match config.scaling_algorithm.as_str() {
+        "lanczos" => ":flags=lanczos",
+        "bilinear" => ":flags=bilinear",
+        "nearest" => ":flags=neighbor",
+        "bicubic" => ":flags=bicubic",
+        _ => "",
+    };
 
-        filters.push(scale_filter);
+    if config.resolution == "custom" {
+        let width = config.custom_width.as_deref().unwrap_or("-1");
+        let height = config.custom_height.as_deref().unwrap_or("-1");
+        return custom_resolution_scale_filter(width, height, algorithm);
     }
 
-    filters
+    match config.resolution.as_str() {
+        "1080p" => format!("scale=-2:1080{algorithm}"),
+        "720p" => format!("scale=-2:720{algorithm}"),
+        "480p" => format!("scale=-2:480{algorithm}"),
+        _ => "scale=-1:-1".to_string(),
+    }
+}
+
+fn custom_resolution_scale_filter(width: &str, height: &str, algorithm: &str) -> String {
+    if width != "-1" && height != "-1" {
+        format!(
+            "scale={width}:{height}:force_original_aspect_ratio=decrease{algorithm},pad={width}:{height}:(ow-iw)/2:(oh-ih)/2"
+        )
+    } else if width == "-1" && height == "-1" {
+        "scale=-1:-1".to_string()
+    } else {
+        format!("scale={width}:{height}{algorithm}")
+    }
 }
 
 #[must_use]
@@ -347,18 +367,7 @@ fn format_preview_seconds(seconds: f64) -> String {
 
 #[must_use]
 pub fn build_audio_filters(config: &ConversionConfig) -> Vec<String> {
-    let mut filters = Vec::new();
-
-    if config.audio_normalize {
-        filters.push("loudnorm=I=-16:TP=-1.5:LRA=11".to_string());
-    }
-
-    if (config.audio_volume - 100.0).abs() > VOLUME_EPSILON {
-        let volume_factor = config.audio_volume / 100.0;
-        filters.push(format!("volume={volume_factor:.2}"));
-    }
-
-    filters
+    build_audio_effect_filters(config)
 }
 
 #[cfg(test)]
@@ -380,6 +389,8 @@ mod tests {
             audio_channels: "original".to_string(),
             audio_volume: 100.0,
             audio_normalize: false,
+            video_filters: crate::types::VideoFiltersConfig::default(),
+            audio_filters: crate::types::AudioFiltersConfig::default(),
             selected_audio_tracks: vec![],
             selected_subtitle_tracks: vec![],
             subtitle_burn_path: None,
@@ -627,7 +638,7 @@ mod tests {
         let mut config = default_config();
         config.audio_volume = 150.0;
         let filters = build_audio_filters(&config);
-        assert_eq!(filters, vec!["volume=1.50"]);
+        assert_eq!(filters, vec!["volume=1.500"]);
     }
 
     #[test]
