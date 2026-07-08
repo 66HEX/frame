@@ -4,7 +4,9 @@ use crate::settings::ConversionConfig;
 
 use super::{
     format::{derive_output_name, file_name_from_path, file_size_bytes, original_format_from_name},
-    status::{FileStateTone, FileStatus, RowActionAvailability},
+    status::{
+        FileStateTone, FileStatus, RowActionAvailability, RowPrimaryAction, RowSecondaryAction,
+    },
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -55,7 +57,7 @@ impl FileItem {
     #[must_use]
     pub fn row_state_label(&self) -> String {
         match self.status {
-            FileStatus::Converting | FileStatus::Paused => {
+            FileStatus::Converting | FileStatus::Paused | FileStatus::Cancelling => {
                 format!("{}%", self.progress_percent)
             }
             FileStatus::Completed => "ready".to_string(),
@@ -71,16 +73,39 @@ impl FileItem {
             FileStatus::Converting => FileStateTone::Amber,
             FileStatus::Completed => FileStateTone::Blue,
             FileStatus::Error => FileStateTone::Red,
-            FileStatus::Idle | FileStatus::Queued | FileStatus::Paused => FileStateTone::Muted,
+            FileStatus::Idle | FileStatus::Queued | FileStatus::Paused | FileStatus::Cancelling => {
+                FileStateTone::Muted
+            }
         }
     }
 
     #[must_use]
     pub const fn row_actions(&self) -> RowActionAvailability {
-        RowActionAvailability {
-            can_pause: matches!(self.status, FileStatus::Converting),
-            can_resume: matches!(self.status, FileStatus::Paused),
-            can_delete: self.status.can_be_removed_from_list(),
+        match self.status {
+            FileStatus::Queued => RowActionAvailability {
+                primary: RowPrimaryAction::None,
+                secondary: RowSecondaryAction::Cancel,
+            },
+            FileStatus::Converting => RowActionAvailability {
+                primary: RowPrimaryAction::Pause,
+                secondary: RowSecondaryAction::Cancel,
+            },
+            FileStatus::Paused => RowActionAvailability {
+                primary: RowPrimaryAction::Resume,
+                secondary: RowSecondaryAction::Cancel,
+            },
+            FileStatus::Completed => RowActionAvailability {
+                primary: RowPrimaryAction::Reconvert,
+                secondary: RowSecondaryAction::Delete,
+            },
+            FileStatus::Idle | FileStatus::Error => RowActionAvailability {
+                primary: RowPrimaryAction::None,
+                secondary: RowSecondaryAction::Delete,
+            },
+            FileStatus::Cancelling => RowActionAvailability {
+                primary: RowPrimaryAction::None,
+                secondary: RowSecondaryAction::None,
+            },
         }
     }
 }

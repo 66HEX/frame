@@ -2,8 +2,9 @@ use super::{
     BatchSelectionState, ClickEvent, Context, ExternalPaths, FILE_LIST_ACTION_BUTTON_SIZE,
     FILE_LIST_ACTION_ICON_SIZE, FILE_LIST_ACTIONS_WIDTH, FILE_ROW_HEIGHT, FileItem, FileQueue,
     FileStateTone, FluentBuilder, FrameRoot, InteractiveElement, IntoElement, MouseButton,
-    PANEL_HEADER_HEIGHT, ParentElement, Rgba, RowActionAvailability, StatefulInteractiveElement,
-    Styled, WORKSPACE_GAP, Window, assets, div, format_file_size, px, theme,
+    PANEL_HEADER_HEIGHT, ParentElement, Rgba, RowActionAvailability, RowPrimaryAction,
+    RowSecondaryAction, StatefulInteractiveElement, Styled, WORKSPACE_GAP, Window, assets, div,
+    format_file_size, px, theme,
 };
 use super::{
     accessibility::apply_accessible_checkbox,
@@ -307,77 +308,104 @@ pub(super) fn row_actions_cell(
             cx.stop_propagation();
         }));
 
-    if actions.can_pause {
-        let id = file_id.clone();
-        cell = cell.child(
-            row_action_button(
-                element_id("file-row-action-pause", &id),
-                assets::ICON_PAUSE,
-                "Pause conversion",
-                true,
-                RowActionTone::Normal,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
-                cx.stop_propagation();
-                if root.pause_conversion_task(&id) {
-                    cx.notify();
-                }
-            })),
-        );
+    if let Some(primary) = row_primary_action_button(file_id.clone(), actions.primary, window, cx) {
+        cell = cell.child(primary);
     }
-    if actions.can_resume {
-        let id = file_id.clone();
-        cell = cell.child(
-            row_action_button(
-                element_id("file-row-action-resume", &id),
-                assets::ICON_PLAY,
-                "Resume conversion",
-                true,
-                RowActionTone::Normal,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
-                cx.stop_propagation();
-                if root.resume_conversion_task(&id) {
-                    cx.notify();
-                }
-            })),
-        );
+    if let Some(secondary) = row_secondary_action_button(file_id, actions.secondary, window, cx) {
+        cell = cell.child(secondary);
     }
 
-    if actions.can_delete {
-        let id = file_id;
-        cell.child(
-            row_action_button(
-                element_id("file-row-action-delete", &id),
-                assets::ICON_TRASH,
-                "Remove file",
-                true,
-                RowActionTone::Destructive,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
-                cx.stop_propagation();
-                if root.remove_file_from_queue(&id) {
-                    cx.notify();
-                }
-            })),
+    cell
+}
+
+fn row_primary_action_button(
+    file_id: String,
+    action: RowPrimaryAction,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> Option<gpui::Stateful<gpui::Div>> {
+    let (id_prefix, icon, label) = match action {
+        RowPrimaryAction::None => return None,
+        RowPrimaryAction::Pause => (
+            "file-row-action-pause",
+            assets::ICON_PAUSE,
+            "Pause conversion",
+        ),
+        RowPrimaryAction::Resume => (
+            "file-row-action-resume",
+            assets::ICON_PLAY,
+            "Resume conversion",
+        ),
+        RowPrimaryAction::Reconvert => (
+            "file-row-action-reconvert",
+            assets::ICON_REFRESH,
+            "Convert again",
+        ),
+    };
+    let id = file_id;
+    Some(
+        row_action_button(
+            element_id(id_prefix, &id),
+            icon,
+            label,
+            true,
+            RowActionTone::Normal,
+            window,
+            cx,
         )
-    } else {
-        cell.child(row_action_button(
-            element_id("file-row-action-delete-disabled", &file_id),
-            assets::ICON_TRASH,
-            "Remove file",
-            false,
+        .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+            cx.stop_propagation();
+            let changed = match action {
+                RowPrimaryAction::None => false,
+                RowPrimaryAction::Pause => root.pause_conversion_task(&id),
+                RowPrimaryAction::Resume => root.resume_conversion_task(&id),
+                RowPrimaryAction::Reconvert => root.prepare_file_for_reconversion(&id),
+            };
+            if changed {
+                cx.notify();
+            }
+        })),
+    )
+}
+
+fn row_secondary_action_button(
+    file_id: String,
+    action: RowSecondaryAction,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> Option<gpui::Stateful<gpui::Div>> {
+    let (id_prefix, icon, label) = match action {
+        RowSecondaryAction::None => return None,
+        RowSecondaryAction::Cancel => (
+            "file-row-action-cancel",
+            assets::ICON_SQUARE,
+            "Cancel conversion",
+        ),
+        RowSecondaryAction::Delete => ("file-row-action-delete", assets::ICON_TRASH, "Remove file"),
+    };
+    let id = file_id;
+    Some(
+        row_action_button(
+            element_id(id_prefix, &id),
+            icon,
+            label,
+            true,
             RowActionTone::Destructive,
             window,
             cx,
-        ))
-    }
+        )
+        .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+            cx.stop_propagation();
+            let changed = match action {
+                RowSecondaryAction::None => false,
+                RowSecondaryAction::Cancel => root.cancel_conversion_task(&id),
+                RowSecondaryAction::Delete => root.remove_file_from_queue(&id),
+            };
+            if changed {
+                cx.notify();
+            }
+        })),
+    )
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

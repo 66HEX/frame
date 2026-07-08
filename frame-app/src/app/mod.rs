@@ -81,7 +81,7 @@ use crate::{
     },
     file_queue::{
         BatchSelectionState, FileItem, FileQueue, FileStateTone, FileStatus, RowActionAvailability,
-        format_file_size,
+        RowPrimaryAction, RowSecondaryAction, format_file_size,
     },
     format_total_size,
     native_dialogs::{

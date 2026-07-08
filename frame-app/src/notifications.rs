@@ -103,8 +103,11 @@ pub fn conversion_finished_notification_for_task_ids(
         match file.status {
             FileStatus::Completed => completed_count += 1,
             FileStatus::Error => error_count += 1,
-            FileStatus::Idle | FileStatus::Queued | FileStatus::Converting | FileStatus::Paused => {
-            }
+            FileStatus::Idle
+            | FileStatus::Queued
+            | FileStatus::Converting
+            | FileStatus::Paused
+            | FileStatus::Cancelling => {}
         }
     }
 

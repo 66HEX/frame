@@ -4,6 +4,7 @@ pub enum FileStatus {
     Queued,
     Converting,
     Paused,
+    Cancelling,
     Completed,
     Error,
 }
@@ -11,17 +12,20 @@ pub enum FileStatus {
 impl FileStatus {
     #[must_use]
     pub const fn locks_settings(self) -> bool {
-        matches!(self, Self::Converting | Self::Queued | Self::Completed)
+        matches!(
+            self,
+            Self::Converting | Self::Queued | Self::Paused | Self::Cancelling | Self::Completed
+        )
     }
 
     #[must_use]
-    pub const fn can_be_cancelled_before_removal(self) -> bool {
+    pub const fn can_be_cancelled(self) -> bool {
         matches!(self, Self::Converting | Self::Paused | Self::Queued)
     }
 
     #[must_use]
     pub const fn can_be_removed_from_list(self) -> bool {
-        !matches!(self, Self::Converting)
+        matches!(self, Self::Idle | Self::Completed | Self::Error)
     }
 
     #[must_use]
@@ -36,6 +40,7 @@ impl FileStatus {
             Self::Queued => "Queued",
             Self::Converting => "Converting",
             Self::Paused => "Paused",
+            Self::Cancelling => "Cancelling",
             Self::Completed => "Ready",
             Self::Error => "Error",
         }
@@ -52,10 +57,26 @@ pub enum FileStateTone {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum RowPrimaryAction {
+    #[default]
+    None,
+    Pause,
+    Resume,
+    Reconvert,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum RowSecondaryAction {
+    #[default]
+    None,
+    Cancel,
+    Delete,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct RowActionAvailability {
-    pub can_pause: bool,
-    pub can_resume: bool,
-    pub can_delete: bool,
+    pub primary: RowPrimaryAction,
+    pub secondary: RowSecondaryAction,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

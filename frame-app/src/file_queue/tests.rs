@@ -8,15 +8,18 @@ mod file_status {
     use super::*;
 
     #[test]
-    fn locks_settings_for_current_original_locked_statuses() {
+    fn locks_settings_while_task_is_active_or_completed() {
         assert!(FileStatus::Converting.locks_settings());
         assert!(FileStatus::Queued.locks_settings());
+        assert!(FileStatus::Paused.locks_settings());
+        assert!(FileStatus::Cancelling.locks_settings());
         assert!(FileStatus::Completed.locks_settings());
     }
 
     #[test]
-    fn keeps_paused_files_editable_like_original_ui() {
-        assert!(!FileStatus::Paused.locks_settings());
+    fn keeps_idle_and_error_files_editable() {
+        assert!(!FileStatus::Idle.locks_settings());
+        assert!(!FileStatus::Error.locks_settings());
     }
 
     #[test]
@@ -31,6 +34,7 @@ mod file_status {
         assert!(!FileStatus::Queued.is_actionable_for_conversion());
         assert!(!FileStatus::Converting.is_actionable_for_conversion());
         assert!(!FileStatus::Paused.is_actionable_for_conversion());
+        assert!(!FileStatus::Cancelling.is_actionable_for_conversion());
     }
 
     #[test]
@@ -39,10 +43,11 @@ mod file_status {
     }
 
     #[test]
-    fn queued_and_paused_files_can_be_removed_through_cancel_control() {
-        assert!(FileStatus::Queued.can_be_removed_from_list());
+    fn only_settled_files_can_be_removed_from_list() {
+        assert!(!FileStatus::Queued.can_be_removed_from_list());
         assert!(!FileStatus::Converting.can_be_removed_from_list());
-        assert!(FileStatus::Paused.can_be_removed_from_list());
+        assert!(!FileStatus::Paused.can_be_removed_from_list());
+        assert!(!FileStatus::Cancelling.can_be_removed_from_list());
         assert!(FileStatus::Idle.can_be_removed_from_list());
         assert!(FileStatus::Completed.can_be_removed_from_list());
         assert!(FileStatus::Error.can_be_removed_from_list());
@@ -137,26 +142,48 @@ mod file_item {
         assert_eq!(
             file.row_actions(),
             RowActionAvailability {
-                can_pause: true,
-                can_resume: false,
-                can_delete: false,
+                primary: RowPrimaryAction::Pause,
+                secondary: RowSecondaryAction::Cancel,
             }
         );
     }
 
     #[test]
-    fn paused_row_can_resume_and_delete_through_cancel_control() {
+    fn paused_row_can_resume_or_cancel_without_removing_source() {
         let mut file = FileItem::from_path("1", "/tmp/video.mp4", 10);
         file.status = FileStatus::Paused;
 
         assert_eq!(
             file.row_actions(),
             RowActionAvailability {
-                can_pause: false,
-                can_resume: true,
-                can_delete: true,
+                primary: RowPrimaryAction::Resume,
+                secondary: RowSecondaryAction::Cancel,
             }
         );
+    }
+
+    #[test]
+    fn completed_row_can_be_prepared_again_or_removed() {
+        let mut file = FileItem::from_path("1", "/tmp/video.mp4", 10);
+        file.status = FileStatus::Completed;
+
+        assert_eq!(
+            file.row_actions(),
+            RowActionAvailability {
+                primary: RowPrimaryAction::Reconvert,
+                secondary: RowSecondaryAction::Delete,
+            }
+        );
+    }
+
+    #[test]
+    fn cancelling_row_has_no_repeatable_actions() {
+        let mut file = FileItem::from_path("1", "/tmp/video.mp4", 10);
+        file.status = FileStatus::Cancelling;
+        file.progress_percent = 42;
+
+        assert_eq!(file.row_actions(), RowActionAvailability::default());
+        assert_eq!(file.row_state_label(), "42%");
     }
 
     fn temp_file_path(name: &str) -> PathBuf {
@@ -369,23 +396,23 @@ mod file_queue {
     }
 
     #[test]
-    fn remove_interactive_file_allows_paused_file_after_cancel_control_exists() {
+    fn remove_interactive_file_keeps_paused_file_until_cancel_finishes() {
         let mut queue = FileQueue::new();
         queue.add_file(sample_file("first", "/tmp/one.mp4", 1));
         queue.update_status("first", FileStatus::Paused, 20);
 
-        assert!(queue.remove_interactive_file("first").is_some());
-        assert!(queue.files().is_empty());
+        assert!(queue.remove_interactive_file("first").is_none());
+        assert_eq!(queue.files().len(), 1);
     }
 
     #[test]
-    fn remove_interactive_file_allows_queued_file_after_cancel_control_exists() {
+    fn remove_interactive_file_keeps_queued_file_until_cancel_finishes() {
         let mut queue = FileQueue::new();
         queue.add_file(sample_file("first", "/tmp/one.mp4", 1));
         queue.update_status("first", FileStatus::Queued, 0);
 
-        assert!(queue.remove_interactive_file("first").is_some());
-        assert!(queue.files().is_empty());
+        assert!(queue.remove_interactive_file("first").is_none());
+        assert_eq!(queue.files().len(), 1);
     }
 
     #[test]
@@ -556,12 +583,12 @@ mod file_queue {
     }
 
     #[test]
-    fn selected_file_locked_keeps_paused_file_editable_like_original_ui() {
+    fn selected_file_locked_keeps_paused_file_locked_until_cancelled() {
         let mut queue = FileQueue::new();
         queue.add_file(sample_file("first", "/tmp/one.mp4", 10));
         queue.update_status("first", FileStatus::Paused, 30);
 
-        assert!(!queue.selected_file_locked());
+        assert!(queue.selected_file_locked());
     }
 
     #[test]
@@ -577,6 +604,8 @@ mod file_queue {
         let locked_statuses = [
             FileStatus::Queued,
             FileStatus::Converting,
+            FileStatus::Paused,
+            FileStatus::Cancelling,
             FileStatus::Completed,
         ];
 
@@ -584,9 +613,8 @@ mod file_queue {
     }
 
     #[test]
-    fn file_status_keeps_idle_paused_and_error_editable() {
+    fn file_status_keeps_only_idle_and_error_editable() {
         assert!(!FileStatus::Idle.locks_settings());
-        assert!(!FileStatus::Paused.locks_settings());
         assert!(!FileStatus::Error.locks_settings());
     }
 
@@ -777,5 +805,54 @@ mod file_queue {
             queue.selected_file().map(|file| file.status),
             Some(FileStatus::Idle)
         );
+    }
+
+    #[test]
+    fn mark_file_cancelling_preserves_source_and_configuration() {
+        let mut queue = FileQueue::new();
+        let mut file = sample_file("first", "/tmp/one.mp4", 10);
+        file.config.container = "mkv".to_string();
+        queue.add_file(file);
+        queue.update_status("first", FileStatus::Converting, 40);
+
+        assert!(queue.mark_file_cancelling("first"));
+        let file = queue
+            .file_by_id("first")
+            .expect("file should remain queued");
+        assert_eq!(file.status, FileStatus::Cancelling);
+        assert_eq!(file.config.container, "mkv");
+    }
+
+    #[test]
+    fn mark_file_cancelling_rejects_settled_file() {
+        let mut queue = FileQueue::new();
+        queue.add_file(sample_file("first", "/tmp/one.mp4", 10));
+
+        assert!(!queue.mark_file_cancelling("first"));
+    }
+
+    #[test]
+    fn prepare_file_for_reconversion_resets_progress_and_preserves_configuration() {
+        let mut queue = FileQueue::new();
+        let mut file = sample_file("first", "/tmp/one.mp4", 10);
+        file.config.container = "webm".to_string();
+        queue.add_file(file);
+        queue.update_status("first", FileStatus::Completed, 100);
+
+        assert!(queue.prepare_file_for_reconversion("first"));
+        let file = queue
+            .file_by_id("first")
+            .expect("file should remain queued");
+        assert_eq!(file.status, FileStatus::Idle);
+        assert_eq!(file.progress_percent, 0);
+        assert_eq!(file.config.container, "webm");
+    }
+
+    #[test]
+    fn prepare_file_for_reconversion_rejects_idle_file() {
+        let mut queue = FileQueue::new();
+        queue.add_file(sample_file("first", "/tmp/one.mp4", 10));
+
+        assert!(!queue.prepare_file_for_reconversion("first"));
     }
 }

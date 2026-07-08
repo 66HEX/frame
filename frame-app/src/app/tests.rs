@@ -363,6 +363,48 @@ mod frame_root_conversion {
     }
 
     #[test]
+    fn cancel_conversion_task_keeps_source_until_runner_confirms_cancellation() {
+        let mut root = FrameRoot::new();
+        root.file_queue
+            .add_file(FileItem::from_path("first", "/tmp/one.mp4", 1));
+        root.file_queue
+            .update_status("first", FileStatus::Queued, 0);
+
+        assert!(root.cancel_conversion_task("first"));
+        assert_eq!(
+            root.file_queue.file_by_id("first").map(|file| file.status),
+            Some(FileStatus::Cancelling)
+        );
+
+        root.apply_conversion_event(ConversionEvent::cancelled("first"));
+
+        assert_eq!(
+            root.file_queue.file_by_id("first").map(|file| file.status),
+            Some(FileStatus::Idle)
+        );
+    }
+
+    #[test]
+    fn prepare_file_for_reconversion_keeps_source_settings_and_enables_start() {
+        let mut root = FrameRoot::new();
+        let mut file = FileItem::from_path("first", "/tmp/one.mp4", 1);
+        file.config.container = "mkv".to_string();
+        root.file_queue.add_file(file);
+        root.file_queue
+            .update_status("first", FileStatus::Completed, 100);
+
+        assert!(root.prepare_file_for_reconversion("first"));
+
+        let file = root
+            .file_queue
+            .file_by_id("first")
+            .expect("source should remain in queue");
+        assert_eq!(file.status, FileStatus::Idle);
+        assert_eq!(file.config.container, "mkv");
+        assert!(root.app_state().can_start_conversion());
+    }
+
+    #[test]
     fn max_concurrency_defaults_to_shared_backend_limit() {
         let root = FrameRoot::new();
 

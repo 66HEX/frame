@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Settings Tab Tooltips:** Added animated labels to the icon-only settings tabs, with a configurable hover delay and a grace period for immediate transitions between neighboring tabs.
+- **Reusable Conversion Sources:** Added explicit Cancel controls that stop queued, running, or paused conversions without removing their source, plus a Convert Again action that preserves completed-file settings and returns the source to an editable state. Resolves [#45](https://github.com/66HEX/frame/issues/45).
 
 ### Fixed
 

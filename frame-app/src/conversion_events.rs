@@ -406,6 +406,13 @@ mod tests {
     }
 
     #[test]
+    fn all_conversions_settled_waits_for_cancellation_confirmation() {
+        let queue = queue_with_file(FileStatus::Cancelling);
+
+        assert!(!all_conversions_settled(&queue));
+    }
+
+    #[test]
     fn all_conversions_settled_accepts_terminal_and_idle_items() {
         let mut queue = FileQueue::new();
         queue.add_file(FileItem::from_path("idle", "/tmp/idle.mp4", 1));

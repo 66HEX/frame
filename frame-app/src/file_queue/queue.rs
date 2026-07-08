@@ -260,6 +260,32 @@ impl FileQueue {
         true
     }
 
+    pub fn mark_file_cancelling(&mut self, id: &str) -> bool {
+        let Some(file) = self.files.iter_mut().find(|file| file.id == id) else {
+            return false;
+        };
+        if !file.status.can_be_cancelled() {
+            return false;
+        }
+
+        file.status = FileStatus::Cancelling;
+        true
+    }
+
+    pub fn prepare_file_for_reconversion(&mut self, id: &str) -> bool {
+        let Some(file) = self.files.iter_mut().find(|file| file.id == id) else {
+            return false;
+        };
+        if file.status != FileStatus::Completed {
+            return false;
+        }
+
+        file.status = FileStatus::Idle;
+        file.progress_percent = 0;
+        file.conversion_error = None;
+        true
+    }
+
     pub fn update_status(&mut self, id: &str, status: FileStatus, progress_percent: u8) -> bool {
         if let Some(file) = self.files.iter_mut().find(|file| file.id == id) {
             file.status = status;

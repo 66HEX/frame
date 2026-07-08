@@ -120,12 +120,32 @@ impl FrameRoot {
             }
         }
     }
+    pub(super) fn cancel_conversion_task(&mut self, id: &str) -> bool {
+        if !self
+            .file_queue
+            .file_by_id(id)
+            .is_some_and(|file| file.status.can_be_cancelled())
+        {
+            return false;
+        }
+
+        match self.conversion_processes.cancel_task(id) {
+            Ok(()) => self.file_queue.mark_file_cancelling(id),
+            Err(error) => {
+                self.log_conversion_control_error(id, "cancel", &error);
+                false
+            }
+        }
+    }
+    pub(super) fn prepare_file_for_reconversion(&mut self, id: &str) -> bool {
+        self.file_queue.prepare_file_for_reconversion(id)
+    }
     pub(super) fn remove_file_from_queue(&mut self, id: &str) -> bool {
         let Some(status) = self.file_queue.file_by_id(id).map(|file| file.status) else {
             return false;
         };
 
-        if status.can_be_cancelled_before_removal()
+        if status.can_be_cancelled()
             && let Err(error) = self.conversion_processes.cancel_task(id)
         {
             self.log_conversion_control_error(id, "cancel", &error);
