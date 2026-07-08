@@ -3,6 +3,7 @@ use crate::app::preview_panel::preview_presented_frame;
 use crate::conversion_runner::core_config_from_gpui;
 use crate::numeric::rounded_f64_to_u64;
 use crate::preview_engine::PreviewEngineError;
+use crate::settings::{AudioFiltersConfig, FilterValue, VideoFiltersConfig};
 use std::{
     collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
@@ -97,6 +98,10 @@ impl FrameRoot {
         }
 
         if self.preview_ui.pending_runtime_key.is_some() {
+            return;
+        }
+
+        if self.should_defer_filter_preview_reconfigure(&request.key) {
             return;
         }
 
@@ -684,12 +689,15 @@ impl FrameRoot {
                     .update(cx, |root, cx| {
                         let canvas_changed = root.tick_preview_canvas_animation();
                         let preview_dimensions_ready = root.tick_preview_dimensions_debounce();
+                        let filter_preview_ready = root.tick_filter_preview_debounce();
                         if root.preview_ui.session.is_none() {
-                            if canvas_changed || preview_dimensions_ready {
+                            if canvas_changed || preview_dimensions_ready || filter_preview_ready {
                                 cx.notify();
                                 return true;
                             }
-                            if root.preview_dimensions_debounce_pending() {
+                            if root.preview_dimensions_debounce_pending()
+                                || root.filter_preview_debounce_pending()
+                            {
                                 return true;
                             }
                             root.preview_ui.frame_tick_active = false;
@@ -700,6 +708,7 @@ impl FrameRoot {
                             || root.preview_ui.playback.is_playing()
                             || canvas_changed
                             || preview_dimensions_ready
+                            || filter_preview_ready
                         {
                             cx.notify();
                         }
@@ -729,6 +738,51 @@ impl FrameRoot {
     fn preview_dimensions_debounce_pending(&self) -> bool {
         self.preview_ui
             .preview_dimensions_debounce_until
+            .is_some_and(|deadline| Instant::now() < deadline)
+    }
+
+    fn should_defer_filter_preview_reconfigure(&mut self, next_key: &PreviewRuntimeKey) -> bool {
+        self.preview_ui
+            .runtime_key
+            .clone()
+            .is_some_and(|current_key| {
+                current_key.can_reconfigure_to(next_key)
+                    && preview_runtime_hash_changed(&current_key, next_key)
+                    && self.filter_preview_debounce_active()
+            })
+    }
+
+    pub(super) fn defer_filter_preview_reconfigure(&mut self, cx: &Context<Self>) {
+        self.preview_ui.filter_preview_debounce_until =
+            Some(Instant::now() + PREVIEW_FILTER_DEBOUNCE_INTERVAL);
+        self.schedule_preview_frame_tick(cx);
+    }
+
+    fn tick_filter_preview_debounce(&mut self) -> bool {
+        let Some(deadline) = self.preview_ui.filter_preview_debounce_until else {
+            return false;
+        };
+        if Instant::now() < deadline {
+            return false;
+        }
+        self.preview_ui.filter_preview_debounce_until = None;
+        true
+    }
+
+    pub(super) fn filter_preview_debounce_active(&mut self) -> bool {
+        let Some(deadline) = self.preview_ui.filter_preview_debounce_until else {
+            return false;
+        };
+        if Instant::now() < deadline {
+            return true;
+        }
+        self.preview_ui.filter_preview_debounce_until = None;
+        false
+    }
+
+    fn filter_preview_debounce_pending(&self) -> bool {
+        self.preview_ui
+            .filter_preview_debounce_until
             .is_some_and(|deadline| Instant::now() < deadline)
     }
 
@@ -2077,6 +2131,7 @@ fn preview_visual_hash(config: &ConversionConfig) -> u64 {
     config.subtitle_outline_color.hash(&mut state);
     config.subtitle_position.hash(&mut state);
     hash_overlay(config.overlay.as_ref(), &mut state);
+    hash_video_filters(&config.video_filters, &mut state);
     config.gif_colors.hash(&mut state);
     config.gif_dither.hash(&mut state);
     state.finish()
@@ -2092,7 +2147,56 @@ fn preview_audio_hash(
     selected_audio_track.hash(&mut state);
     config.audio_volume.hash(&mut state);
     config.audio_normalize.hash(&mut state);
+    hash_audio_filters(&config.audio_filters, &mut state);
     state.finish()
+}
+
+const fn preview_runtime_hash_changed(
+    current: &PreviewRuntimeKey,
+    next: &PreviewRuntimeKey,
+) -> bool {
+    current.visual_hash != next.visual_hash || current.audio_hash != next.audio_hash
+}
+
+fn hash_video_filters(filters: &VideoFiltersConfig, state: &mut DefaultHasher) {
+    hash_filter_value(&filters.color.brightness, state);
+    hash_filter_value(&filters.color.contrast, state);
+    hash_filter_value(&filters.color.saturation, state);
+    hash_filter_value(&filters.color.gamma, state);
+    hash_filter_value(&filters.hue, state);
+    hash_filter_value(&filters.temperature, state);
+    hash_filter_value(&filters.sharpen, state);
+    hash_filter_value(&filters.gaussian_blur, state);
+    filters.denoise_enabled.hash(state);
+    if filters.denoise_enabled {
+        filters.denoise_strength.hash(state);
+    }
+    hash_filter_value(&filters.deband, state);
+    hash_filter_value(&filters.vignette, state);
+    filters.grayscale.hash(state);
+    filters.deinterlace.hash(state);
+}
+
+fn hash_audio_filters(filters: &AudioFiltersConfig, state: &mut DefaultHasher) {
+    filters.compressor_enabled.hash(state);
+    if filters.compressor_enabled {
+        filters.compressor_strength.hash(state);
+    }
+    hash_filter_value(&filters.limiter, state);
+    hash_filter_value(&filters.bass, state);
+    hash_filter_value(&filters.treble, state);
+    hash_filter_value(&filters.high_pass, state);
+    hash_filter_value(&filters.low_pass, state);
+    hash_filter_value(&filters.noise_reduction, state);
+    hash_filter_value(&filters.de_esser, state);
+    hash_filter_value(&filters.stereo_width, state);
+}
+
+fn hash_filter_value<T: Hash>(filter: &FilterValue<T>, state: &mut DefaultHasher) {
+    filter.enabled.hash(state);
+    if filter.enabled {
+        filter.value.hash(state);
+    }
 }
 
 fn hash_crop(crop: Option<&CropSettings>, state: &mut DefaultHasher) {

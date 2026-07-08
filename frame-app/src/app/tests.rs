@@ -1814,6 +1814,10 @@ mod frame_root_config {
     }
 
     #[test]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "This scenario verifies preview runtime hashing across visual, audio, trim, and transform config."
+    )]
     fn preview_runtime_key_tracks_visual_config_but_ignores_encoder_quality() {
         let mut root = FrameRoot::new();
         root.file_queue
@@ -1871,6 +1875,85 @@ mod frame_root_config {
             trim_request.config.conversion_config.end_time.as_deref(),
             Some("00:00:08.000")
         );
+
+        root.update_selected_config(|config| {
+            config.video_filters.temperature.value = 3200;
+            true
+        });
+        let disabled_video_filter_request = root
+            .selected_preview_runtime_request(&metadata_entry)
+            .expect("disabled video filter request");
+
+        assert_eq!(disabled_video_filter_request.key, initial_request.key);
+
+        root.update_selected_config(|config| {
+            config.video_filters.color.brightness.enabled = true;
+            config.video_filters.color.brightness.value = 20;
+            true
+        });
+        let video_filter_request = root
+            .selected_preview_runtime_request(&metadata_entry)
+            .expect("video filter request");
+
+        assert_ne!(
+            video_filter_request.key.visual_hash,
+            initial_request.key.visual_hash
+        );
+        assert_eq!(
+            video_filter_request.key.audio_hash,
+            initial_request.key.audio_hash
+        );
+
+        root.update_selected_config(|config| {
+            config.video_filters.color.brightness.enabled = false;
+            config.video_filters.color.brightness.value = 80;
+            true
+        });
+        let disabled_video_value_request = root
+            .selected_preview_runtime_request(&metadata_entry)
+            .expect("disabled video filter value request");
+
+        assert_eq!(
+            disabled_video_value_request.key.visual_hash,
+            disabled_video_filter_request.key.visual_hash
+        );
+
+        root.update_selected_config(|config| {
+            config.audio_filters.bass.value = 12;
+            true
+        });
+        let disabled_audio_filter_request = root
+            .selected_preview_runtime_request(&metadata_entry)
+            .expect("disabled audio filter request");
+
+        assert_eq!(
+            disabled_audio_filter_request.key.audio_hash,
+            initial_request.key.audio_hash
+        );
+
+        root.update_selected_config(|config| {
+            config.audio_filters.limiter.enabled = true;
+            config.audio_filters.limiter.value = -3;
+            true
+        });
+        let audio_filter_request = root
+            .selected_preview_runtime_request(&metadata_entry)
+            .expect("audio filter request");
+
+        assert_eq!(
+            audio_filter_request.key.visual_hash,
+            disabled_audio_filter_request.key.visual_hash
+        );
+        assert_ne!(
+            audio_filter_request.key.audio_hash,
+            initial_request.key.audio_hash
+        );
+
+        root.update_selected_config(|config| {
+            config.video_filters = crate::settings::VideoFiltersConfig::default();
+            config.audio_filters = crate::settings::AudioFiltersConfig::default();
+            true
+        });
 
         root.update_selected_config(|config| {
             config.audio_volume = 80;
@@ -2152,6 +2235,23 @@ mod frame_root_config {
                 max_height: 720
             }
         );
+    }
+
+    #[test]
+    fn filter_preview_debounce_active_expires_deadline() {
+        let mut root = FrameRoot::new();
+
+        root.preview_ui.filter_preview_debounce_until =
+            Some(std::time::Instant::now() + PREVIEW_FILTER_DEBOUNCE_INTERVAL);
+        assert!(root.filter_preview_debounce_active());
+
+        root.preview_ui.filter_preview_debounce_until = Some(
+            std::time::Instant::now()
+                .checked_sub(PREVIEW_FILTER_DEBOUNCE_INTERVAL)
+                .expect("deadline should move into the past"),
+        );
+        assert!(!root.filter_preview_debounce_active());
+        assert!(root.preview_ui.filter_preview_debounce_until.is_none());
     }
 
     #[test]
@@ -2909,6 +3009,26 @@ mod visual_fixtures {
     }
 
     #[test]
+    fn settings_audio_filters_fixture_opens_audio_filters_tab_with_enabled_filters() {
+        let mut root = FrameRoot::new();
+
+        root.apply_visual_fixture(Some(VisualFixture::SettingsAudioFilters));
+
+        let selected = root
+            .file_queue
+            .selected_file()
+            .expect("audio filters fixture should select a file");
+        assert_eq!(root.settings_ui.active_tab, SettingsTab::AudioFilters);
+        assert!(selected.config.audio_normalize);
+        assert_eq!(selected.config.audio_volume, 132);
+        assert!(selected.config.audio_filters.compressor_enabled);
+        assert!(selected.config.audio_filters.limiter.enabled);
+        assert!(selected.config.audio_filters.high_pass.enabled);
+        assert!(selected.config.audio_filters.low_pass.enabled);
+        assert!(selected.config.audio_filters.stereo_width.enabled);
+    }
+
+    #[test]
     fn settings_metadata_fixture_opens_metadata_tab_with_source_tags() {
         let mut root = FrameRoot::new();
 
@@ -2935,6 +3055,28 @@ mod visual_fixtures {
                 .selected_file()
                 .and_then(|file| file.config.custom_width.as_deref()),
             Some("1920")
+        );
+    }
+
+    #[test]
+    fn settings_video_filters_fixture_opens_video_filters_tab_with_enabled_filters() {
+        let mut root = FrameRoot::new();
+
+        root.apply_visual_fixture(Some(VisualFixture::SettingsVideoFilters));
+
+        let selected = root
+            .file_queue
+            .selected_file()
+            .expect("video filters fixture should select a file");
+        assert_eq!(root.settings_ui.active_tab, SettingsTab::VideoFilters);
+        assert!(selected.config.video_filters.color.brightness.enabled);
+        assert!(selected.config.video_filters.color.contrast.enabled);
+        assert!(selected.config.video_filters.temperature.enabled);
+        assert!(selected.config.video_filters.sharpen.enabled);
+        assert!(selected.config.video_filters.denoise_enabled);
+        assert_eq!(
+            selected.config.video_filters.deinterlace,
+            crate::settings::DeinterlaceMode::Auto
         );
     }
 
@@ -3073,6 +3215,32 @@ mod preview_shell {
         &ENCODERS
     }
 
+    fn empty_filters() -> &'static AvailableFilters {
+        static FILTERS: AvailableFilters = AvailableFilters {
+            eq: false,
+            hue: false,
+            colortemperature: false,
+            unsharp: false,
+            gblur: false,
+            hqdn3d: false,
+            deband: false,
+            vignette: false,
+            bwdif: false,
+            highpass: false,
+            lowpass: false,
+            afftdn: false,
+            deesser: false,
+            bass: false,
+            treble: false,
+            acompressor: false,
+            loudnorm: false,
+            volume: false,
+            stereotools: false,
+            alimiter: false,
+        };
+        &FILTERS
+    }
+
     fn settings_state<'a>(
         config: &'a ConversionConfig,
         metadata: Option<&'a SourceMetadata>,
@@ -3123,6 +3291,7 @@ mod preview_shell {
             preset_notice: None,
             subtitle_fonts: &[],
             available_encoders: empty_encoders(),
+            available_filters: empty_filters(),
         }
     }
 

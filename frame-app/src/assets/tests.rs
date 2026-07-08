@@ -49,6 +49,7 @@ mod frame_assets {
             "flip-vertical.svg",
             "folder-import.svg",
             "hard-drive.svg",
+            "audio-filters.svg",
             "layout-list.svg",
             "list-checks.svg",
             "minus.svg",
@@ -66,6 +67,7 @@ mod frame_assets {
             "terminal.svg",
             "trash.svg",
             "unfold-more.svg",
+            "video-filters.svg",
         ] {
             assert!(
                 listed.iter().any(|name| name.as_ref() == icon_name),
@@ -104,6 +106,8 @@ mod frame_assets {
             ICON_FILE_VIDEO,
             ICON_FILE_IMAGE,
             ICON_MUSIC,
+            ICON_VIDEO_FILTERS,
+            ICON_AUDIO_FILTERS,
             ICON_CAPTIONS,
             ICON_TAGS,
             ICON_BOOKMARK,

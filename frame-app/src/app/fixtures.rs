@@ -1,5 +1,6 @@
 use super::*;
 
+use crate::settings::{DeinterlaceMode, FilterStrength};
 use frame_updater::{PlatformAssetKey, UpdateAsset};
 use semver::Version;
 
@@ -41,6 +42,9 @@ impl FrameRoot {
             Some(VisualFixture::PreviewCrop) => self.apply_preview_crop_fixture(),
             Some(VisualFixture::PreviewReady) => self.apply_preview_ready_fixture(),
             Some(VisualFixture::SettingsAudio) => self.apply_settings_audio_fixture(),
+            Some(VisualFixture::SettingsAudioFilters) => {
+                self.apply_settings_audio_filters_fixture();
+            }
             Some(VisualFixture::SettingsImages) => self.apply_settings_images_fixture(),
             Some(VisualFixture::SettingsMetadata) => self.apply_settings_metadata_fixture(),
             Some(VisualFixture::SettingsOutput) => self.apply_settings_output_fixture(),
@@ -51,6 +55,9 @@ impl FrameRoot {
                 self.apply_settings_subtitles_popover_fixture();
             }
             Some(VisualFixture::SettingsVideo) => self.apply_settings_video_fixture(),
+            Some(VisualFixture::SettingsVideoFilters) => {
+                self.apply_settings_video_filters_fixture();
+            }
             Some(VisualFixture::UpdateAvailable) => self.apply_update_available_fixture(),
             Some(VisualFixture::WorkspaceAudio) => self.apply_workspace_audio_fixture(),
             Some(VisualFixture::WorkspaceEmpty) => self.apply_workspace_empty_fixture(),
@@ -179,6 +186,27 @@ impl FrameRoot {
             file.config.crf = 18;
         }
     }
+    pub(super) fn apply_settings_video_filters_fixture(&mut self) {
+        self.apply_preview_ready_fixture();
+        self.settings_ui.active_tab = SettingsTab::VideoFilters;
+        if let Some(file) = self.file_queue.selected_file_mut() {
+            file.config.video_filters.color.brightness.enabled = true;
+            file.config.video_filters.color.brightness.value = 18;
+            file.config.video_filters.color.contrast.enabled = true;
+            file.config.video_filters.color.contrast.value = 112;
+            file.config.video_filters.temperature.enabled = true;
+            file.config.video_filters.temperature.value = 5200;
+            file.config.video_filters.sharpen.enabled = true;
+            file.config.video_filters.sharpen.value = 35;
+            file.config.video_filters.denoise_enabled = true;
+            file.config.video_filters.denoise_strength = FilterStrength::Medium;
+            file.config.video_filters.deband.enabled = true;
+            file.config.video_filters.deband.value = 28;
+            file.config.video_filters.vignette.enabled = true;
+            file.config.video_filters.vignette.value = 18;
+            file.config.video_filters.deinterlace = DeinterlaceMode::Auto;
+        }
+    }
     pub(super) fn apply_settings_audio_fixture(&mut self) {
         self.seed_audio_source_fixture();
         self.settings_ui.active_tab = SettingsTab::Audio;
@@ -191,6 +219,32 @@ impl FrameRoot {
             file.config.audio_volume = 145;
             file.config.audio_normalize = true;
             file.config.selected_audio_tracks = vec![1];
+        }
+    }
+    pub(super) fn apply_settings_audio_filters_fixture(&mut self) {
+        self.seed_audio_source_fixture();
+        self.settings_ui.active_tab = SettingsTab::AudioFilters;
+        if let Some(file) = self.file_queue.selected_file_mut() {
+            file.config.audio_volume = 132;
+            file.config.audio_normalize = true;
+            file.config.audio_filters.compressor_enabled = true;
+            file.config.audio_filters.compressor_strength = FilterStrength::Medium;
+            file.config.audio_filters.limiter.enabled = true;
+            file.config.audio_filters.limiter.value = -3;
+            file.config.audio_filters.bass.enabled = true;
+            file.config.audio_filters.bass.value = 4;
+            file.config.audio_filters.treble.enabled = true;
+            file.config.audio_filters.treble.value = 3;
+            file.config.audio_filters.high_pass.enabled = true;
+            file.config.audio_filters.high_pass.value = 80;
+            file.config.audio_filters.low_pass.enabled = true;
+            file.config.audio_filters.low_pass.value = 16_000;
+            file.config.audio_filters.noise_reduction.enabled = true;
+            file.config.audio_filters.noise_reduction.value = 12;
+            file.config.audio_filters.de_esser.enabled = true;
+            file.config.audio_filters.de_esser.value = 35;
+            file.config.audio_filters.stereo_width.enabled = true;
+            file.config.audio_filters.stereo_width.value = 118;
         }
     }
     pub(super) fn apply_settings_images_fixture(&mut self) {

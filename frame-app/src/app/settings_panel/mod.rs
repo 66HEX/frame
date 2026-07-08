@@ -28,6 +28,7 @@ use super::{
 };
 
 mod audio;
+mod audio_filters;
 mod images;
 mod metadata;
 mod output;
@@ -37,8 +38,10 @@ mod shared;
 mod source;
 mod subtitles;
 mod video;
+mod video_filters;
 
 pub(super) use audio::*;
+pub(super) use audio_filters::*;
 pub(super) use images::*;
 pub(super) use metadata::*;
 pub(super) use output::*;
@@ -48,3 +51,4 @@ pub(super) use shared::*;
 pub(super) use source::*;
 pub(super) use subtitles::*;
 pub(super) use video::*;
+pub(super) use video_filters::*;

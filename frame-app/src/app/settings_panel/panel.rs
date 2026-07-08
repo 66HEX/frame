@@ -3,14 +3,16 @@ use super::{
     ButtonVariant, ClickEvent, Context, FluentBuilder, FrameRoot, FrameSurface, InteractiveElement,
     IntoElement, MouseButton, PANEL_HEADER_HEIGHT, ParentElement, SETTINGS_PANEL_PADDING,
     SETTINGS_TAB_BUTTON_SIZE, SETTINGS_TAB_ICON_SIZE, SettingsPresetsTabState, SettingsRenderState,
-    SettingsSubtitlesTabState, SettingsTab, SettingsVideoInputFocuses, StatefulInteractiveElement,
-    Styled, Window, button_colors, button_highlight_shadows, button_mouse_down, color, div,
-    frame_tooltip, hover_motion, icon_svg, mix_color, panel_bottom_separator, px,
-    resolve_active_settings_tab, retarget_hover_motion, settings_audio_tab, settings_images_tab,
-    settings_metadata_tab, settings_output_tab, settings_presets_tab, settings_section_label,
-    settings_source_tab, settings_subtitles_tab, settings_tab_icon, settings_video_tab, theme,
-    visible_settings_tabs,
+    SettingsSubtitlesTabState, SettingsTab, SettingsVideoInputFocuses, SourceKind,
+    StatefulInteractiveElement, Styled, Window, button_colors, button_highlight_shadows,
+    button_mouse_down, color, div, frame_tooltip, hover_motion, icon_svg, mix_color,
+    panel_bottom_separator, px, resolve_active_settings_tab, retarget_hover_motion,
+    settings_audio_filters_tab, settings_audio_tab, settings_images_tab, settings_metadata_tab,
+    settings_output_tab, settings_presets_tab, settings_section_label, settings_source_tab,
+    settings_subtitles_tab, settings_tab_icon, settings_video_filters_tab, settings_video_tab,
+    theme, visible_settings_tabs,
 };
+use crate::settings::source_kind_for;
 
 pub(in crate::app) fn settings_panel(
     settings: &SettingsRenderState<'_>,
@@ -174,6 +176,10 @@ fn settings_tab_for_key(
     }
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "Settings tab dispatch is intentionally explicit for routing clarity."
+)]
 pub(in crate::app) fn settings_tab_content(
     tab: SettingsTab,
     settings: &SettingsRenderState<'_>,
@@ -215,6 +221,14 @@ pub(in crate::app) fn settings_tab_content(
             window,
             cx,
         )),
+        SettingsTab::VideoFilters => content.child(settings_video_filters_tab(
+            settings.config,
+            settings.settings_disabled,
+            source_kind_for(settings.metadata) == SourceKind::Image,
+            settings.available_filters,
+            window,
+            cx,
+        )),
         SettingsTab::Images => content.child(settings_images_tab(
             settings.config,
             settings.settings_disabled,
@@ -229,6 +243,13 @@ pub(in crate::app) fn settings_tab_content(
             settings.settings_disabled,
             settings.available_encoders,
             settings.audio_bitrate_focus,
+            window,
+            cx,
+        )),
+        SettingsTab::AudioFilters => content.child(settings_audio_filters_tab(
+            settings.config,
+            settings.settings_disabled,
+            settings.available_filters,
             window,
             cx,
         )),

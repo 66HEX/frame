@@ -1518,7 +1518,9 @@ mod visible_settings_tabs {
                 "source",
                 "output",
                 "video",
+                "video-filters",
                 "audio",
+                "audio-filters",
                 "subtitles",
                 "metadata",
                 "presets"
@@ -1543,7 +1545,14 @@ mod visible_settings_tabs {
 
         assert_eq!(
             tabs,
-            vec!["source", "output", "audio", "metadata", "presets"]
+            vec![
+                "source",
+                "output",
+                "audio",
+                "audio-filters",
+                "metadata",
+                "presets"
+            ]
         );
     }
 
@@ -1564,7 +1573,14 @@ mod visible_settings_tabs {
 
         assert_eq!(
             tabs,
-            vec!["source", "output", "images", "metadata", "presets"]
+            vec![
+                "source",
+                "output",
+                "video-filters",
+                "images",
+                "metadata",
+                "presets"
+            ]
         );
     }
 

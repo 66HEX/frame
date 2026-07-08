@@ -25,14 +25,18 @@ pub fn visible_settings_tabs(
         && container_supports_subtitles(&config.container);
     let supports_video_tab =
         !is_source_audio_only && !is_source_image && !is_audio_container && !is_copy_mode;
+    let supports_video_filters_tab = !is_source_audio_only && !is_audio_container && !is_copy_mode;
     let supports_images_tab = is_source_image && !is_audio_container && !is_copy_mode;
+    let supports_audio_filters_tab = supports_audio && !is_copy_mode;
 
     ALL_SETTINGS_TABS
         .into_iter()
         .filter(|tab| match tab {
             SettingsTab::Video => supports_video_tab,
+            SettingsTab::VideoFilters => supports_video_filters_tab,
             SettingsTab::Images => supports_images_tab,
             SettingsTab::Audio => supports_audio,
+            SettingsTab::AudioFilters => supports_audio_filters_tab,
             SettingsTab::Subtitles => supports_subtitles,
             SettingsTab::Source
             | SettingsTab::Output

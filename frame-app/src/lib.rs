@@ -96,6 +96,7 @@ pub enum VisualFixture {
     PreviewCrop,
     PreviewReady,
     SettingsAudio,
+    SettingsAudioFilters,
     SettingsImages,
     SettingsMetadata,
     SettingsOutput,
@@ -104,6 +105,7 @@ pub enum VisualFixture {
     SettingsSubtitles,
     SettingsSubtitlesPopover,
     SettingsVideo,
+    SettingsVideoFilters,
     UpdateAvailable,
     WorkspaceAudio,
     WorkspaceEmpty,
@@ -118,6 +120,7 @@ pub fn visual_fixture_from_env_value(value: Option<&str>) -> Option<VisualFixtur
         Some("preview-crop") => Some(VisualFixture::PreviewCrop),
         Some("preview-ready") => Some(VisualFixture::PreviewReady),
         Some("settings-audio") => Some(VisualFixture::SettingsAudio),
+        Some("settings-audio-filters") => Some(VisualFixture::SettingsAudioFilters),
         Some("settings-images") => Some(VisualFixture::SettingsImages),
         Some("settings-metadata") => Some(VisualFixture::SettingsMetadata),
         Some("settings-output") => Some(VisualFixture::SettingsOutput),
@@ -126,6 +129,7 @@ pub fn visual_fixture_from_env_value(value: Option<&str>) -> Option<VisualFixtur
         Some("settings-subtitles") => Some(VisualFixture::SettingsSubtitles),
         Some("settings-subtitles-popover") => Some(VisualFixture::SettingsSubtitlesPopover),
         Some("settings-video") => Some(VisualFixture::SettingsVideo),
+        Some("settings-video-filters") => Some(VisualFixture::SettingsVideoFilters),
         Some("update-available") => Some(VisualFixture::UpdateAvailable),
         Some("workspace-audio") => Some(VisualFixture::WorkspaceAudio),
         Some("workspace-empty") => Some(VisualFixture::WorkspaceEmpty),
@@ -343,6 +347,14 @@ mod tests {
         }
 
         #[test]
+        fn settings_audio_filters_value_enables_audio_filters_fixture() {
+            assert_eq!(
+                visual_fixture_from_env_value(Some("settings-audio-filters")),
+                Some(VisualFixture::SettingsAudioFilters)
+            );
+        }
+
+        #[test]
         fn settings_metadata_value_enables_metadata_fixture() {
             assert_eq!(
                 visual_fixture_from_env_value(Some("settings-metadata")),
@@ -379,6 +391,14 @@ mod tests {
             assert_eq!(
                 visual_fixture_from_env_value(Some("settings-video")),
                 Some(VisualFixture::SettingsVideo)
+            );
+        }
+
+        #[test]
+        fn settings_video_filters_value_enables_video_filters_fixture() {
+            assert_eq!(
+                visual_fixture_from_env_value(Some("settings-video-filters")),
+                Some(VisualFixture::SettingsVideoFilters)
             );
         }
 

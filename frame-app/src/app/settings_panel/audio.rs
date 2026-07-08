@@ -94,7 +94,6 @@ pub(in crate::app) fn settings_audio_channels_grid(
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum SettingsAudioRangeTarget {
     Quality,
-    Volume,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -188,25 +187,6 @@ fn settings_audio_encoding_controls(
     }
 
     controls
-        .child(settings_audio_range_field(
-            SettingsAudioRangeSpec {
-                label: "Volume",
-                value_label: format!("{}%", config.audio_volume),
-                value: config.audio_volume,
-                min: 0,
-                max: 200,
-                lower_label: "Muted",
-                upper_label: "Max volume",
-                target: SettingsAudioRangeTarget::Volume,
-            },
-            controls_disabled,
-            cx,
-        ))
-        .child(settings_audio_normalize_toggle(
-            config.audio_normalize,
-            controls_disabled,
-            cx,
-        ))
 }
 
 fn settings_audio_bitrate_mode_grid(
@@ -331,11 +311,9 @@ fn settings_audio_range_slider(
     frame_slider(
         match target {
             SettingsAudioRangeTarget::Quality => "settings-audio-quality-slider",
-            SettingsAudioRangeTarget::Volume => "settings-audio-volume-slider",
         },
         match target {
             SettingsAudioRangeTarget::Quality => "Audio quality",
-            SettingsAudioRangeTarget::Volume => "Audio volume",
         },
         fraction,
         disabled,
@@ -410,7 +388,6 @@ fn apply_settings_audio_range_value(
 ) -> bool {
     match target {
         SettingsAudioRangeTarget::Quality => apply_audio_quality(config, &value.to_string()),
-        SettingsAudioRangeTarget::Volume => apply_audio_volume(config, value),
     }
 }
 
@@ -422,7 +399,6 @@ fn settings_audio_range_handle(
     let handle = frame_slider_handle(
         match drag.target {
             SettingsAudioRangeTarget::Quality => "settings-audio-quality-handle",
-            SettingsAudioRangeTarget::Volume => "settings-audio-volume-handle",
         },
         fraction,
         enabled,
@@ -435,29 +411,6 @@ fn settings_audio_range_handle(
     } else {
         handle
     }
-}
-
-fn settings_audio_normalize_toggle(
-    checked: bool,
-    disabled: bool,
-    cx: &Context<FrameRoot>,
-) -> gpui::Stateful<gpui::Div> {
-    frame_checkbox_row(
-        "settings-audio-normalize-row",
-        "Normalize audio",
-        "Smooth out loudness differences.",
-        checked,
-        disabled,
-        cx,
-        move |root, _event, _window, cx| {
-            if disabled {
-                return;
-            }
-            if root.update_selected_config(|config| apply_audio_normalize(config, !checked)) {
-                cx.notify();
-            }
-        },
-    )
 }
 
 pub(in crate::app) fn settings_audio_codec_list(
