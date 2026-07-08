@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Settings Tab Tooltips:** Added animated labels to the icon-only settings tabs, with a configurable hover delay and a grace period for immediate transitions between neighboring tabs.
+
 ### Fixed
 
 - **macOS Release Builds:** Moved Intel and Apple Silicon bundle jobs to the macOS 26 GitHub-hosted runners so release and validation workflows use the supported packaging environment.

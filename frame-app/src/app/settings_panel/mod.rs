@@ -16,7 +16,7 @@ use super::{
         frame_select_options_list, frame_select_popover, frame_select_trigger,
         frame_select_trigger_content, frame_select_trigger_content_with_focus,
         frame_select_trigger_with_focus, frame_slider, frame_slider_handle, frame_text_button,
-        frame_track_list_item, frame_vertical_scrollbar,
+        frame_tooltip, frame_track_list_item, frame_vertical_scrollbar,
     },
     input::{FrameTextInputSpec, frame_text_input},
     preview_panel::timeline_slider_percent_from_bounds,

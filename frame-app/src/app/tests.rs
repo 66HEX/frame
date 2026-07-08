@@ -3041,6 +3041,7 @@ mod preview_shell {
 
         SettingsRenderState {
             active_tab: SettingsTab::Source,
+            tooltip_visible_id: None,
             config,
             metadata,
             metadata_status: status,

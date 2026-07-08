@@ -5,10 +5,11 @@ use super::{
     SETTINGS_TAB_BUTTON_SIZE, SETTINGS_TAB_ICON_SIZE, SettingsPresetsTabState, SettingsRenderState,
     SettingsSubtitlesTabState, SettingsTab, SettingsVideoInputFocuses, StatefulInteractiveElement,
     Styled, Window, button_colors, button_highlight_shadows, button_mouse_down, color, div,
-    hover_motion, icon_svg, mix_color, panel_bottom_separator, px, resolve_active_settings_tab,
-    retarget_hover_motion, settings_audio_tab, settings_images_tab, settings_metadata_tab,
-    settings_output_tab, settings_presets_tab, settings_section_label, settings_source_tab,
-    settings_subtitles_tab, settings_tab_icon, settings_video_tab, theme, visible_settings_tabs,
+    frame_tooltip, hover_motion, icon_svg, mix_color, panel_bottom_separator, px,
+    resolve_active_settings_tab, retarget_hover_motion, settings_audio_tab, settings_images_tab,
+    settings_metadata_tab, settings_output_tab, settings_presets_tab, settings_section_label,
+    settings_source_tab, settings_subtitles_tab, settings_tab_icon, settings_video_tab, theme,
+    visible_settings_tabs,
 };
 
 pub(in crate::app) fn settings_panel(
@@ -32,6 +33,7 @@ pub(in crate::app) fn settings_panel(
             *tab,
             active_tab == *tab,
             &visible_tabs,
+            settings.tooltip_visible_id,
             window,
             cx,
         ));
@@ -70,6 +72,7 @@ pub(in crate::app) fn settings_tab_button(
     tab: SettingsTab,
     selected: bool,
     visible_tabs: &[SettingsTab],
+    tooltip_visible_id: Option<&str>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
@@ -93,7 +96,7 @@ pub(in crate::app) fn settings_tab_button(
     );
     let keyboard_tabs = visible_tabs.to_vec();
 
-    div()
+    let button = div()
         .id(tab_id.clone())
         .role(gpui::Role::Tab)
         .aria_label(tab.label())
@@ -140,7 +143,16 @@ pub(in crate::app) fn settings_tab_button(
             settings_tab_icon(tab),
             SETTINGS_TAB_ICON_SIZE,
             foreground,
-        ))
+        ));
+
+    frame_tooltip(
+        tab.id(),
+        tab.label(),
+        tooltip_visible_id == Some(tab.id()),
+        button,
+        window,
+        cx,
+    )
 }
 
 fn settings_tab_for_key(

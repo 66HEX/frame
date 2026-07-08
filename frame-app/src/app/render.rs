@@ -382,6 +382,7 @@ impl Render for FrameRoot {
                 }
                 let settings = SettingsRenderState {
                     active_tab: self.settings_ui.active_tab,
+                    tooltip_visible_id: self.tooltip_ui.visible_id.as_deref(),
                     config: &selected_config_snapshot,
                     metadata: source_metadata.as_ref(),
                     metadata_status: source_metadata_entry.status,

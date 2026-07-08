@@ -87,6 +87,7 @@ impl FrameRoot {
             log_copy_feedback_epoch: 0,
             is_processing: false,
             settings_ui,
+            tooltip_ui: TooltipUiState::default(),
             drag_drop_ui: DragDropUiState::default(),
             max_concurrency,
             text_input_ui: FrameTextInputUiState::default(),

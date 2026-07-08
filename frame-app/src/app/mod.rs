@@ -248,6 +248,7 @@ pub struct FrameRoot {
     log_copy_feedback_epoch: usize,
     is_processing: bool,
     settings_ui: SettingsUiState,
+    tooltip_ui: TooltipUiState,
     drag_drop_ui: DragDropUiState,
     max_concurrency: usize,
     text_input_ui: FrameTextInputUiState,
@@ -284,6 +285,14 @@ struct SettingsUiState {
     preset_name_draft: String,
     preset_notice: Option<PresetNotice>,
     next_custom_preset_sequence: u64,
+}
+
+#[derive(Default)]
+struct TooltipUiState {
+    hovered_id: Option<String>,
+    visible_id: Option<String>,
+    warm_until: Option<Instant>,
+    hover_epoch: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -702,6 +711,7 @@ struct SettingsSubtitleColorPickerBounds {
 #[derive(Clone, Copy)]
 struct SettingsRenderState<'a> {
     active_tab: SettingsTab,
+    tooltip_visible_id: Option<&'a str>,
     config: &'a ConversionConfig,
     metadata: Option<&'a SourceMetadata>,
     metadata_status: MetadataStatus,
