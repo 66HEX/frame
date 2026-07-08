@@ -6,9 +6,9 @@ use super::{
 use gpui::{FocusHandle, StatefulInteractiveElement};
 use std::rc::Rc;
 
-pub(in crate::app) const FRAME_CHECKBOX_SIZE: f32 = 14.0;
-pub(in crate::app) const FRAME_CHECK_ICON_SIZE: f32 = 12.0;
-pub(in crate::app) const FRAME_CHECKBOX_ROW_INDICATOR_OFFSET_Y: f32 = 3.0;
+pub(in crate::app) const FRAME_CHECKBOX_SIZE: f32 = 16.0;
+pub(in crate::app) const FRAME_CHECK_ICON_SIZE: f32 = 14.0;
+pub(in crate::app) const FRAME_CHECKBOX_ROW_INDICATOR_OFFSET_Y: f32 = 2.0;
 const FRAME_CHECKBOX_MARK_SIZE: f32 = 8.0;
 const FRAME_SELECTION_DOT_SIZE: f32 = 12.0;
 const FRAME_SELECTION_DOT_MARK_SIZE: f32 = 6.0;
@@ -25,9 +25,9 @@ pub(in crate::app) fn frame_checkbox_indicator(
         .flex()
         .items_center()
         .justify_center()
-        .rounded(px(3.0))
+        .rounded(px(theme::RADIUS_XS))
         .bg(if active {
-            color(theme::FRAME_GRAY_600)
+            color(theme::FRAME_GRAY_400)
         } else {
             color(theme::TRANSPARENT)
         });
@@ -55,7 +55,7 @@ pub(in crate::app) fn frame_checkbox_indicator(
         .flex()
         .items_center()
         .justify_center()
-        .rounded(px(3.0))
+        .rounded(px(theme::RADIUS_XS))
         .bg(color(theme::BACKGROUND))
         .opacity(if disabled { 0.5 } else { 1.0 })
         .shadow(input_highlight_shadows())
@@ -129,7 +129,9 @@ fn frame_checkbox_row_inner(
     let id = id.into();
     let label = label.into();
     let display_label = theme::ui_text_owned(label.clone());
-    let hint = theme::ui_text_owned(hint.into());
+    let hint = hint.into();
+    let has_hint = !hint.is_empty();
+    let hint = theme::ui_text_owned(hint);
     let enabled = !disabled;
     let action = Rc::new(action);
     let row_action = Rc::clone(&action);
@@ -167,20 +169,22 @@ fn frame_checkbox_row_inner(
             div()
                 .flex()
                 .flex_col()
-                .gap_1()
+                .when(has_hint, gpui::Styled::gap_1)
                 .child(
                     div()
                         .text_size(px(theme::TEXT_LABEL_SIZE))
                         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-                        .text_color(color(theme::FRAME_GRAY_600))
+                        .text_color(color(theme::FRAME_GRAY_400))
                         .child(display_label),
                 )
-                .child(
-                    div()
-                        .text_size(px(theme::TEXT_LABEL_SIZE))
-                        .font_weight(theme::TEXT_WEIGHT_REGULAR)
-                        .text_color(color(theme::FRAME_GRAY_600))
-                        .child(hint),
-                ),
+                .when(has_hint, |this| {
+                    this.child(
+                        div()
+                            .text_size(px(theme::TEXT_LABEL_SIZE))
+                            .font_weight(theme::TEXT_WEIGHT_REGULAR)
+                            .text_color(color(theme::FRAME_GRAY_400))
+                            .child(hint),
+                    )
+                }),
         )
 }

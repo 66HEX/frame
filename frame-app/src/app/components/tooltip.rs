@@ -148,9 +148,11 @@ mod tests {
     #[test]
     fn tooltip_hysteresis_is_warm_immediately_after_leaving() {
         let now = Instant::now();
-        let mut state = TooltipUiState::default();
-        state.hovered_id = Some("source".to_string());
-        state.visible_id = Some("source".to_string());
+        let mut state = TooltipUiState {
+            hovered_id: Some("source".to_string()),
+            visible_id: Some("source".to_string()),
+            ..TooltipUiState::default()
+        };
 
         state.end_hover(now);
 
@@ -160,9 +162,11 @@ mod tests {
     #[test]
     fn tooltip_hysteresis_expires_after_window() {
         let now = Instant::now();
-        let mut state = TooltipUiState::default();
-        state.hovered_id = Some("source".to_string());
-        state.visible_id = Some("source".to_string());
+        let mut state = TooltipUiState {
+            hovered_id: Some("source".to_string()),
+            visible_id: Some("source".to_string()),
+            ..TooltipUiState::default()
+        };
         state.end_hover(now);
         let after_window = now
             .checked_add(TOOLTIP_HYSTERESIS_WINDOW + Duration::from_millis(1))
