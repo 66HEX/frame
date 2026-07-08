@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::codec::{
     add_audio_codec_args, add_fps_args, add_subtitle_codec_args, add_video_codec_args,
@@ -10,7 +10,7 @@ use crate::filters::{
     build_overlay_filter_complex, build_video_filters, has_overlay,
 };
 use crate::media_rules::{
-    container_supports_audio, container_supports_subtitles, is_audio_codec_allowed,
+    all_containers, container_supports_audio, container_supports_subtitles, is_audio_codec_allowed,
     is_audio_stream_codec_allowed, is_image_container, is_subtitle_codec_allowed,
     is_video_codec_allowed, is_video_only_container, is_video_pixel_format_allowed,
     is_video_stream_codec_allowed,
@@ -470,14 +470,21 @@ pub fn build_output_path(file_path: &str, container: &str, output_name: Option<&
     output_name.and_then(sanitize_output_name).map_or_else(
         || format!("{file_path}_converted.{container}"),
         |custom| {
-            let input_path = Path::new(file_path);
-            let mut output: PathBuf = match input_path.parent() {
-                Some(parent) if !parent.as_os_str().is_empty() => parent.to_path_buf(),
-                _ => PathBuf::new(),
-            };
-            output.push(custom);
-            output.set_extension(container);
-            output.to_string_lossy().to_string()
+            let directory_end = file_path
+                .rfind(['/', '\\'])
+                .map_or(0, |separator_index| separator_index + 1);
+            let directory = &file_path[..directory_end];
+            let output_stem = custom
+                .rsplit_once('.')
+                .filter(|(stem, extension)| {
+                    !stem.is_empty()
+                        && all_containers()
+                            .iter()
+                            .any(|known| known.eq_ignore_ascii_case(extension))
+                })
+                .map_or(custom.as_str(), |(stem, _)| stem);
+
+            format!("{directory}{output_stem}.{container}")
         },
     )
 }
@@ -979,6 +986,26 @@ mod tests {
         let args = build_ffmpeg_args("input.mov", "output.png", &config);
 
         assert!(!args.iter().any(|arg| arg == EVEN_DIMENSIONS_FILTER));
+    }
+
+    #[test]
+    fn build_output_path_preserves_periods_in_output_name_on_unc_share() {
+        let input =
+            r"\\myserver.domain.com\share\movies\Really Funny Home Video Vol.1 (2026)\source.mkv";
+
+        let output = build_output_path(input, "mp4", Some("Really Funny Home Video Vol.1 (2026)"));
+
+        assert_eq!(
+            output,
+            r"\\myserver.domain.com\share\movies\Really Funny Home Video Vol.1 (2026)\Really Funny Home Video Vol.1 (2026).mp4"
+        );
+    }
+
+    #[test]
+    fn build_output_path_replaces_known_container_extension() {
+        let output = build_output_path("/tmp/source.mkv", "mp4", Some("render.mov"));
+
+        assert_eq!(output, "/tmp/render.mp4");
     }
 
     #[test]

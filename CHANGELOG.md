@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **UNC Output Paths:** Preserved periods in generated output names on Windows network shares instead of treating the final portion of the name as a file extension. Resolves [#61](https://github.com/66HEX/frame/issues/61).
 - **macOS Release Builds:** Moved Intel and Apple Silicon bundle jobs to the macOS 26 GitHub-hosted runners so release and validation workflows use the supported packaging environment.
 - **Bundled FFmpeg Integrity:** Pinned FFmpeg and FFprobe to version `8.1.2` across macOS, Linux, and Windows, replaced mutable download URLs, and added SHA-256 verification for downloaded archives, extracted binaries, and cached runtime files.
 
