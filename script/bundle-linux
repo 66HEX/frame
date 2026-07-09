@@ -262,14 +262,21 @@ create_appimage() {
 
 	local appimage_dir="$temp_dir/Frame.AppDir"
 	local output="$target_dir/release/Frame-$runtime_arch.AppImage"
+	local output_dir
+	output_dir="$(dirname "$output")"
+	local output_name
+	output_name="$(basename "$output")"
 	local zsync_output="$output.zsync"
 	local update_information="gh-releases-zsync|66HEX|frame|latest|$(basename "$zsync_output")"
 	rm -rf "$appimage_dir" "$output" "$zsync_output"
 	copy_managed_layout_to_appdir "$appimage_dir"
-	ARCH="$runtime_arch" APPIMAGE_EXTRACT_AND_RUN=1 "$appimagetool" \
-		-u "$update_information" \
-		"$appimage_dir" \
-		"$output"
+	(
+		cd "$output_dir"
+		ARCH="$runtime_arch" APPIMAGE_EXTRACT_AND_RUN=1 "$appimagetool" \
+			-u "$update_information" \
+			"$appimage_dir" \
+			"$output_name"
+	)
 	if [[ ! -s "$zsync_output" ]]; then
 		echo "AppImage update metadata was requested, but $zsync_output was not created." >&2
 		exit 1
