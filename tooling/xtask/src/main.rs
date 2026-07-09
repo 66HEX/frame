@@ -1195,7 +1195,7 @@ const fn setup_rust_step() -> &'static str {
 
 fn linux_job(arch: &str, runner: &str) -> String {
     let appimagetool_arch = arch;
-    let linux_packages = "clang curl desktop-file-utils file flatpak flatpak-builder libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf";
+    let linux_packages = "clang curl desktop-file-utils file flatpak flatpak-builder libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync";
     let flatpak_setup = r"    - name: steps::setup_flatpak
       run: |
         flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
@@ -1233,6 +1233,13 @@ fn linux_job(arch: &str, runner: &str) -> String {
       env:
         APPIMAGETOOL: /tmp/appimagetool.AppImage
       run: ./script/bundle-linux {bundle_args}
+    - name: run_bundling::verify_appimage_update_information
+      shell: bash
+      run: |
+        expected='gh-releases-zsync|66HEX|frame|latest|Frame-{arch}.AppImage.zsync'
+        actual=$(APPIMAGE_EXTRACT_AND_RUN=1 target/release/Frame-{arch}.AppImage --appimage-updateinformation)
+        test $actual = $expected
+        test -s target/release/Frame-{arch}.AppImage.zsync
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@v4
       with:
@@ -1244,6 +1251,12 @@ fn linux_job(arch: &str, runner: &str) -> String {
       with:
         name: Frame-{arch}.AppImage
         path: target/release/Frame-{arch}.AppImage
+        if-no-files-found: error
+    - name: run_bundling::upload_appimage_zsync_artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Frame-{arch}.AppImage.zsync
+        path: target/release/Frame-{arch}.AppImage.zsync
         if-no-files-found: error
 {flatpak_upload}
     timeout-minutes: {timeout_minutes}
@@ -1363,7 +1376,7 @@ jobs:
     - name: steps::setup_linux
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang curl desktop-file-utils file flatpak flatpak-builder libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf
+        sudo apt-get install -y clang curl desktop-file-utils file flatpak flatpak-builder libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync
     - name: steps::setup_appimagetool
       run: |
         curl -L --fail -o /tmp/appimagetool.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
@@ -1376,6 +1389,13 @@ jobs:
       env:
         APPIMAGETOOL: /tmp/appimagetool.AppImage
       run: ./script/bundle-linux --tarball --appimage --flatpak
+    - name: release::verify_linux_x86_64_appimage_update_information
+      shell: bash
+      run: |
+        expected='gh-releases-zsync|66HEX|frame|latest|Frame-x86_64.AppImage.zsync'
+        actual="$(APPIMAGE_EXTRACT_AND_RUN=1 target/release/Frame-x86_64.AppImage --appimage-updateinformation)"
+        test "$actual" = "$expected"
+        test -s target/release/Frame-x86_64.AppImage.zsync
     - name: release::upload_linux_x86_64
       uses: actions/upload-artifact@v4
       with:
@@ -1387,6 +1407,12 @@ jobs:
       with:
         name: Frame-x86_64.AppImage
         path: target/release/Frame-x86_64.AppImage
+        if-no-files-found: error
+    - name: release::upload_linux_x86_64_appimage_zsync
+      uses: actions/upload-artifact@v4
+      with:
+        name: Frame-x86_64.AppImage.zsync
+        path: target/release/Frame-x86_64.AppImage.zsync
         if-no-files-found: error
     - name: release::upload_linux_x86_64_flatpak
       uses: actions/upload-artifact@v4
@@ -1413,7 +1439,7 @@ jobs:
     - name: steps::setup_linux
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang curl desktop-file-utils file flatpak flatpak-builder libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf
+        sudo apt-get install -y clang curl desktop-file-utils file flatpak flatpak-builder libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync
     - name: steps::setup_appimagetool
       run: |
         curl -L --fail -o /tmp/appimagetool.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-aarch64.AppImage
@@ -1426,6 +1452,13 @@ jobs:
       env:
         APPIMAGETOOL: /tmp/appimagetool.AppImage
       run: ./script/bundle-linux --tarball --appimage --flatpak
+    - name: release::verify_linux_aarch64_appimage_update_information
+      shell: bash
+      run: |
+        expected='gh-releases-zsync|66HEX|frame|latest|Frame-aarch64.AppImage.zsync'
+        actual="$(APPIMAGE_EXTRACT_AND_RUN=1 target/release/Frame-aarch64.AppImage --appimage-updateinformation)"
+        test "$actual" = "$expected"
+        test -s target/release/Frame-aarch64.AppImage.zsync
     - name: release::upload_linux_aarch64
       uses: actions/upload-artifact@v4
       with:
@@ -1437,6 +1470,12 @@ jobs:
       with:
         name: Frame-aarch64.AppImage
         path: target/release/Frame-aarch64.AppImage
+        if-no-files-found: error
+    - name: release::upload_linux_aarch64_appimage_zsync
+      uses: actions/upload-artifact@v4
+      with:
+        name: Frame-aarch64.AppImage.zsync
+        path: target/release/Frame-aarch64.AppImage.zsync
         if-no-files-found: error
     - name: release::upload_linux_aarch64_flatpak
       uses: actions/upload-artifact@v4
@@ -1659,7 +1698,9 @@ jobs:
           target/release-artifacts/frame-linux-x86_64.tar.gz
           target/release-artifacts/frame-linux-aarch64.tar.gz
           target/release-artifacts/Frame-x86_64.AppImage
+          target/release-artifacts/Frame-x86_64.AppImage.zsync
           target/release-artifacts/Frame-aarch64.AppImage
+          target/release-artifacts/Frame-aarch64.AppImage.zsync
           target/release-artifacts/Frame-x86_64.flatpak
           target/release-artifacts/Frame-aarch64.flatpak
           target/release/latest.json
@@ -2099,17 +2140,51 @@ mod tests {
     }
 
     #[test]
-    fn release_workflow_publishes_manual_linux_assets() {
+    fn release_workflow_publishes_appimage_update_assets() {
         let workflow = release_workflow();
 
         assert!(workflow.contains("target/release-artifacts/Frame-x86_64.AppImage"));
+        assert!(workflow.contains("target/release-artifacts/Frame-x86_64.AppImage.zsync"));
         assert!(workflow.contains("target/release-artifacts/Frame-aarch64.AppImage"));
+        assert!(workflow.contains("target/release-artifacts/Frame-aarch64.AppImage.zsync"));
         assert!(workflow.contains("target/release-artifacts/Frame-x86_64.flatpak"));
         assert!(workflow.contains("target/release-artifacts/Frame-aarch64.flatpak"));
     }
 
     #[test]
-    fn release_workflow_keeps_manual_linux_assets_out_of_update_manifest() {
+    fn run_bundling_workflow_requires_appimage_zsync_assets() {
+        let workflow = run_bundling_workflow();
+
+        assert!(workflow.contains("zsync"));
+        assert!(workflow.contains("run_bundling::verify_appimage_update_information"));
+        assert!(workflow.contains("--appimage-updateinformation"));
+        assert!(
+            workflow.contains("gh-releases-zsync|66HEX|frame|latest|Frame-x86_64.AppImage.zsync")
+        );
+        assert!(
+            workflow.contains("gh-releases-zsync|66HEX|frame|latest|Frame-aarch64.AppImage.zsync")
+        );
+        assert!(workflow.contains("target/release/Frame-x86_64.AppImage.zsync"));
+        assert!(workflow.contains("target/release/Frame-aarch64.AppImage.zsync"));
+    }
+
+    #[test]
+    fn release_workflow_verifies_appimage_update_information() {
+        let workflow = release_workflow();
+
+        assert!(workflow.contains("release::verify_linux_x86_64_appimage_update_information"));
+        assert!(workflow.contains("release::verify_linux_aarch64_appimage_update_information"));
+        assert!(workflow.contains("--appimage-updateinformation"));
+        assert!(
+            workflow.contains("gh-releases-zsync|66HEX|frame|latest|Frame-x86_64.AppImage.zsync")
+        );
+        assert!(
+            workflow.contains("gh-releases-zsync|66HEX|frame|latest|Frame-aarch64.AppImage.zsync")
+        );
+    }
+
+    #[test]
+    fn release_workflow_keeps_appimage_and_flatpak_out_of_frame_update_manifest() {
         let workflow = release_workflow();
 
         assert!(!workflow.contains(":linux-x86_64:linux_appimage"));

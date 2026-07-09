@@ -113,7 +113,7 @@ fn package_manager_update_explanation(
         )
     } else if appimage_runtime {
         Some(
-            "This AppImage build is updated manually. Download the latest AppImage from GitHub Releases."
+            "This AppImage build is updated by AppImage update tools. Use AppImageUpdate, AppImageLauncher, Gear Lever, or AppManager."
                 .to_string(),
         )
     } else {
@@ -159,7 +159,7 @@ mod tests {
         assert_eq!(
             package_manager_update_explanation(true, false, false),
             Some(
-                "This AppImage build is updated manually. Download the latest AppImage from GitHub Releases."
+                "This AppImage build is updated by AppImage update tools. Use AppImageUpdate, AppImageLauncher, Gear Lever, or AppManager."
                     .to_string()
             )
         );

@@ -255,14 +255,28 @@ create_appimage() {
 		echo "Missing appimagetool. Set APPIMAGETOOL=/path/to/appimagetool or install it in PATH." >&2
 		exit 1
 	fi
+	if ! command -v zsyncmake >/dev/null 2>&1; then
+		echo "Missing zsyncmake. Install zsync before building an updateable AppImage." >&2
+		exit 1
+	fi
 
 	local appimage_dir="$temp_dir/Frame.AppDir"
 	local output="$target_dir/release/Frame-$runtime_arch.AppImage"
-	rm -rf "$appimage_dir" "$output"
+	local zsync_output="$output.zsync"
+	local update_information="gh-releases-zsync|66HEX|frame|latest|$(basename "$zsync_output")"
+	rm -rf "$appimage_dir" "$output" "$zsync_output"
 	copy_managed_layout_to_appdir "$appimage_dir"
-	ARCH="$runtime_arch" APPIMAGE_EXTRACT_AND_RUN=1 "$appimagetool" "$appimage_dir" "$output"
+	ARCH="$runtime_arch" APPIMAGE_EXTRACT_AND_RUN=1 "$appimagetool" \
+		-u "$update_information" \
+		"$appimage_dir" \
+		"$output"
+	if [[ ! -s "$zsync_output" ]]; then
+		echo "AppImage update metadata was requested, but $zsync_output was not created." >&2
+		exit 1
+	fi
 	chmod +x "$output"
 	echo "Created $output"
+	echo "Created $zsync_output"
 }
 
 sed_escape_replacement() {
