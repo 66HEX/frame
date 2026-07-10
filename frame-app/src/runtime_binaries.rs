@@ -10,6 +10,7 @@ pub const BUNDLED_BINARIES_DIR: &str = "binaries";
 
 const FFMPEG_ENV_VAR: &str = "FRAME_FFMPEG_PATH";
 const FFPROBE_ENV_VAR: &str = "FRAME_FFPROBE_PATH";
+const SYSTEM_MEDIA_TOOLS_ENV_VAR: &str = "FRAME_USE_SYSTEM_MEDIA_TOOLS";
 
 #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
 const SETUP_TARGET_TRIPLE: Option<&str> = Some("x86_64-apple-darwin");
@@ -42,11 +43,28 @@ pub fn ffprobe_executable() -> String {
 
 fn resolve_tool_executable(env_var: &str, tool_name: &str) -> String {
     let env_value = env::var(env_var).ok();
+    resolve_tool_executable_with_mode(env_value.as_deref(), tool_name, use_system_media_tools())
+}
+
+fn resolve_tool_executable_with_mode(
+    env_value: Option<&str>,
+    tool_name: &str,
+    system_media_tools: bool,
+) -> String {
+    if system_media_tools {
+        return resolved_executable(env_value, tool_name, &[]);
+    }
     let candidates = runtime_binary_file_name(tool_name)
         .map(|file_name| binary_candidates(&file_name))
         .unwrap_or_default();
 
-    resolved_executable(env_value.as_deref(), tool_name, &candidates)
+    resolved_executable(env_value, tool_name, &candidates)
+}
+
+fn use_system_media_tools() -> bool {
+    env::var(SYSTEM_MEDIA_TOOLS_ENV_VAR)
+        .ok()
+        .is_some_and(|value| matches!(value.trim(), "1" | "true" | "TRUE" | "yes" | "YES"))
 }
 
 fn resolved_executable(env_value: Option<&str>, tool_name: &str, candidates: &[PathBuf]) -> String {
@@ -163,6 +181,18 @@ mod tests {
     #[test]
     fn resolved_executable_falls_back_to_tool_name() {
         assert_eq!(resolved_executable(None, "ffmpeg", &[]), "ffmpeg");
+    }
+
+    #[test]
+    fn system_media_tools_mode_skips_bundled_candidates() {
+        assert_eq!(
+            resolve_tool_executable_with_mode(None, "ffmpeg", true),
+            "ffmpeg"
+        );
+        assert_eq!(
+            resolve_tool_executable_with_mode(Some(" /custom/ffmpeg "), "ffmpeg", true),
+            "/custom/ffmpeg"
+        );
     }
 
     #[test]
