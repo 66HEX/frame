@@ -27,12 +27,13 @@ use crate::{
 };
 
 #[must_use]
-pub fn conversion_task_from_file(file: &FileItem) -> ConversionTask {
+pub fn conversion_task_from_file(file: &FileItem, output_directory: &str) -> ConversionTask {
     let output_name = crate::settings::sanitize_output_name(&file.output_name);
 
     ConversionTask {
         id: file.id.clone(),
         file_path: file.path.clone(),
+        output_directory: output_directory.to_string(),
         output_name: (!output_name.is_empty()).then_some(output_name),
         config: core_config_from_gpui(&file.config),
     }

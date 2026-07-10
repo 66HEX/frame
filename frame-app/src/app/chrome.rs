@@ -296,9 +296,12 @@ pub(super) struct AppSettingsSheetProps<'a> {
     pub(super) current_max_concurrency: usize,
     pub(super) draft_max_concurrency: &'a str,
     pub(super) error: Option<&'a str>,
+    pub(super) default_output_directory: Option<&'a str>,
+    pub(super) output_directory_error: Option<&'a str>,
     pub(super) auto_update_check: bool,
     pub(super) update_status: &'a UpdateStatus,
     pub(super) value_focus: &'a FocusHandle,
+    pub(super) output_directory_focus: &'a FocusHandle,
     pub(super) auto_update_focus: &'a FocusHandle,
     pub(super) check_now_focus: &'a FocusHandle,
     pub(super) download_focus: &'a FocusHandle,
@@ -440,6 +443,13 @@ pub(super) fn app_settings_sheet(
                         .gap_4()
                         .p_4()
                         .text_size(px(theme::TEXT_LABEL_SIZE))
+                        .child(app_settings_output_directory_section(
+                            props.default_output_directory,
+                            props.output_directory_error,
+                            props.output_directory_focus,
+                            window,
+                            cx,
+                        ))
                         .child(
                             settings_section("Max concurrency")
                                 .child(app_settings_concurrency_control(
@@ -480,6 +490,62 @@ pub(super) fn app_settings_sheet(
                         )),
                 ),
         )
+}
+
+fn app_settings_output_directory_section(
+    default_output_directory: Option<&str>,
+    error: Option<&str>,
+    focus: &FocusHandle,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    let selected_path = default_output_directory
+        .unwrap_or("No folder selected")
+        .to_string();
+    let button_label = if default_output_directory.is_some() {
+        "Change default output folder"
+    } else {
+        "Choose default output folder"
+    };
+
+    let mut section = settings_section("Output folder")
+        .child(
+            frame_text_button_with_focus(
+                "app-settings-output-directory",
+                button_label,
+                ButtonVariant::Secondary,
+                false,
+                true,
+                focus,
+                window,
+                cx,
+            )
+            .w_full()
+            .on_click(cx.listener(|_root, _: &ClickEvent, window, cx| {
+                cx.stop_propagation();
+                FrameRoot::prompt_default_output_folder(window, cx);
+            })),
+        )
+        .child(
+            div()
+                .id("app-settings-output-directory-path")
+                .overflow_hidden()
+                .text_color(color(theme::FRAME_GRAY_600))
+                .child(selected_path),
+        );
+
+    if let Some(error) = error {
+        section = section.child(
+            div()
+                .id("app-settings-output-directory-error")
+                .role(gpui::Role::Alert)
+                .aria_label(error.to_string())
+                .text_color(color(theme::FRAME_RED))
+                .child(error.to_string()),
+        );
+    }
+
+    section
 }
 
 #[derive(Clone, Copy)]

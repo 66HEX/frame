@@ -40,7 +40,7 @@ pub(in crate::app) fn settings_output_tab(
                     cx,
                 ))
                 .child(settings_hint_text(
-                    "Output stays next to the original file.",
+                    "Output is saved to the default folder selected in Settings.",
                 )),
         )
         .child(

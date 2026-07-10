@@ -467,27 +467,31 @@ fn sanitize_output_name(raw: &str) -> Option<String> {
     Some(candidate.to_string())
 }
 
-pub fn build_output_path(file_path: &str, container: &str, output_name: Option<&str>) -> String {
-    output_name.and_then(sanitize_output_name).map_or_else(
-        || format!("{file_path}_converted.{container}"),
-        |custom| {
-            let directory_end = file_path
-                .rfind(['/', '\\'])
-                .map_or(0, |separator_index| separator_index + 1);
-            let directory = &file_path[..directory_end];
-            let output_stem = custom
-                .rsplit_once('.')
-                .filter(|(stem, extension)| {
-                    !stem.is_empty()
-                        && all_containers()
-                            .iter()
-                            .any(|known| known.eq_ignore_ascii_case(extension))
-                })
-                .map_or(custom.as_str(), |(stem, _)| stem);
+pub fn build_output_path(
+    output_directory: &str,
+    container: &str,
+    output_name: Option<&str>,
+) -> String {
+    let output_name = output_name
+        .and_then(sanitize_output_name)
+        .unwrap_or_else(|| "output_converted".to_string());
+    let output_stem = output_name
+        .rsplit_once('.')
+        .filter(|(stem, extension)| {
+            !stem.is_empty()
+                && all_containers()
+                    .iter()
+                    .any(|known| known.eq_ignore_ascii_case(extension))
+        })
+        .map_or(output_name.as_str(), |(stem, _)| stem);
+    let separator = if output_directory.contains('\\') && !output_directory.contains('/') {
+        "\\"
+    } else {
+        "/"
+    };
+    let directory = output_directory.trim_end_matches(['/', '\\']);
 
-            format!("{directory}{output_stem}.{container}")
-        },
-    )
+    format!("{directory}{separator}{output_stem}.{container}")
 }
 
 #[expect(
@@ -994,10 +998,11 @@ mod tests {
 
     #[test]
     fn build_output_path_preserves_periods_in_output_name_on_unc_share() {
-        let input =
-            r"\\myserver.domain.com\share\movies\Really Funny Home Video Vol.1 (2026)\source.mkv";
-
-        let output = build_output_path(input, "mp4", Some("Really Funny Home Video Vol.1 (2026)"));
+        let output = build_output_path(
+            r"\\myserver.domain.com\share\movies\Really Funny Home Video Vol.1 (2026)",
+            "mp4",
+            Some("Really Funny Home Video Vol.1 (2026)"),
+        );
 
         assert_eq!(
             output,
@@ -1007,9 +1012,16 @@ mod tests {
 
     #[test]
     fn build_output_path_replaces_known_container_extension() {
-        let output = build_output_path("/tmp/source.mkv", "mp4", Some("render.mov"));
+        let output = build_output_path("/tmp", "mp4", Some("render.mov"));
 
         assert_eq!(output, "/tmp/render.mp4");
+    }
+
+    #[test]
+    fn build_output_path_uses_selected_output_directory() {
+        let output = build_output_path("/exports", "mp4", Some("render"));
+
+        assert_eq!(output, "/exports/render.mp4");
     }
 
     #[test]

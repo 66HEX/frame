@@ -98,6 +98,7 @@ impl FrameRoot {
             tooltip_ui: TooltipUiState::default(),
             drag_drop_ui: DragDropUiState::default(),
             max_concurrency,
+            default_output_directory: persisted_settings.default_output_directory,
             text_input_ui: FrameTextInputUiState::default(),
             source_metadata: SourceMetadataStore::default(),
             conversion_processes,
@@ -124,7 +125,12 @@ impl FrameRoot {
         root
     }
     pub(super) fn app_state(&self) -> FrameAppState {
-        FrameAppState::from_file_queue(self.active_view, self.is_processing, &self.file_queue)
+        FrameAppState::from_file_queue(
+            self.active_view,
+            self.is_processing,
+            self.default_output_directory.is_some(),
+            &self.file_queue,
+        )
     }
     pub(super) fn selected_config(&self) -> Option<&ConversionConfig> {
         self.file_queue.selected_file().map(|file| &file.config)
@@ -150,6 +156,7 @@ impl FrameRoot {
 
         persistence.save(&AppSettings::from_runtime(
             self.max_concurrency,
+            self.default_output_directory.clone(),
             &self.presets,
             self.auto_update_check,
             self.update_channel,

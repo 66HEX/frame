@@ -145,6 +145,7 @@ pub struct FrameAppState {
     pub file_count: usize,
     pub selected_count: usize,
     pub has_actionable_files: bool,
+    pub has_default_output_directory: bool,
     pub total_size_bytes: u64,
 }
 
@@ -156,6 +157,7 @@ impl Default for FrameAppState {
             file_count: 0,
             selected_count: 0,
             has_actionable_files: false,
+            has_default_output_directory: false,
             total_size_bytes: 0,
         }
     }
@@ -164,13 +166,17 @@ impl Default for FrameAppState {
 impl FrameAppState {
     #[must_use]
     pub const fn can_start_conversion(self) -> bool {
-        !self.is_processing && self.selected_count > 0 && self.has_actionable_files
+        !self.is_processing
+            && self.selected_count > 0
+            && self.has_actionable_files
+            && self.has_default_output_directory
     }
 
     #[must_use]
     pub fn from_file_queue(
         active_view: ActiveView,
         is_processing: bool,
+        has_default_output_directory: bool,
         file_queue: &FileQueue,
     ) -> Self {
         Self {
@@ -179,6 +185,7 @@ impl FrameAppState {
             file_count: file_queue.files().len(),
             selected_count: file_queue.selected_count(),
             has_actionable_files: file_queue.has_actionable_files(),
+            has_default_output_directory,
             total_size_bytes: file_queue.total_size_bytes(),
         }
     }
@@ -215,6 +222,7 @@ mod tests {
             let state = FrameAppState {
                 selected_count: 1,
                 has_actionable_files: true,
+                has_default_output_directory: true,
                 ..FrameAppState::default()
             };
 
@@ -234,11 +242,22 @@ mod tests {
         }
 
         #[test]
+        fn can_start_conversion_returns_false_without_default_output_directory() {
+            let state = FrameAppState {
+                selected_count: 1,
+                has_actionable_files: true,
+                ..FrameAppState::default()
+            };
+
+            assert!(!state.can_start_conversion());
+        }
+
+        #[test]
         fn from_file_queue_uses_queue_derived_counts() {
             let mut queue = FileQueue::new();
             queue.add_file(file_queue::FileItem::from_path("first", "/tmp/one.mp4", 10));
 
-            let state = FrameAppState::from_file_queue(ActiveView::Workspace, false, &queue);
+            let state = FrameAppState::from_file_queue(ActiveView::Workspace, false, true, &queue);
 
             assert_eq!(state.file_count, 1);
         }

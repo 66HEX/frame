@@ -12,7 +12,7 @@ use thiserror::Error;
 
 use crate::settings::PresetDefinition;
 
-const APP_SETTINGS_VERSION: u32 = 2;
+const APP_SETTINGS_VERSION: u32 = 3;
 const SETTINGS_FILE_NAME: &str = "settings.json";
 const LEGACY_APP_SETTINGS_FILE_NAME: &str = "app-settings.dat";
 const LEGACY_PRESETS_FILE_NAME: &str = "presets.dat";
@@ -20,6 +20,7 @@ const LEGACY_PRESETS_FILE_NAME: &str = "presets.dat";
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AppSettings {
     pub max_concurrency: usize,
+    pub default_output_directory: Option<PathBuf>,
     pub custom_presets: Vec<PresetDefinition>,
     pub auto_update_check: bool,
     pub update_channel: UpdateChannel,
@@ -31,6 +32,7 @@ impl AppSettings {
     #[must_use]
     pub fn from_runtime(
         max_concurrency: usize,
+        default_output_directory: Option<PathBuf>,
         presets: &[PresetDefinition],
         auto_update_check: bool,
         update_channel: UpdateChannel,
@@ -39,6 +41,7 @@ impl AppSettings {
     ) -> Self {
         Self {
             max_concurrency: valid_max_concurrency(max_concurrency),
+            default_output_directory,
             custom_presets: normalize_custom_presets(
                 presets
                     .iter()
@@ -58,6 +61,7 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             max_concurrency: DEFAULT_MAX_CONCURRENCY,
+            default_output_directory: None,
             custom_presets: Vec::new(),
             auto_update_check: true,
             update_channel: UpdateChannel::Stable,
@@ -188,6 +192,7 @@ pub enum AppPersistenceError {
 struct PersistedAppSettings {
     version: u32,
     max_concurrency: usize,
+    default_output_directory: Option<PathBuf>,
     custom_presets: Vec<PresetDefinition>,
     auto_update_check: bool,
     update_channel: UpdateChannel,
@@ -213,6 +218,7 @@ impl PersistedAppSettings {
         Self {
             version: APP_SETTINGS_VERSION,
             max_concurrency: valid_max_concurrency(settings.max_concurrency),
+            default_output_directory: settings.default_output_directory.clone(),
             custom_presets: normalize_custom_presets(settings.custom_presets.clone()),
             auto_update_check: settings.auto_update_check,
             update_channel: settings.update_channel,
@@ -224,6 +230,7 @@ impl PersistedAppSettings {
     fn into_app_settings(self) -> AppSettings {
         AppSettings {
             max_concurrency: valid_max_concurrency(self.max_concurrency),
+            default_output_directory: self.default_output_directory,
             custom_presets: normalize_custom_presets(self.custom_presets),
             auto_update_check: self.auto_update_check,
             update_channel: self.update_channel,
@@ -238,6 +245,7 @@ impl Default for PersistedAppSettings {
         Self {
             version: APP_SETTINGS_VERSION,
             max_concurrency: DEFAULT_MAX_CONCURRENCY,
+            default_output_directory: None,
             custom_presets: Vec::new(),
             auto_update_check: true,
             update_channel: UpdateChannel::Stable,
@@ -322,6 +330,7 @@ mod tests {
         let persistence = AppPersistence::from_settings_path(test_settings_path());
         let settings = AppSettings {
             max_concurrency: 4,
+            default_output_directory: Some(PathBuf::from("/tmp/frame-output")),
             custom_presets: vec![PresetDefinition::custom(
                 "custom-preset-1".to_string(),
                 "Review MP4".to_string(),
@@ -342,6 +351,24 @@ mod tests {
         let loaded = persistence.load().expect("settings should be loaded");
 
         assert_eq!(loaded, settings);
+    }
+
+    #[test]
+    fn load_accepts_settings_without_default_output_directory() {
+        let path = test_settings_path();
+        let parent = path.parent().expect("test path should have parent");
+        fs::create_dir_all(parent).expect("test directory should be created");
+        fs::write(
+            &path,
+            r#"{"version":2,"maxConcurrency":4,"customPresets":[],"autoUpdateCheck":true,"updateChannel":"stable","skippedUpdateVersion":null,"lastUpdateCheckAt":null}"#,
+        )
+        .expect("settings fixture should be written");
+
+        let settings = AppPersistence::from_settings_path(path)
+            .load()
+            .expect("settings should load");
+
+        assert_eq!(settings.default_output_directory, None);
     }
 
     #[test]
@@ -433,6 +460,7 @@ mod tests {
     fn from_runtime_persists_only_custom_presets() {
         let settings = AppSettings::from_runtime(
             3,
+            Some(PathBuf::from("/tmp/frame-output")),
             &[
                 PresetDefinition::built_in(
                     "balanced-mp4",

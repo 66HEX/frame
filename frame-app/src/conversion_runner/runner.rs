@@ -116,7 +116,7 @@ pub fn run_conversion_task_with_control(
     }
 
     let output_path = build_output_path(
-        &task.file_path,
+        &task.output_directory,
         &task.config.container,
         task.output_name.as_deref(),
     );

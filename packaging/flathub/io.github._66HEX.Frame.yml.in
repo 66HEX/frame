@@ -11,7 +11,6 @@ finish-args:
   - --socket=fallback-x11
   - --socket=pulseaudio
   - --device=dri
-  - --filesystem=home
   - --talk-name=org.freedesktop.Notifications
   - --env=FRAME_USE_SYSTEM_MEDIA_TOOLS=1
 cleanup:

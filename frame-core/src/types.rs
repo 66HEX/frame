@@ -592,6 +592,7 @@ pub struct FfprobeTags {
 pub struct ConversionTask {
     pub id: String,
     pub file_path: String,
+    pub output_directory: String,
     pub output_name: Option<String>,
     pub config: ConversionConfig,
 }

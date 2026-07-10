@@ -551,6 +551,11 @@ impl Render for FrameRoot {
 
         if self.settings_ui.is_present {
             let value_focus = self.ensure_text_input_focus(FrameTextInputKind::MaxConcurrency, cx);
+            let output_directory_focus = self.ensure_focus(
+                FrameFocusKey::Control("app-settings-output-directory".to_string()),
+                true,
+                cx,
+            );
             let auto_update_focus = self.ensure_focus(
                 FrameFocusKey::Control("app-settings-auto-update-check".to_string()),
                 true,
@@ -615,9 +620,15 @@ impl Render for FrameRoot {
                     current_max_concurrency: self.max_concurrency,
                     draft_max_concurrency: &self.settings_ui.max_concurrency_draft,
                     error: self.settings_ui.max_concurrency_error.as_deref(),
+                    default_output_directory: self
+                        .default_output_directory
+                        .as_deref()
+                        .and_then(std::path::Path::to_str),
+                    output_directory_error: self.settings_ui.output_directory_error.as_deref(),
                     auto_update_check: self.auto_update_check,
                     update_status: &self.update_ui.status,
                     value_focus: &value_focus,
+                    output_directory_focus: &output_directory_focus,
                     auto_update_focus: &auto_update_focus,
                     check_now_focus: &check_now_focus,
                     download_focus: &download_focus,

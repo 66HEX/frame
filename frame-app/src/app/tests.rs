@@ -182,9 +182,28 @@ mod frame_root_updates {
 mod frame_root_conversion {
     use super::*;
 
+    fn root_with_output_directory() -> FrameRoot {
+        let mut root = FrameRoot::new();
+        root.default_output_directory = Some(PathBuf::from("/tmp/frame-output"));
+        root
+    }
+
+    #[test]
+    fn queue_selected_conversion_tasks_requires_default_output_directory() {
+        let mut root = FrameRoot::new();
+        root.file_queue
+            .add_file(FileItem::from_path("first", "/tmp/one.mp4", 1));
+
+        assert!(root.queue_selected_conversion_tasks().is_empty());
+        assert_eq!(
+            root.file_queue.file_by_id("first").map(|file| file.status),
+            Some(FileStatus::Idle)
+        );
+    }
+
     #[test]
     fn queue_selected_conversion_tasks_marks_pending_file_as_queued() {
-        let mut root = FrameRoot::new();
+        let mut root = root_with_output_directory();
         root.file_queue
             .add_file(FileItem::from_path("first", "/tmp/one.mp4", 1));
         root.file_queue
@@ -205,11 +224,12 @@ mod frame_root_conversion {
             Some(FileStatus::Queued)
         );
         assert_eq!(tasks[0].output_name.as_deref(), Some("one_converted"));
+        assert_eq!(tasks[0].output_directory, "/tmp/frame-output");
     }
 
     #[test]
     fn queue_selected_conversion_tasks_normalizes_each_file_from_own_metadata() {
-        let mut root = FrameRoot::new();
+        let mut root = root_with_output_directory();
         root.file_queue
             .add_file(FileItem::from_path("video", "/tmp/one.mp4", 1));
         root.file_queue
@@ -234,7 +254,7 @@ mod frame_root_conversion {
 
     #[test]
     fn queue_selected_conversion_tasks_infers_image_config_from_extension_without_metadata() {
-        let mut root = FrameRoot::new();
+        let mut root = root_with_output_directory();
         root.file_queue
             .add_file(FileItem::from_path("image", "/tmp/two.PNG", 1));
 
@@ -246,7 +266,7 @@ mod frame_root_conversion {
 
     #[test]
     fn apply_conversion_event_updates_processing_state_from_queue() {
-        let mut root = FrameRoot::new();
+        let mut root = root_with_output_directory();
         root.file_queue
             .add_file(FileItem::from_path("first", "/tmp/one.mp4", 1));
         root.queue_selected_conversion_tasks();
@@ -273,6 +293,7 @@ mod frame_root_conversion {
                     .push(summary);
             },
         ));
+        root.default_output_directory = Some(PathBuf::from("/tmp/frame-output"));
         root.file_queue
             .add_file(FileItem::from_path("first", "/tmp/one.mp4", 1));
         root.file_queue
@@ -308,6 +329,7 @@ mod frame_root_conversion {
                     .push(summary);
             },
         ));
+        root.default_output_directory = Some(PathBuf::from("/tmp/frame-output"));
         root.file_queue
             .add_file(FileItem::from_path("first", "/tmp/one.mp4", 1));
         root.queue_selected_conversion_tasks();
@@ -401,6 +423,7 @@ mod frame_root_conversion {
             .expect("source should remain in queue");
         assert_eq!(file.status, FileStatus::Idle);
         assert_eq!(file.config.container, "mkv");
+        root.default_output_directory = Some(PathBuf::from("/tmp/frame-output"));
         assert!(root.app_state().can_start_conversion());
     }
 
@@ -447,6 +470,27 @@ mod frame_root_conversion {
                 .any(|preset| preset.name == "Review MP4")
         );
         assert_eq!(root.settings_ui.next_custom_preset_sequence, 7);
+    }
+
+    #[test]
+    fn default_output_directory_persists_for_future_sessions() {
+        let persistence = AppPersistence::from_settings_path(test_settings_path());
+        let mut root = FrameRoot::new_with_persistence(persistence.clone());
+
+        root.set_default_output_directory(PathBuf::from("/tmp/frame-output"))
+            .expect("output directory should persist");
+
+        assert_eq!(
+            persistence
+                .load()
+                .expect("settings should be readable")
+                .default_output_directory,
+            Some(PathBuf::from("/tmp/frame-output"))
+        );
+        assert_eq!(
+            FrameRoot::new_with_persistence(persistence).default_output_directory,
+            Some(PathBuf::from("/tmp/frame-output"))
+        );
     }
 
     #[test]

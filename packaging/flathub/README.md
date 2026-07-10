@@ -14,6 +14,8 @@ The Flathub package intentionally differs from the local devel Flatpak built by
   `ffprobe` from the Flatpak runtime PATH,
 - it uses the Freedesktop 25.08 runtime and its automatically installed
   `org.freedesktop.Platform.codecs-extra` extension instead of bundling FFmpeg.
+- it does not request static home-directory access; Frame asks the user to
+  choose its default output folder through the file chooser portal.
 
 ## One-Time Flathub Setup
 

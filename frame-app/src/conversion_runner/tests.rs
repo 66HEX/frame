@@ -234,10 +234,11 @@ fn conversion_task_from_file_sanitizes_output_name() {
     let mut file = FileItem::from_path("file-1", "/tmp/source.mov", 1);
     file.output_name = "/tmp/export/final cut.mp4".to_string();
 
-    let task = conversion_task_from_file(&file);
+    let task = conversion_task_from_file(&file, "/tmp/frame-output");
 
     assert_eq!(task.output_name.as_deref(), Some("final cut.mp4"));
     assert_eq!(task.file_path, "/tmp/source.mov");
+    assert_eq!(task.output_directory, "/tmp/frame-output");
 }
 
 #[test]
@@ -378,6 +379,7 @@ fn run_conversion_task_with_control_emits_cancelled_when_cancelled_before_valida
     let task = ConversionTask {
         id: "task-1".to_string(),
         file_path: "/definitely/missing.mov".to_string(),
+        output_directory: "/tmp/frame-output".to_string(),
         output_name: None,
         config: core_config_from_gpui(&GpuiConversionConfig::default()),
     };
@@ -422,6 +424,7 @@ fn run_conversion_task_should_emit_completed_for_real_ffmpeg_job() {
     let task = ConversionTask {
         id: "task-real".to_string(),
         file_path: input.to_string_lossy().into_owned(),
+        output_directory: sandbox.root.to_string_lossy().into_owned(),
         output_name: Some(output_name.to_string()),
         config: core_config_from_gpui(&GpuiConversionConfig::default()),
     };
@@ -466,6 +469,7 @@ fn run_conversion_task_should_emit_completed_for_real_image_encoding_job() {
     let task = ConversionTask {
         id: "task-image-real".to_string(),
         file_path: input.to_string_lossy().into_owned(),
+        output_directory: sandbox.root.to_string_lossy().into_owned(),
         output_name: Some(output_name.to_string()),
         config: core_config_from_gpui(&config),
     };

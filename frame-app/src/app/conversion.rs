@@ -4,12 +4,19 @@ impl FrameRoot {
     pub(super) fn queue_selected_conversion_tasks(
         &mut self,
     ) -> Vec<frame_core::types::ConversionTask> {
+        let Some(output_directory) = self
+            .default_output_directory
+            .as_ref()
+            .map(|path| path.to_string_lossy().into_owned())
+        else {
+            return Vec::new();
+        };
         self.normalize_selected_actionable_conversion_configs();
 
         self.file_queue
             .queue_selected_pending_conversions()
             .iter()
-            .map(conversion_task_from_file)
+            .map(|file| conversion_task_from_file(file, &output_directory))
             .collect()
     }
     pub(super) fn start_selected_conversions(&mut self, cx: &mut Context<Self>) {

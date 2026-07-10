@@ -1,7 +1,8 @@
 use super::{
     Context, FrameRoot, FrameTextInputKind, PresetDefinition, PresetNotice, PresetNoticeTone,
     PromptButton, PromptLevel, Window, apply_preset, apply_subtitle_burn_path,
-    create_custom_preset, is_supported_subtitle_path, pick_subtitle_file, subtitle_file_dialog,
+    create_custom_preset, is_supported_subtitle_path, output_folder_dialog, pick_output_folder,
+    pick_subtitle_file, subtitle_file_dialog,
 };
 
 impl FrameRoot {
@@ -10,11 +11,13 @@ impl FrameRoot {
         self.settings_ui.is_present = true;
         self.settings_ui.max_concurrency_draft = self.max_concurrency.to_string();
         self.settings_ui.max_concurrency_error = None;
+        self.settings_ui.output_directory_error = None;
     }
 
     pub(super) fn close_app_settings(&mut self) {
         self.settings_ui.is_open = false;
         self.settings_ui.max_concurrency_error = None;
+        self.settings_ui.output_directory_error = None;
         self.text_input_ui
             .focuses
             .clear(FrameTextInputKind::MaxConcurrency);
@@ -59,6 +62,38 @@ impl FrameRoot {
         let trimmed = self.settings_ui.max_concurrency_draft.trim();
         let value = trimmed.parse::<usize>().ok()?;
         (value > 0).then_some(value)
+    }
+
+    pub(super) fn prompt_default_output_folder(window: &Window, cx: &Context<Self>) {
+        let dialog = output_folder_dialog(window);
+        cx.spawn(async move |this, cx| {
+            let Some(path) = pick_output_folder(dialog).await else {
+                return;
+            };
+
+            this.update(cx, |root, cx| {
+                root.settings_ui.output_directory_error = root
+                    .set_default_output_directory(path)
+                    .err()
+                    .map(|error| format!("Failed to save settings: {error}"));
+                cx.notify();
+            })
+            .ok();
+        })
+        .detach();
+    }
+
+    pub(super) fn set_default_output_directory(
+        &mut self,
+        path: std::path::PathBuf,
+    ) -> Result<(), crate::app_persistence::AppPersistenceError> {
+        let previous = self.default_output_directory.replace(path);
+        if let Err(error) = self.persist_app_settings() {
+            self.default_output_directory = previous;
+            return Err(error);
+        }
+
+        Ok(())
     }
 
     pub(super) fn prompt_subtitle_burn_file(&self, window: &Window, cx: &Context<Self>) {

@@ -63,6 +63,12 @@ pub const SOURCE_FOLDER_DIALOG_SPEC: NativeDialogSpec = NativeDialogSpec {
     allows_multiple: false,
 };
 
+pub const OUTPUT_FOLDER_DIALOG_SPEC: NativeDialogSpec = NativeDialogSpec {
+    title: "Choose Default Output Folder",
+    filters: &[],
+    allows_multiple: false,
+};
+
 pub const SUBTITLE_FILE_DIALOG_SPEC: NativeDialogSpec = NativeDialogSpec {
     title: "Select subtitle file",
     filters: &SUBTITLE_FILE_DIALOG_FILTERS,
@@ -87,6 +93,10 @@ pub async fn pick_source_folder(dialog: AsyncFileDialog) -> Option<PathBuf> {
     dialog.pick_folder().await.as_ref().map(file_handle_to_path)
 }
 
+pub async fn pick_output_folder(dialog: AsyncFileDialog) -> Option<PathBuf> {
+    dialog.pick_folder().await.as_ref().map(file_handle_to_path)
+}
+
 pub async fn pick_subtitle_file(dialog: AsyncFileDialog) -> Option<PathBuf> {
     dialog.pick_file().await.as_ref().map(file_handle_to_path)
 }
@@ -103,6 +113,11 @@ pub fn source_file_dialog(parent: &Window) -> AsyncFileDialog {
 #[must_use]
 pub fn source_folder_dialog(parent: &Window) -> AsyncFileDialog {
     file_dialog_from_spec(SOURCE_FOLDER_DIALOG_SPEC).set_parent(parent)
+}
+
+#[must_use]
+pub fn output_folder_dialog(parent: &Window) -> AsyncFileDialog {
+    file_dialog_from_spec(OUTPUT_FOLDER_DIALOG_SPEC).set_parent(parent)
 }
 
 #[must_use]

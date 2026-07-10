@@ -2565,6 +2565,7 @@ mod tests {
         assert!(!template.contains("frame-update-helper"));
         assert!(!template.contains("ffmpeg-full"));
         assert!(!template.contains("add-extensions"));
+        assert!(!template.contains("--filesystem=home"));
     }
 
     #[test]
