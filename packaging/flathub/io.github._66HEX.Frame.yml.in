@@ -15,7 +15,6 @@ finish-args:
   - --env=FRAME_USE_SYSTEM_MEDIA_TOOLS=1
 cleanup:
   - /include
-  - /lib/debug
   - /lib/pkgconfig
   - /share/man
 modules:
