@@ -28,8 +28,10 @@ To build and run Frame locally, you will need:
 ### System Dependencies
 
 These dependencies are needed when building Frame from source. Release artifacts
-such as AppImage, Flatpak, DMG, and the Windows installer have their own bundled
-runtime layout.
+such as AppImage, DMG, and the Windows installer have their own bundled runtime
+layout. The production Flathub build is different: it builds from source inside
+the Freedesktop SDK and uses runtime-provided FFmpeg/FFprobe and media libraries
+instead of Frame's bundled media tools.
 
 #### macOS
 
@@ -75,24 +77,41 @@ sudo pacman -S --needed base-devel clang pkgconf \
   alsa-lib libpulse libdrm
 ```
 
-Linux packaging commands need a few extra tools:
+Linux tarball and AppImage packaging commands need a few extra tools:
 
 ```bash
 # Ubuntu/Debian
-sudo apt-get install -y curl desktop-file-utils file patchelf flatpak flatpak-builder
+sudo apt-get install -y curl desktop-file-utils file patchelf
 
 # Fedora
-sudo dnf install curl desktop-file-utils file patchelf flatpak flatpak-builder
+sudo dnf install curl desktop-file-utils file patchelf
 
 # Arch Linux
-sudo pacman -S --needed curl desktop-file-utils file patchelf flatpak flatpak-builder
+sudo pacman -S --needed curl desktop-file-utils file patchelf
 ```
 
-The Flatpak bundle also expects the Flathub runtime and SDK:
+The local devel Flatpak helper still expects Flatpak tooling and the Flathub
+runtime:
 
 ```bash
+# Ubuntu/Debian
+sudo apt-get install -y flatpak flatpak-builder
+
+# Fedora
+sudo dnf install flatpak flatpak-builder
+
+# Arch Linux
+sudo pacman -S --needed flatpak flatpak-builder
+
 flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
+```
+
+Production Flathub repository files are generated with:
+
+```bash
+cargo xtask flathub-sources --version <version>
+cargo xtask flathub-manifest --help
 ```
 
 #### Windows
@@ -152,7 +171,10 @@ choco install innosetup --no-progress -y
 
    Windows app icons are embedded into the `.exe` by `frame-app/build.rs`
    during the normal Cargo build, and the Windows package script places the
-   FFmpeg and FFprobe runtime files next to the app.
+   FFmpeg and FFprobe runtime files next to the app. The production Flathub
+   package is generated through `cargo xtask flathub-sources` and
+   `cargo xtask flathub-manifest`; it does not install Frame's bundled media
+   binaries.
 
 ## Development Workflow
 

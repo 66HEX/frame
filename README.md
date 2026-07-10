@@ -176,6 +176,23 @@ brew tap 66HEX/frame
 brew install --cask frame
 ```
 
+### Flathub (Linux)
+
+The production Flatpak is distributed through Flathub under
+`io.github._66HEX.Frame`. The Flathub build uses FFmpeg, FFprobe, codecs, and
+media libraries from the Freedesktop runtime instead of bundled sidecar media
+tools.
+
+```bash
+flatpak install flathub io.github._66HEX.Frame
+```
+
+To update:
+
+```bash
+flatpak update io.github._66HEX.Frame
+```
+
 ### Build from Source
 
 If you prefer to build the application yourself or want to contribute, follow
