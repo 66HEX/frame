@@ -15,6 +15,9 @@ use frame_updater::{
 use sha2::{Digest, Sha256};
 const RUN_BUNDLING_WORKFLOW_PATH: &str = ".github/workflows/run_bundling.yml";
 const RELEASE_WORKFLOW_PATH: &str = ".github/workflows/release.yml";
+const FLATHUB_MANIFEST_TEMPLATE_PATH: &str = "packaging/flathub/io.github._66HEX.Frame.yml.in";
+const FLATHUB_METAINFO_TEMPLATE_PATH: &str =
+    "packaging/flathub/io.github._66HEX.Frame.metainfo.xml.in";
 const FFMPEG_VERSION: &str = "8.1.2";
 
 #[cfg(unix)]
@@ -59,6 +62,14 @@ fn run_xtask() -> Result<()> {
             let args = args.collect::<Vec<_>>();
             sign_update_manifest(&args)
         }
+        "flathub-sources" => {
+            let args = args.collect::<Vec<_>>();
+            flathub_sources(&args)
+        }
+        "flathub-manifest" => {
+            let args = args.collect::<Vec<_>>();
+            flathub_manifest(&args)
+        }
         "workflows" => write_workflows(),
         "-h" | "--help" | "help" => {
             print_help();
@@ -83,6 +94,8 @@ Commands:
   setup-ffmpeg      Download FFmpeg and FFprobe runtime binaries
   update-manifest   Generate a signed-update manifest from release artifacts
   sign-update-manifest Sign update-manifest.json with FRAME_UPDATE_SIGNING_KEY
+  flathub-sources   Create Flathub source and cargo-vendor release archives
+  flathub-manifest  Render Flathub repository manifest files
   ci                Run local formatting, tests, lints, and script checks
   workflows         Regenerate GitHub Actions workflows
 "
@@ -509,6 +522,286 @@ fn sign_update_manifest(args: &[String]) -> Result<()> {
     println!("Created {}", options.out.display());
 
     Ok(())
+}
+
+fn flathub_sources(args: &[String]) -> Result<()> {
+    let options = FlathubSourcesOptions::parse(args)?;
+    let root = repo_root()?;
+    let output_dir = root.join(&options.out_dir);
+    let source_archive = output_dir.join(format!("frame-{}-source.tar.gz", options.version));
+    let vendor_dir = output_dir.join("cargo-vendor");
+    let vendor_archive = output_dir.join(format!("frame-{}-cargo-vendor.tar.gz", options.version));
+    let checksums_path = output_dir.join("checksums.env");
+
+    fs::create_dir_all(&output_dir)?;
+    if vendor_dir.exists() {
+        fs::remove_dir_all(&vendor_dir)?;
+    }
+    for archive in [&source_archive, &vendor_archive] {
+        if archive.exists() {
+            fs::remove_file(archive)?;
+        }
+    }
+
+    run_command_path(
+        "git",
+        &[
+            "archive".to_string(),
+            "--format=tar.gz".to_string(),
+            format!("--prefix=frame-{}/", options.version),
+            "-o".to_string(),
+            path_to_string_lossy(&source_archive),
+            "HEAD".to_string(),
+        ],
+    )?;
+    let vendor_config = run_command_capture(
+        "cargo",
+        &[
+            "vendor".to_string(),
+            "--locked".to_string(),
+            path_to_string_lossy(&vendor_dir),
+        ],
+    )?;
+    let normalized_vendor_config =
+        vendor_config.replace(&path_to_string_lossy(&vendor_dir), "cargo-vendor");
+    fs::write(
+        vendor_dir.join("cargo-config.toml"),
+        normalized_vendor_config,
+    )?;
+    run_command_path(
+        "tar",
+        &[
+            "-czf".to_string(),
+            path_to_string_lossy(&vendor_archive),
+            "-C".to_string(),
+            path_to_string_lossy(&vendor_dir),
+            ".".to_string(),
+        ],
+    )?;
+
+    let source_sha256 = file_sha256_hex(&source_archive)?;
+    let vendor_sha256 = file_sha256_hex(&vendor_archive)?;
+    fs::write(
+        &checksums_path,
+        format!(
+            "FRAME_SOURCE_ARCHIVE={}\nFRAME_SOURCE_SHA256={source_sha256}\nFRAME_CARGO_VENDOR_ARCHIVE={}\nFRAME_CARGO_VENDOR_SHA256={vendor_sha256}\n",
+            source_archive
+                .file_name()
+                .and_then(OsStr::to_str)
+                .unwrap_or_default(),
+            vendor_archive
+                .file_name()
+                .and_then(OsStr::to_str)
+                .unwrap_or_default(),
+        ),
+    )?;
+
+    println!("Wrote {}", source_archive.display());
+    println!("Wrote {}", vendor_archive.display());
+    println!("Wrote {}", checksums_path.display());
+    Ok(())
+}
+
+fn flathub_manifest(args: &[String]) -> Result<()> {
+    let options = FlathubManifestOptions::parse(args)?;
+    let root = repo_root()?;
+    let out_dir = root.join(&options.out);
+    fs::create_dir_all(&out_dir)?;
+
+    let manifest = render_flathub_manifest_template(
+        &fs::read_to_string(root.join(FLATHUB_MANIFEST_TEMPLATE_PATH))?,
+        &options,
+    );
+    let metainfo = render_flathub_metainfo_template(
+        &fs::read_to_string(root.join(FLATHUB_METAINFO_TEMPLATE_PATH))?,
+        &options,
+    );
+
+    fs::write(out_dir.join("io.github._66HEX.Frame.yml"), manifest)?;
+    fs::write(
+        out_dir.join("io.github._66HEX.Frame.metainfo.xml"),
+        metainfo,
+    )?;
+    println!("Wrote {}", out_dir.display());
+    Ok(())
+}
+
+fn render_flathub_manifest_template(template: &str, options: &FlathubManifestOptions) -> String {
+    template
+        .replace("@@FRAME_VERSION@@", &options.version)
+        .replace("@@FRAME_RELEASE_DATE@@", &options.release_date)
+        .replace("@@FRAME_SOURCE_URL@@", &options.source_url)
+        .replace("@@FRAME_SOURCE_SHA256@@", &options.source_sha256)
+        .replace("@@FRAME_CARGO_VENDOR_URL@@", &options.vendor_url)
+        .replace("@@FRAME_CARGO_VENDOR_SHA256@@", &options.vendor_sha256)
+}
+
+fn render_flathub_metainfo_template(template: &str, options: &FlathubManifestOptions) -> String {
+    template
+        .replace("@FRAME_FLATHUB_VERSION@", &options.version)
+        .replace("@FRAME_FLATHUB_RELEASE_DATE@", &options.release_date)
+}
+
+fn path_to_string_lossy(path: &Path) -> String {
+    path.to_string_lossy().into_owned()
+}
+
+#[derive(Clone, Debug)]
+struct FlathubSourcesOptions {
+    version: String,
+    out_dir: PathBuf,
+}
+
+impl FlathubSourcesOptions {
+    fn parse(args: &[String]) -> Result<Self> {
+        let mut version = None;
+        let mut out_dir = PathBuf::from("target/flathub");
+        let mut index = 0;
+
+        while index < args.len() {
+            match args[index].as_str() {
+                "--version" => {
+                    version = Some(required_option_value(args, &mut index, "--version")?);
+                }
+                "--out-dir" => {
+                    out_dir = PathBuf::from(required_option_value(args, &mut index, "--out-dir")?);
+                }
+                "-h" | "--help" => {
+                    println!(
+                        "\
+Usage: cargo xtask flathub-sources --version <semver> [--out-dir <path>]
+"
+                    );
+                    return Err(XtaskError::Help);
+                }
+                other => {
+                    return Err(XtaskError::Usage(format!(
+                        "unknown flathub-sources option `{other}`"
+                    )));
+                }
+            }
+        }
+
+        let version = version.ok_or_else(|| XtaskError::Usage("missing --version".to_string()))?;
+        validate_semver(&version, "--version")?;
+        Ok(Self { version, out_dir })
+    }
+}
+
+#[derive(Clone, Debug)]
+struct FlathubManifestOptions {
+    version: String,
+    release_date: String,
+    source_url: String,
+    source_sha256: String,
+    vendor_url: String,
+    vendor_sha256: String,
+    out: PathBuf,
+}
+
+impl FlathubManifestOptions {
+    fn parse(args: &[String]) -> Result<Self> {
+        let mut version = None;
+        let mut release_date = None;
+        let mut source_url = None;
+        let mut source_sha256 = None;
+        let mut vendor_url = None;
+        let mut vendor_sha256 = None;
+        let mut out = None;
+        let mut index = 0;
+
+        while index < args.len() {
+            match args[index].as_str() {
+                "--version" => {
+                    version = Some(required_option_value(args, &mut index, "--version")?);
+                }
+                "--release-date" => {
+                    release_date = Some(required_option_value(args, &mut index, "--release-date")?);
+                }
+                "--source-url" => {
+                    source_url = Some(required_option_value(args, &mut index, "--source-url")?);
+                }
+                "--source-sha256" => {
+                    source_sha256 =
+                        Some(required_option_value(args, &mut index, "--source-sha256")?);
+                }
+                "--vendor-url" => {
+                    vendor_url = Some(required_option_value(args, &mut index, "--vendor-url")?);
+                }
+                "--vendor-sha256" => {
+                    vendor_sha256 =
+                        Some(required_option_value(args, &mut index, "--vendor-sha256")?);
+                }
+                "--out" => {
+                    out = Some(PathBuf::from(required_option_value(
+                        args, &mut index, "--out",
+                    )?));
+                }
+                "-h" | "--help" => {
+                    println!(
+                        "\
+Usage: cargo xtask flathub-manifest [options]
+
+Required:
+  --version <semver>
+  --release-date <yyyy-mm-dd>
+  --source-url <url>
+  --source-sha256 <sha256>
+  --vendor-url <url>
+  --vendor-sha256 <sha256>
+  --out <path>
+"
+                    );
+                    return Err(XtaskError::Help);
+                }
+                other => {
+                    return Err(XtaskError::Usage(format!(
+                        "unknown flathub-manifest option `{other}`"
+                    )));
+                }
+            }
+        }
+
+        let options = Self {
+            version: version.ok_or_else(|| XtaskError::Usage("missing --version".to_string()))?,
+            release_date: release_date
+                .ok_or_else(|| XtaskError::Usage("missing --release-date".to_string()))?,
+            source_url: source_url
+                .ok_or_else(|| XtaskError::Usage("missing --source-url".to_string()))?,
+            source_sha256: source_sha256
+                .ok_or_else(|| XtaskError::Usage("missing --source-sha256".to_string()))?,
+            vendor_url: vendor_url
+                .ok_or_else(|| XtaskError::Usage("missing --vendor-url".to_string()))?,
+            vendor_sha256: vendor_sha256
+                .ok_or_else(|| XtaskError::Usage("missing --vendor-sha256".to_string()))?,
+            out: out.ok_or_else(|| XtaskError::Usage("missing --out".to_string()))?,
+        };
+        validate_semver(&options.version, "--version")?;
+        validate_sha256(&options.source_sha256, "--source-sha256")?;
+        validate_sha256(&options.vendor_sha256, "--vendor-sha256")?;
+        if options.release_date.len() != 10 {
+            return Err(XtaskError::Usage(
+                "--release-date must use yyyy-mm-dd format".to_string(),
+            ));
+        }
+        Ok(options)
+    }
+}
+
+fn validate_semver(value: &str, flag: &str) -> Result<()> {
+    semver::Version::parse(value)
+        .map(|_| ())
+        .map_err(|error| XtaskError::Usage(format!("invalid {flag} `{value}`: {error}")))
+}
+
+fn validate_sha256(value: &str, flag: &str) -> Result<()> {
+    if value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        Ok(())
+    } else {
+        Err(XtaskError::Usage(format!(
+            "{flag} must be a 64-character SHA-256 hex digest"
+        )))
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -1149,6 +1442,29 @@ fn run_command_path(program: impl AsRef<OsStr>, args: &[String]) -> Result<()> {
     }
 }
 
+fn run_command_capture(program: &str, args: &[String]) -> Result<String> {
+    println!("$ {} {}", program, args.join(" "));
+    let output = Command::new(program)
+        .args(args)
+        .current_dir(repo_root()?)
+        .output()
+        .map_err(|source| XtaskError::CommandSpawn {
+            program: program.to_string(),
+            source,
+        })?;
+
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    } else {
+        eprint!("{}", String::from_utf8_lossy(&output.stdout));
+        eprint!("{}", String::from_utf8_lossy(&output.stderr));
+        Err(XtaskError::CommandFailed {
+            program: program.to_string(),
+            status: output.status,
+        })
+    }
+}
+
 fn run_bundling_workflow() -> String {
     let header = "\
 # Generated from xtask::workflows::run_bundling
@@ -1195,22 +1511,8 @@ const fn setup_rust_step() -> &'static str {
 
 fn linux_job(arch: &str, runner: &str) -> String {
     let appimagetool_arch = arch;
-    let linux_packages = "clang curl desktop-file-utils file flatpak flatpak-builder libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync";
-    let flatpak_setup = r"    - name: steps::setup_flatpak
-      run: |
-        flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-        flatpak install --user -y --noninteractive flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
-";
-    let bundle_args = "--tarball --appimage --flatpak";
-    let flatpak_upload = format!(
-        r"    - name: run_bundling::upload_flatpak_artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: Frame-{arch}.flatpak
-        path: target/release/Frame-{arch}.flatpak
-        if-no-files-found: error
-"
-    );
+    let linux_packages = "clang curl desktop-file-utils file libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync";
+    let bundle_args = "--tarball --appimage";
     let timeout_minutes = 90;
 
     format!(
@@ -1229,7 +1531,7 @@ fn linux_job(arch: &str, runner: &str) -> String {
       run: |
         curl -L --fail -o /tmp/appimagetool.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-{appimagetool_arch}.AppImage
         chmod +x /tmp/appimagetool.AppImage
-{flatpak_setup}    - name: ./script/bundle-linux
+    - name: ./script/bundle-linux
       env:
         APPIMAGETOOL: /tmp/appimagetool.AppImage
       run: ./script/bundle-linux {bundle_args}
@@ -1258,7 +1560,6 @@ fn linux_job(arch: &str, runner: &str) -> String {
         name: Frame-{arch}.AppImage.zsync
         path: target/release/Frame-{arch}.AppImage.zsync
         if-no-files-found: error
-{flatpak_upload}
     timeout-minutes: {timeout_minutes}
 ",
         if_expression = bundle_if_expression(),
@@ -1266,9 +1567,7 @@ fn linux_job(arch: &str, runner: &str) -> String {
         rust = setup_rust_step(),
         appimagetool_arch = appimagetool_arch,
         linux_packages = linux_packages,
-        flatpak_setup = flatpak_setup,
         bundle_args = bundle_args,
-        flatpak_upload = flatpak_upload,
         timeout_minutes = timeout_minutes,
     )
 }
@@ -1376,19 +1675,15 @@ jobs:
     - name: steps::setup_linux
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang curl desktop-file-utils file flatpak flatpak-builder libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync
+        sudo apt-get install -y clang curl desktop-file-utils file libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync
     - name: steps::setup_appimagetool
       run: |
         curl -L --fail -o /tmp/appimagetool.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
         chmod +x /tmp/appimagetool.AppImage
-    - name: steps::setup_flatpak
-      run: |
-        flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-        flatpak install --user -y --noninteractive flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
     - name: ./script/bundle-linux
       env:
         APPIMAGETOOL: /tmp/appimagetool.AppImage
-      run: ./script/bundle-linux --tarball --appimage --flatpak
+      run: ./script/bundle-linux --tarball --appimage
     - name: release::verify_linux_x86_64_appimage_update_information
       shell: bash
       run: |
@@ -1414,12 +1709,6 @@ jobs:
         name: Frame-x86_64.AppImage.zsync
         path: target/release/Frame-x86_64.AppImage.zsync
         if-no-files-found: error
-    - name: release::upload_linux_x86_64_flatpak
-      uses: actions/upload-artifact@v4
-      with:
-        name: Frame-x86_64.flatpak
-        path: target/release/Frame-x86_64.flatpak
-        if-no-files-found: error
     timeout-minutes: 90
 
   build_linux_aarch64:
@@ -1439,19 +1728,15 @@ jobs:
     - name: steps::setup_linux
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang curl desktop-file-utils file flatpak flatpak-builder libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync
+        sudo apt-get install -y clang curl desktop-file-utils file libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync
     - name: steps::setup_appimagetool
       run: |
         curl -L --fail -o /tmp/appimagetool.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-aarch64.AppImage
         chmod +x /tmp/appimagetool.AppImage
-    - name: steps::setup_flatpak
-      run: |
-        flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-        flatpak install --user -y --noninteractive flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
     - name: ./script/bundle-linux
       env:
         APPIMAGETOOL: /tmp/appimagetool.AppImage
-      run: ./script/bundle-linux --tarball --appimage --flatpak
+      run: ./script/bundle-linux --tarball --appimage
     - name: release::verify_linux_aarch64_appimage_update_information
       shell: bash
       run: |
@@ -1476,12 +1761,6 @@ jobs:
       with:
         name: Frame-aarch64.AppImage.zsync
         path: target/release/Frame-aarch64.AppImage.zsync
-        if-no-files-found: error
-    - name: release::upload_linux_aarch64_flatpak
-      uses: actions/upload-artifact@v4
-      with:
-        name: Frame-aarch64.flatpak
-        path: target/release/Frame-aarch64.flatpak
         if-no-files-found: error
     timeout-minutes: 90
 
@@ -1659,6 +1938,8 @@ jobs:
           echo "::error::CHANGELOG.md has no release notes section for [$version]" >&2
           exit 1
         fi
+    - name: release::prepare_flathub_sources
+      run: cargo xtask flathub-sources --version "${{ steps.release.outputs.version }}"
     - name: release::download_tauri_latest_json
       run: |
         mkdir -p target/release
@@ -1701,8 +1982,8 @@ jobs:
           target/release-artifacts/Frame-x86_64.AppImage.zsync
           target/release-artifacts/Frame-aarch64.AppImage
           target/release-artifacts/Frame-aarch64.AppImage.zsync
-          target/release-artifacts/Frame-x86_64.flatpak
-          target/release-artifacts/Frame-aarch64.flatpak
+          target/flathub/frame-${{ steps.release.outputs.version }}-source.tar.gz
+          target/flathub/frame-${{ steps.release.outputs.version }}-cargo-vendor.tar.gz
           target/release/latest.json
           target/release/update-manifest.json
           target/release/update-manifest.json.sig
@@ -1798,6 +2079,107 @@ jobs:
         else
           git commit -m "Update Frame to $VERSION"
           git push
+        fi
+    timeout-minutes: 20
+
+  update_flathub:
+    runs-on: ubuntu-22.04
+    needs: publish_release
+    env:
+      GH_TOKEN: ${{ github.token }}
+      FLATHUB_GITHUB_TOKEN: ${{ secrets.FLATHUB_GITHUB_TOKEN }}
+      FLATHUB_REPOSITORY: flathub/io.github._66HEX.Frame
+    steps:
+    - name: release::resolve_tag
+      id: release
+      shell: bash
+      run: |
+        tag="${GITHUB_REF_NAME}"
+        if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+          tag="${{ inputs.tag }}"
+        fi
+        echo "tag=$tag" >> "$GITHUB_OUTPUT"
+        echo "release_date=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+    - name: release::check_flathub_token
+      shell: bash
+      run: |
+        if [[ -z "$FLATHUB_GITHUB_TOKEN" ]]; then
+          echo "::notice::FLATHUB_GITHUB_TOKEN is not configured; skipping Flathub manifest update."
+        fi
+    - name: steps::checkout_repo
+      if: env.FLATHUB_GITHUB_TOKEN != ''
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+    - name: steps::setup_rust
+      if: env.FLATHUB_GITHUB_TOKEN != ''
+      uses: dtolnay/rust-toolchain@stable
+    - name: release::download_flathub_sources
+      if: env.FLATHUB_GITHUB_TOKEN != ''
+      id: flathub_sources
+      shell: bash
+      run: |
+        mkdir -p target/flathub-download
+        tag="${{ steps.release.outputs.tag }}"
+        gh release download "$tag" --repo 66HEX/frame --pattern "frame-$tag-source.tar.gz" --dir target/flathub-download --clobber
+        gh release download "$tag" --repo 66HEX/frame --pattern "frame-$tag-cargo-vendor.tar.gz" --dir target/flathub-download --clobber
+        source_archive="target/flathub-download/frame-$tag-source.tar.gz"
+        vendor_archive="target/flathub-download/frame-$tag-cargo-vendor.tar.gz"
+        source_sha256="$(sha256sum "$source_archive" | awk '{print $1}')"
+        vendor_sha256="$(sha256sum "$vendor_archive" | awk '{print $1}')"
+        echo "SOURCE_SHA256=$source_sha256" >> "$GITHUB_OUTPUT"
+        echo "VENDOR_SHA256=$vendor_sha256" >> "$GITHUB_OUTPUT"
+    - name: release::render_flathub_manifest
+      if: env.FLATHUB_GITHUB_TOKEN != ''
+      run: |
+        tag="${{ steps.release.outputs.tag }}"
+        cargo xtask flathub-manifest \
+          --version "$tag" \
+          --release-date "${{ steps.release.outputs.release_date }}" \
+          --source-url "https://github.com/66HEX/frame/releases/download/$tag/frame-$tag-source.tar.gz" \
+          --source-sha256 "${{ steps.flathub_sources.outputs.SOURCE_SHA256 }}" \
+          --vendor-url "https://github.com/66HEX/frame/releases/download/$tag/frame-$tag-cargo-vendor.tar.gz" \
+          --vendor-sha256 "${{ steps.flathub_sources.outputs.VENDOR_SHA256 }}" \
+          --out target/flathub/repo
+    - name: release::checkout_flathub
+      if: env.FLATHUB_GITHUB_TOKEN != ''
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ env.FLATHUB_REPOSITORY }}
+        token: ${{ env.FLATHUB_GITHUB_TOKEN }}
+        path: flathub
+    - name: release::publish_flathub_pr
+      if: env.FLATHUB_GITHUB_TOKEN != ''
+      working-directory: flathub
+      env:
+        GH_TOKEN: ${{ env.FLATHUB_GITHUB_TOKEN }}
+        VERSION: ${{ steps.release.outputs.tag }}
+      shell: bash
+      run: |
+        branch="frame-$VERSION"
+        git checkout -B "$branch"
+        cp ../target/flathub/repo/io.github._66HEX.Frame.yml .
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add io.github._66HEX.Frame.yml
+        if git diff --staged --quiet; then
+          echo "No Flathub manifest changes to publish."
+          exit 0
+        fi
+        git commit -m "Update Frame to $VERSION"
+        git push --force-with-lease origin "$branch"
+        if gh pr view "$branch" --repo "$FLATHUB_REPOSITORY" >/dev/null 2>&1; then
+          gh pr edit "$branch" \
+            --repo "$FLATHUB_REPOSITORY" \
+            --title "Update Frame to $VERSION" \
+            --body "Updates Frame to $VERSION using the GitHub release source and cargo vendor archives."
+        else
+          gh pr create \
+            --repo "$FLATHUB_REPOSITORY" \
+            --base master \
+            --head "$branch" \
+            --title "Update Frame to $VERSION" \
+            --body "Updates Frame to $VERSION using the GitHub release source and cargo vendor archives."
         fi
     timeout-minutes: 20
 
@@ -2147,8 +2529,42 @@ mod tests {
         assert!(workflow.contains("target/release-artifacts/Frame-x86_64.AppImage.zsync"));
         assert!(workflow.contains("target/release-artifacts/Frame-aarch64.AppImage"));
         assert!(workflow.contains("target/release-artifacts/Frame-aarch64.AppImage.zsync"));
-        assert!(workflow.contains("target/release-artifacts/Frame-x86_64.flatpak"));
-        assert!(workflow.contains("target/release-artifacts/Frame-aarch64.flatpak"));
+    }
+
+    #[test]
+    fn release_workflow_publishes_flathub_source_archives() {
+        let workflow = release_workflow();
+
+        assert!(workflow.contains("release::prepare_flathub_sources"));
+        assert!(
+            workflow.contains(
+                "target/flathub/frame-${{ steps.release.outputs.version }}-source.tar.gz"
+            )
+        );
+        assert!(workflow.contains(
+            "target/flathub/frame-${{ steps.release.outputs.version }}-cargo-vendor.tar.gz"
+        ));
+    }
+
+    #[test]
+    fn release_workflow_updates_flathub_manifest_repository() {
+        let workflow = release_workflow();
+
+        assert!(workflow.contains("update_flathub:"));
+        assert!(workflow.contains("FLATHUB_REPOSITORY: flathub/io.github._66HEX.Frame"));
+        assert!(workflow.contains("cargo xtask flathub-manifest"));
+        assert!(workflow.contains("FLATHUB_GITHUB_TOKEN"));
+    }
+
+    #[test]
+    fn flathub_template_uses_runtime_media_tools_without_bundled_binaries() {
+        let template = include_str!("../../../packaging/flathub/io.github._66HEX.Frame.yml.in");
+
+        assert!(template.contains("--env=FRAME_USE_SYSTEM_MEDIA_TOOLS=1"));
+        assert!(!template.contains("resources/binaries"));
+        assert!(!template.contains("frame-update-helper"));
+        assert!(!template.contains("ffmpeg-full"));
+        assert!(!template.contains("add-extensions"));
     }
 
     #[test]

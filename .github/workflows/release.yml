@@ -34,19 +34,15 @@ jobs:
     - name: steps::setup_linux
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang curl desktop-file-utils file flatpak flatpak-builder libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync
+        sudo apt-get install -y clang curl desktop-file-utils file libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync
     - name: steps::setup_appimagetool
       run: |
         curl -L --fail -o /tmp/appimagetool.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
         chmod +x /tmp/appimagetool.AppImage
-    - name: steps::setup_flatpak
-      run: |
-        flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-        flatpak install --user -y --noninteractive flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
     - name: ./script/bundle-linux
       env:
         APPIMAGETOOL: /tmp/appimagetool.AppImage
-      run: ./script/bundle-linux --tarball --appimage --flatpak
+      run: ./script/bundle-linux --tarball --appimage
     - name: release::verify_linux_x86_64_appimage_update_information
       shell: bash
       run: |
@@ -72,12 +68,6 @@ jobs:
         name: Frame-x86_64.AppImage.zsync
         path: target/release/Frame-x86_64.AppImage.zsync
         if-no-files-found: error
-    - name: release::upload_linux_x86_64_flatpak
-      uses: actions/upload-artifact@v4
-      with:
-        name: Frame-x86_64.flatpak
-        path: target/release/Frame-x86_64.flatpak
-        if-no-files-found: error
     timeout-minutes: 90
 
   build_linux_aarch64:
@@ -97,19 +87,15 @@ jobs:
     - name: steps::setup_linux
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang curl desktop-file-utils file flatpak flatpak-builder libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync
+        sudo apt-get install -y clang curl desktop-file-utils file libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync
     - name: steps::setup_appimagetool
       run: |
         curl -L --fail -o /tmp/appimagetool.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-aarch64.AppImage
         chmod +x /tmp/appimagetool.AppImage
-    - name: steps::setup_flatpak
-      run: |
-        flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-        flatpak install --user -y --noninteractive flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
     - name: ./script/bundle-linux
       env:
         APPIMAGETOOL: /tmp/appimagetool.AppImage
-      run: ./script/bundle-linux --tarball --appimage --flatpak
+      run: ./script/bundle-linux --tarball --appimage
     - name: release::verify_linux_aarch64_appimage_update_information
       shell: bash
       run: |
@@ -134,12 +120,6 @@ jobs:
       with:
         name: Frame-aarch64.AppImage.zsync
         path: target/release/Frame-aarch64.AppImage.zsync
-        if-no-files-found: error
-    - name: release::upload_linux_aarch64_flatpak
-      uses: actions/upload-artifact@v4
-      with:
-        name: Frame-aarch64.flatpak
-        path: target/release/Frame-aarch64.flatpak
         if-no-files-found: error
     timeout-minutes: 90
 
@@ -317,6 +297,8 @@ jobs:
           echo "::error::CHANGELOG.md has no release notes section for [$version]" >&2
           exit 1
         fi
+    - name: release::prepare_flathub_sources
+      run: cargo xtask flathub-sources --version "${{ steps.release.outputs.version }}"
     - name: release::download_tauri_latest_json
       run: |
         mkdir -p target/release
@@ -359,8 +341,8 @@ jobs:
           target/release-artifacts/Frame-x86_64.AppImage.zsync
           target/release-artifacts/Frame-aarch64.AppImage
           target/release-artifacts/Frame-aarch64.AppImage.zsync
-          target/release-artifacts/Frame-x86_64.flatpak
-          target/release-artifacts/Frame-aarch64.flatpak
+          target/flathub/frame-${{ steps.release.outputs.version }}-source.tar.gz
+          target/flathub/frame-${{ steps.release.outputs.version }}-cargo-vendor.tar.gz
           target/release/latest.json
           target/release/update-manifest.json
           target/release/update-manifest.json.sig
@@ -456,6 +438,107 @@ jobs:
         else
           git commit -m "Update Frame to $VERSION"
           git push
+        fi
+    timeout-minutes: 20
+
+  update_flathub:
+    runs-on: ubuntu-22.04
+    needs: publish_release
+    env:
+      GH_TOKEN: ${{ github.token }}
+      FLATHUB_GITHUB_TOKEN: ${{ secrets.FLATHUB_GITHUB_TOKEN }}
+      FLATHUB_REPOSITORY: flathub/io.github._66HEX.Frame
+    steps:
+    - name: release::resolve_tag
+      id: release
+      shell: bash
+      run: |
+        tag="${GITHUB_REF_NAME}"
+        if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+          tag="${{ inputs.tag }}"
+        fi
+        echo "tag=$tag" >> "$GITHUB_OUTPUT"
+        echo "release_date=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+    - name: release::check_flathub_token
+      shell: bash
+      run: |
+        if [[ -z "$FLATHUB_GITHUB_TOKEN" ]]; then
+          echo "::notice::FLATHUB_GITHUB_TOKEN is not configured; skipping Flathub manifest update."
+        fi
+    - name: steps::checkout_repo
+      if: env.FLATHUB_GITHUB_TOKEN != ''
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+    - name: steps::setup_rust
+      if: env.FLATHUB_GITHUB_TOKEN != ''
+      uses: dtolnay/rust-toolchain@stable
+    - name: release::download_flathub_sources
+      if: env.FLATHUB_GITHUB_TOKEN != ''
+      id: flathub_sources
+      shell: bash
+      run: |
+        mkdir -p target/flathub-download
+        tag="${{ steps.release.outputs.tag }}"
+        gh release download "$tag" --repo 66HEX/frame --pattern "frame-$tag-source.tar.gz" --dir target/flathub-download --clobber
+        gh release download "$tag" --repo 66HEX/frame --pattern "frame-$tag-cargo-vendor.tar.gz" --dir target/flathub-download --clobber
+        source_archive="target/flathub-download/frame-$tag-source.tar.gz"
+        vendor_archive="target/flathub-download/frame-$tag-cargo-vendor.tar.gz"
+        source_sha256="$(sha256sum "$source_archive" | awk '{print $1}')"
+        vendor_sha256="$(sha256sum "$vendor_archive" | awk '{print $1}')"
+        echo "SOURCE_SHA256=$source_sha256" >> "$GITHUB_OUTPUT"
+        echo "VENDOR_SHA256=$vendor_sha256" >> "$GITHUB_OUTPUT"
+    - name: release::render_flathub_manifest
+      if: env.FLATHUB_GITHUB_TOKEN != ''
+      run: |
+        tag="${{ steps.release.outputs.tag }}"
+        cargo xtask flathub-manifest \
+          --version "$tag" \
+          --release-date "${{ steps.release.outputs.release_date }}" \
+          --source-url "https://github.com/66HEX/frame/releases/download/$tag/frame-$tag-source.tar.gz" \
+          --source-sha256 "${{ steps.flathub_sources.outputs.SOURCE_SHA256 }}" \
+          --vendor-url "https://github.com/66HEX/frame/releases/download/$tag/frame-$tag-cargo-vendor.tar.gz" \
+          --vendor-sha256 "${{ steps.flathub_sources.outputs.VENDOR_SHA256 }}" \
+          --out target/flathub/repo
+    - name: release::checkout_flathub
+      if: env.FLATHUB_GITHUB_TOKEN != ''
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ env.FLATHUB_REPOSITORY }}
+        token: ${{ env.FLATHUB_GITHUB_TOKEN }}
+        path: flathub
+    - name: release::publish_flathub_pr
+      if: env.FLATHUB_GITHUB_TOKEN != ''
+      working-directory: flathub
+      env:
+        GH_TOKEN: ${{ env.FLATHUB_GITHUB_TOKEN }}
+        VERSION: ${{ steps.release.outputs.tag }}
+      shell: bash
+      run: |
+        branch="frame-$VERSION"
+        git checkout -B "$branch"
+        cp ../target/flathub/repo/io.github._66HEX.Frame.yml .
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add io.github._66HEX.Frame.yml
+        if git diff --staged --quiet; then
+          echo "No Flathub manifest changes to publish."
+          exit 0
+        fi
+        git commit -m "Update Frame to $VERSION"
+        git push --force-with-lease origin "$branch"
+        if gh pr view "$branch" --repo "$FLATHUB_REPOSITORY" >/dev/null 2>&1; then
+          gh pr edit "$branch" \
+            --repo "$FLATHUB_REPOSITORY" \
+            --title "Update Frame to $VERSION" \
+            --body "Updates Frame to $VERSION using the GitHub release source and cargo vendor archives."
+        else
+          gh pr create \
+            --repo "$FLATHUB_REPOSITORY" \
+            --base master \
+            --head "$branch" \
+            --title "Update Frame to $VERSION" \
+            --body "Updates Frame to $VERSION using the GitHub release source and cargo vendor archives."
         fi
     timeout-minutes: 20
 

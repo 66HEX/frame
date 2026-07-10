@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github._66HEX.Frame</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Frame</name>
+  <summary>Convert video, audio, images, subtitles, and metadata with FFmpeg</summary>
+  <description>
+    <p>
+      Frame is a native media conversion app for video, audio, image, subtitle,
+      and metadata workflows. It provides preset-based exports, trim and crop
+      controls, source probing, conversion logs, and FFmpeg-backed previews.
+    </p>
+    <p>
+      The Flathub build uses FFmpeg, FFprobe, codecs, graphics, and media
+      libraries from the Freedesktop runtime instead of bundling private media
+      binaries.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github._66HEX.Frame.desktop</launchable>
+  <developer_name>66HEX</developer_name>
+  <url type="homepage">https://github.com/66HEX/frame</url>
+  <url type="bugtracker">https://github.com/66HEX/frame/issues</url>
+  <url type="vcs-browser">https://github.com/66HEX/frame</url>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/66HEX/frame/main/preview.png</image>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="@FRAME_FLATHUB_VERSION@" date="@FRAME_FLATHUB_RELEASE_DATE@" />
+  </releases>
+</component>
