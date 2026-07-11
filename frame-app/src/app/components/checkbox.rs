@@ -174,7 +174,7 @@ fn frame_checkbox_row_inner(
                     div()
                         .text_size(px(theme::TEXT_LABEL_SIZE))
                         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-                        .text_color(color(theme::FRAME_GRAY_400))
+                        .text_color(color(theme::FRAME_GRAY_600))
                         .child(display_label),
                 )
                 .when(has_hint, |this| {
@@ -182,7 +182,7 @@ fn frame_checkbox_row_inner(
                         div()
                             .text_size(px(theme::TEXT_LABEL_SIZE))
                             .font_weight(theme::TEXT_WEIGHT_REGULAR)
-                            .text_color(color(theme::FRAME_GRAY_400))
+                            .text_color(color(theme::FRAME_GRAY_600))
                             .child(hint),
                     )
                 }),
