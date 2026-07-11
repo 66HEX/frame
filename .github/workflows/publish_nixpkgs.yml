@@ -208,7 +208,7 @@ jobs:
         build_and_capture_hash() {
           local log_file="$1"
           set +e
-          nix-build -A "$NIXPKGS_PACKAGE" -L 2>&1 | tee "$log_file"
+          nix-build -A "$NIXPKGS_PACKAGE" 2>&1 | tee "$log_file"
           local status="${PIPESTATUS[0]}"
           set -e
           return "$status"
@@ -242,9 +242,9 @@ jobs:
         export CARGO_HASH="$cargo_hash"
         perl -0pi -e 's/cargoHash = lib\.fakeHash;/cargoHash = "$ENV{CARGO_HASH}";/' "$package_path"
 
-        nix-build -A "$NIXPKGS_PACKAGE" -L
+        nix-build -A "$NIXPKGS_PACKAGE"
         nix-shell -p nixfmt-rfc-style --run "nixfmt $package_path maintainers/maintainer-list.nix"
-        nix-build -A "$NIXPKGS_PACKAGE" -L
+        nix-build -A "$NIXPKGS_PACKAGE"
         nix-build lib/tests/maintainers.nix
 
         git config user.name "github-actions[bot]"
@@ -284,7 +284,7 @@ jobs:
         path: nixpkgs
     - name: release::build_nixpkgs_aarch64
       working-directory: nixpkgs
-      run: nix-build -A "$NIXPKGS_PACKAGE" -L
+      run: nix-build -A "$NIXPKGS_PACKAGE"
     timeout-minutes: 90
 
   publish_nixpkgs:

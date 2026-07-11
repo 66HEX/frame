@@ -2416,7 +2416,7 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>) -> String {
         build_and_capture_hash() {
           local log_file="$1"
           set +e
-          nix-build -A "$NIXPKGS_PACKAGE" -L 2>&1 | tee "$log_file"
+          nix-build -A "$NIXPKGS_PACKAGE" 2>&1 | tee "$log_file"
           local status="${PIPESTATUS[0]}"
           set -e
           return "$status"
@@ -2450,9 +2450,9 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>) -> String {
         export CARGO_HASH="$cargo_hash"
         perl -0pi -e 's/cargoHash = lib\.fakeHash;/cargoHash = "$ENV{CARGO_HASH}";/' "$package_path"
 
-        nix-build -A "$NIXPKGS_PACKAGE" -L
+        nix-build -A "$NIXPKGS_PACKAGE"
         nix-shell -p nixfmt-rfc-style --run "nixfmt $package_path maintainers/maintainer-list.nix"
-        nix-build -A "$NIXPKGS_PACKAGE" -L
+        nix-build -A "$NIXPKGS_PACKAGE"
         nix-build lib/tests/maintainers.nix
 
         git config user.name "github-actions[bot]"
@@ -2492,7 +2492,7 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>) -> String {
         path: nixpkgs
     - name: release::build_nixpkgs_aarch64
       working-directory: nixpkgs
-      run: nix-build -A "$NIXPKGS_PACKAGE" -L
+      run: nix-build -A "$NIXPKGS_PACKAGE"
     timeout-minutes: 90
 
   publish_nixpkgs:
@@ -2921,6 +2921,7 @@ mod tests {
         assert!(workflow.contains("NIXPKGS_PACKAGE: frame-media-converter"));
         assert!(workflow.contains("Could not find alphabetical insertion point for _66HEX."));
         assert!(!workflow.contains("_0x4A6F"));
+        assert!(!workflow.contains("nix-build -A \"$NIXPKGS_PACKAGE\" -L"));
         assert!(workflow.contains("VERSION: ${{ steps.release.outputs.tag }}"));
         assert!(workflow.contains(r#""x86_64-linux""#));
         assert!(workflow.contains(r#""aarch64-linux""#));
@@ -2938,6 +2939,7 @@ mod tests {
         assert!(workflow.contains("prepare_nixpkgs:"));
         assert!(workflow.contains("validate_nixpkgs_aarch64:"));
         assert!(workflow.contains("publish_nixpkgs:"));
+        assert!(!workflow.contains("nix-build -A \"$NIXPKGS_PACKAGE\" -L"));
         assert!(!workflow.contains("needs: publish_release"));
         assert!(!workflow.contains("publish_release:"));
         assert!(!workflow.contains("publish_winget:"));
