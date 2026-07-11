@@ -15,6 +15,7 @@ use frame_updater::{
 use sha2::{Digest, Sha256};
 const RUN_BUNDLING_WORKFLOW_PATH: &str = ".github/workflows/run_bundling.yml";
 const RELEASE_WORKFLOW_PATH: &str = ".github/workflows/release.yml";
+const PUBLISH_NIXPKGS_WORKFLOW_PATH: &str = ".github/workflows/publish_nixpkgs.yml";
 const FLATHUB_MANIFEST_TEMPLATE_PATH: &str = "packaging/flathub/io.github._66HEX.Frame.yml.in";
 const FLATHUB_METAINFO_TEMPLATE_PATH: &str =
     "packaging/flathub/io.github._66HEX.Frame.metainfo.xml.in";
@@ -1352,6 +1353,7 @@ fn write_workflows() -> Result<()> {
     for (relative_path, content) in [
         (RUN_BUNDLING_WORKFLOW_PATH, run_bundling_workflow()),
         (RELEASE_WORKFLOW_PATH, release_workflow()),
+        (PUBLISH_NIXPKGS_WORKFLOW_PATH, publish_nixpkgs_workflow()),
     ] {
         let path = root.join(relative_path);
         fs::create_dir_all(path.parent().expect("workflow path should have a parent"))?;
@@ -2183,7 +2185,42 @@ jobs:
         fi
     timeout-minutes: 20
 
-  prepare_nixpkgs:
+  __NIXPKGS_JOBS__
+
+
+  publish_winget:
+    runs-on: windows-latest
+    needs: publish_release
+    steps:
+    - name: release::resolve_tag
+      id: release
+      shell: bash
+      run: |
+        tag="${GITHUB_REF_NAME}"
+        if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+          tag="${{ inputs.tag }}"
+        fi
+        echo "tag=$tag" >> "$GITHUB_OUTPUT"
+    - name: release::publish_winget
+      uses: vedantmgoyal9/winget-releaser@v2
+      with:
+        identifier: 66HEX.Frame
+        version: ${{ steps.release.outputs.tag }}
+        installers-regex: '^Frame-x86_64\.exe$'
+        release-repository: frame
+        release-tag: ${{ steps.release.outputs.tag }}
+        release-notes-url: https://github.com/66HEX/frame/releases/tag/${{ steps.release.outputs.tag }}
+        token: ${{ secrets.WINGET_ACC_TOKEN }}
+    timeout-minutes: 30
+"#
+    .replace("  __NIXPKGS_JOBS__\n", &nixpkgs_release_jobs(Some("publish_release")))
+}
+
+fn nixpkgs_release_jobs(prepare_needs: Option<&str>) -> String {
+    let prepare_needs = prepare_needs
+        .map(|needs| format!("    needs: {needs}\n"))
+        .unwrap_or_default();
+    let mut jobs = r#"  prepare_nixpkgs:
     runs-on: ubuntu-22.04
     needs: publish_release
     outputs:
@@ -2495,33 +2532,32 @@ jobs:
             --body "Updates Frame to ${BRANCH#frame-media-converter-} from the GitHub release tag."
         fi
     timeout-minutes: 10
-
-  publish_winget:
-    runs-on: windows-latest
-    needs: publish_release
-    steps:
-    - name: release::resolve_tag
-      id: release
-      shell: bash
-      run: |
-        tag="${GITHUB_REF_NAME}"
-        if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-          tag="${{ inputs.tag }}"
-        fi
-        echo "tag=$tag" >> "$GITHUB_OUTPUT"
-    - name: release::publish_winget
-      uses: vedantmgoyal9/winget-releaser@v2
-      with:
-        identifier: 66HEX.Frame
-        version: ${{ steps.release.outputs.tag }}
-        installers-regex: '^Frame-x86_64\.exe$'
-        release-repository: frame
-        release-tag: ${{ steps.release.outputs.tag }}
-        release-notes-url: https://github.com/66HEX/frame/releases/tag/${{ steps.release.outputs.tag }}
-        token: ${{ secrets.WINGET_ACC_TOKEN }}
-    timeout-minutes: 30
 "#
-    .to_string()
+        .to_string();
+    jobs = jobs.replace("    needs: publish_release\n", &prepare_needs);
+    jobs
+}
+
+fn publish_nixpkgs_workflow() -> String {
+    let mut workflow = r#"# Generated from xtask::workflows::publish_nixpkgs
+# Rebuild with `cargo xtask workflows`.
+name: publish nixpkgs
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: '1'
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish to nixpkgs, without a v prefix.
+        required: true
+permissions:
+  contents: read
+jobs:
+"#
+    .to_string();
+    workflow.push_str(&nixpkgs_release_jobs(None));
+    workflow
 }
 
 fn repo_root() -> Result<PathBuf> {
@@ -2890,6 +2926,25 @@ mod tests {
         assert!(workflow.contains(r#""aarch64-linux""#));
         assert!(workflow.contains("gh pr create"));
         assert!(!workflow.contains("0.31.0"));
+    }
+
+    #[test]
+    fn publish_nixpkgs_workflow_only_publishes_nixpkgs_from_manual_tag() {
+        let workflow = publish_nixpkgs_workflow();
+
+        assert!(workflow.contains("name: publish nixpkgs"));
+        assert!(workflow.contains("workflow_dispatch:"));
+        assert!(workflow.contains("description: Release tag to publish to nixpkgs"));
+        assert!(workflow.contains("prepare_nixpkgs:"));
+        assert!(workflow.contains("validate_nixpkgs_aarch64:"));
+        assert!(workflow.contains("publish_nixpkgs:"));
+        assert!(!workflow.contains("needs: publish_release"));
+        assert!(!workflow.contains("publish_release:"));
+        assert!(!workflow.contains("publish_winget:"));
+        assert!(!workflow.contains("update_homebrew_tap:"));
+        assert!(!workflow.contains("update_flathub:"));
+        assert!(!workflow.contains("build_linux_x86_64:"));
+        assert!(!workflow.contains("build_macos_aarch64:"));
     }
 
     #[test]
