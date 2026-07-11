@@ -2245,7 +2245,28 @@ jobs:
         git checkout -B "$branch" upstream/master
 
         if ! grep -q '_66HEX = {' maintainers/maintainer-list.nix; then
-          perl -0pi -e 's/(  _0x4A6F = \{\n    github = "_0x4A6F";\n    githubId = 171539067;\n    name = "Joachim Fritschi";\n  \};\n)/$1\n  _66HEX = {\n    name = "Marek Jóźwiak";\n    github = "66HEX";\n    githubId = 168720167;\n  };\n/' maintainers/maintainer-list.nix
+          python3 - <<'PY'
+        from pathlib import Path
+        import re
+        import sys
+
+        path = Path("maintainers/maintainer-list.nix")
+        text = path.read_text()
+        entry = '''  _66HEX = {
+            name = "Marek Jóźwiak";
+            github = "66HEX";
+            githubId = 168720167;
+          };
+        '''
+
+        for match in re.finditer(r"^  ([A-Za-z0-9_]+) = \{\n", text, re.MULTILINE):
+            if match.group(1) > "_66HEX":
+                path.write_text(text[:match.start()] + entry + text[match.start():])
+                break
+        else:
+            print("Could not find alphabetical insertion point for _66HEX.", file=sys.stderr)
+            sys.exit(1)
+        PY
         fi
         if ! grep -q '_66HEX = {' maintainers/maintainer-list.nix; then
           echo "::error::Could not insert _66HEX into maintainer-list.nix." >&2
@@ -2862,6 +2883,8 @@ mod tests {
         assert!(workflow.contains("NIXPKGS_GITHUB_TOKEN"));
         assert!(workflow.contains("NIXPKGS_UPSTREAM: NixOS/nixpkgs"));
         assert!(workflow.contains("NIXPKGS_PACKAGE: frame-media-converter"));
+        assert!(workflow.contains("Could not find alphabetical insertion point for _66HEX."));
+        assert!(!workflow.contains("_0x4A6F"));
         assert!(workflow.contains("VERSION: ${{ steps.release.outputs.tag }}"));
         assert!(workflow.contains(r#""x86_64-linux""#));
         assert!(workflow.contains(r#""aarch64-linux""#));
