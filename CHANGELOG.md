@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings Tab Tooltips:** Added animated labels to the icon-only settings tabs, with a configurable hover delay and a grace period for immediate transitions between neighboring tabs. Resolves [#45](https://github.com/66HEX/frame/issues/57).
 - **Reusable Conversion Sources:** Added explicit Cancel controls that stop queued, running, or paused conversions without removing their source, plus a Convert Again action that preserves completed-file settings and returns the source to an editable state. Resolves [#45](https://github.com/66HEX/frame/issues/45).
 
+### Changed
+
+- **Output Folder Selection:** Conversion outputs now use the default output folder selected in Settings instead of being saved next to each source file, giving queued files from different locations one consistent destination.
+
 ### Fixed
 
 - **UNC Output Paths:** Preserved periods in generated output names on Windows network shares instead of treating the final portion of the name as a file extension. Resolves [#61](https://github.com/66HEX/frame/issues/61).
