@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-07-11
+
 ### Added
 
 - **Updateable AppImage Releases:** Embedded `gh-releases-zsync` update information into Linux AppImage builds, generated matching `.zsync` metadata, and published those files with releases so AppImage managers can update Frame without manual GitHub downloads.
@@ -795,7 +797,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.30.0...HEAD
+[Unreleased]: https://github.com/66HEX/frame/compare/0.31.0...HEAD
+[0.30.0]: https://github.com/66HEX/frame/compare/0.30.0...0.31.0
 [0.30.0]: https://github.com/66HEX/frame/compare/0.29.2...0.30.0
 [0.29.2]: https://github.com/66HEX/frame/compare/0.29.1...0.29.2
 [0.29.1]: https://github.com/66HEX/frame/compare/0.29.0...0.29.1

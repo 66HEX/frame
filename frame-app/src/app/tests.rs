@@ -3593,9 +3593,9 @@ mod visual_contract {
     fn file_list_controls_match_design_sizes() {
         assert_eq!(components::FRAME_ICON_BUTTON_SM_SIZE, 24.0);
         assert_eq!(components::FRAME_ICON_SM_SIZE, 16.0);
-        assert_eq!(components::FRAME_CHECKBOX_SIZE, 14.0);
+        assert_eq!(components::FRAME_CHECKBOX_SIZE, 16.0);
         assert_eq!(components::FRAME_CHECK_ICON_SIZE, 14.0);
-        assert_eq!(components::FRAME_CHECKBOX_ROW_INDICATOR_OFFSET_Y, 3.0);
+        assert_eq!(components::FRAME_CHECKBOX_ROW_INDICATOR_OFFSET_Y, 2.0);
     }
 
     #[test]
