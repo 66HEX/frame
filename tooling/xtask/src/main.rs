@@ -1539,7 +1539,7 @@ fn linux_job(arch: &str, runner: &str) -> String {
       shell: bash
       run: |
         expected='gh-releases-zsync|66HEX|frame|latest|Frame-{arch}.AppImage.zsync'
-        actual=$(APPIMAGE_EXTRACT_AND_RUN=1 target/release/Frame-{arch}.AppImage --appimage-updateinformation)
+        actual=$(target/release/Frame-{arch}.AppImage --appimage-updateinformation)
         test $actual = $expected
         test -s target/release/Frame-{arch}.AppImage.zsync
     - name: run_bundling::upload_artifact
@@ -1688,7 +1688,7 @@ jobs:
       shell: bash
       run: |
         expected='gh-releases-zsync|66HEX|frame|latest|Frame-x86_64.AppImage.zsync'
-        actual="$(APPIMAGE_EXTRACT_AND_RUN=1 target/release/Frame-x86_64.AppImage --appimage-updateinformation)"
+        actual="$(target/release/Frame-x86_64.AppImage --appimage-updateinformation)"
         test "$actual" = "$expected"
         test -s target/release/Frame-x86_64.AppImage.zsync
     - name: release::upload_linux_x86_64
@@ -1741,7 +1741,7 @@ jobs:
       shell: bash
       run: |
         expected='gh-releases-zsync|66HEX|frame|latest|Frame-aarch64.AppImage.zsync'
-        actual="$(APPIMAGE_EXTRACT_AND_RUN=1 target/release/Frame-aarch64.AppImage --appimage-updateinformation)"
+        actual="$(target/release/Frame-aarch64.AppImage --appimage-updateinformation)"
         test "$actual" = "$expected"
         test -s target/release/Frame-aarch64.AppImage.zsync
     - name: release::upload_linux_aarch64
