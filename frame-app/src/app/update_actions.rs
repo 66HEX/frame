@@ -1,6 +1,8 @@
 use super::*;
 
 impl FrameRoot {
+    const SETTINGS_UPDATE_STATUS_DISMISS_DELAY: Duration = Duration::from_secs(4);
+
     pub(super) const fn open_update_dialog(&mut self) -> bool {
         let changed = !self.update_ui.dialog_open || !self.update_ui.dialog_present;
         self.update_ui.dialog_open = true;
@@ -37,6 +39,7 @@ impl FrameRoot {
         if let Some(explanation) = updates_disabled_explanation() {
             if manual {
                 self.update_ui.status = UpdateStatus::Disabled(explanation);
+                self.schedule_settings_update_status_dismiss(cx);
                 cx.notify();
             }
             return;
@@ -90,6 +93,9 @@ impl FrameRoot {
                 }
                 if let Err(error) = root.persist_app_settings() {
                     root.update_ui.status = UpdateStatus::Error(error.to_string());
+                }
+                if manual {
+                    root.schedule_settings_update_status_dismiss(cx);
                 }
                 cx.notify();
             })
@@ -229,16 +235,17 @@ impl FrameRoot {
         .detach();
     }
 
-    pub(super) fn toggle_auto_update_check(&mut self) -> bool {
+    pub(super) fn toggle_auto_update_check(&mut self, cx: &mut Context<Self>) -> bool {
         self.auto_update_check = !self.auto_update_check;
         if let Err(error) = self.persist_app_settings() {
             self.update_ui.status = UpdateStatus::Error(error.to_string());
+            self.schedule_settings_update_status_dismiss(cx);
             return false;
         }
         true
     }
 
-    pub(super) fn skip_available_update(&mut self) -> bool {
+    pub(super) fn skip_available_update(&mut self, cx: &mut Context<Self>) -> bool {
         let UpdateStatus::Available(info) = &self.update_ui.status else {
             return false;
         };
@@ -248,6 +255,7 @@ impl FrameRoot {
         self.close_update_dialog();
         if let Err(error) = self.persist_app_settings() {
             self.update_ui.status = UpdateStatus::Error(error.to_string());
+            self.schedule_settings_update_status_dismiss(cx);
             return false;
         }
         true
@@ -259,5 +267,30 @@ impl FrameRoot {
             self.update_ui.dialog_info = None;
             self.close_update_dialog();
         }
+    }
+
+    fn schedule_settings_update_status_dismiss(&mut self, cx: &mut Context<Self>) {
+        self.update_ui.status_dismiss_epoch = self.update_ui.status_dismiss_epoch.wrapping_add(1);
+        let dismiss_epoch = self.update_ui.status_dismiss_epoch;
+
+        cx.spawn(async move |this, cx| {
+            cx.background_executor()
+                .timer(Self::SETTINGS_UPDATE_STATUS_DISMISS_DELAY)
+                .await;
+
+            this.update(cx, |root, cx| {
+                if root.update_ui.status_dismiss_epoch == dismiss_epoch
+                    && matches!(
+                        root.update_ui.status,
+                        UpdateStatus::UpToDate | UpdateStatus::Disabled(_) | UpdateStatus::Error(_)
+                    )
+                {
+                    root.dismiss_update_status();
+                    cx.notify();
+                }
+            })
+            .ok();
+        })
+        .detach();
     }
 }

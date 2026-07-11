@@ -307,7 +307,6 @@ pub(super) struct AppSettingsSheetProps<'a> {
     pub(super) download_focus: &'a FocusHandle,
     pub(super) skip_focus: &'a FocusHandle,
     pub(super) install_focus: &'a FocusHandle,
-    pub(super) dismiss_focus: &'a FocusHandle,
     pub(super) panel_focus: &'a FocusHandle,
     pub(super) close_focus: &'a FocusHandle,
     pub(super) last_focus: &'a FocusHandle,
@@ -483,7 +482,6 @@ pub(super) fn app_settings_sheet(
                                 download: props.download_focus,
                                 skip: props.skip_focus,
                                 install: props.install_focus,
-                                dismiss: props.dismiss_focus,
                             },
                             window,
                             cx,
@@ -555,7 +553,6 @@ struct AppSettingsUpdateFocuses<'a> {
     download: &'a FocusHandle,
     skip: &'a FocusHandle,
     install: &'a FocusHandle,
-    dismiss: &'a FocusHandle,
 }
 
 fn app_settings_updates_section(
@@ -576,11 +573,12 @@ fn app_settings_updates_section(
             focuses.auto_update,
             cx,
             |root, _event, _window, cx| {
-                if root.toggle_auto_update_check() {
+                if root.toggle_auto_update_check(cx) {
                     cx.notify();
                 }
             },
         ))
+        .child(update_check_now_button(busy, focuses.check_now, window, cx))
         .child(update_status_label(update_status));
 
     if let UpdateStatus::Downloading {
@@ -598,7 +596,11 @@ fn app_settings_updates_section(
         ));
     }
 
-    section.child(update_action_row(update_status, busy, focuses, window, cx))
+    if let Some(row) = update_action_row(update_status, focuses, window, cx) {
+        section = section.child(row);
+    }
+
+    section
 }
 
 fn update_status_label(status: &UpdateStatus) -> gpui::Stateful<gpui::Div> {
@@ -874,108 +876,107 @@ fn update_download_detail(
 
 fn update_action_row(
     status: &UpdateStatus,
-    busy: bool,
     focuses: AppSettingsUpdateFocuses<'_>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
-) -> gpui::Div {
-    let mut row = div().flex().items_center().gap_2();
-    row = row.child(
-        frame_text_button_with_focus(
-            "app-settings-update-check-now",
-            "Check now",
-            ButtonVariant::Secondary,
-            false,
-            !busy,
-            focuses.check_now,
-            window,
-            cx,
-        )
-        .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
-            cx.stop_propagation();
-            if !busy {
-                root.check_for_updates(true, cx);
-                cx.notify();
-            }
-        })),
-    );
-
+) -> Option<gpui::Div> {
     match status {
-        UpdateStatus::Available(_) => row
-            .child(
+        UpdateStatus::Available(_) => Some(
+            div()
+                .flex()
+                .items_center()
+                .gap_2()
+                .child(
+                    frame_text_button_with_focus(
+                        "app-settings-update-download",
+                        "Download",
+                        ButtonVariant::Default,
+                        false,
+                        true,
+                        focuses.download,
+                        window,
+                        cx,
+                    )
+                    .on_click(cx.listener(
+                        |root, _: &ClickEvent, _window, cx| {
+                            cx.stop_propagation();
+                            root.download_available_update(cx);
+                            cx.notify();
+                        },
+                    )),
+                )
+                .child(
+                    frame_text_button_with_focus(
+                        "app-settings-update-skip",
+                        "Skip",
+                        ButtonVariant::Secondary,
+                        false,
+                        true,
+                        focuses.skip,
+                        window,
+                        cx,
+                    )
+                    .on_click(cx.listener(
+                        |root, _: &ClickEvent, _window, cx| {
+                            cx.stop_propagation();
+                            if root.skip_available_update(cx) {
+                                cx.notify();
+                            }
+                        },
+                    )),
+                ),
+        ),
+        UpdateStatus::ReadyToInstall(_) => Some(
+            div().flex().items_center().gap_2().child(
                 frame_text_button_with_focus(
-                    "app-settings-update-download",
-                    "Download",
+                    "app-settings-update-install",
+                    "Install and restart",
                     ButtonVariant::Default,
                     false,
                     true,
-                    focuses.download,
+                    focuses.install,
                     window,
                     cx,
                 )
                 .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
                     cx.stop_propagation();
-                    root.download_available_update(cx);
+                    root.install_downloaded_update(cx);
                     cx.notify();
                 })),
-            )
-            .child(
-                frame_text_button_with_focus(
-                    "app-settings-update-skip",
-                    "Skip",
-                    ButtonVariant::Secondary,
-                    false,
-                    true,
-                    focuses.skip,
-                    window,
-                    cx,
-                )
-                .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
-                    cx.stop_propagation();
-                    if root.skip_available_update() {
-                        cx.notify();
-                    }
-                })),
             ),
-        UpdateStatus::ReadyToInstall(_) => row.child(
-            frame_text_button_with_focus(
-                "app-settings-update-install",
-                "Install and restart",
-                ButtonVariant::Default,
-                false,
-                true,
-                focuses.install,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
-                cx.stop_propagation();
-                root.install_downloaded_update(cx);
-                cx.notify();
-            })),
         ),
-        UpdateStatus::UpToDate | UpdateStatus::Disabled(_) | UpdateStatus::Error(_) => row.child(
-            frame_text_button_with_focus(
-                "app-settings-update-dismiss",
-                "Dismiss",
-                ButtonVariant::Secondary,
-                false,
-                true,
-                focuses.dismiss,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
-                cx.stop_propagation();
-                root.dismiss_update_status();
-                cx.notify();
-            })),
-        ),
+        UpdateStatus::UpToDate | UpdateStatus::Disabled(_) | UpdateStatus::Error(_) => None,
         UpdateStatus::Idle
         | UpdateStatus::Checking
         | UpdateStatus::Downloading { .. }
-        | UpdateStatus::Installing => row,
+        | UpdateStatus::Installing => None,
     }
+}
+
+fn update_check_now_button(
+    busy: bool,
+    focus: &FocusHandle,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> impl IntoElement {
+    frame_text_button_with_focus(
+        "app-settings-update-check-now",
+        "Check now",
+        ButtonVariant::Secondary,
+        false,
+        !busy,
+        focus,
+        window,
+        cx,
+    )
+    .w_full()
+    .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        cx.stop_propagation();
+        if !busy {
+            root.check_for_updates(true, cx);
+            cx.notify();
+        }
+    }))
 }
 
 #[derive(Clone, Copy)]

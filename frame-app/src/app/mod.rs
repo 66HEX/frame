@@ -307,6 +307,7 @@ struct UpdateUiState {
     dialog_present: bool,
     dialog_info: Option<Box<UpdateInfo>>,
     release_notes_scroll_handle: ScrollHandle,
+    status_dismiss_epoch: u64,
 }
 
 impl Default for UpdateUiState {
@@ -317,6 +318,7 @@ impl Default for UpdateUiState {
             dialog_present: false,
             dialog_info: None,
             release_notes_scroll_handle: ScrollHandle::new(),
+            status_dismiss_epoch: 0,
         }
     }
 }

@@ -582,19 +582,11 @@ impl Render for FrameRoot {
                 matches!(&self.update_ui.status, UpdateStatus::ReadyToInstall(_)),
                 cx,
             );
-            let dismiss_focus = self.ensure_focus(
-                FrameFocusKey::Control("app-settings-update-dismiss".to_string()),
-                matches!(
-                    &self.update_ui.status,
-                    UpdateStatus::UpToDate | UpdateStatus::Disabled(_) | UpdateStatus::Error(_)
-                ),
-                cx,
-            );
             let last_focus = match &self.update_ui.status {
                 UpdateStatus::Available(_) => &skip_focus,
                 UpdateStatus::ReadyToInstall(_) => &install_focus,
                 UpdateStatus::UpToDate | UpdateStatus::Disabled(_) | UpdateStatus::Error(_) => {
-                    &dismiss_focus
+                    &check_now_focus
                 }
                 UpdateStatus::Idle => &check_now_focus,
                 UpdateStatus::Checking
@@ -634,7 +626,6 @@ impl Render for FrameRoot {
                     download_focus: &download_focus,
                     skip_focus: &skip_focus,
                     install_focus: &install_focus,
-                    dismiss_focus: &dismiss_focus,
                     panel_focus: &panel_focus,
                     close_focus: &close_focus,
                     last_focus,
