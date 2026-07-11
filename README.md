@@ -77,9 +77,10 @@ details, tier suggestions, and a launch checklist.
   - `prores` (Apple ProRes)
   - `libsvtav1` (SVT-AV1)
   - `gif` palette output
-  - **Hardware Acceleration:** `h264_videotoolbox`, `hevc_videotoolbox`,
-    `h264_nvenc`, `hevc_nvenc`, `av1_nvenc` when available in the configured
-    FFmpeg build.
+  - **Hardware Acceleration:** macOS bundles include VideoToolbox encoders
+    (`h264_videotoolbox`, `hevc_videotoolbox`); Windows bundles include NVIDIA
+    NVENC encoders (`h264_nvenc`, `hevc_nvenc`, `av1_nvenc`). Linux bundles use
+    software encoders.
 - **Image Encoders:** `png`, `mjpeg` (JPEG), `libwebp` (WebP), `bmp`, `tiff`.
 - **Audio Encoders:** `aac`, `ac3`, `libopus`, `mp3`, `alac`, `flac`,
   `pcm_s16le`, plus optional `libfdk_aac` when available.
@@ -87,9 +88,14 @@ details, tier suggestions, and a launch checklist.
   codec-specific presets.
 - **Video Processing:** Resolution presets, custom dimensions, FPS conversion,
   pixel format selection, scaling, crop, rotate, flip, and image overlay.
+- **Video Filters:** Brightness, contrast, saturation, gamma, hue, color
+  temperature, sharpen, Gaussian blur, denoise, deband, vignette, grayscale,
+  and deinterlace controls.
 - **GIF Controls:** Frame rate, color count, dithering, and loop count.
 - **Audio Controls:** Codec, bitrate, VBR quality, channel layout, volume, and
   per-track selection.
+- **Audio Filters:** Normalize, limiter, compressor, bass, treble, high-pass,
+  low-pass, noise reduction, de-esser, and stereo width controls.
 - **Subtitles:** Stream selection, `.srt` / `.ass` / `.vtt` source filtering,
   burn-in subtitle file selection, font, size, color, outline color, and
   position controls.
@@ -146,11 +152,6 @@ platform directly from GitHub.
 Native release builds include a signed-manifest updater. Frame checks the latest
 GitHub Release manifest, verifies its Ed25519 signature and the SHA-256 hash of
 the selected platform asset, then installs through a small bundled helper.
-
-For release builds, set `FRAME_UPDATE_PUBLIC_KEY` when compiling the app and set
-`FRAME_UPDATE_SIGNING_KEY` in GitHub Actions for manifest signing. The generated
-`.github/workflows/release.yml` publishes `update-manifest.json` and
-`update-manifest.json.sig` with the release assets.
 
 ### WinGet (Windows)
 
@@ -262,24 +263,6 @@ cargo xtask setup-ffmpeg
 
   The release binary embeds the Frame `.ico` resource during the normal Cargo
   build so Explorer and the taskbar can resolve the application icon.
-
-## Usage
-
-1. **Input:** Add source files through the native file dialog or drag and drop.
-2. **Configuration:**
-   - **Source:** View detected file, video, audio, subtitle, and metadata
-     details.
-   - **Output:** Select processing mode, container format, and output filename.
-   - **Video:** Configure codec, bitrate/CRF, resolution, scaling, pixel format,
-     framerate, and visual transforms.
-   - **Images:** Configure image output format, resolution, scaling, and pixel
-     format.
-   - **Audio:** Select codec, bitrate, channels, volume, and tracks.
-   - **Subtitles:** Select subtitle tracks or burn in external subtitle files.
-   - **Metadata:** Preserve, clean, or replace metadata fields.
-   - **Presets:** Save and load reusable conversion profiles.
-3. **Execution:** Start conversion tasks from the workspace queue.
-4. **Monitoring:** View real-time progress and FFmpeg logs in the Logs view.
 
 ## Development Checks
 
