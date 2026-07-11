@@ -67,7 +67,7 @@ use crate::{
     TITLEBAR_WINDOWS_WINDOW_ICON_SIZE, TITLEBAR_WINDOWS_WINDOW_MAX_ICON_SIZE, VisualFixture,
     WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH, WORKSPACE_COLUMNS, WORKSPACE_GAP,
     active_view_from_env_value,
-    app_info::FRAME_APP_ID,
+    app_info::{FRAME_APP_ID, FRAME_APP_VERSION},
     app_persistence::{AppPersistence, AppSettings},
     assets::{self},
     capabilities::{detect_available_encoders, detect_available_filters},

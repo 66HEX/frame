@@ -14,10 +14,10 @@ use super::primitives::{
 };
 use super::settings_panel::{settings_hint_text, settings_section};
 use super::{
-    ActiveView, ClickEvent, Context, ExternalPaths, FILE_LIST_ACTION_ICON_SIZE, FluentBuilder,
-    FocusHandle, FrameAppState, FrameRoot, FrameTextInputKind, InteractiveElement, IntoElement,
-    LEFT_COLUMN_SPAN, MouseButton, PANEL_HEADER_HEIGHT, ParentElement, RIGHT_COLUMN_SPAN,
-    SETTINGS_CONTROL_HEIGHT, SETTINGS_SHEET_MOTION_DURATION, ScrollHandle,
+    ActiveView, ClickEvent, Context, ExternalPaths, FILE_LIST_ACTION_ICON_SIZE, FRAME_APP_VERSION,
+    FluentBuilder, FocusHandle, FrameAppState, FrameRoot, FrameTextInputKind, InteractiveElement,
+    IntoElement, LEFT_COLUMN_SPAN, MouseButton, PANEL_HEADER_HEIGHT, ParentElement,
+    RIGHT_COLUMN_SPAN, SETTINGS_CONTROL_HEIGHT, SETTINGS_SHEET_MOTION_DURATION, ScrollHandle,
     StatefulInteractiveElement, Styled, TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_DIVIDER_HEIGHT,
     TITLEBAR_HEIGHT, TITLEBAR_ICON_SIZE, TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
     TITLEBAR_LINUX_WINDOW_CONTROLS_GAP, TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X,
@@ -437,57 +437,76 @@ pub(super) fn app_settings_sheet(
                 )
                 .child(
                     div()
+                        .flex_1()
                         .flex()
                         .flex_col()
-                        .gap_4()
+                        .justify_between()
                         .p_4()
                         .text_size(px(theme::TEXT_LABEL_SIZE))
-                        .child(app_settings_output_directory_section(
-                            props.default_output_directory,
-                            props.output_directory_error,
-                            props.output_directory_focus,
-                            window,
-                            cx,
-                        ))
                         .child(
-                            settings_section("Max concurrency")
-                                .child(app_settings_concurrency_control(
-                                    props.draft_max_concurrency,
-                                    draft_is_dirty,
-                                    props.error,
-                                    props.value_focus,
+                            div()
+                                .flex()
+                                .flex_col()
+                                .gap_4()
+                                .child(app_settings_output_directory_section(
+                                    props.default_output_directory,
+                                    props.output_directory_error,
+                                    props.output_directory_focus,
                                     window,
                                     cx,
                                 ))
-                                .child(settings_hint_text(
-                                    "Controls how many queued conversions can run at the same time.",
+                                .child(
+                                    settings_section("Max concurrency")
+                                        .child(app_settings_concurrency_control(
+                                            props.draft_max_concurrency,
+                                            draft_is_dirty,
+                                            props.error,
+                                            props.value_focus,
+                                            window,
+                                            cx,
+                                        ))
+                                        .child(settings_hint_text(
+                                            "Controls how many queued conversions can run at the same time.",
+                                        )),
+                                )
+                                .when_some(props.error.map(str::to_string), |this, error| {
+                                    this.child(
+                                        div()
+                                            .id("app-settings-max-concurrency-error")
+                                            .role(gpui::Role::Alert)
+                                            .aria_label(error.clone())
+                                            .text_color(color(theme::FRAME_RED))
+                                            .child(error),
+                                    )
+                                })
+                                .child(app_settings_updates_section(
+                                    props.auto_update_check,
+                                    props.update_status,
+                                    AppSettingsUpdateFocuses {
+                                        auto_update: props.auto_update_focus,
+                                        check_now: props.check_now_focus,
+                                        download: props.download_focus,
+                                        skip: props.skip_focus,
+                                        install: props.install_focus,
+                                    },
+                                    window,
+                                    cx,
                                 )),
                         )
-                        .when_some(props.error.map(str::to_string), |this, error| {
-                            this.child(
-                                div()
-                                    .id("app-settings-max-concurrency-error")
-                                    .role(gpui::Role::Alert)
-                                    .aria_label(error.clone())
-                                    .text_color(color(theme::FRAME_RED))
-                                    .child(error),
-                            )
-                        })
-                        .child(app_settings_updates_section(
-                            props.auto_update_check,
-                            props.update_status,
-                            AppSettingsUpdateFocuses {
-                                auto_update: props.auto_update_focus,
-                                check_now: props.check_now_focus,
-                                download: props.download_focus,
-                                skip: props.skip_focus,
-                                install: props.install_focus,
-                            },
-                            window,
-                            cx,
-                        )),
+                        .child(app_settings_version_label()),
                 ),
         )
+}
+
+fn app_settings_version_label() -> gpui::Div {
+    div()
+        .w_full()
+        .flex()
+        .justify_end()
+        .pt_4()
+        .text_size(px(11.0))
+        .text_color(color(theme::FRAME_GRAY_400))
+        .child(theme::ui_text_owned(format!("Frame v{FRAME_APP_VERSION}")))
 }
 
 fn app_settings_output_directory_section(
