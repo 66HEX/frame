@@ -2183,6 +2183,298 @@ jobs:
         fi
     timeout-minutes: 20
 
+  prepare_nixpkgs:
+    runs-on: ubuntu-22.04
+    needs: publish_release
+    outputs:
+      branch: ${{ steps.nixpkgs.outputs.branch }}
+      commit_subject: ${{ steps.nixpkgs.outputs.commit_subject }}
+      should_publish: ${{ steps.nixpkgs.outputs.should_publish }}
+    env:
+      GH_TOKEN: ${{ secrets.NIXPKGS_GITHUB_TOKEN }}
+      NIXPKGS_FORK: 66HEX/nixpkgs
+      NIXPKGS_UPSTREAM: NixOS/nixpkgs
+      NIXPKGS_PACKAGE: frame-media-converter
+    steps:
+    - name: release::resolve_tag
+      id: release
+      shell: bash
+      run: |
+        tag="${GITHUB_REF_NAME}"
+        if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+          tag="${{ inputs.tag }}"
+        fi
+        echo "tag=$tag" >> "$GITHUB_OUTPUT"
+    - name: release::check_nixpkgs_token
+      shell: bash
+      run: |
+        if [[ -z "$GH_TOKEN" ]]; then
+          echo "::notice::NIXPKGS_GITHUB_TOKEN is not configured; skipping nixpkgs PR."
+        fi
+    - name: steps::install_nix
+      if: env.GH_TOKEN != ''
+      uses: cachix/install-nix-action@v31
+      with:
+        extra_nix_config: |
+          sandbox = true
+    - name: release::checkout_nixpkgs
+      if: env.GH_TOKEN != ''
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ env.NIXPKGS_FORK }}
+        token: ${{ env.GH_TOKEN }}
+        path: nixpkgs
+        fetch-depth: 0
+    - name: release::prepare_nixpkgs_branch
+      id: nixpkgs
+      if: env.GH_TOKEN != ''
+      working-directory: nixpkgs
+      env:
+        VERSION: ${{ steps.release.outputs.tag }}
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        package_path="pkgs/by-name/fr/frame-media-converter/package.nix"
+        branch="frame-media-converter-$VERSION"
+        commit_subject="frame-media-converter: init at $VERSION"
+        echo "branch=$branch" >> "$GITHUB_OUTPUT"
+
+        git remote add upstream "https://github.com/$NIXPKGS_UPSTREAM.git"
+        git fetch upstream master
+        git checkout -B "$branch" upstream/master
+
+        if ! grep -q '_66HEX = {' maintainers/maintainer-list.nix; then
+          perl -0pi -e 's/(  _0x4A6F = \{\n    github = "_0x4A6F";\n    githubId = 171539067;\n    name = "Joachim Fritschi";\n  \};\n)/$1\n  _66HEX = {\n    name = "Marek Jóźwiak";\n    github = "66HEX";\n    githubId = 168720167;\n  };\n/' maintainers/maintainer-list.nix
+        fi
+        if ! grep -q '_66HEX = {' maintainers/maintainer-list.nix; then
+          echo "::error::Could not insert _66HEX into maintainer-list.nix." >&2
+          exit 1
+        fi
+
+        if [[ -f "$package_path" ]]; then
+          commit_subject="frame-media-converter: update to $VERSION"
+          perl -0pi -e 's/version = "[^"]+";/version = "$ENV{VERSION}";/' "$package_path"
+          perl -0pi -e 's/hash = "[^"]+";/hash = lib.fakeHash;/' "$package_path"
+          perl -0pi -e 's/cargoHash = "[^"]+";/cargoHash = lib.fakeHash;/' "$package_path"
+        else
+          mkdir -p "$(dirname "$package_path")"
+          cat > "$package_path" <<'EOF'
+        {
+          lib,
+          fetchFromGitHub,
+          rustPlatform,
+          pkg-config,
+          makeWrapper,
+          alsa-lib,
+          ffmpeg,
+          fontconfig,
+          freetype,
+          libdrm,
+          libGL,
+          libx11,
+          libxcb,
+          libxkbcommon,
+          wayland,
+        }:
+
+        rustPlatform.buildRustPackage (finalAttrs: {
+          pname = "frame-media-converter";
+          version = "@VERSION@";
+
+          src = fetchFromGitHub {
+            owner = "66HEX";
+            repo = "frame";
+            tag = finalAttrs.version;
+            hash = lib.fakeHash;
+          };
+
+          cargoHash = lib.fakeHash;
+          cargoBuildFlags = [ "--package" "frame-app" ];
+          cargoTestFlags = [ "--package" "frame-app" ];
+
+          nativeBuildInputs = [
+            makeWrapper
+            pkg-config
+          ];
+
+          buildInputs = [
+            alsa-lib
+            fontconfig
+            freetype
+            libdrm
+            libGL
+            libx11
+            libxcb
+            libxkbcommon
+            wayland
+          ];
+
+          postInstall = ''
+            install -Dm444 frame-app/resources/frame.desktop.in \
+              $out/share/applications/frame.desktop
+            substituteInPlace $out/share/applications/frame.desktop \
+              --replace-fail '$APP_NAME' Frame \
+              --replace-fail '$APP_CLI' frame \
+              --replace-fail '$APP_ICON' frame
+
+            install -Dm444 frame-app/resources/app-icons/32x32.png \
+              $out/share/icons/hicolor/32x32/apps/frame.png
+            install -Dm444 frame-app/resources/app-icons/64x64.png \
+              $out/share/icons/hicolor/64x64/apps/frame.png
+            install -Dm444 frame-app/resources/app-icons/128x128.png \
+              $out/share/icons/hicolor/128x128/apps/frame.png
+            install -Dm444 frame-app/resources/app-icons/128x128@2x.png \
+              $out/share/icons/hicolor/256x256/apps/frame.png
+            install -Dm444 frame-app/resources/app-icons/icon.png \
+              $out/share/icons/hicolor/512x512/apps/frame.png
+          '';
+
+          postFixup = ''
+            wrapProgram $out/bin/frame \
+              --prefix PATH : ${lib.makeBinPath [ ffmpeg ]} \
+              --set FRAME_USE_SYSTEM_MEDIA_TOOLS 1 \
+              --set FRAME_UPDATE_EXPLANATION \
+                'This Nixpkgs build is managed by Nix. Install updates through your Nix profile, flake, or NixOS configuration.'
+          '';
+
+          meta = {
+            description = "Native desktop interface for FFmpeg media conversion";
+            homepage = "https://github.com/66HEX/frame";
+            changelog = "https://github.com/66HEX/frame/blob/${finalAttrs.version}/CHANGELOG.md";
+            license = lib.licenses.gpl3Plus;
+            mainProgram = "frame";
+            maintainers = [ lib.maintainers._66HEX ];
+            platforms = [
+              "x86_64-linux"
+              "aarch64-linux"
+            ];
+          };
+        })
+        EOF
+          perl -0pi -e 's/\@VERSION\@/$ENV{VERSION}/g' "$package_path"
+        fi
+
+        build_and_capture_hash() {
+          local log_file="$1"
+          set +e
+          nix-build -A "$NIXPKGS_PACKAGE" -L 2>&1 | tee "$log_file"
+          local status="${PIPESTATUS[0]}"
+          set -e
+          return "$status"
+        }
+
+        extract_got_hash() {
+          awk '/got:[[:space:]]+sha256-/ { print $2 }' "$1" | tail -n1
+        }
+
+        if build_and_capture_hash source-hash.log; then
+          echo "::error::Source hash was unexpectedly already valid." >&2
+          exit 1
+        fi
+        src_hash="$(extract_got_hash source-hash.log)"
+        if [[ -z "$src_hash" ]]; then
+          echo "::error::Could not determine nixpkgs source hash." >&2
+          exit 1
+        fi
+        export SRC_HASH="$src_hash"
+        perl -0pi -e 's/hash = lib\.fakeHash;/hash = "$ENV{SRC_HASH}";/' "$package_path"
+
+        if build_and_capture_hash cargo-hash.log; then
+          echo "::error::Cargo hash was unexpectedly already valid." >&2
+          exit 1
+        fi
+        cargo_hash="$(extract_got_hash cargo-hash.log)"
+        if [[ -z "$cargo_hash" ]]; then
+          echo "::error::Could not determine nixpkgs cargo hash." >&2
+          exit 1
+        fi
+        export CARGO_HASH="$cargo_hash"
+        perl -0pi -e 's/cargoHash = lib\.fakeHash;/cargoHash = "$ENV{CARGO_HASH}";/' "$package_path"
+
+        nix-build -A "$NIXPKGS_PACKAGE" -L
+        nix-shell -p nixfmt-rfc-style --run "nixfmt $package_path maintainers/maintainer-list.nix"
+        nix-build -A "$NIXPKGS_PACKAGE" -L
+        nix-build lib/tests/maintainers.nix
+
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add "$package_path" maintainers/maintainer-list.nix
+        if git diff --staged --quiet; then
+          echo "No nixpkgs changes to publish."
+          echo "should_publish=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        git commit -m "$commit_subject"
+        git push --force-with-lease origin "$branch"
+        echo "commit_subject=$commit_subject" >> "$GITHUB_OUTPUT"
+        echo "should_publish=true" >> "$GITHUB_OUTPUT"
+    timeout-minutes: 90
+
+  validate_nixpkgs_aarch64:
+    runs-on: ubuntu-22.04-arm
+    needs: prepare_nixpkgs
+    if: needs.prepare_nixpkgs.outputs.should_publish == 'true'
+    env:
+      GH_TOKEN: ${{ secrets.NIXPKGS_GITHUB_TOKEN }}
+      NIXPKGS_FORK: 66HEX/nixpkgs
+      NIXPKGS_PACKAGE: frame-media-converter
+    steps:
+    - name: steps::install_nix
+      uses: cachix/install-nix-action@v31
+      with:
+        extra_nix_config: |
+          sandbox = true
+    - name: release::checkout_nixpkgs
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ env.NIXPKGS_FORK }}
+        ref: ${{ needs.prepare_nixpkgs.outputs.branch }}
+        token: ${{ env.GH_TOKEN }}
+        path: nixpkgs
+    - name: release::build_nixpkgs_aarch64
+      working-directory: nixpkgs
+      run: nix-build -A "$NIXPKGS_PACKAGE" -L
+    timeout-minutes: 90
+
+  publish_nixpkgs:
+    runs-on: ubuntu-22.04
+    needs:
+      - prepare_nixpkgs
+      - validate_nixpkgs_aarch64
+    if: needs.prepare_nixpkgs.outputs.should_publish == 'true'
+    env:
+      GH_TOKEN: ${{ secrets.NIXPKGS_GITHUB_TOKEN }}
+      NIXPKGS_UPSTREAM: NixOS/nixpkgs
+    steps:
+    - name: release::publish_nixpkgs_pr
+      env:
+        BRANCH: ${{ needs.prepare_nixpkgs.outputs.branch }}
+        COMMIT_SUBJECT: ${{ needs.prepare_nixpkgs.outputs.commit_subject }}
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        existing_pr="$(gh pr list \
+          --repo "$NIXPKGS_UPSTREAM" \
+          --head "66HEX:$BRANCH" \
+          --json number \
+          --jq '.[0].number')"
+        if [[ -n "$existing_pr" ]]; then
+          gh pr edit "$existing_pr" \
+            --repo "$NIXPKGS_UPSTREAM" \
+            --title "$COMMIT_SUBJECT" \
+            --body "Updates Frame to ${BRANCH#frame-media-converter-} from the GitHub release tag."
+        else
+          gh pr create \
+            --repo "$NIXPKGS_UPSTREAM" \
+            --base master \
+            --head "66HEX:$BRANCH" \
+            --title "$COMMIT_SUBJECT" \
+            --body "Updates Frame to ${BRANCH#frame-media-converter-} from the GitHub release tag."
+        fi
+    timeout-minutes: 10
+
   publish_winget:
     runs-on: windows-latest
     needs: publish_release
@@ -2554,6 +2846,27 @@ mod tests {
         assert!(workflow.contains("FLATHUB_REPOSITORY: flathub/io.github._66HEX.Frame"));
         assert!(workflow.contains("cargo xtask flathub-manifest"));
         assert!(workflow.contains("FLATHUB_GITHUB_TOKEN"));
+    }
+
+    #[test]
+    fn release_workflow_publishes_nixpkgs_pr_from_release_tag() {
+        let workflow = release_workflow();
+
+        assert!(workflow.contains("prepare_nixpkgs:"));
+        assert!(workflow.contains("validate_nixpkgs_aarch64:"));
+        assert!(workflow.contains("publish_nixpkgs:"));
+        assert!(workflow.contains("needs: publish_release"));
+        assert!(workflow.contains("runs-on: ubuntu-22.04-arm"));
+        assert!(workflow.contains("release::build_nixpkgs_aarch64"));
+        assert!(workflow.contains("- validate_nixpkgs_aarch64"));
+        assert!(workflow.contains("NIXPKGS_GITHUB_TOKEN"));
+        assert!(workflow.contains("NIXPKGS_UPSTREAM: NixOS/nixpkgs"));
+        assert!(workflow.contains("NIXPKGS_PACKAGE: frame-media-converter"));
+        assert!(workflow.contains("VERSION: ${{ steps.release.outputs.tag }}"));
+        assert!(workflow.contains(r#""x86_64-linux""#));
+        assert!(workflow.contains(r#""aarch64-linux""#));
+        assert!(workflow.contains("gh pr create"));
+        assert!(!workflow.contains("0.31.0"));
     }
 
     #[test]
