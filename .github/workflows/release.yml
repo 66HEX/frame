@@ -662,6 +662,8 @@ jobs:
           pname = "frame-media-converter";
           version = "@VERSION@";
 
+          __structuredAttrs = true;
+
           src = fetchFromGitHub {
             owner = "66HEX";
             repo = "frame";

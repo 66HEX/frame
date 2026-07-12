@@ -2340,6 +2340,8 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>) -> String {
           pname = "frame-media-converter";
           version = "@VERSION@";
 
+          __structuredAttrs = true;
+
           src = fetchFromGitHub {
             owner = "66HEX";
             repo = "frame";
@@ -2920,6 +2922,7 @@ mod tests {
         assert!(workflow.contains("NIXPKGS_UPSTREAM: NixOS/nixpkgs"));
         assert!(workflow.contains("NIXPKGS_PACKAGE: frame-media-converter"));
         assert!(workflow.contains("Could not find alphabetical insertion point for _66HEX."));
+        assert!(workflow.contains("__structuredAttrs = true;"));
         assert!(!workflow.contains("_0x4A6F"));
         assert!(!workflow.contains("nix-build -A \"$NIXPKGS_PACKAGE\" -L"));
         assert!(workflow.contains("nix-shell -I nixpkgs=\"$PWD\""));
