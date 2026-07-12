@@ -243,7 +243,7 @@ jobs:
         perl -0pi -e 's/cargoHash = lib\.fakeHash;/cargoHash = "$ENV{CARGO_HASH}";/' "$package_path"
 
         nix-build -A "$NIXPKGS_PACKAGE"
-        nix-shell -p nixfmt-rfc-style --run "nixfmt $package_path maintainers/maintainer-list.nix"
+        nix-shell -I nixpkgs="$PWD" -p nixfmt-rfc-style --run "nixfmt $package_path maintainers/maintainer-list.nix"
         nix-build -A "$NIXPKGS_PACKAGE"
         nix-build lib/tests/maintainers.nix
 

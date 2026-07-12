@@ -2451,7 +2451,7 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>) -> String {
         perl -0pi -e 's/cargoHash = lib\.fakeHash;/cargoHash = "$ENV{CARGO_HASH}";/' "$package_path"
 
         nix-build -A "$NIXPKGS_PACKAGE"
-        nix-shell -p nixfmt-rfc-style --run "nixfmt $package_path maintainers/maintainer-list.nix"
+        nix-shell -I nixpkgs="$PWD" -p nixfmt-rfc-style --run "nixfmt $package_path maintainers/maintainer-list.nix"
         nix-build -A "$NIXPKGS_PACKAGE"
         nix-build lib/tests/maintainers.nix
 
@@ -2922,6 +2922,7 @@ mod tests {
         assert!(workflow.contains("Could not find alphabetical insertion point for _66HEX."));
         assert!(!workflow.contains("_0x4A6F"));
         assert!(!workflow.contains("nix-build -A \"$NIXPKGS_PACKAGE\" -L"));
+        assert!(workflow.contains("nix-shell -I nixpkgs=\"$PWD\""));
         assert!(workflow.contains("VERSION: ${{ steps.release.outputs.tag }}"));
         assert!(workflow.contains(r#""x86_64-linux""#));
         assert!(workflow.contains(r#""aarch64-linux""#));
@@ -2940,6 +2941,7 @@ mod tests {
         assert!(workflow.contains("validate_nixpkgs_aarch64:"));
         assert!(workflow.contains("publish_nixpkgs:"));
         assert!(!workflow.contains("nix-build -A \"$NIXPKGS_PACKAGE\" -L"));
+        assert!(workflow.contains("nix-shell -I nixpkgs=\"$PWD\""));
         assert!(!workflow.contains("needs: publish_release"));
         assert!(!workflow.contains("publish_release:"));
         assert!(!workflow.contains("publish_winget:"));
