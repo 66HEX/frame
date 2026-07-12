@@ -2955,7 +2955,13 @@ mod tests {
     fn flathub_template_uses_runtime_media_tools_without_bundled_binaries() {
         let template = include_str!("../../../packaging/flathub/io.github._66HEX.Frame.yml.in");
 
-        assert!(template.contains("--env=FRAME_USE_SYSTEM_MEDIA_TOOLS=1"));
+        assert!(template.contains("install -Dm755 target/release/frame /app/lib/frame/frame"));
+        assert!(template.contains("export FRAME_USE_SYSTEM_MEDIA_TOOLS=1"));
+        assert!(template.contains("exec /app/lib/frame/frame"));
+        assert!(template.contains("desktop-file-edit"));
+        assert!(!template.contains("--env=FRAME_USE_SYSTEM_MEDIA_TOOLS=1"));
+        assert!(!template.contains("install -Dm644 LICENSE"));
+        assert!(!template.contains("strip-components: 1"));
         assert!(!template.contains("resources/binaries"));
         assert!(!template.contains("frame-update-helper"));
         assert!(!template.contains("ffmpeg-full"));

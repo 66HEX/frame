@@ -12,7 +12,6 @@ finish-args:
   - --socket=pulseaudio
   - --device=dri
   - --talk-name=org.freedesktop.Notifications
-  - --env=FRAME_USE_SYSTEM_MEDIA_TOOLS=1
 cleanup:
   - /include
   - /lib/pkgconfig
@@ -30,13 +29,22 @@ modules:
       - mkdir -p .cargo
       - cp cargo-vendor/cargo-config.toml .cargo/config.toml
       - cargo build --release --locked --offline --manifest-path frame-app/Cargo.toml
-      - install -Dm755 target/release/frame /app/bin/frame
+      - install -Dm755 target/release/frame /app/lib/frame/frame
       - |
-        sed \
-          -e 's|$APP_NAME|Frame|g' \
-          -e 's|$APP_CLI|frame|g' \
-          -e 's|$APP_ICON|io.github._66HEX.Frame|g' \
-          frame-app/resources/frame.desktop.in > io.github._66HEX.Frame.desktop
+        install -d /app/bin
+        printf '%s\n' \
+          '#!/bin/sh' \
+          'export FRAME_USE_SYSTEM_MEDIA_TOOLS=1' \
+          'exec /app/lib/frame/frame "$@"' \
+          > /app/bin/frame
+        chmod +x /app/bin/frame
+      - cp frame-app/resources/frame.desktop.in io.github._66HEX.Frame.desktop
+      - desktop-file-edit
+        --set-name=Frame
+        --set-key=Exec --set-value=frame
+        --set-key=TryExec --set-value=frame
+        --set-icon=io.github._66HEX.Frame
+        io.github._66HEX.Frame.desktop
       - install -Dm644 io.github._66HEX.Frame.desktop /app/share/applications/io.github._66HEX.Frame.desktop
       - |
         sed \
@@ -49,12 +57,10 @@ modules:
       - install -Dm644 frame-app/resources/app-icons/128x128.png /app/share/icons/hicolor/128x128/apps/io.github._66HEX.Frame.png
       - install -Dm644 frame-app/resources/app-icons/128x128@2x.png /app/share/icons/hicolor/256x256/apps/io.github._66HEX.Frame.png
       - install -Dm644 frame-app/resources/app-icons/icon.png /app/share/icons/hicolor/512x512/apps/io.github._66HEX.Frame.png
-      - install -Dm644 LICENSE /app/share/licenses/frame/LICENSE
     sources:
       - type: archive
         url: '@@FRAME_SOURCE_URL@@'
         sha256: '@@FRAME_SOURCE_SHA256@@'
-        strip-components: 1
       - type: archive
         url: '@@FRAME_CARGO_VENDOR_URL@@'
         sha256: '@@FRAME_CARGO_VENDOR_SHA256@@'
