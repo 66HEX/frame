@@ -376,9 +376,10 @@ const LINUX_AARCH64_BINARIES: &[FfmpegBinaryEntry] = &[
     },
 ];
 
+// BtbN retains month-end snapshots for two years; ordinary daily builds expire after 14 days.
 const WINDOWS_X86_64_ARCHIVE: FfmpegArchive = FfmpegArchive {
-    url: "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-06-28-13-24/ffmpeg-n8.1.2-win64-gpl-8.1.zip",
-    sha256: "dd247ae801e42777eb8d8b0a0c322f78862c265dad5749f9859cc379665e279e",
+    url: "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-06-30-13-34/ffmpeg-n8.1.2-21-gce3c09c101-win64-gpl-8.1.zip",
+    sha256: "682361e32c9631caec09e5d9f09077101c9ed90c14e275f62014fefa6d397990",
 };
 
 const WINDOWS_X86_64_BINARIES: &[FfmpegBinaryEntry] = &[
@@ -387,7 +388,7 @@ const WINDOWS_X86_64_BINARIES: &[FfmpegBinaryEntry] = &[
         archive: None,
         expected_names: &["ffmpeg.exe"],
         destination_name: "ffmpeg-x86_64-pc-windows-msvc.exe",
-        sha256: "bc4a55f7e5b6ff537890e20f4a178dd6d614073c38612b29c37df665f3170df5",
+        sha256: "c47e9e15e76897778915ba16e36c8002b0a3f2f9e7c0a71aa1d41459ac1d02d1",
         make_executable: false,
     },
     FfmpegBinaryEntry {
@@ -395,7 +396,7 @@ const WINDOWS_X86_64_BINARIES: &[FfmpegBinaryEntry] = &[
         archive: None,
         expected_names: &["ffprobe.exe"],
         destination_name: "ffprobe-x86_64-pc-windows-msvc.exe",
-        sha256: "d08266eac436dc44f00d6e15a15aa3e3eab9e6bd408f9ab49657d32687510670",
+        sha256: "2864c7a71b820b07d3a9666bb4389c8af4bb9449876b07a75b3b7f15adbdafaa",
         make_executable: false,
     },
 ];
@@ -2719,9 +2720,17 @@ mod tests {
     #[test]
     fn archive_entry_name_matches_nested_zip_paths() {
         assert!(archive_entry_name_matches(
-            "ffmpeg-n8.1.2-win64-gpl-8.1/bin/ffprobe.exe",
+            "ffmpeg-n8.1.2-21-gce3c09c101-win64-gpl-8.1/bin/ffprobe.exe",
             &["ffprobe.exe"],
         ));
+    }
+
+    #[test]
+    fn windows_ffmpeg_archive_uses_retained_monthly_snapshot() {
+        assert_eq!(
+            WINDOWS_X86_64_ARCHIVE.url,
+            "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-06-30-13-34/ffmpeg-n8.1.2-21-gce3c09c101-win64-gpl-8.1.zip"
+        );
     }
 
     #[test]

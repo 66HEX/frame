@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Linux Notifications:** Routed conversion completion notifications through the XDG Desktop Portal with a direct notification-service fallback for non-Flatpak Linux installations, and removed the Flatpak permission for direct notification bus access.
 - **Flathub Desktop Metadata:** Shipped ready-to-install desktop and AppStream metadata from upstream, moved the system media-tools environment flag into the Flatpak sandbox configuration, and removed build-time metadata rewriting and the launcher wrapper from the production manifest.
 
+### Fixed
+
+- **Windows Release Builds:** Pinned the Windows FFmpeg bundle to a retained BtbN month-end snapshot so release builds do not depend on daily assets that expire after 14 days.
+
 ## [0.31.0] - 2026-07-11
 
 ### Added
