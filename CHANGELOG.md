@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.1] - 2026-07-14
+
 ### Changed
 
 - **Linux Notifications:** Routed conversion completion notifications through the XDG Desktop Portal with a direct notification-service fallback for non-Flatpak Linux installations, and removed the Flatpak permission for direct notification bus access.
+- **Flathub Desktop Metadata:** Shipped ready-to-install desktop and AppStream metadata from upstream, moved the system media-tools environment flag into the Flatpak sandbox configuration, and removed build-time metadata rewriting and the launcher wrapper from the production manifest.
 
 ## [0.31.0] - 2026-07-11
 
@@ -801,8 +804,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.31.0...HEAD
-[0.30.0]: https://github.com/66HEX/frame/compare/0.30.0...0.31.0
+[Unreleased]: https://github.com/66HEX/frame/compare/0.31.1...HEAD
+[0.31.1]: https://github.com/66HEX/frame/compare/0.31.0...0.31.1
+[0.31.0]: https://github.com/66HEX/frame/compare/0.30.0...0.31.0
 [0.30.0]: https://github.com/66HEX/frame/compare/0.29.2...0.30.0
 [0.29.2]: https://github.com/66HEX/frame/compare/0.29.1...0.29.2
 [0.29.1]: https://github.com/66HEX/frame/compare/0.29.0...0.29.1

@@ -2041,7 +2041,7 @@ dependencies = [
 
 [[package]]
 name = "frame-app"
-version = "0.31.0"
+version = "0.31.1"
 dependencies = [
  "ashpd 0.13.12",
  "cpal",
@@ -2069,7 +2069,7 @@ dependencies = [
 
 [[package]]
 name = "frame-core"
-version = "0.31.0"
+version = "0.31.1"
 dependencies = [
  "font-kit",
  "regex",
@@ -2080,7 +2080,7 @@ dependencies = [
 
 [[package]]
 name = "frame-updater"
-version = "0.31.0"
+version = "0.31.1"
 dependencies = [
  "base64",
  "directories",
