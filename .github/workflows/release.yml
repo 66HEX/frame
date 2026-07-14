@@ -458,7 +458,6 @@ jobs:
           tag="${{ inputs.tag }}"
         fi
         echo "tag=$tag" >> "$GITHUB_OUTPUT"
-        echo "release_date=$(date -u +%F)" >> "$GITHUB_OUTPUT"
     - name: release::check_flathub_token
       shell: bash
       run: |
@@ -494,7 +493,6 @@ jobs:
         tag="${{ steps.release.outputs.tag }}"
         cargo xtask flathub-manifest \
           --version "$tag" \
-          --release-date "${{ steps.release.outputs.release_date }}" \
           --source-url "https://github.com/66HEX/frame/releases/download/$tag/frame-$tag-source.tar.gz" \
           --source-sha256 "${{ steps.flathub_sources.outputs.SOURCE_SHA256 }}" \
           --vendor-url "https://github.com/66HEX/frame/releases/download/$tag/frame-$tag-cargo-vendor.tar.gz" \

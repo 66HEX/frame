@@ -11,6 +11,7 @@ finish-args:
   - --socket=fallback-x11
   - --socket=pulseaudio
   - --device=dri
+  - --env=FRAME_USE_SYSTEM_MEDIA_TOOLS=1
 cleanup:
   - /include
   - /lib/pkgconfig
@@ -23,34 +24,13 @@ modules:
       env:
         CARGO_HOME: /run/build/frame/cargo
         CARGO_NET_OFFLINE: 'true'
-        FRAME_USE_SYSTEM_MEDIA_TOOLS: '1'
     build-commands:
       - mkdir -p .cargo
       - cp cargo-vendor/cargo-config.toml .cargo/config.toml
       - cargo build --release --locked --offline --manifest-path frame-app/Cargo.toml
-      - install -Dm755 target/release/frame /app/lib/frame/frame
-      - |
-        install -d /app/bin
-        printf '%s\n' \
-          '#!/bin/sh' \
-          'export FRAME_USE_SYSTEM_MEDIA_TOOLS=1' \
-          'exec /app/lib/frame/frame "$@"' \
-          > /app/bin/frame
-        chmod +x /app/bin/frame
-      - cp frame-app/resources/frame.desktop.in io.github._66HEX.Frame.desktop
-      - desktop-file-edit
-        --set-name=Frame
-        --set-key=Exec --set-value=frame
-        --set-key=TryExec --set-value=frame
-        --set-icon=io.github._66HEX.Frame
-        io.github._66HEX.Frame.desktop
-      - install -Dm644 io.github._66HEX.Frame.desktop /app/share/applications/io.github._66HEX.Frame.desktop
-      - |
-        sed \
-          -e "s|@FRAME_FLATHUB_VERSION@|@@FRAME_VERSION@@|g" \
-          -e "s|@FRAME_FLATHUB_RELEASE_DATE@|@@FRAME_RELEASE_DATE@@|g" \
-          packaging/flathub/io.github._66HEX.Frame.metainfo.xml.in > io.github._66HEX.Frame.metainfo.xml
-      - install -Dm644 io.github._66HEX.Frame.metainfo.xml /app/share/metainfo/io.github._66HEX.Frame.metainfo.xml
+      - install -Dm755 target/release/frame /app/bin/frame
+      - install -Dm644 packaging/flathub/io.github._66HEX.Frame.desktop /app/share/applications/io.github._66HEX.Frame.desktop
+      - install -Dm644 packaging/flathub/io.github._66HEX.Frame.metainfo.xml /app/share/metainfo/io.github._66HEX.Frame.metainfo.xml
       - install -Dm644 frame-app/resources/app-icons/32x32.png /app/share/icons/hicolor/32x32/apps/io.github._66HEX.Frame.png
       - install -Dm644 frame-app/resources/app-icons/64x64.png /app/share/icons/hicolor/64x64/apps/io.github._66HEX.Frame.png
       - install -Dm644 frame-app/resources/app-icons/128x128.png /app/share/icons/hicolor/128x128/apps/io.github._66HEX.Frame.png

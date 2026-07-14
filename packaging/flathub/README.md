@@ -55,7 +55,6 @@ Render the Flathub repository files with:
 ```bash
 cargo xtask flathub-manifest \
   --version 0.30.0 \
-  --release-date 2026-07-10 \
   --source-url https://github.com/66HEX/frame/releases/download/0.30.0/frame-0.30.0-source.tar.gz \
   --source-sha256 "$(grep FRAME_SOURCE_SHA256 target/flathub/checksums.env | cut -d= -f2)" \
   --vendor-url https://github.com/66HEX/frame/releases/download/0.30.0/frame-0.30.0-cargo-vendor.tar.gz \
@@ -64,6 +63,7 @@ cargo xtask flathub-manifest \
 ```
 
 `target/flathub/repo/io.github._66HEX.Frame.yml` belongs in
-`flathub/io.github._66HEX.Frame`. The rendered metainfo XML in the same
-directory is only a validation aid; the Flathub build installs metainfo from the
-upstream source archive.
+`flathub/io.github._66HEX.Frame`. The copied metainfo XML in the same directory
+is only a validation aid; its release version and date are maintained upstream,
+and the Flathub build installs it together with the ready-to-use desktop file
+from the release source archive.

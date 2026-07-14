@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Frame
+GenericName=Media Converter
+Comment=Convert video, audio, image, subtitle, and metadata settings with FFmpeg.
+TryExec=frame
+StartupNotify=true
+Exec=frame
+Icon=io.github._66HEX.Frame
+Categories=AudioVideo;AudioVideoEditing;Video;Graphics;
+Keywords=frame;ffmpeg;converter;video;audio;image;

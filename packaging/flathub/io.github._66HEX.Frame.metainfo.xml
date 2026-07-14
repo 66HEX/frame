@@ -29,6 +29,6 @@
   </screenshots>
   <content_rating type="oars-1.1" />
   <releases>
-    <release version="@FRAME_FLATHUB_VERSION@" date="@FRAME_FLATHUB_RELEASE_DATE@" />
+    <release version="0.31.1" date="2026-07-14" />
   </releases>
 </component>

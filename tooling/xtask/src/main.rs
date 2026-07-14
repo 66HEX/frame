@@ -17,8 +17,7 @@ const RUN_BUNDLING_WORKFLOW_PATH: &str = ".github/workflows/run_bundling.yml";
 const RELEASE_WORKFLOW_PATH: &str = ".github/workflows/release.yml";
 const PUBLISH_NIXPKGS_WORKFLOW_PATH: &str = ".github/workflows/publish_nixpkgs.yml";
 const FLATHUB_MANIFEST_TEMPLATE_PATH: &str = "packaging/flathub/io.github._66HEX.Frame.yml.in";
-const FLATHUB_METAINFO_TEMPLATE_PATH: &str =
-    "packaging/flathub/io.github._66HEX.Frame.metainfo.xml.in";
+const FLATHUB_METAINFO_PATH: &str = "packaging/flathub/io.github._66HEX.Frame.metainfo.xml";
 const FFMPEG_VERSION: &str = "8.1.2";
 
 #[cfg(unix)]
@@ -613,10 +612,8 @@ fn flathub_manifest(args: &[String]) -> Result<()> {
         &fs::read_to_string(root.join(FLATHUB_MANIFEST_TEMPLATE_PATH))?,
         &options,
     );
-    let metainfo = render_flathub_metainfo_template(
-        &fs::read_to_string(root.join(FLATHUB_METAINFO_TEMPLATE_PATH))?,
-        &options,
-    );
+    let metainfo = fs::read_to_string(root.join(FLATHUB_METAINFO_PATH))?;
+    validate_flathub_metainfo_version(&metainfo, &options.version)?;
 
     fs::write(out_dir.join("io.github._66HEX.Frame.yml"), manifest)?;
     fs::write(
@@ -629,18 +626,21 @@ fn flathub_manifest(args: &[String]) -> Result<()> {
 
 fn render_flathub_manifest_template(template: &str, options: &FlathubManifestOptions) -> String {
     template
-        .replace("@@FRAME_VERSION@@", &options.version)
-        .replace("@@FRAME_RELEASE_DATE@@", &options.release_date)
         .replace("@@FRAME_SOURCE_URL@@", &options.source_url)
         .replace("@@FRAME_SOURCE_SHA256@@", &options.source_sha256)
         .replace("@@FRAME_CARGO_VENDOR_URL@@", &options.vendor_url)
         .replace("@@FRAME_CARGO_VENDOR_SHA256@@", &options.vendor_sha256)
 }
 
-fn render_flathub_metainfo_template(template: &str, options: &FlathubManifestOptions) -> String {
-    template
-        .replace("@FRAME_FLATHUB_VERSION@", &options.version)
-        .replace("@FRAME_FLATHUB_RELEASE_DATE@", &options.release_date)
+fn validate_flathub_metainfo_version(metainfo: &str, version: &str) -> Result<()> {
+    let release_prefix = format!(r#"<release version="{version}" date=""#);
+    if metainfo.contains(&release_prefix) {
+        return Ok(());
+    }
+
+    Err(XtaskError::Usage(format!(
+        "{FLATHUB_METAINFO_PATH} does not contain release metadata for version {version}"
+    )))
 }
 
 fn path_to_string_lossy(path: &Path) -> String {
@@ -692,7 +692,6 @@ Usage: cargo xtask flathub-sources --version <semver> [--out-dir <path>]
 #[derive(Clone, Debug)]
 struct FlathubManifestOptions {
     version: String,
-    release_date: String,
     source_url: String,
     source_sha256: String,
     vendor_url: String,
@@ -703,7 +702,6 @@ struct FlathubManifestOptions {
 impl FlathubManifestOptions {
     fn parse(args: &[String]) -> Result<Self> {
         let mut version = None;
-        let mut release_date = None;
         let mut source_url = None;
         let mut source_sha256 = None;
         let mut vendor_url = None;
@@ -715,9 +713,6 @@ impl FlathubManifestOptions {
             match args[index].as_str() {
                 "--version" => {
                     version = Some(required_option_value(args, &mut index, "--version")?);
-                }
-                "--release-date" => {
-                    release_date = Some(required_option_value(args, &mut index, "--release-date")?);
                 }
                 "--source-url" => {
                     source_url = Some(required_option_value(args, &mut index, "--source-url")?);
@@ -745,7 +740,6 @@ Usage: cargo xtask flathub-manifest [options]
 
 Required:
   --version <semver>
-  --release-date <yyyy-mm-dd>
   --source-url <url>
   --source-sha256 <sha256>
   --vendor-url <url>
@@ -765,8 +759,6 @@ Required:
 
         let options = Self {
             version: version.ok_or_else(|| XtaskError::Usage("missing --version".to_string()))?,
-            release_date: release_date
-                .ok_or_else(|| XtaskError::Usage("missing --release-date".to_string()))?,
             source_url: source_url
                 .ok_or_else(|| XtaskError::Usage("missing --source-url".to_string()))?,
             source_sha256: source_sha256
@@ -780,11 +772,6 @@ Required:
         validate_semver(&options.version, "--version")?;
         validate_sha256(&options.source_sha256, "--source-sha256")?;
         validate_sha256(&options.vendor_sha256, "--vendor-sha256")?;
-        if options.release_date.len() != 10 {
-            return Err(XtaskError::Usage(
-                "--release-date must use yyyy-mm-dd format".to_string(),
-            ));
-        }
         Ok(options)
     }
 }
@@ -2101,7 +2088,6 @@ jobs:
           tag="${{ inputs.tag }}"
         fi
         echo "tag=$tag" >> "$GITHUB_OUTPUT"
-        echo "release_date=$(date -u +%F)" >> "$GITHUB_OUTPUT"
     - name: release::check_flathub_token
       shell: bash
       run: |
@@ -2137,7 +2123,6 @@ jobs:
         tag="${{ steps.release.outputs.tag }}"
         cargo xtask flathub-manifest \
           --version "$tag" \
-          --release-date "${{ steps.release.outputs.release_date }}" \
           --source-url "https://github.com/66HEX/frame/releases/download/$tag/frame-$tag-source.tar.gz" \
           --source-sha256 "${{ steps.flathub_sources.outputs.SOURCE_SHA256 }}" \
           --vendor-url "https://github.com/66HEX/frame/releases/download/$tag/frame-$tag-cargo-vendor.tar.gz" \
@@ -2958,11 +2943,14 @@ mod tests {
     fn flathub_template_uses_runtime_media_tools_without_bundled_binaries() {
         let template = include_str!("../../../packaging/flathub/io.github._66HEX.Frame.yml.in");
 
-        assert!(template.contains("install -Dm755 target/release/frame /app/lib/frame/frame"));
-        assert!(template.contains("export FRAME_USE_SYSTEM_MEDIA_TOOLS=1"));
-        assert!(template.contains("exec /app/lib/frame/frame"));
-        assert!(template.contains("desktop-file-edit"));
-        assert!(!template.contains("--env=FRAME_USE_SYSTEM_MEDIA_TOOLS=1"));
+        assert!(template.contains("install -Dm755 target/release/frame /app/bin/frame"));
+        assert!(template.contains("--env=FRAME_USE_SYSTEM_MEDIA_TOOLS=1"));
+        assert!(template.contains("packaging/flathub/io.github._66HEX.Frame.desktop"));
+        assert!(template.contains("packaging/flathub/io.github._66HEX.Frame.metainfo.xml"));
+        assert!(!template.contains("desktop-file-edit"));
+        assert!(!template.contains("sed"));
+        assert!(!template.contains("/app/lib/frame/frame"));
+        assert!(!template.contains("export FRAME_USE_SYSTEM_MEDIA_TOOLS=1"));
         assert!(!template.contains("install -Dm644 LICENSE"));
         assert!(!template.contains("strip-components: 1"));
         assert!(!template.contains("resources/binaries"));
@@ -2973,6 +2961,35 @@ mod tests {
         assert!(!template.contains("--talk-name=org.freedesktop.Notifications"));
         assert!(!template.contains("--talk-name=org.freedesktop.portal.Desktop"));
         assert!(!template.contains("--socket=session-bus"));
+    }
+
+    #[test]
+    fn flathub_desktop_file_is_ready_to_install() {
+        let desktop = include_str!("../../../packaging/flathub/io.github._66HEX.Frame.desktop");
+
+        assert!(
+            desktop.contains("Exec=frame")
+                && desktop.contains("TryExec=frame")
+                && desktop.contains("Icon=io.github._66HEX.Frame")
+                && !desktop.contains("$APP_")
+        );
+    }
+
+    #[test]
+    fn flathub_metainfo_contains_release_metadata() {
+        let metainfo =
+            include_str!("../../../packaging/flathub/io.github._66HEX.Frame.metainfo.xml");
+
+        assert!(metainfo.contains(r#"<release version="0.31.1" date="2026-07-14" />"#));
+    }
+
+    #[test]
+    fn flathub_metainfo_validation_rejects_a_different_release() {
+        let metainfo = r#"<release version="0.31.0" date="2026-07-11" />"#;
+
+        let error = validate_flathub_metainfo_version(metainfo, "0.31.1").unwrap_err();
+
+        assert!(matches!(error, XtaskError::Usage(_)));
     }
 
     #[test]
