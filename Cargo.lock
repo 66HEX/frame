@@ -2043,6 +2043,7 @@ dependencies = [
 name = "frame-app"
 version = "0.31.0"
 dependencies = [
+ "ashpd 0.13.12",
  "cpal",
  "directories",
  "embed-resource",
@@ -2060,6 +2061,7 @@ dependencies = [
  "serde",
  "serde_json",
  "smallvec",
+ "smol",
  "sysinfo",
  "thiserror 2.0.18",
  "windows 0.62.2",

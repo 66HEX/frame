@@ -16,6 +16,8 @@ The Flathub package intentionally differs from the local devel Flatpak built by
   `org.freedesktop.Platform.codecs-extra` extension instead of bundling FFmpeg.
 - it does not request static home-directory access; Frame asks the user to
   choose its default output folder through the file chooser portal.
+- it sends completion notifications through the notification portal without
+  direct access to `org.freedesktop.Notifications`.
 
 ## One-Time Flathub Setup
 

@@ -15,6 +15,7 @@ pub(crate) mod numeric;
 pub mod preview;
 pub mod preview_engine;
 pub mod runtime_binaries;
+pub(crate) mod runtime_environment;
 pub mod settings;
 pub mod source_metadata;
 pub mod theme;

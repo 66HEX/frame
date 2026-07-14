@@ -1,9 +1,6 @@
 //! Runtime configuration for Frame update checks.
 
-use std::{
-    path::Path,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use frame_updater::{
     InstallContext, UpdateChannel, UpdateClient, UpdateClientConfig, UpdateError,
@@ -11,12 +8,11 @@ use frame_updater::{
 };
 use semver::Version;
 
-use crate::app_info::FRAME_APP_ID;
+use crate::{app_info::FRAME_APP_ID, runtime_environment};
 
 pub const AUTO_UPDATE_CHECK_INTERVAL_SECS: u64 = 24 * 60 * 60;
 const UPDATE_EXPLANATION_ENV: &str = "FRAME_UPDATE_EXPLANATION";
 const UPDATE_PUBLIC_KEY_ENV: &str = "FRAME_UPDATE_PUBLIC_KEY";
-const FLATPAK_INFO_PATH: &str = "/.flatpak-info";
 
 /// Builds an update client for the configured update channel.
 ///
@@ -56,8 +52,7 @@ pub fn updates_disabled_explanation() -> Option<String> {
 
     package_manager_update_explanation(
         std::env::var_os("APPIMAGE").is_some(),
-        std::env::var_os("FLATPAK_ID").is_some(),
-        Path::new(FLATPAK_INFO_PATH).is_file(),
+        runtime_environment::is_flatpak(),
     )
 }
 
@@ -104,9 +99,8 @@ fn push_public_keys(value: &str, keys: &mut Vec<String>) {
 fn package_manager_update_explanation(
     appimage_runtime: bool,
     flatpak_runtime: bool,
-    flatpak_info_exists: bool,
 ) -> Option<String> {
-    if flatpak_runtime || flatpak_info_exists {
+    if flatpak_runtime {
         Some(
             "This Flatpak build is managed by Flatpak. Install updates through Flatpak or Flathub."
                 .to_string(),
@@ -157,7 +151,7 @@ mod tests {
     #[test]
     fn package_manager_update_explanation_detects_appimage() {
         assert_eq!(
-            package_manager_update_explanation(true, false, false),
+            package_manager_update_explanation(true, false),
             Some(
                 "This AppImage build is updated by AppImage update tools. Use AppImageUpdate, AppImageLauncher, Gear Lever, or AppManager."
                     .to_string()
@@ -168,7 +162,7 @@ mod tests {
     #[test]
     fn package_manager_update_explanation_detects_flatpak() {
         assert_eq!(
-            package_manager_update_explanation(false, true, false),
+            package_manager_update_explanation(false, true),
             Some(
                 "This Flatpak build is managed by Flatpak. Install updates through Flatpak or Flathub."
                     .to_string()
@@ -179,7 +173,7 @@ mod tests {
     #[test]
     fn package_manager_update_explanation_prefers_flatpak_over_appimage() {
         assert_eq!(
-            package_manager_update_explanation(true, false, true),
+            package_manager_update_explanation(true, true),
             Some(
                 "This Flatpak build is managed by Flatpak. Install updates through Flatpak or Flathub."
                     .to_string()

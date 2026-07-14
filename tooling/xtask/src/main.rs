@@ -2970,6 +2970,19 @@ mod tests {
         assert!(!template.contains("ffmpeg-full"));
         assert!(!template.contains("add-extensions"));
         assert!(!template.contains("--filesystem=home"));
+        assert!(!template.contains("--talk-name=org.freedesktop.Notifications"));
+        assert!(!template.contains("--talk-name=org.freedesktop.portal.Desktop"));
+        assert!(!template.contains("--socket=session-bus"));
+    }
+
+    #[test]
+    fn devel_flatpak_template_uses_notification_portal_without_direct_bus_access() {
+        let template =
+            include_str!("../../../packaging/flatpak/io.github._66HEX.Frame.Devel.yml.in");
+
+        assert!(!template.contains("--talk-name=org.freedesktop.Notifications"));
+        assert!(!template.contains("--talk-name=org.freedesktop.portal.Desktop"));
+        assert!(!template.contains("--socket=session-bus"));
     }
 
     #[test]

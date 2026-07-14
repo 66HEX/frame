@@ -10,13 +10,29 @@ use std::{
 
 use notify_rust::{Notification, Timeout};
 
+#[cfg(target_os = "linux")]
+use ashpd::{
+    Error as PortalError,
+    desktop::{
+        Icon,
+        notification::{
+            Notification as PortalNotification, NotificationProxy, Priority as PortalPriority,
+        },
+    },
+};
+
 use crate::{
     app_info::FRAME_APP_NAME,
     file_queue::{FileQueue, FileStatus},
 };
 
+#[cfg(target_os = "linux")]
+use crate::runtime_environment;
+
 const CONVERSION_FINISHED_TITLE: &str = "Queue Finished";
 const FRAME_NOTIFICATION_ICON: &str = "frame";
+#[cfg(any(target_os = "linux", test))]
+const CONVERSION_FINISHED_NOTIFICATION_ID: &str = "conversion-finished";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ConversionNotificationSummary {
@@ -117,18 +133,132 @@ pub fn conversion_finished_notification_for_task_ids(
 fn send_system_conversion_finished_notification(summary: ConversionNotificationSummary) {
     if let Err(error) = thread::Builder::new()
         .name("frame-notification".to_string())
-        .spawn(move || {
-            if let Err(error) = show_system_conversion_finished_notification(summary) {
-                eprintln!("Failed to show conversion notification: {error}");
-            }
-        })
+        .spawn(move || deliver_system_conversion_finished_notification(summary))
     {
         eprintln!("Failed to spawn conversion notification: {error}");
     }
 }
 
+#[cfg(target_os = "linux")]
+fn deliver_system_conversion_finished_notification(summary: ConversionNotificationSummary) {
+    let runtime = if runtime_environment::is_flatpak() {
+        LinuxRuntime::Flatpak
+    } else {
+        LinuxRuntime::Host
+    };
+
+    match deliver_linux_notification(
+        runtime,
+        || show_portal_conversion_finished_notification(summary),
+        || show_direct_conversion_finished_notification(summary),
+    ) {
+        LinuxDeliveryOutcome::Portal => {}
+        LinuxDeliveryOutcome::FreedesktopFallback { portal_error } => {
+            eprintln!(
+                "Desktop portal notification failed: {portal_error}; delivered through org.freedesktop.Notifications fallback"
+            );
+        }
+        LinuxDeliveryOutcome::PortalFailedInFlatpak { portal_error } => {
+            eprintln!(
+                "Failed to show conversion notification through the desktop portal: {portal_error}; runtime=flatpak; direct fallback disabled"
+            );
+        }
+        LinuxDeliveryOutcome::BothFailed {
+            portal_error,
+            fallback_error,
+        } => {
+            eprintln!(
+                "Failed to show conversion notification: portal error: {portal_error}; fallback error: {fallback_error}"
+            );
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn show_portal_conversion_finished_notification(
+    summary: ConversionNotificationSummary,
+) -> Result<(), PortalError> {
+    let body = summary.body();
+    let flatpak_id = std::env::var("FLATPAK_ID").ok();
+    let icon_names = portal_icon_names(flatpak_id.as_deref());
+
+    smol::block_on(async move {
+        let proxy = NotificationProxy::new().await?;
+        let notification = PortalNotification::new(summary.title())
+            .body(body.as_str())
+            .priority(PortalPriority::Normal)
+            .icon(Icon::with_names(icon_names));
+
+        proxy
+            .add_notification(CONVERSION_FINISHED_NOTIFICATION_ID, notification)
+            .await
+    })
+}
+
+#[cfg(any(target_os = "linux", test))]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum LinuxRuntime {
+    Flatpak,
+    Host,
+}
+
+#[cfg(any(target_os = "linux", test))]
+#[derive(Debug, Eq, PartialEq)]
+enum LinuxDeliveryOutcome<PortalFailure, FallbackFailure> {
+    Portal,
+    FreedesktopFallback {
+        portal_error: PortalFailure,
+    },
+    PortalFailedInFlatpak {
+        portal_error: PortalFailure,
+    },
+    BothFailed {
+        portal_error: PortalFailure,
+        fallback_error: FallbackFailure,
+    },
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn deliver_linux_notification<PortalFailure, FallbackFailure>(
+    runtime: LinuxRuntime,
+    portal: impl FnOnce() -> Result<(), PortalFailure>,
+    fallback: impl FnOnce() -> Result<(), FallbackFailure>,
+) -> LinuxDeliveryOutcome<PortalFailure, FallbackFailure> {
+    let portal_error = match portal() {
+        Ok(()) => return LinuxDeliveryOutcome::Portal,
+        Err(error) => error,
+    };
+
+    if runtime == LinuxRuntime::Flatpak {
+        return LinuxDeliveryOutcome::PortalFailedInFlatpak { portal_error };
+    }
+
+    match fallback() {
+        Ok(()) => LinuxDeliveryOutcome::FreedesktopFallback { portal_error },
+        Err(fallback_error) => LinuxDeliveryOutcome::BothFailed {
+            portal_error,
+            fallback_error,
+        },
+    }
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn portal_icon_names(flatpak_id: Option<&str>) -> Vec<String> {
+    let mut names = flatpak_id
+        .map(str::trim)
+        .filter(|id| !id.is_empty())
+        .map(|id| vec![id.to_string()])
+        .unwrap_or_default();
+
+    if !names.iter().any(|name| name == FRAME_NOTIFICATION_ICON) {
+        names.push(FRAME_NOTIFICATION_ICON.to_string());
+    }
+
+    names
+}
+
 #[cfg(not(target_os = "macos"))]
-fn show_system_conversion_finished_notification(
+fn show_direct_conversion_finished_notification(
     summary: ConversionNotificationSummary,
 ) -> notify_rust::error::Result<()> {
     Notification::new()
@@ -142,21 +272,27 @@ fn show_system_conversion_finished_notification(
     Ok(())
 }
 
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+fn deliver_system_conversion_finished_notification(summary: ConversionNotificationSummary) {
+    if let Err(error) = show_direct_conversion_finished_notification(summary) {
+        eprintln!("Failed to show conversion notification: {error}");
+    }
+}
+
 #[cfg(target_os = "macos")]
-fn show_system_conversion_finished_notification(
-    summary: ConversionNotificationSummary,
-) -> notify_rust::error::Result<()> {
+fn deliver_system_conversion_finished_notification(summary: ConversionNotificationSummary) {
     initialize_macos_notification_application();
 
-    Notification::new()
+    if let Err(error) = Notification::new()
         .appname(FRAME_APP_NAME)
         .summary(summary.title())
         .body(&summary.body())
         .icon(FRAME_NOTIFICATION_ICON)
         .timeout(Timeout::Default)
-        .schedule_raw(macos_delivery_timestamp())?;
-
-    Ok(())
+        .schedule_raw(macos_delivery_timestamp())
+    {
+        eprintln!("Failed to show conversion notification: {error}");
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -184,6 +320,8 @@ fn macos_delivery_timestamp() -> f64 {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::Cell;
+
     use super::*;
     use crate::file_queue::FileItem;
 
@@ -238,5 +376,124 @@ mod tests {
 
         assert_eq!(summary.title(), "Queue Finished");
         assert_eq!(summary.body(), "Processed 2 files with 1 errors.");
+    }
+
+    #[test]
+    fn linux_delivery_uses_portal_without_host_fallback() {
+        let fallback_calls = Cell::new(0);
+
+        let outcome = deliver_linux_notification(
+            LinuxRuntime::Host,
+            || Ok::<(), &str>(()),
+            || {
+                fallback_calls.set(fallback_calls.get() + 1);
+                Ok::<(), &str>(())
+            },
+        );
+
+        assert_eq!(outcome, LinuxDeliveryOutcome::Portal);
+        assert_eq!(fallback_calls.get(), 0);
+    }
+
+    #[test]
+    fn linux_delivery_uses_portal_without_flatpak_fallback() {
+        let fallback_calls = Cell::new(0);
+
+        let outcome = deliver_linux_notification(
+            LinuxRuntime::Flatpak,
+            || Ok::<(), &str>(()),
+            || {
+                fallback_calls.set(fallback_calls.get() + 1);
+                Ok::<(), &str>(())
+            },
+        );
+
+        assert_eq!(outcome, LinuxDeliveryOutcome::Portal);
+        assert_eq!(fallback_calls.get(), 0);
+    }
+
+    #[test]
+    fn linux_delivery_falls_back_on_host_after_portal_failure() {
+        let fallback_calls = Cell::new(0);
+
+        let outcome = deliver_linux_notification(
+            LinuxRuntime::Host,
+            || Err::<(), _>("portal unavailable"),
+            || {
+                fallback_calls.set(fallback_calls.get() + 1);
+                Ok::<(), &str>(())
+            },
+        );
+
+        assert_eq!(
+            outcome,
+            LinuxDeliveryOutcome::FreedesktopFallback {
+                portal_error: "portal unavailable"
+            }
+        );
+        assert_eq!(fallback_calls.get(), 1);
+    }
+
+    #[test]
+    fn linux_delivery_does_not_fall_back_in_flatpak_after_portal_failure() {
+        let fallback_calls = Cell::new(0);
+
+        let outcome = deliver_linux_notification(
+            LinuxRuntime::Flatpak,
+            || Err::<(), _>("portal unavailable"),
+            || {
+                fallback_calls.set(fallback_calls.get() + 1);
+                Ok::<(), &str>(())
+            },
+        );
+
+        assert_eq!(
+            outcome,
+            LinuxDeliveryOutcome::PortalFailedInFlatpak {
+                portal_error: "portal unavailable"
+            }
+        );
+        assert_eq!(fallback_calls.get(), 0);
+    }
+
+    #[test]
+    fn linux_delivery_preserves_portal_and_fallback_failures() {
+        let outcome = deliver_linux_notification(
+            LinuxRuntime::Host,
+            || Err::<(), _>("portal unavailable"),
+            || Err::<(), _>("notification daemon unavailable"),
+        );
+
+        assert_eq!(
+            outcome,
+            LinuxDeliveryOutcome::BothFailed {
+                portal_error: "portal unavailable",
+                fallback_error: "notification daemon unavailable"
+            }
+        );
+    }
+
+    #[test]
+    fn portal_icon_names_prefer_flatpak_identity() {
+        assert_eq!(
+            portal_icon_names(Some("io.github._66HEX.Frame")),
+            ["io.github._66HEX.Frame", "frame"]
+        );
+        assert_eq!(
+            portal_icon_names(Some("io.github._66HEX.Frame.Devel")),
+            ["io.github._66HEX.Frame.Devel", "frame"]
+        );
+    }
+
+    #[test]
+    fn portal_icon_names_fall_back_to_native_icon() {
+        assert_eq!(portal_icon_names(None), ["frame"]);
+        assert_eq!(portal_icon_names(Some("  ")), ["frame"]);
+        assert_eq!(portal_icon_names(Some("frame")), ["frame"]);
+    }
+
+    #[test]
+    fn portal_notification_id_is_stable() {
+        assert_eq!(CONVERSION_FINISHED_NOTIFICATION_ID, "conversion-finished");
     }
 }

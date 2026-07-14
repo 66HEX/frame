@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Linux Notifications:** Routed conversion completion notifications through the XDG Desktop Portal with a direct notification-service fallback for non-Flatpak Linux installations, and removed the Flatpak permission for direct notification bus access.
+
 ## [0.31.0] - 2026-07-11
 
 ### Added
