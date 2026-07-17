@@ -8,10 +8,7 @@ use std::{
 };
 
 use frame_core::{
-    args::{
-        build_ffmpeg_args, build_output_path, validate_stream_copy_compatibility,
-        validate_task_input,
-    },
+    args::{build_ffmpeg_args, build_output_path, validate_task_input},
     error::ConversionError,
     events::ConversionEvent,
     probe::{ffprobe_json_args, parse_ffprobe_stdout},
@@ -110,17 +107,14 @@ pub fn run_conversion_task_with_control(
     }
 
     validate_task_input(&task.file_path, &task.config)?;
-    if task.config.processing_mode == "copy" {
-        let probe = probe_media_file(&task.file_path)?;
-        validate_stream_copy_compatibility(&task.config, &probe)?;
-    }
+    let probe = probe_media_file(&task.file_path)?;
 
     let output_path = build_output_path(
         &task.output_directory,
         &task.config.container,
         task.output_name.as_deref(),
     );
-    let args = build_ffmpeg_args(&task.file_path, &output_path, &task.config);
+    let args = build_ffmpeg_args(&task.file_path, &output_path, &task.config, &probe)?;
     let executable = ffmpeg_executable();
 
     emit(ConversionEvent::log(

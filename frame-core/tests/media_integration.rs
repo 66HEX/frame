@@ -9,7 +9,7 @@ use std::{
 };
 
 use frame_core::{
-    args::{build_ffmpeg_args, validate_stream_copy_compatibility, validate_task_input},
+    args::{build_ffmpeg_args, validate_task_input},
     preview::{PreviewFfmpegOptions, build_ffmpeg_preview_args},
     probe::{ffprobe_json_args, parse_ffprobe_stdout},
     types::{
@@ -776,11 +776,9 @@ fn convert(
     let input = path_arg(input);
     let output = path_arg(output);
     validate_task_input(&input, config).map_err(|error| error.to_string())?;
-    if config.processing_mode == "copy" {
-        let probe = probe_media(tools, Path::new(&input))?;
-        validate_stream_copy_compatibility(config, &probe).map_err(|error| error.to_string())?;
-    }
-    let args = build_ffmpeg_args(&input, &output, config);
+    let probe = probe_media(tools, Path::new(&input))?;
+    let args =
+        build_ffmpeg_args(&input, &output, config, &probe).map_err(|error| error.to_string())?;
     run_tool(&tools.ffmpeg, &args)?;
 
     let output_path = Path::new(&output);

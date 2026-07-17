@@ -81,6 +81,74 @@ fn collect_selected_subtitle_tracks<'a>(
         .collect()
 }
 
+fn collect_reencode_subtitle_tracks<'a>(
+    config: &ConversionConfig,
+    probe: &'a ProbeMetadata,
+) -> Result<Vec<&'a SubtitleTrack>, ConversionError> {
+    let tracks = collect_selected_subtitle_tracks(config, probe)?;
+    if config.selected_subtitle_tracks.is_empty() {
+        return Ok(tracks
+            .into_iter()
+            .filter(|track| subtitle_can_be_encoded_for_container(&config.container, &track.codec))
+            .collect());
+    }
+
+    for track in &tracks {
+        if !subtitle_can_be_encoded_for_container(&config.container, &track.codec) {
+            return Err(ConversionError::InvalidInput(format!(
+                "Subtitle codec '{}' from source track #{} cannot be converted for container '{}'",
+                track.codec, track.index, config.container
+            )));
+        }
+    }
+
+    Ok(tracks)
+}
+
+fn subtitle_can_be_encoded_for_container(container: &str, codec: &str) -> bool {
+    if container.eq_ignore_ascii_case("mkv") {
+        return true;
+    }
+
+    matches!(
+        container.to_ascii_lowercase().as_str(),
+        "mp4" | "mov" | "webm"
+    ) && is_text_subtitle_codec(codec)
+}
+
+fn is_text_subtitle_codec(codec: &str) -> bool {
+    matches!(
+        codec.trim().to_ascii_lowercase().as_str(),
+        "text"
+            | "ssa"
+            | "mov_text"
+            | "srt"
+            | "microdvd"
+            | "eia_608"
+            | "jacosub"
+            | "sami"
+            | "realtext"
+            | "stl"
+            | "subviewer1"
+            | "subviewer"
+            | "subrip"
+            | "webvtt"
+            | "mpl2"
+            | "vplayer"
+            | "pjs"
+            | "ass"
+            | "hdmv_text_subtitle"
+            | "ttml"
+    )
+}
+
+fn add_track_maps<T>(args: &mut Vec<String>, tracks: &[&T], index: impl Fn(&T) -> u32) {
+    for track in tracks {
+        args.push("-map".to_string());
+        args.push(format!("0:{}", index(track)));
+    }
+}
+
 /// Validates whether stream-copy mode can preserve the selected source streams.
 ///
 /// # Errors
@@ -156,8 +224,18 @@ pub fn validate_stream_copy_compatibility(
     clippy::too_many_lines,
     reason = "FFmpeg command assembly stays in one place to keep ordering guarantees explicit"
 )]
-#[must_use]
-pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -> Vec<String> {
+/// Builds probe-aware `FFmpeg` arguments for one conversion.
+///
+/// # Errors
+///
+/// Returns [`ConversionError`] when a selected source stream is missing or
+/// cannot be represented by the requested output configuration.
+pub fn build_ffmpeg_args(
+    input: &str,
+    output: &str,
+    config: &ConversionConfig,
+    probe: &ProbeMetadata,
+) -> Result<Vec<String>, ConversionError> {
     let mut args = Vec::new();
 
     // Hardware decode acceleration (must be before -i)
@@ -230,50 +308,36 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         .is_some_and(|path| !path.trim().is_empty());
 
     if is_copy_mode(config) {
+        validate_stream_copy_compatibility(config, probe)?;
+
         if !is_audio_only {
             args.push("-map".to_string());
             args.push("0:v?".to_string());
         }
 
-        if !config.selected_audio_tracks.is_empty() {
-            for track_index in &config.selected_audio_tracks {
-                args.push("-map".to_string());
-                args.push(format!("0:{track_index}"));
-            }
-        } else if container_supports_audio(&config.container) {
-            args.push("-map".to_string());
-            args.push("0:a?".to_string());
+        if container_supports_audio(&config.container) {
+            let audio_tracks = collect_selected_audio_tracks(config, probe)?;
+            add_track_maps(&mut args, &audio_tracks, |track| track.index);
         }
 
-        if !config.selected_subtitle_tracks.is_empty() {
-            for track_index in &config.selected_subtitle_tracks {
-                args.push("-map".to_string());
-                args.push(format!("0:{track_index}"));
-            }
-        } else if container_supports_subtitles(&config.container) {
-            args.push("-map".to_string());
-            args.push("0:s?".to_string());
+        if container_supports_subtitles(&config.container) {
+            let subtitle_tracks = collect_selected_subtitle_tracks(config, probe)?;
+            add_track_maps(&mut args, &subtitle_tracks, |track| track.index);
         }
 
         args.push("-c".to_string());
         args.push("copy".to_string());
+        args.push("-dn".to_string());
         args.push("-y".to_string());
         args.push(output.to_string());
-        return args;
+        return Ok(args);
     }
 
     if is_audio_only {
         args.push("-vn".to_string());
 
-        if config.selected_audio_tracks.is_empty() {
-            args.push("-map".to_string());
-            args.push("0:a?".to_string());
-        } else {
-            for track_index in &config.selected_audio_tracks {
-                args.push("-map".to_string());
-                args.push(format!("0:{track_index}"));
-            }
-        }
+        let audio_tracks = collect_selected_audio_tracks(config, probe)?;
+        add_track_maps(&mut args, &audio_tracks, |track| track.index);
 
         add_audio_codec_args(&mut args, config);
     } else if is_video_only && is_gif_output {
@@ -345,28 +409,17 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
             "0:v:0".to_string()
         });
 
-        if config.selected_audio_tracks.is_empty() {
-            args.push("-map".to_string());
-            args.push("0:a?".to_string());
-        } else {
-            for track_index in &config.selected_audio_tracks {
-                args.push("-map".to_string());
-                args.push(format!("0:{track_index}"));
-            }
-        }
+        let audio_tracks = collect_selected_audio_tracks(config, probe)?;
+        add_track_maps(&mut args, &audio_tracks, |track| track.index);
 
         add_audio_codec_args(&mut args, config);
 
-        if !config.selected_subtitle_tracks.is_empty() {
-            for track_index in &config.selected_subtitle_tracks {
-                args.push("-map".to_string());
-                args.push(format!("0:{track_index}"));
+        if !config.selected_subtitle_tracks.is_empty() || !has_burn_subtitles {
+            let subtitle_tracks = collect_reencode_subtitle_tracks(config, probe)?;
+            if !subtitle_tracks.is_empty() {
+                add_track_maps(&mut args, &subtitle_tracks, |track| track.index);
+                add_subtitle_codec_args(&mut args, config);
             }
-            add_subtitle_codec_args(&mut args, config);
-        } else if !has_burn_subtitles {
-            args.push("-map".to_string());
-            args.push("0:s?".to_string());
-            add_subtitle_codec_args(&mut args, config);
         }
     }
 
@@ -378,10 +431,11 @@ pub fn build_ffmpeg_args(input: &str, output: &str, config: &ConversionConfig) -
         }
     }
 
+    args.push("-dn".to_string());
     args.push("-y".to_string());
     args.push(output.to_string());
 
-    args
+    Ok(args)
 }
 
 fn normalize_gif_dither(dither: &str) -> &'static str {
@@ -977,11 +1031,26 @@ mod tests {
         }
     }
 
+    fn sample_probe() -> ProbeMetadata {
+        ProbeMetadata {
+            media_kind: "video".to_string(),
+            video_codec: Some("h264".to_string()),
+            audio_tracks: vec![AudioTrack {
+                index: 1,
+                codec: "aac".to_string(),
+                channels: "2".to_string(),
+                ..AudioTrack::default()
+            }],
+            ..ProbeMetadata::default()
+        }
+    }
+
     #[test]
     fn build_ffmpeg_args_adds_even_dimensions_guard_for_default_video_reencode() {
         let config = sample_config("mp4", "libx264");
 
-        let args = build_ffmpeg_args("input.mov", "output.mp4", &config);
+        let args = build_ffmpeg_args("input.mov", "output.mp4", &config, &sample_probe())
+            .expect("arguments should build");
 
         let vf_index = args.iter().position(|arg| arg == "-vf").unwrap();
         assert_eq!(args[vf_index + 1], EVEN_DIMENSIONS_FILTER);
@@ -991,7 +1060,8 @@ mod tests {
     fn build_ffmpeg_args_does_not_add_even_dimensions_guard_for_image_output() {
         let config = sample_config("png", "png");
 
-        let args = build_ffmpeg_args("input.mov", "output.png", &config);
+        let args = build_ffmpeg_args("input.mov", "output.png", &config, &sample_probe())
+            .expect("arguments should build");
 
         assert!(!args.iter().any(|arg| arg == EVEN_DIMENSIONS_FILTER));
     }
@@ -1030,7 +1100,8 @@ mod tests {
         config.image_png_compression = 3;
         config.image_png_prediction = "mixed".to_string();
 
-        let args = build_ffmpeg_args("input.mov", "output.png", &config);
+        let args = build_ffmpeg_args("input.mov", "output.png", &config, &sample_probe())
+            .expect("arguments should build");
 
         assert!(args_contains_pair(&args, "-compression_level", "3"));
         assert!(args_contains_pair(&args, "-pred", "mixed"));
@@ -1042,7 +1113,8 @@ mod tests {
         config.image_jpeg_quality = 100;
         config.image_jpeg_huffman = "default".to_string();
 
-        let args = build_ffmpeg_args("input.mov", "output.jpg", &config);
+        let args = build_ffmpeg_args("input.mov", "output.jpg", &config, &sample_probe())
+            .expect("arguments should build");
 
         assert!(args_contains_pair(&args, "-q:v", "2"));
         assert!(args_contains_pair(&args, "-huffman", "default"));
@@ -1056,7 +1128,8 @@ mod tests {
         config.image_webp_compression = 6;
         config.image_webp_preset = "photo".to_string();
 
-        let args = build_ffmpeg_args("input.mov", "output.webp", &config);
+        let args = build_ffmpeg_args("input.mov", "output.webp", &config, &sample_probe())
+            .expect("arguments should build");
 
         assert!(args_contains_pair(&args, "-lossless", "1"));
         assert!(args_contains_pair(&args, "-quality", "88"));
@@ -1069,9 +1142,103 @@ mod tests {
         let mut config = sample_config("tiff", "tiff");
         config.image_tiff_compression = "deflate".to_string();
 
-        let args = build_ffmpeg_args("input.mov", "output.tiff", &config);
+        let args = build_ffmpeg_args("input.mov", "output.tiff", &config, &sample_probe())
+            .expect("arguments should build");
 
         assert!(args_contains_pair(&args, "-compression_algo", "deflate"));
+    }
+
+    #[test]
+    fn build_ffmpeg_args_maps_only_audio_tracks_returned_by_probe() {
+        let config = sample_config("mp4", "libx264");
+        let probe = sample_probe();
+
+        let args = build_ffmpeg_args("spatial.mov", "output.mp4", &config, &probe)
+            .expect("recognized AAC track should be mapped");
+
+        assert!(args_contains_pair(&args, "-map", "0:1"));
+        assert!(!args.iter().any(|arg| arg == "0:a?"));
+        assert!(!args.iter().any(|arg| arg == "0:2"));
+        assert!(args.iter().any(|arg| arg == "-dn"));
+    }
+
+    #[test]
+    fn build_ffmpeg_args_skips_bitmap_subtitles_for_mp4_by_default() {
+        let config = sample_config("mp4", "libx264");
+        let mut probe = sample_probe();
+        probe.subtitle_tracks = vec![
+            SubtitleTrack {
+                index: 2,
+                codec: "hdmv_pgs_subtitle".to_string(),
+                ..SubtitleTrack::default()
+            },
+            SubtitleTrack {
+                index: 3,
+                codec: "subrip".to_string(),
+                ..SubtitleTrack::default()
+            },
+        ];
+
+        let args = build_ffmpeg_args("subtitles.mkv", "output.mp4", &config, &probe)
+            .expect("compatible text subtitle should be mapped");
+
+        assert!(!args.iter().any(|arg| arg == "0:s?"));
+        assert!(!args.iter().any(|arg| arg == "0:2"));
+        assert!(args_contains_pair(&args, "-map", "0:3"));
+        assert!(args_contains_pair(&args, "-c:s", "mov_text"));
+    }
+
+    #[test]
+    fn build_ffmpeg_args_omits_subtitle_codec_when_mp4_source_has_only_pgs() {
+        let config = sample_config("mp4", "libx264");
+        let mut probe = sample_probe();
+        probe.subtitle_tracks = vec![SubtitleTrack {
+            index: 2,
+            codec: "hdmv_pgs_subtitle".to_string(),
+            ..SubtitleTrack::default()
+        }];
+
+        let args = build_ffmpeg_args("pgs.mkv", "output.mp4", &config, &probe)
+            .expect("default PGS subtitle should be skipped");
+
+        assert!(!args.iter().any(|arg| arg == "0:2"));
+        assert!(!args.iter().any(|arg| arg == "-c:s"));
+    }
+
+    #[test]
+    fn build_ffmpeg_args_rejects_explicit_pgs_selection_for_mp4() {
+        let mut config = sample_config("mp4", "libx264");
+        config.selected_subtitle_tracks = vec![2];
+        let mut probe = sample_probe();
+        probe.subtitle_tracks = vec![SubtitleTrack {
+            index: 2,
+            codec: "hdmv_pgs_subtitle".to_string(),
+            ..SubtitleTrack::default()
+        }];
+
+        let error = build_ffmpeg_args("pgs.mkv", "output.mp4", &config, &probe)
+            .expect_err("explicit PGS selection should fail before FFmpeg starts");
+
+        assert!(error.to_string().contains("hdmv_pgs_subtitle"));
+        assert!(error.to_string().contains("track #2"));
+        assert!(error.to_string().contains("mp4"));
+    }
+
+    #[test]
+    fn build_ffmpeg_args_keeps_pgs_subtitles_for_mkv() {
+        let config = sample_config("mkv", "libx264");
+        let mut probe = sample_probe();
+        probe.subtitle_tracks = vec![SubtitleTrack {
+            index: 2,
+            codec: "hdmv_pgs_subtitle".to_string(),
+            ..SubtitleTrack::default()
+        }];
+
+        let args = build_ffmpeg_args("pgs.mkv", "output.mkv", &config, &probe)
+            .expect("Matroska should preserve PGS subtitles");
+
+        assert!(args_contains_pair(&args, "-map", "0:2"));
+        assert!(args_contains_pair(&args, "-c:s", "copy"));
     }
 
     #[test]

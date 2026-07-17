@@ -82,16 +82,16 @@ fn metadata_from_ffprobe(file_path: &str, probe_data: FfprobeOutput) -> ProbeMet
         .iter()
         .filter(|s| s.codec_type == "audio")
     {
+        let Some(codec) = recognized_codec_name(stream.codec_name.as_deref()) else {
+            continue;
+        };
         let label = stream.tags.as_ref().and_then(|t| t.title.clone());
         let language = stream.tags.as_ref().and_then(|t| t.language.clone());
         let track_bitrate = parse_probe_bitrate(stream.bit_rate.as_deref());
 
         metadata.audio_tracks.push(AudioTrack {
             index: stream.index,
-            codec: stream
-                .codec_name
-                .clone()
-                .unwrap_or_else(|| "unknown".to_string()),
+            codec: codec.to_string(),
             channels: stream
                 .channels
                 .map_or_else(|| "?".to_string(), |c| c.to_string()),
@@ -107,15 +107,15 @@ fn metadata_from_ffprobe(file_path: &str, probe_data: FfprobeOutput) -> ProbeMet
         .iter()
         .filter(|s| s.codec_type == "subtitle")
     {
+        let Some(codec) = recognized_codec_name(stream.codec_name.as_deref()) else {
+            continue;
+        };
         let label = stream.tags.as_ref().and_then(|t| t.title.clone());
         let language = stream.tags.as_ref().and_then(|t| t.language.clone());
 
         metadata.subtitle_tracks.push(SubtitleTrack {
             index: stream.index,
-            codec: stream
-                .codec_name
-                .clone()
-                .unwrap_or_else(|| "unknown".to_string()),
+            codec: codec.to_string(),
             language,
             label,
         });
@@ -161,6 +161,14 @@ fn metadata_from_ffprobe(file_path: &str, probe_data: FfprobeOutput) -> ProbeMet
     }
 
     metadata
+}
+
+fn recognized_codec_name(codec_name: Option<&str>) -> Option<&str> {
+    codec_name.map(str::trim).filter(|codec| {
+        !codec.is_empty()
+            && !codec.eq_ignore_ascii_case("none")
+            && !codec.eq_ignore_ascii_case("unknown")
+    })
 }
 
 fn is_known_image_extension(file_path: &str) -> bool {
@@ -296,6 +304,46 @@ mod tests {
                 .and_then(|tags| tags.title.as_deref()),
             Some("Demo")
         );
+    }
+
+    #[test]
+    fn parse_ffprobe_stdout_omits_streams_without_a_recognized_codec() {
+        let metadata = parse_ffprobe_stdout(
+            "/tmp/iphone-spatial.mov",
+            r#"{
+                "streams": [
+                    {
+                        "index": 0,
+                        "codec_type": "video",
+                        "codec_name": "hevc"
+                    },
+                    {
+                        "index": 1,
+                        "codec_type": "audio",
+                        "codec_name": "aac",
+                        "channels": 2
+                    },
+                    {
+                        "index": 2,
+                        "codec_type": "audio",
+                        "codec_tag_string": "apac",
+                        "channels": 4
+                    },
+                    {
+                        "index": 3,
+                        "codec_type": "subtitle",
+                        "codec_name": "none"
+                    }
+                ],
+                "format": {}
+            }"#,
+        )
+        .expect("probe metadata should parse");
+
+        assert_eq!(metadata.audio_tracks.len(), 1);
+        assert_eq!(metadata.audio_tracks[0].index, 1);
+        assert_eq!(metadata.audio_codec.as_deref(), Some("aac"));
+        assert!(metadata.subtitle_tracks.is_empty());
     }
 
     #[test]
