@@ -235,7 +235,7 @@ impl FrameRoot {
         .detach();
     }
 
-    pub(super) fn toggle_auto_update_check(&mut self, cx: &mut Context<Self>) -> bool {
+    pub(super) fn toggle_auto_update_check(&mut self, cx: &Context<Self>) -> bool {
         self.auto_update_check = !self.auto_update_check;
         if let Err(error) = self.persist_app_settings() {
             self.update_ui.status = UpdateStatus::Error(error.to_string());
@@ -245,7 +245,7 @@ impl FrameRoot {
         true
     }
 
-    pub(super) fn skip_available_update(&mut self, cx: &mut Context<Self>) -> bool {
+    pub(super) fn skip_available_update(&mut self, cx: &Context<Self>) -> bool {
         let UpdateStatus::Available(info) = &self.update_ui.status else {
             return false;
         };
@@ -269,7 +269,7 @@ impl FrameRoot {
         }
     }
 
-    fn schedule_settings_update_status_dismiss(&mut self, cx: &mut Context<Self>) {
+    fn schedule_settings_update_status_dismiss(&mut self, cx: &Context<Self>) {
         self.update_ui.status_dismiss_epoch = self.update_ui.status_dismiss_epoch.wrapping_add(1);
         let dismiss_epoch = self.update_ui.status_dismiss_epoch;
 
