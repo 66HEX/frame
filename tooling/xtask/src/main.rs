@@ -1275,6 +1275,15 @@ fn ci() -> Result<()> {
         &[
             "fmt",
             "--manifest-path",
+            "frame-updater/Cargo.toml",
+            "--check",
+        ],
+    )?;
+    run_command(
+        "cargo",
+        &[
+            "fmt",
+            "--manifest-path",
             "tooling/xtask/Cargo.toml",
             "--check",
         ],
@@ -1286,6 +1295,10 @@ fn ci() -> Result<()> {
     run_command(
         "cargo",
         &["test", "--manifest-path", "frame-app/Cargo.toml"],
+    )?;
+    run_command(
+        "cargo",
+        &["test", "--manifest-path", "frame-updater/Cargo.toml"],
     )?;
     run_command(
         "cargo",
@@ -1310,6 +1323,19 @@ fn ci() -> Result<()> {
             "clippy",
             "--manifest-path",
             "frame-app/Cargo.toml",
+            "--all-targets",
+            "--locked",
+            "--",
+            "-D",
+            "warnings",
+        ],
+    )?;
+    run_command(
+        "cargo",
+        &[
+            "clippy",
+            "--manifest-path",
+            "frame-updater/Cargo.toml",
             "--all-targets",
             "--locked",
             "--",
