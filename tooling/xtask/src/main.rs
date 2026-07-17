@@ -2202,6 +2202,10 @@ jobs:
     .replace("  __NIXPKGS_JOBS__\n", &nixpkgs_release_jobs(Some("publish_release")))
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "The generated GitHub Actions jobs are kept as one raw template for easier diffing against YAML output."
+)]
 fn nixpkgs_release_jobs(prepare_needs: Option<&str>) -> String {
     let prepare_needs = prepare_needs
         .map(|needs| format!("    needs: {needs}\n"))
@@ -2527,7 +2531,7 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>) -> String {
 }
 
 fn publish_nixpkgs_workflow() -> String {
-    let mut workflow = r#"# Generated from xtask::workflows::publish_nixpkgs
+    let mut workflow = r"# Generated from xtask::workflows::publish_nixpkgs
 # Rebuild with `cargo xtask workflows`.
 name: publish nixpkgs
 env:
@@ -2542,7 +2546,7 @@ on:
 permissions:
   contents: read
 jobs:
-"#
+"
     .to_string();
     workflow.push_str(&nixpkgs_release_jobs(None));
     workflow

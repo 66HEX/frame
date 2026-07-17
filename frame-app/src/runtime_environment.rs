@@ -5,7 +5,7 @@ use std::path::Path;
 const FLATPAK_INFO_PATH: &str = "/.flatpak-info";
 
 #[must_use]
-pub(crate) fn is_flatpak() -> bool {
+pub fn is_flatpak() -> bool {
     is_flatpak_from(
         std::env::var_os("FLATPAK_ID").is_some(),
         Path::new(FLATPAK_INFO_PATH).is_file(),

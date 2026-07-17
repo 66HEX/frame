@@ -964,8 +964,10 @@ fn update_action_row(
                 })),
             ),
         ),
-        UpdateStatus::UpToDate | UpdateStatus::Disabled(_) | UpdateStatus::Error(_) => None,
-        UpdateStatus::Idle
+        UpdateStatus::UpToDate
+        | UpdateStatus::Disabled(_)
+        | UpdateStatus::Error(_)
+        | UpdateStatus::Idle
         | UpdateStatus::Checking
         | UpdateStatus::Downloading { .. }
         | UpdateStatus::Installing => None,
