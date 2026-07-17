@@ -18,7 +18,7 @@ use frame_core::{
 
 use crate::runtime_binaries::{ffmpeg_executable, ffprobe_executable};
 
-use super::controller::ConversionProcessController;
+use super::{controller::ConversionProcessController, output_paths::disambiguate_output_paths};
 
 /// Runs a single conversion task with a default process controller.
 ///
@@ -40,10 +40,11 @@ pub fn run_conversion_task(
 /// Returns an error when the controller state cannot be read or the worker
 /// channel disconnects before all tasks complete.
 pub fn run_conversion_batch_with_control(
-    tasks: Vec<ConversionTask>,
+    mut tasks: Vec<ConversionTask>,
     controller: &ConversionProcessController,
     mut emit: impl FnMut(ConversionEvent),
 ) -> Result<(), ConversionError> {
+    disambiguate_output_paths(&mut tasks);
     let mut pending = VecDeque::from(tasks);
     let mut running_count = 0_usize;
     let (event_tx, event_rx) = mpsc::channel::<ConversionEvent>();
@@ -97,6 +98,15 @@ pub fn run_conversion_batch_with_control(
 /// Returns an error when task validation, probing, process spawning, process
 /// registration, log reading, cancellation handling, or `FFmpeg` execution fails.
 pub fn run_conversion_task_with_control(
+    mut task: ConversionTask,
+    controller: &ConversionProcessController,
+    emit: &mut impl FnMut(ConversionEvent),
+) -> Result<(), ConversionError> {
+    disambiguate_output_paths(std::slice::from_mut(&mut task));
+    run_prepared_conversion_task_with_control(task, controller, emit)
+}
+
+fn run_prepared_conversion_task_with_control(
     task: ConversionTask,
     controller: &ConversionProcessController,
     emit: &mut impl FnMut(ConversionEvent),
@@ -174,7 +184,7 @@ fn spawn_batch_worker(
 ) {
     let task_id = task.id.clone();
     thread::spawn(move || {
-        let result = run_conversion_task_with_control(task, &controller, &mut |event| {
+        let result = run_prepared_conversion_task_with_control(task, &controller, &mut |event| {
             let _ = event_tx.send(event);
         });
         let _ = done_tx.send((task_id, result));

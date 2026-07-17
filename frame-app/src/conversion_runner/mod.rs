@@ -2,6 +2,7 @@
 
 mod config;
 mod controller;
+mod output_paths;
 mod process;
 mod runner;
 #[cfg(test)]
@@ -9,6 +10,7 @@ mod tests;
 
 pub use config::*;
 pub use controller::*;
+pub use output_paths::*;
 pub use runner::*;
 
 #[cfg(test)]

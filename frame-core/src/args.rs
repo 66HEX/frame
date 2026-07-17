@@ -328,7 +328,7 @@ pub fn build_ffmpeg_args(
         args.push("-c".to_string());
         args.push("copy".to_string());
         args.push("-dn".to_string());
-        args.push("-y".to_string());
+        args.push("-n".to_string());
         args.push(output.to_string());
         return Ok(args);
     }
@@ -432,7 +432,7 @@ pub fn build_ffmpeg_args(
     }
 
     args.push("-dn".to_string());
-    args.push("-y".to_string());
+    args.push("-n".to_string());
     args.push(output.to_string());
 
     Ok(args)
@@ -1092,6 +1092,39 @@ mod tests {
         let output = build_output_path("/exports", "mp4", Some("render"));
 
         assert_eq!(output, "/exports/render.mp4");
+    }
+
+    #[test]
+    fn build_ffmpeg_args_disables_output_overwrite_for_reencode() {
+        let config = sample_config("mp4", "libx264");
+
+        let args = build_ffmpeg_args("input.mov", "output.mp4", &config, &sample_probe())
+            .expect("re-encode arguments should build");
+
+        assert_eq!(
+            (
+                args.iter().any(|arg| arg == "-n"),
+                args.iter().any(|arg| arg == "-y")
+            ),
+            (true, false)
+        );
+    }
+
+    #[test]
+    fn build_ffmpeg_args_disables_output_overwrite_for_stream_copy() {
+        let mut config = sample_config("mp4", "libx264");
+        config.processing_mode = "copy".to_string();
+
+        let args = build_ffmpeg_args("input.mov", "output.mp4", &config, &sample_probe())
+            .expect("stream-copy arguments should build");
+
+        assert_eq!(
+            (
+                args.iter().any(|arg| arg == "-n"),
+                args.iter().any(|arg| arg == "-y")
+            ),
+            (true, false)
+        );
     }
 
     #[test]

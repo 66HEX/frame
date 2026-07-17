@@ -13,11 +13,32 @@ impl FrameRoot {
         };
         self.normalize_selected_actionable_conversion_configs();
 
-        self.file_queue
+        let mut tasks = self
+            .file_queue
             .queue_selected_pending_conversions()
             .iter()
             .map(|file| conversion_task_from_file(file, &output_directory))
-            .collect()
+            .collect::<Vec<_>>();
+        disambiguate_output_paths(&mut tasks);
+
+        for task in &tasks {
+            let Some(output_name) = task.output_name.as_ref() else {
+                continue;
+            };
+            let Some(file) = self
+                .file_queue
+                .files_mut()
+                .iter_mut()
+                .find(|file| file.id == task.id)
+            else {
+                continue;
+            };
+            if file.output_name != *output_name {
+                file.output_name.clone_from(output_name);
+            }
+        }
+
+        tasks
     }
     pub(super) fn start_selected_conversions(&mut self, cx: &mut Context<Self>) {
         if self.is_processing {

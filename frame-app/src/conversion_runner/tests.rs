@@ -242,6 +242,84 @@ fn conversion_task_from_file_sanitizes_output_name() {
 }
 
 #[test]
+fn disambiguate_output_paths_suffixes_same_stem_files_from_different_directories() {
+    let sandbox = ConversionRunnerSandbox::new("duplicate-output-names");
+    let output_directory = sandbox.root.to_string_lossy();
+    let first = FileItem::from_path("mov", "/A/clip.mov", 1);
+    let second = FileItem::from_path("mkv", "/B/clip.mkv", 1);
+    let mut tasks = vec![
+        conversion_task_from_file(&first, &output_directory),
+        conversion_task_from_file(&second, &output_directory),
+    ];
+
+    disambiguate_output_paths(&mut tasks);
+
+    assert_eq!(
+        (
+            tasks[0].output_name.as_deref(),
+            tasks[1].output_name.as_deref()
+        ),
+        (Some("clip_converted"), Some("clip_converted_2"))
+    );
+}
+
+#[test]
+fn disambiguate_output_paths_preserves_single_non_conflicting_name() {
+    let sandbox = ConversionRunnerSandbox::new("single-output-name");
+    let file = FileItem::from_path("mov", "/A/clip.mov", 1);
+    let mut tasks = vec![conversion_task_from_file(
+        &file,
+        &sandbox.root.to_string_lossy(),
+    )];
+
+    disambiguate_output_paths(&mut tasks);
+
+    assert_eq!(tasks[0].output_name.as_deref(), Some("clip_converted"));
+}
+
+#[test]
+fn disambiguate_output_paths_skips_existing_files() {
+    let sandbox = ConversionRunnerSandbox::new("existing-output-name");
+    fs::write(sandbox.path("clip_converted.mp4"), b"keep")
+        .expect("existing output fixture should be written");
+    let file = FileItem::from_path("mov", "/A/clip.mov", 1);
+    let mut tasks = vec![conversion_task_from_file(
+        &file,
+        &sandbox.root.to_string_lossy(),
+    )];
+
+    disambiguate_output_paths(&mut tasks);
+
+    assert_eq!(tasks[0].output_name.as_deref(), Some("clip_converted_2"));
+}
+
+#[test]
+fn disambiguate_output_paths_uses_next_free_suffix_deterministically() {
+    let sandbox = ConversionRunnerSandbox::new("occupied-output-suffixes");
+    fs::write(sandbox.path("clip_converted.mp4"), b"keep")
+        .expect("base output fixture should be written");
+    fs::write(sandbox.path("clip_converted_2.mp4"), b"keep")
+        .expect("suffixed output fixture should be written");
+    let first = FileItem::from_path("mov", "/A/clip.mov", 1);
+    let second = FileItem::from_path("mkv", "/B/clip.mkv", 1);
+    let output_directory = sandbox.root.to_string_lossy();
+    let mut tasks = vec![
+        conversion_task_from_file(&first, &output_directory),
+        conversion_task_from_file(&second, &output_directory),
+    ];
+
+    disambiguate_output_paths(&mut tasks);
+
+    assert_eq!(
+        (
+            tasks[0].output_name.as_deref(),
+            tasks[1].output_name.as_deref()
+        ),
+        (Some("clip_converted_3"), Some("clip_converted_4"))
+    );
+}
+
+#[test]
 fn ffmpeg_progress_uses_duration_line_before_time_line() {
     let mut duration = None;
 
@@ -485,6 +563,108 @@ fn run_conversion_task_should_emit_completed_for_real_image_encoding_job() {
             .any(|event| matches!(event, ConversionEvent::Completed(payload) if payload.output_path == output.to_string_lossy())),
         "runner should emit a Completed event for {}",
         output.display()
+    );
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn run_conversion_batch_should_create_distinct_outputs_for_same_stem_sources() {
+    let sandbox = ConversionRunnerSandbox::new("duplicate-real-outputs");
+    let output_directory = sandbox.path("exports");
+    let first_input = sandbox.path("A/clip.mov");
+    let second_input = sandbox.path("B/clip.mkv");
+    fs::create_dir_all(
+        first_input
+            .parent()
+            .expect("first source should have a parent directory"),
+    )
+    .expect("first source directory should be created");
+    fs::create_dir_all(
+        second_input
+            .parent()
+            .expect("second source should have a parent directory"),
+    )
+    .expect("second source directory should be created");
+    fs::create_dir_all(&output_directory).expect("output directory should be created");
+    generate_runner_source(&first_input);
+    generate_runner_source(&second_input);
+    let first = FileItem::from_os_path("mov", &first_input);
+    let second = FileItem::from_os_path("mkv", &second_input);
+    let output_directory_string = output_directory.to_string_lossy();
+    let tasks = vec![
+        conversion_task_from_file(&first, &output_directory_string),
+        conversion_task_from_file(&second, &output_directory_string),
+    ];
+    let controller = ConversionProcessController::default();
+    controller
+        .update_max_concurrency(2)
+        .expect("concurrency should be updated");
+    let mut events = Vec::new();
+
+    run_conversion_batch_with_control(tasks, &controller, |event| events.push(event))
+        .expect("duplicate-name batch should finish");
+
+    let first_output = output_directory.join("clip_converted.mp4");
+    let second_output = output_directory.join("clip_converted_2.mp4");
+    let mut completed_paths = events
+        .iter()
+        .filter_map(|event| match event {
+            ConversionEvent::Completed(payload) => Some(payload.output_path.clone()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    completed_paths.sort();
+    let mut expected_paths = vec![
+        first_output.to_string_lossy().into_owned(),
+        second_output.to_string_lossy().into_owned(),
+    ];
+    expected_paths.sort();
+
+    assert_eq!(
+        (
+            first_output.is_file(),
+            second_output.is_file(),
+            completed_paths
+        ),
+        (true, true, expected_paths)
+    );
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn run_conversion_task_should_preserve_existing_output_and_use_suffix() {
+    let sandbox = ConversionRunnerSandbox::new("preserve-existing-output");
+    let input = sandbox.path("source.mov");
+    let output_directory = sandbox.path("exports");
+    fs::create_dir_all(&output_directory).expect("output directory should be created");
+    generate_runner_source(&input);
+    let existing_output = output_directory.join("protected.mp4");
+    let suffixed_output = output_directory.join("protected_2.mp4");
+    fs::write(&existing_output, b"keep this data")
+        .expect("protected output fixture should be written");
+    let mut file = FileItem::from_os_path("protected", &input);
+    file.output_name = "protected".to_string();
+    let task = conversion_task_from_file(&file, &output_directory.to_string_lossy());
+    let mut events = Vec::new();
+
+    run_conversion_task(task, |event| events.push(event))
+        .expect("conversion beside an existing output should succeed");
+
+    let completed_path = events.iter().find_map(|event| match event {
+        ConversionEvent::Completed(payload) => Some(payload.output_path.as_str()),
+        _ => None,
+    });
+    assert_eq!(
+        (
+            fs::read(&existing_output).expect("protected output should remain readable"),
+            suffixed_output.is_file(),
+            completed_path
+        ),
+        (
+            b"keep this data".to_vec(),
+            true,
+            Some(suffixed_output.to_string_lossy().as_ref())
+        )
     );
 }
 

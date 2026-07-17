@@ -73,7 +73,8 @@ use crate::{
     capabilities::{detect_available_encoders, detect_available_filters},
     conversion_events::{ActiveLogFile, ConversionEventState, LogLine, all_conversions_settled},
     conversion_runner::{
-        ConversionProcessController, conversion_task_from_file, run_conversion_batch_with_control,
+        ConversionProcessController, conversion_task_from_file, disambiguate_output_paths,
+        run_conversion_batch_with_control,
     },
     file_filters::{
         AUDIO_FILE_EXTENSIONS, IMAGE_FILE_EXTENSIONS, discover_supported_source_paths,

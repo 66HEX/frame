@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Collision-Safe Output Paths:** Assigned deterministic suffixes to duplicate or existing output paths before conversion and disabled FFmpeg overwrites, preventing same-stem batch jobs or pre-existing targets from replacing prior data. Resolves [#81](https://github.com/66HEX/frame/issues/81).
 - **Display-Matrix Previews:** Applied source display-matrix orientation when sizing preview frames so portrait iPhone videos are no longer stretched to their encoded landscape dimensions.
 - **Probe-Aware Stream Mapping:** Replaced wildcard audio and subtitle mapping with explicit `ffprobe` stream indices, ignored undecodable APAC and data tracks, and skipped bitmap subtitles when the target requires text subtitles. Explicit incompatible subtitle selections now fail during preflight. Resolves [#47](https://github.com/66HEX/frame/issues/47) and [#68](https://github.com/66HEX/frame/issues/68).
 - **Conversion Notification Grammar:** Pluralized `file` and `error` independently so conversion-finished notifications use correct singular, plural, and zero-count wording. Resolves [#77](https://github.com/66HEX/frame/issues/77).

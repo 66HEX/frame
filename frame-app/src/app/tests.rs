@@ -228,6 +228,37 @@ mod frame_root_conversion {
     }
 
     #[test]
+    fn queue_selected_conversion_tasks_assigns_and_exposes_unique_output_names() {
+        let mut root = FrameRoot::new();
+        root.default_output_directory = Some(test_settings_path().with_file_name("exports"));
+        root.file_queue
+            .add_file(FileItem::from_path("mov", "/A/clip.mov", 1));
+        root.file_queue
+            .add_file(FileItem::from_path("mkv", "/B/clip.mkv", 1));
+
+        let tasks = root.queue_selected_conversion_tasks();
+
+        assert_eq!(
+            (
+                tasks[0].output_name.as_deref(),
+                tasks[1].output_name.as_deref(),
+                root.file_queue
+                    .file_by_id("mov")
+                    .map(|file| file.output_name.as_str()),
+                root.file_queue
+                    .file_by_id("mkv")
+                    .map(|file| file.output_name.as_str())
+            ),
+            (
+                Some("clip_converted"),
+                Some("clip_converted_2"),
+                Some("clip_converted"),
+                Some("clip_converted_2")
+            )
+        );
+    }
+
+    #[test]
     fn queue_selected_conversion_tasks_normalizes_each_file_from_own_metadata() {
         let mut root = root_with_output_directory();
         root.file_queue
