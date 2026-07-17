@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Structured Issue Forms:** Added guided bug-report and feature-request forms covering environment, source media, reproduction steps, logs, workflow context, alternatives, and duplicate and Code of Conduct confirmations while keeping blank issues available. Resolves [#79](https://github.com/66HEX/frame/issues/79).
+
+### Changed
+
+- **Contributor CI Coverage:** Extended `cargo xtask ci` to format, test, and lint `frame-updater` explicitly, including its unit tests and all-target Clippy checks. Resolves [#72](https://github.com/66HEX/frame/issues/72).
+- **macOS Contributor Setup:** Documented the full-Xcode Metal Toolchain requirement, availability check, and component download command for GPUI shader builds. Resolves [#75](https://github.com/66HEX/frame/issues/75).
+
+### Fixed
+
+- **Conversion Notification Grammar:** Pluralized `file` and `error` independently so conversion-finished notifications use correct singular, plural, and zero-count wording. Resolves [#77](https://github.com/66HEX/frame/issues/77).
+- **Rust 1.95 Contributor Checks:** Restored `cargo xtask ci` on the pinned Rust 1.95 toolchain by resolving new Clippy diagnostics without changing application behavior or generated workflow output. Resolves [#70](https://github.com/66HEX/frame/issues/70).
+
 ## [0.31.1] - 2026-07-14
 
 ### Changed
