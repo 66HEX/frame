@@ -60,9 +60,12 @@ impl ConversionNotificationSummary {
 
     #[must_use]
     pub fn body(self) -> String {
+        let file_suffix = if self.completed_count == 1 { "" } else { "s" };
+        let error_suffix = if self.error_count == 1 { "" } else { "s" };
+
         format!(
-            "Processed {} files with {} errors.",
-            self.completed_count, self.error_count
+            "Processed {} file{file_suffix} with {} error{error_suffix}.",
+            self.completed_count, self.error_count,
         )
     }
 }
@@ -368,14 +371,25 @@ mod tests {
     }
 
     #[test]
-    fn conversion_notification_summary_uses_legacy_copy() {
-        let summary = ConversionNotificationSummary {
-            completed_count: 2,
-            error_count: 1,
-        };
+    fn conversion_notification_summary_pluralizes_file_and_error_counts() {
+        let cases = [
+            (2, 1, "Processed 2 files with 1 error."),
+            (1, 2, "Processed 1 file with 2 errors."),
+            (1, 1, "Processed 1 file with 1 error."),
+            (2, 2, "Processed 2 files with 2 errors."),
+            (1, 0, "Processed 1 file with 0 errors."),
+            (0, 1, "Processed 0 files with 1 error."),
+        ];
 
-        assert_eq!(summary.title(), "Queue Finished");
-        assert_eq!(summary.body(), "Processed 2 files with 1 errors.");
+        for (completed_count, error_count, expected) in cases {
+            let summary = ConversionNotificationSummary {
+                completed_count,
+                error_count,
+            };
+
+            assert_eq!(summary.title(), "Queue Finished");
+            assert_eq!(summary.body(), expected);
+        }
     }
 
     #[test]
