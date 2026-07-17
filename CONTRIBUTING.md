@@ -41,6 +41,22 @@ Install Xcode Command Line Tools:
 xcode-select --install
 ```
 
+Frame's GPUI shader build also requires the Metal compiler from a full Xcode
+installation. Ensure Xcode is the active developer directory, then verify the
+compiler is available:
+
+```bash
+xcrun metal --version
+```
+
+If that command reports a missing Metal Toolchain, download the component and
+verify it again:
+
+```bash
+xcodebuild -downloadComponent MetalToolchain
+xcrun metal --version
+```
+
 No additional Homebrew packages are required for normal local development.
 `cargo xtask setup-ffmpeg` downloads the FFmpeg and FFprobe binaries used by the
 app during development.
