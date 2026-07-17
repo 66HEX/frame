@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use crate::error::ConversionError;
-use crate::types::{AudioTrack, FfprobeOutput, ProbeMetadata, SubtitleTrack};
+use crate::types::{AudioTrack, FfprobeOutput, FfprobeStream, ProbeMetadata, SubtitleTrack};
 use crate::utils::{parse_frame_rate_string, parse_probe_bitrate};
 
 #[must_use]
@@ -59,13 +59,15 @@ fn metadata_from_ffprobe(file_path: &str, probe_data: FfprobeOutput) -> ProbeMet
             .clone_from(&video_stream.color_primaries);
         metadata.profile.clone_from(&video_stream.profile);
 
-        if let (Some(w), Some(h)) = (video_stream.width, video_stream.height)
-            && w > 0
-            && h > 0
+        if let (Some(width), Some(height)) = (video_stream.width, video_stream.height)
+            && width > 0
+            && height > 0
         {
-            metadata.width = u32::try_from(w).ok();
-            metadata.height = u32::try_from(h).ok();
-            metadata.resolution = Some(format!("{w}x{h}"));
+            let (display_width, display_height) =
+                display_oriented_dimensions(width, height, video_stream);
+            metadata.width = u32::try_from(display_width).ok();
+            metadata.height = u32::try_from(display_height).ok();
+            metadata.resolution = Some(format!("{display_width}x{display_height}"));
         }
 
         if metadata.frame_rate.is_none() {
@@ -169,6 +171,33 @@ fn recognized_codec_name(codec_name: Option<&str>) -> Option<&str> {
             && !codec.eq_ignore_ascii_case("none")
             && !codec.eq_ignore_ascii_case("unknown")
     })
+}
+
+fn display_oriented_dimensions(
+    width: i32,
+    height: i32,
+    video_stream: &FfprobeStream,
+) -> (i32, i32) {
+    if video_stream
+        .side_data_list
+        .iter()
+        .filter_map(|side_data| side_data.rotation)
+        .any(is_side_display_rotation)
+    {
+        (height, width)
+    } else {
+        (width, height)
+    }
+}
+
+fn is_side_display_rotation(rotation: f64) -> bool {
+    const TOLERANCE_DEGREES: f64 = 0.5;
+
+    if !rotation.is_finite() {
+        return false;
+    }
+    let normalized = rotation.rem_euclid(360.0);
+    (normalized - 90.0).abs() < TOLERANCE_DEGREES || (normalized - 270.0).abs() < TOLERANCE_DEGREES
 }
 
 fn is_known_image_extension(file_path: &str) -> bool {
@@ -344,6 +373,41 @@ mod tests {
         assert_eq!(metadata.audio_tracks[0].index, 1);
         assert_eq!(metadata.audio_codec.as_deref(), Some("aac"));
         assert!(metadata.subtitle_tracks.is_empty());
+    }
+
+    #[test]
+    fn parse_ffprobe_stdout_uses_display_oriented_dimensions_for_side_rotation() {
+        let metadata = parse_ffprobe_stdout(
+            "/tmp/iphone-spatial.mov",
+            r#"{
+                "streams": [
+                    {
+                        "index": 0,
+                        "codec_type": "video",
+                        "codec_name": "hevc",
+                        "width": 3840,
+                        "height": 2160,
+                        "side_data_list": [
+                            {
+                                "side_data_type": "Display Matrix",
+                                "rotation": -90
+                            }
+                        ]
+                    }
+                ],
+                "format": {}
+            }"#,
+        )
+        .expect("rotated probe metadata should parse");
+
+        assert_eq!(
+            (
+                metadata.width,
+                metadata.height,
+                metadata.resolution.as_deref()
+            ),
+            (Some(2160), Some(3840), Some("2160x3840"))
+        );
     }
 
     #[test]

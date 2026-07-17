@@ -732,6 +732,21 @@ mod tests {
     }
 
     #[test]
+    fn build_ffmpeg_preview_args_preserves_display_oriented_portrait_dimensions() {
+        let mut options = default_options();
+        options.source_width = Some(2160);
+        options.source_height = Some(3840);
+
+        let plan = build_ffmpeg_preview_args("iphone.mov", &default_config(), &options)
+            .expect("display-oriented preview args");
+
+        assert_eq!(
+            (plan.width, plan.height, plan.frame_bytes),
+            (404, 720, 404 * 720 * 4)
+        );
+    }
+
+    #[test]
     fn build_ffmpeg_preview_args_uses_cropped_aspect_for_preview_dimensions() {
         let mut config = default_config();
         config.crop = Some(CropConfig {

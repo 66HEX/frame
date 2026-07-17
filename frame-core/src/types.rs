@@ -557,6 +557,13 @@ pub struct FfprobeStream {
     pub color_primaries: Option<String>,
     pub profile: Option<String>,
     pub sample_rate: Option<String>,
+    #[serde(default)]
+    pub side_data_list: Vec<FfprobeSideData>,
+}
+
+#[derive(Deserialize)]
+pub struct FfprobeSideData {
+    pub rotation: Option<f64>,
 }
 
 #[derive(Deserialize)]

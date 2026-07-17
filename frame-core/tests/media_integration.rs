@@ -767,6 +767,73 @@ fn preview_subtitle_burn_should_use_source_time_after_seek() -> TestResult {
     Ok(())
 }
 
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn display_matrix_rotation_should_produce_portrait_preview_frame() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("display_matrix_rotation")?;
+    let base = sandbox.path("base.mp4");
+    let rotated = sandbox.path("rotated.mov");
+
+    generate_h264_aac_source(&tools, &base, 0.25, 160, 90)?;
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-display_rotation:v:0",
+            "90",
+            "-i",
+            &path_arg(&base),
+            "-map",
+            "0:v:0",
+            "-c",
+            "copy",
+            "-y",
+            &path_arg(&rotated),
+        ]),
+    )?;
+
+    let metadata = probe_media(&tools, &rotated)?;
+    let plan = build_ffmpeg_preview_args(
+        &path_arg(&rotated),
+        &video_config("mov", "libx264", "aac"),
+        &PreviewFfmpegOptions {
+            start_seconds: 0.0,
+            end_seconds: Some(0.2),
+            source_width: metadata.width,
+            source_height: metadata.height,
+            max_width: 160,
+            max_height: 160,
+            fps: 12,
+            realtime: false,
+            precise_seek: true,
+            source_is_image: false,
+        },
+    )
+    .map_err(|error| error.to_string())?;
+    let mut preview_args = plan.args.clone();
+    let output_index = preview_args.len().saturating_sub(1);
+    preview_args.insert(output_index, "-frames:v".to_string());
+    preview_args.insert(output_index + 1, "1".to_string());
+    let frame = run_tool_output(&tools.ffmpeg, &preview_args)?;
+
+    assert_eq!(
+        (
+            metadata.width,
+            metadata.height,
+            plan.width,
+            plan.height,
+            frame.len()
+        ),
+        (Some(90), Some(160), 90, 160, plan.frame_bytes),
+        "preview args: {:?}",
+        plan.args
+    );
+    Ok(())
+}
+
 fn convert(
     tools: &Toolchain,
     input: &Path,
