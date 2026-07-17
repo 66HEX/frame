@@ -1,0 +1,65 @@
+name: Feature request
+description: Suggest an improvement to Frame or a new workflow it could support.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem first, then the outcome that would make the workflow better.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or limitation
+      description: What are you trying to do, and what makes it difficult today?
+      placeholder: I am trying to ... but ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed solution
+      description: Describe the behavior or outcome you would like Frame to provide.
+    validations:
+      required: true
+
+  - type: textarea
+    id: workflow-context
+    attributes:
+      label: Workflow and media context
+      description: Include relevant formats, codecs, platforms, batch sizes, or other workflow constraints.
+
+  - type: dropdown
+    id: platforms
+    attributes:
+      label: Relevant platforms
+      multiple: true
+      options:
+        - macOS
+        - Windows
+        - Linux
+        - All platforms
+        - Not sure
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Share any workarounds or different approaches you have tried.
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add sketches, screenshots, sample media links, or related issues if useful.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched the existing issues and did not find a duplicate request.
+          required: true
+        - label: I agree to follow this project's Code of Conduct.
+          required: true

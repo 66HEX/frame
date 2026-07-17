@@ -1,0 +1,100 @@
+name: Bug report
+description: Report reproducible Frame behavior that differs from what you expected.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please share the smallest reproducible case you can. Clear details make it easier to confirm what is happening.
+
+  - type: input
+    id: frame-version
+    attributes:
+      label: Frame version
+      description: Find this in Frame's About dialog or on the downloaded release.
+      placeholder: e.g. 0.31.1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: operating-system
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Windows
+        - Linux
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: operating-system-version
+    attributes:
+      label: Operating system version
+      placeholder: e.g. macOS 15.5, Windows 11 24H2, or Ubuntu 24.04
+    validations:
+      required: true
+
+  - type: textarea
+    id: source-media
+    attributes:
+      label: Source media details
+      description: For media-related bugs, include the container, codecs, resolution, duration, and file size. Otherwise, write N/A.
+      placeholder: Container, video/audio codecs, resolution, duration, and file size
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Start from opening Frame and include the settings needed to trigger the problem.
+      placeholder: |
+        1. Open Frame
+        2. Add ...
+        3. Choose ...
+        4. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected behavior
+      placeholder: What should have happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual behavior
+      placeholder: What happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: ffmpeg-logs
+    attributes:
+      label: FFmpeg logs
+      description: For conversion bugs, paste the relevant output from Frame's Logs view. Otherwise, write N/A.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add screenshots, screen recordings, sample media links, or any other useful context.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched the existing issues and did not find a duplicate.
+          required: true
+        - label: I agree to follow this project's Code of Conduct.
+          required: true
