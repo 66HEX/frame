@@ -24,10 +24,11 @@ use super::{
     TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_PLACEHOLDER_WIDTH, TITLEBAR_NAV_BUTTON_HEIGHT,
     TITLEBAR_PLATFORM_DIVIDER_HEIGHT, TITLEBAR_SEGMENT_HEIGHT, TITLEBAR_TOP_PADDING,
     TITLEBAR_TRAFFIC_LIGHT_SIZE, TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
-    TITLEBAR_WINDOWS_WINDOW_ICON_SIZE, TITLEBAR_WINDOWS_WINDOW_MAX_ICON_SIZE, UpdateInfo,
-    UpdateStatus, WORKSPACE_COLUMNS, WORKSPACE_GAP, Window, WindowControlArea, assets, div,
-    ease_in_out, format_total_size, mix_color, motion_is_hidden, motion_target, px, relative,
-    set_motion_target, settings_sheet_right_inset, svg, theme,
+    TITLEBAR_WINDOWS_WINDOW_ICON_SIZE, TITLEBAR_WINDOWS_WINDOW_MAX_ICON_SIZE,
+    UPDATE_INSTALL_WAIT_MESSAGE, UpdateInfo, UpdateStatus, WORKSPACE_COLUMNS, WORKSPACE_GAP,
+    Window, WindowControlArea, assets, div, ease_in_out, format_total_size, mix_color,
+    motion_is_hidden, motion_target, px, relative, set_motion_target, settings_sheet_right_inset,
+    svg, theme,
 };
 use gpui::{HighlightStyle, StyledText};
 
@@ -300,6 +301,7 @@ pub(super) struct AppSettingsSheetProps<'a> {
     pub(super) output_directory_error: Option<&'a str>,
     pub(super) auto_update_check: bool,
     pub(super) update_status: &'a UpdateStatus,
+    pub(super) update_install_ready: bool,
     pub(super) value_focus: &'a FocusHandle,
     pub(super) output_directory_focus: &'a FocusHandle,
     pub(super) auto_update_focus: &'a FocusHandle,
@@ -420,6 +422,7 @@ pub(super) fn app_settings_sheet(
                             app_settings_close_button(
                                 "app-settings-close",
                                 "Close settings",
+                                true,
                                 props.close_focus,
                                 window,
                                 cx,
@@ -482,6 +485,7 @@ pub(super) fn app_settings_sheet(
                                 .child(app_settings_updates_section(
                                     props.auto_update_check,
                                     props.update_status,
+                                    props.update_install_ready,
                                     AppSettingsUpdateFocuses {
                                         auto_update: props.auto_update_focus,
                                         check_now: props.check_now_focus,
@@ -577,6 +581,7 @@ struct AppSettingsUpdateFocuses<'a> {
 fn app_settings_updates_section(
     auto_update_check: bool,
     update_status: &UpdateStatus,
+    update_install_ready: bool,
     focuses: AppSettingsUpdateFocuses<'_>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
@@ -598,7 +603,7 @@ fn app_settings_updates_section(
             },
         ))
         .child(update_check_now_button(busy, focuses.check_now, window, cx))
-        .child(update_status_label(update_status));
+        .child(update_status_label(update_status, update_install_ready));
 
     if let UpdateStatus::Downloading {
         progress_percent,
@@ -615,20 +620,23 @@ fn app_settings_updates_section(
         ));
     }
 
-    if let Some(row) = update_action_row(update_status, focuses, window, cx) {
+    if let Some(row) = update_action_row(update_status, update_install_ready, focuses, window, cx) {
         section = section.child(row);
     }
 
     section
 }
 
-fn update_status_label(status: &UpdateStatus) -> gpui::Stateful<gpui::Div> {
+fn update_status_label(
+    status: &UpdateStatus,
+    update_install_ready: bool,
+) -> gpui::Stateful<gpui::Div> {
     let tone = match status {
         UpdateStatus::Error(_) => theme::FRAME_RED,
         UpdateStatus::Disabled(_) => theme::FRAME_AMBER,
         _ => theme::FRAME_GRAY_600,
     };
-    let text = update_status_text(status);
+    let text = update_status_text(status, update_install_ready);
 
     div()
         .id("app-settings-update-status")
@@ -639,7 +647,7 @@ fn update_status_label(status: &UpdateStatus) -> gpui::Stateful<gpui::Div> {
         .child(theme::ui_text_owned(text))
 }
 
-fn update_status_text(status: &UpdateStatus) -> String {
+fn update_status_text(status: &UpdateStatus, update_install_ready: bool) -> String {
     match status {
         UpdateStatus::Idle => "No update check is running.".to_string(),
         UpdateStatus::Checking => "Checking for updates...".to_string(),
@@ -655,6 +663,9 @@ fn update_status_text(status: &UpdateStatus) -> String {
             || format!("Downloading Frame {version}..."),
             |percent| format!("Downloading Frame {version}: {percent}%"),
         ),
+        UpdateStatus::ReadyToInstall(_) if !update_install_ready => {
+            UPDATE_INSTALL_WAIT_MESSAGE.to_string()
+        }
         UpdateStatus::ReadyToInstall(package) => {
             format!("Frame {} is ready to install.", package.version)
         }
@@ -895,6 +906,7 @@ fn update_download_detail(
 
 fn update_action_row(
     status: &UpdateStatus,
+    update_install_ready: bool,
     focuses: AppSettingsUpdateFocuses<'_>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
@@ -952,7 +964,7 @@ fn update_action_row(
                     "Install and restart",
                     ButtonVariant::Default,
                     false,
-                    true,
+                    update_install_ready,
                     focuses.install,
                     window,
                     cx,
@@ -1004,6 +1016,7 @@ fn update_check_now_button(
 pub(super) struct UpdateDialogView<'a> {
     pub(super) status: &'a UpdateStatus,
     pub(super) info: Option<&'a UpdateInfo>,
+    pub(super) install_ready: bool,
     pub(super) release_notes_scroll_handle: &'a ScrollHandle,
     pub(super) panel_focus: &'a FocusHandle,
     pub(super) close_focus: &'a FocusHandle,
@@ -1110,9 +1123,15 @@ fn update_dialog_panel(
         .child(update_dialog_body(
             view.status,
             view.info,
+            view.install_ready,
             view.release_notes_scroll_handle,
         ))
-        .child(update_dialog_footer(view.status, window, cx));
+        .child(update_dialog_footer(
+            view.status,
+            view.install_ready,
+            window,
+            cx,
+        ));
 
     if matches!(view.status, UpdateStatus::Downloading { .. }) {
         panel = panel.child(update_dialog_download_state(view.status));
@@ -1159,15 +1178,18 @@ fn update_dialog_header(
             app_settings_close_button(
                 "update-dialog-close",
                 "Close update dialog",
+                !status.is_busy(),
                 close_focus,
                 window,
                 cx,
             )
             .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
                 cx.stop_propagation();
-                root.close_update_dialog();
-                root.restore_focus_after_update_dialog_close(window, cx);
-                cx.notify();
+                if !root.update_ui.status.is_busy() {
+                    root.close_update_dialog();
+                    root.restore_focus_after_update_dialog_close(window, cx);
+                    cx.notify();
+                }
             })),
         )
         .child(panel_bottom_separator())
@@ -1176,12 +1198,13 @@ fn update_dialog_header(
 fn update_dialog_body(
     status: &UpdateStatus,
     info: Option<&UpdateInfo>,
+    install_ready: bool,
     release_notes_scroll_handle: &ScrollHandle,
 ) -> gpui::Div {
     let notes = update_release_notes_text(info);
     let mut body = div().flex().flex_col().gap_3().p_4();
 
-    if let Some(summary) = update_dialog_summary(status, notes.is_some()) {
+    if let Some(summary) = update_dialog_summary(status, notes.is_some(), install_ready) {
         body = body.child(
             div()
                 .text_size(px(theme::TEXT_LABEL_SIZE))
@@ -1244,6 +1267,7 @@ fn update_dialog_download_state(status: &UpdateStatus) -> gpui::Div {
 
 fn update_dialog_footer(
     status: &UpdateStatus,
+    install_ready: bool,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -1275,11 +1299,17 @@ fn update_dialog_footer(
                 }
             })),
         )
-        .child(update_dialog_primary_action(status, window, cx))
+        .child(update_dialog_primary_action(
+            status,
+            install_ready,
+            window,
+            cx,
+        ))
 }
 
 fn update_dialog_primary_action(
     status: &UpdateStatus,
+    install_ready: bool,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -1304,7 +1334,7 @@ fn update_dialog_primary_action(
             "Install and restart",
             ButtonVariant::Default,
             false,
-            true,
+            install_ready,
             window,
             cx,
         )
@@ -1388,7 +1418,11 @@ fn update_dialog_title(status: &UpdateStatus) -> String {
     }
 }
 
-fn update_dialog_summary(status: &UpdateStatus, has_notes: bool) -> Option<String> {
+fn update_dialog_summary(
+    status: &UpdateStatus,
+    has_notes: bool,
+    install_ready: bool,
+) -> Option<String> {
     match status {
         UpdateStatus::Available(_) if has_notes => None,
         UpdateStatus::Available(_) => Some(
@@ -1397,6 +1431,9 @@ fn update_dialog_summary(status: &UpdateStatus, has_notes: bool) -> Option<Strin
         UpdateStatus::Downloading { .. } => Some(
             "Keep Frame open while the update package is downloaded and verified.".to_string()
         ),
+        UpdateStatus::ReadyToInstall(_) if !install_ready => {
+            Some(UPDATE_INSTALL_WAIT_MESSAGE.to_string())
+        }
         UpdateStatus::ReadyToInstall(_) => Some(
             "The update was downloaded and verified. Frame will restart to finish installation."
                 .to_string()
@@ -1461,11 +1498,12 @@ pub(super) fn app_settings_concurrency_control(
 pub(super) fn app_settings_close_button(
     id: &'static str,
     label: &'static str,
+    enabled: bool,
     focus: &FocusHandle,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    let colors = button_colors(ButtonVariant::Ghost, false, true);
+    let colors = button_colors(ButtonVariant::Ghost, false, enabled);
     let animated = animated_button_colors(id, colors, window, cx);
     let background = animated.background;
     let foreground = animated.foreground;
@@ -1482,16 +1520,18 @@ pub(super) fn app_settings_close_button(
         .rounded(px(theme::RADIUS_SM))
         .bg(background)
         .text_color(foreground)
-        .hover(gpui::Styled::cursor_pointer)
-        .active(move |style| style.bg(color(colors.active_background)))
+        .when(enabled, |this| this.hover(gpui::Styled::cursor_pointer))
+        .when(enabled, |this| {
+            this.active(move |style| style.bg(color(colors.active_background)))
+        })
         .child(icon_svg(
             assets::ICON_CLOSE,
             FILE_LIST_ACTION_ICON_SIZE,
             foreground,
         ));
-    let button = apply_button_motion(button, motion, true);
+    let button = apply_button_motion(button, motion, enabled);
 
-    apply_accessible_button_with_focus(button, label, true, focus)
+    apply_accessible_button_with_focus(button, label, enabled, focus)
 }
 
 pub(super) fn app_settings_apply_button(
@@ -1987,6 +2027,9 @@ fn titlebar_view_for_key(current: ActiveView, key: &str) -> Option<ActiveView> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use frame_updater::{PlatformAssetKey, UpdateAssetKind, UpdateChannel, UpdatePackage};
+    use semver::Version;
+    use std::path::PathBuf;
 
     #[test]
     fn current_titlebar_platform_matches_compile_target() {
@@ -2052,5 +2095,33 @@ mod tests {
 
         assert_eq!(text, "• **Native GPUI Application: Rebuilt Frame");
         assert!(highlights.is_empty());
+    }
+
+    #[test]
+    fn ready_update_explains_why_install_is_blocked() {
+        let status = UpdateStatus::ReadyToInstall(Box::new(test_update_package()));
+
+        assert_eq!(
+            update_status_text(&status, false),
+            UPDATE_INSTALL_WAIT_MESSAGE
+        );
+        assert_eq!(
+            update_dialog_summary(&status, false, false).as_deref(),
+            Some(UPDATE_INSTALL_WAIT_MESSAGE)
+        );
+    }
+
+    fn test_update_package() -> UpdatePackage {
+        UpdatePackage {
+            version: Version::new(0, 32, 0),
+            channel: UpdateChannel::Stable,
+            asset_key: PlatformAssetKey::MacosAarch64,
+            kind: UpdateAssetKind::MacosAppZip,
+            file_name: "Frame.zip".to_string(),
+            path: PathBuf::from("/tmp/Frame.zip"),
+            size_bytes: 1,
+            sha256: "00".repeat(32),
+            installer_args: Vec::new(),
+        }
     }
 }

@@ -545,7 +545,7 @@ impl Render for FrameRoot {
             }))
             .on_drag_move(cx.listener(
                 |root, _event: &DragMoveEvent<ExternalPaths>, _window, cx| {
-                    if root.open_drag_drop_overlay() {
+                    if !root.update_installation_in_progress() && root.open_drag_drop_overlay() {
                         cx.notify();
                     }
                 },
@@ -555,6 +555,7 @@ impl Render for FrameRoot {
             .child(FileDropLifecycleProbe { owner: cx.entity() });
 
         if self.settings_ui.is_present {
+            let update_install_ready = self.can_install_downloaded_update();
             let value_focus = self.ensure_text_input_focus(FrameTextInputKind::MaxConcurrency, cx);
             let output_directory_focus = self.ensure_focus(
                 FrameFocusKey::Control("app-settings-output-directory".to_string()),
@@ -584,16 +585,17 @@ impl Render for FrameRoot {
             );
             let install_focus = self.ensure_focus(
                 FrameFocusKey::Control("app-settings-update-install".to_string()),
-                matches!(&self.update_ui.status, UpdateStatus::ReadyToInstall(_)),
+                update_install_ready,
                 cx,
             );
             let last_focus = match &self.update_ui.status {
                 UpdateStatus::Available(_) => &skip_focus,
-                UpdateStatus::ReadyToInstall(_) => &install_focus,
-                UpdateStatus::UpToDate | UpdateStatus::Disabled(_) | UpdateStatus::Error(_) => {
-                    &check_now_focus
-                }
-                UpdateStatus::Idle => &check_now_focus,
+                UpdateStatus::ReadyToInstall(_) if update_install_ready => &install_focus,
+                UpdateStatus::ReadyToInstall(_)
+                | UpdateStatus::UpToDate
+                | UpdateStatus::Disabled(_)
+                | UpdateStatus::Error(_)
+                | UpdateStatus::Idle => &check_now_focus,
                 UpdateStatus::Checking
                 | UpdateStatus::Downloading { .. }
                 | UpdateStatus::Installing => &auto_update_focus,
@@ -624,6 +626,7 @@ impl Render for FrameRoot {
                     output_directory_error: self.settings_ui.output_directory_error.as_deref(),
                     auto_update_check: self.auto_update_check,
                     update_status: &self.update_ui.status,
+                    update_install_ready,
                     value_focus: &value_focus,
                     output_directory_focus: &output_directory_focus,
                     auto_update_focus: &auto_update_focus,
@@ -645,6 +648,7 @@ impl Render for FrameRoot {
         }
 
         if self.update_ui.dialog_present {
+            let update_install_ready = self.can_install_downloaded_update();
             let panel_focus = self.ensure_focus(
                 FrameFocusKey::Control("update-dialog-panel".to_string()),
                 false,
@@ -652,7 +656,7 @@ impl Render for FrameRoot {
             );
             let close_focus = self.ensure_focus(
                 FrameFocusKey::Control("update-dialog-close".to_string()),
-                true,
+                !self.update_ui.status.is_busy(),
                 cx,
             );
             if self.update_ui.dialog_open && !panel_focus.contains_focused(window, cx) {
@@ -663,6 +667,7 @@ impl Render for FrameRoot {
                 UpdateDialogView {
                     status: &self.update_ui.status,
                     info: self.update_ui.dialog_info.as_deref(),
+                    install_ready: update_install_ready,
                     release_notes_scroll_handle: &self.update_ui.release_notes_scroll_handle,
                     panel_focus: &panel_focus,
                     close_focus: &close_focus,

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Update Session Restoration:** Kept update downloads running alongside conversions, blocked installation until conversion workers settle, atomically saved the queue and per-file settings before updater handoff, and restored that workspace after restart. Resolves [#66](https://github.com/66HEX/frame/issues/66).
 - **Structured Issue Forms:** Added guided bug-report and feature-request forms covering environment, source media, reproduction steps, logs, workflow context, alternatives, and duplicate and Code of Conduct confirmations while keeping blank issues available. Resolves [#79](https://github.com/66HEX/frame/issues/79).
 
 ### Changed
