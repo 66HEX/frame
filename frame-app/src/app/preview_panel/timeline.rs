@@ -85,7 +85,7 @@ impl Element for PreviewTimelineTrackBoundsProbe {
 
 pub(in crate::app) fn preview_timeline(
     state: &PreviewShellState,
-    focuses: PreviewTimecodeInputFocuses<'_>,
+    inputs: PreviewTimecodeInputFocuses<'_>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -105,11 +105,11 @@ pub(in crate::app) fn preview_timeline(
                 .child(preview_timecode_field(
                     PreviewTimecodeFieldSpec {
                         label: "Start time",
-                        value: labels.start,
+                        value: inputs.start_value.to_string(),
                         enabled: trim_enabled,
                         width: 128.0,
                         kind: Some(FrameTextInputKind::PreviewStartTime),
-                        focus: focuses.start,
+                        focus: inputs.start,
                     },
                     window,
                     cx,
@@ -117,11 +117,11 @@ pub(in crate::app) fn preview_timeline(
                 .child(preview_timecode_field(
                     PreviewTimecodeFieldSpec {
                         label: "End time",
-                        value: labels.end,
+                        value: inputs.end_value.to_string(),
                         enabled: trim_enabled,
                         width: 128.0,
                         kind: Some(FrameTextInputKind::PreviewEndTime),
-                        focus: focuses.end,
+                        focus: inputs.end,
                     },
                     window,
                     cx,

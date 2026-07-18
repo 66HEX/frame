@@ -1884,7 +1884,7 @@ impl FrameRoot {
         false
     }
 
-    fn apply_preview_media_command(
+    pub(super) fn apply_preview_media_command(
         &mut self,
         command: PlaybackMediaCommand,
         precise_seek: bool,

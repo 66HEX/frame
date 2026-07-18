@@ -54,6 +54,10 @@ impl FileQueue {
         self.files.iter().find(|file| file.id == id)
     }
 
+    pub fn file_by_id_mut(&mut self, id: &str) -> Option<&mut FileItem> {
+        self.files.iter_mut().find(|file| file.id == id)
+    }
+
     #[must_use]
     pub fn selected_file_locked(&self) -> bool {
         self.selected_file().is_some_and(FileItem::locks_settings)

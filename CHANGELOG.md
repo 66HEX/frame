@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Timecode Trim Editing:** Reworked preview in/out fields as fixed `HH:MM:SS.mmm` masks with separator-skipping cursor navigation, draft-only editing, formatted paste support, Escape cancellation, and silent normalization and clamping only on Enter or focus loss, preventing partial input from being recalculated prematurely. Resolves [#74](https://github.com/66HEX/frame/issues/74).
 - **Pressed Button Foregrounds:** Kept animated text and icon colors synchronized with pressed button backgrounds across shared controls while the pointer moves, including correct hover restoration when released inside and animation reset when released outside.
 - **Collision-Safe Output Paths:** Assigned deterministic suffixes to duplicate or existing output paths before conversion and disabled FFmpeg overwrites, preventing same-stem batch jobs or pre-existing targets from replacing prior data. Resolves [#81](https://github.com/66HEX/frame/issues/81).
 - **Display-Matrix Previews:** Applied source display-matrix orientation when sizing preview frames so portrait iPhone videos are no longer stretched to their encoded landscape dimensions.

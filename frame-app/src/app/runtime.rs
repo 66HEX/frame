@@ -32,6 +32,12 @@ pub fn init_app(cx: &mut App, name: impl Into<SharedString>) {
         KeyBinding::new("cmd-c", TextInputCopy, Some(FRAME_TEXT_INPUT_CONTEXT)),
         KeyBinding::new("cmd-x", TextInputCut, Some(FRAME_TEXT_INPUT_CONTEXT)),
         KeyBinding::new("cmd-v", TextInputPaste, Some(FRAME_TEXT_INPUT_CONTEXT)),
+        KeyBinding::new("enter", TextInputCommit, Some(FRAME_TIMECODE_INPUT_CONTEXT)),
+        KeyBinding::new(
+            "escape",
+            TextInputCancel,
+            Some(FRAME_TIMECODE_INPUT_CONTEXT),
+        ),
     ]);
     cx.set_menus(vec![Menu {
         name: name.into(),

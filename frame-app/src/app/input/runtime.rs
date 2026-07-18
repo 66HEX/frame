@@ -66,6 +66,16 @@ impl FrameTextInputKind {
             Self::SubtitleOutlineColorHex => "Subtitle outline color",
         }
     }
+
+    pub(in crate::app) const fn is_preview_timecode(self) -> bool {
+        matches!(self, Self::PreviewStartTime | Self::PreviewEndTime)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::app) struct FrameTimecodeInputDraft {
+    pub(in crate::app) file_id: String,
+    pub(in crate::app) value: String,
 }
 
 pub(in crate::app) struct FrameTextInputRuntime {
@@ -76,6 +86,7 @@ pub(in crate::app) struct FrameTextInputRuntime {
     pub(in crate::app) last_bounds: Option<Bounds<Pixels>>,
     pub(in crate::app) scroll_x: Pixels,
     pub(in crate::app) is_selecting: bool,
+    pub(in crate::app) timecode_draft: Option<FrameTimecodeInputDraft>,
 }
 
 impl Default for FrameTextInputRuntime {
@@ -88,6 +99,7 @@ impl Default for FrameTextInputRuntime {
             last_bounds: None,
             scroll_x: Pixels::ZERO,
             is_selecting: false,
+            timecode_draft: None,
         }
     }
 }

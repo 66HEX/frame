@@ -183,8 +183,7 @@ impl Element for FrameTextInputElement {
 
         self.owner.update(cx, |root, cx| {
             if focused && root.text_input_ui.active != Some(kind) {
-                root.text_input_ui.active = Some(kind);
-                root.start_text_input_cursor(cx);
+                root.activate_text_input(kind, cx);
             }
         });
 
@@ -273,7 +272,11 @@ pub(in crate::app) fn frame_text_input(
         .text_color(color(label_color))
         .opacity(if disabled { 0.5 } else { 1.0 })
         .shadow(input_highlight_shadows())
-        .key_context(FRAME_TEXT_INPUT_CONTEXT)
+        .key_context(if kind.is_preview_timecode() {
+            FRAME_TIMECODE_TEXT_INPUT_CONTEXT
+        } else {
+            FRAME_TEXT_INPUT_CONTEXT
+        })
         .when(!disabled, gpui::Styled::cursor_text)
         .when(disabled, gpui::Styled::cursor_not_allowed)
         .when(!disabled, |this| {
@@ -289,6 +292,10 @@ pub(in crate::app) fn frame_text_input(
                 .on_action(cx.listener(FrameRoot::text_input_copy))
                 .on_action(cx.listener(FrameRoot::text_input_cut))
                 .on_action(cx.listener(FrameRoot::text_input_paste))
+                .when(kind.is_preview_timecode(), |this| {
+                    this.on_action(cx.listener(FrameRoot::text_input_commit))
+                        .on_action(cx.listener(FrameRoot::text_input_cancel))
+                })
                 .on_mouse_down(
                     MouseButton::Left,
                     cx.listener(move |root, event: &MouseDownEvent, window, cx| {

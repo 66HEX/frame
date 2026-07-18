@@ -1,8 +1,9 @@
 use super::{
     text::{
-        clamp_text_offset, clamp_text_range, next_text_boundary, previous_text_boundary,
+        clamp_text_offset, clamp_text_range, next_text_boundary, next_timecode_cursor,
+        previous_text_boundary, previous_timecode_cursor, replace_timecode_mask,
         sanitize_hex_draft, sanitize_number_input, sanitize_replacement_text,
-        text_range_from_utf16, text_range_to_utf16,
+        text_range_from_utf16, text_range_to_utf16, timecode_cursor_at_or_after,
     },
     *,
 };
@@ -59,6 +60,41 @@ impl FrameRoot {
             .or(self.text_input_ui.active)
     }
 
+    pub(in crate::app) fn activate_text_input(
+        &mut self,
+        kind: FrameTextInputKind,
+        cx: &mut Context<Self>,
+    ) {
+        if self.text_input_ui.active == Some(kind) {
+            return;
+        }
+
+        if let Some(active) = self.text_input_ui.active {
+            self.commit_preview_timecode_input(active, Some(cx));
+        }
+        self.text_input_ui.active = Some(kind);
+        self.start_text_input_cursor(cx);
+    }
+
+    pub(in crate::app) fn reconcile_text_input_focus(
+        &mut self,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(active) = self.text_input_ui.active else {
+            return;
+        };
+        if self.focused_text_input_kind(window) == Some(active) {
+            return;
+        }
+
+        let changed = self.commit_preview_timecode_input(active, Some(cx));
+        self.stop_text_input_cursor();
+        if changed {
+            cx.notify();
+        }
+    }
+
     pub(in crate::app) fn text_input_disabled(&self, kind: FrameTextInputKind) -> bool {
         kind != FrameTextInputKind::MaxConcurrency && self.file_queue.selected_file_locked()
     }
@@ -92,10 +128,23 @@ impl FrameRoot {
                 .file_queue
                 .selected_file()
                 .map_or_else(String::new, |file| file.config.gif_loop.to_string()),
-            FrameTextInputKind::PreviewStartTime => {
-                format_time(self.preview_ui.playback.start_value())
-            }
-            FrameTextInputKind::PreviewEndTime => format_time(self.preview_ui.playback.end_value()),
+            FrameTextInputKind::PreviewStartTime | FrameTextInputKind::PreviewEndTime => self
+                .text_input_runtime(kind)
+                .timecode_draft
+                .as_ref()
+                .filter(|draft| self.file_queue.selected_file_id() == Some(draft.file_id.as_str()))
+                .map_or_else(
+                    || match kind {
+                        FrameTextInputKind::PreviewStartTime => {
+                            format_time(self.preview_ui.playback.start_value())
+                        }
+                        FrameTextInputKind::PreviewEndTime => {
+                            format_time(self.preview_ui.playback.end_value())
+                        }
+                        _ => unreachable!("matched preview timecode text input variants"),
+                    },
+                    |draft| draft.value.clone(),
+                ),
             FrameTextInputKind::MetadataTitle
             | FrameTextInputKind::MetadataArtist
             | FrameTextInputKind::MetadataAlbum
@@ -198,39 +247,13 @@ impl FrameRoot {
                 if self.file_queue.selected_file_locked() {
                     return None;
                 }
-                let normalized = normalize_timecode_text_input(candidate)?.into_config_value();
-                let next_start = if kind == FrameTextInputKind::PreviewStartTime {
-                    normalized.clone()
-                } else {
-                    self.file_queue
-                        .selected_file()
-                        .and_then(|file| file.config.start_time.clone())
-                };
-                let next_end = if kind == FrameTextInputKind::PreviewEndTime {
-                    normalized
-                } else {
-                    self.file_queue
-                        .selected_file()
-                        .and_then(|file| file.config.end_time.clone())
-                };
-                self.file_queue.selected_file_mut().map(|file| {
-                    apply_trim_times(&mut file.config, next_start, next_end);
-                })?;
-                if let Some(file) = self.file_queue.selected_file() {
-                    self.preview_ui.playback.sync_initial_values(
-                        file.config.start_time.as_deref(),
-                        file.config.end_time.as_deref(),
-                    );
-                }
-                Some(match kind {
-                    FrameTextInputKind::PreviewStartTime => {
-                        format_time(self.preview_ui.playback.start_value())
-                    }
-                    FrameTextInputKind::PreviewEndTime => {
-                        format_time(self.preview_ui.playback.end_value())
-                    }
-                    _ => unreachable!("matched preview timecode text input variants"),
-                })
+                let file_id = self.file_queue.selected_file_id()?.to_string();
+                let next = candidate.to_string();
+                self.text_input_runtime_mut(kind).timecode_draft = Some(FrameTimecodeInputDraft {
+                    file_id,
+                    value: next.clone(),
+                });
+                Some(next)
             }
             FrameTextInputKind::MetadataTitle
             | FrameTextInputKind::MetadataArtist
@@ -309,7 +332,11 @@ impl FrameRoot {
         cx: &mut Context<Self>,
     ) {
         let text = self.text_input_value(kind);
-        let offset = clamp_text_offset(&text, offset);
+        let offset = if kind.is_preview_timecode() {
+            timecode_cursor_at_or_after(&text, offset)
+        } else {
+            clamp_text_offset(&text, offset)
+        };
         let runtime = self.text_input_runtime_mut(kind);
         runtime.selected_range = offset..offset;
         runtime.selection_reversed = false;
@@ -325,7 +352,11 @@ impl FrameRoot {
         cx: &mut Context<Self>,
     ) {
         let text = self.text_input_value(kind);
-        let offset = clamp_text_offset(&text, offset);
+        let offset = if kind.is_preview_timecode() {
+            timecode_cursor_at_or_after(&text, offset)
+        } else {
+            clamp_text_offset(&text, offset)
+        };
         let runtime = self.text_input_runtime_mut(kind);
         if runtime.selection_reversed {
             runtime.selected_range.start = offset;
@@ -356,6 +387,10 @@ impl FrameRoot {
     ) -> bool {
         if self.text_input_disabled(kind) {
             return false;
+        }
+
+        if kind.is_preview_timecode() {
+            return self.replace_timecode_input_range(kind, range_utf16.as_ref(), new_text);
         }
 
         let current = self.text_input_value(kind);
@@ -410,6 +445,41 @@ impl FrameRoot {
         runtime.selected_range = next_range;
         runtime.selection_reversed = false;
         runtime.marked_range = next_marked_range;
+        self.text_input_ui.active = Some(kind);
+        true
+    }
+
+    fn replace_timecode_input_range(
+        &mut self,
+        kind: FrameTextInputKind,
+        range_utf16: Option<&Range<usize>>,
+        new_text: &str,
+    ) -> bool {
+        let current = self.text_input_value(kind);
+        let selected_range = self.clamped_text_input_selection(kind, &current);
+        let marked_range = self.text_input_runtime(kind).marked_range.clone();
+        let range = range_utf16
+            .map(|range| text_range_from_utf16(&current, range))
+            .or(marked_range)
+            .unwrap_or(selected_range);
+        let range = clamp_text_range(&current, &range);
+        let replacement = sanitize_replacement_text(kind, new_text);
+
+        if replacement.is_empty() && !new_text.is_empty() {
+            return false;
+        }
+
+        let Some(edit) = replace_timecode_mask(&current, &range, &replacement) else {
+            return false;
+        };
+        let Some(actual) = self.write_text_input_value(kind, &edit.value) else {
+            return false;
+        };
+        let cursor = timecode_cursor_at_or_after(&actual, edit.cursor);
+        let runtime = self.text_input_runtime_mut(kind);
+        runtime.selected_range = cursor..cursor;
+        runtime.selection_reversed = false;
+        runtime.marked_range = None;
         self.text_input_ui.active = Some(kind);
         true
     }
@@ -478,7 +548,7 @@ impl FrameRoot {
         if let Some(focus) = self.text_input_focus_handle(kind) {
             focus.focus(window, cx);
         }
-        self.text_input_ui.active = Some(kind);
+        self.activate_text_input(kind, cx);
         self.text_input_runtime_mut(kind).is_selecting = true;
         let offset = self.text_input_index_for_mouse_position(kind, event.position);
         if event.modifiers.shift {
@@ -522,7 +592,14 @@ impl FrameRoot {
         };
         let text = self.text_input_value(kind);
         let selected_range = self.clamped_text_input_selection(kind, &text);
-        let range = if selected_range.is_empty() {
+        let range = if kind.is_preview_timecode() && selected_range.is_empty() {
+            let cursor = self.text_input_cursor_offset(kind, &text);
+            if cursor == 0 {
+                return;
+            }
+            let previous = previous_timecode_cursor(&text, cursor);
+            previous..previous.saturating_add(1)
+        } else if selected_range.is_empty() {
             let cursor = self.text_input_cursor_offset(kind, &text);
             previous_text_boundary(&text, cursor)..cursor
         } else {
@@ -545,7 +622,14 @@ impl FrameRoot {
         };
         let text = self.text_input_value(kind);
         let selected_range = self.clamped_text_input_selection(kind, &text);
-        let range = if selected_range.is_empty() {
+        let range = if kind.is_preview_timecode() && selected_range.is_empty() {
+            let cursor =
+                timecode_cursor_at_or_after(&text, self.text_input_cursor_offset(kind, &text));
+            if cursor == text.len() {
+                return;
+            }
+            cursor..cursor.saturating_add(1)
+        } else if selected_range.is_empty() {
             let cursor = self.text_input_cursor_offset(kind, &text);
             cursor..next_text_boundary(&text, cursor)
         } else {
@@ -568,7 +652,9 @@ impl FrameRoot {
         };
         let text = self.text_input_value(kind);
         let selected_range = self.clamped_text_input_selection(kind, &text);
-        let next = if selected_range.is_empty() {
+        let next = if kind.is_preview_timecode() && selected_range.is_empty() {
+            previous_timecode_cursor(&text, self.text_input_cursor_offset(kind, &text))
+        } else if selected_range.is_empty() {
             previous_text_boundary(&text, self.text_input_cursor_offset(kind, &text))
         } else {
             selected_range.start
@@ -587,7 +673,9 @@ impl FrameRoot {
         };
         let text = self.text_input_value(kind);
         let selected_range = self.clamped_text_input_selection(kind, &text);
-        let next = if selected_range.is_empty() {
+        let next = if kind.is_preview_timecode() && selected_range.is_empty() {
+            next_timecode_cursor(&text, self.text_input_cursor_offset(kind, &text))
+        } else if selected_range.is_empty() {
             next_text_boundary(&text, self.text_input_cursor_offset(kind, &text))
         } else {
             selected_range.end
@@ -606,7 +694,12 @@ impl FrameRoot {
         };
         let text = self.text_input_value(kind);
         let cursor = self.text_input_cursor_offset(kind, &text);
-        self.select_text_input_to(kind, previous_text_boundary(&text, cursor), cx);
+        let next = if kind.is_preview_timecode() {
+            previous_timecode_cursor(&text, cursor)
+        } else {
+            previous_text_boundary(&text, cursor)
+        };
+        self.select_text_input_to(kind, next, cx);
     }
 
     pub(in crate::app) fn text_input_select_right(
@@ -620,7 +713,12 @@ impl FrameRoot {
         };
         let text = self.text_input_value(kind);
         let cursor = self.text_input_cursor_offset(kind, &text);
-        self.select_text_input_to(kind, next_text_boundary(&text, cursor), cx);
+        let next = if kind.is_preview_timecode() {
+            next_timecode_cursor(&text, cursor)
+        } else {
+            next_text_boundary(&text, cursor)
+        };
+        self.select_text_input_to(kind, next, cx);
     }
 
     pub(in crate::app) fn text_input_home(
@@ -721,6 +819,108 @@ impl FrameRoot {
         }
     }
 
+    pub(in crate::app) fn text_input_commit(
+        &mut self,
+        _: &TextInputCommit,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(kind) = self.active_text_input_kind(window) else {
+            return;
+        };
+        if self.commit_preview_timecode_input(kind, Some(cx)) {
+            self.pause_text_input_cursor(cx);
+        }
+    }
+
+    pub(in crate::app) fn text_input_cancel(
+        &mut self,
+        _: &TextInputCancel,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(kind) = self.active_text_input_kind(window) else {
+            return;
+        };
+        if self.cancel_preview_timecode_input(kind) {
+            self.pause_text_input_cursor(cx);
+        }
+    }
+
+    pub(in crate::app) fn cancel_preview_timecode_input(
+        &mut self,
+        kind: FrameTextInputKind,
+    ) -> bool {
+        kind.is_preview_timecode()
+            && self
+                .text_input_runtime_mut(kind)
+                .timecode_draft
+                .take()
+                .is_some()
+    }
+
+    pub(in crate::app) fn commit_preview_timecode_input(
+        &mut self,
+        kind: FrameTextInputKind,
+        cx: Option<&Context<Self>>,
+    ) -> bool {
+        if !kind.is_preview_timecode() {
+            return false;
+        }
+        let Some(draft) = self.text_input_runtime_mut(kind).timecode_draft.take() else {
+            return false;
+        };
+
+        if self.preview_ui.playback_file_id.as_deref() != Some(draft.file_id.as_str())
+            || self
+                .file_queue
+                .file_by_id(&draft.file_id)
+                .is_none_or(FileItem::locks_settings)
+        {
+            return true;
+        }
+
+        let seconds = parse_time_to_seconds(&draft.value);
+        let duration = self.preview_ui.playback.duration();
+        if !seconds.is_finite() || !duration.is_finite() || duration <= 0.0 {
+            return true;
+        }
+
+        let command = match kind {
+            FrameTextInputKind::PreviewStartTime => {
+                let maximum = (self.preview_ui.playback.end_value() - TIMECODE_PRECISION_SECONDS)
+                    .max(0.0)
+                    .min(duration);
+                self.preview_ui
+                    .playback
+                    .set_start_from_input(seconds.clamp(0.0, maximum))
+            }
+            FrameTextInputKind::PreviewEndTime => {
+                let minimum = (self.preview_ui.playback.start_value() + TIMECODE_PRECISION_SECONDS)
+                    .min(duration);
+                self.preview_ui
+                    .playback
+                    .set_end_from_input(seconds.clamp(minimum, duration))
+            }
+            _ => unreachable!("matched preview timecode text input variants"),
+        };
+        let Some(command) = command else {
+            return true;
+        };
+        let Some(trim) = self.preview_ui.playback.commit_trim_values() else {
+            return true;
+        };
+
+        if let Some(file) = self.file_queue.file_by_id_mut(&draft.file_id) {
+            apply_trim_times(&mut file.config, trim.start_time, trim.end_time);
+        }
+        if self.file_queue.selected_file_id() == Some(draft.file_id.as_str()) {
+            self.apply_preview_media_command(command, true, cx);
+        }
+
+        true
+    }
+
     pub(in crate::app) const fn next_text_input_cursor_epoch(&mut self) -> usize {
         self.text_input_ui.cursor_epoch += 1;
         self.text_input_ui.cursor_epoch
@@ -802,36 +1002,4 @@ const fn metadata_field_for_text_input(kind: FrameTextInputKind) -> Option<Metad
 
 fn text_input_drag_scroll_amount(distance: Pixels) -> Pixels {
     distance.clamp(px(4.0), px(40.0))
-}
-
-enum NormalizedTimecodeText {
-    Clear,
-    Value(String),
-}
-
-impl NormalizedTimecodeText {
-    fn into_config_value(self) -> Option<String> {
-        match self {
-            Self::Clear => None,
-            Self::Value(value) => Some(value),
-        }
-    }
-}
-
-fn normalize_timecode_text_input(candidate: &str) -> Option<NormalizedTimecodeText> {
-    let trimmed = candidate.trim().replace(',', ".");
-    if trimmed.is_empty() {
-        return Some(NormalizedTimecodeText::Clear);
-    }
-
-    let seconds = if trimmed.contains(':') {
-        parse_time_to_seconds(&trimmed)
-    } else {
-        trimmed.parse::<f64>().ok()?
-    };
-    if !seconds.is_finite() || seconds < 0.0 {
-        return None;
-    }
-
-    Some(NormalizedTimecodeText::Value(format_time(seconds)))
 }

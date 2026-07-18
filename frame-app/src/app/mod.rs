@@ -191,6 +191,8 @@ actions!(
         TextInputCopy,
         TextInputCut,
         TextInputPaste,
+        TextInputCommit,
+        TextInputCancel,
     ]
 );
 
@@ -210,10 +212,13 @@ const DEFAULT_CROP_Y: f64 = 0.1;
 const DEFAULT_CROP_SIZE: f64 = 0.8;
 const CROP_HANDLE_SIZE: f32 = 10.0;
 const FRAME_TEXT_INPUT_CONTEXT: &str = "FrameTextInput";
+const FRAME_TIMECODE_INPUT_CONTEXT: &str = "FrameTimecodeInput";
+const FRAME_TIMECODE_TEXT_INPUT_CONTEXT: &str = "FrameTextInput FrameTimecodeInput";
 const TEXT_INPUT_CARET_WIDTH: f32 = 1.5;
 const TEXT_INPUT_CARET_HEIGHT: f32 = theme::TEXT_INPUT_CARET_HEIGHT;
 const TEXT_INPUT_BLINK_INTERVAL: Duration = Duration::from_millis(500);
 const TEXT_INPUT_BLINK_PAUSE: Duration = Duration::from_millis(300);
+const TIMECODE_PRECISION_SECONDS: f64 = 0.001;
 const PREVIEW_CANVAS_DEFAULT_ZOOM: f64 = 1.0;
 const PREVIEW_CANVAS_INITIAL_CONTAIN_SCALE: f64 = 0.9;
 const PREVIEW_CANVAS_MIN_ZOOM: f64 = 0.25;

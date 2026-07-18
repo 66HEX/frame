@@ -107,6 +107,8 @@ impl PreviewOverlayRenderState {
 pub(in crate::app) struct PreviewTimecodeInputFocuses<'a> {
     pub(in crate::app) start: Option<&'a FocusHandle>,
     pub(in crate::app) end: Option<&'a FocusHandle>,
+    pub(in crate::app) start_value: &'a str,
+    pub(in crate::app) end_value: &'a str,
 }
 
 pub(in crate::app) struct PreviewPanelProps<'a> {

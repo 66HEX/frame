@@ -22,6 +22,8 @@ impl Render for FrameRoot {
             app_root_focus.focus(window, cx);
         }
 
+        self.reconcile_text_input_focus(window, cx);
+
         let state = self.app_state();
         let source_metadata_entry = self.selected_source_metadata_entry();
         let source_metadata = source_metadata_entry.metadata.clone();
@@ -37,9 +39,6 @@ impl Render for FrameRoot {
         let selected_output_name =
             selected_file.map_or_else(String::new, |file| file.output_name.clone());
         let preview_runtime_request = self.selected_preview_runtime_request(&source_metadata_entry);
-        if self.text_input_ui.active.is_some() && self.focused_text_input_kind(window).is_none() {
-            self.stop_text_input_cursor();
-        }
         self.sync_preview_crop_for_selection(
             selected_file_id.as_deref(),
             &selected_config_snapshot,
@@ -191,6 +190,10 @@ impl Render for FrameRoot {
                     self.ensure_text_input_focus(FrameTextInputKind::PreviewStartTime, cx);
                 let preview_end_time_focus =
                     self.ensure_text_input_focus(FrameTextInputKind::PreviewEndTime, cx);
+                let preview_start_time_value =
+                    self.text_input_value(FrameTextInputKind::PreviewStartTime);
+                let preview_end_time_value =
+                    self.text_input_value(FrameTextInputKind::PreviewEndTime);
                 let metadata_title_focus =
                     self.ensure_text_input_focus(FrameTextInputKind::MetadataTitle, cx);
                 let metadata_artist_focus =
@@ -481,6 +484,8 @@ impl Render for FrameRoot {
                         timecode_focuses: PreviewTimecodeInputFocuses {
                             start: Some(&preview_start_time_focus),
                             end: Some(&preview_end_time_focus),
+                            start_value: &preview_start_time_value,
+                            end_value: &preview_end_time_value,
                         },
                         playback: preview_playback,
                         presentation: preview_presentation,
