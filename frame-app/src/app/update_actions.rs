@@ -1,7 +1,56 @@
 use super::*;
+use crate::update_session::{UpdateSessionError, UpdateSessionSnapshot, UpdateSessionStore};
+
+#[derive(Debug, thiserror::Error)]
+enum UpdateInstallationError {
+    #[error(transparent)]
+    Updater(#[from] frame_updater::UpdateError),
+    #[error(transparent)]
+    Session(#[from] UpdateSessionError),
+    #[error(transparent)]
+    Settings(#[from] crate::app_persistence::AppPersistenceError),
+    #[error(transparent)]
+    Preview(#[from] crate::preview_engine::PreviewEngineError),
+    #[error("{UPDATE_INSTALL_WAIT_MESSAGE}")]
+    ConversionStateChanged,
+}
 
 impl FrameRoot {
     const SETTINGS_UPDATE_STATUS_DISMISS_DELAY: Duration = Duration::from_secs(4);
+
+    pub(super) fn can_install_downloaded_update(&self) -> bool {
+        matches!(self.update_ui.status, UpdateStatus::ReadyToInstall(_))
+            && self.conversions_settled_for_update()
+    }
+
+    pub(super) const fn update_installation_in_progress(&self) -> bool {
+        matches!(self.update_ui.status, UpdateStatus::Installing)
+    }
+
+    fn conversions_settled_for_update(&self) -> bool {
+        all_conversions_settled(&self.file_queue)
+            && self
+                .conversion_processes
+                .active_process_count()
+                .is_ok_and(|count| count == 0)
+    }
+
+    fn capture_installation_session(
+        &mut self,
+        target_version: &str,
+        cx: &Context<Self>,
+    ) -> Result<(UpdateSessionStore, UpdateSessionSnapshot), UpdateInstallationError> {
+        if !self.update_installation_in_progress() || !self.conversions_settled_for_update() {
+            return Err(UpdateInstallationError::ConversionStateChanged);
+        }
+
+        self.commit_preview_timecode_input(FrameTextInputKind::PreviewStartTime, Some(cx));
+        self.commit_preview_timecode_input(FrameTextInputKind::PreviewEndTime, Some(cx));
+        self.persist_app_settings()?;
+        let store = self.update_session_store()?;
+        let snapshot = self.capture_update_session(target_version)?;
+        Ok((store, snapshot))
+    }
 
     pub(super) const fn open_update_dialog(&mut self) -> bool {
         let changed = !self.update_ui.dialog_open || !self.update_ui.dialog_present;
@@ -202,40 +251,102 @@ impl FrameRoot {
     }
 
     pub(super) fn install_downloaded_update(&mut self, cx: &Context<Self>) {
-        if self.update_ui.status.is_busy() {
+        if !self.can_install_downloaded_update() {
             return;
         }
         let UpdateStatus::ReadyToInstall(package) = &self.update_ui.status else {
             return;
         };
         let package = (**package).clone();
+        let target_version = package.version.to_string();
         self.update_ui.status = UpdateStatus::Installing;
         self.open_update_dialog();
         let channel = self.update_channel;
 
         cx.spawn(async move |this, cx| {
-            let result = cx
+            let prepared: Result<_, UpdateInstallationError> = cx
                 .background_spawn(async move {
                     let client = build_update_client(channel)?;
                     let plan_path = client.prepare_install(&package)?;
-                    client.spawn_helper(&plan_path)
+                    Ok((client, plan_path))
                 })
                 .await;
 
-            this.update(cx, |root, cx| match result {
-                Ok(()) => cx.quit(),
+            let (client, plan_path) = match prepared {
+                Ok(prepared) => prepared,
                 Err(error) => {
-                    root.update_ui.status = UpdateStatus::Error(error.to_string());
-                    root.open_update_dialog();
-                    cx.notify();
+                    report_update_installation_error(&this, cx, error.to_string());
+                    return;
                 }
-            })
-            .ok();
+            };
+
+            let Ok(capture_result) = this.update(cx, |root, cx| {
+                root.capture_installation_session(&target_version, cx)
+            }) else {
+                return;
+            };
+            let (store, snapshot) = match capture_result {
+                Ok(capture) => capture,
+                Err(error) => {
+                    report_update_installation_error(&this, cx, error.to_string());
+                    return;
+                }
+            };
+
+            let snapshot_store = store.clone();
+            let save_result = cx
+                .background_spawn(async move { snapshot_store.save(&snapshot) })
+                .await;
+            if let Err(error) = save_result {
+                report_update_installation_error(&this, cx, error.to_string());
+                return;
+            }
+
+            let preview_result = this
+                .update(cx, |root, cx| {
+                    if !root.update_installation_in_progress() {
+                        return Err(UpdateInstallationError::ConversionStateChanged);
+                    }
+                    root.clear_preview_runtime(cx)?;
+                    cx.notify();
+                    Ok(())
+                })
+                .unwrap_or(Err(UpdateInstallationError::ConversionStateChanged));
+            if let Err(error) = preview_result {
+                let rollback_result = cx
+                    .background_spawn(async move { store.discard_pending() })
+                    .await;
+                let message = rollback_update_session_message(error.to_string(), rollback_result);
+                report_update_installation_error(&this, cx, message);
+                return;
+            }
+
+            let rollback_store = store.clone();
+            let helper_result = cx
+                .background_spawn(async move { client.spawn_helper(&plan_path) })
+                .await;
+
+            match helper_result {
+                Ok(()) => {
+                    this.update(cx, |_root, cx| cx.quit()).ok();
+                }
+                Err(error) => {
+                    let rollback_result = cx
+                        .background_spawn(async move { rollback_store.discard_pending() })
+                        .await;
+                    let message =
+                        rollback_update_session_message(error.to_string(), rollback_result);
+                    report_update_installation_error(&this, cx, message);
+                }
+            }
         })
         .detach();
     }
 
     pub(super) fn toggle_auto_update_check(&mut self, cx: &Context<Self>) -> bool {
+        if self.update_installation_in_progress() {
+            return false;
+        }
         self.auto_update_check = !self.auto_update_check;
         if let Err(error) = self.persist_app_settings() {
             self.update_ui.status = UpdateStatus::Error(error.to_string());
@@ -292,5 +403,30 @@ impl FrameRoot {
             .ok();
         })
         .detach();
+    }
+}
+
+fn report_update_installation_error(
+    root: &gpui::WeakEntity<FrameRoot>,
+    cx: &mut gpui::AsyncApp,
+    message: String,
+) {
+    root.update(cx, |root, cx| {
+        root.update_ui.status = UpdateStatus::Error(message);
+        root.open_update_dialog();
+        cx.notify();
+    })
+    .ok();
+}
+
+fn rollback_update_session_message(
+    message: String,
+    rollback_result: Result<(), UpdateSessionError>,
+) -> String {
+    match rollback_result {
+        Ok(()) => message,
+        Err(rollback_error) => {
+            format!("{message}; failed to discard the pending update session: {rollback_error}")
+        }
     }
 }

@@ -66,6 +66,15 @@ impl ConversionProcessController {
         Ok(self.lock_state()?.max_concurrency.max(1))
     }
 
+    /// Returns the number of conversion worker processes still tracked as active.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the controller state mutex is poisoned.
+    pub fn active_process_count(&self) -> Result<usize, ConversionError> {
+        Ok(self.lock_state()?.active_processes.len())
+    }
+
     #[must_use]
     pub fn active_pid(&self, id: &str) -> Option<u32> {
         self.active_process(id).map(|process| process.pid)
@@ -233,6 +242,50 @@ mod tests {
         let result = ensure_same_process("self", ActiveConversionProcess { pid, start_time });
 
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn active_process_count_tracks_registered_and_finished_processes() {
+        let controller = ConversionProcessController::default();
+
+        assert_eq!(
+            controller
+                .active_process_count()
+                .expect("controller state should be readable"),
+            0
+        );
+        controller
+            .register_started_process("task-1", 0)
+            .expect("test process should be registered");
+        assert_eq!(
+            controller
+                .active_process_count()
+                .expect("controller state should be readable"),
+            1
+        );
+        controller
+            .finish_task("task-1")
+            .expect("test process should be finished");
+        assert_eq!(
+            controller
+                .active_process_count()
+                .expect("controller state should be readable"),
+            0
+        );
+    }
+
+    #[test]
+    fn active_process_count_reports_poisoned_controller_state() {
+        let controller = ConversionProcessController::default();
+        let state = controller.state.clone();
+        let panic_result = std::thread::spawn(move || {
+            let _guard = state.lock().expect("controller state should lock");
+            panic!("poison controller state for test");
+        })
+        .join();
+
+        assert!(panic_result.is_err());
+        assert!(controller.active_process_count().is_err());
     }
 
     #[test]

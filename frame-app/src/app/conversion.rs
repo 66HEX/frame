@@ -4,6 +4,9 @@ impl FrameRoot {
     pub(super) fn queue_selected_conversion_tasks(
         &mut self,
     ) -> Vec<frame_core::types::ConversionTask> {
+        if self.update_installation_in_progress() {
+            return Vec::new();
+        }
         let Some(output_directory) = self
             .default_output_directory
             .as_ref()
@@ -41,7 +44,7 @@ impl FrameRoot {
         tasks
     }
     pub(super) fn start_selected_conversions(&mut self, cx: &mut Context<Self>) {
-        if self.is_processing {
+        if self.is_processing || self.update_installation_in_progress() {
             return;
         }
 
@@ -166,9 +169,15 @@ impl FrameRoot {
         }
     }
     pub(super) fn prepare_file_for_reconversion(&mut self, id: &str) -> bool {
+        if self.update_installation_in_progress() {
+            return false;
+        }
         self.file_queue.prepare_file_for_reconversion(id)
     }
     pub(super) fn remove_file_from_queue(&mut self, id: &str) -> bool {
+        if self.update_installation_in_progress() {
+            return false;
+        }
         let Some(status) = self.file_queue.file_by_id(id).map(|file| file.status) else {
             return false;
         };

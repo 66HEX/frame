@@ -139,6 +139,9 @@ impl FrameRoot {
         &mut self,
         update: impl FnOnce(&mut ConversionConfig) -> bool,
     ) -> bool {
+        if self.update_installation_in_progress() {
+            return false;
+        }
         self.file_queue
             .selected_file_mut()
             .is_some_and(|file| update(&mut file.config))

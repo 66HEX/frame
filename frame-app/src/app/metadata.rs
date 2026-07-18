@@ -17,6 +17,25 @@ impl FrameRoot {
         file_path: String,
         cx: &mut Context<Self>,
     ) {
+        self.queue_source_metadata_probe_inner(file_id, file_path, true, cx);
+    }
+
+    pub(super) fn queue_restored_source_metadata_probe(
+        &mut self,
+        file_id: String,
+        file_path: String,
+        cx: &mut Context<Self>,
+    ) {
+        self.queue_source_metadata_probe_inner(file_id, file_path, false, cx);
+    }
+
+    fn queue_source_metadata_probe_inner(
+        &mut self,
+        file_id: String,
+        file_path: String,
+        normalize_selected_config: bool,
+        cx: &mut Context<Self>,
+    ) {
         self.source_metadata.mark_loading(file_id.clone());
         cx.notify();
 
@@ -31,7 +50,10 @@ impl FrameRoot {
                         root.source_metadata.mark_ready(file_id.clone(), metadata);
                         if root.file_queue.selected_file_id() == Some(file_id.as_str()) {
                             let selected_metadata = root.selected_source_metadata();
-                            root.normalize_selected_config(selected_metadata.as_ref());
+                            if normalize_selected_config && !root.update_installation_in_progress()
+                            {
+                                root.normalize_selected_config(selected_metadata.as_ref());
+                            }
                             root.resolve_selected_settings_tab(selected_metadata.as_ref());
                         }
                     }

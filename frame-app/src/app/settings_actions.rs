@@ -35,6 +35,9 @@ impl FrameRoot {
     }
 
     pub(super) fn apply_max_concurrency_draft(&mut self) -> bool {
+        if self.update_installation_in_progress() {
+            return false;
+        }
         let Some(value) = self.parsed_max_concurrency_draft() else {
             self.settings_ui.max_concurrency_error =
                 Some("Enter a whole number greater than zero.".to_string());
@@ -87,6 +90,9 @@ impl FrameRoot {
         &mut self,
         path: std::path::PathBuf,
     ) -> Result<(), crate::app_persistence::AppPersistenceError> {
+        if self.update_installation_in_progress() {
+            return Err(crate::app_persistence::AppPersistenceError::InstallationInProgress);
+        }
         let previous = self.default_output_directory.replace(path);
         if let Err(error) = self.persist_app_settings() {
             self.default_output_directory = previous;
@@ -124,7 +130,7 @@ impl FrameRoot {
     }
 
     pub(super) fn save_preset_from_draft(&mut self) -> bool {
-        if self.file_queue.selected_file_locked() {
+        if self.update_installation_in_progress() || self.file_queue.selected_file_locked() {
             return false;
         }
         let name = self.settings_ui.preset_name_draft.trim();
@@ -165,6 +171,9 @@ impl FrameRoot {
     }
 
     pub(super) fn delete_preset(&mut self, preset_id: &str) -> bool {
+        if self.update_installation_in_progress() {
+            return false;
+        }
         let Some(index) = self
             .presets
             .iter()
@@ -195,7 +204,7 @@ impl FrameRoot {
     }
 
     pub(super) fn apply_preset_to_selected(&mut self, preset_id: &str) -> bool {
-        if self.file_queue.selected_file_locked() {
+        if self.update_installation_in_progress() || self.file_queue.selected_file_locked() {
             return false;
         }
         let Some(preset) = self
@@ -270,6 +279,9 @@ impl FrameRoot {
     }
 
     pub(super) fn apply_preset_to_all_pending(&mut self, preset: &PresetDefinition) -> bool {
+        if self.update_installation_in_progress() {
+            return false;
+        }
         let mut changed = false;
         for file in self.file_queue.files_mut() {
             if !file.status.is_actionable_for_conversion() {

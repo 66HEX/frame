@@ -56,8 +56,10 @@ pub(super) fn file_list_header(
         })
         .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
             cx.stop_propagation();
-            if selection_enabled && !root.file_queue.files().is_empty() {
-                root.file_queue.toggle_all_batch_selection();
+            if selection_enabled
+                && !root.file_queue.files().is_empty()
+                && root.toggle_all_file_batch_selection().is_some()
+            {
                 cx.notify();
             }
         }))
@@ -74,8 +76,10 @@ pub(super) fn file_list_header(
                         return;
                     }
                     cx.stop_propagation();
-                    if selection_enabled && !root.file_queue.files().is_empty() {
-                        root.file_queue.toggle_all_batch_selection();
+                    if selection_enabled
+                        && !root.file_queue.files().is_empty()
+                        && root.toggle_all_file_batch_selection().is_some()
+                    {
                         cx.notify();
                     }
                 },
@@ -200,7 +204,7 @@ pub(super) fn file_list_row(
         })
         .hover(|style| style.bg(color(theme::FRAME_GRAY_100)).cursor_pointer())
         .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
-            if root.file_queue.select_existing_file(&select_id) {
+            if root.select_workspace_file(&select_id) {
                 cx.notify();
             }
         }))
@@ -465,8 +469,8 @@ pub(super) fn row_checkbox_control(
         })
         .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
             cx.stop_propagation();
-            let mut changed = root.file_queue.select_existing_file(&click_id);
-            changed |= root.file_queue.toggle_batch_selection(&click_id).is_some();
+            let mut changed = root.select_workspace_file(&click_id);
+            changed |= root.toggle_file_batch_selection(&click_id).is_some();
             if changed {
                 cx.notify();
             }
@@ -480,8 +484,8 @@ pub(super) fn row_checkbox_control(
                             return;
                         }
                         cx.stop_propagation();
-                        let mut changed = root.file_queue.select_existing_file(&key_id);
-                        changed |= root.file_queue.toggle_batch_selection(&key_id).is_some();
+                        let mut changed = root.select_workspace_file(&key_id);
+                        changed |= root.toggle_file_batch_selection(&key_id).is_some();
                         if changed {
                             cx.notify();
                         }

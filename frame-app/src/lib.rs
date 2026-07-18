@@ -20,6 +20,7 @@ pub mod settings;
 pub mod source_metadata;
 pub mod theme;
 pub mod update_runtime;
+pub(crate) mod update_session;
 
 use file_queue::FileQueue;
 use numeric::u64_to_f64;

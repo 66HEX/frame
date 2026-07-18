@@ -21,6 +21,7 @@ mod state;
 #[cfg(test)]
 mod tests;
 mod update_actions;
+mod update_session;
 mod workspace;
 pub use runtime::{frame_window_options, init_app, open_frame_window};
 
@@ -242,6 +243,8 @@ const PREVIEW_FILTER_DEBOUNCE_INTERVAL: Duration = Duration::from_millis(120);
 const PREVIEW_FRAME_TICK_INTERVAL: Duration = Duration::from_millis(16);
 const TRIM_PREVIEW_SEEK_INTERVAL: Duration = Duration::from_millis(50);
 const TRIM_PREVIEW_SEEK_EPSILON_SECONDS: f64 = 1.0 / 240.0;
+const UPDATE_INSTALL_WAIT_MESSAGE: &str =
+    "Finish or cancel active conversions before installing the update.";
 
 pub struct FrameRoot {
     active_view: ActiveView,

@@ -1,6 +1,8 @@
 use std::{
     collections::HashSet,
-    fs, io,
+    fs,
+    fs::File,
+    io::{self, Write},
     path::{Path, PathBuf},
 };
 
@@ -132,14 +134,7 @@ impl AppPersistence {
         let persisted = PersistedAppSettings::from_app_settings(settings);
         let json = serde_json::to_vec_pretty(&persisted)?;
 
-        if let Some(parent) = self.settings_path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-
-        let temp_path = temp_path_for(&self.settings_path);
-
-        fs::write(&temp_path, json)?;
-        replace_file(&temp_path, &self.settings_path)?;
+        write_bytes_atomically(&self.settings_path, &json)?;
 
         Ok(())
     }
@@ -181,6 +176,8 @@ impl AppPersistence {
 pub enum AppPersistenceError {
     #[error("config directory is unavailable")]
     ConfigDirectoryUnavailable,
+    #[error("update installation is in progress")]
+    InstallationInProgress,
     #[error("failed to read or write app settings: {0}")]
     Io(#[from] io::Error),
     #[error("failed to parse app settings: {0}")]
@@ -283,6 +280,27 @@ fn normalize_custom_presets(presets: Vec<PresetDefinition>) -> Vec<PresetDefinit
         .collect()
 }
 
+pub(crate) fn write_bytes_atomically(path: &Path, bytes: &[u8]) -> Result<(), io::Error> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    let temp_path = temp_path_for(path);
+    let mut file = File::create(&temp_path)?;
+    file.write_all(bytes)?;
+    file.sync_all()?;
+    drop(file);
+    replace_file(&temp_path, path)?;
+
+    #[cfg(unix)]
+    if let Some(parent) = path.parent() {
+        let _ = File::open(parent).and_then(|directory| directory.sync_all());
+    }
+
+    Ok(())
+}
+
+#[cfg(not(windows))]
 fn replace_file(temp_path: &Path, final_path: &Path) -> Result<(), io::Error> {
     match fs::rename(temp_path, final_path) {
         Ok(()) => Ok(()),
@@ -292,6 +310,38 @@ fn replace_file(temp_path: &Path, final_path: &Path) -> Result<(), io::Error> {
         }
         Err(error) => Err(error),
     }
+}
+
+#[cfg(windows)]
+fn replace_file(temp_path: &Path, final_path: &Path) -> Result<(), io::Error> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows::{
+        Win32::Storage::FileSystem::{
+            MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, MoveFileExW,
+        },
+        core::PCWSTR,
+    };
+
+    let temp_path = temp_path
+        .as_os_str()
+        .encode_wide()
+        .chain(Some(0))
+        .collect::<Vec<_>>();
+    let final_path = final_path
+        .as_os_str()
+        .encode_wide()
+        .chain(Some(0))
+        .collect::<Vec<_>>();
+
+    // SAFETY: Both UTF-16 buffers are NUL-terminated and remain alive for the call.
+    unsafe {
+        MoveFileExW(
+            PCWSTR(temp_path.as_ptr()),
+            PCWSTR(final_path.as_ptr()),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+        )
+    }
+    .map_err(io::Error::other)
 }
 
 fn temp_path_for(path: &Path) -> PathBuf {

@@ -62,6 +62,7 @@ pub fn open_frame_window(cx: &mut App) {
     cx.open_window(frame_window_options(bounds), |_, cx| {
         cx.new(|cx| {
             let mut root = FrameRoot::new_with_platform_persistence();
+            root.restore_pending_update_session(cx);
             root.load_runtime_capabilities(cx);
             root.startup_update_check(cx);
             root

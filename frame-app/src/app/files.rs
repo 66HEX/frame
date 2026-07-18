@@ -77,6 +77,24 @@ impl Element for FileDropLifecycleProbe {
 }
 
 impl FrameRoot {
+    pub(super) fn select_workspace_file(&mut self, id: &str) -> bool {
+        !self.update_installation_in_progress() && self.file_queue.select_existing_file(id)
+    }
+
+    pub(super) fn toggle_file_batch_selection(&mut self, id: &str) -> Option<bool> {
+        if self.update_installation_in_progress() {
+            return None;
+        }
+        self.file_queue.toggle_batch_selection(id)
+    }
+
+    pub(super) fn toggle_all_file_batch_selection(&mut self) -> Option<bool> {
+        if self.update_installation_in_progress() {
+            return None;
+        }
+        Some(self.file_queue.toggle_all_batch_selection())
+    }
+
     pub(super) const fn open_drag_drop_overlay(&mut self) -> bool {
         let changed = !self.drag_drop_ui.is_open || !self.drag_drop_ui.is_present;
         self.drag_drop_ui.is_open = true;
@@ -140,7 +158,13 @@ impl FrameRoot {
             let paths = cx
                 .background_spawn(async move { discover_supported_source_paths(paths) })
                 .await;
-            let Ok(imports) = this.update(cx, |root, _cx| root.allocate_file_imports(paths)) else {
+            let Ok(imports) = this.update(cx, |root, _cx| {
+                if root.update_installation_in_progress() {
+                    Vec::new()
+                } else {
+                    root.allocate_file_imports(paths)
+                }
+            }) else {
                 return;
             };
             if imports.is_empty() {
@@ -161,6 +185,9 @@ impl FrameRoot {
                 .collect::<Vec<_>>();
 
             this.update(cx, |root, cx| {
+                if root.update_installation_in_progress() {
+                    return;
+                }
                 if root.file_queue.add_files(files) > 0 {
                     for (file_id, file_path) in probe_targets {
                         root.queue_source_metadata_probe(file_id, file_path, cx);
