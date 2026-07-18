@@ -86,24 +86,14 @@ pub fn frame_window_options(bounds: Bounds<Pixels>) -> WindowOptions {
         window_min_size: Some(size(px(WINDOW_MIN_WIDTH), px(WINDOW_MIN_HEIGHT))),
         window_background: WindowBackgroundAppearance::Opaque,
         window_decorations: Some(WindowDecorations::Client),
-        client_side_frame: linux_client_side_frame(),
+        client_side_frame: cfg!(target_os = "linux").then_some(ClientSideFrameOptions {
+            corner_radius: px(theme::RADIUS_LG + crate::LINUX_WINDOW_FRAME_INSET),
+        }),
         app_id: Some(FRAME_APP_ID.to_owned()),
         #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         icon: frame_window_icon(),
         ..Default::default()
     }
-}
-
-#[cfg(target_os = "linux")]
-const fn linux_client_side_frame() -> Option<ClientSideFrameOptions> {
-    Some(ClientSideFrameOptions {
-        corner_radius: px(theme::RADIUS_LG + LINUX_WINDOW_FRAME_INSET),
-    })
-}
-
-#[cfg(not(target_os = "linux"))]
-const fn linux_client_side_frame() -> Option<ClientSideFrameOptions> {
-    None
 }
 
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
