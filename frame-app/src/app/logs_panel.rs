@@ -1,7 +1,7 @@
 use super::accessibility::focus_visible_ring;
 use super::components::{
     FRAME_ICON_BUTTON_SM_SIZE, FRAME_ICON_SM_SIZE, FrameIconButtonSize, FrameIconButtonVariant,
-    frame_icon_button, frame_vertical_uniform_scrollbar,
+    frame_icon_button, frame_icon_swap_button, frame_vertical_uniform_scrollbar,
 };
 use super::primitives::{
     FrameSurface, button_mouse_down, card_surface_shadows, color, element_id,
@@ -450,14 +450,11 @@ pub(super) fn logs_copy_button(
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
     let file_id = file_id.to_string();
-    let icon = if copied {
-        assets::ICON_CHECK
-    } else {
-        assets::ICON_COPY
-    };
-    frame_icon_button(
+    frame_icon_swap_button(
         "logs-copy",
-        icon,
+        assets::ICON_COPY,
+        assets::ICON_CHECK,
+        copied,
         if copied { "Logs copied" } else { "Copy logs" },
         FrameIconButtonVariant::Ghost,
         enabled,

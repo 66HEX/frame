@@ -1,9 +1,7 @@
-use super::{App, Duration, ElementId, Lerp, Rgba, Window, color, ease_out_quint, theme};
+use super::{App, Duration, ElementId, Lerp, Rgba, Window, color, ease_in_out, theme};
 
-pub(super) const SETTINGS_SHEET_MOTION_DURATION: Duration = Duration::from_millis(200);
-pub(super) const SUBTITLE_POPOVER_MOTION_DURATION: Duration = Duration::from_millis(140);
-pub(super) const INTERACTION_HOVER_MOTION_DURATION: Duration = Duration::from_millis(120);
-pub(super) const SETTINGS_LIST_ITEM_MOTION_DURATION: Duration = Duration::from_millis(150);
+pub(super) const SURFACE_MOTION_DURATION: Duration = Duration::from_millis(100);
+pub(super) const INTERACTION_MOTION_DURATION: Duration = Duration::from_millis(75);
 pub(super) const MOTION_DONE_EPSILON: f32 = 0.001;
 
 const SETTINGS_SHEET_SLIDE_DISTANCE: f32 = 24.0;
@@ -57,13 +55,8 @@ pub(super) fn hover_motion(
     cx: &mut App,
 ) -> gpui::Transition<f32> {
     window
-        .use_keyed_transition(
-            key,
-            cx,
-            INTERACTION_HOVER_MOTION_DURATION,
-            |_window, _cx| 0.0_f32,
-        )
-        .with_easing(ease_out_quint())
+        .use_keyed_transition(key, cx, INTERACTION_MOTION_DURATION, |_window, _cx| 0.0_f32)
+        .with_easing(ease_in_out)
 }
 
 pub(super) fn selected_motion(
@@ -73,14 +66,22 @@ pub(super) fn selected_motion(
     cx: &mut App,
 ) -> f32 {
     let transition = window
-        .use_keyed_transition(
-            key,
-            cx,
-            SETTINGS_LIST_ITEM_MOTION_DURATION,
-            |_window, _cx| 0.0_f32,
-        )
-        .with_easing(ease_out_quint());
+        .use_keyed_transition(key, cx, INTERACTION_MOTION_DURATION, |_window, _cx| 0.0_f32)
+        .with_easing(ease_in_out);
     set_motion_target(&transition, motion_target(selected), cx);
+    *transition.evaluate(window, cx)
+}
+
+pub(super) fn contextual_icon_motion(
+    key: impl Into<ElementId>,
+    active: bool,
+    window: &mut Window,
+    cx: &mut App,
+) -> f32 {
+    let transition = window
+        .use_keyed_transition(key, cx, INTERACTION_MOTION_DURATION, |_window, _cx| 0.0_f32)
+        .with_easing(ease_in_out);
+    set_motion_target(&transition, motion_target(active), cx);
     *transition.evaluate(window, cx)
 }
 

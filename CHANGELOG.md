@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Interface Motion:** Standardized GPUI transitions on shared surface and interaction timings with ease-in-out easing, and animated the Logs copy confirmation by scaling, blurring, and cross-fading between the copy and check icons.
 - **Contributor CI Coverage:** Extended `cargo xtask ci` to format, test, and lint `frame-updater` explicitly, including its unit tests and all-target Clippy checks. Resolves [#72](https://github.com/66HEX/frame/issues/72).
 - **macOS Contributor Setup:** Documented the full-Xcode Metal Toolchain requirement, availability check, and component download command for GPUI shader builds. Resolves [#75](https://github.com/66HEX/frame/issues/75).
 

@@ -17,7 +17,7 @@ use super::{
     ActiveView, ClickEvent, Context, ExternalPaths, FILE_LIST_ACTION_ICON_SIZE, FRAME_APP_VERSION,
     FluentBuilder, FocusHandle, FrameAppState, FrameRoot, FrameTextInputKind, InteractiveElement,
     IntoElement, LEFT_COLUMN_SPAN, MouseButton, PANEL_HEADER_HEIGHT, ParentElement,
-    RIGHT_COLUMN_SPAN, SETTINGS_CONTROL_HEIGHT, SETTINGS_SHEET_MOTION_DURATION, ScrollHandle,
+    RIGHT_COLUMN_SPAN, SETTINGS_CONTROL_HEIGHT, SURFACE_MOTION_DURATION, ScrollHandle,
     StatefulInteractiveElement, Styled, TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_DIVIDER_HEIGHT,
     TITLEBAR_HEIGHT, TITLEBAR_ICON_SIZE, TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
     TITLEBAR_LINUX_WINDOW_CONTROLS_GAP, TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X,
@@ -26,8 +26,8 @@ use super::{
     TITLEBAR_TOP_PADDING, TITLEBAR_TRAFFIC_LIGHT_SIZE, TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
     TITLEBAR_WINDOWS_WINDOW_ICON_SIZE, TITLEBAR_WINDOWS_WINDOW_MAX_ICON_SIZE, UpdateInfo,
     UpdateStatus, WORKSPACE_COLUMNS, WORKSPACE_GAP, Window, WindowControlArea, assets, div,
-    ease_out_quint, format_total_size, hover_motion, mix_color, motion_is_hidden, motion_target,
-    px, relative, retarget_hover_motion, set_motion_target, settings_sheet_right_inset, svg, theme,
+    ease_in_out, format_total_size, hover_motion, mix_color, motion_is_hidden, motion_target, px,
+    relative, retarget_hover_motion, set_motion_target, settings_sheet_right_inset, svg, theme,
 };
 use gpui::{HighlightStyle, StyledText};
 
@@ -327,10 +327,10 @@ pub(super) fn app_settings_sheet(
         .use_keyed_transition(
             "app-settings-sheet-motion",
             cx,
-            SETTINGS_SHEET_MOTION_DURATION,
+            SURFACE_MOTION_DURATION,
             |_window, _cx| 0.0_f32,
         )
-        .with_easing(ease_out_quint());
+        .with_easing(ease_in_out);
     let target = motion_target(props.is_open);
     set_motion_target(&transition, target, cx);
     let progress = *transition.evaluate(window, cx);
@@ -1019,10 +1019,10 @@ pub(super) fn update_dialog(
         .use_keyed_transition(
             "update-dialog-motion",
             cx,
-            SETTINGS_SHEET_MOTION_DURATION,
+            SURFACE_MOTION_DURATION,
             |_window, _cx| 0.0_f32,
         )
-        .with_easing(ease_out_quint());
+        .with_easing(ease_in_out);
     set_motion_target(&transition, motion_target(is_open), cx);
     let progress = *transition.evaluate(window, cx);
     let panel_offset = (1.0 - progress.clamp(0.0, 1.0)) * 12.0;
@@ -1524,10 +1524,10 @@ pub(super) fn drag_drop_overlay(
         .use_keyed_transition(
             "drag-drop-overlay-motion",
             cx,
-            SETTINGS_SHEET_MOTION_DURATION,
+            SURFACE_MOTION_DURATION,
             |_window, _cx| 0.0_f32,
         )
-        .with_easing(ease_out_quint());
+        .with_easing(ease_in_out);
     set_motion_target(&transition, motion_target(is_open), cx);
     let progress = *transition.evaluate(window, cx);
 

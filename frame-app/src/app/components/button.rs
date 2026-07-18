@@ -3,9 +3,9 @@ use super::{
     MouseButton, ParentElement, SETTINGS_CONTROL_HEIGHT, StatefulInteractiveElement, Styled,
     Window, animated_button_colors, apply_accessible_button, apply_accessible_button_with_focus,
     apply_accessible_toggle_button, button_colors, button_highlight_shadows, button_mouse_down,
-    color, div, icon_svg, px, retarget_hover_motion, theme,
+    color, contextual_icon_motion, div, icon_svg, px, retarget_hover_motion, theme,
 };
-use gpui::FocusHandle;
+use gpui::{FocusHandle, Rgba, Svg, Transformation, size, svg};
 
 pub(in crate::app) const FRAME_ICON_BUTTON_SM_SIZE: f32 = 24.0;
 pub(in crate::app) const FRAME_ICON_SM_SIZE: f32 = 16.0;
@@ -20,6 +20,23 @@ pub(in crate::app) enum FrameIconButtonVariant {
 pub(in crate::app) struct FrameIconButtonSize {
     pub(in crate::app) button: f32,
     pub(in crate::app) icon: f32,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum FrameIconButtonContent {
+    Static(&'static str),
+    Swap {
+        inactive: &'static str,
+        active: &'static str,
+        progress: f32,
+    },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ContextualIconVisuals {
+    opacity: f32,
+    scale: f32,
+    blur_radius: f32,
 }
 
 pub(in crate::app) fn frame_choice_button(
@@ -164,6 +181,66 @@ pub(in crate::app) fn frame_icon_button(
 ) -> gpui::Stateful<gpui::Div> {
     let id = id.into();
     let label = label.into();
+    frame_icon_button_inner(
+        id,
+        FrameIconButtonContent::Static(icon),
+        label,
+        variant,
+        enabled,
+        size,
+        window,
+        cx,
+    )
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Animated icon buttons add the alternate icon and active state to the existing explicit button contract."
+)]
+pub(in crate::app) fn frame_icon_swap_button(
+    id: impl Into<String>,
+    inactive_icon: &'static str,
+    active_icon: &'static str,
+    active: bool,
+    label: impl Into<String>,
+    variant: FrameIconButtonVariant,
+    enabled: bool,
+    size: FrameIconButtonSize,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    let id = id.into();
+    let progress = contextual_icon_motion(format!("{id}-icon-motion"), active, window, cx);
+    frame_icon_button_inner(
+        id,
+        FrameIconButtonContent::Swap {
+            inactive: inactive_icon,
+            active: active_icon,
+            progress,
+        },
+        label.into(),
+        variant,
+        enabled,
+        size,
+        window,
+        cx,
+    )
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "The shared implementation preserves the existing explicit icon button contract."
+)]
+fn frame_icon_button_inner(
+    id: String,
+    content: FrameIconButtonContent,
+    label: String,
+    variant: FrameIconButtonVariant,
+    enabled: bool,
+    size: FrameIconButtonSize,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
     let (background, hover_background, active_background, foreground, hover_foreground, opacity) =
         match (variant, enabled) {
             (FrameIconButtonVariant::Ghost, true) => (
@@ -215,6 +292,7 @@ pub(in crate::app) fn frame_icon_button(
     let animated_background = animated.background;
     let animated_foreground = animated.foreground;
     let hover_transition = animated.hover_transition;
+    let icon = frame_icon_button_content(content, size.icon, animated_foreground);
 
     let button = div()
         .id(id.clone())
@@ -239,9 +317,57 @@ pub(in crate::app) fn frame_icon_button(
         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
             button_mouse_down(enabled, window, cx);
         })
-        .child(icon_svg(icon, size.icon, animated_foreground));
+        .child(icon);
 
     apply_accessible_button(button, label, enabled)
+}
+
+fn frame_icon_button_content(
+    content: FrameIconButtonContent,
+    icon_size: f32,
+    icon_color: Rgba,
+) -> gpui::Div {
+    let container = div().relative().w(px(icon_size)).h(px(icon_size));
+    match content {
+        FrameIconButtonContent::Static(icon) => {
+            container.child(icon_svg(icon, icon_size, icon_color))
+        }
+        FrameIconButtonContent::Swap {
+            inactive,
+            active,
+            progress,
+        } => container
+            .child(contextual_icon_svg(
+                inactive,
+                1.0 - progress,
+                icon_size,
+                icon_color,
+            ))
+            .child(contextual_icon_svg(active, progress, icon_size, icon_color)),
+    }
+}
+
+fn contextual_icon_svg(icon: &'static str, progress: f32, icon_size: f32, icon_color: Rgba) -> Svg {
+    let visuals = contextual_icon_visuals(progress);
+    svg()
+        .absolute()
+        .inset_0()
+        .path(icon)
+        .w(px(icon_size))
+        .h(px(icon_size))
+        .text_color(icon_color)
+        .opacity(visuals.opacity)
+        .blur(px(visuals.blur_radius))
+        .with_transformation(Transformation::scale(size(visuals.scale, visuals.scale)))
+}
+
+fn contextual_icon_visuals(progress: f32) -> ContextualIconVisuals {
+    let progress = progress.clamp(0.0, 1.0);
+    ContextualIconVisuals {
+        opacity: progress,
+        scale: progress.mul_add(0.75, 0.25),
+        blur_radius: (1.0 - progress) * 4.0,
+    }
 }
 
 #[cfg(test)]
@@ -261,5 +387,29 @@ mod tests {
     #[test]
     fn secondary_text_button_keeps_highlight() {
         assert!(text_button_uses_highlight(ButtonVariant::Secondary, false));
+    }
+
+    #[test]
+    fn contextual_icon_visuals_use_hidden_endpoint_for_zero_progress() {
+        assert_eq!(
+            contextual_icon_visuals(0.0),
+            ContextualIconVisuals {
+                opacity: 0.0,
+                scale: 0.25,
+                blur_radius: 4.0,
+            }
+        );
+    }
+
+    #[test]
+    fn contextual_icon_visuals_use_visible_endpoint_for_full_progress() {
+        assert_eq!(
+            contextual_icon_visuals(1.0),
+            ContextualIconVisuals {
+                opacity: 1.0,
+                scale: 1.0,
+                blur_radius: 0.0,
+            }
+        );
     }
 }

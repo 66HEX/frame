@@ -1,14 +1,13 @@
 use super::super::primitives::card_surface_shadows;
 use super::{
-    Context, Duration, FluentBuilder, FrameRoot, InteractiveElement, IntoElement, ParentElement,
-    StatefulInteractiveElement, Styled, TooltipUiState, Window, color, deferred, div,
-    ease_out_quint, motion_target, px, set_motion_target, theme,
+    Context, Duration, FluentBuilder, FrameRoot, INTERACTION_MOTION_DURATION, InteractiveElement,
+    IntoElement, ParentElement, StatefulInteractiveElement, Styled, TooltipUiState, Window, color,
+    deferred, div, ease_in_out, motion_target, px, set_motion_target, theme,
 };
 use std::time::Instant;
 
 const TOOLTIP_HOVER_DELAY: Duration = Duration::from_millis(500);
 const TOOLTIP_HYSTERESIS_WINDOW: Duration = Duration::from_millis(300);
-const TOOLTIP_MOTION_DURATION: Duration = Duration::from_millis(140);
 const TOOLTIP_OFFSET: f32 = 6.0;
 const TOOLTIP_ENTER_DISTANCE: f32 = 4.0;
 const TOOLTIP_DEFERRED_PRIORITY: usize = 20;
@@ -28,10 +27,10 @@ pub(in crate::app) fn frame_tooltip(
         .use_keyed_transition(
             format!("tooltip-{id}-motion"),
             cx,
-            TOOLTIP_MOTION_DURATION,
+            INTERACTION_MOTION_DURATION,
             |_window, _cx| 0.0_f32,
         )
-        .with_easing(ease_out_quint());
+        .with_easing(ease_in_out);
     set_motion_target(&motion, motion_target(is_visible), cx);
     let progress = *motion.evaluate(window, cx);
 

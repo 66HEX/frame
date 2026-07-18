@@ -1140,10 +1140,10 @@ fn subtitle_popover_progress(
         .use_keyed_transition(
             subtitle_popover_motion_key(popover),
             cx,
-            SUBTITLE_POPOVER_MOTION_DURATION,
+            INTERACTION_MOTION_DURATION,
             |_window, _cx| 0.0_f32,
         )
-        .with_easing(ease_out_quint());
+        .with_easing(ease_in_out);
     let target = motion_target(is_open);
     set_motion_target(&transition, target, cx);
     let progress = *transition.evaluate(window, cx);
