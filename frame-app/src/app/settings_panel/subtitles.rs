@@ -267,7 +267,7 @@ fn settings_subtitle_load_button(
     let animated = animated_button_colors("settings-subtitle-burn-file", colors, window, cx);
     let background = animated.background;
     let foreground = animated.foreground;
-    let hover_transition = animated.hover_transition;
+    let motion = animated.motion;
     let has_path = config.subtitle_burn_path.is_some();
     let label = subtitle_burn_file_label(config);
     let display_label = if has_path {
@@ -296,12 +296,6 @@ fn settings_subtitle_load_button(
                 .active(move |style| style.bg(color(colors.active_background)))
         })
         .when(disabled, gpui::Styled::cursor_not_allowed)
-        .on_hover(move |hover, _window, cx| {
-            retarget_hover_motion(&hover_transition, *hover && !disabled, cx);
-        })
-        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-            button_mouse_down(!disabled, window, cx);
-        })
         .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
             cx.stop_propagation();
             if disabled {
@@ -310,6 +304,8 @@ fn settings_subtitle_load_button(
             root.prompt_subtitle_burn_file(window, cx);
         }))
         .child(div().truncate().child(display_label));
+
+    let button = apply_button_motion(button, motion, !disabled);
 
     if let Some(focus) = focus {
         apply_accessible_button_with_focus(button, label, !disabled, focus)

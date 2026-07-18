@@ -564,7 +564,7 @@ fn preview_overlay_icon_button_inner(
     let animated = animated_button_colors(button_id.clone(), colors, window, cx);
     let background = animated.background;
     let foreground = animated.foreground;
-    let hover_transition = animated.hover_transition;
+    let motion = animated.motion;
     let highlighted = matches!(variant, ButtonVariant::Default);
 
     let button = div()
@@ -588,13 +588,9 @@ fn preview_overlay_icon_button_inner(
                         .text_color(color(colors.hover_foreground))
                 })
         })
-        .on_hover(move |hover, _window, cx| {
-            retarget_hover_motion(&hover_transition, *hover && enabled, cx);
-        })
-        .child(icon_svg(icon, PREVIEW_TOOLBAR_ICON_SIZE, foreground))
-        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-            button_mouse_down(enabled, window, cx);
-        });
+        .child(icon_svg(icon, PREVIEW_TOOLBAR_ICON_SIZE, foreground));
+
+    let button = apply_button_motion(button, motion, enabled);
 
     if let Some(focus) = focus {
         apply_accessible_button_with_focus(button, label, enabled, focus)

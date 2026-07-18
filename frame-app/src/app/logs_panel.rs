@@ -4,16 +4,16 @@ use super::components::{
     frame_icon_button, frame_icon_swap_button, frame_vertical_uniform_scrollbar,
 };
 use super::primitives::{
-    FrameSurface, button_mouse_down, card_surface_shadows, color, element_id,
+    FrameSurface, apply_button_motion, button_motion, card_surface_shadows, color, element_id,
     panel_bottom_separator,
 };
 use super::{
     ActiveLogFile, ClickEvent, Context, ConversionEventState, FileQueue, FluentBuilder, FrameRoot,
     InteractiveElement, IntoElement, LOG_LINE_HEIGHT, LOG_LINE_NUMBER_WIDTH,
     LOG_SCROLL_BUTTON_OFFSET, LOG_SCROLL_BUTTON_PADDING, LOG_SCROLL_BUTTON_SIZE,
-    LOG_SCROLL_ICON_SIZE, Lerp, LogLine, MouseButton, PANEL_HEADER_HEIGHT, ParentElement,
-    ScrollStrategy, ScrollWheelEvent, StatefulInteractiveElement, Styled, UniformListScrollHandle,
-    Window, assets, div, hover_motion, px, retarget_hover_motion, theme, uniform_list,
+    LOG_SCROLL_ICON_SIZE, Lerp, LogLine, PANEL_HEADER_HEIGHT, ParentElement, ScrollStrategy,
+    ScrollWheelEvent, StatefulInteractiveElement, Styled, UniformListScrollHandle, Window, assets,
+    div, px, theme, uniform_list,
 };
 use crate::numeric::usize_to_f32;
 
@@ -132,15 +132,15 @@ pub(super) fn log_tab_button(
     let file_id = file.id.clone();
     let key_file_id = file.id.clone();
     let keyboard_file_ids = active_file_ids.to_vec();
-    let hover_transition = hover_motion(element_id("logs-tab-hover", &file.id), window, cx);
-    let hover_progress = *hover_transition.evaluate(window, cx);
+    let motion = button_motion(element_id("logs-tab-hover", &file.id), window, cx);
+    let hover_progress = *motion.hover_transition.evaluate(window, cx);
     let foreground = if selected {
         color(theme::FOREGROUND)
     } else {
         color(theme::FRAME_GRAY_600).lerp(&color(theme::FOREGROUND), hover_progress)
     };
 
-    div()
+    let button = div()
         .id(element_id("logs-tab", &file.id))
         .role(gpui::Role::Tab)
         .aria_label(file.name.clone())
@@ -153,12 +153,6 @@ pub(super) fn log_tab_button(
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
         .hover(gpui::Styled::cursor_pointer)
-        .on_hover(move |hover, _window, cx| {
-            retarget_hover_motion(&hover_transition, *hover && !selected, cx);
-        })
-        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-            button_mouse_down(true, window, cx);
-        })
         .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
             if root.select_log_file_for_logs_view(&file_id) {
                 cx.notify();
@@ -180,7 +174,9 @@ pub(super) fn log_tab_button(
                 cx.stop_propagation();
             }),
         )
-        .child(file.name.clone())
+        .child(file.name.clone());
+
+    apply_button_motion(button, motion, true)
 }
 
 pub(super) fn logs_body(

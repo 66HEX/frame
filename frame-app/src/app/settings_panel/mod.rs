@@ -21,8 +21,8 @@ use super::{
     input::{FrameTextInputSpec, frame_text_input},
     preview_panel::timeline_slider_percent_from_bounds,
     primitives::{
-        ButtonVariant, FrameSurface, animated_button_colors, button_colors,
-        button_highlight_shadows, button_mouse_down, color, horizontal_separator_shadows, icon_svg,
+        ButtonVariant, FrameSurface, animated_button_colors, apply_button_motion, button_colors,
+        button_highlight_shadows, button_motion, color, horizontal_separator_shadows, icon_svg,
         panel_bottom_separator,
     },
 };

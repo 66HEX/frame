@@ -7,9 +7,9 @@ pub(in crate::app) use super::accessibility::{
 };
 use super::{
     primitives::{
-        ButtonColors, ButtonVariant, animated_button_colors, button_colors,
-        button_highlight_shadows, button_mouse_down, color, icon_svg, input_highlight_shadows,
-        parse_hex,
+        ButtonColors, ButtonVariant, animated_button_colors, apply_button_motion, button_colors,
+        button_highlight_shadows, button_motion, button_mouse_down, color, icon_svg,
+        input_highlight_shadows, parse_hex,
     },
     *,
 };

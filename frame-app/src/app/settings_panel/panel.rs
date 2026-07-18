@@ -1,16 +1,16 @@
 use super::super::accessibility::focus_visible_ring;
 use super::{
     ButtonVariant, ClickEvent, Context, FluentBuilder, FrameRoot, FrameSurface, InteractiveElement,
-    IntoElement, MouseButton, PANEL_HEADER_HEIGHT, ParentElement, SETTINGS_PANEL_PADDING,
+    IntoElement, PANEL_HEADER_HEIGHT, ParentElement, SETTINGS_PANEL_PADDING,
     SETTINGS_TAB_BUTTON_SIZE, SETTINGS_TAB_ICON_SIZE, SettingsPresetsTabState, SettingsRenderState,
     SettingsSubtitlesTabState, SettingsTab, SettingsVideoInputFocuses, SourceKind,
-    StatefulInteractiveElement, Styled, Window, button_colors, button_highlight_shadows,
-    button_mouse_down, color, div, frame_tooltip, hover_motion, icon_svg, mix_color,
-    panel_bottom_separator, px, resolve_active_settings_tab, retarget_hover_motion,
-    settings_audio_filters_tab, settings_audio_tab, settings_images_tab, settings_metadata_tab,
-    settings_output_tab, settings_presets_tab, settings_section_label, settings_source_tab,
-    settings_subtitles_tab, settings_tab_icon, settings_video_filters_tab, settings_video_tab,
-    theme, visible_settings_tabs,
+    StatefulInteractiveElement, Styled, Window, apply_button_motion, button_colors,
+    button_highlight_shadows, button_motion, color, div, frame_tooltip, icon_svg, mix_color,
+    panel_bottom_separator, px, resolve_active_settings_tab, settings_audio_filters_tab,
+    settings_audio_tab, settings_images_tab, settings_metadata_tab, settings_output_tab,
+    settings_presets_tab, settings_section_label, settings_source_tab, settings_subtitles_tab,
+    settings_tab_icon, settings_video_filters_tab, settings_video_tab, theme,
+    visible_settings_tabs,
 };
 use crate::settings::source_kind_for;
 
@@ -80,8 +80,8 @@ pub(in crate::app) fn settings_tab_button(
 ) -> impl IntoElement {
     let colors = button_colors(ButtonVariant::Secondary, selected, true);
     let tab_id = format!("settings-tab-{}", tab.id());
-    let hover_transition = hover_motion(format!("{tab_id}-hover"), window, cx);
-    let hover_progress = *hover_transition.evaluate(window, cx);
+    let motion = button_motion(format!("{tab_id}-hover"), window, cx);
+    let hover_progress = *motion.hover_transition.evaluate(window, cx);
     let background = if selected {
         mix_color(colors.background, colors.hover_background, hover_progress)
     } else {
@@ -118,12 +118,6 @@ pub(in crate::app) fn settings_tab_button(
         .when(selected, |this| this.shadow(button_highlight_shadows()))
         .hover(gpui::Styled::cursor_pointer)
         .active(move |style| style.bg(color(colors.active_background)))
-        .on_hover(move |hover, _window, cx| {
-            retarget_hover_motion(&hover_transition, *hover, cx);
-        })
-        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-            button_mouse_down(true, window, cx);
-        })
         .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
             root.settings_ui.active_tab = tab;
             cx.stop_propagation();
@@ -146,6 +140,7 @@ pub(in crate::app) fn settings_tab_button(
             SETTINGS_TAB_ICON_SIZE,
             foreground,
         ));
+    let button = apply_button_motion(button, motion, true);
 
     frame_tooltip(
         tab.id(),

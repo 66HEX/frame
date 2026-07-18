@@ -1,9 +1,9 @@
 use super::{
-    ButtonVariant, Context, FluentBuilder, FrameRoot, InteractiveElement, MouseButton,
-    ParentElement, SETTINGS_CONTROL_HEIGHT, StatefulInteractiveElement, Styled, Window,
-    animated_button_colors, apply_accessible_toggle_button, button_colors,
-    button_highlight_shadows, button_mouse_down, color, div, frame_selection_dot, hover_motion,
-    mix_color, mix_scalar, px, retarget_hover_motion, selected_motion, theme,
+    ButtonVariant, Context, FluentBuilder, FrameRoot, InteractiveElement, ParentElement,
+    SETTINGS_CONTROL_HEIGHT, StatefulInteractiveElement, Styled, Window, animated_button_colors,
+    apply_accessible_toggle_button, apply_button_motion, button_colors, button_highlight_shadows,
+    button_motion, color, div, frame_selection_dot, mix_color, mix_scalar, px, selected_motion,
+    theme,
 };
 
 pub(in crate::app) fn frame_list_item(
@@ -17,8 +17,8 @@ pub(in crate::app) fn frame_list_item(
     let id = id.into();
     let label = label.into();
     let selected_progress = selected_motion(format!("{id}-selected"), selected, window, cx);
-    let hover_transition = hover_motion(format!("{id}-hover"), window, cx);
-    let hover_progress = *hover_transition.evaluate(window, cx);
+    let motion = button_motion(format!("{id}-hover"), window, cx);
+    let hover_progress = *motion.hover_transition.evaluate(window, cx);
     let emphasis_progress = selected_progress.max(hover_progress);
 
     let item = div()
@@ -51,13 +51,9 @@ pub(in crate::app) fn frame_list_item(
         ))
         .opacity(if enabled { 1.0 } else { 0.5 })
         .when(enabled, |this| this.hover(gpui::Styled::cursor_pointer))
-        .when(!enabled, gpui::Styled::cursor_not_allowed)
-        .on_hover(move |hover, _window, cx| {
-            retarget_hover_motion(&hover_transition, *hover && enabled, cx);
-        })
-        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-            button_mouse_down(enabled, window, cx);
-        });
+        .when(!enabled, gpui::Styled::cursor_not_allowed);
+
+    let item = apply_button_motion(item, motion, enabled);
 
     apply_accessible_toggle_button(item, label, enabled, selected)
 }
@@ -119,7 +115,7 @@ pub(in crate::app) fn frame_track_list_item(
     let animated = animated_button_colors(id.clone(), colors, window, cx);
     let background = animated.background;
     let foreground = animated.foreground;
-    let hover_transition = animated.hover_transition;
+    let motion = animated.motion;
     let FrameTrackListItemText {
         index_label,
         primary,
@@ -193,14 +189,10 @@ pub(in crate::app) fn frame_track_list_item(
                 .active(move |style| style.bg(color(colors.active_background)))
         })
         .when(!enabled, gpui::Styled::cursor_not_allowed)
-        .on_hover(move |hover, _window, cx| {
-            retarget_hover_motion(&hover_transition, *hover && enabled, cx);
-        })
-        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-            button_mouse_down(enabled, window, cx);
-        })
         .child(content)
         .child(frame_selection_dot(selected));
+
+    let item = apply_button_motion(item, motion, enabled);
 
     apply_accessible_toggle_button(item, accessible_label, enabled, selected)
 }

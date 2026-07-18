@@ -8,26 +8,26 @@ use super::components::{
 };
 use super::input::{FrameTextInputSpec, frame_text_input};
 use super::primitives::{
-    ButtonColors, ButtonVariant, action_button, animated_button_colors, button_colors,
-    button_highlight_shadows, button_mouse_down, card_surface_shadows, color, icon_svg,
+    ButtonColors, ButtonVariant, action_button, animated_button_colors, apply_button_motion,
+    button_colors, button_highlight_shadows, button_motion, card_surface_shadows, color, icon_svg,
     input_highlight_shadows, panel_bottom_separator, vertical_separator,
 };
 use super::settings_panel::{settings_hint_text, settings_section};
 use super::{
     ActiveView, ClickEvent, Context, ExternalPaths, FILE_LIST_ACTION_ICON_SIZE, FRAME_APP_VERSION,
     FluentBuilder, FocusHandle, FrameAppState, FrameRoot, FrameTextInputKind, InteractiveElement,
-    IntoElement, LEFT_COLUMN_SPAN, MouseButton, PANEL_HEADER_HEIGHT, ParentElement,
-    RIGHT_COLUMN_SPAN, SETTINGS_CONTROL_HEIGHT, SURFACE_MOTION_DURATION, ScrollHandle,
-    StatefulInteractiveElement, Styled, TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_DIVIDER_HEIGHT,
-    TITLEBAR_HEIGHT, TITLEBAR_ICON_SIZE, TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
-    TITLEBAR_LINUX_WINDOW_CONTROLS_GAP, TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X,
-    TITLEBAR_LOGO_SIZE, TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_PLACEHOLDER_WIDTH,
-    TITLEBAR_NAV_BUTTON_HEIGHT, TITLEBAR_PLATFORM_DIVIDER_HEIGHT, TITLEBAR_SEGMENT_HEIGHT,
-    TITLEBAR_TOP_PADDING, TITLEBAR_TRAFFIC_LIGHT_SIZE, TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
+    IntoElement, LEFT_COLUMN_SPAN, PANEL_HEADER_HEIGHT, ParentElement, RIGHT_COLUMN_SPAN,
+    SETTINGS_CONTROL_HEIGHT, SURFACE_MOTION_DURATION, ScrollHandle, StatefulInteractiveElement,
+    Styled, TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_DIVIDER_HEIGHT, TITLEBAR_HEIGHT,
+    TITLEBAR_ICON_SIZE, TITLEBAR_LINUX_WINDOW_BUTTON_SIZE, TITLEBAR_LINUX_WINDOW_CONTROLS_GAP,
+    TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X, TITLEBAR_LOGO_SIZE,
+    TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_PLACEHOLDER_WIDTH, TITLEBAR_NAV_BUTTON_HEIGHT,
+    TITLEBAR_PLATFORM_DIVIDER_HEIGHT, TITLEBAR_SEGMENT_HEIGHT, TITLEBAR_TOP_PADDING,
+    TITLEBAR_TRAFFIC_LIGHT_SIZE, TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
     TITLEBAR_WINDOWS_WINDOW_ICON_SIZE, TITLEBAR_WINDOWS_WINDOW_MAX_ICON_SIZE, UpdateInfo,
     UpdateStatus, WORKSPACE_COLUMNS, WORKSPACE_GAP, Window, WindowControlArea, assets, div,
-    ease_in_out, format_total_size, hover_motion, mix_color, motion_is_hidden, motion_target, px,
-    relative, retarget_hover_motion, set_motion_target, settings_sheet_right_inset, svg, theme,
+    ease_in_out, format_total_size, mix_color, motion_is_hidden, motion_target, px, relative,
+    set_motion_target, settings_sheet_right_inset, svg, theme,
 };
 use gpui::{HighlightStyle, StyledText};
 
@@ -1469,7 +1469,7 @@ pub(super) fn app_settings_close_button(
     let animated = animated_button_colors(id, colors, window, cx);
     let background = animated.background;
     let foreground = animated.foreground;
-    let hover_transition = animated.hover_transition;
+    let motion = animated.motion;
 
     let button = div()
         .id(id)
@@ -1484,17 +1484,12 @@ pub(super) fn app_settings_close_button(
         .text_color(foreground)
         .hover(gpui::Styled::cursor_pointer)
         .active(move |style| style.bg(color(colors.active_background)))
-        .on_hover(move |hover, _window, cx| {
-            retarget_hover_motion(&hover_transition, *hover, cx);
-        })
-        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-            button_mouse_down(true, window, cx);
-        })
         .child(icon_svg(
             assets::ICON_CLOSE,
             FILE_LIST_ACTION_ICON_SIZE,
             foreground,
         ));
+    let button = apply_button_motion(button, motion, true);
 
     apply_accessible_button_with_focus(button, label, true, focus)
 }
@@ -1776,7 +1771,7 @@ pub(super) fn titlebar_window_button(
     let animated = animated_button_colors(id, colors, window, cx);
     let background = animated.background;
     let icon_color = animated.foreground;
-    let hover_transition = animated.hover_transition;
+    let motion = animated.motion;
 
     let button = div()
         .id(id)
@@ -1790,13 +1785,8 @@ pub(super) fn titlebar_window_button(
         .text_color(icon_color)
         .hover(gpui::Styled::cursor_pointer)
         .active(move |style| style.bg(color(active_background)))
-        .on_hover(move |hover, _window, cx| {
-            retarget_hover_motion(&hover_transition, *hover, cx);
-        })
-        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-            button_mouse_down(true, window, cx);
-        })
         .child(icon_svg(icon, metrics.icon_size, icon_color));
+    let button = apply_button_motion(button, motion, true);
 
     apply_accessible_button(button, label, true).tab_stop(false)
 }
@@ -1918,8 +1908,8 @@ pub(super) fn titlebar_segment(
         ActiveView::Workspace => "titlebar-workspace",
         ActiveView::Logs => "titlebar-logs",
     };
-    let hover_transition = hover_motion(format!("{segment_id}-hover"), window, cx);
-    let hover_progress = *hover_transition.evaluate(window, cx);
+    let motion = button_motion(format!("{segment_id}-hover"), window, cx);
+    let hover_progress = *motion.hover_transition.evaluate(window, cx);
     let background = if selected {
         mix_color(colors.background, colors.hover_background, hover_progress)
     } else {
@@ -1935,7 +1925,7 @@ pub(super) fn titlebar_segment(
         hover_progress,
     );
 
-    div()
+    let button = div()
         .id(segment_id)
         .h(px(TITLEBAR_NAV_BUTTON_HEIGHT))
         .role(gpui::Role::Tab)
@@ -1956,12 +1946,6 @@ pub(super) fn titlebar_segment(
         .when(selected, |this| this.shadow(button_highlight_shadows()))
         .hover(gpui::Styled::cursor_pointer)
         .active(move |style| style.bg(color(colors.active_background)))
-        .on_hover(move |hover, _window, cx| {
-            retarget_hover_motion(&hover_transition, *hover, cx);
-        })
-        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-            button_mouse_down(true, window, cx);
-        })
         .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
             if root.active_view != view {
                 root.active_view = view;
@@ -1983,7 +1967,9 @@ pub(super) fn titlebar_segment(
             }),
         )
         .child(icon_svg(icon, TITLEBAR_ICON_SIZE, foreground))
-        .child(theme::ui_text(label))
+        .child(theme::ui_text(label));
+
+    apply_button_motion(button, motion, true)
 }
 
 fn titlebar_view_for_key(current: ActiveView, key: &str) -> Option<ActiveView> {

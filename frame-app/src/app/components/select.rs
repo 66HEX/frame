@@ -4,9 +4,9 @@ use super::{
     ScrollHandle, ScrollWheelEvent, StatefulInteractiveElement, Styled, Window,
     animated_button_colors, apply_accessible_select_option,
     apply_accessible_select_option_with_focus, apply_accessible_select_trigger,
-    apply_accessible_select_trigger_with_focus, assets, button_colors, button_highlight_shadows,
-    button_mouse_down, color, div, icon_svg, input_highlight_shadows, parse_hex, px,
-    retarget_hover_motion, theme,
+    apply_accessible_select_trigger_with_focus, apply_button_motion, assets, button_colors,
+    button_highlight_shadows, button_mouse_down, color, div, icon_svg, input_highlight_shadows,
+    parse_hex, px, theme,
 };
 use crate::numeric::usize_to_f32;
 use gpui::FocusHandle;
@@ -130,7 +130,7 @@ fn frame_select_trigger_content_inner(
     let animated = animated_button_colors(id.clone(), colors, window, cx);
     let background = animated.background;
     let foreground = animated.foreground;
-    let hover_transition = animated.hover_transition;
+    let motion = animated.motion;
 
     let trigger = div()
         .id(id.clone())
@@ -154,19 +154,19 @@ fn frame_select_trigger_content_inner(
                 .active(move |style| style.bg(color(colors.active_background)))
         })
         .when(!enabled, gpui::Styled::cursor_not_allowed)
-        .on_hover(move |hover, _window, cx| {
-            retarget_hover_motion(&hover_transition, *hover && enabled, cx);
-        })
-        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-            cx.stop_propagation();
-            button_mouse_down(enabled, window, cx);
-        })
         .child(content)
         .child(
             div()
                 .flex_shrink_0()
                 .child(icon_svg(assets::ICON_UNFOLD_MORE, 12.0, foreground)),
         );
+
+    let trigger = apply_button_motion(trigger, motion, enabled).on_mouse_down(
+        MouseButton::Left,
+        move |_, _window, cx| {
+            cx.stop_propagation();
+        },
+    );
 
     if let Some(focus) = focus {
         apply_accessible_select_trigger_with_focus(trigger, label, enabled, expanded, focus)

@@ -1,5 +1,5 @@
 use super::{
-    App, BoxShadow, Context, ElementId, FluentBuilder, FrameRoot, InteractiveElement, IntoElement,
+    App, BoxShadow, Context, FluentBuilder, FrameRoot, InteractiveElement, IntoElement,
     MouseButton, ParentElement, Rgba, StatefulInteractiveElement, Styled,
     TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_BUTTON_HEIGHT, TITLEBAR_ICON_BUTTON_SIZE,
     TITLEBAR_ICON_SIZE, Window, accessibility::apply_accessible_button, div, hover_motion, hsla,
@@ -26,7 +26,12 @@ pub(super) struct ButtonColors {
 pub(super) struct AnimatedButtonColors {
     pub(super) background: Rgba,
     pub(super) foreground: Rgba,
+    pub(super) motion: ButtonMotion,
+}
+
+pub(super) struct ButtonMotion {
     pub(super) hover_transition: gpui::Transition<f32>,
+    pressed: gpui::Entity<bool>,
 }
 
 pub(super) const fn button_colors(
@@ -92,18 +97,86 @@ pub(super) const fn button_colors(
 }
 
 pub(super) fn animated_button_colors(
-    id: impl Into<ElementId>,
+    id: impl Into<String>,
     colors: ButtonColors,
     window: &mut Window,
     cx: &mut App,
 ) -> AnimatedButtonColors {
-    let hover_transition = hover_motion(id, window, cx);
-    let hover_progress = *hover_transition.evaluate(window, cx);
+    let motion = button_motion(id, window, cx);
+    let hover_progress = *motion.hover_transition.evaluate(window, cx);
     AnimatedButtonColors {
         background: mix_color(colors.background, colors.hover_background, hover_progress),
         foreground: mix_color(colors.foreground, colors.hover_foreground, hover_progress),
-        hover_transition,
+        motion,
     }
+}
+
+pub(super) fn button_motion(
+    id: impl Into<String>,
+    window: &mut Window,
+    cx: &mut App,
+) -> ButtonMotion {
+    let id = id.into();
+    ButtonMotion {
+        hover_transition: hover_motion(id.clone(), window, cx),
+        // GPUI refreshes after mouse-down, so pressed state must outlive render closures.
+        pressed: window.use_keyed_state(format!("{id}-pressed"), cx, |_window, _cx| false),
+    }
+}
+
+pub(super) fn apply_button_motion(
+    button: gpui::Stateful<gpui::Div>,
+    motion: ButtonMotion,
+    enabled: bool,
+) -> gpui::Stateful<gpui::Div> {
+    let hover_transition = motion.hover_transition.clone();
+    let pressed = motion.pressed.clone();
+    let button = button.on_hover(move |hover, _window, cx| {
+        // GPUI suppresses hover while a click is pending; pressed keeps the whole button emphasized.
+        let pressed = *pressed.read(cx);
+        retarget_hover_motion(
+            &hover_transition,
+            button_motion_is_emphasized(enabled, *hover, pressed),
+            cx,
+        );
+    });
+
+    let hover_transition = motion.hover_transition.clone();
+    let pressed = motion.pressed.clone();
+    let button = button.on_mouse_down(MouseButton::Left, move |_, window, cx| {
+        if enabled {
+            set_button_pressed(&pressed, true, cx);
+            retarget_hover_motion(&hover_transition, true, cx);
+        }
+        button_mouse_down(enabled, window, cx);
+    });
+
+    let hover_transition = motion.hover_transition.clone();
+    let pressed = motion.pressed.clone();
+    let button = button.on_mouse_up(MouseButton::Left, move |_, _window, cx| {
+        set_button_pressed(&pressed, false, cx);
+        retarget_hover_motion(&hover_transition, enabled, cx);
+    });
+
+    let hover_transition = motion.hover_transition;
+    let pressed = motion.pressed;
+    button.on_mouse_up_out(MouseButton::Left, move |_, _window, cx| {
+        set_button_pressed(&pressed, false, cx);
+        retarget_hover_motion(&hover_transition, false, cx);
+    })
+}
+
+fn set_button_pressed(pressed: &gpui::Entity<bool>, is_pressed: bool, cx: &mut App) {
+    if *pressed.read(cx) != is_pressed {
+        pressed.update(cx, |pressed, cx| {
+            *pressed = is_pressed;
+            cx.notify();
+        });
+    }
+}
+
+const fn button_motion_is_emphasized(enabled: bool, hovered: bool, pressed: bool) -> bool {
+    enabled && (hovered || pressed)
 }
 
 pub(super) fn button_mouse_down(enabled: bool, window: &mut Window, cx: &mut App) {
@@ -135,7 +208,7 @@ pub(super) fn action_button(
     let animated = animated_button_colors(id.clone(), colors, window, cx);
     let background = animated.background;
     let foreground = animated.foreground;
-    let hover_transition = animated.hover_transition;
+    let motion = animated.motion;
 
     let button = div()
         .id(id.clone())
@@ -152,13 +225,9 @@ pub(super) fn action_button(
         .text_color(foreground)
         .opacity(colors.opacity)
         .when(enabled, |this| this.hover(gpui::Styled::cursor_pointer))
-        .when(!enabled, gpui::Styled::cursor_not_allowed)
-        .on_hover(move |hover, _window, cx| {
-            retarget_hover_motion(&hover_transition, *hover && enabled, cx);
-        })
-        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-            button_mouse_down(enabled, window, cx);
-        });
+        .when(!enabled, gpui::Styled::cursor_not_allowed);
+
+    let button = apply_button_motion(button, motion, enabled);
 
     let button = if is_icon_only {
         button.w(px(TITLEBAR_ICON_BUTTON_SIZE)).child(icon_svg(
@@ -338,5 +407,30 @@ pub(super) const fn color(token: theme::RgbaToken) -> Rgba {
         g: token.green,
         b: token.blue,
         a: token.alpha,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn button_motion_emphasizes_hovered_button() {
+        assert!(button_motion_is_emphasized(true, true, false));
+    }
+
+    #[test]
+    fn button_motion_keeps_pressed_button_emphasized_without_hover() {
+        assert!(button_motion_is_emphasized(true, false, true));
+    }
+
+    #[test]
+    fn button_motion_clears_emphasis_after_release_outside() {
+        assert!(!button_motion_is_emphasized(true, false, false));
+    }
+
+    #[test]
+    fn button_motion_never_emphasizes_disabled_button() {
+        assert!(!button_motion_is_emphasized(false, true, true));
     }
 }

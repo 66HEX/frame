@@ -1,9 +1,9 @@
 use super::{
     ButtonColors, ButtonVariant, Context, FluentBuilder, FrameRoot, InteractiveElement,
-    MouseButton, ParentElement, SETTINGS_CONTROL_HEIGHT, StatefulInteractiveElement, Styled,
-    Window, animated_button_colors, apply_accessible_button, apply_accessible_button_with_focus,
-    apply_accessible_toggle_button, button_colors, button_highlight_shadows, button_mouse_down,
-    color, contextual_icon_motion, div, icon_svg, px, retarget_hover_motion, theme,
+    ParentElement, SETTINGS_CONTROL_HEIGHT, StatefulInteractiveElement, Styled, Window,
+    animated_button_colors, apply_accessible_button, apply_accessible_button_with_focus,
+    apply_accessible_toggle_button, apply_button_motion, button_colors, button_highlight_shadows,
+    color, contextual_icon_motion, div, icon_svg, px, theme,
 };
 use gpui::{FocusHandle, Rgba, Svg, Transformation, size, svg};
 
@@ -124,7 +124,7 @@ fn frame_text_button_inner(
     let animated = animated_button_colors(id.clone(), colors, window, cx);
     let background = animated.background;
     let foreground = animated.foreground;
-    let hover_transition = animated.hover_transition;
+    let motion = animated.motion;
     let button = div()
         .id(id)
         .h(px(SETTINGS_CONTROL_HEIGHT))
@@ -146,13 +146,9 @@ fn frame_text_button_inner(
                 .active(move |style| style.bg(color(colors.active_background)))
         })
         .when(!enabled, gpui::Styled::cursor_not_allowed)
-        .on_hover(move |hover, _window, cx| {
-            retarget_hover_motion(&hover_transition, *hover && enabled, cx);
-        })
-        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-            button_mouse_down(enabled, window, cx);
-        })
         .child(display_label);
+
+    let button = apply_button_motion(button, motion, enabled);
 
     if let Some(focus) = focus {
         apply_accessible_button_with_focus(button, label, enabled, focus)
@@ -291,7 +287,7 @@ fn frame_icon_button_inner(
     );
     let animated_background = animated.background;
     let animated_foreground = animated.foreground;
-    let hover_transition = animated.hover_transition;
+    let motion = animated.motion;
     let icon = frame_icon_button_content(content, size.icon, animated_foreground);
 
     let button = div()
@@ -311,13 +307,9 @@ fn frame_icon_button_inner(
                 .active(move |style| style.bg(color(active_background)))
         })
         .when(!enabled, gpui::Styled::cursor_not_allowed)
-        .on_hover(move |hover, _window, cx| {
-            retarget_hover_motion(&hover_transition, *hover && enabled, cx);
-        })
-        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-            button_mouse_down(enabled, window, cx);
-        })
         .child(icon);
+
+    let button = apply_button_motion(button, motion, enabled);
 
     apply_accessible_button(button, label, enabled)
 }

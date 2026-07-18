@@ -1,11 +1,11 @@
 use super::{
     ButtonVariant, ClickEvent, Context, FlipAxis, FluentBuilder, FrameRoot, InteractiveElement,
-    MouseButton, PREVIEW_TOOLBAR_BUTTON_SIZE, PREVIEW_TOOLBAR_ICON_SIZE, PREVIEW_TOOLBAR_OFFSET,
-    ParentElement, PreviewCanvasZoomDirection, PreviewShellState, PreviewToolFocuses,
-    StatefulInteractiveElement, Styled, Window, animated_button_colors, apply_accessible_button,
-    apply_accessible_button_with_focus, apply_accessible_toggle_button, assets, button_colors,
-    button_highlight_shadows, button_mouse_down, card_surface_shadows, color, div, icon_svg,
-    parse_hex, preview_visual_controls_enabled, px, relative, retarget_hover_motion, theme,
+    PREVIEW_TOOLBAR_BUTTON_SIZE, PREVIEW_TOOLBAR_ICON_SIZE, PREVIEW_TOOLBAR_OFFSET, ParentElement,
+    PreviewCanvasZoomDirection, PreviewShellState, PreviewToolFocuses, StatefulInteractiveElement,
+    Styled, Window, animated_button_colors, apply_accessible_button,
+    apply_accessible_button_with_focus, apply_accessible_toggle_button, apply_button_motion,
+    assets, button_colors, button_highlight_shadows, card_surface_shadows, color, div, icon_svg,
+    parse_hex, preview_visual_controls_enabled, px, relative, theme,
 };
 use gpui::FocusHandle;
 
@@ -247,7 +247,7 @@ fn preview_tool_button_inner(
     let animated = animated_button_colors(button_id.clone(), colors, window, cx);
     let background = animated.background;
     let foreground = animated.foreground;
-    let hover_transition = animated.hover_transition;
+    let motion = animated.motion;
 
     let button = div()
         .id(button_id)
@@ -270,13 +270,9 @@ fn preview_tool_button_inner(
                         .text_color(color(colors.hover_foreground))
                 })
         })
-        .on_hover(move |hover, _window, cx| {
-            retarget_hover_motion(&hover_transition, *hover && enabled, cx);
-        })
-        .child(icon_svg(icon, PREVIEW_TOOLBAR_ICON_SIZE, foreground))
-        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-            button_mouse_down(enabled, window, cx);
-        });
+        .child(icon_svg(icon, PREVIEW_TOOLBAR_ICON_SIZE, foreground));
+
+    let button = apply_button_motion(button, motion, enabled);
 
     if let Some(focus) = focus {
         let button = apply_accessible_button_with_focus(button, label, enabled, focus);

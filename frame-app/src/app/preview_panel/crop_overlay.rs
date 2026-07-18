@@ -461,7 +461,7 @@ fn compact_text_button_variant_inner(
     let animated = animated_button_colors(id.clone(), colors, window, cx);
     let background = animated.background;
     let foreground = animated.foreground;
-    let hover_transition = animated.hover_transition;
+    let motion = animated.motion;
     let highlighted = selected || matches!(variant, ButtonVariant::Default);
 
     let button = div()
@@ -487,13 +487,9 @@ fn compact_text_button_variant_inner(
                 })
         })
         .when(!enabled, gpui::Styled::cursor_not_allowed)
-        .on_hover(move |hover, _window, cx| {
-            retarget_hover_motion(&hover_transition, *hover && enabled, cx);
-        })
-        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-            button_mouse_down(enabled, window, cx);
-        })
         .child(theme::ui_text(label));
+
+    let button = apply_button_motion(button, motion, enabled);
 
     if let Some(focus) = focus {
         let button = apply_accessible_button_with_focus(button, label, enabled, focus);
