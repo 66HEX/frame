@@ -165,8 +165,11 @@ impl UpdateClient {
         let version_dir = self.version_cache_dir(&update.version);
         fs::create_dir_all(&version_dir)?;
         let final_path = version_dir.join(&update.asset.file_name);
-        if final_path.is_file() && file_sha256_hex(&final_path)? == update.asset.sha256 {
-            return Ok(update_package(update, final_path));
+        if final_path.is_file() {
+            match validate_package_file(&final_path, &update.asset) {
+                Ok(_) => return Ok(update_package(update, final_path)),
+                Err(_) => fs::remove_file(&final_path)?,
+            }
         }
 
         let tmp_dir = self.config.cache_dir.join("tmp");
@@ -206,22 +209,14 @@ impl UpdateClient {
         file.sync_all()?;
         drop(file);
 
+        let actual_size = match validate_package_file(&part_path, &update.asset) {
+            Ok(actual_size) => actual_size,
+            Err(error) => {
+                fs::remove_file(&part_path).ok();
+                return Err(error);
+            }
+        };
         replace_file(&part_path, &final_path)?;
-        let actual_hash = file_sha256_hex(&final_path)?;
-        if actual_hash != update.asset.sha256 {
-            fs::remove_file(&final_path).ok();
-            return Err(UpdateError::HashMismatch {
-                expected: update.asset.sha256.clone(),
-                actual: actual_hash,
-            });
-        }
-        let actual_size = fs::metadata(&final_path)?.len();
-        if actual_size != update.asset.size_bytes {
-            return Err(UpdateError::InvalidManifest(format!(
-                "asset size mismatch: expected {}, got {actual_size}",
-                update.asset.size_bytes
-            )));
-        }
 
         on_progress(DownloadProgress {
             received_bytes: actual_size,
@@ -501,6 +496,26 @@ fn update_package(update: &UpdateInfo, path: PathBuf) -> UpdatePackage {
     }
 }
 
+fn validate_package_file(path: &Path, asset: &UpdateAsset) -> Result<u64, UpdateError> {
+    let actual_hash = file_sha256_hex(path)?;
+    if actual_hash != asset.sha256 {
+        return Err(UpdateError::HashMismatch {
+            expected: asset.sha256.clone(),
+            actual: actual_hash,
+        });
+    }
+
+    let actual_size = fs::metadata(path)?.len();
+    if actual_size != asset.size_bytes {
+        return Err(UpdateError::InvalidManifest(format!(
+            "asset size mismatch: expected {}, got {actual_size}",
+            asset.size_bytes
+        )));
+    }
+
+    Ok(actual_size)
+}
+
 fn manifest_signature_url(manifest_url: &str) -> String {
     format!("{manifest_url}.sig")
 }
@@ -518,7 +533,83 @@ fn replace_file(temp_path: &Path, final_path: &Path) -> Result<(), io::Error> {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        net::TcpListener,
+        thread::{self, JoinHandle},
+    };
+
+    use sha2::{Digest, Sha256};
+
     use super::*;
+
+    fn serve_package(body: &[u8], request_count: usize) -> (String, JoinHandle<()>) {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("test server should bind");
+        let address = listener
+            .local_addr()
+            .expect("test server should have an address");
+        let body = body.to_vec();
+        let server = thread::spawn(move || {
+            for _ in 0..request_count {
+                let (mut stream, _) = listener.accept().expect("test request should arrive");
+                let mut request = [0_u8; 1024];
+                let request_size = stream
+                    .read(&mut request)
+                    .expect("test request should be readable");
+                assert!(request_size > 0, "test request should not be empty");
+                write!(
+                    stream,
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    body.len()
+                )
+                .expect("test response headers should be writable");
+                stream
+                    .write_all(&body)
+                    .expect("test response body should be writable");
+            }
+        });
+
+        (format!("http://{address}/frame-update.zip"), server)
+    }
+
+    fn test_client(cache_dir: PathBuf) -> UpdateClient {
+        UpdateClient::new(UpdateClientConfig {
+            app_id: "Frame".to_string(),
+            current_version: Version::new(0, 31, 1),
+            channel: UpdateChannel::Stable,
+            manifest_url: "https://example.com/update-manifest.json".to_string(),
+            public_keys: Vec::new(),
+            install_context: InstallContext {
+                install_root: cache_dir.join("Frame.app"),
+                executable_path: cache_dir.join("Frame.app/frame"),
+                helper_path: cache_dir.join("frame-update-helper"),
+                relaunch: false,
+            },
+            cache_dir,
+        })
+        .expect("test client should be created")
+    }
+
+    fn test_update(url: String, body: &[u8], size_bytes: u64) -> UpdateInfo {
+        let asset_key = PlatformAssetKey::current().expect("test platform should be supported");
+        let sha256 = hex::encode(Sha256::digest(body));
+
+        UpdateInfo {
+            version: Version::new(0, 32, 0),
+            channel: UpdateChannel::Stable,
+            asset_key,
+            asset: UpdateAsset {
+                target_triple: asset_key.target_triple().to_string(),
+                kind: asset_key.asset_kind(),
+                file_name: "frame-update.zip".to_string(),
+                url,
+                size_bytes,
+                sha256,
+                installer_args: Vec::new(),
+            },
+            release_notes_url: None,
+            release_notes_markdown: None,
+        }
+    }
 
     #[test]
     fn download_progress_percent_uses_total_when_available() {
@@ -536,5 +627,60 @@ mod tests {
             manifest_signature_url("https://example.com/update-manifest.json"),
             "https://example.com/update-manifest.json.sig"
         );
+    }
+
+    #[test]
+    fn download_rejects_size_mismatch_on_repeated_attempts() {
+        let package = b"update package";
+        let (url, server) = serve_package(package, 2);
+        let temp_dir = tempfile::tempdir().expect("temporary directory should be created");
+        let client = test_client(temp_dir.path().to_path_buf());
+        let update = test_update(url, package, package.len() as u64 + 1);
+
+        let first = client.download(&update, |_| {});
+        assert!(
+            matches!(&first, Err(UpdateError::InvalidManifest(message)) if message.contains("asset size mismatch")),
+            "first attempt should reject the size mismatch, got {first:?}"
+        );
+
+        let second = client.download(&update, |_| {});
+        assert!(
+            matches!(&second, Err(UpdateError::InvalidManifest(message)) if message.contains("asset size mismatch")),
+            "second attempt should reject the size mismatch, got {second:?}"
+        );
+
+        server.join().expect("test server should finish");
+        let cached_package = client
+            .version_cache_dir(&update.version)
+            .join(&update.asset.file_name);
+        assert!(!cached_package.exists());
+    }
+
+    #[test]
+    fn download_revalidates_cached_package_size() {
+        let package = b"update package";
+        let (url, server) = serve_package(package, 1);
+        let temp_dir = tempfile::tempdir().expect("temporary directory should be created");
+        let client = test_client(temp_dir.path().to_path_buf());
+        let update = test_update(url, package, package.len() as u64 + 1);
+        let cached_package = client
+            .version_cache_dir(&update.version)
+            .join(&update.asset.file_name);
+        fs::create_dir_all(
+            cached_package
+                .parent()
+                .expect("cached package should have a parent"),
+        )
+        .expect("cache directory should be created");
+        fs::write(&cached_package, package).expect("cached package should be written");
+
+        let result = client.download(&update, |_| {});
+
+        assert!(
+            matches!(&result, Err(UpdateError::InvalidManifest(message)) if message.contains("asset size mismatch")),
+            "cached package should be revalidated, got {result:?}"
+        );
+        server.join().expect("test server should finish");
+        assert!(!cached_package.exists());
     }
 }
