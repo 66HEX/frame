@@ -197,12 +197,16 @@ impl PreviewSession {
         }
     }
 
-    pub fn stop(&self) {
+    /// Stops the preview pipeline and releases its `FFmpeg` processes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the preview pipeline cannot stop a child process.
+    pub fn stop(&self) -> Result<(), PreviewEngineError> {
         let pipeline = { lock(&self.pipeline).take() };
-        if let Some(mut pipeline) = pipeline {
-            pipeline.stop();
-        }
+        let result = pipeline.map_or(Ok(()), |mut pipeline| pipeline.stop());
         *lock(&self.playing) = false;
+        result
     }
 
     fn update_duration(&self, duration: f64) -> f64 {
@@ -230,7 +234,7 @@ impl Drop for PreviewSession {
     fn drop(&mut self) {
         let pipeline = { lock(&self.pipeline).take() };
         if let Some(mut pipeline) = pipeline {
-            pipeline.stop();
+            let _ = pipeline.stop();
         }
     }
 }

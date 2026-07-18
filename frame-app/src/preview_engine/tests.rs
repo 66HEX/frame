@@ -240,7 +240,7 @@ fn ffmpeg_preview_session_publishes_first_video_frame() {
     let _ = std::fs::remove_file(&path);
 
     let frame = session.latest_frame().expect("latest frame").frame;
-    session.stop();
+    session.stop().expect("preview session should stop");
 
     assert_eq!(
         frame.dimensions(),
@@ -268,7 +268,7 @@ fn ffmpeg_preview_session_can_play_pause_and_seek() {
         .expect("seek");
     let seek_position = session.snapshot().playback.position_seconds;
     let _ = std::fs::remove_file(&path);
-    session.stop();
+    session.stop().expect("preview session should stop");
 
     assert!(played_position > 0.0);
     assert!(seek_position >= 0.99);
@@ -290,7 +290,7 @@ fn ffmpeg_preview_session_reconfigure_preserves_playback_position() {
     session.reconfigure(next_config).expect("reconfigure");
     let after = session.snapshot().playback;
     let _ = std::fs::remove_file(&path);
-    session.stop();
+    session.stop().expect("preview session should stop");
 
     assert!(before.position_seconds > 0.0);
     assert!(after.position_seconds >= before.position_seconds);
@@ -310,7 +310,7 @@ fn ffmpeg_preview_session_collects_audio_video_metrics_for_sync_fixture() {
     let snapshot = session.snapshot();
     let playback_elapsed_seconds = playback_started_at.elapsed().as_secs_f64();
     let _ = std::fs::remove_file(&path);
-    session.stop();
+    session.stop().expect("preview session should stop");
 
     assert!(snapshot.runtime_metrics.video_process_spawns >= 1);
     assert!(snapshot.runtime_metrics.audio_process_spawns >= 1);

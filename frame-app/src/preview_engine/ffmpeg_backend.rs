@@ -477,9 +477,15 @@ impl RunningPreviewProcess {
         lock_playback(&self.playback).ended
     }
 
-    pub fn stop(&mut self) {
-        let _ = self.stop_running_processes();
+    /// Stops every `FFmpeg` process owned by the preview pipeline.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a preview video or audio process cannot be stopped.
+    pub fn stop(&mut self) -> Result<(), PreviewEngineError> {
+        let result = self.stop_running_processes();
         log_preview_runtime_metrics("stop", self.metrics.snapshot());
+        result
     }
 
     /// Rebuilds the `FFmpeg` preview command for a new conversion config while

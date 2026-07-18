@@ -76,7 +76,7 @@ impl FrameRoot {
         cx: &mut Context<Self>,
     ) {
         let Some(request) = request else {
-            self.clear_preview_runtime(cx);
+            self.clear_preview_runtime_for_selection(cx);
             self.preview_ui.render_presentation = PreviewRenderPresentation::default();
             self.preview_ui.rendered_presentation = PreviewRenderPresentation::default();
             return;
@@ -147,7 +147,7 @@ impl FrameRoot {
             return;
         }
 
-        self.clear_preview_runtime(cx);
+        self.clear_preview_runtime_for_selection(cx);
 
         let key = request.key.clone();
         self.preview_ui.pending_runtime_key = Some(key.clone());
@@ -160,7 +160,7 @@ impl FrameRoot {
             this.update(cx, move |root, cx| {
                 if root.preview_ui.pending_runtime_key.as_ref() != Some(&key) {
                     if let Ok(session) = result {
-                        session.stop();
+                        session.stop().ok();
                     }
                     return;
                 }
@@ -628,10 +628,15 @@ impl FrameRoot {
             || self.preview_ui.trim_preview_seek.is_active()
     }
 
-    fn clear_preview_runtime(&mut self, cx: &mut Context<Self>) {
-        if let Some(session) = self.preview_ui.session.take() {
-            session.stop();
-        }
+    pub(super) fn clear_preview_runtime(
+        &mut self,
+        cx: &mut Context<Self>,
+    ) -> Result<(), crate::preview_engine::PreviewEngineError> {
+        let stop_result = self
+            .preview_ui
+            .session
+            .take()
+            .map_or(Ok(()), |session| session.stop());
         if let Some(image) = self.preview_ui.render_image.take() {
             cx.drop_image(image, None);
         }
@@ -642,6 +647,13 @@ impl FrameRoot {
         self.preview_ui.trim_preview_seek.reset();
         self.preview_ui.render_generation = 0;
         self.preview_ui.runtime_error = None;
+        stop_result
+    }
+
+    fn clear_preview_runtime_for_selection(&mut self, cx: &mut Context<Self>) {
+        if let Err(error) = self.clear_preview_runtime(cx) {
+            eprintln!("Failed to stop the FFmpeg preview runtime: {error}");
+        }
     }
 
     fn refresh_preview_render_image(&mut self, cx: &mut Context<Self>) -> bool {
