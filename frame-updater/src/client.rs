@@ -7,7 +7,7 @@ use std::{
 };
 
 use directories::ProjectDirs;
-use reqwest::blocking::Client;
+use reqwest::{blocking::Client, header::CONTENT_LENGTH};
 use semver::Version;
 use serde::{Deserialize, Serialize};
 
@@ -187,6 +187,19 @@ impl UpdateClient {
             .map_err(|error| UpdateError::Network(error.to_string()))?
             .error_for_status()
             .map_err(|error| UpdateError::Network(error.to_string()))?;
+        let declared_content_length = response
+            .headers()
+            .get(CONTENT_LENGTH)
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.parse::<u64>().ok());
+        if let Some(declared_content_length) = declared_content_length
+            && declared_content_length != update.asset.size_bytes
+        {
+            return Err(asset_size_mismatch(
+                update.asset.size_bytes,
+                declared_content_length,
+            ));
+        }
         let total_bytes = response.content_length().or(Some(update.asset.size_bytes));
         let mut file = File::create(&part_path)?;
         let mut received_bytes = 0_u64;
@@ -199,8 +212,17 @@ impl UpdateClient {
             if read == 0 {
                 break;
             }
+            let next_received_bytes = received_bytes.saturating_add(read as u64);
+            if next_received_bytes > update.asset.size_bytes {
+                drop(file);
+                fs::remove_file(&part_path)?;
+                return Err(asset_size_mismatch(
+                    update.asset.size_bytes,
+                    next_received_bytes,
+                ));
+            }
             file.write_all(&buffer[..read])?;
-            received_bytes = received_bytes.saturating_add(read as u64);
+            received_bytes = next_received_bytes;
             on_progress(DownloadProgress {
                 received_bytes,
                 total_bytes,
@@ -507,13 +529,16 @@ fn validate_package_file(path: &Path, asset: &UpdateAsset) -> Result<u64, Update
 
     let actual_size = fs::metadata(path)?.len();
     if actual_size != asset.size_bytes {
-        return Err(UpdateError::InvalidManifest(format!(
-            "asset size mismatch: expected {}, got {actual_size}",
-            asset.size_bytes
-        )));
+        return Err(asset_size_mismatch(asset.size_bytes, actual_size));
     }
 
     Ok(actual_size)
+}
+
+fn asset_size_mismatch(expected: u64, actual: u64) -> UpdateError {
+    UpdateError::InvalidManifest(format!(
+        "asset size mismatch: expected {expected}, got {actual}"
+    ))
 }
 
 fn manifest_signature_url(manifest_url: &str) -> String {
@@ -542,12 +567,15 @@ mod tests {
 
     use super::*;
 
-    fn serve_package(body: &[u8], request_count: usize) -> (String, JoinHandle<()>) {
+    fn serve_response(
+        headers: String,
+        body: Vec<u8>,
+        request_count: usize,
+    ) -> (String, JoinHandle<()>) {
         let listener = TcpListener::bind(("127.0.0.1", 0)).expect("test server should bind");
         let address = listener
             .local_addr()
             .expect("test server should have an address");
-        let body = body.to_vec();
         let server = thread::spawn(move || {
             for _ in 0..request_count {
                 let (mut stream, _) = listener.accept().expect("test request should arrive");
@@ -558,8 +586,7 @@ mod tests {
                 assert!(request_size > 0, "test request should not be empty");
                 write!(
                     stream,
-                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                    body.len()
+                    "HTTP/1.1 200 OK\r\n{headers}Connection: close\r\n\r\n"
                 )
                 .expect("test response headers should be writable");
                 stream
@@ -569,6 +596,25 @@ mod tests {
         });
 
         (format!("http://{address}/frame-update.zip"), server)
+    }
+
+    fn serve_package(body: &[u8], request_count: usize) -> (String, JoinHandle<()>) {
+        serve_response(
+            format!("Content-Length: {}\r\n", body.len()),
+            body.to_vec(),
+            request_count,
+        )
+    }
+
+    fn serve_chunked_package(body: &[u8]) -> (String, JoinHandle<()>) {
+        let mut chunked_body = format!("{:X}\r\n", body.len()).into_bytes();
+        chunked_body.extend_from_slice(body);
+        chunked_body.extend_from_slice(b"\r\n0\r\n\r\n");
+        serve_response(
+            "Transfer-Encoding: chunked\r\n".to_string(),
+            chunked_body,
+            1,
+        )
     }
 
     fn test_client(cache_dir: PathBuf) -> UpdateClient {
@@ -609,6 +655,14 @@ mod tests {
             release_notes_url: None,
             release_notes_markdown: None,
         }
+    }
+
+    fn assert_no_partial_file(client: &UpdateClient) {
+        let tmp_dir = client.config.cache_dir.join("tmp");
+        let partial_files = fs::read_dir(tmp_dir)
+            .expect("temporary download directory should exist")
+            .count();
+        assert_eq!(partial_files, 0, "partial download should be removed");
     }
 
     #[test]
@@ -682,5 +736,53 @@ mod tests {
         );
         server.join().expect("test server should finish");
         assert!(!cached_package.exists());
+    }
+
+    #[test]
+    fn download_rejects_mismatched_content_length_before_writing() {
+        let package = b"oversized package";
+        let (url, server) = serve_package(package, 1);
+        let temp_dir = tempfile::tempdir().expect("temporary directory should be created");
+        let client = test_client(temp_dir.path().to_path_buf());
+        let update = test_update(url, package, package.len() as u64 - 1);
+        let mut progress_updates = Vec::new();
+
+        let result = client.download(&update, |progress| progress_updates.push(progress));
+
+        assert!(
+            matches!(&result, Err(UpdateError::InvalidManifest(message)) if message.contains("asset size mismatch")),
+            "declared size mismatch should be rejected, got {result:?}"
+        );
+        assert!(
+            progress_updates.is_empty(),
+            "declared size mismatch should be rejected before body progress"
+        );
+        server.join().expect("test server should finish");
+        assert_no_partial_file(&client);
+    }
+
+    #[test]
+    fn download_aborts_oversized_chunked_response_and_removes_partial_file() {
+        let package = b"oversized package";
+        let (url, server) = serve_chunked_package(package);
+        let temp_dir = tempfile::tempdir().expect("temporary directory should be created");
+        let client = test_client(temp_dir.path().to_path_buf());
+        let update = test_update(url, package, package.len() as u64 - 1);
+        let mut progress_updates = Vec::new();
+
+        let result = client.download(&update, |progress| progress_updates.push(progress));
+
+        assert!(
+            matches!(&result, Err(UpdateError::InvalidManifest(message)) if message.contains("asset size mismatch")),
+            "oversized streamed response should be rejected, got {result:?}"
+        );
+        assert!(
+            progress_updates
+                .iter()
+                .all(|progress| progress.received_bytes <= update.asset.size_bytes),
+            "streaming should stop before accepting bytes beyond the signed size"
+        );
+        server.join().expect("test server should finish");
+        assert_no_partial_file(&client);
     }
 }
