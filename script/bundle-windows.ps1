@@ -2,6 +2,8 @@
 Param(
     [Parameter()][Alias('i')][switch]$Install,
     [Parameter()][Alias('h')][switch]$Help,
+    [Parameter()][switch]$PrepareOnly,
+    [Parameter()][switch]$PackageOnly,
     [Parameter()][Alias('a')][string]$Architecture
 )
 
@@ -9,18 +11,24 @@ $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 
 function Help-Info {
-    Write-Output "Usage: bundle-windows.ps1 [-Architecture x86_64] [-Install]"
+    Write-Output "Usage: bundle-windows.ps1 [-Architecture x86_64] [-Install] [-PrepareOnly|-PackageOnly]"
     Write-Output "Build the Frame installer for Windows."
     Write-Output ""
     Write-Output "Options:"
     Write-Output "  -Architecture, -a Which architecture to build. Currently supported: x86_64"
     Write-Output "  -Install, -i      Run the installer after building."
+    Write-Output "  -PrepareOnly      Build binaries and prepare installer inputs without signing."
+    Write-Output "  -PackageOnly      Package prepared inputs without running Cargo."
     Write-Output "  -Help, -h         Show this help message."
 }
 
 if ($Help) {
     Help-Info
     exit 0
+}
+
+if ($PrepareOnly -and $PackageOnly) {
+    throw '-PrepareOnly and -PackageOnly are mutually exclusive'
 }
 
 $RepoRoot = (Resolve-Path "$PSScriptRoot\..").Path
@@ -100,10 +108,6 @@ function Build-Installer {
         "/dResourcesDir=$InnoDir"
     )
 
-    if ($env:WINDOWS_SIGNTOOL) {
-        $definitions += "/sDefaultsign=`"$env:WINDOWS_SIGNTOOL `$f`""
-    }
-
     Invoke-Checked $innoSetupPath "$RepoRoot\inno\frame.iss" @definitions
 
     if (-not (Test-Path $InstallerPath)) {
@@ -111,18 +115,26 @@ function Build-Installer {
     }
 }
 
-Initialize-VsDevShell
-Invoke-Checked rustup target add $Target
-Push-Location $RepoRoot
-try {
-    Invoke-Checked cargo xtask setup-ffmpeg --platform win32 --arch $Architecture
+if (-not $PackageOnly) {
+    Initialize-VsDevShell
+    Invoke-Checked rustup target add $Target
+    Push-Location $RepoRoot
+    try {
+        Invoke-Checked cargo xtask setup-ffmpeg --platform win32 --arch $Architecture
+    }
+    finally {
+        Pop-Location
+    }
+    Invoke-Checked cargo build --manifest-path "$RepoRoot\frame-app\Cargo.toml" --release --target $Target
+    Invoke-Checked cargo build --manifest-path "$RepoRoot\frame-updater\Cargo.toml" --release --target $Target --bin frame-update-helper
+    Prepare-BundleDirectory
 }
-finally {
-    Pop-Location
+
+if ($PrepareOnly) {
+    Write-Output "Prepared unsigned installer inputs at $InnoDir"
+    exit 0
 }
-Invoke-Checked cargo build --manifest-path "$RepoRoot\frame-app\Cargo.toml" --release --target $Target
-Invoke-Checked cargo build --manifest-path "$RepoRoot\frame-updater\Cargo.toml" --release --target $Target --bin frame-update-helper
-Prepare-BundleDirectory
+
 Build-Installer
 
 if ($Install) {

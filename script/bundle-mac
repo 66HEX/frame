@@ -9,6 +9,8 @@ target_profile="release"
 open_result=false
 local_install=false
 can_notarize=false
+build_only=false
+package_only=false
 
 help_info() {
 	echo "
@@ -19,11 +21,13 @@ Options:
   -d    Compile in debug mode and skip DMG creation.
   -o    Open the resulting DMG directory or launch the app in debug mode.
   -i    Install the resulting DMG into /Applications.
+  -b    Build and prepare the app bundle without signing or packaging.
+  -p    Sign and package an app bundle prepared by -b without running Cargo.
   -h    Display this help and exit.
 "
 }
 
-while getopts 'doih' flag; do
+while getopts 'doibph' flag; do
 	case "${flag}" in
 		d)
 			export CARGO_INCREMENTAL=true
@@ -32,6 +36,8 @@ while getopts 'doih' flag; do
 			;;
 		o) open_result=true ;;
 		i) local_install=true ;;
+		b) build_only=true ;;
+		p) package_only=true ;;
 		h)
 			help_info
 			exit 0
@@ -40,16 +46,22 @@ while getopts 'doih' flag; do
 done
 shift $((OPTIND - 1))
 
+if [[ "$build_only" = true && "$package_only" = true ]]; then
+	echo "Options -b and -p are mutually exclusive." >&2
+	exit 1
+fi
+
 if [[ "$(uname -s)" != "Darwin" ]]; then
 	echo "script/bundle-mac must be run on macOS." >&2
 	exit 1
 fi
 
-version_info="$(rustc --version --verbose)"
-host_line="$(echo "$version_info" | grep host)"
-target_triple="${host_line#*: }"
 if [[ $# -gt 0 && -n "$1" ]]; then
 	target_triple="$1"
+else
+	version_info="$(rustc --version --verbose)"
+	host_line="$(echo "$version_info" | grep host)"
+	target_triple="${host_line#*: }"
 fi
 
 case "$target_triple" in
@@ -61,14 +73,16 @@ case "$target_triple" in
 		;;
 esac
 
-(cd "$repo_root" && cargo xtask setup-ffmpeg --platform darwin --arch "$arch_suffix")
-rustup target add "$target_triple"
+if [[ "$package_only" = false ]]; then
+	(cd "$repo_root" && cargo xtask setup-ffmpeg --platform darwin --arch "$arch_suffix")
+	rustup target add "$target_triple"
 
-(
-	cd "$repo_root/frame-app"
-	cargo bundle ${build_flag} --format osx --target "$target_triple"
-)
-cargo build --manifest-path "$repo_root/frame-updater/Cargo.toml" ${build_flag} --target "$target_triple" --bin frame-update-helper
+	(
+		cd "$repo_root/frame-app"
+		cargo bundle ${build_flag} --format osx --target "$target_triple"
+	)
+	cargo build --manifest-path "$repo_root/frame-updater/Cargo.toml" ${build_flag} --target "$target_triple" --bin frame-update-helper
+fi
 
 app_bundle=""
 for candidate in \
@@ -87,12 +101,14 @@ if [[ -z "$app_bundle" ]]; then
 	exit 1
 fi
 
-helper_binary="$target_dir/$target_triple/$target_profile/frame-update-helper"
-if [[ ! -x "$helper_binary" ]]; then
-	echo "Missing update helper binary: $helper_binary" >&2
-	exit 1
+if [[ "$package_only" = false ]]; then
+	helper_binary="$target_dir/$target_triple/$target_profile/frame-update-helper"
+	if [[ ! -x "$helper_binary" ]]; then
+		echo "Missing update helper binary: $helper_binary" >&2
+		exit 1
+	fi
+	cp "$helper_binary" "$app_bundle/Contents/MacOS/frame-update-helper"
 fi
-cp "$helper_binary" "$app_bundle/Contents/MacOS/frame-update-helper"
 
 resource_dir="$app_bundle/Contents/Resources/resources/binaries"
 for binary in "ffmpeg-$target_triple" "ffprobe-$target_triple"; do
@@ -101,6 +117,11 @@ for binary in "ffmpeg-$target_triple" "ffprobe-$target_triple"; do
 		exit 1
 	fi
 done
+
+if [[ "$build_only" = true ]]; then
+	echo "Prepared unsigned application bundle: $app_bundle"
+	exit 0
+fi
 
 if [[ -n "${MACOS_SIGNING_IDENTITY:-}" ]]; then
 	echo "Code signing application bundle"

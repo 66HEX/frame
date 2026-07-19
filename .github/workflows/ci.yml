@@ -1,0 +1,58 @@
+# Generated from xtask::workflows::ci
+# Rebuild with `cargo xtask workflows`.
+name: ci
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  cargo_xtask_ci:
+    name: cargo xtask ci
+    runs-on: ubuntu-22.04
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
+    - name: steps::setup_rust
+      run: |
+        rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
+        rustup default 1.95.0
+        test "$(rustc --version | awk '{print $2}')" = "1.95.0"
+    - name: steps::setup_linux
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang desktop-file-utils libasound2-dev libdrm-dev libfontconfig1-dev libfreetype6-dev libx11-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev pkg-config
+    - name: security::validate_workflow_syntax
+      run: |
+        mkdir -p target/actionlint
+        curl --fail --location --proto '=https' --tlsv1.2 \
+          --output target/actionlint/actionlint.tar.gz \
+          https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+        echo '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  target/actionlint/actionlint.tar.gz' | sha256sum --check --strict
+        tar --extract --gzip --file target/actionlint/actionlint.tar.gz --directory target/actionlint actionlint
+        target/actionlint/actionlint -color
+    - name: security::install_cargo_deny
+      run: cargo install cargo-deny --version 0.20.2 --locked
+    - name: security::cargo_deny
+      run: cargo deny check
+    - name: security::install_cargo_audit
+      run: cargo install cargo-audit --version 0.22.2 --locked
+    - name: security::cargo_audit
+      run: |
+        cargo audit --deny unmaintained --deny unsound --no-yanked \
+          --ignore RUSTSEC-2024-0384 \
+          --ignore RUSTSEC-2024-0436 \
+          --ignore RUSTSEC-2026-0192 \
+          --ignore RUSTSEC-2026-0194 \
+          --ignore RUSTSEC-2026-0195 \
+          --ignore RUSTSEC-2026-0206
+    - name: ci::run_documented_gate
+      run: cargo xtask ci
+    timeout-minutes: 60

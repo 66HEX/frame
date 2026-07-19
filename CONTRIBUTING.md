@@ -209,6 +209,8 @@ choco install innosetup --no-progress -y
   and pixel format compatibility.
 - `tooling/xtask/`: Rust automation entrypoint for checks, bundling, and
   generated workflows.
+- `tooling/manifest-signer/`: minimal, network-free release manifest signer;
+  changes require security-focused CODEOWNERS review.
 - `script/`: platform bundling entrypoints called by `xtask` and GitHub
   Actions.
 - `CHANGELOG.md`: product release history.
@@ -235,6 +237,7 @@ Before submitting a PR, run the relevant checks:
 
 ```bash
 cargo xtask ci
+cargo xtask workflows --check
 ```
 
 For UI changes, add or update focused GPUI tests where practical. Visual parity
@@ -264,8 +267,7 @@ from the Logs view when conversion behavior is involved.
 
 ## Financial Support
 
-If you want to support the long-term maintenance of Frame, especially
-code-signing for macOS and Windows builds, use
+If you want to support the long-term maintenance and development of Frame, use
 [GitHub Sponsors](https://github.com/sponsors/66HEX).
 
 ---

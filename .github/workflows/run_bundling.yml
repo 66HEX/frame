@@ -9,28 +9,35 @@ on:
   pull_request:
     types:
       - labeled
-      - synchronize
+permissions:
+  contents: read
 jobs:
   bundle_linux_x86_64:
     if: |-
       github.event_name == 'workflow_dispatch' ||
-      (github.event.action == 'labeled' && github.event.label.name == 'run-bundling') ||
-      (github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'run-bundling'))
+      (github.event.action == 'labeled' && github.event.label.name == 'run-bundling')
     runs-on: ubuntu-22.04
+    environment: run-bundling
     env:
       CARGO_INCREMENTAL: 0
     steps:
     - name: steps::checkout_repo
-      uses: actions/checkout@v4
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
     - name: steps::setup_rust
-      uses: dtolnay/rust-toolchain@stable
+      run: |
+        rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
+        rustup default 1.95.0
+        test "$(rustc --version | awk '{print $2}')" = "1.95.0"
     - name: steps::setup_linux
       run: |
         sudo apt-get update
         sudo apt-get install -y clang curl desktop-file-utils file libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync
     - name: steps::setup_appimagetool
       run: |
-        curl -L --fail -o /tmp/appimagetool.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+        curl --fail --location --proto '=https' --tlsv1.2 --output /tmp/appimagetool.AppImage https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
+        echo 'ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0  /tmp/appimagetool.AppImage' | sha256sum --check --strict
         chmod +x /tmp/appimagetool.AppImage
     - name: ./script/bundle-linux
       env:
@@ -40,23 +47,23 @@ jobs:
       shell: bash
       run: |
         expected='gh-releases-zsync|66HEX|frame|latest|Frame-x86_64.AppImage.zsync'
-        actual=$(target/release/Frame-x86_64.AppImage --appimage-updateinformation)
-        test $actual = $expected
+        actual="$(target/release/Frame-x86_64.AppImage --appimage-updateinformation)"
+        test "$actual" = "$expected"
         test -s target/release/Frame-x86_64.AppImage.zsync
     - name: run_bundling::upload_artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: frame-linux-x86_64.tar.gz
         path: target/release/frame-linux-x86_64.tar.gz
         if-no-files-found: error
     - name: run_bundling::upload_appimage_artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: Frame-x86_64.AppImage
         path: target/release/Frame-x86_64.AppImage
         if-no-files-found: error
     - name: run_bundling::upload_appimage_zsync_artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: Frame-x86_64.AppImage.zsync
         path: target/release/Frame-x86_64.AppImage.zsync
@@ -65,23 +72,29 @@ jobs:
   bundle_linux_aarch64:
     if: |-
       github.event_name == 'workflow_dispatch' ||
-      (github.event.action == 'labeled' && github.event.label.name == 'run-bundling') ||
-      (github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'run-bundling'))
+      (github.event.action == 'labeled' && github.event.label.name == 'run-bundling')
     runs-on: ubuntu-22.04-arm
+    environment: run-bundling
     env:
       CARGO_INCREMENTAL: 0
     steps:
     - name: steps::checkout_repo
-      uses: actions/checkout@v4
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
     - name: steps::setup_rust
-      uses: dtolnay/rust-toolchain@stable
+      run: |
+        rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
+        rustup default 1.95.0
+        test "$(rustc --version | awk '{print $2}')" = "1.95.0"
     - name: steps::setup_linux
       run: |
         sudo apt-get update
         sudo apt-get install -y clang curl desktop-file-utils file libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync
     - name: steps::setup_appimagetool
       run: |
-        curl -L --fail -o /tmp/appimagetool.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-aarch64.AppImage
+        curl --fail --location --proto '=https' --tlsv1.2 --output /tmp/appimagetool.AppImage https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-aarch64.AppImage
+        echo 'f0837e7448a0c1e4e650a93bb3e85802546e60654ef287576f46c71c126a9158  /tmp/appimagetool.AppImage' | sha256sum --check --strict
         chmod +x /tmp/appimagetool.AppImage
     - name: ./script/bundle-linux
       env:
@@ -91,23 +104,23 @@ jobs:
       shell: bash
       run: |
         expected='gh-releases-zsync|66HEX|frame|latest|Frame-aarch64.AppImage.zsync'
-        actual=$(target/release/Frame-aarch64.AppImage --appimage-updateinformation)
-        test $actual = $expected
+        actual="$(target/release/Frame-aarch64.AppImage --appimage-updateinformation)"
+        test "$actual" = "$expected"
         test -s target/release/Frame-aarch64.AppImage.zsync
     - name: run_bundling::upload_artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: frame-linux-aarch64.tar.gz
         path: target/release/frame-linux-aarch64.tar.gz
         if-no-files-found: error
     - name: run_bundling::upload_appimage_artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: Frame-aarch64.AppImage
         path: target/release/Frame-aarch64.AppImage
         if-no-files-found: error
     - name: run_bundling::upload_appimage_zsync_artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: Frame-aarch64.AppImage.zsync
         path: target/release/Frame-aarch64.AppImage.zsync
@@ -116,28 +129,33 @@ jobs:
   bundle_macos_x86_64:
     if: |-
       github.event_name == 'workflow_dispatch' ||
-      (github.event.action == 'labeled' && github.event.label.name == 'run-bundling') ||
-      (github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'run-bundling'))
+      (github.event.action == 'labeled' && github.event.label.name == 'run-bundling')
     runs-on: macos-26-intel
+    environment: run-bundling
     env:
       CARGO_INCREMENTAL: 0
     steps:
     - name: steps::checkout_repo
-      uses: actions/checkout@v4
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
     - name: steps::setup_rust
-      uses: dtolnay/rust-toolchain@stable
+      run: |
+        rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
+        rustup default 1.95.0
+        test "$(rustc --version | awk '{print $2}')" = "1.95.0"
     - name: steps::install_cargo_bundle
-      run: cargo install cargo-bundle --locked
+      run: cargo install cargo-bundle --version 0.11.0 --locked
     - name: ./script/bundle-mac
       run: ./script/bundle-mac x86_64-apple-darwin
     - name: run_bundling::upload_artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: Frame-x86_64.dmg
         path: target/x86_64-apple-darwin/release/Frame-x86_64.dmg
         if-no-files-found: error
     - name: run_bundling::upload_update_artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: Frame-x86_64.app.zip
         path: target/x86_64-apple-darwin/release/Frame-x86_64.app.zip
@@ -146,28 +164,33 @@ jobs:
   bundle_macos_aarch64:
     if: |-
       github.event_name == 'workflow_dispatch' ||
-      (github.event.action == 'labeled' && github.event.label.name == 'run-bundling') ||
-      (github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'run-bundling'))
+      (github.event.action == 'labeled' && github.event.label.name == 'run-bundling')
     runs-on: macos-26
+    environment: run-bundling
     env:
       CARGO_INCREMENTAL: 0
     steps:
     - name: steps::checkout_repo
-      uses: actions/checkout@v4
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
     - name: steps::setup_rust
-      uses: dtolnay/rust-toolchain@stable
+      run: |
+        rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
+        rustup default 1.95.0
+        test "$(rustc --version | awk '{print $2}')" = "1.95.0"
     - name: steps::install_cargo_bundle
-      run: cargo install cargo-bundle --locked
+      run: cargo install cargo-bundle --version 0.11.0 --locked
     - name: ./script/bundle-mac
       run: ./script/bundle-mac aarch64-apple-darwin
     - name: run_bundling::upload_artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: Frame-aarch64.dmg
         path: target/aarch64-apple-darwin/release/Frame-aarch64.dmg
         if-no-files-found: error
     - name: run_bundling::upload_update_artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: Frame-aarch64.app.zip
         path: target/aarch64-apple-darwin/release/Frame-aarch64.app.zip
@@ -176,24 +199,29 @@ jobs:
   bundle_windows_x86_64:
     if: |-
       github.event_name == 'workflow_dispatch' ||
-      (github.event.action == 'labeled' && github.event.label.name == 'run-bundling') ||
-      (github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'run-bundling'))
+      (github.event.action == 'labeled' && github.event.label.name == 'run-bundling')
     runs-on: windows-2022
+    environment: run-bundling
     env:
       CARGO_INCREMENTAL: 0
     steps:
     - name: steps::checkout_repo
-      uses: actions/checkout@v4
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
     - name: steps::setup_rust
-      uses: dtolnay/rust-toolchain@stable
+      run: |
+        rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
+        rustup default 1.95.0
+        test "$(rustc --version | awk '{print $2}')" = "1.95.0"
     - name: steps::setup_inno
       shell: pwsh
-      run: choco install innosetup --no-progress -y
+      run: choco install innosetup --version 6.7.1 --no-progress --yes
     - name: ./script/bundle-windows.ps1
       shell: pwsh
       run: ./script/bundle-windows.ps1 -Architecture x86_64
     - name: run_bundling::upload_artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: Frame-x86_64.exe
         path: target/Frame-x86_64.exe
