@@ -60,12 +60,13 @@ impl ConversionNotificationSummary {
 
     #[must_use]
     pub fn body(self) -> String {
-        let file_suffix = if self.completed_count == 1 { "" } else { "s" };
+        let processed_count = self.completed_count + self.error_count;
+        let file_suffix = if processed_count == 1 { "" } else { "s" };
         let error_suffix = if self.error_count == 1 { "" } else { "s" };
 
         format!(
             "Processed {} file{file_suffix} with {} error{error_suffix}.",
-            self.completed_count, self.error_count,
+            processed_count, self.error_count,
         )
     }
 }
@@ -373,12 +374,12 @@ mod tests {
     #[test]
     fn conversion_notification_summary_pluralizes_file_and_error_counts() {
         let cases = [
-            (2, 1, "Processed 2 files with 1 error."),
-            (1, 2, "Processed 1 file with 2 errors."),
-            (1, 1, "Processed 1 file with 1 error."),
-            (2, 2, "Processed 2 files with 2 errors."),
+            (2, 1, "Processed 3 files with 1 error."),
+            (1, 2, "Processed 3 files with 2 errors."),
+            (1, 1, "Processed 2 files with 1 error."),
+            (2, 2, "Processed 4 files with 2 errors."),
             (1, 0, "Processed 1 file with 0 errors."),
-            (0, 1, "Processed 0 files with 1 error."),
+            (0, 1, "Processed 1 file with 1 error."),
         ];
 
         for (completed_count, error_count, expected) in cases {
