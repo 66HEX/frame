@@ -21,6 +21,7 @@ jobs:
       with:
         persist-credentials: false
     - name: steps::setup_rust
+      shell: bash
       run: |
         rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
         rustup default 1.95.0

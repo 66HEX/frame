@@ -1534,7 +1534,7 @@ fn pin_workflow_tools(workflow: &mut String) {
     *workflow = workflow.replace(
         &rust_install,
         &format!(
-            "      run: |\n        rustup toolchain install {RUST_VERSION} --profile minimal --component clippy,rustfmt\n        rustup default {RUST_VERSION}\n        test \"$(rustc --version | awk '{{print $2}}')\" = \"{RUST_VERSION}\""
+            "      shell: bash\n      run: |\n        rustup toolchain install {RUST_VERSION} --profile minimal --component clippy,rustfmt\n        rustup default {RUST_VERSION}\n        test \"$(rustc --version | awk '{{print $2}}')\" = \"{RUST_VERSION}\""
         ),
     );
     *workflow = workflow.replace(
@@ -1979,6 +1979,7 @@ on:
         required: true
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
   cancel-in-progress: false
@@ -3761,6 +3762,7 @@ mod tests {
         }
 
         let release = release_workflow();
+        assert_eq!(release.matches("  actions: read").count(), 1);
         assert_eq!(release.matches("      contents: write").count(), 1);
         assert_eq!(release.matches("      id-token: write").count(), 1);
         assert_eq!(release.matches("      attestations: write").count(), 1);
@@ -3811,6 +3813,21 @@ mod tests {
                     .count(),
                 "every Rust installation in {path} must verify the active version"
             );
+            let rust_setup_count = workflow.matches("    - name: steps::setup_rust").count();
+            assert_eq!(
+                rust_install_count, rust_setup_count,
+                "every Rust installation in {path} must belong to a setup step"
+            );
+            for block in workflow
+                .split("    - name: steps::setup_rust")
+                .skip(1)
+                .map(|remainder| remainder.split("    - name:").next().unwrap())
+            {
+                assert!(
+                    block.contains("\n      shell: bash\n"),
+                    "every Rust setup in {path} must use an explicit cross-platform shell"
+                );
+            }
 
             let nix_action_count = workflow.matches("uses: cachix/install-nix-action@").count();
             let pinned_nix_count = workflow
