@@ -425,7 +425,7 @@ fn detect_install_root(executable_path: &Path) -> Result<PathBuf, UpdateError> {
         {
             return Ok(root.to_path_buf());
         }
-        return Ok(bin_dir.to_path_buf());
+        Ok(bin_dir.to_path_buf())
     }
 
     #[cfg(target_os = "windows")]
