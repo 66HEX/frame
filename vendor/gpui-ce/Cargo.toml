@@ -80,8 +80,8 @@ pollster = "0.4.0"
 url = "2.2"
 uuid = { version = "1.1.2", features = ["v4", "v5", "v7", "serde"] }
 web-time = "1.1.0"
-cocoa = "=0.26.0"
-cocoa-foundation = "=0.2.0"
+cocoa = "=0.26.1"
+cocoa-foundation = "=0.2.1"
 core-foundation = "=0.10.0"
 core-foundation-sys = "0.8.6"
 core-video = { version = "0.5.2", features = ["metal"] }
