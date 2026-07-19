@@ -459,9 +459,10 @@ pub fn parse_time_to_seconds(time: &str) -> f64 {
 
 #[must_use]
 pub fn format_time(seconds: f64) -> String {
-    let hours = (seconds / 3600.0).floor();
-    let minutes = ((seconds % 3600.0) / 60.0).floor();
-    let seconds = seconds % 60.0;
+    let rounded_seconds = (seconds * 1000.0).round() / 1000.0;
+    let hours = (rounded_seconds / 3600.0).floor();
+    let minutes = ((rounded_seconds % 3600.0) / 60.0).floor();
+    let seconds = rounded_seconds % 60.0;
 
     format!("{hours:02.0}:{minutes:02.0}:{seconds:06.3}")
 }
