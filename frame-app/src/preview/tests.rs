@@ -492,6 +492,12 @@ mod time_formatting {
     fn format_time_pads_single_digit_seconds() {
         assert_eq!(super::super::format_time(61.2), "00:01:01.200");
     }
+
+    #[test]
+    fn format_time_carries_rounded_seconds_across_timecode_boundaries() {
+        assert_eq!(super::super::format_time(59.9999), "00:01:00.000");
+        assert_eq!(super::super::format_time(3599.9999), "01:00:00.000");
+    }
 }
 
 mod preview_playback_state {
