@@ -1,0 +1,18 @@
+# Generated from xtask::workflows::dependency_review
+# Rebuild with `cargo xtask workflows`.
+name: dependency review
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  dependency_review:
+    name: dependency review
+    runs-on: ubuntu-22.04
+    steps:
+    - name: security::review_dependency_changes
+      uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+      with:
+        fail-on-severity: moderate
+        comment-summary-in-pr: never
+    timeout-minutes: 10

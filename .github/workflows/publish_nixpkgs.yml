@@ -13,53 +13,88 @@ on:
 permissions:
   contents: read
 jobs:
+  validate_release:
+    runs-on: ubuntu-22.04
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+    - name: release::validate_signed_published_tag
+      id: release
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TAG: ${{ inputs.tag }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [[ ! "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "::error::Release tag must be stable semver without a v prefix." >&2
+          exit 1
+        fi
+        ref_json="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG")"
+        test "$(jq -r '.object.type' <<<"$ref_json")" = tag
+        tag_json="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$(jq -r '.object.sha' <<<"$ref_json")")"
+        test "$(jq -r '.verification.verified' <<<"$tag_json")" = true
+        test "$(jq -r '.object.type' <<<"$tag_json")" = commit
+        commit_sha="$(jq -r '.object.sha' <<<"$tag_json")"
+        comparison="$(gh api "repos/$GITHUB_REPOSITORY/compare/$commit_sha...master")"
+        comparison_status="$(jq -r '.status' <<<"$comparison")"
+        if [[ "$comparison_status" != ahead && "$comparison_status" != identical ]]; then
+          echo "::error::Release tag is not an ancestor of master." >&2
+          exit 1
+        fi
+        release_json="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG")"
+        test "$(jq -r '.draft or .prerelease' <<<"$release_json")" = false
+        jq -e '[.assets[].name] | index("SHA256SUMS") != null' <<<"$release_json" >/dev/null
+        echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+    timeout-minutes: 10
   prepare_nixpkgs:
     runs-on: ubuntu-22.04
+    needs: validate_release
+    environment: production-distribution
     outputs:
       branch: ${{ steps.nixpkgs.outputs.branch }}
       commit_subject: ${{ steps.nixpkgs.outputs.commit_subject }}
       should_publish: ${{ steps.nixpkgs.outputs.should_publish }}
     env:
-      GH_TOKEN: ${{ secrets.NIXPKGS_GITHUB_TOKEN }}
       NIXPKGS_FORK: 66HEX/nixpkgs
       NIXPKGS_UPSTREAM: NixOS/nixpkgs
       NIXPKGS_PACKAGE: frame-media-converter
+      VERSION: ${{ needs.validate_release.outputs.tag }}
     steps:
-    - name: release::resolve_tag
-      id: release
-      shell: bash
-      run: |
-        tag="${GITHUB_REF_NAME}"
-        if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-          tag="${{ inputs.tag }}"
-        fi
-        echo "tag=$tag" >> "$GITHUB_OUTPUT"
     - name: release::check_nixpkgs_token
+      id: token
+      env:
+        NIXPKGS_GITHUB_TOKEN: ${{ secrets.NIXPKGS_GITHUB_TOKEN }}
       shell: bash
       run: |
-        if [[ -z "$GH_TOKEN" ]]; then
+        if [[ -z "$NIXPKGS_GITHUB_TOKEN" ]]; then
           echo "::notice::NIXPKGS_GITHUB_TOKEN is not configured; skipping nixpkgs PR."
+          echo "configured=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "configured=true" >> "$GITHUB_OUTPUT"
         fi
     - name: steps::install_nix
-      if: env.GH_TOKEN != ''
-      uses: cachix/install-nix-action@v31
+      if: steps.token.outputs.configured == 'true'
+      uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31.11.0
       with:
+        install_url: https://releases.nixos.org/nix/nix-2.35.1/install
         extra_nix_config: |
           sandbox = true
     - name: release::checkout_nixpkgs
-      if: env.GH_TOKEN != ''
-      uses: actions/checkout@v4
+      if: steps.token.outputs.configured == 'true'
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       with:
+        persist-credentials: false
         repository: ${{ env.NIXPKGS_FORK }}
-        token: ${{ env.GH_TOKEN }}
+        token: ${{ secrets.NIXPKGS_GITHUB_TOKEN }}
         path: nixpkgs
         fetch-depth: 0
     - name: release::prepare_nixpkgs_branch
       id: nixpkgs
-      if: env.GH_TOKEN != ''
+      if: steps.token.outputs.configured == 'true'
       working-directory: nixpkgs
       env:
-        VERSION: ${{ steps.release.outputs.tag }}
+        GH_TOKEN: ${{ secrets.NIXPKGS_GITHUB_TOKEN }}
       shell: bash
       run: |
         set -euo pipefail
@@ -258,6 +293,7 @@ jobs:
           exit 0
         fi
         git commit -m "$commit_subject"
+        gh auth setup-git
         git push --force-with-lease origin "$branch"
         echo "commit_subject=$commit_subject" >> "$GITHUB_OUTPUT"
         echo "should_publish=true" >> "$GITHUB_OUTPUT"
@@ -268,21 +304,21 @@ jobs:
     needs: prepare_nixpkgs
     if: needs.prepare_nixpkgs.outputs.should_publish == 'true'
     env:
-      GH_TOKEN: ${{ secrets.NIXPKGS_GITHUB_TOKEN }}
       NIXPKGS_FORK: 66HEX/nixpkgs
       NIXPKGS_PACKAGE: frame-media-converter
     steps:
     - name: steps::install_nix
-      uses: cachix/install-nix-action@v31
+      uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31.11.0
       with:
+        install_url: https://releases.nixos.org/nix/nix-2.35.1/install
         extra_nix_config: |
           sandbox = true
     - name: release::checkout_nixpkgs
-      uses: actions/checkout@v4
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       with:
+        persist-credentials: false
         repository: ${{ env.NIXPKGS_FORK }}
         ref: ${{ needs.prepare_nixpkgs.outputs.branch }}
-        token: ${{ env.GH_TOKEN }}
         path: nixpkgs
     - name: release::build_nixpkgs_aarch64
       working-directory: nixpkgs
@@ -291,18 +327,19 @@ jobs:
 
   publish_nixpkgs:
     runs-on: ubuntu-22.04
+    environment: production-distribution
     needs:
       - prepare_nixpkgs
       - validate_nixpkgs_aarch64
     if: needs.prepare_nixpkgs.outputs.should_publish == 'true'
     env:
-      GH_TOKEN: ${{ secrets.NIXPKGS_GITHUB_TOKEN }}
       NIXPKGS_UPSTREAM: NixOS/nixpkgs
     steps:
     - name: release::publish_nixpkgs_pr
       env:
         BRANCH: ${{ needs.prepare_nixpkgs.outputs.branch }}
         COMMIT_SUBJECT: ${{ needs.prepare_nixpkgs.outputs.commit_subject }}
+        GH_TOKEN: ${{ secrets.NIXPKGS_GITHUB_TOKEN }}
       shell: bash
       run: |
         set -euo pipefail

@@ -1,23 +1,56 @@
 # Security Policy
 
-## Supported Versions
+## Supported versions
 
-We currently only provide security updates for the latest version of Frame. Please ensure you are using the most recent release.
+Security fixes are provided for the latest stable Frame release. Users should
+upgrade to the newest published version before reporting a problem that may
+already have been fixed.
 
-## Update Authenticity
+## Report a vulnerability privately
 
-Native Frame releases use a signed update manifest. The application verifies the
-manifest with an embedded Ed25519 public key and checks each downloaded asset
-against the SHA-256 value recorded in that signed manifest before installation.
+Do not open a public issue for a suspected vulnerability, leaked credential,
+malicious dependency, compromised release, or updater bypass.
 
-The private update signing key must stay in GitHub Actions secrets or an
-equivalent restricted release environment. Do not commit it to the repository or
-ship it inside an application bundle.
+Use [GitHub private vulnerability reporting](https://github.com/66HEX/frame/security/advisories/new)
+when available. If that is not possible, email `hexthecoder@gmail.com` with:
 
-## Reporting a Vulnerability
+- affected version and platform;
+- reproduction steps or proof of concept;
+- the expected security impact;
+- relevant logs, hashes, URLs, or screenshots;
+- whether the information has been shared with anyone else.
 
-We take the security of Frame seriously. If you believe you've found a security vulnerability, please do NOT open a public issue.
+You should receive an acknowledgement within 48 hours. Status updates are
+provided at least every seven days while the report remains open. Please allow
+time for a coordinated fix and release before public disclosure.
 
-Instead, please report it privately by emailing hexthecoder@gmail.com.
+## Release authenticity
 
-We will acknowledge your report within 48 hours and provide a timeline for a fix. Please provide as much detail as possible, including steps to reproduce the vulnerability.
+Updater-managed macOS, Windows, and Linux tar releases use an Ed25519-signed
+update manifest. The application verifies the manifest with an embedded public
+key and checks downloaded assets against signed SHA-256 digests before
+installation. GitHub releases also include `SHA256SUMS`, a CycloneDX SBOM, and
+GitHub build-provenance attestations.
+
+AppImage and Flatpak are intentionally outside Frame's native updater. Flatpak
+updates are authenticated by its repository. AppImage update tools use the
+AppImage/GitHub channel rather than Frame's signed manifest, so security-sensitive
+users should verify `SHA256SUMS` and the GitHub attestation or use the managed
+Linux tar release.
+
+Release tags must be annotated, cryptographically signed, verified by GitHub,
+and point to a commit already contained in `master`. Published release assets
+are immutable: a failed or compromised release must be revoked and replaced by
+a new version, never silently overwritten.
+
+The private update key and platform signing credentials belong only in protected
+GitHub environments. They must never be committed, copied into artifacts, added
+to logs, or exposed to pull-request workflows.
+
+## Dependency audit exceptions
+
+`deny.toml` contains the complete, reasoned list of temporary RustSec exceptions
+for transitive dependencies that cannot yet be upgraded independently of GPUI,
+Wayland tooling, or Windows notification support. New advisories fail CI by
+default. Every existing exception must be re-evaluated during dependency updates
+and removed as soon as a compatible upstream release exists.

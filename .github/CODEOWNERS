@@ -1,0 +1,15 @@
+# Default ownership.
+* @66HEX
+
+# Release and supply-chain trust boundaries.
+/.github/ @66HEX
+/tooling/xtask/ @66HEX
+/tooling/manifest-signer/ @66HEX
+/script/ @66HEX
+/inno/ @66HEX
+/packaging/ @66HEX
+/rust-toolchain.toml @66HEX
+/Cargo.lock @66HEX
+/Cargo.toml @66HEX
+/deny.toml @66HEX
+/SECURITY.md @66HEX

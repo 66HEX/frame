@@ -36,6 +36,9 @@ PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\Frame.exe
+#ifdef SignToolName
+SignTool={#SignToolName}
+#endif
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

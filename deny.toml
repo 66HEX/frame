@@ -1,0 +1,53 @@
+[graph]
+all-features = true
+
+[advisories]
+version = 2
+yanked = "deny"
+ignore = [
+  { crate = "spin@0.9.8", reason = "flume 0.11 in the pinned Zed scheduler requires this yanked release; replace with the next vendored GPUI/Zed scheduler update" },
+  { id = "RUSTSEC-2024-0384", reason = "instant is an unmaintained transitive dependency of the pinned vendored GPUI snapshot; replace during the tracked GPUI upgrade" },
+  { id = "RUSTSEC-2024-0436", reason = "paste is an unmaintained transitive dependency; no vulnerability is reported and upstream replacements are being tracked" },
+  { id = "RUSTSEC-2026-0192", reason = "ttf-parser is pulled by vendored GPUI text/SVG code; no safe compatible upgrade is currently available" },
+  { id = "RUSTSEC-2026-0194", reason = "affected quick-xml versions are constrained by current Wayland build tooling and Windows notification code; inputs on these paths are trusted and upstream upgrades are required" },
+  { id = "RUSTSEC-2026-0195", reason = "affected quick-xml versions are constrained by current Wayland build tooling and Windows notification code; inputs on these paths are trusted and upstream upgrades are required" },
+  { id = "RUSTSEC-2026-0206", reason = "rustybuzz is pulled by vendored GPUI SVG rendering; no safe compatible upgrade is currently available" },
+]
+
+[licenses]
+version = 2
+confidence-threshold = 0.8
+allow = [
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "BSL-1.0",
+  "CC0-1.0",
+  "CDLA-Permissive-2.0",
+  "ISC",
+  "MIT",
+  "MPL-2.0",
+  "NCSA",
+  "Unicode-3.0",
+  "Zlib",
+]
+
+[licenses.private]
+ignore = true
+
+[bans]
+multiple-versions = "warn"
+wildcards = "allow"
+highlight = "all"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = [
+  "https://github.com/zed-industries/font-kit",
+  "https://github.com/zed-industries/wgpu.git",
+  "https://github.com/zed-industries/xim-rs.git",
+  "https://github.com/zed-industries/zed",
+]

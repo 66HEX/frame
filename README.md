@@ -240,12 +240,13 @@ cargo xtask setup-ffmpeg
 
   ```bash
   cargo xtask workflows
+  cargo xtask workflows --check
   ```
 
 - **macOS DMG:**
 
   ```bash
-  cargo install cargo-bundle
+  cargo install cargo-bundle --version 0.11.0 --locked
   cargo xtask bundle macos
   ```
 

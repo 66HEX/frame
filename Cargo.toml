@@ -4,6 +4,7 @@ members = [
     "frame-app",
     "frame-core",
     "frame-updater",
+    "tooling/manifest-signer",
     "tooling/xtask",
 ]
 exclude = ["vendor/gpui-ce"]

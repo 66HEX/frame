@@ -1,0 +1,36 @@
+# Generated from xtask::workflows::codeql
+# Rebuild with `cargo xtask workflows`.
+name: codeql
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+  schedule:
+    - cron: '23 4 * * 3'
+permissions:
+  contents: read
+  security-events: write
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  analyze:
+    name: codeql rust
+    runs-on: ubuntu-22.04
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
+    - name: security::initialize_codeql
+      uses: github/codeql-action/init@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
+      with:
+        languages: rust
+        build-mode: none
+        queries: security-extended
+    - name: security::analyze_code
+      uses: github/codeql-action/analyze@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
+      with:
+        category: /language:rust
+    timeout-minutes: 30

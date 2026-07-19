@@ -13,12 +13,45 @@ use frame_updater::{
     sign_manifest_bytes,
 };
 use sha2::{Digest, Sha256};
+
+const CI_WORKFLOW_PATH: &str = ".github/workflows/ci.yml";
+const DEPENDENCY_REVIEW_WORKFLOW_PATH: &str = ".github/workflows/dependency-review.yml";
+const CODEQL_WORKFLOW_PATH: &str = ".github/workflows/codeql.yml";
 const RUN_BUNDLING_WORKFLOW_PATH: &str = ".github/workflows/run_bundling.yml";
 const RELEASE_WORKFLOW_PATH: &str = ".github/workflows/release.yml";
 const PUBLISH_NIXPKGS_WORKFLOW_PATH: &str = ".github/workflows/publish_nixpkgs.yml";
 const FLATHUB_MANIFEST_TEMPLATE_PATH: &str = "packaging/flathub/io.github._66HEX.Frame.yml.in";
 const FLATHUB_METAINFO_PATH: &str = "packaging/flathub/io.github._66HEX.Frame.metainfo.xml";
 const FFMPEG_VERSION: &str = "8.1.2";
+const RUST_VERSION: &str = "1.95.0";
+const CARGO_BUNDLE_VERSION: &str = "0.11.0";
+const CARGO_DENY_VERSION: &str = "0.20.2";
+const CARGO_AUDIT_VERSION: &str = "0.22.2";
+const CARGO_CYCLONEDX_VERSION: &str = "0.5.9";
+const INNO_SETUP_VERSION: &str = "6.7.1";
+const NIX_VERSION: &str = "2.35.1";
+const APPIMAGETOOL_VERSION: &str = "1.9.1";
+const APPIMAGETOOL_X86_64_SHA256: &str =
+    "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0";
+const APPIMAGETOOL_AARCH64_SHA256: &str =
+    "f0837e7448a0c1e4e650a93bb3e85802546e60654ef287576f46c71c126a9158";
+const TAURI_BRIDGE_LATEST_JSON_SHA256: &str =
+    "5cb46d105add55f71c24cbdf14433207ca377b11be4acf685acdb84244e98b3c";
+const KOMAC_VERSION: &str = "2.16.0";
+const KOMAC_LINUX_X86_64_SHA256: &str =
+    "7d2707fa6210f2789a3702de49fbd150b736dbf426ee0b9bc8e098736f9fd82d";
+const ACTIONLINT_VERSION: &str = "1.7.12";
+const ACTIONLINT_LINUX_X86_64_SHA256: &str =
+    "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8";
+
+const ACTION_CHECKOUT_SHA: &str = "9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0";
+const ACTION_UPLOAD_ARTIFACT_SHA: &str = "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a";
+const ACTION_DOWNLOAD_ARTIFACT_SHA: &str = "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c";
+const ACTION_DEPENDENCY_REVIEW_SHA: &str = "a1d282b36b6f3519aa1f3fc636f609c47dddb294";
+const ACTION_CODEQL_SHA: &str = "7188fc363630916deb702c7fdcf4e481b751f97a";
+const ACTION_ATTEST_BUILD_PROVENANCE_SHA: &str = "0f67c3f4856b2e3261c31976d6725780e5e4c373";
+const ACTION_IMPORT_CODESIGN_CERTS_SHA: &str = "5142e029c445c10ffc7149d172e540235a065466";
+const ACTION_INSTALL_NIX_SHA: &str = "630ae543ea3a38a9a4166f03376c02c50f408342";
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -70,7 +103,16 @@ fn run_xtask() -> Result<()> {
             let args = args.collect::<Vec<_>>();
             flathub_manifest(&args)
         }
-        "workflows" => write_workflows(),
+        "workflows" => {
+            let args = args.collect::<Vec<_>>();
+            match args.as_slice() {
+                [] => write_workflows(),
+                [flag] if flag == "--check" => check_workflows(),
+                _ => Err(XtaskError::Usage(
+                    "usage: cargo xtask workflows [--check]".to_string(),
+                )),
+            }
+        }
         "-h" | "--help" | "help" => {
             print_help();
             Ok(())
@@ -98,6 +140,7 @@ Commands:
   flathub-manifest  Render Flathub repository manifest files
   ci                Run local formatting, tests, lints, and script checks
   workflows         Regenerate GitHub Actions workflows
+  workflows --check Verify checked-in workflows match the generator exactly
 "
     );
 }
@@ -1262,119 +1305,85 @@ const fn host_arch() -> &'static str {
 }
 
 fn ci() -> Result<()> {
-    run_command(
-        "cargo",
-        &["fmt", "--manifest-path", "frame-core/Cargo.toml", "--check"],
-    )?;
-    run_command(
-        "cargo",
-        &["fmt", "--manifest-path", "frame-app/Cargo.toml", "--check"],
-    )?;
-    run_command(
-        "cargo",
-        &[
-            "fmt",
-            "--manifest-path",
-            "frame-updater/Cargo.toml",
-            "--check",
-        ],
-    )?;
-    run_command(
-        "cargo",
-        &[
-            "fmt",
-            "--manifest-path",
-            "tooling/xtask/Cargo.toml",
-            "--check",
-        ],
-    )?;
-    run_command(
-        "cargo",
-        &["test", "--manifest-path", "frame-core/Cargo.toml"],
-    )?;
-    run_command(
-        "cargo",
-        &["test", "--manifest-path", "frame-app/Cargo.toml"],
-    )?;
-    run_command(
-        "cargo",
-        &["test", "--manifest-path", "frame-updater/Cargo.toml"],
-    )?;
-    run_command(
-        "cargo",
-        &["test", "--manifest-path", "tooling/xtask/Cargo.toml"],
-    )?;
-    run_command(
-        "cargo",
-        &[
-            "clippy",
-            "--manifest-path",
-            "frame-core/Cargo.toml",
-            "--all-targets",
-            "--locked",
-            "--",
-            "-D",
-            "warnings",
-        ],
-    )?;
-    run_command(
-        "cargo",
-        &[
-            "clippy",
-            "--manifest-path",
-            "frame-app/Cargo.toml",
-            "--all-targets",
-            "--locked",
-            "--",
-            "-D",
-            "warnings",
-        ],
-    )?;
-    run_command(
-        "cargo",
-        &[
-            "clippy",
-            "--manifest-path",
-            "frame-updater/Cargo.toml",
-            "--all-targets",
-            "--locked",
-            "--",
-            "-D",
-            "warnings",
-        ],
-    )?;
-    run_command(
-        "cargo",
-        &[
-            "clippy",
-            "--manifest-path",
-            "tooling/xtask/Cargo.toml",
-            "--all-targets",
-            "--locked",
-            "--",
-            "-D",
-            "warnings",
-        ],
-    )?;
+    const MANIFESTS: [&str; 5] = [
+        "frame-core/Cargo.toml",
+        "frame-app/Cargo.toml",
+        "frame-updater/Cargo.toml",
+        "tooling/manifest-signer/Cargo.toml",
+        "tooling/xtask/Cargo.toml",
+    ];
+
+    for manifest in MANIFESTS {
+        run_command("cargo", &["fmt", "--manifest-path", manifest, "--check"])?;
+    }
+    for manifest in MANIFESTS {
+        run_command("cargo", &["test", "--manifest-path", manifest])?;
+    }
+    for manifest in MANIFESTS {
+        run_command(
+            "cargo",
+            &[
+                "clippy",
+                "--manifest-path",
+                manifest,
+                "--all-targets",
+                "--locked",
+                "--",
+                "-D",
+                "warnings",
+            ],
+        )?;
+    }
     run_command("bash", &["-n", "script/bundle-mac"])?;
     run_command("bash", &["-n", "script/bundle-linux"])?;
+    check_workflows()?;
     run_command("git", &["diff", "--check"])?;
     Ok(())
 }
 
 fn write_workflows() -> Result<()> {
     let root = repo_root()?;
-    for (relative_path, content) in [
-        (RUN_BUNDLING_WORKFLOW_PATH, run_bundling_workflow()),
-        (RELEASE_WORKFLOW_PATH, release_workflow()),
-        (PUBLISH_NIXPKGS_WORKFLOW_PATH, publish_nixpkgs_workflow()),
-    ] {
+    for (relative_path, content) in generated_workflows() {
         let path = root.join(relative_path);
         fs::create_dir_all(path.parent().expect("workflow path should have a parent"))?;
         fs::write(&path, content)?;
         println!("Wrote {}", path.display());
     }
     Ok(())
+}
+
+fn check_workflows() -> Result<()> {
+    let root = repo_root()?;
+    for (relative_path, expected) in generated_workflows() {
+        let path = root.join(relative_path);
+        let actual = fs::read_to_string(&path).map_err(|error| {
+            XtaskError::Usage(format!(
+                "failed to read generated workflow `{}`: {error}",
+                path.display()
+            ))
+        })?;
+        if actual != expected {
+            return Err(XtaskError::GeneratedWorkflowOutOfDate {
+                path: relative_path.to_string(),
+            });
+        }
+    }
+    println!("Checked-in GitHub Actions workflows match the xtask generator.");
+    Ok(())
+}
+
+fn generated_workflows() -> Vec<(&'static str, String)> {
+    vec![
+        (CI_WORKFLOW_PATH, ci_workflow()),
+        (
+            DEPENDENCY_REVIEW_WORKFLOW_PATH,
+            dependency_review_workflow(),
+        ),
+        (CODEQL_WORKFLOW_PATH, codeql_workflow()),
+        (RUN_BUNDLING_WORKFLOW_PATH, run_bundling_workflow()),
+        (RELEASE_WORKFLOW_PATH, release_workflow()),
+        (PUBLISH_NIXPKGS_WORKFLOW_PATH, publish_nixpkgs_workflow()),
+    ]
 }
 
 fn run_script(script: &str, args: &[&str]) -> Result<()> {
@@ -1481,6 +1490,308 @@ fn run_command_capture(program: &str, args: &[String]) -> Result<String> {
     }
 }
 
+fn render_workflow(template: &str) -> String {
+    let replacements = [
+        ("__RUST_VERSION__", RUST_VERSION),
+        ("__CARGO_BUNDLE_VERSION__", CARGO_BUNDLE_VERSION),
+        ("__CARGO_DENY_VERSION__", CARGO_DENY_VERSION),
+        ("__CARGO_AUDIT_VERSION__", CARGO_AUDIT_VERSION),
+        ("__CARGO_CYCLONEDX_VERSION__", CARGO_CYCLONEDX_VERSION),
+        ("__INNO_SETUP_VERSION__", INNO_SETUP_VERSION),
+        ("__NIX_VERSION__", NIX_VERSION),
+        ("__APPIMAGETOOL_VERSION__", APPIMAGETOOL_VERSION),
+        ("__APPIMAGETOOL_X86_64_SHA256__", APPIMAGETOOL_X86_64_SHA256),
+        (
+            "__APPIMAGETOOL_AARCH64_SHA256__",
+            APPIMAGETOOL_AARCH64_SHA256,
+        ),
+        (
+            "__TAURI_BRIDGE_LATEST_JSON_SHA256__",
+            TAURI_BRIDGE_LATEST_JSON_SHA256,
+        ),
+        ("__KOMAC_VERSION__", KOMAC_VERSION),
+        ("__KOMAC_LINUX_X86_64_SHA256__", KOMAC_LINUX_X86_64_SHA256),
+        ("__ACTIONLINT_VERSION__", ACTIONLINT_VERSION),
+        (
+            "__ACTIONLINT_LINUX_X86_64_SHA256__",
+            ACTIONLINT_LINUX_X86_64_SHA256,
+        ),
+    ];
+    let mut workflow = template.to_string();
+    for (placeholder, value) in replacements {
+        workflow = workflow.replace(placeholder, value);
+    }
+
+    pin_workflow_tools(&mut workflow);
+    pin_workflow_actions(&mut workflow);
+    disable_checkout_credentials(&workflow)
+}
+
+fn pin_workflow_tools(workflow: &mut String) {
+    let rust_install = format!(
+        "      run: rustup toolchain install {RUST_VERSION} --profile minimal --component clippy,rustfmt"
+    );
+    *workflow = workflow.replace("      uses: dtolnay/rust-toolchain@stable", &rust_install);
+    *workflow = workflow.replace(
+        &rust_install,
+        &format!(
+            "      run: |\n        rustup toolchain install {RUST_VERSION} --profile minimal --component clippy,rustfmt\n        rustup default {RUST_VERSION}\n        test \"$(rustc --version | awk '{{print $2}}')\" = \"{RUST_VERSION}\""
+        ),
+    );
+    *workflow = workflow.replace(
+        "cargo install cargo-bundle --locked",
+        &format!("cargo install cargo-bundle --version {CARGO_BUNDLE_VERSION} --locked"),
+    );
+    *workflow = workflow.replace(
+        "choco install innosetup --no-progress -y",
+        &format!("choco install innosetup --version {INNO_SETUP_VERSION} --no-progress --yes"),
+    );
+}
+
+fn pin_workflow_actions(workflow: &mut String) {
+    let action_replacements = [
+        (
+            "actions/checkout@v4",
+            format!("actions/checkout@{ACTION_CHECKOUT_SHA} # v7.0.0"),
+        ),
+        (
+            "actions/checkout@v7.0.0",
+            format!("actions/checkout@{ACTION_CHECKOUT_SHA} # v7.0.0"),
+        ),
+        (
+            "actions/upload-artifact@v4",
+            format!("actions/upload-artifact@{ACTION_UPLOAD_ARTIFACT_SHA} # v7.0.1"),
+        ),
+        (
+            "actions/upload-artifact@v7.0.1",
+            format!("actions/upload-artifact@{ACTION_UPLOAD_ARTIFACT_SHA} # v7.0.1"),
+        ),
+        (
+            "actions/download-artifact@v4",
+            format!("actions/download-artifact@{ACTION_DOWNLOAD_ARTIFACT_SHA} # v8.0.1"),
+        ),
+        (
+            "actions/download-artifact@v8.0.1",
+            format!("actions/download-artifact@{ACTION_DOWNLOAD_ARTIFACT_SHA} # v8.0.1"),
+        ),
+        (
+            "actions/dependency-review-action@v5.0.0",
+            format!("actions/dependency-review-action@{ACTION_DEPENDENCY_REVIEW_SHA} # v5.0.0"),
+        ),
+        (
+            "actions/attest-build-provenance@v4.1.1",
+            format!(
+                "actions/attest-build-provenance@{ACTION_ATTEST_BUILD_PROVENANCE_SHA} # v4.1.1"
+            ),
+        ),
+        (
+            "Apple-Actions/import-codesign-certs@v3",
+            format!(
+                "Apple-Actions/import-codesign-certs@{ACTION_IMPORT_CODESIGN_CERTS_SHA} # v7.0.0"
+            ),
+        ),
+        (
+            "Apple-Actions/import-codesign-certs@v7.0.0",
+            format!(
+                "Apple-Actions/import-codesign-certs@{ACTION_IMPORT_CODESIGN_CERTS_SHA} # v7.0.0"
+            ),
+        ),
+        (
+            "cachix/install-nix-action@v31.11.0",
+            format!("cachix/install-nix-action@{ACTION_INSTALL_NIX_SHA} # v31.11.0"),
+        ),
+        (
+            "cachix/install-nix-action@v31",
+            format!("cachix/install-nix-action@{ACTION_INSTALL_NIX_SHA} # v31.11.0"),
+        ),
+        (
+            "github/codeql-action/init@v4.37.1",
+            format!("github/codeql-action/init@{ACTION_CODEQL_SHA} # v4.37.1"),
+        ),
+        (
+            "github/codeql-action/analyze@v4.37.1",
+            format!("github/codeql-action/analyze@{ACTION_CODEQL_SHA} # v4.37.1"),
+        ),
+    ];
+    for (reference, pinned) in action_replacements {
+        *workflow = workflow.replace(reference, &pinned);
+    }
+}
+
+fn disable_checkout_credentials(workflow: &str) -> String {
+    let lines = workflow.lines().collect::<Vec<_>>();
+    let mut rendered = String::with_capacity(workflow.len() + 256);
+    let mut index = 0;
+
+    while index < lines.len() {
+        let line = lines[index];
+        rendered.push_str(line);
+        rendered.push('\n');
+
+        if line.trim_start().starts_with("uses: actions/checkout@") {
+            let step_indent = line.len() - line.trim_start().len();
+            if lines
+                .get(index + 1)
+                .is_some_and(|next| next.trim() == "with:")
+            {
+                let with_line = lines[index + 1];
+                rendered.push_str(with_line);
+                rendered.push('\n');
+                let with_indent = with_line.len() - with_line.trim_start().len();
+                let has_setting = lines[index + 2..]
+                    .iter()
+                    .take_while(|candidate| {
+                        let trimmed = candidate.trim();
+                        trimmed.is_empty()
+                            || candidate.len() - candidate.trim_start().len() > with_indent
+                    })
+                    .any(|candidate| candidate.trim_start().starts_with("persist-credentials:"));
+                if !has_setting {
+                    rendered.push_str(&" ".repeat(with_indent + 2));
+                    rendered.push_str("persist-credentials: false\n");
+                }
+                index += 2;
+                continue;
+            }
+
+            rendered.push_str(&" ".repeat(step_indent));
+            rendered.push_str("with:\n");
+            rendered.push_str(&" ".repeat(step_indent + 2));
+            rendered.push_str("persist-credentials: false\n");
+        }
+        index += 1;
+    }
+
+    rendered
+}
+
+fn ci_workflow() -> String {
+    render_workflow(
+        r"# Generated from xtask::workflows::ci
+# Rebuild with `cargo xtask workflows`.
+name: ci
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  cargo_xtask_ci:
+    name: cargo xtask ci
+    runs-on: ubuntu-22.04
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v7.0.0
+      with:
+        persist-credentials: false
+    - name: steps::setup_rust
+      run: rustup toolchain install __RUST_VERSION__ --profile minimal --component clippy,rustfmt
+    - name: steps::setup_linux
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang desktop-file-utils libasound2-dev libdrm-dev libfontconfig1-dev libfreetype6-dev libx11-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev pkg-config
+    - name: security::validate_workflow_syntax
+      run: |
+        mkdir -p target/actionlint
+        curl --fail --location --proto '=https' --tlsv1.2 \
+          --output target/actionlint/actionlint.tar.gz \
+          https://github.com/rhysd/actionlint/releases/download/v__ACTIONLINT_VERSION__/actionlint___ACTIONLINT_VERSION___linux_amd64.tar.gz
+        echo '__ACTIONLINT_LINUX_X86_64_SHA256__  target/actionlint/actionlint.tar.gz' | sha256sum --check --strict
+        tar --extract --gzip --file target/actionlint/actionlint.tar.gz --directory target/actionlint actionlint
+        target/actionlint/actionlint -color
+    - name: security::install_cargo_deny
+      run: cargo install cargo-deny --version __CARGO_DENY_VERSION__ --locked
+    - name: security::cargo_deny
+      run: cargo deny check
+    - name: security::install_cargo_audit
+      run: cargo install cargo-audit --version __CARGO_AUDIT_VERSION__ --locked
+    - name: security::cargo_audit
+      run: |
+        cargo audit --deny unmaintained --deny unsound --no-yanked \
+          --ignore RUSTSEC-2024-0384 \
+          --ignore RUSTSEC-2024-0436 \
+          --ignore RUSTSEC-2026-0192 \
+          --ignore RUSTSEC-2026-0194 \
+          --ignore RUSTSEC-2026-0195 \
+          --ignore RUSTSEC-2026-0206
+    - name: ci::run_documented_gate
+      run: cargo xtask ci
+    timeout-minutes: 60
+",
+    )
+}
+
+fn dependency_review_workflow() -> String {
+    render_workflow(
+        r"# Generated from xtask::workflows::dependency_review
+# Rebuild with `cargo xtask workflows`.
+name: dependency review
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  dependency_review:
+    name: dependency review
+    runs-on: ubuntu-22.04
+    steps:
+    - name: security::review_dependency_changes
+      uses: actions/dependency-review-action@v5.0.0
+      with:
+        fail-on-severity: moderate
+        comment-summary-in-pr: never
+    timeout-minutes: 10
+",
+    )
+}
+
+fn codeql_workflow() -> String {
+    render_workflow(
+        r"# Generated from xtask::workflows::codeql
+# Rebuild with `cargo xtask workflows`.
+name: codeql
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+  schedule:
+    - cron: '23 4 * * 3'
+permissions:
+  contents: read
+  security-events: write
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  analyze:
+    name: codeql rust
+    runs-on: ubuntu-22.04
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v7.0.0
+      with:
+        persist-credentials: false
+    - name: security::initialize_codeql
+      uses: github/codeql-action/init@v4.37.1
+      with:
+        languages: rust
+        build-mode: none
+        queries: security-extended
+    - name: security::analyze_code
+      uses: github/codeql-action/analyze@v4.37.1
+      with:
+        category: /language:rust
+    timeout-minutes: 30
+",
+    )
+}
+
 fn run_bundling_workflow() -> String {
     let header = "\
 # Generated from xtask::workflows::run_bundling
@@ -1494,7 +1805,8 @@ on:
   pull_request:
     types:
       - labeled
-      - synchronize
+permissions:
+  contents: read
 ";
 
     let jobs = [
@@ -1506,22 +1818,24 @@ on:
     ]
     .join("");
 
-    format!("{header}jobs:\n{jobs}")
+    render_workflow(&format!("{header}jobs:\n{jobs}"))
 }
 
 const fn bundle_if_expression() -> &'static str {
-    "      github.event_name == 'workflow_dispatch' ||\n      (github.event.action == 'labeled' && github.event.label.name == 'run-bundling') ||\n      (github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'run-bundling'))"
+    "      github.event_name == 'workflow_dispatch' ||\n      (github.event.action == 'labeled' && github.event.label.name == 'run-bundling')"
 }
 
 const fn checkout_step() -> &'static str {
     r"    - name: steps::checkout_repo
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7.0.0
+      with:
+        persist-credentials: false
 "
 }
 
 const fn setup_rust_step() -> &'static str {
     r"    - name: steps::setup_rust
-      uses: dtolnay/rust-toolchain@stable
+      run: rustup toolchain install __RUST_VERSION__ --profile minimal --component clippy,rustfmt
 "
 }
 
@@ -1536,6 +1850,7 @@ fn linux_job(arch: &str, runner: &str) -> String {
     if: |-
 {if_expression}
     runs-on: {runner}
+    environment: run-bundling
     env:
       CARGO_INCREMENTAL: 0
     steps:
@@ -1545,7 +1860,8 @@ fn linux_job(arch: &str, runner: &str) -> String {
         sudo apt-get install -y {linux_packages}
     - name: steps::setup_appimagetool
       run: |
-        curl -L --fail -o /tmp/appimagetool.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-{appimagetool_arch}.AppImage
+        curl --fail --location --proto '=https' --tlsv1.2 --output /tmp/appimagetool.AppImage https://github.com/AppImage/appimagetool/releases/download/__APPIMAGETOOL_VERSION__/appimagetool-{appimagetool_arch}.AppImage
+        echo '__APPIMAGETOOL_{appimagetool_sha_name}_SHA256__  /tmp/appimagetool.AppImage' | sha256sum --check --strict
         chmod +x /tmp/appimagetool.AppImage
     - name: ./script/bundle-linux
       env:
@@ -1559,19 +1875,19 @@ fn linux_job(arch: &str, runner: &str) -> String {
         test $actual = $expected
         test -s target/release/Frame-{arch}.AppImage.zsync
     - name: run_bundling::upload_artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7.0.1
       with:
         name: frame-linux-{arch}.tar.gz
         path: target/release/frame-linux-{arch}.tar.gz
         if-no-files-found: error
     - name: run_bundling::upload_appimage_artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7.0.1
       with:
         name: Frame-{arch}.AppImage
         path: target/release/Frame-{arch}.AppImage
         if-no-files-found: error
     - name: run_bundling::upload_appimage_zsync_artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7.0.1
       with:
         name: Frame-{arch}.AppImage.zsync
         path: target/release/Frame-{arch}.AppImage.zsync
@@ -1582,6 +1898,7 @@ fn linux_job(arch: &str, runner: &str) -> String {
         checkout = checkout_step(),
         rust = setup_rust_step(),
         appimagetool_arch = appimagetool_arch,
+        appimagetool_sha_name = arch.to_ascii_uppercase(),
         linux_packages = linux_packages,
         bundle_args = bundle_args,
         timeout_minutes = timeout_minutes,
@@ -1594,21 +1911,22 @@ fn macos_job(arch: &str, target: &str, runner: &str) -> String {
     if: |-
 {if_expression}
     runs-on: {runner}
+    environment: run-bundling
     env:
       CARGO_INCREMENTAL: 0
     steps:
 {checkout}{rust}    - name: steps::install_cargo_bundle
-      run: cargo install cargo-bundle --locked
+      run: cargo install cargo-bundle --version __CARGO_BUNDLE_VERSION__ --locked
     - name: ./script/bundle-mac
       run: ./script/bundle-mac {target}
     - name: run_bundling::upload_artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7.0.1
       with:
         name: Frame-{arch}.dmg
         path: target/{target}/release/Frame-{arch}.dmg
         if-no-files-found: error
     - name: run_bundling::upload_update_artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7.0.1
       with:
         name: Frame-{arch}.app.zip
         path: target/{target}/release/Frame-{arch}.app.zip
@@ -1627,17 +1945,18 @@ fn windows_job(arch: &str, runner: &str) -> String {
     if: |-
 {if_expression}
     runs-on: {runner}
+    environment: run-bundling
     env:
       CARGO_INCREMENTAL: 0
     steps:
 {checkout}{rust}    - name: steps::setup_inno
       shell: pwsh
-      run: choco install innosetup --no-progress -y
+      run: choco install innosetup --version __INNO_SETUP_VERSION__ --no-progress --yes
     - name: ./script/bundle-windows.ps1
       shell: pwsh
       run: ./script/bundle-windows.ps1 -Architecture {arch}
     - name: run_bundling::upload_artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7.0.1
       with:
         name: Frame-{arch}.exe
         path: target/Frame-{arch}.exe
@@ -1655,7 +1974,7 @@ fn windows_job(arch: &str, runner: &str) -> String {
     reason = "The generated GitHub Actions workflow is kept as one raw template for easier diffing against YAML output."
 )]
 fn release_workflow() -> String {
-    r#"# Generated from xtask::workflows::release
+    let workflow = r#"# Generated from xtask::workflows::release
 # Rebuild with `cargo xtask workflows`.
 name: release
 env:
@@ -1672,18 +1991,108 @@ on:
         description: Release tag to publish, without a v prefix.
         required: true
 permissions:
-  contents: write
+  contents: read
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
 jobs:
+  prepare_release:
+    runs-on: ubuntu-22.04
+    outputs:
+      commit_sha: ${{ steps.release.outputs.commit_sha }}
+      tag: ${{ steps.release.outputs.tag }}
+      tag_object_sha: ${{ steps.release.outputs.tag_object_sha }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+    - name: release::resolve_and_verify_signed_tag
+      id: release
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REQUESTED_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        tag="$REQUESTED_TAG"
+        if [[ ! "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "::error::Release tag must be stable semver without a v prefix: $tag" >&2
+          exit 1
+        fi
+        if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch && "$GITHUB_REF" != "refs/tags/$tag" ]]; then
+          echo "::error::A manual release must be dispatched from the exact requested tag ref." >&2
+          exit 1
+        fi
+
+        ref_json="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag")"
+        if [[ "$(jq -r '.object.type' <<<"$ref_json")" != "tag" ]]; then
+          echo "::error::Release tag must be an annotated, signed tag." >&2
+          exit 1
+        fi
+        tag_object_sha="$(jq -r '.object.sha' <<<"$ref_json")"
+        tag_json="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$tag_object_sha")"
+        if [[ "$(jq -r '.verification.verified' <<<"$tag_json")" != "true" ]]; then
+          reason="$(jq -r '.verification.reason' <<<"$tag_json")"
+          echo "::error::GitHub did not verify the tag signature: $reason" >&2
+          exit 1
+        fi
+        if [[ "$(jq -r '.object.type' <<<"$tag_json")" != "commit" ]]; then
+          echo "::error::Signed tag does not point directly to a commit." >&2
+          exit 1
+        fi
+        commit_sha="$(jq -r '.object.sha' <<<"$tag_json")"
+
+        if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" >/dev/null 2>&1; then
+          echo "::error::A GitHub release already exists for $tag; release assets are immutable." >&2
+          exit 1
+        fi
+        echo "commit_sha=$commit_sha" >> "$GITHUB_OUTPUT"
+        echo "tag=$tag" >> "$GITHUB_OUTPUT"
+        echo "tag_object_sha=$tag_object_sha" >> "$GITHUB_OUTPUT"
+        echo "version=$tag" >> "$GITHUB_OUTPUT"
+    - name: steps::checkout_verified_commit
+      uses: actions/checkout@v7.0.0
+      with:
+        ref: ${{ steps.release.outputs.commit_sha }}
+        fetch-depth: 0
+    - name: release::verify_commit_source_and_ci
+      env:
+        COMMIT_SHA: ${{ steps.release.outputs.commit_sha }}
+        GH_TOKEN: ${{ github.token }}
+        TAG: ${{ steps.release.outputs.tag }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        git fetch --no-tags origin refs/heads/master:refs/remotes/origin/master
+        git merge-base --is-ancestor "$COMMIT_SHA" refs/remotes/origin/master || {
+          echo "::error::Release commit is not an ancestor of origin/master." >&2
+          exit 1
+        }
+        test "$(git rev-parse HEAD)" = "$COMMIT_SHA"
+        version="$(sed -n '/^\[package\]$/,/^\[/s/^version = "\([^"]*\)"$/\1/p' frame-app/Cargo.toml | head -n1)"
+        if [[ "$version" != "$TAG" ]]; then
+          echo "::error::frame-app version $version does not match signed tag $TAG." >&2
+          exit 1
+        fi
+        ci_runs="$(gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" \
+          -f head_sha="$COMMIT_SHA" -f branch=master -f status=completed -f per_page=100)"
+        if ! jq -e --arg sha "$COMMIT_SHA" \
+          '[.workflow_runs[] | select(.head_sha == $sha and .head_branch == "master" and .event == "push" and .conclusion == "success")] | length > 0' \
+          <<<"$ci_runs" >/dev/null; then
+          echo "::error::The verified commit has no successful ci.yml run from a push to master." >&2
+          exit 1
+        fi
+    timeout-minutes: 10
+
   build_linux_x86_64:
     runs-on: ubuntu-22.04
+    needs: prepare_release
     env:
       CARGO_INCREMENTAL: 0
-      FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY || secrets.FRAME_UPDATE_PUBLIC_KEY }}
+      FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY }}
     steps:
     - name: steps::checkout_repo
       uses: actions/checkout@v4
       with:
-        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+        ref: ${{ needs.prepare_release.outputs.commit_sha }}
     - name: release::check_public_key
       run: test -n "$FRAME_UPDATE_PUBLIC_KEY"
     - name: steps::setup_rust
@@ -1694,7 +2103,8 @@ jobs:
         sudo apt-get install -y clang curl desktop-file-utils file libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync
     - name: steps::setup_appimagetool
       run: |
-        curl -L --fail -o /tmp/appimagetool.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+        curl --fail --location --proto '=https' --tlsv1.2 --output /tmp/appimagetool.AppImage https://github.com/AppImage/appimagetool/releases/download/__APPIMAGETOOL_VERSION__/appimagetool-x86_64.AppImage
+        echo '__APPIMAGETOOL_X86_64_SHA256__  /tmp/appimagetool.AppImage' | sha256sum --check --strict
         chmod +x /tmp/appimagetool.AppImage
     - name: ./script/bundle-linux
       env:
@@ -1710,33 +2120,34 @@ jobs:
     - name: release::upload_linux_x86_64
       uses: actions/upload-artifact@v4
       with:
-        name: frame-linux-x86_64.tar.gz
+        name: release-asset-frame-linux-x86_64
         path: target/release/frame-linux-x86_64.tar.gz
         if-no-files-found: error
     - name: release::upload_linux_x86_64_appimage
       uses: actions/upload-artifact@v4
       with:
-        name: Frame-x86_64.AppImage
+        name: release-asset-Frame-x86_64-AppImage
         path: target/release/Frame-x86_64.AppImage
         if-no-files-found: error
     - name: release::upload_linux_x86_64_appimage_zsync
       uses: actions/upload-artifact@v4
       with:
-        name: Frame-x86_64.AppImage.zsync
+        name: release-asset-Frame-x86_64-AppImage-zsync
         path: target/release/Frame-x86_64.AppImage.zsync
         if-no-files-found: error
     timeout-minutes: 90
 
   build_linux_aarch64:
     runs-on: ubuntu-22.04-arm
+    needs: prepare_release
     env:
       CARGO_INCREMENTAL: 0
-      FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY || secrets.FRAME_UPDATE_PUBLIC_KEY }}
+      FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY }}
     steps:
     - name: steps::checkout_repo
       uses: actions/checkout@v4
       with:
-        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+        ref: ${{ needs.prepare_release.outputs.commit_sha }}
     - name: release::check_public_key
       run: test -n "$FRAME_UPDATE_PUBLIC_KEY"
     - name: steps::setup_rust
@@ -1747,7 +2158,8 @@ jobs:
         sudo apt-get install -y clang curl desktop-file-utils file libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync
     - name: steps::setup_appimagetool
       run: |
-        curl -L --fail -o /tmp/appimagetool.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-aarch64.AppImage
+        curl --fail --location --proto '=https' --tlsv1.2 --output /tmp/appimagetool.AppImage https://github.com/AppImage/appimagetool/releases/download/__APPIMAGETOOL_VERSION__/appimagetool-aarch64.AppImage
+        echo '__APPIMAGETOOL_AARCH64_SHA256__  /tmp/appimagetool.AppImage' | sha256sum --check --strict
         chmod +x /tmp/appimagetool.AppImage
     - name: ./script/bundle-linux
       env:
@@ -1763,278 +2175,625 @@ jobs:
     - name: release::upload_linux_aarch64
       uses: actions/upload-artifact@v4
       with:
-        name: frame-linux-aarch64.tar.gz
+        name: release-asset-frame-linux-aarch64
         path: target/release/frame-linux-aarch64.tar.gz
         if-no-files-found: error
     - name: release::upload_linux_aarch64_appimage
       uses: actions/upload-artifact@v4
       with:
-        name: Frame-aarch64.AppImage
+        name: release-asset-Frame-aarch64-AppImage
         path: target/release/Frame-aarch64.AppImage
         if-no-files-found: error
     - name: release::upload_linux_aarch64_appimage_zsync
       uses: actions/upload-artifact@v4
       with:
-        name: Frame-aarch64.AppImage.zsync
+        name: release-asset-Frame-aarch64-AppImage-zsync
         path: target/release/Frame-aarch64.AppImage.zsync
         if-no-files-found: error
     timeout-minutes: 90
 
   build_macos_x86_64:
     runs-on: macos-26-intel
+    needs: prepare_release
+    outputs:
+      unsigned_sha256: ${{ steps.unsigned.outputs.sha256 }}
     env:
       CARGO_INCREMENTAL: 0
-      FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY || secrets.FRAME_UPDATE_PUBLIC_KEY }}
-      MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
-      MACOS_CERTIFICATES_P12: ${{ secrets.MACOS_CERTIFICATES_P12 }}
-      MACOS_CERTIFICATES_PASSWORD: ${{ secrets.MACOS_CERTIFICATES_PASSWORD }}
-      APPLE_NOTARIZATION_KEY: ${{ secrets.APPLE_NOTARIZATION_KEY }}
-      APPLE_NOTARIZATION_KEY_ID: ${{ secrets.APPLE_NOTARIZATION_KEY_ID }}
-      APPLE_NOTARIZATION_ISSUER_ID: ${{ secrets.APPLE_NOTARIZATION_ISSUER_ID }}
+      FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY }}
     steps:
     - name: steps::checkout_repo
       uses: actions/checkout@v4
       with:
-        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+        ref: ${{ needs.prepare_release.outputs.commit_sha }}
     - name: release::check_public_key
       run: test -n "$FRAME_UPDATE_PUBLIC_KEY"
-    - name: release::import_macos_signing_certificate
-      if: env.MACOS_SIGNING_IDENTITY != '' && env.MACOS_CERTIFICATES_P12 != '' && env.MACOS_CERTIFICATES_PASSWORD != ''
-      uses: Apple-Actions/import-codesign-certs@v3
-      with:
-        p12-file-base64: ${{ env.MACOS_CERTIFICATES_P12 }}
-        p12-password: ${{ env.MACOS_CERTIFICATES_PASSWORD }}
     - name: steps::setup_rust
       uses: dtolnay/rust-toolchain@stable
     - name: steps::install_cargo_bundle
       run: cargo install cargo-bundle --locked
-    - name: ./script/bundle-mac
-      run: ./script/bundle-mac x86_64-apple-darwin
+    - name: release::build_macos_x86_64_unsigned
+      run: ./script/bundle-mac -b x86_64-apple-darwin
+    - name: release::archive_macos_x86_64_unsigned
+      id: unsigned
+      run: |
+        ditto -c -k --sequesterRsrc --keepParent \
+          target/x86_64-apple-darwin/release/bundle/osx/Frame.app \
+          target/Frame-x86_64-unsigned.app.zip
+        echo "sha256=$(shasum -a 256 target/Frame-x86_64-unsigned.app.zip | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+    - name: release::upload_macos_x86_64_unsigned
+      uses: actions/upload-artifact@v4
+      with:
+        name: signing-input-Frame-x86_64-app
+        path: target/Frame-x86_64-unsigned.app.zip
+        if-no-files-found: error
+        retention-days: 3
+    timeout-minutes: 90
+
+  sign_macos_x86_64:
+    runs-on: macos-26-intel
+    needs:
+      - prepare_release
+      - build_macos_x86_64
+    environment: production-release
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ needs.prepare_release.outputs.commit_sha }}
+    - name: release::download_macos_x86_64_unsigned
+      uses: actions/download-artifact@v4
+      with:
+        name: signing-input-Frame-x86_64-app
+        path: target/signing-input
+    - name: release::extract_macos_x86_64_unsigned
+      run: |
+        echo '${{ needs.build_macos_x86_64.outputs.unsigned_sha256 }}  target/signing-input/Frame-x86_64-unsigned.app.zip' | shasum -a 256 --check
+        mkdir -p target/x86_64-apple-darwin/release/bundle/osx
+        ditto -x -k target/signing-input/Frame-x86_64-unsigned.app.zip \
+          target/x86_64-apple-darwin/release/bundle/osx
+        test -d target/x86_64-apple-darwin/release/bundle/osx/Frame.app
+    - name: release::check_macos_signing_credentials
+      env:
+        MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        MACOS_CERTIFICATES_P12: ${{ secrets.MACOS_CERTIFICATES_P12 }}
+        MACOS_CERTIFICATES_PASSWORD: ${{ secrets.MACOS_CERTIFICATES_PASSWORD }}
+        APPLE_NOTARIZATION_KEY: ${{ secrets.APPLE_NOTARIZATION_KEY }}
+        APPLE_NOTARIZATION_KEY_ID: ${{ secrets.APPLE_NOTARIZATION_KEY_ID }}
+        APPLE_NOTARIZATION_ISSUER_ID: ${{ secrets.APPLE_NOTARIZATION_ISSUER_ID }}
+      run: |
+        test -n "$MACOS_SIGNING_IDENTITY"
+        test -n "$MACOS_CERTIFICATES_P12"
+        test -n "$MACOS_CERTIFICATES_PASSWORD"
+        test -n "$APPLE_NOTARIZATION_KEY"
+        test -n "$APPLE_NOTARIZATION_KEY_ID"
+        test -n "$APPLE_NOTARIZATION_ISSUER_ID"
+    - name: release::import_macos_signing_certificate
+      uses: Apple-Actions/import-codesign-certs@v3
+      with:
+        p12-file-base64: ${{ secrets.MACOS_CERTIFICATES_P12 }}
+        p12-password: ${{ secrets.MACOS_CERTIFICATES_PASSWORD }}
+    - name: release::sign_and_package_macos_x86_64
+      env:
+        MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        APPLE_NOTARIZATION_KEY: ${{ secrets.APPLE_NOTARIZATION_KEY }}
+        APPLE_NOTARIZATION_KEY_ID: ${{ secrets.APPLE_NOTARIZATION_KEY_ID }}
+        APPLE_NOTARIZATION_ISSUER_ID: ${{ secrets.APPLE_NOTARIZATION_ISSUER_ID }}
+      run: ./script/bundle-mac -p x86_64-apple-darwin
+    - name: release::verify_macos_x86_64_signing
+      run: |
+        codesign --verify --strict --verbose=2 target/x86_64-apple-darwin/release/Frame-x86_64.dmg
+        xcrun stapler validate target/x86_64-apple-darwin/release/Frame-x86_64.dmg
     - name: release::upload_macos_x86_64_dmg
       uses: actions/upload-artifact@v4
       with:
-        name: Frame-x86_64.dmg
+        name: release-asset-Frame-x86_64-dmg
         path: target/x86_64-apple-darwin/release/Frame-x86_64.dmg
         if-no-files-found: error
     - name: release::upload_macos_x86_64_update
       uses: actions/upload-artifact@v4
       with:
-        name: Frame-x86_64.app.zip
+        name: release-asset-Frame-x86_64-app-zip
         path: target/x86_64-apple-darwin/release/Frame-x86_64.app.zip
         if-no-files-found: error
     timeout-minutes: 90
 
   build_macos_aarch64:
     runs-on: macos-26
+    needs: prepare_release
+    outputs:
+      unsigned_sha256: ${{ steps.unsigned.outputs.sha256 }}
     env:
       CARGO_INCREMENTAL: 0
-      FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY || secrets.FRAME_UPDATE_PUBLIC_KEY }}
-      MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
-      MACOS_CERTIFICATES_P12: ${{ secrets.MACOS_CERTIFICATES_P12 }}
-      MACOS_CERTIFICATES_PASSWORD: ${{ secrets.MACOS_CERTIFICATES_PASSWORD }}
-      APPLE_NOTARIZATION_KEY: ${{ secrets.APPLE_NOTARIZATION_KEY }}
-      APPLE_NOTARIZATION_KEY_ID: ${{ secrets.APPLE_NOTARIZATION_KEY_ID }}
-      APPLE_NOTARIZATION_ISSUER_ID: ${{ secrets.APPLE_NOTARIZATION_ISSUER_ID }}
+      FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY }}
     steps:
     - name: steps::checkout_repo
       uses: actions/checkout@v4
       with:
-        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+        ref: ${{ needs.prepare_release.outputs.commit_sha }}
     - name: release::check_public_key
       run: test -n "$FRAME_UPDATE_PUBLIC_KEY"
-    - name: release::import_macos_signing_certificate
-      if: env.MACOS_SIGNING_IDENTITY != '' && env.MACOS_CERTIFICATES_P12 != '' && env.MACOS_CERTIFICATES_PASSWORD != ''
-      uses: Apple-Actions/import-codesign-certs@v3
-      with:
-        p12-file-base64: ${{ env.MACOS_CERTIFICATES_P12 }}
-        p12-password: ${{ env.MACOS_CERTIFICATES_PASSWORD }}
     - name: steps::setup_rust
       uses: dtolnay/rust-toolchain@stable
     - name: steps::install_cargo_bundle
       run: cargo install cargo-bundle --locked
-    - name: ./script/bundle-mac
-      run: ./script/bundle-mac aarch64-apple-darwin
+    - name: release::build_macos_aarch64_unsigned
+      run: ./script/bundle-mac -b aarch64-apple-darwin
+    - name: release::archive_macos_aarch64_unsigned
+      id: unsigned
+      run: |
+        ditto -c -k --sequesterRsrc --keepParent \
+          target/aarch64-apple-darwin/release/bundle/osx/Frame.app \
+          target/Frame-aarch64-unsigned.app.zip
+        echo "sha256=$(shasum -a 256 target/Frame-aarch64-unsigned.app.zip | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+    - name: release::upload_macos_aarch64_unsigned
+      uses: actions/upload-artifact@v4
+      with:
+        name: signing-input-Frame-aarch64-app
+        path: target/Frame-aarch64-unsigned.app.zip
+        if-no-files-found: error
+        retention-days: 3
+    timeout-minutes: 90
+
+  sign_macos_aarch64:
+    runs-on: macos-26
+    needs:
+      - prepare_release
+      - build_macos_aarch64
+    environment: production-release
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ needs.prepare_release.outputs.commit_sha }}
+    - name: release::download_macos_aarch64_unsigned
+      uses: actions/download-artifact@v4
+      with:
+        name: signing-input-Frame-aarch64-app
+        path: target/signing-input
+    - name: release::extract_macos_aarch64_unsigned
+      run: |
+        echo '${{ needs.build_macos_aarch64.outputs.unsigned_sha256 }}  target/signing-input/Frame-aarch64-unsigned.app.zip' | shasum -a 256 --check
+        mkdir -p target/aarch64-apple-darwin/release/bundle/osx
+        ditto -x -k target/signing-input/Frame-aarch64-unsigned.app.zip \
+          target/aarch64-apple-darwin/release/bundle/osx
+        test -d target/aarch64-apple-darwin/release/bundle/osx/Frame.app
+    - name: release::check_macos_signing_credentials
+      env:
+        MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        MACOS_CERTIFICATES_P12: ${{ secrets.MACOS_CERTIFICATES_P12 }}
+        MACOS_CERTIFICATES_PASSWORD: ${{ secrets.MACOS_CERTIFICATES_PASSWORD }}
+        APPLE_NOTARIZATION_KEY: ${{ secrets.APPLE_NOTARIZATION_KEY }}
+        APPLE_NOTARIZATION_KEY_ID: ${{ secrets.APPLE_NOTARIZATION_KEY_ID }}
+        APPLE_NOTARIZATION_ISSUER_ID: ${{ secrets.APPLE_NOTARIZATION_ISSUER_ID }}
+      run: |
+        test -n "$MACOS_SIGNING_IDENTITY"
+        test -n "$MACOS_CERTIFICATES_P12"
+        test -n "$MACOS_CERTIFICATES_PASSWORD"
+        test -n "$APPLE_NOTARIZATION_KEY"
+        test -n "$APPLE_NOTARIZATION_KEY_ID"
+        test -n "$APPLE_NOTARIZATION_ISSUER_ID"
+    - name: release::import_macos_signing_certificate
+      uses: Apple-Actions/import-codesign-certs@v3
+      with:
+        p12-file-base64: ${{ secrets.MACOS_CERTIFICATES_P12 }}
+        p12-password: ${{ secrets.MACOS_CERTIFICATES_PASSWORD }}
+    - name: release::sign_and_package_macos_aarch64
+      env:
+        MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        APPLE_NOTARIZATION_KEY: ${{ secrets.APPLE_NOTARIZATION_KEY }}
+        APPLE_NOTARIZATION_KEY_ID: ${{ secrets.APPLE_NOTARIZATION_KEY_ID }}
+        APPLE_NOTARIZATION_ISSUER_ID: ${{ secrets.APPLE_NOTARIZATION_ISSUER_ID }}
+      run: ./script/bundle-mac -p aarch64-apple-darwin
+    - name: release::verify_macos_aarch64_signing
+      run: |
+        codesign --verify --strict --verbose=2 target/aarch64-apple-darwin/release/Frame-aarch64.dmg
+        xcrun stapler validate target/aarch64-apple-darwin/release/Frame-aarch64.dmg
     - name: release::upload_macos_aarch64_dmg
       uses: actions/upload-artifact@v4
       with:
-        name: Frame-aarch64.dmg
+        name: release-asset-Frame-aarch64-dmg
         path: target/aarch64-apple-darwin/release/Frame-aarch64.dmg
         if-no-files-found: error
     - name: release::upload_macos_aarch64_update
       uses: actions/upload-artifact@v4
       with:
-        name: Frame-aarch64.app.zip
+        name: release-asset-Frame-aarch64-app-zip
         path: target/aarch64-apple-darwin/release/Frame-aarch64.app.zip
         if-no-files-found: error
     timeout-minutes: 90
 
   build_windows_x86_64:
     runs-on: windows-2022
+    needs: prepare_release
+    outputs:
+      unsigned_sha256: ${{ steps.unsigned.outputs.sha256 }}
     env:
       CARGO_INCREMENTAL: 0
-      FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY || secrets.FRAME_UPDATE_PUBLIC_KEY }}
-      WINDOWS_SIGNTOOL: ${{ secrets.WINDOWS_SIGNTOOL }}
+      FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY }}
     steps:
     - name: steps::checkout_repo
       uses: actions/checkout@v4
       with:
-        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+        ref: ${{ needs.prepare_release.outputs.commit_sha }}
     - name: release::check_public_key
       shell: pwsh
       run: |
         if (-not $env:FRAME_UPDATE_PUBLIC_KEY) { throw "FRAME_UPDATE_PUBLIC_KEY is required" }
     - name: steps::setup_rust
       uses: dtolnay/rust-toolchain@stable
+    - name: release::build_windows_x86_64_unsigned
+      shell: pwsh
+      run: ./script/bundle-windows.ps1 -Architecture x86_64 -PrepareOnly
+    - name: release::archive_windows_x86_64_unsigned
+      id: unsigned
+      shell: pwsh
+      run: |
+        Compress-Archive -Path target/inno/x86_64/* -DestinationPath target/Frame-x86_64-inno-inputs.zip
+        $sha256 = (Get-FileHash target/Frame-x86_64-inno-inputs.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+        "sha256=$sha256" >> $env:GITHUB_OUTPUT
+    - name: release::upload_windows_x86_64_unsigned
+      uses: actions/upload-artifact@v4
+      with:
+        name: signing-input-Frame-x86_64-windows
+        path: target/Frame-x86_64-inno-inputs.zip
+        if-no-files-found: error
+        retention-days: 3
+    timeout-minutes: 90
+
+  sign_windows_x86_64:
+    runs-on: windows-2022
+    needs:
+      - prepare_release
+      - build_windows_x86_64
+    environment: production-release
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ needs.prepare_release.outputs.commit_sha }}
+    - name: release::download_windows_x86_64_unsigned
+      uses: actions/download-artifact@v4
+      with:
+        name: signing-input-Frame-x86_64-windows
+        path: target/signing-input
+    - name: release::extract_windows_x86_64_unsigned
+      shell: pwsh
+      run: |
+        $expected = '${{ needs.build_windows_x86_64.outputs.unsigned_sha256 }}'
+        $actual = (Get-FileHash target/signing-input/Frame-x86_64-inno-inputs.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($actual -ne $expected) { throw "Unsigned Windows input digest mismatch: $actual != $expected" }
+        Expand-Archive -Path target/signing-input/Frame-x86_64-inno-inputs.zip -DestinationPath target/inno/x86_64
     - name: steps::setup_inno
       shell: pwsh
       run: choco install innosetup --no-progress -y
-    - name: ./script/bundle-windows.ps1
+    - name: release::sign_and_package_windows_x86_64
+      env:
+        WINDOWS_SIGNTOOL: ${{ secrets.WINDOWS_SIGNTOOL }}
       shell: pwsh
-      run: ./script/bundle-windows.ps1 -Architecture x86_64
+      run: |
+        if (-not $env:WINDOWS_SIGNTOOL) { throw "WINDOWS_SIGNTOOL is required for production releases" }
+        ./script/bundle-windows.ps1 -Architecture x86_64 -PackageOnly
+        $signature = Get-AuthenticodeSignature target/Frame-x86_64.exe
+        if ($signature.Status -ne 'Valid') { throw "Installer signature is not valid: $($signature.Status)" }
     - name: release::upload_windows_x86_64
       uses: actions/upload-artifact@v4
       with:
-        name: Frame-x86_64.exe
+        name: release-asset-Frame-x86_64-exe
         path: target/Frame-x86_64.exe
         if-no-files-found: error
     timeout-minutes: 60
 
-  publish_release:
+  generate_release_metadata:
     runs-on: ubuntu-22.04
     needs:
+      - prepare_release
       - build_linux_x86_64
       - build_linux_aarch64
-      - build_macos_x86_64
-      - build_macos_aarch64
-      - build_windows_x86_64
+      - sign_macos_x86_64
+      - sign_macos_aarch64
+      - sign_windows_x86_64
     env:
-      FRAME_UPDATE_SIGNING_KEY: ${{ secrets.FRAME_UPDATE_SIGNING_KEY }}
-      GH_TOKEN: ${{ github.token }}
       TAURI_BRIDGE_RELEASE_TAG: '0.29.3'
     steps:
     - name: steps::checkout_repo
       uses: actions/checkout@v4
       with:
-        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
-    - name: release::check_signing_key
-      run: test -n "$FRAME_UPDATE_SIGNING_KEY"
+        ref: ${{ needs.prepare_release.outputs.commit_sha }}
     - name: steps::setup_rust
       uses: dtolnay/rust-toolchain@stable
-    - name: release::download_artifacts
+    - name: release::download_build_artifacts
       uses: actions/download-artifact@v4
       with:
+        pattern: release-asset-*
         path: target/release-artifacts
         merge-multiple: true
-    - name: release::resolve_tag
-      id: release
-      shell: bash
-      run: |
-        tag="${GITHUB_REF_NAME}"
-        if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-          tag="${{ inputs.tag }}"
-        fi
-        if [[ "$tag" == v* ]]; then
-          echo "::error::Release tags must not use a v prefix: $tag" >&2
-          exit 1
-        fi
-        if [[ ! "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-          echo "::error::Release tag must be semver without a v prefix: $tag" >&2
-          exit 1
-        fi
-        version="$tag"
-        echo "tag=$tag" >> "$GITHUB_OUTPUT"
-        echo "version=$version" >> "$GITHUB_OUTPUT"
     - name: release::extract_release_notes
       shell: bash
       run: |
-        mkdir -p target/release
-        version="${{ steps.release.outputs.version }}"
-        awk -v ver="[$version]" '/^## / { if (p) { exit }; if ($2 == ver) { p=1; next } } p' CHANGELOG.md > target/release/release-notes.md
-        if [[ ! -s target/release/release-notes.md ]]; then
+        mkdir -p target/release-files
+        version="${{ needs.prepare_release.outputs.version }}"
+        awk -v ver="[$version]" '/^## / { if (p) { exit }; if ($2 == ver) { p=1; next } } p' CHANGELOG.md > target/release-files/release-notes.md
+        if [[ ! -s target/release-files/release-notes.md ]]; then
           echo "::error::CHANGELOG.md has no release notes section for [$version]" >&2
           exit 1
         fi
     - name: release::prepare_flathub_sources
-      run: cargo xtask flathub-sources --version "${{ steps.release.outputs.version }}"
-    - name: release::download_tauri_latest_json
       run: |
-        mkdir -p target/release
+        cargo xtask flathub-sources --version "${{ needs.prepare_release.outputs.version }}"
+        cp "target/flathub/frame-${{ needs.prepare_release.outputs.version }}-source.tar.gz" target/release-files/
+        cp "target/flathub/frame-${{ needs.prepare_release.outputs.version }}-cargo-vendor.tar.gz" target/release-files/
+    - name: release::download_tauri_latest_json
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
         gh release download "$TAURI_BRIDGE_RELEASE_TAG" \
           --repo 66HEX/frame \
           --pattern latest.json \
-          --dir target/release \
-          --clobber
-        test -s target/release/latest.json
+          --dir target/release-files
+        echo '__TAURI_BRIDGE_LATEST_JSON_SHA256__  target/release-files/latest.json' | sha256sum --check --strict
     - name: release::generate_update_manifest
       run: |
         cargo xtask update-manifest \
-          --version "${{ steps.release.outputs.version }}" \
-          --release-tag "${{ steps.release.outputs.tag }}" \
+          --version "${{ needs.prepare_release.outputs.version }}" \
+          --release-tag "${{ needs.prepare_release.outputs.tag }}" \
           --artifact target/release-artifacts/Frame-aarch64.app.zip:macos-aarch64:macos_app_zip \
           --artifact target/release-artifacts/Frame-x86_64.app.zip:macos-x86_64:macos_app_zip \
           --artifact target/release-artifacts/Frame-x86_64.exe:windows-x86_64:windows_inno \
           --artifact target/release-artifacts/frame-linux-x86_64.tar.gz:linux-x86_64:linux_managed_tar \
           --artifact target/release-artifacts/frame-linux-aarch64.tar.gz:linux-aarch64:linux_managed_tar \
-          --release-notes-markdown "$(< target/release/release-notes.md)" \
-          --out target/release/update-manifest.json
-    - name: release::sign_update_manifest
+          --release-notes-markdown "$(< target/release-files/release-notes.md)" \
+          --out target/release-files/update-manifest.json
+    - name: security::generate_cyclonedx_sbom
       run: |
-        cargo xtask sign-update-manifest \
-          --manifest target/release/update-manifest.json \
-          --out target/release/update-manifest.json.sig
-    - name: release::publish_github_release
+        cargo install cargo-cyclonedx --version __CARGO_CYCLONEDX_VERSION__ --locked
+        cargo cyclonedx \
+          --manifest-path frame-app/Cargo.toml \
+          --format json \
+          --target all \
+          --override-filename Frame.cdx \
+          --spec-version 1.5
+        cp frame-app/Frame.cdx.json target/release-files/Frame.cdx.json
+    - name: release::build_isolated_manifest_signer
+      run: cargo build --manifest-path tooling/manifest-signer/Cargo.toml --release --locked
+    - name: release::upload_unsigned_metadata
+      uses: actions/upload-artifact@v4
+      with:
+        name: unsigned-release-metadata
+        path: target/release-files
+        if-no-files-found: error
+        retention-days: 3
+    - name: release::upload_manifest_signer
+      uses: actions/upload-artifact@v4
+      with:
+        name: manifest-signer
+        path: target/release/frame-manifest-signer
+        if-no-files-found: error
+        retention-days: 3
+    timeout-minutes: 90
+
+  sign_release_metadata:
+    runs-on: ubuntu-22.04
+    needs:
+      - prepare_release
+      - generate_release_metadata
+    environment: production-release
+    steps:
+    - name: release::download_unsigned_metadata
+      uses: actions/download-artifact@v4
+      with:
+        name: unsigned-release-metadata
+        path: target/release-files
+    - name: release::download_manifest_signer
+      uses: actions/download-artifact@v4
+      with:
+        name: manifest-signer
+        path: target/signer
+    - name: release::sign_update_manifest
+      env:
+        FRAME_UPDATE_SIGNING_KEY: ${{ secrets.FRAME_UPDATE_SIGNING_KEY }}
+        FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY }}
       shell: bash
       run: |
-        tag="${{ steps.release.outputs.tag }}"
-        assets=(
-          target/release-artifacts/Frame-aarch64.dmg
-          target/release-artifacts/Frame-aarch64.app.zip
-          target/release-artifacts/Frame-x86_64.dmg
-          target/release-artifacts/Frame-x86_64.app.zip
-          target/release-artifacts/Frame-x86_64.exe
-          target/release-artifacts/frame-linux-x86_64.tar.gz
-          target/release-artifacts/frame-linux-aarch64.tar.gz
-          target/release-artifacts/Frame-x86_64.AppImage
-          target/release-artifacts/Frame-x86_64.AppImage.zsync
-          target/release-artifacts/Frame-aarch64.AppImage
-          target/release-artifacts/Frame-aarch64.AppImage.zsync
-          target/flathub/frame-${{ steps.release.outputs.version }}-source.tar.gz
-          target/flathub/frame-${{ steps.release.outputs.version }}-cargo-vendor.tar.gz
-          target/release/latest.json
-          target/release/update-manifest.json
-          target/release/update-manifest.json.sig
+        set -euo pipefail
+        test -n "$FRAME_UPDATE_SIGNING_KEY"
+        chmod +x target/signer/frame-manifest-signer
+        target/signer/frame-manifest-signer \
+          --manifest target/release-files/update-manifest.json \
+          --out target/release-files/update-manifest.json.sig
+    - name: release::upload_manifest_signature
+      uses: actions/upload-artifact@v4
+      with:
+        name: signed-update-manifest
+        path: target/release-files/update-manifest.json.sig
+        if-no-files-found: error
+        retention-days: 3
+    timeout-minutes: 10
+
+  assemble_release:
+    runs-on: ubuntu-22.04
+    needs:
+      - prepare_release
+      - build_linux_x86_64
+      - build_linux_aarch64
+      - sign_macos_x86_64
+      - sign_macos_aarch64
+      - sign_windows_x86_64
+      - generate_release_metadata
+      - sign_release_metadata
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+    - name: release::download_build_artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: release-asset-*
+        path: target/release-package
+        merge-multiple: true
+    - name: release::download_unsigned_metadata
+      uses: actions/download-artifact@v4
+      with:
+        name: unsigned-release-metadata
+        path: target/metadata
+    - name: release::download_manifest_signature
+      uses: actions/download-artifact@v4
+      with:
+        name: signed-update-manifest
+        path: target/signature
+    - name: release::assemble_exact_asset_set
+      env:
+        VERSION: ${{ needs.prepare_release.outputs.version }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        cp target/metadata/Frame.cdx.json target/release-package/
+        cp target/metadata/latest.json target/release-package/
+        cp target/metadata/update-manifest.json target/release-package/
+        cp target/metadata/frame-"$VERSION"-source.tar.gz target/release-package/
+        cp target/metadata/frame-"$VERSION"-cargo-vendor.tar.gz target/release-package/
+        cp target/signature/update-manifest.json.sig target/release-package/
+        cp target/metadata/release-notes.md target/release-package/
+
+        expected=(
+          Frame-aarch64.AppImage
+          Frame-aarch64.AppImage.zsync
+          Frame-aarch64.app.zip
+          Frame-aarch64.dmg
+          Frame-x86_64.AppImage
+          Frame-x86_64.AppImage.zsync
+          Frame-x86_64.app.zip
+          Frame-x86_64.dmg
+          Frame-x86_64.exe
+          Frame.cdx.json
+          frame-linux-aarch64.tar.gz
+          frame-linux-x86_64.tar.gz
+          frame-"$VERSION"-cargo-vendor.tar.gz
+          frame-"$VERSION"-source.tar.gz
+          latest.json
+          release-notes.md
+          update-manifest.json
+          update-manifest.json.sig
         )
-        if gh release view "$tag" >/dev/null 2>&1; then
-          gh release edit "$tag" --title "Frame ${{ steps.release.outputs.version }}" --notes-file target/release/release-notes.md
-          gh release upload "$tag" "${assets[@]}" --clobber
-        else
-          gh release create "$tag" "${assets[@]}" --title "Frame ${{ steps.release.outputs.version }}" --notes-file target/release/release-notes.md
+        mapfile -t actual < <(find target/release-package -maxdepth 1 -type f -printf '%f\n' | LC_ALL=C sort)
+        mapfile -t wanted < <(printf '%s\n' "${expected[@]}" | LC_ALL=C sort)
+        diff <(printf '%s\n' "${wanted[@]}") <(printf '%s\n' "${actual[@]}")
+
+        (
+          cd target/release-package
+          for asset in "${wanted[@]}"; do
+            if [[ "$asset" != release-notes.md ]]; then
+              sha256sum "$asset"
+            fi
+          done > SHA256SUMS
+        )
+        (cd target/release-package && sha256sum --check --strict SHA256SUMS)
+    - name: security::attest_release_assets
+      uses: actions/attest-build-provenance@v4.1.1
+      with:
+        subject-checksums: target/release-package/SHA256SUMS
+    - name: release::upload_complete_release_package
+      uses: actions/upload-artifact@v4
+      with:
+        name: complete-release-package
+        path: target/release-package
+        if-no-files-found: error
+        retention-days: 3
+    timeout-minutes: 20
+
+  publish_release:
+    runs-on: ubuntu-22.04
+    needs:
+      - prepare_release
+      - assemble_release
+    environment: production-release
+    permissions:
+      contents: write
+    env:
+      COMMIT_SHA: ${{ needs.prepare_release.outputs.commit_sha }}
+      TAG: ${{ needs.prepare_release.outputs.tag }}
+      TAG_OBJECT_SHA: ${{ needs.prepare_release.outputs.tag_object_sha }}
+      VERSION: ${{ needs.prepare_release.outputs.version }}
+    steps:
+    - name: release::download_complete_release_package
+      uses: actions/download-artifact@v4
+      with:
+        name: complete-release-package
+        path: target/release-package
+    - name: release::create_verified_draft_then_publish
+      env:
+        GH_TOKEN: ${{ github.token }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        cd target/release-package
+        sha256sum --check --strict SHA256SUMS
+        mapfile -t checksummed < <(awk '{print $2}' SHA256SUMS | LC_ALL=C sort)
+        mapfile -t packaged < <(find . -maxdepth 1 -type f ! -name release-notes.md ! -name SHA256SUMS -printf '%f\n' | LC_ALL=C sort)
+        diff <(printf '%s\n' "${checksummed[@]}") <(printf '%s\n' "${packaged[@]}")
+
+        ref_json="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG")"
+        test "$(jq -r '.object.type' <<<"$ref_json")" = tag
+        test "$(jq -r '.object.sha' <<<"$ref_json")" = "$TAG_OBJECT_SHA"
+        tag_json="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$TAG_OBJECT_SHA")"
+        test "$(jq -r '.verification.verified' <<<"$tag_json")" = true
+        test "$(jq -r '.object.type' <<<"$tag_json")" = commit
+        test "$(jq -r '.object.sha' <<<"$tag_json")" = "$COMMIT_SHA"
+        comparison="$(gh api "repos/$GITHUB_REPOSITORY/compare/$COMMIT_SHA...master")"
+        comparison_status="$(jq -r '.status' <<<"$comparison")"
+        if [[ "$comparison_status" != ahead && "$comparison_status" != identical ]]; then
+          echo "::error::Verified release commit is no longer an ancestor of master." >&2
+          exit 1
         fi
+        if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+          echo "::error::Release $TAG already exists; refusing to overwrite it." >&2
+          exit 1
+        fi
+        mapfile -t assets < <(find . -maxdepth 1 -type f ! -name release-notes.md -printf '%f\n' | LC_ALL=C sort)
+        gh release create "$TAG" "${assets[@]}" \
+          --repo "$GITHUB_REPOSITORY" \
+          --target "$COMMIT_SHA" \
+          --verify-tag \
+          --draft \
+          --title "Frame $VERSION" \
+          --notes-file release-notes.md
+
+        release_id="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq ".[] | select(.tag_name == \"$TAG\") | .id" | head -n1)"
+        test -n "$release_id"
+        release_json="$(gh api "repos/$GITHUB_REPOSITORY/releases/$release_id")"
+        test "$(jq -r '.draft' <<<"$release_json")" = true
+        mapfile -t remote_assets < <(jq -r '.assets[].name' <<<"$release_json" | LC_ALL=C sort)
+        diff <(printf '%s\n' "${assets[@]}") <(printf '%s\n' "${remote_assets[@]}")
+        for asset in "${assets[@]}"; do
+          local_digest="sha256:$(sha256sum "$asset" | awk '{print $1}')"
+          remote_digest="$(jq -r --arg name "$asset" '.assets[] | select(.name == $name) | .digest' <<<"$release_json")"
+          if [[ "$remote_digest" != "$local_digest" ]]; then
+            echo "::error::Uploaded digest mismatch for $asset: $remote_digest != $local_digest" >&2
+            exit 1
+          fi
+        done
+        gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/$release_id" -F draft=false >/dev/null
     timeout-minutes: 30
 
   update_homebrew_tap:
     runs-on: ubuntu-22.04
-    needs: publish_release
+    needs:
+      - prepare_release
+      - publish_release
+    environment: production-distribution
     steps:
-    - name: release::resolve_tag
-      id: release
-      shell: bash
-      run: |
-        tag="${GITHUB_REF_NAME}"
-        if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-          tag="${{ inputs.tag }}"
-        fi
-        echo "tag=$tag" >> "$GITHUB_OUTPUT"
     - name: release::download_macos_dmgs
       id: hashes
       env:
         GH_TOKEN: ${{ github.token }}
-        VERSION: ${{ steps.release.outputs.tag }}
+        VERSION: ${{ needs.prepare_release.outputs.tag }}
       shell: bash
       run: |
         mkdir -p target/homebrew
-        gh release download "$VERSION" --repo 66HEX/frame --pattern Frame-aarch64.dmg --dir target/homebrew --clobber
-        gh release download "$VERSION" --repo 66HEX/frame --pattern Frame-x86_64.dmg --dir target/homebrew --clobber
+        gh release download "$VERSION" --repo 66HEX/frame --pattern Frame-aarch64.dmg --dir target/homebrew
+        gh release download "$VERSION" --repo 66HEX/frame --pattern Frame-x86_64.dmg --dir target/homebrew
+        gh release download "$VERSION" --repo 66HEX/frame --pattern SHA256SUMS --dir target/homebrew
+        (cd target/homebrew && sha256sum --check --strict --ignore-missing SHA256SUMS)
         echo "HASH_ARM=$(sha256sum target/homebrew/Frame-aarch64.dmg | awk '{print $1}')" >> "$GITHUB_OUTPUT"
         echo "HASH_INTEL=$(sha256sum target/homebrew/Frame-x86_64.dmg | awk '{print $1}')" >> "$GITHUB_OUTPUT"
     - name: release::checkout_tap
@@ -2046,9 +2805,10 @@ jobs:
     - name: release::update_cask
       working-directory: tap
       env:
-        VERSION: ${{ steps.release.outputs.tag }}
+        VERSION: ${{ needs.prepare_release.outputs.tag }}
         HASH_ARM: ${{ steps.hashes.outputs.HASH_ARM }}
         HASH_INTEL: ${{ steps.hashes.outputs.HASH_INTEL }}
+        GH_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
       shell: bash
       run: |
         mkdir -p Casks
@@ -2076,14 +2836,6 @@ jobs:
             "~/Library/Saved Application State/com.66hex.frame.savedState",
           ]
 
-          caveats <<~EOS
-            Frame is not notarized. On first launch, you may need to:
-            1. Right-click the app and select "Open".
-            2. Click "Open" in the security dialog.
-
-            Alternatively, you can run:
-              xattr -dr com.apple.quarantine /Applications/Frame.app
-          EOS
         end
         EOF
 
@@ -2094,50 +2846,53 @@ jobs:
           echo "No Homebrew cask changes to publish."
         else
           git commit -m "Update Frame to $VERSION"
+          gh auth setup-git
           git push
         fi
     timeout-minutes: 20
 
   update_flathub:
     runs-on: ubuntu-22.04
-    needs: publish_release
+    needs:
+      - prepare_release
+      - publish_release
+    environment: production-distribution
     env:
-      GH_TOKEN: ${{ github.token }}
-      FLATHUB_GITHUB_TOKEN: ${{ secrets.FLATHUB_GITHUB_TOKEN }}
       FLATHUB_REPOSITORY: flathub/io.github._66HEX.Frame
     steps:
-    - name: release::resolve_tag
-      id: release
-      shell: bash
-      run: |
-        tag="${GITHUB_REF_NAME}"
-        if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-          tag="${{ inputs.tag }}"
-        fi
-        echo "tag=$tag" >> "$GITHUB_OUTPUT"
     - name: release::check_flathub_token
+      id: flathub_token
+      env:
+        FLATHUB_GITHUB_TOKEN: ${{ secrets.FLATHUB_GITHUB_TOKEN }}
       shell: bash
       run: |
         if [[ -z "$FLATHUB_GITHUB_TOKEN" ]]; then
           echo "::notice::FLATHUB_GITHUB_TOKEN is not configured; skipping Flathub manifest update."
+          echo "configured=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "configured=true" >> "$GITHUB_OUTPUT"
         fi
     - name: steps::checkout_repo
-      if: env.FLATHUB_GITHUB_TOKEN != ''
+      if: steps.flathub_token.outputs.configured == 'true'
       uses: actions/checkout@v4
       with:
-        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+        ref: ${{ needs.prepare_release.outputs.commit_sha }}
     - name: steps::setup_rust
-      if: env.FLATHUB_GITHUB_TOKEN != ''
+      if: steps.flathub_token.outputs.configured == 'true'
       uses: dtolnay/rust-toolchain@stable
     - name: release::download_flathub_sources
-      if: env.FLATHUB_GITHUB_TOKEN != ''
+      if: steps.flathub_token.outputs.configured == 'true'
       id: flathub_sources
+      env:
+        GH_TOKEN: ${{ github.token }}
       shell: bash
       run: |
         mkdir -p target/flathub-download
-        tag="${{ steps.release.outputs.tag }}"
-        gh release download "$tag" --repo 66HEX/frame --pattern "frame-$tag-source.tar.gz" --dir target/flathub-download --clobber
-        gh release download "$tag" --repo 66HEX/frame --pattern "frame-$tag-cargo-vendor.tar.gz" --dir target/flathub-download --clobber
+        tag="${{ needs.prepare_release.outputs.tag }}"
+        gh release download "$tag" --repo 66HEX/frame --pattern "frame-$tag-source.tar.gz" --dir target/flathub-download
+        gh release download "$tag" --repo 66HEX/frame --pattern "frame-$tag-cargo-vendor.tar.gz" --dir target/flathub-download
+        gh release download "$tag" --repo 66HEX/frame --pattern SHA256SUMS --dir target/flathub-download
+        (cd target/flathub-download && sha256sum --check --strict --ignore-missing SHA256SUMS)
         source_archive="target/flathub-download/frame-$tag-source.tar.gz"
         vendor_archive="target/flathub-download/frame-$tag-cargo-vendor.tar.gz"
         source_sha256="$(sha256sum "$source_archive" | awk '{print $1}')"
@@ -2145,9 +2900,9 @@ jobs:
         echo "SOURCE_SHA256=$source_sha256" >> "$GITHUB_OUTPUT"
         echo "VENDOR_SHA256=$vendor_sha256" >> "$GITHUB_OUTPUT"
     - name: release::render_flathub_manifest
-      if: env.FLATHUB_GITHUB_TOKEN != ''
+      if: steps.flathub_token.outputs.configured == 'true'
       run: |
-        tag="${{ steps.release.outputs.tag }}"
+        tag="${{ needs.prepare_release.outputs.tag }}"
         cargo xtask flathub-manifest \
           --version "$tag" \
           --source-url "https://github.com/66HEX/frame/releases/download/$tag/frame-$tag-source.tar.gz" \
@@ -2156,18 +2911,18 @@ jobs:
           --vendor-sha256 "${{ steps.flathub_sources.outputs.VENDOR_SHA256 }}" \
           --out target/flathub/repo
     - name: release::checkout_flathub
-      if: env.FLATHUB_GITHUB_TOKEN != ''
+      if: steps.flathub_token.outputs.configured == 'true'
       uses: actions/checkout@v4
       with:
         repository: ${{ env.FLATHUB_REPOSITORY }}
-        token: ${{ env.FLATHUB_GITHUB_TOKEN }}
+        token: ${{ secrets.FLATHUB_GITHUB_TOKEN }}
         path: flathub
     - name: release::publish_flathub_pr
-      if: env.FLATHUB_GITHUB_TOKEN != ''
+      if: steps.flathub_token.outputs.configured == 'true'
       working-directory: flathub
       env:
-        GH_TOKEN: ${{ env.FLATHUB_GITHUB_TOKEN }}
-        VERSION: ${{ steps.release.outputs.tag }}
+        GH_TOKEN: ${{ secrets.FLATHUB_GITHUB_TOKEN }}
+        VERSION: ${{ needs.prepare_release.outputs.tag }}
       shell: bash
       run: |
         branch="frame-$VERSION"
@@ -2181,6 +2936,7 @@ jobs:
           exit 0
         fi
         git commit -m "Update Frame to $VERSION"
+        gh auth setup-git
         git push --force-with-lease origin "$branch"
         if gh pr view "$branch" --repo "$FLATHUB_REPOSITORY" >/dev/null 2>&1; then
           gh pr edit "$branch" \
@@ -2201,89 +2957,104 @@ jobs:
 
 
   publish_winget:
-    runs-on: windows-latest
-    needs: publish_release
+    runs-on: ubuntu-22.04
+    needs:
+      - prepare_release
+      - publish_release
+    environment: production-distribution
+    env:
+      KOMAC_FORK_OWNER: 66HEX
+      VERSION: ${{ needs.prepare_release.outputs.tag }}
     steps:
-    - name: release::resolve_tag
-      id: release
+    - name: release::install_verified_komac
       shell: bash
       run: |
-        tag="${GITHUB_REF_NAME}"
-        if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-          tag="${{ inputs.tag }}"
-        fi
-        echo "tag=$tag" >> "$GITHUB_OUTPUT"
+        set -euo pipefail
+        archive="komac-__KOMAC_VERSION__-x86_64-unknown-linux-gnu.tar.gz"
+        curl --fail --location --proto '=https' --tlsv1.2 \
+          --output "/tmp/$archive" \
+          "https://github.com/russellbanks/Komac/releases/download/v__KOMAC_VERSION__/$archive"
+        echo '__KOMAC_LINUX_X86_64_SHA256__  /tmp/'"$archive" | sha256sum --check --strict
+        tar --extract --gzip --file "/tmp/$archive" --directory /tmp komac
+        install -m 0755 /tmp/komac /usr/local/bin/komac
     - name: release::publish_winget
-      uses: vedantmgoyal9/winget-releaser@v2
-      with:
-        identifier: 66HEX.Frame
-        version: ${{ steps.release.outputs.tag }}
-        installers-regex: '^Frame-x86_64\.exe$'
-        release-repository: frame
-        release-tag: ${{ steps.release.outputs.tag }}
-        release-notes-url: https://github.com/66HEX/frame/releases/tag/${{ steps.release.outputs.tag }}
-        token: ${{ secrets.WINGET_ACC_TOKEN }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.WINGET_ACC_TOKEN }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        test -n "$GITHUB_TOKEN"
+        komac update 66HEX.Frame \
+          --version "$VERSION" \
+          --urls "https://github.com/66HEX/frame/releases/download/$VERSION/Frame-x86_64.exe" \
+          --submit
     timeout-minutes: 30
 "#
-    .replace("  __NIXPKGS_JOBS__\n", &nixpkgs_release_jobs(Some("publish_release")))
+    .replace(
+        "  __NIXPKGS_JOBS__\n",
+        &nixpkgs_release_jobs(
+            Some("[prepare_release, publish_release]"),
+            "${{ needs.prepare_release.outputs.tag }}",
+        ),
+    );
+    render_workflow(&workflow)
 }
 
 #[expect(
     clippy::too_many_lines,
     reason = "The generated GitHub Actions jobs are kept as one raw template for easier diffing against YAML output."
 )]
-fn nixpkgs_release_jobs(prepare_needs: Option<&str>) -> String {
+fn nixpkgs_release_jobs(prepare_needs: Option<&str>, version_expression: &str) -> String {
     let prepare_needs = prepare_needs
         .map(|needs| format!("    needs: {needs}\n"))
         .unwrap_or_default();
     let mut jobs = r#"  prepare_nixpkgs:
     runs-on: ubuntu-22.04
     needs: publish_release
+    environment: production-distribution
     outputs:
       branch: ${{ steps.nixpkgs.outputs.branch }}
       commit_subject: ${{ steps.nixpkgs.outputs.commit_subject }}
       should_publish: ${{ steps.nixpkgs.outputs.should_publish }}
     env:
-      GH_TOKEN: ${{ secrets.NIXPKGS_GITHUB_TOKEN }}
       NIXPKGS_FORK: 66HEX/nixpkgs
       NIXPKGS_UPSTREAM: NixOS/nixpkgs
       NIXPKGS_PACKAGE: frame-media-converter
+      VERSION: __NIXPKGS_VERSION__
     steps:
-    - name: release::resolve_tag
-      id: release
-      shell: bash
-      run: |
-        tag="${GITHUB_REF_NAME}"
-        if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-          tag="${{ inputs.tag }}"
-        fi
-        echo "tag=$tag" >> "$GITHUB_OUTPUT"
     - name: release::check_nixpkgs_token
+      id: token
+      env:
+        NIXPKGS_GITHUB_TOKEN: ${{ secrets.NIXPKGS_GITHUB_TOKEN }}
       shell: bash
       run: |
-        if [[ -z "$GH_TOKEN" ]]; then
+        if [[ -z "$NIXPKGS_GITHUB_TOKEN" ]]; then
           echo "::notice::NIXPKGS_GITHUB_TOKEN is not configured; skipping nixpkgs PR."
+          echo "configured=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "configured=true" >> "$GITHUB_OUTPUT"
         fi
     - name: steps::install_nix
-      if: env.GH_TOKEN != ''
+      if: steps.token.outputs.configured == 'true'
       uses: cachix/install-nix-action@v31
       with:
+        install_url: https://releases.nixos.org/nix/nix-__NIX_VERSION__/install
         extra_nix_config: |
           sandbox = true
     - name: release::checkout_nixpkgs
-      if: env.GH_TOKEN != ''
+      if: steps.token.outputs.configured == 'true'
       uses: actions/checkout@v4
       with:
         repository: ${{ env.NIXPKGS_FORK }}
-        token: ${{ env.GH_TOKEN }}
+        token: ${{ secrets.NIXPKGS_GITHUB_TOKEN }}
         path: nixpkgs
         fetch-depth: 0
     - name: release::prepare_nixpkgs_branch
       id: nixpkgs
-      if: env.GH_TOKEN != ''
+      if: steps.token.outputs.configured == 'true'
       working-directory: nixpkgs
       env:
-        VERSION: ${{ steps.release.outputs.tag }}
+        GH_TOKEN: ${{ secrets.NIXPKGS_GITHUB_TOKEN }}
       shell: bash
       run: |
         set -euo pipefail
@@ -2482,6 +3253,7 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>) -> String {
           exit 0
         fi
         git commit -m "$commit_subject"
+        gh auth setup-git
         git push --force-with-lease origin "$branch"
         echo "commit_subject=$commit_subject" >> "$GITHUB_OUTPUT"
         echo "should_publish=true" >> "$GITHUB_OUTPUT"
@@ -2492,13 +3264,13 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>) -> String {
     needs: prepare_nixpkgs
     if: needs.prepare_nixpkgs.outputs.should_publish == 'true'
     env:
-      GH_TOKEN: ${{ secrets.NIXPKGS_GITHUB_TOKEN }}
       NIXPKGS_FORK: 66HEX/nixpkgs
       NIXPKGS_PACKAGE: frame-media-converter
     steps:
     - name: steps::install_nix
       uses: cachix/install-nix-action@v31
       with:
+        install_url: https://releases.nixos.org/nix/nix-__NIX_VERSION__/install
         extra_nix_config: |
           sandbox = true
     - name: release::checkout_nixpkgs
@@ -2506,7 +3278,6 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>) -> String {
       with:
         repository: ${{ env.NIXPKGS_FORK }}
         ref: ${{ needs.prepare_nixpkgs.outputs.branch }}
-        token: ${{ env.GH_TOKEN }}
         path: nixpkgs
     - name: release::build_nixpkgs_aarch64
       working-directory: nixpkgs
@@ -2515,18 +3286,19 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>) -> String {
 
   publish_nixpkgs:
     runs-on: ubuntu-22.04
+    environment: production-distribution
     needs:
       - prepare_nixpkgs
       - validate_nixpkgs_aarch64
     if: needs.prepare_nixpkgs.outputs.should_publish == 'true'
     env:
-      GH_TOKEN: ${{ secrets.NIXPKGS_GITHUB_TOKEN }}
       NIXPKGS_UPSTREAM: NixOS/nixpkgs
     steps:
     - name: release::publish_nixpkgs_pr
       env:
         BRANCH: ${{ needs.prepare_nixpkgs.outputs.branch }}
         COMMIT_SUBJECT: ${{ needs.prepare_nixpkgs.outputs.commit_subject }}
+        GH_TOKEN: ${{ secrets.NIXPKGS_GITHUB_TOKEN }}
       shell: bash
       run: |
         set -euo pipefail
@@ -2553,11 +3325,11 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>) -> String {
 "#
         .to_string();
     jobs = jobs.replace("    needs: publish_release\n", &prepare_needs);
-    jobs
+    jobs.replace("__NIXPKGS_VERSION__", version_expression)
 }
 
 fn publish_nixpkgs_workflow() -> String {
-    let mut workflow = r"# Generated from xtask::workflows::publish_nixpkgs
+    let mut workflow = r#"# Generated from xtask::workflows::publish_nixpkgs
 # Rebuild with `cargo xtask workflows`.
 name: publish nixpkgs
 env:
@@ -2572,10 +3344,47 @@ on:
 permissions:
   contents: read
 jobs:
-"
+  validate_release:
+    runs-on: ubuntu-22.04
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+    - name: release::validate_signed_published_tag
+      id: release
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TAG: ${{ inputs.tag }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [[ ! "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "::error::Release tag must be stable semver without a v prefix." >&2
+          exit 1
+        fi
+        ref_json="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG")"
+        test "$(jq -r '.object.type' <<<"$ref_json")" = tag
+        tag_json="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$(jq -r '.object.sha' <<<"$ref_json")")"
+        test "$(jq -r '.verification.verified' <<<"$tag_json")" = true
+        test "$(jq -r '.object.type' <<<"$tag_json")" = commit
+        commit_sha="$(jq -r '.object.sha' <<<"$tag_json")"
+        comparison="$(gh api "repos/$GITHUB_REPOSITORY/compare/$commit_sha...master")"
+        comparison_status="$(jq -r '.status' <<<"$comparison")"
+        if [[ "$comparison_status" != ahead && "$comparison_status" != identical ]]; then
+          echo "::error::Release tag is not an ancestor of master." >&2
+          exit 1
+        fi
+        release_json="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG")"
+        test "$(jq -r '.draft or .prerelease' <<<"$release_json")" = false
+        jq -e '[.assets[].name] | index("SHA256SUMS") != null' <<<"$release_json" >/dev/null
+        echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+    timeout-minutes: 10
+"#
     .to_string();
-    workflow.push_str(&nixpkgs_release_jobs(None));
-    workflow
+    workflow.push_str(&nixpkgs_release_jobs(
+        Some("validate_release"),
+        "${{ needs.validate_release.outputs.tag }}",
+    ));
+    render_workflow(&workflow)
 }
 
 fn repo_root() -> Result<PathBuf> {
@@ -2608,6 +3417,9 @@ enum XtaskError {
         subject: String,
         expected: String,
         actual: String,
+    },
+    GeneratedWorkflowOutOfDate {
+        path: String,
     },
     Help,
     Io(io::Error),
@@ -2643,6 +3455,10 @@ impl fmt::Display for XtaskError {
             } => write!(
                 formatter,
                 "SHA-256 mismatch for `{subject}`: expected {expected}, got {actual}"
+            ),
+            Self::GeneratedWorkflowOutOfDate { path } => write!(
+                formatter,
+                "generated workflow `{path}` is out of date; run `cargo xtask workflows`"
             ),
             Self::Help => Ok(()),
             Self::Io(error) => write!(formatter, "{error}"),
@@ -2876,7 +3692,7 @@ mod tests {
         let workflow = release_workflow();
 
         assert!(workflow.contains("release::extract_release_notes"));
-        assert!(workflow.contains("CHANGELOG.md > target/release/release-notes.md"));
+        assert!(workflow.contains("CHANGELOG.md > target/release-files/release-notes.md"));
     }
 
     #[test]
@@ -2884,7 +3700,9 @@ mod tests {
         let workflow = release_workflow();
 
         assert!(
-            workflow.contains("--release-notes-markdown \"$(< target/release/release-notes.md)\"")
+            workflow.contains(
+                "--release-notes-markdown \"$(< target/release-files/release-notes.md)\""
+            )
         );
     }
 
@@ -2892,7 +3710,7 @@ mod tests {
     fn release_workflow_uses_changelog_notes_for_github_release() {
         let workflow = release_workflow();
 
-        assert!(workflow.contains("--notes-file target/release/release-notes.md"));
+        assert!(workflow.contains("--notes-file release-notes.md"));
         assert!(!workflow.contains("--generate-notes"));
     }
 
@@ -2900,10 +3718,10 @@ mod tests {
     fn release_workflow_publishes_appimage_update_assets() {
         let workflow = release_workflow();
 
-        assert!(workflow.contains("target/release-artifacts/Frame-x86_64.AppImage"));
-        assert!(workflow.contains("target/release-artifacts/Frame-x86_64.AppImage.zsync"));
-        assert!(workflow.contains("target/release-artifacts/Frame-aarch64.AppImage"));
-        assert!(workflow.contains("target/release-artifacts/Frame-aarch64.AppImage.zsync"));
+        assert!(workflow.contains("Frame-x86_64.AppImage"));
+        assert!(workflow.contains("Frame-x86_64.AppImage.zsync"));
+        assert!(workflow.contains("Frame-aarch64.AppImage"));
+        assert!(workflow.contains("Frame-aarch64.AppImage.zsync"));
     }
 
     #[test]
@@ -2911,13 +3729,11 @@ mod tests {
         let workflow = release_workflow();
 
         assert!(workflow.contains("release::prepare_flathub_sources"));
-        assert!(
-            workflow.contains(
-                "target/flathub/frame-${{ steps.release.outputs.version }}-source.tar.gz"
-            )
-        );
         assert!(workflow.contains(
-            "target/flathub/frame-${{ steps.release.outputs.version }}-cargo-vendor.tar.gz"
+            "target/flathub/frame-${{ needs.prepare_release.outputs.version }}-source.tar.gz"
+        ));
+        assert!(workflow.contains(
+            "target/flathub/frame-${{ needs.prepare_release.outputs.version }}-cargo-vendor.tar.gz"
         ));
     }
 
@@ -2938,7 +3754,7 @@ mod tests {
         assert!(workflow.contains("prepare_nixpkgs:"));
         assert!(workflow.contains("validate_nixpkgs_aarch64:"));
         assert!(workflow.contains("publish_nixpkgs:"));
-        assert!(workflow.contains("needs: publish_release"));
+        assert!(workflow.contains("needs: [prepare_release, publish_release]"));
         assert!(workflow.contains("runs-on: ubuntu-22.04-arm"));
         assert!(workflow.contains("release::build_nixpkgs_aarch64"));
         assert!(workflow.contains("- validate_nixpkgs_aarch64"));
@@ -2950,7 +3766,7 @@ mod tests {
         assert!(!workflow.contains("_0x4A6F"));
         assert!(!workflow.contains("nix-build -A \"$NIXPKGS_PACKAGE\" -L"));
         assert!(workflow.contains("nix-shell -I nixpkgs=\"$PWD\""));
-        assert!(workflow.contains("VERSION: ${{ steps.release.outputs.tag }}"));
+        assert!(workflow.contains("VERSION: ${{ needs.prepare_release.outputs.tag }}"));
         assert!(workflow.contains(r#""x86_64-linux""#));
         assert!(workflow.contains(r#""aarch64-linux""#));
         assert!(workflow.contains("gh pr create"));
@@ -2976,6 +3792,205 @@ mod tests {
         assert!(!workflow.contains("update_flathub:"));
         assert!(!workflow.contains("build_linux_x86_64:"));
         assert!(!workflow.contains("build_macos_aarch64:"));
+    }
+
+    #[test]
+    fn generated_workflows_pin_every_external_action_to_a_full_commit_sha() {
+        for (path, workflow) in generated_workflows() {
+            for line in workflow.lines() {
+                let Some(reference) = line.trim().strip_prefix("uses: ") else {
+                    continue;
+                };
+                if reference.starts_with("./") {
+                    continue;
+                }
+                let Some((_, revision)) = reference.split_once('@') else {
+                    panic!("external action in {path} has no revision: {reference}");
+                };
+                let revision = revision.split_whitespace().next().unwrap();
+                assert!(
+                    revision.len() == 40 && revision.bytes().all(|byte| byte.is_ascii_hexdigit()),
+                    "external action in {path} is not pinned to a full SHA: {reference}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn generated_workflows_disable_checkout_credentials() {
+        for (path, workflow) in generated_workflows() {
+            let checkout_count = workflow.matches("uses: actions/checkout@").count();
+            let disabled_count = workflow.matches("persist-credentials: false").count();
+            assert_eq!(
+                checkout_count, disabled_count,
+                "each checkout in {path} must disable persisted credentials"
+            );
+        }
+    }
+
+    #[test]
+    fn generated_workflows_use_explicit_least_privilege_permissions() {
+        for (path, workflow) in generated_workflows() {
+            assert!(
+                workflow.contains("permissions:\n  contents: read"),
+                "{path} must default GITHUB_TOKEN to contents: read"
+            );
+            assert!(!workflow.contains("permissions: write-all"));
+        }
+
+        let release = release_workflow();
+        assert_eq!(release.matches("      contents: write").count(), 1);
+        assert_eq!(release.matches("      id-token: write").count(), 1);
+        assert_eq!(release.matches("      attestations: write").count(), 1);
+        assert!(!release.contains("      actions: write"));
+
+        let codeql = codeql_workflow();
+        assert_eq!(codeql.matches("  security-events: write").count(), 1);
+    }
+
+    #[test]
+    fn generated_workflows_pin_installed_tool_versions() {
+        for (path, workflow) in generated_workflows() {
+            for line in workflow.lines() {
+                if line.contains("cargo install ") {
+                    assert!(
+                        line.contains(" --version "),
+                        "cargo tool in {path} has no exact version: {line}"
+                    );
+                }
+                if line.contains("rustup toolchain install ") {
+                    assert!(
+                        line.contains(RUST_VERSION),
+                        "Rust toolchain in {path} is not pinned: {line}"
+                    );
+                }
+                if line.contains("choco install ") {
+                    assert!(
+                        line.contains(" --version "),
+                        "Chocolatey tool in {path} has no exact version: {line}"
+                    );
+                }
+            }
+
+            let rust_install_count = workflow.matches("rustup toolchain install ").count();
+            assert_eq!(
+                rust_install_count,
+                workflow
+                    .matches(&format!("rustup default {RUST_VERSION}"))
+                    .count(),
+                "every Rust installation in {path} must activate the pinned toolchain"
+            );
+            assert_eq!(
+                rust_install_count,
+                workflow
+                    .matches(&format!(
+                        "test \"$(rustc --version | awk '{{print $2}}')\" = \"{RUST_VERSION}\""
+                    ))
+                    .count(),
+                "every Rust installation in {path} must verify the active version"
+            );
+
+            let nix_action_count = workflow.matches("uses: cachix/install-nix-action@").count();
+            let pinned_nix_count = workflow
+                .matches(&format!(
+                    "install_url: https://releases.nixos.org/nix/nix-{NIX_VERSION}/install"
+                ))
+                .count();
+            assert_eq!(
+                nix_action_count, pinned_nix_count,
+                "every Nix installation in {path} must use the pinned version"
+            );
+        }
+
+        for workflow in [run_bundling_workflow(), release_workflow()] {
+            assert!(workflow.contains(&format!(
+                "/appimagetool/releases/download/{APPIMAGETOOL_VERSION}/"
+            )));
+            assert!(workflow.contains(APPIMAGETOOL_X86_64_SHA256));
+            assert!(workflow.contains(APPIMAGETOOL_AARCH64_SHA256));
+            assert!(!workflow.contains("/continuous/"));
+        }
+    }
+
+    #[test]
+    fn release_workflow_enforces_immutable_verified_release_pipeline() {
+        let workflow = release_workflow();
+
+        for required in [
+            "release::resolve_and_verify_signed_tag",
+            ".verification.verified",
+            "git merge-base --is-ancestor",
+            "actions/workflows/ci.yml/runs",
+            "A manual release must be dispatched from the exact requested tag ref",
+            "TAG_OBJECT_SHA",
+            "Verified release commit is no longer an ancestor of master",
+            "generate_release_metadata:",
+            "sign_macos_x86_64:",
+            "sign_macos_aarch64:",
+            "sign_windows_x86_64:",
+            "sign_release_metadata:",
+            "assemble_release:",
+            "publish_release:",
+            "Frame.cdx.json",
+            "SHA256SUMS",
+            "security::attest_release_assets",
+            "--draft",
+            ".assets[] | select(.name == $name) | .digest",
+        ] {
+            assert!(
+                workflow.contains(required),
+                "missing release guard: {required}"
+            );
+        }
+        for forbidden in ["--clobber", "releases/download/continuous", "@stable"] {
+            assert!(
+                !workflow.contains(forbidden),
+                "release workflow contains mutable or overwrite path: {forbidden}"
+            );
+        }
+    }
+
+    #[test]
+    fn release_workflow_isolates_platform_builds_from_signing_secrets() {
+        let workflow = release_workflow();
+
+        for (build_job, signing_job) in [
+            ("build_macos_x86_64", "sign_macos_x86_64"),
+            ("build_macos_aarch64", "sign_macos_aarch64"),
+            ("build_windows_x86_64", "sign_windows_x86_64"),
+        ] {
+            let build = workflow_job(&workflow, build_job);
+            assert!(build.contains("unsigned"));
+            assert!(!build.contains("secrets."));
+            assert!(!build.contains("environment: production-release"));
+
+            let signing = workflow_job(&workflow, signing_job);
+            assert!(signing.contains("environment: production-release"));
+            assert!(signing.contains("secrets."));
+            assert!(signing.contains("outputs.unsigned_sha256"));
+            assert!(!signing.contains("cargo build"));
+            assert!(!signing.contains("cargo bundle"));
+        }
+    }
+
+    fn workflow_job<'a>(workflow: &'a str, name: &str) -> &'a str {
+        let marker = format!("\n  {name}:\n");
+        let (_, rest) = workflow
+            .split_once(&marker)
+            .unwrap_or_else(|| panic!("missing workflow job {name}"));
+        rest.split("\n\n  ")
+            .next()
+            .expect("workflow job should have content")
+    }
+
+    #[test]
+    fn run_bundling_requires_a_new_labeled_event_and_protected_environment() {
+        let workflow = run_bundling_workflow();
+
+        assert!(workflow.contains("types:\n      - labeled"));
+        assert!(!workflow.contains("synchronize"));
+        assert_eq!(workflow.matches("environment: run-bundling").count(), 5);
+        assert!(!workflow.contains("secrets."));
     }
 
     #[test]
