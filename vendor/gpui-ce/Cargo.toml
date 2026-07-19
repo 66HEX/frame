@@ -133,7 +133,7 @@ gpui_shared_string = { path = "./crates/gpui_shared_string/" }
 gpui_tokio = { path = "./crates/gpui_tokio/" }
 
 [workspace.dependencies.windows]
-version = "0.61"
+version = "0.62"
 features = [
   "Foundation_Numerics",
   "Globalization_DateTimeFormatting",
