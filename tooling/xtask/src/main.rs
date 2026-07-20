@@ -1190,7 +1190,7 @@ fn download_file(url: &str) -> Result<Vec<u8>> {
             source: Box::new(source),
         })?;
     let mut bytes = Vec::new();
-    response.into_reader().read_to_end(&mut bytes)?;
+    response.into_body().into_reader().read_to_end(&mut bytes)?;
     Ok(bytes)
 }
 
