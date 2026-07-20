@@ -16,6 +16,7 @@ on:
         required: true
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
   cancel-in-progress: false
@@ -124,6 +125,7 @@ jobs:
     - name: release::check_public_key
       run: test -n "$FRAME_UPDATE_PUBLIC_KEY"
     - name: steps::setup_rust
+      shell: bash
       run: |
         rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
         rustup default 1.95.0
@@ -183,6 +185,7 @@ jobs:
     - name: release::check_public_key
       run: test -n "$FRAME_UPDATE_PUBLIC_KEY"
     - name: steps::setup_rust
+      shell: bash
       run: |
         rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
         rustup default 1.95.0
@@ -244,6 +247,7 @@ jobs:
     - name: release::check_public_key
       run: test -n "$FRAME_UPDATE_PUBLIC_KEY"
     - name: steps::setup_rust
+      shell: bash
       run: |
         rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
         rustup default 1.95.0
@@ -324,6 +328,7 @@ jobs:
     - name: release::check_public_key
       run: test -n "$FRAME_UPDATE_PUBLIC_KEY"
     - name: steps::setup_rust
+      shell: bash
       run: |
         rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
         rustup default 1.95.0
@@ -406,6 +411,7 @@ jobs:
       run: |
         if (-not $env:FRAME_UPDATE_PUBLIC_KEY) { throw "FRAME_UPDATE_PUBLIC_KEY is required" }
     - name: steps::setup_rust
+      shell: bash
       run: |
         rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
         rustup default 1.95.0
@@ -484,6 +490,7 @@ jobs:
         persist-credentials: false
         ref: ${{ needs.prepare_release.outputs.commit_sha }}
     - name: steps::setup_rust
+      shell: bash
       run: |
         rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
         rustup default 1.95.0
@@ -868,6 +875,7 @@ jobs:
         ref: ${{ needs.prepare_release.outputs.commit_sha }}
     - name: steps::setup_rust
       if: steps.flathub_token.outputs.configured == 'true'
+      shell: bash
       run: |
         rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
         rustup default 1.95.0
