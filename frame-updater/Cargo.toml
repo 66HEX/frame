@@ -9,7 +9,7 @@ publish = false
 [dependencies]
 base64 = "0.22.1"
 directories = "6.0.0"
-ed25519-dalek = "2.2.0"
+ed25519-dalek = "3.0.0"
 hex = "0.4.3"
 reqwest = { version = "0.12.27", default-features = false, features = ["blocking", "rustls-tls"] }
 semver = { version = "1.0.27", features = ["serde"] }
@@ -25,8 +25,7 @@ libc = "0.2"
 windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_System_Threading"] }
 
 [dev-dependencies]
-ed25519-dalek = { version = "2.2.0", features = ["rand_core"] }
-rand_core = { version = "0.6.4", features = ["getrandom"] }
+ed25519-dalek = "3.0.0"
 tempfile = "3.23.0"
 
 [lints]

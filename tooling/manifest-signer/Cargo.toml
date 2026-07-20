@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 base64 = "0.22.1"
-ed25519-dalek = "2.2.0"
+ed25519-dalek = "3.0.0"
 zeroize = "1.8.2"
 
 [lints]
