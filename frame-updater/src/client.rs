@@ -519,17 +519,17 @@ fn update_package(update: &UpdateInfo, path: PathBuf) -> UpdatePackage {
 }
 
 fn validate_package_file(path: &Path, asset: &UpdateAsset) -> Result<u64, UpdateError> {
+    let actual_size = fs::metadata(path)?.len();
+    if actual_size != asset.size_bytes {
+        return Err(asset_size_mismatch(asset.size_bytes, actual_size));
+    }
+
     let actual_hash = file_sha256_hex(path)?;
     if actual_hash != asset.sha256 {
         return Err(UpdateError::HashMismatch {
             expected: asset.sha256.clone(),
             actual: actual_hash,
         });
-    }
-
-    let actual_size = fs::metadata(path)?.len();
-    if actual_size != asset.size_bytes {
-        return Err(asset_size_mismatch(asset.size_bytes, actual_size));
     }
 
     Ok(actual_size)
@@ -686,28 +686,31 @@ mod tests {
     #[test]
     fn download_rejects_size_mismatch_on_repeated_attempts() {
         let package = b"update package";
-        let (url, server) = serve_package(package, 2);
+        let (url, server) = serve_response(String::new(), package.to_vec(), 2);
         let temp_dir = tempfile::tempdir().expect("temporary directory should be created");
         let client = test_client(temp_dir.path().to_path_buf());
         let update = test_update(url, package, package.len() as u64 + 1);
+        let cached_package = client
+            .version_cache_dir(&update.version)
+            .join(&update.asset.file_name);
 
         let first = client.download(&update, |_| {});
         assert!(
             matches!(&first, Err(UpdateError::InvalidManifest(message)) if message.contains("asset size mismatch")),
             "first attempt should reject the size mismatch, got {first:?}"
         );
+        assert_no_partial_file(&client);
+        assert!(!cached_package.exists());
 
         let second = client.download(&update, |_| {});
         assert!(
             matches!(&second, Err(UpdateError::InvalidManifest(message)) if message.contains("asset size mismatch")),
             "second attempt should reject the size mismatch, got {second:?}"
         );
+        assert_no_partial_file(&client);
+        assert!(!cached_package.exists());
 
         server.join().expect("test server should finish");
-        let cached_package = client
-            .version_cache_dir(&update.version)
-            .join(&update.asset.file_name);
-        assert!(!cached_package.exists());
     }
 
     #[test]
