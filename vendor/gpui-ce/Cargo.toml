@@ -72,7 +72,7 @@ slotmap = "1.0.6"
 smallvec = { version = "1.6", features = ["union", "const_new"] }
 async-channel = "2.5.0"
 stacksafe = "1.0"
-strum = { version = "0.27.2", features = ["derive"] }
+strum = { version = "0.28.0", features = ["derive"] }
 sum_tree = { git = "https://github.com/zed-industries/zed", rev = "876ec5a8a074ba83cce2129ed4d76b59c05a37e9" }
 thiserror = "2.0.12"
 hdrhistogram = "7"
