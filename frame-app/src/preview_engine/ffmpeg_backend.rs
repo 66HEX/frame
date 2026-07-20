@@ -229,7 +229,7 @@ impl AudioOutputSpec {
         })?;
         let config = supported_config.config();
         Ok(Self {
-            sample_rate: config.sample_rate.0,
+            sample_rate: config.sample_rate,
             channels: config.channels,
         })
     }
@@ -251,7 +251,7 @@ impl AudioPreviewOutput {
         let sample_format = supported_config.sample_format();
         let config = supported_config.config();
         let channels = config.channels;
-        let sample_rate = config.sample_rate.0;
+        let sample_rate = config.sample_rate;
         let capacity = usize::try_from(sample_rate)
             .unwrap_or(48_000)
             .saturating_mul(usize::from(channels))
@@ -304,7 +304,7 @@ fn build_audio_output_stream_f32(
     let playback = Arc::clone(playback);
     device
         .build_output_stream(
-            config,
+            *config,
             move |data: &mut [f32], _| {
                 fill_audio_output_f32(data, &buffer, &metrics, &playback, generation);
             },
@@ -329,7 +329,7 @@ fn build_audio_output_stream_f64(
     let playback = Arc::clone(playback);
     device
         .build_output_stream(
-            config,
+            *config,
             move |data: &mut [f64], _| {
                 fill_audio_output_f64(data, &buffer, &metrics, &playback, generation);
             },
@@ -354,7 +354,7 @@ fn build_audio_output_stream_i16(
     let playback = Arc::clone(playback);
     device
         .build_output_stream(
-            config,
+            *config,
             move |data: &mut [i16], _| {
                 fill_audio_output_i16(data, &buffer, &metrics, &playback, generation);
             },
@@ -379,7 +379,7 @@ fn build_audio_output_stream_u16(
     let playback = Arc::clone(playback);
     device
         .build_output_stream(
-            config,
+            *config,
             move |data: &mut [u16], _| {
                 fill_audio_output_u16(data, &buffer, &metrics, &playback, generation);
             },
