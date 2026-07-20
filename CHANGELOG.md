@@ -9,17 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Release Supply-Chain Verification:** Added signed-tag and green-CI release gates, immutable release handling, SHA-256 checksum manifests, CycloneDX SBOMs, GitHub build-provenance attestations, and protected offline Ed25519 update-manifest signing.
+- **Repository Security Automation:** Added weekly Dependabot updates, CodeQL, dependency review, `cargo audit` and `cargo deny` checks, security-focused CODEOWNERS rules, checksum-pinned workflow tooling, least-privilege permissions, and credential-free repository checkouts.
 - **Update Session Restoration:** Kept update downloads running alongside conversions, blocked installation until conversion workers settle, atomically saved the queue and per-file settings before updater handoff, and restored that workspace after restart. Resolves [#66](https://github.com/66HEX/frame/issues/66).
 - **Structured Issue Forms:** Added guided bug-report and feature-request forms covering environment, source media, reproduction steps, logs, workflow context, alternatives, and duplicate and Code of Conduct confirmations while keeping blank issues available. Resolves [#79](https://github.com/66HEX/frame/issues/79).
 
 ### Changed
 
+- **Rust Dependency Stack:** Updated the application and release tooling to `cpal` 0.18, `ed25519-dalek` 3, `rfd` 0.17, `ureq` 3, `zip` 8, and newer vendored GPUI dependencies while preserving audio preview, signed-update, native dialog, verified download, and cross-platform bundling behavior.
 - **Interface Motion:** Standardized GPUI transitions on shared surface and interaction timings with ease-in-out easing, and animated the Logs copy confirmation by scaling, blurring, and cross-fading between the copy and check icons.
 - **Contributor CI Coverage:** Extended `cargo xtask ci` to format, test, and lint `frame-updater` explicitly, including its unit tests and all-target Clippy checks. Resolves [#72](https://github.com/66HEX/frame/issues/72).
 - **macOS Contributor Setup:** Documented the full-Xcode Metal Toolchain requirement, availability check, and component download command for GPUI shader builds. Resolves [#75](https://github.com/66HEX/frame/issues/75).
 
 ### Fixed
 
+- **Updater Package Size Validation:** Enforced the signed manifest size before and during package downloads, revalidated cached packages, and removed rejected partial files so oversized or truncated update payloads are never installed or retained. Resolves [#83](https://github.com/66HEX/frame/issues/83).
+- **Rounded Timecode Boundaries:** Carried millisecond rounding across second, minute, and hour boundaries so values just below a boundary, such as `59.9999` seconds, render as `00:01:00.000` instead of producing an invalid timecode.
 - **Timecode Trim Editing:** Reworked preview in/out fields as fixed `HH:MM:SS.mmm` masks with separator-skipping cursor navigation, draft-only editing, formatted paste support, Escape cancellation, and silent normalization and clamping only on Enter or focus loss, preventing partial input from being recalculated prematurely. Resolves [#74](https://github.com/66HEX/frame/issues/74).
 - **Pressed Button Foregrounds:** Kept animated text and icon colors synchronized with pressed button backgrounds across shared controls while the pointer moves, including correct hover restoration when released inside and animation reset when released outside.
 - **Collision-Safe Output Paths:** Assigned deterministic suffixes to duplicate or existing output paths before conversion and disabled FFmpeg overwrites, preventing same-stem batch jobs or pre-existing targets from replacing prior data. Resolves [#81](https://github.com/66HEX/frame/issues/81).
