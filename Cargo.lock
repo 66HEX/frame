@@ -2463,7 +2463,7 @@ dependencies = [
  "itertools 0.15.0",
  "log",
  "lyon",
- "mach2 0.5.0",
+ "mach2 0.6.0",
  "media",
  "metal",
  "num_cpus",
@@ -2582,7 +2582,7 @@ dependencies = [
  "itertools 0.15.0",
  "libc",
  "log",
- "mach2 0.5.0",
+ "mach2 0.6.0",
  "media",
  "metal",
  "objc",
@@ -3571,6 +3571,12 @@ checksum = "6a1b95cd5421ec55b445b5ae102f5ea0e768de1f82bd3001e11f426c269c3aea"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "mach2"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dae608c151f68243f2b000364e1f7b186d9c29845f7d2d85bd31b9ad77ad552b"
 
 [[package]]
 name = "malloc_buf"
