@@ -102,13 +102,12 @@ fn decode_signature(value: &str) -> Result<Signature, UpdateError> {
 mod tests {
     use base64::{Engine as _, engine::general_purpose::STANDARD};
     use ed25519_dalek::{Signer, SigningKey};
-    use rand_core::OsRng;
 
     use super::*;
 
     #[test]
     fn verify_manifest_signature_accepts_matching_key() {
-        let signing_key = SigningKey::generate(&mut OsRng);
+        let signing_key = SigningKey::from_bytes(&[7_u8; 32]);
         let manifest = br#"{"schemaVersion":1}"#;
         let signature = signing_key.sign(manifest);
         let public_key = STANDARD.encode(signing_key.verifying_key().to_bytes());
@@ -124,7 +123,7 @@ mod tests {
 
     #[test]
     fn verify_manifest_signature_rejects_tampered_bytes() {
-        let signing_key = SigningKey::generate(&mut OsRng);
+        let signing_key = SigningKey::from_bytes(&[8_u8; 32]);
         let signature = signing_key.sign(br#"{"schemaVersion":1}"#);
         let public_key = STANDARD.encode(signing_key.verifying_key().to_bytes());
 
