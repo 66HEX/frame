@@ -3,7 +3,10 @@ use super::accessibility::{
     handle_modal_tab_navigation,
 };
 use super::components::{
-    frame_checkbox_row_with_focus, frame_text_button, frame_text_button_with_focus,
+    FRAME_SELECT_MAX_HEIGHT, apply_frame_select_popover_focus_trap, frame_checkbox_row_with_focus,
+    frame_select_content_height, frame_select_option, frame_select_option_with_focus,
+    frame_select_options_list, frame_select_popover, frame_select_target_index,
+    frame_select_trigger_with_focus, frame_text_button, frame_text_button_with_focus,
     frame_vertical_scrollbar,
 };
 use super::input::{FrameTextInputSpec, frame_text_input};
@@ -12,25 +15,26 @@ use super::primitives::{
     button_colors, button_highlight_shadows, button_motion, card_surface_shadows, color, icon_svg,
     input_highlight_shadows, panel_bottom_separator, vertical_separator,
 };
-use super::settings_panel::{settings_hint_text, settings_section};
+use super::settings_panel::{settings_field_label, settings_hint_text, settings_section};
 use super::{
-    ActiveView, ClickEvent, Context, ExternalPaths, FILE_LIST_ACTION_ICON_SIZE, FRAME_APP_VERSION,
-    FluentBuilder, FocusHandle, FrameAppState, FrameRoot, FrameTextInputKind, InteractiveElement,
-    IntoElement, LEFT_COLUMN_SPAN, MouseButton, PANEL_HEADER_HEIGHT, ParentElement,
-    RIGHT_COLUMN_SPAN, SETTINGS_CONTROL_HEIGHT, SURFACE_MOTION_DURATION, ScrollHandle,
-    StatefulInteractiveElement, Styled, TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_DIVIDER_HEIGHT,
-    TITLEBAR_HEIGHT, TITLEBAR_ICON_SIZE, TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
-    TITLEBAR_LINUX_WINDOW_CONTROLS_GAP, TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X,
-    TITLEBAR_LOGO_SIZE, TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_PLACEHOLDER_WIDTH,
-    TITLEBAR_NAV_BUTTON_HEIGHT, TITLEBAR_PLATFORM_DIVIDER_HEIGHT, TITLEBAR_SEGMENT_HEIGHT,
-    TITLEBAR_TOP_PADDING, TITLEBAR_TRAFFIC_LIGHT_SIZE, TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
+    ActiveView, AppearanceSettings, ClickEvent, Context, ExternalPaths, FILE_LIST_ACTION_ICON_SIZE,
+    FRAME_APP_VERSION, FluentBuilder, FocusHandle, FrameAppState, FrameRoot, FrameTextInputKind,
+    INTERACTION_MOTION_DURATION, InteractiveElement, IntoElement, LEFT_COLUMN_SPAN, MouseButton,
+    PANEL_HEADER_HEIGHT, ParentElement, RIGHT_COLUMN_SPAN, SETTINGS_CONTROL_HEIGHT,
+    SURFACE_MOTION_DURATION, ScalePreset, ScrollHandle, StatefulInteractiveElement, Styled,
+    TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_DIVIDER_HEIGHT, TITLEBAR_HEIGHT, TITLEBAR_ICON_SIZE,
+    TITLEBAR_LINUX_WINDOW_BUTTON_SIZE, TITLEBAR_LINUX_WINDOW_CONTROLS_GAP,
+    TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X, TITLEBAR_LOGO_SIZE,
+    TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_PLACEHOLDER_WIDTH, TITLEBAR_NAV_BUTTON_HEIGHT,
+    TITLEBAR_PLATFORM_DIVIDER_HEIGHT, TITLEBAR_SEGMENT_HEIGHT, TITLEBAR_TOP_PADDING,
+    TITLEBAR_TRAFFIC_LIGHT_SIZE, TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
     TITLEBAR_WINDOWS_WINDOW_ICON_SIZE, TITLEBAR_WINDOWS_WINDOW_MAX_ICON_SIZE,
-    UPDATE_INSTALL_WAIT_MESSAGE, UpdateInfo, UpdateStatus, WORKSPACE_COLUMNS, WORKSPACE_GAP,
-    Window, WindowControlArea, assets, div, ease_in_out, format_total_size, mix_color,
-    motion_is_hidden, motion_target, px, relative, set_motion_target, settings_sheet_right_inset,
-    svg, theme,
+    UPDATE_INSTALL_WAIT_MESSAGE, UiScalePopoverState, UpdateInfo, UpdateStatus, WORKSPACE_COLUMNS,
+    WORKSPACE_GAP, Window, WindowControlArea, assets, div, ease_in_out, format_total_size,
+    mix_color, motion_is_hidden, motion_target, px, relative, set_motion_target,
+    settings_sheet_right_inset, subtitle_popover_slide_offset, svg, theme,
 };
-use gpui::{HighlightStyle, StyledText};
+use gpui::{HighlightStyle, StyledText, deferred};
 
 const MAX_RELEASE_NOTES_CHARS: usize = 8_000;
 const UPDATE_RELEASE_NOTES_MAX_HEIGHT: f32 = 360.0;
@@ -88,14 +92,14 @@ pub(super) fn macos_titlebar(
     let show_workspace_controls = titlebar_shows_workspace_controls(state);
 
     titlebar_drag_surface(cx)
-        .h(px(TITLEBAR_HEIGHT))
+        .h(theme::ui_rem(TITLEBAR_HEIGHT))
         .w_full()
         .flex()
         .items_center()
         .justify_between()
         .px_4()
-        .pt(px(TITLEBAR_TOP_PADDING))
-        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .pt(theme::ui_rem(TITLEBAR_TOP_PADDING))
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .child(
             div()
                 .flex()
@@ -132,10 +136,10 @@ pub(super) fn windows_titlebar(
 ) -> gpui::Div {
     titlebar_drag_surface(cx)
         .relative()
-        .h(px(TITLEBAR_HEIGHT))
+        .h(theme::ui_rem(TITLEBAR_HEIGHT))
         .w_full()
         .flex_none()
-        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .child(platform_titlebar_content(state, window, cx))
         .child(windows_window_controls(window, cx))
 }
@@ -147,10 +151,10 @@ pub(super) fn linux_titlebar(
 ) -> gpui::Div {
     titlebar_drag_surface(cx)
         .relative()
-        .h(px(TITLEBAR_HEIGHT))
+        .h(theme::ui_rem(TITLEBAR_HEIGHT))
         .w_full()
         .flex_none()
-        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .child(platform_titlebar_content(state, window, cx))
         .child(linux_window_controls(window, cx))
 }
@@ -199,7 +203,7 @@ pub(super) fn platform_titlebar_content(
             div()
                 .grid()
                 .grid_cols(WORKSPACE_COLUMNS)
-                .gap(px(WORKSPACE_GAP))
+                .gap(theme::ui_rem(WORKSPACE_GAP))
                 .w_full()
                 .child(
                     div()
@@ -319,6 +323,12 @@ pub(super) struct AppSettingsSheetProps<'a> {
     pub(super) error: Option<&'a str>,
     pub(super) default_output_directory: Option<&'a str>,
     pub(super) output_directory_error: Option<&'a str>,
+    pub(super) appearance: AppearanceSettings,
+    pub(super) appearance_error: Option<&'a str>,
+    pub(super) ui_scale_popover: UiScalePopoverState,
+    pub(super) scroll_handle: &'a ScrollHandle,
+    pub(super) ui_scale_scroll_handle: &'a ScrollHandle,
+    pub(super) ui_scale_focuses: AppSettingsScaleSelectFocuses<'a>,
     pub(super) auto_update_check: bool,
     pub(super) update_status: &'a UpdateStatus,
     pub(super) update_install_ready: bool,
@@ -332,6 +342,13 @@ pub(super) struct AppSettingsSheetProps<'a> {
     pub(super) panel_focus: &'a FocusHandle,
     pub(super) close_focus: &'a FocusHandle,
     pub(super) last_focus: &'a FocusHandle,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct AppSettingsScaleSelectFocuses<'a> {
+    pub(super) trigger: &'a FocusHandle,
+    pub(super) panel: &'a FocusHandle,
+    pub(super) options: &'a [FocusHandle],
 }
 
 #[expect(
@@ -359,6 +376,7 @@ pub(super) fn app_settings_sheet(
     let right_inset = settings_sheet_right_inset(progress);
     let first_focus = props.close_focus.clone();
     let last_focus = props.last_focus.clone();
+    let ui_scale_trigger_focus = props.ui_scale_focuses.trigger.clone();
 
     if !props.is_open && motion_is_hidden(progress) {
         cx.defer_in(window, |root, _window, cx| {
@@ -376,8 +394,13 @@ pub(super) fn app_settings_sheet(
             move |root, event: &gpui::KeyDownEvent, window, cx| {
                 match event.keystroke.key.as_str() {
                     "escape" => {
-                        root.close_app_settings();
-                        root.restore_focus_after_settings_close(window, cx);
+                        if root.settings_ui.ui_scale_popover.is_open() {
+                            root.close_app_settings_ui_scale_popover();
+                            ui_scale_trigger_focus.focus(window, cx);
+                        } else {
+                            root.close_app_settings();
+                            root.restore_focus_after_settings_close(window, cx);
+                        }
                         cx.stop_propagation();
                         cx.notify();
                     }
@@ -394,7 +417,7 @@ pub(super) fn app_settings_sheet(
                 .absolute()
                 .inset_0()
                 .bg(color(theme::BACKGROUND.with_alpha(0.60 * progress)))
-                .backdrop_blur(px(4.0 * progress))
+                .backdrop_blur(theme::ui_rem(4.0 * progress).to_pixels(window.rem_size()))
                 .occlude()
                 .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
                     cx.stop_propagation();
@@ -412,29 +435,34 @@ pub(super) fn app_settings_sheet(
                 .tab_stop(false)
                 .absolute()
                 .top_2()
-                .right(px(right_inset))
+                .right(theme::ui_rem(right_inset))
                 .bottom_2()
-                .w(px(360.0))
+                .w(theme::ui_rem(360.0))
+                .max_w(relative(0.95))
                 .flex()
                 .flex_col()
-                .rounded(px(theme::RADIUS_LG))
+                .rounded(theme::ui_rem(theme::RADIUS_LG))
                 .bg(color(theme::SIDEBAR))
                 .opacity(progress)
                 .shadow(card_surface_shadows())
                 .occlude()
-                .on_click(cx.listener(|_, _: &ClickEvent, _window, cx| {
+                .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
                     cx.stop_propagation();
+                    if root.settings_ui.ui_scale_popover.is_open() {
+                        root.close_app_settings_ui_scale_popover();
+                        cx.notify();
+                    }
                 }))
                 .child(
                     div()
-                        .h(px(PANEL_HEADER_HEIGHT))
+                        .h(theme::ui_rem(PANEL_HEADER_HEIGHT))
                         .w_full()
                         .relative()
                         .flex()
                         .items_center()
                         .justify_between()
                         .px_4()
-                        .text_size(px(theme::TEXT_LABEL_SIZE))
+                        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
                         .text_color(color(theme::FOREGROUND))
                         .child(theme::ui_text("Settings"))
@@ -460,12 +488,15 @@ pub(super) fn app_settings_sheet(
                 )
                 .child(
                     div()
+                        .id("app-settings-scroll-body")
                         .flex_1()
                         .flex()
                         .flex_col()
+                        .overflow_y_scroll()
+                        .track_scroll(props.scroll_handle)
                         .justify_between()
                         .p_4()
-                        .text_size(px(theme::TEXT_LABEL_SIZE))
+                        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                         .child(
                             div()
                                 .flex()
@@ -475,6 +506,15 @@ pub(super) fn app_settings_sheet(
                                     props.default_output_directory,
                                     props.output_directory_error,
                                     props.output_directory_focus,
+                                    window,
+                                    cx,
+                                ))
+                                .child(app_settings_appearance_section(
+                                    props.appearance,
+                                    props.appearance_error,
+                                    props.ui_scale_popover,
+                                    props.ui_scale_scroll_handle,
+                                    props.ui_scale_focuses,
                                     window,
                                     cx,
                                 ))
@@ -528,7 +568,7 @@ fn app_settings_version_label() -> gpui::Div {
         .flex()
         .justify_end()
         .pt_4()
-        .text_size(px(11.0))
+        .text_size(theme::ui_rem(11.0))
         .text_color(color(theme::FRAME_GRAY_400))
         .child(theme::ui_text_owned(format!("Frame v{FRAME_APP_VERSION}")))
 }
@@ -587,6 +627,312 @@ fn app_settings_output_directory_section(
     }
 
     section
+}
+
+fn app_settings_appearance_section(
+    appearance: AppearanceSettings,
+    error: Option<&str>,
+    ui_scale_popover: UiScalePopoverState,
+    ui_scale_scroll_handle: &ScrollHandle,
+    ui_scale_focuses: AppSettingsScaleSelectFocuses<'_>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    let mut section = settings_section("Appearance")
+        .child(app_settings_ui_scale_select(
+            appearance.ui_scale,
+            ui_scale_popover.is_open(),
+            ui_scale_popover.is_rendered(),
+            ui_scale_scroll_handle,
+            ui_scale_focuses,
+            window,
+            cx,
+        ))
+        .child(settings_hint_text(
+            "Changes the size of the complete interface.",
+        ));
+
+    if let Some(error) = error {
+        section = section.child(
+            div()
+                .id("app-settings-appearance-error")
+                .role(gpui::Role::Alert)
+                .aria_label(error.to_string())
+                .text_color(color(theme::FRAME_RED))
+                .child(error.to_string()),
+        );
+    }
+
+    section
+}
+
+#[expect(
+    clippy::too_many_lines,
+    reason = "A select keeps its trigger, animated popover, keyboard navigation, and options together."
+)]
+fn app_settings_ui_scale_select(
+    selected: ScalePreset,
+    is_open: bool,
+    is_rendered: bool,
+    scroll_handle: &ScrollHandle,
+    focuses: AppSettingsScaleSelectFocuses<'_>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    const LABEL: &str = "UI scale";
+    let options = ScalePreset::ALL;
+    let selected_index = options
+        .iter()
+        .position(|option| *option == selected)
+        .unwrap_or_default();
+    let option_focuses = focuses.options.to_vec();
+    let key_option_focuses = option_focuses.clone();
+    let key_scroll_handle = scroll_handle.clone();
+    let trigger = frame_select_trigger_with_focus(
+        "app-settings-ui-scale",
+        LABEL,
+        selected.display(),
+        true,
+        is_open,
+        focuses.trigger,
+        window,
+        cx,
+    )
+    .on_click(cx.listener(move |root, event: &ClickEvent, _window, cx| {
+        cx.stop_propagation();
+        if event.is_keyboard() {
+            return;
+        }
+        root.toggle_app_settings_ui_scale_popover();
+        cx.notify();
+    }))
+    .on_key_down(
+        cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+            let key = event.keystroke.key.as_str();
+            match key {
+                "down" | "up" | "home" | "end" => {
+                    cx.stop_propagation();
+                    root.settings_ui.ui_scale_popover = UiScalePopoverState::Open;
+                    let target = frame_select_target_index(
+                        key_option_focuses.len(),
+                        Some(selected_index),
+                        key,
+                        |_| true,
+                    )
+                    .unwrap_or(selected_index);
+                    focus_app_settings_scale_option(
+                        target,
+                        &key_option_focuses,
+                        &key_scroll_handle,
+                        window,
+                        cx,
+                    );
+                    cx.notify();
+                }
+                "enter" | "space" if root.settings_ui.ui_scale_popover.is_open() => {
+                    cx.stop_propagation();
+                    root.close_app_settings_ui_scale_popover();
+                    cx.notify();
+                }
+                "enter" | "space" => {
+                    cx.stop_propagation();
+                    root.settings_ui.ui_scale_popover = UiScalePopoverState::Open;
+                    let focus = key_option_focuses.get(selected_index).cloned();
+                    key_scroll_handle.scroll_to_item(selected_index);
+                    if let Some(focus) = focus {
+                        cx.defer_in(window, move |_root, window, cx| {
+                            focus.focus(window, cx);
+                        });
+                    }
+                    cx.notify();
+                }
+                "escape" => {
+                    cx.stop_propagation();
+                    root.close_app_settings_ui_scale_popover();
+                    cx.notify();
+                }
+                _ => {}
+            }
+        }),
+    );
+
+    let mut field = div()
+        .relative()
+        .flex()
+        .flex_col()
+        .gap_2()
+        .child(settings_field_label(LABEL))
+        .child(trigger);
+
+    if is_rendered {
+        let progress = app_settings_ui_scale_popover_progress(is_open, window, cx);
+        let content_height = frame_select_content_height(options.len());
+        let mut list =
+            frame_select_options_list("app-settings-ui-scale-options-list", scroll_handle);
+
+        for (index, option) in options.into_iter().enumerate() {
+            let focus = option_focuses.get(index);
+            list = list.child(app_settings_ui_scale_option(
+                option,
+                index,
+                selected,
+                focus,
+                &option_focuses,
+                scroll_handle,
+                focuses.trigger,
+                cx,
+            ));
+        }
+
+        let mut menu = frame_select_popover(
+            "app-settings-ui-scale-options",
+            54.0 + subtitle_popover_slide_offset(progress),
+            progress,
+            list,
+        );
+        if let (Some(first), Some(last)) = (option_focuses.first(), option_focuses.last()) {
+            menu = apply_frame_select_popover_focus_trap(
+                menu,
+                Some(focuses.panel),
+                Some(first),
+                Some(last),
+                cx,
+            );
+        }
+        if content_height > FRAME_SELECT_MAX_HEIGHT {
+            menu = menu.child(frame_vertical_scrollbar(
+                "app-settings-ui-scale-scrollbar",
+                scroll_handle.clone(),
+                content_height,
+            ));
+        }
+        field = field.child(deferred(menu).with_priority(20));
+    }
+
+    field
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Each option needs its selection, focus, navigation, scrolling, and root action context."
+)]
+fn app_settings_ui_scale_option(
+    option: ScalePreset,
+    index: usize,
+    selected: ScalePreset,
+    focus: Option<&FocusHandle>,
+    option_focuses: &[FocusHandle],
+    scroll_handle: &ScrollHandle,
+    trigger_focus: &FocusHandle,
+    cx: &Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    let option_id = format!("app-settings-ui-scale-option-{}", option.percent());
+    let option_focuses_for_key = option_focuses.to_vec();
+    let scroll_handle_for_key = scroll_handle.clone();
+    let trigger_focus_for_click = trigger_focus.clone();
+    let trigger_focus_for_key = trigger_focus.clone();
+    let element = if let Some(focus) = focus {
+        frame_select_option_with_focus(option_id, option.display(), option == selected, true, focus)
+    } else {
+        frame_select_option(option_id, option.display(), option == selected, true)
+    };
+
+    element
+        .on_click(cx.listener(move |root, event: &ClickEvent, window, cx| {
+            cx.stop_propagation();
+            if event.is_keyboard() {
+                return;
+            }
+            apply_app_settings_ui_scale(root, option, window);
+            root.close_app_settings_ui_scale_popover();
+            trigger_focus_for_click.focus(window, cx);
+            cx.notify();
+        }))
+        .on_key_down(
+            cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+                let key = event.keystroke.key.as_str();
+                match key {
+                    "enter" | "space" => {
+                        cx.stop_propagation();
+                        apply_app_settings_ui_scale(root, option, window);
+                        root.close_app_settings_ui_scale_popover();
+                        let focus = trigger_focus_for_key.clone();
+                        cx.defer_in(window, move |_root, window, cx| {
+                            focus.focus(window, cx);
+                        });
+                        cx.notify();
+                    }
+                    "up" | "down" | "home" | "end" => {
+                        cx.stop_propagation();
+                        if let Some(target) = frame_select_target_index(
+                            option_focuses_for_key.len(),
+                            Some(index),
+                            key,
+                            |_| true,
+                        ) {
+                            focus_app_settings_scale_option(
+                                target,
+                                &option_focuses_for_key,
+                                &scroll_handle_for_key,
+                                window,
+                                cx,
+                            );
+                        }
+                    }
+                    "escape" => {
+                        cx.stop_propagation();
+                        root.close_app_settings_ui_scale_popover();
+                        trigger_focus_for_key.focus(window, cx);
+                        cx.notify();
+                    }
+                    _ => {}
+                }
+            }),
+        )
+}
+
+fn focus_app_settings_scale_option(
+    index: usize,
+    option_focuses: &[FocusHandle],
+    scroll_handle: &ScrollHandle,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) {
+    scroll_handle.scroll_to_item(index);
+    if let Some(focus) = option_focuses.get(index) {
+        focus.focus(window, cx);
+    }
+}
+
+fn apply_app_settings_ui_scale(root: &mut FrameRoot, scale: ScalePreset, window: &mut Window) {
+    if root.set_ui_scale(scale) {
+        window.set_rem_size(px(crate::appearance::BASE_REM_PX * scale.factor()));
+    }
+}
+
+fn app_settings_ui_scale_popover_progress(
+    is_open: bool,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> f32 {
+    let transition = window
+        .use_keyed_transition(
+            "app-settings-ui-scale-motion",
+            cx,
+            INTERACTION_MOTION_DURATION,
+            |_window, _cx| 0.0_f32,
+        )
+        .with_easing(ease_in_out);
+    set_motion_target(&transition, motion_target(is_open), cx);
+    let progress = *transition.evaluate(window, cx);
+    if !is_open && motion_is_hidden(progress) {
+        cx.defer_in(window, move |root, _window, cx| {
+            if root.finish_app_settings_ui_scale_popover_close() {
+                cx.notify();
+            }
+        });
+    }
+    progress
 }
 
 #[derive(Clone, Copy)]
@@ -662,7 +1008,7 @@ fn update_status_label(
         .id("app-settings-update-status")
         .role(gpui::Role::Status)
         .aria_label(text.clone())
-        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .text_color(color(tone))
         .child(theme::ui_text_owned(text))
 }
@@ -721,8 +1067,8 @@ fn update_release_notes_block(
     let content_height = update_release_notes_content_height(&lines);
     let mut content = div()
         .id("update-dialog-release-notes-content")
-        .min_h(px(UPDATE_RELEASE_NOTES_MIN_HEIGHT))
-        .max_h(px(UPDATE_RELEASE_NOTES_MAX_HEIGHT))
+        .min_h(theme::ui_rem(UPDATE_RELEASE_NOTES_MIN_HEIGHT))
+        .max_h(theme::ui_rem(UPDATE_RELEASE_NOTES_MAX_HEIGHT))
         .overflow_y_scroll()
         .track_scroll(scroll_handle)
         .p_3()
@@ -735,10 +1081,10 @@ fn update_release_notes_block(
     div()
         .id("update-dialog-release-notes")
         .relative()
-        .min_h(px(UPDATE_RELEASE_NOTES_MIN_HEIGHT))
-        .max_h(px(UPDATE_RELEASE_NOTES_MAX_HEIGHT))
+        .min_h(theme::ui_rem(UPDATE_RELEASE_NOTES_MIN_HEIGHT))
+        .max_h(theme::ui_rem(UPDATE_RELEASE_NOTES_MAX_HEIGHT))
         .overflow_hidden()
-        .rounded(px(theme::RADIUS_SM))
+        .rounded(theme::ui_rem(theme::RADIUS_SM))
         .bg(color(theme::FRAME_GRAY_100))
         .child(content)
         .child(frame_vertical_scrollbar(
@@ -781,7 +1127,7 @@ fn normalized_release_note_lines(notes: &str) -> Vec<String> {
 fn update_release_note_line(line: &str) -> gpui::Div {
     let trimmed = line.trim();
     if trimmed.is_empty() {
-        return div().h(px(8.0));
+        return div().h(theme::ui_rem(8.0));
     }
 
     let heading = trimmed.trim_start_matches('#').trim();
@@ -815,10 +1161,10 @@ fn update_release_note_line(line: &str) -> gpui::Div {
     let (text, highlights) = parse_update_release_note_emphasis(&text);
 
     let mut line = div()
-        .pl(px(left_padding))
-        .pb(px(4.0))
-        .text_size(px(theme::TEXT_LABEL_SIZE))
-        .line_height(px(16.0))
+        .pl(theme::ui_rem(left_padding))
+        .pb(theme::ui_rem(4.0))
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
+        .line_height(theme::ui_rem(16.0))
         .text_color(color(text_color))
         .font_weight(font_weight);
 
@@ -884,16 +1230,16 @@ fn update_progress_bar(progress_percent: Option<u8>) -> gpui::Stateful<gpui::Div
         .aria_min_numeric_value(0.0)
         .aria_max_numeric_value(100.0)
         .aria_value(value_text)
-        .h(px(6.0))
+        .h(theme::ui_rem(6.0))
         .w_full()
         .overflow_hidden()
-        .rounded(px(theme::RADIUS_SM))
+        .rounded(theme::ui_rem(theme::RADIUS_SM))
         .bg(color(theme::FRAME_GRAY_100))
         .child(
             div()
                 .h_full()
                 .w(relative(fraction.clamp(0.0, 1.0)))
-                .rounded(px(theme::RADIUS_SM))
+                .rounded(theme::ui_rem(theme::RADIUS_SM))
                 .bg(color(theme::FRAME_BLUE)),
         )
 }
@@ -918,7 +1264,7 @@ fn update_download_detail(
     };
 
     div()
-        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .text_color(color(theme::FRAME_GRAY_600))
         .font_features(assets::frame_tabular_number_font_features())
         .child(detail)
@@ -1077,7 +1423,7 @@ pub(super) fn update_dialog(
         .justify_center()
         .p_4()
         .bg(color(theme::BACKGROUND.with_alpha(0.64 * progress)))
-        .backdrop_blur(px(4.0 * progress))
+        .backdrop_blur(theme::ui_rem(4.0 * progress).to_pixels(window.rem_size()))
         .opacity(progress)
         .occlude()
         .on_key_down(cx.listener(|root, event: &gpui::KeyDownEvent, window, cx| {
@@ -1122,12 +1468,12 @@ fn update_dialog_panel(
         .aria_label(update_dialog_title(view.status))
         .track_focus(view.panel_focus)
         .tab_stop(false)
-        .mt(px(panel_offset))
+        .mt(theme::ui_rem(panel_offset))
         .w_full()
-        .max_w(px(640.0))
+        .max_w(theme::ui_rem(640.0))
         .max_h(relative(0.86))
         .overflow_hidden()
-        .rounded(px(theme::RADIUS_LG))
+        .rounded(theme::ui_rem(theme::RADIUS_LG))
         .bg(color(theme::SIDEBAR))
         .shadow(card_surface_shadows())
         .occlude()
@@ -1170,7 +1516,7 @@ fn update_dialog_header(
     if let Some(kicker) = update_dialog_kicker(status) {
         title_stack = title_stack.child(
             div()
-                .text_size(px(theme::TEXT_LABEL_SIZE))
+                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .font_weight(theme::TEXT_WEIGHT_MEDIUM)
                 .text_color(color(theme::FRAME_GRAY_600))
                 .child(theme::ui_text(kicker)),
@@ -1178,7 +1524,7 @@ fn update_dialog_header(
     }
     title_stack = title_stack.child(
         div()
-            .text_size(px(theme::TEXT_LABEL_SIZE))
+            .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
             .font_weight(theme::TEXT_WEIGHT_MEDIUM)
             .text_color(color(theme::FOREGROUND))
             .child(theme::ui_text_owned(update_dialog_title(status))),
@@ -1186,7 +1532,7 @@ fn update_dialog_header(
 
     div()
         .relative()
-        .h(px(PANEL_HEADER_HEIGHT))
+        .h(theme::ui_rem(PANEL_HEADER_HEIGHT))
         .w_full()
         .flex()
         .items_center()
@@ -1227,8 +1573,8 @@ fn update_dialog_body(
     if let Some(summary) = update_dialog_summary(status, notes.is_some(), install_ready) {
         body = body.child(
             div()
-                .text_size(px(theme::TEXT_LABEL_SIZE))
-                .line_height(px(16.0))
+                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
+                .line_height(theme::ui_rem(16.0))
                 .text_color(color(theme::FRAME_GRAY_600))
                 .child(theme::ui_text_owned(summary)),
         );
@@ -1247,11 +1593,11 @@ fn update_dialog_body(
                 .id("update-dialog-error-alert")
                 .role(gpui::Role::Alert)
                 .aria_label(error.clone())
-                .rounded(px(theme::RADIUS_SM))
+                .rounded(theme::ui_rem(theme::RADIUS_SM))
                 .bg(color(theme::FRAME_RED.with_alpha(0.08)))
                 .p_3()
-                .text_size(px(theme::TEXT_LABEL_SIZE))
-                .line_height(px(16.0))
+                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
+                .line_height(theme::ui_rem(16.0))
                 .text_color(color(theme::FRAME_RED))
                 .child(error.clone()),
         );
@@ -1532,12 +1878,12 @@ pub(super) fn app_settings_close_button(
     let button = div()
         .id(id)
         .group(id)
-        .w(px(SETTINGS_CONTROL_HEIGHT))
-        .h(px(SETTINGS_CONTROL_HEIGHT))
+        .w(theme::ui_rem(SETTINGS_CONTROL_HEIGHT))
+        .h(theme::ui_rem(SETTINGS_CONTROL_HEIGHT))
         .flex()
         .items_center()
         .justify_center()
-        .rounded(px(theme::RADIUS_SM))
+        .rounded(theme::ui_rem(theme::RADIUS_SM))
         .bg(background)
         .text_color(foreground)
         .when(enabled, |this| this.hover(gpui::Styled::cursor_pointer))
@@ -1603,7 +1949,7 @@ pub(super) fn drag_drop_overlay(
         .justify_center()
         .p_4()
         .bg(color(theme::BACKGROUND.with_alpha(0.60 * progress)))
-        .backdrop_blur(px(4.0 * progress))
+        .backdrop_blur(theme::ui_rem(4.0 * progress).to_pixels(window.rem_size()))
         .opacity(progress)
         .occlude()
         .on_drop(cx.listener(|root, paths: &ExternalPaths, _window, cx| {
@@ -1618,7 +1964,7 @@ pub(super) fn drag_drop_overlay(
                 .flex()
                 .items_center()
                 .justify_center()
-                .rounded(px(theme::RADIUS_LG))
+                .rounded(theme::ui_rem(theme::RADIUS_LG))
                 .border_1()
                 .border_dashed()
                 .border_color(color(theme::FRAME_GRAY_100))
@@ -1626,7 +1972,7 @@ pub(super) fn drag_drop_overlay(
                 .shadow(card_surface_shadows())
                 .child(
                     div()
-                        .text_size(px(theme::TEXT_LABEL_SIZE))
+                        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                         .text_color(color(theme::FOREGROUND))
                         .child(theme::ui_text("Import source files")),
                 ),
@@ -1635,8 +1981,10 @@ pub(super) fn drag_drop_overlay(
 
 pub(super) fn macos_native_window_controls_placeholder() -> gpui::Div {
     div()
-        .w(px(TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_PLACEHOLDER_WIDTH))
-        .h(px(TITLEBAR_TRAFFIC_LIGHT_SIZE))
+        .w(theme::ui_rem(
+            TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_PLACEHOLDER_WIDTH,
+        ))
+        .h(theme::ui_rem(TITLEBAR_TRAFFIC_LIGHT_SIZE))
         .mr_2()
 }
 
@@ -1725,8 +2073,8 @@ pub(super) fn linux_window_controls(window: &mut Window, cx: &mut Context<FrameR
         .h_full()
         .flex()
         .items_center()
-        .gap(px(TITLEBAR_LINUX_WINDOW_CONTROLS_GAP))
-        .px(px(TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X))
+        .gap(theme::ui_rem(TITLEBAR_LINUX_WINDOW_CONTROLS_GAP))
+        .px(theme::ui_rem(TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X))
         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
         .child(
             titlebar_window_button(
@@ -1837,12 +2185,12 @@ pub(super) fn titlebar_window_button(
 
     let button = div()
         .id(id)
-        .w(px(metrics.width))
-        .h(px(metrics.height))
+        .w(theme::ui_rem(metrics.width))
+        .h(theme::ui_rem(metrics.height))
         .flex()
         .items_center()
         .justify_center()
-        .rounded(px(metrics.radius))
+        .rounded(theme::ui_rem(metrics.radius))
         .bg(background)
         .text_color(icon_color)
         .hover(gpui::Styled::cursor_pointer)
@@ -1864,8 +2212,8 @@ pub(super) fn frame_logo() -> gpui::Div {
         .child(
             svg()
                 .path(assets::ICON_FRAME)
-                .w(px(TITLEBAR_LOGO_SIZE))
-                .h(px(TITLEBAR_LOGO_SIZE))
+                .w(theme::ui_rem(TITLEBAR_LOGO_SIZE))
+                .h(theme::ui_rem(TITLEBAR_LOGO_SIZE))
                 .text_color(color(theme::FRAME_GRAY_600)),
         )
 }
@@ -1879,8 +2227,8 @@ pub(super) fn platform_frame_logo() -> gpui::Div {
         .child(
             svg()
                 .path(assets::ICON_FRAME)
-                .w(px(TITLEBAR_LOGO_SIZE))
-                .h(px(TITLEBAR_LOGO_SIZE))
+                .w(theme::ui_rem(TITLEBAR_LOGO_SIZE))
+                .h(theme::ui_rem(TITLEBAR_LOGO_SIZE))
                 .text_color(color(theme::FRAME_GRAY_600)),
         )
 }
@@ -1902,14 +2250,14 @@ pub(super) fn titlebar_navigation(
         .id("titlebar-main-view-tabs")
         .role(gpui::Role::TabList)
         .aria_label("Main view")
-        .h(px(TITLEBAR_SEGMENT_HEIGHT))
+        .h(theme::ui_rem(TITLEBAR_SEGMENT_HEIGHT))
         .flex()
         .items_center()
         .gap_1()
-        .rounded(px(theme::RADIUS_MD))
+        .rounded(theme::ui_rem(theme::RADIUS_MD))
         .bg(color(theme::FRAME_GRAY_100))
-        .px(px(3.0))
-        .py(px(2.0))
+        .px(theme::ui_rem(3.0))
+        .py(theme::ui_rem(2.0))
         .shadow(input_highlight_shadows())
         .child(titlebar_segment(
             assets::ICON_LAYOUT_LIST,
@@ -1990,7 +2338,7 @@ pub(super) fn titlebar_segment(
 
     let button = div()
         .id(segment_id)
-        .h(px(TITLEBAR_NAV_BUTTON_HEIGHT))
+        .h(theme::ui_rem(TITLEBAR_NAV_BUTTON_HEIGHT))
         .role(gpui::Role::Tab)
         .aria_label(label)
         .aria_selected(selected)
@@ -2000,7 +2348,7 @@ pub(super) fn titlebar_segment(
         .flex()
         .items_center()
         .gap_2()
-        .rounded(px(theme::RADIUS_SM))
+        .rounded(theme::ui_rem(theme::RADIUS_SM))
         .group(segment_id)
         .px_2()
         .bg(background)

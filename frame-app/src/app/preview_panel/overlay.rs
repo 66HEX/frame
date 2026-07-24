@@ -239,9 +239,9 @@ pub(in crate::app) fn preview_overlay_controls(
         .flex()
         .items_center()
         .gap_2()
-        .rounded(px(theme::RADIUS_MD))
+        .rounded(theme::ui_rem(theme::RADIUS_MD))
         .bg(parse_hex(PREVIEW_TOOLBAR_BACKGROUND))
-        .p(px(4.0))
+        .p(theme::ui_rem(4.0))
         .shadow(card_surface_shadows())
         .on_key_down(
             cx.listener(move |_root, event: &gpui::KeyDownEvent, window, cx| {
@@ -341,7 +341,7 @@ pub(in crate::app) fn preview_overlay_controls(
     Some(
         div()
             .absolute()
-            .bottom(px(16.0))
+            .bottom(theme::ui_rem(16.0))
             .left_0()
             .right_0()
             .flex()
@@ -403,10 +403,10 @@ fn preview_overlay_handle(
             .absolute()
             .left(relative(x))
             .top(relative(y))
-            .ml(px(-(OVERLAY_HANDLE_SIZE / 2.0)))
-            .mt(px(-(OVERLAY_HANDLE_SIZE / 2.0)))
-            .w(px(OVERLAY_HANDLE_SIZE))
-            .h(px(OVERLAY_HANDLE_SIZE))
+            .ml(theme::ui_rem(-(OVERLAY_HANDLE_SIZE / 2.0)))
+            .mt(theme::ui_rem(-(OVERLAY_HANDLE_SIZE / 2.0)))
+            .w(theme::ui_rem(OVERLAY_HANDLE_SIZE))
+            .h(theme::ui_rem(OVERLAY_HANDLE_SIZE))
             .rounded_full()
             .border_1()
             .border_color(hsla(0.0, 0.0, 0.0, 0.45))
@@ -569,12 +569,12 @@ fn preview_overlay_icon_button_inner(
 
     let button = div()
         .id(button_id)
-        .w(px(PREVIEW_TOOLBAR_BUTTON_SIZE))
-        .h(px(PREVIEW_TOOLBAR_BUTTON_SIZE))
+        .w(theme::ui_rem(PREVIEW_TOOLBAR_BUTTON_SIZE))
+        .h(theme::ui_rem(PREVIEW_TOOLBAR_BUTTON_SIZE))
         .flex()
         .items_center()
         .justify_center()
-        .rounded(px(theme::RADIUS_SM))
+        .rounded(theme::ui_rem(theme::RADIUS_SM))
         .bg(background)
         .text_color(foreground)
         .opacity(colors.opacity)
@@ -614,7 +614,7 @@ fn preview_overlay_opacity_slider(
         value,
         !enabled,
     )
-    .w(px(OVERLAY_OPACITY_SLIDER_WIDTH))
+    .w(theme::ui_rem(OVERLAY_OPACITY_SLIDER_WIDTH))
     .on_a11y_action(gpui::AccessibleAction::Increment, move |_, _window, cx| {
         if !enabled {
             return;

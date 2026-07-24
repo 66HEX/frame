@@ -6,7 +6,7 @@ use super::{
     apply_image_webp_preset, apply_image_webp_quality, apply_pixel_format, color, div,
     frame_choice_button, frame_list_item_with_caption, frame_slider, frame_slider_handle,
     image_jpeg_huffman_options, image_png_prediction_options, image_tiff_compression_options,
-    image_webp_preset_options, px, range_fraction, range_value_for_key, range_value_from_fraction,
+    image_webp_preset_options, range_fraction, range_value_for_key, range_value_from_fraction,
     settings_field_label, settings_hint_text, settings_section, settings_value_badge,
     settings_video_resolution_section, settings_video_scaling_section, theme,
     timeline_slider_percent_from_bounds, video_pixel_format_options,
@@ -32,7 +32,7 @@ struct SettingsImageRangeDragPreview;
 
 impl Render for SettingsImageRangeDragPreview {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl gpui::IntoElement {
-        div().w(px(0.0)).h(px(0.0))
+        div().w(theme::ui_rem(0.0)).h(theme::ui_rem(0.0))
     }
 }
 
@@ -327,7 +327,7 @@ fn settings_image_range_field(
             div()
                 .flex()
                 .justify_between()
-                .text_size(px(theme::TEXT_LABEL_SIZE))
+                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .text_color(color(theme::FRAME_GRAY_600))
                 .child(theme::ui_text(lower_label))
                 .child(theme::ui_text(upper_label)),

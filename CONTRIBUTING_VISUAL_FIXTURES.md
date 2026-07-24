@@ -15,6 +15,16 @@ Set `FRAME_GPUI_VISUAL_FIXTURE` before launching the app:
 FRAME_GPUI_VISUAL_FIXTURE=update-available cargo xtask run
 ```
 
+Any fixture can be combined with a supported interface scale using
+`FRAME_GPUI_UI_SCALE`. Values may be written as `80` or `80%`; supported
+presets are `80`, `90`, `100`, `110`, `125`, `150`, `175`, and `200`.
+
+```bash
+FRAME_GPUI_VISUAL_FIXTURE=settings-subtitles \
+FRAME_GPUI_UI_SCALE=200 \
+cargo xtask run
+```
+
 Use a clean app window for visual review when possible. Fixtures run at startup
 and intentionally override only the state they need for the target scenario.
 
@@ -23,6 +33,7 @@ and intentionally override only the state they need for the target scenario.
 | Fixture | Visual scenario | What it is useful for checking |
 | --- | --- | --- |
 | `app-settings` | Runtime app settings sheet | Settings modal layout, concurrency draft value, modal focus treatment, close action, and app-level settings spacing. |
+| `app-settings-ui-open` | App settings with UI scale open at 200% | Scaled geometry and typography, scrollable sheet body, popover placement, and titlebar coexistence. |
 | `logs-active` | Logs tab with an active FFmpeg conversion | Log tab navigation, active file state, plain FFmpeg log rendering, progress line wrapping, monospaced text rendering, and scroll density. |
 | `preview-ready` | Workspace with a selected ready video source | Preview panel shell, selected video metadata, timeline controls, toolbar visibility, empty frame handling, and source video state. |
 | `preview-crop` | Preview panel with crop mode enabled | Crop aspect bar, crop overlay geometry, crop handles, preview toolbar coexistence, and canvas framing while editing crop bounds. |

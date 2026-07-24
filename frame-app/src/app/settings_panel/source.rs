@@ -12,7 +12,7 @@ pub(in crate::app) fn settings_source_tab(
     match status {
         MetadataStatus::Loading => {
             return div()
-                .text_size(px(theme::TEXT_LABEL_SIZE))
+                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .text_color(color(theme::FRAME_GRAY_600))
                 .child(theme::ui_text("Analyzing source..."))
                 .into_any_element();
@@ -25,7 +25,7 @@ pub(in crate::app) fn settings_source_tab(
                 .flex()
                 .flex_col()
                 .gap_1()
-                .text_size(px(theme::TEXT_LABEL_SIZE))
+                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .text_color(color(theme::FRAME_RED))
                 .child(theme::ui_text("Failed to read source metadata."));
             if let Some(error) = error {
@@ -42,7 +42,7 @@ pub(in crate::app) fn settings_source_tab(
 
     let Some(metadata) = metadata else {
         return div()
-            .text_size(px(theme::TEXT_LABEL_SIZE))
+            .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
             .text_color(color(theme::FRAME_GRAY_600))
             .child(theme::ui_text("Metadata unavailable."))
             .into_any_element();
@@ -51,7 +51,7 @@ pub(in crate::app) fn settings_source_tab(
     let sections = source_info_sections(metadata);
     if sections.is_empty() {
         return div()
-            .text_size(px(theme::TEXT_LABEL_SIZE))
+            .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
             .text_color(color(theme::FRAME_GRAY_600))
             .child(theme::ui_text("Metadata unavailable."))
             .into_any_element();
@@ -119,7 +119,7 @@ pub(in crate::app) fn settings_section_label(label: &'static str) -> gpui::Div {
         .flex()
         .flex_col()
         .gap_1()
-        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(color(theme::FRAME_GRAY_600))
         .child(theme::ui_text(label))

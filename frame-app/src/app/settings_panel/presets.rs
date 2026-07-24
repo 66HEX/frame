@@ -4,8 +4,8 @@ use super::{
     FrameRoot, FrameTextInputKind, FrameTextInputSpec, InteractiveElement, ParentElement,
     PresetDefinition, PresetNotice, PresetNoticeTone, PresetOption, SourceMetadata,
     StatefulInteractiveElement, Styled, Window, assets, color, div, frame_icon_button,
-    frame_list_item, frame_text_button, frame_text_input, preset_options, px,
-    settings_section_label, theme,
+    frame_list_item, frame_text_button, frame_text_input, preset_options, settings_section_label,
+    theme,
 };
 
 #[derive(Clone, Copy)]
@@ -66,7 +66,7 @@ fn settings_presets_header(notice: Option<&PresetNotice>) -> gpui::Div {
                     PresetNoticeTone::Error => gpui::Role::Alert,
                 })
                 .aria_label(notice.text.clone())
-                .text_size(px(theme::TEXT_LABEL_SIZE))
+                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .text_color(color(match notice.tone {
                     PresetNoticeTone::Success => theme::FOREGROUND,
                     PresetNoticeTone::Error => theme::FRAME_RED,
@@ -148,23 +148,30 @@ fn settings_preset_row(
         window,
         cx,
     )
-    .pr(px(4.0))
+    .pr(theme::ui_rem(4.0))
     .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
         cx.stop_propagation();
         if is_enabled && root.apply_preset_to_selected(&preset_id) {
             cx.notify();
         }
     }))
-    .child(div().min_w_0().truncate().child(preset.name.clone()))
     .child(
         div()
+            .min_w_0()
+            .flex_1()
+            .truncate()
+            .child(preset.name.clone()),
+    )
+    .child(
+        div()
+            .flex_none()
             .flex()
             .items_center()
             .gap_2()
             .child(
                 div()
-                    .pr(px(8.0))
-                    .text_size(px(theme::TEXT_LABEL_SIZE))
+                    .pr(theme::ui_rem(8.0))
+                    .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                     .font_weight(theme::TEXT_WEIGHT_REGULAR)
                     .text_color(color(theme::FRAME_GRAY_600))
                     .child(theme::ui_text(status.unwrap_or_default())),

@@ -2,7 +2,7 @@ use super::{
     ClickEvent, Context, FILE_LIST_ROW_SPAN, FileQueue, FrameRoot, LEFT_COLUMN_SPAN,
     LEFT_GRID_ROWS, PREVIEW_ROW_SPAN, ParentElement, PreviewPanelProps, RIGHT_COLUMN_SPAN,
     SettingsRenderState, StatefulInteractiveElement, Styled, WORKSPACE_COLUMNS, WORKSPACE_GAP,
-    Window, assets, color, div, px, svg, theme,
+    Window, assets, color, div, svg, theme,
 };
 use super::{
     file_list_panel::file_list_panel,
@@ -30,14 +30,14 @@ pub(super) fn workspace_view(
     div()
         .grid()
         .grid_cols(WORKSPACE_COLUMNS)
-        .gap(px(WORKSPACE_GAP))
+        .gap(theme::ui_rem(WORKSPACE_GAP))
         .size_full()
         .child(
             div()
                 .col_span(LEFT_COLUMN_SPAN)
                 .grid()
                 .grid_rows(LEFT_GRID_ROWS)
-                .gap(px(WORKSPACE_GAP))
+                .gap(theme::ui_rem(WORKSPACE_GAP))
                 .size_full()
                 .child(
                     preview_panel(file_queue, settings, preview_props, window, cx)
@@ -58,7 +58,7 @@ pub(super) fn welcome_view(window: &mut Window, cx: &mut Context<FrameRoot>) -> 
         .justify_center()
         .child(
             div()
-                .max_w(px(WELCOME_MAX_WIDTH))
+                .max_w(theme::ui_rem(WELCOME_MAX_WIDTH))
                 .flex()
                 .flex_col()
                 .items_center()
@@ -67,8 +67,8 @@ pub(super) fn welcome_view(window: &mut Window, cx: &mut Context<FrameRoot>) -> 
                 .child(
                     svg()
                         .path(assets::ICON_FRAME)
-                        .w(px(WELCOME_LOGO_SIZE))
-                        .h(px(WELCOME_LOGO_SIZE))
+                        .w(theme::ui_rem(WELCOME_LOGO_SIZE))
+                        .h(theme::ui_rem(WELCOME_LOGO_SIZE))
                         .text_color(color(theme::FRAME_GRAY_600)),
                 )
                 .child(
@@ -79,14 +79,14 @@ pub(super) fn welcome_view(window: &mut Window, cx: &mut Context<FrameRoot>) -> 
                         .gap_2()
                         .child(
                             div()
-                                .text_size(px(theme::TEXT_ROW_SIZE))
+                                .text_size(theme::ui_rem(theme::TEXT_ROW_BASE_SIZE))
                                 .font_weight(theme::TEXT_WEIGHT_MEDIUM)
                                 .text_color(color(theme::FOREGROUND))
                                 .child(theme::ui_text("Frame")),
                         )
                         .child(
                             div()
-                                .text_size(px(theme::TEXT_LABEL_SIZE))
+                                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                                 .text_color(color(theme::FRAME_GRAY_600))
                                 .child(theme::ui_text("Add media to start a conversion queue.")),
                         ),
@@ -158,13 +158,13 @@ fn empty_settings_panel() -> gpui::Div {
         .items_center()
         .justify_center()
         .overflow_hidden()
-        .p(px(EMPTY_SETTINGS_PANEL_PADDING))
+        .p(theme::ui_rem(EMPTY_SETTINGS_PANEL_PADDING))
         .text_center()
         .card_surface()
         .child(
             div()
-                .max_w(px(EMPTY_SETTINGS_HINT_MAX_WIDTH))
-                .text_size(px(theme::TEXT_LABEL_SIZE))
+                .max_w(theme::ui_rem(EMPTY_SETTINGS_HINT_MAX_WIDTH))
+                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .text_color(color(theme::FRAME_GRAY_600))
                 .child(theme::ui_text(
                     "Select an item from the queue to access configuration",

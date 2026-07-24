@@ -84,6 +84,7 @@ impl FrameRoot {
             active_view: active_view_from_env_value(
                 std::env::var("FRAME_GPUI_INITIAL_VIEW").ok().as_deref(),
             ),
+            appearance: persisted_settings.appearance,
             titlebar_drag: TitlebarDragState::default(),
             focus_registry: FrameFocusRegistry::default(),
             file_queue: FileQueue::new(),
@@ -123,6 +124,11 @@ impl FrameRoot {
         root.apply_visual_fixture(visual_fixture_from_env_value(
             std::env::var("FRAME_GPUI_VISUAL_FIXTURE").ok().as_deref(),
         ));
+        if let Some(ui_scale) = crate::appearance::scale_preset_from_env_value(
+            std::env::var("FRAME_GPUI_UI_SCALE").ok().as_deref(),
+        ) {
+            root.appearance.ui_scale = ui_scale;
+        }
         root
     }
     pub(super) fn app_state(&self) -> FrameAppState {
@@ -159,6 +165,7 @@ impl FrameRoot {
         };
 
         persistence.save(&AppSettings::from_runtime(
+            self.appearance,
             self.max_concurrency,
             self.default_output_directory.clone(),
             &self.presets,

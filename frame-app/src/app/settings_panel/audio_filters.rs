@@ -29,7 +29,7 @@ struct AudioFilterRangeDragPreview;
 
 impl Render for AudioFilterRangeDragPreview {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        div().w(px(0.0)).h(px(0.0))
+        div().w(theme::ui_rem(0.0)).h(theme::ui_rem(0.0))
     }
 }
 

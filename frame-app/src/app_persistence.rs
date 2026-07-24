@@ -12,15 +12,19 @@ use frame_updater::UpdateChannel;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::settings::PresetDefinition;
+use crate::{
+    appearance::{AppearanceSettings, ScalePreset},
+    settings::PresetDefinition,
+};
 
-const APP_SETTINGS_VERSION: u32 = 3;
+const APP_SETTINGS_VERSION: u32 = 4;
 const SETTINGS_FILE_NAME: &str = "settings.json";
 const LEGACY_APP_SETTINGS_FILE_NAME: &str = "app-settings.dat";
 const LEGACY_PRESETS_FILE_NAME: &str = "presets.dat";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AppSettings {
+    pub appearance: AppearanceSettings,
     pub max_concurrency: usize,
     pub default_output_directory: Option<PathBuf>,
     pub custom_presets: Vec<PresetDefinition>,
@@ -32,7 +36,12 @@ pub struct AppSettings {
 
 impl AppSettings {
     #[must_use]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "Persistence snapshots explicitly include each independent runtime settings domain."
+    )]
     pub fn from_runtime(
+        appearance: AppearanceSettings,
         max_concurrency: usize,
         default_output_directory: Option<PathBuf>,
         presets: &[PresetDefinition],
@@ -42,6 +51,7 @@ impl AppSettings {
         last_update_check_at: Option<u64>,
     ) -> Self {
         Self {
+            appearance,
             max_concurrency: valid_max_concurrency(max_concurrency),
             default_output_directory,
             custom_presets: normalize_custom_presets(
@@ -62,6 +72,7 @@ impl AppSettings {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
+            appearance: AppearanceSettings::default(),
             max_concurrency: DEFAULT_MAX_CONCURRENCY,
             default_output_directory: None,
             custom_presets: Vec::new(),
@@ -188,6 +199,7 @@ pub enum AppPersistenceError {
 #[serde(default, rename_all = "camelCase")]
 struct PersistedAppSettings {
     version: u32,
+    ui_scale_percent: u16,
     max_concurrency: usize,
     default_output_directory: Option<PathBuf>,
     custom_presets: Vec<PresetDefinition>,
@@ -214,6 +226,7 @@ impl PersistedAppSettings {
     fn from_app_settings(settings: &AppSettings) -> Self {
         Self {
             version: APP_SETTINGS_VERSION,
+            ui_scale_percent: settings.appearance.ui_scale.percent(),
             max_concurrency: valid_max_concurrency(settings.max_concurrency),
             default_output_directory: settings.default_output_directory.clone(),
             custom_presets: normalize_custom_presets(settings.custom_presets.clone()),
@@ -226,6 +239,9 @@ impl PersistedAppSettings {
 
     fn into_app_settings(self) -> AppSettings {
         AppSettings {
+            appearance: AppearanceSettings {
+                ui_scale: ScalePreset::from_percent(self.ui_scale_percent).unwrap_or_default(),
+            },
             max_concurrency: valid_max_concurrency(self.max_concurrency),
             default_output_directory: self.default_output_directory,
             custom_presets: normalize_custom_presets(self.custom_presets),
@@ -241,6 +257,7 @@ impl Default for PersistedAppSettings {
     fn default() -> Self {
         Self {
             version: APP_SETTINGS_VERSION,
+            ui_scale_percent: ScalePreset::Percent100.percent(),
             max_concurrency: DEFAULT_MAX_CONCURRENCY,
             default_output_directory: None,
             custom_presets: Vec::new(),
@@ -379,6 +396,9 @@ mod tests {
     fn save_round_trips_max_concurrency_and_custom_presets() {
         let persistence = AppPersistence::from_settings_path(test_settings_path());
         let settings = AppSettings {
+            appearance: AppearanceSettings {
+                ui_scale: ScalePreset::Percent125,
+            },
             max_concurrency: 4,
             default_output_directory: Some(PathBuf::from("/tmp/frame-output")),
             custom_presets: vec![PresetDefinition::custom(
@@ -401,6 +421,20 @@ mod tests {
         let loaded = persistence.load().expect("settings should be loaded");
 
         assert_eq!(loaded, settings);
+    }
+
+    #[test]
+    fn every_supported_ui_scale_round_trips() {
+        for ui_scale in ScalePreset::ALL {
+            let settings = AppSettings {
+                appearance: AppearanceSettings { ui_scale },
+                ..AppSettings::default()
+            };
+
+            let loaded = PersistedAppSettings::from_app_settings(&settings).into_app_settings();
+
+            assert_eq!(loaded.appearance, settings.appearance);
+        }
     }
 
     #[test]
@@ -437,6 +471,45 @@ mod tests {
             .expect("settings should load");
 
         assert_eq!(settings.max_concurrency, DEFAULT_MAX_CONCURRENCY);
+    }
+
+    #[test]
+    fn load_version_three_settings_defaults_appearance_without_losing_existing_values() {
+        let path = test_settings_path();
+        let parent = path.parent().expect("test path should have parent");
+        fs::create_dir_all(parent).expect("test directory should be created");
+        fs::write(
+            &path,
+            r#"{"version":3,"maxConcurrency":7,"customPresets":[],"autoUpdateCheck":false}"#,
+        )
+        .expect("settings fixture should be written");
+
+        let settings = AppPersistence::from_settings_path(path)
+            .load()
+            .expect("version three settings should load");
+
+        assert_eq!(settings.appearance, AppearanceSettings::default());
+        assert_eq!(settings.max_concurrency, 7);
+        assert!(!settings.auto_update_check);
+    }
+
+    #[test]
+    fn load_normalizes_invalid_ui_scale_without_resetting_other_settings() {
+        let path = test_settings_path();
+        let parent = path.parent().expect("test path should have parent");
+        fs::create_dir_all(parent).expect("test directory should be created");
+        fs::write(
+            &path,
+            r#"{"version":4,"uiScalePercent":0,"maxConcurrency":5,"customPresets":[]}"#,
+        )
+        .expect("settings fixture should be written");
+
+        let settings = AppPersistence::from_settings_path(path)
+            .load()
+            .expect("settings should load");
+
+        assert_eq!(settings.appearance.ui_scale, ScalePreset::Percent100);
+        assert_eq!(settings.max_concurrency, 5);
     }
 
     #[test]
@@ -509,6 +582,7 @@ mod tests {
     #[test]
     fn from_runtime_persists_only_custom_presets() {
         let settings = AppSettings::from_runtime(
+            AppearanceSettings::default(),
             3,
             Some(PathBuf::from("/tmp/frame-output")),
             &[

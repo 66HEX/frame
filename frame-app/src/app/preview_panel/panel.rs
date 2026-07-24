@@ -185,7 +185,7 @@ pub(in crate::app) fn preview_panel(
         .flex_col()
         .overflow_hidden()
         .card_surface()
-        .p(px(PREVIEW_PANEL_PADDING))
+        .p(theme::ui_rem(PREVIEW_PANEL_PADDING))
         .child(preview_viewport(&state, props.viewport_focuses, window, cx))
         .child(preview_timeline(&state, props.timecode_focuses, window, cx))
 }

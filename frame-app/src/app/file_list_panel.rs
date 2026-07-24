@@ -4,7 +4,7 @@ use super::{
     FileStateTone, FluentBuilder, FrameRoot, InteractiveElement, IntoElement, MouseButton,
     PANEL_HEADER_HEIGHT, ParentElement, Rgba, RowActionAvailability, RowPrimaryAction,
     RowSecondaryAction, StatefulInteractiveElement, Styled, WORKSPACE_GAP, Window, assets, div,
-    format_file_size, px, theme,
+    format_file_size, theme,
 };
 use super::{
     accessibility::apply_accessible_checkbox,
@@ -45,8 +45,8 @@ pub(super) fn file_list_header(
     let selection_enabled = selection.is_enabled;
     let header_checkbox = div()
         .id("file-list-header-checkbox-hit-area")
-        .w(px(theme::MIN_HIT_AREA))
-        .h(px(FILE_ROW_HEIGHT))
+        .w(theme::ui_rem(theme::MIN_HIT_AREA))
+        .h(theme::ui_rem(FILE_ROW_HEIGHT))
         .flex()
         .items_center()
         .justify_start()
@@ -91,7 +91,7 @@ pub(super) fn file_list_header(
         ));
 
     div()
-        .h(px(PANEL_HEADER_HEIGHT))
+        .h(theme::ui_rem(PANEL_HEADER_HEIGHT))
         .w_full()
         .flex()
         .items_center()
@@ -102,9 +102,9 @@ pub(super) fn file_list_header(
                 .flex_1()
                 .grid()
                 .grid_cols(12)
-                .gap(px(WORKSPACE_GAP))
+                .gap(theme::ui_rem(WORKSPACE_GAP))
                 .items_center()
-                .text_size(px(theme::TEXT_LABEL_SIZE))
+                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .text_color(color(theme::FRAME_GRAY_600))
                 .child(
                     div()
@@ -121,8 +121,8 @@ pub(super) fn file_list_header(
         .child(
             div()
                 .ml_4()
-                .w(px(FILE_LIST_ACTIONS_WIDTH))
-                .text_size(px(theme::TEXT_LABEL_SIZE))
+                .w(theme::ui_rem(FILE_LIST_ACTIONS_WIDTH))
+                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .font_weight(theme::TEXT_WEIGHT_MEDIUM)
                 .text_color(color(theme::FRAME_GRAY_600))
                 .text_right()
@@ -151,7 +151,7 @@ pub(super) fn file_list_body(
                 .flex()
                 .items_center()
                 .justify_center()
-                .text_size(px(theme::TEXT_UI_SIZE))
+                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .text_color(color(theme::FRAME_GRAY_600))
                 .child(theme::ui_text("Drop files or use Add Source")),
         );
@@ -186,7 +186,7 @@ pub(super) fn file_list_row(
     );
 
     div()
-        .h(px(FILE_ROW_HEIGHT))
+        .h(theme::ui_rem(FILE_ROW_HEIGHT))
         .w_full()
         .id(element_id("file-list-row", &select_id))
         .role(gpui::Role::ListItem)
@@ -213,9 +213,9 @@ pub(super) fn file_list_row(
                 .flex_1()
                 .grid()
                 .grid_cols(12)
-                .gap(px(WORKSPACE_GAP))
+                .gap(theme::ui_rem(WORKSPACE_GAP))
                 .items_center()
-                .text_size(px(theme::TEXT_ROW_SIZE))
+                .text_size(theme::ui_rem(theme::TEXT_ROW_BASE_SIZE))
                 .child(
                     div()
                         .col_span(1)
@@ -297,7 +297,7 @@ pub(super) fn row_actions_cell(
     let mut cell = div()
         .id(element_id("file-row-actions", &file_id))
         .ml_4()
-        .w(px(FILE_LIST_ACTIONS_WIDTH))
+        .w(theme::ui_rem(FILE_LIST_ACTIONS_WIDTH))
         .h_full()
         .flex()
         .items_center()
@@ -458,8 +458,8 @@ pub(super) fn row_checkbox_control(
 
     div()
         .id(element_id("file-row-checkbox-hit-area", file_id))
-        .w(px(theme::MIN_HIT_AREA))
-        .h(px(FILE_ROW_HEIGHT))
+        .w(theme::ui_rem(theme::MIN_HIT_AREA))
+        .h(theme::ui_rem(FILE_ROW_HEIGHT))
         .flex()
         .items_center()
         .justify_start()

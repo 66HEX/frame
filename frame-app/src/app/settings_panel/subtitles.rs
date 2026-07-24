@@ -278,15 +278,15 @@ fn settings_subtitle_load_button(
 
     let button = div()
         .id("settings-subtitle-burn-file")
-        .h(px(SETTINGS_CONTROL_HEIGHT))
+        .h(theme::ui_rem(SETTINGS_CONTROL_HEIGHT))
         .w_full()
         .flex()
         .items_center()
         .justify_center()
-        .rounded(px(theme::RADIUS_SM))
-        .px(px(10.0))
+        .rounded(theme::ui_rem(theme::RADIUS_SM))
+        .px(theme::ui_rem(10.0))
         .bg(background)
-        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
         .opacity(colors.opacity)
@@ -467,115 +467,6 @@ fn defer_focus_optional(focus: Option<FocusHandle>, window: &Window, cx: &mut Co
     }
 }
 
-const fn subtitle_select_option_focus(
-    index: usize,
-    option_count: usize,
-    focuses: SettingsSubtitleSelectFocuses<'_>,
-) -> Option<&FocusHandle> {
-    if index == 0 {
-        focuses.first_option
-    } else if index + 1 == option_count {
-        focuses.last_option
-    } else {
-        None
-    }
-}
-
-const fn subtitle_select_last_focus(
-    option_count: usize,
-    focuses: SettingsSubtitleSelectFocuses<'_>,
-) -> Option<&FocusHandle> {
-    if option_count <= 1 {
-        focuses.first_option
-    } else {
-        focuses.last_option
-    }
-}
-
-fn focus_subtitle_select_initial_target(
-    key: &str,
-    option_count: usize,
-    first_focus: Option<&FocusHandle>,
-    last_focus: Option<&FocusHandle>,
-    scroll_handle: &ScrollHandle,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
-) {
-    if option_count == 0 {
-        return;
-    }
-    let target_index = if matches!(key, "up" | "end") {
-        option_count.saturating_sub(1)
-    } else {
-        0
-    };
-    scroll_handle.scroll_to_item(target_index);
-    if target_index == 0 {
-        focus_optional(first_focus, window, cx);
-    } else {
-        focus_optional(last_focus.or(first_focus), window, cx);
-    }
-}
-
-fn apply_subtitle_select_popover_focus_trap(
-    popover: gpui::Stateful<gpui::Div>,
-    focuses: SettingsSubtitleSelectFocuses<'_>,
-    option_count: usize,
-    cx: &Context<FrameRoot>,
-) -> gpui::Stateful<gpui::Div> {
-    let Some(panel_focus) = focuses.panel else {
-        return popover;
-    };
-    let Some(first_focus) = focuses.first_option else {
-        return popover;
-    };
-    let Some(last_focus) = subtitle_select_last_focus(option_count, focuses) else {
-        return popover;
-    };
-
-    let first_focus = first_focus.clone();
-    let last_focus = last_focus.clone();
-    popover
-        .track_focus(panel_focus)
-        .tab_stop(false)
-        .on_key_down(
-            cx.listener(move |_root, event: &gpui::KeyDownEvent, window, cx| {
-                handle_modal_tab_navigation(event, &first_focus, &last_focus, window, cx);
-            }),
-        )
-}
-
-#[derive(Clone, Copy)]
-struct SubtitleSelectFocusTarget<'a> {
-    current_index: usize,
-    target_index: usize,
-    first_focus: Option<&'a FocusHandle>,
-    last_focus: Option<&'a FocusHandle>,
-    scroll_handle: &'a ScrollHandle,
-}
-
-fn focus_subtitle_select_target(
-    key: &str,
-    target: SubtitleSelectFocusTarget<'_>,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
-) {
-    target.scroll_handle.scroll_to_item(target.target_index);
-    match key {
-        "home" => focus_optional(target.first_focus, window, cx),
-        "end" => focus_optional(target.last_focus, window, cx),
-        "down" if target.target_index <= target.current_index => {
-            focus_optional(target.first_focus, window, cx);
-        }
-        "up" if target.target_index >= target.current_index => {
-            focus_optional(target.last_focus, window, cx);
-        }
-        "down" => window.focus_next(cx),
-        "up" => window.focus_prev(cx),
-        _ => {}
-    }
-}
-
 #[expect(
     clippy::too_many_lines,
     reason = "Subtitle font select keeps trigger, keyboard handling, popover, and scrollbar together for one GPUI control."
@@ -618,7 +509,12 @@ fn settings_subtitle_font_select(
         )
     };
     let key_first_option_focus = state.focuses.first_option.cloned();
-    let key_last_option_focus = subtitle_select_last_focus(options.len(), state.focuses).cloned();
+    let key_last_option_focus = frame_select_last_focus(
+        options.len(),
+        state.focuses.first_option,
+        state.focuses.last_option,
+    )
+    .cloned();
     let key_scroll_handle = state.scroll_handle.clone();
     let option_count = options.len();
 
@@ -646,7 +542,7 @@ fn settings_subtitle_font_select(
                         match event.keystroke.key.as_str() {
                             "down" | "up" if root.subtitle_ui.popover == Some(popover) => {
                                 cx.stop_propagation();
-                                focus_subtitle_select_initial_target(
+                                focus_frame_select_initial_target(
                                     event.keystroke.key.as_str(),
                                     option_count,
                                     key_first_option_focus.as_ref(),
@@ -660,7 +556,7 @@ fn settings_subtitle_font_select(
                                 cx.stop_propagation();
                                 root.subtitle_ui.popover = Some(popover);
                                 root.subtitle_ui.rendered_popover = Some(popover);
-                                focus_subtitle_select_initial_target(
+                                focus_frame_select_initial_target(
                                     event.keystroke.key.as_str(),
                                     option_count,
                                     key_first_option_focus.as_ref(),
@@ -707,7 +603,12 @@ fn settings_subtitle_font_select(
         for (index, option) in options.into_iter().enumerate() {
             let name = option.name.clone();
             let is_enabled = !option.is_disabled;
-            let option_focus = subtitle_select_option_focus(index, option_count, state.focuses);
+            let option_focus = frame_select_option_focus(
+                index,
+                option_count,
+                state.focuses.first_option,
+                state.focuses.last_option,
+            );
             list = list.child(settings_subtitle_font_option(
                 option,
                 is_enabled,
@@ -728,8 +629,17 @@ fn settings_subtitle_font_select(
             progress,
             list,
         );
-        popover =
-            apply_subtitle_select_popover_focus_trap(popover, state.focuses, option_count, cx);
+        popover = apply_frame_select_popover_focus_trap(
+            popover,
+            state.focuses.panel,
+            state.focuses.first_option,
+            frame_select_last_focus(
+                option_count,
+                state.focuses.first_option,
+                state.focuses.last_option,
+            ),
+            cx,
+        );
 
         if content_height > FRAME_SELECT_MAX_HEIGHT {
             popover = popover.child(frame_vertical_scrollbar(
@@ -786,7 +696,12 @@ fn settings_subtitle_font_size_select(
         )
     };
     let key_first_option_focus = state.focuses.first_option.cloned();
-    let key_last_option_focus = subtitle_select_last_focus(options.len(), state.focuses).cloned();
+    let key_last_option_focus = frame_select_last_focus(
+        options.len(),
+        state.focuses.first_option,
+        state.focuses.last_option,
+    )
+    .cloned();
     let key_scroll_handle = state.scroll_handle.clone();
     let option_count = options.len();
 
@@ -814,7 +729,7 @@ fn settings_subtitle_font_size_select(
                         match event.keystroke.key.as_str() {
                             "down" | "up" if root.subtitle_ui.popover == Some(popover) => {
                                 cx.stop_propagation();
-                                focus_subtitle_select_initial_target(
+                                focus_frame_select_initial_target(
                                     event.keystroke.key.as_str(),
                                     option_count,
                                     key_first_option_focus.as_ref(),
@@ -828,7 +743,7 @@ fn settings_subtitle_font_size_select(
                                 cx.stop_propagation();
                                 root.subtitle_ui.popover = Some(popover);
                                 root.subtitle_ui.rendered_popover = Some(popover);
-                                focus_subtitle_select_initial_target(
+                                focus_frame_select_initial_target(
                                     event.keystroke.key.as_str(),
                                     option_count,
                                     key_first_option_focus.as_ref(),
@@ -877,7 +792,12 @@ fn settings_subtitle_font_size_select(
         for (index, option) in options.into_iter().enumerate() {
             let size = option.size;
             let is_enabled = !option.is_disabled;
-            let option_focus = subtitle_select_option_focus(index, option_count, state.focuses);
+            let option_focus = frame_select_option_focus(
+                index,
+                option_count,
+                state.focuses.first_option,
+                state.focuses.last_option,
+            );
             list = list.child(settings_subtitle_size_option(
                 option,
                 is_enabled,
@@ -898,8 +818,17 @@ fn settings_subtitle_font_size_select(
             progress,
             list,
         );
-        popover =
-            apply_subtitle_select_popover_focus_trap(popover, state.focuses, option_count, cx);
+        popover = apply_frame_select_popover_focus_trap(
+            popover,
+            state.focuses.panel,
+            state.focuses.first_option,
+            frame_select_last_focus(
+                option_count,
+                state.focuses.first_option,
+                state.focuses.last_option,
+            ),
+            cx,
+        );
 
         if content_height > FRAME_SELECT_MAX_HEIGHT {
             popover = popover.child(frame_vertical_scrollbar(
@@ -936,7 +865,8 @@ fn settings_subtitle_font_option(
     let trigger_focus_for_click = focuses.trigger.cloned();
     let trigger_focus_for_key = focuses.trigger.cloned();
     let first_focus_for_key = focuses.first_option.cloned();
-    let last_focus_for_key = subtitle_select_last_focus(option_count, focuses).cloned();
+    let last_focus_for_key =
+        frame_select_last_focus(option_count, focuses.first_option, focuses.last_option).cloned();
     let scroll_handle_for_key = scroll_handle.clone();
     let option = if let Some(focus) = focus {
         frame_select_option_with_focus(
@@ -987,16 +917,16 @@ fn settings_subtitle_font_option(
                         }
                     }
                     "up" | "down" | "home" | "end" if is_enabled => {
-                        let target_index = subtitle_select_target_index(
+                        let target_index = frame_select_target_index(
                             keyboard_options.len(),
                             Some(index),
                             key,
                             |index| !keyboard_options[index].is_disabled,
                         );
                         if let Some(target_index) = target_index {
-                            focus_subtitle_select_target(
+                            focus_frame_select_target(
                                 key,
-                                SubtitleSelectFocusTarget {
+                                FrameSelectFocusTarget {
                                     current_index: index,
                                     target_index,
                                     first_focus: first_focus_for_key.as_ref(),
@@ -1041,7 +971,8 @@ fn settings_subtitle_size_option(
     let trigger_focus_for_click = focuses.trigger.cloned();
     let trigger_focus_for_key = focuses.trigger.cloned();
     let first_focus_for_key = focuses.first_option.cloned();
-    let last_focus_for_key = subtitle_select_last_focus(option_count, focuses).cloned();
+    let last_focus_for_key =
+        frame_select_last_focus(option_count, focuses.first_option, focuses.last_option).cloned();
     let scroll_handle_for_key = scroll_handle.clone();
     let option = if let Some(focus) = focus {
         frame_select_option_with_focus(
@@ -1092,16 +1023,16 @@ fn settings_subtitle_size_option(
                         }
                     }
                     "up" | "down" | "home" | "end" if is_enabled => {
-                        let target_index = subtitle_select_target_index(
+                        let target_index = frame_select_target_index(
                             keyboard_options.len(),
                             Some(index),
                             key,
                             |index| !keyboard_options[index].is_disabled,
                         );
                         if let Some(target_index) = target_index {
-                            focus_subtitle_select_target(
+                            focus_frame_select_target(
                                 key,
-                                SubtitleSelectFocusTarget {
+                                FrameSelectFocusTarget {
                                     current_index: index,
                                     target_index,
                                     first_focus: first_focus_for_key.as_ref(),
@@ -1395,10 +1326,10 @@ fn settings_subtitle_sv_square(
         .aria_label(settings_subtitle_sv_label(target))
         .aria_value(settings_subtitle_sv_value(hsv))
         .relative()
-        .h(px(FRAME_COLOR_PICKER_SV_HEIGHT))
+        .h(theme::ui_rem(FRAME_COLOR_PICKER_SV_HEIGHT))
         .w_full()
         .overflow_hidden()
-        .rounded(px(theme::RADIUS_SM))
+        .rounded(theme::ui_rem(theme::RADIUS_SM))
         .border_1()
         .border_color(color(theme::FRAME_GRAY_200))
         .bg(color(theme::FRAME_GRAY_100))
@@ -1487,7 +1418,7 @@ fn settings_subtitle_hue_slider(
             SettingsSubtitleColorTarget::Outline => "settings-subtitle-outline-color-hue",
         })
         .relative()
-        .h(px(FRAME_COLOR_PICKER_HUE_VISUAL_HEIGHT))
+        .h(theme::ui_rem(FRAME_COLOR_PICKER_HUE_VISUAL_HEIGHT))
         .w_full()
         .cursor_ew_resize()
         .on_mouse_down(
@@ -1640,34 +1571,6 @@ fn subtitle_hue_hsv_for_key(hsv: SettingsSubtitleHsv, key: &str) -> Option<Setti
     };
     next.h = hue.clamp(0.0, 360.0);
     Some(next)
-}
-
-fn subtitle_select_target_index(
-    len: usize,
-    selected_index: Option<usize>,
-    key: &str,
-    is_enabled: impl Fn(usize) -> bool,
-) -> Option<usize> {
-    if len == 0 {
-        return None;
-    }
-    match key {
-        "home" => (0..len).find(|index| is_enabled(*index)),
-        "end" => (0..len).rev().find(|index| is_enabled(*index)),
-        "down" => {
-            let start = selected_index.unwrap_or(len - 1);
-            (1..=len)
-                .map(|offset| (start + offset) % len)
-                .find(|index| is_enabled(*index))
-        }
-        "up" => {
-            let start = selected_index.unwrap_or(0);
-            (1..=len)
-                .map(|offset| (start + len - offset) % len)
-                .find(|index| is_enabled(*index))
-        }
-        _ => None,
-    }
 }
 
 impl FrameRoot {
@@ -2070,10 +1973,10 @@ mod tests {
             },
         ];
 
-        let down_index = subtitle_select_target_index(options.len(), Some(0), "down", |index| {
+        let down_index = frame_select_target_index(options.len(), Some(0), "down", |index| {
             !options[index].is_disabled
         });
-        let up_index = subtitle_select_target_index(options.len(), Some(0), "up", |index| {
+        let up_index = frame_select_target_index(options.len(), Some(0), "up", |index| {
             !options[index].is_disabled
         });
 
@@ -2107,10 +2010,10 @@ mod tests {
             },
         ];
 
-        let home_index = subtitle_select_target_index(options.len(), Some(1), "home", |index| {
+        let home_index = frame_select_target_index(options.len(), Some(1), "home", |index| {
             !options[index].is_disabled
         });
-        let end_index = subtitle_select_target_index(options.len(), Some(1), "end", |index| {
+        let end_index = frame_select_target_index(options.len(), Some(1), "end", |index| {
             !options[index].is_disabled
         });
 

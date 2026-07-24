@@ -258,7 +258,8 @@ impl Element for PreviewViewportRoundedClip {
     ) {
         // GPUI clips overflow to a rectangular content mask, so the media layer needs
         // exact rounded-corner cutouts painted above it.
-        if let Some(path) = preview_viewport_rounded_clip_path(bounds, px(theme::RADIUS_MD)) {
+        let radius = theme::ui_rem(theme::RADIUS_MD).to_pixels(window.rem_size());
+        if let Some(path) = preview_viewport_rounded_clip_path(bounds, radius) {
             window.paint_path(path, parse_hex("#1B1D21"));
         }
     }
@@ -299,7 +300,7 @@ pub(in crate::app) fn preview_viewport(
         .items_center()
         .justify_center()
         .overflow_hidden()
-        .rounded(px(theme::RADIUS_MD))
+        .rounded(theme::ui_rem(theme::RADIUS_MD))
         .bg(parse_hex("#14161A"))
         .shadow(input_highlight_shadows())
         .track_focus(focuses.viewport)
@@ -429,14 +430,14 @@ pub(in crate::app) fn preview_viewport_content(
 
     let content = div()
         .id("preview-empty-state")
-        .max_w(px(360.0))
+        .max_w(theme::ui_rem(360.0))
         .flex()
         .flex_col()
         .items_center()
         .justify_center()
         .gap_3()
         .text_center()
-        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .text_color(color(theme::FRAME_GRAY_600));
 
     if state.selected_file_name.is_none() {
@@ -458,7 +459,7 @@ pub(in crate::app) fn preview_viewport_content(
             if let Some(message) = state.metadata_error.as_deref() {
                 error = error.child(
                     div()
-                        .max_w(px(320.0))
+                        .max_w(theme::ui_rem(320.0))
                         .truncate()
                         .text_color(color(theme::FRAME_GRAY_600))
                         .child(message.to_string()),
@@ -475,7 +476,7 @@ pub(in crate::app) fn preview_viewport_content(
                     .child(theme::ui_text("Preview unavailable"))
                     .child(
                         div()
-                            .max_w(px(320.0))
+                            .max_w(theme::ui_rem(320.0))
                             .truncate()
                             .text_color(color(theme::FRAME_GRAY_600))
                             .child(message.to_string()),

@@ -3,6 +3,7 @@
 pub mod app;
 pub mod app_info;
 pub mod app_persistence;
+pub mod appearance;
 pub mod assets;
 pub mod capabilities;
 pub mod conversion_events;
@@ -94,6 +95,7 @@ pub fn active_view_from_env_value(value: Option<&str>) -> ActiveView {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum VisualFixture {
     AppSettings,
+    AppSettingsUiOpen,
     LogsActive,
     PreviewCrop,
     PreviewReady,
@@ -118,6 +120,7 @@ pub enum VisualFixture {
 pub fn visual_fixture_from_env_value(value: Option<&str>) -> Option<VisualFixture> {
     match value.map(str::trim).map(str::to_ascii_lowercase).as_deref() {
         Some("app-settings") => Some(VisualFixture::AppSettings),
+        Some("app-settings-ui-open") => Some(VisualFixture::AppSettingsUiOpen),
         Some("logs-active") => Some(VisualFixture::LogsActive),
         Some("preview-crop") => Some(VisualFixture::PreviewCrop),
         Some("preview-ready") => Some(VisualFixture::PreviewReady),
@@ -292,6 +295,14 @@ mod tests {
             assert_eq!(
                 visual_fixture_from_env_value(Some("app-settings")),
                 Some(VisualFixture::AppSettings)
+            );
+        }
+
+        #[test]
+        fn app_settings_ui_open_value_enables_ui_scale_fixture() {
+            assert_eq!(
+                visual_fixture_from_env_value(Some("app-settings-ui-open")),
+                Some(VisualFixture::AppSettingsUiOpen)
             );
         }
 

@@ -1,7 +1,7 @@
 use super::{
     ClickEvent, Context, FluentBuilder, FrameRoot, InteractiveElement, MouseButton, ParentElement,
     Styled, Window, apply_accessible_checkbox, apply_accessible_checkbox_with_focus, assets,
-    button_mouse_down, color, div, icon_svg, input_highlight_shadows, px, theme,
+    button_mouse_down, color, div, icon_svg, input_highlight_shadows, theme,
 };
 use gpui::{FocusHandle, StatefulInteractiveElement};
 use std::rc::Rc;
@@ -20,12 +20,12 @@ pub(in crate::app) fn frame_checkbox_indicator(
 ) -> gpui::Div {
     let active = checked || indeterminate;
     let mut mark = div()
-        .w(px(FRAME_CHECKBOX_SIZE))
-        .h(px(FRAME_CHECKBOX_SIZE))
+        .w(theme::ui_rem(FRAME_CHECKBOX_SIZE))
+        .h(theme::ui_rem(FRAME_CHECKBOX_SIZE))
         .flex()
         .items_center()
         .justify_center()
-        .rounded(px(theme::RADIUS_XS))
+        .rounded(theme::ui_rem(theme::RADIUS_XS))
         .bg(if active {
             color(theme::FRAME_GRAY_400)
         } else {
@@ -35,9 +35,9 @@ pub(in crate::app) fn frame_checkbox_indicator(
     if indeterminate {
         mark = mark.child(
             div()
-                .w(px(FRAME_CHECKBOX_MARK_SIZE))
-                .h(px(2.0))
-                .rounded(px(theme::RADIUS_XS))
+                .w(theme::ui_rem(FRAME_CHECKBOX_MARK_SIZE))
+                .h(theme::ui_rem(2.0))
+                .rounded(theme::ui_rem(theme::RADIUS_XS))
                 .bg(color(theme::FOREGROUND)),
         );
     } else if checked {
@@ -49,13 +49,13 @@ pub(in crate::app) fn frame_checkbox_indicator(
     }
 
     div()
-        .w(px(FRAME_CHECKBOX_SIZE))
-        .h(px(FRAME_CHECKBOX_SIZE))
+        .w(theme::ui_rem(FRAME_CHECKBOX_SIZE))
+        .h(theme::ui_rem(FRAME_CHECKBOX_SIZE))
         .flex_shrink_0()
         .flex()
         .items_center()
         .justify_center()
-        .rounded(px(theme::RADIUS_XS))
+        .rounded(theme::ui_rem(theme::RADIUS_XS))
         .bg(color(theme::BACKGROUND))
         .opacity(if disabled { 0.5 } else { 1.0 })
         .shadow(input_highlight_shadows())
@@ -64,8 +64,8 @@ pub(in crate::app) fn frame_checkbox_indicator(
 
 pub(in crate::app) fn frame_selection_dot(is_selected: bool) -> gpui::Div {
     div()
-        .w(px(FRAME_SELECTION_DOT_SIZE))
-        .h(px(FRAME_SELECTION_DOT_SIZE))
+        .w(theme::ui_rem(FRAME_SELECTION_DOT_SIZE))
+        .h(theme::ui_rem(FRAME_SELECTION_DOT_SIZE))
         .flex_shrink_0()
         .flex()
         .items_center()
@@ -75,8 +75,8 @@ pub(in crate::app) fn frame_selection_dot(is_selected: bool) -> gpui::Div {
         .shadow(input_highlight_shadows())
         .child(
             div()
-                .w(px(FRAME_SELECTION_DOT_MARK_SIZE))
-                .h(px(FRAME_SELECTION_DOT_MARK_SIZE))
+                .w(theme::ui_rem(FRAME_SELECTION_DOT_MARK_SIZE))
+                .h(theme::ui_rem(FRAME_SELECTION_DOT_MARK_SIZE))
                 .rounded_full()
                 .bg(color(theme::FRAME_GRAY_600))
                 .opacity(if is_selected { 1.0 } else { 0.0 }),
@@ -138,7 +138,7 @@ fn frame_checkbox_row_inner(
     let indicator_action = Rc::clone(&action);
     let indicator = frame_checkbox_indicator(checked, false, disabled)
         .id(format!("{id}-indicator"))
-        .mt(px(FRAME_CHECKBOX_ROW_INDICATOR_OFFSET_Y))
+        .mt(theme::ui_rem(FRAME_CHECKBOX_ROW_INDICATOR_OFFSET_Y))
         .on_click(cx.listener(move |root, event: &ClickEvent, window, cx| {
             cx.stop_propagation();
             indicator_action(root, event, window, cx);
@@ -172,7 +172,7 @@ fn frame_checkbox_row_inner(
                 .when(has_hint, gpui::Styled::gap_1)
                 .child(
                     div()
-                        .text_size(px(theme::TEXT_LABEL_SIZE))
+                        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
                         .text_color(color(theme::FRAME_GRAY_600))
                         .child(display_label),
@@ -180,7 +180,7 @@ fn frame_checkbox_row_inner(
                 .when(has_hint, |this| {
                     this.child(
                         div()
-                            .text_size(px(theme::TEXT_LABEL_SIZE))
+                            .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                             .font_weight(theme::TEXT_WEIGHT_REGULAR)
                             .text_color(color(theme::FRAME_GRAY_600))
                             .child(hint),

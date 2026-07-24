@@ -18,7 +18,7 @@ struct SettingsVideoRangeDragPreview;
 
 impl Render for SettingsVideoRangeDragPreview {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        div().w(px(0.0)).h(px(0.0))
+        div().w(theme::ui_rem(0.0)).h(theme::ui_rem(0.0))
     }
 }
 
@@ -198,7 +198,7 @@ fn settings_custom_dimensions_grid(
         .grid()
         .grid_cols(2)
         .gap_2()
-        .pt(px(4.0))
+        .pt(theme::ui_rem(4.0))
         .child(
             div()
                 .flex()
@@ -559,7 +559,7 @@ fn settings_video_quality_section(
                 .flex()
                 .flex_col()
                 .gap_2()
-                .pt(px(4.0))
+                .pt(theme::ui_rem(4.0))
                 .child(settings_field_label("Target bitrate (kbps)"))
                 .child(frame_text_input(
                     FrameTextInputSpec {
@@ -630,7 +630,7 @@ fn settings_video_range_field(
         .flex()
         .flex_col()
         .gap_2()
-        .pt(px(4.0))
+        .pt(theme::ui_rem(4.0))
         .child(
             div()
                 .flex()
@@ -646,7 +646,7 @@ fn settings_video_range_field(
             div()
                 .flex()
                 .justify_between()
-                .text_size(px(theme::TEXT_LABEL_SIZE))
+                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .text_color(color(theme::FRAME_GRAY_600))
                 .child(theme::ui_text(lower_label))
                 .child(theme::ui_text(upper_label)),

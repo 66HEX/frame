@@ -5,7 +5,7 @@ use super::{
     Styled, Window, animated_button_colors, apply_accessible_button,
     apply_accessible_button_with_focus, apply_accessible_toggle_button, apply_button_motion,
     assets, button_colors, button_highlight_shadows, card_surface_shadows, color, div, icon_svg,
-    parse_hex, preview_visual_controls_enabled, px, relative, theme,
+    parse_hex, preview_visual_controls_enabled, relative, theme,
 };
 use gpui::FocusHandle;
 
@@ -41,14 +41,14 @@ pub(in crate::app) fn preview_toolbar(
     div()
         .absolute()
         .top(relative(0.5))
-        .mt(px(preview_toolbar_center_margin()))
-        .left(px(PREVIEW_TOOLBAR_OFFSET))
+        .mt(theme::ui_rem(preview_toolbar_center_margin()))
+        .left(theme::ui_rem(PREVIEW_TOOLBAR_OFFSET))
         .flex()
         .flex_col()
-        .gap(px(PREVIEW_TOOLBAR_GAP))
-        .rounded(px(theme::RADIUS_MD))
+        .gap(theme::ui_rem(PREVIEW_TOOLBAR_GAP))
+        .rounded(theme::ui_rem(theme::RADIUS_MD))
         .bg(parse_hex(PREVIEW_TOOLBAR_BACKGROUND))
-        .p(px(PREVIEW_TOOLBAR_PADDING))
+        .p(theme::ui_rem(PREVIEW_TOOLBAR_PADDING))
         .shadow(card_surface_shadows())
         .child(
             preview_tool_button(
@@ -143,13 +143,13 @@ pub(in crate::app) fn preview_zoom_toolbar(
 
     div()
         .absolute()
-        .right(px(PREVIEW_TOOLBAR_OFFSET))
-        .bottom(px(PREVIEW_TOOLBAR_OFFSET))
+        .right(theme::ui_rem(PREVIEW_TOOLBAR_OFFSET))
+        .bottom(theme::ui_rem(PREVIEW_TOOLBAR_OFFSET))
         .flex()
         .gap_2()
-        .rounded(px(theme::RADIUS_MD))
+        .rounded(theme::ui_rem(theme::RADIUS_MD))
         .bg(parse_hex(PREVIEW_TOOLBAR_BACKGROUND))
-        .p(px(4.0))
+        .p(theme::ui_rem(4.0))
         .shadow(card_surface_shadows())
         .child(
             preview_tool_button(
@@ -188,8 +188,8 @@ pub(in crate::app) fn preview_zoom_toolbar(
 pub(in crate::app) fn preview_toolbar_vertical_separator() -> gpui::Div {
     div()
         .flex_none()
-        .h(px(PREVIEW_TOOLBAR_VERTICAL_SEPARATOR_HEIGHT))
-        .w(px(PREVIEW_TOOLBAR_VERTICAL_SEPARATOR_WIDTH))
+        .h(theme::ui_rem(PREVIEW_TOOLBAR_VERTICAL_SEPARATOR_HEIGHT))
+        .w(theme::ui_rem(PREVIEW_TOOLBAR_VERTICAL_SEPARATOR_WIDTH))
         .bg(color(theme::FRAME_GRAY_200))
 }
 
@@ -251,12 +251,12 @@ fn preview_tool_button_inner(
 
     let button = div()
         .id(button_id)
-        .w(px(PREVIEW_TOOLBAR_BUTTON_SIZE))
-        .h(px(PREVIEW_TOOLBAR_BUTTON_SIZE))
+        .w(theme::ui_rem(PREVIEW_TOOLBAR_BUTTON_SIZE))
+        .h(theme::ui_rem(PREVIEW_TOOLBAR_BUTTON_SIZE))
         .flex()
         .items_center()
         .justify_center()
-        .rounded(px(theme::RADIUS_SM))
+        .rounded(theme::ui_rem(theme::RADIUS_SM))
         .bg(background)
         .text_color(foreground)
         .opacity(colors.opacity)

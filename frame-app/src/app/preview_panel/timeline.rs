@@ -10,7 +10,7 @@ pub(super) struct PreviewTimelineDragPreview;
 
 impl Render for PreviewTimelineDragPreview {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        div().w(px(0.0)).h(px(0.0))
+        div().w(theme::ui_rem(0.0)).h(theme::ui_rem(0.0))
     }
 }
 
@@ -93,7 +93,7 @@ pub(in crate::app) fn preview_timeline(
     let trim_enabled = preview_trim_enabled(state);
 
     div()
-        .mt(px(PREVIEW_TIMELINE_TOP_MARGIN))
+        .mt(theme::ui_rem(PREVIEW_TIMELINE_TOP_MARGIN))
         .px_2()
         .flex()
         .items_center()
@@ -145,7 +145,7 @@ pub(in crate::app) fn preview_timeline(
                 .flex_1()
                 .flex()
                 .flex_col()
-                .gap(px(6.0))
+                .gap(theme::ui_rem(6.0))
                 .child(preview_timeline_label("Trim"))
                 .child(preview_timeline_track(state, cx)),
         )
@@ -153,7 +153,7 @@ pub(in crate::app) fn preview_timeline(
             div()
                 .flex()
                 .flex_col()
-                .gap(px(6.0))
+                .gap(theme::ui_rem(6.0))
                 .child(preview_timeline_label(" "))
                 .child(preview_play_button(state, window, cx)),
         )
@@ -233,10 +233,10 @@ pub(in crate::app) fn preview_timecode_field(
     } else {
         div()
             .w_full()
-            .h(px(PREVIEW_TIMELINE_CONTROL_HEIGHT))
+            .h(theme::ui_rem(PREVIEW_TIMELINE_CONTROL_HEIGHT))
             .flex()
             .items_center()
-            .text_size(px(theme::TEXT_LABEL_SIZE))
+            .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
             .text_color(color(theme::FOREGROUND))
             .font_features(assets::frame_tabular_number_font_features())
             .child(value)
@@ -246,20 +246,20 @@ pub(in crate::app) fn preview_timecode_field(
     div()
         .flex()
         .flex_col()
-        .gap(px(6.0))
+        .gap(theme::ui_rem(6.0))
         .child(preview_timeline_label(label))
         .child(
             div()
-                .w(px(width))
-                .h(px(PREVIEW_TIMELINE_CONTROL_HEIGHT))
+                .w(theme::ui_rem(width))
+                .h(theme::ui_rem(PREVIEW_TIMELINE_CONTROL_HEIGHT))
                 .child(field),
         )
 }
 
 pub(in crate::app) fn preview_timeline_label(label: &'static str) -> gpui::Div {
     div()
-        .h(px(12.0))
-        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .h(theme::ui_rem(12.0))
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(color(theme::FRAME_GRAY_600))
         .child(theme::ui_text(label))
@@ -297,9 +297,9 @@ pub(in crate::app) fn preview_timeline_track(
     let track = div()
         .id("preview-timeline-track")
         .relative()
-        .h(px(PREVIEW_TIMELINE_CONTROL_HEIGHT))
+        .h(theme::ui_rem(PREVIEW_TIMELINE_CONTROL_HEIGHT))
         .w_full()
-        .rounded(px(theme::RADIUS_SM))
+        .rounded(theme::ui_rem(theme::RADIUS_SM))
         .opacity(if enabled { 1.0 } else { 0.5 })
         .when(enabled, gpui::Styled::cursor_pointer)
         .on_mouse_down(
@@ -388,9 +388,9 @@ pub(in crate::app) fn preview_timeline_track(
             .absolute()
             .left_0()
             .right_0()
-            .top(px(track_top))
-            .h(px(PREVIEW_TRACK_HEIGHT))
-            .rounded(px(1.5))
+            .top(theme::ui_rem(track_top))
+            .h(theme::ui_rem(PREVIEW_TRACK_HEIGHT))
+            .rounded(theme::ui_rem(1.5))
             .bg(color(theme::FRAME_GRAY_100)),
     )
     .child(
@@ -398,9 +398,9 @@ pub(in crate::app) fn preview_timeline_track(
             .absolute()
             .left(relative(start_fraction))
             .right(relative((1.0 - end_fraction).max(0.0)))
-            .top(px(track_top))
-            .h(px(PREVIEW_TRACK_HEIGHT))
-            .rounded(px(1.0))
+            .top(theme::ui_rem(track_top))
+            .h(theme::ui_rem(PREVIEW_TRACK_HEIGHT))
+            .rounded(theme::ui_rem(1.0))
             .bg(color(theme::FOREGROUND)),
     )
     .child(PreviewTimelineTrackBoundsProbe { owner: cx.entity() })
@@ -409,8 +409,8 @@ pub(in crate::app) fn preview_timeline_track(
             .absolute()
             .left(relative(playhead_fraction))
             .ml(px(-0.5))
-            .top(px(playhead_top))
-            .h(px(PREVIEW_PLAYHEAD_HEIGHT))
+            .top(theme::ui_rem(playhead_top))
+            .h(theme::ui_rem(PREVIEW_PLAYHEAD_HEIGHT))
             .w(px(1.0))
             .bg(color(theme::FOREGROUND)),
     )
@@ -451,10 +451,10 @@ pub(in crate::app) fn preview_timeline_handle(
         .absolute()
         .top_0()
         .left(relative(fraction))
-        .ml(px(-(PREVIEW_TIMELINE_HANDLE_WIDTH / 2.0)))
-        .h(px(PREVIEW_TIMELINE_CONTROL_HEIGHT))
-        .w(px(PREVIEW_TIMELINE_HANDLE_WIDTH))
-        .rounded(px(theme::RADIUS_SM))
+        .ml(theme::ui_rem(-(PREVIEW_TIMELINE_HANDLE_WIDTH / 2.0)))
+        .h(theme::ui_rem(PREVIEW_TIMELINE_CONTROL_HEIGHT))
+        .w(theme::ui_rem(PREVIEW_TIMELINE_HANDLE_WIDTH))
+        .rounded(theme::ui_rem(theme::RADIUS_SM))
         .on_mouse_down(MouseButton::Left, |_event, _window, cx| {
             cx.stop_propagation();
         })

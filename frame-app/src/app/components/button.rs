@@ -127,14 +127,14 @@ fn frame_text_button_inner(
     let motion = animated.motion;
     let button = div()
         .id(id)
-        .h(px(SETTINGS_CONTROL_HEIGHT))
+        .min_h(theme::ui_rem(SETTINGS_CONTROL_HEIGHT))
         .flex()
         .items_center()
         .justify_center()
-        .rounded(px(theme::RADIUS_SM))
-        .px(px(10.0))
+        .rounded(theme::ui_rem(theme::RADIUS_SM))
+        .px(theme::ui_rem(10.0))
         .bg(background)
-        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
         .opacity(colors.opacity)
@@ -293,12 +293,12 @@ fn frame_icon_button_inner(
     let button = div()
         .id(id.clone())
         .group(id)
-        .w(px(size.button))
-        .h(px(size.button))
+        .w(theme::ui_rem(size.button))
+        .h(theme::ui_rem(size.button))
         .flex()
         .items_center()
         .justify_center()
-        .rounded(px(theme::RADIUS_SM))
+        .rounded(theme::ui_rem(theme::RADIUS_SM))
         .bg(animated_background)
         .text_color(animated_foreground)
         .opacity(opacity)
@@ -319,7 +319,10 @@ fn frame_icon_button_content(
     icon_size: f32,
     icon_color: Rgba,
 ) -> gpui::Div {
-    let container = div().relative().w(px(icon_size)).h(px(icon_size));
+    let container = div()
+        .relative()
+        .w(theme::ui_rem(icon_size))
+        .h(theme::ui_rem(icon_size));
     match content {
         FrameIconButtonContent::Static(icon) => {
             container.child(icon_svg(icon, icon_size, icon_color))
@@ -345,8 +348,8 @@ fn contextual_icon_svg(icon: &'static str, progress: f32, icon_size: f32, icon_c
         .absolute()
         .inset_0()
         .path(icon)
-        .w(px(icon_size))
-        .h(px(icon_size))
+        .w(theme::ui_rem(icon_size))
+        .h(theme::ui_rem(icon_size))
         .text_color(icon_color)
         .opacity(visuals.opacity)
         .blur(px(visuals.blur_radius))

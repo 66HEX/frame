@@ -107,7 +107,7 @@ struct SettingsAudioRangeDragPreview;
 
 impl Render for SettingsAudioRangeDragPreview {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        div().w(px(0.0)).h(px(0.0))
+        div().w(theme::ui_rem(0.0)).h(theme::ui_rem(0.0))
     }
 }
 
@@ -288,7 +288,7 @@ fn settings_audio_range_field(
             div()
                 .flex()
                 .justify_between()
-                .text_size(px(theme::TEXT_LABEL_SIZE))
+                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .text_color(color(theme::FRAME_GRAY_600))
                 .child(theme::ui_text(spec.lower_label))
                 .child(theme::ui_text(spec.upper_label)),

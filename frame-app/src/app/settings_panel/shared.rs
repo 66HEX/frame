@@ -1,11 +1,11 @@
 use super::{
-    ParentElement, SettingsTab, Styled, assets, button_highlight_shadows, color, div, px, theme,
+    ParentElement, SettingsTab, Styled, assets, button_highlight_shadows, color, div, theme,
 };
 use crate::numeric::{rounded_f64_to_u32, u32_to_f32};
 
 pub(in crate::app) fn settings_field_label(label: &'static str) -> gpui::Div {
     div()
-        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(color(theme::FRAME_GRAY_600))
         .child(theme::ui_text(label))
@@ -13,13 +13,13 @@ pub(in crate::app) fn settings_field_label(label: &'static str) -> gpui::Div {
 
 pub(in crate::app) fn settings_value_badge(value: String) -> gpui::Div {
     div()
-        .h(px(18.0))
+        .min_h(theme::ui_rem(18.0))
         .flex()
         .items_center()
-        .rounded(px(theme::RADIUS_SM))
+        .rounded(theme::ui_rem(theme::RADIUS_SM))
         .bg(color(theme::FRAME_GRAY_400))
-        .px(px(6.0))
-        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .px(theme::ui_rem(6.0))
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(color(theme::FOREGROUND))
         .font_features(assets::frame_tabular_number_font_features())
@@ -29,7 +29,7 @@ pub(in crate::app) fn settings_value_badge(value: String) -> gpui::Div {
 
 pub(in crate::app) fn settings_hint_text(text: &'static str) -> gpui::Div {
     div()
-        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .text_color(color(theme::FRAME_GRAY_600))
         .child(theme::ui_text(text))
 }
