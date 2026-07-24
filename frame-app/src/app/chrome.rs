@@ -16,14 +16,14 @@ use super::settings_panel::{settings_hint_text, settings_section};
 use super::{
     ActiveView, ClickEvent, Context, ExternalPaths, FILE_LIST_ACTION_ICON_SIZE, FRAME_APP_VERSION,
     FluentBuilder, FocusHandle, FrameAppState, FrameRoot, FrameTextInputKind, InteractiveElement,
-    IntoElement, LEFT_COLUMN_SPAN, PANEL_HEADER_HEIGHT, ParentElement, RIGHT_COLUMN_SPAN,
-    SETTINGS_CONTROL_HEIGHT, SURFACE_MOTION_DURATION, ScrollHandle, StatefulInteractiveElement,
-    Styled, TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_DIVIDER_HEIGHT, TITLEBAR_HEIGHT,
-    TITLEBAR_ICON_SIZE, TITLEBAR_LINUX_WINDOW_BUTTON_SIZE, TITLEBAR_LINUX_WINDOW_CONTROLS_GAP,
-    TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X, TITLEBAR_LOGO_SIZE,
-    TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_PLACEHOLDER_WIDTH, TITLEBAR_NAV_BUTTON_HEIGHT,
-    TITLEBAR_PLATFORM_DIVIDER_HEIGHT, TITLEBAR_SEGMENT_HEIGHT, TITLEBAR_TOP_PADDING,
-    TITLEBAR_TRAFFIC_LIGHT_SIZE, TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
+    IntoElement, LEFT_COLUMN_SPAN, MouseButton, PANEL_HEADER_HEIGHT, ParentElement,
+    RIGHT_COLUMN_SPAN, SETTINGS_CONTROL_HEIGHT, SURFACE_MOTION_DURATION, ScrollHandle,
+    StatefulInteractiveElement, Styled, TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_DIVIDER_HEIGHT,
+    TITLEBAR_HEIGHT, TITLEBAR_ICON_SIZE, TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
+    TITLEBAR_LINUX_WINDOW_CONTROLS_GAP, TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X,
+    TITLEBAR_LOGO_SIZE, TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_PLACEHOLDER_WIDTH,
+    TITLEBAR_NAV_BUTTON_HEIGHT, TITLEBAR_PLATFORM_DIVIDER_HEIGHT, TITLEBAR_SEGMENT_HEIGHT,
+    TITLEBAR_TOP_PADDING, TITLEBAR_TRAFFIC_LIGHT_SIZE, TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
     TITLEBAR_WINDOWS_WINDOW_ICON_SIZE, TITLEBAR_WINDOWS_WINDOW_MAX_ICON_SIZE,
     UPDATE_INSTALL_WAIT_MESSAGE, UpdateInfo, UpdateStatus, WORKSPACE_COLUMNS, WORKSPACE_GAP,
     Window, WindowControlArea, assets, div, ease_in_out, format_total_size, mix_color,
@@ -87,7 +87,7 @@ pub(super) fn macos_titlebar(
 ) -> gpui::Div {
     let show_workspace_controls = titlebar_shows_workspace_controls(state);
 
-    titlebar_drag_surface()
+    titlebar_drag_surface(cx)
         .h(px(TITLEBAR_HEIGHT))
         .w_full()
         .flex()
@@ -130,7 +130,7 @@ pub(super) fn windows_titlebar(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    titlebar_drag_surface()
+    titlebar_drag_surface(cx)
         .relative()
         .h(px(TITLEBAR_HEIGHT))
         .w_full()
@@ -145,7 +145,7 @@ pub(super) fn linux_titlebar(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    titlebar_drag_surface()
+    titlebar_drag_surface(cx)
         .relative()
         .h(px(TITLEBAR_HEIGHT))
         .w_full()
@@ -155,10 +155,30 @@ pub(super) fn linux_titlebar(
         .child(linux_window_controls(window, cx))
 }
 
-fn titlebar_drag_surface() -> gpui::Div {
-    // The root view has a full-window focus hitbox for keyboard navigation.
-    // Keep it out of titlebar mouse dispatch so it cannot prevent native window moves.
-    div().window_control_area(WindowControlArea::Drag).occlude()
+fn titlebar_drag_surface(cx: &Context<FrameRoot>) -> gpui::Div {
+    div()
+        .window_control_area(WindowControlArea::Drag)
+        .on_mouse_down_out(cx.listener(|root, _event, _window, _cx| {
+            root.titlebar_drag.should_move = false;
+        }))
+        .on_mouse_up(
+            MouseButton::Left,
+            cx.listener(|root, _event, _window, _cx| {
+                root.titlebar_drag.should_move = false;
+            }),
+        )
+        .on_mouse_down(
+            MouseButton::Left,
+            cx.listener(|root, _event, _window, _cx| {
+                root.titlebar_drag.should_move = true;
+            }),
+        )
+        .on_mouse_move(cx.listener(|root, _event, window, _cx| {
+            if root.titlebar_drag.should_move {
+                root.titlebar_drag.should_move = false;
+                window.start_window_move();
+            }
+        }))
 }
 
 pub(super) fn platform_titlebar_content(
@@ -1631,6 +1651,7 @@ pub(super) fn windows_window_controls(
         .h_full()
         .flex()
         .items_center()
+        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
         .child(
             titlebar_window_button(
                 "titlebar-windows-minimize",
@@ -1706,6 +1727,7 @@ pub(super) fn linux_window_controls(window: &mut Window, cx: &mut Context<FrameR
         .items_center()
         .gap(px(TITLEBAR_LINUX_WINDOW_CONTROLS_GAP))
         .px(px(TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X))
+        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
         .child(
             titlebar_window_button(
                 "titlebar-linux-minimize",
@@ -1825,6 +1847,7 @@ pub(super) fn titlebar_window_button(
         .text_color(icon_color)
         .hover(gpui::Styled::cursor_pointer)
         .active(move |style| style.bg(color(active_background)))
+        .on_mouse_move(|_, _, cx| cx.stop_propagation())
         .child(icon_svg(icon, metrics.icon_size, icon_color));
     let button = apply_button_motion(button, motion, true);
 

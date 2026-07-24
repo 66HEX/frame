@@ -1985,8 +1985,7 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                                 first_mouse: state.enter_token.take().is_some(),
                             });
                             drop(state);
-                            let result = window.handle_input(input);
-                            window.handle_window_control_mouse_down(button, serial, result);
+                            window.handle_input(input);
                         }
                     }
                     wl_pointer::ButtonState::Released => {

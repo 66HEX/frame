@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Linux Titlebar Dragging:** Replaced GPUI-CE's immediate mouse-down window move with Zed's titlebar drag sequence, starting native X11 and Wayland moves only after pointer motion and isolating window controls from drag events. This prevents clicks on empty titlebar space from crashing affected Linux sessions. Resolves [#63](https://github.com/66HEX/frame/issues/63) and [#110](https://github.com/66HEX/frame/issues/110).
 - **Updater Package Size Validation:** Enforced the signed manifest size before and during package downloads, revalidated cached packages, and removed rejected partial files so oversized or truncated update payloads are never installed or retained. Resolves [#83](https://github.com/66HEX/frame/issues/83).
 - **Rounded Timecode Boundaries:** Carried millisecond rounding across second, minute, and hour boundaries so values just below a boundary, such as `59.9999` seconds, render as `00:01:00.000` instead of producing an invalid timecode.
 - **Timecode Trim Editing:** Reworked preview in/out fields as fixed `HH:MM:SS.mmm` masks with separator-skipping cursor navigation, draft-only editing, formatted paste support, Escape cancellation, and silent normalization and clamping only on Enter or focus loss, preventing partial input from being recalculated prematurely. Resolves [#74](https://github.com/66HEX/frame/issues/74).

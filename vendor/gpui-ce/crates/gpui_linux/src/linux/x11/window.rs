@@ -2,14 +2,12 @@ use anyhow::{Context as _, anyhow};
 use x11rb::connection::RequestConnection;
 
 use crate::linux::X11ClientStatePtr;
-use crate::linux::window_controls::should_start_window_move;
 use gpui::{
     AnyWindowHandle, Bounds, ClientSideFrameOptions, Decorations, DevicePixels,
-    DispatchEventResult, ForegroundExecutor, GpuSpecs, Modifiers, MouseButton, Pixels,
-    PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow, Point,
-    PromptButton, PromptLevel, RequestFrameOptions, ResizeEdge, ScaledPixels, Scene, Size, Tiling,
-    WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControlArea,
-    WindowDecorations, WindowKind, WindowParams, px,
+    ForegroundExecutor, GpuSpecs, Modifiers, Pixels, PlatformAtlas, PlatformDisplay, PlatformInput,
+    PlatformInputHandler, PlatformWindow, Point, PromptButton, PromptLevel, RequestFrameOptions,
+    ResizeEdge, ScaledPixels, Scene, Size, Tiling, WindowAppearance, WindowBackgroundAppearance,
+    WindowBounds, WindowControlArea, WindowDecorations, WindowKind, WindowParams, px,
 };
 use gpui_wgpu::{CompositorGpuHint, WgpuRenderer, WgpuSurfaceConfig};
 
@@ -246,7 +244,6 @@ unsafe impl Sync for RawWindow {}
 pub struct Callbacks {
     request_frame: Option<Box<dyn FnMut(RequestFrameOptions)>>,
     input: Option<Box<dyn FnMut(PlatformInput) -> gpui::DispatchEventResult>>,
-    hit_test_window_control: Option<Box<dyn FnMut() -> Option<WindowControlArea>>>,
     active_status_change: Option<Box<dyn FnMut(bool)>>,
     hovered_status_change: Option<Box<dyn FnMut(bool)>>,
     resize: Option<Box<dyn FnMut(Size<Pixels>, f32)>>,
@@ -284,7 +281,6 @@ pub struct X11WindowState {
     hovered: bool,
     pub(crate) force_render_after_recovery: bool,
     fullscreen: bool,
-    is_movable: bool,
     client_side_decorations_supported: bool,
     decorations: WindowDecorations,
     edge_constraints: Option<EdgeConstraints>,
@@ -825,7 +821,6 @@ impl X11WindowState {
                 hovered: false,
                 force_render_after_recovery: false,
                 fullscreen: false,
-                is_movable: params.is_movable,
                 maximized_vertical: false,
                 maximized_horizontal: false,
                 hidden: false,
@@ -1174,79 +1169,31 @@ impl X11WindowStatePtr {
         }
     }
 
-    pub fn handle_input(&self, input: PlatformInput) -> DispatchEventResult {
+    pub fn handle_input(&self, input: PlatformInput) {
         if self.is_blocked() {
-            return DispatchEventResult::default();
-        }
-        let key_down = match &input {
-            PlatformInput::KeyDown(event) => Some(event.clone()),
-            _ => None,
-        };
-        let callback = self.callbacks.borrow_mut().input.take();
-        if let Some(mut fun) = callback {
-            let result = fun(input);
-            self.callbacks.borrow_mut().input = Some(fun);
-            if !result.propagate {
-                return result;
-            }
-
-            if let Some(event) = key_down {
-                // only allow shift modifier when inserting text
-                if event.keystroke.modifiers.is_subset_of(&Modifiers::shift()) {
-                    let mut state = self.state.borrow_mut();
-                    if let Some(mut input_handler) = state.input_handler.take() {
-                        if let Some(key_char) = &event.keystroke.key_char {
-                            drop(state);
-                            input_handler.replace_text_in_range(None, key_char);
-                            state = self.state.borrow_mut();
-                        }
-                        state.input_handler = Some(input_handler);
-                    }
-                }
-            }
-
-            result
-        } else {
-            DispatchEventResult::default()
-        }
-    }
-
-    fn hit_test_window_control(&self) -> Option<WindowControlArea> {
-        let callback = self.callbacks.borrow_mut().hit_test_window_control.take();
-        if let Some(mut callback) = callback {
-            let area = callback();
-            self.callbacks
-                .borrow_mut()
-                .hit_test_window_control
-                .replace(callback);
-            area
-        } else {
-            None
-        }
-    }
-
-    pub fn handle_window_control_mouse_down(
-        &self,
-        button: MouseButton,
-        result: DispatchEventResult,
-    ) {
-        let (is_movable, is_fullscreen) = {
-            let state = self.state.borrow();
-            (state.is_movable, state.fullscreen)
-        };
-        if !should_start_window_move(
-            button,
-            result.clone(),
-            Some(WindowControlArea::Drag),
-            is_movable,
-            is_fullscreen,
-        ) {
             return;
         }
-
-        let area = self.hit_test_window_control();
-        if should_start_window_move(button, result, area, is_movable, is_fullscreen) {
-            X11Window(self.clone()).start_window_move();
+        let callback = self.callbacks.borrow_mut().input.take();
+        if let Some(mut fun) = callback {
+            let result = fun(input.clone());
+            self.callbacks.borrow_mut().input = Some(fun);
+            if !result.propagate {
+                return;
+            }
+        }
+        if let PlatformInput::KeyDown(event) = input {
+            // only allow shift modifier when inserting text
+            if event.keystroke.modifiers.is_subset_of(&Modifiers::shift()) {
+                let mut state = self.state.borrow_mut();
+                if let Some(mut input_handler) = state.input_handler.take() {
+                    if let Some(key_char) = &event.keystroke.key_char {
+                        drop(state);
+                        input_handler.replace_text_in_range(None, key_char);
+                        state = self.state.borrow_mut();
+                    }
+                    state.input_handler = Some(input_handler);
+                }
+            }
         }
     }
 
@@ -1739,9 +1686,7 @@ impl PlatformWindow for X11Window {
         self.0.callbacks.borrow_mut().close = Some(callback);
     }
 
-    fn on_hit_test_window_control(&self, callback: Box<dyn FnMut() -> Option<WindowControlArea>>) {
-        self.0.callbacks.borrow_mut().hit_test_window_control = Some(callback);
-    }
+    fn on_hit_test_window_control(&self, _callback: Box<dyn FnMut() -> Option<WindowControlArea>>) {}
 
     fn on_appearance_changed(&self, callback: Box<dyn FnMut()>) {
         self.0.callbacks.borrow_mut().appearance_changed = Some(callback);

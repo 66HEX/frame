@@ -28,15 +28,14 @@ use wayland_protocols_plasma::blur::client::org_kde_kwin_blur;
 use wayland_protocols_wlr::layer_shell::v1::client::zwlr_layer_surface_v1;
 
 use crate::linux::wayland::{display::WaylandDisplay, serial::SerialKind};
-use crate::linux::window_controls::should_start_window_move;
 use crate::linux::{Globals, Output, WaylandClientStatePtr, get_window};
 use gpui::{
     AnyWindowHandle, Bounds, Capslock, ClientSideFrameOptions, Decorations, DevicePixels,
-    DispatchEventResult, GpuSpecs, Modifiers, MouseButton, Pixels, PlatformAtlas, PlatformDisplay,
-    PlatformInput, PlatformInputHandler, PlatformWindow, Point, PromptButton, PromptLevel,
-    RequestFrameOptions, ResizeEdge, ScaledPixels, Scene, Size, Tiling, WindowAppearance,
-    WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowControls, WindowDecorations,
-    WindowKind, WindowParams, layer_shell::LayerShellNotSupportedError, px, size,
+    GpuSpecs, Modifiers, Pixels, PlatformAtlas, PlatformDisplay, PlatformInput,
+    PlatformInputHandler, PlatformWindow, Point, PromptButton, PromptLevel, RequestFrameOptions,
+    ResizeEdge, ScaledPixels, Scene, Size, Tiling, WindowAppearance, WindowBackgroundAppearance,
+    WindowBounds, WindowControlArea, WindowControls, WindowDecorations, WindowKind, WindowParams,
+    layer_shell::LayerShellNotSupportedError, px, size,
 };
 use gpui_wgpu::{CompositorGpuHint, WgpuRenderer, WgpuSurfaceConfig, wgpu};
 
@@ -44,7 +43,6 @@ use gpui_wgpu::{CompositorGpuHint, WgpuRenderer, WgpuSurfaceConfig, wgpu};
 pub(crate) struct Callbacks {
     request_frame: Option<Box<dyn FnMut(RequestFrameOptions)>>,
     input: Option<Box<dyn FnMut(gpui::PlatformInput) -> gpui::DispatchEventResult>>,
-    hit_test_window_control: Option<Box<dyn FnMut() -> Option<WindowControlArea>>>,
     active_status_change: Option<Box<dyn FnMut(bool)>>,
     hover_status_change: Option<Box<dyn FnMut(bool)>>,
     resize: Option<Box<dyn FnMut(Size<Pixels>, f32)>>,
@@ -112,7 +110,6 @@ pub struct WaylandWindowState {
     background_appearance: WindowBackgroundAppearance,
     client_side_frame: Option<ClientSideFrameOptions>,
     fullscreen: bool,
-    is_movable: bool,
     maximized: bool,
     tiling: Tiling,
     window_bounds: Bounds<Pixels>,
@@ -404,7 +401,6 @@ impl WaylandWindowState {
             background_appearance: WindowBackgroundAppearance::Opaque,
             client_side_frame: options.client_side_frame,
             fullscreen: false,
-            is_movable: options.is_movable,
             maximized: false,
             tiling: Tiling::default(),
             window_bounds: options.bounds,
@@ -1059,84 +1055,27 @@ impl WaylandWindowStatePtr {
         }
     }
 
-    pub fn handle_input(&self, input: PlatformInput) -> DispatchEventResult {
+    pub fn handle_input(&self, input: PlatformInput) {
         if self.is_blocked() {
-            return DispatchEventResult::default();
-        }
-        let key_down = match &input {
-            PlatformInput::KeyDown(event) => Some(event.clone()),
-            _ => None,
-        };
-        let callback = self.callbacks.borrow_mut().input.take();
-        if let Some(mut fun) = callback {
-            let result = fun(input);
-            self.callbacks.borrow_mut().input = Some(fun);
-            if !result.propagate {
-                return result;
-            }
-
-            if let Some(event) = key_down
-                && event.keystroke.modifiers.is_subset_of(&Modifiers::shift())
-                && let Some(key_char) = &event.keystroke.key_char
-            {
-                let mut state = self.state.borrow_mut();
-                if let Some(mut input_handler) = state.input_handler.take() {
-                    drop(state);
-                    input_handler.replace_text_in_range(None, key_char);
-                    self.state.borrow_mut().input_handler = Some(input_handler);
-                }
-            }
-
-            result
-        } else {
-            DispatchEventResult::default()
-        }
-    }
-
-    fn hit_test_window_control(&self) -> Option<WindowControlArea> {
-        let callback = self.callbacks.borrow_mut().hit_test_window_control.take();
-        if let Some(mut callback) = callback {
-            let area = callback();
-            self.callbacks
-                .borrow_mut()
-                .hit_test_window_control
-                .replace(callback);
-            area
-        } else {
-            None
-        }
-    }
-
-    pub fn handle_window_control_mouse_down(
-        &self,
-        button: MouseButton,
-        serial: u32,
-        result: DispatchEventResult,
-    ) {
-        let (is_movable, is_fullscreen) = {
-            let state = self.state.borrow();
-            (state.is_movable, state.fullscreen)
-        };
-        if !should_start_window_move(
-            button,
-            result.clone(),
-            Some(WindowControlArea::Drag),
-            is_movable,
-            is_fullscreen,
-        ) {
             return;
         }
-
-        let area = self.hit_test_window_control();
-        if should_start_window_move(button, result, area, is_movable, is_fullscreen) {
-            if serial == 0 {
-                log::trace!("Wayland window move skipped because mouse press serial is 0");
+        let callback = self.callbacks.borrow_mut().input.take();
+        if let Some(mut fun) = callback {
+            let result = fun(input.clone());
+            self.callbacks.borrow_mut().input = Some(fun);
+            if !result.propagate {
                 return;
             }
-
-            let state = self.state.borrow();
-            if let Some(toplevel) = state.surface_state.toplevel() {
-                toplevel._move(&state.globals.seat, serial);
+        }
+        if let PlatformInput::KeyDown(event) = input
+            && event.keystroke.modifiers.is_subset_of(&Modifiers::shift())
+            && let Some(key_char) = &event.keystroke.key_char
+        {
+            let mut state = self.state.borrow_mut();
+            if let Some(mut input_handler) = state.input_handler.take() {
+                drop(state);
+                input_handler.replace_text_in_range(None, key_char);
+                self.state.borrow_mut().input_handler = Some(input_handler);
             }
         }
     }
@@ -1469,9 +1408,7 @@ impl PlatformWindow for WaylandWindow {
         self.0.callbacks.borrow_mut().close = Some(callback);
     }
 
-    fn on_hit_test_window_control(&self, callback: Box<dyn FnMut() -> Option<WindowControlArea>>) {
-        self.0.callbacks.borrow_mut().hit_test_window_control = Some(callback);
-    }
+    fn on_hit_test_window_control(&self, _callback: Box<dyn FnMut() -> Option<WindowControlArea>>) {}
 
     fn on_appearance_changed(&self, callback: Box<dyn FnMut()>) {
         self.0.callbacks.borrow_mut().appearance_changed = Some(callback);
@@ -1546,10 +1483,6 @@ impl PlatformWindow for WaylandWindow {
     fn start_window_move(&self) {
         let state = self.borrow();
         let serial = state.client.get_serial(SerialKind::MousePress);
-        if serial == 0 {
-            log::trace!("Wayland window move skipped because mouse press serial is 0");
-            return;
-        }
         if let Some(toplevel) = state.surface_state.toplevel() {
             toplevel._move(&state.globals.seat, serial);
         }
