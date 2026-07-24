@@ -104,6 +104,24 @@ pub fn frame_window_options(bounds: Bounds<Pixels>) -> WindowOptions {
     }
 }
 
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
+fn frame_window_icon() -> Option<std::sync::Arc<image::RgbaImage>> {
+    use std::{io::Cursor, sync::LazyLock};
+
+    static APP_ICON: LazyLock<Option<std::sync::Arc<image::RgbaImage>>> = LazyLock::new(|| {
+        const BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/app_icon.png"));
+        image::ImageReader::new(Cursor::new(BYTES))
+            .with_guessed_format()
+            .ok()?
+            .decode()
+            .ok()
+            .map(image::DynamicImage::into_rgba8)
+            .map(std::sync::Arc::new)
+    });
+
+    APP_ICON.as_ref().cloned()
+}
+
 #[cfg(test)]
 mod ui_scale_keybinding_tests {
     use gpui::Keystroke;
@@ -134,22 +152,4 @@ mod ui_scale_keybinding_tests {
         #[cfg(not(target_os = "macos"))]
         assert!(keystroke.modifiers.control && !keystroke.modifiers.platform);
     }
-}
-
-#[cfg(any(target_os = "linux", target_os = "freebsd"))]
-fn frame_window_icon() -> Option<std::sync::Arc<image::RgbaImage>> {
-    use std::{io::Cursor, sync::LazyLock};
-
-    static APP_ICON: LazyLock<Option<std::sync::Arc<image::RgbaImage>>> = LazyLock::new(|| {
-        const BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/app_icon.png"));
-        image::ImageReader::new(Cursor::new(BYTES))
-            .with_guessed_format()
-            .ok()?
-            .decode()
-            .ok()
-            .map(image::DynamicImage::into_rgba8)
-            .map(std::sync::Arc::new)
-    });
-
-    APP_ICON.as_ref().cloned()
 }
