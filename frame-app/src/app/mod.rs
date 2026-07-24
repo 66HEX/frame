@@ -246,8 +246,14 @@ const TRIM_PREVIEW_SEEK_EPSILON_SECONDS: f64 = 1.0 / 240.0;
 const UPDATE_INSTALL_WAIT_MESSAGE: &str =
     "Finish or cancel active conversions before installing the update.";
 
+#[derive(Default)]
+struct TitlebarDragState {
+    should_move: bool,
+}
+
 pub struct FrameRoot {
     active_view: ActiveView,
+    titlebar_drag: TitlebarDragState,
     focus_registry: FrameFocusRegistry,
     file_queue: FileQueue,
     conversion_events: ConversionEventState,
