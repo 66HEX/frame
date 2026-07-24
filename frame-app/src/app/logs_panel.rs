@@ -13,7 +13,7 @@ use super::{
     LOG_SCROLL_BUTTON_OFFSET, LOG_SCROLL_BUTTON_PADDING, LOG_SCROLL_BUTTON_SIZE,
     LOG_SCROLL_ICON_SIZE, Lerp, LogLine, PANEL_HEADER_HEIGHT, ParentElement, ScrollStrategy,
     ScrollWheelEvent, StatefulInteractiveElement, Styled, UniformListScrollHandle, Window, assets,
-    div, px, theme, uniform_list,
+    div, theme, uniform_list,
 };
 use crate::numeric::usize_to_f32;
 
@@ -94,14 +94,14 @@ pub(super) fn logs_tab_strip(
     if active_files.is_empty() {
         tabs = tabs.child(
             div()
-                .text_size(px(theme::TEXT_LABEL_SIZE))
+                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .text_color(color(theme::FRAME_GRAY_600))
                 .child(theme::ui_text("No active processes")),
         );
     }
 
     let header = div()
-        .h(px(PANEL_HEADER_HEIGHT))
+        .h(theme::ui_rem(PANEL_HEADER_HEIGHT))
         .w_full()
         .relative()
         .flex()
@@ -149,7 +149,7 @@ pub(super) fn log_tab_button(
         .tab_stop(true)
         .focus_visible(focus_visible_ring)
         .flex_none()
-        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
         .hover(gpui::Styled::cursor_pointer)
@@ -249,9 +249,9 @@ pub(super) fn log_lines_list(
         cx.notify();
     }))
     .size_full()
-    .p(px(2.0))
+    .p(theme::ui_rem(2.0))
     .text_color(color(theme::FOREGROUND))
-    .line_height(px(LOG_LINE_HEIGHT));
+    .line_height(theme::ui_rem(LOG_LINE_HEIGHT));
 
     div()
         .relative()
@@ -367,21 +367,21 @@ pub(super) fn log_line_row(line: LogLine) -> impl IntoElement {
     div()
         .id(row_group.clone())
         .group(row_group.clone())
-        .h(px(LOG_LINE_HEIGHT))
+        .min_h(theme::ui_rem(LOG_LINE_HEIGHT))
         .w_full()
         .flex()
         .items_center()
-        .rounded(px(theme::RADIUS_XS))
+        .rounded(theme::ui_rem(theme::RADIUS_XS))
         .overflow_hidden()
         .px_1()
-        .text_size(px(theme::TEXT_LABEL_SIZE))
-        .line_height(px(LOG_LINE_HEIGHT))
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
+        .line_height(theme::ui_rem(LOG_LINE_HEIGHT))
         .hover(|style| style.bg(color(theme::FRAME_GRAY_100)))
         .child(
             div()
                 .flex_none()
-                .w(px(LOG_LINE_NUMBER_WIDTH))
-                .mr(px(12.0))
+                .w(theme::ui_rem(LOG_LINE_NUMBER_WIDTH))
+                .mr(theme::ui_rem(12.0))
                 .text_right()
                 .text_color(color(theme::FRAME_GRAY_400))
                 .font_features(assets::frame_tabular_number_font_features())
@@ -409,11 +409,11 @@ pub(super) fn log_scroll_to_bottom_button(
 ) -> impl IntoElement {
     div()
         .absolute()
-        .right(px(LOG_SCROLL_BUTTON_OFFSET))
-        .bottom(px(LOG_SCROLL_BUTTON_OFFSET))
-        .rounded(px(theme::RADIUS_MD))
+        .right(theme::ui_rem(LOG_SCROLL_BUTTON_OFFSET))
+        .bottom(theme::ui_rem(LOG_SCROLL_BUTTON_OFFSET))
+        .rounded(theme::ui_rem(theme::RADIUS_MD))
         .bg(color(theme::BACKGROUND))
-        .p(px(LOG_SCROLL_BUTTON_PADDING))
+        .p(theme::ui_rem(LOG_SCROLL_BUTTON_PADDING))
         .shadow(card_surface_shadows())
         .child(
             frame_icon_button(
@@ -526,7 +526,7 @@ pub(super) fn logs_empty_state(message: &'static str) -> gpui::Div {
         .flex()
         .items_center()
         .justify_center()
-        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .text_color(color(theme::FRAME_GRAY_600))
         .child(theme::ui_text(message))
 }

@@ -25,6 +25,12 @@ pub(in crate::app) struct FrameScrollbarMetrics {
     pub(in crate::app) thumb_height: f32,
 }
 
+#[derive(Clone, Copy)]
+struct FrameScrollbarPaintState {
+    metrics: Option<FrameScrollbarMetrics>,
+    ui_scale: f32,
+}
+
 pub(in crate::app) fn frame_vertical_scrollbar(
     id: impl Into<String>,
     scroll_handle: ScrollHandle,
@@ -43,7 +49,7 @@ pub(in crate::app) fn frame_vertical_scrollbar(
         .top_0()
         .right_0()
         .bottom_0()
-        .w(px(FRAME_SCROLLBAR_WIDTH))
+        .w(theme::ui_rem(FRAME_SCROLLBAR_WIDTH))
         .cursor_default()
         .hover(gpui::Styled::cursor_pointer)
         .on_drag(drag, |_drag, _offset, window, cx| {
@@ -55,9 +61,10 @@ pub(in crate::app) fn frame_vertical_scrollbar(
                 let drag = event.drag(cx);
                 let y = (event.event.position.y - event.bounds.origin.y).as_f32();
                 let viewport_height = event.bounds.size.height.as_f32();
+                let ui_scale = window.rem_size().as_f32() / crate::appearance::BASE_REM_PX;
                 let content_height = frame_scrollbar_content_height(
                     &drag.scroll_handle,
-                    drag.content_height,
+                    drag.content_height * ui_scale,
                     viewport_height,
                 );
                 set_frame_vertical_scrollbar_offset(
@@ -71,48 +78,54 @@ pub(in crate::app) fn frame_vertical_scrollbar(
         )
         .child(
             canvas(
-                move |bounds, _window, _cx| {
+                move |bounds, window, _cx| {
                     let viewport_height = bounds.size.height.as_f32();
+                    let ui_scale = window.rem_size().as_f32() / crate::appearance::BASE_REM_PX;
                     let content_height = frame_scrollbar_content_height(
                         &paint_handle,
-                        content_height,
+                        content_height * ui_scale,
                         viewport_height,
                     );
-                    frame_vertical_scrollbar_metrics(
-                        viewport_height,
-                        content_height,
-                        paint_handle.offset().y.as_f32(),
-                    )
+                    FrameScrollbarPaintState {
+                        metrics: frame_vertical_scrollbar_metrics_with_min_height(
+                            viewport_height,
+                            content_height,
+                            paint_handle.offset().y.as_f32(),
+                            FRAME_SCROLLBAR_MIN_THUMB_HEIGHT * ui_scale,
+                        ),
+                        ui_scale,
+                    }
                 },
-                |bounds, metrics, window, _cx| {
-                    let Some(metrics) = metrics else {
+                |bounds, state, window, _cx| {
+                    let Some(metrics) = state.metrics else {
                         return;
                     };
+                    let track_width = FRAME_SCROLLBAR_TRACK_WIDTH * state.ui_scale;
+                    let thumb_width = FRAME_SCROLLBAR_THUMB_WIDTH * state.ui_scale;
+                    let scrollbar_width = FRAME_SCROLLBAR_WIDTH * state.ui_scale;
 
                     let track_bounds = Bounds::new(
                         point(
-                            bounds.origin.x
-                                + px((FRAME_SCROLLBAR_WIDTH - FRAME_SCROLLBAR_TRACK_WIDTH) / 2.0),
+                            bounds.origin.x + px((scrollbar_width - track_width) / 2.0),
                             bounds.origin.y,
                         ),
-                        size(px(FRAME_SCROLLBAR_TRACK_WIDTH), bounds.size.height),
+                        size(px(track_width), bounds.size.height),
                     );
                     window.paint_quad(
                         fill(track_bounds, color(theme::FRAME_GRAY_100))
-                            .corner_radii(px(FRAME_SCROLLBAR_TRACK_WIDTH / 2.0)),
+                            .corner_radii(px(track_width / 2.0)),
                     );
 
                     let thumb_bounds = Bounds::new(
                         point(
-                            bounds.origin.x
-                                + px((FRAME_SCROLLBAR_WIDTH - FRAME_SCROLLBAR_THUMB_WIDTH) / 2.0),
+                            bounds.origin.x + px((scrollbar_width - thumb_width) / 2.0),
                             bounds.origin.y + px(metrics.thumb_top),
                         ),
-                        size(px(FRAME_SCROLLBAR_THUMB_WIDTH), px(metrics.thumb_height)),
+                        size(px(thumb_width), px(metrics.thumb_height)),
                     );
                     window.paint_quad(
                         fill(thumb_bounds, color(theme::FRAME_GRAY_600))
-                            .corner_radii(px(FRAME_SCROLLBAR_THUMB_WIDTH / 2.0)),
+                            .corner_radii(px(thumb_width / 2.0)),
                     );
                 },
             )
@@ -158,14 +171,28 @@ pub(in crate::app) fn frame_vertical_scrollbar_metrics(
     content_height: f32,
     offset_y: f32,
 ) -> Option<FrameScrollbarMetrics> {
+    frame_vertical_scrollbar_metrics_with_min_height(
+        viewport_height,
+        content_height,
+        offset_y,
+        FRAME_SCROLLBAR_MIN_THUMB_HEIGHT,
+    )
+}
+
+fn frame_vertical_scrollbar_metrics_with_min_height(
+    viewport_height: f32,
+    content_height: f32,
+    offset_y: f32,
+    minimum_thumb_height: f32,
+) -> Option<FrameScrollbarMetrics> {
     if viewport_height <= 0.0 || content_height <= viewport_height {
         return None;
     }
 
     let max_offset_y = content_height - viewport_height;
 
-    let thumb_height = ((viewport_height / content_height) * viewport_height)
-        .max(FRAME_SCROLLBAR_MIN_THUMB_HEIGHT);
+    let thumb_height =
+        ((viewport_height / content_height) * viewport_height).max(minimum_thumb_height);
     let max_thumb_top = (viewport_height - thumb_height).max(0.0);
     let progress = (-offset_y / max_offset_y).clamp(0.0, 1.0);
 

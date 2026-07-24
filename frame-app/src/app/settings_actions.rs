@@ -1,6 +1,7 @@
 use super::{
-    Context, FrameRoot, FrameTextInputKind, PresetDefinition, PresetNotice, PresetNoticeTone,
-    PromptButton, PromptLevel, Window, apply_preset, apply_subtitle_burn_path,
+    AppearanceSettings, Context, DecreaseUiScale, FrameRoot, FrameTextInputKind, IncreaseUiScale,
+    PresetDefinition, PresetNotice, PresetNoticeTone, PromptButton, PromptLevel, ResetUiScale,
+    ScalePreset, UiScalePopoverState, Window, apply_preset, apply_subtitle_burn_path,
     create_custom_preset, is_supported_subtitle_path, output_folder_dialog, pick_output_folder,
     pick_subtitle_file, subtitle_file_dialog,
 };
@@ -12,18 +13,46 @@ impl FrameRoot {
         self.settings_ui.max_concurrency_draft = self.max_concurrency.to_string();
         self.settings_ui.max_concurrency_error = None;
         self.settings_ui.output_directory_error = None;
+        self.settings_ui.appearance_error = None;
+        self.settings_ui.ui_scale_popover = UiScalePopoverState::Hidden;
     }
 
     pub(super) fn close_app_settings(&mut self) {
         self.settings_ui.is_open = false;
         self.settings_ui.max_concurrency_error = None;
         self.settings_ui.output_directory_error = None;
+        self.settings_ui.appearance_error = None;
+        self.close_app_settings_ui_scale_popover();
         self.text_input_ui
             .focuses
             .clear(FrameTextInputKind::MaxConcurrency);
         if self.text_input_ui.active == Some(FrameTextInputKind::MaxConcurrency) {
             self.stop_text_input_cursor();
         }
+    }
+
+    pub(super) const fn toggle_app_settings_ui_scale_popover(&mut self) {
+        self.settings_ui.ui_scale_popover = match self.settings_ui.ui_scale_popover {
+            UiScalePopoverState::Open => UiScalePopoverState::Closing,
+            UiScalePopoverState::Hidden | UiScalePopoverState::Closing => UiScalePopoverState::Open,
+        };
+    }
+
+    pub(super) const fn close_app_settings_ui_scale_popover(&mut self) {
+        if matches!(self.settings_ui.ui_scale_popover, UiScalePopoverState::Open) {
+            self.settings_ui.ui_scale_popover = UiScalePopoverState::Closing;
+        }
+    }
+
+    pub(super) const fn finish_app_settings_ui_scale_popover_close(&mut self) -> bool {
+        if !matches!(
+            self.settings_ui.ui_scale_popover,
+            UiScalePopoverState::Closing
+        ) {
+            return false;
+        }
+        self.settings_ui.ui_scale_popover = UiScalePopoverState::Hidden;
+        true
     }
 
     pub(super) const fn finish_app_settings_close(&mut self) -> bool {
@@ -65,6 +94,68 @@ impl FrameRoot {
         let trimmed = self.settings_ui.max_concurrency_draft.trim();
         let value = trimmed.parse::<usize>().ok()?;
         (value > 0).then_some(value)
+    }
+
+    pub(super) fn set_ui_scale(&mut self, scale: ScalePreset) -> bool {
+        let mut appearance = self.appearance;
+        appearance.ui_scale = scale;
+        self.set_appearance(appearance)
+    }
+
+    pub(super) fn increase_ui_scale(
+        &mut self,
+        _: &IncreaseUiScale,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.apply_ui_scale_shortcut(self.appearance.ui_scale.next(), window, cx);
+    }
+
+    pub(super) fn decrease_ui_scale(
+        &mut self,
+        _: &DecreaseUiScale,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.apply_ui_scale_shortcut(self.appearance.ui_scale.previous(), window, cx);
+    }
+
+    pub(super) fn reset_ui_scale(
+        &mut self,
+        _: &ResetUiScale,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.apply_ui_scale_shortcut(ScalePreset::Percent100, window, cx);
+    }
+
+    fn apply_ui_scale_shortcut(
+        &mut self,
+        scale: ScalePreset,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.set_ui_scale(scale) {
+            window.set_rem_size(gpui::px(crate::appearance::BASE_REM_PX * scale.factor()));
+            cx.notify();
+        }
+    }
+
+    fn set_appearance(&mut self, appearance: AppearanceSettings) -> bool {
+        if self.update_installation_in_progress() || self.appearance == appearance {
+            return false;
+        }
+
+        let previous = self.appearance;
+        self.appearance = appearance;
+        if let Err(error) = self.persist_app_settings() {
+            self.appearance = previous;
+            self.settings_ui.appearance_error = Some(format!("Failed to save settings: {error}"));
+            return false;
+        }
+
+        self.settings_ui.appearance_error = None;
+        true
     }
 
     pub(super) fn prompt_default_output_folder(window: &Window, cx: &Context<Self>) {

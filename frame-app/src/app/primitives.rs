@@ -213,12 +213,12 @@ pub(super) fn action_button(
     let button = div()
         .id(id.clone())
         .group(id)
-        .h(px(TITLEBAR_BUTTON_HEIGHT))
+        .min_h(theme::ui_rem(TITLEBAR_BUTTON_HEIGHT))
         .flex()
         .items_center()
         .justify_center()
         .gap_2()
-        .rounded(px(theme::RADIUS_SM))
+        .rounded(theme::ui_rem(theme::RADIUS_SM))
         .bg(background)
         .shadow(button_highlight_shadows())
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
@@ -230,14 +230,12 @@ pub(super) fn action_button(
     let button = apply_button_motion(button, motion, enabled);
 
     let button = if is_icon_only {
-        button.w(px(TITLEBAR_ICON_BUTTON_SIZE)).child(icon_svg(
-            icon,
-            TITLEBAR_ACTION_ICON_SIZE,
-            foreground,
-        ))
+        button
+            .w(theme::ui_rem(TITLEBAR_ICON_BUTTON_SIZE))
+            .child(icon_svg(icon, TITLEBAR_ACTION_ICON_SIZE, foreground))
     } else {
         button
-            .px(px(10.0))
+            .px(theme::ui_rem(10.0))
             .child(icon_svg(icon, TITLEBAR_ICON_SIZE, foreground))
             .child(theme::ui_text(label.unwrap_or_default()))
     };
@@ -248,8 +246,8 @@ pub(super) fn action_button(
 pub(super) fn icon_svg(path: &'static str, size: f32, icon_color: Rgba) -> impl IntoElement {
     svg()
         .path(path)
-        .w(px(size))
-        .h(px(size))
+        .w(theme::ui_rem(size))
+        .h(theme::ui_rem(size))
         .text_color(icon_color)
 }
 
@@ -311,7 +309,7 @@ pub(super) fn button_highlight_shadows() -> Vec<BoxShadow> {
 pub(super) fn vertical_separator(height: f32) -> gpui::Div {
     div()
         .flex()
-        .h(px(height))
+        .h(theme::ui_rem(height))
         .w(px(2.0))
         .child(div().h_full().w(px(1.0)).bg(color(theme::BACKGROUND)))
         .child(div().h_full().w(px(1.0)).bg(color(theme::FRAME_GRAY_100)))
@@ -338,7 +336,7 @@ pub(super) trait FrameSurface {
 
 impl FrameSurface for gpui::Div {
     fn card_surface(self) -> Self {
-        self.rounded(px(theme::RADIUS_LG))
+        self.rounded(theme::ui_rem(theme::RADIUS_LG))
             .bg(color(theme::FRAME_GRAY_100))
             .shadow(card_surface_shadows())
     }

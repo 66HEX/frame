@@ -27,7 +27,8 @@ pub use runtime::{frame_window_options, init_app, open_frame_window};
 
 use accessibility::{FrameFocusKey, FrameFocusRegistry};
 use chrome::{
-    AppSettingsSheetProps, app_settings_sheet, drag_drop_overlay, titlebar, update_dialog,
+    AppSettingsScaleSelectFocuses, AppSettingsSheetProps, app_settings_sheet, drag_drop_overlay,
+    titlebar, update_dialog,
 };
 use input::{FrameTextInputKind, FrameTextInputUiState};
 use logs_panel::logs_view;
@@ -61,8 +62,7 @@ use crate::{
     TITLEBAR_DIVIDER_HEIGHT, TITLEBAR_HEIGHT, TITLEBAR_ICON_BUTTON_SIZE, TITLEBAR_ICON_SIZE,
     TITLEBAR_LINUX_WINDOW_BUTTON_SIZE, TITLEBAR_LINUX_WINDOW_CONTROLS_GAP,
     TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X, TITLEBAR_LOGO_SIZE,
-    TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_PLACEHOLDER_WIDTH, TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_X,
-    TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_Y, TITLEBAR_NAV_BUTTON_HEIGHT,
+    TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_PLACEHOLDER_WIDTH, TITLEBAR_NAV_BUTTON_HEIGHT,
     TITLEBAR_PLATFORM_DIVIDER_HEIGHT, TITLEBAR_SEGMENT_HEIGHT, TITLEBAR_TOP_PADDING,
     TITLEBAR_TRAFFIC_LIGHT_SIZE, TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
     TITLEBAR_WINDOWS_WINDOW_ICON_SIZE, TITLEBAR_WINDOWS_WINDOW_MAX_ICON_SIZE, VisualFixture,
@@ -70,6 +70,7 @@ use crate::{
     active_view_from_env_value,
     app_info::{FRAME_APP_ID, FRAME_APP_VERSION},
     app_persistence::{AppPersistence, AppSettings},
+    appearance::{AppearanceSettings, ScalePreset},
     assets::{self},
     capabilities::{detect_available_encoders, detect_available_filters},
     conversion_events::{ActiveLogFile, ConversionEventState, LogLine, all_conversions_settled},
@@ -194,6 +195,9 @@ actions!(
         TextInputPaste,
         TextInputCommit,
         TextInputCancel,
+        IncreaseUiScale,
+        DecreaseUiScale,
+        ResetUiScale,
     ]
 );
 
@@ -216,7 +220,7 @@ const FRAME_TEXT_INPUT_CONTEXT: &str = "FrameTextInput";
 const FRAME_TIMECODE_INPUT_CONTEXT: &str = "FrameTimecodeInput";
 const FRAME_TIMECODE_TEXT_INPUT_CONTEXT: &str = "FrameTextInput FrameTimecodeInput";
 const TEXT_INPUT_CARET_WIDTH: f32 = 1.5;
-const TEXT_INPUT_CARET_HEIGHT: f32 = theme::TEXT_INPUT_CARET_HEIGHT;
+const TEXT_INPUT_CARET_BASE_HEIGHT: f32 = theme::TEXT_INPUT_CARET_BASE_HEIGHT;
 const TEXT_INPUT_BLINK_INTERVAL: Duration = Duration::from_millis(500);
 const TEXT_INPUT_BLINK_PAUSE: Duration = Duration::from_millis(300);
 const TIMECODE_PRECISION_SECONDS: f64 = 0.001;
@@ -253,6 +257,7 @@ struct TitlebarDragState {
 
 pub struct FrameRoot {
     active_view: ActiveView,
+    appearance: AppearanceSettings,
     titlebar_drag: TitlebarDragState,
     focus_registry: FrameFocusRegistry,
     file_queue: FileQueue,
@@ -302,9 +307,31 @@ struct SettingsUiState {
     max_concurrency_draft: String,
     max_concurrency_error: Option<String>,
     output_directory_error: Option<String>,
+    appearance_error: Option<String>,
+    ui_scale_popover: UiScalePopoverState,
+    app_settings_scroll_handle: ScrollHandle,
+    ui_scale_scroll_handle: ScrollHandle,
     preset_name_draft: String,
     preset_notice: Option<PresetNotice>,
     next_custom_preset_sequence: u64,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(super) enum UiScalePopoverState {
+    #[default]
+    Hidden,
+    Closing,
+    Open,
+}
+
+impl UiScalePopoverState {
+    pub(super) const fn is_open(self) -> bool {
+        matches!(self, Self::Open)
+    }
+
+    pub(super) const fn is_rendered(self) -> bool {
+        !matches!(self, Self::Hidden)
+    }
 }
 
 #[derive(Default)]
@@ -375,6 +402,10 @@ impl Default for SettingsUiState {
             max_concurrency_draft: DEFAULT_MAX_CONCURRENCY.to_string(),
             max_concurrency_error: None,
             output_directory_error: None,
+            appearance_error: None,
+            ui_scale_popover: UiScalePopoverState::Hidden,
+            app_settings_scroll_handle: ScrollHandle::new(),
+            ui_scale_scroll_handle: ScrollHandle::new(),
             preset_name_draft: String::new(),
             preset_notice: None,
             next_custom_preset_sequence: 0,

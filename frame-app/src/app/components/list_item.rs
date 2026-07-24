@@ -2,8 +2,7 @@ use super::{
     ButtonVariant, Context, FluentBuilder, FrameRoot, InteractiveElement, ParentElement,
     SETTINGS_CONTROL_HEIGHT, StatefulInteractiveElement, Styled, Window, animated_button_colors,
     apply_accessible_toggle_button, apply_button_motion, button_colors, button_highlight_shadows,
-    button_motion, color, div, frame_selection_dot, mix_color, mix_scalar, px, selected_motion,
-    theme,
+    button_motion, color, div, frame_selection_dot, mix_color, mix_scalar, selected_motion, theme,
 };
 
 pub(in crate::app) fn frame_list_item(
@@ -23,13 +22,13 @@ pub(in crate::app) fn frame_list_item(
 
     let item = div()
         .id(id)
-        .h(px(SETTINGS_CONTROL_HEIGHT))
+        .min_h(theme::ui_rem(SETTINGS_CONTROL_HEIGHT))
         .w_full()
         .flex()
         .items_center()
         .justify_between()
-        .rounded(px(theme::RADIUS_SM))
-        .border_l(px(2.0))
+        .rounded(theme::ui_rem(theme::RADIUS_SM))
+        .border_l(theme::ui_rem(2.0))
         .border_color(mix_color(
             theme::TRANSPARENT,
             theme::FRAME_GRAY_600,
@@ -40,9 +39,9 @@ pub(in crate::app) fn frame_list_item(
             theme::FRAME_GRAY_100,
             selected_progress,
         ))
-        .pl(px(mix_scalar(8.0, 12.0, selected_progress)))
-        .pr(px(12.0))
-        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .pl(theme::ui_rem(mix_scalar(8.0, 12.0, selected_progress)))
+        .pr(theme::ui_rem(12.0))
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(mix_color(
             theme::FRAME_GRAY_600,
@@ -75,13 +74,17 @@ pub(in crate::app) fn frame_list_item_with_caption(
         .gap_3()
         .child(
             div()
+                .flex_none()
                 .text_color(color(theme::FOREGROUND))
                 .child(display_title),
         )
         .child(
             div()
+                .min_w_0()
+                .flex_auto()
                 .truncate()
-                .text_size(px(theme::TEXT_LABEL_SIZE))
+                .text_right()
+                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .font_weight(theme::TEXT_WEIGHT_REGULAR)
                 .text_color(color(theme::FRAME_GRAY_600))
                 .child(caption),
@@ -169,17 +172,17 @@ pub(in crate::app) fn frame_track_list_item(
 
     let item = div()
         .id(id)
-        .min_h(px(SETTINGS_CONTROL_HEIGHT))
+        .min_h(theme::ui_rem(SETTINGS_CONTROL_HEIGHT))
         .w_full()
         .flex()
         .items_center()
         .justify_between()
         .gap_3()
-        .rounded(px(theme::RADIUS_SM))
-        .px(px(10.0))
-        .py(px(6.0))
+        .rounded(theme::ui_rem(theme::RADIUS_SM))
+        .px(theme::ui_rem(10.0))
+        .py(theme::ui_rem(6.0))
         .bg(background)
-        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
         .opacity(colors.opacity)

@@ -38,6 +38,13 @@ impl FrameRoot {
     pub(super) fn apply_visual_fixture(&mut self, fixture: Option<VisualFixture>) {
         match fixture {
             Some(VisualFixture::AppSettings) => self.open_app_settings(),
+            Some(VisualFixture::AppSettingsUiOpen) => {
+                self.appearance = AppearanceSettings {
+                    ui_scale: ScalePreset::Percent200,
+                };
+                self.open_app_settings();
+                self.toggle_app_settings_ui_scale_popover();
+            }
             Some(VisualFixture::LogsActive) => self.apply_logs_active_fixture(),
             Some(VisualFixture::PreviewCrop) => self.apply_preview_crop_fixture(),
             Some(VisualFixture::PreviewReady) => self.apply_preview_ready_fixture(),

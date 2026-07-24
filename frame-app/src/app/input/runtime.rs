@@ -1,4 +1,24 @@
-use super::{Bounds, FocusHandle, Pixels, Range, ShapedLine, TEXT_INPUT_CARET_WIDTH, Task, px};
+use super::{
+    Bounds, FocusHandle, Pixels, Range, SETTINGS_CONTROL_HEIGHT, ShapedLine,
+    TEXT_INPUT_CARET_BASE_HEIGHT, TEXT_INPUT_CARET_WIDTH, Task,
+};
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(in crate::app) struct FrameTextInputMetrics {
+    pub(in crate::app) control_height: f32,
+    pub(in crate::app) caret_height: f32,
+    pub(in crate::app) caret_width: f32,
+}
+
+impl FrameTextInputMetrics {
+    pub(in crate::app) fn from_ui_scale(ui_scale: f32) -> Self {
+        Self {
+            control_height: SETTINGS_CONTROL_HEIGHT * ui_scale,
+            caret_height: TEXT_INPUT_CARET_BASE_HEIGHT * ui_scale,
+            caret_width: TEXT_INPUT_CARET_WIDTH * ui_scale,
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::app) enum FrameTextInputKind {
@@ -120,9 +140,10 @@ pub(in crate::app) fn text_input_scroll_x_for_cursor(
     cursor_x: Pixels,
     content_width: Pixels,
     viewport_width: Pixels,
+    caret_width: Pixels,
 ) -> Pixels {
     let mut next = current;
-    let trailing_edge = (viewport_width - px(TEXT_INPUT_CARET_WIDTH)).max(Pixels::ZERO);
+    let trailing_edge = (viewport_width - caret_width).max(Pixels::ZERO);
 
     if cursor_x - next > trailing_edge {
         next = cursor_x - trailing_edge;
@@ -131,6 +152,32 @@ pub(in crate::app) fn text_input_scroll_x_for_cursor(
     }
 
     clamp_text_input_scroll_x(next, content_width, viewport_width)
+}
+
+#[cfg(test)]
+mod metrics_tests {
+    #![expect(
+        clippy::float_cmp,
+        reason = "Input metrics tests compare exact deterministic scale products."
+    )]
+
+    use super::*;
+
+    #[test]
+    fn input_metrics_preserve_baseline_dimensions() {
+        let metrics = FrameTextInputMetrics::from_ui_scale(1.0);
+        assert_eq!(metrics.control_height, SETTINGS_CONTROL_HEIGHT);
+        assert_eq!(metrics.caret_height, TEXT_INPUT_CARET_BASE_HEIGHT);
+        assert_eq!(metrics.caret_width, TEXT_INPUT_CARET_WIDTH);
+    }
+
+    #[test]
+    fn ui_scale_resizes_control_and_caret_together() {
+        let metrics = FrameTextInputMetrics::from_ui_scale(2.0);
+        assert_eq!(metrics.control_height, 60.0);
+        assert_eq!(metrics.caret_height, 28.0);
+        assert_eq!(metrics.caret_width, 3.0);
+    }
 }
 
 #[derive(Default)]

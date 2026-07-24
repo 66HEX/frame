@@ -507,6 +507,7 @@ impl FrameRoot {
         };
         let viewport_width = bounds.size.width;
         let mut local_x = position.x - bounds.left();
+        let ui_scale = self.appearance.ui_scale.factor();
 
         {
             let runtime = self.text_input_runtime_mut(kind);
@@ -514,14 +515,14 @@ impl FrameRoot {
                 clamp_text_input_scroll_x(runtime.scroll_x, line_width, viewport_width);
             if position.x < bounds.left() {
                 scroll_x = clamp_text_input_scroll_x(
-                    scroll_x - text_input_drag_scroll_amount(bounds.left() - position.x),
+                    scroll_x - text_input_drag_scroll_amount(bounds.left() - position.x, ui_scale),
                     line_width,
                     viewport_width,
                 );
                 local_x = Pixels::ZERO;
             } else if position.x > bounds.right() {
                 scroll_x = clamp_text_input_scroll_x(
-                    scroll_x + text_input_drag_scroll_amount(position.x - bounds.right()),
+                    scroll_x + text_input_drag_scroll_amount(position.x - bounds.right(), ui_scale),
                     line_width,
                     viewport_width,
                 );
@@ -1002,6 +1003,6 @@ const fn metadata_field_for_text_input(kind: FrameTextInputKind) -> Option<Metad
     }
 }
 
-fn text_input_drag_scroll_amount(distance: Pixels) -> Pixels {
-    distance.clamp(px(4.0), px(40.0))
+fn text_input_drag_scroll_amount(distance: Pixels, ui_scale: f32) -> Pixels {
+    distance.clamp(px(4.0 * ui_scale), px(40.0 * ui_scale))
 }

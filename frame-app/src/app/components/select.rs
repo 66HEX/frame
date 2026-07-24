@@ -6,8 +6,9 @@ use super::{
     apply_accessible_select_option_with_focus, apply_accessible_select_trigger,
     apply_accessible_select_trigger_with_focus, apply_button_motion, assets, button_colors,
     button_highlight_shadows, button_mouse_down, color, div, icon_svg, input_highlight_shadows,
-    parse_hex, px, theme,
+    parse_hex, theme,
 };
+use crate::app::accessibility::handle_modal_tab_navigation;
 use crate::numeric::usize_to_f32;
 use gpui::FocusHandle;
 
@@ -135,16 +136,16 @@ fn frame_select_trigger_content_inner(
     let trigger = div()
         .id(id.clone())
         .group(id)
-        .h(px(SETTINGS_CONTROL_HEIGHT))
+        .min_h(theme::ui_rem(SETTINGS_CONTROL_HEIGHT))
         .w_full()
         .flex()
         .items_center()
         .justify_between()
         .min_w_0()
-        .rounded(px(theme::RADIUS_SM))
-        .px(px(10.0))
+        .rounded(theme::ui_rem(theme::RADIUS_SM))
+        .px(theme::ui_rem(10.0))
         .bg(background)
-        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
         .opacity(colors.opacity)
@@ -184,12 +185,12 @@ pub(in crate::app) fn frame_select_popover(
     div()
         .absolute()
         .id(id)
-        .top(px(top))
+        .top(theme::ui_rem(top))
         .left_0()
         .right_0()
-        .max_h(px(FRAME_SELECT_MAX_HEIGHT))
+        .max_h(theme::ui_rem(FRAME_SELECT_MAX_HEIGHT))
         .overflow_hidden()
-        .rounded(px(theme::RADIUS_SM))
+        .rounded(theme::ui_rem(theme::RADIUS_SM))
         .bg(color(theme::DROPDOWN))
         .opacity(progress)
         .shadow(button_highlight_shadows())
@@ -207,10 +208,10 @@ pub(in crate::app) fn frame_select_options_list(
     div()
         .id(id)
         .role(gpui::Role::ListBox)
-        .max_h(px(FRAME_SELECT_MAX_HEIGHT))
+        .max_h(theme::ui_rem(FRAME_SELECT_MAX_HEIGHT))
         .overflow_y_scroll()
         .track_scroll(scroll_handle)
-        .p(px(FRAME_SELECT_CONTENT_PADDING))
+        .p(theme::ui_rem(FRAME_SELECT_CONTENT_PADDING))
         .on_scroll_wheel(refresh_select_hover_after_scroll)
 }
 
@@ -219,6 +220,149 @@ pub(in crate::app) fn frame_select_content_height(option_count: usize) -> f32 {
         FRAME_SELECT_OPTION_HEIGHT,
         FRAME_SELECT_CONTENT_PADDING * 2.0,
     )
+}
+
+pub(in crate::app) fn frame_select_target_index(
+    len: usize,
+    selected_index: Option<usize>,
+    key: &str,
+    is_enabled: impl Fn(usize) -> bool,
+) -> Option<usize> {
+    if len == 0 {
+        return None;
+    }
+    match key {
+        "home" => (0..len).find(|index| is_enabled(*index)),
+        "end" => (0..len).rev().find(|index| is_enabled(*index)),
+        "down" => {
+            let start = selected_index.unwrap_or(len - 1);
+            (1..=len)
+                .map(|offset| (start + offset) % len)
+                .find(|index| is_enabled(*index))
+        }
+        "up" => {
+            let start = selected_index.unwrap_or(0);
+            (1..=len)
+                .map(|offset| (start + len - offset) % len)
+                .find(|index| is_enabled(*index))
+        }
+        _ => None,
+    }
+}
+
+pub(in crate::app) const fn frame_select_option_focus<'a>(
+    index: usize,
+    option_count: usize,
+    first_focus: Option<&'a FocusHandle>,
+    last_focus: Option<&'a FocusHandle>,
+) -> Option<&'a FocusHandle> {
+    if index == 0 {
+        first_focus
+    } else if index + 1 == option_count {
+        last_focus
+    } else {
+        None
+    }
+}
+
+pub(in crate::app) const fn frame_select_last_focus<'a>(
+    option_count: usize,
+    first_focus: Option<&'a FocusHandle>,
+    last_focus: Option<&'a FocusHandle>,
+) -> Option<&'a FocusHandle> {
+    if option_count <= 1 {
+        first_focus
+    } else {
+        last_focus
+    }
+}
+
+pub(in crate::app) fn focus_frame_select_initial_target(
+    key: &str,
+    option_count: usize,
+    first_focus: Option<&FocusHandle>,
+    last_focus: Option<&FocusHandle>,
+    scroll_handle: &ScrollHandle,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) {
+    if option_count == 0 {
+        return;
+    }
+    let target_index = if matches!(key, "up" | "end") {
+        option_count.saturating_sub(1)
+    } else {
+        0
+    };
+    scroll_handle.scroll_to_item(target_index);
+    let focus = if target_index == 0 {
+        first_focus
+    } else {
+        last_focus.or(first_focus)
+    };
+    if let Some(focus) = focus {
+        focus.focus(window, cx);
+    }
+}
+
+pub(in crate::app) fn apply_frame_select_popover_focus_trap(
+    popover: gpui::Stateful<gpui::Div>,
+    panel_focus: Option<&FocusHandle>,
+    first_focus: Option<&FocusHandle>,
+    last_focus: Option<&FocusHandle>,
+    cx: &Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    let (Some(panel_focus), Some(first_focus), Some(last_focus)) =
+        (panel_focus, first_focus, last_focus)
+    else {
+        return popover;
+    };
+    let first_focus = first_focus.clone();
+    let last_focus = last_focus.clone();
+    popover
+        .track_focus(panel_focus)
+        .tab_stop(false)
+        .on_key_down(
+            cx.listener(move |_root, event: &gpui::KeyDownEvent, window, cx| {
+                handle_modal_tab_navigation(event, &first_focus, &last_focus, window, cx);
+            }),
+        )
+}
+
+#[derive(Clone, Copy)]
+pub(in crate::app) struct FrameSelectFocusTarget<'a> {
+    pub(in crate::app) current_index: usize,
+    pub(in crate::app) target_index: usize,
+    pub(in crate::app) first_focus: Option<&'a FocusHandle>,
+    pub(in crate::app) last_focus: Option<&'a FocusHandle>,
+    pub(in crate::app) scroll_handle: &'a ScrollHandle,
+}
+
+pub(in crate::app) fn focus_frame_select_target(
+    key: &str,
+    target: FrameSelectFocusTarget<'_>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) {
+    target.scroll_handle.scroll_to_item(target.target_index);
+    let boundary_focus = match key {
+        "home" => target.first_focus,
+        "end" => target.last_focus,
+        "down" if target.target_index <= target.current_index => target.first_focus,
+        "up" if target.target_index >= target.current_index => target.last_focus,
+        "down" => {
+            window.focus_next(cx);
+            None
+        }
+        "up" => {
+            window.focus_prev(cx);
+            None
+        }
+        _ => None,
+    };
+    if let Some(focus) = boundary_focus {
+        focus.focus(window, cx);
+    }
 }
 
 pub(in crate::app) fn frame_select_option(
@@ -257,15 +401,15 @@ fn frame_select_option_inner(
 
     let option = div()
         .id(id.into())
-        .h(px(FRAME_SELECT_OPTION_HEIGHT))
+        .min_h(theme::ui_rem(FRAME_SELECT_OPTION_HEIGHT))
         .w_full()
         .flex()
         .items_center()
         .justify_between()
         .gap_2()
-        .rounded(px(theme::RADIUS_XS))
-        .px(px(12.0))
-        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .rounded(theme::ui_rem(theme::RADIUS_XS))
+        .px(theme::ui_rem(12.0))
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(color(text_color))
         .opacity(if enabled { 1.0 } else { 0.5 })
@@ -315,10 +459,10 @@ pub(in crate::app) fn frame_color_select_value(value: &str) -> gpui::Div {
 
 pub(in crate::app) fn frame_color_swatch(value: &str) -> gpui::Div {
     div()
-        .w(px(FRAME_COLOR_SWATCH_SIZE))
-        .h(px(FRAME_COLOR_SWATCH_SIZE))
+        .w(theme::ui_rem(FRAME_COLOR_SWATCH_SIZE))
+        .h(theme::ui_rem(FRAME_COLOR_SWATCH_SIZE))
         .flex_shrink_0()
-        .rounded(px(theme::RADIUS_XS))
+        .rounded(theme::ui_rem(theme::RADIUS_XS))
         .bg(parse_hex(value))
         .shadow(input_highlight_shadows())
 }
@@ -362,5 +506,50 @@ mod tests {
     #[test]
     fn frame_color_swatch_uses_compact_visual_size() {
         assert_eq!(FRAME_COLOR_SWATCH_SIZE, 14.0);
+    }
+
+    #[test]
+    fn frame_select_target_wraps_to_next_enabled_option() {
+        let target = frame_select_target_index(4, Some(3), "down", |index| index != 0);
+        assert_eq!(target, Some(1));
+    }
+
+    #[test]
+    fn frame_select_target_supports_home_and_end() {
+        let home = frame_select_target_index(4, Some(2), "home", |index| index != 0);
+        let end = frame_select_target_index(4, Some(2), "end", |index| index != 3);
+        assert_eq!((home, end), (Some(1), Some(2)));
+    }
+
+    #[test]
+    fn frame_select_target_handles_empty_and_fully_disabled_lists() {
+        assert_eq!(frame_select_target_index(0, None, "down", |_| true), None);
+        assert_eq!(frame_select_target_index(3, Some(1), "up", |_| false), None);
+        assert_eq!(
+            frame_select_target_index(3, Some(1), "home", |_| false),
+            None
+        );
+        assert_eq!(
+            frame_select_target_index(3, Some(1), "end", |_| false),
+            None
+        );
+    }
+
+    #[test]
+    fn frame_select_target_keeps_a_single_enabled_option_stable() {
+        for key in ["up", "down", "home", "end"] {
+            assert_eq!(
+                frame_select_target_index(1, Some(0), key, |_| true),
+                Some(0)
+            );
+        }
+    }
+
+    #[test]
+    fn frame_select_target_ignores_unhandled_keys() {
+        assert_eq!(
+            frame_select_target_index(3, Some(1), "escape", |_| true),
+            None
+        );
     }
 }

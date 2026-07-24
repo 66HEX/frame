@@ -12,6 +12,9 @@ impl Render for FrameRoot {
         reason = "The root GPUI render function assembles the full application shell from a single state snapshot."
     )]
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(
+            crate::appearance::BASE_REM_PX * self.appearance.ui_scale.factor()
+        ));
         self.begin_accessibility_frame();
         let app_root_focus = self.ensure_focus(
             FrameFocusKey::Control(APP_ROOT_FOCUS_ID.to_string()),
@@ -166,7 +169,7 @@ impl Render for FrameRoot {
         if overlay_toolbar_active && !overlay_toolbar_panel_focus.contains_focused(window, cx) {
             overlay_toolbar_first_focus.focus(window, cx);
         }
-        let content = div().flex_1().p(px(CONTENT_PADDING));
+        let content = div().flex_1().p(theme::ui_rem(CONTENT_PADDING));
         let active_content_view = if state.file_count == 0 {
             None
         } else {
@@ -519,10 +522,13 @@ impl Render for FrameRoot {
             .group(ROOT_DROP_GROUP)
             .bg(color(theme::BACKGROUND))
             .text_color(color(theme::FOREGROUND))
-            .text_size(px(theme::TEXT_UI_SIZE))
+            .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
             .font_family(assets::FRAME_FONT_FAMILY)
             .font_weight(theme::TEXT_WEIGHT_REGULAR)
             .font_features(assets::frame_font_features())
+            .on_action(cx.listener(Self::increase_ui_scale))
+            .on_action(cx.listener(Self::decrease_ui_scale))
+            .on_action(cx.listener(Self::reset_ui_scale))
             .on_key_down(
                 cx.listener(|_root, event: &gpui::KeyDownEvent, window, cx| {
                     handle_tab_navigation(event, window, cx);
@@ -556,6 +562,30 @@ impl Render for FrameRoot {
 
         if self.settings_ui.is_present {
             let update_install_ready = self.can_install_downloaded_update();
+            let ui_scale_popover_active = self.settings_ui.ui_scale_popover.is_open();
+            let ui_scale_trigger_focus = self.ensure_focus(
+                FrameFocusKey::Control("app-settings-ui-scale".to_string()),
+                true,
+                cx,
+            );
+            let ui_scale_panel_focus = self.ensure_focus(
+                FrameFocusKey::Control("app-settings-ui-scale-options".to_string()),
+                false,
+                cx,
+            );
+            let ui_scale_option_focuses = ScalePreset::ALL
+                .into_iter()
+                .map(|scale| {
+                    self.ensure_focus(
+                        FrameFocusKey::Control(format!(
+                            "app-settings-ui-scale-option-{}",
+                            scale.percent()
+                        )),
+                        ui_scale_popover_active,
+                        cx,
+                    )
+                })
+                .collect::<Vec<_>>();
             let value_focus = self.ensure_text_input_focus(FrameTextInputKind::MaxConcurrency, cx);
             let output_directory_focus = self.ensure_focus(
                 FrameFocusKey::Control("app-settings-output-directory".to_string()),
@@ -610,7 +640,10 @@ impl Render for FrameRoot {
                 true,
                 cx,
             );
-            if self.settings_ui.is_open && !panel_focus.contains_focused(window, cx) {
+            if self.settings_ui.is_open
+                && !self.settings_ui.ui_scale_popover.is_open()
+                && !panel_focus.contains_focused(window, cx)
+            {
                 close_focus.focus(window, cx);
             }
             root = root.child(app_settings_sheet(
@@ -624,6 +657,16 @@ impl Render for FrameRoot {
                         .as_deref()
                         .and_then(std::path::Path::to_str),
                     output_directory_error: self.settings_ui.output_directory_error.as_deref(),
+                    appearance: self.appearance,
+                    appearance_error: self.settings_ui.appearance_error.as_deref(),
+                    ui_scale_popover: self.settings_ui.ui_scale_popover,
+                    scroll_handle: &self.settings_ui.app_settings_scroll_handle,
+                    ui_scale_scroll_handle: &self.settings_ui.ui_scale_scroll_handle,
+                    ui_scale_focuses: AppSettingsScaleSelectFocuses {
+                        trigger: &ui_scale_trigger_focus,
+                        panel: &ui_scale_panel_focus,
+                        options: &ui_scale_option_focuses,
+                    },
                     auto_update_check: self.auto_update_check,
                     update_status: &self.update_ui.status,
                     update_install_ready,

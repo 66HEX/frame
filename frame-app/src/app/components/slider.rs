@@ -1,6 +1,6 @@
 use super::{
     FluentBuilder, InteractiveElement, ParentElement, Styled, apply_accessible_slider, color, div,
-    px, relative, theme,
+    relative, theme,
 };
 
 pub(in crate::app) const FRAME_SLIDER_VISUAL_HEIGHT: f32 = 20.0;
@@ -24,9 +24,9 @@ pub(in crate::app) fn frame_slider(
     let slider = div()
         .id(id)
         .relative()
-        .h(px(FRAME_SLIDER_VISUAL_HEIGHT))
+        .h(theme::ui_rem(FRAME_SLIDER_VISUAL_HEIGHT))
         .w_full()
-        .rounded(px(theme::RADIUS_SM))
+        .rounded(theme::ui_rem(theme::RADIUS_SM))
         .opacity(if disabled { 0.5 } else { 1.0 })
         .when(!disabled, gpui::Styled::cursor_pointer)
         .child(
@@ -34,19 +34,19 @@ pub(in crate::app) fn frame_slider(
                 .absolute()
                 .left_0()
                 .right_0()
-                .top(px(FRAME_SLIDER_TRACK_TOP))
-                .h(px(FRAME_SLIDER_TRACK_HEIGHT))
-                .rounded(px(FRAME_SLIDER_TRACK_RADIUS))
+                .top(theme::ui_rem(FRAME_SLIDER_TRACK_TOP))
+                .h(theme::ui_rem(FRAME_SLIDER_TRACK_HEIGHT))
+                .rounded(theme::ui_rem(FRAME_SLIDER_TRACK_RADIUS))
                 .bg(color(theme::FRAME_GRAY_100)),
         )
         .child(
             div()
                 .absolute()
                 .left_0()
-                .top(px(FRAME_SLIDER_TRACK_TOP))
-                .h(px(FRAME_SLIDER_TRACK_HEIGHT))
+                .top(theme::ui_rem(FRAME_SLIDER_TRACK_TOP))
+                .h(theme::ui_rem(FRAME_SLIDER_TRACK_HEIGHT))
                 .w(relative(clamped_fraction))
-                .rounded(px(FRAME_SLIDER_FILL_RADIUS))
+                .rounded(theme::ui_rem(FRAME_SLIDER_FILL_RADIUS))
                 .bg(color(theme::FOREGROUND)),
         );
 
@@ -70,10 +70,10 @@ pub(in crate::app) fn frame_slider_handle(
         .id(id)
         .absolute()
         .left(relative(fraction.clamp(0.0, 1.0)))
-        .top(px(FRAME_SLIDER_HANDLE_TOP))
-        .ml(px(-(FRAME_SLIDER_HANDLE_WIDTH / 2.0)))
-        .w(px(FRAME_SLIDER_HANDLE_WIDTH))
-        .h(px(FRAME_SLIDER_HANDLE_HEIGHT))
+        .top(theme::ui_rem(FRAME_SLIDER_HANDLE_TOP))
+        .ml(theme::ui_rem(-(FRAME_SLIDER_HANDLE_WIDTH / 2.0)))
+        .w(theme::ui_rem(FRAME_SLIDER_HANDLE_WIDTH))
+        .h(theme::ui_rem(FRAME_SLIDER_HANDLE_HEIGHT))
         .when(enabled, gpui::Styled::cursor_ew_resize)
 }
 

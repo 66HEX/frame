@@ -1,6 +1,8 @@
 //! Frame native visual tokens.
 
-use gpui::FontWeight;
+use gpui::{FontWeight, Rems, rems};
+
+use crate::appearance::BASE_REM_PX;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RgbaToken {
@@ -49,23 +51,21 @@ pub const RADIUS_MD: f32 = RADIUS_BASE * 3.0;
 pub const RADIUS_LG: f32 = RADIUS_BASE * 4.0;
 pub const RADIUS_XL: f32 = RADIUS_BASE * 6.0;
 
-pub const TEXT_SCALE: f32 = 1.0;
 pub const TEXT_UI_BASE_SIZE: f32 = 12.0;
 pub const TEXT_ROW_BASE_SIZE: f32 = 14.0;
 pub const TEXT_MARKDOWN_BASE_SIZE: f32 = 14.0;
 pub const TEXT_MARKDOWN_LIST_BASE_SIZE: f32 = 12.0;
 pub const TEXT_INPUT_CARET_BASE_HEIGHT: f32 = 14.0;
-
-pub const TEXT_UI_SIZE: f32 = TEXT_UI_BASE_SIZE * TEXT_SCALE;
-pub const TEXT_LABEL_SIZE: f32 = TEXT_UI_SIZE;
-pub const TEXT_ROW_SIZE: f32 = TEXT_ROW_BASE_SIZE * TEXT_SCALE;
-pub const TEXT_MARKDOWN_SIZE: f32 = TEXT_MARKDOWN_BASE_SIZE * TEXT_SCALE;
-pub const TEXT_MARKDOWN_LIST_SIZE: f32 = TEXT_MARKDOWN_LIST_BASE_SIZE * TEXT_SCALE;
-pub const TEXT_INPUT_CARET_HEIGHT: f32 = TEXT_INPUT_CARET_BASE_HEIGHT * TEXT_SCALE;
 pub const TEXT_WEIGHT_REGULAR: FontWeight = FontWeight::NORMAL;
 pub const TEXT_WEIGHT_MEDIUM: FontWeight = FontWeight::MEDIUM;
 pub const FORCE_UPPERCASE_UI_TEXT: bool = false;
 pub const MIN_HIT_AREA: f32 = 40.0;
+
+/// Converts a base Frame logical-pixel token into a scalable rem length.
+#[must_use]
+pub const fn ui_rem(base_pixels: f32) -> Rems {
+    rems(base_pixels / BASE_REM_PX)
+}
 
 #[must_use]
 pub fn ui_text(text: &str) -> String {
@@ -177,19 +177,13 @@ mod tests {
         use super::*;
 
         #[test]
-        fn text_scale_defaults_to_native_size_scale() {
-            assert_eq!(TEXT_SCALE, 1.0);
-        }
-
-        #[test]
         fn ui_text_matches_twelve_pixel_controls() {
-            assert_eq!(TEXT_UI_SIZE, 12.0);
-            assert_eq!(TEXT_LABEL_SIZE, TEXT_UI_SIZE);
+            assert_eq!(TEXT_UI_BASE_SIZE, 12.0);
         }
 
         #[test]
         fn row_text_matches_file_list_size() {
-            assert_eq!(TEXT_ROW_SIZE, 14.0);
+            assert_eq!(TEXT_ROW_BASE_SIZE, 14.0);
         }
 
         #[test]

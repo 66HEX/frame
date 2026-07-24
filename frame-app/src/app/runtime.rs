@@ -38,6 +38,11 @@ pub fn init_app(cx: &mut App, name: impl Into<SharedString>) {
             TextInputCancel,
             Some(FRAME_TIMECODE_INPUT_CONTEXT),
         ),
+        KeyBinding::new("secondary-=", IncreaseUiScale, None),
+        KeyBinding::new("secondary-+", IncreaseUiScale, None),
+        KeyBinding::new("secondary-shift-=", IncreaseUiScale, None),
+        KeyBinding::new("secondary--", DecreaseUiScale, None),
+        KeyBinding::new("secondary-0", ResetUiScale, None),
     ]);
     cx.set_menus(vec![Menu {
         name: name.into(),
@@ -79,8 +84,8 @@ pub fn frame_window_options(bounds: Bounds<Pixels>) -> WindowOptions {
             title: None,
             appears_transparent: true,
             traffic_light_position: Some(point(
-                px(TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_X),
-                px(TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_Y),
+                px(crate::TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_X),
+                px(crate::TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_Y),
             )),
         }),
         window_min_size: Some(size(px(WINDOW_MIN_WIDTH), px(WINDOW_MIN_HEIGHT))),
@@ -96,6 +101,38 @@ pub fn frame_window_options(bounds: Bounds<Pixels>) -> WindowOptions {
         #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         icon: frame_window_icon(),
         ..Default::default()
+    }
+}
+
+#[cfg(test)]
+mod ui_scale_keybinding_tests {
+    use gpui::Keystroke;
+
+    #[test]
+    fn primary_modifier_ui_scale_bindings_use_valid_gpui_syntax() {
+        for binding in [
+            "secondary-=",
+            "secondary-+",
+            "secondary-shift-=",
+            "secondary--",
+            "secondary-0",
+        ] {
+            assert!(
+                Keystroke::parse(binding).is_ok(),
+                "{binding} should be a valid GPUI keystroke"
+            );
+        }
+    }
+
+    #[test]
+    fn secondary_uses_the_native_primary_modifier() {
+        let keystroke = Keystroke::parse("secondary-0").expect("binding should parse");
+
+        #[cfg(target_os = "macos")]
+        assert!(keystroke.modifiers.platform && !keystroke.modifiers.control);
+
+        #[cfg(not(target_os = "macos"))]
+        assert!(keystroke.modifiers.control && !keystroke.modifiers.platform);
     }
 }
 

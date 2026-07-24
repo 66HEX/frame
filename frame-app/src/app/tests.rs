@@ -27,6 +27,7 @@ use crate::notifications::{AppNotifier, ConversionNotificationSummary};
 use crate::preview_engine::{
     PreviewCrop as EnginePreviewCrop, PreviewFrame, render_image_from_frame,
 };
+use crate::{TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_X, TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_Y};
 use std::{
     path::PathBuf,
     sync::{
@@ -648,6 +649,119 @@ mod frame_root_conversion {
     fn app_settings_sheet_motion_keeps_final_edge_inset() {
         assert_eq!(settings_sheet_right_inset(1.0), 8.0);
         assert_eq!(settings_sheet_right_inset(0.0), -16.0);
+    }
+
+    #[test]
+    fn ui_scale_selection_persists() {
+        let persistence = AppPersistence::from_settings_path(test_settings_path());
+        let mut root = FrameRoot::new_with_persistence(persistence.clone());
+
+        assert!(root.set_ui_scale(ScalePreset::Percent125));
+
+        assert_eq!(
+            persistence
+                .load()
+                .expect("appearance settings should be readable")
+                .appearance,
+            AppearanceSettings {
+                ui_scale: ScalePreset::Percent125,
+            }
+        );
+    }
+
+    #[test]
+    fn appearance_save_failure_rolls_runtime_state_back() {
+        let blocker = test_settings_path();
+        std::fs::create_dir_all(blocker.parent().expect("test path should have a parent"))
+            .expect("test settings parent should be created");
+        std::fs::write(&blocker, b"not a directory").expect("blocker file should be created");
+        let persistence = AppPersistence::from_settings_path(blocker.join("settings.json"));
+        let mut root = FrameRoot::new_with_persistence(persistence);
+
+        assert!(!root.set_ui_scale(ScalePreset::Percent150));
+
+        assert_eq!(root.appearance, AppearanceSettings::default());
+        assert!(
+            root.settings_ui
+                .appearance_error
+                .as_deref()
+                .is_some_and(|error| error.starts_with("Failed to save settings:"))
+        );
+    }
+
+    #[test]
+    fn toggling_ui_scale_popover_opens_and_closes_it() {
+        let mut root = FrameRoot::new();
+
+        root.toggle_app_settings_ui_scale_popover();
+
+        assert_eq!(root.settings_ui.ui_scale_popover, UiScalePopoverState::Open);
+
+        root.toggle_app_settings_ui_scale_popover();
+
+        assert_eq!(
+            root.settings_ui.ui_scale_popover,
+            UiScalePopoverState::Closing
+        );
+    }
+
+    #[test]
+    fn appearance_popover_remains_rendered_until_close_motion_finishes() {
+        let mut root = FrameRoot::new();
+        root.toggle_app_settings_ui_scale_popover();
+
+        root.close_app_settings_ui_scale_popover();
+
+        assert_eq!(
+            root.settings_ui.ui_scale_popover,
+            UiScalePopoverState::Closing
+        );
+        assert!(root.finish_app_settings_ui_scale_popover_close());
+        assert_eq!(
+            root.settings_ui.ui_scale_popover,
+            UiScalePopoverState::Hidden
+        );
+    }
+
+    #[test]
+    fn closing_app_settings_closes_the_active_appearance_popover() {
+        let mut root = FrameRoot::new();
+        root.open_app_settings();
+        root.toggle_app_settings_ui_scale_popover();
+
+        root.close_app_settings();
+
+        assert!(!root.settings_ui.ui_scale_popover.is_open());
+        assert!(!root.settings_ui.is_open);
+    }
+
+    #[test]
+    fn ui_scale_step_uses_the_next_supported_preset() {
+        let mut root = FrameRoot::new();
+        assert!(root.set_ui_scale(ScalePreset::Percent175));
+
+        assert!(root.set_ui_scale(root.appearance.ui_scale.next()));
+
+        assert_eq!(root.appearance.ui_scale, ScalePreset::Percent200);
+    }
+
+    #[test]
+    fn ui_scale_steps_at_bounds_are_no_ops() {
+        let mut root = FrameRoot::new();
+        root.appearance.ui_scale = ScalePreset::Percent200;
+        assert!(!root.set_ui_scale(root.appearance.ui_scale.next()));
+
+        root.appearance.ui_scale = ScalePreset::Percent80;
+        assert!(!root.set_ui_scale(root.appearance.ui_scale.previous()));
+    }
+
+    #[test]
+    fn appearance_changes_are_blocked_during_update_installation() {
+        let mut root = FrameRoot::new();
+        root.update_ui.status = UpdateStatus::Installing;
+
+        assert!(!root.set_ui_scale(ScalePreset::Percent150));
+        assert_eq!(root.appearance, AppearanceSettings::default());
     }
 
     #[test]
@@ -1469,21 +1583,24 @@ mod frame_root_conversion {
 
     #[test]
     fn text_input_scroll_reveals_cursor_past_right_edge() {
-        let scroll_x = text_input_scroll_x_for_cursor(px(0.0), px(180.0), px(240.0), px(120.0));
+        let scroll_x =
+            text_input_scroll_x_for_cursor(px(0.0), px(180.0), px(240.0), px(120.0), px(1.0));
 
         assert!(scroll_x > px(0.0));
     }
 
     #[test]
     fn text_input_scroll_reveals_cursor_past_left_edge() {
-        let scroll_x = text_input_scroll_x_for_cursor(px(80.0), px(40.0), px(240.0), px(120.0));
+        let scroll_x =
+            text_input_scroll_x_for_cursor(px(80.0), px(40.0), px(240.0), px(120.0), px(1.0));
 
         assert_eq!(scroll_x, px(40.0));
     }
 
     #[test]
     fn text_input_scroll_stays_zero_when_content_fits() {
-        let scroll_x = text_input_scroll_x_for_cursor(px(0.0), px(60.0), px(90.0), px(120.0));
+        let scroll_x =
+            text_input_scroll_x_for_cursor(px(0.0), px(60.0), px(90.0), px(120.0), px(1.0));
 
         assert_eq!(scroll_x, px(0.0));
     }
@@ -3219,6 +3336,17 @@ mod visual_fixtures {
             root.settings_ui.max_concurrency_draft,
             root.max_concurrency.to_string()
         );
+    }
+
+    #[test]
+    fn ui_scale_fixture_opens_ui_select_at_maximum_scale() {
+        let mut root = FrameRoot::new();
+
+        root.apply_visual_fixture(Some(VisualFixture::AppSettingsUiOpen));
+
+        assert!(root.settings_ui.is_open);
+        assert_eq!(root.appearance.ui_scale, ScalePreset::Percent200);
+        assert!(root.settings_ui.ui_scale_popover.is_open());
     }
 
     #[test]

@@ -6,7 +6,7 @@ use super::{
     SettingsSubtitlesTabState, SettingsTab, SettingsVideoInputFocuses, SourceKind,
     StatefulInteractiveElement, Styled, Window, apply_button_motion, button_colors,
     button_highlight_shadows, button_motion, color, div, frame_tooltip, icon_svg, mix_color,
-    panel_bottom_separator, px, resolve_active_settings_tab, settings_audio_filters_tab,
+    panel_bottom_separator, resolve_active_settings_tab, settings_audio_filters_tab,
     settings_audio_tab, settings_images_tab, settings_metadata_tab, settings_output_tab,
     settings_presets_tab, settings_section_label, settings_source_tab, settings_subtitles_tab,
     settings_tab_icon, settings_video_filters_tab, settings_video_tab, theme,
@@ -48,7 +48,7 @@ pub(in crate::app) fn settings_panel(
         .card_surface()
         .child(
             div()
-                .h(px(PANEL_HEADER_HEIGHT))
+                .min_h(theme::ui_rem(PANEL_HEADER_HEIGHT))
                 .w_full()
                 .flex()
                 .items_center()
@@ -65,7 +65,7 @@ pub(in crate::app) fn settings_panel(
                 .flex()
                 .flex_col()
                 .overflow_y_scroll()
-                .p(px(SETTINGS_PANEL_PADDING))
+                .p(theme::ui_rem(SETTINGS_PANEL_PADDING))
                 .child(settings_tab_content(active_tab, settings, window, cx)),
         )
 }
@@ -107,12 +107,12 @@ pub(in crate::app) fn settings_tab_button(
         .tab_stop(true)
         .focus_visible(focus_visible_ring)
         .group(tab_id)
-        .w(px(SETTINGS_TAB_BUTTON_SIZE))
-        .h(px(SETTINGS_TAB_BUTTON_SIZE))
+        .w(theme::ui_rem(SETTINGS_TAB_BUTTON_SIZE))
+        .h(theme::ui_rem(SETTINGS_TAB_BUTTON_SIZE))
         .flex()
         .items_center()
         .justify_center()
-        .rounded(px(theme::RADIUS_SM))
+        .rounded(theme::ui_rem(theme::RADIUS_SM))
         .bg(background)
         .text_color(foreground)
         .when(selected, |this| this.shadow(button_highlight_shadows()))
@@ -185,7 +185,7 @@ pub(in crate::app) fn settings_tab_content(
         .flex()
         .flex_col()
         .gap_4()
-        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .text_color(color(theme::FRAME_GRAY_600));
 
     match tab {

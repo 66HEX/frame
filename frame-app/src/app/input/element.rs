@@ -13,6 +13,7 @@ pub(super) struct FrameTextInputPrepaintState {
     cursor: Option<PaintQuad>,
     selection: Option<PaintQuad>,
     scroll_x: Pixels,
+    metrics: FrameTextInputMetrics,
 }
 
 pub(in crate::app) const fn should_handle_text_input(
@@ -54,9 +55,10 @@ impl Element for FrameTextInputElement {
         window: &mut Window,
         cx: &mut App,
     ) -> (LayoutId, Self::RequestLayoutState) {
+        let metrics = frame_text_input_metrics(self.owner.read(cx));
         let mut style = Style::default();
         style.size.width = relative(1.0).into();
-        style.size.height = px(SETTINGS_CONTROL_HEIGHT).into();
+        style.size.height = px(metrics.control_height).into();
         (window.request_layout(style, [], cx), ())
     }
 
@@ -103,7 +105,8 @@ impl Element for FrameTextInputElement {
         let line = window
             .text_system()
             .shape_line(display_text, font_size, &[run], None);
-        let text_top = bounds.top() + px((SETTINGS_CONTROL_HEIGHT - TEXT_INPUT_CARET_HEIGHT) / 2.0);
+        let metrics = frame_text_input_metrics(root);
+        let text_top = bounds.top() + (bounds.size.height - px(metrics.caret_height)) / 2.0;
         let focused = self.focus_handle.is_focused(window);
         let should_reveal_cursor =
             focused && root.text_input_ui.active == Some(self.kind) && !is_placeholder;
@@ -116,6 +119,7 @@ impl Element for FrameTextInputElement {
                 cursor_x,
                 line.width(),
                 bounds.size.width,
+                px(metrics.caret_width),
             )
         } else {
             clamp_text_input_scroll_x(runtime.scroll_x, line.width(), bounds.size.width)
@@ -130,7 +134,7 @@ impl Element for FrameTextInputElement {
             fill(
                 Bounds::new(
                     point(bounds.left() + cursor_x - scroll_x, text_top),
-                    size(px(TEXT_INPUT_CARET_WIDTH), px(TEXT_INPUT_CARET_HEIGHT)),
+                    size(px(metrics.caret_width), px(metrics.caret_height)),
                 ),
                 hsla(0.0, 0.0, 1.0, 1.0),
             )
@@ -144,7 +148,7 @@ impl Element for FrameTextInputElement {
                     ),
                     point(
                         bounds.left() + line.x_for_index(selected_range.end) - scroll_x,
-                        text_top + px(TEXT_INPUT_CARET_HEIGHT),
+                        text_top + px(metrics.caret_height),
                     ),
                 ),
                 hsla(0.0, 0.0, 1.0, 0.18),
@@ -156,6 +160,7 @@ impl Element for FrameTextInputElement {
             cursor,
             selection,
             scroll_x,
+            metrics,
         }
     }
 
@@ -188,7 +193,8 @@ impl Element for FrameTextInputElement {
         });
 
         let line = prepaint.line.take().expect("input line should be shaped");
-        let text_top = bounds.top() + px((SETTINGS_CONTROL_HEIGHT - TEXT_INPUT_CARET_HEIGHT) / 2.0);
+        let text_top =
+            bounds.top() + (bounds.size.height - px(prepaint.metrics.caret_height)) / 2.0;
         let scroll_x = prepaint.scroll_x;
         window.with_content_mask(Some(gpui::ContentMask { bounds }), |window| {
             if let Some(selection) = prepaint.selection.take() {
@@ -197,7 +203,7 @@ impl Element for FrameTextInputElement {
 
             line.paint(
                 point(bounds.left() - scroll_x, text_top),
-                px(TEXT_INPUT_CARET_HEIGHT),
+                px(prepaint.metrics.caret_height),
                 gpui::TextAlign::Left,
                 None,
                 window,
@@ -260,15 +266,15 @@ pub(in crate::app) fn frame_text_input(
 
     let mut field = div()
         .id(id)
-        .h(px(SETTINGS_CONTROL_HEIGHT))
+        .min_h(theme::ui_rem(SETTINGS_CONTROL_HEIGHT))
         .w_full()
         .flex()
         .items_center()
         .min_w_0()
-        .rounded(px(theme::RADIUS_SM))
+        .rounded(theme::ui_rem(theme::RADIUS_SM))
         .bg(color(theme::BACKGROUND))
-        .px(px(10.0))
-        .text_size(px(theme::TEXT_LABEL_SIZE))
+        .px(theme::ui_rem(10.0))
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .text_color(color(label_color))
         .opacity(if disabled { 0.5 } else { 1.0 })
         .shadow(input_highlight_shadows())
@@ -351,4 +357,8 @@ pub(in crate::app) fn frame_text_input(
     }
 
     apply_accessible_text_input(field, kind.accessibility_label(), !disabled, value)
+}
+
+fn frame_text_input_metrics(root: &FrameRoot) -> FrameTextInputMetrics {
+    FrameTextInputMetrics::from_ui_scale(root.appearance.ui_scale.factor())
 }

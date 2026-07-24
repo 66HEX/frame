@@ -2,7 +2,7 @@ use super::super::primitives::card_surface_shadows;
 use super::{
     Context, Duration, FluentBuilder, FrameRoot, INTERACTION_MOTION_DURATION, InteractiveElement,
     IntoElement, ParentElement, StatefulInteractiveElement, Styled, TooltipUiState, Window, color,
-    deferred, div, ease_in_out, motion_target, px, set_motion_target, theme,
+    deferred, div, ease_in_out, motion_target, set_motion_target, theme,
 };
 use std::time::Instant;
 
@@ -51,7 +51,7 @@ pub(in crate::app) fn frame_tooltip(
                     div()
                         .id(format!("tooltip-{id}"))
                         .absolute()
-                        .bottom(px((progress - 1.0).mul_add(
+                        .bottom(theme::ui_rem((progress - 1.0).mul_add(
                             TOOLTIP_ENTER_DISTANCE,
                             super::super::SETTINGS_TAB_BUTTON_SIZE + TOOLTIP_OFFSET,
                         )))
@@ -63,11 +63,11 @@ pub(in crate::app) fn frame_tooltip(
                             div()
                                 .flex_none()
                                 .whitespace_nowrap()
-                                .rounded(px(theme::RADIUS_SM))
+                                .rounded(theme::ui_rem(theme::RADIUS_SM))
                                 .bg(color(theme::DROPDOWN))
                                 .px_2()
-                                .py(px(2.0))
-                                .text_size(px(theme::TEXT_LABEL_SIZE))
+                                .py(theme::ui_rem(2.0))
+                                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                                 .font_weight(theme::TEXT_WEIGHT_MEDIUM)
                                 .text_color(color(theme::FOREGROUND))
                                 .opacity(progress)

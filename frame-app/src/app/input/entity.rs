@@ -1,6 +1,6 @@
 use super::{
-    Bounds, Context, EntityInputHandler, FrameRoot, Pixels, Point, Range, SETTINGS_CONTROL_HEIGHT,
-    TEXT_INPUT_CARET_HEIGHT, UTF16Selection, Window, point, px,
+    Bounds, Context, EntityInputHandler, FrameRoot, FrameTextInputMetrics, Pixels, Point, Range,
+    UTF16Selection, Window, point, px,
     text::{clamp_text_offset, text_offset_to_utf16, text_range_from_utf16, text_range_to_utf16},
 };
 
@@ -102,7 +102,8 @@ impl EntityInputHandler for FrameRoot {
         let range = text_range_from_utf16(&text, &range_utf16);
         let runtime = self.text_input_runtime(kind);
         let line = runtime.last_layout.as_ref()?;
-        let text_top = bounds.top() + px((SETTINGS_CONTROL_HEIGHT - TEXT_INPUT_CARET_HEIGHT) / 2.0);
+        let metrics = FrameTextInputMetrics::from_ui_scale(self.appearance.ui_scale.factor());
+        let text_top = bounds.top() + (bounds.size.height - px(metrics.caret_height)) / 2.0;
         Some(Bounds::from_corners(
             point(
                 bounds.left() + line.x_for_index(range.start) - runtime.scroll_x,
@@ -110,7 +111,7 @@ impl EntityInputHandler for FrameRoot {
             ),
             point(
                 bounds.left() + line.x_for_index(range.end) - runtime.scroll_x,
-                text_top + px(TEXT_INPUT_CARET_HEIGHT),
+                text_top + px(metrics.caret_height),
             ),
         ))
     }
