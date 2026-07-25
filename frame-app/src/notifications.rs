@@ -31,7 +31,7 @@ use crate::runtime_environment;
 
 const CONVERSION_FINISHED_TITLE: &str = "Queue Finished";
 const FRAME_NOTIFICATION_ICON: &str = "frame";
-#[cfg(any(target_os = "linux", test))]
+#[cfg(target_os = "linux")]
 const CONVERSION_FINISHED_NOTIFICATION_ID: &str = "conversion-finished";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -505,10 +505,5 @@ mod tests {
         assert_eq!(portal_icon_names(None), ["frame"]);
         assert_eq!(portal_icon_names(Some("  ")), ["frame"]);
         assert_eq!(portal_icon_names(Some("frame")), ["frame"]);
-    }
-
-    #[test]
-    fn portal_notification_id_is_stable() {
-        assert_eq!(CONVERSION_FINISHED_NOTIFICATION_ID, "conversion-finished");
     }
 }

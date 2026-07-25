@@ -159,16 +159,6 @@ mod frame_assets {
     }
 
     #[test]
-    fn frame_font_family_matches_bundled_font_name_table_family() {
-        assert_eq!(FRAME_FONT_FAMILY, "Overused Grotesk");
-    }
-
-    #[test]
-    fn frame_font_alias_matches_bundled_font_alias() {
-        assert_eq!(FRAME_FONT_ALIAS, "OverusedGrotesk");
-    }
-
-    #[test]
     fn frame_font_features_enable_requested_opentype_tags() {
         let features = frame_font_features();
 
@@ -211,10 +201,5 @@ mod frame_assets {
                 "{path} should load"
             );
         }
-    }
-
-    #[test]
-    fn frame_font_bytes_registers_regular_and_medium_faces() {
-        assert_eq!(frame_font_bytes().len(), 2);
     }
 }

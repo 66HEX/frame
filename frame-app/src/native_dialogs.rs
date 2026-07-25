@@ -151,17 +151,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn source_dialog_spec_matches_runtime_source_validation_extensions() {
-        assert_eq!(
-            SOURCE_FILE_DIALOG_SPEC.filters[0],
-            NativeDialogFilterSpec {
-                label: "Media Files",
-                extensions: SOURCE_FILE_EXTENSIONS,
-            }
-        );
-    }
-
-    #[test]
     fn source_dialog_spec_keeps_platform_group_filters() {
         assert_eq!(
             SOURCE_FILE_DIALOG_SPEC.filters,

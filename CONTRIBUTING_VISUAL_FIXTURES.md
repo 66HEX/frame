@@ -31,6 +31,43 @@ cargo xtask run
 Use a clean app window for visual review when possible. Fixtures run at startup
 and intentionally override only the state they need for the target scenario.
 
+## Appearance Regression Pair
+
+Run this pair after changing shared card, button, input, or separator styling.
+It replaces unit assertions against the internal order of `BoxShadow` layers
+and raw button color tokens with a review of the rendered result.
+
+```bash
+FRAME_GPUI_VISUAL_FIXTURE=app-settings \
+FRAME_GPUI_UI_SCALE=100 \
+FRAME_VISUAL_THEME=dark \
+cargo xtask run
+```
+
+```bash
+FRAME_GPUI_VISUAL_FIXTURE=app-settings \
+FRAME_GPUI_UI_SCALE=100 \
+FRAME_VISUAL_THEME=light \
+cargo xtask run
+```
+
+For both themes, verify the following rendered relationships:
+
+1. the settings sheet and its cards remain visually separated from the app
+   surface without clipped shadows;
+2. default, secondary, ghost, disabled, hovered, and pressed buttons remain
+   distinguishable;
+3. text inputs and select controls use the same recessed depth as neighboring
+   buttons;
+4. separators remain crisp at the platform pixel scale and do not turn into a
+   blurred band;
+5. focus rings, text contrast, and disabled-state contrast remain legible.
+
+Capture before-and-after images at the same window size when a change is
+intentional. The code-level WCAG contrast and focus behavior tests remain the
+automated safety net; this pair checks what those structural tests could not:
+the final GPUI rendering.
+
 ## Available Fixtures
 
 | Fixture | Visual scenario | What it is useful for checking |

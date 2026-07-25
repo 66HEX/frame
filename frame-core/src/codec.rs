@@ -238,12 +238,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn jpeg_quality_to_qscale_maps_best_quality_to_low_quantizer() {
-        assert_eq!(jpeg_quality_to_qscale(100), 2);
-    }
-
-    #[test]
-    fn jpeg_quality_to_qscale_maps_lowest_quality_to_high_quantizer() {
-        assert_eq!(jpeg_quality_to_qscale(1), 31);
+    fn jpeg_quality_to_qscale_maps_both_quality_endpoints() {
+        for (quality, expected) in [(100, 2), (1, 31)] {
+            assert_eq!(
+                jpeg_quality_to_qscale(quality),
+                expected,
+                "unexpected qscale for JPEG quality {quality}"
+            );
+        }
     }
 }

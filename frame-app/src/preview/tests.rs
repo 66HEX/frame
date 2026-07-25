@@ -43,23 +43,15 @@ mod transform_crop_rect {
     use super::*;
 
     #[test]
-    fn round_trips_zero_rotation_without_flips() {
-        assert_round_trip(PreviewRotation::Deg0, false, false);
-    }
-
-    #[test]
-    fn round_trips_side_rotation_with_both_flips() {
-        assert_round_trip(PreviewRotation::Deg90, true, true);
-    }
-
-    #[test]
-    fn round_trips_half_rotation_with_horizontal_flip() {
-        assert_round_trip(PreviewRotation::Deg180, true, false);
-    }
-
-    #[test]
-    fn round_trips_reverse_side_rotation_with_vertical_flip() {
-        assert_round_trip(PreviewRotation::Deg270, false, true);
+    fn transform_crop_rect_round_trips_the_rotation_and_flip_matrix() {
+        for (rotation, flip_horizontal, flip_vertical) in [
+            (PreviewRotation::Deg0, false, false),
+            (PreviewRotation::Deg90, true, true),
+            (PreviewRotation::Deg180, true, false),
+            (PreviewRotation::Deg270, false, true),
+        ] {
+            assert_round_trip(rotation, flip_horizontal, flip_vertical);
+        }
     }
 
     fn assert_round_trip(rotation: PreviewRotation, flip_horizontal: bool, flip_vertical: bool) {
@@ -93,35 +85,21 @@ mod remap_drag_deltas {
     use super::*;
 
     #[test]
-    fn leaves_zero_rotation_deltas_unchanged() {
-        assert_eq!(
-            super::super::remap_drag_deltas(0.2, 0.1, PreviewRotation::Deg0, false, false),
-            DragDelta { dx: 0.2, dy: 0.1 }
-        );
-    }
+    fn remap_drag_deltas_handles_the_rotation_matrix() {
+        let cases = [
+            (PreviewRotation::Deg0, DragDelta { dx: 0.2, dy: 0.1 }),
+            (PreviewRotation::Deg90, DragDelta { dx: 0.1, dy: -0.2 }),
+            (PreviewRotation::Deg180, DragDelta { dx: -0.2, dy: -0.1 }),
+            (PreviewRotation::Deg270, DragDelta { dx: -0.1, dy: 0.2 }),
+        ];
 
-    #[test]
-    fn remaps_clockwise_side_rotation() {
-        assert_eq!(
-            super::super::remap_drag_deltas(0.2, 0.1, PreviewRotation::Deg90, false, false),
-            DragDelta { dx: 0.1, dy: -0.2 }
-        );
-    }
-
-    #[test]
-    fn remaps_half_rotation() {
-        assert_eq!(
-            super::super::remap_drag_deltas(0.2, 0.1, PreviewRotation::Deg180, false, false),
-            DragDelta { dx: -0.2, dy: -0.1 }
-        );
-    }
-
-    #[test]
-    fn remaps_reverse_side_rotation() {
-        assert_eq!(
-            super::super::remap_drag_deltas(0.2, 0.1, PreviewRotation::Deg270, false, false),
-            DragDelta { dx: -0.1, dy: 0.2 }
-        );
+        for (rotation, expected) in cases {
+            assert_eq!(
+                super::super::remap_drag_deltas(0.2, 0.1, rotation, false, false),
+                expected,
+                "delta remapping failed for rotation={rotation:?}"
+            );
+        }
     }
 
     #[test]

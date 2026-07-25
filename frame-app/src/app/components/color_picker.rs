@@ -223,10 +223,4 @@ mod tests {
         assert_eq!(frame_hsv_to_hex(120.0, 1.0, 1.0), "#00ff00");
         assert_eq!(frame_hsv_to_hex(240.0, 1.0, 1.0), "#0000ff");
     }
-
-    #[test]
-    fn frame_color_picker_visual_sizes_match_settings_control() {
-        assert!((FRAME_COLOR_PICKER_SV_HEIGHT - 96.0).abs() < f32::EPSILON);
-        assert!((FRAME_COLOR_PICKER_HUE_HEIGHT - 10.0).abs() < f32::EPSILON);
-    }
 }

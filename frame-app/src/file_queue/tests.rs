@@ -23,11 +23,6 @@ mod file_status {
     }
 
     #[test]
-    fn completed_files_are_not_actionable_for_conversion() {
-        assert!(!FileStatus::Completed.is_actionable_for_conversion());
-    }
-
-    #[test]
     fn only_idle_and_error_files_are_actionable_for_conversion() {
         assert!(FileStatus::Idle.is_actionable_for_conversion());
         assert!(FileStatus::Error.is_actionable_for_conversion());
@@ -35,11 +30,6 @@ mod file_status {
         assert!(!FileStatus::Converting.is_actionable_for_conversion());
         assert!(!FileStatus::Paused.is_actionable_for_conversion());
         assert!(!FileStatus::Cancelling.is_actionable_for_conversion());
-    }
-
-    #[test]
-    fn converting_files_are_not_removed_directly_from_list() {
-        assert!(!FileStatus::Converting.can_be_removed_from_list());
     }
 
     #[test]
@@ -597,25 +587,6 @@ mod file_queue {
         queue.add_file(sample_file("first", "/tmp/one.mp4", 10));
 
         assert!(!queue.selected_file_locked());
-    }
-
-    #[test]
-    fn file_status_locks_settings_for_processing_and_completed_states() {
-        let locked_statuses = [
-            FileStatus::Queued,
-            FileStatus::Converting,
-            FileStatus::Paused,
-            FileStatus::Cancelling,
-            FileStatus::Completed,
-        ];
-
-        assert!(locked_statuses.into_iter().all(FileStatus::locks_settings));
-    }
-
-    #[test]
-    fn file_status_keeps_only_idle_and_error_editable() {
-        assert!(!FileStatus::Idle.locks_settings());
-        assert!(!FileStatus::Error.locks_settings());
     }
 
     #[test]

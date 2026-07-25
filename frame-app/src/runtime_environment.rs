@@ -21,22 +21,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn flatpak_detection_accepts_environment_marker() {
-        assert!(is_flatpak_from(true, false));
-    }
-
-    #[test]
-    fn flatpak_detection_accepts_info_file() {
-        assert!(is_flatpak_from(false, true));
-    }
-
-    #[test]
-    fn flatpak_detection_accepts_both_markers() {
-        assert!(is_flatpak_from(true, true));
-    }
-
-    #[test]
-    fn flatpak_detection_rejects_missing_markers() {
-        assert!(!is_flatpak_from(false, false));
+    fn flatpak_detection_follows_the_marker_truth_table() {
+        for (flatpak_id_present, flatpak_info_exists, expected) in [
+            (true, false, true),
+            (false, true, true),
+            (true, true, true),
+            (false, false, false),
+        ] {
+            assert_eq!(
+                is_flatpak_from(flatpak_id_present, flatpak_info_exists),
+                expected,
+                "unexpected detection for env={flatpak_id_present}, info-file={flatpak_info_exists}"
+            );
+        }
     }
 }

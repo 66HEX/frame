@@ -491,123 +491,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn button_motion_emphasizes_hovered_button() {
-        assert!(button_motion_is_emphasized(true, true, false));
-    }
+    fn button_motion_emphasis_follows_the_interaction_matrix() {
+        let cases = [
+            (true, true, false, true),
+            (true, false, true, true),
+            (true, false, false, false),
+            (false, true, true, false),
+        ];
 
-    #[test]
-    fn button_motion_keeps_pressed_button_emphasized_without_hover() {
-        assert!(button_motion_is_emphasized(true, false, true));
-    }
-
-    #[test]
-    fn button_motion_clears_emphasis_after_release_outside() {
-        assert!(!button_motion_is_emphasized(true, false, false));
-    }
-
-    #[test]
-    fn button_motion_never_emphasizes_disabled_button() {
-        assert!(!button_motion_is_emphasized(false, true, true));
-    }
-
-    #[test]
-    fn light_cards_use_control_geometry_outside_the_surface() {
-        let palette = theme::palette(crate::appearance::ColorTheme::Light);
-        let controls = input_highlight_shadows(palette);
-        let cards = card_surface_shadows(palette);
-
-        assert_eq!(cards.len(), controls.len());
-        for (card, control) in cards.iter().zip(&controls) {
-            assert_eq!(card.color, control.color);
-            assert_eq!(card.offset, control.offset);
-            assert_eq!(card.blur_radius, control.blur_radius);
-            assert_eq!(card.spread_radius, control.spread_radius);
-            assert!(!card.inset);
-            assert!(control.inset);
+        for (enabled, hovered, pressed, expected) in cases {
+            assert_eq!(
+                button_motion_is_emphasized(enabled, hovered, pressed),
+                expected,
+                "emphasis mismatch for enabled={enabled}, hovered={hovered}, pressed={pressed}"
+            );
         }
-    }
-
-    #[test]
-    fn dark_card_surface_shadow_stack_preserves_legacy_geometry() {
-        let shadows = card_surface_shadows(theme::palette(crate::appearance::ColorTheme::Dark));
-
-        assert_eq!(shadows.len(), 4);
-        assert_eq!(shadows[0].offset.y, px(4.0));
-        assert_eq!(shadows[0].blur_radius, px(6.0));
-        assert_eq!(shadows[1].offset.y, px(2.0));
-        assert_eq!(shadows[1].blur_radius, px(4.0));
-        assert!(shadows[2].inset);
-        assert!(shadows[3].inset);
-    }
-
-    #[test]
-    fn light_buttons_use_the_same_recessed_depth_as_inputs() {
-        let palette = theme::palette(crate::appearance::ColorTheme::Light);
-
-        assert_eq!(
-            button_highlight_shadows(palette),
-            input_highlight_shadows(palette)
-        );
-    }
-
-    #[test]
-    fn light_controls_match_motion_core_search_trigger_geometry() {
-        let palette = theme::palette(crate::appearance::ColorTheme::Light);
-        let shadows = input_highlight_shadows(palette);
-
-        assert_eq!(shadows.len(), 5);
-        assert_eq!(shadows[0].offset.y, px(1.0));
-        assert_eq!(shadows[0].blur_radius, px(1.0));
-        assert_eq!(shadows[0].spread_radius, px(-0.5));
-        assert_eq!(shadows[1].offset.y, px(3.0));
-        assert_eq!(shadows[1].blur_radius, px(3.0));
-        assert_eq!(shadows[1].spread_radius, px(-1.5));
-        assert_eq!(shadows[2].offset.y, px(6.0));
-        assert_eq!(shadows[2].blur_radius, px(6.0));
-        assert_eq!(shadows[2].spread_radius, px(-3.0));
-        assert_eq!(shadows[3].offset.y, px(-frame_highlight_px()));
-        assert_eq!(shadows[4].spread_radius, px(frame_highlight_px()));
-        assert!(shadows.iter().all(|shadow| shadow.inset));
-    }
-
-    #[test]
-    fn dark_control_shadows_preserve_legacy_geometry() {
-        let palette = theme::palette(crate::appearance::ColorTheme::Dark);
-        let inputs = input_highlight_shadows(palette);
-        let buttons = button_highlight_shadows(palette);
-
-        assert_eq!(inputs.len(), 2);
-        assert_eq!(inputs[0].offset.y, px(frame_highlight_px()));
-        assert_eq!(inputs[1].offset.y, px(-frame_highlight_px()));
-        assert!(inputs.iter().all(|shadow| shadow.inset));
-
-        assert_eq!(buttons.len(), 2);
-        assert_eq!(buttons[0].offset.y, px(frame_highlight_px()));
-        assert_eq!(buttons[1].spread_radius, px(frame_highlight_px()));
-        assert!(buttons.iter().all(|shadow| shadow.inset));
-    }
-
-    #[test]
-    fn dark_horizontal_separator_preserves_full_pixel_two_tone_edge() {
-        let palette = theme::palette(crate::appearance::ColorTheme::Dark);
-        let shadows = horizontal_separator_shadows(palette);
-
-        assert_eq!(shadows.len(), 1);
-        assert_eq!(shadows[0].color, color(palette.fill_subtle).into());
-        assert_eq!(shadows[0].offset.y, px(1.0));
-        assert_eq!(shadows[0].blur_radius, px(0.0));
-        assert!(!shadows[0].inset);
-    }
-
-    #[test]
-    fn light_horizontal_separator_keeps_platform_hairline_edge() {
-        let palette = theme::palette(crate::appearance::ColorTheme::Light);
-        let shadows = horizontal_separator_shadows(palette);
-
-        assert_eq!(shadows.len(), 1);
-        assert_eq!(shadows[0].color, color(palette.border_subtle).into());
-        assert_eq!(shadows[0].offset.y, px(frame_highlight_px()));
-        assert_eq!(shadows[0].blur_radius, px(0.0));
-        assert!(!shadows[0].inset);
     }
 }

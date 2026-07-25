@@ -270,13 +270,21 @@ mod tests {
     }
 
     #[test]
-    fn next_clamps_at_maximum() {
-        assert_eq!(ScalePreset::Percent200.next(), ScalePreset::Percent200);
-    }
-
-    #[test]
-    fn previous_clamps_at_minimum() {
-        assert_eq!(ScalePreset::Percent80.previous(), ScalePreset::Percent80);
+    fn next_and_previous_clamp_at_the_supported_bounds() {
+        for (actual, expected, boundary) in [
+            (
+                ScalePreset::Percent200.next(),
+                ScalePreset::Percent200,
+                "maximum",
+            ),
+            (
+                ScalePreset::Percent80.previous(),
+                ScalePreset::Percent80,
+                "minimum",
+            ),
+        ] {
+            assert_eq!(actual, expected, "preset did not clamp at {boundary}");
+        }
     }
 
     #[test]
