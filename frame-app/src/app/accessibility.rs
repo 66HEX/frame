@@ -127,10 +127,13 @@ impl FrameRoot {
     }
 }
 
-pub(in crate::app) fn focus_visible_ring(style: StyleRefinement) -> StyleRefinement {
+pub(in crate::app) fn focus_visible_ring(
+    style: StyleRefinement,
+    palette: &'static theme::ThemePalette,
+) -> StyleRefinement {
     style
         .ring_width(px(FOCUS_RING_WIDTH))
-        .ring_color(color(theme::FRAME_BLUE.with_alpha(FOCUS_RING_ALPHA)))
+        .ring_color(color(palette.accent.with_alpha(FOCUS_RING_ALPHA)))
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -217,13 +220,14 @@ pub(in crate::app) fn apply_accessible_button(
     element: gpui::Stateful<gpui::Div>,
     label: impl Into<SharedString>,
     enabled: bool,
+    palette: &'static theme::ThemePalette,
 ) -> gpui::Stateful<gpui::Div> {
     let element = element.role(Role::Button).aria_label(label);
     if enabled {
         element
             .focusable()
             .tab_stop(true)
-            .focus_visible(focus_visible_ring)
+            .focus_visible(move |style| focus_visible_ring(style, palette))
     } else {
         element.tab_stop(false).aria_disabled(true)
     }
@@ -234,13 +238,16 @@ pub(in crate::app) fn apply_accessible_button_with_focus(
     label: impl Into<SharedString>,
     enabled: bool,
     focus: &FocusHandle,
+    palette: &'static theme::ThemePalette,
 ) -> gpui::Stateful<gpui::Div> {
     let element = element
         .role(Role::Button)
         .aria_label(label)
         .track_focus(focus);
     if enabled {
-        element.tab_stop(true).focus_visible(focus_visible_ring)
+        element
+            .tab_stop(true)
+            .focus_visible(move |style| focus_visible_ring(style, palette))
     } else {
         element.tab_stop(false).aria_disabled(true)
     }
@@ -251,8 +258,9 @@ pub(in crate::app) fn apply_accessible_toggle_button(
     label: impl Into<SharedString>,
     enabled: bool,
     selected: bool,
+    palette: &'static theme::ThemePalette,
 ) -> gpui::Stateful<gpui::Div> {
-    apply_accessible_button(element, label, enabled).aria_toggled(Toggled::from(selected))
+    apply_accessible_button(element, label, enabled, palette).aria_toggled(Toggled::from(selected))
 }
 
 pub(in crate::app) fn apply_accessible_checkbox(
@@ -261,6 +269,7 @@ pub(in crate::app) fn apply_accessible_checkbox(
     enabled: bool,
     checked: bool,
     indeterminate: bool,
+    palette: &'static theme::ThemePalette,
 ) -> gpui::Stateful<gpui::Div> {
     let toggled = if indeterminate {
         Toggled::Mixed
@@ -275,7 +284,7 @@ pub(in crate::app) fn apply_accessible_checkbox(
         element
             .focusable()
             .tab_stop(true)
-            .focus_visible(focus_visible_ring)
+            .focus_visible(move |style| focus_visible_ring(style, palette))
     } else {
         element.tab_stop(false).aria_disabled(true)
     }
@@ -288,6 +297,7 @@ pub(in crate::app) fn apply_accessible_checkbox_with_focus(
     checked: bool,
     indeterminate: bool,
     focus: &FocusHandle,
+    palette: &'static theme::ThemePalette,
 ) -> gpui::Stateful<gpui::Div> {
     let toggled = if indeterminate {
         Toggled::Mixed
@@ -300,7 +310,9 @@ pub(in crate::app) fn apply_accessible_checkbox_with_focus(
         .aria_toggled(toggled)
         .track_focus(focus);
     if enabled {
-        element.tab_stop(true).focus_visible(focus_visible_ring)
+        element
+            .tab_stop(true)
+            .focus_visible(move |style| focus_visible_ring(style, palette))
     } else {
         element.tab_stop(false).aria_disabled(true)
     }
@@ -311,6 +323,7 @@ pub(in crate::app) fn apply_accessible_select_trigger(
     label: impl Into<SharedString>,
     enabled: bool,
     expanded: bool,
+    palette: &'static theme::ThemePalette,
 ) -> gpui::Stateful<gpui::Div> {
     let element = element
         .role(Role::ComboBox)
@@ -320,7 +333,7 @@ pub(in crate::app) fn apply_accessible_select_trigger(
         element
             .focusable()
             .tab_stop(true)
-            .focus_visible(focus_visible_ring)
+            .focus_visible(move |style| focus_visible_ring(style, palette))
     } else {
         element.tab_stop(false).aria_disabled(true)
     }
@@ -332,6 +345,7 @@ pub(in crate::app) fn apply_accessible_select_trigger_with_focus(
     enabled: bool,
     expanded: bool,
     focus: &FocusHandle,
+    palette: &'static theme::ThemePalette,
 ) -> gpui::Stateful<gpui::Div> {
     let element = element
         .role(Role::ComboBox)
@@ -339,7 +353,9 @@ pub(in crate::app) fn apply_accessible_select_trigger_with_focus(
         .aria_expanded(expanded)
         .track_focus(focus);
     if enabled {
-        element.tab_stop(true).focus_visible(focus_visible_ring)
+        element
+            .tab_stop(true)
+            .focus_visible(move |style| focus_visible_ring(style, palette))
     } else {
         element.tab_stop(false).aria_disabled(true)
     }
@@ -350,6 +366,7 @@ pub(in crate::app) fn apply_accessible_select_option(
     label: impl Into<SharedString>,
     enabled: bool,
     selected: bool,
+    palette: &'static theme::ThemePalette,
 ) -> gpui::Stateful<gpui::Div> {
     let element = element
         .role(Role::ListBoxOption)
@@ -359,7 +376,7 @@ pub(in crate::app) fn apply_accessible_select_option(
         element
             .focusable()
             .tab_stop(true)
-            .focus_visible(focus_visible_ring)
+            .focus_visible(move |style| focus_visible_ring(style, palette))
     } else {
         element.tab_stop(false).aria_disabled(true)
     }
@@ -371,6 +388,7 @@ pub(in crate::app) fn apply_accessible_select_option_with_focus(
     enabled: bool,
     selected: bool,
     focus: &FocusHandle,
+    palette: &'static theme::ThemePalette,
 ) -> gpui::Stateful<gpui::Div> {
     let element = element
         .role(Role::ListBoxOption)
@@ -378,12 +396,18 @@ pub(in crate::app) fn apply_accessible_select_option_with_focus(
         .aria_selected(selected)
         .track_focus(focus);
     if enabled {
-        element.tab_stop(true).focus_visible(focus_visible_ring)
+        element
+            .tab_stop(true)
+            .focus_visible(move |style| focus_visible_ring(style, palette))
     } else {
         element.tab_stop(false).aria_disabled(true)
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Slider accessibility requires the full ARIA range plus explicit theme and render context."
+)]
 pub(in crate::app) fn apply_accessible_slider(
     element: gpui::Stateful<gpui::Div>,
     label: impl Into<SharedString>,
@@ -392,6 +416,7 @@ pub(in crate::app) fn apply_accessible_slider(
     min: f64,
     max: f64,
     value_text: impl Into<String>,
+    palette: &'static theme::ThemePalette,
 ) -> gpui::Stateful<gpui::Div> {
     let element = element
         .role(Role::Slider)
@@ -405,7 +430,7 @@ pub(in crate::app) fn apply_accessible_slider(
         element
             .focusable()
             .tab_stop(true)
-            .focus_visible(focus_visible_ring)
+            .focus_visible(move |style| focus_visible_ring(style, palette))
     } else {
         element.tab_stop(false).aria_disabled(true)
     }
@@ -424,6 +449,7 @@ pub(in crate::app) fn apply_accessible_slider_with_focus(
     max: f64,
     value_text: impl Into<String>,
     focus: &FocusHandle,
+    palette: &'static theme::ThemePalette,
 ) -> gpui::Stateful<gpui::Div> {
     let element = element
         .role(Role::Slider)
@@ -435,7 +461,9 @@ pub(in crate::app) fn apply_accessible_slider_with_focus(
         .aria_value(value_text)
         .track_focus(focus);
     if enabled {
-        element.tab_stop(true).focus_visible(focus_visible_ring)
+        element
+            .tab_stop(true)
+            .focus_visible(move |style| focus_visible_ring(style, palette))
     } else {
         element.tab_stop(false).aria_disabled(true)
     }
@@ -446,6 +474,7 @@ pub(in crate::app) fn apply_accessible_text_input(
     label: impl Into<SharedString>,
     enabled: bool,
     value: impl Into<String>,
+    palette: &'static theme::ThemePalette,
 ) -> gpui::Stateful<gpui::Div> {
     let element = element
         .role(Role::TextInput)
@@ -455,7 +484,7 @@ pub(in crate::app) fn apply_accessible_text_input(
         element
             .focusable()
             .tab_stop(true)
-            .focus_visible(focus_visible_ring)
+            .focus_visible(move |style| focus_visible_ring(style, palette))
     } else {
         element.tab_stop(false).aria_disabled(true)
     }
@@ -467,12 +496,13 @@ mod tests {
 
     #[test]
     fn focus_ring_uses_non_layout_affecting_ring_style() {
-        let style = focus_visible_ring(StyleRefinement::default());
+        let palette = theme::palette(crate::appearance::ColorTheme::Dark);
+        let style = focus_visible_ring(StyleRefinement::default(), palette);
 
         assert_eq!(style.ring_width, Some(px(FOCUS_RING_WIDTH).into()));
         assert_eq!(
             style.ring_color,
-            Some(color(theme::FRAME_BLUE.with_alpha(FOCUS_RING_ALPHA)).into())
+            Some(color(palette.accent.with_alpha(FOCUS_RING_ALPHA)).into())
         );
         assert!(style.box_shadow.is_none());
     }

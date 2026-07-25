@@ -11,7 +11,9 @@ struct PreviewCanvasBoundsProbe {
     owner: Entity<FrameRoot>,
 }
 
-struct PreviewViewportRoundedClip;
+struct PreviewViewportRoundedClip {
+    color: Rgba,
+}
 
 struct PreviewMediaImage {
     render_image: Arc<RenderImage>,
@@ -260,7 +262,7 @@ impl Element for PreviewViewportRoundedClip {
         // exact rounded-corner cutouts painted above it.
         let radius = theme::ui_rem(theme::RADIUS_MD).to_pixels(window.rem_size());
         if let Some(path) = preview_viewport_rounded_clip_path(bounds, radius) {
-            window.paint_path(path, parse_hex("#1B1D21"));
+            window.paint_path(path, self.color);
         }
     }
 }
@@ -289,6 +291,7 @@ pub(in crate::app) fn preview_viewport(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
+    let palette = state.palette;
     let pan_enabled = preview_canvas_pan_enabled(state);
     let mut viewport = div()
         .id("preview-viewport")
@@ -301,8 +304,8 @@ pub(in crate::app) fn preview_viewport(
         .justify_center()
         .overflow_hidden()
         .rounded(theme::ui_rem(theme::RADIUS_MD))
-        .bg(parse_hex("#14161A"))
-        .shadow(input_highlight_shadows())
+        .bg(color(palette.canvas))
+        .shadow(input_highlight_shadows(palette))
         .track_focus(focuses.viewport)
         .tab_stop(pan_enabled)
         .child(preview_viewport_content(state, cx));
@@ -313,7 +316,7 @@ pub(in crate::app) fn preview_viewport(
             .role(gpui::Role::Pane)
             .aria_label("Preview canvas")
             .aria_description("Use arrow keys to pan the zoomed preview.")
-            .focus_visible(focus_visible_ring)
+            .focus_visible(move |style| focus_visible_ring(style, palette))
             .cursor_grab()
             .on_key_down(
                 cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
@@ -333,7 +336,9 @@ pub(in crate::app) fn preview_viewport(
     }
 
     if state.render_image.is_some() && state.media.is_some() {
-        viewport = viewport.child(PreviewViewportRoundedClip);
+        viewport = viewport.child(PreviewViewportRoundedClip {
+            color: color(palette.surface),
+        });
     }
 
     if state.crop.crop_mode && state.crop.draft_crop.is_some() {
@@ -368,6 +373,7 @@ pub(in crate::app) fn preview_viewport_content(
     state: &PreviewShellState,
     cx: &Context<FrameRoot>,
 ) -> gpui::AnyElement {
+    let palette = state.palette;
     if let (Some(render_image), Some(media)) = (&state.render_image, state.media) {
         let content = div()
             .id("preview-canvas-pan-layer")
@@ -438,7 +444,7 @@ pub(in crate::app) fn preview_viewport_content(
         .gap_3()
         .text_center()
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-        .text_color(color(theme::FRAME_GRAY_600));
+        .text_color(color(palette.text_muted));
 
     if state.selected_file_name.is_none() {
         return content
@@ -454,14 +460,14 @@ pub(in crate::app) fn preview_viewport_content(
             let mut error = content
                 .role(gpui::Role::Alert)
                 .aria_label("Preview unavailable")
-                .text_color(color(theme::FRAME_RED))
+                .text_color(color(palette.danger))
                 .child(theme::ui_text("Preview unavailable"));
             if let Some(message) = state.metadata_error.as_deref() {
                 error = error.child(
                     div()
                         .max_w(theme::ui_rem(320.0))
                         .truncate()
-                        .text_color(color(theme::FRAME_GRAY_600))
+                        .text_color(color(palette.text_muted))
                         .child(message.to_string()),
                 );
             }
@@ -472,13 +478,13 @@ pub(in crate::app) fn preview_viewport_content(
                 return content
                     .role(gpui::Role::Alert)
                     .aria_label("Preview unavailable")
-                    .text_color(color(theme::FRAME_RED))
+                    .text_color(color(palette.danger))
                     .child(theme::ui_text("Preview unavailable"))
                     .child(
                         div()
                             .max_w(theme::ui_rem(320.0))
                             .truncate()
-                            .text_color(color(theme::FRAME_GRAY_600))
+                            .text_color(color(palette.text_muted))
                             .child(message.to_string()),
                     )
                     .into_any_element();
@@ -494,7 +500,10 @@ pub(in crate::app) fn preview_viewport_content(
                     .into_any_element();
             }
 
-            content.child(preview_media_placeholder(state.availability.media_kind))
+            content.child(preview_media_placeholder(
+                state.availability.media_kind,
+                palette,
+            ))
         }
     };
 
@@ -703,11 +712,14 @@ fn preview_scroll_delta_y(delta: &ScrollDelta) -> f64 {
     }
 }
 
-pub(in crate::app) fn preview_media_placeholder(media_kind: PreviewMediaKind) -> gpui::Div {
+pub(in crate::app) fn preview_media_placeholder(
+    media_kind: PreviewMediaKind,
+    palette: &'static theme::ThemePalette,
+) -> gpui::Div {
     div().flex().items_center().justify_center().child(icon_svg(
         preview_media_icon(media_kind),
         32.0,
-        color(theme::FRAME_GRAY_600),
+        color(palette.text_muted),
     ))
 }
 
@@ -766,6 +778,7 @@ mod tests {
     #[test]
     fn preview_waiting_for_visual_render_only_hides_visual_media_without_frame() {
         let mut state = PreviewShellState {
+            palette: theme::palette(crate::appearance::ColorTheme::Dark),
             selected_file_name: Some("sample.mov".to_string()),
             metadata_status: PreviewMetadataStatus::Ready,
             metadata_error: None,

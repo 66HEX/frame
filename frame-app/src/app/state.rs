@@ -61,9 +61,14 @@ impl FrameRoot {
 
     fn new_inner(
         persistence: Option<AppPersistence>,
-        persisted_settings: AppSettings,
+        mut persisted_settings: AppSettings,
         notifier: AppNotifier,
     ) -> Self {
+        if let Some(color_theme) = crate::appearance::color_theme_from_env_value(
+            std::env::var("FRAME_VISUAL_THEME").ok().as_deref(),
+        ) {
+            persisted_settings.appearance.color_theme = color_theme;
+        }
         let conversion_processes = ConversionProcessController::default();
         let max_concurrency = if conversion_processes
             .update_max_concurrency(persisted_settings.max_concurrency)

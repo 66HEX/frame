@@ -27,7 +27,7 @@ pub use runtime::{frame_window_options, init_app, open_frame_window};
 
 use accessibility::{FrameFocusKey, FrameFocusRegistry};
 use chrome::{
-    AppSettingsScaleSelectFocuses, AppSettingsSheetProps, app_settings_sheet, drag_drop_overlay,
+    AppSettingsSelectFocuses, AppSettingsSheetProps, app_settings_sheet, drag_drop_overlay,
     titlebar, update_dialog,
 };
 use input::{FrameTextInputKind, FrameTextInputUiState};
@@ -70,7 +70,7 @@ use crate::{
     active_view_from_env_value,
     app_info::{FRAME_APP_ID, FRAME_APP_VERSION},
     app_persistence::{AppPersistence, AppSettings},
-    appearance::{AppearanceSettings, ScalePreset},
+    appearance::{AppearanceSettings, ColorTheme, ScalePreset},
     assets::{self},
     capabilities::{detect_available_encoders, detect_available_filters},
     conversion_events::{ActiveLogFile, ConversionEventState, LogLine, all_conversions_settled},
@@ -308,8 +308,10 @@ struct SettingsUiState {
     max_concurrency_error: Option<String>,
     output_directory_error: Option<String>,
     appearance_error: Option<String>,
-    ui_scale_popover: UiScalePopoverState,
+    theme_popover: PopoverState,
+    ui_scale_popover: PopoverState,
     app_settings_scroll_handle: ScrollHandle,
+    theme_scroll_handle: ScrollHandle,
     ui_scale_scroll_handle: ScrollHandle,
     preset_name_draft: String,
     preset_notice: Option<PresetNotice>,
@@ -317,14 +319,20 @@ struct SettingsUiState {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(super) enum UiScalePopoverState {
+pub(super) enum PopoverState {
     #[default]
     Hidden,
     Closing,
     Open,
 }
 
-impl UiScalePopoverState {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum AppearancePopover {
+    Theme,
+    UiScale,
+}
+
+impl PopoverState {
     pub(super) const fn is_open(self) -> bool {
         matches!(self, Self::Open)
     }
@@ -403,8 +411,10 @@ impl Default for SettingsUiState {
             max_concurrency_error: None,
             output_directory_error: None,
             appearance_error: None,
-            ui_scale_popover: UiScalePopoverState::Hidden,
+            theme_popover: PopoverState::Hidden,
+            ui_scale_popover: PopoverState::Hidden,
             app_settings_scroll_handle: ScrollHandle::new(),
+            theme_scroll_handle: ScrollHandle::new(),
             ui_scale_scroll_handle: ScrollHandle::new(),
             preset_name_draft: String::new(),
             preset_notice: None,
@@ -766,6 +776,7 @@ struct SettingsSubtitleColorPickerBounds {
 
 #[derive(Clone, Copy)]
 struct SettingsRenderState<'a> {
+    palette: &'static theme::ThemePalette,
     active_tab: SettingsTab,
     tooltip_visible_id: Option<&'a str>,
     config: &'a ConversionConfig,

@@ -19,6 +19,7 @@ pub(in crate::app) struct PreviewCropRenderState {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(in crate::app) struct PreviewShellState {
+    pub(in crate::app) palette: &'static theme::ThemePalette,
     pub(in crate::app) selected_file_name: Option<String>,
     pub(in crate::app) metadata_status: PreviewMetadataStatus,
     pub(in crate::app) metadata_error: Option<String>,
@@ -168,6 +169,7 @@ pub(in crate::app) fn preview_panel(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let palette = settings.palette;
     let state = preview_shell_state(PreviewShellStateInput {
         selected_file: file_queue.selected_file(),
         settings,
@@ -184,7 +186,7 @@ pub(in crate::app) fn preview_panel(
         .flex()
         .flex_col()
         .overflow_hidden()
-        .card_surface()
+        .card_surface(palette)
         .p(theme::ui_rem(PREVIEW_PANEL_PADDING))
         .child(preview_viewport(&state, props.viewport_focuses, window, cx))
         .child(preview_timeline(&state, props.timecode_focuses, window, cx))
@@ -214,6 +216,7 @@ pub(in crate::app) fn preview_shell_state(input: PreviewShellStateInput<'_>) -> 
     });
     let duration_seconds = preview_duration_seconds(settings.metadata);
     PreviewShellState {
+        palette: settings.palette,
         selected_file_name: selected_file.map(|file| file.name.clone()),
         metadata_status,
         metadata_error: settings.metadata_error.map(str::to_string),

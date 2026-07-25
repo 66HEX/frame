@@ -19,6 +19,7 @@ pub(in crate::app) fn settings_panel(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let palette = settings.palette;
     let active_tab =
         resolve_active_settings_tab(settings.active_tab, settings.config, settings.metadata);
     let visible_tabs = visible_settings_tabs(settings.config, settings.metadata);
@@ -36,6 +37,7 @@ pub(in crate::app) fn settings_panel(
             active_tab == *tab,
             &visible_tabs,
             settings.tooltip_visible_id,
+            palette,
             window,
             cx,
         ));
@@ -45,7 +47,7 @@ pub(in crate::app) fn settings_panel(
         .flex()
         .flex_col()
         .overflow_hidden()
-        .card_surface()
+        .card_surface(palette)
         .child(
             div()
                 .min_h(theme::ui_rem(PANEL_HEADER_HEIGHT))
@@ -56,7 +58,7 @@ pub(in crate::app) fn settings_panel(
                 .relative()
                 .px_4()
                 .child(tab_rail)
-                .child(panel_bottom_separator()),
+                .child(panel_bottom_separator(palette)),
         )
         .child(
             div()
@@ -75,25 +77,26 @@ pub(in crate::app) fn settings_tab_button(
     selected: bool,
     visible_tabs: &[SettingsTab],
     tooltip_visible_id: Option<&str>,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
-    let colors = button_colors(ButtonVariant::Secondary, selected, true);
+    let colors = button_colors(ButtonVariant::Secondary, selected, true, palette);
     let tab_id = format!("settings-tab-{}", tab.id());
     let motion = button_motion(format!("{tab_id}-hover"), window, cx);
     let hover_progress = *motion.hover_transition.evaluate(window, cx);
     let background = if selected {
         mix_color(colors.background, colors.hover_background, hover_progress)
     } else {
-        mix_color(theme::TRANSPARENT, theme::FRAME_GRAY_100, hover_progress)
+        mix_color(palette.transparent, palette.fill_subtle, hover_progress)
     };
     let foreground = mix_color(
         if selected {
-            theme::FOREGROUND
+            palette.text_primary
         } else {
-            theme::FRAME_GRAY_600
+            palette.text_muted
         },
-        theme::FOREGROUND,
+        palette.text_primary,
         hover_progress,
     );
     let keyboard_tabs = visible_tabs.to_vec();
@@ -105,7 +108,7 @@ pub(in crate::app) fn settings_tab_button(
         .aria_selected(selected)
         .focusable()
         .tab_stop(true)
-        .focus_visible(focus_visible_ring)
+        .focus_visible(move |style| focus_visible_ring(style, palette))
         .group(tab_id)
         .w(theme::ui_rem(SETTINGS_TAB_BUTTON_SIZE))
         .h(theme::ui_rem(SETTINGS_TAB_BUTTON_SIZE))
@@ -115,7 +118,9 @@ pub(in crate::app) fn settings_tab_button(
         .rounded(theme::ui_rem(theme::RADIUS_SM))
         .bg(background)
         .text_color(foreground)
-        .when(selected, |this| this.shadow(button_highlight_shadows()))
+        .when(selected, |this| {
+            this.shadow(button_highlight_shadows(palette))
+        })
         .hover(gpui::Styled::cursor_pointer)
         .active(move |style| style.bg(color(colors.active_background)))
         .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
@@ -147,6 +152,7 @@ pub(in crate::app) fn settings_tab_button(
         tab.label(),
         tooltip_visible_id == Some(tab.id()),
         button,
+        palette,
         window,
         cx,
     )
@@ -181,18 +187,20 @@ pub(in crate::app) fn settings_tab_content(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let palette = settings.palette;
     let content = div()
         .flex()
         .flex_col()
         .gap_4()
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-        .text_color(color(theme::FRAME_GRAY_600));
+        .text_color(color(palette.text_muted));
 
     match tab {
         SettingsTab::Source => content.child(settings_source_tab(
             settings.metadata,
             settings.metadata_status,
             settings.metadata_error,
+            palette,
         )),
         SettingsTab::Output => content.child(settings_output_tab(
             settings.config,
@@ -200,6 +208,7 @@ pub(in crate::app) fn settings_tab_content(
             settings.settings_disabled,
             settings.output_name,
             settings.output_name_focus,
+            palette,
             window,
             cx,
         )),
@@ -213,6 +222,7 @@ pub(in crate::app) fn settings_tab_content(
                 bitrate: settings.video_bitrate_focus,
                 gif_loop: settings.gif_loop_focus,
             },
+            palette,
             window,
             cx,
         )),
@@ -221,6 +231,7 @@ pub(in crate::app) fn settings_tab_content(
             settings.settings_disabled,
             source_kind_for(settings.metadata) == SourceKind::Image,
             settings.available_filters,
+            palette,
             window,
             cx,
         )),
@@ -229,6 +240,7 @@ pub(in crate::app) fn settings_tab_content(
             settings.settings_disabled,
             settings.video_width_focus,
             settings.video_height_focus,
+            palette,
             window,
             cx,
         )),
@@ -238,6 +250,7 @@ pub(in crate::app) fn settings_tab_content(
             settings.settings_disabled,
             settings.available_encoders,
             settings.audio_bitrate_focus,
+            palette,
             window,
             cx,
         )),
@@ -245,6 +258,7 @@ pub(in crate::app) fn settings_tab_content(
             settings.config,
             settings.settings_disabled,
             settings.available_filters,
+            palette,
             window,
             cx,
         )),
@@ -264,6 +278,7 @@ pub(in crate::app) fn settings_tab_content(
                 outline_color_draft: settings.subtitle_outline_color_draft,
                 font_color_hsv_draft: settings.subtitle_font_color_hsv_draft,
                 outline_color_hsv_draft: settings.subtitle_outline_color_hsv_draft,
+                palette,
             },
             window,
             cx,
@@ -273,6 +288,7 @@ pub(in crate::app) fn settings_tab_content(
             settings.metadata,
             settings.settings_disabled,
             settings.metadata_focuses,
+            palette,
             window,
             cx,
         )),
@@ -285,6 +301,7 @@ pub(in crate::app) fn settings_tab_content(
                 preset_name_focus: settings.preset_name_focus,
                 presets: settings.presets,
                 notice: settings.preset_notice,
+                palette,
             },
             window,
             cx,
@@ -292,12 +309,15 @@ pub(in crate::app) fn settings_tab_content(
     }
 }
 
-pub(in crate::app) fn settings_section(label: &'static str) -> gpui::Div {
+pub(in crate::app) fn settings_section(
+    label: &'static str,
+    palette: &'static theme::ThemePalette,
+) -> gpui::Div {
     div()
         .flex()
         .flex_col()
         .gap_3()
-        .child(settings_section_label(label))
+        .child(settings_section_label(label, palette))
 }
 
 #[cfg(test)]

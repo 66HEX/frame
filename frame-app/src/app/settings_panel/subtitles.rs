@@ -100,6 +100,7 @@ pub(in crate::app) struct SettingsSubtitlesTabState<'a> {
     pub(in crate::app) outline_color_draft: &'a str,
     pub(in crate::app) font_color_hsv_draft: SettingsSubtitleHsv,
     pub(in crate::app) outline_color_hsv_draft: SettingsSubtitleHsv,
+    pub(in crate::app) palette: &'static theme::ThemePalette,
 }
 
 #[derive(Clone, Copy)]
@@ -117,6 +118,7 @@ struct SettingsSubtitleStyleState<'a> {
     outline_color_draft: &'a str,
     font_color_hsv_draft: SettingsSubtitleHsv,
     outline_color_hsv_draft: SettingsSubtitleHsv,
+    palette: &'static theme::ThemePalette,
 }
 
 struct SettingsSubtitleColorFieldSpec<'a> {
@@ -131,6 +133,7 @@ struct SettingsSubtitleColorFieldSpec<'a> {
     rendered_popover: Option<SettingsSubtitlePopover>,
     draft: &'a str,
     hsv: SettingsSubtitleHsv,
+    palette: &'static theme::ThemePalette,
 }
 
 #[derive(Clone, Copy)]
@@ -143,6 +146,7 @@ struct SettingsSubtitleFontSelectState<'a> {
     popover: SettingsSubtitlePopover,
     scroll_handle: &'a ScrollHandle,
     focuses: SettingsSubtitleSelectFocuses<'a>,
+    palette: &'static theme::ThemePalette,
 }
 
 #[derive(Clone, Copy)]
@@ -154,6 +158,7 @@ struct SettingsSubtitleFontSizeSelectState<'a> {
     popover: SettingsSubtitlePopover,
     scroll_handle: &'a ScrollHandle,
     focuses: SettingsSubtitleSelectFocuses<'a>,
+    palette: &'static theme::ThemePalette,
 }
 
 #[expect(
@@ -165,30 +170,35 @@ pub(in crate::app) fn settings_subtitles_tab(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let palette = state.palette;
     let config = state.config;
     let copy_mode = config.processing_mode == ProcessingMode::Copy;
     let burn_in_disabled = state.settings_disabled || copy_mode;
     let content = div().flex().flex_col().gap_4().child(
-        settings_section("Burn-in subtitles")
+        settings_section("Burn-in subtitles", palette)
             .child(settings_subtitle_burn_button(
                 config,
                 burn_in_disabled,
                 state.focuses.burn_file,
+                palette,
                 window,
                 cx,
             ))
-            .child(settings_hint_text(if copy_mode {
-                "Burn-in subtitles are disabled in stream copy mode."
-            } else {
-                "Burning in subtitles will force video re-encoding."
-            })),
+            .child(settings_hint_text(
+                if copy_mode {
+                    "Burn-in subtitles are disabled in stream copy mode."
+                } else {
+                    "Burning in subtitles will force video re-encoding."
+                },
+                palette,
+            )),
     );
 
     let content = if copy_mode {
         content
     } else {
         content.child(
-            settings_section("Style").child(settings_subtitle_style_controls(
+            settings_section("Style", palette).child(settings_subtitle_style_controls(
                 SettingsSubtitleStyleState {
                     config,
                     disabled: burn_in_disabled,
@@ -203,6 +213,7 @@ pub(in crate::app) fn settings_subtitles_tab(
                     outline_color_draft: state.outline_color_draft,
                     font_color_hsv_draft: state.font_color_hsv_draft,
                     outline_color_hsv_draft: state.outline_color_hsv_draft,
+                    palette,
                 },
                 window,
                 cx,
@@ -212,22 +223,25 @@ pub(in crate::app) fn settings_subtitles_tab(
 
     let track_options = subtitle_track_options(config, state.metadata, state.settings_disabled);
     if track_options.is_empty() {
-        return content
-            .child(settings_section("Source tracks").child(settings_hint_text("No subtitles")));
+        return content.child(
+            settings_section("Source tracks", palette)
+                .child(settings_hint_text("No subtitles", palette)),
+        );
     }
 
     let mut list = div().grid().grid_cols(1).gap_2();
     for option in track_options {
-        list = list.child(settings_subtitle_track_button(option, window, cx));
+        list = list.child(settings_subtitle_track_button(option, palette, window, cx));
     }
 
-    content.child(settings_section("Source tracks").child(list))
+    content.child(settings_section("Source tracks", palette).child(list))
 }
 
 fn settings_subtitle_burn_button(
     config: &ConversionConfig,
     disabled: bool,
     burn_file_focus: Option<&FocusHandle>,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -245,12 +259,14 @@ fn settings_subtitle_burn_button(
                     config,
                     disabled,
                     burn_file_focus,
+                    palette,
                     window,
                     cx,
                 )),
         )
         .child(settings_subtitle_clear_button(
             disabled || !has_path,
+            palette,
             window,
             cx,
         ))
@@ -260,10 +276,11 @@ fn settings_subtitle_load_button(
     config: &ConversionConfig,
     disabled: bool,
     focus: Option<&FocusHandle>,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    let colors = button_colors(ButtonVariant::Secondary, false, !disabled);
+    let colors = button_colors(ButtonVariant::Secondary, false, !disabled, palette);
     let animated = animated_button_colors("settings-subtitle-burn-file", colors, window, cx);
     let background = animated.background;
     let foreground = animated.foreground;
@@ -290,7 +307,7 @@ fn settings_subtitle_load_button(
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
         .opacity(colors.opacity)
-        .shadow(button_highlight_shadows())
+        .shadow(button_highlight_shadows(palette))
         .when(!disabled, |this| {
             this.hover(gpui::Styled::cursor_pointer)
                 .active(move |style| style.bg(color(colors.active_background)))
@@ -308,14 +325,15 @@ fn settings_subtitle_load_button(
     let button = apply_button_motion(button, motion, !disabled);
 
     if let Some(focus) = focus {
-        apply_accessible_button_with_focus(button, label, !disabled, focus)
+        apply_accessible_button_with_focus(button, label, !disabled, focus, palette)
     } else {
-        apply_accessible_button(button, label, !disabled)
+        apply_accessible_button(button, label, !disabled, palette)
     }
 }
 
 fn settings_subtitle_clear_button(
     disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -329,6 +347,7 @@ fn settings_subtitle_clear_button(
             button: SETTINGS_CONTROL_HEIGHT,
             icon: FRAME_ICON_SM_SIZE,
         },
+        palette,
         window,
         cx,
     )
@@ -345,6 +364,7 @@ fn settings_subtitle_clear_button(
 
 #[expect(
     clippy::large_types_passed_by_value,
+    clippy::too_many_lines,
     reason = "Style render state is a short-lived bundle of references and copyable focus handles consumed during render."
 )]
 fn settings_subtitle_style_controls(
@@ -371,6 +391,7 @@ fn settings_subtitle_style_controls(
                         popover: SettingsSubtitlePopover::FontName,
                         scroll_handle: state.font_select_scroll_handle,
                         focuses: state.focuses.font_select,
+                        palette: state.palette,
                     },
                     window,
                     cx,
@@ -384,6 +405,7 @@ fn settings_subtitle_style_controls(
                         popover: SettingsSubtitlePopover::FontSize,
                         scroll_handle: state.font_size_select_scroll_handle,
                         focuses: state.focuses.font_size_select,
+                        palette: state.palette,
                     },
                     window,
                     cx,
@@ -410,6 +432,7 @@ fn settings_subtitle_style_controls(
                         rendered_popover: state.rendered_popover,
                         draft: state.font_color_draft,
                         hsv: state.font_color_hsv_draft,
+                        palette: state.palette,
                     },
                     window,
                     cx,
@@ -430,6 +453,7 @@ fn settings_subtitle_style_controls(
                         rendered_popover: state.rendered_popover,
                         draft: state.outline_color_draft,
                         hsv: state.outline_color_hsv_draft,
+                        palette: state.palette,
                     },
                     window,
                     cx,
@@ -440,16 +464,18 @@ fn settings_subtitle_style_controls(
                 .flex()
                 .flex_col()
                 .gap_2()
-                .child(settings_field_label("Position"))
+                .child(settings_field_label("Position", state.palette))
                 .child(settings_subtitle_position_grid(
                     state.config,
                     state.disabled,
+                    state.palette,
                     window,
                     cx,
                 )),
         )
         .child(settings_hint_text(
             "Style applies to burned-in subtitles only.",
+            state.palette,
         ))
 }
 
@@ -494,6 +520,7 @@ fn settings_subtitle_font_select(
             enabled,
             state.rendered_popover == Some(popover),
             focus,
+            state.palette,
             window,
             cx,
         )
@@ -504,6 +531,7 @@ fn settings_subtitle_font_select(
             display,
             enabled,
             state.rendered_popover == Some(popover),
+            state.palette,
             window,
             cx,
         )
@@ -523,7 +551,7 @@ fn settings_subtitle_font_select(
         .flex()
         .flex_col()
         .gap_2()
-        .child(settings_field_label("Font"))
+        .child(settings_field_label("Font", state.palette))
         .child(
             trigger
                 .on_click(cx.listener(move |root, event: &ClickEvent, _window, cx| {
@@ -619,6 +647,7 @@ fn settings_subtitle_font_select(
                 option_focus,
                 state.focuses,
                 state.scroll_handle,
+                state.palette,
                 cx,
             ));
         }
@@ -628,6 +657,7 @@ fn settings_subtitle_font_select(
             SUBTITLE_POPOVER_TOP_OFFSET + subtitle_popover_slide_offset(progress),
             progress,
             list,
+            state.palette,
         );
         popover = apply_frame_select_popover_focus_trap(
             popover,
@@ -646,6 +676,7 @@ fn settings_subtitle_font_select(
                 "settings-subtitle-font-options-scrollbar",
                 state.scroll_handle.clone(),
                 content_height,
+                state.palette,
             ));
         }
 
@@ -681,6 +712,7 @@ fn settings_subtitle_font_size_select(
             enabled,
             state.rendered_popover == Some(popover),
             focus,
+            state.palette,
             window,
             cx,
         )
@@ -691,6 +723,7 @@ fn settings_subtitle_font_size_select(
             display,
             enabled,
             state.rendered_popover == Some(popover),
+            state.palette,
             window,
             cx,
         )
@@ -710,7 +743,7 @@ fn settings_subtitle_font_size_select(
         .flex()
         .flex_col()
         .gap_2()
-        .child(settings_field_label("Size"))
+        .child(settings_field_label("Size", state.palette))
         .child(
             trigger
                 .on_click(cx.listener(move |root, event: &ClickEvent, _window, cx| {
@@ -808,6 +841,7 @@ fn settings_subtitle_font_size_select(
                 option_focus,
                 state.focuses,
                 state.scroll_handle,
+                state.palette,
                 cx,
             ));
         }
@@ -817,6 +851,7 @@ fn settings_subtitle_font_size_select(
             SUBTITLE_POPOVER_TOP_OFFSET + subtitle_popover_slide_offset(progress),
             progress,
             list,
+            state.palette,
         );
         popover = apply_frame_select_popover_focus_trap(
             popover,
@@ -835,6 +870,7 @@ fn settings_subtitle_font_size_select(
                 "settings-subtitle-font-size-options-scrollbar",
                 state.scroll_handle.clone(),
                 content_height,
+                state.palette,
             ));
         }
 
@@ -858,6 +894,7 @@ fn settings_subtitle_font_option(
     focus: Option<&FocusHandle>,
     focuses: SettingsSubtitleSelectFocuses<'_>,
     scroll_handle: &ScrollHandle,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let click_name = name.clone();
@@ -875,6 +912,7 @@ fn settings_subtitle_font_option(
             option.is_selected,
             is_enabled,
             focus,
+            palette,
         )
     } else {
         frame_select_option(
@@ -882,6 +920,7 @@ fn settings_subtitle_font_option(
             option.name,
             option.is_selected,
             is_enabled,
+            palette,
         )
     };
     option
@@ -966,6 +1005,7 @@ fn settings_subtitle_size_option(
     focus: Option<&FocusHandle>,
     focuses: SettingsSubtitleSelectFocuses<'_>,
     scroll_handle: &ScrollHandle,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let trigger_focus_for_click = focuses.trigger.cloned();
@@ -981,6 +1021,7 @@ fn settings_subtitle_size_option(
             option.is_selected,
             is_enabled,
             focus,
+            palette,
         )
     } else {
         frame_select_option(
@@ -988,6 +1029,7 @@ fn settings_subtitle_size_option(
             option.size,
             option.is_selected,
             is_enabled,
+            palette,
         )
     };
     option
@@ -1116,6 +1158,7 @@ fn settings_subtitle_color_field(
         rendered_popover,
         draft,
         hsv,
+        palette,
     } = spec;
     let popover = match target {
         SettingsSubtitleColorTarget::Font => SettingsSubtitlePopover::FontColor,
@@ -1124,7 +1167,7 @@ fn settings_subtitle_color_field(
     let enabled = !disabled;
     let click_value = value.clone();
     let key_value = value.clone();
-    let trigger_content = frame_color_select_value(&value);
+    let trigger_content = frame_color_select_value(&value, palette);
     let trigger = if let Some(focus) = popover_focuses.trigger {
         frame_select_trigger_content_with_focus(
             id,
@@ -1133,6 +1176,7 @@ fn settings_subtitle_color_field(
             enabled,
             rendered_popover == Some(popover),
             focus,
+            palette,
             window,
             cx,
         )
@@ -1143,6 +1187,7 @@ fn settings_subtitle_color_field(
             trigger_content,
             enabled,
             rendered_popover == Some(popover),
+            palette,
             window,
             cx,
         )
@@ -1155,7 +1200,7 @@ fn settings_subtitle_color_field(
         .flex()
         .flex_col()
         .gap_2()
-        .child(settings_field_label(label))
+        .child(settings_field_label(label, palette))
         .child(
             trigger
                 .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
@@ -1217,6 +1262,7 @@ fn settings_subtitle_color_field(
                 focus,
                 popover_focuses,
                 progress,
+                palette,
                 window,
                 cx,
             ))
@@ -1238,6 +1284,7 @@ fn settings_subtitle_color_picker(
     focus: Option<&FocusHandle>,
     popover_focuses: SettingsSubtitleColorPopoverFocuses<'_>,
     progress: f32,
+    palette: &'static theme::ThemePalette,
     window: &Window,
     cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -1253,8 +1300,8 @@ fn settings_subtitle_color_picker(
     let panel = frame_color_picker_panel(
         SUBTITLE_POPOVER_TOP_OFFSET + subtitle_popover_slide_offset(progress),
         progress,
-        settings_subtitle_sv_square(target, hsv, popover_focuses.sv, cx),
-        settings_subtitle_hue_slider(target, hsv, popover_focuses.hue, cx),
+        settings_subtitle_sv_square(target, hsv, popover_focuses.sv, palette, cx),
+        settings_subtitle_hue_slider(target, hsv, popover_focuses.hue, palette, cx),
         frame_text_input(
             FrameTextInputSpec {
                 id: match target {
@@ -1267,9 +1314,11 @@ fn settings_subtitle_color_picker(
                 focus,
                 kind: input_kind,
             },
+            palette,
             window,
             cx,
         ),
+        palette,
     )
     .id(panel_id);
 
@@ -1310,6 +1359,7 @@ fn settings_subtitle_sv_square(
     target: SettingsSubtitleColorTarget,
     hsv: SettingsSubtitleHsv,
     focus: Option<&FocusHandle>,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let drag = SettingsSubtitleColorDrag {
@@ -1331,8 +1381,8 @@ fn settings_subtitle_sv_square(
         .overflow_hidden()
         .rounded(theme::ui_rem(theme::RADIUS_SM))
         .border_1()
-        .border_color(color(theme::FRAME_GRAY_200))
-        .bg(color(theme::FRAME_GRAY_100))
+        .border_color(color(palette.fill_selected))
+        .bg(color(palette.fill_subtle))
         .cursor_crosshair()
         .occlude()
         .on_mouse_down(
@@ -1364,7 +1414,7 @@ fn settings_subtitle_sv_square(
             target,
             kind: SettingsSubtitleColorDragKind::SaturationValue,
         })
-        .child(frame_color_picker_sv_canvas(hsv.h, hsv.s, hsv.v))
+        .child(frame_color_picker_sv_canvas(hsv.h, hsv.s, hsv.v, palette))
         .on_drag(drag, |_drag, _position, _window, cx| {
             cx.new(|_| SettingsSubtitleColorDragPreview)
         })
@@ -1385,12 +1435,12 @@ fn settings_subtitle_sv_square(
         square
             .track_focus(focus)
             .tab_stop(true)
-            .focus_visible(focus_visible_ring)
+            .focus_visible(move |style| focus_visible_ring(style, palette))
     } else {
         square
             .focusable()
             .tab_stop(true)
-            .focus_visible(focus_visible_ring)
+            .focus_visible(move |style| focus_visible_ring(style, palette))
     }
 }
 
@@ -1402,6 +1452,7 @@ fn settings_subtitle_hue_slider(
     target: SettingsSubtitleColorTarget,
     hsv: SettingsSubtitleHsv,
     focus: Option<&FocusHandle>,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let drag = SettingsSubtitleColorDrag {
@@ -1450,8 +1501,8 @@ fn settings_subtitle_hue_slider(
             target,
             kind: SettingsSubtitleColorDragKind::Hue,
         })
-        .child(frame_color_picker_hue_track())
-        .child(frame_color_picker_hue_handle(hsv.h))
+        .child(frame_color_picker_hue_track(palette))
+        .child(frame_color_picker_hue_handle(hsv.h, palette))
         .on_drag(drag, |_drag, _position, _window, cx| {
             cx.new(|_| SettingsSubtitleColorDragPreview)
         });
@@ -1466,6 +1517,7 @@ fn settings_subtitle_hue_slider(
             360.0,
             format!("{:.0} degrees", hsv.h.round()),
             focus,
+            palette,
         )
     } else {
         apply_accessible_slider(
@@ -1476,6 +1528,7 @@ fn settings_subtitle_hue_slider(
             0.0,
             360.0,
             format!("{:.0} degrees", hsv.h.round()),
+            palette,
         )
     };
 
@@ -1880,6 +1933,7 @@ pub(in crate::app) fn subtitle_hsv_to_hex(h: f64, s: f64, v: f64) -> String {
 fn settings_subtitle_position_grid(
     config: &ConversionConfig,
     disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -1893,6 +1947,7 @@ fn settings_subtitle_position_grid(
                 option.label,
                 option.is_selected,
                 is_enabled,
+                palette,
                 window,
                 cx,
             )
@@ -1913,6 +1968,7 @@ fn settings_subtitle_position_grid(
 
 pub(in crate::app) fn settings_subtitle_track_button(
     option: crate::settings::SubtitleTrackOption,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -1935,6 +1991,7 @@ pub(in crate::app) fn settings_subtitle_track_button(
         option.is_selected,
         is_enabled,
         FrameTrackListItemLayout::Inline,
+        palette,
         window,
         cx,
     )

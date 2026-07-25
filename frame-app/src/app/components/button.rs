@@ -44,6 +44,7 @@ pub(in crate::app) fn frame_choice_button(
     label: impl Into<String>,
     selected: bool,
     enabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -55,6 +56,7 @@ pub(in crate::app) fn frame_choice_button(
             ButtonVariant::Secondary,
             selected,
             enabled,
+            palette,
             window,
             cx,
         )
@@ -62,19 +64,27 @@ pub(in crate::app) fn frame_choice_button(
         label,
         enabled,
         selected,
+        palette,
     )
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "This shared button constructor exposes its semantic state, palette, and GPUI render context explicitly."
+)]
 pub(in crate::app) fn frame_text_button(
     id: impl Into<String>,
     label: impl Into<String>,
     variant: ButtonVariant,
     selected: bool,
     enabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    frame_text_button_inner(id, label, variant, selected, enabled, None, window, cx)
+    frame_text_button_inner(
+        id, label, variant, selected, enabled, None, palette, window, cx,
+    )
 }
 
 #[expect(
@@ -88,6 +98,7 @@ pub(in crate::app) fn frame_text_button_with_focus(
     selected: bool,
     enabled: bool,
     focus: &FocusHandle,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -98,6 +109,7 @@ pub(in crate::app) fn frame_text_button_with_focus(
         selected,
         enabled,
         Some(focus),
+        palette,
         window,
         cx,
     )
@@ -114,13 +126,14 @@ fn frame_text_button_inner(
     selected: bool,
     enabled: bool,
     focus: Option<&FocusHandle>,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let id = id.into();
     let label = label.into();
     let display_label = theme::ui_text_owned(label.clone());
-    let colors = button_colors(variant, selected, enabled);
+    let colors = button_colors(variant, selected, enabled, palette);
     let animated = animated_button_colors(id.clone(), colors, window, cx);
     let background = animated.background;
     let foreground = animated.foreground;
@@ -139,7 +152,7 @@ fn frame_text_button_inner(
         .text_color(foreground)
         .opacity(colors.opacity)
         .when(text_button_uses_highlight(variant, selected), |this| {
-            this.shadow(button_highlight_shadows())
+            this.shadow(button_highlight_shadows(palette))
         })
         .when(enabled, |this| {
             this.hover(gpui::Styled::cursor_pointer)
@@ -151,9 +164,9 @@ fn frame_text_button_inner(
     let button = apply_button_motion(button, motion, enabled);
 
     if let Some(focus) = focus {
-        apply_accessible_button_with_focus(button, label, enabled, focus)
+        apply_accessible_button_with_focus(button, label, enabled, focus, palette)
     } else {
-        apply_accessible_button(button, label, enabled)
+        apply_accessible_button(button, label, enabled, palette)
     }
 }
 
@@ -172,6 +185,7 @@ pub(in crate::app) fn frame_icon_button(
     variant: FrameIconButtonVariant,
     enabled: bool,
     size: FrameIconButtonSize,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -184,6 +198,7 @@ pub(in crate::app) fn frame_icon_button(
         variant,
         enabled,
         size,
+        palette,
         window,
         cx,
     )
@@ -202,6 +217,7 @@ pub(in crate::app) fn frame_icon_swap_button(
     variant: FrameIconButtonVariant,
     enabled: bool,
     size: FrameIconButtonSize,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -218,6 +234,7 @@ pub(in crate::app) fn frame_icon_swap_button(
         variant,
         enabled,
         size,
+        palette,
         window,
         cx,
     )
@@ -234,41 +251,42 @@ fn frame_icon_button_inner(
     variant: FrameIconButtonVariant,
     enabled: bool,
     size: FrameIconButtonSize,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let (background, hover_background, active_background, foreground, hover_foreground, opacity) =
         match (variant, enabled) {
             (FrameIconButtonVariant::Ghost, true) => (
-                theme::TRANSPARENT,
-                theme::FRAME_GRAY_100,
-                theme::FRAME_GRAY_200,
-                theme::FRAME_GRAY_600,
-                theme::FOREGROUND,
+                palette.transparent,
+                palette.fill_subtle,
+                palette.fill_selected,
+                palette.text_muted,
+                palette.text_primary,
                 1.0,
             ),
             (FrameIconButtonVariant::Ghost, false) => (
-                theme::TRANSPARENT,
-                theme::TRANSPARENT,
-                theme::TRANSPARENT,
-                theme::FRAME_GRAY_600,
-                theme::FRAME_GRAY_600,
+                palette.transparent,
+                palette.transparent,
+                palette.transparent,
+                palette.text_muted,
+                palette.text_muted,
                 0.5,
             ),
             (FrameIconButtonVariant::DestructiveGhost, false) => (
-                theme::FRAME_GRAY_100,
-                theme::FRAME_GRAY_100,
-                theme::FRAME_GRAY_100,
-                theme::FRAME_RED.with_alpha(0.5),
-                theme::FRAME_RED.with_alpha(0.5),
+                palette.fill_subtle,
+                palette.fill_subtle,
+                palette.fill_subtle,
+                palette.danger.with_alpha(0.5),
+                palette.danger.with_alpha(0.5),
                 1.0,
             ),
             (FrameIconButtonVariant::DestructiveGhost, true) => (
-                theme::TRANSPARENT,
-                theme::FRAME_GRAY_100,
-                theme::FRAME_GRAY_200,
-                theme::FRAME_RED,
-                theme::FRAME_RED,
+                palette.transparent,
+                palette.fill_subtle,
+                palette.fill_selected,
+                palette.danger,
+                palette.danger,
                 1.0,
             ),
         };
@@ -311,7 +329,7 @@ fn frame_icon_button_inner(
 
     let button = apply_button_motion(button, motion, enabled);
 
-    apply_accessible_button(button, label, enabled)
+    apply_accessible_button(button, label, enabled, palette)
 }
 
 fn frame_icon_button_content(

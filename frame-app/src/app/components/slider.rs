@@ -17,6 +17,7 @@ pub(in crate::app) fn frame_slider(
     label: impl Into<String>,
     fraction: f32,
     disabled: bool,
+    palette: &'static theme::ThemePalette,
 ) -> gpui::Stateful<gpui::Div> {
     let label = label.into();
     let clamped_fraction = fraction.clamp(0.0, 1.0);
@@ -37,7 +38,7 @@ pub(in crate::app) fn frame_slider(
                 .top(theme::ui_rem(FRAME_SLIDER_TRACK_TOP))
                 .h(theme::ui_rem(FRAME_SLIDER_TRACK_HEIGHT))
                 .rounded(theme::ui_rem(FRAME_SLIDER_TRACK_RADIUS))
-                .bg(color(theme::FRAME_GRAY_100)),
+                .bg(color(palette.fill_subtle)),
         )
         .child(
             div()
@@ -47,7 +48,7 @@ pub(in crate::app) fn frame_slider(
                 .h(theme::ui_rem(FRAME_SLIDER_TRACK_HEIGHT))
                 .w(relative(clamped_fraction))
                 .rounded(theme::ui_rem(FRAME_SLIDER_FILL_RADIUS))
-                .bg(color(theme::FOREGROUND)),
+                .bg(color(palette.text_primary)),
         );
 
     apply_accessible_slider(
@@ -58,6 +59,7 @@ pub(in crate::app) fn frame_slider(
         0.0,
         100.0,
         format!("{value_percent:.0}%"),
+        palette,
     )
 }
 

@@ -17,6 +17,7 @@ pub(in crate::app) struct SettingsPresetsTabState<'a> {
     pub(in crate::app) preset_name_focus: Option<&'a FocusHandle>,
     pub(in crate::app) presets: &'a [PresetDefinition],
     pub(in crate::app) notice: Option<&'a PresetNotice>,
+    pub(in crate::app) palette: &'static theme::ThemePalette,
 }
 
 pub(in crate::app) fn settings_presets_tab(
@@ -24,11 +25,13 @@ pub(in crate::app) fn settings_presets_tab(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let palette = state.palette;
     let mut list = div().grid().grid_cols(1);
     for option in preset_options(state.config, state.presets, state.metadata) {
         list = list.child(settings_preset_row(
             option,
             state.settings_disabled,
+            palette,
             window,
             cx,
         ));
@@ -38,22 +41,26 @@ pub(in crate::app) fn settings_presets_tab(
         .flex()
         .flex_col()
         .gap_3()
-        .child(settings_presets_header(state.notice))
+        .child(settings_presets_header(state.notice, palette))
         .child(settings_presets_save_row(
             state.preset_name,
             state.settings_disabled,
             state.preset_name_focus,
+            palette,
             window,
             cx,
         ))
         .child(list)
 }
 
-fn settings_presets_header(notice: Option<&PresetNotice>) -> gpui::Div {
+fn settings_presets_header(
+    notice: Option<&PresetNotice>,
+    palette: &'static theme::ThemePalette,
+) -> gpui::Div {
     let mut header = div()
         .relative()
         .w_full()
-        .child(settings_section_label("Preset library"));
+        .child(settings_section_label("Preset library", palette));
     if let Some(notice) = notice {
         header = header.child(
             div()
@@ -68,8 +75,8 @@ fn settings_presets_header(notice: Option<&PresetNotice>) -> gpui::Div {
                 .aria_label(notice.text.clone())
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .text_color(color(match notice.tone {
-                    PresetNoticeTone::Success => theme::FOREGROUND,
-                    PresetNoticeTone::Error => theme::FRAME_RED,
+                    PresetNoticeTone::Success => palette.text_primary,
+                    PresetNoticeTone::Error => palette.danger,
                 }))
                 .child(theme::ui_text_owned(notice.text.clone())),
         );
@@ -82,6 +89,7 @@ fn settings_presets_save_row(
     preset_name: &str,
     settings_disabled: bool,
     preset_name_focus: Option<&FocusHandle>,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -98,14 +106,21 @@ fn settings_presets_save_row(
                 focus: preset_name_focus,
                 kind: FrameTextInputKind::PresetName,
             },
+            palette,
             window,
             cx,
         )))
-        .child(settings_save_preset_button(save_enabled, window, cx))
+        .child(settings_save_preset_button(
+            save_enabled,
+            palette,
+            window,
+            cx,
+        ))
 }
 
 fn settings_save_preset_button(
     enabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -115,6 +130,7 @@ fn settings_save_preset_button(
         ButtonVariant::Secondary,
         false,
         enabled,
+        palette,
         window,
         cx,
     )
@@ -129,6 +145,7 @@ fn settings_save_preset_button(
 fn settings_preset_row(
     option: PresetOption,
     settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -145,6 +162,7 @@ fn settings_preset_row(
         preset.name.clone(),
         selected,
         is_enabled,
+        palette,
         window,
         cx,
     )
@@ -173,7 +191,7 @@ fn settings_preset_row(
                     .pr(theme::ui_rem(8.0))
                     .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                     .font_weight(theme::TEXT_WEIGHT_REGULAR)
-                    .text_color(color(theme::FRAME_GRAY_600))
+                    .text_color(color(palette.text_muted))
                     .child(theme::ui_text(status.unwrap_or_default())),
             )
             .when(option.is_compatible, |this| {
@@ -183,6 +201,7 @@ fn settings_preset_row(
                     "Apply preset to all files",
                     FrameIconButtonVariant::Ghost,
                     !settings_disabled,
+                    palette,
                     move |root, window, cx| {
                         root.confirm_apply_preset_to_all(&apply_all_id, window, cx);
                     },
@@ -197,6 +216,7 @@ fn settings_preset_row(
                     "Delete preset",
                     FrameIconButtonVariant::DestructiveGhost,
                     !settings_disabled,
+                    palette,
                     move |root, _window, cx| {
                         if root.delete_preset(&delete_id) {
                             cx.notify();
@@ -219,6 +239,7 @@ fn settings_preset_icon_button(
     label: &'static str,
     variant: FrameIconButtonVariant,
     enabled: bool,
+    palette: &'static theme::ThemePalette,
     action: impl Fn(&mut FrameRoot, &mut Window, &mut Context<FrameRoot>) + 'static,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
@@ -233,6 +254,7 @@ fn settings_preset_icon_button(
             button: FRAME_ICON_BUTTON_SM_SIZE,
             icon: FRAME_ICON_SM_SIZE,
         },
+        palette,
         window,
         cx,
     )

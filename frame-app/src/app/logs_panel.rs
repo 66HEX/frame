@@ -17,12 +17,17 @@ use super::{
 };
 use crate::numeric::usize_to_f32;
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "The logs view explicitly receives its queue, scroll state, selection, palette, and render context."
+)]
 pub(super) fn logs_view(
     queue: &FileQueue,
     conversion_events: &ConversionEventState,
     scroll_handle: &UniformListScrollHandle,
     follow_tail: bool,
     copied_log_file_id: Option<&str>,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -37,12 +42,13 @@ pub(super) fn logs_view(
         .flex()
         .flex_col()
         .overflow_hidden()
-        .card_surface()
+        .card_surface(palette)
         .child(logs_tab_strip(
             &active_files,
             selected_id,
             selected_line_count,
             selected_logs_copied,
+            palette,
             window,
             cx,
         ))
@@ -52,6 +58,7 @@ pub(super) fn logs_view(
             !active_files.is_empty(),
             scroll_handle,
             follow_tail,
+            palette,
             window,
             cx,
         ))
@@ -62,6 +69,7 @@ pub(super) fn logs_tab_strip(
     selected_id: Option<&str>,
     selected_line_count: usize,
     selected_logs_copied: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -86,6 +94,7 @@ pub(super) fn logs_tab_strip(
             file,
             selected_id.is_some_and(|id| id == file.id),
             &tab_ids,
+            palette,
             window,
             cx,
         ));
@@ -95,7 +104,7 @@ pub(super) fn logs_tab_strip(
         tabs = tabs.child(
             div()
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-                .text_color(color(theme::FRAME_GRAY_600))
+                .text_color(color(palette.text_muted))
                 .child(theme::ui_text("No active processes")),
         );
     }
@@ -114,18 +123,20 @@ pub(super) fn logs_tab_strip(
                 selected_id,
                 selected_line_count > 0,
                 selected_logs_copied,
+                palette,
                 window,
                 cx,
             ))
         });
 
-    header.child(panel_bottom_separator())
+    header.child(panel_bottom_separator(palette))
 }
 
 pub(super) fn log_tab_button(
     file: &ActiveLogFile,
     selected: bool,
     active_file_ids: &[String],
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
@@ -135,9 +146,9 @@ pub(super) fn log_tab_button(
     let motion = button_motion(element_id("logs-tab-hover", &file.id), window, cx);
     let hover_progress = *motion.hover_transition.evaluate(window, cx);
     let foreground = if selected {
-        color(theme::FOREGROUND)
+        color(palette.text_primary)
     } else {
-        color(theme::FRAME_GRAY_600).lerp(&color(theme::FOREGROUND), hover_progress)
+        color(palette.text_muted).lerp(&color(palette.text_primary), hover_progress)
     };
 
     let button = div()
@@ -147,7 +158,7 @@ pub(super) fn log_tab_button(
         .aria_selected(selected)
         .focusable()
         .tab_stop(true)
-        .focus_visible(focus_visible_ring)
+        .focus_visible(move |style| focus_visible_ring(style, palette))
         .flex_none()
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
@@ -179,12 +190,17 @@ pub(super) fn log_tab_button(
     apply_button_motion(button, motion, true)
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "The logs body explicitly receives filtering, scrolling, palette, and render context."
+)]
 pub(super) fn logs_body(
     conversion_events: &ConversionEventState,
     selected_id: Option<&str>,
     has_active_files: bool,
     scroll_handle: &UniformListScrollHandle,
     follow_tail: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
@@ -197,23 +213,38 @@ pub(super) fn logs_body(
         .overflow_hidden();
 
     if !has_active_files {
-        return body.child(logs_empty_state("Select a task to view console output"));
+        return body.child(logs_empty_state(
+            "Select a task to view console output",
+            palette,
+        ));
     }
 
     let Some(selected_id) = selected_id else {
-        return body.child(logs_empty_state("Select a task to view console output"));
+        return body.child(logs_empty_state(
+            "Select a task to view console output",
+            palette,
+        ));
     };
 
     let line_count = conversion_events.logs_for(selected_id).len();
     if line_count == 0 {
-        return body.child(logs_empty_state("Process started, waiting for output..."));
+        return body.child(logs_empty_state(
+            "Process started, waiting for output...",
+            palette,
+        ));
     }
 
-    let body = body.child(log_lines_list(selected_id, line_count, scroll_handle, cx));
+    let body = body.child(log_lines_list(
+        selected_id,
+        line_count,
+        scroll_handle,
+        palette,
+        cx,
+    ));
     if follow_tail {
         body
     } else {
-        body.child(log_scroll_to_bottom_button(window, cx))
+        body.child(log_scroll_to_bottom_button(palette, window, cx))
     }
 }
 
@@ -221,6 +252,7 @@ pub(super) fn log_lines_list(
     selected_id: &str,
     line_count: usize,
     scroll_handle: &UniformListScrollHandle,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> impl IntoElement {
     let selected_id = selected_id.to_string();
@@ -235,7 +267,7 @@ pub(super) fn log_lines_list(
             root.conversion_events
                 .log_line_window_for(&processor_selected_id, range)
                 .into_iter()
-                .map(log_line_row)
+                .map(|line| log_line_row(line, palette))
                 .collect()
         }),
     )
@@ -250,7 +282,7 @@ pub(super) fn log_lines_list(
     }))
     .size_full()
     .p(theme::ui_rem(2.0))
-    .text_color(color(theme::FOREGROUND))
+    .text_color(color(palette.text_primary))
     .line_height(theme::ui_rem(LOG_LINE_HEIGHT));
 
     div()
@@ -260,7 +292,7 @@ pub(super) fn log_lines_list(
         .aria_label("Conversion log output")
         .focusable()
         .tab_stop(true)
-        .focus_visible(focus_visible_ring)
+        .focus_visible(move |style| focus_visible_ring(style, palette))
         .size_full()
         .on_key_down(
             cx.listener(move |root, event: &gpui::KeyDownEvent, _window, cx| {
@@ -283,6 +315,7 @@ pub(super) fn log_lines_list(
             "logs-line-list-scrollbar",
             scroll_handle,
             usize_to_f32(line_count) * LOG_LINE_HEIGHT,
+            palette,
         ))
 }
 
@@ -360,7 +393,10 @@ mod keyboard_tests {
     }
 }
 
-pub(super) fn log_line_row(line: LogLine) -> impl IntoElement {
+pub(super) fn log_line_row(
+    line: LogLine,
+    palette: &'static theme::ThemePalette,
+) -> impl IntoElement {
     let tone = log_line_tone(&line.text);
     let row_group = format!("logs-line-{}", line.index);
 
@@ -376,17 +412,17 @@ pub(super) fn log_line_row(line: LogLine) -> impl IntoElement {
         .px_1()
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .line_height(theme::ui_rem(LOG_LINE_HEIGHT))
-        .hover(|style| style.bg(color(theme::FRAME_GRAY_100)))
+        .hover(|style| style.bg(color(palette.fill_subtle)))
         .child(
             div()
                 .flex_none()
                 .w(theme::ui_rem(LOG_LINE_NUMBER_WIDTH))
                 .mr(theme::ui_rem(12.0))
                 .text_right()
-                .text_color(color(theme::FRAME_GRAY_400))
+                .text_color(color(palette.border_subtle))
                 .font_features(assets::frame_tabular_number_font_features())
                 .group_hover(row_group.clone(), |style| {
-                    style.text_color(color(theme::FRAME_GRAY_600))
+                    style.text_color(color(palette.text_muted))
                 })
                 .child(line.index.to_string()),
         )
@@ -395,15 +431,16 @@ pub(super) fn log_line_row(line: LogLine) -> impl IntoElement {
                 .flex_1()
                 .overflow_hidden()
                 .whitespace_nowrap()
-                .text_color(color(log_line_tone_color(tone)))
+                .text_color(color(log_line_tone_color(tone, palette)))
                 .group_hover(row_group, move |style| {
-                    style.text_color(color(log_line_hover_tone_color(tone)))
+                    style.text_color(color(log_line_hover_tone_color(tone, palette)))
                 })
                 .child(line.text),
         )
 }
 
 pub(super) fn log_scroll_to_bottom_button(
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
@@ -412,9 +449,9 @@ pub(super) fn log_scroll_to_bottom_button(
         .right(theme::ui_rem(LOG_SCROLL_BUTTON_OFFSET))
         .bottom(theme::ui_rem(LOG_SCROLL_BUTTON_OFFSET))
         .rounded(theme::ui_rem(theme::RADIUS_MD))
-        .bg(color(theme::BACKGROUND))
+        .bg(color(palette.canvas))
         .p(theme::ui_rem(LOG_SCROLL_BUTTON_PADDING))
-        .shadow(card_surface_shadows())
+        .shadow(card_surface_shadows(palette))
         .child(
             frame_icon_button(
                 "logs-scroll-to-bottom",
@@ -426,6 +463,7 @@ pub(super) fn log_scroll_to_bottom_button(
                     button: LOG_SCROLL_BUTTON_SIZE,
                     icon: LOG_SCROLL_ICON_SIZE,
                 },
+                palette,
                 window,
                 cx,
             )
@@ -442,6 +480,7 @@ pub(super) fn logs_copy_button(
     file_id: &str,
     enabled: bool,
     copied: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
@@ -458,6 +497,7 @@ pub(super) fn logs_copy_button(
             button: FRAME_ICON_BUTTON_SM_SIZE,
             icon: FRAME_ICON_SM_SIZE,
         },
+        palette,
         window,
         cx,
     )
@@ -503,31 +543,40 @@ pub(super) fn log_line_tone(text: &str) -> LogLineTone {
 }
 
 #[must_use]
-pub(super) const fn log_line_tone_color(tone: LogLineTone) -> theme::RgbaToken {
+pub(super) const fn log_line_tone_color(
+    tone: LogLineTone,
+    palette: &theme::ThemePalette,
+) -> theme::RgbaToken {
     match tone {
-        LogLineTone::Default => theme::FOREGROUND,
-        LogLineTone::Warning => theme::FRAME_AMBER,
-        LogLineTone::Error => theme::FRAME_RED,
+        LogLineTone::Default => palette.text_primary,
+        LogLineTone::Warning => palette.warning,
+        LogLineTone::Error => palette.danger,
     }
 }
 
 #[must_use]
-pub(super) const fn log_line_hover_tone_color(tone: LogLineTone) -> theme::RgbaToken {
+pub(super) const fn log_line_hover_tone_color(
+    tone: LogLineTone,
+    palette: &theme::ThemePalette,
+) -> theme::RgbaToken {
     match tone {
-        LogLineTone::Default => theme::FOREGROUND,
-        LogLineTone::Warning => theme::FRAME_AMBER,
-        LogLineTone::Error => theme::FRAME_RED,
+        LogLineTone::Default => palette.text_primary,
+        LogLineTone::Warning => palette.warning,
+        LogLineTone::Error => palette.danger,
     }
 }
 
-pub(super) fn logs_empty_state(message: &'static str) -> gpui::Div {
+pub(super) fn logs_empty_state(
+    message: &'static str,
+    palette: &'static theme::ThemePalette,
+) -> gpui::Div {
     div()
         .size_full()
         .flex()
         .items_center()
         .justify_center()
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-        .text_color(color(theme::FRAME_GRAY_600))
+        .text_color(color(palette.text_muted))
         .child(theme::ui_text(message))
 }
 

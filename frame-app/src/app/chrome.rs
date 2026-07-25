@@ -17,22 +17,22 @@ use super::primitives::{
 };
 use super::settings_panel::{settings_field_label, settings_hint_text, settings_section};
 use super::{
-    ActiveView, AppearanceSettings, ClickEvent, Context, ExternalPaths, FILE_LIST_ACTION_ICON_SIZE,
-    FRAME_APP_VERSION, FluentBuilder, FocusHandle, FrameAppState, FrameRoot, FrameTextInputKind,
-    INTERACTION_MOTION_DURATION, InteractiveElement, IntoElement, LEFT_COLUMN_SPAN, MouseButton,
-    PANEL_HEADER_HEIGHT, ParentElement, RIGHT_COLUMN_SPAN, SETTINGS_CONTROL_HEIGHT,
-    SURFACE_MOTION_DURATION, ScalePreset, ScrollHandle, StatefulInteractiveElement, Styled,
-    TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_DIVIDER_HEIGHT, TITLEBAR_HEIGHT, TITLEBAR_ICON_SIZE,
-    TITLEBAR_LINUX_WINDOW_BUTTON_SIZE, TITLEBAR_LINUX_WINDOW_CONTROLS_GAP,
-    TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X, TITLEBAR_LOGO_SIZE,
-    TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_PLACEHOLDER_WIDTH, TITLEBAR_NAV_BUTTON_HEIGHT,
-    TITLEBAR_PLATFORM_DIVIDER_HEIGHT, TITLEBAR_SEGMENT_HEIGHT, TITLEBAR_TOP_PADDING,
-    TITLEBAR_TRAFFIC_LIGHT_SIZE, TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
+    ActiveView, AppearancePopover, AppearanceSettings, ClickEvent, ColorTheme, Context,
+    ExternalPaths, FILE_LIST_ACTION_ICON_SIZE, FRAME_APP_VERSION, FluentBuilder, FocusHandle,
+    FrameAppState, FrameRoot, FrameTextInputKind, INTERACTION_MOTION_DURATION, InteractiveElement,
+    IntoElement, LEFT_COLUMN_SPAN, MouseButton, PANEL_HEADER_HEIGHT, ParentElement, PopoverState,
+    RIGHT_COLUMN_SPAN, SETTINGS_CONTROL_HEIGHT, SURFACE_MOTION_DURATION, ScalePreset, ScrollHandle,
+    StatefulInteractiveElement, Styled, TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_DIVIDER_HEIGHT,
+    TITLEBAR_HEIGHT, TITLEBAR_ICON_SIZE, TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
+    TITLEBAR_LINUX_WINDOW_CONTROLS_GAP, TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X,
+    TITLEBAR_LOGO_SIZE, TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_PLACEHOLDER_WIDTH,
+    TITLEBAR_NAV_BUTTON_HEIGHT, TITLEBAR_PLATFORM_DIVIDER_HEIGHT, TITLEBAR_SEGMENT_HEIGHT,
+    TITLEBAR_TOP_PADDING, TITLEBAR_TRAFFIC_LIGHT_SIZE, TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
     TITLEBAR_WINDOWS_WINDOW_ICON_SIZE, TITLEBAR_WINDOWS_WINDOW_MAX_ICON_SIZE,
-    UPDATE_INSTALL_WAIT_MESSAGE, UiScalePopoverState, UpdateInfo, UpdateStatus, WORKSPACE_COLUMNS,
-    WORKSPACE_GAP, Window, WindowControlArea, assets, div, ease_in_out, format_total_size,
-    mix_color, motion_is_hidden, motion_target, px, relative, set_motion_target,
-    settings_sheet_right_inset, subtitle_popover_slide_offset, svg, theme,
+    UPDATE_INSTALL_WAIT_MESSAGE, UpdateInfo, UpdateStatus, WORKSPACE_COLUMNS, WORKSPACE_GAP,
+    Window, WindowControlArea, assets, div, ease_in_out, format_total_size, mix_color,
+    motion_is_hidden, motion_target, px, relative, set_motion_target, settings_sheet_right_inset,
+    subtitle_popover_slide_offset, svg, theme,
 };
 use gpui::{HighlightStyle, StyledText, deferred};
 
@@ -65,27 +65,30 @@ impl FrameTitlebarPlatform {
 
 pub(super) fn titlebar(
     state: FrameAppState,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    titlebar_for_platform(FrameTitlebarPlatform::current(), state, window, cx)
+    titlebar_for_platform(FrameTitlebarPlatform::current(), state, palette, window, cx)
 }
 
 pub(super) fn titlebar_for_platform(
     platform: FrameTitlebarPlatform,
     state: FrameAppState,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     match platform {
-        FrameTitlebarPlatform::Macos => macos_titlebar(state, window, cx),
-        FrameTitlebarPlatform::Windows => windows_titlebar(state, window, cx),
-        FrameTitlebarPlatform::Linux => linux_titlebar(state, window, cx),
+        FrameTitlebarPlatform::Macos => macos_titlebar(state, palette, window, cx),
+        FrameTitlebarPlatform::Windows => windows_titlebar(state, palette, window, cx),
+        FrameTitlebarPlatform::Linux => linux_titlebar(state, palette, window, cx),
     }
 }
 
 pub(super) fn macos_titlebar(
     state: FrameAppState,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -108,11 +111,11 @@ pub(super) fn macos_titlebar(
                 .gap_6()
                 .child(macos_native_window_controls_placeholder())
                 .when(show_workspace_controls, |this| {
-                    this.child(frame_logo())
-                        .child(titlebar_divider())
-                        .child(titlebar_navigation(state.active_view, window, cx))
-                        .child(titlebar_divider())
-                        .child(titlebar_stats(state))
+                    this.child(frame_logo(palette))
+                        .child(titlebar_divider(palette))
+                        .child(titlebar_navigation(state.active_view, palette, window, cx))
+                        .child(titlebar_divider(palette))
+                        .child(titlebar_stats(state, palette))
                 }),
         )
         .child(
@@ -122,15 +125,16 @@ pub(super) fn macos_titlebar(
                 .mt_2()
                 .gap_2()
                 .when(show_workspace_controls, |this| {
-                    this.child(titlebar_settings_button(window, cx))
-                        .child(titlebar_add_source_button(window, cx))
-                        .child(titlebar_start_button(state, window, cx))
+                    this.child(titlebar_settings_button(palette, window, cx))
+                        .child(titlebar_add_source_button(palette, window, cx))
+                        .child(titlebar_start_button(state, palette, window, cx))
                 }),
         )
 }
 
 pub(super) fn windows_titlebar(
     state: FrameAppState,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -140,12 +144,13 @@ pub(super) fn windows_titlebar(
         .w_full()
         .flex_none()
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-        .child(platform_titlebar_content(state, window, cx))
-        .child(windows_window_controls(window, cx))
+        .child(platform_titlebar_content(state, palette, window, cx))
+        .child(windows_window_controls(palette, window, cx))
 }
 
 pub(super) fn linux_titlebar(
     state: FrameAppState,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -155,8 +160,8 @@ pub(super) fn linux_titlebar(
         .w_full()
         .flex_none()
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-        .child(platform_titlebar_content(state, window, cx))
-        .child(linux_window_controls(window, cx))
+        .child(platform_titlebar_content(state, palette, window, cx))
+        .child(linux_window_controls(palette, window, cx))
 }
 
 fn titlebar_drag_surface(cx: &Context<FrameRoot>) -> gpui::Div {
@@ -187,6 +192,7 @@ fn titlebar_drag_surface(cx: &Context<FrameRoot>) -> gpui::Div {
 
 pub(super) fn platform_titlebar_content(
     state: FrameAppState,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -213,11 +219,11 @@ pub(super) fn platform_titlebar_content(
                         .items_center()
                         .gap_6()
                         .when(show_workspace_controls, |this| {
-                            this.child(platform_frame_logo())
-                                .child(platform_titlebar_divider())
-                                .child(titlebar_navigation(state.active_view, window, cx))
-                                .child(platform_titlebar_divider())
-                                .child(titlebar_stats(state))
+                            this.child(platform_frame_logo(palette))
+                                .child(platform_titlebar_divider(palette))
+                                .child(titlebar_navigation(state.active_view, palette, window, cx))
+                                .child(platform_titlebar_divider(palette))
+                                .child(titlebar_stats(state, palette))
                         }),
                 )
                 .child(
@@ -228,9 +234,9 @@ pub(super) fn platform_titlebar_content(
                         .items_center()
                         .gap_2()
                         .when(show_workspace_controls, |this| {
-                            this.child(titlebar_settings_button(window, cx))
-                                .child(titlebar_add_source_button(window, cx))
-                                .child(titlebar_start_button(state, window, cx))
+                            this.child(titlebar_settings_button(palette, window, cx))
+                                .child(titlebar_add_source_button(palette, window, cx))
+                                .child(titlebar_start_button(state, palette, window, cx))
                         }),
                 ),
         )
@@ -241,6 +247,7 @@ const fn titlebar_shows_workspace_controls(state: FrameAppState) -> bool {
 }
 
 pub(super) fn titlebar_settings_button(
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
@@ -251,6 +258,7 @@ pub(super) fn titlebar_settings_button(
         "Settings",
         ButtonVariant::Secondary,
         true,
+        palette,
         window,
         cx,
     )
@@ -265,6 +273,7 @@ pub(super) fn titlebar_settings_button(
 }
 
 pub(super) fn titlebar_add_source_button(
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
@@ -275,6 +284,7 @@ pub(super) fn titlebar_add_source_button(
         "Add source",
         ButtonVariant::Secondary,
         true,
+        palette,
         window,
         cx,
     )
@@ -286,6 +296,7 @@ pub(super) fn titlebar_add_source_button(
 
 pub(super) fn titlebar_start_button(
     state: FrameAppState,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
@@ -304,6 +315,7 @@ pub(super) fn titlebar_start_button(
         },
         ButtonVariant::Default,
         state.can_start_conversion(),
+        palette,
         window,
         cx,
     )
@@ -324,11 +336,15 @@ pub(super) struct AppSettingsSheetProps<'a> {
     pub(super) default_output_directory: Option<&'a str>,
     pub(super) output_directory_error: Option<&'a str>,
     pub(super) appearance: AppearanceSettings,
+    pub(super) palette: &'static theme::ThemePalette,
     pub(super) appearance_error: Option<&'a str>,
-    pub(super) ui_scale_popover: UiScalePopoverState,
+    pub(super) theme_popover: PopoverState,
+    pub(super) ui_scale_popover: PopoverState,
     pub(super) scroll_handle: &'a ScrollHandle,
+    pub(super) theme_scroll_handle: &'a ScrollHandle,
     pub(super) ui_scale_scroll_handle: &'a ScrollHandle,
-    pub(super) ui_scale_focuses: AppSettingsScaleSelectFocuses<'a>,
+    pub(super) theme_focuses: AppSettingsSelectFocuses<'a>,
+    pub(super) ui_scale_focuses: AppSettingsSelectFocuses<'a>,
     pub(super) auto_update_check: bool,
     pub(super) update_status: &'a UpdateStatus,
     pub(super) update_install_ready: bool,
@@ -345,7 +361,7 @@ pub(super) struct AppSettingsSheetProps<'a> {
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct AppSettingsScaleSelectFocuses<'a> {
+pub(super) struct AppSettingsSelectFocuses<'a> {
     pub(super) trigger: &'a FocusHandle,
     pub(super) panel: &'a FocusHandle,
     pub(super) options: &'a [FocusHandle],
@@ -353,13 +369,15 @@ pub(super) struct AppSettingsScaleSelectFocuses<'a> {
 
 #[expect(
     clippy::too_many_lines,
-    reason = "The settings sheet is a declarative GPUI layout kept together to preserve visual structure."
+    clippy::large_types_passed_by_value,
+    reason = "The declarative settings render consumes a copyable bundle so all render inputs remain explicit."
 )]
 pub(super) fn app_settings_sheet(
     props: AppSettingsSheetProps<'_>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
+    let palette = props.palette;
     let draft_is_dirty =
         props.draft_max_concurrency.trim() != props.current_max_concurrency.to_string();
     let transition = window
@@ -376,6 +394,7 @@ pub(super) fn app_settings_sheet(
     let right_inset = settings_sheet_right_inset(progress);
     let first_focus = props.close_focus.clone();
     let last_focus = props.last_focus.clone();
+    let theme_trigger_focus = props.theme_focuses.trigger.clone();
     let ui_scale_trigger_focus = props.ui_scale_focuses.trigger.clone();
 
     if !props.is_open && motion_is_hidden(progress) {
@@ -394,8 +413,11 @@ pub(super) fn app_settings_sheet(
             move |root, event: &gpui::KeyDownEvent, window, cx| {
                 match event.keystroke.key.as_str() {
                     "escape" => {
-                        if root.settings_ui.ui_scale_popover.is_open() {
-                            root.close_app_settings_ui_scale_popover();
+                        if root.settings_ui.theme_popover.is_open() {
+                            root.close_app_settings_appearance_popover(AppearancePopover::Theme);
+                            theme_trigger_focus.focus(window, cx);
+                        } else if root.settings_ui.ui_scale_popover.is_open() {
+                            root.close_app_settings_appearance_popover(AppearancePopover::UiScale);
                             ui_scale_trigger_focus.focus(window, cx);
                         } else {
                             root.close_app_settings();
@@ -416,7 +438,7 @@ pub(super) fn app_settings_sheet(
                 .id("app-settings-backdrop")
                 .absolute()
                 .inset_0()
-                .bg(color(theme::BACKGROUND.with_alpha(0.60 * progress)))
+                .bg(color(palette.canvas.with_alpha(0.60 * progress)))
                 .backdrop_blur(theme::ui_rem(4.0 * progress).to_pixels(window.rem_size()))
                 .occlude()
                 .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
@@ -442,14 +464,18 @@ pub(super) fn app_settings_sheet(
                 .flex()
                 .flex_col()
                 .rounded(theme::ui_rem(theme::RADIUS_LG))
-                .bg(color(theme::SIDEBAR))
+                .bg(color(palette.surface))
                 .opacity(progress)
-                .shadow(card_surface_shadows())
+                .shadow(card_surface_shadows(palette))
                 .occlude()
                 .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
                     cx.stop_propagation();
                     if root.settings_ui.ui_scale_popover.is_open() {
-                        root.close_app_settings_ui_scale_popover();
+                        root.close_app_settings_appearance_popover(AppearancePopover::UiScale);
+                        cx.notify();
+                    }
+                    if root.settings_ui.theme_popover.is_open() {
+                        root.close_app_settings_appearance_popover(AppearancePopover::Theme);
                         cx.notify();
                     }
                 }))
@@ -464,7 +490,7 @@ pub(super) fn app_settings_sheet(
                         .px_4()
                         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-                        .text_color(color(theme::FOREGROUND))
+                        .text_color(color(palette.text_primary))
                         .child(theme::ui_text("Settings"))
                         .child(
                             app_settings_close_button(
@@ -472,6 +498,7 @@ pub(super) fn app_settings_sheet(
                                 "Close settings",
                                 true,
                                 props.close_focus,
+                                palette,
                                 window,
                                 cx,
                             )
@@ -484,7 +511,7 @@ pub(super) fn app_settings_sheet(
                                 }),
                             ),
                         )
-                        .child(panel_bottom_separator()),
+                        .child(panel_bottom_separator(palette)),
                 )
                 .child(
                     div()
@@ -506,30 +533,37 @@ pub(super) fn app_settings_sheet(
                                     props.default_output_directory,
                                     props.output_directory_error,
                                     props.output_directory_focus,
+                                    palette,
                                     window,
                                     cx,
                                 ))
                                 .child(app_settings_appearance_section(
                                     props.appearance,
                                     props.appearance_error,
+                                    props.theme_popover,
                                     props.ui_scale_popover,
+                                    props.theme_scroll_handle,
                                     props.ui_scale_scroll_handle,
+                                    props.theme_focuses,
                                     props.ui_scale_focuses,
+                                    palette,
                                     window,
                                     cx,
                                 ))
                                 .child(
-                                    settings_section("Max concurrency")
+                                    settings_section("Max concurrency", palette)
                                         .child(app_settings_concurrency_control(
                                             props.draft_max_concurrency,
                                             draft_is_dirty,
                                             props.error,
                                             props.value_focus,
+                                            palette,
                                             window,
                                             cx,
                                         ))
                                         .child(settings_hint_text(
                                             "Controls how many queued conversions can run at the same time.",
+                                            palette,
                                         )),
                                 )
                                 .when_some(props.error.map(str::to_string), |this, error| {
@@ -538,7 +572,7 @@ pub(super) fn app_settings_sheet(
                                             .id("app-settings-max-concurrency-error")
                                             .role(gpui::Role::Alert)
                                             .aria_label(error.clone())
-                                            .text_color(color(theme::FRAME_RED))
+                                            .text_color(color(palette.danger))
                                             .child(error),
                                     )
                                 })
@@ -553,23 +587,24 @@ pub(super) fn app_settings_sheet(
                                         skip: props.skip_focus,
                                         install: props.install_focus,
                                     },
+                                    palette,
                                     window,
                                     cx,
                                 )),
                         )
-                        .child(app_settings_version_label()),
+                        .child(app_settings_version_label(palette)),
                 ),
         )
 }
 
-fn app_settings_version_label() -> gpui::Div {
+fn app_settings_version_label(palette: &'static theme::ThemePalette) -> gpui::Div {
     div()
         .w_full()
         .flex()
         .justify_end()
         .pt_4()
         .text_size(theme::ui_rem(11.0))
-        .text_color(color(theme::FRAME_GRAY_400))
+        .text_color(color(palette.border_subtle))
         .child(theme::ui_text_owned(format!("Frame v{FRAME_APP_VERSION}")))
 }
 
@@ -577,6 +612,7 @@ fn app_settings_output_directory_section(
     default_output_directory: Option<&str>,
     error: Option<&str>,
     focus: &FocusHandle,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -589,7 +625,7 @@ fn app_settings_output_directory_section(
         "Choose default output folder"
     };
 
-    let mut section = settings_section("Output folder")
+    let mut section = settings_section("Output folder", palette)
         .child(
             frame_text_button_with_focus(
                 "app-settings-output-directory",
@@ -598,6 +634,7 @@ fn app_settings_output_directory_section(
                 false,
                 true,
                 focus,
+                palette,
                 window,
                 cx,
             )
@@ -611,7 +648,7 @@ fn app_settings_output_directory_section(
             div()
                 .id("app-settings-output-directory-path")
                 .overflow_hidden()
-                .text_color(color(theme::FRAME_GRAY_600))
+                .text_color(color(palette.text_muted))
                 .child(selected_path),
         );
 
@@ -621,44 +658,7 @@ fn app_settings_output_directory_section(
                 .id("app-settings-output-directory-error")
                 .role(gpui::Role::Alert)
                 .aria_label(error.to_string())
-                .text_color(color(theme::FRAME_RED))
-                .child(error.to_string()),
-        );
-    }
-
-    section
-}
-
-fn app_settings_appearance_section(
-    appearance: AppearanceSettings,
-    error: Option<&str>,
-    ui_scale_popover: UiScalePopoverState,
-    ui_scale_scroll_handle: &ScrollHandle,
-    ui_scale_focuses: AppSettingsScaleSelectFocuses<'_>,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
-) -> gpui::Div {
-    let mut section = settings_section("Appearance")
-        .child(app_settings_ui_scale_select(
-            appearance.ui_scale,
-            ui_scale_popover.is_open(),
-            ui_scale_popover.is_rendered(),
-            ui_scale_scroll_handle,
-            ui_scale_focuses,
-            window,
-            cx,
-        ))
-        .child(settings_hint_text(
-            "Changes the size of the complete interface.",
-        ));
-
-    if let Some(error) = error {
-        section = section.child(
-            div()
-                .id("app-settings-appearance-error")
-                .role(gpui::Role::Alert)
-                .aria_label(error.to_string())
-                .text_color(color(theme::FRAME_RED))
+                .text_color(color(palette.danger))
                 .child(error.to_string()),
         );
     }
@@ -667,20 +667,163 @@ fn app_settings_appearance_section(
 }
 
 #[expect(
-    clippy::too_many_lines,
-    reason = "A select keeps its trigger, animated popover, keyboard navigation, and options together."
+    clippy::too_many_arguments,
+    reason = "The appearance section explicitly receives both independent select states, focus groups, and theme context."
 )]
-fn app_settings_ui_scale_select(
-    selected: ScalePreset,
-    is_open: bool,
-    is_rendered: bool,
-    scroll_handle: &ScrollHandle,
-    focuses: AppSettingsScaleSelectFocuses<'_>,
+fn app_settings_appearance_section(
+    appearance: AppearanceSettings,
+    error: Option<&str>,
+    theme_popover: PopoverState,
+    ui_scale_popover: PopoverState,
+    theme_scroll_handle: &ScrollHandle,
+    ui_scale_scroll_handle: &ScrollHandle,
+    theme_focuses: AppSettingsSelectFocuses<'_>,
+    ui_scale_focuses: AppSettingsSelectFocuses<'_>,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    const LABEL: &str = "UI scale";
-    let options = ScalePreset::ALL;
+    let mut section = settings_section("Appearance", palette)
+        .child(
+            div()
+                .grid()
+                .grid_cols(2)
+                .gap_2()
+                .child(app_settings_appearance_select(
+                    AppSettingsAppearanceSelectProps {
+                        selected: appearance.color_theme,
+                        popover_state: theme_popover,
+                        scroll_handle: theme_scroll_handle,
+                        focuses: theme_focuses,
+                        palette,
+                    },
+                    window,
+                    cx,
+                ))
+                .child(app_settings_appearance_select(
+                    AppSettingsAppearanceSelectProps {
+                        selected: appearance.ui_scale,
+                        popover_state: ui_scale_popover,
+                        scroll_handle: ui_scale_scroll_handle,
+                        focuses: ui_scale_focuses,
+                        palette,
+                    },
+                    window,
+                    cx,
+                )),
+        )
+        .child(settings_hint_text(
+            "Changes the color theme and size of the complete interface.",
+            palette,
+        ));
+
+    if let Some(error) = error {
+        section = section.child(
+            div()
+                .id("app-settings-appearance-error")
+                .role(gpui::Role::Alert)
+                .aria_label(error.to_string())
+                .text_color(color(palette.danger))
+                .child(error.to_string()),
+        );
+    }
+
+    section
+}
+
+trait AppSettingsAppearanceValue: Copy + Eq + 'static {
+    const LABEL: &'static str;
+    const TRIGGER_ID: &'static str;
+    const LIST_ID: &'static str;
+    const PANEL_ID: &'static str;
+    const SCROLLBAR_ID: &'static str;
+    const MOTION_ID: &'static str;
+    const POPOVER: AppearancePopover;
+
+    fn options() -> &'static [Self];
+    fn display(self) -> &'static str;
+    fn option_id(self) -> String;
+    fn apply(self, root: &mut FrameRoot, window: &mut Window);
+}
+
+impl AppSettingsAppearanceValue for ColorTheme {
+    const LABEL: &'static str = "Theme";
+    const TRIGGER_ID: &'static str = "app-settings-theme";
+    const LIST_ID: &'static str = "app-settings-theme-options-list";
+    const PANEL_ID: &'static str = "app-settings-theme-options";
+    const SCROLLBAR_ID: &'static str = "app-settings-theme-scrollbar";
+    const MOTION_ID: &'static str = "app-settings-theme-motion";
+    const POPOVER: AppearancePopover = AppearancePopover::Theme;
+
+    fn options() -> &'static [Self] {
+        &Self::ALL
+    }
+
+    fn display(self) -> &'static str {
+        self.display()
+    }
+
+    fn option_id(self) -> String {
+        format!("app-settings-theme-option-{}", self.persisted())
+    }
+
+    fn apply(self, root: &mut FrameRoot, _window: &mut Window) {
+        root.set_color_theme(self);
+    }
+}
+
+impl AppSettingsAppearanceValue for ScalePreset {
+    const LABEL: &'static str = "UI scale";
+    const TRIGGER_ID: &'static str = "app-settings-ui-scale";
+    const LIST_ID: &'static str = "app-settings-ui-scale-options-list";
+    const PANEL_ID: &'static str = "app-settings-ui-scale-options";
+    const SCROLLBAR_ID: &'static str = "app-settings-ui-scale-scrollbar";
+    const MOTION_ID: &'static str = "app-settings-ui-scale-motion";
+    const POPOVER: AppearancePopover = AppearancePopover::UiScale;
+
+    fn options() -> &'static [Self] {
+        &Self::ALL
+    }
+
+    fn display(self) -> &'static str {
+        self.display()
+    }
+
+    fn option_id(self) -> String {
+        format!("app-settings-ui-scale-option-{}", self.percent())
+    }
+
+    fn apply(self, root: &mut FrameRoot, window: &mut Window) {
+        apply_app_settings_ui_scale(root, self, window);
+    }
+}
+
+#[derive(Clone, Copy)]
+struct AppSettingsAppearanceSelectProps<'a, T> {
+    selected: T,
+    popover_state: PopoverState,
+    scroll_handle: &'a ScrollHandle,
+    focuses: AppSettingsSelectFocuses<'a>,
+    palette: &'static theme::ThemePalette,
+}
+
+#[expect(
+    clippy::too_many_lines,
+    reason = "The shared appearance select keeps its trigger, animated popover, keyboard navigation, and options together."
+)]
+fn app_settings_appearance_select<T: AppSettingsAppearanceValue>(
+    props: AppSettingsAppearanceSelectProps<'_, T>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    let AppSettingsAppearanceSelectProps {
+        selected,
+        popover_state,
+        scroll_handle,
+        focuses,
+        palette,
+    } = props;
+    let options = T::options();
     let selected_index = options
         .iter()
         .position(|option| *option == selected)
@@ -689,12 +832,13 @@ fn app_settings_ui_scale_select(
     let key_option_focuses = option_focuses.clone();
     let key_scroll_handle = scroll_handle.clone();
     let trigger = frame_select_trigger_with_focus(
-        "app-settings-ui-scale",
-        LABEL,
+        T::TRIGGER_ID,
+        T::LABEL,
         selected.display(),
         true,
-        is_open,
+        popover_state.is_open(),
         focuses.trigger,
+        palette,
         window,
         cx,
     )
@@ -703,7 +847,7 @@ fn app_settings_ui_scale_select(
         if event.is_keyboard() {
             return;
         }
-        root.toggle_app_settings_ui_scale_popover();
+        root.toggle_app_settings_appearance_popover(T::POPOVER);
         cx.notify();
     }))
     .on_key_down(
@@ -712,7 +856,7 @@ fn app_settings_ui_scale_select(
             match key {
                 "down" | "up" | "home" | "end" => {
                     cx.stop_propagation();
-                    root.settings_ui.ui_scale_popover = UiScalePopoverState::Open;
+                    root.open_app_settings_appearance_popover(T::POPOVER);
                     let target = frame_select_target_index(
                         key_option_focuses.len(),
                         Some(selected_index),
@@ -720,7 +864,7 @@ fn app_settings_ui_scale_select(
                         |_| true,
                     )
                     .unwrap_or(selected_index);
-                    focus_app_settings_scale_option(
+                    focus_app_settings_select_option(
                         target,
                         &key_option_focuses,
                         &key_scroll_handle,
@@ -729,14 +873,14 @@ fn app_settings_ui_scale_select(
                     );
                     cx.notify();
                 }
-                "enter" | "space" if root.settings_ui.ui_scale_popover.is_open() => {
+                "enter" | "space" if root.appearance_popover_state(T::POPOVER).is_open() => {
                     cx.stop_propagation();
-                    root.close_app_settings_ui_scale_popover();
+                    root.close_app_settings_appearance_popover(T::POPOVER);
                     cx.notify();
                 }
                 "enter" | "space" => {
                     cx.stop_propagation();
-                    root.settings_ui.ui_scale_popover = UiScalePopoverState::Open;
+                    root.open_app_settings_appearance_popover(T::POPOVER);
                     let focus = key_option_focuses.get(selected_index).cloned();
                     key_scroll_handle.scroll_to_item(selected_index);
                     if let Some(focus) = focus {
@@ -748,7 +892,7 @@ fn app_settings_ui_scale_select(
                 }
                 "escape" => {
                     cx.stop_propagation();
-                    root.close_app_settings_ui_scale_popover();
+                    root.close_app_settings_appearance_popover(T::POPOVER);
                     cx.notify();
                 }
                 _ => {}
@@ -761,18 +905,18 @@ fn app_settings_ui_scale_select(
         .flex()
         .flex_col()
         .gap_2()
-        .child(settings_field_label(LABEL))
+        .child(settings_field_label(T::LABEL, palette))
         .child(trigger);
 
-    if is_rendered {
-        let progress = app_settings_ui_scale_popover_progress(is_open, window, cx);
+    if popover_state.is_rendered() {
+        let progress =
+            app_settings_appearance_popover_progress::<T>(popover_state.is_open(), window, cx);
         let content_height = frame_select_content_height(options.len());
-        let mut list =
-            frame_select_options_list("app-settings-ui-scale-options-list", scroll_handle);
+        let mut list = frame_select_options_list(T::LIST_ID, scroll_handle);
 
-        for (index, option) in options.into_iter().enumerate() {
+        for (index, option) in options.iter().copied().enumerate() {
             let focus = option_focuses.get(index);
-            list = list.child(app_settings_ui_scale_option(
+            list = list.child(app_settings_appearance_option(
                 option,
                 index,
                 selected,
@@ -780,15 +924,17 @@ fn app_settings_ui_scale_select(
                 &option_focuses,
                 scroll_handle,
                 focuses.trigger,
+                palette,
                 cx,
             ));
         }
 
         let mut menu = frame_select_popover(
-            "app-settings-ui-scale-options",
+            T::PANEL_ID,
             54.0 + subtitle_popover_slide_offset(progress),
             progress,
             list,
+            palette,
         );
         if let (Some(first), Some(last)) = (option_focuses.first(), option_focuses.last()) {
             menu = apply_frame_select_popover_focus_trap(
@@ -801,9 +947,10 @@ fn app_settings_ui_scale_select(
         }
         if content_height > FRAME_SELECT_MAX_HEIGHT {
             menu = menu.child(frame_vertical_scrollbar(
-                "app-settings-ui-scale-scrollbar",
+                T::SCROLLBAR_ID,
                 scroll_handle.clone(),
                 content_height,
+                palette,
             ));
         }
         field = field.child(deferred(menu).with_priority(20));
@@ -816,25 +963,39 @@ fn app_settings_ui_scale_select(
     clippy::too_many_arguments,
     reason = "Each option needs its selection, focus, navigation, scrolling, and root action context."
 )]
-fn app_settings_ui_scale_option(
-    option: ScalePreset,
+fn app_settings_appearance_option<T: AppSettingsAppearanceValue>(
+    option: T,
     index: usize,
-    selected: ScalePreset,
+    selected: T,
     focus: Option<&FocusHandle>,
     option_focuses: &[FocusHandle],
     scroll_handle: &ScrollHandle,
     trigger_focus: &FocusHandle,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    let option_id = format!("app-settings-ui-scale-option-{}", option.percent());
+    let option_id = option.option_id();
     let option_focuses_for_key = option_focuses.to_vec();
     let scroll_handle_for_key = scroll_handle.clone();
     let trigger_focus_for_click = trigger_focus.clone();
     let trigger_focus_for_key = trigger_focus.clone();
     let element = if let Some(focus) = focus {
-        frame_select_option_with_focus(option_id, option.display(), option == selected, true, focus)
+        frame_select_option_with_focus(
+            option_id,
+            option.display(),
+            option == selected,
+            true,
+            focus,
+            palette,
+        )
     } else {
-        frame_select_option(option_id, option.display(), option == selected, true)
+        frame_select_option(
+            option_id,
+            option.display(),
+            option == selected,
+            true,
+            palette,
+        )
     };
 
     element
@@ -843,8 +1004,8 @@ fn app_settings_ui_scale_option(
             if event.is_keyboard() {
                 return;
             }
-            apply_app_settings_ui_scale(root, option, window);
-            root.close_app_settings_ui_scale_popover();
+            option.apply(root, window);
+            root.close_app_settings_appearance_popover(T::POPOVER);
             trigger_focus_for_click.focus(window, cx);
             cx.notify();
         }))
@@ -854,8 +1015,8 @@ fn app_settings_ui_scale_option(
                 match key {
                     "enter" | "space" => {
                         cx.stop_propagation();
-                        apply_app_settings_ui_scale(root, option, window);
-                        root.close_app_settings_ui_scale_popover();
+                        option.apply(root, window);
+                        root.close_app_settings_appearance_popover(T::POPOVER);
                         let focus = trigger_focus_for_key.clone();
                         cx.defer_in(window, move |_root, window, cx| {
                             focus.focus(window, cx);
@@ -870,7 +1031,7 @@ fn app_settings_ui_scale_option(
                             key,
                             |_| true,
                         ) {
-                            focus_app_settings_scale_option(
+                            focus_app_settings_select_option(
                                 target,
                                 &option_focuses_for_key,
                                 &scroll_handle_for_key,
@@ -881,7 +1042,7 @@ fn app_settings_ui_scale_option(
                     }
                     "escape" => {
                         cx.stop_propagation();
-                        root.close_app_settings_ui_scale_popover();
+                        root.close_app_settings_appearance_popover(T::POPOVER);
                         trigger_focus_for_key.focus(window, cx);
                         cx.notify();
                     }
@@ -891,7 +1052,32 @@ fn app_settings_ui_scale_option(
         )
 }
 
-fn focus_app_settings_scale_option(
+fn app_settings_appearance_popover_progress<T: AppSettingsAppearanceValue>(
+    is_open: bool,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> f32 {
+    let transition = window
+        .use_keyed_transition(
+            T::MOTION_ID,
+            cx,
+            INTERACTION_MOTION_DURATION,
+            |_window, _cx| 0.0_f32,
+        )
+        .with_easing(ease_in_out);
+    set_motion_target(&transition, motion_target(is_open), cx);
+    let progress = *transition.evaluate(window, cx);
+    if !is_open && motion_is_hidden(progress) {
+        cx.defer_in(window, move |root, _window, cx| {
+            if root.finish_app_settings_appearance_popover_close(T::POPOVER) {
+                cx.notify();
+            }
+        });
+    }
+    progress
+}
+
+fn focus_app_settings_select_option(
     index: usize,
     option_focuses: &[FocusHandle],
     scroll_handle: &ScrollHandle,
@@ -910,31 +1096,6 @@ fn apply_app_settings_ui_scale(root: &mut FrameRoot, scale: ScalePreset, window:
     }
 }
 
-fn app_settings_ui_scale_popover_progress(
-    is_open: bool,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
-) -> f32 {
-    let transition = window
-        .use_keyed_transition(
-            "app-settings-ui-scale-motion",
-            cx,
-            INTERACTION_MOTION_DURATION,
-            |_window, _cx| 0.0_f32,
-        )
-        .with_easing(ease_in_out);
-    set_motion_target(&transition, motion_target(is_open), cx);
-    let progress = *transition.evaluate(window, cx);
-    if !is_open && motion_is_hidden(progress) {
-        cx.defer_in(window, move |root, _window, cx| {
-            if root.finish_app_settings_ui_scale_popover_close() {
-                cx.notify();
-            }
-        });
-    }
-    progress
-}
-
 #[derive(Clone, Copy)]
 struct AppSettingsUpdateFocuses<'a> {
     auto_update: &'a FocusHandle,
@@ -949,11 +1110,12 @@ fn app_settings_updates_section(
     update_status: &UpdateStatus,
     update_install_ready: bool,
     focuses: AppSettingsUpdateFocuses<'_>,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let busy = update_status.is_busy();
-    let mut section = settings_section("Updates")
+    let mut section = settings_section("Updates", palette)
         .child(frame_checkbox_row_with_focus(
             "app-settings-auto-update-check",
             "Check automatically",
@@ -961,6 +1123,7 @@ fn app_settings_updates_section(
             auto_update_check,
             false,
             focuses.auto_update,
+            palette,
             cx,
             |root, _event, _window, cx| {
                 if root.toggle_auto_update_check(cx) {
@@ -968,8 +1131,18 @@ fn app_settings_updates_section(
                 }
             },
         ))
-        .child(update_check_now_button(busy, focuses.check_now, window, cx))
-        .child(update_status_label(update_status, update_install_ready));
+        .child(update_check_now_button(
+            busy,
+            focuses.check_now,
+            palette,
+            window,
+            cx,
+        ))
+        .child(update_status_label(
+            update_status,
+            update_install_ready,
+            palette,
+        ));
 
     if let UpdateStatus::Downloading {
         progress_percent,
@@ -978,15 +1151,23 @@ fn app_settings_updates_section(
         ..
     } = update_status
     {
-        section = section.child(update_progress_bar(*progress_percent));
+        section = section.child(update_progress_bar(*progress_percent, palette));
         section = section.child(update_download_detail(
             *received_bytes,
             *total_bytes,
             *progress_percent,
+            palette,
         ));
     }
 
-    if let Some(row) = update_action_row(update_status, update_install_ready, focuses, window, cx) {
+    if let Some(row) = update_action_row(
+        update_status,
+        update_install_ready,
+        focuses,
+        palette,
+        window,
+        cx,
+    ) {
         section = section.child(row);
     }
 
@@ -996,11 +1177,12 @@ fn app_settings_updates_section(
 fn update_status_label(
     status: &UpdateStatus,
     update_install_ready: bool,
+    palette: &'static theme::ThemePalette,
 ) -> gpui::Stateful<gpui::Div> {
     let tone = match status {
-        UpdateStatus::Error(_) => theme::FRAME_RED,
-        UpdateStatus::Disabled(_) => theme::FRAME_AMBER,
-        _ => theme::FRAME_GRAY_600,
+        UpdateStatus::Error(_) => palette.danger,
+        UpdateStatus::Disabled(_) => palette.warning,
+        _ => palette.text_muted,
     };
     let text = update_status_text(status, update_install_ready);
 
@@ -1062,6 +1244,7 @@ fn update_release_notes_text(info: Option<&UpdateInfo>) -> Option<String> {
 fn update_release_notes_block(
     notes: &str,
     scroll_handle: &ScrollHandle,
+    palette: &'static theme::ThemePalette,
 ) -> gpui::Stateful<gpui::Div> {
     let lines = normalized_release_note_lines(notes);
     let content_height = update_release_notes_content_height(&lines);
@@ -1075,7 +1258,7 @@ fn update_release_notes_block(
         .pr_5();
 
     for line in lines {
-        content = content.child(update_release_note_line(&line));
+        content = content.child(update_release_note_line(&line, palette));
     }
 
     div()
@@ -1085,12 +1268,13 @@ fn update_release_notes_block(
         .max_h(theme::ui_rem(UPDATE_RELEASE_NOTES_MAX_HEIGHT))
         .overflow_hidden()
         .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .bg(color(theme::FRAME_GRAY_100))
+        .bg(color(palette.fill_subtle))
         .child(content)
         .child(frame_vertical_scrollbar(
             "update-dialog-release-notes-scrollbar",
             scroll_handle.clone(),
             content_height,
+            palette,
         ))
 }
 
@@ -1124,7 +1308,7 @@ fn normalized_release_note_lines(notes: &str) -> Vec<String> {
     }
 }
 
-fn update_release_note_line(line: &str) -> gpui::Div {
+fn update_release_note_line(line: &str, palette: &'static theme::ThemePalette) -> gpui::Div {
     let trimmed = line.trim();
     if trimmed.is_empty() {
         return div().h(theme::ui_rem(8.0));
@@ -1140,25 +1324,25 @@ fn update_release_note_line(line: &str) -> gpui::Div {
             (
                 heading.to_string(),
                 0.0,
-                theme::FOREGROUND,
+                palette.text_primary,
                 theme::TEXT_WEIGHT_MEDIUM,
             )
         } else if let Some(bullet) = bullet {
             (
                 format!("• {bullet}"),
                 8.0,
-                theme::FRAME_GRAY_600,
+                palette.text_muted,
                 theme::TEXT_WEIGHT_REGULAR,
             )
         } else {
             (
                 trimmed.to_string(),
                 0.0,
-                theme::FRAME_GRAY_600,
+                palette.text_muted,
                 theme::TEXT_WEIGHT_REGULAR,
             )
         };
-    let (text, highlights) = parse_update_release_note_emphasis(&text);
+    let (text, highlights) = parse_update_release_note_emphasis(&text, palette);
 
     let mut line = div()
         .pl(theme::ui_rem(left_padding))
@@ -1179,12 +1363,13 @@ fn update_release_note_line(line: &str) -> gpui::Div {
 
 fn parse_update_release_note_emphasis(
     input: &str,
+    palette: &'static theme::ThemePalette,
 ) -> (String, Vec<(std::ops::Range<usize>, HighlightStyle)>) {
     let mut text = String::with_capacity(input.len());
     let mut highlights = Vec::new();
     let mut rest = input;
     let highlight_style = HighlightStyle {
-        color: Some(color(theme::FOREGROUND).into()),
+        color: Some(color(palette.text_primary).into()),
         font_weight: Some(theme::TEXT_WEIGHT_MEDIUM),
         ..HighlightStyle::default()
     };
@@ -1214,7 +1399,10 @@ fn parse_update_release_note_emphasis(
     (text, highlights)
 }
 
-fn update_progress_bar(progress_percent: Option<u8>) -> gpui::Stateful<gpui::Div> {
+fn update_progress_bar(
+    progress_percent: Option<u8>,
+    palette: &'static theme::ThemePalette,
+) -> gpui::Stateful<gpui::Div> {
     let fraction = progress_percent.map_or(0.0, |percent| f32::from(percent) / 100.0);
     let numeric_percent = progress_percent.map_or(0.0, f64::from);
     let value_text = progress_percent.map_or_else(
@@ -1234,13 +1422,13 @@ fn update_progress_bar(progress_percent: Option<u8>) -> gpui::Stateful<gpui::Div
         .w_full()
         .overflow_hidden()
         .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .bg(color(theme::FRAME_GRAY_100))
+        .bg(color(palette.fill_subtle))
         .child(
             div()
                 .h_full()
                 .w(relative(fraction.clamp(0.0, 1.0)))
                 .rounded(theme::ui_rem(theme::RADIUS_SM))
-                .bg(color(theme::FRAME_BLUE)),
+                .bg(color(palette.accent)),
         )
 }
 
@@ -1248,6 +1436,7 @@ fn update_download_detail(
     received_bytes: u64,
     total_bytes: Option<u64>,
     progress_percent: Option<u8>,
+    palette: &'static theme::ThemePalette,
 ) -> gpui::Div {
     let detail = match (total_bytes, progress_percent) {
         (Some(total_bytes), Some(percent)) => format!(
@@ -1265,7 +1454,7 @@ fn update_download_detail(
 
     div()
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-        .text_color(color(theme::FRAME_GRAY_600))
+        .text_color(color(palette.text_muted))
         .font_features(assets::frame_tabular_number_font_features())
         .child(detail)
 }
@@ -1274,6 +1463,7 @@ fn update_action_row(
     status: &UpdateStatus,
     update_install_ready: bool,
     focuses: AppSettingsUpdateFocuses<'_>,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> Option<gpui::Div> {
@@ -1291,6 +1481,7 @@ fn update_action_row(
                         false,
                         true,
                         focuses.download,
+                        palette,
                         window,
                         cx,
                     )
@@ -1310,6 +1501,7 @@ fn update_action_row(
                         false,
                         true,
                         focuses.skip,
+                        palette,
                         window,
                         cx,
                     )
@@ -1332,6 +1524,7 @@ fn update_action_row(
                     false,
                     update_install_ready,
                     focuses.install,
+                    palette,
                     window,
                     cx,
                 )
@@ -1355,6 +1548,7 @@ fn update_action_row(
 fn update_check_now_button(
     busy: bool,
     focus: &FocusHandle,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
@@ -1365,6 +1559,7 @@ fn update_check_now_button(
         false,
         !busy,
         focus,
+        palette,
         window,
         cx,
     )
@@ -1386,6 +1581,7 @@ pub(super) struct UpdateDialogView<'a> {
     pub(super) release_notes_scroll_handle: &'a ScrollHandle,
     pub(super) panel_focus: &'a FocusHandle,
     pub(super) close_focus: &'a FocusHandle,
+    pub(super) palette: &'static theme::ThemePalette,
 }
 
 pub(super) fn update_dialog(
@@ -1394,6 +1590,7 @@ pub(super) fn update_dialog(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
+    let palette = view.palette;
     let transition = window
         .use_keyed_transition(
             "update-dialog-motion",
@@ -1422,7 +1619,7 @@ pub(super) fn update_dialog(
         .items_center()
         .justify_center()
         .p_4()
-        .bg(color(theme::BACKGROUND.with_alpha(0.64 * progress)))
+        .bg(color(palette.canvas.with_alpha(0.64 * progress)))
         .backdrop_blur(theme::ui_rem(4.0 * progress).to_pixels(window.rem_size()))
         .opacity(progress)
         .occlude()
@@ -1462,6 +1659,7 @@ fn update_dialog_panel(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
+    let palette = view.palette;
     let mut panel = div()
         .id("update-dialog-panel")
         .role(gpui::Role::AlertDialog)
@@ -1474,8 +1672,8 @@ fn update_dialog_panel(
         .max_h(relative(0.86))
         .overflow_hidden()
         .rounded(theme::ui_rem(theme::RADIUS_LG))
-        .bg(color(theme::SIDEBAR))
-        .shadow(card_surface_shadows())
+        .bg(color(palette.surface))
+        .shadow(card_surface_shadows(palette))
         .occlude()
         .on_click(cx.listener(|_, _: &ClickEvent, _window, cx| {
             cx.stop_propagation();
@@ -1483,6 +1681,7 @@ fn update_dialog_panel(
         .child(update_dialog_header(
             view.status,
             view.close_focus,
+            palette,
             window,
             cx,
         ))
@@ -1491,16 +1690,18 @@ fn update_dialog_panel(
             view.info,
             view.install_ready,
             view.release_notes_scroll_handle,
+            palette,
         ))
         .child(update_dialog_footer(
             view.status,
             view.install_ready,
+            palette,
             window,
             cx,
         ));
 
     if matches!(view.status, UpdateStatus::Downloading { .. }) {
-        panel = panel.child(update_dialog_download_state(view.status));
+        panel = panel.child(update_dialog_download_state(view.status, palette));
     }
 
     panel
@@ -1509,6 +1710,7 @@ fn update_dialog_panel(
 fn update_dialog_header(
     status: &UpdateStatus,
     close_focus: &FocusHandle,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -1518,7 +1720,7 @@ fn update_dialog_header(
             div()
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-                .text_color(color(theme::FRAME_GRAY_600))
+                .text_color(color(palette.text_muted))
                 .child(theme::ui_text(kicker)),
         );
     }
@@ -1526,7 +1728,7 @@ fn update_dialog_header(
         div()
             .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
             .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-            .text_color(color(theme::FOREGROUND))
+            .text_color(color(palette.text_primary))
             .child(theme::ui_text_owned(update_dialog_title(status))),
     );
 
@@ -1546,6 +1748,7 @@ fn update_dialog_header(
                 "Close update dialog",
                 !status.is_busy(),
                 close_focus,
+                palette,
                 window,
                 cx,
             )
@@ -1558,7 +1761,7 @@ fn update_dialog_header(
                 }
             })),
         )
-        .child(panel_bottom_separator())
+        .child(panel_bottom_separator(palette))
 }
 
 fn update_dialog_body(
@@ -1566,6 +1769,7 @@ fn update_dialog_body(
     info: Option<&UpdateInfo>,
     install_ready: bool,
     release_notes_scroll_handle: &ScrollHandle,
+    palette: &'static theme::ThemePalette,
 ) -> gpui::Div {
     let notes = update_release_notes_text(info);
     let mut body = div().flex().flex_col().gap_3().p_4();
@@ -1575,7 +1779,7 @@ fn update_dialog_body(
             div()
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .line_height(theme::ui_rem(16.0))
-                .text_color(color(theme::FRAME_GRAY_600))
+                .text_color(color(palette.text_muted))
                 .child(theme::ui_text_owned(summary)),
         );
     }
@@ -1584,6 +1788,7 @@ fn update_dialog_body(
         body = body.child(update_release_notes_block(
             notes,
             release_notes_scroll_handle,
+            palette,
         ));
     }
 
@@ -1594,11 +1799,11 @@ fn update_dialog_body(
                 .role(gpui::Role::Alert)
                 .aria_label(error.clone())
                 .rounded(theme::ui_rem(theme::RADIUS_SM))
-                .bg(color(theme::FRAME_RED.with_alpha(0.08)))
+                .bg(color(palette.danger.with_alpha(0.08)))
                 .p_3()
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .line_height(theme::ui_rem(16.0))
-                .text_color(color(theme::FRAME_RED))
+                .text_color(color(palette.danger))
                 .child(error.clone()),
         );
     }
@@ -1606,7 +1811,10 @@ fn update_dialog_body(
     body
 }
 
-fn update_dialog_download_state(status: &UpdateStatus) -> gpui::Div {
+fn update_dialog_download_state(
+    status: &UpdateStatus,
+    palette: &'static theme::ThemePalette,
+) -> gpui::Div {
     let UpdateStatus::Downloading {
         progress_percent,
         received_bytes,
@@ -1623,17 +1831,19 @@ fn update_dialog_download_state(status: &UpdateStatus) -> gpui::Div {
         .flex()
         .flex_col()
         .gap_2()
-        .child(update_progress_bar(*progress_percent))
+        .child(update_progress_bar(*progress_percent, palette))
         .child(update_download_detail(
             *received_bytes,
             *total_bytes,
             *progress_percent,
+            palette,
         ))
 }
 
 fn update_dialog_footer(
     status: &UpdateStatus,
     install_ready: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -1653,6 +1863,7 @@ fn update_dialog_footer(
                 ButtonVariant::Ghost,
                 false,
                 !status.is_busy(),
+                palette,
                 window,
                 cx,
             )
@@ -1668,6 +1879,7 @@ fn update_dialog_footer(
         .child(update_dialog_primary_action(
             status,
             install_ready,
+            palette,
             window,
             cx,
         ))
@@ -1676,6 +1888,7 @@ fn update_dialog_footer(
 fn update_dialog_primary_action(
     status: &UpdateStatus,
     install_ready: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -1687,6 +1900,7 @@ fn update_dialog_primary_action(
             "Download",
             ButtonVariant::Default,
             true,
+            palette,
             window,
             cx,
         )
@@ -1701,6 +1915,7 @@ fn update_dialog_primary_action(
             ButtonVariant::Default,
             false,
             install_ready,
+            palette,
             window,
             cx,
         )
@@ -1715,6 +1930,7 @@ fn update_dialog_primary_action(
             ButtonVariant::Secondary,
             false,
             true,
+            palette,
             window,
             cx,
         )
@@ -1730,6 +1946,7 @@ fn update_dialog_primary_action(
             ButtonVariant::Secondary,
             false,
             false,
+            palette,
             window,
             cx,
         ),
@@ -1742,6 +1959,7 @@ fn update_dialog_primary_action(
             ButtonVariant::Secondary,
             false,
             true,
+            palette,
             window,
             cx,
         )
@@ -1825,6 +2043,7 @@ pub(super) fn app_settings_concurrency_control(
     can_apply: bool,
     error: Option<&str>,
     value_focus: &FocusHandle,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -1837,6 +2056,7 @@ pub(super) fn app_settings_concurrency_control(
             focus: Some(value_focus),
             kind: FrameTextInputKind::MaxConcurrency,
         },
+        palette,
         window,
         cx,
     )
@@ -1850,7 +2070,7 @@ pub(super) fn app_settings_concurrency_control(
         .gap_2()
         .child(div().flex_1().min_w_0().child(input))
         .child(
-            app_settings_apply_button(can_apply, window, cx).on_click(cx.listener(
+            app_settings_apply_button(can_apply, palette, window, cx).on_click(cx.listener(
                 move |root, _: &ClickEvent, _window, cx| {
                     cx.stop_propagation();
                     if can_apply && root.apply_max_concurrency_draft() {
@@ -1866,10 +2086,11 @@ pub(super) fn app_settings_close_button(
     label: &'static str,
     enabled: bool,
     focus: &FocusHandle,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    let colors = button_colors(ButtonVariant::Ghost, false, enabled);
+    let colors = button_colors(ButtonVariant::Ghost, false, enabled, palette);
     let animated = animated_button_colors(id, colors, window, cx);
     let background = animated.background;
     let foreground = animated.foreground;
@@ -1897,11 +2118,12 @@ pub(super) fn app_settings_close_button(
         ));
     let button = apply_button_motion(button, motion, enabled);
 
-    apply_accessible_button_with_focus(button, label, enabled, focus)
+    apply_accessible_button_with_focus(button, label, enabled, focus, palette)
 }
 
 pub(super) fn app_settings_apply_button(
     enabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -1911,6 +2133,7 @@ pub(super) fn app_settings_apply_button(
         ButtonVariant::Secondary,
         false,
         enabled,
+        palette,
         window,
         cx,
     )
@@ -1918,6 +2141,7 @@ pub(super) fn app_settings_apply_button(
 
 pub(super) fn drag_drop_overlay(
     is_open: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
@@ -1948,7 +2172,7 @@ pub(super) fn drag_drop_overlay(
         .items_center()
         .justify_center()
         .p_4()
-        .bg(color(theme::BACKGROUND.with_alpha(0.60 * progress)))
+        .bg(color(palette.canvas.with_alpha(0.60 * progress)))
         .backdrop_blur(theme::ui_rem(4.0 * progress).to_pixels(window.rem_size()))
         .opacity(progress)
         .occlude()
@@ -1967,13 +2191,13 @@ pub(super) fn drag_drop_overlay(
                 .rounded(theme::ui_rem(theme::RADIUS_LG))
                 .border_1()
                 .border_dashed()
-                .border_color(color(theme::FRAME_GRAY_100))
-                .bg(color(theme::FRAME_GRAY_100))
-                .shadow(card_surface_shadows())
+                .border_color(color(palette.fill_subtle))
+                .bg(color(palette.fill_subtle))
+                .shadow(card_surface_shadows(palette))
                 .child(
                     div()
                         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-                        .text_color(color(theme::FOREGROUND))
+                        .text_color(color(palette.text_primary))
                         .child(theme::ui_text("Import source files")),
                 ),
         )
@@ -1989,6 +2213,7 @@ pub(super) fn macos_native_window_controls_placeholder() -> gpui::Div {
 }
 
 pub(super) fn windows_window_controls(
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -2012,6 +2237,7 @@ pub(super) fn windows_window_controls(
                     radius: 0.0,
                 },
                 false,
+                palette,
                 window,
                 cx,
             )
@@ -2033,6 +2259,7 @@ pub(super) fn windows_window_controls(
                     radius: 0.0,
                 },
                 false,
+                palette,
                 window,
                 cx,
             )
@@ -2054,6 +2281,7 @@ pub(super) fn windows_window_controls(
                     radius: 0.0,
                 },
                 true,
+                palette,
                 window,
                 cx,
             )
@@ -2065,7 +2293,11 @@ pub(super) fn windows_window_controls(
         )
 }
 
-pub(super) fn linux_window_controls(window: &mut Window, cx: &mut Context<FrameRoot>) -> gpui::Div {
+pub(super) fn linux_window_controls(
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
     div()
         .absolute()
         .top_0()
@@ -2088,6 +2320,7 @@ pub(super) fn linux_window_controls(window: &mut Window, cx: &mut Context<FrameR
                     radius: theme::RADIUS_SM,
                 },
                 false,
+                palette,
                 window,
                 cx,
             )
@@ -2109,6 +2342,7 @@ pub(super) fn linux_window_controls(window: &mut Window, cx: &mut Context<FrameR
                     radius: theme::RADIUS_SM,
                 },
                 false,
+                palette,
                 window,
                 cx,
             )
@@ -2130,6 +2364,7 @@ pub(super) fn linux_window_controls(window: &mut Window, cx: &mut Context<FrameR
                     radius: theme::RADIUS_SM,
                 },
                 true,
+                palette,
                 window,
                 cx,
             )
@@ -2149,29 +2384,34 @@ pub(super) struct TitlebarWindowButtonMetrics {
     pub(super) radius: f32,
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Window chrome keeps platform metrics, semantics, palette, and render context explicit."
+)]
 pub(super) fn titlebar_window_button(
     id: &'static str,
     icon: &'static str,
     label: &'static str,
     metrics: TitlebarWindowButtonMetrics,
     destructive: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let hover_background = if destructive {
-        theme::FRAME_RED
+        palette.danger
     } else {
-        theme::FRAME_GRAY_100
+        palette.fill_subtle
     };
     let active_background = if destructive {
-        theme::FRAME_RED
+        palette.danger
     } else {
-        theme::FRAME_GRAY_200
+        palette.fill_selected
     };
-    let hover_foreground = theme::FOREGROUND;
-    let foreground = theme::FRAME_GRAY_600;
+    let hover_foreground = palette.text_primary;
+    let foreground = palette.text_muted;
     let colors = ButtonColors {
-        background: theme::TRANSPARENT,
+        background: palette.transparent,
         hover_background,
         active_background,
         foreground,
@@ -2199,50 +2439,51 @@ pub(super) fn titlebar_window_button(
         .child(icon_svg(icon, metrics.icon_size, icon_color));
     let button = apply_button_motion(button, motion, true);
 
-    apply_accessible_button(button, label, true).tab_stop(false)
+    apply_accessible_button(button, label, true, palette).tab_stop(false)
 }
 
-pub(super) fn frame_logo() -> gpui::Div {
+pub(super) fn frame_logo(palette: &'static theme::ThemePalette) -> gpui::Div {
     div()
         .flex()
         .items_center()
         .justify_center()
         .px_2()
-        .text_color(color(theme::FRAME_GRAY_600))
+        .text_color(color(palette.text_muted))
         .child(
             svg()
                 .path(assets::ICON_FRAME)
                 .w(theme::ui_rem(TITLEBAR_LOGO_SIZE))
                 .h(theme::ui_rem(TITLEBAR_LOGO_SIZE))
-                .text_color(color(theme::FRAME_GRAY_600)),
+                .text_color(color(palette.text_muted)),
         )
 }
 
-pub(super) fn platform_frame_logo() -> gpui::Div {
+pub(super) fn platform_frame_logo(palette: &'static theme::ThemePalette) -> gpui::Div {
     div()
         .flex()
         .items_center()
         .justify_center()
-        .text_color(color(theme::FRAME_GRAY_600))
+        .text_color(color(palette.text_muted))
         .child(
             svg()
                 .path(assets::ICON_FRAME)
                 .w(theme::ui_rem(TITLEBAR_LOGO_SIZE))
                 .h(theme::ui_rem(TITLEBAR_LOGO_SIZE))
-                .text_color(color(theme::FRAME_GRAY_600)),
+                .text_color(color(palette.text_muted)),
         )
 }
 
-pub(super) fn titlebar_divider() -> gpui::Div {
-    vertical_separator(TITLEBAR_DIVIDER_HEIGHT)
+pub(super) fn titlebar_divider(palette: &'static theme::ThemePalette) -> gpui::Div {
+    vertical_separator(TITLEBAR_DIVIDER_HEIGHT, palette)
 }
 
-pub(super) fn platform_titlebar_divider() -> gpui::Div {
-    vertical_separator(TITLEBAR_PLATFORM_DIVIDER_HEIGHT)
+pub(super) fn platform_titlebar_divider(palette: &'static theme::ThemePalette) -> gpui::Div {
+    vertical_separator(TITLEBAR_PLATFORM_DIVIDER_HEIGHT, palette)
 }
 
 pub(super) fn titlebar_navigation(
     active_view: ActiveView,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -2255,15 +2496,16 @@ pub(super) fn titlebar_navigation(
         .items_center()
         .gap_1()
         .rounded(theme::ui_rem(theme::RADIUS_MD))
-        .bg(color(theme::FRAME_GRAY_100))
+        .bg(color(palette.surface))
         .px(theme::ui_rem(3.0))
         .py(theme::ui_rem(2.0))
-        .shadow(input_highlight_shadows())
+        .shadow(input_highlight_shadows(palette))
         .child(titlebar_segment(
             assets::ICON_LAYOUT_LIST,
             "Workspace",
             ActiveView::Workspace,
             active_view == ActiveView::Workspace,
+            palette,
             window,
             cx,
         ))
@@ -2272,28 +2514,38 @@ pub(super) fn titlebar_navigation(
             "Logs",
             ActiveView::Logs,
             active_view == ActiveView::Logs,
+            palette,
             window,
             cx,
         ))
 }
 
-pub(super) fn titlebar_stats(state: FrameAppState) -> gpui::Div {
+pub(super) fn titlebar_stats(
+    state: FrameAppState,
+    palette: &'static theme::ThemePalette,
+) -> gpui::Div {
     div()
         .flex()
         .items_center()
         .gap_4()
-        .text_color(color(theme::FRAME_GRAY_600))
+        .text_color(color(palette.text_muted))
         .child(titlebar_stat(
             assets::ICON_HARD_DRIVE,
             format!("Storage {}", format_total_size(state.total_size_bytes)),
+            palette,
         ))
         .child(titlebar_stat(
             assets::ICON_FILE_VIDEO,
             format!("Items {}", state.file_count),
+            palette,
         ))
 }
 
-pub(super) fn titlebar_stat(icon: &'static str, label: String) -> gpui::Div {
+pub(super) fn titlebar_stat(
+    icon: &'static str,
+    label: String,
+    palette: &'static theme::ThemePalette,
+) -> gpui::Div {
     div()
         .flex()
         .items_center()
@@ -2301,7 +2553,7 @@ pub(super) fn titlebar_stat(icon: &'static str, label: String) -> gpui::Div {
         .child(icon_svg(
             icon,
             TITLEBAR_ICON_SIZE,
-            color(theme::FRAME_GRAY_600),
+            color(palette.text_muted),
         ))
         .child(theme::ui_text_owned(label))
 }
@@ -2311,10 +2563,11 @@ pub(super) fn titlebar_segment(
     label: &'static str,
     view: ActiveView,
     selected: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
-    let colors = button_colors(ButtonVariant::Secondary, selected, true);
+    let colors = button_colors(ButtonVariant::Secondary, selected, true, palette);
     let segment_id = match view {
         ActiveView::Workspace => "titlebar-workspace",
         ActiveView::Logs => "titlebar-logs",
@@ -2324,15 +2577,15 @@ pub(super) fn titlebar_segment(
     let background = if selected {
         mix_color(colors.background, colors.hover_background, hover_progress)
     } else {
-        mix_color(theme::TRANSPARENT, theme::FRAME_GRAY_100, hover_progress)
+        mix_color(palette.transparent, palette.fill_subtle, hover_progress)
     };
     let foreground = mix_color(
         if selected {
-            theme::FOREGROUND
+            palette.text_primary
         } else {
-            theme::FRAME_GRAY_600
+            palette.text_muted
         },
-        theme::FOREGROUND,
+        palette.text_primary,
         hover_progress,
     );
 
@@ -2344,7 +2597,7 @@ pub(super) fn titlebar_segment(
         .aria_selected(selected)
         .focusable()
         .tab_stop(true)
-        .focus_visible(focus_visible_ring)
+        .focus_visible(move |style| focus_visible_ring(style, palette))
         .flex()
         .items_center()
         .gap_2()
@@ -2354,7 +2607,9 @@ pub(super) fn titlebar_segment(
         .bg(background)
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
-        .when(selected, |this| this.shadow(button_highlight_shadows()))
+        .when(selected, |this| {
+            this.shadow(button_highlight_shadows(palette))
+        })
         .hover(gpui::Styled::cursor_pointer)
         .active(move |style| style.bg(color(colors.active_background)))
         .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
@@ -2449,20 +2704,28 @@ mod tests {
 
     #[test]
     fn release_note_emphasis_strips_markers_and_highlights_range() {
-        let (text, highlights) =
-            parse_update_release_note_emphasis("• **Native GPUI Application:** Rebuilt Frame");
+        let palette = theme::palette(crate::appearance::ColorTheme::Dark);
+        let (text, highlights) = parse_update_release_note_emphasis(
+            "• **Native GPUI Application:** Rebuilt Frame",
+            palette,
+        );
 
         assert_eq!(text, "• Native GPUI Application: Rebuilt Frame");
         assert_eq!(highlights.len(), 1);
         assert_eq!(&text[highlights[0].0.clone()], "Native GPUI Application:");
-        assert_eq!(highlights[0].1.color, Some(color(theme::FOREGROUND).into()));
+        assert_eq!(
+            highlights[0].1.color,
+            Some(color(palette.text_primary).into())
+        );
         assert_eq!(highlights[0].1.font_weight, Some(theme::TEXT_WEIGHT_MEDIUM));
     }
 
     #[test]
     fn release_note_emphasis_keeps_unclosed_markers_literal() {
-        let (text, highlights) =
-            parse_update_release_note_emphasis("• **Native GPUI Application: Rebuilt Frame");
+        let (text, highlights) = parse_update_release_note_emphasis(
+            "• **Native GPUI Application: Rebuilt Frame",
+            theme::palette(crate::appearance::ColorTheme::Dark),
+        );
 
         assert_eq!(text, "• **Native GPUI Application: Rebuilt Frame");
         assert!(highlights.is_empty());

@@ -91,6 +91,7 @@ pub(in crate::app) fn preview_overlay_layer(
     state: &PreviewShellState,
     cx: &Context<FrameRoot>,
 ) -> Option<gpui::Stateful<gpui::Div>> {
+    let palette = state.palette;
     let overlay = state.overlay.overlay.as_ref()?;
     if !overlay.enabled || overlay.path.is_empty() {
         return None;
@@ -114,8 +115,6 @@ pub(in crate::app) fn preview_overlay_layer(
         .h(relative(unit_f64_to_f32(height)))
         .when(state.overlay.overlay_mode, |this| {
             this.cursor_grab()
-                .border_1()
-                .border_color(color(theme::FOREGROUND.with_alpha(0.90)))
                 .on_drag(drag, |_drag, _position, _window, cx| {
                     cx.new(|_| PreviewTimelineDragPreview)
                 })
@@ -131,11 +130,22 @@ pub(in crate::app) fn preview_overlay_layer(
                         .size_full()
                         .object_fit(ObjectFit::Contain),
                 ),
-        );
+        )
+        .when(state.overlay.overlay_mode, |this| {
+            // Keep the selection outline below the resize handles. GPUI paints a
+            // parent's border after its children, so the outline must be a child.
+            this.child(
+                div()
+                    .absolute()
+                    .inset_0()
+                    .border_1()
+                    .border_color(preview_selection_line_color()),
+            )
+        });
 
     if state.overlay.overlay_mode {
         let media = state.media;
-        layer = apply_accessible_button(layer, "Move overlay image", true)
+        layer = apply_accessible_button(layer, "Move overlay image", true, palette)
             .aria_description(overlay_keyboard_description())
             .on_key_down(
                 cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
@@ -179,6 +189,7 @@ pub(in crate::app) fn preview_overlay_layer(
                 width,
                 height,
                 state.media,
+                palette,
                 cx,
             ))
             .child(preview_overlay_handle(
@@ -188,6 +199,7 @@ pub(in crate::app) fn preview_overlay_layer(
                 width,
                 height,
                 state.media,
+                palette,
                 cx,
             ))
             .child(preview_overlay_handle(
@@ -197,6 +209,7 @@ pub(in crate::app) fn preview_overlay_layer(
                 width,
                 height,
                 state.media,
+                palette,
                 cx,
             ))
             .child(preview_overlay_handle(
@@ -206,6 +219,7 @@ pub(in crate::app) fn preview_overlay_layer(
                 width,
                 height,
                 state.media,
+                palette,
                 cx,
             ));
     }
@@ -223,6 +237,7 @@ pub(in crate::app) fn preview_overlay_controls(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> Option<gpui::Div> {
+    let palette = state.palette;
     let overlay = state.overlay.overlay.as_ref()?;
     if !state.overlay.overlay_mode {
         return None;
@@ -240,9 +255,9 @@ pub(in crate::app) fn preview_overlay_controls(
         .items_center()
         .gap_2()
         .rounded(theme::ui_rem(theme::RADIUS_MD))
-        .bg(parse_hex(PREVIEW_TOOLBAR_BACKGROUND))
+        .bg(color(palette.surface_elevated))
         .p(theme::ui_rem(4.0))
-        .shadow(card_surface_shadows())
+        .shadow(card_surface_shadows(palette))
         .on_key_down(
             cx.listener(move |_root, event: &gpui::KeyDownEvent, window, cx| {
                 handle_modal_tab_navigation(event, &first_focus, &last_focus, window, cx);
@@ -256,6 +271,7 @@ pub(in crate::app) fn preview_overlay_controls(
                 ButtonVariant::Ghost,
                 enabled,
                 focuses.first,
+                palette,
                 window,
                 cx,
             )
@@ -263,7 +279,7 @@ pub(in crate::app) fn preview_overlay_controls(
                 root.prompt_selected_overlay_image(window, cx);
             })),
         )
-        .child(preview_toolbar_vertical_separator())
+        .child(preview_toolbar_vertical_separator(palette))
         .child(
             preview_overlay_icon_button(
                 "decrease",
@@ -271,6 +287,7 @@ pub(in crate::app) fn preview_overlay_controls(
                 "Decrease overlay size",
                 ButtonVariant::Ghost,
                 enabled,
+                palette,
                 window,
                 cx,
             )
@@ -287,6 +304,7 @@ pub(in crate::app) fn preview_overlay_controls(
                 "Increase overlay size",
                 ButtonVariant::Ghost,
                 enabled,
+                palette,
                 window,
                 cx,
             )
@@ -296,8 +314,13 @@ pub(in crate::app) fn preview_overlay_controls(
                 }
             })),
         )
-        .child(preview_overlay_opacity_slider(overlay.opacity, enabled, cx))
-        .child(preview_toolbar_vertical_separator())
+        .child(preview_overlay_opacity_slider(
+            overlay.opacity,
+            enabled,
+            palette,
+            cx,
+        ))
+        .child(preview_toolbar_vertical_separator(palette))
         .child(
             frame_icon_button(
                 "preview-overlay-remove",
@@ -309,6 +332,7 @@ pub(in crate::app) fn preview_overlay_controls(
                     button: PREVIEW_TOOLBAR_BUTTON_SIZE,
                     icon: PREVIEW_TOOLBAR_ICON_SIZE,
                 },
+                palette,
                 window,
                 cx,
             )
@@ -327,6 +351,7 @@ pub(in crate::app) fn preview_overlay_controls(
                 ButtonVariant::Default,
                 enabled,
                 focuses.last,
+                palette,
                 window,
                 cx,
             )
@@ -385,6 +410,10 @@ fn preview_overlay_height_ratio(state: &PreviewShellState) -> f64 {
     overlay_ratio * media_ratio
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Overlay handles require explicit geometry, media state, palette, and root context."
+)]
 fn preview_overlay_handle(
     handle: OverlayDragHandle,
     x: f32,
@@ -392,6 +421,7 @@ fn preview_overlay_handle(
     width: f64,
     height: f64,
     media: Option<PreviewMediaRenderState>,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let handle_element = overlay_handle_cursor(
@@ -409,9 +439,10 @@ fn preview_overlay_handle(
             .h(theme::ui_rem(OVERLAY_HANDLE_SIZE))
             .rounded_full()
             .border_1()
+            // Media overlay: the handle outline contrasts with arbitrary source pixels.
             .border_color(hsla(0.0, 0.0, 0.0, 0.45))
-            .bg(color(theme::FOREGROUND))
-            .shadow(card_surface_shadows()),
+            .bg(color(preview_handle_color(palette)))
+            .shadow(card_surface_shadows(palette)),
         handle,
     )
     .on_drag(
@@ -423,7 +454,7 @@ fn preview_overlay_handle(
         |_drag, _position, _window, cx| cx.new(|_| PreviewTimelineDragPreview),
     );
 
-    apply_accessible_button(handle_element, overlay_handle_label(handle), true)
+    apply_accessible_button(handle_element, overlay_handle_label(handle), true, palette)
         .aria_description(overlay_keyboard_description())
         .on_key_down(
             cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
@@ -516,16 +547,21 @@ const fn overlay_keyboard_description() -> &'static str {
     "Use arrow keys to move or resize the overlay. Hold Shift for a larger step. Press plus or minus to resize, Enter or Escape to finish, or Delete to remove."
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Overlay buttons keep semantics, state, palette, and render context explicit."
+)]
 fn preview_overlay_icon_button(
     id: &'static str,
     icon: &'static str,
     label: &'static str,
     variant: ButtonVariant,
     enabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    preview_overlay_icon_button_inner(id, icon, label, variant, enabled, None, window, cx)
+    preview_overlay_icon_button_inner(id, icon, label, variant, enabled, None, palette, window, cx)
 }
 
 #[expect(
@@ -539,10 +575,21 @@ fn preview_overlay_icon_button_with_focus(
     variant: ButtonVariant,
     enabled: bool,
     focus: &FocusHandle,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    preview_overlay_icon_button_inner(id, icon, label, variant, enabled, Some(focus), window, cx)
+    preview_overlay_icon_button_inner(
+        id,
+        icon,
+        label,
+        variant,
+        enabled,
+        Some(focus),
+        palette,
+        window,
+        cx,
+    )
 }
 
 #[expect(
@@ -556,10 +603,11 @@ fn preview_overlay_icon_button_inner(
     variant: ButtonVariant,
     enabled: bool,
     focus: Option<&FocusHandle>,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    let colors = button_colors(variant, false, enabled);
+    let colors = button_colors(variant, false, enabled, palette);
     let button_id = format!("preview-overlay-{id}");
     let animated = animated_button_colors(button_id.clone(), colors, window, cx);
     let background = animated.background;
@@ -578,7 +626,9 @@ fn preview_overlay_icon_button_inner(
         .bg(background)
         .text_color(foreground)
         .opacity(colors.opacity)
-        .when(highlighted, |this| this.shadow(button_highlight_shadows()))
+        .when(highlighted, |this| {
+            this.shadow(button_highlight_shadows(palette))
+        })
         .when(!enabled, gpui::Styled::cursor_not_allowed)
         .when(enabled, |this| {
             this.hover(gpui::Styled::cursor_pointer)
@@ -593,15 +643,16 @@ fn preview_overlay_icon_button_inner(
     let button = apply_button_motion(button, motion, enabled);
 
     if let Some(focus) = focus {
-        apply_accessible_button_with_focus(button, label, enabled, focus)
+        apply_accessible_button_with_focus(button, label, enabled, focus, palette)
     } else {
-        apply_accessible_button(button, label, enabled)
+        apply_accessible_button(button, label, enabled, palette)
     }
 }
 
 fn preview_overlay_opacity_slider(
     value: f64,
     enabled: bool,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let value = f64_to_f32(value.clamp(0.0, 1.0));
@@ -613,6 +664,7 @@ fn preview_overlay_opacity_slider(
         "Overlay opacity",
         value,
         !enabled,
+        palette,
     )
     .w(theme::ui_rem(OVERLAY_OPACITY_SLIDER_WIDTH))
     .on_a11y_action(gpui::AccessibleAction::Increment, move |_, _window, cx| {

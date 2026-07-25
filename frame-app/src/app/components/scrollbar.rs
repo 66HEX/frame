@@ -35,6 +35,7 @@ pub(in crate::app) fn frame_vertical_scrollbar(
     id: impl Into<String>,
     scroll_handle: ScrollHandle,
     content_height: f32,
+    palette: &'static theme::ThemePalette,
 ) -> gpui::Stateful<gpui::Div> {
     let content_height = content_height.max(0.0);
     let drag = FrameScrollbarDrag {
@@ -112,7 +113,7 @@ pub(in crate::app) fn frame_vertical_scrollbar(
                         size(px(track_width), bounds.size.height),
                     );
                     window.paint_quad(
-                        fill(track_bounds, color(theme::FRAME_GRAY_100))
+                        fill(track_bounds, color(palette.fill_subtle))
                             .corner_radii(px(track_width / 2.0)),
                     );
 
@@ -124,7 +125,7 @@ pub(in crate::app) fn frame_vertical_scrollbar(
                         size(px(thumb_width), px(metrics.thumb_height)),
                     );
                     window.paint_quad(
-                        fill(thumb_bounds, color(theme::FRAME_GRAY_600))
+                        fill(thumb_bounds, color(palette.control_muted))
                             .corner_radii(px(thumb_width / 2.0)),
                     );
                 },
@@ -161,9 +162,10 @@ pub(in crate::app) fn frame_vertical_uniform_scrollbar(
     id: impl Into<String>,
     scroll_handle: &UniformListScrollHandle,
     content_height: f32,
+    palette: &'static theme::ThemePalette,
 ) -> gpui::Stateful<gpui::Div> {
     let base_handle = scroll_handle.0.borrow().base_handle.clone();
-    frame_vertical_scrollbar(id, base_handle, content_height)
+    frame_vertical_scrollbar(id, base_handle, content_height, palette)
 }
 
 pub(in crate::app) fn frame_vertical_scrollbar_metrics(

@@ -15,6 +15,7 @@ impl Render for FrameRoot {
         window.set_rem_size(px(
             crate::appearance::BASE_REM_PX * self.appearance.ui_scale.factor()
         ));
+        let palette = theme::palette(self.appearance.color_theme);
         self.begin_accessibility_frame();
         let app_root_focus = self.ensure_focus(
             FrameFocusKey::Control(APP_ROOT_FOCUS_ID.to_string()),
@@ -176,7 +177,7 @@ impl Render for FrameRoot {
             Some(state.active_view)
         };
         let content = match active_content_view {
-            None => content.child(welcome_view(window, cx)),
+            None => content.child(welcome_view(palette, window, cx)),
             Some(ActiveView::Workspace) => {
                 let output_name_focus =
                     self.ensure_text_input_focus(FrameTextInputKind::OutputName, cx);
@@ -387,6 +388,7 @@ impl Render for FrameRoot {
                     subtitle_outline_color_sv_focus.focus(window, cx);
                 }
                 let settings = SettingsRenderState {
+                    palette,
                     active_tab: self.settings_ui.active_tab,
                     tooltip_visible_id: self.tooltip_ui.visible_id.as_deref(),
                     config: &selected_config_snapshot,
@@ -505,6 +507,7 @@ impl Render for FrameRoot {
                 &self.logs_scroll_handle,
                 self.logs_follow_tail,
                 self.copied_log_file_id.as_deref(),
+                palette,
                 window,
                 cx,
             )),
@@ -520,8 +523,8 @@ impl Render for FrameRoot {
             .flex_col()
             .overflow_hidden()
             .group(ROOT_DROP_GROUP)
-            .bg(color(theme::BACKGROUND))
-            .text_color(color(theme::FOREGROUND))
+            .bg(color(palette.canvas))
+            .text_color(color(palette.text_primary))
             .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
             .font_family(assets::FRAME_FONT_FAMILY)
             .font_weight(theme::TEXT_WEIGHT_REGULAR)
@@ -541,6 +544,14 @@ impl Render for FrameRoot {
                         root.close_subtitle_popover();
                         cx.notify();
                     }
+                    if root.settings_ui.theme_popover.is_open() {
+                        root.close_app_settings_appearance_popover(AppearancePopover::Theme);
+                        cx.notify();
+                    }
+                    if root.settings_ui.ui_scale_popover.is_open() {
+                        root.close_app_settings_appearance_popover(AppearancePopover::UiScale);
+                        cx.notify();
+                    }
                 }),
             )
             .on_drop(cx.listener(|root, paths: &ExternalPaths, _window, cx| {
@@ -556,13 +567,37 @@ impl Render for FrameRoot {
                     }
                 },
             ))
-            .child(titlebar(state, window, cx))
+            .child(titlebar(state, palette, window, cx))
             .child(content)
             .child(FileDropLifecycleProbe { owner: cx.entity() });
 
         if self.settings_ui.is_present {
             let update_install_ready = self.can_install_downloaded_update();
+            let theme_popover_active = self.settings_ui.theme_popover.is_open();
             let ui_scale_popover_active = self.settings_ui.ui_scale_popover.is_open();
+            let theme_trigger_focus = self.ensure_focus(
+                FrameFocusKey::Control("app-settings-theme".to_string()),
+                true,
+                cx,
+            );
+            let theme_panel_focus = self.ensure_focus(
+                FrameFocusKey::Control("app-settings-theme-options".to_string()),
+                false,
+                cx,
+            );
+            let theme_option_focuses = ColorTheme::ALL
+                .into_iter()
+                .map(|color_theme| {
+                    self.ensure_focus(
+                        FrameFocusKey::Control(format!(
+                            "app-settings-theme-option-{}",
+                            color_theme.persisted()
+                        )),
+                        theme_popover_active,
+                        cx,
+                    )
+                })
+                .collect::<Vec<_>>();
             let ui_scale_trigger_focus = self.ensure_focus(
                 FrameFocusKey::Control("app-settings-ui-scale".to_string()),
                 true,
@@ -641,6 +676,7 @@ impl Render for FrameRoot {
                 cx,
             );
             if self.settings_ui.is_open
+                && !self.settings_ui.theme_popover.is_open()
                 && !self.settings_ui.ui_scale_popover.is_open()
                 && !panel_focus.contains_focused(window, cx)
             {
@@ -658,11 +694,19 @@ impl Render for FrameRoot {
                         .and_then(std::path::Path::to_str),
                     output_directory_error: self.settings_ui.output_directory_error.as_deref(),
                     appearance: self.appearance,
+                    palette,
                     appearance_error: self.settings_ui.appearance_error.as_deref(),
+                    theme_popover: self.settings_ui.theme_popover,
                     ui_scale_popover: self.settings_ui.ui_scale_popover,
                     scroll_handle: &self.settings_ui.app_settings_scroll_handle,
+                    theme_scroll_handle: &self.settings_ui.theme_scroll_handle,
                     ui_scale_scroll_handle: &self.settings_ui.ui_scale_scroll_handle,
-                    ui_scale_focuses: AppSettingsScaleSelectFocuses {
+                    theme_focuses: AppSettingsSelectFocuses {
+                        trigger: &theme_trigger_focus,
+                        panel: &theme_panel_focus,
+                        options: &theme_option_focuses,
+                    },
+                    ui_scale_focuses: AppSettingsSelectFocuses {
                         trigger: &ui_scale_trigger_focus,
                         panel: &ui_scale_panel_focus,
                         options: &ui_scale_option_focuses,
@@ -687,7 +731,12 @@ impl Render for FrameRoot {
         }
 
         if self.drag_drop_ui.is_present {
-            root = root.child(drag_drop_overlay(self.drag_drop_ui.is_open, window, cx));
+            root = root.child(drag_drop_overlay(
+                self.drag_drop_ui.is_open,
+                palette,
+                window,
+                cx,
+            ));
         }
 
         if self.update_ui.dialog_present {
@@ -714,6 +763,7 @@ impl Render for FrameRoot {
                     release_notes_scroll_handle: &self.update_ui.release_notes_scroll_handle,
                     panel_focus: &panel_focus,
                     close_focus: &close_focus,
+                    palette,
                 },
                 window,
                 cx,
@@ -722,12 +772,16 @@ impl Render for FrameRoot {
 
         self.finish_accessibility_frame(window, cx, Some(&app_root_focus));
 
-        linux_window_frame(root, window)
+        linux_window_frame(root, window, palette)
     }
 }
 
 #[cfg(target_os = "linux")]
-fn linux_window_frame(root: gpui::Stateful<gpui::Div>, window: &Window) -> impl IntoElement {
+fn linux_window_frame(
+    root: gpui::Stateful<gpui::Div>,
+    window: &Window,
+    palette: &'static theme::ThemePalette,
+) -> impl IntoElement {
     let should_draw_frame = matches!(
         window.window_decorations(),
         gpui::Decorations::Client { tiling }
@@ -741,35 +795,39 @@ fn linux_window_frame(root: gpui::Stateful<gpui::Div>, window: &Window) -> impl 
     div().size_full().p(px(LINUX_WINDOW_FRAME_INSET)).child(
         root.rounded(px(theme::RADIUS_LG))
             .border_1()
-            .border_color(color(theme::FRAME_GRAY_200))
-            .shadow(linux_window_frame_shadows()),
+            .border_color(color(palette.fill_selected))
+            .shadow(linux_window_frame_shadows(palette)),
     )
 }
 
 #[cfg(not(target_os = "linux"))]
-fn linux_window_frame(root: gpui::Stateful<gpui::Div>, _window: &Window) -> impl IntoElement {
+fn linux_window_frame(
+    root: gpui::Stateful<gpui::Div>,
+    _window: &Window,
+    _palette: &'static theme::ThemePalette,
+) -> impl IntoElement {
     root
 }
 
 #[cfg(target_os = "linux")]
-fn linux_window_frame_shadows() -> Vec<BoxShadow> {
+fn linux_window_frame_shadows(palette: &'static theme::ThemePalette) -> Vec<BoxShadow> {
     vec![
         BoxShadow {
-            color: hsla(0.0, 0.0, 0.0, 0.28),
+            color: color(palette.shadow.with_alpha(0.28)).into(),
             offset: point(px(0.0), px(8.0)),
             blur_radius: px(8.0),
             spread_radius: px(-7.0),
             inset: false,
         },
         BoxShadow {
-            color: hsla(0.0, 0.0, 0.0, 0.18),
+            color: color(palette.shadow.with_alpha(0.18)).into(),
             offset: point(px(0.0), px(3.0)),
             blur_radius: px(5.0),
             spread_radius: px(-3.0),
             inset: false,
         },
         BoxShadow {
-            color: color(theme::FRAME_GRAY_200).into(),
+            color: color(palette.fill_selected).into(),
             offset: point(px(0.0), px(0.0)),
             blur_radius: px(0.0),
             spread_radius: px(1.0),

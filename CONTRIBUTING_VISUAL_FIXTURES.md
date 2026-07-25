@@ -18,10 +18,13 @@ FRAME_GPUI_VISUAL_FIXTURE=update-available cargo xtask run
 Any fixture can be combined with a supported interface scale using
 `FRAME_GPUI_UI_SCALE`. Values may be written as `80` or `80%`; supported
 presets are `80`, `90`, `100`, `110`, `125`, `150`, `175`, and `200`.
+Use `FRAME_VISUAL_THEME=dark|light` to override the persisted color theme for
+the fixture process without writing the override back to settings.
 
 ```bash
 FRAME_GPUI_VISUAL_FIXTURE=settings-subtitles \
 FRAME_GPUI_UI_SCALE=200 \
+FRAME_VISUAL_THEME=light \
 cargo xtask run
 ```
 
@@ -33,6 +36,7 @@ and intentionally override only the state they need for the target scenario.
 | Fixture | Visual scenario | What it is useful for checking |
 | --- | --- | --- |
 | `app-settings` | Runtime app settings sheet | Settings modal layout, concurrency draft value, modal focus treatment, close action, and app-level settings spacing. |
+| `app-settings-theme-open` | App settings with the Theme select open | Dark/Light option order, selected checkmark, keyboard focus treatment, popover placement, and equal-width Appearance columns. |
 | `app-settings-ui-open` | App settings with UI scale open at 200% | Scaled geometry and typography, scrollable sheet body, popover placement, and titlebar coexistence. |
 | `logs-active` | Logs tab with an active FFmpeg conversion | Log tab navigation, active file state, plain FFmpeg log rendering, progress line wrapping, monospaced text rendering, and scroll density. |
 | `preview-ready` | Workspace with a selected ready video source | Preview panel shell, selected video metadata, timeline controls, toolbar visibility, empty frame handling, and source video state. |

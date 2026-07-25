@@ -3,7 +3,7 @@ use super::{
     FrameTextInputSpec, MetadataField, ParentElement, SettingsMetadataInputFocuses, SourceMetadata,
     StatefulInteractiveElement, Styled, Window, apply_metadata_mode, div, frame_choice_button,
     frame_text_input, metadata_field_options, metadata_mode_options, settings_field_label,
-    settings_hint_text, settings_section,
+    settings_hint_text, settings_section, theme,
 };
 
 pub(in crate::app) fn settings_metadata_tab(
@@ -11,23 +11,36 @@ pub(in crate::app) fn settings_metadata_tab(
     metadata: Option<&SourceMetadata>,
     settings_disabled: bool,
     focuses: SettingsMetadataInputFocuses<'_>,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let mut content = div().flex().flex_col().gap_4().child(
-        settings_section("Metadata mode")
+        settings_section("Metadata mode", palette)
             .child(settings_metadata_mode_grid(
                 config,
                 settings_disabled,
+                palette,
                 window,
                 cx,
             ))
-            .child(settings_hint_text(config.metadata.mode.description())),
+            .child(settings_hint_text(
+                config.metadata.mode.description(),
+                palette,
+            )),
     );
 
     if config.metadata.mode != crate::settings::MetadataMode::Clean {
-        content = content.child(settings_section("Metadata fields").child(
-            settings_metadata_fields(config, metadata, settings_disabled, focuses, window, cx),
+        content = content.child(settings_section("Metadata fields", palette).child(
+            settings_metadata_fields(
+                config,
+                metadata,
+                settings_disabled,
+                focuses,
+                palette,
+                window,
+                cx,
+            ),
         ));
     }
 
@@ -37,6 +50,7 @@ pub(in crate::app) fn settings_metadata_tab(
 fn settings_metadata_mode_grid(
     config: &ConversionConfig,
     settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -50,6 +64,7 @@ fn settings_metadata_mode_grid(
                 option.label,
                 option.is_selected,
                 is_enabled,
+                palette,
                 window,
                 cx,
             )
@@ -73,6 +88,7 @@ fn settings_metadata_fields(
     metadata: Option<&SourceMetadata>,
     settings_disabled: bool,
     focuses: SettingsMetadataInputFocuses<'_>,
+    palette: &'static theme::ThemePalette,
     window: &Window,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
@@ -86,7 +102,7 @@ fn settings_metadata_fields(
                 .flex()
                 .flex_col()
                 .gap_2()
-                .child(settings_field_label(option.label))
+                .child(settings_field_label(option.label, palette))
                 .child(frame_text_input(
                     FrameTextInputSpec {
                         id: metadata_field_input_id(field),
@@ -96,6 +112,7 @@ fn settings_metadata_fields(
                         focus: metadata_field_focus(field, focuses),
                         kind: metadata_field_input_kind(field),
                     },
+                    palette,
                     window,
                     cx,
                 )),

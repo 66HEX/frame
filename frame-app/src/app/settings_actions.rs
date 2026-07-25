@@ -1,9 +1,9 @@
 use super::{
-    AppearanceSettings, Context, DecreaseUiScale, FrameRoot, FrameTextInputKind, IncreaseUiScale,
-    PresetDefinition, PresetNotice, PresetNoticeTone, PromptButton, PromptLevel, ResetUiScale,
-    ScalePreset, UiScalePopoverState, Window, apply_preset, apply_subtitle_burn_path,
-    create_custom_preset, is_supported_subtitle_path, output_folder_dialog, pick_output_folder,
-    pick_subtitle_file, subtitle_file_dialog,
+    AppearancePopover, AppearanceSettings, ColorTheme, Context, DecreaseUiScale, FrameRoot,
+    FrameTextInputKind, IncreaseUiScale, PopoverState, PresetDefinition, PresetNotice,
+    PresetNoticeTone, PromptButton, PromptLevel, ResetUiScale, ScalePreset, Window, apply_preset,
+    apply_subtitle_burn_path, create_custom_preset, is_supported_subtitle_path,
+    output_folder_dialog, pick_output_folder, pick_subtitle_file, subtitle_file_dialog,
 };
 
 impl FrameRoot {
@@ -14,7 +14,8 @@ impl FrameRoot {
         self.settings_ui.max_concurrency_error = None;
         self.settings_ui.output_directory_error = None;
         self.settings_ui.appearance_error = None;
-        self.settings_ui.ui_scale_popover = UiScalePopoverState::Hidden;
+        self.settings_ui.theme_popover = PopoverState::Hidden;
+        self.settings_ui.ui_scale_popover = PopoverState::Hidden;
     }
 
     pub(super) fn close_app_settings(&mut self) {
@@ -22,7 +23,8 @@ impl FrameRoot {
         self.settings_ui.max_concurrency_error = None;
         self.settings_ui.output_directory_error = None;
         self.settings_ui.appearance_error = None;
-        self.close_app_settings_ui_scale_popover();
+        self.close_app_settings_appearance_popover(AppearancePopover::Theme);
+        self.close_app_settings_appearance_popover(AppearancePopover::UiScale);
         self.text_input_ui
             .focuses
             .clear(FrameTextInputKind::MaxConcurrency);
@@ -31,28 +33,78 @@ impl FrameRoot {
         }
     }
 
-    pub(super) const fn toggle_app_settings_ui_scale_popover(&mut self) {
-        self.settings_ui.ui_scale_popover = match self.settings_ui.ui_scale_popover {
-            UiScalePopoverState::Open => UiScalePopoverState::Closing,
-            UiScalePopoverState::Hidden | UiScalePopoverState::Closing => UiScalePopoverState::Open,
+    pub(super) const fn appearance_popover_state(
+        &self,
+        popover: AppearancePopover,
+    ) -> PopoverState {
+        match popover {
+            AppearancePopover::Theme => self.settings_ui.theme_popover,
+            AppearancePopover::UiScale => self.settings_ui.ui_scale_popover,
+        }
+    }
+
+    pub(super) const fn toggle_app_settings_appearance_popover(
+        &mut self,
+        popover: AppearancePopover,
+    ) {
+        let current = self.appearance_popover_state(popover);
+        self.hide_other_appearance_popover(popover);
+        *self.appearance_popover_state_mut(popover) = match current {
+            PopoverState::Open => PopoverState::Closing,
+            PopoverState::Hidden | PopoverState::Closing => PopoverState::Open,
         };
     }
 
-    pub(super) const fn close_app_settings_ui_scale_popover(&mut self) {
-        if matches!(self.settings_ui.ui_scale_popover, UiScalePopoverState::Open) {
-            self.settings_ui.ui_scale_popover = UiScalePopoverState::Closing;
+    pub(super) const fn open_app_settings_appearance_popover(
+        &mut self,
+        popover: AppearancePopover,
+    ) {
+        self.hide_other_appearance_popover(popover);
+        *self.appearance_popover_state_mut(popover) = PopoverState::Open;
+    }
+
+    pub(super) const fn close_app_settings_appearance_popover(
+        &mut self,
+        popover: AppearancePopover,
+    ) {
+        if matches!(self.appearance_popover_state(popover), PopoverState::Open) {
+            *self.appearance_popover_state_mut(popover) = PopoverState::Closing;
         }
     }
 
-    pub(super) const fn finish_app_settings_ui_scale_popover_close(&mut self) -> bool {
+    pub(super) const fn finish_app_settings_appearance_popover_close(
+        &mut self,
+        popover: AppearancePopover,
+    ) -> bool {
         if !matches!(
-            self.settings_ui.ui_scale_popover,
-            UiScalePopoverState::Closing
+            self.appearance_popover_state(popover),
+            PopoverState::Closing
         ) {
             return false;
         }
-        self.settings_ui.ui_scale_popover = UiScalePopoverState::Hidden;
+        *self.appearance_popover_state_mut(popover) = PopoverState::Hidden;
         true
+    }
+
+    const fn appearance_popover_state_mut(
+        &mut self,
+        popover: AppearancePopover,
+    ) -> &mut PopoverState {
+        match popover {
+            AppearancePopover::Theme => &mut self.settings_ui.theme_popover,
+            AppearancePopover::UiScale => &mut self.settings_ui.ui_scale_popover,
+        }
+    }
+
+    const fn hide_other_appearance_popover(&mut self, popover: AppearancePopover) {
+        match popover {
+            AppearancePopover::Theme => {
+                self.settings_ui.ui_scale_popover = PopoverState::Hidden;
+            }
+            AppearancePopover::UiScale => {
+                self.settings_ui.theme_popover = PopoverState::Hidden;
+            }
+        }
     }
 
     pub(super) const fn finish_app_settings_close(&mut self) -> bool {
@@ -99,6 +151,12 @@ impl FrameRoot {
     pub(super) fn set_ui_scale(&mut self, scale: ScalePreset) -> bool {
         let mut appearance = self.appearance;
         appearance.ui_scale = scale;
+        self.set_appearance(appearance)
+    }
+
+    pub(super) fn set_color_theme(&mut self, color_theme: ColorTheme) -> bool {
+        let mut appearance = self.appearance;
+        appearance.color_theme = color_theme;
         self.set_appearance(appearance)
     }
 
