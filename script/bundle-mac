@@ -146,9 +146,10 @@ if [[ -n "${APPLE_NOTARIZATION_KEY:-}" && -n "${APPLE_NOTARIZATION_KEY_ID:-}" &&
 fi
 
 dmg_target_directory="$target_dir/$target_triple/$target_profile"
-dmg_source_directory="$dmg_target_directory/dmg"
 dmg_file_path="$dmg_target_directory/Frame-$arch_suffix.dmg"
 app_zip_file_path="$dmg_target_directory/Frame-$arch_suffix.app.zip"
+dmg_background_path="$repo_root/packaging/macos/dmg-background.png"
+dmg_settings_path="$repo_root/packaging/macos/dmg-settings.py"
 
 create_app_zip() {
 	rm -f "$app_zip_file_path"
@@ -168,18 +169,37 @@ if [[ "$can_notarize" = true ]]; then
 	create_app_zip
 fi
 
-rm -rf "$dmg_source_directory"
-mkdir -p "$dmg_source_directory"
-cp -R "$app_bundle" "$dmg_source_directory/Frame.app"
+if [[ ! -f "$dmg_background_path" ]]; then
+	echo "Missing DMG background: $dmg_background_path" >&2
+	exit 1
+fi
 
-echo "Adding symlink to /Applications to $dmg_source_directory"
-ln -s /Applications "$dmg_source_directory/Applications"
+background_width="$(sips -g pixelWidth "$dmg_background_path" | awk '/pixelWidth/ { print $2 }')"
+background_height="$(sips -g pixelHeight "$dmg_background_path" | awk '/pixelHeight/ { print $2 }')"
+background_dpi_width="$(sips -g dpiWidth "$dmg_background_path" | awk '/dpiWidth/ { print int($2) }')"
+background_dpi_height="$(sips -g dpiHeight "$dmg_background_path" | awk '/dpiHeight/ { print int($2) }')"
+if [[ "$background_width" != 1200 || "$background_height" != 760 || "$background_dpi_width" != 144 || "$background_dpi_height" != 144 ]]; then
+	echo "DMG background must be 1200x760 pixels at 144 DPI; got ${background_width}x${background_height} at ${background_dpi_width}x${background_dpi_height} DPI." >&2
+	exit 1
+fi
 
-echo "Creating final DMG at $dmg_file_path using $dmg_source_directory"
+if [[ ! -f "$dmg_settings_path" ]]; then
+	echo "Missing DMG settings: $dmg_settings_path" >&2
+	exit 1
+fi
+if ! python3 -c 'import dmgbuild' >/dev/null 2>&1; then
+	echo "dmgbuild is required. Install packaging/macos/dmgbuild-requirements.txt or set PYTHONPATH to its target directory." >&2
+	exit 1
+fi
+
+echo "Creating styled DMG at $dmg_file_path"
 rm -f "$dmg_file_path"
-hdiutil create -volname Frame -srcfolder "$dmg_source_directory" -ov -format UDZO "$dmg_file_path"
-
-rm "$dmg_source_directory/Applications"
+python3 -m dmgbuild \
+	--settings "$dmg_settings_path" \
+	-D "app=$app_bundle" \
+	-D "background=$dmg_background_path" \
+	Frame \
+	"$dmg_file_path"
 
 if [[ "$can_notarize" = true ]]; then
 	echo "Code signing DMG"

@@ -295,7 +295,18 @@ jobs:
         ditto -x -k target/packaging-input/Frame-x86_64-unsigned.app.zip \
           target/x86_64-apple-darwin/release/bundle/osx
         test -d target/x86_64-apple-darwin/release/bundle/osx/Frame.app
+    - name: steps::setup_dmgbuild
+      shell: bash
+      run: |
+        python3 -m pip install \
+          --disable-pip-version-check \
+          --no-deps \
+          --require-hashes \
+          --target target/dmgbuild \
+          --requirement packaging/macos/dmgbuild-requirements.txt
     - name: release::package_macos_x86_64
+      env:
+        PYTHONPATH: target/dmgbuild
       run: ./script/bundle-mac -p x86_64-apple-darwin
     - name: release::upload_macos_x86_64_dmg
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -376,7 +387,18 @@ jobs:
         ditto -x -k target/packaging-input/Frame-aarch64-unsigned.app.zip \
           target/aarch64-apple-darwin/release/bundle/osx
         test -d target/aarch64-apple-darwin/release/bundle/osx/Frame.app
+    - name: steps::setup_dmgbuild
+      shell: bash
+      run: |
+        python3 -m pip install \
+          --disable-pip-version-check \
+          --no-deps \
+          --require-hashes \
+          --target target/dmgbuild \
+          --requirement packaging/macos/dmgbuild-requirements.txt
     - name: release::package_macos_aarch64
+      env:
+        PYTHONPATH: target/dmgbuild
       run: ./script/bundle-mac -p aarch64-apple-darwin
     - name: release::upload_macos_aarch64_dmg
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
