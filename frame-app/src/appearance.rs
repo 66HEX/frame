@@ -3,6 +3,56 @@
 /// The base size of one Frame rem at 100% UI scale.
 pub const BASE_REM_PX: f32 = 16.0;
 
+/// A user-selectable application color theme.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum ColorTheme {
+    #[default]
+    Dark,
+    Light,
+}
+
+impl ColorTheme {
+    /// All supported themes in user-facing order.
+    pub const ALL: [Self; 2] = [Self::Dark, Self::Light];
+
+    /// Returns the label shown in appearance controls.
+    #[must_use]
+    pub const fn display(self) -> &'static str {
+        match self {
+            Self::Dark => "Dark",
+            Self::Light => "Light",
+        }
+    }
+
+    /// Returns the canonical value stored in settings JSON.
+    #[must_use]
+    pub const fn persisted(self) -> &'static str {
+        match self {
+            Self::Dark => "dark",
+            Self::Light => "light",
+        }
+    }
+
+    /// Parses a persisted value, defaulting safely for missing or future values.
+    #[must_use]
+    pub fn from_persisted(value: Option<&str>) -> Self {
+        match value.map(str::trim).map(str::to_ascii_lowercase).as_deref() {
+            Some("light") => Self::Light,
+            _ => Self::Dark,
+        }
+    }
+}
+
+/// Parses a fixture-only color theme override.
+#[must_use]
+pub fn color_theme_from_env_value(value: Option<&str>) -> Option<ColorTheme> {
+    match value.map(str::trim).map(str::to_ascii_lowercase).as_deref() {
+        Some("dark") => Some(ColorTheme::Dark),
+        Some("light") => Some(ColorTheme::Light),
+        _ => None,
+    }
+}
+
 /// A supported user-facing scale percentage.
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 pub enum ScalePreset {
@@ -123,6 +173,7 @@ pub fn scale_preset_from_env_value(value: Option<&str>) -> Option<ScalePreset> {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct AppearanceSettings {
     pub ui_scale: ScalePreset,
+    pub color_theme: ColorTheme,
 }
 
 #[must_use]
@@ -145,8 +196,39 @@ mod tests {
             AppearanceSettings::default(),
             AppearanceSettings {
                 ui_scale: ScalePreset::Percent100,
+                color_theme: ColorTheme::Dark,
             }
         );
+    }
+
+    #[test]
+    fn color_theme_options_use_the_user_facing_order() {
+        assert_eq!(ColorTheme::ALL, [ColorTheme::Dark, ColorTheme::Light]);
+    }
+
+    #[test]
+    fn persisted_color_theme_parser_defaults_unknown_values_to_dark() {
+        assert_eq!(ColorTheme::from_persisted(Some("future")), ColorTheme::Dark);
+        assert_eq!(ColorTheme::from_persisted(None), ColorTheme::Dark);
+        assert_eq!(ColorTheme::from_persisted(Some(" DARK ")), ColorTheme::Dark);
+        assert_eq!(
+            ColorTheme::from_persisted(Some(" LIGHT ")),
+            ColorTheme::Light
+        );
+    }
+
+    #[test]
+    fn visual_theme_parser_accepts_light_case_insensitively() {
+        assert_eq!(
+            color_theme_from_env_value(Some(" LIGHT ")),
+            Some(ColorTheme::Light)
+        );
+        assert_eq!(
+            color_theme_from_env_value(Some(" DARK ")),
+            Some(ColorTheme::Dark)
+        );
+        assert_eq!(color_theme_from_env_value(Some("system")), None);
+        assert_eq!(color_theme_from_env_value(None), None);
     }
 
     #[test]

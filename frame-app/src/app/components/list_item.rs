@@ -10,6 +10,7 @@ pub(in crate::app) fn frame_list_item(
     label: impl Into<String>,
     selected: bool,
     enabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -30,13 +31,13 @@ pub(in crate::app) fn frame_list_item(
         .rounded(theme::ui_rem(theme::RADIUS_SM))
         .border_l(theme::ui_rem(2.0))
         .border_color(mix_color(
-            theme::TRANSPARENT,
-            theme::FRAME_GRAY_600,
+            palette.transparent,
+            palette.text_muted,
             selected_progress,
         ))
         .bg(mix_color(
-            theme::TRANSPARENT,
-            theme::FRAME_GRAY_100,
+            palette.transparent,
+            palette.fill_subtle,
             selected_progress,
         ))
         .pl(theme::ui_rem(mix_scalar(8.0, 12.0, selected_progress)))
@@ -44,8 +45,8 @@ pub(in crate::app) fn frame_list_item(
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(mix_color(
-            theme::FRAME_GRAY_600,
-            theme::FOREGROUND,
+            palette.text_muted,
+            palette.text_primary,
             emphasis_progress,
         ))
         .opacity(if enabled { 1.0 } else { 0.5 })
@@ -54,15 +55,20 @@ pub(in crate::app) fn frame_list_item(
 
     let item = apply_button_motion(item, motion, enabled);
 
-    apply_accessible_toggle_button(item, label, enabled, selected)
+    apply_accessible_toggle_button(item, label, enabled, selected, palette)
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "The list-item builder keeps content, interaction state, palette, and render context explicit."
+)]
 pub(in crate::app) fn frame_list_item_with_caption(
     id: impl Into<String>,
     title: impl Into<String>,
     caption: impl Into<String>,
     selected: bool,
     enabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -70,12 +76,12 @@ pub(in crate::app) fn frame_list_item_with_caption(
     let display_title = theme::ui_text_owned(title.clone());
     let caption = theme::ui_text_owned(caption.into());
 
-    frame_list_item(id, title, selected, enabled, window, cx)
+    frame_list_item(id, title, selected, enabled, palette, window, cx)
         .gap_3()
         .child(
             div()
                 .flex_none()
-                .text_color(color(theme::FOREGROUND))
+                .text_color(color(palette.text_primary))
                 .child(display_title),
         )
         .child(
@@ -86,7 +92,7 @@ pub(in crate::app) fn frame_list_item_with_caption(
                 .text_right()
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .font_weight(theme::TEXT_WEIGHT_REGULAR)
-                .text_color(color(theme::FRAME_GRAY_600))
+                .text_color(color(palette.text_muted))
                 .child(caption),
         )
 }
@@ -104,17 +110,22 @@ pub(in crate::app) struct FrameTrackListItemText {
     pub(in crate::app) detail: String,
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "The track-item builder keeps layout, interaction state, palette, and render context explicit."
+)]
 pub(in crate::app) fn frame_track_list_item(
     id: impl Into<String>,
     text: FrameTrackListItemText,
     selected: bool,
     enabled: bool,
     layout: FrameTrackListItemLayout,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let id = id.into();
-    let colors = button_colors(ButtonVariant::Secondary, selected, enabled);
+    let colors = button_colors(ButtonVariant::Secondary, selected, enabled, palette);
     let animated = animated_button_colors(id.clone(), colors, window, cx);
     let background = animated.background;
     let foreground = animated.foreground;
@@ -137,11 +148,11 @@ pub(in crate::app) fn frame_track_list_item(
         .gap_2()
         .child(
             div()
-                .text_color(color(theme::FRAME_GRAY_600))
+                .text_color(color(palette.text_muted))
                 .font_weight(theme::TEXT_WEIGHT_REGULAR)
                 .child(index_label),
         )
-        .child(div().text_color(color(theme::FOREGROUND)).child(primary));
+        .child(div().text_color(color(palette.text_primary)).child(primary));
 
     let content = match layout {
         FrameTrackListItemLayout::Inline => label_row.when(!detail.is_empty(), |this| {
@@ -149,7 +160,7 @@ pub(in crate::app) fn frame_track_list_item(
                 div()
                     .truncate()
                     .font_weight(theme::TEXT_WEIGHT_REGULAR)
-                    .text_color(color(theme::FRAME_GRAY_600))
+                    .text_color(color(palette.text_muted))
                     .child(detail),
             )
         }),
@@ -164,7 +175,7 @@ pub(in crate::app) fn frame_track_list_item(
                     div()
                         .truncate()
                         .font_weight(theme::TEXT_WEIGHT_REGULAR)
-                        .text_color(color(theme::FRAME_GRAY_600))
+                        .text_color(color(palette.text_muted))
                         .child(detail),
                 )
             }),
@@ -186,16 +197,16 @@ pub(in crate::app) fn frame_track_list_item(
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
         .opacity(colors.opacity)
-        .shadow(button_highlight_shadows())
+        .shadow(button_highlight_shadows(palette))
         .when(enabled, |this| {
             this.hover(gpui::Styled::cursor_pointer)
                 .active(move |style| style.bg(color(colors.active_background)))
         })
         .when(!enabled, gpui::Styled::cursor_not_allowed)
         .child(content)
-        .child(frame_selection_dot(selected));
+        .child(frame_selection_dot(selected, palette));
 
     let item = apply_button_motion(item, motion, enabled);
 
-    apply_accessible_toggle_button(item, accessible_label, enabled, selected)
+    apply_accessible_toggle_button(item, accessible_label, enabled, selected, palette)
 }

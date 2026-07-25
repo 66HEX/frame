@@ -1,5 +1,5 @@
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     env,
     ffi::OsStr,
     fmt, fs, io,
@@ -13,6 +13,10 @@ use frame_updater::{
     sign_manifest_bytes,
 };
 use sha2::{Digest, Sha256};
+use syn::{
+    Expr, ImplItemFn, ItemFn, Lit, UnOp,
+    visit::{self, Visit},
+};
 
 const CI_WORKFLOW_PATH: &str = ".github/workflows/ci.yml";
 const DEPENDENCY_REVIEW_WORKFLOW_PATH: &str = ".github/workflows/dependency-review.yml";
@@ -1312,6 +1316,7 @@ fn ci() -> Result<()> {
         "tooling/xtask/Cargo.toml",
     ];
 
+    check_theme_color_literals()?;
     for manifest in MANIFESTS {
         run_command("cargo", &["fmt", "--manifest-path", manifest, "--check"])?;
     }
@@ -1337,6 +1342,288 @@ fn ci() -> Result<()> {
     run_command("bash", &["-n", "script/bundle-linux"])?;
     check_workflows()?;
     run_command("git", &["diff", "--check"])?;
+    Ok(())
+}
+
+const LEGACY_THEME_TOKENS: [&str; 12] = [
+    "BACKGROUND",
+    "FOREGROUND",
+    "TRANSPARENT",
+    "SIDEBAR",
+    "DROPDOWN",
+    "FRAME_GRAY_100",
+    "FRAME_GRAY_200",
+    "FRAME_GRAY_400",
+    "FRAME_GRAY_600",
+    "FRAME_BLUE",
+    "FRAME_RED",
+    "FRAME_AMBER",
+];
+
+struct ApprovedUiColorLiteral {
+    path: &'static str,
+    function: &'static str,
+    constructor: &'static str,
+    arguments: &'static [f64],
+}
+
+const APPROVED_UI_COLOR_LITERALS: [ApprovedUiColorLiteral; 7] = [
+    ApprovedUiColorLiteral {
+        path: "frame-app/src/app/components/color_picker.rs",
+        function: "frame_color_picker_sv_canvas",
+        constructor: "hsla",
+        arguments: &[0.0, 0.0, 1.0, 1.0],
+    },
+    ApprovedUiColorLiteral {
+        path: "frame-app/src/app/components/color_picker.rs",
+        function: "frame_color_picker_sv_canvas",
+        constructor: "hsla",
+        arguments: &[0.0, 0.0, 1.0, 0.0],
+    },
+    ApprovedUiColorLiteral {
+        path: "frame-app/src/app/components/color_picker.rs",
+        function: "frame_color_picker_sv_canvas",
+        constructor: "hsla",
+        arguments: &[0.0, 0.0, 0.0, 1.0],
+    },
+    ApprovedUiColorLiteral {
+        path: "frame-app/src/app/components/color_picker.rs",
+        function: "frame_color_picker_sv_canvas",
+        constructor: "hsla",
+        arguments: &[0.0, 0.0, 0.0, 0.0],
+    },
+    ApprovedUiColorLiteral {
+        path: "frame-app/src/app/preview_panel/crop_overlay.rs",
+        function: "crop_mask_rect",
+        constructor: "hsla",
+        arguments: &[0.0, 0.0, 0.0, 0.55],
+    },
+    ApprovedUiColorLiteral {
+        path: "frame-app/src/app/preview_panel/crop_overlay.rs",
+        function: "preview_crop_handle",
+        constructor: "hsla",
+        arguments: &[0.0, 0.0, 0.0, 0.45],
+    },
+    ApprovedUiColorLiteral {
+        path: "frame-app/src/app/preview_panel/overlay.rs",
+        function: "preview_overlay_handle",
+        constructor: "hsla",
+        arguments: &[0.0, 0.0, 0.0, 0.45],
+    },
+];
+
+#[derive(Debug, PartialEq)]
+struct UiColorLiteralCall {
+    function: Option<String>,
+    constructor: &'static str,
+    arguments: Vec<f64>,
+}
+
+#[derive(Debug, Default, PartialEq)]
+struct ThemeColorAudit {
+    legacy_tokens: BTreeSet<String>,
+    color_literals: Vec<UiColorLiteralCall>,
+}
+
+#[derive(Default)]
+struct ThemeColorVisitor {
+    current_function: Option<String>,
+    audit: ThemeColorAudit,
+}
+
+impl<'ast> Visit<'ast> for ThemeColorVisitor {
+    fn visit_ident(&mut self, ident: &'ast syn::Ident) {
+        let identifier = ident.to_string();
+        if LEGACY_THEME_TOKENS.contains(&identifier.as_str()) {
+            self.audit.legacy_tokens.insert(identifier);
+        }
+    }
+
+    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
+        let previous = self
+            .current_function
+            .replace(function.sig.ident.to_string());
+        visit::visit_item_fn(self, function);
+        self.current_function = previous;
+    }
+
+    fn visit_impl_item_fn(&mut self, function: &'ast ImplItemFn) {
+        let previous = self
+            .current_function
+            .replace(function.sig.ident.to_string());
+        visit::visit_impl_item_fn(self, function);
+        self.current_function = previous;
+    }
+
+    fn visit_expr_call(&mut self, call: &'ast syn::ExprCall) {
+        if let Some((constructor, arguments)) = numeric_color_literal(call) {
+            self.audit.color_literals.push(UiColorLiteralCall {
+                function: self.current_function.clone(),
+                constructor,
+                arguments,
+            });
+        }
+        visit::visit_expr_call(self, call);
+    }
+}
+
+fn numeric_color_literal(call: &syn::ExprCall) -> Option<(&'static str, Vec<f64>)> {
+    let constructor = audited_color_constructor(&call.func)?;
+    let arguments = call
+        .args
+        .iter()
+        .map(numeric_literal_value)
+        .collect::<Option<Vec<_>>>()?;
+    (!arguments.is_empty()).then_some((constructor, arguments))
+}
+
+fn audited_color_constructor(callee: &Expr) -> Option<&'static str> {
+    let Expr::Path(path) = callee else {
+        return None;
+    };
+    let last = path.path.segments.last()?.ident.to_string();
+    match last.as_str() {
+        "rgb" => Some("rgb"),
+        "rgba" => Some("rgba"),
+        "hsla" => Some("hsla"),
+        "from_rgb"
+            if path
+                .path
+                .segments
+                .iter()
+                .rev()
+                .nth(1)
+                .is_some_and(|segment| segment.ident == "RgbaToken") =>
+        {
+            Some("RgbaToken::from_rgb")
+        }
+        "new"
+            if path
+                .path
+                .segments
+                .iter()
+                .rev()
+                .nth(1)
+                .is_some_and(|segment| segment.ident == "OklchToken") =>
+        {
+            Some("OklchToken::new")
+        }
+        _ => None,
+    }
+}
+
+fn numeric_literal_value(expression: &Expr) -> Option<f64> {
+    match expression {
+        Expr::Lit(literal) => match &literal.lit {
+            Lit::Int(value) => value.base10_digits().parse().ok(),
+            Lit::Float(value) => value.base10_digits().parse().ok(),
+            _ => None,
+        },
+        Expr::Unary(unary) if matches!(&unary.op, UnOp::Neg(_)) => {
+            numeric_literal_value(&unary.expr).map(|value| -value)
+        }
+        Expr::Group(group) => numeric_literal_value(&group.expr),
+        Expr::Paren(parenthesized) => numeric_literal_value(&parenthesized.expr),
+        _ => None,
+    }
+}
+
+fn analyze_theme_color_source(source: &str) -> syn::Result<ThemeColorAudit> {
+    let file = syn::parse_file(source)?;
+    let mut visitor = ThemeColorVisitor::default();
+    visitor.visit_file(&file);
+    Ok(visitor.audit)
+}
+
+fn approved_ui_color_literal_index(path: &str, literal: &UiColorLiteralCall) -> Option<usize> {
+    APPROVED_UI_COLOR_LITERALS.iter().position(|approved| {
+        approved.path == path
+            && literal.function.as_deref() == Some(approved.function)
+            && literal.constructor == approved.constructor
+            && literal.arguments == approved.arguments
+    })
+}
+
+fn check_theme_color_literals() -> Result<()> {
+    let root = repo_root()?;
+    let mut source_paths = Vec::new();
+    collect_rust_sources(&root.join("frame-app/src"), &mut source_paths)?;
+    source_paths.sort();
+
+    let mut approved_counts = vec![0_usize; APPROVED_UI_COLOR_LITERALS.len()];
+    let mut violations = Vec::new();
+
+    for path in source_paths {
+        let source = fs::read_to_string(&path)?;
+        let relative_path = path
+            .strip_prefix(&root)
+            .expect("theme audit sources should live inside the repository")
+            .to_string_lossy()
+            .replace('\\', "/");
+        let audit = match analyze_theme_color_source(&source) {
+            Ok(audit) => audit,
+            Err(error) => {
+                violations.push(format!(
+                    "{relative_path}: failed to parse Rust source: {error}"
+                ));
+                continue;
+            }
+        };
+
+        for token in audit.legacy_tokens {
+            violations.push(format!("{relative_path}: legacy theme token `{token}`"));
+        }
+
+        if !relative_path.starts_with("frame-app/src/app/") {
+            continue;
+        }
+        for literal in audit.color_literals {
+            if let Some(index) = approved_ui_color_literal_index(&relative_path, &literal) {
+                approved_counts[index] += 1;
+            } else {
+                let function = literal.function.as_deref().unwrap_or("<module>");
+                let arguments = literal
+                    .arguments
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                violations.push(format!(
+                    "{relative_path}: unapproved {}({arguments}) in `{function}`",
+                    literal.constructor
+                ));
+            }
+        }
+    }
+
+    for (approved, actual_count) in APPROVED_UI_COLOR_LITERALS.iter().zip(approved_counts) {
+        if actual_count != 1 {
+            violations.push(format!(
+                "{}: expected one approved {} literal in `{}`, found {actual_count}",
+                approved.path, approved.constructor, approved.function
+            ));
+        }
+    }
+
+    if violations.is_empty() {
+        println!("Theme color audit passed: no legacy tokens or unapproved UI literals.");
+        Ok(())
+    } else {
+        Err(XtaskError::ThemeColorAudit {
+            details: violations.join("\n"),
+        })
+    }
+}
+
+fn collect_rust_sources(directory: &Path, paths: &mut Vec<PathBuf>) -> Result<()> {
+    for entry in fs::read_dir(directory)? {
+        let path = entry?.path();
+        if path.is_dir() {
+            collect_rust_sources(&path, paths)?;
+        } else if path.extension().and_then(OsStr::to_str) == Some("rs") {
+            paths.push(path);
+        }
+    }
     Ok(())
 }
 
@@ -3385,6 +3672,9 @@ enum XtaskError {
     Help,
     Io(io::Error),
     RepoRoot,
+    ThemeColorAudit {
+        details: String,
+    },
     Usage(String),
     Update(frame_updater::UpdateError),
     Json(serde_json::Error),
@@ -3424,6 +3714,9 @@ impl fmt::Display for XtaskError {
             Self::Help => Ok(()),
             Self::Io(error) => write!(formatter, "{error}"),
             Self::RepoRoot => write!(formatter, "failed to resolve repository root"),
+            Self::ThemeColorAudit { details } => {
+                write!(formatter, "theme color audit failed:\n{details}")
+            }
             Self::Usage(message) => write!(formatter, "{message}"),
             Self::Update(error) => write!(formatter, "{error}"),
             Self::Json(error) => write!(formatter, "failed to process JSON: {error}"),
@@ -3459,6 +3752,86 @@ impl From<frame_updater::UpdateError> for XtaskError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn theme_color_audit_accepts_current_source_inventory() {
+        check_theme_color_literals().expect("theme color inventory should remain allowlisted");
+    }
+
+    #[test]
+    fn theme_color_audit_ignores_legacy_names_in_comments_and_strings() {
+        let audit = analyze_theme_color_source(
+            r#"
+            // BACKGROUND is only documentation.
+            fn example() {
+                let _label = "FRAME_BLUE";
+            }
+            "#,
+        )
+        .unwrap();
+
+        assert!(audit.legacy_tokens.is_empty());
+    }
+
+    #[test]
+    fn theme_color_audit_detects_exact_legacy_identifiers() {
+        let audit = analyze_theme_color_source(
+            r"
+            fn example() {
+                let _color = BACKGROUND;
+            }
+            ",
+        )
+        .unwrap();
+
+        assert_eq!(
+            audit.legacy_tokens,
+            BTreeSet::from(["BACKGROUND".to_string()])
+        );
+    }
+
+    #[test]
+    fn theme_color_audit_catches_numeric_token_constructors_but_not_dynamic_colors() {
+        let audit = analyze_theme_color_source(
+            r"
+            fn example(red: u8, green: u8, blue: u8) {
+                let _hardcoded = RgbaToken::from_rgb(255, 255, 255);
+                let _dynamic = RgbaToken::from_rgb(red, green, blue);
+            }
+            ",
+        )
+        .unwrap();
+
+        assert_eq!(
+            audit.color_literals,
+            vec![UiColorLiteralCall {
+                function: Some("example".to_string()),
+                constructor: "RgbaToken::from_rgb",
+                arguments: vec![255.0, 255.0, 255.0],
+            }]
+        );
+    }
+
+    #[test]
+    fn theme_color_allowlist_requires_the_exact_function_context() {
+        let audit = analyze_theme_color_source(
+            r"
+            fn wrong_function() {
+                let _overlay = hsla(0.0, 0.0, 0.0, 0.55);
+            }
+            ",
+        )
+        .unwrap();
+        let literal = audit.color_literals.first().unwrap();
+
+        assert_eq!(
+            approved_ui_color_literal_index(
+                "frame-app/src/app/preview_panel/crop_overlay.rs",
+                literal,
+            ),
+            None
+        );
+    }
 
     #[test]
     fn setup_ffmpeg_options_parse_platform_arch_and_force() {

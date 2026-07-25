@@ -17,6 +17,7 @@ pub(in crate::app) fn frame_color_picker_panel(
     sv_square: impl IntoElement,
     hue_slider: impl IntoElement,
     input: impl IntoElement,
+    palette: &'static theme::ThemePalette,
 ) -> gpui::Div {
     div()
         .absolute()
@@ -27,10 +28,10 @@ pub(in crate::app) fn frame_color_picker_panel(
         .flex_col()
         .gap_2()
         .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .bg(color(theme::DROPDOWN))
+        .bg(color(palette.surface_elevated))
         .opacity(progress)
         .p_2()
-        .shadow(button_highlight_shadows())
+        .shadow(button_highlight_shadows(palette))
         .occlude()
         .on_mouse_down(MouseButton::Left, move |_, _window, cx| {
             cx.stop_propagation();
@@ -44,6 +45,7 @@ pub(in crate::app) fn frame_color_picker_sv_canvas(
     hue: f64,
     saturation: f64,
     value: f64,
+    palette: &'static theme::ThemePalette,
 ) -> gpui::Div {
     div()
         .absolute()
@@ -51,6 +53,8 @@ pub(in crate::app) fn frame_color_picker_sv_canvas(
         .right(theme::ui_rem(0.0))
         .top(theme::ui_rem(0.0))
         .bottom(theme::ui_rem(0.0))
+        // Content color: these white/black gradients define HSV saturation and value,
+        // independently of the application chrome theme.
         .child(
             div()
                 .absolute()
@@ -89,10 +93,12 @@ pub(in crate::app) fn frame_color_picker_sv_canvas(
                     linear_color_stop(hsla(0.0, 0.0, 0.0, 0.0), 1.0),
                 )),
         )
-        .child(frame_color_picker_sv_handle(saturation, value))
+        .child(frame_color_picker_sv_handle(saturation, value, palette))
 }
 
-pub(in crate::app) fn frame_color_picker_hue_track() -> gpui::Div {
+pub(in crate::app) fn frame_color_picker_hue_track(
+    palette: &'static theme::ThemePalette,
+) -> gpui::Div {
     let stops = [
         ("#ff0000", "#ffff00"),
         ("#ffff00", "#00ff00"),
@@ -111,7 +117,7 @@ pub(in crate::app) fn frame_color_picker_hue_track() -> gpui::Div {
         .flex()
         .overflow_hidden()
         .rounded(theme::ui_rem(theme::RADIUS_XS))
-        .shadow(input_highlight_shadows());
+        .shadow(input_highlight_shadows(palette));
 
     for (from, to) in stops {
         row = row.child(div().flex_1().h_full().bg(linear_gradient(
@@ -124,7 +130,10 @@ pub(in crate::app) fn frame_color_picker_hue_track() -> gpui::Div {
     row
 }
 
-pub(in crate::app) fn frame_color_picker_hue_handle(hue: f64) -> gpui::Div {
+pub(in crate::app) fn frame_color_picker_hue_handle(
+    hue: f64,
+    palette: &'static theme::ThemePalette,
+) -> gpui::Div {
     div()
         .absolute()
         .left(relative(unit_f64_to_f32(hue / 360.0)))
@@ -133,8 +142,8 @@ pub(in crate::app) fn frame_color_picker_hue_handle(hue: f64) -> gpui::Div {
         .h(theme::ui_rem(16.0))
         .w(theme::ui_rem(FRAME_COLOR_PICKER_HUE_HANDLE_WIDTH))
         .rounded(theme::ui_rem(1.5))
-        .bg(color(theme::BACKGROUND))
-        .shadow(button_highlight_shadows())
+        .bg(color(palette.canvas))
+        .shadow(button_highlight_shadows(palette))
 }
 
 pub(in crate::app) fn frame_color_picker_hue_color(hue: f64) -> Rgba {
@@ -170,7 +179,11 @@ pub(in crate::app) fn frame_hsv_to_hex(hue_degrees: f64, saturation: f64, value:
     )
 }
 
-fn frame_color_picker_sv_handle(saturation: f64, value: f64) -> gpui::Div {
+fn frame_color_picker_sv_handle(
+    saturation: f64,
+    value: f64,
+    palette: &'static theme::ThemePalette,
+) -> gpui::Div {
     div()
         .absolute()
         .left(relative(unit_f64_to_f32(saturation)))
@@ -181,9 +194,9 @@ fn frame_color_picker_sv_handle(saturation: f64, value: f64) -> gpui::Div {
         .h(theme::ui_rem(FRAME_COLOR_PICKER_HANDLE_SIZE))
         .rounded_full()
         .border_1()
-        .border_color(color(theme::FOREGROUND))
+        .border_color(color(palette.text_primary))
         .shadow(vec![BoxShadow {
-            color: hsla(0.0, 0.0, 0.0, 0.35),
+            color: color(palette.shadow.with_alpha(0.35)).into(),
             offset: point(px(0.0), px(0.0)),
             blur_radius: px(0.0),
             spread_radius: px(1.0),

@@ -22,11 +22,16 @@ impl Render for SettingsVideoRangeDragPreview {
     }
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "The declarative video tab keeps its conditional sections in the same order as the UI."
+)]
 pub(in crate::app) fn settings_video_tab(
     config: &ConversionConfig,
     settings_disabled: bool,
     available_encoders: &AvailableEncoders,
     focuses: SettingsVideoInputFocuses<'_>,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -40,12 +45,14 @@ pub(in crate::app) fn settings_video_tab(
             settings_disabled,
             focuses.width,
             focuses.height,
+            palette,
             window,
             cx,
         ))
         .child(settings_video_scaling_section(
             config,
             settings_disabled,
+            palette,
             window,
             cx,
         ));
@@ -53,6 +60,7 @@ pub(in crate::app) fn settings_video_tab(
     content = content.child(settings_video_fps_section(
         config,
         settings_disabled,
+        palette,
         window,
         cx,
     ));
@@ -62,12 +70,14 @@ pub(in crate::app) fn settings_video_tab(
             .child(settings_video_gif_colors_section(
                 config,
                 settings_disabled,
+                palette,
                 window,
                 cx,
             ))
             .child(settings_video_gif_dither_section(
                 config,
                 settings_disabled,
+                palette,
                 window,
                 cx,
             ))
@@ -75,6 +85,7 @@ pub(in crate::app) fn settings_video_tab(
                 config,
                 settings_disabled,
                 focuses.gif_loop,
+                palette,
                 window,
                 cx,
             ));
@@ -85,12 +96,14 @@ pub(in crate::app) fn settings_video_tab(
             config,
             settings_disabled,
             available_encoders,
+            palette,
             window,
             cx,
         ))
         .child(settings_video_pixel_format_section(
             config,
             settings_disabled,
+            palette,
             window,
             cx,
         ))
@@ -98,6 +111,7 @@ pub(in crate::app) fn settings_video_tab(
             this.child(settings_video_preset_section(
                 config,
                 settings_disabled,
+                palette,
                 window,
                 cx,
             ))
@@ -106,21 +120,33 @@ pub(in crate::app) fn settings_video_tab(
             config,
             settings_disabled,
             focuses.bitrate,
+            palette,
             window,
             cx,
         ))
         .when(is_nvenc_video_codec(&config.video_codec), |this| {
-            this.child(settings_video_nvenc_section(config, settings_disabled, cx))
+            this.child(settings_video_nvenc_section(
+                config,
+                settings_disabled,
+                palette,
+                cx,
+            ))
         })
         .when(is_videotoolbox_video_codec(&config.video_codec), |this| {
             this.child(settings_video_videotoolbox_section(
                 config,
                 settings_disabled,
+                palette,
                 cx,
             ))
         })
         .when(is_hardware_video_codec(&config.video_codec), |this| {
-            this.child(settings_video_hw_section(config, settings_disabled, cx))
+            this.child(settings_video_hw_section(
+                config,
+                settings_disabled,
+                palette,
+                cx,
+            ))
         })
 }
 
@@ -129,15 +155,13 @@ pub(in crate::app) fn settings_video_resolution_section(
     settings_disabled: bool,
     video_width_focus: Option<&FocusHandle>,
     video_height_focus: Option<&FocusHandle>,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let mut section = settings_section("Resolution & framerate").child(settings_resolution_grid(
-        config,
-        settings_disabled,
-        window,
-        cx,
-    ));
+    let mut section = settings_section("Resolution & framerate", palette).child(
+        settings_resolution_grid(config, settings_disabled, palette, window, cx),
+    );
 
     if config.resolution == "custom" {
         section = section.child(settings_custom_dimensions_grid(
@@ -145,6 +169,7 @@ pub(in crate::app) fn settings_video_resolution_section(
             settings_disabled,
             video_width_focus,
             video_height_focus,
+            palette,
             window,
             cx,
         ));
@@ -156,6 +181,7 @@ pub(in crate::app) fn settings_video_resolution_section(
 pub(in crate::app) fn settings_resolution_grid(
     config: &ConversionConfig,
     disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -169,6 +195,7 @@ pub(in crate::app) fn settings_resolution_grid(
                 label,
                 selected,
                 !disabled,
+                palette,
                 window,
                 cx,
             )
@@ -191,6 +218,7 @@ fn settings_custom_dimensions_grid(
     disabled: bool,
     video_width_focus: Option<&FocusHandle>,
     video_height_focus: Option<&FocusHandle>,
+    palette: &'static theme::ThemePalette,
     window: &Window,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
@@ -204,7 +232,7 @@ fn settings_custom_dimensions_grid(
                 .flex()
                 .flex_col()
                 .gap_1()
-                .child(settings_field_label("Width"))
+                .child(settings_field_label("Width", palette))
                 .child(frame_text_input(
                     FrameTextInputSpec {
                         id: "settings-video-width-field",
@@ -214,6 +242,7 @@ fn settings_custom_dimensions_grid(
                         focus: video_width_focus,
                         kind: FrameTextInputKind::VideoCustomWidth,
                     },
+                    palette,
                     window,
                     cx,
                 )),
@@ -223,7 +252,7 @@ fn settings_custom_dimensions_grid(
                 .flex()
                 .flex_col()
                 .gap_1()
-                .child(settings_field_label("Height"))
+                .child(settings_field_label("Height", palette))
                 .child(frame_text_input(
                     FrameTextInputSpec {
                         id: "settings-video-height-field",
@@ -233,6 +262,7 @@ fn settings_custom_dimensions_grid(
                         focus: video_height_focus,
                         kind: FrameTextInputKind::VideoCustomHeight,
                     },
+                    palette,
                     window,
                     cx,
                 )),
@@ -242,6 +272,7 @@ fn settings_custom_dimensions_grid(
 pub(in crate::app) fn settings_video_scaling_section(
     config: &ConversionConfig,
     settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -254,6 +285,7 @@ pub(in crate::app) fn settings_video_scaling_section(
                 scaling_algorithm_label(algorithm),
                 config.scaling_algorithm == *algorithm,
                 !disabled,
+                palette,
                 window,
                 cx,
             )
@@ -270,12 +302,13 @@ pub(in crate::app) fn settings_video_scaling_section(
         );
     }
 
-    settings_section("Scaling algorithm").child(grid)
+    settings_section("Scaling algorithm", palette).child(grid)
 }
 
 pub(in crate::app) fn settings_video_fps_section(
     config: &ConversionConfig,
     settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -288,6 +321,7 @@ pub(in crate::app) fn settings_video_fps_section(
                 fps_label(fps),
                 config.fps == *fps,
                 !settings_disabled,
+                palette,
                 window,
                 cx,
             )
@@ -303,12 +337,13 @@ pub(in crate::app) fn settings_video_fps_section(
         );
     }
 
-    settings_section("Framerate").child(grid)
+    settings_section("Framerate", palette).child(grid)
 }
 
 pub(in crate::app) fn settings_video_gif_colors_section(
     config: &ConversionConfig,
     settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -320,6 +355,7 @@ pub(in crate::app) fn settings_video_gif_colors_section(
                 colors.to_string(),
                 config.gif_colors == *colors,
                 !settings_disabled,
+                palette,
                 window,
                 cx,
             )
@@ -335,12 +371,13 @@ pub(in crate::app) fn settings_video_gif_colors_section(
         );
     }
 
-    settings_section("Palette colors").child(grid)
+    settings_section("Palette colors", palette).child(grid)
 }
 
 pub(in crate::app) fn settings_video_gif_dither_section(
     config: &ConversionConfig,
     settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -354,6 +391,7 @@ pub(in crate::app) fn settings_video_gif_dither_section(
                 dither.to_string(),
                 config.gif_dither == dither,
                 !settings_disabled,
+                palette,
                 window,
                 cx,
             )
@@ -369,17 +407,18 @@ pub(in crate::app) fn settings_video_gif_dither_section(
         );
     }
 
-    settings_section("Dithering").child(list)
+    settings_section("Dithering", palette).child(list)
 }
 
 fn settings_video_gif_loop_section(
     config: &ConversionConfig,
     settings_disabled: bool,
     gif_loop_focus: Option<&FocusHandle>,
+    palette: &'static theme::ThemePalette,
     window: &Window,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("Loop count")
+    settings_section("Loop count", palette)
         .child(frame_text_input(
             FrameTextInputSpec {
                 id: "settings-gif-loop-field",
@@ -389,16 +428,18 @@ fn settings_video_gif_loop_section(
                 focus: gif_loop_focus,
                 kind: FrameTextInputKind::GifLoop,
             },
+            palette,
             window,
             cx,
         ))
-        .child(settings_hint_text("Use 0 for infinite looping."))
+        .child(settings_hint_text("Use 0 for infinite looping.", palette))
 }
 
 fn settings_video_encoder_section(
     config: &ConversionConfig,
     settings_disabled: bool,
     available_encoders: &AvailableEncoders,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -413,6 +454,7 @@ fn settings_video_encoder_section(
                 option.disabled_reason.unwrap_or(option.label).to_string(),
                 option.is_selected,
                 enabled,
+                palette,
                 window,
                 cx,
             )
@@ -428,12 +470,13 @@ fn settings_video_encoder_section(
         );
     }
 
-    settings_section("Video encoder").child(list)
+    settings_section("Video encoder", palette).child(list)
 }
 
 fn settings_video_pixel_format_section(
     config: &ConversionConfig,
     settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -448,6 +491,7 @@ fn settings_video_pixel_format_section(
                 option.caption,
                 option.is_selected,
                 enabled,
+                palette,
                 window,
                 cx,
             )
@@ -463,12 +507,13 @@ fn settings_video_pixel_format_section(
         );
     }
 
-    settings_section("Pixel format").child(list)
+    settings_section("Pixel format", palette).child(list)
 }
 
 fn settings_video_preset_section(
     config: &ConversionConfig,
     settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -483,6 +528,7 @@ fn settings_video_preset_section(
                 option.caption,
                 option.is_selected,
                 enabled,
+                palette,
                 window,
                 cx,
             )
@@ -498,22 +544,20 @@ fn settings_video_preset_section(
         );
     }
 
-    settings_section("Encoding speed").child(list)
+    settings_section("Encoding speed", palette).child(list)
 }
 
 fn settings_video_quality_section(
     config: &ConversionConfig,
     settings_disabled: bool,
     video_bitrate_focus: Option<&FocusHandle>,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let mut section = settings_section("Quality control").child(settings_video_bitrate_mode_grid(
-        config,
-        settings_disabled,
-        window,
-        cx,
-    ));
+    let mut section = settings_section("Quality control", palette).child(
+        settings_video_bitrate_mode_grid(config, settings_disabled, palette, window, cx),
+    );
 
     if config.video_bitrate_mode == "crf" {
         let is_hardware = is_hardware_video_codec(&config.video_codec);
@@ -551,6 +595,7 @@ fn settings_video_quality_section(
                 SettingsVideoRangeTarget::Crf
             },
             settings_disabled,
+            palette,
             cx,
         ));
     } else {
@@ -560,7 +605,7 @@ fn settings_video_quality_section(
                 .flex_col()
                 .gap_2()
                 .pt(theme::ui_rem(4.0))
-                .child(settings_field_label("Target bitrate (kbps)"))
+                .child(settings_field_label("Target bitrate (kbps)", palette))
                 .child(frame_text_input(
                     FrameTextInputSpec {
                         id: "settings-video-bitrate-field",
@@ -570,6 +615,7 @@ fn settings_video_quality_section(
                         focus: video_bitrate_focus,
                         kind: FrameTextInputKind::VideoBitrate,
                     },
+                    palette,
                     window,
                     cx,
                 )),
@@ -582,6 +628,7 @@ fn settings_video_quality_section(
 fn settings_video_bitrate_mode_grid(
     config: &ConversionConfig,
     disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -593,6 +640,7 @@ fn settings_video_bitrate_mode_grid(
                 label,
                 config.video_bitrate_mode == mode,
                 !disabled,
+                palette,
                 window,
                 cx,
             )
@@ -624,6 +672,7 @@ fn settings_video_range_field(
     upper_label: &'static str,
     target: SettingsVideoRangeTarget,
     disabled: bool,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
     div()
@@ -636,18 +685,18 @@ fn settings_video_range_field(
                 .flex()
                 .items_end()
                 .justify_between()
-                .child(settings_field_label(label))
-                .child(settings_value_badge(value_label)),
+                .child(settings_field_label(label, palette))
+                .child(settings_value_badge(value_label, palette)),
         )
         .child(settings_video_range_slider(
-            value, min, max, disabled, target, cx,
+            value, min, max, disabled, target, palette, cx,
         ))
         .child(
             div()
                 .flex()
                 .justify_between()
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-                .text_color(color(theme::FRAME_GRAY_600))
+                .text_color(color(palette.text_muted))
                 .child(theme::ui_text(lower_label))
                 .child(theme::ui_text(upper_label)),
         )
@@ -659,6 +708,7 @@ fn settings_video_range_slider(
     max: u32,
     disabled: bool,
     target: SettingsVideoRangeTarget,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let fraction = range_fraction(value, min, max);
@@ -677,6 +727,7 @@ fn settings_video_range_slider(
         },
         fraction,
         disabled,
+        palette,
     )
     .on_a11y_action(gpui::AccessibleAction::Increment, move |_, _window, cx| {
         if disabled {
@@ -778,15 +829,17 @@ fn settings_video_range_handle(
 fn settings_video_nvenc_section(
     config: &ConversionConfig,
     disabled: bool,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("NVENC options")
+    settings_section("NVENC options", palette)
         .child(settings_video_checkbox_row(
             "video-nvenc-spatial-aq",
             "Spatial AQ",
             "Improves detail in scenes with high complexity",
             config.nvenc_spatial_aq,
             disabled,
+            palette,
             cx,
             move |root, _event, _window, cx| {
                 if disabled {
@@ -805,6 +858,7 @@ fn settings_video_nvenc_section(
             "Stabilizes quality between frames",
             config.nvenc_temporal_aq,
             disabled,
+            palette,
             cx,
             move |root, _event, _window, cx| {
                 if disabled {
@@ -822,14 +876,16 @@ fn settings_video_nvenc_section(
 fn settings_video_videotoolbox_section(
     config: &ConversionConfig,
     disabled: bool,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("VideoToolbox options").child(settings_video_checkbox_row(
+    settings_section("VideoToolbox options", palette).child(settings_video_checkbox_row(
         "video-videotoolbox-allow-sw",
         "Allow software fallback",
         "Drop back to CPU encoding if hardware fails",
         config.videotoolbox_allow_sw,
         disabled,
+        palette,
         cx,
         move |root, _event, _window, cx| {
             if disabled {
@@ -847,14 +903,16 @@ fn settings_video_videotoolbox_section(
 fn settings_video_hw_section(
     config: &ConversionConfig,
     disabled: bool,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("Hardware acceleration").child(settings_video_checkbox_row(
+    settings_section("Hardware acceleration", palette).child(settings_video_checkbox_row(
         "video-hw-decode",
         "Hardware decoding",
         "Use GPU for decoding input video (faster)",
         config.hw_decode,
         disabled,
+        palette,
         cx,
         move |root, _event, _window, cx| {
             if disabled {
@@ -867,16 +925,21 @@ fn settings_video_hw_section(
     ))
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Video checkbox rows keep semantics, state, palette, root context, and action explicit."
+)]
 fn settings_video_checkbox_row(
     id: &'static str,
     label: &'static str,
     hint: &'static str,
     checked: bool,
     disabled: bool,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
     action: impl Fn(&mut FrameRoot, &ClickEvent, &mut Window, &mut Context<FrameRoot>) + 'static,
 ) -> gpui::Stateful<gpui::Div> {
-    frame_checkbox_row(id, label, hint, checked, disabled, cx, action)
+    frame_checkbox_row(id, label, hint, checked, disabled, palette, cx, action)
 }
 
 fn resolution_label(resolution: &str) -> &'static str {

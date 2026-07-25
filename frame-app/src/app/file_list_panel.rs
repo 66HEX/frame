@@ -19,6 +19,7 @@ use super::{
 
 pub(super) fn file_list_panel(
     queue: &FileQueue,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -26,20 +27,21 @@ pub(super) fn file_list_panel(
         .flex()
         .flex_col()
         .overflow_hidden()
-        .card_surface()
+        .card_surface(palette)
         .drag_over::<ExternalPaths>(|style, _paths, _window, _cx| {
             style
                 .border_1()
                 .border_dashed()
-                .border_color(color(theme::FRAME_GRAY_600))
-                .shadow(drop_target_shadows())
+                .border_color(color(palette.control_muted))
+                .shadow(drop_target_shadows(palette))
         })
-        .child(file_list_header(queue.batch_selection_state(), cx))
-        .child(file_list_body(queue, window, cx))
+        .child(file_list_header(queue.batch_selection_state(), palette, cx))
+        .child(file_list_body(queue, palette, window, cx))
 }
 
 pub(super) fn file_list_header(
     selection: BatchSelectionState,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
     let selection_enabled = selection.is_enabled;
@@ -68,6 +70,7 @@ pub(super) fn file_list_header(
                 selection.is_checked,
                 selection.is_indeterminate,
                 !selection_enabled,
+                palette,
             )
             .id("file-list-header-checkbox")
             .on_key_down(cx.listener(
@@ -88,6 +91,7 @@ pub(super) fn file_list_header(
             selection_enabled,
             selection.is_checked,
             selection.is_indeterminate,
+            palette,
         ));
 
     div()
@@ -105,7 +109,7 @@ pub(super) fn file_list_header(
                 .gap(theme::ui_rem(WORKSPACE_GAP))
                 .items_center()
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-                .text_color(color(theme::FRAME_GRAY_600))
+                .text_color(color(palette.text_muted))
                 .child(
                     div()
                         .col_span(1)
@@ -124,15 +128,16 @@ pub(super) fn file_list_header(
                 .w(theme::ui_rem(FILE_LIST_ACTIONS_WIDTH))
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-                .text_color(color(theme::FRAME_GRAY_600))
+                .text_color(color(palette.text_muted))
                 .text_right()
                 .child(theme::ui_text("Actions")),
         )
-        .child(panel_bottom_separator())
+        .child(panel_bottom_separator(palette))
 }
 
 pub(super) fn file_list_body(
     queue: &FileQueue,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
@@ -152,7 +157,7 @@ pub(super) fn file_list_body(
                 .items_center()
                 .justify_center()
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-                .text_color(color(theme::FRAME_GRAY_600))
+                .text_color(color(palette.text_muted))
                 .child(theme::ui_text("Drop files or use Add Source")),
         );
     }
@@ -162,6 +167,7 @@ pub(super) fn file_list_body(
         body = body.child(file_list_row(
             file,
             queue.selected_file_id() == Some(file.id.as_str()),
+            palette,
             window,
             cx,
         ));
@@ -172,6 +178,7 @@ pub(super) fn file_list_body(
 pub(super) fn file_list_row(
     file: &FileItem,
     is_selected: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
@@ -198,11 +205,11 @@ pub(super) fn file_list_row(
         .relative()
         .px_4()
         .bg(if is_selected {
-            color(theme::FRAME_GRAY_100)
+            color(palette.fill_subtle)
         } else {
-            color(theme::TRANSPARENT)
+            color(palette.transparent)
         })
-        .hover(|style| style.bg(color(theme::FRAME_GRAY_100)).cursor_pointer())
+        .hover(|style| style.bg(color(palette.fill_subtle)).cursor_pointer())
         .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
             if root.select_workspace_file(&select_id) {
                 cx.notify();
@@ -225,6 +232,7 @@ pub(super) fn file_list_row(
                             file.id.as_str(),
                             file.name.as_str(),
                             file.is_selected_for_conversion,
+                            palette,
                             cx,
                         )),
                 )
@@ -232,35 +240,36 @@ pub(super) fn file_list_row(
                     file.name.clone(),
                     5,
                     false,
-                    color(theme::FOREGROUND),
+                    color(palette.text_primary),
                 ))
                 .child(row_label(
                     format_file_size(file.size_bytes),
                     2,
                     true,
-                    color(theme::FRAME_GRAY_600),
+                    color(palette.text_muted),
                 ))
                 .child(row_label(
                     file.original_format.clone(),
                     2,
                     true,
-                    color(theme::FRAME_GRAY_600),
+                    color(palette.text_muted),
                 ))
                 .child(row_label(
                     file.row_state_label(),
                     2,
                     true,
-                    state_tone_color(file.row_state_tone()),
+                    state_tone_color(file.row_state_tone(), palette),
                 )),
         )
         .child(row_actions_cell(
             file.id.clone(),
             file.row_actions(),
             group_name,
+            palette,
             window,
             cx,
         ))
-        .child(panel_bottom_separator())
+        .child(panel_bottom_separator(palette))
 }
 
 pub(super) fn header_label(label: &'static str, span: u16, align_right: bool) -> gpui::Div {
@@ -291,6 +300,7 @@ pub(super) fn row_actions_cell(
     file_id: String,
     actions: RowActionAvailability,
     group_name: String,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
@@ -312,10 +322,14 @@ pub(super) fn row_actions_cell(
             cx.stop_propagation();
         }));
 
-    if let Some(primary) = row_primary_action_button(file_id.clone(), actions.primary, window, cx) {
+    if let Some(primary) =
+        row_primary_action_button(file_id.clone(), actions.primary, palette, window, cx)
+    {
         cell = cell.child(primary);
     }
-    if let Some(secondary) = row_secondary_action_button(file_id, actions.secondary, window, cx) {
+    if let Some(secondary) =
+        row_secondary_action_button(file_id, actions.secondary, palette, window, cx)
+    {
         cell = cell.child(secondary);
     }
 
@@ -325,6 +339,7 @@ pub(super) fn row_actions_cell(
 fn row_primary_action_button(
     file_id: String,
     action: RowPrimaryAction,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> Option<gpui::Stateful<gpui::Div>> {
@@ -354,6 +369,7 @@ fn row_primary_action_button(
             label,
             true,
             RowActionTone::Normal,
+            palette,
             window,
             cx,
         )
@@ -375,6 +391,7 @@ fn row_primary_action_button(
 fn row_secondary_action_button(
     file_id: String,
     action: RowSecondaryAction,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> Option<gpui::Stateful<gpui::Div>> {
@@ -395,6 +412,7 @@ fn row_secondary_action_button(
             label,
             true,
             RowActionTone::Destructive,
+            palette,
             window,
             cx,
         )
@@ -418,12 +436,17 @@ pub(super) enum RowActionTone {
     Destructive,
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Row actions keep their semantic tone, state, palette, and render context explicit."
+)]
 pub(super) fn row_action_button(
     id: String,
     icon: &'static str,
     label: &'static str,
     enabled: bool,
     tone: RowActionTone,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -442,6 +465,7 @@ pub(super) fn row_action_button(
             button: FILE_LIST_ACTION_BUTTON_SIZE,
             icon: FILE_LIST_ACTION_ICON_SIZE,
         },
+        palette,
         window,
         cx,
     )
@@ -450,6 +474,7 @@ pub(super) fn row_checkbox_control(
     file_id: &str,
     file_name: &str,
     is_checked: bool,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> impl IntoElement {
     let label = format!("Select {file_name} for conversion");
@@ -476,7 +501,7 @@ pub(super) fn row_checkbox_control(
             }
         }))
         .child(apply_accessible_checkbox(
-            frame_checkbox_indicator(is_checked, false, false)
+            frame_checkbox_indicator(is_checked, false, false, palette)
                 .id(element_id("file-row-checkbox", file_id))
                 .on_key_down(
                     cx.listener(move |root, event: &gpui::KeyDownEvent, _window, cx| {
@@ -495,15 +520,16 @@ pub(super) fn row_checkbox_control(
             true,
             is_checked,
             false,
+            palette,
         ))
 }
 
-pub(super) const fn state_tone_color(tone: FileStateTone) -> Rgba {
+pub(super) const fn state_tone_color(tone: FileStateTone, palette: &theme::ThemePalette) -> Rgba {
     match tone {
-        FileStateTone::Foreground => color(theme::FOREGROUND),
-        FileStateTone::Muted => color(theme::FRAME_GRAY_600),
-        FileStateTone::Blue => color(theme::FRAME_BLUE),
-        FileStateTone::Amber => color(theme::FRAME_AMBER),
-        FileStateTone::Red => color(theme::FRAME_RED),
+        FileStateTone::Foreground => color(palette.text_primary),
+        FileStateTone::Muted => color(palette.text_muted),
+        FileStateTone::Blue => color(palette.accent),
+        FileStateTone::Amber => color(palette.warning),
+        FileStateTone::Red => color(palette.danger),
     }
 }

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Light and Dark Themes:** Added a persistent manual Dark/Light appearance setting backed by semantic OKLCH palettes, immediate whole-interface updates, accessible keyboard-selectable controls, deterministic visual-fixture overrides, contrast validation, and CI guards against legacy or unapproved UI color literals. Dark remains the default for existing installations.
 - **UI Scaling:** Added persistent 80–200% interface scale presets to the Appearance section in app settings, primary-modifier zoom shortcuts, and scalable controls and custom input metrics across every GPUI surface. Interface scaling remains independent from preview canvas zoom and native macOS window controls. Resolves [#52](https://github.com/66HEX/frame/issues/52) and [#60](https://github.com/66HEX/frame/issues/60).
 - **Release Supply-Chain Verification:** Added signed-tag and green-CI release gates, immutable release handling, SHA-256 checksum manifests, CycloneDX SBOMs, GitHub build-provenance attestations, and protected offline Ed25519 update-manifest signing.
 - **Repository Security Automation:** Added weekly Dependabot updates, CodeQL, dependency review, `cargo audit` and `cargo deny` checks, security-focused CODEOWNERS rules, checksum-pinned workflow tooling, least-privilege permissions, and credential-free repository checkouts.

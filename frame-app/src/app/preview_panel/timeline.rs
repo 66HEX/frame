@@ -89,6 +89,7 @@ pub(in crate::app) fn preview_timeline(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let palette = state.palette;
     let labels = preview_timeline_labels(state);
     let trim_enabled = preview_trim_enabled(state);
 
@@ -111,6 +112,7 @@ pub(in crate::app) fn preview_timeline(
                         kind: Some(FrameTextInputKind::PreviewStartTime),
                         focus: inputs.start,
                     },
+                    palette,
                     window,
                     cx,
                 ))
@@ -123,6 +125,7 @@ pub(in crate::app) fn preview_timeline(
                         kind: Some(FrameTextInputKind::PreviewEndTime),
                         focus: inputs.end,
                     },
+                    palette,
                     window,
                     cx,
                 ))
@@ -135,6 +138,7 @@ pub(in crate::app) fn preview_timeline(
                         kind: None,
                         focus: None,
                     },
+                    palette,
                     window,
                     cx,
                 )),
@@ -146,7 +150,7 @@ pub(in crate::app) fn preview_timeline(
                 .flex()
                 .flex_col()
                 .gap(theme::ui_rem(6.0))
-                .child(preview_timeline_label("Trim"))
+                .child(preview_timeline_label("Trim", palette))
                 .child(preview_timeline_track(state, cx)),
         )
         .child(
@@ -154,7 +158,7 @@ pub(in crate::app) fn preview_timeline(
                 .flex()
                 .flex_col()
                 .gap(theme::ui_rem(6.0))
-                .child(preview_timeline_label(" "))
+                .child(preview_timeline_label(" ", palette))
                 .child(preview_play_button(state, window, cx)),
         )
 }
@@ -200,6 +204,7 @@ pub(in crate::app) struct PreviewTimecodeFieldSpec<'a> {
 
 pub(in crate::app) fn preview_timecode_field(
     spec: PreviewTimecodeFieldSpec<'_>,
+    palette: &'static theme::ThemePalette,
     window: &Window,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
@@ -225,6 +230,7 @@ pub(in crate::app) fn preview_timecode_field(
                 focus: Some(focus),
                 kind,
             },
+            palette,
             window,
             cx,
         )
@@ -237,7 +243,7 @@ pub(in crate::app) fn preview_timecode_field(
             .flex()
             .items_center()
             .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-            .text_color(color(theme::FOREGROUND))
+            .text_color(color(palette.text_primary))
             .font_features(assets::frame_tabular_number_font_features())
             .child(value)
             .into_any_element()
@@ -247,7 +253,7 @@ pub(in crate::app) fn preview_timecode_field(
         .flex()
         .flex_col()
         .gap(theme::ui_rem(6.0))
-        .child(preview_timeline_label(label))
+        .child(preview_timeline_label(label, palette))
         .child(
             div()
                 .w(theme::ui_rem(width))
@@ -256,12 +262,15 @@ pub(in crate::app) fn preview_timecode_field(
         )
 }
 
-pub(in crate::app) fn preview_timeline_label(label: &'static str) -> gpui::Div {
+pub(in crate::app) fn preview_timeline_label(
+    label: &'static str,
+    palette: &'static theme::ThemePalette,
+) -> gpui::Div {
     div()
         .h(theme::ui_rem(12.0))
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-        .text_color(color(theme::FRAME_GRAY_600))
+        .text_color(color(palette.text_muted))
         .child(theme::ui_text(label))
 }
 
@@ -273,6 +282,7 @@ pub(in crate::app) fn preview_timeline_track(
     state: &PreviewShellState,
     cx: &Context<FrameRoot>,
 ) -> impl IntoElement {
+    let palette = state.palette;
     let enabled = preview_trim_enabled(state);
     let duration = state.playback.duration();
     let current_time = state.playback.current_time();
@@ -345,6 +355,7 @@ pub(in crate::app) fn preview_timeline_track(
         0.0,
         duration,
         format_time(current_time),
+        palette,
     )
     .on_a11y_action(gpui::AccessibleAction::Increment, move |_, _window, cx| {
         owner.update(cx, |root, cx| {
@@ -391,7 +402,7 @@ pub(in crate::app) fn preview_timeline_track(
             .top(theme::ui_rem(track_top))
             .h(theme::ui_rem(PREVIEW_TRACK_HEIGHT))
             .rounded(theme::ui_rem(1.5))
-            .bg(color(theme::FRAME_GRAY_100)),
+            .bg(color(palette.fill_subtle)),
     )
     .child(
         div()
@@ -401,7 +412,7 @@ pub(in crate::app) fn preview_timeline_track(
             .top(theme::ui_rem(track_top))
             .h(theme::ui_rem(PREVIEW_TRACK_HEIGHT))
             .rounded(theme::ui_rem(1.0))
-            .bg(color(theme::FOREGROUND)),
+            .bg(color(palette.text_primary)),
     )
     .child(PreviewTimelineTrackBoundsProbe { owner: cx.entity() })
     .child(
@@ -412,7 +423,7 @@ pub(in crate::app) fn preview_timeline_track(
             .top(theme::ui_rem(playhead_top))
             .h(theme::ui_rem(PREVIEW_PLAYHEAD_HEIGHT))
             .w(px(1.0))
-            .bg(color(theme::FOREGROUND)),
+            .bg(color(palette.text_primary)),
     )
     .child(preview_timeline_handle(
         TimelineDragTarget::Start,
@@ -420,6 +431,7 @@ pub(in crate::app) fn preview_timeline_track(
         enabled,
         state.playback.start_value(),
         duration,
+        palette,
         cx,
     ))
     .child(preview_timeline_handle(
@@ -428,6 +440,7 @@ pub(in crate::app) fn preview_timeline_track(
         enabled,
         state.playback.end_value(),
         duration,
+        palette,
         cx,
     ))
 }
@@ -438,6 +451,7 @@ pub(in crate::app) fn preview_timeline_handle(
     enabled: bool,
     value: f64,
     duration: f64,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let (handle_id, label) = match target {
@@ -480,6 +494,7 @@ pub(in crate::app) fn preview_timeline_handle(
         0.0,
         duration,
         format_time(value),
+        palette,
     )
     .on_a11y_action(gpui::AccessibleAction::Increment, move |_, _window, cx| {
         owner.update(cx, |root, cx| {
@@ -534,6 +549,7 @@ pub(in crate::app) fn preview_play_button(
         },
         false,
         enabled,
+        state.palette,
         window,
         cx,
     )

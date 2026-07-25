@@ -5,11 +5,9 @@ use super::{
     Styled, Window, animated_button_colors, apply_accessible_button,
     apply_accessible_button_with_focus, apply_accessible_toggle_button, apply_button_motion,
     assets, button_colors, button_highlight_shadows, card_surface_shadows, color, div, icon_svg,
-    parse_hex, preview_visual_controls_enabled, relative, theme,
+    preview_visual_controls_enabled, relative, theme,
 };
 use gpui::FocusHandle;
-
-pub(in crate::app) const PREVIEW_TOOLBAR_BACKGROUND: &str = "#1B1D21";
 
 const PREVIEW_TOOLBAR_PADDING: f32 = 4.0;
 const PREVIEW_TOOLBAR_GAP: f32 = 8.0;
@@ -28,12 +26,17 @@ pub(in crate::app) const fn preview_toolbar_center_margin() -> f32 {
     -(preview_toolbar_height() / 2.0)
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "The declarative toolbar layout keeps its mutually dependent controls in visual order."
+)]
 pub(in crate::app) fn preview_toolbar(
     state: &PreviewShellState,
     focuses: PreviewToolFocuses<'_>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let palette = state.palette;
     let transform_enabled = preview_visual_controls_enabled(state);
     let crop_enabled = transform_enabled && state.crop.has_crop_dimensions;
     let overlay_enabled = transform_enabled && state.availability.overlay_available;
@@ -47,9 +50,9 @@ pub(in crate::app) fn preview_toolbar(
         .flex_col()
         .gap(theme::ui_rem(PREVIEW_TOOLBAR_GAP))
         .rounded(theme::ui_rem(theme::RADIUS_MD))
-        .bg(parse_hex(PREVIEW_TOOLBAR_BACKGROUND))
+        .bg(color(palette.surface))
         .p(theme::ui_rem(PREVIEW_TOOLBAR_PADDING))
-        .shadow(card_surface_shadows())
+        .shadow(card_surface_shadows(palette))
         .child(
             preview_tool_button(
                 "preview-tool-rotate",
@@ -57,6 +60,7 @@ pub(in crate::app) fn preview_toolbar(
                 "Rotate preview",
                 false,
                 transform_enabled,
+                palette,
                 window,
                 cx,
             )
@@ -73,6 +77,7 @@ pub(in crate::app) fn preview_toolbar(
                 "Flip horizontally",
                 state.crop.flip_horizontal,
                 transform_enabled,
+                palette,
                 window,
                 cx,
             )
@@ -89,6 +94,7 @@ pub(in crate::app) fn preview_toolbar(
                 "Flip vertically",
                 state.crop.flip_vertical,
                 transform_enabled,
+                palette,
                 window,
                 cx,
             )
@@ -106,6 +112,7 @@ pub(in crate::app) fn preview_toolbar(
                 state.crop.crop_mode || state.crop.applied_crop.is_some(),
                 crop_enabled,
                 focuses.crop,
+                palette,
                 window,
                 cx,
             )
@@ -123,6 +130,7 @@ pub(in crate::app) fn preview_toolbar(
                 state.overlay.overlay_mode || state.overlay.has_overlay,
                 overlay_enabled,
                 focuses.overlay,
+                palette,
                 window,
                 cx,
             )
@@ -139,6 +147,7 @@ pub(in crate::app) fn preview_zoom_toolbar(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let palette = state.palette;
     let enabled = preview_visual_controls_enabled(state);
 
     div()
@@ -148,9 +157,9 @@ pub(in crate::app) fn preview_zoom_toolbar(
         .flex()
         .gap_2()
         .rounded(theme::ui_rem(theme::RADIUS_MD))
-        .bg(parse_hex(PREVIEW_TOOLBAR_BACKGROUND))
+        .bg(color(palette.surface))
         .p(theme::ui_rem(4.0))
-        .shadow(card_surface_shadows())
+        .shadow(card_surface_shadows(palette))
         .child(
             preview_tool_button(
                 "preview-zoom-out",
@@ -158,6 +167,7 @@ pub(in crate::app) fn preview_zoom_toolbar(
                 "Zoom out",
                 false,
                 enabled,
+                palette,
                 window,
                 cx,
             )
@@ -174,6 +184,7 @@ pub(in crate::app) fn preview_zoom_toolbar(
                 "Zoom in",
                 false,
                 enabled,
+                palette,
                 window,
                 cx,
             )
@@ -185,24 +196,33 @@ pub(in crate::app) fn preview_zoom_toolbar(
         )
 }
 
-pub(in crate::app) fn preview_toolbar_vertical_separator() -> gpui::Div {
+pub(in crate::app) fn preview_toolbar_vertical_separator(
+    palette: &'static theme::ThemePalette,
+) -> gpui::Div {
     div()
         .flex_none()
         .h(theme::ui_rem(PREVIEW_TOOLBAR_VERTICAL_SEPARATOR_HEIGHT))
         .w(theme::ui_rem(PREVIEW_TOOLBAR_VERTICAL_SEPARATOR_WIDTH))
-        .bg(color(theme::FRAME_GRAY_200))
+        .bg(color(palette.fill_selected))
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Toolbar buttons keep semantics, interaction state, palette, and render context explicit."
+)]
 pub(in crate::app) fn preview_tool_button(
     id: impl Into<String>,
     icon: &'static str,
     label: impl Into<String>,
     selected: bool,
     enabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    preview_tool_button_inner(id, icon, label, selected, enabled, None, window, cx)
+    preview_tool_button_inner(
+        id, icon, label, selected, enabled, None, palette, window, cx,
+    )
 }
 
 #[expect(
@@ -216,10 +236,21 @@ pub(in crate::app) fn preview_tool_button_with_focus(
     selected: bool,
     enabled: bool,
     focus: &FocusHandle,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    preview_tool_button_inner(id, icon, label, selected, enabled, Some(focus), window, cx)
+    preview_tool_button_inner(
+        id,
+        icon,
+        label,
+        selected,
+        enabled,
+        Some(focus),
+        palette,
+        window,
+        cx,
+    )
 }
 
 #[expect(
@@ -233,6 +264,7 @@ fn preview_tool_button_inner(
     selected: bool,
     enabled: bool,
     focus: Option<&FocusHandle>,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -243,7 +275,7 @@ fn preview_tool_button_inner(
     };
     let button_id = id.into();
     let label = label.into();
-    let colors = button_colors(variant, selected, enabled);
+    let colors = button_colors(variant, selected, enabled, palette);
     let animated = animated_button_colors(button_id.clone(), colors, window, cx);
     let background = animated.background;
     let foreground = animated.foreground;
@@ -260,7 +292,9 @@ fn preview_tool_button_inner(
         .bg(background)
         .text_color(foreground)
         .opacity(colors.opacity)
-        .when(selected, |this| this.shadow(button_highlight_shadows()))
+        .when(selected, |this| {
+            this.shadow(button_highlight_shadows(palette))
+        })
         .when(!enabled, gpui::Styled::cursor_not_allowed)
         .when(enabled, |this| {
             this.hover(gpui::Styled::cursor_pointer)
@@ -275,15 +309,15 @@ fn preview_tool_button_inner(
     let button = apply_button_motion(button, motion, enabled);
 
     if let Some(focus) = focus {
-        let button = apply_accessible_button_with_focus(button, label, enabled, focus);
+        let button = apply_accessible_button_with_focus(button, label, enabled, focus, palette);
         if selected {
             button.aria_toggled(gpui::Toggled::True)
         } else {
             button
         }
     } else if selected {
-        apply_accessible_toggle_button(button, label, enabled, true)
+        apply_accessible_toggle_button(button, label, enabled, true, palette)
     } else {
-        apply_accessible_button(button, label, enabled)
+        apply_accessible_button(button, label, enabled, palette)
     }
 }

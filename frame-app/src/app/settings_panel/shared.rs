@@ -3,40 +3,50 @@ use super::{
 };
 use crate::numeric::{rounded_f64_to_u32, u32_to_f32};
 
-pub(in crate::app) fn settings_field_label(label: &'static str) -> gpui::Div {
+pub(in crate::app) fn settings_field_label(
+    label: &'static str,
+    palette: &'static theme::ThemePalette,
+) -> gpui::Div {
     div()
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-        .text_color(color(theme::FRAME_GRAY_600))
+        .text_color(color(palette.text_muted))
         .child(theme::ui_text(label))
 }
 
-pub(in crate::app) fn settings_value_badge(value: String) -> gpui::Div {
+pub(in crate::app) fn settings_value_badge(
+    value: String,
+    palette: &'static theme::ThemePalette,
+) -> gpui::Div {
     div()
         .min_h(theme::ui_rem(18.0))
         .flex()
         .items_center()
         .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .bg(color(theme::FRAME_GRAY_400))
+        .bg(color(palette.border_subtle))
         .px(theme::ui_rem(6.0))
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-        .text_color(color(theme::FOREGROUND))
+        .text_color(color(palette.text_primary))
         .font_features(assets::frame_tabular_number_font_features())
-        .shadow(button_highlight_shadows())
+        .shadow(button_highlight_shadows(palette))
         .child(value)
 }
 
-pub(in crate::app) fn settings_hint_text(text: &'static str) -> gpui::Div {
+pub(in crate::app) fn settings_hint_text(
+    text: &'static str,
+    palette: &'static theme::ThemePalette,
+) -> gpui::Div {
     div()
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-        .text_color(color(theme::FRAME_GRAY_600))
+        .text_color(color(palette.text_muted))
         .child(theme::ui_text(text))
 }
 
 pub(in crate::app) fn settings_value_row(
     label: &'static str,
     value: impl Into<String>,
+    palette: &'static theme::ThemePalette,
 ) -> gpui::Div {
     div()
         .grid()
@@ -44,13 +54,13 @@ pub(in crate::app) fn settings_value_row(
         .gap_4()
         .child(
             div()
-                .text_color(color(theme::FRAME_GRAY_600))
+                .text_color(color(palette.text_muted))
                 .child(theme::ui_text(label)),
         )
         .child(
             div()
                 .text_right()
-                .text_color(color(theme::FOREGROUND))
+                .text_color(color(palette.text_primary))
                 .child(value.into()),
         )
 }

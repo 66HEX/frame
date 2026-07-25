@@ -41,6 +41,7 @@ pub(in crate::app) fn settings_audio_filters_tab(
     config: &ConversionConfig,
     settings_disabled: bool,
     available_filters: &AvailableFilters,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -52,14 +53,15 @@ pub(in crate::app) fn settings_audio_filters_tab(
         .flex_col()
         .gap_3()
         .child(
-            settings_section("Audio Filters").child(settings_audio_filters_reset_all(
+            settings_section("Audio Filters", palette).child(settings_audio_filters_reset_all(
                 controls_disabled,
+                palette,
                 window,
                 cx,
             )),
         )
         .child(
-            settings_section("Level")
+            settings_section("Level", palette)
                 .child(settings_audio_filter_range_field(
                     audio_filter_spec(
                         AudioFilterRangeTarget::Volume,
@@ -68,12 +70,14 @@ pub(in crate::app) fn settings_audio_filters_tab(
                         available_filters,
                     ),
                     controls_disabled,
+                    palette,
                     window,
                     cx,
                 ))
                 .child(settings_audio_normalize_control(
                     config.audio_normalize,
                     controls_disabled || !available_filters.loudnorm,
+                    palette,
                     cx,
                 ))
                 .child(settings_audio_filter_range_field(
@@ -84,21 +88,23 @@ pub(in crate::app) fn settings_audio_filters_tab(
                         available_filters,
                     ),
                     controls_disabled,
+                    palette,
                     window,
                     cx,
                 )),
         )
         .child(
-            settings_section("Dynamics").child(settings_audio_compressor_control(
+            settings_section("Dynamics", palette).child(settings_audio_compressor_control(
                 filters.compressor_enabled,
                 filters.compressor_strength,
                 controls_disabled || !available_filters.acompressor,
+                palette,
                 window,
                 cx,
             )),
         )
         .child(
-            settings_section("Tone")
+            settings_section("Tone", palette)
                 .child(settings_audio_filter_range_field(
                     audio_filter_spec(
                         AudioFilterRangeTarget::Bass,
@@ -107,6 +113,7 @@ pub(in crate::app) fn settings_audio_filters_tab(
                         available_filters,
                     ),
                     controls_disabled,
+                    palette,
                     window,
                     cx,
                 ))
@@ -118,6 +125,7 @@ pub(in crate::app) fn settings_audio_filters_tab(
                         available_filters,
                     ),
                     controls_disabled,
+                    palette,
                     window,
                     cx,
                 ))
@@ -129,6 +137,7 @@ pub(in crate::app) fn settings_audio_filters_tab(
                         available_filters,
                     ),
                     controls_disabled,
+                    palette,
                     window,
                     cx,
                 ))
@@ -140,12 +149,13 @@ pub(in crate::app) fn settings_audio_filters_tab(
                         available_filters,
                     ),
                     controls_disabled,
+                    palette,
                     window,
                     cx,
                 )),
         )
         .child(
-            settings_section("Cleanup")
+            settings_section("Cleanup", palette)
                 .child(settings_audio_filter_range_field(
                     audio_filter_spec(
                         AudioFilterRangeTarget::NoiseReduction,
@@ -154,6 +164,7 @@ pub(in crate::app) fn settings_audio_filters_tab(
                         available_filters,
                     ),
                     controls_disabled,
+                    palette,
                     window,
                     cx,
                 ))
@@ -165,12 +176,13 @@ pub(in crate::app) fn settings_audio_filters_tab(
                         available_filters,
                     ),
                     controls_disabled,
+                    palette,
                     window,
                     cx,
                 )),
         )
         .child(
-            settings_section("Stereo").child(settings_audio_filter_range_field(
+            settings_section("Stereo", palette).child(settings_audio_filter_range_field(
                 audio_filter_spec(
                     AudioFilterRangeTarget::StereoWidth,
                     filters.stereo_width.enabled,
@@ -178,6 +190,7 @@ pub(in crate::app) fn settings_audio_filters_tab(
                     available_filters,
                 ),
                 controls_disabled,
+                palette,
                 window,
                 cx,
             )),
@@ -310,6 +323,7 @@ fn audio_spec(
 fn settings_audio_filter_range_field(
     spec: AudioFilterRangeSpec,
     settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -342,6 +356,7 @@ fn settings_audio_filter_range_field(
                         },
                         spec.enabled,
                         control_disabled || is_volume,
+                        palette,
                         cx,
                         move |root, _event, _window, cx| {
                             if control_disabled || is_volume {
@@ -366,11 +381,12 @@ fn settings_audio_filter_range_field(
                         .flex()
                         .items_center()
                         .gap_1()
-                        .child(settings_value_badge(spec.value_label.clone()))
+                        .child(settings_value_badge(spec.value_label.clone(), palette))
                         .child(settings_audio_filter_reset(
                             spec.target,
                             spec.default_value,
                             control_disabled,
+                            palette,
                             window,
                             cx,
                         )),
@@ -382,6 +398,7 @@ fn settings_audio_filter_range_field(
             spec.max,
             slider_disabled,
             spec.target,
+            palette,
             cx,
         ))
 }
@@ -392,6 +409,7 @@ fn settings_audio_filter_range_slider(
     max: i32,
     disabled: bool,
     target: AudioFilterRangeTarget,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let fraction = signed_range_fraction(value, min, max);
@@ -404,6 +422,7 @@ fn settings_audio_filter_range_slider(
         audio_slider_label(target),
         fraction,
         disabled,
+        palette,
     )
     .on_a11y_action(gpui::AccessibleAction::Increment, move |_, _window, cx| {
         if disabled {
@@ -485,6 +504,7 @@ fn settings_audio_filter_reset(
     target: AudioFilterRangeTarget,
     default_value: i32,
     disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -498,6 +518,7 @@ fn settings_audio_filter_reset(
             button: FRAME_ICON_BUTTON_SM_SIZE,
             icon: FRAME_ICON_SM_SIZE,
         },
+        palette,
         window,
         cx,
     )
@@ -516,6 +537,7 @@ fn settings_audio_filter_reset(
 fn settings_audio_normalize_control(
     checked: bool,
     disabled: bool,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     frame_checkbox_row(
@@ -524,6 +546,7 @@ fn settings_audio_normalize_control(
         "",
         checked,
         disabled,
+        palette,
         cx,
         move |root, _event, _window, cx| {
             if disabled {
@@ -540,6 +563,7 @@ fn settings_audio_compressor_control(
     enabled: bool,
     strength: FilterStrength,
     disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -558,6 +582,7 @@ fn settings_audio_compressor_control(
                 label,
                 enabled && strength == candidate,
                 !disabled,
+                palette,
                 window,
                 cx,
             )
@@ -584,6 +609,7 @@ fn settings_audio_compressor_control(
             "",
             enabled,
             disabled,
+            palette,
             cx,
             move |root, _event, _window, cx| {
                 if disabled {
@@ -601,6 +627,7 @@ fn settings_audio_compressor_control(
 
 fn settings_audio_filters_reset_all(
     disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -610,6 +637,7 @@ fn settings_audio_filters_reset_all(
         ButtonVariant::Secondary,
         false,
         !disabled,
+        palette,
         window,
         cx,
     )

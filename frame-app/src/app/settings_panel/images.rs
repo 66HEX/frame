@@ -41,6 +41,7 @@ pub(in crate::app) fn settings_images_tab(
     settings_disabled: bool,
     video_width_focus: Option<&FocusHandle>,
     video_height_focus: Option<&FocusHandle>,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -53,24 +54,28 @@ pub(in crate::app) fn settings_images_tab(
             settings_disabled,
             video_width_focus,
             video_height_focus,
+            palette,
             window,
             cx,
         ))
         .child(settings_video_scaling_section(
             config,
             settings_disabled,
+            palette,
             window,
             cx,
         ))
         .child(settings_images_pixel_format_section(
             config,
             settings_disabled,
+            palette,
             window,
             cx,
         ))
         .child(settings_images_encoding_section(
             config,
             settings_disabled,
+            palette,
             window,
             cx,
         ))
@@ -79,6 +84,7 @@ pub(in crate::app) fn settings_images_tab(
 fn settings_images_pixel_format_section(
     config: &ConversionConfig,
     settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -93,6 +99,7 @@ fn settings_images_pixel_format_section(
                 option.caption,
                 option.is_selected,
                 enabled,
+                palette,
                 window,
                 cx,
             )
@@ -108,24 +115,26 @@ fn settings_images_pixel_format_section(
         );
     }
 
-    settings_section("Pixel format").child(list)
+    settings_section("Pixel format", palette).child(list)
 }
 
 fn settings_images_encoding_section(
     config: &ConversionConfig,
     settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     match config.container.as_str() {
-        "jpg" => settings_image_jpeg_section(config, settings_disabled, window, cx),
-        "webp" => settings_image_webp_section(config, settings_disabled, window, cx),
-        "png" => settings_image_png_section(config, settings_disabled, window, cx),
-        "tiff" => settings_image_tiff_section(config, settings_disabled, window, cx),
-        "bmp" => settings_section("BMP encoding")
-            .child(settings_hint_text("BMP output is uncompressed.")),
-        _ => settings_section("Image encoding").child(settings_hint_text(
+        "jpg" => settings_image_jpeg_section(config, settings_disabled, palette, window, cx),
+        "webp" => settings_image_webp_section(config, settings_disabled, palette, window, cx),
+        "png" => settings_image_png_section(config, settings_disabled, palette, window, cx),
+        "tiff" => settings_image_tiff_section(config, settings_disabled, palette, window, cx),
+        "bmp" => settings_section("BMP encoding", palette)
+            .child(settings_hint_text("BMP output is uncompressed.", palette)),
+        _ => settings_section("Image encoding", palette).child(settings_hint_text(
             "Select an image format to tune encoding.",
+            palette,
         )),
     }
 }
@@ -133,10 +142,11 @@ fn settings_images_encoding_section(
 fn settings_image_jpeg_section(
     config: &ConversionConfig,
     settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("JPEG encoding")
+    settings_section("JPEG encoding", palette)
         .child(settings_image_range_field(
             "Quality",
             format!("{}%", config.image_jpeg_quality),
@@ -147,11 +157,13 @@ fn settings_image_jpeg_section(
             "Best quality",
             SettingsImageRangeTarget::JpegQuality,
             settings_disabled,
+            palette,
             cx,
         ))
         .child(settings_image_option_list(
             image_jpeg_huffman_options(config, settings_disabled),
             "image-jpeg-huffman",
+            palette,
             window,
             cx,
             apply_image_jpeg_huffman,
@@ -161,13 +173,15 @@ fn settings_image_jpeg_section(
 fn settings_image_webp_section(
     config: &ConversionConfig,
     settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("WebP encoding")
+    settings_section("WebP encoding", palette)
         .child(settings_image_webp_mode_grid(
             config,
             settings_disabled,
+            palette,
             window,
             cx,
         ))
@@ -193,6 +207,7 @@ fn settings_image_webp_section(
             },
             SettingsImageRangeTarget::WebpQuality,
             settings_disabled,
+            palette,
             cx,
         ))
         .child(settings_image_range_field(
@@ -205,11 +220,13 @@ fn settings_image_webp_section(
             "Smallest",
             SettingsImageRangeTarget::WebpCompression,
             settings_disabled,
+            palette,
             cx,
         ))
         .child(settings_image_option_list(
             image_webp_preset_options(config, settings_disabled),
             "image-webp-preset",
+            palette,
             window,
             cx,
             apply_image_webp_preset,
@@ -219,10 +236,11 @@ fn settings_image_webp_section(
 fn settings_image_png_section(
     config: &ConversionConfig,
     settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("PNG compression")
+    settings_section("PNG compression", palette)
         .child(settings_image_range_field(
             "Compression level",
             config.image_png_compression.to_string(),
@@ -233,11 +251,13 @@ fn settings_image_png_section(
             "Smallest",
             SettingsImageRangeTarget::PngCompression,
             settings_disabled,
+            palette,
             cx,
         ))
         .child(settings_image_option_list(
             image_png_prediction_options(config, settings_disabled),
             "image-png-prediction",
+            palette,
             window,
             cx,
             apply_image_png_prediction,
@@ -247,12 +267,14 @@ fn settings_image_png_section(
 fn settings_image_tiff_section(
     config: &ConversionConfig,
     settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("TIFF compression").child(settings_image_option_list(
+    settings_section("TIFF compression", palette).child(settings_image_option_list(
         image_tiff_compression_options(config, settings_disabled),
         "image-tiff-compression",
+        palette,
         window,
         cx,
         apply_image_tiff_compression,
@@ -262,6 +284,7 @@ fn settings_image_tiff_section(
 fn settings_image_webp_mode_grid(
     config: &ConversionConfig,
     disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -273,6 +296,7 @@ fn settings_image_webp_mode_grid(
                 label,
                 config.image_webp_lossless == lossless,
                 !disabled,
+                palette,
                 window,
                 cx,
             )
@@ -306,6 +330,7 @@ fn settings_image_range_field(
     upper_label: &'static str,
     target: SettingsImageRangeTarget,
     disabled: bool,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
     div()
@@ -317,18 +342,18 @@ fn settings_image_range_field(
                 .flex()
                 .items_end()
                 .justify_between()
-                .child(settings_field_label(label))
-                .child(settings_value_badge(value_label)),
+                .child(settings_field_label(label, palette))
+                .child(settings_value_badge(value_label, palette)),
         )
         .child(settings_image_range_slider(
-            value, min, max, disabled, target, cx,
+            value, min, max, disabled, target, palette, cx,
         ))
         .child(
             div()
                 .flex()
                 .justify_between()
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-                .text_color(color(theme::FRAME_GRAY_600))
+                .text_color(color(palette.text_muted))
                 .child(theme::ui_text(lower_label))
                 .child(theme::ui_text(upper_label)),
         )
@@ -340,6 +365,7 @@ fn settings_image_range_slider(
     max: u32,
     disabled: bool,
     target: SettingsImageRangeTarget,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let fraction = range_fraction(value, min, max);
@@ -352,6 +378,7 @@ fn settings_image_range_slider(
         settings_image_range_slider_label(target),
         fraction,
         disabled,
+        palette,
     )
     .on_a11y_action(gpui::AccessibleAction::Increment, move |_, _window, cx| {
         if disabled {
@@ -479,6 +506,7 @@ const fn settings_image_range_handle_id(target: SettingsImageRangeTarget) -> &'s
 fn settings_image_option_list(
     options: Vec<crate::settings::ImageEncodingOption>,
     id_prefix: &'static str,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
     apply: fn(&mut ConversionConfig, &str) -> bool,
@@ -494,6 +522,7 @@ fn settings_image_option_list(
                 option.caption,
                 option.is_selected,
                 enabled,
+                palette,
                 window,
                 cx,
             )

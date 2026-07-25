@@ -95,6 +95,7 @@ pub fn active_view_from_env_value(value: Option<&str>) -> ActiveView {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum VisualFixture {
     AppSettings,
+    AppSettingsThemeOpen,
     AppSettingsUiOpen,
     LogsActive,
     PreviewCrop,
@@ -120,6 +121,7 @@ pub enum VisualFixture {
 pub fn visual_fixture_from_env_value(value: Option<&str>) -> Option<VisualFixture> {
     match value.map(str::trim).map(str::to_ascii_lowercase).as_deref() {
         Some("app-settings") => Some(VisualFixture::AppSettings),
+        Some("app-settings-theme-open") => Some(VisualFixture::AppSettingsThemeOpen),
         Some("app-settings-ui-open") => Some(VisualFixture::AppSettingsUiOpen),
         Some("logs-active") => Some(VisualFixture::LogsActive),
         Some("preview-crop") => Some(VisualFixture::PreviewCrop),
@@ -303,6 +305,14 @@ mod tests {
             assert_eq!(
                 visual_fixture_from_env_value(Some("app-settings-ui-open")),
                 Some(VisualFixture::AppSettingsUiOpen)
+            );
+        }
+
+        #[test]
+        fn app_settings_theme_open_value_enables_theme_fixture() {
+            assert_eq!(
+                visual_fixture_from_env_value(Some("app-settings-theme-open")),
+                Some(VisualFixture::AppSettingsThemeOpen)
             );
         }
 

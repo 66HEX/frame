@@ -3,15 +3,20 @@ use super::{
     FrameTextInputSpec, ParentElement, SourceMetadata, StatefulInteractiveElement, Styled, Window,
     apply_output_container, apply_processing_mode, div, frame_choice_button, frame_text_input,
     normalize_output_config, output_container_options, output_processing_mode_options,
-    settings_hint_text, settings_section,
+    settings_hint_text, settings_section, theme,
 };
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "The output tab explicitly receives conversion state, editable input, focus, palette, and render context."
+)]
 pub(in crate::app) fn settings_output_tab(
     config: &ConversionConfig,
     metadata: Option<&SourceMetadata>,
     settings_disabled: bool,
     output_name: &str,
     output_name_focus: Option<&FocusHandle>,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -20,34 +25,38 @@ pub(in crate::app) fn settings_output_tab(
         .flex_col()
         .gap_4()
         .child(
-            settings_section("Processing mode")
+            settings_section("Processing mode", palette)
                 .child(settings_processing_mode_grid(
                     config,
                     metadata,
                     settings_disabled,
+                    palette,
                     window,
                     cx,
                 ))
-                .child(settings_hint_text(config.processing_mode.hint())),
+                .child(settings_hint_text(config.processing_mode.hint(), palette)),
         )
         .child(
-            settings_section("Output name")
+            settings_section("Output name", palette)
                 .child(settings_output_name_field(
                     output_name,
                     settings_disabled,
                     output_name_focus,
+                    palette,
                     window,
                     cx,
                 ))
                 .child(settings_hint_text(
                     "Output is saved to the default folder selected in Settings.",
+                    palette,
                 )),
         )
         .child(
-            settings_section("Output container").child(settings_container_grid(
+            settings_section("Output container", palette).child(settings_container_grid(
                 config,
                 metadata,
                 settings_disabled,
+                palette,
                 window,
                 cx,
             )),
@@ -58,6 +67,7 @@ pub(in crate::app) fn settings_processing_mode_grid(
     config: &ConversionConfig,
     metadata: Option<&SourceMetadata>,
     settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -71,6 +81,7 @@ pub(in crate::app) fn settings_processing_mode_grid(
                 option.label,
                 option.is_selected,
                 is_enabled,
+                palette,
                 window,
                 cx,
             )
@@ -97,6 +108,7 @@ pub(in crate::app) fn settings_container_grid(
     config: &ConversionConfig,
     metadata: Option<&SourceMetadata>,
     settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -110,6 +122,7 @@ pub(in crate::app) fn settings_container_grid(
                 container.as_str(),
                 option.is_selected,
                 is_enabled,
+                palette,
                 window,
                 cx,
             )
@@ -138,6 +151,7 @@ pub(in crate::app) fn settings_output_name_field(
     output_name: &str,
     disabled: bool,
     output_name_focus: Option<&FocusHandle>,
+    palette: &'static theme::ThemePalette,
     window: &Window,
     cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -150,6 +164,7 @@ pub(in crate::app) fn settings_output_name_field(
             focus: output_name_focus,
             kind: FrameTextInputKind::OutputName,
         },
+        palette,
         window,
         cx,
     )

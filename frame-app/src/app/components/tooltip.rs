@@ -17,6 +17,7 @@ pub(in crate::app) fn frame_tooltip(
     label: impl Into<String>,
     is_visible: bool,
     child: impl IntoElement,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -64,14 +65,14 @@ pub(in crate::app) fn frame_tooltip(
                                 .flex_none()
                                 .whitespace_nowrap()
                                 .rounded(theme::ui_rem(theme::RADIUS_SM))
-                                .bg(color(theme::DROPDOWN))
+                                .bg(color(palette.text_primary))
                                 .px_2()
                                 .py(theme::ui_rem(2.0))
                                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                                 .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-                                .text_color(color(theme::FOREGROUND))
+                                .text_color(color(palette.canvas))
                                 .opacity(progress)
-                                .shadow(card_surface_shadows())
+                                .shadow(card_surface_shadows(palette))
                                 .child(theme::ui_text_owned(label)),
                         ),
                 )

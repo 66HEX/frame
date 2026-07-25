@@ -6,6 +6,7 @@ pub(super) struct FrameTextInputElement {
     placeholder: SharedString,
     disabled: bool,
     focus_handle: FocusHandle,
+    palette: &'static theme::ThemePalette,
 }
 
 pub(super) struct FrameTextInputPrepaintState {
@@ -88,9 +89,9 @@ impl Element for FrameTextInputElement {
         };
         let mut style = window.text_style();
         style.color = if is_placeholder || self.disabled {
-            hsla(0.0, 0.0, 1.0, 0.40)
+            color(self.palette.text_muted).into()
         } else {
-            hsla(0.0, 0.0, 1.0, 1.0)
+            color(self.palette.text_primary).into()
         };
 
         let run = TextRun {
@@ -136,7 +137,7 @@ impl Element for FrameTextInputElement {
                     point(bounds.left() + cursor_x - scroll_x, text_top),
                     size(px(metrics.caret_width), px(metrics.caret_height)),
                 ),
-                hsla(0.0, 0.0, 1.0, 1.0),
+                color(self.palette.text_primary),
             )
         });
         let selection = (!selected_range.is_empty()).then(|| {
@@ -151,7 +152,7 @@ impl Element for FrameTextInputElement {
                         text_top + px(metrics.caret_height),
                     ),
                 ),
-                hsla(0.0, 0.0, 1.0, 0.18),
+                color(self.palette.accent.with_alpha(0.30)),
             )
         });
 
@@ -241,6 +242,7 @@ pub(in crate::app) struct FrameTextInputSpec<'a> {
 )]
 pub(in crate::app) fn frame_text_input(
     spec: FrameTextInputSpec<'_>,
+    palette: &'static theme::ThemePalette,
     _window: &Window,
     cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -259,9 +261,9 @@ pub(in crate::app) fn frame_text_input(
         value.to_string()
     };
     let label_color = if disabled || is_placeholder {
-        theme::FRAME_GRAY_600
+        palette.text_muted
     } else {
-        theme::FOREGROUND
+        palette.text_primary
     };
 
     let mut field = div()
@@ -272,12 +274,12 @@ pub(in crate::app) fn frame_text_input(
         .items_center()
         .min_w_0()
         .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .bg(color(theme::BACKGROUND))
+        .bg(color(palette.canvas))
         .px(theme::ui_rem(10.0))
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .text_color(color(label_color))
         .opacity(if disabled { 0.5 } else { 1.0 })
-        .shadow(input_highlight_shadows())
+        .shadow(input_highlight_shadows(palette))
         .key_context(if kind.is_preview_timecode() {
             FRAME_TIMECODE_TEXT_INPUT_CONTEXT
         } else {
@@ -351,12 +353,13 @@ pub(in crate::app) fn frame_text_input(
             placeholder: SharedString::from(placeholder),
             disabled,
             focus_handle: focus,
+            palette,
         });
     } else {
         field = field.child(div().w_full().min_w_0().truncate().child(label));
     }
 
-    apply_accessible_text_input(field, kind.accessibility_label(), !disabled, value)
+    apply_accessible_text_input(field, kind.accessibility_label(), !disabled, value, palette)
 }
 
 fn frame_text_input_metrics(root: &FrameRoot) -> FrameTextInputMetrics {

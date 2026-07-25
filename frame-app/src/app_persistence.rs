@@ -9,15 +9,15 @@ use std::{
 use directories::ProjectDirs;
 use frame_core::types::DEFAULT_MAX_CONCURRENCY;
 use frame_updater::UpdateChannel;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
 use crate::{
-    appearance::{AppearanceSettings, ScalePreset},
+    appearance::{AppearanceSettings, ColorTheme, ScalePreset},
     settings::PresetDefinition,
 };
 
-const APP_SETTINGS_VERSION: u32 = 4;
+const APP_SETTINGS_VERSION: u32 = 5;
 const SETTINGS_FILE_NAME: &str = "settings.json";
 const LEGACY_APP_SETTINGS_FILE_NAME: &str = "app-settings.dat";
 const LEGACY_PRESETS_FILE_NAME: &str = "presets.dat";
@@ -200,6 +200,8 @@ pub enum AppPersistenceError {
 struct PersistedAppSettings {
     version: u32,
     ui_scale_percent: u16,
+    #[serde(deserialize_with = "deserialize_optional_string")]
+    color_theme: Option<String>,
     max_concurrency: usize,
     default_output_directory: Option<PathBuf>,
     custom_presets: Vec<PresetDefinition>,
@@ -227,6 +229,7 @@ impl PersistedAppSettings {
         Self {
             version: APP_SETTINGS_VERSION,
             ui_scale_percent: settings.appearance.ui_scale.percent(),
+            color_theme: Some(settings.appearance.color_theme.persisted().to_string()),
             max_concurrency: valid_max_concurrency(settings.max_concurrency),
             default_output_directory: settings.default_output_directory.clone(),
             custom_presets: normalize_custom_presets(settings.custom_presets.clone()),
@@ -241,6 +244,7 @@ impl PersistedAppSettings {
         AppSettings {
             appearance: AppearanceSettings {
                 ui_scale: ScalePreset::from_percent(self.ui_scale_percent).unwrap_or_default(),
+                color_theme: ColorTheme::from_persisted(self.color_theme.as_deref()),
             },
             max_concurrency: valid_max_concurrency(self.max_concurrency),
             default_output_directory: self.default_output_directory,
@@ -258,6 +262,7 @@ impl Default for PersistedAppSettings {
         Self {
             version: APP_SETTINGS_VERSION,
             ui_scale_percent: ScalePreset::Percent100.percent(),
+            color_theme: None,
             max_concurrency: DEFAULT_MAX_CONCURRENCY,
             default_output_directory: None,
             custom_presets: Vec::new(),
@@ -267,6 +272,14 @@ impl Default for PersistedAppSettings {
             last_update_check_at: None,
         }
     }
+}
+
+fn deserialize_optional_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    Ok(value.as_str().map(str::to_string))
 }
 
 const fn valid_max_concurrency(value: usize) -> usize {
@@ -398,6 +411,7 @@ mod tests {
         let settings = AppSettings {
             appearance: AppearanceSettings {
                 ui_scale: ScalePreset::Percent125,
+                color_theme: ColorTheme::Light,
             },
             max_concurrency: 4,
             default_output_directory: Some(PathBuf::from("/tmp/frame-output")),
@@ -427,7 +441,10 @@ mod tests {
     fn every_supported_ui_scale_round_trips() {
         for ui_scale in ScalePreset::ALL {
             let settings = AppSettings {
-                appearance: AppearanceSettings { ui_scale },
+                appearance: AppearanceSettings {
+                    ui_scale,
+                    color_theme: ColorTheme::Dark,
+                },
                 ..AppSettings::default()
             };
 
@@ -510,6 +527,110 @@ mod tests {
 
         assert_eq!(settings.appearance.ui_scale, ScalePreset::Percent100);
         assert_eq!(settings.max_concurrency, 5);
+    }
+
+    #[test]
+    fn load_version_four_settings_defaults_theme_without_losing_existing_values() {
+        let path = test_settings_path();
+        let parent = path.parent().expect("test path should have parent");
+        fs::create_dir_all(parent).expect("test directory should be created");
+        fs::write(
+            &path,
+            r#"{"version":4,"uiScalePercent":125,"maxConcurrency":7,"customPresets":[]}"#,
+        )
+        .expect("settings fixture should be written");
+
+        let settings = AppPersistence::from_settings_path(path)
+            .load()
+            .expect("version four settings should load");
+
+        assert_eq!(settings.appearance.color_theme, ColorTheme::Dark);
+        assert_eq!(settings.appearance.ui_scale, ScalePreset::Percent125);
+        assert_eq!(settings.max_concurrency, 7);
+    }
+
+    #[test]
+    fn every_supported_color_theme_round_trips() {
+        for color_theme in ColorTheme::ALL {
+            let settings = AppSettings {
+                appearance: AppearanceSettings {
+                    ui_scale: ScalePreset::Percent100,
+                    color_theme,
+                },
+                ..AppSettings::default()
+            };
+
+            let persisted = PersistedAppSettings::from_app_settings(&settings);
+            let json = serde_json::to_value(&persisted).expect("settings should serialize");
+            assert_eq!(json["colorTheme"], color_theme.persisted());
+            let loaded = persisted.into_app_settings();
+
+            assert_eq!(loaded.appearance.color_theme, color_theme);
+        }
+    }
+
+    #[test]
+    fn load_missing_or_null_color_theme_defaults_only_theme() {
+        for color_field in ["", r#","colorTheme":null"#] {
+            let path = test_settings_path();
+            let parent = path.parent().expect("test path should have parent");
+            fs::create_dir_all(parent).expect("test directory should be created");
+            fs::write(
+                &path,
+                format!(
+                    r#"{{"version":5,"uiScalePercent":175{color_field},"maxConcurrency":8,"customPresets":[]}}"#
+                ),
+            )
+            .expect("settings fixture should be written");
+
+            let settings = AppPersistence::from_settings_path(path)
+                .load()
+                .expect("settings should load");
+
+            assert_eq!(settings.appearance.color_theme, ColorTheme::Dark);
+            assert_eq!(settings.appearance.ui_scale, ScalePreset::Percent175);
+            assert_eq!(settings.max_concurrency, 8);
+        }
+    }
+
+    #[test]
+    fn load_unknown_color_theme_defaults_only_theme() {
+        let path = test_settings_path();
+        let parent = path.parent().expect("test path should have parent");
+        fs::create_dir_all(parent).expect("test directory should be created");
+        fs::write(
+            &path,
+            r#"{"version":5,"uiScalePercent":150,"colorTheme":"future","maxConcurrency":6,"customPresets":[]}"#,
+        )
+        .expect("settings fixture should be written");
+
+        let settings = AppPersistence::from_settings_path(path)
+            .load()
+            .expect("settings should load");
+
+        assert_eq!(settings.appearance.color_theme, ColorTheme::Dark);
+        assert_eq!(settings.appearance.ui_scale, ScalePreset::Percent150);
+        assert_eq!(settings.max_concurrency, 6);
+    }
+
+    #[test]
+    fn load_wrong_type_color_theme_defaults_only_theme() {
+        let path = test_settings_path();
+        let parent = path.parent().expect("test path should have parent");
+        fs::create_dir_all(parent).expect("test directory should be created");
+        fs::write(
+            &path,
+            r#"{"version":5,"uiScalePercent":110,"colorTheme":42,"maxConcurrency":3,"customPresets":[]}"#,
+        )
+        .expect("settings fixture should be written");
+
+        let settings = AppPersistence::from_settings_path(path)
+            .load()
+            .expect("settings should load");
+
+        assert_eq!(settings.appearance.color_theme, ColorTheme::Dark);
+        assert_eq!(settings.appearance.ui_scale, ScalePreset::Percent110);
+        assert_eq!(settings.max_concurrency, 3);
     }
 
     #[test]

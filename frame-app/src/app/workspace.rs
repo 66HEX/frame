@@ -24,7 +24,7 @@ pub(super) fn workspace_view(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     if file_queue.files().is_empty() {
-        return welcome_view(window, cx);
+        return welcome_view(settings.palette, window, cx);
     }
 
     div()
@@ -43,14 +43,21 @@ pub(super) fn workspace_view(
                     preview_panel(file_queue, settings, preview_props, window, cx)
                         .row_span(PREVIEW_ROW_SPAN),
                 )
-                .child(file_list_panel(file_queue, window, cx).row_span(FILE_LIST_ROW_SPAN)),
+                .child(
+                    file_list_panel(file_queue, settings.palette, window, cx)
+                        .row_span(FILE_LIST_ROW_SPAN),
+                ),
         )
         .child(settings_panel_for_selection(
             file_queue, settings, window, cx,
         ))
 }
 
-pub(super) fn welcome_view(window: &mut Window, cx: &mut Context<FrameRoot>) -> gpui::Div {
+pub(super) fn welcome_view(
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
     div()
         .size_full()
         .flex()
@@ -69,7 +76,7 @@ pub(super) fn welcome_view(window: &mut Window, cx: &mut Context<FrameRoot>) -> 
                         .path(assets::ICON_FRAME)
                         .w(theme::ui_rem(WELCOME_LOGO_SIZE))
                         .h(theme::ui_rem(WELCOME_LOGO_SIZE))
-                        .text_color(color(theme::FRAME_GRAY_600)),
+                        .text_color(color(palette.text_muted)),
                 )
                 .child(
                     div()
@@ -81,13 +88,13 @@ pub(super) fn welcome_view(window: &mut Window, cx: &mut Context<FrameRoot>) -> 
                             div()
                                 .text_size(theme::ui_rem(theme::TEXT_ROW_BASE_SIZE))
                                 .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-                                .text_color(color(theme::FOREGROUND))
+                                .text_color(color(palette.text_primary))
                                 .child(theme::ui_text("Frame")),
                         )
                         .child(
                             div()
                                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-                                .text_color(color(theme::FRAME_GRAY_600))
+                                .text_color(color(palette.text_muted))
                                 .child(theme::ui_text("Add media to start a conversion queue.")),
                         ),
                 )
@@ -104,6 +111,7 @@ pub(super) fn welcome_view(window: &mut Window, cx: &mut Context<FrameRoot>) -> 
                                 "Open file",
                                 ButtonVariant::Default,
                                 true,
+                                palette,
                                 window,
                                 cx,
                             )
@@ -122,6 +130,7 @@ pub(super) fn welcome_view(window: &mut Window, cx: &mut Context<FrameRoot>) -> 
                                 "Open folder",
                                 ButtonVariant::Secondary,
                                 true,
+                                palette,
                                 window,
                                 cx,
                             )
@@ -145,11 +154,11 @@ fn settings_panel_for_selection(
     if file_queue.selected_file().is_some() {
         settings_panel(settings, window, cx).col_span(RIGHT_COLUMN_SPAN)
     } else {
-        empty_settings_panel().col_span(RIGHT_COLUMN_SPAN)
+        empty_settings_panel(settings.palette).col_span(RIGHT_COLUMN_SPAN)
     }
 }
 
-fn empty_settings_panel() -> gpui::Div {
+fn empty_settings_panel(palette: &'static theme::ThemePalette) -> gpui::Div {
     div()
         .relative()
         .size_full()
@@ -160,12 +169,12 @@ fn empty_settings_panel() -> gpui::Div {
         .overflow_hidden()
         .p(theme::ui_rem(EMPTY_SETTINGS_PANEL_PADDING))
         .text_center()
-        .card_surface()
+        .card_surface(palette)
         .child(
             div()
                 .max_w(theme::ui_rem(EMPTY_SETTINGS_HINT_MAX_WIDTH))
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-                .text_color(color(theme::FRAME_GRAY_600))
+                .text_color(color(palette.text_muted))
                 .child(theme::ui_text(
                     "Select an item from the queue to access configuration",
                 )),

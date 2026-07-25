@@ -2,7 +2,7 @@ use super::{
     App, BoxShadow, Context, FluentBuilder, FrameRoot, InteractiveElement, IntoElement,
     MouseButton, ParentElement, Rgba, StatefulInteractiveElement, Styled,
     TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_BUTTON_HEIGHT, TITLEBAR_ICON_BUTTON_SIZE,
-    TITLEBAR_ICON_SIZE, Window, accessibility::apply_accessible_button, div, hover_motion, hsla,
+    TITLEBAR_ICON_SIZE, Window, accessibility::apply_accessible_button, div, hover_motion,
     mix_color, point, px, retarget_hover_motion, svg, theme,
 };
 
@@ -38,21 +38,22 @@ pub(super) const fn button_colors(
     variant: ButtonVariant,
     selected: bool,
     enabled: bool,
+    palette: &'static theme::ThemePalette,
 ) -> ButtonColors {
     let active_variant = matches!(variant, ButtonVariant::Default) || selected;
     if !enabled {
         let (background, foreground, opacity) = if active_variant {
             (
-                theme::FRAME_GRAY_400.with_alpha(0.10),
-                theme::FOREGROUND.with_alpha(0.50),
+                palette.border_subtle.with_alpha(0.10),
+                palette.text_primary.with_alpha(0.50),
                 1.0,
             )
         } else if matches!(variant, ButtonVariant::Ghost) {
-            (theme::TRANSPARENT, theme::FRAME_GRAY_600, 0.5)
+            (palette.transparent, palette.text_muted, 0.5)
         } else {
             (
-                theme::FRAME_GRAY_100,
-                theme::FOREGROUND.with_alpha(0.50),
+                palette.fill_subtle,
+                palette.text_primary.with_alpha(0.50),
                 0.5,
             )
         };
@@ -68,29 +69,29 @@ pub(super) const fn button_colors(
 
     if active_variant {
         ButtonColors {
-            background: theme::FRAME_GRAY_400,
-            hover_background: theme::FRAME_GRAY_400.with_alpha(0.18),
-            active_background: theme::FRAME_GRAY_400.with_alpha(0.18),
-            foreground: theme::FOREGROUND,
-            hover_foreground: theme::FOREGROUND,
+            background: palette.border_subtle,
+            hover_background: palette.border_subtle.with_alpha(0.18),
+            active_background: palette.border_subtle.with_alpha(0.18),
+            foreground: palette.text_primary,
+            hover_foreground: palette.text_primary,
             opacity: 1.0,
         }
     } else if matches!(variant, ButtonVariant::Ghost) {
         ButtonColors {
-            background: theme::TRANSPARENT,
-            hover_background: theme::FRAME_GRAY_100,
-            active_background: theme::FRAME_GRAY_200,
-            foreground: theme::FRAME_GRAY_600,
-            hover_foreground: theme::FOREGROUND,
+            background: palette.transparent,
+            hover_background: palette.fill_subtle,
+            active_background: palette.fill_selected,
+            foreground: palette.text_muted,
+            hover_foreground: palette.text_primary,
             opacity: 1.0,
         }
     } else {
         ButtonColors {
-            background: theme::FRAME_GRAY_100,
-            hover_background: theme::FRAME_GRAY_200,
-            active_background: theme::FRAME_GRAY_200,
-            foreground: theme::FOREGROUND,
-            hover_foreground: theme::FOREGROUND,
+            background: palette.fill_subtle,
+            hover_background: palette.fill_selected,
+            active_background: palette.fill_selected,
+            foreground: palette.text_primary,
+            hover_foreground: palette.text_primary,
             opacity: 1.0,
         }
     }
@@ -198,13 +199,14 @@ pub(super) fn action_button(
     accessibility_label: impl Into<String>,
     variant: ButtonVariant,
     enabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let id = id.into();
     let accessibility_label = accessibility_label.into();
     let is_icon_only = label.is_none();
-    let colors = button_colors(variant, false, enabled);
+    let colors = button_colors(variant, false, enabled, palette);
     let animated = animated_button_colors(id.clone(), colors, window, cx);
     let background = animated.background;
     let foreground = animated.foreground;
@@ -220,7 +222,7 @@ pub(super) fn action_button(
         .gap_2()
         .rounded(theme::ui_rem(theme::RADIUS_SM))
         .bg(background)
-        .shadow(button_highlight_shadows())
+        .shadow(button_highlight_shadows(palette))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
         .opacity(colors.opacity)
@@ -240,7 +242,7 @@ pub(super) fn action_button(
             .child(theme::ui_text(label.unwrap_or_default()))
     };
 
-    apply_accessible_button(button, accessibility_label, enabled)
+    apply_accessible_button(button, accessibility_label, enabled, palette)
 }
 
 pub(super) fn icon_svg(path: &'static str, size: f32, icon_color: Rgba) -> impl IntoElement {
@@ -264,40 +266,48 @@ pub(super) const fn frame_highlight_px() -> f32 {
     if cfg!(target_os = "macos") { 0.5 } else { 1.0 }
 }
 
-pub(super) fn input_highlight_shadows() -> Vec<BoxShadow> {
+pub(super) fn input_highlight_shadows(palette: &theme::ThemePalette) -> Vec<BoxShadow> {
     let highlight_px = frame_highlight_px();
 
-    vec![
-        BoxShadow {
-            color: hsla(0.0, 0.0, 0.0, 0.20),
-            offset: point(px(0.0), px(highlight_px)),
-            blur_radius: px(0.0),
-            spread_radius: px(0.0),
-            inset: true,
-        },
-        BoxShadow {
-            color: color(theme::FRAME_GRAY_400).into(),
-            offset: point(px(0.0), px(-highlight_px)),
-            blur_radius: px(0.0),
-            spread_radius: px(0.0),
-            inset: true,
-        },
-    ]
+    if palette.is_light() {
+        light_control_depth_shadows(palette, true)
+    } else {
+        vec![
+            BoxShadow {
+                color: color(palette.shadow.with_alpha(0.20)).into(),
+                offset: point(px(0.0), px(highlight_px)),
+                blur_radius: px(0.0),
+                spread_radius: px(0.0),
+                inset: true,
+            },
+            BoxShadow {
+                color: color(palette.border_subtle).into(),
+                offset: point(px(0.0), px(-highlight_px)),
+                blur_radius: px(0.0),
+                spread_radius: px(0.0),
+                inset: true,
+            },
+        ]
+    }
 }
 
-pub(super) fn button_highlight_shadows() -> Vec<BoxShadow> {
+pub(super) fn button_highlight_shadows(palette: &theme::ThemePalette) -> Vec<BoxShadow> {
+    if palette.is_light() {
+        return light_control_depth_shadows(palette, true);
+    }
+
     let highlight_px = frame_highlight_px();
 
     vec![
         BoxShadow {
-            color: color(theme::FRAME_GRAY_400).into(),
+            color: color(palette.border_subtle).into(),
             offset: point(px(0.0), px(highlight_px)),
             blur_radius: px(0.0),
             spread_radius: px(0.0),
             inset: true,
         },
         BoxShadow {
-            color: color(theme::FRAME_GRAY_200).into(),
+            color: color(palette.fill_subtle).into(),
             offset: point(px(0.0), px(0.0)),
             blur_radius: px(0.0),
             spread_radius: px(highlight_px),
@@ -306,24 +316,77 @@ pub(super) fn button_highlight_shadows() -> Vec<BoxShadow> {
     ]
 }
 
-pub(super) fn vertical_separator(height: f32) -> gpui::Div {
-    div()
-        .flex()
-        .h(theme::ui_rem(height))
-        .w(px(2.0))
-        .child(div().h_full().w(px(1.0)).bg(color(theme::BACKGROUND)))
-        .child(div().h_full().w(px(1.0)).bg(color(theme::FRAME_GRAY_100)))
+fn light_control_depth_shadows(palette: &theme::ThemePalette, inset: bool) -> Vec<BoxShadow> {
+    let highlight_px = frame_highlight_px();
+
+    vec![
+        BoxShadow {
+            color: color(palette.shadow.with_alpha(0.06)).into(),
+            offset: point(px(0.0), px(1.0)),
+            blur_radius: px(1.0),
+            spread_radius: px(-0.5),
+            inset,
+        },
+        BoxShadow {
+            color: color(palette.shadow.with_alpha(0.06)).into(),
+            offset: point(px(0.0), px(3.0)),
+            blur_radius: px(3.0),
+            spread_radius: px(-1.5),
+            inset,
+        },
+        BoxShadow {
+            color: color(palette.shadow.with_alpha(0.06)).into(),
+            offset: point(px(0.0), px(6.0)),
+            blur_radius: px(6.0),
+            spread_radius: px(-3.0),
+            inset,
+        },
+        BoxShadow {
+            color: color(palette.surface.with_alpha(0.08)).into(),
+            offset: point(px(0.0), px(-highlight_px)),
+            blur_radius: px(0.0),
+            spread_radius: px(0.0),
+            inset,
+        },
+        BoxShadow {
+            color: color(palette.shadow.with_alpha(0.08)).into(),
+            offset: point(px(0.0), px(0.0)),
+            blur_radius: px(0.0),
+            spread_radius: px(highlight_px),
+            inset,
+        },
+    ]
 }
 
-pub(super) fn panel_bottom_separator() -> gpui::Div {
-    div()
-        .absolute()
-        .left_0()
-        .right_0()
-        .bottom_0()
-        .h(px(1.0))
-        .bg(color(theme::BACKGROUND))
-        .shadow(horizontal_separator_shadows())
+pub(super) fn vertical_separator(height: f32, palette: &theme::ThemePalette) -> gpui::Div {
+    if palette.is_light() {
+        div()
+            .h(theme::ui_rem(height))
+            .w(px(frame_highlight_px()))
+            .bg(color(palette.border_subtle))
+    } else {
+        div()
+            .flex()
+            .h(theme::ui_rem(height))
+            .w(px(2.0))
+            .child(div().h_full().w(px(1.0)).bg(color(palette.canvas)))
+            .child(div().h_full().w(px(1.0)).bg(color(palette.fill_subtle)))
+    }
+}
+
+pub(super) fn panel_bottom_separator(palette: &theme::ThemePalette) -> gpui::Div {
+    let separator = div().absolute().left_0().right_0().bottom_0();
+
+    if palette.is_light() {
+        separator
+            .h(px(frame_highlight_px()))
+            .bg(color(palette.border_subtle))
+    } else {
+        separator
+            .h(px(1.0))
+            .bg(color(palette.canvas))
+            .shadow(horizontal_separator_shadows(palette))
+    }
 }
 
 pub(super) fn element_id(prefix: &str, id: &str) -> String {
@@ -331,66 +394,81 @@ pub(super) fn element_id(prefix: &str, id: &str) -> String {
 }
 
 pub(super) trait FrameSurface {
-    fn card_surface(self) -> Self;
+    fn card_surface(self, palette: &theme::ThemePalette) -> Self;
 }
 
 impl FrameSurface for gpui::Div {
-    fn card_surface(self) -> Self {
+    fn card_surface(self, palette: &theme::ThemePalette) -> Self {
         self.rounded(theme::ui_rem(theme::RADIUS_LG))
-            .bg(color(theme::FRAME_GRAY_100))
-            .shadow(card_surface_shadows())
+            .bg(color(if palette.is_light() {
+                palette.surface
+            } else {
+                palette.fill_subtle
+            }))
+            .shadow(card_surface_shadows(palette))
     }
 }
 
-pub(super) fn card_surface_shadows() -> Vec<BoxShadow> {
+pub(super) fn card_surface_shadows(palette: &theme::ThemePalette) -> Vec<BoxShadow> {
     let highlight_px = frame_highlight_px();
 
-    vec![
-        BoxShadow {
-            color: hsla(0.0, 0.0, 0.0, 0.10),
-            offset: point(px(0.0), px(4.0)),
-            blur_radius: px(6.0),
-            spread_radius: px(-1.0),
-            inset: false,
-        },
-        BoxShadow {
-            color: hsla(0.0, 0.0, 0.0, 0.10),
-            offset: point(px(0.0), px(2.0)),
-            blur_radius: px(4.0),
-            spread_radius: px(-2.0),
-            inset: false,
-        },
-        BoxShadow {
-            color: color(theme::FRAME_GRAY_200).into(),
-            offset: point(px(0.0), px(highlight_px)),
-            blur_radius: px(0.0),
-            spread_radius: px(0.0),
-            inset: true,
-        },
-        BoxShadow {
-            color: color(theme::FRAME_GRAY_100).into(),
-            offset: point(px(0.0), px(0.0)),
-            blur_radius: px(0.0),
-            spread_radius: px(highlight_px),
-            inset: true,
-        },
-    ]
+    if palette.is_light() {
+        light_control_depth_shadows(palette, false)
+    } else {
+        vec![
+            BoxShadow {
+                color: color(palette.shadow.with_alpha(0.10)).into(),
+                offset: point(px(0.0), px(4.0)),
+                blur_radius: px(6.0),
+                spread_radius: px(-1.0),
+                inset: false,
+            },
+            BoxShadow {
+                color: color(palette.shadow.with_alpha(0.10)).into(),
+                offset: point(px(0.0), px(2.0)),
+                blur_radius: px(4.0),
+                spread_radius: px(-2.0),
+                inset: false,
+            },
+            BoxShadow {
+                color: color(palette.fill_selected).into(),
+                offset: point(px(0.0), px(highlight_px)),
+                blur_radius: px(0.0),
+                spread_radius: px(0.0),
+                inset: true,
+            },
+            BoxShadow {
+                color: color(palette.fill_subtle).into(),
+                offset: point(px(0.0), px(0.0)),
+                blur_radius: px(0.0),
+                spread_radius: px(highlight_px),
+                inset: true,
+            },
+        ]
+    }
 }
 
-pub(super) fn horizontal_separator_shadows() -> Vec<BoxShadow> {
+pub(super) fn horizontal_separator_shadows(palette: &theme::ThemePalette) -> Vec<BoxShadow> {
+    let (highlight, offset_y) = if palette.is_light() {
+        (palette.border_subtle, frame_highlight_px())
+    } else {
+        // Dark separators intentionally pair their canvas base with a full-pixel light edge.
+        (palette.fill_subtle, 1.0)
+    };
+
     vec![BoxShadow {
-        color: color(theme::FRAME_GRAY_100).into(),
-        offset: point(px(0.0), px(1.0)),
+        color: color(highlight).into(),
+        offset: point(px(0.0), px(offset_y)),
         blur_radius: px(0.0),
         spread_radius: px(0.0),
         inset: false,
     }]
 }
 
-pub(super) fn drop_target_shadows() -> Vec<BoxShadow> {
-    let mut shadows = card_surface_shadows();
+pub(super) fn drop_target_shadows(palette: &theme::ThemePalette) -> Vec<BoxShadow> {
+    let mut shadows = card_surface_shadows(palette);
     shadows.push(BoxShadow {
-        color: color(theme::FRAME_GRAY_600.with_alpha(0.55)).into(),
+        color: color(palette.text_muted.with_alpha(0.55)).into(),
         offset: point(px(0.0), px(0.0)),
         blur_radius: px(0.0),
         spread_radius: px(frame_highlight_px()),
@@ -430,5 +508,106 @@ mod tests {
     #[test]
     fn button_motion_never_emphasizes_disabled_button() {
         assert!(!button_motion_is_emphasized(false, true, true));
+    }
+
+    #[test]
+    fn light_cards_use_control_geometry_outside_the_surface() {
+        let palette = theme::palette(crate::appearance::ColorTheme::Light);
+        let controls = input_highlight_shadows(palette);
+        let cards = card_surface_shadows(palette);
+
+        assert_eq!(cards.len(), controls.len());
+        for (card, control) in cards.iter().zip(&controls) {
+            assert_eq!(card.color, control.color);
+            assert_eq!(card.offset, control.offset);
+            assert_eq!(card.blur_radius, control.blur_radius);
+            assert_eq!(card.spread_radius, control.spread_radius);
+            assert!(!card.inset);
+            assert!(control.inset);
+        }
+    }
+
+    #[test]
+    fn dark_card_surface_shadow_stack_preserves_legacy_geometry() {
+        let shadows = card_surface_shadows(theme::palette(crate::appearance::ColorTheme::Dark));
+
+        assert_eq!(shadows.len(), 4);
+        assert_eq!(shadows[0].offset.y, px(4.0));
+        assert_eq!(shadows[0].blur_radius, px(6.0));
+        assert_eq!(shadows[1].offset.y, px(2.0));
+        assert_eq!(shadows[1].blur_radius, px(4.0));
+        assert!(shadows[2].inset);
+        assert!(shadows[3].inset);
+    }
+
+    #[test]
+    fn light_buttons_use_the_same_recessed_depth_as_inputs() {
+        let palette = theme::palette(crate::appearance::ColorTheme::Light);
+
+        assert_eq!(
+            button_highlight_shadows(palette),
+            input_highlight_shadows(palette)
+        );
+    }
+
+    #[test]
+    fn light_controls_match_motion_core_search_trigger_geometry() {
+        let palette = theme::palette(crate::appearance::ColorTheme::Light);
+        let shadows = input_highlight_shadows(palette);
+
+        assert_eq!(shadows.len(), 5);
+        assert_eq!(shadows[0].offset.y, px(1.0));
+        assert_eq!(shadows[0].blur_radius, px(1.0));
+        assert_eq!(shadows[0].spread_radius, px(-0.5));
+        assert_eq!(shadows[1].offset.y, px(3.0));
+        assert_eq!(shadows[1].blur_radius, px(3.0));
+        assert_eq!(shadows[1].spread_radius, px(-1.5));
+        assert_eq!(shadows[2].offset.y, px(6.0));
+        assert_eq!(shadows[2].blur_radius, px(6.0));
+        assert_eq!(shadows[2].spread_radius, px(-3.0));
+        assert_eq!(shadows[3].offset.y, px(-frame_highlight_px()));
+        assert_eq!(shadows[4].spread_radius, px(frame_highlight_px()));
+        assert!(shadows.iter().all(|shadow| shadow.inset));
+    }
+
+    #[test]
+    fn dark_control_shadows_preserve_legacy_geometry() {
+        let palette = theme::palette(crate::appearance::ColorTheme::Dark);
+        let inputs = input_highlight_shadows(palette);
+        let buttons = button_highlight_shadows(palette);
+
+        assert_eq!(inputs.len(), 2);
+        assert_eq!(inputs[0].offset.y, px(frame_highlight_px()));
+        assert_eq!(inputs[1].offset.y, px(-frame_highlight_px()));
+        assert!(inputs.iter().all(|shadow| shadow.inset));
+
+        assert_eq!(buttons.len(), 2);
+        assert_eq!(buttons[0].offset.y, px(frame_highlight_px()));
+        assert_eq!(buttons[1].spread_radius, px(frame_highlight_px()));
+        assert!(buttons.iter().all(|shadow| shadow.inset));
+    }
+
+    #[test]
+    fn dark_horizontal_separator_preserves_full_pixel_two_tone_edge() {
+        let palette = theme::palette(crate::appearance::ColorTheme::Dark);
+        let shadows = horizontal_separator_shadows(palette);
+
+        assert_eq!(shadows.len(), 1);
+        assert_eq!(shadows[0].color, color(palette.fill_subtle).into());
+        assert_eq!(shadows[0].offset.y, px(1.0));
+        assert_eq!(shadows[0].blur_radius, px(0.0));
+        assert!(!shadows[0].inset);
+    }
+
+    #[test]
+    fn light_horizontal_separator_keeps_platform_hairline_edge() {
+        let palette = theme::palette(crate::appearance::ColorTheme::Light);
+        let shadows = horizontal_separator_shadows(palette);
+
+        assert_eq!(shadows.len(), 1);
+        assert_eq!(shadows[0].color, color(palette.border_subtle).into());
+        assert_eq!(shadows[0].offset.y, px(frame_highlight_px()));
+        assert_eq!(shadows[0].blur_radius, px(0.0));
+        assert!(!shadows[0].inset);
     }
 }

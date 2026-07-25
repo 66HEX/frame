@@ -86,9 +86,56 @@ pub(super) fn contextual_icon_motion(
 }
 
 pub(super) fn mix_color(from: theme::RgbaToken, to: theme::RgbaToken, progress: f32) -> Rgba {
-    color(from).lerp(&color(to), progress.clamp(0.0, 1.0))
+    let progress = progress.clamp(0.0, 1.0);
+    if progress <= 0.0 {
+        return color(from);
+    }
+    if progress >= 1.0 {
+        return color(to);
+    }
+
+    let alpha = from.alpha.lerp(&to.alpha, progress);
+    if alpha <= f32::EPSILON {
+        return color(theme::RgbaToken {
+            red: 0.0,
+            green: 0.0,
+            blue: 0.0,
+            alpha: 0.0,
+        });
+    }
+
+    let premultiplied = |from_channel: f32, to_channel: f32| {
+        (from_channel * from.alpha).lerp(&(to_channel * to.alpha), progress) / alpha
+    };
+
+    color(theme::RgbaToken {
+        red: premultiplied(from.red, to.red),
+        green: premultiplied(from.green, to.green),
+        blue: premultiplied(from.blue, to.blue),
+        alpha,
+    })
 }
 
 pub(super) fn mix_scalar(from: f32, to: f32, progress: f32) -> f32 {
     from.lerp(&to, progress.clamp(0.0, 1.0))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::appearance::ColorTheme;
+
+    #[test]
+    fn color_motion_does_not_fade_through_transparent_black_in_either_theme() {
+        for color_theme in [ColorTheme::Light, ColorTheme::Dark] {
+            let palette = theme::palette(color_theme);
+            let midpoint = mix_color(palette.transparent, palette.fill_subtle, 0.5);
+
+            assert!((midpoint.r - palette.fill_subtle.red).abs() <= f32::EPSILON);
+            assert!((midpoint.g - palette.fill_subtle.green).abs() <= f32::EPSILON);
+            assert!((midpoint.b - palette.fill_subtle.blue).abs() <= f32::EPSILON);
+            let expected_alpha = palette.fill_subtle.alpha * 0.5;
+            assert!((midpoint.a - expected_alpha).abs() <= f32::EPSILON);
+        }
+    }
 }

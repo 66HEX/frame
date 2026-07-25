@@ -1,18 +1,24 @@
 use super::*;
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "The audio tab explicitly receives conversion state, capabilities, focus, palette, and render context."
+)]
 pub(in crate::app) fn settings_audio_tab(
     config: &ConversionConfig,
     metadata: Option<&SourceMetadata>,
     settings_disabled: bool,
     available_encoders: &AvailableEncoders,
     audio_bitrate_focus: Option<&FocusHandle>,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let mut channels_section = settings_section("Channels / bitrate")
+    let mut channels_section = settings_section("Channels / bitrate", palette)
         .child(settings_audio_channels_grid(
             config,
             settings_disabled,
+            palette,
             window,
             cx,
         ))
@@ -20,12 +26,14 @@ pub(in crate::app) fn settings_audio_tab(
             config,
             settings_disabled,
             audio_bitrate_focus,
+            palette,
             window,
             cx,
         ));
     if config.processing_mode == ProcessingMode::Copy {
         channels_section = channels_section.child(settings_hint_text(
             "Stream copy keeps source audio settings.",
+            palette,
         ));
     }
 
@@ -34,32 +42,37 @@ pub(in crate::app) fn settings_audio_tab(
         .flex_col()
         .gap_4()
         .child(channels_section)
-        .child(settings_section("Codec").child(settings_audio_codec_list(
-            config,
-            available_encoders,
-            settings_disabled,
-            window,
-            cx,
-        )));
+        .child(
+            settings_section("Codec", palette).child(settings_audio_codec_list(
+                config,
+                available_encoders,
+                settings_disabled,
+                palette,
+                window,
+                cx,
+            )),
+        );
 
     let track_options = audio_track_options(config, metadata, settings_disabled);
     if track_options.is_empty() {
         return content.child(
-            settings_section("Source tracks").child(settings_hint_text("No audio tracks.")),
+            settings_section("Source tracks", palette)
+                .child(settings_hint_text("No audio tracks.", palette)),
         );
     }
 
     let mut list = div().flex().flex_col().gap_2();
     for option in track_options {
-        list = list.child(settings_audio_track_button(option, window, cx));
+        list = list.child(settings_audio_track_button(option, palette, window, cx));
     }
 
-    content.child(settings_section("Source tracks").child(list))
+    content.child(settings_section("Source tracks", palette).child(list))
 }
 
 pub(in crate::app) fn settings_audio_channels_grid(
     config: &ConversionConfig,
     settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -73,6 +86,7 @@ pub(in crate::app) fn settings_audio_channels_grid(
                 option.label,
                 option.is_selected,
                 is_enabled,
+                palette,
                 window,
                 cx,
             )
@@ -126,6 +140,7 @@ fn settings_audio_encoding_controls(
     config: &ConversionConfig,
     settings_disabled: bool,
     audio_bitrate_focus: Option<&FocusHandle>,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -137,10 +152,11 @@ fn settings_audio_encoding_controls(
     let mut controls = div().flex().flex_col().gap_3();
     if show_vbr_toggle {
         controls = controls
-            .child(settings_field_label("Quality control"))
+            .child(settings_field_label("Quality control", palette))
             .child(settings_audio_bitrate_mode_grid(
                 config,
                 controls_disabled,
+                palette,
                 window,
                 cx,
             ));
@@ -172,6 +188,7 @@ fn settings_audio_encoding_controls(
                     target: SettingsAudioRangeTarget::Quality,
                 },
                 controls_disabled,
+                palette,
                 cx,
             ));
         }
@@ -181,6 +198,7 @@ fn settings_audio_encoding_controls(
             controls_disabled || is_lossless,
             is_lossless,
             audio_bitrate_focus,
+            palette,
             window,
             cx,
         ));
@@ -192,6 +210,7 @@ fn settings_audio_encoding_controls(
 fn settings_audio_bitrate_mode_grid(
     config: &ConversionConfig,
     disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -206,6 +225,7 @@ fn settings_audio_bitrate_mode_grid(
                 label,
                 selected,
                 enabled,
+                palette,
                 window,
                 cx,
             )
@@ -229,6 +249,7 @@ fn settings_audio_bitrate_field(
     disabled: bool,
     is_lossless: bool,
     audio_bitrate_focus: Option<&FocusHandle>,
+    palette: &'static theme::ThemePalette,
     window: &Window,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
@@ -236,7 +257,7 @@ fn settings_audio_bitrate_field(
         .flex()
         .flex_col()
         .gap_2()
-        .child(settings_field_label("Bitrate (KB/s)"))
+        .child(settings_field_label("Bitrate (KB/s)", palette))
         .child(frame_text_input(
             FrameTextInputSpec {
                 id: "settings-audio-bitrate-field",
@@ -254,6 +275,7 @@ fn settings_audio_bitrate_field(
                 focus: audio_bitrate_focus,
                 kind: FrameTextInputKind::AudioBitrate,
             },
+            palette,
             window,
             cx,
         ))
@@ -262,6 +284,7 @@ fn settings_audio_bitrate_field(
 fn settings_audio_range_field(
     spec: SettingsAudioRangeSpec,
     disabled: bool,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
     div()
@@ -273,8 +296,8 @@ fn settings_audio_range_field(
                 .flex()
                 .items_end()
                 .justify_between()
-                .child(settings_field_label(spec.label))
-                .child(settings_value_badge(spec.value_label)),
+                .child(settings_field_label(spec.label, palette))
+                .child(settings_value_badge(spec.value_label, palette)),
         )
         .child(settings_audio_range_slider(
             spec.value,
@@ -282,6 +305,7 @@ fn settings_audio_range_field(
             spec.max,
             disabled,
             spec.target,
+            palette,
             cx,
         ))
         .child(
@@ -289,7 +313,7 @@ fn settings_audio_range_field(
                 .flex()
                 .justify_between()
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-                .text_color(color(theme::FRAME_GRAY_600))
+                .text_color(color(palette.text_muted))
                 .child(theme::ui_text(spec.lower_label))
                 .child(theme::ui_text(spec.upper_label)),
         )
@@ -301,6 +325,7 @@ fn settings_audio_range_slider(
     max: u32,
     disabled: bool,
     target: SettingsAudioRangeTarget,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let fraction = range_fraction(value, min, max);
@@ -317,6 +342,7 @@ fn settings_audio_range_slider(
         },
         fraction,
         disabled,
+        palette,
     )
     .on_a11y_action(gpui::AccessibleAction::Increment, move |_, _window, cx| {
         if disabled {
@@ -417,12 +443,13 @@ pub(in crate::app) fn settings_audio_codec_list(
     config: &ConversionConfig,
     available_encoders: &AvailableEncoders,
     settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let mut list = div().grid().grid_cols(1);
     for option in audio_codec_options(config, available_encoders, settings_disabled) {
-        list = list.child(settings_audio_codec_button(option, window, cx));
+        list = list.child(settings_audio_codec_button(option, palette, window, cx));
     }
 
     list
@@ -430,6 +457,7 @@ pub(in crate::app) fn settings_audio_codec_list(
 
 pub(in crate::app) fn settings_audio_codec_button(
     option: crate::settings::AudioCodecOption,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -443,6 +471,7 @@ pub(in crate::app) fn settings_audio_codec_button(
         caption,
         option.is_selected,
         is_enabled,
+        palette,
         window,
         cx,
     )
@@ -459,6 +488,7 @@ pub(in crate::app) fn settings_audio_codec_button(
 
 pub(in crate::app) fn settings_audio_track_button(
     option: crate::settings::AudioTrackOption,
+    palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -475,6 +505,7 @@ pub(in crate::app) fn settings_audio_track_button(
         option.is_selected,
         is_enabled,
         FrameTrackListItemLayout::Stacked,
+        palette,
         window,
         cx,
     )

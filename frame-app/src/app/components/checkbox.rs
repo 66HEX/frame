@@ -17,6 +17,7 @@ pub(in crate::app) fn frame_checkbox_indicator(
     checked: bool,
     indeterminate: bool,
     disabled: bool,
+    palette: &theme::ThemePalette,
 ) -> gpui::Div {
     let active = checked || indeterminate;
     let mut mark = div()
@@ -27,9 +28,9 @@ pub(in crate::app) fn frame_checkbox_indicator(
         .justify_center()
         .rounded(theme::ui_rem(theme::RADIUS_XS))
         .bg(if active {
-            color(theme::FRAME_GRAY_400)
+            color(palette.border_subtle)
         } else {
-            color(theme::TRANSPARENT)
+            color(palette.transparent)
         });
 
     if indeterminate {
@@ -38,13 +39,13 @@ pub(in crate::app) fn frame_checkbox_indicator(
                 .w(theme::ui_rem(FRAME_CHECKBOX_MARK_SIZE))
                 .h(theme::ui_rem(2.0))
                 .rounded(theme::ui_rem(theme::RADIUS_XS))
-                .bg(color(theme::FOREGROUND)),
+                .bg(color(palette.text_primary)),
         );
     } else if checked {
         mark = mark.child(icon_svg(
             assets::ICON_CHECK,
             FRAME_CHECK_ICON_SIZE,
-            color(theme::FOREGROUND),
+            color(palette.text_primary),
         ));
     }
 
@@ -56,13 +57,16 @@ pub(in crate::app) fn frame_checkbox_indicator(
         .items_center()
         .justify_center()
         .rounded(theme::ui_rem(theme::RADIUS_XS))
-        .bg(color(theme::BACKGROUND))
+        .bg(color(palette.canvas))
         .opacity(if disabled { 0.5 } else { 1.0 })
-        .shadow(input_highlight_shadows())
+        .shadow(input_highlight_shadows(palette))
         .child(mark)
 }
 
-pub(in crate::app) fn frame_selection_dot(is_selected: bool) -> gpui::Div {
+pub(in crate::app) fn frame_selection_dot(
+    is_selected: bool,
+    palette: &theme::ThemePalette,
+) -> gpui::Div {
     div()
         .w(theme::ui_rem(FRAME_SELECTION_DOT_SIZE))
         .h(theme::ui_rem(FRAME_SELECTION_DOT_SIZE))
@@ -71,28 +75,35 @@ pub(in crate::app) fn frame_selection_dot(is_selected: bool) -> gpui::Div {
         .items_center()
         .justify_center()
         .rounded_full()
-        .bg(color(theme::BACKGROUND))
-        .shadow(input_highlight_shadows())
+        .bg(color(palette.canvas))
+        .shadow(input_highlight_shadows(palette))
         .child(
             div()
                 .w(theme::ui_rem(FRAME_SELECTION_DOT_MARK_SIZE))
                 .h(theme::ui_rem(FRAME_SELECTION_DOT_MARK_SIZE))
                 .rounded_full()
-                .bg(color(theme::FRAME_GRAY_600))
+                .bg(color(palette.control_muted))
                 .opacity(if is_selected { 1.0 } else { 0.0 }),
         )
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "The checkbox row keeps label, hint, state, palette, context, and action explicit at call sites."
+)]
 pub(in crate::app) fn frame_checkbox_row(
     id: impl Into<String>,
     label: impl Into<String>,
     hint: impl Into<String>,
     checked: bool,
     disabled: bool,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
     action: impl Fn(&mut FrameRoot, &ClickEvent, &mut Window, &mut Context<FrameRoot>) + 'static,
 ) -> gpui::Stateful<gpui::Div> {
-    frame_checkbox_row_inner(id, label, hint, checked, disabled, None, cx, action)
+    frame_checkbox_row_inner(
+        id, label, hint, checked, disabled, None, palette, cx, action,
+    )
 }
 
 #[expect(
@@ -106,10 +117,21 @@ pub(in crate::app) fn frame_checkbox_row_with_focus(
     checked: bool,
     disabled: bool,
     focus: &FocusHandle,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
     action: impl Fn(&mut FrameRoot, &ClickEvent, &mut Window, &mut Context<FrameRoot>) + 'static,
 ) -> gpui::Stateful<gpui::Div> {
-    frame_checkbox_row_inner(id, label, hint, checked, disabled, Some(focus), cx, action)
+    frame_checkbox_row_inner(
+        id,
+        label,
+        hint,
+        checked,
+        disabled,
+        Some(focus),
+        palette,
+        cx,
+        action,
+    )
 }
 
 #[expect(
@@ -123,6 +145,7 @@ fn frame_checkbox_row_inner(
     checked: bool,
     disabled: bool,
     focus: Option<&FocusHandle>,
+    palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
     action: impl Fn(&mut FrameRoot, &ClickEvent, &mut Window, &mut Context<FrameRoot>) + 'static,
 ) -> gpui::Stateful<gpui::Div> {
@@ -136,7 +159,7 @@ fn frame_checkbox_row_inner(
     let action = Rc::new(action);
     let row_action = Rc::clone(&action);
     let indicator_action = Rc::clone(&action);
-    let indicator = frame_checkbox_indicator(checked, false, disabled)
+    let indicator = frame_checkbox_indicator(checked, false, disabled, palette)
         .id(format!("{id}-indicator"))
         .mt(theme::ui_rem(FRAME_CHECKBOX_ROW_INDICATOR_OFFSET_Y))
         .on_click(cx.listener(move |root, event: &ClickEvent, window, cx| {
@@ -144,9 +167,11 @@ fn frame_checkbox_row_inner(
             indicator_action(root, event, window, cx);
         }));
     let indicator = if let Some(focus) = focus {
-        apply_accessible_checkbox_with_focus(indicator, label, enabled, checked, false, focus)
+        apply_accessible_checkbox_with_focus(
+            indicator, label, enabled, checked, false, focus, palette,
+        )
     } else {
-        apply_accessible_checkbox(indicator, label, enabled, checked, false)
+        apply_accessible_checkbox(indicator, label, enabled, checked, false, palette)
     };
 
     div()
@@ -174,7 +199,7 @@ fn frame_checkbox_row_inner(
                     div()
                         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-                        .text_color(color(theme::FRAME_GRAY_600))
+                        .text_color(color(palette.text_muted))
                         .child(display_label),
                 )
                 .when(has_hint, |this| {
@@ -182,7 +207,7 @@ fn frame_checkbox_row_inner(
                         div()
                             .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                             .font_weight(theme::TEXT_WEIGHT_REGULAR)
-                            .text_color(color(theme::FRAME_GRAY_600))
+                            .text_color(color(palette.text_muted))
                             .child(hint),
                     )
                 }),
