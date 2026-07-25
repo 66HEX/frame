@@ -147,9 +147,20 @@ jobs:
         rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
         rustup default 1.95.0
         test "$(rustc --version | awk '{print $2}')" = "1.95.0"
+    - name: steps::setup_dmgbuild
+      shell: bash
+      run: |
+        python3 -m pip install \
+          --disable-pip-version-check \
+          --no-deps \
+          --require-hashes \
+          --target target/dmgbuild \
+          --requirement packaging/macos/dmgbuild-requirements.txt
     - name: steps::install_cargo_bundle
       run: cargo install cargo-bundle --version 0.11.0 --locked
     - name: ./script/bundle-mac
+      env:
+        PYTHONPATH: target/dmgbuild
       run: ./script/bundle-mac x86_64-apple-darwin
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -183,9 +194,20 @@ jobs:
         rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
         rustup default 1.95.0
         test "$(rustc --version | awk '{print $2}')" = "1.95.0"
+    - name: steps::setup_dmgbuild
+      shell: bash
+      run: |
+        python3 -m pip install \
+          --disable-pip-version-check \
+          --no-deps \
+          --require-hashes \
+          --target target/dmgbuild \
+          --requirement packaging/macos/dmgbuild-requirements.txt
     - name: steps::install_cargo_bundle
       run: cargo install cargo-bundle --version 0.11.0 --locked
     - name: ./script/bundle-mac
+      env:
+        PYTHONPATH: target/dmgbuild
       run: ./script/bundle-mac aarch64-apple-darwin
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

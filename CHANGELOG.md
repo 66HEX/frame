@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **macOS DMG Presentation:** Replaced the default Finder disk-image layout with a deterministic Retina-ready installer window, branded background, optically positioned application and Applications-folder icons, hidden Finder chrome, and checksum-pinned `dmgbuild` packaging in validation and release workflows.
 - **Rust Dependency Stack:** Updated the application and release tooling to `cpal` 0.18, `ed25519-dalek` 3, `rfd` 0.17, `ureq` 3, `zip` 8, and newer vendored GPUI dependencies while preserving audio preview, signed-update, native dialog, verified download, and cross-platform bundling behavior.
 - **Interface Motion:** Standardized GPUI transitions on shared surface and interaction timings with ease-in-out easing, and animated the Logs copy confirmation by scaling, blurring, and cross-fading between the copy and check icons.
 - **Contributor CI Coverage:** Extended `cargo xtask ci` to format, test, and lint `frame-updater` explicitly, including its unit tests and all-target Clippy checks. Resolves [#72](https://github.com/66HEX/frame/issues/72).

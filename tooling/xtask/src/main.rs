@@ -1826,6 +1826,19 @@ const fn setup_rust_step() -> &'static str {
 "
 }
 
+const fn setup_dmgbuild_step() -> &'static str {
+    r"    - name: steps::setup_dmgbuild
+      shell: bash
+      run: |
+        python3 -m pip install \
+          --disable-pip-version-check \
+          --no-deps \
+          --require-hashes \
+          --target target/dmgbuild \
+          --requirement packaging/macos/dmgbuild-requirements.txt
+"
+}
+
 fn linux_job(arch: &str, runner: &str) -> String {
     let appimagetool_arch = arch;
     let linux_packages = "clang curl desktop-file-utils file libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync";
@@ -1902,9 +1915,11 @@ fn macos_job(arch: &str, target: &str, runner: &str) -> String {
     env:
       CARGO_INCREMENTAL: 0
     steps:
-{checkout}{rust}    - name: steps::install_cargo_bundle
+{checkout}{rust}{dmgbuild}    - name: steps::install_cargo_bundle
       run: cargo install cargo-bundle --version __CARGO_BUNDLE_VERSION__ --locked
     - name: ./script/bundle-mac
+      env:
+        PYTHONPATH: target/dmgbuild
       run: ./script/bundle-mac {target}
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@v7.0.1
@@ -1923,6 +1938,7 @@ fn macos_job(arch: &str, target: &str, runner: &str) -> String {
         if_expression = bundle_if_expression(),
         checkout = checkout_step(),
         rust = setup_rust_step(),
+        dmgbuild = setup_dmgbuild_step(),
     )
 }
 
@@ -2241,7 +2257,18 @@ jobs:
         ditto -x -k target/packaging-input/Frame-x86_64-unsigned.app.zip \
           target/x86_64-apple-darwin/release/bundle/osx
         test -d target/x86_64-apple-darwin/release/bundle/osx/Frame.app
+    - name: steps::setup_dmgbuild
+      shell: bash
+      run: |
+        python3 -m pip install \
+          --disable-pip-version-check \
+          --no-deps \
+          --require-hashes \
+          --target target/dmgbuild \
+          --requirement packaging/macos/dmgbuild-requirements.txt
     - name: release::package_macos_x86_64
+      env:
+        PYTHONPATH: target/dmgbuild
       run: ./script/bundle-mac -p x86_64-apple-darwin
     - name: release::upload_macos_x86_64_dmg
       uses: actions/upload-artifact@v4
@@ -2316,7 +2343,18 @@ jobs:
         ditto -x -k target/packaging-input/Frame-aarch64-unsigned.app.zip \
           target/aarch64-apple-darwin/release/bundle/osx
         test -d target/aarch64-apple-darwin/release/bundle/osx/Frame.app
+    - name: steps::setup_dmgbuild
+      shell: bash
+      run: |
+        python3 -m pip install \
+          --disable-pip-version-check \
+          --no-deps \
+          --require-hashes \
+          --target target/dmgbuild \
+          --requirement packaging/macos/dmgbuild-requirements.txt
     - name: release::package_macos_aarch64
+      env:
+        PYTHONPATH: target/dmgbuild
       run: ./script/bundle-mac -p aarch64-apple-darwin
     - name: release::upload_macos_aarch64_dmg
       uses: actions/upload-artifact@v4
