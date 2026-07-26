@@ -2360,11 +2360,14 @@ jobs:
           exit 1
         }
         test "$(git rev-parse HEAD)" = "$COMMIT_SHA"
-        version="$(sed -n '/^\[package\]$/,/^\[/s/^version = "\([^"]*\)"$/\1/p' frame-app/Cargo.toml | head -n1)"
-        if [[ "$version" != "$TAG" ]]; then
-          echo "::error::frame-app version $version does not match signed tag $TAG." >&2
-          exit 1
-        fi
+        for manifest in frame-app/Cargo.toml frame-core/Cargo.toml frame-updater/Cargo.toml; do
+          package="${manifest%/Cargo.toml}"
+          version="$(sed -n '/^\[package\]$/,/^\[/s/^version = "\([^"]*\)"$/\1/p' "$manifest" | head -n1)"
+          if [[ "$version" != "$TAG" ]]; then
+            echo "::error::$package version $version does not match signed tag $TAG." >&2
+            exit 1
+          fi
+        done
         ci_runs="$(gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" \
           -f head_sha="$COMMIT_SHA" -f branch=master -f status=completed -f per_page=100)"
         if ! jq -e --arg sha "$COMMIT_SHA" \
@@ -4270,6 +4273,8 @@ mod tests {
             "release::resolve_and_verify_signed_tag",
             ".verification.verified",
             "git merge-base --is-ancestor",
+            "for manifest in frame-app/Cargo.toml frame-core/Cargo.toml frame-updater/Cargo.toml",
+            "$package version $version does not match signed tag $TAG",
             "actions/workflows/ci.yml/runs",
             "A manual release must be dispatched from the exact requested tag ref",
             "TAG_OBJECT_SHA",
