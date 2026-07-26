@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-07-26
+
 ### Added
 
 - **Light and Dark Themes:** Added a persistent manual Dark/Light appearance setting backed by semantic OKLCH palettes, immediate whole-interface updates, accessible keyboard-selectable controls, deterministic visual-fixture overrides, contrast validation, and CI guards against legacy or unapproved UI color literals. Dark remains the default for existing installations.
@@ -838,7 +840,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.31.1...HEAD
+[Unreleased]: https://github.com/66HEX/frame/compare/0.32.0...HEAD
+[0.32.0]: https://github.com/66HEX/frame/compare/0.31.1...0.32.0
 [0.31.1]: https://github.com/66HEX/frame/compare/0.31.0...0.31.1
 [0.31.0]: https://github.com/66HEX/frame/compare/0.30.0...0.31.0
 [0.30.0]: https://github.com/66HEX/frame/compare/0.29.2...0.30.0
