@@ -93,7 +93,9 @@ pub(in crate::app) fn frame_color_picker_sv_canvas(
                     linear_color_stop(hsla(0.0, 0.0, 0.0, 0.0), 1.0),
                 )),
         )
-        .child(frame_color_picker_sv_handle(saturation, value, palette))
+        .child(frame_color_picker_sv_handle(
+            hue, saturation, value, palette,
+        ))
 }
 
 pub(in crate::app) fn frame_color_picker_hue_track(
@@ -180,6 +182,7 @@ pub(in crate::app) fn frame_hsv_to_hex(hue_degrees: f64, saturation: f64, value:
 }
 
 fn frame_color_picker_sv_handle(
+    hue: f64,
     saturation: f64,
     value: f64,
     palette: &'static theme::ThemePalette,
@@ -193,8 +196,9 @@ fn frame_color_picker_sv_handle(
         .w(theme::ui_rem(FRAME_COLOR_PICKER_HANDLE_SIZE))
         .h(theme::ui_rem(FRAME_COLOR_PICKER_HANDLE_SIZE))
         .rounded_full()
+        .bg(parse_hex(&frame_hsv_to_hex(hue, saturation, value)))
         .border_1()
-        .border_color(color(palette.text_primary))
+        .border_color(gpui::white())
         .shadow(vec![BoxShadow {
             color: color(palette.shadow.with_alpha(0.35)).into(),
             offset: point(px(0.0), px(0.0)),
