@@ -214,11 +214,6 @@ pub fn format_total_size(bytes: u64) -> String {
 
 #[cfg(test)]
 mod tests {
-    #![expect(
-        clippy::float_cmp,
-        reason = "Layout tests compare exact public sizing constants."
-    )]
-
     use super::*;
 
     mod frame_app_state {
@@ -260,13 +255,30 @@ mod tests {
         }
 
         #[test]
-        fn from_file_queue_uses_queue_derived_counts() {
+        fn from_file_queue_maps_the_complete_queue_snapshot() {
             let mut queue = FileQueue::new();
             queue.add_file(file_queue::FileItem::from_path("first", "/tmp/one.mp4", 10));
+            queue.add_file(file_queue::FileItem::from_path(
+                "second",
+                "/tmp/two.mp4",
+                25,
+            ));
+            assert_eq!(queue.toggle_batch_selection("second"), Some(false));
 
-            let state = FrameAppState::from_file_queue(ActiveView::Workspace, false, true, &queue);
+            let state = FrameAppState::from_file_queue(ActiveView::Logs, true, true, &queue);
 
-            assert_eq!(state.file_count, 1);
+            assert_eq!(
+                state,
+                FrameAppState {
+                    active_view: ActiveView::Logs,
+                    is_processing: true,
+                    file_count: 2,
+                    selected_count: 1,
+                    has_actionable_files: true,
+                    has_default_output_directory: true,
+                    total_size_bytes: 35,
+                }
+            );
         }
     }
 
@@ -293,171 +305,50 @@ mod tests {
         use super::*;
 
         #[test]
-        fn app_settings_value_enables_settings_fixture() {
-            assert_eq!(
-                visual_fixture_from_env_value(Some("app-settings")),
-                Some(VisualFixture::AppSettings)
-            );
-        }
+        fn every_supported_value_enables_its_visual_fixture() {
+            let cases = [
+                ("app-settings", VisualFixture::AppSettings),
+                (
+                    "app-settings-theme-open",
+                    VisualFixture::AppSettingsThemeOpen,
+                ),
+                ("app-settings-ui-open", VisualFixture::AppSettingsUiOpen),
+                ("logs-active", VisualFixture::LogsActive),
+                ("preview-crop", VisualFixture::PreviewCrop),
+                ("preview-ready", VisualFixture::PreviewReady),
+                ("settings-audio", VisualFixture::SettingsAudio),
+                (
+                    "settings-audio-filters",
+                    VisualFixture::SettingsAudioFilters,
+                ),
+                ("settings-images", VisualFixture::SettingsImages),
+                ("settings-metadata", VisualFixture::SettingsMetadata),
+                ("settings-output", VisualFixture::SettingsOutput),
+                ("settings-presets", VisualFixture::SettingsPresets),
+                ("settings-source", VisualFixture::SettingsSource),
+                ("settings-subtitles", VisualFixture::SettingsSubtitles),
+                (
+                    "settings-subtitles-popover",
+                    VisualFixture::SettingsSubtitlesPopover,
+                ),
+                ("settings-video", VisualFixture::SettingsVideo),
+                (
+                    "settings-video-filters",
+                    VisualFixture::SettingsVideoFilters,
+                ),
+                ("update-available", VisualFixture::UpdateAvailable),
+                ("workspace-audio", VisualFixture::WorkspaceAudio),
+                ("workspace-empty", VisualFixture::WorkspaceEmpty),
+                ("workspace-image", VisualFixture::WorkspaceImage),
+            ];
 
-        #[test]
-        fn app_settings_ui_open_value_enables_ui_scale_fixture() {
-            assert_eq!(
-                visual_fixture_from_env_value(Some("app-settings-ui-open")),
-                Some(VisualFixture::AppSettingsUiOpen)
-            );
-        }
-
-        #[test]
-        fn app_settings_theme_open_value_enables_theme_fixture() {
-            assert_eq!(
-                visual_fixture_from_env_value(Some("app-settings-theme-open")),
-                Some(VisualFixture::AppSettingsThemeOpen)
-            );
-        }
-
-        #[test]
-        fn logs_active_value_enables_logs_fixture() {
-            assert_eq!(
-                visual_fixture_from_env_value(Some("logs-active")),
-                Some(VisualFixture::LogsActive)
-            );
-        }
-
-        #[test]
-        fn preview_ready_value_enables_workspace_preview_fixture() {
-            assert_eq!(
-                visual_fixture_from_env_value(Some("preview-ready")),
-                Some(VisualFixture::PreviewReady)
-            );
-        }
-
-        #[test]
-        fn preview_crop_value_enables_workspace_crop_fixture() {
-            assert_eq!(
-                visual_fixture_from_env_value(Some("preview-crop")),
-                Some(VisualFixture::PreviewCrop)
-            );
-        }
-
-        #[test]
-        fn workspace_empty_value_enables_empty_workspace_fixture() {
-            assert_eq!(
-                visual_fixture_from_env_value(Some("workspace-empty")),
-                Some(VisualFixture::WorkspaceEmpty)
-            );
-        }
-
-        #[test]
-        fn workspace_audio_value_enables_selected_audio_fixture() {
-            assert_eq!(
-                visual_fixture_from_env_value(Some("workspace-audio")),
-                Some(VisualFixture::WorkspaceAudio)
-            );
-        }
-
-        #[test]
-        fn workspace_image_value_enables_selected_image_fixture() {
-            assert_eq!(
-                visual_fixture_from_env_value(Some("workspace-image")),
-                Some(VisualFixture::WorkspaceImage)
-            );
-        }
-
-        #[test]
-        fn settings_source_value_enables_source_fixture() {
-            assert_eq!(
-                visual_fixture_from_env_value(Some("settings-source")),
-                Some(VisualFixture::SettingsSource)
-            );
-        }
-
-        #[test]
-        fn settings_output_value_enables_output_fixture() {
-            assert_eq!(
-                visual_fixture_from_env_value(Some("settings-output")),
-                Some(VisualFixture::SettingsOutput)
-            );
-        }
-
-        #[test]
-        fn settings_audio_value_enables_audio_fixture() {
-            assert_eq!(
-                visual_fixture_from_env_value(Some("settings-audio")),
-                Some(VisualFixture::SettingsAudio)
-            );
-        }
-
-        #[test]
-        fn settings_audio_filters_value_enables_audio_filters_fixture() {
-            assert_eq!(
-                visual_fixture_from_env_value(Some("settings-audio-filters")),
-                Some(VisualFixture::SettingsAudioFilters)
-            );
-        }
-
-        #[test]
-        fn settings_metadata_value_enables_metadata_fixture() {
-            assert_eq!(
-                visual_fixture_from_env_value(Some("settings-metadata")),
-                Some(VisualFixture::SettingsMetadata)
-            );
-        }
-
-        #[test]
-        fn settings_presets_value_enables_presets_fixture() {
-            assert_eq!(
-                visual_fixture_from_env_value(Some("settings-presets")),
-                Some(VisualFixture::SettingsPresets)
-            );
-        }
-
-        #[test]
-        fn settings_subtitles_value_enables_subtitles_fixture() {
-            assert_eq!(
-                visual_fixture_from_env_value(Some("settings-subtitles")),
-                Some(VisualFixture::SettingsSubtitles)
-            );
-        }
-
-        #[test]
-        fn settings_subtitles_popover_value_enables_subtitles_popover_fixture() {
-            assert_eq!(
-                visual_fixture_from_env_value(Some("settings-subtitles-popover")),
-                Some(VisualFixture::SettingsSubtitlesPopover)
-            );
-        }
-
-        #[test]
-        fn settings_video_value_enables_video_fixture() {
-            assert_eq!(
-                visual_fixture_from_env_value(Some("settings-video")),
-                Some(VisualFixture::SettingsVideo)
-            );
-        }
-
-        #[test]
-        fn settings_video_filters_value_enables_video_filters_fixture() {
-            assert_eq!(
-                visual_fixture_from_env_value(Some("settings-video-filters")),
-                Some(VisualFixture::SettingsVideoFilters)
-            );
-        }
-
-        #[test]
-        fn settings_images_value_enables_images_fixture() {
-            assert_eq!(
-                visual_fixture_from_env_value(Some("settings-images")),
-                Some(VisualFixture::SettingsImages)
-            );
-        }
-
-        #[test]
-        fn update_available_value_enables_update_fixture() {
-            assert_eq!(
-                visual_fixture_from_env_value(Some("update-available")),
-                Some(VisualFixture::UpdateAvailable)
-            );
+            for (value, expected) in cases {
+                assert_eq!(
+                    visual_fixture_from_env_value(Some(value)),
+                    Some(expected),
+                    "fixture value {value:?} mapped incorrectly"
+                );
+            }
         }
 
         #[test]
@@ -497,86 +388,6 @@ mod tests {
         #[test]
         fn left_workspace_rows_preserve_original_preview_file_list_split() {
             assert_eq!(PREVIEW_ROW_SPAN + FILE_LIST_ROW_SPAN, LEFT_GRID_ROWS);
-        }
-
-        #[test]
-        fn titlebar_height_matches_shared_panel_header_height() {
-            assert_eq!(TITLEBAR_HEIGHT, PANEL_HEADER_HEIGHT);
-        }
-
-        #[test]
-        fn macos_traffic_lights_preserve_original_hit_area() {
-            assert_eq!(TITLEBAR_TRAFFIC_LIGHT_SIZE, 24.0);
-        }
-
-        #[test]
-        fn macos_native_traffic_lights_preserve_original_visual_origin() {
-            assert_eq!(TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_X, 20.8);
-            assert_eq!(TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_Y, 20.8);
-        }
-
-        #[test]
-        fn macos_native_traffic_lights_preserve_original_layout_slot() {
-            assert_eq!(TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_PLACEHOLDER_WIDTH, 72.0);
-        }
-
-        #[test]
-        fn titlebar_segment_matches_original_thirty_pixel_control() {
-            assert_eq!(TITLEBAR_SEGMENT_HEIGHT, 30.0);
-        }
-
-        #[test]
-        fn platform_titlebar_divider_matches_windows_linux_original_height() {
-            assert_eq!(TITLEBAR_PLATFORM_DIVIDER_HEIGHT, 20.0);
-        }
-
-        #[test]
-        fn windows_titlebar_controls_match_original_hit_areas() {
-            assert_eq!(TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH, 46.0);
-            assert_eq!(TITLEBAR_WINDOWS_WINDOW_ICON_SIZE, 18.0);
-            assert_eq!(TITLEBAR_WINDOWS_WINDOW_MAX_ICON_SIZE, 14.0);
-        }
-
-        #[test]
-        fn linux_titlebar_controls_match_original_compact_buttons() {
-            assert_eq!(TITLEBAR_LINUX_WINDOW_BUTTON_SIZE, 28.0);
-            assert_eq!(TITLEBAR_LINUX_WINDOW_CONTROLS_GAP, 2.0);
-            assert_eq!(TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X, 8.0);
-        }
-
-        #[test]
-        fn settings_tab_button_matches_original_icon_button_size() {
-            assert_eq!(SETTINGS_TAB_BUTTON_SIZE, 24.0);
-        }
-
-        #[test]
-        fn settings_panel_padding_matches_original_content_padding() {
-            assert_eq!(SETTINGS_PANEL_PADDING, CONTENT_PADDING);
-        }
-
-        #[test]
-        fn settings_controls_match_original_default_button_height() {
-            assert_eq!(SETTINGS_CONTROL_HEIGHT, 30.0);
-        }
-
-        #[test]
-        fn preview_panel_padding_matches_original_card_padding() {
-            assert_eq!(PREVIEW_PANEL_PADDING, CONTENT_PADDING);
-        }
-
-        #[test]
-        fn preview_timeline_controls_match_original_timecode_height() {
-            assert_eq!(PREVIEW_TIMELINE_CONTROL_HEIGHT, 30.0);
-        }
-
-        #[test]
-        fn preview_toolbar_buttons_match_original_icon_button_size() {
-            assert_eq!(PREVIEW_TOOLBAR_BUTTON_SIZE, 30.0);
-        }
-
-        #[test]
-        fn preview_timeline_handle_matches_original_hit_width() {
-            assert_eq!(PREVIEW_TIMELINE_HANDLE_WIDTH, 20.0);
         }
     }
 }

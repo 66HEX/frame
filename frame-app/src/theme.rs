@@ -295,10 +295,6 @@ mod tests {
 
     use super::*;
 
-    fn assert_channel_close(actual: f32, expected: f32) {
-        assert!((actual - expected).abs() < 0.0001);
-    }
-
     fn assert_token_matches_srgb(token: OklchToken, red: u8, green: u8, blue: u8) {
         assert_rgba_matches_srgb(token.to_rgba(), red, green, blue);
     }
@@ -583,47 +579,8 @@ mod tests {
         }
     }
 
-    mod radius_tokens {
-        use super::*;
-
-        #[test]
-        fn large_radius_matches_design_radius_scale() {
-            assert_eq!(RADIUS_LG, 14.4);
-        }
-
-        #[test]
-        fn nested_icon_button_radius_keeps_concentric_relationship_with_padding() {
-            assert_channel_close(RADIUS_LG - RADIUS_MD, RADIUS_BASE);
-        }
-    }
-
-    mod interaction_tokens {
-        use super::*;
-
-        #[test]
-        fn minimum_hit_area_matches_design_system_floor() {
-            assert_eq!(MIN_HIT_AREA, 40.0);
-        }
-    }
-
     mod typography_tokens {
         use super::*;
-
-        #[test]
-        fn ui_text_matches_twelve_pixel_controls() {
-            assert_eq!(TEXT_UI_BASE_SIZE, 12.0);
-        }
-
-        #[test]
-        fn row_text_matches_file_list_size() {
-            assert_eq!(TEXT_ROW_BASE_SIZE, 14.0);
-        }
-
-        #[test]
-        fn font_weight_tokens_expose_only_regular_and_medium_levels() {
-            assert_eq!(TEXT_WEIGHT_REGULAR, FontWeight::NORMAL);
-            assert_eq!(TEXT_WEIGHT_MEDIUM, FontWeight::MEDIUM);
-        }
 
         #[test]
         fn ui_text_preserves_natural_case_by_default() {

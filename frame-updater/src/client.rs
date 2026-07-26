@@ -666,13 +666,25 @@ mod tests {
     }
 
     #[test]
-    fn download_progress_percent_uses_total_when_available() {
-        let progress = DownloadProgress {
-            received_bytes: 25,
-            total_bytes: Some(100),
-        };
+    fn download_progress_percent_handles_known_unknown_and_invalid_totals() {
+        let cases = [
+            (25, Some(100), Some(25)),
+            (25, None, None),
+            (25, Some(0), None),
+            (125, Some(100), Some(100)),
+        ];
 
-        assert_eq!(progress.percent(), Some(25));
+        for (received_bytes, total_bytes, expected) in cases {
+            let progress = DownloadProgress {
+                received_bytes,
+                total_bytes,
+            };
+            assert_eq!(
+                progress.percent(),
+                expected,
+                "unexpected percentage for received={received_bytes}, total={total_bytes:?}"
+            );
+        }
     }
 
     #[test]

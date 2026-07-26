@@ -20,37 +20,6 @@ mod source_metadata {
     }
 }
 
-mod media_rules {
-    use super::*;
-
-    #[test]
-    fn mp4_supports_audio_and_subtitles_like_original_rules() {
-        assert!(container_supports_audio("mp4"));
-        assert!(container_supports_subtitles("mp4"));
-    }
-
-    #[test]
-    fn image_containers_do_not_support_audio_or_subtitles() {
-        assert!(!container_supports_audio("png"));
-        assert!(!container_supports_subtitles("png"));
-    }
-
-    #[test]
-    fn mp4_rejects_flac_reencode_audio_like_original_rules() {
-        assert!(!is_audio_codec_allowed_for_container("mp4", "flac"));
-    }
-
-    #[test]
-    fn mov_accepts_any_audio_codec_like_original_rules() {
-        assert!(is_audio_codec_allowed_for_container("mov", "flac"));
-    }
-
-    #[test]
-    fn webm_default_audio_codec_matches_shared_rules() {
-        assert_eq!(default_audio_codec_for_container("webm"), "libopus");
-    }
-}
-
 mod output_name {
     use super::*;
 

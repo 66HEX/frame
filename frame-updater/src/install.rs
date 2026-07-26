@@ -383,6 +383,14 @@ mod tests {
 
         let result = InstallResult::failure(&plan, &error);
 
+        assert_eq!(result.schema_version, UPDATE_MANIFEST_SCHEMA_VERSION);
+        assert_eq!(result.app_id, FRAME_APP_ID);
+        assert_eq!(result.from_version, "0.1.0");
         assert_eq!(result.to_version, "0.2.0");
+        assert!(!result.success);
+        assert_eq!(
+            result.error.as_deref(),
+            Some("update installation failed: broken")
+        );
     }
 }

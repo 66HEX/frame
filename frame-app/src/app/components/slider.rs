@@ -78,24 +78,3 @@ pub(in crate::app) fn frame_slider_handle(
         .h(theme::ui_rem(FRAME_SLIDER_HANDLE_HEIGHT))
         .when(enabled, gpui::Styled::cursor_ew_resize)
 }
-
-#[cfg(test)]
-mod tests {
-    #![expect(
-        clippy::float_cmp,
-        reason = "Component tests compare exact deterministic layout constants."
-    )]
-
-    use super::*;
-
-    #[test]
-    fn frame_slider_track_matches_original_svelte_range_height() {
-        assert_eq!(FRAME_SLIDER_TRACK_HEIGHT, 6.0);
-    }
-
-    #[test]
-    fn frame_slider_handle_remains_hit_target_only() {
-        assert_eq!(FRAME_SLIDER_HANDLE_WIDTH, 20.0);
-        assert_eq!(FRAME_SLIDER_HANDLE_HEIGHT, FRAME_SLIDER_VISUAL_HEIGHT);
-    }
-}

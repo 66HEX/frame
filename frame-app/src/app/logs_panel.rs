@@ -364,32 +364,34 @@ mod keyboard_tests {
     }
 
     #[test]
-    fn log_tab_id_for_key_wraps_left_from_first_tab() {
+    fn log_tab_id_for_key_wraps_at_both_ends() {
         let ids = log_ids();
 
-        assert_eq!(log_tab_id_for_key("first", &ids, "left"), Some("third"));
+        for (current, key, expected) in [
+            ("first", "left", Some("third")),
+            ("third", "right", Some("first")),
+        ] {
+            assert_eq!(
+                log_tab_id_for_key(current, &ids, key),
+                expected,
+                "tab navigation failed for current={current:?}, key={key:?}"
+            );
+        }
     }
 
     #[test]
-    fn log_tab_id_for_key_wraps_right_from_last_tab() {
-        let ids = log_ids();
-
-        assert_eq!(log_tab_id_for_key("third", &ids, "right"), Some("first"));
-    }
-
-    #[test]
-    fn log_scroll_target_for_key_moves_page_down_by_ten_lines() {
-        assert_eq!(log_scroll_target_for_key(3, 30, "pagedown"), Some(13));
-    }
-
-    #[test]
-    fn log_scroll_target_for_key_clamps_page_up_to_start() {
-        assert_eq!(log_scroll_target_for_key(3, 30, "pageup"), Some(0));
-    }
-
-    #[test]
-    fn log_scroll_target_for_key_moves_end_to_last_line() {
-        assert_eq!(log_scroll_target_for_key(3, 30, "end"), Some(29));
+    fn log_scroll_target_for_key_handles_the_navigation_matrix() {
+        for (key, expected) in [
+            ("pagedown", Some(13)),
+            ("pageup", Some(0)),
+            ("end", Some(29)),
+        ] {
+            assert_eq!(
+                log_scroll_target_for_key(3, 30, key),
+                expected,
+                "scroll navigation failed for key={key:?}"
+            );
+        }
     }
 }
 

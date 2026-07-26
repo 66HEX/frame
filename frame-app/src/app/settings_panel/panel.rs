@@ -327,42 +327,21 @@ mod tests {
     const TABS: &[SettingsTab] = &[SettingsTab::Source, SettingsTab::Output, SettingsTab::Video];
 
     #[test]
-    fn settings_tab_for_key_wraps_left_from_first_tab() {
-        assert_eq!(
-            settings_tab_for_key(SettingsTab::Source, TABS, "left"),
-            Some(SettingsTab::Video)
-        );
-    }
+    fn settings_tab_for_key_handles_the_navigation_matrix() {
+        let cases = [
+            (SettingsTab::Source, "left", Some(SettingsTab::Video)),
+            (SettingsTab::Video, "right", Some(SettingsTab::Source)),
+            (SettingsTab::Output, "home", Some(SettingsTab::Source)),
+            (SettingsTab::Output, "end", Some(SettingsTab::Video)),
+            (SettingsTab::Output, "space", None),
+        ];
 
-    #[test]
-    fn settings_tab_for_key_wraps_right_from_last_tab() {
-        assert_eq!(
-            settings_tab_for_key(SettingsTab::Video, TABS, "right"),
-            Some(SettingsTab::Source)
-        );
-    }
-
-    #[test]
-    fn settings_tab_for_key_moves_home_to_first_tab() {
-        assert_eq!(
-            settings_tab_for_key(SettingsTab::Output, TABS, "home"),
-            Some(SettingsTab::Source)
-        );
-    }
-
-    #[test]
-    fn settings_tab_for_key_moves_end_to_last_tab() {
-        assert_eq!(
-            settings_tab_for_key(SettingsTab::Output, TABS, "end"),
-            Some(SettingsTab::Video)
-        );
-    }
-
-    #[test]
-    fn settings_tab_for_key_ignores_other_keys() {
-        assert_eq!(
-            settings_tab_for_key(SettingsTab::Output, TABS, "space"),
-            None
-        );
+        for (current, key, expected) in cases {
+            assert_eq!(
+                settings_tab_for_key(current, TABS, key),
+                expected,
+                "navigation failed for current={current:?}, key={key:?}"
+            );
+        }
     }
 }

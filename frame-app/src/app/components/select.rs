@@ -525,11 +525,6 @@ fn refresh_select_hover_after_scroll(
 
 #[cfg(test)]
 mod tests {
-    #![expect(
-        clippy::float_cmp,
-        reason = "Component tests compare exact deterministic layout constants."
-    )]
-
     use super::*;
 
     #[test]
@@ -542,52 +537,30 @@ mod tests {
     }
 
     #[test]
-    fn frame_color_swatch_uses_compact_visual_size() {
-        assert_eq!(FRAME_COLOR_SWATCH_SIZE, 14.0);
-    }
+    fn frame_select_target_handles_the_keyboard_navigation_matrix() {
+        let cases = [
+            (4, Some(3), "down", &[0][..], Some(1)),
+            (4, Some(2), "home", &[0][..], Some(1)),
+            (4, Some(2), "end", &[3][..], Some(2)),
+            (0, None, "down", &[][..], None),
+            (3, Some(1), "up", &[0, 1, 2][..], None),
+            (3, Some(1), "home", &[0, 1, 2][..], None),
+            (3, Some(1), "end", &[0, 1, 2][..], None),
+            (1, Some(0), "up", &[][..], Some(0)),
+            (1, Some(0), "down", &[][..], Some(0)),
+            (1, Some(0), "home", &[][..], Some(0)),
+            (1, Some(0), "end", &[][..], Some(0)),
+            (3, Some(1), "escape", &[][..], None),
+        ];
 
-    #[test]
-    fn frame_select_target_wraps_to_next_enabled_option() {
-        let target = frame_select_target_index(4, Some(3), "down", |index| index != 0);
-        assert_eq!(target, Some(1));
-    }
-
-    #[test]
-    fn frame_select_target_supports_home_and_end() {
-        let home = frame_select_target_index(4, Some(2), "home", |index| index != 0);
-        let end = frame_select_target_index(4, Some(2), "end", |index| index != 3);
-        assert_eq!((home, end), (Some(1), Some(2)));
-    }
-
-    #[test]
-    fn frame_select_target_handles_empty_and_fully_disabled_lists() {
-        assert_eq!(frame_select_target_index(0, None, "down", |_| true), None);
-        assert_eq!(frame_select_target_index(3, Some(1), "up", |_| false), None);
-        assert_eq!(
-            frame_select_target_index(3, Some(1), "home", |_| false),
-            None
-        );
-        assert_eq!(
-            frame_select_target_index(3, Some(1), "end", |_| false),
-            None
-        );
-    }
-
-    #[test]
-    fn frame_select_target_keeps_a_single_enabled_option_stable() {
-        for key in ["up", "down", "home", "end"] {
+        for (option_count, current, key, disabled, expected) in cases {
+            let actual = frame_select_target_index(option_count, current, key, |index| {
+                !disabled.contains(&index)
+            });
             assert_eq!(
-                frame_select_target_index(1, Some(0), key, |_| true),
-                Some(0)
+                actual, expected,
+                "navigation failed for count={option_count}, current={current:?}, key={key:?}, disabled={disabled:?}"
             );
         }
-    }
-
-    #[test]
-    fn frame_select_target_ignores_unhandled_keys() {
-        assert_eq!(
-            frame_select_target_index(3, Some(1), "escape", |_| true),
-            None
-        );
     }
 }

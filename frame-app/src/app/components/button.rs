@@ -388,18 +388,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn ghost_text_button_uses_no_highlight_when_unselected() {
-        assert!(!text_button_uses_highlight(ButtonVariant::Ghost, false));
-    }
+    fn text_button_highlight_follows_variant_and_selection() {
+        let cases = [
+            ("ghost-unselected", ButtonVariant::Ghost, false, false),
+            ("ghost-selected", ButtonVariant::Ghost, true, true),
+            ("secondary", ButtonVariant::Secondary, false, true),
+        ];
 
-    #[test]
-    fn ghost_text_button_uses_highlight_when_selected() {
-        assert!(text_button_uses_highlight(ButtonVariant::Ghost, true));
-    }
-
-    #[test]
-    fn secondary_text_button_keeps_highlight() {
-        assert!(text_button_uses_highlight(ButtonVariant::Secondary, false));
+        for (name, variant, selected, expected) in cases {
+            assert_eq!(
+                text_button_uses_highlight(variant, selected),
+                expected,
+                "highlight mismatch for case={name}, selected={selected}"
+            );
+        }
     }
 
     #[test]

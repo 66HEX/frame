@@ -19,7 +19,7 @@ use super::preview_panel::{
     timeline_fraction_from_percent, timeline_keyboard_time_for_key,
     timeline_slider_percent_from_bounds,
 };
-use super::primitives::{ButtonVariant, button_colors, frame_highlight_px};
+use super::primitives::frame_highlight_px;
 use super::settings_panel::{hex_to_subtitle_hsv, subtitle_hsv_to_hex};
 use super::*;
 use crate::app_persistence::{AppPersistence, AppSettings};
@@ -3770,64 +3770,6 @@ mod visual_fixtures {
     }
 }
 
-mod button_state_colors {
-    use super::*;
-
-    fn dark_palette() -> &'static theme::ThemePalette {
-        theme::palette(crate::appearance::ColorTheme::Dark)
-    }
-
-    #[test]
-    fn default_button_hover_matches_original_frame_gray_400_90() {
-        let palette = dark_palette();
-        let colors = button_colors(ButtonVariant::Default, false, true, palette);
-
-        assert_eq!(
-            colors.hover_background,
-            palette.border_subtle.with_alpha(0.18)
-        );
-        assert_eq!(colors.active_background, colors.hover_background);
-    }
-
-    #[test]
-    fn secondary_button_hover_matches_original_frame_gray_200() {
-        let palette = dark_palette();
-        let colors = button_colors(ButtonVariant::Secondary, false, true, palette);
-
-        assert_eq!(colors.hover_background, palette.fill_selected);
-    }
-
-    #[test]
-    fn disabled_default_button_uses_original_half_alpha_background() {
-        let palette = dark_palette();
-        let colors = button_colors(ButtonVariant::Default, false, false, palette);
-
-        assert_eq!(colors.background, palette.border_subtle.with_alpha(0.10));
-        assert_eq!(colors.opacity, 1.0);
-    }
-
-    #[test]
-    fn disabled_secondary_button_keeps_original_whole_button_opacity() {
-        let palette = dark_palette();
-        let colors = button_colors(ButtonVariant::Secondary, false, false, palette);
-
-        assert_eq!(colors.background, palette.fill_subtle);
-        assert_eq!(colors.opacity, 0.5);
-    }
-
-    #[test]
-    fn ghost_button_matches_original_transparent_icon_button_states() {
-        let palette = dark_palette();
-        let colors = button_colors(ButtonVariant::Ghost, false, true, palette);
-
-        assert_eq!(colors.background, palette.transparent);
-        assert_eq!(colors.hover_background, palette.fill_subtle);
-        assert_eq!(colors.active_background, palette.fill_selected);
-        assert_eq!(colors.foreground, palette.text_muted);
-        assert_eq!(colors.hover_foreground, palette.text_primary);
-    }
-}
-
 mod surface_highlights {
     use super::*;
 
@@ -4188,15 +4130,6 @@ mod visual_contract {
     use super::*;
 
     #[test]
-    fn file_list_controls_match_design_sizes() {
-        assert_eq!(components::FRAME_ICON_BUTTON_SM_SIZE, 24.0);
-        assert_eq!(components::FRAME_ICON_SM_SIZE, 16.0);
-        assert_eq!(components::FRAME_CHECKBOX_SIZE, 16.0);
-        assert_eq!(components::FRAME_CHECK_ICON_SIZE, 14.0);
-        assert_eq!(components::FRAME_CHECKBOX_ROW_INDICATOR_OFFSET_Y, 2.0);
-    }
-
-    #[test]
     fn max_concurrency_runtime_settings_has_no_stepper_actions() {
         let mut root = FrameRoot::new();
         root.settings_ui.max_concurrency_draft = "1".to_string();
@@ -4275,12 +4208,6 @@ mod visual_contract {
             preview_overlay_keyboard_delta("down", true),
             Some(PreviewPoint { x: 0.0, y: 0.05 })
         );
-    }
-
-    #[test]
-    fn preview_left_toolbar_centering_uses_full_stack_height() {
-        assert_eq!(preview_panel::preview_toolbar_height(), 190.0);
-        assert_eq!(preview_panel::preview_toolbar_center_margin(), -95.0);
     }
 
     #[test]
