@@ -6,7 +6,7 @@ license = "GPL-3.0-or-later"
 publish = false
 
 [dependencies]
-base64 = "0.22.1"
+base64 = "0.23.0"
 ed25519-dalek = "3.0.0"
 zeroize = "1.8.2"
 
