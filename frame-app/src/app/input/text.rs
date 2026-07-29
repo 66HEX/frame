@@ -22,7 +22,11 @@ pub(super) fn sanitize_replacement_text(kind: FrameTextInputKind, value: &str) -
         | FrameTextInputKind::MetadataGenre
         | FrameTextInputKind::MetadataDate
         | FrameTextInputKind::MetadataComment
-        | FrameTextInputKind::PresetName => value.chars().filter(|ch| !ch.is_control()).collect(),
+        | FrameTextInputKind::PresetName
+        | FrameTextInputKind::ExternalSubtitleLanguage
+        | FrameTextInputKind::ExternalSubtitleTitle => {
+            value.chars().filter(|ch| !ch.is_control()).collect()
+        }
         FrameTextInputKind::SubtitleFontColorHex | FrameTextInputKind::SubtitleOutlineColorHex => {
             value
                 .chars()

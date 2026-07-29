@@ -1,9 +1,10 @@
 use super::{
     AppearancePopover, AppearanceSettings, ColorTheme, Context, DecreaseUiScale, FrameRoot,
     FrameTextInputKind, IncreaseUiScale, PopoverState, PresetDefinition, PresetNotice,
-    PresetNoticeTone, PromptButton, PromptLevel, ResetUiScale, ScalePreset, Window, apply_preset,
-    apply_subtitle_burn_path, create_custom_preset, is_supported_subtitle_path,
-    output_folder_dialog, pick_output_folder, pick_subtitle_file, subtitle_file_dialog,
+    PresetNoticeTone, PromptButton, PromptLevel, ResetUiScale, ScalePreset, Window,
+    add_external_subtitle_tracks, apply_preset, apply_subtitle_burn_path, create_custom_preset,
+    external_subtitle_file_dialog, is_supported_subtitle_path, output_folder_dialog,
+    pick_external_subtitle_files, pick_output_folder, pick_subtitle_file, subtitle_file_dialog,
 };
 
 impl FrameRoot {
@@ -270,6 +271,38 @@ impl FrameRoot {
                 if root
                     .update_selected_config(|config| apply_subtitle_burn_path(config, Some(path)))
                 {
+                    cx.notify();
+                }
+            })
+            .ok();
+        })
+        .detach();
+    }
+
+    pub(super) fn prompt_external_subtitle_files(&self, window: &Window, cx: &Context<Self>) {
+        if self.file_queue.selected_file_locked() {
+            return;
+        }
+
+        let dialog = external_subtitle_file_dialog(window);
+        cx.spawn(async move |this, cx| {
+            let Some(paths) = pick_external_subtitle_files(dialog).await else {
+                return;
+            };
+            let paths = paths
+                .into_iter()
+                .filter(|path| is_supported_subtitle_path(path))
+                .map(|path| path.to_string_lossy().to_string())
+                .collect::<Vec<_>>();
+
+            this.update(cx, |root, cx| {
+                let mut selected_index = None;
+                let changed = root.update_selected_config(|config| {
+                    selected_index = add_external_subtitle_tracks(config, paths);
+                    selected_index.is_some()
+                });
+                if changed {
+                    root.subtitle_ui.external_track_index = selected_index;
                     cx.notify();
                 }
             })

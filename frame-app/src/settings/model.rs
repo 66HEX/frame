@@ -640,6 +640,7 @@ pub struct ConversionConfig {
     pub overlay: Option<OverlaySettings>,
     pub selected_audio_tracks: Vec<u32>,
     pub selected_subtitle_tracks: Vec<u32>,
+    pub external_subtitle_tracks: Vec<ExternalSubtitleTrack>,
     pub resolution: String,
     pub custom_width: Option<String>,
     pub custom_height: Option<String>,
@@ -700,6 +701,7 @@ impl Default for ConversionConfig {
             overlay: None,
             selected_audio_tracks: Vec::new(),
             selected_subtitle_tracks: Vec::new(),
+            external_subtitle_tracks: Vec::new(),
             resolution: DEFAULT_RESOLUTION.to_string(),
             custom_width: None,
             custom_height: None,
@@ -727,6 +729,17 @@ impl Default for ConversionConfig {
             hw_decode: false,
         }
     }
+}
+
+/// A sidecar subtitle file embedded as a selectable output track.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ExternalSubtitleTrack {
+    pub path: String,
+    pub language: Option<String>,
+    pub title: Option<String>,
+    pub is_default: bool,
+    pub is_forced: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -864,6 +877,7 @@ pub struct AudioTrackOption {
     pub index_label: String,
     pub codec: String,
     pub detail: String,
+    pub bitrate: String,
     pub is_selected: bool,
     pub is_disabled: bool,
 }

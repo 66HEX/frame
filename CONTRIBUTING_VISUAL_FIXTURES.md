@@ -84,7 +84,7 @@ the final GPUI rendering.
 | `settings-audio` | Audio settings tab with an audio source and tracks | Audio codec controls, VBR quality, channel selection, volume and normalize controls, track selection rows, and audio-only source treatment. |
 | `settings-images` | Image settings tab with a selected PNG source | Image output controls, custom image dimensions, image-source metadata, and non-video settings visibility. |
 | `settings-metadata` | Metadata tab with source tags and output metadata drafts | Source metadata presentation, editable metadata fields, long value wrapping, and tag/value alignment. |
-| `settings-subtitles` | Subtitles tab with subtitle tracks and burn-in styling | Subtitle track rows, burn-in file state, font controls, color swatches, outline color, position controls, and selected track state. |
+| `settings-subtitles` | Subtitles tab with selectable sidecars, source tracks, and burn-in styling | External subtitle rows and metadata editor, default/forced states, source track rows, burn-in file state, font controls, color swatches, outline color, position controls, and selected track state. |
 | `settings-subtitles-popover` | Subtitles tab with the font color picker open | Color picker popover placement, swatch state, HSV draft color, popover layering, and focus treatment inside the settings panel. |
 | `settings-presets` | Presets tab with a custom preset draft | Preset list rendering, custom preset row, draft preset name, action buttons, and preset form spacing. |
 | `update-available` | Update dialog with release notes and a platform asset | Update dialog layout, release notes markdown rendering, scroll behavior, close animation, footer actions, and platform-specific asset copy. |

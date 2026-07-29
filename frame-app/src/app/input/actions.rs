@@ -162,6 +162,21 @@ impl FrameRoot {
                 })
                 .unwrap_or_default(),
             FrameTextInputKind::PresetName => self.settings_ui.preset_name_draft.clone(),
+            FrameTextInputKind::ExternalSubtitleLanguage
+            | FrameTextInputKind::ExternalSubtitleTitle => self
+                .subtitle_ui
+                .external_track_index
+                .and_then(|index| {
+                    self.file_queue
+                        .selected_file()
+                        .and_then(|file| file.config.external_subtitle_tracks.get(index))
+                })
+                .and_then(|track| match kind {
+                    FrameTextInputKind::ExternalSubtitleLanguage => track.language.clone(),
+                    FrameTextInputKind::ExternalSubtitleTitle => track.title.clone(),
+                    _ => None,
+                })
+                .unwrap_or_default(),
             FrameTextInputKind::SubtitleFontColorHex => self.subtitle_ui.font_color_draft.clone(),
             FrameTextInputKind::SubtitleOutlineColorHex => {
                 self.subtitle_ui.outline_color_draft.clone()
@@ -279,6 +294,24 @@ impl FrameRoot {
                 let next: String = candidate.chars().filter(|ch| !ch.is_control()).collect();
                 self.settings_ui.preset_name_draft.clone_from(&next);
                 self.settings_ui.preset_notice = None;
+                Some(next)
+            }
+            FrameTextInputKind::ExternalSubtitleLanguage
+            | FrameTextInputKind::ExternalSubtitleTitle => {
+                if self.file_queue.selected_file_locked() {
+                    return None;
+                }
+                let index = self.subtitle_ui.external_track_index?;
+                let next: String = candidate.chars().filter(|ch| !ch.is_control()).collect();
+                self.file_queue.selected_file_mut().map(|file| match kind {
+                    FrameTextInputKind::ExternalSubtitleLanguage => {
+                        apply_external_subtitle_language(&mut file.config, index, &next);
+                    }
+                    FrameTextInputKind::ExternalSubtitleTitle => {
+                        apply_external_subtitle_title(&mut file.config, index, &next);
+                    }
+                    _ => unreachable!("matched external subtitle text input variants"),
+                })?;
                 Some(next)
             }
             FrameTextInputKind::SubtitleFontColorHex

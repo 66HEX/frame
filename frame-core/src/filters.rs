@@ -393,6 +393,7 @@ mod tests {
             audio_filters: crate::types::AudioFiltersConfig::default(),
             selected_audio_tracks: vec![],
             selected_subtitle_tracks: vec![],
+            external_subtitle_tracks: vec![],
             subtitle_burn_path: None,
             subtitle_font_name: None,
             subtitle_font_size: None,

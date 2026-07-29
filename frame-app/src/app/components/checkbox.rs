@@ -64,7 +64,7 @@ pub(in crate::app) fn frame_checkbox_indicator(
 }
 
 pub(in crate::app) fn frame_selection_dot(
-    is_selected: bool,
+    selected_progress: f32,
     palette: &theme::ThemePalette,
 ) -> gpui::Div {
     div()
@@ -83,7 +83,7 @@ pub(in crate::app) fn frame_selection_dot(
                 .h(theme::ui_rem(FRAME_SELECTION_DOT_MARK_SIZE))
                 .rounded_full()
                 .bg(color(palette.control_muted))
-                .opacity(if is_selected { 1.0 } else { 0.0 }),
+                .opacity(selected_progress.clamp(0.0, 1.0)),
         )
 }
 

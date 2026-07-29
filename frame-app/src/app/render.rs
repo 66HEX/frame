@@ -212,6 +212,10 @@ impl Render for FrameRoot {
                     self.ensure_text_input_focus(FrameTextInputKind::MetadataComment, cx);
                 let preset_name_focus =
                     self.ensure_text_input_focus(FrameTextInputKind::PresetName, cx);
+                let external_subtitle_language_focus =
+                    self.ensure_text_input_focus(FrameTextInputKind::ExternalSubtitleLanguage, cx);
+                let external_subtitle_title_focus =
+                    self.ensure_text_input_focus(FrameTextInputKind::ExternalSubtitleTitle, cx);
                 let subtitle_font_color_focus =
                     self.ensure_text_input_focus(FrameTextInputKind::SubtitleFontColorHex, cx);
                 let subtitle_outline_color_focus =
@@ -222,6 +226,8 @@ impl Render for FrameRoot {
                 let subtitles_enabled = subtitles_tab_active
                     && !self.file_queue.selected_file_locked()
                     && !subtitles_copy_mode;
+                let external_subtitles_enabled =
+                    subtitles_tab_active && !self.file_queue.selected_file_locked();
                 let subtitle_font_option_count = subtitle_font_options(
                     &selected_config_snapshot,
                     &self.subtitle_font_families,
@@ -235,6 +241,11 @@ impl Render for FrameRoot {
                 let subtitle_burn_file_focus = self.ensure_focus(
                     FrameFocusKey::Control("settings-subtitle-burn-file".to_string()),
                     subtitles_enabled,
+                    cx,
+                );
+                let subtitle_add_external_focus = self.ensure_focus(
+                    FrameFocusKey::Control("settings-subtitle-add-external".to_string()),
+                    external_subtitles_enabled,
                     cx,
                 );
                 let subtitle_font_trigger_focus = self.ensure_focus(
@@ -412,6 +423,7 @@ impl Render for FrameRoot {
                         comment: Some(&metadata_comment_focus),
                     },
                     subtitle_focuses: SettingsSubtitleFocuses {
+                        add_external_files: Some(&subtitle_add_external_focus),
                         burn_file: Some(&subtitle_burn_file_focus),
                         font_select: SettingsSubtitleSelectFocuses {
                             trigger: Some(&subtitle_font_trigger_focus),
@@ -438,6 +450,10 @@ impl Render for FrameRoot {
                             hue: Some(&subtitle_outline_color_hue_focus),
                         },
                     },
+                    external_subtitle_language_focus: Some(&external_subtitle_language_focus),
+                    external_subtitle_title_focus: Some(&external_subtitle_title_focus),
+                    external_subtitle_track_index: self.subtitle_ui.external_track_index,
+                    subtitle_mode: self.subtitle_ui.mode,
                     subtitle_color_focuses: SettingsSubtitleColorInputFocuses {
                         font: Some(&subtitle_font_color_focus),
                         outline: Some(&subtitle_outline_color_focus),

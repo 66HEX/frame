@@ -86,34 +86,33 @@ pub(super) fn contextual_icon_motion(
 }
 
 pub(super) fn mix_color(from: theme::RgbaToken, to: theme::RgbaToken, progress: f32) -> Rgba {
+    mix_rgba(color(from), color(to), progress)
+}
+
+pub(super) fn mix_rgba(from: Rgba, to: Rgba, progress: f32) -> Rgba {
     let progress = progress.clamp(0.0, 1.0);
     if progress <= 0.0 {
-        return color(from);
+        return from;
     }
     if progress >= 1.0 {
-        return color(to);
+        return to;
     }
 
-    let alpha = from.alpha.lerp(&to.alpha, progress);
+    let alpha = from.a.lerp(&to.a, progress);
     if alpha <= f32::EPSILON {
-        return color(theme::RgbaToken {
-            red: 0.0,
-            green: 0.0,
-            blue: 0.0,
-            alpha: 0.0,
-        });
+        return Rgba::default();
     }
 
     let premultiplied = |from_channel: f32, to_channel: f32| {
-        (from_channel * from.alpha).lerp(&(to_channel * to.alpha), progress) / alpha
+        (from_channel * from.a).lerp(&(to_channel * to.a), progress) / alpha
     };
 
-    color(theme::RgbaToken {
-        red: premultiplied(from.red, to.red),
-        green: premultiplied(from.green, to.green),
-        blue: premultiplied(from.blue, to.blue),
-        alpha,
-    })
+    Rgba {
+        r: premultiplied(from.r, to.r),
+        g: premultiplied(from.g, to.g),
+        b: premultiplied(from.b, to.b),
+        a: alpha,
+    }
 }
 
 pub(super) fn mix_scalar(from: f32, to: f32, progress: f32) -> f32 {

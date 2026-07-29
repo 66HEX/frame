@@ -291,14 +291,19 @@ pub(super) fn audio_track_detail(track: &AudioTrack) -> String {
     if let Some(label) = track.label.as_deref().filter(|value| !value.is_empty()) {
         parts.push(label.to_string());
     }
-    if track.bitrate_kbps.is_some_and(|bitrate| bitrate > 0.0) {
-        parts.push(format_source_bitrate_kbps(track.bitrate_kbps));
-    }
 
     if parts.is_empty() {
         "Source track".to_string()
     } else {
         parts.join(" • ")
+    }
+}
+
+pub(super) fn audio_track_bitrate(track: &AudioTrack) -> String {
+    if track.bitrate_kbps.is_some_and(|bitrate| bitrate > 0.0) {
+        format_source_bitrate_kbps(track.bitrate_kbps)
+    } else {
+        String::new()
     }
 }
 

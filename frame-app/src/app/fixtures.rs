@@ -341,6 +341,22 @@ impl FrameRoot {
             },
         );
         if let Some(file) = self.file_queue.selected_file_mut() {
+            file.config.external_subtitle_tracks = vec![
+                crate::settings::ExternalSubtitleTrack {
+                    path: "/tmp/english-selectable.srt".to_string(),
+                    language: Some("eng".to_string()),
+                    title: Some("English".to_string()),
+                    is_default: true,
+                    is_forced: false,
+                },
+                crate::settings::ExternalSubtitleTrack {
+                    path: "/tmp/signs-and-songs.ass".to_string(),
+                    language: Some("eng".to_string()),
+                    title: Some("Signs & songs".to_string()),
+                    is_default: false,
+                    is_forced: true,
+                },
+            ];
             file.config.subtitle_burn_path = Some("/tmp/dialogue-final.srt".to_string());
             file.config.subtitle_font_name = Some("Arial".to_string());
             file.config.subtitle_font_size = Some("24".to_string());
@@ -349,9 +365,11 @@ impl FrameRoot {
             file.config.subtitle_position = Some("bottom".to_string());
             file.config.selected_subtitle_tracks = vec![2];
         }
+        self.subtitle_ui.external_track_index = Some(0);
     }
     pub(super) fn apply_settings_subtitles_popover_fixture(&mut self) {
         self.apply_settings_subtitles_fixture();
+        self.subtitle_ui.mode = SettingsSubtitleMode::BurnIn;
         self.subtitle_ui.popover = Some(SettingsSubtitlePopover::FontColor);
         self.subtitle_ui.rendered_popover = Some(SettingsSubtitlePopover::FontColor);
         self.subtitle_ui.font_color_draft = "#FFD166".to_string();

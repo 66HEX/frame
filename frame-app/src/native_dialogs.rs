@@ -75,6 +75,12 @@ pub const SUBTITLE_FILE_DIALOG_SPEC: NativeDialogSpec = NativeDialogSpec {
     allows_multiple: false,
 };
 
+pub const EXTERNAL_SUBTITLE_FILE_DIALOG_SPEC: NativeDialogSpec = NativeDialogSpec {
+    title: "Add selectable subtitles",
+    filters: &SUBTITLE_FILE_DIALOG_FILTERS,
+    allows_multiple: true,
+};
+
 pub const OVERLAY_IMAGE_DIALOG_SPEC: NativeDialogSpec = NativeDialogSpec {
     title: "Select overlay image",
     filters: &OVERLAY_IMAGE_DIALOG_FILTERS,
@@ -101,6 +107,14 @@ pub async fn pick_subtitle_file(dialog: AsyncFileDialog) -> Option<PathBuf> {
     dialog.pick_file().await.as_ref().map(file_handle_to_path)
 }
 
+pub async fn pick_external_subtitle_files(dialog: AsyncFileDialog) -> Option<Vec<PathBuf>> {
+    dialog
+        .pick_files()
+        .await
+        .as_deref()
+        .map(file_handles_to_paths)
+}
+
 pub async fn pick_overlay_image_file(dialog: AsyncFileDialog) -> Option<PathBuf> {
     dialog.pick_file().await.as_ref().map(file_handle_to_path)
 }
@@ -123,6 +137,11 @@ pub fn output_folder_dialog(parent: &Window) -> AsyncFileDialog {
 #[must_use]
 pub fn subtitle_file_dialog(parent: &Window) -> AsyncFileDialog {
     file_dialog_from_spec(SUBTITLE_FILE_DIALOG_SPEC).set_parent(parent)
+}
+
+#[must_use]
+pub fn external_subtitle_file_dialog(parent: &Window) -> AsyncFileDialog {
+    file_dialog_from_spec(EXTERNAL_SUBTITLE_FILE_DIALOG_SPEC).set_parent(parent)
 }
 
 #[must_use]
@@ -184,6 +203,10 @@ mod tests {
                 extensions: SUBTITLE_FILE_EXTENSIONS,
             }]
         );
+        assert_eq!(
+            EXTERNAL_SUBTITLE_FILE_DIALOG_SPEC.filters,
+            SUBTITLE_FILE_DIALOG_SPEC.filters
+        );
     }
 
     #[test]
@@ -203,6 +226,7 @@ mod tests {
             assert!(SOURCE_FILE_DIALOG_SPEC.allows_multiple);
             assert!(!SOURCE_FOLDER_DIALOG_SPEC.allows_multiple);
             assert!(!SUBTITLE_FILE_DIALOG_SPEC.allows_multiple);
+            assert!(EXTERNAL_SUBTITLE_FILE_DIALOG_SPEC.allows_multiple);
             assert!(!OVERLAY_IMAGE_DIALOG_SPEC.allows_multiple);
         }
     }

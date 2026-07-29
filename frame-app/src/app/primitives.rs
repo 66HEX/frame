@@ -133,30 +133,27 @@ pub(super) fn apply_button_motion(
     let hover_transition = motion.hover_transition.clone();
     let pressed = motion.pressed.clone();
     let button = button.on_hover(move |hover, _window, cx| {
-        // GPUI suppresses hover while a click is pending; pressed keeps the whole button emphasized.
         let pressed = *pressed.read(cx);
-        retarget_hover_motion(
-            &hover_transition,
-            button_motion_is_emphasized(enabled, *hover, pressed),
-            cx,
-        );
+        if let Some(target) = button_motion_hover_target(enabled, *hover, pressed) {
+            retarget_hover_motion(&hover_transition, target, cx);
+        }
     });
 
-    let hover_transition = motion.hover_transition.clone();
     let pressed = motion.pressed.clone();
     let button = button.on_mouse_down(MouseButton::Left, move |_, window, cx| {
         if enabled {
             set_button_pressed(&pressed, true, cx);
-            retarget_hover_motion(&hover_transition, true, cx);
         }
         button_mouse_down(enabled, window, cx);
     });
 
-    let hover_transition = motion.hover_transition.clone();
     let pressed = motion.pressed.clone();
-    let button = button.on_mouse_up(MouseButton::Left, move |_, _window, cx| {
-        set_button_pressed(&pressed, false, cx);
-        retarget_hover_motion(&hover_transition, enabled, cx);
+    let button = button.capture_any_mouse_up(move |event, _window, cx| {
+        if event.button == MouseButton::Left {
+            set_button_pressed(&pressed, false, cx);
+            // Release before click listeners run: they may stop propagation while updating the
+            // selected state, which would prevent a bubble-phase mouse-up handler from running.
+        }
     });
 
     let hover_transition = motion.hover_transition;
@@ -176,8 +173,12 @@ fn set_button_pressed(pressed: &gpui::Entity<bool>, is_pressed: bool, cx: &mut A
     }
 }
 
-const fn button_motion_is_emphasized(enabled: bool, hovered: bool, pressed: bool) -> bool {
-    enabled && (hovered || pressed)
+const fn button_motion_hover_target(enabled: bool, hovered: bool, pressed: bool) -> Option<bool> {
+    if pressed {
+        None
+    } else {
+        Some(enabled && hovered)
+    }
 }
 
 pub(super) fn button_mouse_down(enabled: bool, window: &mut Window, cx: &mut App) {
@@ -491,19 +492,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn button_motion_emphasis_follows_the_interaction_matrix() {
+    fn button_motion_hover_target_ignores_synthetic_changes_while_pressed() {
         let cases = [
-            (true, true, false, true),
-            (true, false, true, true),
-            (true, false, false, false),
-            (false, true, true, false),
+            (true, true, false, Some(true)),
+            (true, false, false, Some(false)),
+            (false, true, false, Some(false)),
+            (true, true, true, None),
+            (true, false, true, None),
         ];
 
         for (enabled, hovered, pressed, expected) in cases {
             assert_eq!(
-                button_motion_is_emphasized(enabled, hovered, pressed),
+                button_motion_hover_target(enabled, hovered, pressed),
                 expected,
-                "emphasis mismatch for enabled={enabled}, hovered={hovered}, pressed={pressed}"
+                "hover target mismatch for enabled={enabled}, hovered={hovered}, pressed={pressed}"
             );
         }
     }

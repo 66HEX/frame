@@ -38,12 +38,14 @@ pub(in crate::app) enum FrameTextInputKind {
     MetadataDate,
     MetadataComment,
     PresetName,
+    ExternalSubtitleLanguage,
+    ExternalSubtitleTitle,
     SubtitleFontColorHex,
     SubtitleOutlineColorHex,
 }
 
 impl FrameTextInputKind {
-    pub(in crate::app) const ALL: [Self; 18] = [
+    pub(in crate::app) const ALL: [Self; 20] = [
         Self::MaxConcurrency,
         Self::OutputName,
         Self::AudioBitrate,
@@ -60,6 +62,8 @@ impl FrameTextInputKind {
         Self::MetadataDate,
         Self::MetadataComment,
         Self::PresetName,
+        Self::ExternalSubtitleLanguage,
+        Self::ExternalSubtitleTitle,
         Self::SubtitleFontColorHex,
         Self::SubtitleOutlineColorHex,
     ];
@@ -82,6 +86,8 @@ impl FrameTextInputKind {
             Self::MetadataDate => "Metadata date",
             Self::MetadataComment => "Metadata comment",
             Self::PresetName => "Preset name",
+            Self::ExternalSubtitleLanguage => "Selectable subtitle language",
+            Self::ExternalSubtitleTitle => "Selectable subtitle title",
             Self::SubtitleFontColorHex => "Subtitle font color",
             Self::SubtitleOutlineColorHex => "Subtitle outline color",
         }
@@ -198,6 +204,8 @@ pub(in crate::app) struct FrameTextInputStore {
     metadata_date: FrameTextInputRuntime,
     metadata_comment: FrameTextInputRuntime,
     preset_name: FrameTextInputRuntime,
+    external_subtitle_language: FrameTextInputRuntime,
+    external_subtitle_title: FrameTextInputRuntime,
     subtitle_font_color: FrameTextInputRuntime,
     subtitle_outline_color: FrameTextInputRuntime,
 }
@@ -221,6 +229,8 @@ impl FrameTextInputStore {
             FrameTextInputKind::MetadataDate => &self.metadata_date,
             FrameTextInputKind::MetadataComment => &self.metadata_comment,
             FrameTextInputKind::PresetName => &self.preset_name,
+            FrameTextInputKind::ExternalSubtitleLanguage => &self.external_subtitle_language,
+            FrameTextInputKind::ExternalSubtitleTitle => &self.external_subtitle_title,
             FrameTextInputKind::SubtitleFontColorHex => &self.subtitle_font_color,
             FrameTextInputKind::SubtitleOutlineColorHex => &self.subtitle_outline_color,
         }
@@ -247,6 +257,8 @@ impl FrameTextInputStore {
             FrameTextInputKind::MetadataDate => &mut self.metadata_date,
             FrameTextInputKind::MetadataComment => &mut self.metadata_comment,
             FrameTextInputKind::PresetName => &mut self.preset_name,
+            FrameTextInputKind::ExternalSubtitleLanguage => &mut self.external_subtitle_language,
+            FrameTextInputKind::ExternalSubtitleTitle => &mut self.external_subtitle_title,
             FrameTextInputKind::SubtitleFontColorHex => &mut self.subtitle_font_color,
             FrameTextInputKind::SubtitleOutlineColorHex => &mut self.subtitle_outline_color,
         }
@@ -271,6 +283,8 @@ pub(in crate::app) struct FrameTextInputFocusStore {
     metadata_date: Option<FocusHandle>,
     metadata_comment: Option<FocusHandle>,
     preset_name: Option<FocusHandle>,
+    external_subtitle_language: Option<FocusHandle>,
+    external_subtitle_title: Option<FocusHandle>,
     subtitle_font_color: Option<FocusHandle>,
     subtitle_outline_color: Option<FocusHandle>,
 }
@@ -294,6 +308,10 @@ impl FrameTextInputFocusStore {
             FrameTextInputKind::MetadataDate => self.metadata_date.as_ref(),
             FrameTextInputKind::MetadataComment => self.metadata_comment.as_ref(),
             FrameTextInputKind::PresetName => self.preset_name.as_ref(),
+            FrameTextInputKind::ExternalSubtitleLanguage => {
+                self.external_subtitle_language.as_ref()
+            }
+            FrameTextInputKind::ExternalSubtitleTitle => self.external_subtitle_title.as_ref(),
             FrameTextInputKind::SubtitleFontColorHex => self.subtitle_font_color.as_ref(),
             FrameTextInputKind::SubtitleOutlineColorHex => self.subtitle_outline_color.as_ref(),
         }
@@ -320,6 +338,8 @@ impl FrameTextInputFocusStore {
             FrameTextInputKind::MetadataDate => &mut self.metadata_date,
             FrameTextInputKind::MetadataComment => &mut self.metadata_comment,
             FrameTextInputKind::PresetName => &mut self.preset_name,
+            FrameTextInputKind::ExternalSubtitleLanguage => &mut self.external_subtitle_language,
+            FrameTextInputKind::ExternalSubtitleTitle => &mut self.external_subtitle_title,
             FrameTextInputKind::SubtitleFontColorHex => &mut self.subtitle_font_color,
             FrameTextInputKind::SubtitleOutlineColorHex => &mut self.subtitle_outline_color,
         }

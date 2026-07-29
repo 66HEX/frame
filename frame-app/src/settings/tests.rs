@@ -249,14 +249,25 @@ mod audio_track_options {
     }
 
     #[test]
-    fn formats_track_detail_like_original_row_metadata() {
+    fn formats_track_detail_without_trailing_bitrate() {
         let options = audio_track_options(
             &ConversionConfig::default(),
             Some(&metadata_with_tracks()),
             false,
         );
 
-        assert_eq!(options[0].detail, "2 channels • eng • Main • 192 kb/s");
+        assert_eq!(options[0].detail, "2 channels • eng • Main");
+    }
+
+    #[test]
+    fn formats_track_bitrate_as_trailing_metadata() {
+        let options = audio_track_options(
+            &ConversionConfig::default(),
+            Some(&metadata_with_tracks()),
+            false,
+        );
+
+        assert_eq!(options[0].bitrate, "192 kb/s");
     }
 
     #[test]
@@ -324,6 +335,7 @@ mod subtitle_options {
         assert_eq!(config.subtitle_font_name, None);
         assert_eq!(config.subtitle_font_size, None);
         assert_eq!(config.subtitle_font_color, None);
+        assert!(config.external_subtitle_tracks.is_empty());
         assert_eq!(subtitle_position(&config), SubtitlePosition::Bottom);
     }
 
@@ -382,10 +394,99 @@ mod subtitle_options {
     }
 
     #[test]
+    fn external_subtitle_updates_add_unique_files_and_edit_metadata() {
+        let mut config = ConversionConfig::default();
+
+        let selected = add_external_subtitle_tracks(
+            &mut config,
+            [
+                " /tmp/english.srt ".to_string(),
+                "/tmp/english.srt".to_string(),
+            ],
+        );
+
+        assert_eq!(selected, Some(0));
+        assert_eq!(config.external_subtitle_tracks.len(), 1);
+        assert_eq!(config.external_subtitle_tracks[0].path, "/tmp/english.srt");
+        assert!(apply_external_subtitle_language(&mut config, 0, "eng"));
+        assert!(apply_external_subtitle_title(
+            &mut config,
+            0,
+            "English subtitles"
+        ));
+        assert!(apply_external_subtitle_forced(&mut config, 0, true));
+        assert_eq!(
+            config.external_subtitle_tracks[0].language.as_deref(),
+            Some("eng")
+        );
+        assert_eq!(
+            config.external_subtitle_tracks[0].title.as_deref(),
+            Some("English subtitles")
+        );
+        assert!(config.external_subtitle_tracks[0].is_forced);
+    }
+
+    #[test]
+    fn external_subtitle_default_selection_is_exclusive() {
+        let mut config = ConversionConfig::default();
+        assert_eq!(
+            add_external_subtitle_tracks(
+                &mut config,
+                ["/tmp/first.srt".to_string(), "/tmp/second.ass".to_string()]
+            ),
+            Some(1)
+        );
+
+        assert!(apply_external_subtitle_default(&mut config, 0, true));
+        assert!(apply_external_subtitle_default(&mut config, 1, true));
+
+        assert!(!config.external_subtitle_tracks[0].is_default);
+        assert!(config.external_subtitle_tracks[1].is_default);
+    }
+
+    #[test]
+    fn stream_copy_normalization_keeps_selectable_subtitles() {
+        let mut config = ConversionConfig {
+            processing_mode: ProcessingMode::Copy,
+            external_subtitle_tracks: vec![ExternalSubtitleTrack {
+                path: "/tmp/english.srt".to_string(),
+                ..ExternalSubtitleTrack::default()
+            }],
+            subtitle_burn_path: Some("/tmp/burn.srt".to_string()),
+            ..ConversionConfig::default()
+        };
+
+        assert!(normalize_output_config(
+            &mut config,
+            Some(&metadata_with_subtitles())
+        ));
+
+        assert_eq!(config.external_subtitle_tracks.len(), 1);
+        assert_eq!(config.subtitle_burn_path, None);
+    }
+
+    #[test]
+    fn removing_external_subtitle_track_preserves_remaining_order() {
+        let mut config = ConversionConfig::default();
+        add_external_subtitle_tracks(
+            &mut config,
+            ["/tmp/first.srt".to_string(), "/tmp/second.vtt".to_string()],
+        );
+
+        assert!(remove_external_subtitle_track(&mut config, 0));
+        assert!(!remove_external_subtitle_track(&mut config, 4));
+        assert_eq!(config.external_subtitle_tracks[0].path, "/tmp/second.vtt");
+    }
+
+    #[test]
     fn normalize_output_config_clears_subtitle_settings_for_audio_container() {
         let mut config = ConversionConfig {
             container: "mp3".to_string(),
             selected_subtitle_tracks: vec![2],
+            external_subtitle_tracks: vec![ExternalSubtitleTrack {
+                path: "/tmp/soft.srt".to_string(),
+                ..ExternalSubtitleTrack::default()
+            }],
             subtitle_burn_path: Some("/tmp/sub.srt".to_string()),
             subtitle_font_name: Some("Arial".to_string()),
             ..ConversionConfig::default()
@@ -397,6 +498,7 @@ mod subtitle_options {
         ));
 
         assert!(config.selected_subtitle_tracks.is_empty());
+        assert!(config.external_subtitle_tracks.is_empty());
         assert_eq!(config.subtitle_burn_path, None);
         assert_eq!(config.subtitle_font_name, None);
     }

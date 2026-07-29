@@ -13,7 +13,8 @@ use frame_core::{
     preview::{PreviewFfmpegOptions, build_ffmpeg_preview_args},
     probe::{ffprobe_json_args, parse_ffprobe_stdout},
     types::{
-        ConversionConfig, CropConfig, MetadataConfig, MetadataMode, OverlayConfig, ProbeMetadata,
+        ConversionConfig, CropConfig, ExternalSubtitleTrack, MetadataConfig, MetadataMode,
+        OverlayConfig, ProbeMetadata,
     },
 };
 
@@ -632,6 +633,203 @@ fn subtitle_stream_should_transcode_to_mov_text_in_mp4() -> TestResult {
 
 #[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn external_selectable_subtitle_should_survive_stream_copy_with_metadata() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("external_selectable_subtitle")?;
+    let input = sandbox.path("source.mp4");
+    let subtitle = sandbox.path("english.srt");
+    let output = sandbox.path("subtitled.mp4");
+
+    generate_h264_aac_source(&tools, &input, 1.0, 64, 48)?;
+    write_srt(&subtitle)?;
+    let mut config = video_config("mp4", "libx264", "aac");
+    config.processing_mode = "copy".to_string();
+    config.external_subtitle_tracks = vec![ExternalSubtitleTrack {
+        path: path_arg(&subtitle),
+        language: Some("eng".to_string()),
+        title: Some("English".to_string()),
+        is_default: true,
+        is_forced: true,
+    }];
+
+    convert(&tools, &input, &output, &config)?;
+
+    let metadata = probe_media(&tools, &output)?;
+    assert_eq!(metadata.subtitle_tracks.len(), 1);
+    assert_eq!(metadata.subtitle_tracks[0].codec, "mov_text");
+    assert_eq!(metadata.subtitle_tracks[0].language.as_deref(), Some("eng"));
+    assert_eq!(
+        metadata.subtitle_tracks[0].label.as_deref(),
+        Some("English")
+    );
+
+    let probe_args = args(&[
+        "-v",
+        "error",
+        "-select_streams",
+        "s:0",
+        "-show_entries",
+        "stream_disposition=default,forced",
+        "-of",
+        "json",
+        &path_arg(&output),
+    ]);
+    let output_json: serde_json::Value =
+        serde_json::from_slice(&run_tool_output(&tools.ffprobe, &probe_args)?)
+            .map_err(|error| format!("failed to parse subtitle disposition: {error}"))?;
+    let disposition = &output_json["streams"][0]["disposition"];
+    assert_eq!(disposition["default"], 1);
+    assert_eq!(disposition["forced"], 1);
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn external_selectable_subtitle_should_use_each_container_codec_contract() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("external_subtitle_container_matrix")?;
+    let input = sandbox.path("source.mp4");
+    let subtitle = sandbox.path("captions.srt");
+    generate_h264_aac_source(&tools, &input, 1.0, 64, 48)?;
+    write_srt(&subtitle)?;
+
+    for (container, video_codec, audio_codec, expected_subtitle_codec) in [
+        ("mp4", "libx264", "aac", "mov_text"),
+        ("mov", "libx264", "aac", "mov_text"),
+        ("mkv", "libx264", "aac", "subrip"),
+        ("webm", "vp9", "libopus", "webvtt"),
+    ] {
+        let output = sandbox.path(&format!("subtitled.{container}"));
+        let mut config = video_config(container, video_codec, audio_codec);
+        config.external_subtitle_tracks = vec![ExternalSubtitleTrack {
+            path: path_arg(&subtitle),
+            ..ExternalSubtitleTrack::default()
+        }];
+
+        convert(&tools, &input, &output, &config)?;
+
+        let metadata = probe_media(&tools, &output)?;
+        assert_eq!(
+            metadata
+                .subtitle_tracks
+                .first()
+                .map(|track| track.codec.as_str()),
+            Some(expected_subtitle_codec),
+            "unexpected external subtitle codec for {container}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn every_supported_external_subtitle_format_should_embed_in_mkv() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("external_subtitle_format_matrix")?;
+    let input = sandbox.path("source.mp4");
+    generate_h264_aac_source(&tools, &input, 1.0, 64, 48)?;
+
+    for (extension, contents, expected_codec) in [
+        (
+            "srt",
+            "1\n00:00:00,000 --> 00:00:00,900\nSubRip subtitle\n",
+            "subrip",
+        ),
+        (
+            "ass",
+            "[Script Info]\nScriptType: v4.00+\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:00.00,0:00:00.90,Default,,0,0,0,,ASS subtitle\n",
+            "ass",
+        ),
+        (
+            "vtt",
+            "WEBVTT\n\n00:00.000 --> 00:00.900\nWebVTT subtitle\n",
+            "webvtt",
+        ),
+    ] {
+        let subtitle = sandbox.path(&format!("captions.{extension}"));
+        let output = sandbox.path(&format!("subtitled-{extension}.mkv"));
+        fs::write(&subtitle, contents)
+            .map_err(|error| format!("failed to write {}: {error}", subtitle.display()))?;
+        let mut config = video_config("mkv", "libx264", "aac");
+        config.external_subtitle_tracks = vec![ExternalSubtitleTrack {
+            path: path_arg(&subtitle),
+            ..ExternalSubtitleTrack::default()
+        }];
+
+        convert(&tools, &input, &output, &config)?;
+
+        let metadata = probe_media(&tools, &output)?;
+        assert_eq!(
+            metadata
+                .subtitle_tracks
+                .first()
+                .map(|track| track.codec.as_str()),
+            Some(expected_codec),
+            "unexpected MKV subtitle codec for .{extension}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn trimmed_external_selectable_subtitle_should_keep_source_relative_timing() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("trimmed_external_subtitle")?;
+    let input = sandbox.path("source.mp4");
+    let subtitle = sandbox.path("captions.srt");
+    let output = sandbox.path("trimmed.mp4");
+    generate_h264_aac_source(&tools, &input, 3.0, 64, 48)?;
+    fs::write(
+        &subtitle,
+        "1\n00:00:01,200 --> 00:00:02,200\nTrimmed subtitle\n",
+    )
+    .map_err(|error| format!("failed to write {}: {error}", subtitle.display()))?;
+    let mut config = video_config("mp4", "libx264", "aac");
+    config.start_time = Some("00:00:01.000".to_string());
+    config.end_time = Some("00:00:02.500".to_string());
+    config.external_subtitle_tracks = vec![ExternalSubtitleTrack {
+        path: path_arg(&subtitle),
+        ..ExternalSubtitleTrack::default()
+    }];
+
+    convert(&tools, &input, &output, &config)?;
+
+    let packet_args = args(&[
+        "-v",
+        "error",
+        "-select_streams",
+        "s:0",
+        "-show_entries",
+        "packet=pts_time,duration_time,size",
+        "-of",
+        "json",
+        &path_arg(&output),
+    ]);
+    let packets: serde_json::Value =
+        serde_json::from_slice(&run_tool_output(&tools.ffprobe, &packet_args)?)
+            .map_err(|error| format!("failed to parse subtitle packets: {error}"))?;
+    let timed_packet = packets["packets"]
+        .as_array()
+        .and_then(|packets| {
+            packets.iter().find(|packet| {
+                packet["size"]
+                    .as_str()
+                    .and_then(|size| size.parse::<u64>().ok())
+                    .is_some_and(|size| size > 2)
+            })
+        })
+        .ok_or_else(|| "trimmed output has no subtitle payload packet".to_string())?;
+    let pts = timed_packet["pts_time"]
+        .as_str()
+        .and_then(|value| value.parse::<f64>().ok())
+        .ok_or_else(|| "subtitle payload packet has no timestamp".to_string())?;
+    assert!((pts - 0.2).abs() < 0.05, "unexpected subtitle PTS: {pts}");
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 fn metadata_replace_should_write_requested_title() -> TestResult {
     let tools = Toolchain::discover()?;
     let sandbox = Sandbox::new("metadata_replace")?;
@@ -898,6 +1096,7 @@ fn base_config(container: &str, video_codec: &str) -> ConversionConfig {
         audio_filters: frame_core::types::AudioFiltersConfig::default(),
         selected_audio_tracks: Vec::new(),
         selected_subtitle_tracks: Vec::new(),
+        external_subtitle_tracks: Vec::new(),
         subtitle_burn_path: None,
         subtitle_font_name: None,
         subtitle_font_size: None,

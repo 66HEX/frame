@@ -420,6 +420,13 @@ mod tests {
                 "Review MP4".to_string(),
                 ConversionConfig {
                     video_bitrate: "9000".to_string(),
+                    external_subtitle_tracks: vec![crate::settings::ExternalSubtitleTrack {
+                        path: "/tmp/english.srt".to_string(),
+                        language: Some("eng".to_string()),
+                        title: Some("English".to_string()),
+                        is_default: true,
+                        is_forced: false,
+                    }],
                     ..ConversionConfig::default()
                 },
             )],
