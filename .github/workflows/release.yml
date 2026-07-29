@@ -76,7 +76,7 @@ jobs:
           echo "version=$tag"
         } >> "$GITHUB_OUTPUT"
     - name: steps::checkout_verified_commit
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
         ref: ${{ steps.release.outputs.commit_sha }}
@@ -121,7 +121,7 @@ jobs:
       FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY }}
     steps:
     - name: steps::checkout_repo
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
         ref: ${{ needs.prepare_release.outputs.commit_sha }}
@@ -181,7 +181,7 @@ jobs:
       FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY }}
     steps:
     - name: steps::checkout_repo
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
         ref: ${{ needs.prepare_release.outputs.commit_sha }}
@@ -243,7 +243,7 @@ jobs:
       FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY }}
     steps:
     - name: steps::checkout_repo
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
         ref: ${{ needs.prepare_release.outputs.commit_sha }}
@@ -282,7 +282,7 @@ jobs:
       - build_macos_x86_64
     steps:
     - name: steps::checkout_repo
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
         ref: ${{ needs.prepare_release.outputs.commit_sha }}
@@ -335,7 +335,7 @@ jobs:
       FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY }}
     steps:
     - name: steps::checkout_repo
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
         ref: ${{ needs.prepare_release.outputs.commit_sha }}
@@ -374,7 +374,7 @@ jobs:
       - build_macos_aarch64
     steps:
     - name: steps::checkout_repo
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
         ref: ${{ needs.prepare_release.outputs.commit_sha }}
@@ -427,7 +427,7 @@ jobs:
       FRAME_UPDATE_PUBLIC_KEY: ${{ vars.FRAME_UPDATE_PUBLIC_KEY }}
     steps:
     - name: steps::checkout_repo
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
         ref: ${{ needs.prepare_release.outputs.commit_sha }}
@@ -467,7 +467,7 @@ jobs:
       - build_windows_x86_64
     steps:
     - name: steps::checkout_repo
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
         ref: ${{ needs.prepare_release.outputs.commit_sha }}
@@ -510,7 +510,7 @@ jobs:
       TAURI_BRIDGE_RELEASE_TAG: '0.29.3'
     steps:
     - name: steps::checkout_repo
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
         ref: ${{ needs.prepare_release.outputs.commit_sha }}
@@ -816,7 +816,7 @@ jobs:
         echo "HASH_ARM=$(sha256sum target/homebrew/Frame-aarch64.dmg | awk '{print $1}')" >> "$GITHUB_OUTPUT"
         echo "HASH_INTEL=$(sha256sum target/homebrew/Frame-x86_64.dmg | awk '{print $1}')" >> "$GITHUB_OUTPUT"
     - name: release::checkout_tap
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
         repository: 66HEX/homebrew-frame
@@ -894,7 +894,7 @@ jobs:
         fi
     - name: steps::checkout_repo
       if: steps.flathub_token.outputs.configured == 'true'
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
         ref: ${{ needs.prepare_release.outputs.commit_sha }}
@@ -937,7 +937,7 @@ jobs:
           --out target/flathub/repo
     - name: release::checkout_flathub
       if: steps.flathub_token.outputs.configured == 'true'
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
         repository: ${{ env.FLATHUB_REPOSITORY }}
@@ -1014,7 +1014,7 @@ jobs:
           sandbox = true
     - name: release::checkout_nixpkgs
       if: steps.token.outputs.configured == 'true'
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
         repository: ${{ env.NIXPKGS_FORK }}
@@ -1246,7 +1246,7 @@ jobs:
         extra_nix_config: |
           sandbox = true
     - name: release::checkout_nixpkgs
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
         repository: ${{ env.NIXPKGS_FORK }}

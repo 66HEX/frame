@@ -48,7 +48,7 @@ const ACTIONLINT_VERSION: &str = "1.7.12";
 const ACTIONLINT_LINUX_X86_64_SHA256: &str =
     "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8";
 
-const ACTION_CHECKOUT_SHA: &str = "9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0";
+const ACTION_CHECKOUT_SHA: &str = "3d3c42e5aac5ba805825da76410c181273ba90b1";
 const ACTION_UPLOAD_ARTIFACT_SHA: &str = "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a";
 const ACTION_DOWNLOAD_ARTIFACT_SHA: &str = "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c";
 const ACTION_DEPENDENCY_REVIEW_SHA: &str = "a1d282b36b6f3519aa1f3fc636f609c47dddb294";
@@ -1838,11 +1838,11 @@ fn pin_workflow_actions(workflow: &mut String) {
     let action_replacements = [
         (
             "actions/checkout@v4",
-            format!("actions/checkout@{ACTION_CHECKOUT_SHA} # v7.0.0"),
+            format!("actions/checkout@{ACTION_CHECKOUT_SHA} # v7.0.1"),
         ),
         (
             "actions/checkout@v7.0.0",
-            format!("actions/checkout@{ACTION_CHECKOUT_SHA} # v7.0.0"),
+            format!("actions/checkout@{ACTION_CHECKOUT_SHA} # v7.0.1"),
         ),
         (
             "actions/upload-artifact@v4",
