@@ -115,7 +115,7 @@ objc2-app-kit = { version = "0.3", default-features = false, features = [
   "NSGraphics",
 ] }
 semver = { version = "1.0", features = ["serde"] }
-windows-core = "0.61"
+windows-core = "0.62"
 tokio = { version = "1" }
 gpui_util = { git = "https://github.com/zed-industries/zed", rev = "876ec5a8a074ba83cce2129ed4d76b59c05a37e9" }
 
