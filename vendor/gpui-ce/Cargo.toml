@@ -96,7 +96,7 @@ unicode-segmentation = "1.10"
 wasm-bindgen = "0.2.120"
 heck = "0.5"
 proc-macro2 = "1.0.93"
-syn = { version = "2.0.101", features = ["full", "extra-traits", "visit-mut"] }
+syn = { version = "3.0.1", features = ["full", "extra-traits", "visit-mut"] }
 quote = "1.0.9"
 ashpd = { version = "0.13", default-features = false, features = [
   "async-io",

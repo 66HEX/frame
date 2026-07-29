@@ -57,11 +57,12 @@ fn generate_reflected_trait(trait_item: ItemTrait) -> TokenStream {
             let method_name = &method.sig.ident;
 
             // Check if method has self or mut self receiver
-            let has_valid_self_receiver = method
-                .sig
-                .inputs
-                .iter()
-                .any(|arg| matches!(arg, FnArg::Receiver(r) if r.reference.is_none()));
+            let has_valid_self_receiver = method.sig.inputs.iter().any(|arg| {
+                matches!(
+                    arg,
+                    FnArg::Receiver(r) if matches!(&r.kind, syn::ReceiverKind::Value)
+                )
+            });
 
             // Check if method returns Self
             let returns_self = match &method.sig.output {
