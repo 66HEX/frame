@@ -91,6 +91,10 @@ pub(in crate::app) struct SettingsSubtitlesTabState<'a> {
     pub(in crate::app) settings_disabled: bool,
     pub(in crate::app) subtitle_fonts: &'a [String],
     pub(in crate::app) focuses: SettingsSubtitleFocuses<'a>,
+    pub(in crate::app) external_language_focus: Option<&'a FocusHandle>,
+    pub(in crate::app) external_title_focus: Option<&'a FocusHandle>,
+    pub(in crate::app) external_track_index: Option<usize>,
+    pub(in crate::app) mode: SettingsSubtitleMode,
     pub(in crate::app) color_focuses: SettingsSubtitleColorInputFocuses<'a>,
     pub(in crate::app) active_popover: Option<SettingsSubtitlePopover>,
     pub(in crate::app) rendered_popover: Option<SettingsSubtitlePopover>,
@@ -171,57 +175,81 @@ pub(in crate::app) fn settings_subtitles_tab(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let palette = state.palette;
-    let config = state.config;
-    let copy_mode = config.processing_mode == ProcessingMode::Copy;
-    let burn_in_disabled = state.settings_disabled || copy_mode;
     let content = div().flex().flex_col().gap_4().child(
-        settings_section("Burn-in subtitles", palette)
-            .child(settings_subtitle_burn_button(
-                config,
-                burn_in_disabled,
-                state.focuses.burn_file,
-                palette,
-                window,
-                cx,
-            ))
-            .child(settings_hint_text(
-                if copy_mode {
-                    "Burn-in subtitles are disabled in stream copy mode."
-                } else {
-                    "Burning in subtitles will force video re-encoding."
-                },
-                palette,
-            )),
+        settings_section("Subtitle type", palette)
+            .child(settings_subtitle_mode_grid(state.mode, palette, window, cx)),
     );
 
-    let content = if copy_mode {
-        content
-    } else {
-        content.child(
-            settings_section("Style", palette).child(settings_subtitle_style_controls(
-                SettingsSubtitleStyleState {
-                    config,
-                    disabled: burn_in_disabled,
-                    subtitle_fonts: state.subtitle_fonts,
-                    focuses: state.focuses,
-                    color_focuses: state.color_focuses,
-                    active_popover: state.active_popover,
-                    rendered_popover: state.rendered_popover,
-                    font_select_scroll_handle: state.font_select_scroll_handle,
-                    font_size_select_scroll_handle: state.font_size_select_scroll_handle,
-                    font_color_draft: state.font_color_draft,
-                    outline_color_draft: state.outline_color_draft,
-                    font_color_hsv_draft: state.font_color_hsv_draft,
-                    outline_color_hsv_draft: state.outline_color_hsv_draft,
-                    palette,
-                },
+    match state.mode {
+        SettingsSubtitleMode::Selectable => {
+            content.child(settings_selectable_subtitles_content(&state, window, cx))
+        }
+        SettingsSubtitleMode::BurnIn => {
+            content.child(settings_burn_in_subtitles_content(&state, window, cx))
+        }
+    }
+}
+
+fn settings_subtitle_mode_grid(
+    mode: SettingsSubtitleMode,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    div()
+        .grid()
+        .grid_cols(2)
+        .gap_2()
+        .child(
+            frame_choice_button(
+                "settings-subtitle-mode-selectable",
+                "Selectable",
+                mode == SettingsSubtitleMode::Selectable,
+                true,
+                palette,
                 window,
                 cx,
-            )),
+            )
+            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+                cx.stop_propagation();
+                if root.select_subtitle_mode(SettingsSubtitleMode::Selectable) {
+                    cx.notify();
+                }
+            })),
         )
-    };
+        .child(
+            frame_choice_button(
+                "settings-subtitle-mode-burn-in",
+                "Burn-in",
+                mode == SettingsSubtitleMode::BurnIn,
+                true,
+                palette,
+                window,
+                cx,
+            )
+            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+                cx.stop_propagation();
+                if root.select_subtitle_mode(SettingsSubtitleMode::BurnIn) {
+                    cx.notify();
+                }
+            })),
+        )
+}
 
-    let track_options = subtitle_track_options(config, state.metadata, state.settings_disabled);
+fn settings_selectable_subtitles_content(
+    state: &SettingsSubtitlesTabState<'_>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    let palette = state.palette;
+    let content = div()
+        .flex()
+        .flex_col()
+        .gap_4()
+        .child(settings_external_subtitles_section(state, window, cx));
+
+    let track_options =
+        subtitle_track_options(state.config, state.metadata, state.settings_disabled);
     if track_options.is_empty() {
         return content.child(
             settings_section("Source tracks", palette)
@@ -237,43 +265,403 @@ pub(in crate::app) fn settings_subtitles_tab(
     content.child(settings_section("Source tracks", palette).child(list))
 }
 
-fn settings_subtitle_burn_button(
-    config: &ConversionConfig,
-    disabled: bool,
-    burn_file_focus: Option<&FocusHandle>,
+fn settings_burn_in_subtitles_content(
+    state: &SettingsSubtitlesTabState<'_>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    let config = state.config;
+    let palette = state.palette;
+    let copy_mode = config.processing_mode == ProcessingMode::Copy;
+    let burn_in_disabled = state.settings_disabled || copy_mode;
+    let mut burn_in_section = settings_section("Burn-in file", palette)
+        .child(settings_subtitle_load_button(
+            burn_in_disabled,
+            state.focuses.burn_file,
+            palette,
+            window,
+            cx,
+        ))
+        .child(settings_hint_text(
+            if copy_mode {
+                "Burn-in subtitles are disabled in stream copy mode."
+            } else {
+                "Burning in subtitles will force video re-encoding."
+            },
+            palette,
+        ));
+
+    if config.subtitle_burn_path.is_some() {
+        burn_in_section = burn_in_section.child(settings_subtitle_burn_file_row(
+            config,
+            burn_in_disabled,
+            palette,
+            window,
+            cx,
+        ));
+    }
+
+    let content = div().flex().flex_col().gap_4().child(burn_in_section);
+
+    if copy_mode {
+        return content;
+    }
+
+    content.child(
+        settings_section("Style", palette).child(settings_subtitle_style_controls(
+            SettingsSubtitleStyleState {
+                config,
+                disabled: burn_in_disabled,
+                subtitle_fonts: state.subtitle_fonts,
+                focuses: state.focuses,
+                color_focuses: state.color_focuses,
+                active_popover: state.active_popover,
+                rendered_popover: state.rendered_popover,
+                font_select_scroll_handle: state.font_select_scroll_handle,
+                font_size_select_scroll_handle: state.font_size_select_scroll_handle,
+                font_color_draft: state.font_color_draft,
+                outline_color_draft: state.outline_color_draft,
+                font_color_hsv_draft: state.font_color_hsv_draft,
+                outline_color_hsv_draft: state.outline_color_hsv_draft,
+                palette,
+            },
+            window,
+            cx,
+        )),
+    )
+}
+
+fn settings_external_subtitles_section(
+    state: &SettingsSubtitlesTabState<'_>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    let config = state.config;
+    let palette = state.palette;
+    let enabled = !state.settings_disabled;
+    let mut section = settings_section("External files", palette)
+        .child(settings_external_subtitle_add_button(
+            enabled,
+            state.focuses.add_external_files,
+            palette,
+            window,
+            cx,
+        ))
+        .child(settings_hint_text(
+            "Embedded as switchable tracks in the exported file; they are not shown in the preview.",
+            palette,
+        ));
+
+    if config.external_subtitle_tracks.is_empty() {
+        return section.child(settings_hint_text("No external subtitle files", palette));
+    }
+
+    let selected_index = state
+        .external_track_index
+        .filter(|index| *index < config.external_subtitle_tracks.len());
+    let mut list = div().flex().flex_col().gap_2();
+    for (index, track) in config.external_subtitle_tracks.iter().enumerate() {
+        list = list.child(settings_external_subtitle_track_row(
+            index,
+            track,
+            selected_index == Some(index),
+            enabled,
+            palette,
+            window,
+            cx,
+        ));
+    }
+    section = section.child(list);
+
+    if let Some(index) = selected_index {
+        section = section.child(settings_external_subtitle_editor(
+            config,
+            index,
+            enabled,
+            state.external_language_focus,
+            state.external_title_focus,
+            palette,
+            window,
+            cx,
+        ));
+    }
+
+    section
+}
+
+fn settings_external_subtitle_add_button(
+    enabled: bool,
+    focus: Option<&FocusHandle>,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    let button = if let Some(focus) = focus {
+        frame_text_button_with_focus(
+            "settings-subtitle-add-external",
+            "Add subtitle files",
+            ButtonVariant::Secondary,
+            false,
+            enabled,
+            focus,
+            palette,
+            window,
+            cx,
+        )
+    } else {
+        frame_text_button(
+            "settings-subtitle-add-external",
+            "Add subtitle files",
+            ButtonVariant::Secondary,
+            false,
+            enabled,
+            palette,
+            window,
+            cx,
+        )
+    };
+
+    button
+        .w_full()
+        .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
+            cx.stop_propagation();
+            if enabled {
+                root.prompt_external_subtitle_files(window, cx);
+            }
+        }))
+}
+
+fn settings_external_subtitle_track_row(
+    index: usize,
+    track: &crate::settings::ExternalSubtitleTrack,
+    selected: bool,
+    enabled: bool,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let has_path = config.subtitle_burn_path.is_some();
+    let filename = std::path::Path::new(&track.path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(&track.path)
+        .to_string();
+    let mut details = Vec::new();
+    if let Some(language) = track
+        .language
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        details.push(language.trim().to_string());
+    }
+    if track.is_default {
+        details.push("Default".to_string());
+    }
+    if track.is_forced {
+        details.push("Forced".to_string());
+    }
+    let detail = details.join(" • ");
 
     div()
         .flex()
         .items_center()
         .gap_2()
         .child(
-            div()
-                .flex_1()
-                .min_w_0()
-                .child(settings_subtitle_load_button(
-                    config,
-                    disabled,
-                    burn_file_focus,
+            div().flex_1().min_w_0().child(
+                frame_track_list_item(
+                    format!("external-subtitle-track-{index}"),
+                    FrameTrackListItemText {
+                        index_label: format!("#{}", index + 1),
+                        primary: filename,
+                        detail,
+                        trailing: String::new(),
+                        layout: FrameTrackListItemLayout::Compact,
+                    },
+                    selected,
+                    enabled,
                     palette,
                     window,
                     cx,
-                )),
+                )
+                .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+                    cx.stop_propagation();
+                    if enabled && root.subtitle_ui.external_track_index != Some(index) {
+                        root.subtitle_ui.external_track_index = Some(index);
+                        cx.notify();
+                    }
+                })),
+            ),
         )
-        .child(settings_subtitle_clear_button(
-            disabled || !has_path,
-            palette,
-            window,
-            cx,
-        ))
+        .child(
+            frame_icon_button(
+                format!("external-subtitle-remove-{index}"),
+                assets::ICON_TRASH,
+                format!("Remove selectable subtitle {}", index + 1),
+                FrameIconButtonVariant::DestructiveGhost,
+                enabled,
+                FrameIconButtonSize {
+                    button: SETTINGS_CONTROL_HEIGHT,
+                    icon: FRAME_ICON_SM_SIZE,
+                },
+                palette,
+                window,
+                cx,
+            )
+            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+                cx.stop_propagation();
+                if !enabled {
+                    return;
+                }
+                let mut remaining = None;
+                let changed = root.update_selected_config(|config| {
+                    let changed = remove_external_subtitle_track(config, index);
+                    remaining = Some(config.external_subtitle_tracks.len());
+                    changed
+                });
+                if changed {
+                    let remaining = remaining.unwrap_or_default();
+                    root.subtitle_ui.external_track_index =
+                        match root.subtitle_ui.external_track_index {
+                            Some(_) if remaining == 0 => None,
+                            Some(selected) if selected > index => Some(selected - 1),
+                            Some(selected) if selected == index => Some(index.min(remaining - 1)),
+                            selected => selected,
+                        };
+                    cx.notify();
+                }
+            })),
+        )
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "The editor follows the explicit settings-control render contract used across the panel."
+)]
+#[expect(
+    clippy::too_many_lines,
+    reason = "The compact sidecar editor keeps its paired fields and track flags in one render unit."
+)]
+fn settings_external_subtitle_editor(
+    config: &ConversionConfig,
+    index: usize,
+    enabled: bool,
+    language_focus: Option<&FocusHandle>,
+    title_focus: Option<&FocusHandle>,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    let track = &config.external_subtitle_tracks[index];
+    let language = track.language.as_deref().unwrap_or_default();
+    let title = track.title.as_deref().unwrap_or_default();
+    let is_default = track.is_default;
+    let is_forced = track.is_forced;
+
+    div()
+        .flex()
+        .flex_col()
+        .gap_3()
+        .pt(theme::ui_rem(4.0))
+        .child(
+            div()
+                .grid()
+                .grid_cols(2)
+                .gap_2()
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap_2()
+                        .child(settings_field_label("Language", palette))
+                        .child(frame_text_input(
+                            FrameTextInputSpec {
+                                id: "settings-external-subtitle-language",
+                                value: language,
+                                placeholder: "e.g. eng",
+                                disabled: !enabled,
+                                focus: language_focus,
+                                kind: FrameTextInputKind::ExternalSubtitleLanguage,
+                            },
+                            palette,
+                            window,
+                            cx,
+                        )),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap_2()
+                        .child(settings_field_label("Title", palette))
+                        .child(frame_text_input(
+                            FrameTextInputSpec {
+                                id: "settings-external-subtitle-title",
+                                value: title,
+                                placeholder: "Optional label",
+                                disabled: !enabled,
+                                focus: title_focus,
+                                kind: FrameTextInputKind::ExternalSubtitleTitle,
+                            },
+                            palette,
+                            window,
+                            cx,
+                        )),
+                ),
+        )
+        .child(
+            div()
+                .grid()
+                .grid_cols(2)
+                .gap_2()
+                .child(
+                    frame_choice_button(
+                        "settings-external-subtitle-default",
+                        "Default",
+                        is_default,
+                        enabled,
+                        palette,
+                        window,
+                        cx,
+                    )
+                    .on_click(cx.listener(
+                        move |root, _: &ClickEvent, _window, cx| {
+                            cx.stop_propagation();
+                            if enabled
+                                && root.update_selected_config(|config| {
+                                    apply_external_subtitle_default(config, index, !is_default)
+                                })
+                            {
+                                cx.notify();
+                            }
+                        },
+                    )),
+                )
+                .child(
+                    frame_choice_button(
+                        "settings-external-subtitle-forced",
+                        "Forced",
+                        is_forced,
+                        enabled,
+                        palette,
+                        window,
+                        cx,
+                    )
+                    .on_click(cx.listener(
+                        move |root, _: &ClickEvent, _window, cx| {
+                            cx.stop_propagation();
+                            if enabled
+                                && root.update_selected_config(|config| {
+                                    apply_external_subtitle_forced(config, index, !is_forced)
+                                })
+                            {
+                                cx.notify();
+                            }
+                        },
+                    )),
+                ),
+        )
 }
 
 fn settings_subtitle_load_button(
-    config: &ConversionConfig,
     disabled: bool,
     focus: Option<&FocusHandle>,
     palette: &'static theme::ThemePalette,
@@ -285,13 +673,7 @@ fn settings_subtitle_load_button(
     let background = animated.background;
     let foreground = animated.foreground;
     let motion = animated.motion;
-    let has_path = config.subtitle_burn_path.is_some();
-    let label = subtitle_burn_file_label(config);
-    let display_label = if has_path {
-        label.clone()
-    } else {
-        theme::ui_text_owned(label.clone())
-    };
+    let label = "Add subtitle file";
 
     let button = div()
         .id("settings-subtitle-burn-file")
@@ -320,7 +702,7 @@ fn settings_subtitle_load_button(
             }
             root.prompt_subtitle_burn_file(window, cx);
         }))
-        .child(div().truncate().child(display_label));
+        .child(theme::ui_text(label));
 
     let button = apply_button_motion(button, motion, !disabled);
 
@@ -329,6 +711,42 @@ fn settings_subtitle_load_button(
     } else {
         apply_accessible_button(button, label, !disabled, palette)
     }
+}
+
+fn settings_subtitle_burn_file_row(
+    config: &ConversionConfig,
+    disabled: bool,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    let label = subtitle_burn_file_label(config);
+    let colors = button_colors(ButtonVariant::Secondary, false, !disabled, palette);
+
+    div()
+        .flex()
+        .items_center()
+        .gap_2()
+        .child(
+            div()
+                .h(theme::ui_rem(SETTINGS_CONTROL_HEIGHT))
+                .min_w_0()
+                .flex_1()
+                .flex()
+                .items_center()
+                .rounded(theme::ui_rem(theme::RADIUS_SM))
+                .px(theme::ui_rem(10.0))
+                .bg(color(colors.background))
+                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
+                .font_weight(theme::TEXT_WEIGHT_MEDIUM)
+                .text_color(color(colors.foreground))
+                .opacity(colors.opacity)
+                .shadow(button_highlight_shadows(palette))
+                .child(div().min_w_0().truncate().child(label)),
+        )
+        .child(settings_subtitle_clear_button(
+            disabled, palette, window, cx,
+        ))
 }
 
 fn settings_subtitle_clear_button(
@@ -1627,6 +2045,19 @@ fn subtitle_hue_hsv_for_key(hsv: SettingsSubtitleHsv, key: &str) -> Option<Setti
 }
 
 impl FrameRoot {
+    pub(in crate::app) fn select_subtitle_mode(&mut self, mode: SettingsSubtitleMode) -> bool {
+        if self.subtitle_ui.mode == mode {
+            return false;
+        }
+
+        self.subtitle_ui.mode = mode;
+        if mode == SettingsSubtitleMode::Selectable {
+            self.subtitle_ui.popover = None;
+            self.subtitle_ui.rendered_popover = None;
+        }
+        true
+    }
+
     pub(in crate::app) fn toggle_subtitle_popover(&mut self, popover: SettingsSubtitlePopover) {
         if self.subtitle_ui.popover == Some(popover) {
             self.subtitle_ui.popover = None;
@@ -1974,23 +2405,17 @@ pub(in crate::app) fn settings_subtitle_track_button(
 ) -> gpui::Stateful<gpui::Div> {
     let index = option.index;
     let is_enabled = !option.is_disabled;
-    let detail = option.detail;
-    let detail = if detail.is_empty() {
-        String::new()
-    } else {
-        format!("• {detail}")
-    };
-
     frame_track_list_item(
         format!("subtitle-track-{index}"),
         FrameTrackListItemText {
             index_label: option.index_label,
             primary: option.codec,
-            detail,
+            detail: option.detail,
+            trailing: String::new(),
+            layout: FrameTrackListItemLayout::Compact,
         },
         option.is_selected,
         is_enabled,
-        FrameTrackListItemLayout::Inline,
         palette,
         window,
         cx,

@@ -87,7 +87,10 @@ fn metadata_from_ffprobe(file_path: &str, probe_data: FfprobeOutput) -> ProbeMet
         let Some(codec) = recognized_codec_name(stream.codec_name.as_deref()) else {
             continue;
         };
-        let label = stream.tags.as_ref().and_then(|t| t.title.clone());
+        let label = stream
+            .tags
+            .as_ref()
+            .and_then(|tags| tags.title.clone().or_else(|| tags.handler_name.clone()));
         let language = stream.tags.as_ref().and_then(|t| t.language.clone());
         let track_bitrate = parse_probe_bitrate(stream.bit_rate.as_deref());
 
@@ -112,7 +115,10 @@ fn metadata_from_ffprobe(file_path: &str, probe_data: FfprobeOutput) -> ProbeMet
         let Some(codec) = recognized_codec_name(stream.codec_name.as_deref()) else {
             continue;
         };
-        let label = stream.tags.as_ref().and_then(|t| t.title.clone());
+        let label = stream
+            .tags
+            .as_ref()
+            .and_then(|tags| tags.title.clone().or_else(|| tags.handler_name.clone()));
         let language = stream.tags.as_ref().and_then(|t| t.language.clone());
 
         metadata.subtitle_tracks.push(SubtitleTrack {

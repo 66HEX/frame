@@ -1,8 +1,8 @@
 use super::{
     ButtonVariant, Context, FluentBuilder, FrameRoot, InteractiveElement, ParentElement,
-    SETTINGS_CONTROL_HEIGHT, StatefulInteractiveElement, Styled, Window, animated_button_colors,
-    apply_accessible_toggle_button, apply_button_motion, button_colors, button_highlight_shadows,
-    button_motion, color, div, frame_selection_dot, mix_color, mix_scalar, selected_motion, theme,
+    SETTINGS_CONTROL_HEIGHT, Styled, Window, apply_accessible_toggle_button, apply_button_motion,
+    button_colors, button_highlight_shadows, button_motion, color, div, frame_selection_dot,
+    mix_color, mix_rgba, mix_scalar, selected_motion, theme,
 };
 
 pub(in crate::app) fn frame_list_item(
@@ -97,89 +97,68 @@ pub(in crate::app) fn frame_list_item_with_caption(
         )
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(in crate::app) enum FrameTrackListItemLayout {
-    Inline,
-    Stacked,
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub(in crate::app) struct FrameTrackListItemText {
     pub(in crate::app) index_label: String,
     pub(in crate::app) primary: String,
     pub(in crate::app) detail: String,
+    pub(in crate::app) trailing: String,
+    pub(in crate::app) layout: FrameTrackListItemLayout,
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "The track-item builder keeps layout, interaction state, palette, and render context explicit."
-)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::app) enum FrameTrackListItemLayout {
+    Compact,
+    Detailed,
+}
+
 pub(in crate::app) fn frame_track_list_item(
     id: impl Into<String>,
     text: FrameTrackListItemText,
     selected: bool,
     enabled: bool,
-    layout: FrameTrackListItemLayout,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let id = id.into();
-    let colors = button_colors(ButtonVariant::Secondary, selected, enabled, palette);
-    let animated = animated_button_colors(id.clone(), colors, window, cx);
-    let background = animated.background;
-    let foreground = animated.foreground;
-    let motion = animated.motion;
-    let FrameTrackListItemText {
-        index_label,
-        primary,
-        detail,
-    } = text;
-    let accessible_label = if detail.is_empty() {
-        primary.clone()
-    } else {
-        format!("{primary}, {detail}")
-    };
-
-    let label_row = div()
-        .min_w_0()
-        .flex()
-        .items_center()
-        .gap_2()
-        .child(
-            div()
-                .text_color(color(palette.text_muted))
-                .font_weight(theme::TEXT_WEIGHT_REGULAR)
-                .child(index_label),
-        )
-        .child(div().text_color(color(palette.text_primary)).child(primary));
-
-    let content = match layout {
-        FrameTrackListItemLayout::Inline => label_row.when(!detail.is_empty(), |this| {
-            this.child(
-                div()
-                    .truncate()
-                    .font_weight(theme::TEXT_WEIGHT_REGULAR)
-                    .text_color(color(palette.text_muted))
-                    .child(detail),
-            )
-        }),
-        FrameTrackListItemLayout::Stacked => div()
-            .min_w_0()
-            .flex()
-            .flex_col()
-            .gap_1()
-            .child(label_row)
-            .when(!detail.is_empty(), |this| {
-                this.child(
-                    div()
-                        .truncate()
-                        .font_weight(theme::TEXT_WEIGHT_REGULAR)
-                        .text_color(color(palette.text_muted))
-                        .child(detail),
-                )
-            }),
-    };
+    let resting_colors = button_colors(ButtonVariant::Secondary, false, enabled, palette);
+    let selected_colors = button_colors(ButtonVariant::Secondary, true, enabled, palette);
+    let selected_progress = selected_motion(format!("{id}-selected"), selected, window, cx);
+    let motion = button_motion(id.clone(), window, cx);
+    let hover_progress = *motion.hover_transition.evaluate(window, cx);
+    let background = mix_rgba(
+        mix_color(
+            resting_colors.background,
+            selected_colors.background,
+            selected_progress,
+        ),
+        mix_color(
+            resting_colors.hover_background,
+            selected_colors.hover_background,
+            selected_progress,
+        ),
+        hover_progress,
+    );
+    let foreground = mix_rgba(
+        mix_color(
+            resting_colors.foreground,
+            selected_colors.foreground,
+            selected_progress,
+        ),
+        mix_color(
+            resting_colors.hover_foreground,
+            selected_colors.hover_foreground,
+            selected_progress,
+        ),
+        hover_progress,
+    );
+    let opacity = mix_scalar(
+        resting_colors.opacity,
+        selected_colors.opacity,
+        selected_progress,
+    );
+    let (label, accessible_label) = frame_track_list_item_label(text, palette);
 
     let item = div()
         .id(id)
@@ -196,17 +175,99 @@ pub(in crate::app) fn frame_track_list_item(
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
-        .opacity(colors.opacity)
+        .opacity(opacity)
         .shadow(button_highlight_shadows(palette))
-        .when(enabled, |this| {
-            this.hover(gpui::Styled::cursor_pointer)
-                .active(move |style| style.bg(color(colors.active_background)))
-        })
+        .when(enabled, |this| this.hover(gpui::Styled::cursor_pointer))
         .when(!enabled, gpui::Styled::cursor_not_allowed)
-        .child(content)
-        .child(frame_selection_dot(selected, palette));
+        .child(label)
+        .child(frame_selection_dot(selected_progress, palette));
 
     let item = apply_button_motion(item, motion, enabled);
 
     apply_accessible_toggle_button(item, accessible_label, enabled, selected, palette)
+}
+
+fn frame_track_list_item_label(
+    text: FrameTrackListItemText,
+    palette: &'static theme::ThemePalette,
+) -> (gpui::Div, String) {
+    let FrameTrackListItemText {
+        index_label,
+        primary,
+        detail,
+        trailing,
+        layout,
+    } = text;
+    let accessible_label = [primary.as_str(), detail.as_str(), trailing.as_str()]
+        .into_iter()
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    let index = div()
+        .flex_none()
+        .text_color(color(palette.text_muted))
+        .font_weight(theme::TEXT_WEIGHT_REGULAR)
+        .child(index_label);
+    let primary_label = div()
+        .flex_none()
+        .text_color(color(palette.text_primary))
+        .child(primary);
+
+    let label = match layout {
+        FrameTrackListItemLayout::Compact => div()
+            .min_w_0()
+            .flex_1()
+            .flex()
+            .items_center()
+            .gap_2()
+            .child(index)
+            .child(primary_label)
+            .when(!detail.is_empty(), |this| {
+                this.child(
+                    div()
+                        .min_w_0()
+                        .flex_1()
+                        .truncate()
+                        .font_weight(theme::TEXT_WEIGHT_REGULAR)
+                        .text_color(color(palette.text_muted))
+                        .child(format!("• {detail}")),
+                )
+            }),
+        FrameTrackListItemLayout::Detailed => div()
+            .min_w_0()
+            .flex_1()
+            .flex()
+            .flex_col()
+            .gap_1()
+            .child(
+                div()
+                    .min_w_0()
+                    .w_full()
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .child(index)
+                    .child(primary_label),
+            )
+            .when(!detail.is_empty() || !trailing.is_empty(), |this| {
+                let metadata = match (detail.is_empty(), trailing.is_empty()) {
+                    (false, false) => format!("{detail} • {trailing}"),
+                    (false, true) => detail,
+                    (true, false) => trailing,
+                    (true, true) => String::new(),
+                };
+                this.child(
+                    div()
+                        .min_w_0()
+                        .w_full()
+                        .truncate()
+                        .font_features(crate::assets::frame_tabular_number_font_features())
+                        .font_weight(theme::TEXT_WEIGHT_REGULAR)
+                        .text_color(color(palette.text_muted))
+                        .child(metadata),
+                )
+            }),
+    };
+    (label, accessible_label)
 }

@@ -5,8 +5,9 @@
 
 use super::*;
 use crate::settings::{
-    AudioFiltersConfig, CropSettings, DeinterlaceMode, FilterStrength, FilterValue, MetadataConfig,
-    MetadataMode, ProcessingMode, VideoColorFiltersConfig, VideoFiltersConfig,
+    AudioFiltersConfig, CropSettings, DeinterlaceMode, ExternalSubtitleTrack, FilterStrength,
+    FilterValue, MetadataConfig, MetadataMode, ProcessingMode, VideoColorFiltersConfig,
+    VideoFiltersConfig,
 };
 use std::{
     fs,
@@ -31,6 +32,13 @@ fn core_config_from_gpui_preserves_active_conversion_fields() {
         audio_channels: "stereo".to_string(),
         audio_volume: 125,
         audio_normalize: true,
+        external_subtitle_tracks: vec![ExternalSubtitleTrack {
+            path: "/tmp/dialogue.srt".to_string(),
+            language: Some("eng".to_string()),
+            title: Some("English".to_string()),
+            is_default: true,
+            is_forced: false,
+        }],
         video_filters: VideoFiltersConfig {
             color: VideoColorFiltersConfig {
                 brightness: FilterValue {
@@ -214,6 +222,13 @@ fn core_config_from_gpui_preserves_active_conversion_fields() {
     assert!(core.flip_vertical);
     assert_eq!(core.selected_audio_tracks, [1, 2]);
     assert_eq!(core.selected_subtitle_tracks, [3]);
+    assert_eq!(core.external_subtitle_tracks.len(), 1);
+    assert_eq!(core.external_subtitle_tracks[0].path, "/tmp/dialogue.srt");
+    assert_eq!(
+        core.external_subtitle_tracks[0].language.as_deref(),
+        Some("eng")
+    );
+    assert!(core.external_subtitle_tracks[0].is_default);
     assert_eq!(
         core.subtitle_burn_path.as_deref(),
         Some("/tmp/dialogue.srt")

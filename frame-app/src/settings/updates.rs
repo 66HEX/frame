@@ -4,14 +4,14 @@ use super::{
         DEFAULT_AUDIO_BITRATE_MODE, DEFAULT_AUDIO_CHANNELS, DEFAULT_AUDIO_QUALITY,
         DEFAULT_AUDIO_VOLUME, DEFAULT_FPS, DEFAULT_GIF_DITHER, DEFAULT_IMAGE_JPEG_HUFFMAN,
         DEFAULT_IMAGE_PNG_PREDICTION, DEFAULT_IMAGE_TIFF_COMPRESSION, DEFAULT_IMAGE_WEBP_PRESET,
-        DEFAULT_PIXEL_FORMAT, DEFAULT_RESOLUTION, DEFAULT_VIDEO_BITRATE_MODE, FPS_OPTIONS,
-        GIF_DITHER_OPTIONS, GIF_FPS_OPTIONS, IMAGE_JPEG_HUFFMAN_OPTIONS,
-        IMAGE_PNG_PREDICTION_OPTIONS, IMAGE_TIFF_COMPRESSION_OPTIONS, IMAGE_WEBP_PRESET_OPTIONS,
-        MAX_AUDIO_VOLUME, MAX_GIF_COLORS, MAX_GIF_LOOP, MAX_IMAGE_JPEG_QUALITY,
-        MAX_IMAGE_PNG_COMPRESSION, MAX_IMAGE_WEBP_COMPRESSION, MAX_IMAGE_WEBP_QUALITY,
-        MetadataField, MetadataMode, PresetDefinition, ProcessingMode, RESOLUTION_OPTIONS,
-        SCALING_ALGORITHM_OPTIONS, SUBTITLE_FONT_SIZES, SourceKind, SourceMetadata,
-        SubtitlePosition, VIDEO_CODEC_DEFINITIONS, VIDEO_PIXEL_FORMAT_DEFINITIONS,
+        DEFAULT_PIXEL_FORMAT, DEFAULT_RESOLUTION, DEFAULT_VIDEO_BITRATE_MODE,
+        ExternalSubtitleTrack, FPS_OPTIONS, GIF_DITHER_OPTIONS, GIF_FPS_OPTIONS,
+        IMAGE_JPEG_HUFFMAN_OPTIONS, IMAGE_PNG_PREDICTION_OPTIONS, IMAGE_TIFF_COMPRESSION_OPTIONS,
+        IMAGE_WEBP_PRESET_OPTIONS, MAX_AUDIO_VOLUME, MAX_GIF_COLORS, MAX_GIF_LOOP,
+        MAX_IMAGE_JPEG_QUALITY, MAX_IMAGE_PNG_COMPRESSION, MAX_IMAGE_WEBP_COMPRESSION,
+        MAX_IMAGE_WEBP_QUALITY, MetadataField, MetadataMode, PresetDefinition, ProcessingMode,
+        RESOLUTION_OPTIONS, SCALING_ALGORITHM_OPTIONS, SUBTITLE_FONT_SIZES, SourceKind,
+        SourceMetadata, SubtitlePosition, VIDEO_CODEC_DEFINITIONS, VIDEO_PIXEL_FORMAT_DEFINITIONS,
     },
     options::{
         first_allowed_video_codec, first_allowed_video_pixel_format, first_allowed_video_preset,
@@ -203,6 +203,111 @@ pub fn apply_subtitle_burn_path(config: &mut ConversionConfig, path: Option<Stri
 
     config.subtitle_burn_path = path;
     true
+}
+
+pub fn add_external_subtitle_tracks(
+    config: &mut ConversionConfig,
+    paths: impl IntoIterator<Item = String>,
+) -> Option<usize> {
+    let mut last_added = None;
+    for path in paths {
+        let path = path.trim();
+        if path.is_empty()
+            || config
+                .external_subtitle_tracks
+                .iter()
+                .any(|track| track.path == path)
+        {
+            continue;
+        }
+
+        config.external_subtitle_tracks.push(ExternalSubtitleTrack {
+            path: path.to_string(),
+            ..ExternalSubtitleTrack::default()
+        });
+        last_added = Some(config.external_subtitle_tracks.len() - 1);
+    }
+    last_added
+}
+
+pub fn remove_external_subtitle_track(config: &mut ConversionConfig, index: usize) -> bool {
+    if index >= config.external_subtitle_tracks.len() {
+        return false;
+    }
+    config.external_subtitle_tracks.remove(index);
+    true
+}
+
+pub fn apply_external_subtitle_language(
+    config: &mut ConversionConfig,
+    index: usize,
+    language: &str,
+) -> bool {
+    let Some(track) = config.external_subtitle_tracks.get_mut(index) else {
+        return false;
+    };
+    let language = normalize_subtitle_metadata_value(language);
+    if track.language == language {
+        return false;
+    }
+    track.language = language;
+    true
+}
+
+pub fn apply_external_subtitle_title(
+    config: &mut ConversionConfig,
+    index: usize,
+    title: &str,
+) -> bool {
+    let Some(track) = config.external_subtitle_tracks.get_mut(index) else {
+        return false;
+    };
+    let title = normalize_subtitle_metadata_value(title);
+    if track.title == title {
+        return false;
+    }
+    track.title = title;
+    true
+}
+
+pub fn apply_external_subtitle_default(
+    config: &mut ConversionConfig,
+    index: usize,
+    is_default: bool,
+) -> bool {
+    if index >= config.external_subtitle_tracks.len() {
+        return false;
+    }
+
+    let mut changed = false;
+    for (track_index, track) in config.external_subtitle_tracks.iter_mut().enumerate() {
+        let next = is_default && track_index == index;
+        if track.is_default != next && (track_index == index || is_default) {
+            track.is_default = next;
+            changed = true;
+        }
+    }
+    changed
+}
+
+pub fn apply_external_subtitle_forced(
+    config: &mut ConversionConfig,
+    index: usize,
+    is_forced: bool,
+) -> bool {
+    let Some(track) = config.external_subtitle_tracks.get_mut(index) else {
+        return false;
+    };
+    if track.is_forced == is_forced {
+        return false;
+    }
+    track.is_forced = is_forced;
+    true
+}
+
+fn normalize_subtitle_metadata_value(value: &str) -> Option<String> {
+    let value: String = value.chars().filter(|ch| !ch.is_control()).collect();
+    (!value.trim().is_empty()).then_some(value)
 }
 
 pub fn apply_subtitle_font_name(config: &mut ConversionConfig, font: &str) -> bool {
@@ -866,6 +971,7 @@ fn reset_audio_filter_settings(config: &mut ConversionConfig) {
 
 fn reset_subtitle_settings(config: &mut ConversionConfig) {
     config.selected_subtitle_tracks.clear();
+    config.external_subtitle_tracks.clear();
     config.subtitle_burn_path = None;
     config.subtitle_font_name = None;
     config.subtitle_font_size = None;

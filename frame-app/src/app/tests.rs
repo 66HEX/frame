@@ -1330,6 +1330,50 @@ mod frame_root_conversion {
     }
 
     #[test]
+    fn external_subtitle_inputs_edit_the_selected_sidecar_only() {
+        let mut root = FrameRoot::new();
+        root.file_queue
+            .add_file(FileItem::from_path("first", "/tmp/one.mp4", 1));
+        root.file_queue
+            .selected_file_mut()
+            .unwrap()
+            .config
+            .external_subtitle_tracks = vec![
+            crate::settings::ExternalSubtitleTrack {
+                path: "/tmp/first.srt".to_string(),
+                language: Some("eng".to_string()),
+                ..crate::settings::ExternalSubtitleTrack::default()
+            },
+            crate::settings::ExternalSubtitleTrack {
+                path: "/tmp/second.srt".to_string(),
+                title: Some("Signs".to_string()),
+                ..crate::settings::ExternalSubtitleTrack::default()
+            },
+        ];
+        root.subtitle_ui.external_track_index = Some(1);
+        root.text_input_runtime_mut(FrameTextInputKind::ExternalSubtitleTitle)
+            .selected_range = 5..5;
+
+        assert!(root.replace_text_input_range(
+            FrameTextInputKind::ExternalSubtitleTitle,
+            None,
+            " & songs",
+            None,
+            false,
+        ));
+
+        let tracks = &root
+            .file_queue
+            .selected_file()
+            .unwrap()
+            .config
+            .external_subtitle_tracks;
+        assert_eq!(tracks[0].language.as_deref(), Some("eng"));
+        assert_eq!(tracks[0].title, None);
+        assert_eq!(tracks[1].title.as_deref(), Some("Signs & songs"));
+    }
+
+    #[test]
     fn preset_name_input_inserts_free_text_at_selection() {
         let mut root = FrameRoot::new();
         root.file_queue
@@ -1491,6 +1535,32 @@ mod frame_root_conversion {
                 .and_then(|file| file.config.subtitle_font_color.as_deref()),
             Some("#8000ff")
         );
+    }
+
+    #[test]
+    fn subtitle_mode_switch_changes_only_the_visible_editor() {
+        let mut root = FrameRoot::new();
+        root.file_queue
+            .add_file(FileItem::from_path("first", "/tmp/one.mp4", 1));
+        let config = &mut root.file_queue.selected_file_mut().unwrap().config;
+        config.subtitle_burn_path = Some("/tmp/burn.srt".to_string());
+        config.external_subtitle_tracks = vec![crate::settings::ExternalSubtitleTrack {
+            path: "/tmp/selectable.srt".to_string(),
+            language: Some("eng".to_string()),
+            ..crate::settings::ExternalSubtitleTrack::default()
+        }];
+
+        assert_eq!(root.subtitle_ui.mode, SettingsSubtitleMode::Selectable);
+        assert!(!root.select_subtitle_mode(SettingsSubtitleMode::Selectable));
+        assert!(root.select_subtitle_mode(SettingsSubtitleMode::BurnIn));
+        root.toggle_subtitle_popover(SettingsSubtitlePopover::FontName);
+        assert!(root.select_subtitle_mode(SettingsSubtitleMode::Selectable));
+
+        let config = &root.file_queue.selected_file().unwrap().config;
+        assert_eq!(config.subtitle_burn_path.as_deref(), Some("/tmp/burn.srt"));
+        assert_eq!(config.external_subtitle_tracks.len(), 1);
+        assert_eq!(root.subtitle_ui.popover, None);
+        assert_eq!(root.subtitle_ui.rendered_popover, None);
     }
 
     #[test]
@@ -3857,6 +3927,10 @@ mod preview_shell {
                 comment: None,
             },
             subtitle_focuses: SettingsSubtitleFocuses::default(),
+            external_subtitle_language_focus: None,
+            external_subtitle_title_focus: None,
+            external_subtitle_track_index: None,
+            subtitle_mode: SettingsSubtitleMode::Selectable,
             subtitle_color_focuses: SettingsSubtitleColorInputFocuses {
                 font: None,
                 outline: None,

@@ -22,7 +22,7 @@ use super::{
         is_video_pixel_format_allowed_for_container, is_video_stream_codec_allowed_for_container,
         source_kind_for,
     },
-    source_info::{audio_track_detail, display_source_value},
+    source_info::{audio_track_bitrate, audio_track_detail, display_source_value},
 };
 
 #[must_use]
@@ -137,6 +137,7 @@ pub fn audio_track_options(
                     index_label: format!("#{}", track.index),
                     codec: display_source_value(Some(&track.codec)),
                     detail: audio_track_detail(track),
+                    bitrate: audio_track_bitrate(track),
                     is_selected: config.selected_audio_tracks.contains(&track.index),
                     is_disabled: disabled,
                 })

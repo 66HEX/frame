@@ -34,8 +34,8 @@ use input::{FrameTextInputKind, FrameTextInputUiState};
 use logs_panel::logs_view;
 use motion::{
     INTERACTION_MOTION_DURATION, SURFACE_MOTION_DURATION, contextual_icon_motion, hover_motion,
-    mix_color, mix_scalar, motion_is_hidden, motion_target, retarget_hover_motion, selected_motion,
-    set_motion_target, settings_sheet_right_inset, subtitle_popover_slide_offset,
+    mix_color, mix_rgba, mix_scalar, motion_is_hidden, motion_target, retarget_hover_motion,
+    selected_motion, set_motion_target, settings_sheet_right_inset, subtitle_popover_slide_offset,
 };
 use preview_panel::{
     FlipAxis, PreviewCanvasRenderState, PreviewCropRenderState, PreviewMediaRenderState,
@@ -88,7 +88,8 @@ use crate::{
     },
     format_total_size,
     native_dialogs::{
-        output_folder_dialog, overlay_image_dialog, pick_output_folder, pick_overlay_image_file,
+        external_subtitle_file_dialog, output_folder_dialog, overlay_image_dialog,
+        pick_external_subtitle_files, pick_output_folder, pick_overlay_image_file,
         pick_source_files, pick_source_folder, pick_subtitle_file, source_file_dialog,
         source_folder_dialog, subtitle_file_dialog,
     },
@@ -112,9 +113,11 @@ use crate::{
         DEFAULT_SUBTITLE_OUTLINE_COLOR, MetadataField, OverlaySettings, PresetDefinition,
         PresetNotice, PresetNoticeTone, PresetOption, ProcessingMode, SettingsTab,
         SourceInfoSection, SourceKind, SourceMetadata, SourceTags, SubtitleFontOption,
-        SubtitleFontSizeOption, apply_audio_bitrate, apply_audio_bitrate_mode,
-        apply_audio_channels, apply_audio_codec, apply_audio_normalize, apply_audio_quality,
-        apply_audio_volume, apply_crf, apply_custom_height, apply_custom_width, apply_fps,
+        SubtitleFontSizeOption, add_external_subtitle_tracks, apply_audio_bitrate,
+        apply_audio_bitrate_mode, apply_audio_channels, apply_audio_codec, apply_audio_normalize,
+        apply_audio_quality, apply_audio_volume, apply_crf, apply_custom_height,
+        apply_custom_width, apply_external_subtitle_default, apply_external_subtitle_forced,
+        apply_external_subtitle_language, apply_external_subtitle_title, apply_fps,
         apply_gif_colors, apply_gif_dither, apply_gif_loop, apply_hw_decode,
         apply_image_jpeg_huffman, apply_image_jpeg_quality, apply_image_png_compression,
         apply_image_png_prediction, apply_image_tiff_compression, apply_image_webp_compression,
@@ -133,12 +136,12 @@ use crate::{
         is_videotoolbox_video_codec, metadata_field_options, metadata_field_value,
         metadata_mode_options, normalize_output_config, normalized_hex_color,
         output_container_options, output_processing_mode_options, preset_options,
-        resolution_options, resolve_active_settings_tab, sanitize_output_name,
-        scaling_algorithm_options, source_info_sections, subtitle_burn_file_label,
-        subtitle_color_value, subtitle_font_options, subtitle_font_size_options,
-        subtitle_position_options, subtitle_track_options, toggle_audio_track_selection,
-        toggle_subtitle_track_selection, video_codec_options, video_pixel_format_options,
-        video_preset_options, visible_settings_tabs,
+        remove_external_subtitle_track, resolution_options, resolve_active_settings_tab,
+        sanitize_output_name, scaling_algorithm_options, source_info_sections,
+        subtitle_burn_file_label, subtitle_color_value, subtitle_font_options,
+        subtitle_font_size_options, subtitle_position_options, subtitle_track_options,
+        toggle_audio_track_selection, toggle_subtitle_track_selection, video_codec_options,
+        video_pixel_format_options, video_preset_options, visible_settings_tabs,
     },
     source_metadata::{
         MetadataStatus, SourceMetadataEntry, SourceMetadataStore, probe_source_metadata,
@@ -424,6 +427,8 @@ impl Default for SettingsUiState {
 }
 
 struct SubtitleUiState {
+    mode: SettingsSubtitleMode,
+    external_track_index: Option<usize>,
     popover: Option<SettingsSubtitlePopover>,
     rendered_popover: Option<SettingsSubtitlePopover>,
     font_select_scroll_handle: ScrollHandle,
@@ -438,6 +443,8 @@ struct SubtitleUiState {
 impl Default for SubtitleUiState {
     fn default() -> Self {
         Self {
+            mode: SettingsSubtitleMode::Selectable,
+            external_track_index: None,
             popover: None,
             rendered_popover: None,
             font_select_scroll_handle: ScrollHandle::new(),
@@ -759,6 +766,13 @@ pub(in crate::app) enum SettingsSubtitleColorDragKind {
     Hue,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(in crate::app) enum SettingsSubtitleMode {
+    #[default]
+    Selectable,
+    BurnIn,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(in crate::app) struct SettingsSubtitleColorDrag {
     target: SettingsSubtitleColorTarget,
@@ -793,6 +807,10 @@ struct SettingsRenderState<'a> {
     gif_loop_focus: Option<&'a FocusHandle>,
     metadata_focuses: SettingsMetadataInputFocuses<'a>,
     subtitle_focuses: SettingsSubtitleFocuses<'a>,
+    external_subtitle_language_focus: Option<&'a FocusHandle>,
+    external_subtitle_title_focus: Option<&'a FocusHandle>,
+    external_subtitle_track_index: Option<usize>,
+    subtitle_mode: SettingsSubtitleMode,
     subtitle_color_focuses: SettingsSubtitleColorInputFocuses<'a>,
     subtitle_popover: Option<SettingsSubtitlePopover>,
     subtitle_rendered_popover: Option<SettingsSubtitlePopover>,
@@ -837,6 +855,7 @@ struct SettingsSubtitleColorInputFocuses<'a> {
 
 #[derive(Clone, Copy, Default)]
 struct SettingsSubtitleFocuses<'a> {
+    add_external_files: Option<&'a FocusHandle>,
     burn_file: Option<&'a FocusHandle>,
     font_select: SettingsSubtitleSelectFocuses<'a>,
     font_size_select: SettingsSubtitleSelectFocuses<'a>,

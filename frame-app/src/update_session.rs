@@ -365,6 +365,13 @@ mod tests {
         first.is_selected_for_conversion = false;
         first.config.video_bitrate = "9000".to_string();
         first.config.subtitle_burn_path = Some("/missing/captions.srt".to_string());
+        first.config.external_subtitle_tracks = vec![crate::settings::ExternalSubtitleTrack {
+            path: "/missing/selectable.srt".to_string(),
+            language: Some("eng".to_string()),
+            title: Some("English".to_string()),
+            is_default: true,
+            is_forced: false,
+        }];
         first.config.crop = Some(crate::settings::CropSettings {
             enabled: true,
             x: 12,

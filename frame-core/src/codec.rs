@@ -213,16 +213,19 @@ fn parse_quality(raw: &str, min: u8, max: u8, fallback: u8) -> u8 {
 }
 
 pub fn add_subtitle_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
-    let codec = match config.container.as_str() {
+    if let Some(codec) = subtitle_output_codec(&config.container) {
+        args.push("-c:s".to_string());
+        args.push(codec.to_string());
+    }
+}
+
+#[must_use]
+pub fn subtitle_output_codec(container: &str) -> Option<&'static str> {
+    match container {
         "mkv" => Some("copy"),
         "mp4" | "mov" => Some("mov_text"),
         "webm" => Some("webvtt"),
         _ => None,
-    };
-
-    if let Some(codec) = codec {
-        args.push("-c:s".to_string());
-        args.push(codec.to_string());
     }
 }
 
