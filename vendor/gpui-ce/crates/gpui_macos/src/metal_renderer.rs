@@ -28,7 +28,8 @@ use image::RgbaImage;
 
 use core_foundation::base::TCFType;
 use core_video::{
-    metal_texture::CVMetalTextureGetTexture, metal_texture_cache::CVMetalTextureCache,
+    image_buffer::TCVImageBuffer, metal_texture::CVMetalTextureGetTexture,
+    metal_texture_cache::CVMetalTextureCache,
     pixel_buffer::kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
 };
 use foreign_types::{ForeignType, ForeignTypeRef};
@@ -1843,10 +1844,11 @@ impl MetalRenderer {
                 kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
             );
 
+            let image_buffer = surface.image_buffer.as_image_buffer();
             let y_texture = self
                 .core_video_texture_cache
                 .create_texture_from_image(
-                    surface.image_buffer.as_concrete_TypeRef(),
+                    &image_buffer,
                     None,
                     MTLPixelFormat::R8Unorm,
                     surface.image_buffer.get_width_of_plane(0),
@@ -1857,7 +1859,7 @@ impl MetalRenderer {
             let cb_cr_texture = self
                 .core_video_texture_cache
                 .create_texture_from_image(
-                    surface.image_buffer.as_concrete_TypeRef(),
+                    &image_buffer,
                     None,
                     MTLPixelFormat::RG8Unorm,
                     surface.image_buffer.get_width_of_plane(1),
