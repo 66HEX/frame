@@ -1191,6 +1191,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-graphics2"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b65858d95344d2711161cd92196732f67d6c5fea238cf12f994584828731a5c"
+dependencies = [
+ "bitflags 2.13.1",
+ "block",
+ "cfg-if",
+ "core-foundation 0.10.0",
+ "libc",
+]
+
+[[package]]
 name = "core-text"
 version = "20.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1222,10 +1235,25 @@ checksum = "139679cc63eb9504bdbe37e37874b0247136177655f0008588781e90863afa62"
 dependencies = [
  "block",
  "core-foundation 0.10.0",
- "core-graphics2",
+ "core-graphics2 0.5.2",
  "io-surface",
  "libc",
  "metal",
+]
+
+[[package]]
+name = "core-video"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0f83d7bc2e8fbc517a71dcf3227003db7646e6c7aa5b0b5ab3acc89bc692641"
+dependencies = [
+ "block",
+ "core-foundation 0.10.0",
+ "core-graphics2 0.6.1",
+ "libc",
+ "metal",
+ "objc2-core-foundation",
+ "objc2-io-surface",
 ]
 
 [[package]]
@@ -2404,7 +2432,7 @@ dependencies = [
  "core-foundation-sys",
  "core-graphics 0.24.0",
  "core-text 21.0.0",
- "core-video",
+ "core-video 0.6.1",
  "ctor",
  "derive_more",
  "embed-resource",
@@ -2529,7 +2557,7 @@ dependencies = [
  "core-foundation-sys",
  "core-graphics 0.24.0",
  "core-text 21.0.0",
- "core-video",
+ "core-video 0.6.1",
  "ctor",
  "derive_more",
  "dispatch2",
@@ -3588,7 +3616,7 @@ dependencies = [
  "anyhow",
  "bindgen",
  "core-foundation 0.10.0",
- "core-video",
+ "core-video 0.5.2",
  "ctor",
  "foreign-types",
  "metal",
@@ -4158,6 +4186,16 @@ dependencies = [
  "block2 0.6.2",
  "libc",
  "objc2 0.6.4",
+ "objc2-core-foundation",
+]
+
+[[package]]
+name = "objc2-io-surface"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "180788110936d59bab6bd83b6060ffdfffb3b922ba1396b312ae795e1de9d81d"
+dependencies = [
+ "bitflags 2.13.1",
  "objc2-core-foundation",
 ]
 
