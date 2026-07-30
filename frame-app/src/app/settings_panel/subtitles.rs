@@ -89,6 +89,7 @@ pub(in crate::app) struct SettingsSubtitlesTabState<'a> {
     pub(in crate::app) config: &'a ConversionConfig,
     pub(in crate::app) metadata: Option<&'a SourceMetadata>,
     pub(in crate::app) settings_disabled: bool,
+    pub(in crate::app) available_encoders: &'a frame_core::capabilities::AvailableEncoders,
     pub(in crate::app) subtitle_fonts: &'a [String],
     pub(in crate::app) focuses: SettingsSubtitleFocuses<'a>,
     pub(in crate::app) external_language_focus: Option<&'a FocusHandle>,
@@ -248,8 +249,12 @@ fn settings_selectable_subtitles_content(
         .gap_4()
         .child(settings_external_subtitles_section(state, window, cx));
 
-    let track_options =
-        subtitle_track_options(state.config, state.metadata, state.settings_disabled);
+    let track_options = subtitle_track_options(
+        state.config,
+        state.metadata,
+        state.settings_disabled,
+        state.available_encoders,
+    );
     if track_options.is_empty() {
         return content.child(
             settings_section("Source tracks", palette)
@@ -338,7 +343,9 @@ fn settings_external_subtitles_section(
 ) -> gpui::Div {
     let config = state.config;
     let palette = state.palette;
-    let enabled = !state.settings_disabled;
+    let needs_unavailable_dvbsub =
+        config.container.eq_ignore_ascii_case("m2t") && !state.available_encoders.dvbsub;
+    let enabled = !state.settings_disabled && !needs_unavailable_dvbsub;
     let mut section = settings_section("External files", palette)
         .child(settings_external_subtitle_add_button(
             enabled,
@@ -348,7 +355,11 @@ fn settings_external_subtitles_section(
             cx,
         ))
         .child(settings_hint_text(
-            "Embedded as switchable tracks in the exported file; they are not shown in the preview.",
+            if needs_unavailable_dvbsub {
+                "Selectable .sup/PGS requires the DVB subtitle encoder, which is unavailable in the active FFmpeg runtime. Text subtitles can still be burned in."
+            } else {
+                "Embedded as switchable tracks in the exported file; they are not shown in the preview."
+            },
             palette,
         ));
 
@@ -361,11 +372,17 @@ fn settings_external_subtitles_section(
         .filter(|index| *index < config.external_subtitle_tracks.len());
     let mut list = div().flex().flex_col().gap_2();
     for (index, track) in config.external_subtitle_tracks.iter().enumerate() {
+        let track_requires_dvbsub = config.container.eq_ignore_ascii_case("m2t")
+            && std::path::Path::new(&track.path)
+                .extension()
+                .and_then(|extension| extension.to_str())
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("sup"));
         list = list.child(settings_external_subtitle_track_row(
             index,
             track,
+            &config.container,
             selected_index == Some(index),
-            enabled,
+            enabled && (!track_requires_dvbsub || state.available_encoders.dvbsub),
             palette,
             window,
             cx,
@@ -373,7 +390,9 @@ fn settings_external_subtitles_section(
     }
     section = section.child(list);
 
-    if let Some(index) = selected_index {
+    if let Some(index) = selected_index
+        && external_subtitle_metadata_visibility(&config.container).has_any()
+    {
         section = section.child(settings_external_subtitle_editor(
             config,
             index,
@@ -387,6 +406,41 @@ fn settings_external_subtitles_section(
     }
 
     section
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct ExternalSubtitleMetadataVisibility {
+    language: bool,
+    descriptive: bool,
+}
+
+impl ExternalSubtitleMetadataVisibility {
+    const fn has_any(self) -> bool {
+        self.language || self.descriptive
+    }
+}
+
+const fn external_subtitle_metadata_visibility(
+    container: &str,
+) -> ExternalSubtitleMetadataVisibility {
+    match frame_core::container::transport_stream_profile(container) {
+        Some(frame_core::container::TransportStreamProfile::M2ts192) => {
+            ExternalSubtitleMetadataVisibility {
+                language: false,
+                descriptive: false,
+            }
+        }
+        Some(frame_core::container::TransportStreamProfile::MpegTs188) => {
+            ExternalSubtitleMetadataVisibility {
+                language: true,
+                descriptive: false,
+            }
+        }
+        None => ExternalSubtitleMetadataVisibility {
+            language: true,
+            descriptive: true,
+        },
+    }
 }
 
 fn settings_external_subtitle_add_button(
@@ -431,9 +485,14 @@ fn settings_external_subtitle_add_button(
         }))
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "The row receives track state, container capability context, and GPUI render handles explicitly."
+)]
 fn settings_external_subtitle_track_row(
     index: usize,
     track: &crate::settings::ExternalSubtitleTrack,
+    container: &str,
     selected: bool,
     enabled: bool,
     palette: &'static theme::ThemePalette,
@@ -458,6 +517,13 @@ fn settings_external_subtitle_track_row(
     }
     if track.is_forced {
         details.push("Forced".to_string());
+    }
+    let is_sup = std::path::Path::new(&track.path)
+        .extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|value| value.eq_ignore_ascii_case("sup"));
+    if frame_core::container::is_transport_stream_container(container) && !is_sup {
+        details.push("Unavailable as selectable; use Burn-in".to_string());
     }
     let detail = details.join(" • ");
 
@@ -555,59 +621,64 @@ fn settings_external_subtitle_editor(
     let title = track.title.as_deref().unwrap_or_default();
     let is_default = track.is_default;
     let is_forced = track.is_forced;
+    let visibility = external_subtitle_metadata_visibility(&config.container);
+    let mut fields = div()
+        .grid()
+        .grid_cols(if visibility.descriptive { 2 } else { 1 })
+        .gap_2();
+    if visibility.language {
+        fields = fields.child(
+            div()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(settings_field_label("Language", palette))
+                .child(frame_text_input(
+                    FrameTextInputSpec {
+                        id: "settings-external-subtitle-language",
+                        value: language,
+                        placeholder: "e.g. eng",
+                        disabled: !enabled,
+                        focus: language_focus,
+                        kind: FrameTextInputKind::ExternalSubtitleLanguage,
+                    },
+                    palette,
+                    window,
+                    cx,
+                )),
+        );
+    }
+    if visibility.descriptive {
+        fields = fields.child(
+            div()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(settings_field_label("Title", palette))
+                .child(frame_text_input(
+                    FrameTextInputSpec {
+                        id: "settings-external-subtitle-title",
+                        value: title,
+                        placeholder: "Optional label",
+                        disabled: !enabled,
+                        focus: title_focus,
+                        kind: FrameTextInputKind::ExternalSubtitleTitle,
+                    },
+                    palette,
+                    window,
+                    cx,
+                )),
+        );
+    }
 
-    div()
+    let mut editor = div()
         .flex()
         .flex_col()
         .gap_3()
         .pt(theme::ui_rem(4.0))
-        .child(
-            div()
-                .grid()
-                .grid_cols(2)
-                .gap_2()
-                .child(
-                    div()
-                        .flex()
-                        .flex_col()
-                        .gap_2()
-                        .child(settings_field_label("Language", palette))
-                        .child(frame_text_input(
-                            FrameTextInputSpec {
-                                id: "settings-external-subtitle-language",
-                                value: language,
-                                placeholder: "e.g. eng",
-                                disabled: !enabled,
-                                focus: language_focus,
-                                kind: FrameTextInputKind::ExternalSubtitleLanguage,
-                            },
-                            palette,
-                            window,
-                            cx,
-                        )),
-                )
-                .child(
-                    div()
-                        .flex()
-                        .flex_col()
-                        .gap_2()
-                        .child(settings_field_label("Title", palette))
-                        .child(frame_text_input(
-                            FrameTextInputSpec {
-                                id: "settings-external-subtitle-title",
-                                value: title,
-                                placeholder: "Optional label",
-                                disabled: !enabled,
-                                focus: title_focus,
-                                kind: FrameTextInputKind::ExternalSubtitleTitle,
-                            },
-                            palette,
-                            window,
-                            cx,
-                        )),
-                ),
-        )
-        .child(
+        .child(fields);
+    if visibility.descriptive {
+        editor = editor.child(
             div()
                 .grid()
                 .grid_cols(2)
@@ -658,7 +729,9 @@ fn settings_external_subtitle_editor(
                         },
                     )),
                 ),
-        )
+        );
+    }
+    editor
 }
 
 fn settings_subtitle_load_button(
@@ -2398,13 +2471,20 @@ fn settings_subtitle_position_grid(
 }
 
 pub(in crate::app) fn settings_subtitle_track_button(
-    option: crate::settings::SubtitleTrackOption,
+    mut option: crate::settings::SubtitleTrackOption,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let index = option.index;
     let is_enabled = !option.is_disabled;
+    if let Some(reason) = option.disabled_reason.take() {
+        option.detail = if option.detail.is_empty() {
+            reason
+        } else {
+            format!("{} • {reason}", option.detail)
+        };
+    }
     frame_track_list_item(
         format!("subtitle-track-{index}"),
         FrameTrackListItemText {
@@ -2434,6 +2514,28 @@ pub(in crate::app) fn settings_subtitle_track_button(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn m2ts_sidecars_hide_all_unrepresentable_metadata_controls() {
+        assert_eq!(
+            external_subtitle_metadata_visibility("m2ts"),
+            ExternalSubtitleMetadataVisibility {
+                language: false,
+                descriptive: false,
+            }
+        );
+    }
+
+    #[test]
+    fn m2t_sidecars_show_only_representable_language_control() {
+        assert_eq!(
+            external_subtitle_metadata_visibility("m2t"),
+            ExternalSubtitleMetadataVisibility {
+                language: true,
+                descriptive: false,
+            }
+        );
+    }
 
     #[test]
     fn subtitle_font_keyboard_selection_skips_disabled_options() {
