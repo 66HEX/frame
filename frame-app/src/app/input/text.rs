@@ -22,6 +22,8 @@ pub(super) fn sanitize_replacement_text(kind: FrameTextInputKind, value: &str) -
         | FrameTextInputKind::MetadataGenre
         | FrameTextInputKind::MetadataDate
         | FrameTextInputKind::MetadataComment
+        | FrameTextInputKind::MetadataServiceName
+        | FrameTextInputKind::MetadataServiceProvider
         | FrameTextInputKind::PresetName
         | FrameTextInputKind::ExternalSubtitleLanguage
         | FrameTextInputKind::ExternalSubtitleTitle => {

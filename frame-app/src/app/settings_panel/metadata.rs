@@ -2,8 +2,8 @@ use super::{
     ClickEvent, Context, ConversionConfig, FocusHandle, FrameRoot, FrameTextInputKind,
     FrameTextInputSpec, MetadataField, ParentElement, SettingsMetadataInputFocuses, SourceMetadata,
     StatefulInteractiveElement, Styled, Window, apply_metadata_mode, div, frame_choice_button,
-    frame_text_input, metadata_field_options, metadata_mode_options, settings_field_label,
-    settings_hint_text, settings_section, theme,
+    frame_text_input, metadata_field_options, metadata_mode_description, metadata_mode_options,
+    settings_field_label, settings_hint_text, settings_section, theme,
 };
 
 pub(in crate::app) fn settings_metadata_tab(
@@ -25,7 +25,7 @@ pub(in crate::app) fn settings_metadata_tab(
                 cx,
             ))
             .child(settings_hint_text(
-                config.metadata.mode.description(),
+                metadata_mode_description(config),
                 palette,
             )),
     );
@@ -130,6 +130,8 @@ const fn metadata_field_input_id(field: MetadataField) -> &'static str {
         MetadataField::Genre => "metadata-genre-field",
         MetadataField::Date => "metadata-date-field",
         MetadataField::Comment => "metadata-comment-field",
+        MetadataField::ServiceName => "metadata-service-name-field",
+        MetadataField::ServiceProvider => "metadata-service-provider-field",
     }
 }
 
@@ -141,6 +143,8 @@ const fn metadata_field_input_kind(field: MetadataField) -> FrameTextInputKind {
         MetadataField::Genre => FrameTextInputKind::MetadataGenre,
         MetadataField::Date => FrameTextInputKind::MetadataDate,
         MetadataField::Comment => FrameTextInputKind::MetadataComment,
+        MetadataField::ServiceName => FrameTextInputKind::MetadataServiceName,
+        MetadataField::ServiceProvider => FrameTextInputKind::MetadataServiceProvider,
     }
 }
 
@@ -155,5 +159,7 @@ const fn metadata_field_focus(
         MetadataField::Genre => focuses.genre,
         MetadataField::Date => focuses.date,
         MetadataField::Comment => focuses.comment,
+        MetadataField::ServiceName => focuses.service_name,
+        MetadataField::ServiceProvider => focuses.service_provider,
     }
 }

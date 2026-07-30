@@ -410,6 +410,8 @@ pub enum MetadataField {
     Genre,
     Date,
     Comment,
+    ServiceName,
+    ServiceProvider,
 }
 
 impl MetadataField {
@@ -422,6 +424,8 @@ impl MetadataField {
             Self::Genre => "genre",
             Self::Date => "date",
             Self::Comment => "comment",
+            Self::ServiceName => "serviceName",
+            Self::ServiceProvider => "serviceProvider",
         }
     }
 
@@ -434,12 +438,17 @@ impl MetadataField {
             Self::Genre => "Genre",
             Self::Date => "Date / Year",
             Self::Comment => "Comment",
+            Self::ServiceName => "Service name",
+            Self::ServiceProvider => "Service provider",
         }
     }
 
     #[must_use]
     pub const fn visible_for_image(self) -> bool {
-        !matches!(self, Self::Album | Self::Genre)
+        !matches!(
+            self,
+            Self::Album | Self::Genre | Self::ServiceName | Self::ServiceProvider
+        )
     }
 }
 
@@ -943,6 +952,7 @@ impl SourceTags {
             MetadataField::Genre => self.genre.as_deref(),
             MetadataField::Date => self.date.as_deref(),
             MetadataField::Comment => self.comment.as_deref(),
+            MetadataField::ServiceName | MetadataField::ServiceProvider => None,
         }
     }
 }

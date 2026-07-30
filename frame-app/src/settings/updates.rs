@@ -183,6 +183,8 @@ pub fn apply_metadata_field(
         MetadataField::Genre => &mut config.metadata.genre,
         MetadataField::Date => &mut config.metadata.date,
         MetadataField::Comment => &mut config.metadata.comment,
+        MetadataField::ServiceName => &mut config.metadata.service_name,
+        MetadataField::ServiceProvider => &mut config.metadata.service_provider,
     };
 
     if *target == value {

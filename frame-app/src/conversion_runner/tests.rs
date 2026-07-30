@@ -129,6 +129,8 @@ fn core_config_from_gpui_preserves_active_conversion_fields() {
             mode: MetadataMode::Replace,
             title: Some("Render Title".to_string()),
             artist: Some("Frame".to_string()),
+            service_name: Some("Frame Service".to_string()),
+            service_provider: Some("Frame Provider".to_string()),
             ..MetadataConfig::default()
         },
         subtitle_burn_path: Some("/tmp/dialogue.srt".to_string()),
@@ -217,6 +219,11 @@ fn core_config_from_gpui_preserves_active_conversion_fields() {
     assert_eq!(core.gif_loop, 3);
     assert_eq!(core.start_time.as_deref(), Some("00:00:05.000"));
     assert_eq!(core.end_time.as_deref(), Some("00:00:15.000"));
+    assert_eq!(core.metadata.service_name.as_deref(), Some("Frame Service"));
+    assert_eq!(
+        core.metadata.service_provider.as_deref(),
+        Some("Frame Provider")
+    );
     assert_eq!(core.rotation, "90");
     assert!(core.flip_horizontal);
     assert!(core.flip_vertical);
@@ -306,6 +313,24 @@ fn disambiguate_output_paths_skips_existing_files() {
     disambiguate_output_paths(&mut tasks);
 
     assert_eq!(tasks[0].output_name.as_deref(), Some("clip_converted_2"));
+}
+
+#[test]
+fn disambiguate_output_paths_keeps_transport_stream_public_suffix() {
+    let sandbox = ConversionRunnerSandbox::new("existing-m2ts-output-name");
+    fs::write(sandbox.path("clip_converted.m2ts"), b"keep")
+        .expect("existing M2TS output fixture should be written");
+    let mut file = FileItem::from_path("mts", "/A/clip.MTS", 1);
+    file.config.container = "m2ts".to_string();
+    let mut tasks = vec![conversion_task_from_file(
+        &file,
+        &sandbox.root.to_string_lossy(),
+    )];
+
+    disambiguate_output_paths(&mut tasks);
+
+    assert_eq!(tasks[0].output_name.as_deref(), Some("clip_converted_2"));
+    assert_eq!(tasks[0].config.container, "m2ts");
 }
 
 #[test]

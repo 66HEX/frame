@@ -280,7 +280,12 @@ pub fn metadata_field_options(
     metadata: Option<&SourceMetadata>,
     disabled: bool,
 ) -> Vec<MetadataFieldOption> {
-    metadata_fields_for_source(metadata)
+    let fields = if frame_core::container::is_transport_stream_container(&config.container) {
+        vec![MetadataField::ServiceName, MetadataField::ServiceProvider]
+    } else {
+        metadata_fields_for_source(metadata)
+    };
+    fields
         .iter()
         .copied()
         .map(|field| MetadataFieldOption {
@@ -294,6 +299,23 @@ pub fn metadata_field_options(
             is_disabled: disabled,
         })
         .collect()
+}
+
+#[must_use]
+pub fn metadata_mode_description(config: &ConversionConfig) -> &'static str {
+    if frame_core::container::is_transport_stream_container(&config.container) {
+        return match config.metadata.mode {
+            MetadataMode::Clean => {
+                "Removes source tags and writes the neutral MPEG-TS service identity required by the muxer: Service01 / Frame."
+            }
+            MetadataMode::Replace => {
+                "MPEG-TS requires both service identity values. Empty Service name and Service provider fields are replaced with Service01 and Frame."
+            }
+            MetadataMode::Preserve => config.metadata.mode.description(),
+        };
+    }
+
+    config.metadata.mode.description()
 }
 
 #[must_use]
@@ -315,6 +337,8 @@ pub fn metadata_field_value(config: &ConversionConfig, field: MetadataField) -> 
         MetadataField::Genre => config.metadata.genre.as_deref(),
         MetadataField::Date => config.metadata.date.as_deref(),
         MetadataField::Comment => config.metadata.comment.as_deref(),
+        MetadataField::ServiceName => config.metadata.service_name.as_deref(),
+        MetadataField::ServiceProvider => config.metadata.service_provider.as_deref(),
     }
 }
 
@@ -326,6 +350,19 @@ pub fn metadata_field_placeholder(
 ) -> String {
     if config.metadata.mode != MetadataMode::Preserve {
         return String::new();
+    }
+
+    if field == MetadataField::ServiceName {
+        return metadata
+            .and_then(|value| value.transport_stream.as_ref())
+            .and_then(|value| value.service_name.clone())
+            .unwrap_or_else(|| "Leave empty to keep source service name".to_string());
+    }
+    if field == MetadataField::ServiceProvider {
+        return metadata
+            .and_then(|value| value.transport_stream.as_ref())
+            .and_then(|value| value.service_provider.clone())
+            .unwrap_or_else(|| "Leave empty to keep source service provider".to_string());
     }
 
     metadata
