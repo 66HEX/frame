@@ -119,7 +119,7 @@ pub(in crate::app) fn settings_container_grid(
         grid = grid.child(
             frame_choice_button(
                 format!("output-container-{container}"),
-                container.as_str(),
+                &container,
                 option.is_selected,
                 is_enabled,
                 palette,

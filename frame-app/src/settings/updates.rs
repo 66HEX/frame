@@ -16,15 +16,17 @@ use super::{
     options::{
         first_allowed_video_codec, first_allowed_video_pixel_format, first_allowed_video_preset,
         is_hardware_video_codec, is_nvenc_video_codec, is_video_preset_allowed,
-        is_videotoolbox_video_codec, normalized_hex_color,
+        is_videotoolbox_video_codec, mp2_original_channels_are_unsupported, normalized_hex_color,
     },
     rules::{
         container_supports_audio, container_supports_subtitles, default_audio_codec_for_container,
         is_audio_codec_allowed_for_container, is_audio_only_container, is_gif_container,
-        is_image_container, is_video_codec_allowed_for_container,
-        is_video_pixel_format_allowed_for_container, source_kind_for,
+        is_image_container, is_subtitle_codec_allowed_for_container,
+        is_video_codec_allowed_for_container, is_video_pixel_format_allowed_for_container,
+        source_kind_for,
     },
 };
+use crate::file_filters::is_supported_selectable_subtitle_path_for_container;
 use crate::numeric::u32_to_u16;
 
 #[must_use]
@@ -215,6 +217,10 @@ pub fn add_external_subtitle_tracks(
     for path in paths {
         let path = path.trim();
         if path.is_empty()
+            || !is_supported_selectable_subtitle_path_for_container(
+                std::path::Path::new(path),
+                &config.container,
+            )
             || config
                 .external_subtitle_tracks
                 .iter()
@@ -381,7 +387,17 @@ pub fn apply_preset(
     metadata: Option<&SourceMetadata>,
 ) -> bool {
     let before = config.clone();
+    // Presets describe output settings; stream indices and subtitle paths belong to the source.
+    let selected_audio_tracks = std::mem::take(&mut config.selected_audio_tracks);
+    let selected_subtitle_tracks = std::mem::take(&mut config.selected_subtitle_tracks);
+    let external_subtitle_tracks = std::mem::take(&mut config.external_subtitle_tracks);
+    let subtitle_burn_path = config.subtitle_burn_path.take();
+
     *config = preset.config.clone();
+    config.selected_audio_tracks = selected_audio_tracks;
+    config.selected_subtitle_tracks = selected_subtitle_tracks;
+    config.external_subtitle_tracks = external_subtitle_tracks;
+    config.subtitle_burn_path = subtitle_burn_path;
     normalize_output_config(config, metadata);
 
     before != *config
@@ -831,7 +847,40 @@ pub fn normalize_output_config(
         reset_audio_filter_settings(config);
     }
 
-    if !container_supports_subtitles(&config.container) {
+    if container_supports_subtitles(&config.container) {
+        config.external_subtitle_tracks.retain(|track| {
+            is_supported_selectable_subtitle_path_for_container(
+                std::path::Path::new(&track.path),
+                &config.container,
+            )
+        });
+        match frame_core::container::transport_stream_profile(&config.container) {
+            Some(frame_core::container::TransportStreamProfile::M2ts192) => {
+                for track in &mut config.external_subtitle_tracks {
+                    track.language = None;
+                    track.title = None;
+                    track.is_default = false;
+                    track.is_forced = false;
+                }
+            }
+            Some(frame_core::container::TransportStreamProfile::MpegTs188) => {
+                for track in &mut config.external_subtitle_tracks {
+                    track.title = None;
+                    track.is_default = false;
+                    track.is_forced = false;
+                }
+            }
+            None => {}
+        }
+        if let Some(metadata) = metadata {
+            config.selected_subtitle_tracks.retain(|selected_index| {
+                metadata.subtitle_tracks.iter().any(|track| {
+                    track.index == *selected_index
+                        && is_subtitle_codec_allowed_for_container(&config.container, &track.codec)
+                })
+            });
+        }
+    } else {
         reset_subtitle_settings(config);
     }
 
@@ -842,6 +891,9 @@ pub fn normalize_output_config(
         config.audio_codec = default_audio_codec_for_container(&config.container).to_string();
     }
     normalize_audio_encoding_settings(config);
+    if mp2_original_channels_are_unsupported(config, metadata) {
+        config.audio_channels = "stereo".to_string();
+    }
     normalize_video_config(config, metadata);
 
     before != *config
@@ -901,6 +953,9 @@ pub fn normalize_video_config(
     if !is_video_preset_allowed(&config.video_codec, &config.preset) {
         config.preset = first_allowed_video_preset(&config.video_codec).to_string();
     }
+    if config.video_codec == "mpeg2video" {
+        config.video_bitrate_mode = "bitrate".to_string();
+    }
 
     if !is_nvenc_video_codec(&config.video_codec) {
         config.nvenc_spatial_aq = false;
@@ -935,6 +990,14 @@ fn normalize_audio_encoding_settings(config: &mut ConversionConfig) {
     }
 
     config.audio_quality = normalized_audio_quality(&config.audio_codec, &config.audio_quality);
+    if config.audio_codec == "mp2"
+        && !matches!(
+            config.audio_bitrate.as_str(),
+            "64" | "96" | "112" | "128" | "160" | "192" | "224" | "256" | "320" | "384"
+        )
+    {
+        config.audio_bitrate = "192".to_string();
+    }
     config.audio_volume = config.audio_volume.min(MAX_AUDIO_VOLUME);
 }
 

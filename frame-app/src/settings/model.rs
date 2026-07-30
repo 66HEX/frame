@@ -562,6 +562,7 @@ pub struct SubtitleTrackOption {
     pub detail: String,
     pub is_selected: bool,
     pub is_disabled: bool,
+    pub disabled_reason: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -986,7 +987,7 @@ pub(super) struct AudioCodecDefinition {
     pub(super) label: &'static str,
 }
 
-pub(super) const AUDIO_CODEC_DEFINITIONS: [AudioCodecDefinition; 7] = [
+pub(super) const AUDIO_CODEC_DEFINITIONS: [AudioCodecDefinition; 9] = [
     AudioCodecDefinition {
         codec: "aac",
         label: "AAC / Stereo",
@@ -1014,6 +1015,14 @@ pub(super) const AUDIO_CODEC_DEFINITIONS: [AudioCodecDefinition; 7] = [
     AudioCodecDefinition {
         codec: "pcm_s16le",
         label: "PCM / WAV",
+    },
+    AudioCodecDefinition {
+        codec: "mp2",
+        label: "MPEG Layer II",
+    },
+    AudioCodecDefinition {
+        codec: "pcm_bluray",
+        label: "Blu-ray PCM (Lossless)",
     },
 ];
 
@@ -1059,6 +1068,7 @@ pub(super) struct VideoCodecDefinition {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum VideoCodecCapability {
+    Mpeg2video,
     H264Videotoolbox,
     H264Nvenc,
     HevcVideotoolbox,
@@ -1066,7 +1076,7 @@ pub(super) enum VideoCodecCapability {
     Av1Nvenc,
 }
 
-pub(super) const VIDEO_CODEC_DEFINITIONS: [VideoCodecDefinition; 11] = [
+pub(super) const VIDEO_CODEC_DEFINITIONS: [VideoCodecDefinition; 12] = [
     VideoCodecDefinition {
         codec: "libx264",
         label: "H.264 / AVC",
@@ -1091,6 +1101,11 @@ pub(super) const VIDEO_CODEC_DEFINITIONS: [VideoCodecDefinition; 11] = [
         codec: "libsvtav1",
         label: "AV1 / SVT",
         capability: None,
+    },
+    VideoCodecDefinition {
+        codec: "mpeg2video",
+        label: "MPEG-2 Video",
+        capability: Some(VideoCodecCapability::Mpeg2video),
     },
     VideoCodecDefinition {
         codec: "gif",

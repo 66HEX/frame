@@ -17,6 +17,7 @@ pub(in crate::app) fn settings_audio_tab(
     let mut channels_section = settings_section("Channels / bitrate", palette)
         .child(settings_audio_channels_grid(
             config,
+            metadata,
             settings_disabled,
             palette,
             window,
@@ -33,6 +34,11 @@ pub(in crate::app) fn settings_audio_tab(
     if config.processing_mode == ProcessingMode::Copy {
         channels_section = channels_section.child(settings_hint_text(
             "Stream copy keeps source audio settings.",
+            palette,
+        ));
+    } else if mp2_original_channels_are_unsupported(config, metadata) {
+        channels_section = channels_section.child(settings_hint_text(
+            "MP2 supports at most two channels; multichannel source tracks are exported as stereo.",
             palette,
         ));
     }
@@ -71,13 +77,14 @@ pub(in crate::app) fn settings_audio_tab(
 
 pub(in crate::app) fn settings_audio_channels_grid(
     config: &ConversionConfig,
+    metadata: Option<&SourceMetadata>,
     settings_disabled: bool,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let mut grid = div().grid().grid_cols(3).gap_2();
-    for option in audio_channel_options(config, settings_disabled) {
+    for option in audio_channel_options(config, metadata, settings_disabled) {
         let channels = option.id;
         let is_enabled = !option.is_disabled;
         grid = grid.child(

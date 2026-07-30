@@ -86,6 +86,8 @@ pub fn audio_codec_options(
 
     AUDIO_CODEC_DEFINITIONS
         .iter()
+        .filter(|definition| definition.codec != "mp2" || available_encoders.mp2)
+        .filter(|definition| definition.codec != "pcm_bluray" || available_encoders.pcm_bluray)
         .map(|definition| (definition.codec, definition.label))
         .chain(
             OPTIONAL_AUDIO_CODEC_DEFINITIONS
@@ -110,15 +112,38 @@ pub fn audio_codec_options(
 }
 
 #[must_use]
-pub fn audio_channel_options(config: &ConversionConfig, disabled: bool) -> [AudioChannelOption; 3] {
+pub fn audio_channel_options(
+    config: &ConversionConfig,
+    metadata: Option<&SourceMetadata>,
+    disabled: bool,
+) -> [AudioChannelOption; 3] {
     let disabled = disabled || config.processing_mode == ProcessingMode::Copy;
+    let original_is_unsupported = mp2_original_channels_are_unsupported(config, metadata);
 
     AUDIO_CHANNEL_DEFINITIONS.map(|definition| AudioChannelOption {
         id: definition.id,
         label: definition.label,
         is_selected: config.audio_channels.eq_ignore_ascii_case(definition.id),
-        is_disabled: disabled,
+        is_disabled: disabled || (definition.id == "original" && original_is_unsupported),
     })
+}
+
+#[must_use]
+pub fn mp2_original_channels_are_unsupported(
+    config: &ConversionConfig,
+    metadata: Option<&SourceMetadata>,
+) -> bool {
+    config.audio_codec == "mp2"
+        && metadata.is_some_and(|metadata| {
+            metadata.audio_tracks.iter().any(|track| {
+                config.selected_audio_tracks.contains(&track.index)
+                    && track
+                        .channels
+                        .as_deref()
+                        .and_then(|channels| channels.parse::<u16>().ok())
+                        .is_some_and(|channels| channels > 2)
+            })
+        })
 }
 
 #[must_use]
@@ -151,22 +176,46 @@ pub fn subtitle_track_options(
     config: &ConversionConfig,
     metadata: Option<&SourceMetadata>,
     disabled: bool,
+    available_encoders: &AvailableEncoders,
 ) -> Vec<SubtitleTrackOption> {
     metadata
         .map(|metadata| {
             metadata
                 .subtitle_tracks
                 .iter()
-                .map(|track| SubtitleTrackOption {
-                    index: track.index,
-                    index_label: format!("#{}", track.index),
-                    codec: display_source_value(Some(&track.codec)),
-                    detail: subtitle_track_detail(
-                        track.language.as_deref(),
-                        track.label.as_deref(),
-                    ),
-                    is_selected: config.selected_subtitle_tracks.contains(&track.index),
-                    is_disabled: disabled,
+                .map(|track| {
+                    let compatible = is_subtitle_codec_allowed_for_container(
+                        &config.container,
+                        &track.codec,
+                    );
+                    let requires_unavailable_dvbsub = config.container.eq_ignore_ascii_case("m2t")
+                        && matches!(track.codec.as_str(), "hdmv_pgs_subtitle" | "dvd_subtitle")
+                        && !available_encoders.dvbsub;
+                    let reason = if !compatible {
+                        Some(format!(
+                            "{} cannot be represented in {}; choose another output or leave it unselected",
+                            track.codec, config.container
+                        ))
+                    } else if requires_unavailable_dvbsub {
+                        Some(
+                            "This bitmap track requires the DVB subtitle encoder, which is unavailable in the active FFmpeg runtime"
+                                .to_string(),
+                        )
+                    } else {
+                        None
+                    };
+                    SubtitleTrackOption {
+                        index: track.index,
+                        index_label: format!("#{}", track.index),
+                        codec: display_source_value(Some(&track.codec)),
+                        detail: subtitle_track_detail(
+                            track.language.as_deref(),
+                            track.label.as_deref(),
+                        ),
+                        is_selected: config.selected_subtitle_tracks.contains(&track.index),
+                        is_disabled: disabled || !compatible || requires_unavailable_dvbsub,
+                        disabled_reason: reason,
+                    }
                 })
                 .collect()
         })
@@ -384,6 +433,35 @@ pub fn default_presets() -> Vec<PresetDefinition> {
     vec![
         PresetDefinition::built_in("balanced-mp4", "Balanced MP4", preset_config("mp4")),
         PresetDefinition::built_in(
+            "broadcast-m2t",
+            "M2T Broadcast (188-byte TS)",
+            ConversionConfig {
+                container: "m2t".to_string(),
+                video_codec: "mpeg2video".to_string(),
+                video_bitrate_mode: "bitrate".to_string(),
+                video_bitrate: "18000".to_string(),
+                audio_codec: "mp2".to_string(),
+                audio_bitrate: "192".to_string(),
+                audio_channels: "stereo".to_string(),
+                pixel_format: "yuv420p".to_string(),
+                ..preset_config("m2t")
+            },
+        ),
+        PresetDefinition::built_in(
+            "m2ts-h264",
+            "M2TS H.264 (192-byte)",
+            ConversionConfig {
+                container: "m2ts".to_string(),
+                video_codec: "libx264".to_string(),
+                video_bitrate_mode: "bitrate".to_string(),
+                video_bitrate: "18000".to_string(),
+                audio_codec: "ac3".to_string(),
+                audio_bitrate: "384".to_string(),
+                pixel_format: "yuv420p".to_string(),
+                ..preset_config("m2ts")
+            },
+        ),
+        PresetDefinition::built_in(
             "archive-hq",
             "Archive H.265",
             ConversionConfig {
@@ -560,6 +638,13 @@ pub fn preset_is_compatible(preset: &PresetDefinition, metadata: Option<&SourceM
 
 #[must_use]
 pub fn create_custom_preset(id: String, name: &str, config: &ConversionConfig) -> PresetDefinition {
+    let mut preset_config = config.clone();
+    // Source-bound selections must not leak into a reusable preset.
+    preset_config.selected_audio_tracks.clear();
+    preset_config.selected_subtitle_tracks.clear();
+    preset_config.external_subtitle_tracks.clear();
+    preset_config.subtitle_burn_path = None;
+
     PresetDefinition::custom(
         id,
         if name.trim().is_empty() {
@@ -567,7 +652,7 @@ pub fn create_custom_preset(id: String, name: &str, config: &ConversionConfig) -
         } else {
             name.trim().to_string()
         },
-        config.clone(),
+        preset_config,
     )
 }
 
@@ -934,17 +1019,6 @@ fn selected_audio_codecs<'a>(
     config: &ConversionConfig,
     metadata: &'a SourceMetadata,
 ) -> Vec<&'a str> {
-    if metadata.audio_tracks.is_empty() {
-        return Vec::new();
-    }
-    if config.selected_audio_tracks.is_empty() {
-        return metadata
-            .audio_tracks
-            .iter()
-            .map(|track| track.codec.as_str())
-            .collect();
-    }
-
     metadata
         .audio_tracks
         .iter()
@@ -957,17 +1031,6 @@ fn selected_subtitle_codecs<'a>(
     config: &ConversionConfig,
     metadata: &'a SourceMetadata,
 ) -> Vec<&'a str> {
-    if metadata.subtitle_tracks.is_empty() {
-        return Vec::new();
-    }
-    if config.selected_subtitle_tracks.is_empty() {
-        return metadata
-            .subtitle_tracks
-            .iter()
-            .map(|track| track.codec.as_str())
-            .collect();
-    }
-
     metadata
         .subtitle_tracks
         .iter()
@@ -981,6 +1044,7 @@ const fn video_codec_capability_available(
     capability: VideoCodecCapability,
 ) -> bool {
     match capability {
+        VideoCodecCapability::Mpeg2video => available_encoders.mpeg2video,
         VideoCodecCapability::H264Videotoolbox => available_encoders.h264_videotoolbox,
         VideoCodecCapability::H264Nvenc => available_encoders.h264_nvenc,
         VideoCodecCapability::HevcVideotoolbox => available_encoders.hevc_videotoolbox,

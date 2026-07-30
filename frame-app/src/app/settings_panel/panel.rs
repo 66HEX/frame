@@ -267,6 +267,7 @@ pub(in crate::app) fn settings_tab_content(
                 config: settings.config,
                 metadata: settings.metadata,
                 settings_disabled: settings.settings_disabled,
+                available_encoders: settings.available_encoders,
                 subtitle_fonts: settings.subtitle_fonts,
                 focuses: settings.subtitle_focuses,
                 external_language_focus: settings.external_subtitle_language_focus,
