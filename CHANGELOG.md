@@ -9,10 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **M2T, MTS, and M2TS Workflows:** Added complete MPEG transport-stream import, preview, re-encode, mixed subtitle, and stream-copy workflows with explicit 188-byte M2T and 192-byte MTS/M2TS profiles; MPEG-2 Video, MP2, Opus-in-TS, AC-3, and Blu-ray PCM encoding; program/service metadata Preserve, Clean, and Replace modes; SRT/ASS/WebVTT burn-in; embedded DVB/teletext/ARIB/PGS handling; and selectable `.sup` PGS copy or standards-compliant DVB conversion without private-data subtitle fallbacks. Resolves [#111](https://github.com/66HEX/frame/issues/111).
 - **Selectable External Subtitles:** Added multi-file import for SRT, ASS, and WebVTT sidecars as switchable output tracks, with per-track language, title, default, and forced metadata. External tracks are persisted with file settings, validated before conversion, kept synchronized with trimmed exports, and encoded according to the MP4, MOV, MKV, or WebM subtitle contract without forcing source audio and video streams out of copy mode.
 
 ### Changed
 
+- **Explicit Stream Selection:** Audio and embedded subtitle exports now map only tracks explicitly selected by the user; an empty selection produces no stream of that type instead of implicitly preserving every source track.
 - **Virtualized File Queue:** Reused the Logs panel's uniform-list rendering and scrollbar for the workspace file queue, keeping large batches responsive while preserving row selection, actions, and accessibility.
 - **Subtitle Settings Workflow:** Split the Subtitles tab into Selectable and Burn-in modes so only the relevant controls are shown. Selectable subtitles now combine imported sidecars with embedded source tracks, while burn-in import uses the same post-import file-row and removal pattern as selectable subtitles.
 - **Audio and Subtitle Track Rows:** Reworked shared track rows so audio metadata uses a readable two-line layout with channels, language, track name, and bitrate grouped together, while subtitle rows remain compact and preserve the track index and codec when space is limited. Source track names now fall back to FFmpeg handler metadata when no title is available.
