@@ -1843,7 +1843,6 @@ mod frame_root_config {
             source_kind: EnginePreviewSourceKind::Video,
             source_width: Some(1920),
             source_height: Some(1080),
-            has_audio: false,
             selected_audio_track: None,
             duration_seconds: 90.0,
             max_width: DEFAULT_PREVIEW_MAX_WIDTH,
@@ -2491,6 +2490,66 @@ mod frame_root_config {
         assert_eq!(config.rotation, "90");
         assert!(config.flip_horizontal);
         assert!(!config.flip_vertical);
+    }
+
+    #[test]
+    fn preview_runtime_request_is_silent_without_explicit_audio_selection() {
+        let mut root = FrameRoot::new();
+        root.file_queue
+            .add_file(FileItem::from_path("video", "/tmp/one.mp4", 1));
+        root.source_metadata.mark_ready(
+            "video".to_string(),
+            SourceMetadata {
+                media_kind: Some(SourceKind::Video),
+                width: Some(1920),
+                height: Some(1080),
+                audio_tracks: vec![crate::settings::AudioTrack {
+                    index: 1,
+                    codec: "aac".to_string(),
+                    ..crate::settings::AudioTrack::default()
+                }],
+                ..SourceMetadata::default()
+            },
+        );
+        let metadata_entry = root.source_metadata.entry_for("video");
+
+        let request = root
+            .selected_preview_runtime_request(&metadata_entry)
+            .expect("preview request");
+
+        assert_eq!(request.config.selected_audio_track, None);
+    }
+
+    #[test]
+    fn preview_runtime_request_uses_first_valid_explicit_audio_selection() {
+        let mut root = FrameRoot::new();
+        root.file_queue
+            .add_file(FileItem::from_path("video", "/tmp/one.mp4", 1));
+        root.source_metadata.mark_ready(
+            "video".to_string(),
+            SourceMetadata {
+                media_kind: Some(SourceKind::Video),
+                width: Some(1920),
+                height: Some(1080),
+                audio_tracks: vec![crate::settings::AudioTrack {
+                    index: 1,
+                    codec: "aac".to_string(),
+                    ..crate::settings::AudioTrack::default()
+                }],
+                ..SourceMetadata::default()
+            },
+        );
+        root.update_selected_config(|config| {
+            config.selected_audio_tracks = vec![99, 1];
+            true
+        });
+        let metadata_entry = root.source_metadata.entry_for("video");
+
+        let request = root
+            .selected_preview_runtime_request(&metadata_entry)
+            .expect("preview request");
+
+        assert_eq!(request.config.selected_audio_track, Some(1));
     }
 
     #[test]
@@ -3866,6 +3925,10 @@ mod preview_shell {
 
     fn empty_encoders() -> &'static AvailableEncoders {
         static ENCODERS: AvailableEncoders = AvailableEncoders {
+            mpeg2video: false,
+            mp2: false,
+            dvbsub: false,
+            pcm_bluray: false,
             h264_videotoolbox: false,
             h264_nvenc: false,
             hevc_videotoolbox: false,
@@ -3934,6 +3997,8 @@ mod preview_shell {
                 genre: None,
                 date: None,
                 comment: None,
+                service_name: None,
+                service_provider: None,
             },
             subtitle_focuses: SettingsSubtitleFocuses::default(),
             external_subtitle_language_focus: None,

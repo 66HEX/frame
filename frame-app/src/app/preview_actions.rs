@@ -2041,8 +2041,7 @@ fn preview_runtime_request(
     }
     let core_config = core_config_from_gpui(&preview_config);
     let presentation = PreviewRenderPresentation::default();
-    let has_audio = preview_has_audio(metadata, source_kind);
-    let selected_audio_track = preview_config.selected_audio_tracks.first().copied();
+    let selected_audio_track = preview_selected_audio_track(&preview_config, metadata);
     let key = PreviewRuntimeKey {
         file_id: selected_file.id.clone(),
         path: selected_file.path.clone(),
@@ -2052,7 +2051,7 @@ fn preview_runtime_request(
         duration_millis: rounded_f64_to_u64(duration_seconds * 1000.0),
         preview_dimensions,
         visual_hash: preview_visual_hash(&preview_config),
-        audio_hash: preview_audio_hash(&preview_config, has_audio, selected_audio_track),
+        audio_hash: preview_audio_hash(&preview_config, selected_audio_track),
     };
     let config = PreviewSessionConfig {
         file_id: key.file_id.clone(),
@@ -2060,7 +2059,6 @@ fn preview_runtime_request(
         source_kind,
         source_width,
         source_height,
-        has_audio,
         selected_audio_track,
         duration_seconds,
         max_width: preview_dimensions.max_width,
@@ -2149,13 +2147,8 @@ fn preview_visual_hash(config: &ConversionConfig) -> u64 {
     state.finish()
 }
 
-fn preview_audio_hash(
-    config: &ConversionConfig,
-    has_audio: bool,
-    selected_audio_track: Option<u32>,
-) -> u64 {
+fn preview_audio_hash(config: &ConversionConfig, selected_audio_track: Option<u32>) -> u64 {
     let mut state = DefaultHasher::new();
-    has_audio.hash(&mut state);
     selected_audio_track.hash(&mut state);
     config.audio_volume.hash(&mut state);
     config.audio_normalize.hash(&mut state);
@@ -2250,13 +2243,16 @@ fn engine_source_kind(metadata: &SourceMetadata) -> EnginePreviewSourceKind {
     }
 }
 
-fn preview_has_audio(metadata: &SourceMetadata, source_kind: EnginePreviewSourceKind) -> bool {
-    source_kind == EnginePreviewSourceKind::Audio
-        || !metadata.audio_tracks.is_empty()
-        || metadata
-            .audio_codec
-            .as_deref()
-            .is_some_and(|codec| !codec.trim().is_empty())
+fn preview_selected_audio_track(
+    config: &ConversionConfig,
+    metadata: &SourceMetadata,
+) -> Option<u32> {
+    config.selected_audio_tracks.iter().copied().find(|index| {
+        metadata
+            .audio_tracks
+            .iter()
+            .any(|track| track.index == *index)
+    })
 }
 
 fn preview_overlay_from_settings(settings: &OverlaySettings) -> PreviewOverlay {
