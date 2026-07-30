@@ -3,7 +3,10 @@
 use std::path::Path;
 
 use crate::error::ConversionError;
-use crate::types::{AudioTrack, FfprobeOutput, FfprobeStream, ProbeMetadata, SubtitleTrack};
+use crate::types::{
+    AudioTrack, FfprobeOutput, FfprobeProgram, FfprobeStream, ProbeMetadata, SubtitleTrack,
+    TransportStreamMetadata,
+};
 use crate::utils::{parse_frame_rate_string, parse_probe_bitrate};
 
 #[must_use]
@@ -15,6 +18,7 @@ pub fn ffprobe_json_args(file_path: &str) -> Vec<String> {
         "json".to_string(),
         "-show_format".to_string(),
         "-show_streams".to_string(),
+        "-show_programs".to_string(),
         file_path.to_string(),
     ]
 }
@@ -29,15 +33,28 @@ pub fn parse_ffprobe_stdout(
     stdout: impl AsRef<str>,
 ) -> Result<ProbeMetadata, ConversionError> {
     let probe_data: FfprobeOutput = serde_json::from_str(stdout.as_ref())?;
-    Ok(metadata_from_ffprobe(file_path, probe_data))
+    metadata_from_ffprobe(file_path, probe_data)
 }
 
 #[expect(
     clippy::too_many_lines,
     reason = "ffprobe parsing keeps track extraction in one pass over streams"
 )]
-fn metadata_from_ffprobe(file_path: &str, probe_data: FfprobeOutput) -> ProbeMetadata {
+fn metadata_from_ffprobe(
+    file_path: &str,
+    probe_data: FfprobeOutput,
+) -> Result<ProbeMetadata, ConversionError> {
     let source_format_name = probe_data.format.format_name.clone();
+    let selected_program = select_program(&probe_data)?;
+    let selected_program_id = selected_program.and_then(|program| program.program_id);
+    let selected_program_tags = selected_program.and_then(|program| program.tags.clone());
+    let selected_stream_indices = selected_program.map(|program| {
+        program
+            .streams
+            .iter()
+            .map(|stream| stream.index)
+            .collect::<std::collections::HashSet<_>>()
+    });
 
     let mut metadata = ProbeMetadata {
         duration: probe_data.format.duration,
@@ -49,7 +66,37 @@ fn metadata_from_ffprobe(file_path: &str, probe_data: FfprobeOutput) -> ProbeMet
         metadata.tags = Some(tags);
     }
 
-    if let Some(video_stream) = probe_data.streams.iter().find(|s| s.codec_type == "video") {
+    if source_format_name
+        .as_deref()
+        .is_some_and(|names| names.split(',').any(|name| name.trim() == "mpegts"))
+    {
+        let program_tags = selected_program_tags.as_ref();
+        let packet_size = probe_data
+            .format
+            .ts_packetsize
+            .as_deref()
+            .or_else(|| {
+                probe_data
+                    .streams
+                    .iter()
+                    .find_map(|stream| stream.ts_packetsize.as_deref())
+            })
+            .and_then(|value| value.parse::<u16>().ok());
+        metadata.transport_stream = Some(TransportStreamMetadata {
+            packet_size,
+            program_id: selected_program_id,
+            service_name: program_tags.and_then(|tags| tags.service_name.clone()),
+            service_provider: program_tags.and_then(|tags| tags.service_provider.clone()),
+        });
+    }
+
+    if let Some(video_stream) = probe_data.streams.iter().find(|stream| {
+        stream.codec_type == "video"
+            && selected_stream_indices
+                .as_ref()
+                .is_none_or(|indices| indices.contains(&stream.index))
+    }) {
+        metadata.video_stream_index = Some(video_stream.index);
         metadata.video_codec.clone_from(&video_stream.codec_name);
         metadata.pixel_format.clone_from(&video_stream.pix_fmt);
         metadata.color_space.clone_from(&video_stream.color_space);
@@ -79,11 +126,12 @@ fn metadata_from_ffprobe(file_path: &str, probe_data: FfprobeOutput) -> ProbeMet
         }
     }
 
-    for stream in probe_data
-        .streams
-        .iter()
-        .filter(|s| s.codec_type == "audio")
-    {
+    for stream in probe_data.streams.iter().filter(|s| {
+        s.codec_type == "audio"
+            && selected_stream_indices
+                .as_ref()
+                .is_none_or(|indices| indices.contains(&s.index))
+    }) {
         let Some(codec) = recognized_codec_name(stream.codec_name.as_deref()) else {
             continue;
         };
@@ -107,11 +155,12 @@ fn metadata_from_ffprobe(file_path: &str, probe_data: FfprobeOutput) -> ProbeMet
         });
     }
 
-    for stream in probe_data
-        .streams
-        .iter()
-        .filter(|s| s.codec_type == "subtitle")
-    {
+    for stream in probe_data.streams.iter().filter(|s| {
+        s.codec_type == "subtitle"
+            && selected_stream_indices
+                .as_ref()
+                .is_none_or(|indices| indices.contains(&s.index))
+    }) {
         let Some(codec) = recognized_codec_name(stream.codec_name.as_deref()) else {
             continue;
         };
@@ -168,7 +217,45 @@ fn metadata_from_ffprobe(file_path: &str, probe_data: FfprobeOutput) -> ProbeMet
         metadata.video_bitrate_kbps = None;
     }
 
-    metadata
+    Ok(metadata)
+}
+
+fn select_program(probe: &FfprobeOutput) -> Result<Option<&FfprobeProgram>, ConversionError> {
+    if probe.programs.is_empty() {
+        return Ok(None);
+    }
+    if probe.programs.len() == 1 {
+        return Ok(probe.programs.first());
+    }
+
+    let Some(main_video_index) = probe
+        .streams
+        .iter()
+        .find(|stream| stream.codec_type == "video")
+        .map(|stream| stream.index)
+    else {
+        return Err(ConversionError::Probe(
+            "MPEG transport stream contains multiple programs and no unambiguous main video program"
+                .to_string(),
+        ));
+    };
+    let matching = probe
+        .programs
+        .iter()
+        .filter(|program| {
+            program
+                .streams
+                .iter()
+                .any(|stream| stream.index == main_video_index)
+        })
+        .collect::<Vec<_>>();
+    if matching.len() == 1 {
+        Ok(matching.first().copied())
+    } else {
+        Err(ConversionError::Probe(format!(
+            "MPEG transport stream contains multiple programs; video stream #{main_video_index} does not identify exactly one program"
+        )))
+    }
 }
 
 fn recognized_codec_name(codec_name: Option<&str>) -> Option<&str> {
@@ -252,6 +339,7 @@ mod tests {
                 "json",
                 "-show_format",
                 "-show_streams",
+                "-show_programs",
                 "/tmp/input.mp4"
             ]
         );
@@ -339,6 +427,88 @@ mod tests {
                 .and_then(|tags| tags.title.as_deref()),
             Some("Demo")
         );
+    }
+
+    #[test]
+    fn parse_transport_stream_program_metadata_and_packet_size() {
+        let metadata = parse_ffprobe_stdout(
+            "/tmp/source.M2T",
+            r#"{
+                "programs": [{
+                    "program_id": 42,
+                    "tags": {"service_name":"News", "service_provider":"Frame"},
+                    "streams": [
+                        {"index":0,"codec_type":"video","codec_name":"mpeg2video","ts_packetsize":"188"},
+                        {"index":2,"codec_type":"audio","codec_name":"mp2","channels":2,"ts_packetsize":"188"}
+                    ]
+                }],
+                "streams": [
+                    {"index":0,"codec_type":"video","codec_name":"mpeg2video","width":1920,"height":1080,"ts_packetsize":"188"},
+                    {"index":2,"codec_type":"audio","codec_name":"mp2","channels":2,"ts_packetsize":"188"},
+                    {"index":9,"codec_type":"audio","codec_name":"aac","channels":2,"ts_packetsize":"188"}
+                ],
+                "format":{"format_name":"mpegts","duration":"1.0"}
+            }"#,
+        )
+        .unwrap();
+
+        let transport = metadata.transport_stream.unwrap();
+        assert_eq!(transport.packet_size, Some(188));
+        assert_eq!(transport.program_id, Some(42));
+        assert_eq!(transport.service_name.as_deref(), Some("News"));
+        assert_eq!(transport.service_provider.as_deref(), Some("Frame"));
+        assert_eq!(metadata.audio_tracks.len(), 1);
+        assert_eq!(metadata.audio_tracks[0].index, 2);
+    }
+
+    #[test]
+    fn ambiguous_multi_program_source_is_rejected() {
+        let error = parse_ffprobe_stdout(
+            "/tmp/multi.ts",
+            r#"{
+                "programs": [
+                    {"program_id":1,"streams":[{"index":0,"codec_type":"video","codec_name":"h264"}]},
+                    {"program_id":2,"streams":[{"index":0,"codec_type":"video","codec_name":"h264"}]}
+                ],
+                "streams":[{"index":0,"codec_type":"video","codec_name":"h264"}],
+                "format":{"format_name":"mpegts"}
+            }"#,
+        )
+        .unwrap_err();
+
+        assert!(error.to_string().contains("multiple programs"));
+    }
+
+    #[test]
+    fn multi_program_source_selects_video_from_the_selected_program() {
+        let metadata = parse_ffprobe_stdout(
+            "/tmp/multi.ts",
+            r#"{
+                "programs": [
+                    {"program_id":1,"streams":[
+                        {"index":0,"codec_type":"video","codec_name":"h264"},
+                        {"index":1,"codec_type":"audio","codec_name":"aac","channels":2}
+                    ]},
+                    {"program_id":2,"streams":[
+                        {"index":2,"codec_type":"video","codec_name":"mpeg2video"},
+                        {"index":3,"codec_type":"audio","codec_name":"mp2","channels":2}
+                    ]}
+                ],
+                "streams":[
+                    {"index":0,"codec_type":"video","codec_name":"h264"},
+                    {"index":1,"codec_type":"audio","codec_name":"aac","channels":2},
+                    {"index":2,"codec_type":"video","codec_name":"mpeg2video"},
+                    {"index":3,"codec_type":"audio","codec_name":"mp2","channels":2}
+                ],
+                "format":{"format_name":"mpegts"}
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(metadata.video_stream_index, Some(0));
+        assert_eq!(metadata.video_codec.as_deref(), Some("h264"));
+        assert_eq!(metadata.audio_tracks.len(), 1);
+        assert_eq!(metadata.audio_tracks[0].index, 1);
     }
 
     #[test]

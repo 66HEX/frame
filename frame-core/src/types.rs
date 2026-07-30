@@ -282,6 +282,20 @@ pub struct ProbeMetadata {
     pub color_range: Option<String>,
     pub color_primaries: Option<String>,
     pub profile: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub video_stream_index: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transport_stream: Option<TransportStreamMetadata>,
+}
+
+/// Program-level metadata exposed by MPEG-TS/M2TS sources.
+#[derive(Debug, Serialize, Deserialize, Default, Clone, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TransportStreamMetadata {
+    pub packet_size: Option<u16>,
+    pub program_id: Option<u32>,
+    pub service_name: Option<String>,
+    pub service_provider: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -553,6 +567,16 @@ pub struct LogPayload {
 pub struct FfprobeOutput {
     pub streams: Vec<FfprobeStream>,
     pub format: FfprobeFormat,
+    #[serde(default)]
+    pub programs: Vec<FfprobeProgram>,
+}
+
+#[derive(Deserialize)]
+pub struct FfprobeProgram {
+    pub program_id: Option<u32>,
+    #[serde(default)]
+    pub streams: Vec<FfprobeStream>,
+    pub tags: Option<FfprobeTags>,
 }
 
 #[derive(Deserialize)]
@@ -574,6 +598,7 @@ pub struct FfprobeStream {
     pub color_primaries: Option<String>,
     pub profile: Option<String>,
     pub sample_rate: Option<String>,
+    pub ts_packetsize: Option<String>,
     #[serde(default)]
     pub side_data_list: Vec<FfprobeSideData>,
 }
@@ -589,6 +614,7 @@ pub struct FfprobeFormat {
     pub duration: Option<String>,
     pub bit_rate: Option<String>,
     pub tags: Option<FfprobeTags>,
+    pub ts_packetsize: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
@@ -611,6 +637,8 @@ pub struct FfprobeTags {
     pub comment: Option<String>,
     #[serde(rename = "DESCRIPTION")]
     pub description_upper: Option<String>,
+    pub service_name: Option<String>,
+    pub service_provider: Option<String>,
 }
 
 #[derive(Debug, Clone)]
