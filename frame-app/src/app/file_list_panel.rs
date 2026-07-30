@@ -3,25 +3,27 @@ use super::{
     FILE_LIST_ACTION_ICON_SIZE, FILE_LIST_ACTIONS_WIDTH, FILE_ROW_HEIGHT, FileItem, FileQueue,
     FileStateTone, FluentBuilder, FrameRoot, InteractiveElement, IntoElement, MouseButton,
     PANEL_HEADER_HEIGHT, ParentElement, Rgba, RowActionAvailability, RowPrimaryAction,
-    RowSecondaryAction, StatefulInteractiveElement, Styled, WORKSPACE_GAP, Window, assets, div,
-    format_file_size, theme,
+    RowSecondaryAction, StatefulInteractiveElement, Styled, UniformListScrollHandle, WORKSPACE_GAP,
+    Window, assets, div, format_file_size, theme, uniform_list,
 };
 use super::{
     accessibility::apply_accessible_checkbox,
     components::{
         FrameIconButtonSize, FrameIconButtonVariant, frame_checkbox_indicator, frame_icon_button,
+        frame_vertical_uniform_scrollbar,
     },
     primitives::{
         FrameSurface, button_mouse_down, color, drop_target_shadows, element_id,
         panel_bottom_separator,
     },
 };
+use crate::numeric::usize_to_f32;
 
 pub(super) fn file_list_panel(
     queue: &FileQueue,
+    scroll_handle: &UniformListScrollHandle,
     palette: &'static theme::ThemePalette,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
+    cx: &Context<FrameRoot>,
 ) -> gpui::Div {
     div()
         .flex()
@@ -36,7 +38,7 @@ pub(super) fn file_list_panel(
                 .shadow(drop_target_shadows(palette))
         })
         .child(file_list_header(queue.batch_selection_state(), palette, cx))
-        .child(file_list_body(queue, palette, window, cx))
+        .child(file_list_body(queue, scroll_handle, palette, cx))
 }
 
 pub(super) fn file_list_header(
@@ -137,18 +139,19 @@ pub(super) fn file_list_header(
 
 pub(super) fn file_list_body(
     queue: &FileQueue,
+    scroll_handle: &UniformListScrollHandle,
     palette: &'static theme::ThemePalette,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
+    cx: &Context<FrameRoot>,
 ) -> impl IntoElement {
     let body = div()
         .id("file-list-body")
         .role(gpui::Role::List)
         .aria_label("File queue")
+        .relative()
         .flex_1()
         .flex()
         .flex_col()
-        .overflow_y_scroll();
+        .overflow_hidden();
     if queue.files().is_empty() {
         return body.child(
             div()
@@ -162,17 +165,35 @@ pub(super) fn file_list_body(
         );
     }
 
-    let mut body = body;
-    for file in queue.files() {
-        body = body.child(file_list_row(
-            file,
-            queue.selected_file_id() == Some(file.id.as_str()),
-            palette,
-            window,
-            cx,
-        ));
-    }
-    body
+    let file_count = queue.files().len();
+    let list = uniform_list(
+        "file-list-rows",
+        file_count,
+        cx.processor(move |root, range: std::ops::Range<usize>, window, cx| {
+            let selected_id = root.file_queue.selected_file_id();
+            range
+                .filter_map(|index| root.file_queue.files().get(index))
+                .map(|file| {
+                    file_list_row(
+                        file,
+                        selected_id == Some(file.id.as_str()),
+                        palette,
+                        window,
+                        cx,
+                    )
+                })
+                .collect()
+        }),
+    )
+    .track_scroll(scroll_handle)
+    .size_full();
+
+    body.child(list).child(frame_vertical_uniform_scrollbar(
+        "file-list-scrollbar",
+        scroll_handle,
+        usize_to_f32(file_count) * FILE_ROW_HEIGHT,
+        palette,
+    ))
 }
 
 pub(super) fn file_list_row(
@@ -181,7 +202,7 @@ pub(super) fn file_list_row(
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
-) -> impl IntoElement {
+) -> gpui::Stateful<gpui::Div> {
     let group_name = format!("file-list-row-{}", file.id);
     let select_id = file.id.clone();
     let row_accessible_label = format!(

@@ -478,6 +478,7 @@ impl Render for FrameRoot {
                 };
                 content.child(workspace_view(
                     &self.file_queue,
+                    &self.file_list_scroll_handle,
                     &settings,
                     PreviewPanelProps {
                         canvas: preview_canvas,

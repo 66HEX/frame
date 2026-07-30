@@ -93,6 +93,7 @@ impl FrameRoot {
             titlebar_drag: TitlebarDragState::default(),
             focus_registry: FrameFocusRegistry::default(),
             file_queue: FileQueue::new(),
+            file_list_scroll_handle: UniformListScrollHandle::new(),
             conversion_events: ConversionEventState::new(),
             logs_scroll_handle: UniformListScrollHandle::new(),
             last_log_scroll_target: None,

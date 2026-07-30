@@ -264,6 +264,7 @@ pub struct FrameRoot {
     titlebar_drag: TitlebarDragState,
     focus_registry: FrameFocusRegistry,
     file_queue: FileQueue,
+    file_list_scroll_handle: UniformListScrollHandle,
     conversion_events: ConversionEventState,
     logs_scroll_handle: UniformListScrollHandle,
     last_log_scroll_target: Option<LogScrollTarget>,
