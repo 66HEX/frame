@@ -518,6 +518,10 @@ pub struct MetadataConfig {
     pub genre: Option<String>,
     pub date: Option<String>,
     pub comment: Option<String>,
+    #[serde(default)]
+    pub service_name: Option<String>,
+    #[serde(default)]
+    pub service_provider: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
@@ -705,6 +709,8 @@ mod tests {
         assert_eq!(config.gif_loop, 0);
         assert_eq!(config.metadata.mode, MetadataMode::Preserve);
         assert!(config.external_subtitle_tracks.is_empty());
+        assert_eq!(config.metadata.service_name, None);
+        assert_eq!(config.metadata.service_provider, None);
     }
 
     #[test]
@@ -720,6 +726,26 @@ mod tests {
         assert_eq!(serialized["metadata"]["mode"], "preserve");
         assert_eq!(serialized["externalSubtitleTracks"], json!([]));
         assert!(serialized.get("processing_mode").is_none());
+    }
+
+    #[test]
+    fn transport_service_metadata_serializes_additively() {
+        let mut config: ConversionConfig = serde_json::from_value(minimal_config_json()).unwrap();
+        config.container = "m2ts".to_string();
+        config.metadata.service_name = Some("Frame Service".to_string());
+        config.metadata.service_provider = Some("Frame".to_string());
+
+        let serialized = serde_json::to_value(&config).unwrap();
+        let restored: ConversionConfig = serde_json::from_value(serialized.clone()).unwrap();
+
+        assert_eq!(serialized["container"], "m2ts");
+        assert_eq!(serialized["metadata"]["serviceName"], "Frame Service");
+        assert_eq!(serialized["metadata"]["serviceProvider"], "Frame");
+        assert_eq!(restored.container, "m2ts");
+        assert_eq!(
+            restored.metadata.service_name.as_deref(),
+            Some("Frame Service")
+        );
     }
 
     #[test]

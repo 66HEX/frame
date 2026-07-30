@@ -382,6 +382,8 @@ pub struct MetadataConfig {
     pub genre: Option<String>,
     pub date: Option<String>,
     pub comment: Option<String>,
+    pub service_name: Option<String>,
+    pub service_provider: Option<String>,
 }
 
 impl Default for MetadataConfig {
@@ -394,6 +396,8 @@ impl Default for MetadataConfig {
             genre: None,
             date: None,
             comment: None,
+            service_name: None,
+            service_provider: None,
         }
     }
 }
