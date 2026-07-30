@@ -3654,6 +3654,15 @@ mod visual_fixtures {
     }
 
     #[test]
+    fn workspace_large_queue_fixture_seeds_many_files_for_virtualization_checks() {
+        let mut root = FrameRoot::new();
+
+        root.apply_visual_fixture(Some(VisualFixture::WorkspaceLargeQueue));
+
+        assert_eq!(root.file_queue.files().len(), 500);
+    }
+
+    #[test]
     fn settings_source_fixture_opens_source_tab_with_ready_metadata() {
         let mut root = FrameRoot::new();
 

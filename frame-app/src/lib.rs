@@ -115,6 +115,7 @@ pub enum VisualFixture {
     WorkspaceAudio,
     WorkspaceEmpty,
     WorkspaceImage,
+    WorkspaceLargeQueue,
 }
 
 #[must_use]
@@ -141,6 +142,7 @@ pub fn visual_fixture_from_env_value(value: Option<&str>) -> Option<VisualFixtur
         Some("workspace-audio") => Some(VisualFixture::WorkspaceAudio),
         Some("workspace-empty") => Some(VisualFixture::WorkspaceEmpty),
         Some("workspace-image") => Some(VisualFixture::WorkspaceImage),
+        Some("workspace-large-queue") => Some(VisualFixture::WorkspaceLargeQueue),
         _ => None,
     }
 }
@@ -340,6 +342,7 @@ mod tests {
                 ("workspace-audio", VisualFixture::WorkspaceAudio),
                 ("workspace-empty", VisualFixture::WorkspaceEmpty),
                 ("workspace-image", VisualFixture::WorkspaceImage),
+                ("workspace-large-queue", VisualFixture::WorkspaceLargeQueue),
             ];
 
             for (value, expected) in cases {

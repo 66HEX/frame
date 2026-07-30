@@ -74,6 +74,9 @@ impl FrameRoot {
             Some(VisualFixture::WorkspaceAudio) => self.apply_workspace_audio_fixture(),
             Some(VisualFixture::WorkspaceEmpty) => self.apply_workspace_empty_fixture(),
             Some(VisualFixture::WorkspaceImage) => self.apply_workspace_image_fixture(),
+            Some(VisualFixture::WorkspaceLargeQueue) => {
+                self.apply_workspace_large_queue_fixture();
+            }
             None => {}
         }
     }
@@ -112,6 +115,18 @@ impl FrameRoot {
     pub(super) fn apply_workspace_image_fixture(&mut self) {
         self.seed_image_source_fixture();
         self.settings_ui.active_tab = SettingsTab::Source;
+    }
+    pub(super) fn apply_workspace_large_queue_fixture(&mut self) {
+        const FILE_COUNT: usize = 500;
+
+        self.apply_preview_ready_fixture();
+        self.file_queue.add_files((1..FILE_COUNT).map(|index| {
+            FileItem::from_path(
+                format!("fixture-queue-{index:03}"),
+                format!("/tmp/render_queue_item_{index:03}.mov"),
+                32_000_000 + index as u64 * 1_250_000,
+            )
+        }));
     }
     pub(super) fn apply_logs_active_fixture(&mut self) {
         self.active_view = ActiveView::Logs;

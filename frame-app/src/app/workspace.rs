@@ -1,8 +1,8 @@
 use super::{
     ClickEvent, Context, FILE_LIST_ROW_SPAN, FileQueue, FrameRoot, LEFT_COLUMN_SPAN,
     LEFT_GRID_ROWS, PREVIEW_ROW_SPAN, ParentElement, PreviewPanelProps, RIGHT_COLUMN_SPAN,
-    SettingsRenderState, StatefulInteractiveElement, Styled, WORKSPACE_COLUMNS, WORKSPACE_GAP,
-    Window, assets, color, div, svg, theme,
+    SettingsRenderState, StatefulInteractiveElement, Styled, UniformListScrollHandle,
+    WORKSPACE_COLUMNS, WORKSPACE_GAP, Window, assets, color, div, svg, theme,
 };
 use super::{
     file_list_panel::file_list_panel,
@@ -18,6 +18,7 @@ const WELCOME_MAX_WIDTH: f32 = 420.0;
 
 pub(super) fn workspace_view(
     file_queue: &FileQueue,
+    file_list_scroll_handle: &UniformListScrollHandle,
     settings: &SettingsRenderState<'_>,
     preview_props: PreviewPanelProps<'_>,
     window: &mut Window,
@@ -44,7 +45,7 @@ pub(super) fn workspace_view(
                         .row_span(PREVIEW_ROW_SPAN),
                 )
                 .child(
-                    file_list_panel(file_queue, settings.palette, window, cx)
+                    file_list_panel(file_queue, file_list_scroll_handle, settings.palette, cx)
                         .row_span(FILE_LIST_ROW_SPAN),
                 ),
         )

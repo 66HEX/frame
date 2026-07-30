@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Virtualized File Queue:** Reused the Logs panel's uniform-list rendering and scrollbar for the workspace file queue, keeping large batches responsive while preserving row selection, actions, and accessibility.
 - **Subtitle Settings Workflow:** Split the Subtitles tab into Selectable and Burn-in modes so only the relevant controls are shown. Selectable subtitles now combine imported sidecars with embedded source tracks, while burn-in import uses the same post-import file-row and removal pattern as selectable subtitles.
 - **Audio and Subtitle Track Rows:** Reworked shared track rows so audio metadata uses a readable two-line layout with channels, language, track name, and bitrate grouped together, while subtitle rows remain compact and preserve the track index and codec when space is limited. Source track names now fall back to FFmpeg handler metadata when no title is available.
 
