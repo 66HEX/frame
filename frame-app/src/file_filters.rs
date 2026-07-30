@@ -2,17 +2,21 @@
 
 use std::path::{Path, PathBuf};
 
-pub const VIDEO_FILE_EXTENSIONS: &[&str] = &["mp4", "mov", "mkv", "avi", "webm", "gif"];
+pub const VIDEO_FILE_EXTENSIONS: &[&str] = &[
+    "mp4", "mov", "mkv", "avi", "webm", "mts", "m2t", "m2ts", "gif",
+];
 pub const AUDIO_FILE_EXTENSIONS: &[&str] = &["mp3", "m4a", "wav", "flac"];
 pub const IMAGE_FILE_EXTENSIONS: &[&str] = &[
     "png", "jpg", "jpeg", "webp", "bmp", "tif", "tiff", "avif", "heic", "heif",
 ];
 pub const SOURCE_FILE_EXTENSIONS: &[&str] = &[
-    "mp4", "mov", "mkv", "avi", "webm", "gif", "mp3", "m4a", "wav", "flac", "png", "jpg", "jpeg",
-    "webp", "bmp", "tif", "tiff", "avif", "heic", "heif",
+    "mp4", "mov", "mkv", "avi", "webm", "mts", "m2t", "m2ts", "gif", "mp3", "m4a", "wav", "flac",
+    "png", "jpg", "jpeg", "webp", "bmp", "tif", "tiff", "avif", "heic", "heif",
 ];
 
-pub const SUBTITLE_FILE_EXTENSIONS: &[&str] = &["srt", "ass", "vtt"];
+pub const BURN_SUBTITLE_FILE_EXTENSIONS: &[&str] = &["srt", "ass", "vtt"];
+pub const SELECTABLE_SUBTITLE_FILE_EXTENSIONS: &[&str] = &["srt", "ass", "vtt", "sup"];
+pub const PGS_SUBTITLE_FILE_EXTENSIONS: &[&str] = &["sup"];
 
 #[must_use]
 pub fn is_supported_source_path(path: &Path) -> bool {
@@ -21,7 +25,36 @@ pub fn is_supported_source_path(path: &Path) -> bool {
 
 #[must_use]
 pub fn is_supported_subtitle_path(path: &Path) -> bool {
-    path_has_extension(path, SUBTITLE_FILE_EXTENSIONS)
+    path_has_extension(path, BURN_SUBTITLE_FILE_EXTENSIONS)
+}
+
+#[must_use]
+pub fn is_supported_selectable_subtitle_path(path: &Path) -> bool {
+    path_has_extension(path, SELECTABLE_SUBTITLE_FILE_EXTENSIONS)
+}
+
+#[must_use]
+pub fn selectable_subtitle_extensions_for_container(container: &str) -> &'static [&'static str] {
+    if frame_core::container::is_transport_stream_container(container) {
+        PGS_SUBTITLE_FILE_EXTENSIONS
+    } else if container.eq_ignore_ascii_case("mkv") {
+        SELECTABLE_SUBTITLE_FILE_EXTENSIONS
+    } else if matches!(
+        container.to_ascii_lowercase().as_str(),
+        "mp4" | "mov" | "webm"
+    ) {
+        BURN_SUBTITLE_FILE_EXTENSIONS
+    } else {
+        &[]
+    }
+}
+
+#[must_use]
+pub fn is_supported_selectable_subtitle_path_for_container(path: &Path, container: &str) -> bool {
+    path_has_extension(
+        path,
+        selectable_subtitle_extensions_for_container(container),
+    )
 }
 
 #[must_use]
@@ -97,6 +130,46 @@ mod tests {
     fn is_supported_source_path_accepts_original_media_extensions() {
         assert!(is_supported_source_path(Path::new("/tmp/clip.MOV")));
         assert!(is_supported_source_path(Path::new("/tmp/still.heif")));
+    }
+
+    #[test]
+    fn transport_stream_extensions_are_supported_case_insensitively() {
+        for path in ["clip.m2t", "clip.MTS", "clip.M2TS"] {
+            assert!(is_supported_source_path(Path::new(path)), "{path}");
+        }
+    }
+
+    #[test]
+    fn sup_is_selectable_but_not_offered_for_text_burn_in() {
+        let path = Path::new("/tmp/captions.SUP");
+        assert!(is_supported_selectable_subtitle_path(path));
+        assert!(!is_supported_subtitle_path(path));
+    }
+
+    #[test]
+    fn transport_stream_selectable_subtitles_accept_only_pgs_sidecars() {
+        for container in ["m2t", "mts", "m2ts"] {
+            assert!(is_supported_selectable_subtitle_path_for_container(
+                Path::new("/tmp/captions.SUP"),
+                container
+            ));
+            assert!(!is_supported_selectable_subtitle_path_for_container(
+                Path::new("/tmp/captions.ass"),
+                container
+            ));
+        }
+    }
+
+    #[test]
+    fn mp4_selectable_subtitles_accept_text_but_not_pgs_sidecars() {
+        assert!(is_supported_selectable_subtitle_path_for_container(
+            Path::new("/tmp/captions.vtt"),
+            "mp4"
+        ));
+        assert!(!is_supported_selectable_subtitle_path_for_container(
+            Path::new("/tmp/captions.sup"),
+            "mp4"
+        ));
     }
 
     #[test]

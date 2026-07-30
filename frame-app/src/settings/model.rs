@@ -967,6 +967,7 @@ pub struct SourceMetadata {
     pub color_range: Option<String>,
     pub color_primaries: Option<String>,
     pub profile: Option<String>,
+    pub transport_stream: Option<frame_core::types::TransportStreamMetadata>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

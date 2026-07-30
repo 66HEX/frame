@@ -29,6 +29,34 @@ pub fn source_info_sections(metadata: &SourceMetadata) -> Vec<SourceInfoSection>
         });
     }
 
+    if let Some(transport) = &metadata.transport_stream {
+        let mut rows = Vec::new();
+        if let Some(packet_size) = transport.packet_size {
+            rows.push(SourceInfoRow {
+                label: "Packet size",
+                value: format!("{packet_size} bytes"),
+            });
+        }
+        if let Some(program_id) = transport.program_id {
+            rows.push(SourceInfoRow {
+                label: "Program ID",
+                value: program_id.to_string(),
+            });
+        }
+        push_optional_row(&mut rows, "Service name", transport.service_name.as_deref());
+        push_optional_row(
+            &mut rows,
+            "Service provider",
+            transport.service_provider.as_deref(),
+        );
+        if !rows.is_empty() {
+            sections.push(SourceInfoSection::Rows {
+                title: "Transport stream",
+                rows,
+            });
+        }
+    }
+
     if !metadata.audio_tracks.is_empty() {
         sections.push(SourceInfoSection::Tracks {
             title: "Audio stream",
