@@ -9,6 +9,10 @@ const FFMPEG_FILTER_LIST_ARGS: [&str; 1] = ["-filters"];
     reason = "encoder availability is represented as explicit frontend feature flags"
 )]
 pub struct AvailableEncoders {
+    pub mpeg2video: bool,
+    pub mp2: bool,
+    pub dvbsub: bool,
+    pub pcm_bluray: bool,
     pub h264_videotoolbox: bool,
     pub h264_nvenc: bool,
     pub hevc_videotoolbox: bool,
@@ -61,6 +65,10 @@ pub fn parse_available_encoders(ffmpeg_encoders_stdout: impl AsRef<str>) -> Avai
     let stdout = ffmpeg_encoders_stdout.as_ref();
 
     AvailableEncoders {
+        mpeg2video: encoder_list_contains(stdout, "mpeg2video"),
+        mp2: encoder_list_contains(stdout, "mp2"),
+        dvbsub: encoder_list_contains(stdout, "dvbsub"),
+        pcm_bluray: encoder_list_contains(stdout, "pcm_bluray"),
         h264_videotoolbox: encoder_list_contains(stdout, "h264_videotoolbox"),
         h264_nvenc: encoder_list_contains(stdout, "h264_nvenc"),
         hevc_videotoolbox: encoder_list_contains(stdout, "hevc_videotoolbox"),
@@ -134,6 +142,10 @@ Encoders:
  V....D av1_nvenc NVIDIA NVENC av1 encoder
  A..... libfdk_aac Fraunhofer FDK AAC
  A..... libmp3lame libmp3lame MP3
+ V.S... mpeg2video MPEG-2 video
+ A....D mp2 MP2 (MPEG audio layer 2)
+ S..... dvbsub DVB subtitles
+ A..... pcm_bluray PCM signed 16|20|24-bit big-endian for Blu-ray media
 ";
 
         let actual = parse_available_encoders(stdout);
@@ -141,6 +153,10 @@ Encoders:
         assert_eq!(
             actual,
             AvailableEncoders {
+                mpeg2video: true,
+                mp2: true,
+                dvbsub: true,
+                pcm_bluray: true,
                 h264_videotoolbox: true,
                 h264_nvenc: true,
                 hevc_videotoolbox: true,
