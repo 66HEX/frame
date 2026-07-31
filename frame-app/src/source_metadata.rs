@@ -135,6 +135,7 @@ pub fn source_metadata_from_probe(probe: ProbeMetadata) -> SourceMetadata {
         color_range: probe.color_range,
         color_primaries: probe.color_primaries,
         profile: probe.profile,
+        transport_stream: probe.transport_stream,
     }
 }
 
@@ -225,6 +226,22 @@ mod tests {
             assert_eq!(metadata.media_kind, Some(SourceKind::Video));
             assert_eq!(metadata.video_codec.as_deref(), Some("h264"));
             assert_eq!(metadata.resolution.as_deref(), Some("1920x1080"));
+        }
+
+        #[test]
+        fn maps_transport_stream_program_metadata() {
+            let transport = frame_core::types::TransportStreamMetadata {
+                packet_size: Some(188),
+                program_id: Some(1),
+                service_name: Some("Service".to_string()),
+                service_provider: Some("Provider".to_string()),
+            };
+            let metadata = source_metadata_from_probe(ProbeMetadata {
+                transport_stream: Some(transport.clone()),
+                ..ProbeMetadata::default()
+            });
+
+            assert_eq!(metadata.transport_stream, Some(transport));
         }
 
         #[test]

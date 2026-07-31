@@ -382,6 +382,8 @@ pub struct MetadataConfig {
     pub genre: Option<String>,
     pub date: Option<String>,
     pub comment: Option<String>,
+    pub service_name: Option<String>,
+    pub service_provider: Option<String>,
 }
 
 impl Default for MetadataConfig {
@@ -394,6 +396,8 @@ impl Default for MetadataConfig {
             genre: None,
             date: None,
             comment: None,
+            service_name: None,
+            service_provider: None,
         }
     }
 }
@@ -406,6 +410,8 @@ pub enum MetadataField {
     Genre,
     Date,
     Comment,
+    ServiceName,
+    ServiceProvider,
 }
 
 impl MetadataField {
@@ -418,6 +424,8 @@ impl MetadataField {
             Self::Genre => "genre",
             Self::Date => "date",
             Self::Comment => "comment",
+            Self::ServiceName => "serviceName",
+            Self::ServiceProvider => "serviceProvider",
         }
     }
 
@@ -430,12 +438,17 @@ impl MetadataField {
             Self::Genre => "Genre",
             Self::Date => "Date / Year",
             Self::Comment => "Comment",
+            Self::ServiceName => "Service name",
+            Self::ServiceProvider => "Service provider",
         }
     }
 
     #[must_use]
     pub const fn visible_for_image(self) -> bool {
-        !matches!(self, Self::Album | Self::Genre)
+        !matches!(
+            self,
+            Self::Album | Self::Genre | Self::ServiceName | Self::ServiceProvider
+        )
     }
 }
 
@@ -549,6 +562,7 @@ pub struct SubtitleTrackOption {
     pub detail: String,
     pub is_selected: bool,
     pub is_disabled: bool,
+    pub disabled_reason: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -939,6 +953,7 @@ impl SourceTags {
             MetadataField::Genre => self.genre.as_deref(),
             MetadataField::Date => self.date.as_deref(),
             MetadataField::Comment => self.comment.as_deref(),
+            MetadataField::ServiceName | MetadataField::ServiceProvider => None,
         }
     }
 }
@@ -963,6 +978,7 @@ pub struct SourceMetadata {
     pub color_range: Option<String>,
     pub color_primaries: Option<String>,
     pub profile: Option<String>,
+    pub transport_stream: Option<frame_core::types::TransportStreamMetadata>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -971,7 +987,7 @@ pub(super) struct AudioCodecDefinition {
     pub(super) label: &'static str,
 }
 
-pub(super) const AUDIO_CODEC_DEFINITIONS: [AudioCodecDefinition; 7] = [
+pub(super) const AUDIO_CODEC_DEFINITIONS: [AudioCodecDefinition; 9] = [
     AudioCodecDefinition {
         codec: "aac",
         label: "AAC / Stereo",
@@ -999,6 +1015,14 @@ pub(super) const AUDIO_CODEC_DEFINITIONS: [AudioCodecDefinition; 7] = [
     AudioCodecDefinition {
         codec: "pcm_s16le",
         label: "PCM / WAV",
+    },
+    AudioCodecDefinition {
+        codec: "mp2",
+        label: "MPEG Layer II",
+    },
+    AudioCodecDefinition {
+        codec: "pcm_bluray",
+        label: "Blu-ray PCM (Lossless)",
     },
 ];
 
@@ -1044,6 +1068,7 @@ pub(super) struct VideoCodecDefinition {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum VideoCodecCapability {
+    Mpeg2video,
     H264Videotoolbox,
     H264Nvenc,
     HevcVideotoolbox,
@@ -1051,7 +1076,7 @@ pub(super) enum VideoCodecCapability {
     Av1Nvenc,
 }
 
-pub(super) const VIDEO_CODEC_DEFINITIONS: [VideoCodecDefinition; 11] = [
+pub(super) const VIDEO_CODEC_DEFINITIONS: [VideoCodecDefinition; 12] = [
     VideoCodecDefinition {
         codec: "libx264",
         label: "H.264 / AVC",
@@ -1076,6 +1101,11 @@ pub(super) const VIDEO_CODEC_DEFINITIONS: [VideoCodecDefinition; 11] = [
         codec: "libsvtav1",
         label: "AV1 / SVT",
         capability: None,
+    },
+    VideoCodecDefinition {
+        codec: "mpeg2video",
+        label: "MPEG-2 Video",
+        capability: Some(VideoCodecCapability::Mpeg2video),
     },
     VideoCodecDefinition {
         codec: "gif",

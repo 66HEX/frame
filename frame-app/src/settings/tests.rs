@@ -85,7 +85,8 @@ mod output_options {
         assert_eq!(
             visible_output_containers(None),
             vec![
-                "mp4", "mkv", "webm", "mov", "gif", "mp3", "m4a", "wav", "flac"
+                "mp4", "mkv", "webm", "mov", "m2t", "mts", "m2ts", "gif", "mp3", "m4a", "wav",
+                "flac"
             ]
         );
     }
@@ -172,10 +173,12 @@ mod output_options {
             selected_subtitle_tracks: vec![2],
             ..ConversionConfig::default()
         };
+        let mut metadata = video_metadata();
+        metadata.subtitle_tracks[0].codec = "hdmv_pgs_subtitle".to_string();
 
         assert!(!is_container_compatible_for_stream_copy(
             &config,
-            Some(&video_metadata()),
+            Some(&metadata),
             "mp4"
         ));
     }
@@ -346,7 +349,12 @@ mod subtitle_options {
             ..ConversionConfig::default()
         };
 
-        let options = subtitle_track_options(&config, Some(&metadata_with_subtitles()), false);
+        let options = subtitle_track_options(
+            &config,
+            Some(&metadata_with_subtitles()),
+            false,
+            &frame_core::capabilities::AvailableEncoders::default(),
+        );
 
         assert!(!options[0].is_selected);
         assert!(options[1].is_selected);
@@ -358,9 +366,53 @@ mod subtitle_options {
             &ConversionConfig::default(),
             Some(&metadata_with_subtitles()),
             false,
+            &frame_core::capabilities::AvailableEncoders::default(),
         );
 
         assert_eq!(options[0].detail, "eng • Dialogue");
+    }
+
+    #[test]
+    fn m2t_bitmap_subtitle_requires_available_dvb_encoder() {
+        let config = ConversionConfig {
+            container: "m2t".to_string(),
+            ..ConversionConfig::default()
+        };
+        let metadata = SourceMetadata {
+            subtitle_tracks: vec![SubtitleTrack {
+                index: 4,
+                codec: "hdmv_pgs_subtitle".to_string(),
+                language: None,
+                label: None,
+            }],
+            ..SourceMetadata::default()
+        };
+
+        let unavailable = subtitle_track_options(
+            &config,
+            Some(&metadata),
+            false,
+            &frame_core::capabilities::AvailableEncoders::default(),
+        );
+        let available = subtitle_track_options(
+            &config,
+            Some(&metadata),
+            false,
+            &frame_core::capabilities::AvailableEncoders {
+                dvbsub: true,
+                ..frame_core::capabilities::AvailableEncoders::default()
+            },
+        );
+
+        assert!(unavailable[0].is_disabled);
+        assert!(
+            unavailable[0]
+                .disabled_reason
+                .as_deref()
+                .is_some_and(|reason| reason.contains("DVB subtitle encoder"))
+        );
+        assert!(!available[0].is_disabled);
+        assert!(available[0].disabled_reason.is_none());
     }
 
     #[test]
@@ -395,7 +447,10 @@ mod subtitle_options {
 
     #[test]
     fn external_subtitle_updates_add_unique_files_and_edit_metadata() {
-        let mut config = ConversionConfig::default();
+        let mut config = ConversionConfig {
+            container: "mkv".to_string(),
+            ..ConversionConfig::default()
+        };
 
         let selected = add_external_subtitle_tracks(
             &mut config,
@@ -428,7 +483,10 @@ mod subtitle_options {
 
     #[test]
     fn external_subtitle_default_selection_is_exclusive() {
-        let mut config = ConversionConfig::default();
+        let mut config = ConversionConfig {
+            container: "mkv".to_string(),
+            ..ConversionConfig::default()
+        };
         assert_eq!(
             add_external_subtitle_tracks(
                 &mut config,
@@ -466,8 +524,45 @@ mod subtitle_options {
     }
 
     #[test]
+    fn transport_profile_switch_keeps_compatible_subtitle_drafts_and_selections() {
+        let mut config = ConversionConfig {
+            container: "m2t".to_string(),
+            selected_subtitle_tracks: vec![2],
+            external_subtitle_tracks: vec![ExternalSubtitleTrack {
+                path: "/tmp/captions.sup".to_string(),
+                ..ExternalSubtitleTrack::default()
+            }],
+            subtitle_burn_path: Some("/tmp/burn.ass".to_string()),
+            subtitle_font_name: Some("Arial".to_string()),
+            subtitle_font_size: Some("24".to_string()),
+            ..ConversionConfig::default()
+        };
+        let metadata = SourceMetadata {
+            media_kind: Some(SourceKind::Video),
+            subtitle_tracks: vec![SubtitleTrack {
+                index: 2,
+                codec: "hdmv_pgs_subtitle".to_string(),
+                ..SubtitleTrack::default()
+            }],
+            ..SourceMetadata::default()
+        };
+
+        apply_output_container(&mut config, "m2ts");
+        normalize_output_config(&mut config, Some(&metadata));
+
+        assert_eq!(config.selected_subtitle_tracks, [2]);
+        assert_eq!(config.external_subtitle_tracks.len(), 1);
+        assert_eq!(config.subtitle_burn_path.as_deref(), Some("/tmp/burn.ass"));
+        assert_eq!(config.subtitle_font_name.as_deref(), Some("Arial"));
+        assert_eq!(config.subtitle_font_size.as_deref(), Some("24"));
+    }
+
+    #[test]
     fn removing_external_subtitle_track_preserves_remaining_order() {
-        let mut config = ConversionConfig::default();
+        let mut config = ConversionConfig {
+            container: "mkv".to_string(),
+            ..ConversionConfig::default()
+        };
         add_external_subtitle_tracks(
             &mut config,
             ["/tmp/first.srt".to_string(), "/tmp/second.vtt".to_string()],
@@ -476,6 +571,73 @@ mod subtitle_options {
         assert!(remove_external_subtitle_track(&mut config, 0));
         assert!(!remove_external_subtitle_track(&mut config, 4));
         assert_eq!(config.external_subtitle_tracks[0].path, "/tmp/second.vtt");
+    }
+
+    #[test]
+    fn adding_external_subtitles_rejects_text_sidecars_for_mts() {
+        let mut config = ConversionConfig {
+            container: "mts".to_string(),
+            ..ConversionConfig::default()
+        };
+
+        let selected = add_external_subtitle_tracks(
+            &mut config,
+            [
+                "/tmp/captions.ass".to_string(),
+                "/tmp/captions.sup".to_string(),
+            ],
+        );
+
+        assert_eq!(selected, Some(0));
+        assert_eq!(config.external_subtitle_tracks[0].path, "/tmp/captions.sup");
+    }
+
+    #[test]
+    fn switching_to_mts_removes_incompatible_text_sidecars() {
+        let mut config = ConversionConfig {
+            container: "mts".to_string(),
+            external_subtitle_tracks: vec![
+                ExternalSubtitleTrack {
+                    path: "/tmp/captions.vtt".to_string(),
+                    ..ExternalSubtitleTrack::default()
+                },
+                ExternalSubtitleTrack {
+                    path: "/tmp/captions.sup".to_string(),
+                    ..ExternalSubtitleTrack::default()
+                },
+            ],
+            ..ConversionConfig::default()
+        };
+
+        normalize_output_config(&mut config, Some(&metadata_with_subtitles()));
+
+        assert_eq!(config.external_subtitle_tracks.len(), 1);
+        assert_eq!(config.external_subtitle_tracks[0].path, "/tmp/captions.sup");
+    }
+
+    #[test]
+    fn switching_to_mts_clears_hidden_pgs_sidecar_metadata() {
+        let mut config = ConversionConfig {
+            container: "mts".to_string(),
+            external_subtitle_tracks: vec![ExternalSubtitleTrack {
+                path: "/tmp/captions.sup".to_string(),
+                language: Some("eng".to_string()),
+                title: Some("English".to_string()),
+                is_default: true,
+                is_forced: true,
+            }],
+            ..ConversionConfig::default()
+        };
+
+        normalize_output_config(&mut config, Some(&metadata_with_subtitles()));
+
+        assert_eq!(
+            config.external_subtitle_tracks[0],
+            ExternalSubtitleTrack {
+                path: "/tmp/captions.sup".to_string(),
+                ..ExternalSubtitleTrack::default()
+            }
+        );
     }
 
     #[test]
@@ -502,6 +664,49 @@ mod subtitle_options {
         assert_eq!(config.subtitle_burn_path, None);
         assert_eq!(config.subtitle_font_name, None);
     }
+
+    #[test]
+    fn normalize_output_config_removes_pgs_selection_for_mp4() {
+        let mut config = ConversionConfig {
+            container: "mp4".to_string(),
+            selected_subtitle_tracks: vec![2],
+            ..ConversionConfig::default()
+        };
+        let metadata = SourceMetadata {
+            media_kind: Some(SourceKind::Video),
+            subtitle_tracks: vec![SubtitleTrack {
+                index: 2,
+                codec: "hdmv_pgs_subtitle".to_string(),
+                ..SubtitleTrack::default()
+            }],
+            ..SourceMetadata::default()
+        };
+
+        assert!(normalize_output_config(&mut config, Some(&metadata)));
+        assert!(config.selected_subtitle_tracks.is_empty());
+    }
+
+    #[test]
+    fn normalize_output_config_keeps_text_subtitle_selection_for_mp4() {
+        let mut config = ConversionConfig {
+            container: "mp4".to_string(),
+            selected_subtitle_tracks: vec![2],
+            ..ConversionConfig::default()
+        };
+        let metadata = SourceMetadata {
+            media_kind: Some(SourceKind::Video),
+            subtitle_tracks: vec![SubtitleTrack {
+                index: 2,
+                codec: "subrip".to_string(),
+                ..SubtitleTrack::default()
+            }],
+            ..SourceMetadata::default()
+        };
+
+        normalize_output_config(&mut config, Some(&metadata));
+
+        assert_eq!(config.selected_subtitle_tracks, [2]);
+    }
 }
 
 mod preset_options {
@@ -521,12 +726,41 @@ mod preset_options {
         }
     }
 
+    fn video_metadata() -> SourceMetadata {
+        SourceMetadata {
+            media_kind: Some(SourceKind::Video),
+            video_codec: Some("h264".to_string()),
+            audio_tracks: vec![AudioTrack {
+                index: 1,
+                codec: "aac".to_string(),
+                ..AudioTrack::default()
+            }],
+            subtitle_tracks: vec![SubtitleTrack {
+                index: 2,
+                codec: "subrip".to_string(),
+                ..SubtitleTrack::default()
+            }],
+            ..SourceMetadata::default()
+        }
+    }
+
     #[test]
     fn default_presets_match_original_builtin_order() {
         let presets = default_presets();
 
         assert_eq!(presets[0].id, "balanced-mp4");
-        assert_eq!(presets[14].id, "discord");
+        assert_eq!(presets[16].id, "discord");
+        assert!(presets.iter().any(|preset| preset.id == "broadcast-m2t"));
+        let m2ts = presets
+            .iter()
+            .find(|preset| preset.id == "m2ts-h264")
+            .expect("M2TS H.264 preset should exist");
+        assert_eq!(m2ts.name, "M2TS H.264 (192-byte)");
+        let m2t = presets
+            .iter()
+            .find(|preset| preset.id == "broadcast-m2t")
+            .expect("M2T broadcast preset should exist");
+        assert_eq!(m2t.config.audio_channels, "stereo");
         assert!(presets.iter().all(|preset| preset.built_in));
     }
 
@@ -566,7 +800,13 @@ mod preset_options {
         );
 
         assert!(!options[0].is_compatible);
-        assert!(options[3].is_compatible);
+        assert!(
+            options
+                .iter()
+                .find(|option| option.preset.id == "gif-web-small")
+                .unwrap()
+                .is_compatible
+        );
     }
 
     #[test]
@@ -579,7 +819,13 @@ mod preset_options {
         );
 
         assert!(!options[0].is_compatible);
-        assert!(options[5].is_compatible);
+        assert!(
+            options
+                .iter()
+                .find(|option| option.preset.id == "audio-only")
+                .unwrap()
+                .is_compatible
+        );
     }
 
     #[test]
@@ -594,6 +840,66 @@ mod preset_options {
 
         assert_eq!(config.container, "mp3");
         assert_eq!(config.audio_codec, "mp3");
+    }
+
+    #[test]
+    fn apply_preset_preserves_explicit_source_track_selections() {
+        let preset = default_presets()
+            .into_iter()
+            .find(|preset| preset.id == "archive-hq")
+            .expect("archive preset should exist");
+        let mut config = ConversionConfig {
+            selected_audio_tracks: vec![1],
+            selected_subtitle_tracks: vec![2],
+            ..ConversionConfig::default()
+        };
+
+        apply_preset(&mut config, &preset, Some(&video_metadata()));
+
+        assert_eq!(config.selected_audio_tracks, [1]);
+        assert_eq!(config.selected_subtitle_tracks, [2]);
+    }
+
+    #[test]
+    fn apply_preset_preserves_source_subtitle_files() {
+        let preset = default_presets()
+            .into_iter()
+            .find(|preset| preset.id == "archive-hq")
+            .expect("archive preset should exist");
+        let mut config = ConversionConfig {
+            external_subtitle_tracks: vec![ExternalSubtitleTrack {
+                path: "/tmp/captions.srt".to_string(),
+                ..ExternalSubtitleTrack::default()
+            }],
+            subtitle_burn_path: Some("/tmp/burn.ass".to_string()),
+            ..ConversionConfig::default()
+        };
+
+        apply_preset(&mut config, &preset, Some(&video_metadata()));
+
+        assert_eq!(config.external_subtitle_tracks.len(), 1);
+        assert_eq!(config.subtitle_burn_path.as_deref(), Some("/tmp/burn.ass"));
+    }
+
+    #[test]
+    fn create_custom_preset_omits_source_specific_track_state() {
+        let config = ConversionConfig {
+            selected_audio_tracks: vec![1],
+            selected_subtitle_tracks: vec![2],
+            external_subtitle_tracks: vec![ExternalSubtitleTrack {
+                path: "/tmp/captions.srt".to_string(),
+                ..ExternalSubtitleTrack::default()
+            }],
+            subtitle_burn_path: Some("/tmp/burn.ass".to_string()),
+            ..ConversionConfig::default()
+        };
+
+        let preset = create_custom_preset("custom-1".to_string(), "Custom", &config);
+
+        assert!(preset.config.selected_audio_tracks.is_empty());
+        assert!(preset.config.selected_subtitle_tracks.is_empty());
+        assert!(preset.config.external_subtitle_tracks.is_empty());
+        assert_eq!(preset.config.subtitle_burn_path, None);
     }
 }
 
@@ -650,6 +956,58 @@ mod metadata_options {
     }
 
     #[test]
+    fn transport_stream_metadata_fields_use_program_tag_placeholders() {
+        let config = ConversionConfig {
+            container: "m2ts".to_string(),
+            ..ConversionConfig::default()
+        };
+        let metadata = SourceMetadata {
+            transport_stream: Some(frame_core::types::TransportStreamMetadata {
+                service_name: Some("Camera Service".to_string()),
+                service_provider: Some("Camera Vendor".to_string()),
+                ..frame_core::types::TransportStreamMetadata::default()
+            }),
+            ..SourceMetadata::default()
+        };
+
+        let options = metadata_field_options(&config, Some(&metadata), false);
+
+        assert_eq!(options.len(), 2);
+        assert_eq!(options[0].field, MetadataField::ServiceName);
+        assert_eq!(options[0].placeholder, "Camera Service");
+        assert_eq!(options[1].field, MetadataField::ServiceProvider);
+        assert_eq!(options[1].placeholder, "Camera Vendor");
+    }
+
+    #[test]
+    fn switching_transport_container_preserves_generic_and_service_metadata_drafts() {
+        let mut config = ConversionConfig {
+            metadata: MetadataConfig {
+                title: Some("Generic title".to_string()),
+                service_name: Some("Service draft".to_string()),
+                service_provider: Some("Provider draft".to_string()),
+                ..MetadataConfig::default()
+            },
+            ..ConversionConfig::default()
+        };
+
+        apply_output_container(&mut config, "m2t");
+        normalize_output_config(&mut config, None);
+        apply_output_container(&mut config, "m2ts");
+        normalize_output_config(&mut config, None);
+
+        assert_eq!(config.metadata.title.as_deref(), Some("Generic title"));
+        assert_eq!(
+            config.metadata.service_name.as_deref(),
+            Some("Service draft")
+        );
+        assert_eq!(
+            config.metadata.service_provider.as_deref(),
+            Some("Provider draft")
+        );
+    }
+
+    #[test]
     fn metadata_field_options_hide_album_and_genre_for_images() {
         let metadata = SourceMetadata {
             media_kind: Some(SourceKind::Image),
@@ -677,6 +1035,39 @@ mod metadata_options {
         let options = metadata_field_options(&config, Some(&tagged_metadata()), false);
 
         assert_eq!(options[0].placeholder, "");
+    }
+
+    #[test]
+    fn transport_replace_description_discloses_required_neutral_fallbacks() {
+        let config = ConversionConfig {
+            container: "mts".to_string(),
+            metadata: MetadataConfig {
+                mode: MetadataMode::Replace,
+                ..MetadataConfig::default()
+            },
+            ..ConversionConfig::default()
+        };
+
+        assert_eq!(
+            metadata_mode_description(&config),
+            "MPEG-TS requires both service identity values. Empty Service name and Service provider fields are replaced with Service01 and Frame."
+        );
+    }
+
+    #[test]
+    fn non_transport_replace_description_keeps_generic_contract() {
+        let config = ConversionConfig {
+            metadata: MetadataConfig {
+                mode: MetadataMode::Replace,
+                ..MetadataConfig::default()
+            },
+            ..ConversionConfig::default()
+        };
+
+        assert_eq!(
+            metadata_mode_description(&config),
+            MetadataMode::Replace.description()
+        );
     }
 
     #[test]
@@ -848,7 +1239,7 @@ mod audio_encoding_options {
 
     #[test]
     fn audio_channel_options_mark_original_selected_by_default() {
-        let options = audio_channel_options(&ConversionConfig::default(), false);
+        let options = audio_channel_options(&ConversionConfig::default(), None, false);
 
         assert!(channel_option(&options, "original").is_selected);
     }
@@ -860,9 +1251,58 @@ mod audio_encoding_options {
             ..ConversionConfig::default()
         };
 
-        let options = audio_channel_options(&config, false);
+        let options = audio_channel_options(&config, None, false);
 
         assert!(options.iter().all(|option| option.is_disabled));
+    }
+
+    #[test]
+    fn mp2_disables_original_channels_for_selected_multichannel_track() {
+        let config = ConversionConfig {
+            container: "m2t".to_string(),
+            audio_codec: "mp2".to_string(),
+            selected_audio_tracks: vec![1],
+            ..ConversionConfig::default()
+        };
+        let metadata = SourceMetadata {
+            media_kind: Some(SourceKind::Video),
+            audio_tracks: vec![AudioTrack {
+                index: 1,
+                channels: Some("6".to_string()),
+                ..AudioTrack::default()
+            }],
+            ..SourceMetadata::default()
+        };
+
+        let options = audio_channel_options(&config, Some(&metadata), false);
+
+        assert!(channel_option(&options, "original").is_disabled);
+        assert!(!channel_option(&options, "stereo").is_disabled);
+    }
+
+    #[test]
+    fn normalize_output_config_downmixes_selected_multichannel_track_for_mp2() {
+        let mut config = ConversionConfig {
+            container: "m2t".to_string(),
+            video_codec: "mpeg2video".to_string(),
+            audio_codec: "mp2".to_string(),
+            audio_channels: "original".to_string(),
+            selected_audio_tracks: vec![1],
+            ..ConversionConfig::default()
+        };
+        let metadata = SourceMetadata {
+            media_kind: Some(SourceKind::Video),
+            audio_tracks: vec![AudioTrack {
+                index: 1,
+                channels: Some("6".to_string()),
+                ..AudioTrack::default()
+            }],
+            ..SourceMetadata::default()
+        };
+
+        normalize_output_config(&mut config, Some(&metadata));
+
+        assert_eq!(config.audio_channels, "stereo");
     }
 
     #[test]
@@ -1546,6 +1986,37 @@ mod source_info_sections {
                 },
             ]
         );
+    }
+
+    #[test]
+    fn source_info_sections_show_transport_program_fields() {
+        let metadata = SourceMetadata {
+            media_kind: Some(SourceKind::Video),
+            video_codec: Some("h264".to_string()),
+            transport_stream: Some(frame_core::types::TransportStreamMetadata {
+                packet_size: Some(192),
+                program_id: Some(7),
+                service_name: Some("Camera".to_string()),
+                service_provider: Some("Frame".to_string()),
+            }),
+            ..SourceMetadata::default()
+        };
+
+        let sections = source_info_sections(&metadata);
+        let rows = sections
+            .iter()
+            .find_map(|section| match section {
+                SourceInfoSection::Rows { title, rows } if *title == "Transport stream" => {
+                    Some(rows)
+                }
+                _ => None,
+            })
+            .unwrap();
+
+        assert_eq!(row_value(rows, "Packet size"), Some("192 bytes"));
+        assert_eq!(row_value(rows, "Program ID"), Some("7"));
+        assert_eq!(row_value(rows, "Service name"), Some("Camera"));
+        assert_eq!(row_value(rows, "Service provider"), Some("Frame"));
     }
 
     #[test]

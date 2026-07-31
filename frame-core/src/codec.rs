@@ -16,6 +16,16 @@ pub fn add_video_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
     args.push("-c:v".to_string());
     args.push(config.video_codec.clone());
 
+    if config.video_codec == "mpeg2video" {
+        args.push("-b:v".to_string());
+        args.push(format!("{}k", config.video_bitrate));
+        args.push("-g".to_string());
+        args.push("15".to_string());
+        args.push("-bf".to_string());
+        args.push("2".to_string());
+        return;
+    }
+
     if is_still_image_codec {
         add_still_image_codec_args(args, config);
         return;
@@ -147,7 +157,7 @@ pub fn add_audio_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
     args.push("-c:a".to_string());
     args.push(config.audio_codec.clone());
 
-    let lossless_audio_codecs = ["flac", "alac", "pcm_s16le"];
+    let lossless_audio_codecs = ["flac", "alac", "pcm_s16le", "pcm_bluray"];
     let is_lossless = lossless_audio_codecs.contains(&config.audio_codec.as_str());
 
     if !is_lossless {
@@ -171,6 +181,11 @@ pub fn add_audio_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
             args.push("1".to_string());
         }
         _ => {}
+    }
+
+    if matches!(config.audio_codec.as_str(), "mp2" | "pcm_bluray") {
+        args.push("-ar".to_string());
+        args.push("48000".to_string());
     }
 }
 

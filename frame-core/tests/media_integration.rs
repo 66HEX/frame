@@ -121,6 +121,455 @@ impl Drop for Sandbox {
 
 #[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn transport_stream_reencode_matrix_should_write_packets_streams_and_service_metadata() -> TestResult
+{
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("transport_stream_reencode_matrix")?;
+    let input = sandbox.path("source.mp4");
+    generate_h264_aac_source(&tools, &input, 1.0, 160, 90)?;
+
+    for (container, video_codec, audio_codec, packet_size) in [
+        ("m2t", "mpeg2video", "mp2", 188_u16),
+        ("mts", "libx264", "ac3", 192_u16),
+        ("m2ts", "libx264", "ac3", 192_u16),
+    ] {
+        let output = sandbox.path(&format!("reencoded.{container}"));
+        let mut config = video_config(container, video_codec, audio_codec);
+        config.video_bitrate_mode = "bitrate".to_string();
+        config.video_bitrate = "2500".to_string();
+        config.audio_bitrate = "192".to_string();
+        config.metadata.mode = MetadataMode::Replace;
+        config.metadata.service_name = Some(format!("Frame {container}"));
+        config.metadata.service_provider = Some("Frame Integration".to_string());
+        convert(&tools, &input, &output, &config)?;
+
+        let metadata = probe_media(&tools, &output)?;
+        let transport = metadata
+            .transport_stream
+            .ok_or_else(|| format!("{container} did not probe as a transport stream"))?;
+        assert_eq!(transport.packet_size, Some(packet_size));
+        assert_eq!(
+            transport.service_name.as_deref(),
+            Some(format!("Frame {container}").as_str())
+        );
+        assert_eq!(
+            transport.service_provider.as_deref(),
+            Some("Frame Integration")
+        );
+        assert_eq!(metadata.subtitle_tracks.len(), 0);
+        let file_size = fs::metadata(&output)
+            .map_err(|error| format!("failed to stat {}: {error}", output.display()))?
+            .len();
+        assert_eq!(file_size % u64::from(packet_size), 0);
+        decode_media(&tools, &output)?;
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn transport_stream_audio_encoder_matrix_should_write_standard_stream_types() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("transport_stream_audio_encoder_matrix")?;
+    let input = sandbox.path("source.mp4");
+    generate_h264_aac_source(&tools, &input, 0.5, 160, 90)?;
+
+    for (container, audio_encoder, expected_codec) in [
+        ("m2t", "mp2", "mp2"),
+        ("m2t", "aac", "aac"),
+        ("m2t", "ac3", "ac3"),
+        ("m2t", "mp3", "mp3"),
+        ("m2t", "libopus", "opus"),
+        ("m2ts", "ac3", "ac3"),
+        ("m2ts", "pcm_bluray", "pcm_bluray"),
+    ] {
+        let capability_encoder = if audio_encoder == "mp3" {
+            "libmp3lame"
+        } else {
+            audio_encoder
+        };
+        if !encoder_available(&tools, capability_encoder)? {
+            eprintln!("skipping unavailable encoder {audio_encoder}");
+            continue;
+        }
+        let output = sandbox.path(&format!("audio-{audio_encoder}.{container}"));
+        let mut config = video_config(container, "libx264", audio_encoder);
+        config.selected_audio_tracks = vec![1];
+        config.video_bitrate_mode = "bitrate".to_string();
+        config.video_bitrate = "1500".to_string();
+        config.audio_bitrate = "192".to_string();
+        convert(&tools, &input, &output, &config)?;
+        let metadata = probe_media(&tools, &output)?;
+        assert_eq!(
+            metadata.audio_codec.as_deref(),
+            Some(expected_codec),
+            "unexpected audio codec for {audio_encoder} in {container}"
+        );
+        decode_media(&tools, &output)?;
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn transport_stream_video_encoder_matrix_should_write_standard_stream_types() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("transport_stream_video_encoder_matrix")?;
+    let input = sandbox.path("source.mp4");
+    generate_h264_aac_source(&tools, &input, 0.25, 160, 90)?;
+
+    for (container, video_encoder, expected_codec, audio_encoder) in [
+        ("m2t", "mpeg2video", "mpeg2video", "mp2"),
+        ("m2t", "libx264", "h264", "aac"),
+        ("m2t", "libx265", "hevc", "aac"),
+        ("m2ts", "mpeg2video", "mpeg2video", "ac3"),
+        ("m2ts", "libx264", "h264", "ac3"),
+        ("m2ts", "libx265", "hevc", "ac3"),
+    ] {
+        if !encoder_available(&tools, video_encoder)? {
+            eprintln!("skipping unavailable encoder {video_encoder}");
+            continue;
+        }
+        let output = sandbox.path(&format!("video-{video_encoder}.{container}"));
+        let mut config = video_config(container, video_encoder, audio_encoder);
+        config.audio_bitrate = "192".to_string();
+        if video_encoder == "mpeg2video" {
+            config.video_bitrate_mode = "bitrate".to_string();
+            config.video_bitrate = "2500".to_string();
+        }
+        convert(&tools, &input, &output, &config)?;
+        let metadata = probe_media(&tools, &output)?;
+        assert_eq!(
+            metadata.video_codec.as_deref(),
+            Some(expected_codec),
+            "unexpected video codec for {video_encoder} in {container}"
+        );
+        decode_media(&tools, &output)?;
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn transport_stream_copy_should_preserve_compatible_video_and_audio() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("transport_stream_copy")?;
+    let standard_input = sandbox.path("h264-aac.mp4");
+    generate_h264_aac_source(&tools, &standard_input, 1.0, 160, 90)?;
+
+    let m2t_output = sandbox.path("copied.m2t");
+    let mut m2t_config = video_config("m2t", "libx264", "aac");
+    m2t_config.processing_mode = "copy".to_string();
+    m2t_config.selected_audio_tracks = vec![1];
+    convert(&tools, &standard_input, &m2t_output, &m2t_config)?;
+    let m2t_metadata = probe_media(&tools, &m2t_output)?;
+    assert_eq!(m2t_metadata.video_codec.as_deref(), Some("h264"));
+    assert_eq!(m2t_metadata.audio_codec.as_deref(), Some("aac"));
+    assert_eq!(
+        m2t_metadata.transport_stream.unwrap().packet_size,
+        Some(188)
+    );
+
+    let bluray_input = sandbox.path("h264-ac3.mkv");
+    generate_h264_ac3_source(&tools, &bluray_input)?;
+    for container in ["mts", "m2ts"] {
+        let output = sandbox.path(&format!("copied.{container}"));
+        let mut config = video_config(container, "libx264", "ac3");
+        config.processing_mode = "copy".to_string();
+        config.selected_audio_tracks = vec![1];
+        convert(&tools, &bluray_input, &output, &config)?;
+        let metadata = probe_media(&tools, &output)?;
+        assert_eq!(metadata.video_codec.as_deref(), Some("h264"));
+        assert_eq!(metadata.audio_codec.as_deref(), Some("ac3"));
+        assert_eq!(metadata.transport_stream.unwrap().packet_size, Some(192));
+        decode_media(&tools, &output)?;
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn transport_stream_metadata_modes_should_round_trip_program_tags() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("transport_stream_metadata_modes")?;
+    let input = sandbox.path("source.mp4");
+    let tagged_source = sandbox.path("tagged-source.m2t");
+    generate_h264_aac_source(&tools, &input, 1.0, 160, 90)?;
+
+    let mut source_config = video_config("m2t", "mpeg2video", "mp2");
+    source_config.video_bitrate_mode = "bitrate".to_string();
+    source_config.video_bitrate = "2500".to_string();
+    source_config.audio_bitrate = "192".to_string();
+    source_config.metadata.mode = MetadataMode::Replace;
+    source_config.metadata.service_name = Some("Original Service".to_string());
+    source_config.metadata.service_provider = Some("Original Provider".to_string());
+    convert(&tools, &input, &tagged_source, &source_config)?;
+
+    for (mode, expected_name, expected_provider) in [
+        (
+            MetadataMode::Preserve,
+            "Original Service",
+            "Original Provider",
+        ),
+        (MetadataMode::Clean, "Service01", "Frame"),
+        (MetadataMode::Replace, "Replacement", "Replacement Provider"),
+    ] {
+        let output = sandbox.path(&format!(
+            "metadata-{}.m2t",
+            match mode {
+                MetadataMode::Preserve => "preserve",
+                MetadataMode::Clean => "clean",
+                MetadataMode::Replace => "replace",
+            }
+        ));
+        let mut config = video_config("m2t", "mpeg2video", "mp2");
+        config.processing_mode = "copy".to_string();
+        config.metadata.mode = mode.clone();
+        if mode == MetadataMode::Replace {
+            config.metadata.service_name = Some("Replacement".to_string());
+            config.metadata.service_provider = Some("Replacement Provider".to_string());
+        }
+        convert(&tools, &tagged_source, &output, &config)?;
+        let transport = probe_media(&tools, &output)?
+            .transport_stream
+            .ok_or_else(|| "metadata output did not expose program tags".to_string())?;
+        assert_eq!(transport.service_name.as_deref(), Some(expected_name));
+        assert_eq!(
+            transport.service_provider.as_deref(),
+            Some(expected_provider)
+        );
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn transport_stream_burn_in_should_support_srt_ass_and_vtt_for_every_suffix() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("transport_stream_burn_in")?;
+    let input = sandbox.path("source.mp4");
+    generate_h264_aac_source(&tools, &input, 1.0, 160, 90)?;
+    let subtitle_cases = [
+        ("srt", "1\n00:00:00,000 --> 00:00:00,900\nFrame SRT\n"),
+        ("vtt", "WEBVTT\n\n00:00.000 --> 00:00.900\nFrame VTT\n"),
+        (
+            "ass",
+            "[Script Info]\nScriptType: v4.00+\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,10,10,10,1\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:00.00,0:00:00.90,Default,,0,0,0,,Frame ASS\n",
+        ),
+    ];
+    for (extension, contents) in subtitle_cases {
+        let subtitle = sandbox.path(&format!("captions.{extension}"));
+        fs::write(&subtitle, contents)
+            .map_err(|error| format!("failed to write {}: {error}", subtitle.display()))?;
+        for container in ["m2t", "mts", "m2ts"] {
+            let output = sandbox.path(&format!("burned-{extension}.{container}"));
+            let mut config = video_config(
+                container,
+                if container == "m2t" {
+                    "mpeg2video"
+                } else {
+                    "libx264"
+                },
+                if container == "m2t" { "mp2" } else { "ac3" },
+            );
+            config.video_bitrate_mode = "bitrate".to_string();
+            config.video_bitrate = "2500".to_string();
+            config.audio_bitrate = "192".to_string();
+            config.subtitle_burn_path = Some(path_arg(&subtitle));
+            convert(&tools, &input, &output, &config)?;
+            let metadata = probe_media(&tools, &output)?;
+            assert!(metadata.video_codec.is_some());
+            assert!(metadata.subtitle_tracks.is_empty());
+            decode_media(&tools, &output)?;
+        }
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn transport_stream_combined_processing_graph_should_preserve_existing_features() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("transport_stream_combined_graph")?;
+    let input = sandbox.path("source.mp4");
+    let overlay = sandbox.path("overlay.ppm");
+    let subtitle = sandbox.path("burn.srt");
+    generate_h264_aac_source(&tools, &input, 1.0, 160, 90)?;
+    write_solid_ppm(&overlay, 24, 16, Rgb::RED)?;
+    write_srt(&subtitle)?;
+
+    for container in ["m2t", "m2ts"] {
+        let output = sandbox.path(&format!("combined.{container}"));
+        let mut config = video_config(
+            container,
+            if container == "m2t" {
+                "mpeg2video"
+            } else {
+                "libx264"
+            },
+            if container == "m2t" { "mp2" } else { "ac3" },
+        );
+        config.video_bitrate_mode = "bitrate".to_string();
+        config.video_bitrate = "2500".to_string();
+        config.audio_bitrate = "192".to_string();
+        config.start_time = Some("00:00:00.100".to_string());
+        config.end_time = Some("00:00:00.800".to_string());
+        config.crop = Some(CropConfig {
+            enabled: true,
+            x: 8.0,
+            y: 4.0,
+            width: 144.0,
+            height: 80.0,
+            source_width: Some(160.0),
+            source_height: Some(90.0),
+            aspect_ratio: None,
+        });
+        config.resolution = "custom".to_string();
+        config.custom_width = Some("128".to_string());
+        config.custom_height = Some("72".to_string());
+        config.rotation = "180".to_string();
+        config.flip_horizontal = true;
+        config.video_filters.color.brightness = frame_core::types::FilterValue {
+            enabled: true,
+            value: 5,
+        };
+        config.video_filters.sharpen = frame_core::types::FilterValue {
+            enabled: true,
+            value: 15,
+        };
+        config.audio_filters.bass = frame_core::types::FilterValue {
+            enabled: true,
+            value: 2,
+        };
+        config.audio_filters.limiter = frame_core::types::FilterValue {
+            enabled: true,
+            value: -1,
+        };
+        config.overlay = Some(OverlayConfig {
+            enabled: true,
+            path: path_arg(&overlay),
+            x: 0.5,
+            y: 0.5,
+            width: 0.2,
+            opacity: 0.75,
+            anchor: "center".to_string(),
+        });
+        config.subtitle_burn_path = Some(path_arg(&subtitle));
+        config.subtitle_font_size = Some("18".to_string());
+        config.subtitle_position = Some("bottom".to_string());
+
+        convert(&tools, &input, &output, &config)?;
+        let metadata = probe_media(&tools, &output)?;
+        assert_eq!((metadata.width, metadata.height), (Some(128), Some(72)));
+        let duration = duration_seconds(&metadata)?;
+        assert!((0.4..=1.0).contains(&duration));
+        decode_media(&tools, &output)?;
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe and FRAME_TEST_PGS_FIXTURE pointing to a .sup file"]
+fn pgs_sidecar_should_copy_to_m2ts_and_transcode_to_dvb_for_m2t() -> TestResult {
+    let Some(pgs_fixture) = env::var_os("FRAME_TEST_PGS_FIXTURE").map(PathBuf::from) else {
+        eprintln!("skipping PGS test: FRAME_TEST_PGS_FIXTURE is not set");
+        return Ok(());
+    };
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("pgs_transport_stream")?;
+    let input = sandbox.path("source.mp4");
+    generate_h264_aac_source(&tools, &input, 2.0, 160, 90)?;
+
+    for (container, expected_codec) in [("m2t", "dvb_subtitle"), ("m2ts", "hdmv_pgs_subtitle")] {
+        let output = sandbox.path(&format!("subtitled.{container}"));
+        let mut config = video_config(
+            container,
+            if container == "m2t" {
+                "mpeg2video"
+            } else {
+                "libx264"
+            },
+            if container == "m2t" { "mp2" } else { "ac3" },
+        );
+        config.video_bitrate_mode = "bitrate".to_string();
+        config.video_bitrate = "2500".to_string();
+        config.audio_bitrate = "192".to_string();
+        config.external_subtitle_tracks = vec![ExternalSubtitleTrack {
+            path: path_arg(&pgs_fixture),
+            language: (container == "m2t").then(|| "eng".to_string()),
+            ..ExternalSubtitleTrack::default()
+        }];
+        convert(&tools, &input, &output, &config)?;
+        let metadata = probe_media(&tools, &output)?;
+        assert_eq!(metadata.subtitle_tracks.len(), 1);
+        assert_eq!(metadata.subtitle_tracks[0].codec, expected_codec);
+        assert_eq!(
+            metadata.subtitle_tracks[0].language.as_deref(),
+            (container == "m2t").then_some("eng")
+        );
+    }
+
+    let pgs_source = sandbox.path("embedded-pgs.mkv");
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            &path_arg(&input),
+            "-i",
+            &path_arg(&pgs_fixture),
+            "-map",
+            "0:v:0",
+            "-map",
+            "0:a:0",
+            "-map",
+            "1:s:0",
+            "-c",
+            "copy",
+            "-metadata:s:s:0",
+            "language=eng",
+            "-y",
+            &path_arg(&pgs_source),
+        ]),
+    )?;
+    let subtitle_index = probe_media(&tools, &pgs_source)?
+        .subtitle_tracks
+        .first()
+        .map(|track| track.index)
+        .ok_or_else(|| "generated PGS source has no subtitle stream".to_string())?;
+
+    let dvb_output = sandbox.path("mixed-copy-pgs-to-dvb.m2t");
+    let mut dvb_config = video_config("m2t", "libx264", "aac");
+    dvb_config.processing_mode = "copy".to_string();
+    dvb_config.selected_audio_tracks = vec![1];
+    dvb_config.selected_subtitle_tracks = vec![subtitle_index];
+    convert(&tools, &pgs_source, &dvb_output, &dvb_config)?;
+    let dvb_probe = probe_media(&tools, &dvb_output)?;
+    assert_eq!(dvb_probe.video_codec.as_deref(), Some("h264"));
+    assert_eq!(dvb_probe.audio_codec.as_deref(), Some("aac"));
+    assert_eq!(dvb_probe.subtitle_tracks[0].codec, "dvb_subtitle");
+    assert_eq!(
+        dvb_probe.subtitle_tracks[0].language.as_deref(),
+        Some("eng")
+    );
+
+    let pgs_output = sandbox.path("mixed-reencode-pgs-copy.m2ts");
+    let mut pgs_config = video_config("m2ts", "libx264", "ac3");
+    pgs_config.selected_audio_tracks = vec![1];
+    pgs_config.selected_subtitle_tracks = vec![subtitle_index];
+    pgs_config.audio_bitrate = "192".to_string();
+    convert(&tools, &pgs_source, &pgs_output, &pgs_config)?;
+    let pgs_probe = probe_media(&tools, &pgs_output)?;
+    assert_eq!(pgs_probe.video_codec.as_deref(), Some("h264"));
+    assert_eq!(pgs_probe.audio_codec.as_deref(), Some("ac3"));
+    assert_eq!(pgs_probe.subtitle_tracks[0].codec, "hdmv_pgs_subtitle");
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 fn h264_mp4_reencode_should_write_h264_video_and_aac_audio() -> TestResult {
     let tools = Toolchain::discover()?;
     let sandbox = Sandbox::new("h264_mp4_reencode")?;
@@ -128,7 +577,8 @@ fn h264_mp4_reencode_should_write_h264_video_and_aac_audio() -> TestResult {
     let output = sandbox.path("output.mp4");
 
     generate_h264_aac_source(&tools, &input, 1.0, 64, 48)?;
-    let config = video_config("mp4", "libx264", "aac");
+    let mut config = video_config("mp4", "libx264", "aac");
+    config.selected_audio_tracks = vec![1];
     convert(&tools, &input, &output, &config)?;
 
     let metadata = probe_media(&tools, &output)?;
@@ -167,7 +617,8 @@ fn vp9_webm_reencode_should_write_vp9_video_and_opus_audio() -> TestResult {
     let output = sandbox.path("output.webm");
 
     generate_h264_aac_source(&tools, &input, 0.5, 48, 32)?;
-    let config = video_config("webm", "vp9", "libopus");
+    let mut config = video_config("webm", "vp9", "libopus");
+    config.selected_audio_tracks = vec![1];
     convert(&tools, &input, &output, &config)?;
 
     let metadata = probe_media(&tools, &output)?;
@@ -263,7 +714,8 @@ fn audio_container_matrix_should_write_supported_audio_outputs() -> TestResult {
         ("flac", "flac", "flac"),
     ] {
         let output = sandbox.path(&format!("output.{}", case.0));
-        let config = audio_config(case.0, case.1);
+        let mut config = audio_config(case.0, case.1);
+        config.selected_audio_tracks = vec![0];
         convert(&tools, &input, &output, &config)
             .map_err(|error| format!("{} audio output failed: {error}", case.0))?;
         let metadata = probe_media(&tools, &output)?;
@@ -578,6 +1030,7 @@ fn stream_copy_should_preserve_h264_aac_streams() -> TestResult {
     generate_h264_aac_source(&tools, &input, 1.0, 64, 48)?;
     let mut config = video_config("mp4", "libx264", "aac");
     config.processing_mode = "copy".to_string();
+    config.selected_audio_tracks = vec![1];
     convert(&tools, &input, &output, &config)?;
 
     let metadata = probe_media(&tools, &output)?;
@@ -846,6 +1299,7 @@ fn metadata_replace_should_write_requested_title() -> TestResult {
         genre: None,
         date: None,
         comment: None,
+        ..MetadataConfig::default()
     };
     convert(&tools, &input, &output, &config)?;
 
@@ -867,6 +1321,7 @@ fn audio_normalize_and_mono_wav_should_emit_mono_pcm() -> TestResult {
 
     generate_audio_source(&tools, &input)?;
     let mut config = audio_config("wav", "pcm_s16le");
+    config.selected_audio_tracks = vec![0];
     config.audio_normalize = true;
     config.audio_channels = "mono".to_string();
     convert(&tools, &input, &output, &config)?;
@@ -1175,6 +1630,60 @@ fn generate_h264_aac_source(
             "96k",
             "-y",
             &path_arg(output),
+        ]),
+    )
+}
+
+fn generate_h264_ac3_source(tools: &Toolchain, output: &Path) -> TestResult {
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=160x90:rate=12:duration=1",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:sample_rate=48000:duration=1",
+            "-shortest",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-crf",
+            "28",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "ac3",
+            "-b:a",
+            "192k",
+            "-y",
+            &path_arg(output),
+        ]),
+    )
+}
+
+fn decode_media(tools: &Toolchain, input: &Path) -> TestResult {
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            &path_arg(input),
+            "-map",
+            "0:v?",
+            "-map",
+            "0:a?",
+            "-f",
+            "null",
+            "-",
         ]),
     )
 }

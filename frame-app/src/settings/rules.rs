@@ -68,7 +68,7 @@ pub fn is_video_pixel_format_allowed_for_container(
 
 #[must_use]
 pub fn is_subtitle_codec_allowed_for_container(container: &str, codec: &str) -> bool {
-    media_rules::is_subtitle_codec_allowed(container, codec)
+    media_rules::is_subtitle_stream_supported(container, codec)
 }
 
 #[must_use]

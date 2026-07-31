@@ -282,6 +282,20 @@ pub struct ProbeMetadata {
     pub color_range: Option<String>,
     pub color_primaries: Option<String>,
     pub profile: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub video_stream_index: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transport_stream: Option<TransportStreamMetadata>,
+}
+
+/// Program-level metadata exposed by MPEG-TS/M2TS sources.
+#[derive(Debug, Serialize, Deserialize, Default, Clone, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TransportStreamMetadata {
+    pub packet_size: Option<u16>,
+    pub program_id: Option<u32>,
+    pub service_name: Option<String>,
+    pub service_provider: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -504,6 +518,10 @@ pub struct MetadataConfig {
     pub genre: Option<String>,
     pub date: Option<String>,
     pub comment: Option<String>,
+    #[serde(default)]
+    pub service_name: Option<String>,
+    #[serde(default)]
+    pub service_provider: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
@@ -553,6 +571,16 @@ pub struct LogPayload {
 pub struct FfprobeOutput {
     pub streams: Vec<FfprobeStream>,
     pub format: FfprobeFormat,
+    #[serde(default)]
+    pub programs: Vec<FfprobeProgram>,
+}
+
+#[derive(Deserialize)]
+pub struct FfprobeProgram {
+    pub program_id: Option<u32>,
+    #[serde(default)]
+    pub streams: Vec<FfprobeStream>,
+    pub tags: Option<FfprobeTags>,
 }
 
 #[derive(Deserialize)]
@@ -574,6 +602,7 @@ pub struct FfprobeStream {
     pub color_primaries: Option<String>,
     pub profile: Option<String>,
     pub sample_rate: Option<String>,
+    pub ts_packetsize: Option<String>,
     #[serde(default)]
     pub side_data_list: Vec<FfprobeSideData>,
 }
@@ -589,6 +618,7 @@ pub struct FfprobeFormat {
     pub duration: Option<String>,
     pub bit_rate: Option<String>,
     pub tags: Option<FfprobeTags>,
+    pub ts_packetsize: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
@@ -611,6 +641,8 @@ pub struct FfprobeTags {
     pub comment: Option<String>,
     #[serde(rename = "DESCRIPTION")]
     pub description_upper: Option<String>,
+    pub service_name: Option<String>,
+    pub service_provider: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -677,6 +709,8 @@ mod tests {
         assert_eq!(config.gif_loop, 0);
         assert_eq!(config.metadata.mode, MetadataMode::Preserve);
         assert!(config.external_subtitle_tracks.is_empty());
+        assert_eq!(config.metadata.service_name, None);
+        assert_eq!(config.metadata.service_provider, None);
     }
 
     #[test]
@@ -692,6 +726,26 @@ mod tests {
         assert_eq!(serialized["metadata"]["mode"], "preserve");
         assert_eq!(serialized["externalSubtitleTracks"], json!([]));
         assert!(serialized.get("processing_mode").is_none());
+    }
+
+    #[test]
+    fn transport_service_metadata_serializes_additively() {
+        let mut config: ConversionConfig = serde_json::from_value(minimal_config_json()).unwrap();
+        config.container = "m2ts".to_string();
+        config.metadata.service_name = Some("Frame Service".to_string());
+        config.metadata.service_provider = Some("Frame".to_string());
+
+        let serialized = serde_json::to_value(&config).unwrap();
+        let restored: ConversionConfig = serde_json::from_value(serialized.clone()).unwrap();
+
+        assert_eq!(serialized["container"], "m2ts");
+        assert_eq!(serialized["metadata"]["serviceName"], "Frame Service");
+        assert_eq!(serialized["metadata"]["serviceProvider"], "Frame");
+        assert_eq!(restored.container, "m2ts");
+        assert_eq!(
+            restored.metadata.service_name.as_deref(),
+            Some("Frame Service")
+        );
     }
 
     #[test]

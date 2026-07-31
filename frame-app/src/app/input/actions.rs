@@ -152,7 +152,9 @@ impl FrameRoot {
             | FrameTextInputKind::MetadataAlbum
             | FrameTextInputKind::MetadataGenre
             | FrameTextInputKind::MetadataDate
-            | FrameTextInputKind::MetadataComment => self
+            | FrameTextInputKind::MetadataComment
+            | FrameTextInputKind::MetadataServiceName
+            | FrameTextInputKind::MetadataServiceProvider => self
                 .file_queue
                 .selected_file()
                 .and_then(|file| {
@@ -277,7 +279,9 @@ impl FrameRoot {
             | FrameTextInputKind::MetadataAlbum
             | FrameTextInputKind::MetadataGenre
             | FrameTextInputKind::MetadataDate
-            | FrameTextInputKind::MetadataComment => {
+            | FrameTextInputKind::MetadataComment
+            | FrameTextInputKind::MetadataServiceName
+            | FrameTextInputKind::MetadataServiceProvider => {
                 if self.file_queue.selected_file_locked() {
                     return None;
                 }
@@ -1032,6 +1036,8 @@ const fn metadata_field_for_text_input(kind: FrameTextInputKind) -> Option<Metad
         FrameTextInputKind::MetadataGenre => Some(MetadataField::Genre),
         FrameTextInputKind::MetadataDate => Some(MetadataField::Date),
         FrameTextInputKind::MetadataComment => Some(MetadataField::Comment),
+        FrameTextInputKind::MetadataServiceName => Some(MetadataField::ServiceName),
+        FrameTextInputKind::MetadataServiceProvider => Some(MetadataField::ServiceProvider),
         _ => None,
     }
 }

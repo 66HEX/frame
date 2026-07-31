@@ -107,15 +107,18 @@ pub(in crate::app) fn settings_video_tab(
             window,
             cx,
         ))
-        .when(!is_videotoolbox_video_codec(&config.video_codec), |this| {
-            this.child(settings_video_preset_section(
-                config,
-                settings_disabled,
-                palette,
-                window,
-                cx,
-            ))
-        })
+        .when(
+            !is_videotoolbox_video_codec(&config.video_codec) && config.video_codec != "mpeg2video",
+            |this| {
+                this.child(settings_video_preset_section(
+                    config,
+                    settings_disabled,
+                    palette,
+                    window,
+                    cx,
+                ))
+            },
+        )
         .child(settings_video_quality_section(
             config,
             settings_disabled,
@@ -555,11 +558,18 @@ fn settings_video_quality_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let mut section = settings_section("Quality control", palette).child(
-        settings_video_bitrate_mode_grid(config, settings_disabled, palette, window, cx),
-    );
+    let mut section = settings_section("Quality control", palette);
+    if config.video_codec != "mpeg2video" {
+        section = section.child(settings_video_bitrate_mode_grid(
+            config,
+            settings_disabled,
+            palette,
+            window,
+            cx,
+        ));
+    }
 
-    if config.video_bitrate_mode == "crf" {
+    if config.video_bitrate_mode == "crf" && config.video_codec != "mpeg2video" {
         let is_hardware = is_hardware_video_codec(&config.video_codec);
         section = section.child(settings_video_range_field(
             if is_hardware {

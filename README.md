@@ -62,12 +62,13 @@ details, tier suggestions, and a launch checklist.
 
 - **Media Types:** Video, audio, and image sources.
 - **Supported Source Files:**
-  - **Video:** `mp4`, `mov`, `mkv`, `avi`, `webm`, `gif`
+  - **Video:** `mp4`, `mov`, `mkv`, `avi`, `webm`, `mts`, `m2t`, `m2ts`, `gif`
   - **Audio:** `mp3`, `m4a`, `wav`, `flac`
   - **Image:** `png`, `jpg`, `jpeg`, `webp`, `bmp`, `tif`, `tiff`, `avif`,
     `heic`, `heif`
 - **Supported Output Formats:**
-  - **Video:** `mp4`, `mkv`, `webm`, `mov`, `gif`
+  - **Video:** `mp4`, `mkv`, `webm`, `mov`, `m2t` (188-byte MPEG-TS), `mts`
+    and `m2ts` (192-byte M2TS), `gif`
   - **Audio:** `mp3`, `m4a`, `wav`, `flac`
   - **Image:** `png`, `jpg`, `webp`, `bmp`, `tiff`
 - **Video Encoders:**
@@ -76,14 +77,15 @@ details, tier suggestions, and a launch checklist.
   - `vp9` (Google VP9)
   - `prores` (Apple ProRes)
   - `libsvtav1` (SVT-AV1)
+  - `mpeg2video` (MPEG-2 Video for transport streams)
   - `gif` palette output
   - **Hardware Acceleration:** macOS bundles include VideoToolbox encoders
     (`h264_videotoolbox`, `hevc_videotoolbox`); Windows bundles include NVIDIA
     NVENC encoders (`h264_nvenc`, `hevc_nvenc`, `av1_nvenc`). Linux bundles use
     software encoders.
 - **Image Encoders:** `png`, `mjpeg` (JPEG), `libwebp` (WebP), `bmp`, `tiff`.
-- **Audio Encoders:** `aac`, `ac3`, `libopus`, `mp3`, `alac`, `flac`,
-  `pcm_s16le`, plus optional `libfdk_aac` when available.
+- **Audio Encoders:** `aac`, `ac3`, `libopus`, `mp3`, `mp2`, `alac`, `flac`,
+  `pcm_s16le`, Blu-ray `pcm_bluray`, plus optional `libfdk_aac` when available.
 - **Bitrate Control:** CRF, target bitrate, audio VBR where supported, and
   codec-specific presets.
 - **Video Processing:** Resolution presets, custom dimensions, FPS conversion,
@@ -93,14 +95,18 @@ details, tier suggestions, and a launch checklist.
   and deinterlace controls.
 - **GIF Controls:** Frame rate, color count, dithering, and loop count.
 - **Audio Controls:** Codec, bitrate, VBR quality, channel layout, volume, and
-  per-track selection.
+  explicit per-track selection; only checked source tracks are exported.
 - **Audio Filters:** Normalize, limiter, compressor, bass, treble, high-pass,
   low-pass, noise reduction, de-esser, and stereo width controls.
-- **Subtitles:** Stream selection, `.srt` / `.ass` / `.vtt` source filtering,
-  burn-in subtitle file selection, font, size, color, outline color, and
-  position controls.
-- **Metadata:** Preserve, clean, or replace metadata fields such as title,
-  artist, album, genre, date, and comment.
+- **Subtitles:** Explicit stream selection (only checked source tracks are exported),
+  `.srt` / `.ass` / `.vtt` burn-in with font,
+  size, color, outline, and position controls; selectable text sidecars for
+  MP4/MOV/MKV/WebM; and `.sup`/PGS, DVB subtitle, DVB teletext, ARIB caption,
+  and HDMV subtitle workflows for M2T/MTS/M2TS. M2T converts bitmap PGS/DVDSub
+  to standard DVB subtitles instead of private data.
+- **Metadata:** Preserve, clean, or replace generic metadata fields, plus
+  MPEG-TS/M2TS program service name and provider metadata read through
+  `ffprobe -show_programs`.
 - **Metadata Probing:** Automated source inspection through `ffprobe`.
 
 ### Architecture & Workflow

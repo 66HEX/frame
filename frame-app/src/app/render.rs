@@ -210,6 +210,10 @@ impl Render for FrameRoot {
                     self.ensure_text_input_focus(FrameTextInputKind::MetadataDate, cx);
                 let metadata_comment_focus =
                     self.ensure_text_input_focus(FrameTextInputKind::MetadataComment, cx);
+                let metadata_service_name_focus =
+                    self.ensure_text_input_focus(FrameTextInputKind::MetadataServiceName, cx);
+                let metadata_service_provider_focus =
+                    self.ensure_text_input_focus(FrameTextInputKind::MetadataServiceProvider, cx);
                 let preset_name_focus =
                     self.ensure_text_input_focus(FrameTextInputKind::PresetName, cx);
                 let external_subtitle_language_focus =
@@ -421,6 +425,8 @@ impl Render for FrameRoot {
                         genre: Some(&metadata_genre_focus),
                         date: Some(&metadata_date_focus),
                         comment: Some(&metadata_comment_focus),
+                        service_name: Some(&metadata_service_name_focus),
+                        service_provider: Some(&metadata_service_provider_focus),
                     },
                     subtitle_focuses: SettingsSubtitleFocuses {
                         add_external_files: Some(&subtitle_add_external_focus),

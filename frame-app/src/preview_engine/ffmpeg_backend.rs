@@ -832,7 +832,7 @@ impl RunningPreviewProcess {
         precise: bool,
         generation: u64,
     ) -> Option<PendingAudioStart> {
-        if config.has_audio {
+        if config.selected_audio_track.is_some() {
             return match self
                 .spawn_audio_streaming_with_config(config, seconds, precise, false, generation)
             {
@@ -959,7 +959,7 @@ impl RunningPreviewProcess {
         mark_ended_on_eof: bool,
         generation: u64,
     ) -> Result<PendingAudioStart, PreviewEngineError> {
-        if !config.has_audio {
+        if config.selected_audio_track.is_none() {
             return Ok(PendingAudioStart::OutputDisabled);
         }
 
@@ -1041,7 +1041,7 @@ impl RunningPreviewProcess {
         precise: bool,
         generation: u64,
     ) {
-        if !config.has_audio || !self.has_visual_stream() {
+        if config.selected_audio_track.is_none() || !self.has_visual_stream() {
             return;
         }
         if self.pending_audio_start_generation_matches(generation) {
@@ -1841,6 +1841,11 @@ fn preview_audio_plan(
     precise: bool,
     output: AudioOutputSpec,
 ) -> Result<frame_core::preview::PreviewAudioFfmpegPlan, PreviewEngineError> {
+    let selected_track = config.selected_audio_track.ok_or_else(|| {
+        PreviewEngineError::InvalidInput(
+            "Audio preview requires an explicitly selected source track".to_string(),
+        )
+    })?;
     let end_seconds = parsed_time(config.conversion_config.end_time.as_deref())
         .filter(|end_seconds| *end_seconds > seconds);
     build_ffmpeg_preview_audio_args(
@@ -1853,7 +1858,7 @@ fn preview_audio_plan(
             channels: output.channels,
             realtime,
             precise_seek: precise,
-            selected_track: config.selected_audio_track,
+            selected_track,
         },
     )
     .map_err(|err| PreviewEngineError::Ffmpeg(err.to_string()))
@@ -1963,7 +1968,6 @@ mod tests {
             source_kind: PreviewSourceKind::Video,
             source_width: Some(1920),
             source_height: Some(1080),
-            has_audio: false,
             selected_audio_track: None,
             duration_seconds: 12.5,
             max_width: 1280,
@@ -2001,7 +2005,6 @@ mod tests {
     #[test]
     fn preview_audio_plan_streams_selected_track_as_device_pcm() {
         let mut config = preview_config();
-        config.has_audio = true;
         config.selected_audio_track = Some(2);
         config.conversion_config.end_time = Some("00:00:05.000".to_string());
 
@@ -2022,6 +2025,23 @@ mod tests {
         assert!(plan.args.windows(2).any(|args| args == ["-ar", "44100"]));
         assert!(plan.args.windows(2).any(|args| args == ["-ac", "2"]));
         assert!(plan.args.windows(2).any(|args| args == ["-f", "f32le"]));
+    }
+
+    #[test]
+    fn preview_audio_plan_rejects_missing_explicit_track_selection() {
+        let error = preview_audio_plan(
+            &preview_config(),
+            1.0,
+            true,
+            true,
+            AudioOutputSpec {
+                sample_rate: 44_100,
+                channels: 2,
+            },
+        )
+        .expect_err("audio preview should require an explicit source track");
+
+        assert!(error.to_string().contains("explicitly selected"));
     }
 
     #[test]

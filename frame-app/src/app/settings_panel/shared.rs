@@ -81,7 +81,7 @@ pub(in crate::app) const fn settings_tab_icon(tab: SettingsTab) -> &'static str 
 }
 
 pub(in crate::app) fn is_lossless_audio_codec(codec: &str) -> bool {
-    matches!(codec, "flac" | "alac" | "pcm_s16le")
+    matches!(codec, "flac" | "alac" | "pcm_s16le" | "pcm_bluray")
 }
 
 pub(in crate::app) fn parse_audio_value(value: &str, fallback: u32) -> u32 {

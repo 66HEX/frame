@@ -31,7 +31,7 @@ pub struct PreviewAudioFfmpegOptions {
     pub channels: u16,
     pub realtime: bool,
     pub precise_seek: bool,
-    pub selected_track: Option<u32>,
+    pub selected_track: u32,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -190,11 +190,7 @@ pub fn build_ffmpeg_preview_audio_args(
     args.push("-sn".to_string());
     args.push("-dn".to_string());
     args.push("-map".to_string());
-    if let Some(track) = options.selected_track {
-        args.push(format!("0:{track}"));
-    } else {
-        args.push("0:a:0".to_string());
-    }
+    args.push(format!("0:{}", options.selected_track));
 
     let audio_filters = build_audio_filters(config);
     if !audio_filters.is_empty() {
@@ -603,7 +599,7 @@ mod tests {
             channels: 2,
             realtime: true,
             precise_seek: true,
-            selected_track: None,
+            selected_track: 0,
         }
     }
 
@@ -771,7 +767,7 @@ mod tests {
     #[test]
     fn build_ffmpeg_preview_audio_args_streams_selected_track_as_pcm() {
         let mut options = default_audio_options();
-        options.selected_track = Some(2);
+        options.selected_track = 2;
         let mut config = default_config();
         config.audio_volume = 50.0;
 

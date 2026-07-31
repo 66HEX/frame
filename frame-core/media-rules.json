@@ -4,6 +4,9 @@
 		"mkv",
 		"webm",
 		"mov",
+		"m2t",
+		"mts",
+		"m2ts",
 		"gif",
 		"png",
 		"jpg",
@@ -52,6 +55,8 @@
 			"hevc_videotoolbox",
 			"hevc_nvenc"
 		],
+		"mpegts": ["mpeg2video", "libx264", "libx265", "h264_videotoolbox", "h264_nvenc", "hevc_videotoolbox", "hevc_nvenc"],
+		"m2ts": ["mpeg2video", "libx264", "libx265", "h264_videotoolbox", "h264_nvenc", "hevc_videotoolbox", "hevc_nvenc"],
 		"gif": ["gif"],
 		"png": ["png"],
 		"jpg": ["mjpeg"],
@@ -95,6 +100,24 @@
 			"h264_nvenc": ["yuv420p"],
 			"hevc_nvenc": ["yuv420p", "yuv420p10le"]
 		},
+		"mpegts": {
+			"mpeg2video": ["yuv420p", "yuv422p"],
+			"libx264": ["yuv420p"],
+			"libx265": ["yuv420p", "yuv420p10le"],
+			"h264_videotoolbox": ["yuv420p"],
+			"hevc_videotoolbox": ["yuv420p", "yuv420p10le"],
+			"h264_nvenc": ["yuv420p"],
+			"hevc_nvenc": ["yuv420p", "yuv420p10le"]
+		},
+		"m2ts": {
+			"mpeg2video": ["yuv420p", "yuv422p"],
+			"libx264": ["yuv420p"],
+			"libx265": ["yuv420p", "yuv420p10le"],
+			"h264_videotoolbox": ["yuv420p"],
+			"hevc_videotoolbox": ["yuv420p", "yuv420p10le"],
+			"h264_nvenc": ["yuv420p"],
+			"hevc_nvenc": ["yuv420p", "yuv420p10le"]
+		},
 		"gif": {
 			"gif": []
 		}
@@ -104,7 +127,9 @@
 		"mkv": ["*"],
 		"mov": ["*"],
 		"webm": ["vp8", "vp9", "av1"],
-		"gif": ["gif"]
+		"gif": ["gif"],
+		"mpegts": ["mpeg1video", "mpeg2video", "mpeg4", "h264", "hevc", "vvc", "cavs", "avs2", "avs3", "dirac", "vc1"],
+		"m2ts": ["mpeg2video", "h264", "vc1", "hevc"]
 	},
 	"containerAudioCodecCompatibility": {
 		"mp3": ["mp3"],
@@ -115,6 +140,8 @@
 		"mov": ["*"],
 		"mkv": ["*"],
 		"webm": ["libopus", "vorbis"],
+		"mpegts": ["mp2", "aac", "libfdk_aac", "ac3", "mp3", "libopus"],
+		"m2ts": ["ac3", "pcm_bluray"],
 		"gif": [],
 		"png": [],
 		"jpg": [],
@@ -141,6 +168,8 @@
 		"mov": ["*"],
 		"mkv": ["*"],
 		"webm": ["opus", "vorbis"],
+		"mpegts": ["mp2", "mp3", "aac", "aac_latm", "ac3", "eac3", "dts", "truehd", "opus"],
+		"m2ts": ["pcm_bluray", "ac3", "dts", "truehd", "eac3"],
 		"gif": [],
 		"png": [],
 		"jpg": [],
@@ -152,15 +181,19 @@
 		"mp4": ["mov_text"],
 		"mov": ["*"],
 		"mkv": ["*"],
-		"webm": ["webvtt"]
+		"webm": ["webvtt"],
+		"mpegts": ["dvb_subtitle", "dvb_teletext", "arib_caption"],
+		"m2ts": ["hdmv_pgs_subtitle", "hdmv_text_subtitle"]
 	},
 	"defaultAudioCodec": {
 		"mp3": "mp3",
 		"wav": "pcm_s16le",
 		"flac": "flac",
 		"m4a": "aac",
-		"webm": "libopus"
+		"webm": "libopus",
+		"mpegts": "mp2",
+		"m2ts": "ac3"
 	},
 	"defaultAudioCodecFallback": "aac",
-	"videoCodecFallbackOrder": ["libx264", "libx265", "vp9", "prores", "libsvtav1", "gif"]
+	"videoCodecFallbackOrder": ["libx264", "libx265", "mpeg2video", "vp9", "prores", "libsvtav1", "gif"]
 }

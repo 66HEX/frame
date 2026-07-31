@@ -203,6 +203,8 @@ fn core_metadata_from_gpui(metadata: &GpuiMetadataConfig) -> CoreMetadataConfig 
         genre: metadata.genre.clone(),
         date: metadata.date.clone(),
         comment: metadata.comment.clone(),
+        service_name: metadata.service_name.clone(),
+        service_provider: metadata.service_provider.clone(),
     }
 }
 

@@ -3,8 +3,9 @@
 use std::path::PathBuf;
 
 use crate::file_filters::{
-    AUDIO_FILE_EXTENSIONS, IMAGE_FILE_EXTENSIONS, SOURCE_FILE_EXTENSIONS, SUBTITLE_FILE_EXTENSIONS,
-    VIDEO_FILE_EXTENSIONS,
+    AUDIO_FILE_EXTENSIONS, BURN_SUBTITLE_FILE_EXTENSIONS, IMAGE_FILE_EXTENSIONS,
+    SELECTABLE_SUBTITLE_FILE_EXTENSIONS, SOURCE_FILE_EXTENSIONS, VIDEO_FILE_EXTENSIONS,
+    selectable_subtitle_extensions_for_container,
 };
 use gpui::Window;
 use rfd::{AsyncFileDialog, FileHandle};
@@ -43,8 +44,14 @@ pub const SOURCE_FILE_DIALOG_FILTERS: [NativeDialogFilterSpec; 4] = [
 
 pub const SUBTITLE_FILE_DIALOG_FILTERS: [NativeDialogFilterSpec; 1] = [NativeDialogFilterSpec {
     label: "Subtitles",
-    extensions: SUBTITLE_FILE_EXTENSIONS,
+    extensions: BURN_SUBTITLE_FILE_EXTENSIONS,
 }];
+
+pub const SELECTABLE_SUBTITLE_FILE_DIALOG_FILTERS: [NativeDialogFilterSpec; 1] =
+    [NativeDialogFilterSpec {
+        label: "Subtitles",
+        extensions: SELECTABLE_SUBTITLE_FILE_EXTENSIONS,
+    }];
 
 pub const OVERLAY_IMAGE_DIALOG_FILTERS: [NativeDialogFilterSpec; 1] = [NativeDialogFilterSpec {
     label: "Images",
@@ -77,7 +84,7 @@ pub const SUBTITLE_FILE_DIALOG_SPEC: NativeDialogSpec = NativeDialogSpec {
 
 pub const EXTERNAL_SUBTITLE_FILE_DIALOG_SPEC: NativeDialogSpec = NativeDialogSpec {
     title: "Add selectable subtitles",
-    filters: &SUBTITLE_FILE_DIALOG_FILTERS,
+    filters: &SELECTABLE_SUBTITLE_FILE_DIALOG_FILTERS,
     allows_multiple: true,
 };
 
@@ -140,8 +147,14 @@ pub fn subtitle_file_dialog(parent: &Window) -> AsyncFileDialog {
 }
 
 #[must_use]
-pub fn external_subtitle_file_dialog(parent: &Window) -> AsyncFileDialog {
-    file_dialog_from_spec(EXTERNAL_SUBTITLE_FILE_DIALOG_SPEC).set_parent(parent)
+pub fn external_subtitle_file_dialog(parent: &Window, container: &str) -> AsyncFileDialog {
+    AsyncFileDialog::new()
+        .set_title(EXTERNAL_SUBTITLE_FILE_DIALOG_SPEC.title)
+        .add_filter(
+            "Subtitles",
+            selectable_subtitle_extensions_for_container(container),
+        )
+        .set_parent(parent)
 }
 
 #[must_use]
@@ -200,12 +213,25 @@ mod tests {
             SUBTITLE_FILE_DIALOG_SPEC.filters,
             [NativeDialogFilterSpec {
                 label: "Subtitles",
-                extensions: SUBTITLE_FILE_EXTENSIONS,
+                extensions: BURN_SUBTITLE_FILE_EXTENSIONS,
             }]
         );
         assert_eq!(
             EXTERNAL_SUBTITLE_FILE_DIALOG_SPEC.filters,
-            SUBTITLE_FILE_DIALOG_SPEC.filters
+            SELECTABLE_SUBTITLE_FILE_DIALOG_FILTERS
+        );
+    }
+
+    #[test]
+    fn selectable_subtitle_extensions_follow_output_container_capabilities() {
+        assert_eq!(selectable_subtitle_extensions_for_container("mts"), ["sup"]);
+        assert_eq!(
+            selectable_subtitle_extensions_for_container("mp4"),
+            ["srt", "ass", "vtt"]
+        );
+        assert_eq!(
+            selectable_subtitle_extensions_for_container("mkv"),
+            ["srt", "ass", "vtt", "sup"]
         );
     }
 

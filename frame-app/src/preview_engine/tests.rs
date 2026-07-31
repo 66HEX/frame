@@ -42,7 +42,6 @@ fn session_config_rejects_unpaired_source_dimensions() {
         source_kind: PreviewSourceKind::Video,
         source_width: Some(1920),
         source_height: None,
-        has_audio: false,
         selected_audio_track: None,
         duration_seconds: 10.0,
         max_width: DEFAULT_PREVIEW_MAX_WIDTH,
@@ -56,6 +55,25 @@ fn session_config_rejects_unpaired_source_dimensions() {
         .expect_err("unpaired dimensions should fail");
 
     assert!(error.to_string().contains("provided together"));
+}
+
+#[test]
+fn session_config_accepts_silent_audio_source_without_selected_track() {
+    let config = PreviewSessionConfig {
+        file_id: "audio-1".to_string(),
+        path: PathBuf::from("/tmp/audio.wav"),
+        source_kind: PreviewSourceKind::Audio,
+        source_width: None,
+        source_height: None,
+        selected_audio_track: None,
+        duration_seconds: 10.0,
+        max_width: DEFAULT_PREVIEW_MAX_WIDTH,
+        max_height: DEFAULT_PREVIEW_MAX_HEIGHT,
+        fps: DEFAULT_PREVIEW_FPS,
+        conversion_config: default_core_config(),
+    };
+
+    assert!(config.validate().is_ok());
 }
 
 #[test]
@@ -190,7 +208,6 @@ fn test_preview_session_command_is_noop_without_pipeline() {
         source_kind: PreviewSourceKind::Video,
         source_width: Some(1920),
         source_height: Some(1080),
-        has_audio: false,
         selected_audio_track: None,
         duration_seconds: 12.5,
         max_width: DEFAULT_PREVIEW_MAX_WIDTH,
@@ -215,7 +232,6 @@ fn test_preview_session_snapshot_exposes_runtime_metrics() {
         source_kind: PreviewSourceKind::Video,
         source_width: Some(1920),
         source_height: Some(1080),
-        has_audio: false,
         selected_audio_track: None,
         duration_seconds: 12.5,
         max_width: DEFAULT_PREVIEW_MAX_WIDTH,
@@ -339,7 +355,6 @@ fn real_video_preview_config(path: PathBuf) -> PreviewSessionConfig {
         source_kind: PreviewSourceKind::Video,
         source_width: Some(160),
         source_height: Some(90),
-        has_audio: false,
         selected_audio_track: None,
         duration_seconds: 2.0,
         max_width: 320,
@@ -356,8 +371,7 @@ fn real_av_preview_config(path: PathBuf) -> PreviewSessionConfig {
         source_kind: PreviewSourceKind::Video,
         source_width: Some(160),
         source_height: Some(90),
-        has_audio: true,
-        selected_audio_track: None,
+        selected_audio_track: Some(1),
         duration_seconds: 2.0,
         max_width: 320,
         max_height: 180,

@@ -80,7 +80,8 @@ use crate::{
     },
     file_filters::{
         AUDIO_FILE_EXTENSIONS, IMAGE_FILE_EXTENSIONS, discover_supported_source_paths,
-        filter_supported_source_paths, is_supported_overlay_image_path, is_supported_subtitle_path,
+        filter_supported_source_paths, is_supported_overlay_image_path,
+        is_supported_selectable_subtitle_path, is_supported_subtitle_path,
     },
     file_queue::{
         BatchSelectionState, FileItem, FileQueue, FileStateTone, FileStatus, RowActionAvailability,
@@ -134,14 +135,15 @@ use crate::{
         image_jpeg_huffman_options, image_png_prediction_options, image_tiff_compression_options,
         image_webp_preset_options, is_gif_container, is_hardware_video_codec, is_nvenc_video_codec,
         is_videotoolbox_video_codec, metadata_field_options, metadata_field_value,
-        metadata_mode_options, normalize_output_config, normalized_hex_color,
-        output_container_options, output_processing_mode_options, preset_options,
-        remove_external_subtitle_track, resolution_options, resolve_active_settings_tab,
-        sanitize_output_name, scaling_algorithm_options, source_info_sections,
-        subtitle_burn_file_label, subtitle_color_value, subtitle_font_options,
-        subtitle_font_size_options, subtitle_position_options, subtitle_track_options,
-        toggle_audio_track_selection, toggle_subtitle_track_selection, video_codec_options,
-        video_pixel_format_options, video_preset_options, visible_settings_tabs,
+        metadata_mode_description, metadata_mode_options, mp2_original_channels_are_unsupported,
+        normalize_output_config, normalized_hex_color, output_container_options,
+        output_processing_mode_options, preset_options, remove_external_subtitle_track,
+        resolution_options, resolve_active_settings_tab, sanitize_output_name,
+        scaling_algorithm_options, source_info_sections, subtitle_burn_file_label,
+        subtitle_color_value, subtitle_font_options, subtitle_font_size_options,
+        subtitle_position_options, subtitle_track_options, toggle_audio_track_selection,
+        toggle_subtitle_track_selection, video_codec_options, video_pixel_format_options,
+        video_preset_options, visible_settings_tabs,
     },
     source_metadata::{
         MetadataStatus, SourceMetadataEntry, SourceMetadataStore, probe_source_metadata,
@@ -846,6 +848,8 @@ struct SettingsMetadataInputFocuses<'a> {
     genre: Option<&'a FocusHandle>,
     date: Option<&'a FocusHandle>,
     comment: Option<&'a FocusHandle>,
+    service_name: Option<&'a FocusHandle>,
+    service_provider: Option<&'a FocusHandle>,
 }
 
 #[derive(Clone, Copy)]
