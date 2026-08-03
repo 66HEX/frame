@@ -100,6 +100,7 @@ pub fn core_config_from_gpui(config: &GpuiConversionConfig) -> CoreConversionCon
         videotoolbox_allow_sw: config.videotoolbox_allow_sw,
         hw_decode: config.hw_decode,
         pixel_format: non_empty_or(&config.pixel_format, DEFAULT_PIXEL_FORMAT),
+        image_output_mode: config.image_output_mode.id().to_string(),
         image_jpeg_quality: config.image_jpeg_quality.clamp(1, 100),
         image_jpeg_huffman: config.image_jpeg_huffman.clone(),
         image_webp_lossless: config.image_webp_lossless,

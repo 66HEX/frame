@@ -4,6 +4,37 @@ fn tab_ids(tabs: Vec<SettingsTab>) -> Vec<&'static str> {
     tabs.into_iter().map(SettingsTab::id).collect()
 }
 
+mod image_output_mode_persistence {
+    use super::*;
+
+    #[test]
+    fn legacy_presets_default_to_single_image_output() {
+        let mut value = serde_json::to_value(ConversionConfig::default())
+            .expect("default conversion config should serialize");
+        value
+            .as_object_mut()
+            .expect("conversion config should be an object")
+            .remove("imageOutputMode");
+
+        let restored: ConversionConfig =
+            serde_json::from_value(value).expect("legacy conversion config should deserialize");
+
+        assert_eq!(restored.image_output_mode, ImageOutputMode::Single);
+    }
+
+    #[test]
+    fn sequence_mode_serializes_as_camel_case_field_and_value() {
+        let config = ConversionConfig {
+            image_output_mode: ImageOutputMode::Sequence,
+            ..ConversionConfig::default()
+        };
+
+        let value = serde_json::to_value(config).expect("conversion config should serialize");
+
+        assert_eq!(value["imageOutputMode"], "sequence");
+    }
+}
+
 mod source_metadata {
     use super::*;
 
@@ -81,14 +112,22 @@ mod output_options {
     }
 
     #[test]
-    fn visible_output_containers_for_video_exclude_image_formats() {
-        assert_eq!(
-            visible_output_containers(None),
-            vec![
-                "mp4", "mkv", "webm", "mov", "m2t", "mts", "m2ts", "gif", "mp3", "m4a", "wav",
-                "flac"
-            ]
-        );
+    fn visible_output_containers_for_video_include_all_still_image_formats() {
+        let containers = visible_output_containers(None);
+
+        for format in ["jpg", "webp", "png", "bmp", "tiff"] {
+            assert!(containers.iter().any(|container| container == format));
+        }
+    }
+
+    #[test]
+    fn visible_output_containers_for_audio_exclude_still_image_formats() {
+        let metadata = audio_metadata("aac");
+        let containers = visible_output_containers(Some(&metadata));
+
+        for format in ["jpg", "webp", "png", "bmp", "tiff"] {
+            assert!(!containers.iter().any(|container| container == format));
+        }
     }
 
     #[test]
@@ -108,6 +147,84 @@ mod output_options {
         );
 
         assert!(options[1].is_disabled);
+    }
+
+    #[test]
+    fn processing_mode_options_disable_copy_for_still_image_output() {
+        let config = ConversionConfig {
+            container: "png".to_string(),
+            ..ConversionConfig::default()
+        };
+        let options = output_processing_mode_options(&config, Some(&video_metadata()), false);
+
+        assert!(options[1].is_disabled);
+    }
+
+    #[test]
+    fn image_sequence_estimates_are_fps_and_trim_aware() {
+        let metadata = SourceMetadata {
+            duration: Some("30".to_string()),
+            frame_rate: Some(30.0),
+            ..video_metadata()
+        };
+        let mut config = ConversionConfig {
+            container: "png".to_string(),
+            image_output_mode: ImageOutputMode::Sequence,
+            ..ConversionConfig::default()
+        };
+
+        assert_eq!(
+            estimated_image_sequence_frame_count(&config, Some(&metadata)),
+            Some(900)
+        );
+
+        config.start_time = Some("00:00:05.000".to_string());
+        config.end_time = Some("00:00:15.000".to_string());
+        assert_eq!(
+            estimated_image_sequence_frame_count(&config, Some(&metadata)),
+            Some(300)
+        );
+    }
+
+    #[test]
+    fn image_sequence_estimate_rounds_fractional_frame_rates() {
+        let metadata = SourceMetadata {
+            duration: Some("30".to_string()),
+            frame_rate: Some(29.97),
+            ..video_metadata()
+        };
+        let config = ConversionConfig {
+            image_output_mode: ImageOutputMode::Sequence,
+            ..ConversionConfig::default()
+        };
+
+        assert_eq!(
+            estimated_image_sequence_frame_count(&config, Some(&metadata)),
+            Some(899)
+        );
+    }
+
+    #[test]
+    fn image_sequence_estimate_requires_valid_duration_and_frame_rate() {
+        let config = ConversionConfig {
+            image_output_mode: ImageOutputMode::Sequence,
+            ..ConversionConfig::default()
+        };
+        let missing = video_metadata();
+        let invalid = SourceMetadata {
+            duration: Some("not-a-duration".to_string()),
+            frame_rate: Some(f64::NAN),
+            ..video_metadata()
+        };
+
+        assert_eq!(
+            estimated_image_sequence_frame_count(&config, Some(&missing)),
+            None
+        );
+        assert_eq!(
+            estimated_image_sequence_frame_count(&config, Some(&invalid)),
+            None
+        );
     }
 
     #[test]
@@ -1806,6 +1923,72 @@ mod output_config {
     }
 
     #[test]
+    fn normalize_output_config_reencodes_video_still_image_outputs_and_clears_tracks() {
+        let metadata = SourceMetadata {
+            media_kind: Some(SourceKind::Video),
+            ..SourceMetadata::default()
+        };
+        let mut config = ConversionConfig {
+            processing_mode: ProcessingMode::Copy,
+            container: "png".to_string(),
+            selected_audio_tracks: vec![1],
+            selected_subtitle_tracks: vec![2],
+            ..ConversionConfig::default()
+        };
+
+        normalize_output_config(&mut config, Some(&metadata));
+
+        assert_eq!(config.processing_mode, ProcessingMode::Reencode);
+        assert!(config.selected_audio_tracks.is_empty());
+        assert!(config.selected_subtitle_tracks.is_empty());
+    }
+
+    #[test]
+    fn normalize_output_config_resets_sequence_mode_for_incompatible_targets() {
+        let video = SourceMetadata {
+            media_kind: Some(SourceKind::Video),
+            ..SourceMetadata::default()
+        };
+        let image = SourceMetadata {
+            media_kind: Some(SourceKind::Image),
+            ..SourceMetadata::default()
+        };
+        let mut video_config = ConversionConfig {
+            container: "mp4".to_string(),
+            image_output_mode: ImageOutputMode::Sequence,
+            ..ConversionConfig::default()
+        };
+        let mut image_config = ConversionConfig {
+            container: "png".to_string(),
+            image_output_mode: ImageOutputMode::Sequence,
+            ..ConversionConfig::default()
+        };
+
+        normalize_output_config(&mut video_config, Some(&video));
+        normalize_output_config(&mut image_config, Some(&image));
+
+        assert_eq!(video_config.image_output_mode, ImageOutputMode::Single);
+        assert_eq!(image_config.image_output_mode, ImageOutputMode::Single);
+    }
+
+    #[test]
+    fn normalize_output_config_keeps_sequence_mode_for_video_still_image_output() {
+        let metadata = SourceMetadata {
+            media_kind: Some(SourceKind::Video),
+            ..SourceMetadata::default()
+        };
+        let mut config = ConversionConfig {
+            container: "png".to_string(),
+            image_output_mode: ImageOutputMode::Sequence,
+            ..ConversionConfig::default()
+        };
+
+        normalize_output_config(&mut config, Some(&metadata));
+
+        assert_eq!(config.image_output_mode, ImageOutputMode::Sequence);
+    }
+
+    #[test]
     fn apply_output_container_falls_back_to_default_audio_codec_when_needed() {
         let mut config = ConversionConfig {
             audio_codec: "flac".to_string(),
@@ -2112,6 +2295,33 @@ mod visible_settings_tabs {
             },
             Some(&metadata),
         ));
+
+        assert_eq!(
+            tabs,
+            vec![
+                "source",
+                "output",
+                "video-filters",
+                "images",
+                "metadata",
+                "presets"
+            ]
+        );
+    }
+
+    #[test]
+    fn video_to_still_image_shows_images_and_filters_but_hides_video() {
+        let metadata = SourceMetadata {
+            media_kind: Some(SourceKind::Video),
+            video_codec: Some("h264".to_string()),
+            ..SourceMetadata::default()
+        };
+        let config = ConversionConfig {
+            container: "png".to_string(),
+            ..ConversionConfig::default()
+        };
+
+        let tabs = tab_ids(super::visible_settings_tabs(&config, Some(&metadata)));
 
         assert_eq!(
             tabs,

@@ -770,6 +770,55 @@ fn image_container_matrix_should_write_single_frame_outputs() -> TestResult {
 
 #[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn image_sequence_container_matrix_should_write_numbered_frames() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("image_sequence_container_matrix")?;
+    let input = sandbox.path("source.mp4");
+    generate_h264_aac_source(&tools, &input, 0.5, 64, 48)?;
+
+    for (container, codec) in [
+        ("png", "png"),
+        ("jpg", "mjpeg"),
+        ("webp", "libwebp"),
+        ("bmp", "bmp"),
+        ("tiff", "tiff"),
+    ] {
+        if !encoder_available(&tools, codec)? {
+            eprintln!("skipping unavailable image encoder {codec}");
+            continue;
+        }
+        let result = sandbox.path(&format!("{container}_frames"));
+        fs::create_dir(&result).map_err(|error| error.to_string())?;
+        let output = result.join(format!("frame_%06d.{container}"));
+        let mut config = image_config(container, codec);
+        config.image_output_mode = "sequence".to_string();
+        let input_arg = path_arg(&input);
+        let output_arg = path_arg(&output);
+        validate_task_input(&input_arg, &config).map_err(|error| error.to_string())?;
+        let probe = probe_media(&tools, &input)?;
+        let args = build_ffmpeg_args(&input_arg, &output_arg, &config, &probe)
+            .map_err(|error| error.to_string())?;
+        run_tool(&tools.ffmpeg, &args)
+            .map_err(|error| format!("{container} image sequence failed: {error}"))?;
+
+        let mut frames = fs::read_dir(&result)
+            .map_err(|error| error.to_string())?
+            .map(|entry| {
+                entry
+                    .map(|entry| entry.file_name().to_string_lossy().into_owned())
+                    .map_err(|error| error.to_string())
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        frames.sort();
+        assert!(!frames.is_empty(), "{container} should emit frames");
+        assert_eq!(frames[0], format!("frame_000001.{container}"));
+    }
+
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 fn gif_output_should_write_palette_gif_video() -> TestResult {
     let tools = Toolchain::discover()?;
     let sandbox = Sandbox::new("gif_output")?;
@@ -1579,6 +1628,7 @@ fn base_config(container: &str, video_codec: &str) -> ConversionConfig {
         videotoolbox_allow_sw: false,
         hw_decode: false,
         pixel_format: "auto".to_string(),
+        image_output_mode: "single".to_string(),
         image_jpeg_quality: 85,
         image_jpeg_huffman: "optimal".to_string(),
         image_webp_lossless: false,

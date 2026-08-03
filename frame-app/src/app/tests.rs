@@ -3865,6 +3865,35 @@ mod visual_fixtures {
     }
 
     #[test]
+    fn settings_image_sequence_fixture_shows_video_sequence_with_900_frame_estimate() {
+        let mut root = FrameRoot::new();
+
+        root.apply_visual_fixture(Some(VisualFixture::SettingsImageSequence));
+
+        let selected = root
+            .file_queue
+            .selected_file()
+            .expect("image sequence fixture should select a file");
+        let metadata = root
+            .selected_source_metadata()
+            .expect("image sequence fixture should have metadata");
+        assert_eq!(root.settings_ui.active_tab, SettingsTab::Images);
+        assert_eq!(metadata.source_kind(), SourceKind::Video);
+        assert_eq!(selected.config.container, "jpg");
+        assert_eq!(
+            selected.config.image_output_mode,
+            crate::settings::ImageOutputMode::Sequence
+        );
+        assert_eq!(
+            crate::settings::estimated_image_sequence_frame_count(
+                &selected.config,
+                Some(&metadata)
+            ),
+            Some(900)
+        );
+    }
+
+    #[test]
     fn settings_subtitles_fixture_opens_subtitles_tab_with_tracks() {
         let mut root = FrameRoot::new();
 
