@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-08-04
+
 ### Added
 
 - **M2T, MTS, and M2TS Workflows:** Added complete MPEG transport-stream import, preview, re-encode, mixed subtitle, and stream-copy workflows with explicit 188-byte M2T and 192-byte MTS/M2TS profiles; MPEG-2 Video, MP2, Opus-in-TS, AC-3, and Blu-ray PCM encoding; program/service metadata Preserve, Clean, and Replace modes; SRT/ASS/WebVTT burn-in; embedded DVB/teletext/ARIB/PGS handling; and selectable `.sup` PGS copy or standards-compliant DVB conversion without private-data subtitle fallbacks. Resolves [#111](https://github.com/66HEX/frame/issues/111).
@@ -856,7 +858,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.32.0...HEAD
+[Unreleased]: https://github.com/66HEX/frame/compare/0.33.0...HEAD
+[0.33.0]: https://github.com/66HEX/frame/compare/0.32.0...0.33.0
 [0.32.0]: https://github.com/66HEX/frame/compare/0.31.1...0.32.0
 [0.31.1]: https://github.com/66HEX/frame/compare/0.31.0...0.31.1
 [0.31.0]: https://github.com/66HEX/frame/compare/0.30.0...0.31.0
