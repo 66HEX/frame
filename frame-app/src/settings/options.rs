@@ -6,11 +6,11 @@ use super::{
         AudioTrackOption, ConversionConfig, FPS_OPTIONS, GIF_COLOR_OPTIONS, GIF_DITHER_OPTIONS,
         GIF_FPS_OPTIONS, IMAGE_JPEG_HUFFMAN_OPTIONS, IMAGE_PNG_PREDICTION_OPTIONS,
         IMAGE_TIFF_COMPRESSION_OPTIONS, IMAGE_WEBP_PRESET_OPTIONS, ImageEncodingOption,
-        METADATA_FIELDS, METADATA_MODES, MetadataConfig, MetadataField, MetadataFieldOption,
-        MetadataMode, MetadataModeOption, OPTIONAL_AUDIO_CODEC_DEFINITIONS, OutputContainerOption,
-        OutputModeOption, PresetDefinition, PresetOption, ProcessingMode, RESOLUTION_OPTIONS,
-        SCALING_ALGORITHM_OPTIONS, SUBTITLE_FONT_SIZES, SUBTITLE_POSITIONS, SourceKind,
-        SourceMetadata, SubtitleFontOption, SubtitleFontSizeOption, SubtitlePosition,
+        ImageOutputMode, METADATA_FIELDS, METADATA_MODES, MetadataConfig, MetadataField,
+        MetadataFieldOption, MetadataMode, MetadataModeOption, OPTIONAL_AUDIO_CODEC_DEFINITIONS,
+        OutputContainerOption, OutputModeOption, PresetDefinition, PresetOption, ProcessingMode,
+        RESOLUTION_OPTIONS, SCALING_ALGORITHM_OPTIONS, SUBTITLE_FONT_SIZES, SUBTITLE_POSITIONS,
+        SourceKind, SourceMetadata, SubtitleFontOption, SubtitleFontSizeOption, SubtitlePosition,
         SubtitlePositionOption, SubtitleTrackOption, VIDEO_CODEC_DEFINITIONS,
         VIDEO_PIXEL_FORMAT_DEFINITIONS, VIDEO_PRESETS, VideoCodecCapability, VideoCodecOption,
         VideoPixelFormatOption, VideoPresetOption,
@@ -32,27 +32,85 @@ pub fn output_processing_mode_options(
     disabled: bool,
 ) -> [OutputModeOption; 2] {
     let is_source_image = source_kind_for(metadata) == SourceKind::Image;
+    let is_image_output = is_image_container(&config.container);
     [
         output_mode_option(ProcessingMode::Reencode, config, disabled),
-        output_mode_option(ProcessingMode::Copy, config, disabled || is_source_image),
+        output_mode_option(
+            ProcessingMode::Copy,
+            config,
+            disabled || is_source_image || is_image_output,
+        ),
     ]
 }
 
 #[must_use]
 pub fn visible_output_containers(metadata: Option<&SourceMetadata>) -> Vec<String> {
-    let is_source_image = source_kind_for(metadata) == SourceKind::Image;
+    let source_kind = source_kind_for(metadata);
 
     media_rules::all_containers()
         .iter()
-        .filter(|container| {
-            if is_source_image {
-                is_image_container(container) || is_gif_container(container)
-            } else {
-                !is_image_container(container)
-            }
+        .filter(|container| match source_kind {
+            SourceKind::Image => is_image_container(container) || is_gif_container(container),
+            SourceKind::Audio => !is_image_container(container),
+            SourceKind::Video => true,
         })
         .cloned()
         .collect()
+}
+
+#[must_use]
+pub fn estimated_image_sequence_frame_count(
+    config: &ConversionConfig,
+    metadata: Option<&SourceMetadata>,
+) -> Option<u64> {
+    if config.image_output_mode != ImageOutputMode::Sequence {
+        return None;
+    }
+
+    let metadata = metadata?;
+    let frame_rate = metadata
+        .frame_rate
+        .filter(|value| value.is_finite() && *value > 0.0)?;
+    let source_duration = metadata
+        .duration
+        .as_deref()
+        .and_then(parse_duration_seconds)
+        .filter(|value| value.is_finite() && *value > 0.0)?;
+    let start = config
+        .start_time
+        .as_deref()
+        .and_then(parse_duration_seconds)
+        .unwrap_or(0.0)
+        .clamp(0.0, source_duration);
+    let end = config
+        .end_time
+        .as_deref()
+        .and_then(parse_duration_seconds)
+        .unwrap_or(source_duration)
+        .clamp(start, source_duration);
+    let estimate = ((end - start) * frame_rate).round();
+
+    if !estimate.is_finite() || estimate < 0.0 {
+        return None;
+    }
+
+    format!("{estimate:.0}").parse::<u64>().ok()
+}
+
+fn parse_duration_seconds(value: &str) -> Option<f64> {
+    let value = value.trim();
+    if let Ok(seconds) = value.parse::<f64>() {
+        return Some(seconds);
+    }
+
+    let mut parts = value.split(':').rev();
+    let seconds = parts.next()?.parse::<f64>().ok()?;
+    let minutes = parts.next().unwrap_or("0").parse::<f64>().ok()?;
+    let hours = parts.next().unwrap_or("0").parse::<f64>().ok()?;
+    parts
+        .next()
+        .is_none()
+        .then_some(hours.mul_add(3600.0, minutes.mul_add(60.0, seconds)))
 }
 
 #[must_use]
