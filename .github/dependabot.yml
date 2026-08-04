@@ -9,6 +9,11 @@ updates:
       timezone: Europe/Warsaw
     open-pull-requests-limit: 10
     groups:
+      windows-rs:
+        patterns:
+          - windows
+          - windows-core
+          - windows-numerics
       rust-patch-updates:
         update-types:
           - patch

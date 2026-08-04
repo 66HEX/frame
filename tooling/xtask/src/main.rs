@@ -1996,6 +1996,19 @@ jobs:
     - name: ci::run_documented_gate
       run: cargo xtask ci
     timeout-minutes: 60
+  cargo_check_windows:
+    name: cargo check windows
+    runs-on: windows-2022
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v7.0.0
+      with:
+        persist-credentials: false
+    - name: steps::setup_rust
+      run: rustup toolchain install __RUST_VERSION__ --profile minimal --component clippy,rustfmt
+    - name: ci::check_windows
+      run: cargo check --manifest-path frame-app/Cargo.toml --target x86_64-pc-windows-msvc --locked
+    timeout-minutes: 60
 ",
     )
 }
@@ -4302,6 +4315,33 @@ mod tests {
                 !workflow.contains(forbidden),
                 "release workflow contains mutable or overwrite path: {forbidden}"
             );
+        }
+    }
+
+    #[test]
+    fn ci_workflow_checks_the_windows_target_on_a_windows_runner() {
+        let workflow = ci_workflow();
+        let windows_job = workflow_job(&workflow, "cargo_check_windows");
+
+        assert!(windows_job.contains("runs-on: windows-2022"));
+        assert!(windows_job.contains(
+            "cargo check --manifest-path frame-app/Cargo.toml --target x86_64-pc-windows-msvc --locked"
+        ));
+    }
+
+    #[test]
+    fn dependabot_groups_the_windows_rs_dependency_family() {
+        let config = include_str!("../../../.github/dependabot.yml");
+        let windows_group = config
+            .split_once("      windows-rs:\n")
+            .unwrap()
+            .1
+            .split_once("      rust-patch-updates:\n")
+            .unwrap()
+            .0;
+
+        for dependency in ["windows", "windows-core", "windows-numerics"] {
+            assert!(windows_group.contains(&format!("          - {dependency}\n")));
         }
     }
 

@@ -2695,7 +2695,7 @@ dependencies = [
  "util",
  "uuid",
  "windows 0.61.3",
- "windows-core 0.62.2",
+ "windows-core 0.61.2",
  "windows-numerics 0.2.0",
  "windows-registry",
 ]

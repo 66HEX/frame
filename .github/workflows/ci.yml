@@ -57,3 +57,20 @@ jobs:
     - name: ci::run_documented_gate
       run: cargo xtask ci
     timeout-minutes: 60
+  cargo_check_windows:
+    name: cargo check windows
+    runs-on: windows-2022
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - name: steps::setup_rust
+      shell: bash
+      run: |
+        rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
+        rustup default 1.95.0
+        test "$(rustc --version | awk '{print $2}')" = "1.95.0"
+    - name: ci::check_windows
+      run: cargo check --manifest-path frame-app/Cargo.toml --target x86_64-pc-windows-msvc --locked
+    timeout-minutes: 60
