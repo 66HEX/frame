@@ -52,7 +52,7 @@ const ACTION_CHECKOUT_SHA: &str = "3d3c42e5aac5ba805825da76410c181273ba90b1";
 const ACTION_UPLOAD_ARTIFACT_SHA: &str = "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a";
 const ACTION_DOWNLOAD_ARTIFACT_SHA: &str = "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c";
 const ACTION_DEPENDENCY_REVIEW_SHA: &str = "a1d282b36b6f3519aa1f3fc636f609c47dddb294";
-const ACTION_CODEQL_SHA: &str = "e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81";
+const ACTION_CODEQL_SHA: &str = "db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28";
 const ACTION_ATTEST_BUILD_PROVENANCE_SHA: &str = "4d101475d8b20a2381f78447822ac1eab6504dd8";
 const ACTION_INSTALL_NIX_SHA: &str = "13d8dd58da0234aa297dedd986986ccb8e7f3e24";
 
@@ -1880,11 +1880,11 @@ fn pin_workflow_actions(workflow: &mut String) {
         ),
         (
             "github/codeql-action/init@v4.37.1",
-            format!("github/codeql-action/init@{ACTION_CODEQL_SHA} # v4.37.3"),
+            format!("github/codeql-action/init@{ACTION_CODEQL_SHA} # v4.37.8"),
         ),
         (
             "github/codeql-action/analyze@v4.37.1",
-            format!("github/codeql-action/analyze@{ACTION_CODEQL_SHA} # v4.37.3"),
+            format!("github/codeql-action/analyze@{ACTION_CODEQL_SHA} # v4.37.8"),
         ),
     ];
     for (reference, pinned) in action_replacements {
