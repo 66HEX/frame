@@ -54,7 +54,7 @@ const ACTION_DOWNLOAD_ARTIFACT_SHA: &str = "3e5f45b2cfb9172054b4087a40e8e0b5a546
 const ACTION_DEPENDENCY_REVIEW_SHA: &str = "a1d282b36b6f3519aa1f3fc636f609c47dddb294";
 const ACTION_CODEQL_SHA: &str = "e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81";
 const ACTION_ATTEST_BUILD_PROVENANCE_SHA: &str = "4d101475d8b20a2381f78447822ac1eab6504dd8";
-const ACTION_INSTALL_NIX_SHA: &str = "630ae543ea3a38a9a4166f03376c02c50f408342";
+const ACTION_INSTALL_NIX_SHA: &str = "13d8dd58da0234aa297dedd986986ccb8e7f3e24";
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -1872,11 +1872,11 @@ fn pin_workflow_actions(workflow: &mut String) {
         ),
         (
             "cachix/install-nix-action@v31.11.0",
-            format!("cachix/install-nix-action@{ACTION_INSTALL_NIX_SHA} # v31.11.0"),
+            format!("cachix/install-nix-action@{ACTION_INSTALL_NIX_SHA} # v31.11.1"),
         ),
         (
             "cachix/install-nix-action@v31",
-            format!("cachix/install-nix-action@{ACTION_INSTALL_NIX_SHA} # v31.11.0"),
+            format!("cachix/install-nix-action@{ACTION_INSTALL_NIX_SHA} # v31.11.1"),
         ),
         (
             "github/codeql-action/init@v4.37.1",
