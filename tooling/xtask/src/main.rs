@@ -53,7 +53,7 @@ const ACTION_UPLOAD_ARTIFACT_SHA: &str = "043fb46d1a93c77aae656e7c1c64a875d1fc6a
 const ACTION_DOWNLOAD_ARTIFACT_SHA: &str = "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c";
 const ACTION_DEPENDENCY_REVIEW_SHA: &str = "a1d282b36b6f3519aa1f3fc636f609c47dddb294";
 const ACTION_CODEQL_SHA: &str = "e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81";
-const ACTION_ATTEST_BUILD_PROVENANCE_SHA: &str = "0f67c3f4856b2e3261c31976d6725780e5e4c373";
+const ACTION_ATTEST_BUILD_PROVENANCE_SHA: &str = "4d101475d8b20a2381f78447822ac1eab6504dd8";
 const ACTION_INSTALL_NIX_SHA: &str = "630ae543ea3a38a9a4166f03376c02c50f408342";
 
 #[cfg(unix)]
@@ -1867,7 +1867,7 @@ fn pin_workflow_actions(workflow: &mut String) {
         (
             "actions/attest-build-provenance@v4.1.1",
             format!(
-                "actions/attest-build-provenance@{ACTION_ATTEST_BUILD_PROVENANCE_SHA} # v4.1.1"
+                "actions/attest-build-provenance@{ACTION_ATTEST_BUILD_PROVENANCE_SHA} # v4.2.2"
             ),
         ),
         (
