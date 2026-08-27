@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.33.1] - 2026-08-27
+
 ### Fixed
 
 - **Default Audio Selection:** Selects the first available audio track after probing each new source, while preserving restored sessions and explicit track choices. Resolves [#151](https://github.com/66HEX/frame/issues/151).
@@ -866,7 +868,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.33.0...HEAD
+[Unreleased]: https://github.com/66HEX/frame/compare/0.33.1...HEAD
+[0.33.1]: https://github.com/66HEX/frame/compare/0.33.0...0.33.1
 [0.33.0]: https://github.com/66HEX/frame/compare/0.32.0...0.33.0
 [0.32.0]: https://github.com/66HEX/frame/compare/0.31.1...0.32.0
 [0.31.1]: https://github.com/66HEX/frame/compare/0.31.0...0.31.1
