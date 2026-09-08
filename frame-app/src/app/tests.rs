@@ -3787,7 +3787,7 @@ mod visual_fixtures {
                     | SourceInfoSection::Tracks { title, .. } => *title,
                 })
                 .collect::<Vec<_>>(),
-            ["File information", "Video stream"]
+            ["文件信息", "视频流"]
         );
     }
 

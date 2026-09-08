@@ -20,8 +20,8 @@ const PENDING_UPDATE_SESSION_FILE_NAME: &str = "pending-update-session.json";
 const CONSUMED_UPDATE_SESSION_FILE_NAME: &str = "restored-update-session.json";
 const MAX_UPDATE_SESSION_BYTES: u64 = 16 * 1024 * 1024;
 const MAX_UPDATE_SESSION_FILES: usize = 10_000;
-const MISSING_SOURCE_ERROR: &str = "Source file is no longer available.";
-const RESTORED_CONVERSION_ERROR: &str = "The previous conversion did not complete successfully.";
+const MISSING_SOURCE_ERROR: &str = "源文件已不可用。";
+const RESTORED_CONVERSION_ERROR: &str = "上一次转换未成功完成。";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UpdateSessionStore {

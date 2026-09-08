@@ -36,13 +36,13 @@ impl FileStatus {
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
-            Self::Idle => "Idle",
-            Self::Queued => "Queued",
-            Self::Converting => "Converting",
-            Self::Paused => "Paused",
-            Self::Cancelling => "Cancelling",
-            Self::Completed => "Ready",
-            Self::Error => "Error",
+            Self::Idle => "空闲",
+            Self::Queued => "排队中",
+            Self::Converting => "转换中",
+            Self::Paused => "已暂停",
+            Self::Cancelling => "取消中",
+            Self::Completed => "就绪",
+            Self::Error => "错误",
         }
     }
 }

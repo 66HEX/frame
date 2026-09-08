@@ -76,7 +76,7 @@ pub(super) fn logs_tab_strip(
     let mut tabs = div()
         .id("logs-tab-list")
         .role(gpui::Role::TabList)
-        .aria_label("Log files")
+        .aria_label("日志文件")
         .h_full()
         .flex_1()
         .min_w_0()
@@ -105,7 +105,7 @@ pub(super) fn logs_tab_strip(
             div()
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .text_color(color(palette.text_muted))
-                .child(theme::ui_text("No active processes")),
+                .child(theme::ui_text("无活动进程")),
         );
     }
 
@@ -214,14 +214,14 @@ pub(super) fn logs_body(
 
     if !has_active_files {
         return body.child(logs_empty_state(
-            "Select a task to view console output",
+            "选择任务以查看控制台输出",
             palette,
         ));
     }
 
     let Some(selected_id) = selected_id else {
         return body.child(logs_empty_state(
-            "Select a task to view console output",
+            "选择任务以查看控制台输出",
             palette,
         ));
     };
@@ -229,7 +229,7 @@ pub(super) fn logs_body(
     let line_count = conversion_events.logs_for(selected_id).len();
     if line_count == 0 {
         return body.child(logs_empty_state(
-            "Process started, waiting for output...",
+            "进程已启动，等待输出...",
             palette,
         ));
     }
@@ -289,7 +289,7 @@ pub(super) fn log_lines_list(
         .relative()
         .id(element_id("logs-scroll-area", &selected_id))
         .role(gpui::Role::Log)
-        .aria_label("Conversion log output")
+        .aria_label("转换日志输出")
         .focusable()
         .tab_stop(true)
         .focus_visible(move |style| focus_visible_ring(style, palette))
@@ -458,7 +458,7 @@ pub(super) fn log_scroll_to_bottom_button(
             frame_icon_button(
                 "logs-scroll-to-bottom",
                 assets::ICON_ARROW_DOWN,
-                "Scroll logs to bottom",
+                "滚动至日志底部",
                 FrameIconButtonVariant::Ghost,
                 true,
                 FrameIconButtonSize {
@@ -492,7 +492,7 @@ pub(super) fn logs_copy_button(
         assets::ICON_COPY,
         assets::ICON_CHECK,
         copied,
-        if copied { "Logs copied" } else { "Copy logs" },
+        if copied { "日志已复制" } else { "复制日志" },
         FrameIconButtonVariant::Ghost,
         enabled,
         FrameIconButtonSize {

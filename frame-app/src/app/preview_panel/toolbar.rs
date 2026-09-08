@@ -57,7 +57,7 @@ pub(in crate::app) fn preview_toolbar(
             preview_tool_button(
                 "preview-tool-rotate",
                 assets::ICON_ROTATE_CW,
-                "Rotate preview",
+                "旋转预览",
                 false,
                 transform_enabled,
                 palette,
@@ -74,7 +74,7 @@ pub(in crate::app) fn preview_toolbar(
             preview_tool_button(
                 "preview-tool-flip-horizontal",
                 assets::ICON_FLIP_HORIZONTAL,
-                "Flip horizontally",
+                "水平翻转",
                 state.crop.flip_horizontal,
                 transform_enabled,
                 palette,
@@ -91,7 +91,7 @@ pub(in crate::app) fn preview_toolbar(
             preview_tool_button(
                 "preview-tool-flip-vertical",
                 assets::ICON_FLIP_VERTICAL,
-                "Flip vertically",
+                "垂直翻转",
                 state.crop.flip_vertical,
                 transform_enabled,
                 palette,
@@ -108,7 +108,7 @@ pub(in crate::app) fn preview_toolbar(
             preview_tool_button_with_focus(
                 "preview-tool-crop",
                 assets::ICON_CROP,
-                "Crop",
+                "裁剪",
                 state.crop.crop_mode || state.crop.applied_crop.is_some(),
                 crop_enabled,
                 focuses.crop,
@@ -126,7 +126,7 @@ pub(in crate::app) fn preview_toolbar(
             preview_tool_button_with_focus(
                 "preview-tool-overlay",
                 assets::ICON_FILE_IMAGE,
-                "Overlay image",
+                "叠加图像",
                 state.overlay.overlay_mode || state.overlay.has_overlay,
                 overlay_enabled,
                 focuses.overlay,
@@ -164,7 +164,7 @@ pub(in crate::app) fn preview_zoom_toolbar(
             preview_tool_button(
                 "preview-zoom-out",
                 assets::ICON_MINUS,
-                "Zoom out",
+                "缩小",
                 false,
                 enabled,
                 palette,
@@ -181,7 +181,7 @@ pub(in crate::app) fn preview_zoom_toolbar(
             preview_tool_button(
                 "preview-zoom-in",
                 assets::ICON_PLUS,
-                "Zoom in",
+                "放大",
                 false,
                 enabled,
                 palette,

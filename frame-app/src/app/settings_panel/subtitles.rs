@@ -177,7 +177,7 @@ pub(in crate::app) fn settings_subtitles_tab(
 ) -> gpui::Div {
     let palette = state.palette;
     let content = div().flex().flex_col().gap_4().child(
-        settings_section("Subtitle type", palette)
+        settings_section("字幕类型", palette)
             .child(settings_subtitle_mode_grid(state.mode, palette, window, cx)),
     );
 
@@ -204,7 +204,7 @@ fn settings_subtitle_mode_grid(
         .child(
             frame_choice_button(
                 "settings-subtitle-mode-selectable",
-                "Selectable",
+                "可选字幕",
                 mode == SettingsSubtitleMode::Selectable,
                 true,
                 palette,
@@ -221,7 +221,7 @@ fn settings_subtitle_mode_grid(
         .child(
             frame_choice_button(
                 "settings-subtitle-mode-burn-in",
-                "Burn-in",
+                "烧录字幕",
                 mode == SettingsSubtitleMode::BurnIn,
                 true,
                 palette,
@@ -257,8 +257,8 @@ fn settings_selectable_subtitles_content(
     );
     if track_options.is_empty() {
         return content.child(
-            settings_section("Source tracks", palette)
-                .child(settings_hint_text("No subtitles", palette)),
+            settings_section("源轨道", palette)
+                .child(settings_hint_text("无字幕", palette)),
         );
     }
 
@@ -267,7 +267,7 @@ fn settings_selectable_subtitles_content(
         list = list.child(settings_subtitle_track_button(option, palette, window, cx));
     }
 
-    content.child(settings_section("Source tracks", palette).child(list))
+    content.child(settings_section("源轨道", palette).child(list))
 }
 
 fn settings_burn_in_subtitles_content(
@@ -279,7 +279,7 @@ fn settings_burn_in_subtitles_content(
     let palette = state.palette;
     let copy_mode = config.processing_mode == ProcessingMode::Copy;
     let burn_in_disabled = state.settings_disabled || copy_mode;
-    let mut burn_in_section = settings_section("Burn-in file", palette)
+    let mut burn_in_section = settings_section("烧录文件", palette)
         .child(settings_subtitle_load_button(
             burn_in_disabled,
             state.focuses.burn_file,
@@ -289,9 +289,9 @@ fn settings_burn_in_subtitles_content(
         ))
         .child(settings_hint_text(
             if copy_mode {
-                "Burn-in subtitles are disabled in stream copy mode."
+                "流复制模式下禁用烧录字幕。"
             } else {
-                "Burning in subtitles will force video re-encoding."
+                "烧录字幕将强制重新编码视频。"
             },
             palette,
         ));
@@ -313,7 +313,7 @@ fn settings_burn_in_subtitles_content(
     }
 
     content.child(
-        settings_section("Style", palette).child(settings_subtitle_style_controls(
+        settings_section("风格", palette).child(settings_subtitle_style_controls(
             SettingsSubtitleStyleState {
                 config,
                 disabled: burn_in_disabled,
@@ -346,7 +346,7 @@ fn settings_external_subtitles_section(
     let needs_unavailable_dvbsub =
         config.container.eq_ignore_ascii_case("m2t") && !state.available_encoders.dvbsub;
     let enabled = !state.settings_disabled && !needs_unavailable_dvbsub;
-    let mut section = settings_section("External files", palette)
+    let mut section = settings_section("外部文件", palette)
         .child(settings_external_subtitle_add_button(
             enabled,
             state.focuses.add_external_files,
@@ -356,15 +356,15 @@ fn settings_external_subtitles_section(
         ))
         .child(settings_hint_text(
             if needs_unavailable_dvbsub {
-                "Selectable .sup/PGS requires the DVB subtitle encoder, which is unavailable in the active FFmpeg runtime. Text subtitles can still be burned in."
+                "可选 .sup/PGS 需要 DVB 字幕编码器，当前 FFmpeg 运行时未提供。文本字幕仍可烧录。"
             } else {
-                "Embedded as switchable tracks in the exported file; they are not shown in the preview."
+                "作为可切换轨道嵌入导出文件；预览中不显示。"
             },
             palette,
         ));
 
     if config.external_subtitle_tracks.is_empty() {
-        return section.child(settings_hint_text("No external subtitle files", palette));
+        return section.child(settings_hint_text("无外部字幕文件", palette));
     }
 
     let selected_index = state
@@ -453,7 +453,7 @@ fn settings_external_subtitle_add_button(
     let button = if let Some(focus) = focus {
         frame_text_button_with_focus(
             "settings-subtitle-add-external",
-            "Add subtitle files",
+            "添加字幕文件",
             ButtonVariant::Secondary,
             false,
             enabled,
@@ -465,7 +465,7 @@ fn settings_external_subtitle_add_button(
     } else {
         frame_text_button(
             "settings-subtitle-add-external",
-            "Add subtitle files",
+            "添加字幕文件",
             ButtonVariant::Secondary,
             false,
             enabled,
@@ -513,10 +513,10 @@ fn settings_external_subtitle_track_row(
         details.push(language.trim().to_string());
     }
     if track.is_default {
-        details.push("Default".to_string());
+        details.push("默认".to_string());
     }
     if track.is_forced {
-        details.push("Forced".to_string());
+        details.push("强制".to_string());
     }
     let is_sup = std::path::Path::new(&track.path)
         .extension()
@@ -632,7 +632,7 @@ fn settings_external_subtitle_editor(
                 .flex()
                 .flex_col()
                 .gap_2()
-                .child(settings_field_label("Language", palette))
+                .child(settings_field_label("语言", palette))
                 .child(frame_text_input(
                     FrameTextInputSpec {
                         id: "settings-external-subtitle-language",
@@ -654,7 +654,7 @@ fn settings_external_subtitle_editor(
                 .flex()
                 .flex_col()
                 .gap_2()
-                .child(settings_field_label("Title", palette))
+                .child(settings_field_label("标题", palette))
                 .child(frame_text_input(
                     FrameTextInputSpec {
                         id: "settings-external-subtitle-title",
@@ -686,7 +686,7 @@ fn settings_external_subtitle_editor(
                 .child(
                     frame_choice_button(
                         "settings-external-subtitle-default",
-                        "Default",
+                        "默认",
                         is_default,
                         enabled,
                         palette,
@@ -709,7 +709,7 @@ fn settings_external_subtitle_editor(
                 .child(
                     frame_choice_button(
                         "settings-external-subtitle-forced",
-                        "Forced",
+                        "强制",
                         is_forced,
                         enabled,
                         palette,
@@ -746,7 +746,7 @@ fn settings_subtitle_load_button(
     let background = animated.background;
     let foreground = animated.foreground;
     let motion = animated.motion;
-    let label = "Add subtitle file";
+    let label = "添加字幕文件";
 
     let button = div()
         .id("settings-subtitle-burn-file")
@@ -831,7 +831,7 @@ fn settings_subtitle_clear_button(
     frame_icon_button(
         "settings-subtitle-clear-file",
         assets::ICON_TRASH,
-        "Clear subtitle file",
+        "清除字幕文件",
         FrameIconButtonVariant::DestructiveGhost,
         !disabled,
         FrameIconButtonSize {
@@ -909,7 +909,7 @@ fn settings_subtitle_style_controls(
                 .gap_2()
                 .child(settings_subtitle_color_field(
                     SettingsSubtitleColorFieldSpec {
-                        label: "Text color",
+                        label: "文本颜色",
                         id: "settings-subtitle-font-color",
                         value: subtitle_color_value(
                             state.config.subtitle_font_color.as_ref(),
@@ -930,7 +930,7 @@ fn settings_subtitle_style_controls(
                 ))
                 .child(settings_subtitle_color_field(
                     SettingsSubtitleColorFieldSpec {
-                        label: "Outline color",
+                        label: "描边颜色",
                         id: "settings-subtitle-outline-color",
                         value: subtitle_color_value(
                             state.config.subtitle_outline_color.as_ref(),
@@ -955,7 +955,7 @@ fn settings_subtitle_style_controls(
                 .flex()
                 .flex_col()
                 .gap_2()
-                .child(settings_field_label("Position", state.palette))
+                .child(settings_field_label("位置", state.palette))
                 .child(settings_subtitle_position_grid(
                     state.config,
                     state.disabled,
@@ -965,7 +965,7 @@ fn settings_subtitle_style_controls(
                 )),
         )
         .child(settings_hint_text(
-            "Style applies to burned-in subtitles only.",
+            "样式仅对烧录字幕生效。",
             state.palette,
         ))
 }
@@ -998,7 +998,7 @@ fn settings_subtitle_font_select(
         .subtitle_font_name
         .as_deref()
         .filter(|font| !font.is_empty())
-        .unwrap_or("Default (e.g. Arial)");
+        .unwrap_or("默认（如 Arial）");
     let options = subtitle_font_options(state.config, state.subtitle_fonts, state.disabled);
     let has_options = !options.is_empty();
     let enabled = !state.disabled && has_options;
@@ -1006,7 +1006,7 @@ fn settings_subtitle_font_select(
     let trigger = if let Some(focus) = state.focuses.trigger {
         frame_select_trigger_with_focus(
             "settings-subtitle-font-select",
-            "Subtitle font",
+            "字幕字体",
             display,
             enabled,
             state.rendered_popover == Some(popover),
@@ -1018,7 +1018,7 @@ fn settings_subtitle_font_select(
     } else {
         frame_select_trigger(
             "settings-subtitle-font-select",
-            "Subtitle font",
+            "字幕字体",
             display,
             enabled,
             state.rendered_popover == Some(popover),
@@ -1042,7 +1042,7 @@ fn settings_subtitle_font_select(
         .flex()
         .flex_col()
         .gap_2()
-        .child(settings_field_label("Font", state.palette))
+        .child(settings_field_label("字体", state.palette))
         .child(
             trigger
                 .on_click(cx.listener(move |root, event: &ClickEvent, _window, cx| {
@@ -1191,14 +1191,14 @@ fn settings_subtitle_font_size_select(
         .subtitle_font_size
         .as_deref()
         .filter(|size| !size.is_empty())
-        .unwrap_or("Default");
+        .unwrap_or("默认");
     let options = subtitle_font_size_options(state.config, state.disabled);
     let enabled = !state.disabled;
     let popover = state.popover;
     let trigger = if let Some(focus) = state.focuses.trigger {
         frame_select_trigger_with_focus(
             "settings-subtitle-font-size-select",
-            "Subtitle font size",
+            "字幕字号",
             display,
             enabled,
             state.rendered_popover == Some(popover),
@@ -1210,7 +1210,7 @@ fn settings_subtitle_font_size_select(
     } else {
         frame_select_trigger(
             "settings-subtitle-font-size-select",
-            "Subtitle font size",
+            "字幕字号",
             display,
             enabled,
             state.rendered_popover == Some(popover),
@@ -1234,7 +1234,7 @@ fn settings_subtitle_font_size_select(
         .flex()
         .flex_col()
         .gap_2()
-        .child(settings_field_label("Size", state.palette))
+        .child(settings_field_label("字号", state.palette))
         .child(
             trigger
                 .on_click(cx.listener(move |root, event: &ClickEvent, _window, cx| {
@@ -2058,15 +2058,15 @@ fn settings_subtitle_hue_slider(
 
 const fn settings_subtitle_sv_label(target: SettingsSubtitleColorTarget) -> &'static str {
     match target {
-        SettingsSubtitleColorTarget::Font => "Subtitle font color saturation and brightness",
-        SettingsSubtitleColorTarget::Outline => "Subtitle outline color saturation and brightness",
+        SettingsSubtitleColorTarget::Font => "字幕字体颜色饱和度与亮度",
+        SettingsSubtitleColorTarget::Outline => "字幕描边颜色饱和度与亮度",
     }
 }
 
 const fn settings_subtitle_hue_label(target: SettingsSubtitleColorTarget) -> &'static str {
     match target {
-        SettingsSubtitleColorTarget::Font => "Subtitle font color hue",
-        SettingsSubtitleColorTarget::Outline => "Subtitle outline color hue",
+        SettingsSubtitleColorTarget::Font => "字幕字体颜色色相",
+        SettingsSubtitleColorTarget::Outline => "字幕描边颜色色相",
     }
 }
 

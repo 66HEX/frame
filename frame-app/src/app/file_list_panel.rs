@@ -89,7 +89,7 @@ pub(super) fn file_list_header(
                     }
                 },
             )),
-            "Select all files for conversion",
+            "全选文件以进行转换",
             selection_enabled,
             selection.is_checked,
             selection.is_indeterminate,
@@ -119,10 +119,10 @@ pub(super) fn file_list_header(
                         .items_center()
                         .child(header_checkbox),
                 )
-                .child(header_label("Name", 5, false))
-                .child(header_label("Size", 2, true))
-                .child(header_label("Target", 2, true))
-                .child(header_label("State", 2, true)),
+                .child(header_label("名称", 5, false))
+                .child(header_label("大小", 2, true))
+                .child(header_label("目标", 2, true))
+                .child(header_label("状态", 2, true)),
         )
         .child(
             div()
@@ -132,7 +132,7 @@ pub(super) fn file_list_header(
                 .font_weight(theme::TEXT_WEIGHT_MEDIUM)
                 .text_color(color(palette.text_muted))
                 .text_right()
-                .child(theme::ui_text("Actions")),
+                .child(theme::ui_text("操作")),
         )
         .child(panel_bottom_separator(palette))
 }
@@ -146,7 +146,7 @@ pub(super) fn file_list_body(
     let body = div()
         .id("file-list-body")
         .role(gpui::Role::List)
-        .aria_label("File queue")
+        .aria_label("文件队列")
         .relative()
         .flex_1()
         .flex()
@@ -161,7 +161,7 @@ pub(super) fn file_list_body(
                 .justify_center()
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .text_color(color(palette.text_muted))
-                .child(theme::ui_text("Drop files or use Add Source")),
+                .child(theme::ui_text("拖放文件，或点击“添加源”")),
         );
     }
 
@@ -369,17 +369,17 @@ fn row_primary_action_button(
         RowPrimaryAction::Pause => (
             "file-row-action-pause",
             assets::ICON_PAUSE,
-            "Pause conversion",
+            "暂停转换",
         ),
         RowPrimaryAction::Resume => (
             "file-row-action-resume",
             assets::ICON_PLAY,
-            "Resume conversion",
+            "恢复转换",
         ),
         RowPrimaryAction::Reconvert => (
             "file-row-action-reconvert",
             assets::ICON_REFRESH,
-            "Convert again",
+            "重新转换",
         ),
     };
     let id = file_id;
@@ -421,9 +421,9 @@ fn row_secondary_action_button(
         RowSecondaryAction::Cancel => (
             "file-row-action-cancel",
             assets::ICON_SQUARE,
-            "Cancel conversion",
+            "取消转换",
         ),
-        RowSecondaryAction::Delete => ("file-row-action-delete", assets::ICON_TRASH, "Remove file"),
+        RowSecondaryAction::Delete => ("file-row-action-delete", assets::ICON_TRASH, "移除文件"),
     };
     let id = file_id;
     Some(
@@ -498,7 +498,7 @@ pub(super) fn row_checkbox_control(
     palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> impl IntoElement {
-    let label = format!("Select {file_name} for conversion");
+    let label = format!("选择 {file_name} 以进行转换");
     let click_id = file_id.to_string();
     let key_id = file_id.to_string();
 

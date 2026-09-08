@@ -60,7 +60,7 @@ fn settings_presets_header(
     let mut header = div()
         .relative()
         .w_full()
-        .child(settings_section_label("Preset library", palette));
+        .child(settings_section_label("预设库", palette));
     if let Some(notice) = notice {
         header = header.child(
             div()
@@ -101,7 +101,7 @@ fn settings_presets_save_row(
             FrameTextInputSpec {
                 id: "settings-preset-name-field",
                 value: preset_name,
-                placeholder: "Preset label",
+                placeholder: "预设名称",
                 disabled: settings_disabled,
                 focus: preset_name_focus,
                 kind: FrameTextInputKind::PresetName,
@@ -126,7 +126,7 @@ fn settings_save_preset_button(
 ) -> gpui::Stateful<gpui::Div> {
     frame_text_button(
         "settings-save-preset",
-        "Save",
+        "保存",
         ButtonVariant::Secondary,
         false,
         enabled,
@@ -198,7 +198,7 @@ fn settings_preset_row(
                 this.child(settings_preset_icon_button(
                     format!("settings-preset-apply-all-{apply_all_id}"),
                     assets::ICON_LIST_CHECKS,
-                    "Apply preset to all files",
+                    "将预设应用到所有文件",
                     FrameIconButtonVariant::Ghost,
                     !settings_disabled,
                     palette,
@@ -213,7 +213,7 @@ fn settings_preset_row(
                 this.child(settings_preset_icon_button(
                     format!("settings-preset-delete-{delete_id}"),
                     assets::ICON_TRASH,
-                    "Delete preset",
+                    "删除预设",
                     FrameIconButtonVariant::DestructiveGhost,
                     !settings_disabled,
                     palette,

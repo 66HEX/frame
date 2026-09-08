@@ -256,7 +256,7 @@ pub(super) fn titlebar_settings_button(
         "titlebar-settings",
         assets::ICON_SETTINGS,
         None,
-        "Settings",
+        "设置",
         ButtonVariant::Secondary,
         true,
         palette,
@@ -281,8 +281,8 @@ pub(super) fn titlebar_add_source_button(
     action_button(
         "titlebar-add-source",
         assets::ICON_PLUS,
-        Some("Add source"),
-        "Add source",
+        Some("添加源"),
+        "添加源",
         ButtonVariant::Secondary,
         true,
         palette,
@@ -458,7 +458,7 @@ pub(super) fn app_settings_sheet(
             div()
                 .id("app-settings-panel")
                 .role(gpui::Role::Dialog)
-                .aria_label("Settings")
+                .aria_label("设置")
                 .track_focus(props.panel_focus)
                 .tab_stop(false)
                 .absolute()
@@ -497,11 +497,11 @@ pub(super) fn app_settings_sheet(
                         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
                         .text_color(color(palette.text_primary))
-                        .child(theme::ui_text("Settings"))
+                        .child(theme::ui_text("设置"))
                         .child(
                             app_settings_close_button(
                                 "app-settings-close",
-                                "Close settings",
+                                "关闭设置",
                                 true,
                                 props.close_focus,
                                 palette,
@@ -557,7 +557,7 @@ pub(super) fn app_settings_sheet(
                                     cx,
                                 ))
                                 .child(
-                                    settings_section("Max concurrency", palette)
+                                    settings_section("最大并发数", palette)
                                         .child(app_settings_concurrency_control(
                                             props.draft_max_concurrency,
                                             draft_is_dirty,
@@ -568,7 +568,7 @@ pub(super) fn app_settings_sheet(
                                             cx,
                                         ))
                                         .child(settings_hint_text(
-                                            "Controls how many queued conversions can run at the same time.",
+                                            "控制队列中可同时进行的转换数量。",
                                             palette,
                                         )),
                                 )
@@ -623,15 +623,15 @@ fn app_settings_output_directory_section(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let selected_path = default_output_directory
-        .unwrap_or("No folder selected")
+        .unwrap_or("未选择文件夹")
         .to_string();
     let button_label = if default_output_directory.is_some() {
-        "Change default output folder"
+        "更改默认输出文件夹"
     } else {
-        "Choose default output folder"
+        "选择默认输出文件夹"
     };
 
-    let mut section = settings_section("Output folder", palette)
+    let mut section = settings_section("输出文件夹", palette)
         .child(
             frame_text_button_with_focus(
                 "app-settings-output-directory",
@@ -689,7 +689,7 @@ fn app_settings_appearance_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let mut section = settings_section("Appearance", palette)
+    let mut section = settings_section("外观", palette)
         .child(
             div()
                 .grid()
@@ -719,7 +719,7 @@ fn app_settings_appearance_section(
                 )),
         )
         .child(settings_hint_text(
-            "Changes the color theme and size of the complete interface.",
+            "更改整个界面的颜色主题与大小。",
             palette,
         ));
 
@@ -753,7 +753,7 @@ trait AppSettingsAppearanceValue: Copy + Eq + 'static {
 }
 
 impl AppSettingsAppearanceValue for ColorTheme {
-    const LABEL: &'static str = "Theme";
+    const LABEL: &'static str = "主题";
     const TRIGGER_ID: &'static str = "app-settings-theme";
     const LIST_ID: &'static str = "app-settings-theme-options-list";
     const PANEL_ID: &'static str = "app-settings-theme-options";
@@ -779,7 +779,7 @@ impl AppSettingsAppearanceValue for ColorTheme {
 }
 
 impl AppSettingsAppearanceValue for ScalePreset {
-    const LABEL: &'static str = "UI scale";
+    const LABEL: &'static str = "界面缩放";
     const TRIGGER_ID: &'static str = "app-settings-ui-scale";
     const LIST_ID: &'static str = "app-settings-ui-scale-options-list";
     const PANEL_ID: &'static str = "app-settings-ui-scale-options";
@@ -1124,8 +1124,8 @@ fn app_settings_updates_section(
     let mut section = settings_section("Updates", palette)
         .child(frame_checkbox_row_with_focus(
             "app-settings-auto-update-check",
-            "Check automatically",
-            "Frame checks for signed releases in the background.",
+            "自动检查",
+            "Frame 会在后台检查签名版本。",
             auto_update_check,
             false,
             focuses.auto_update,
@@ -1203,27 +1203,27 @@ fn update_status_label(
 
 fn update_status_text(status: &UpdateStatus, update_install_ready: bool) -> String {
     match status {
-        UpdateStatus::Idle => "No update check is running.".to_string(),
-        UpdateStatus::Checking => "Checking for updates...".to_string(),
-        UpdateStatus::UpToDate => "Frame is up to date.".to_string(),
+        UpdateStatus::Idle => "没有正在进行的更新检查。".to_string(),
+        UpdateStatus::Checking => "正在检查更新...".to_string(),
+        UpdateStatus::UpToDate => "Frame 已是最新版本。".to_string(),
         UpdateStatus::Available(info) => {
-            format!("Frame {} is available.", info.version)
+            format!("有可用的 Frame {} 更新。", info.version)
         }
         UpdateStatus::Downloading {
             version,
             progress_percent,
             ..
         } => progress_percent.map_or_else(
-            || format!("Downloading Frame {version}..."),
-            |percent| format!("Downloading Frame {version}: {percent}%"),
+            || format!("正在下载 Frame {version}..."),
+            |percent| format!("正在下载 Frame {version}：{percent}%"),
         ),
         UpdateStatus::ReadyToInstall(_) if !update_install_ready => {
             UPDATE_INSTALL_WAIT_MESSAGE.to_string()
         }
         UpdateStatus::ReadyToInstall(package) => {
-            format!("Frame {} is ready to install.", package.version)
+            format!("Frame {} 已可安装。", package.version)
         }
-        UpdateStatus::Installing => "Installing update and restarting...".to_string(),
+        UpdateStatus::Installing => "正在安装更新并重启...".to_string(),
         UpdateStatus::Disabled(explanation) => explanation.clone(),
         UpdateStatus::Error(error) => error.clone(),
     }
@@ -1308,7 +1308,7 @@ fn normalized_release_note_lines(notes: &str) -> Vec<String> {
         lines.pop();
     }
     if lines.is_empty() {
-        vec!["No release notes were published for this version.".to_string()]
+        vec!["此版本未发布更新说明。".to_string()]
     } else {
         lines
     }
@@ -1412,14 +1412,14 @@ fn update_progress_bar(
     let fraction = progress_percent.map_or(0.0, |percent| f32::from(percent) / 100.0);
     let numeric_percent = progress_percent.map_or(0.0, f64::from);
     let value_text = progress_percent.map_or_else(
-        || "Download progress unknown".to_string(),
+        || "下载进度未知".to_string(),
         |percent| format!("{percent}%"),
     );
 
     div()
         .id("app-settings-update-progress")
         .role(gpui::Role::ProgressIndicator)
-        .aria_label("Update download progress")
+        .aria_label("更新下载进度")
         .aria_numeric_value(numeric_percent)
         .aria_min_numeric_value(0.0)
         .aria_max_numeric_value(100.0)
@@ -1482,7 +1482,7 @@ fn update_action_row(
                 .child(
                     frame_text_button_with_focus(
                         "app-settings-update-download",
-                        "Download",
+                        "下载",
                         ButtonVariant::Default,
                         false,
                         true,
@@ -1502,7 +1502,7 @@ fn update_action_row(
                 .child(
                     frame_text_button_with_focus(
                         "app-settings-update-skip",
-                        "Skip",
+                        "跳过",
                         ButtonVariant::Secondary,
                         false,
                         true,
@@ -1525,7 +1525,7 @@ fn update_action_row(
             div().flex().items_center().gap_2().child(
                 frame_text_button_with_focus(
                     "app-settings-update-install",
-                    "Install and restart",
+                    "安装并重启",
                     ButtonVariant::Default,
                     false,
                     update_install_ready,
@@ -1560,7 +1560,7 @@ fn update_check_now_button(
 ) -> impl IntoElement {
     frame_text_button_with_focus(
         "app-settings-update-check-now",
-        "Check now",
+        "立即检查",
         ButtonVariant::Secondary,
         false,
         !busy,
@@ -1751,7 +1751,7 @@ fn update_dialog_header(
         .child(
             app_settings_close_button(
                 "update-dialog-close",
-                "Close update dialog",
+                "关闭更新对话框",
                 !status.is_busy(),
                 close_focus,
                 palette,
@@ -1865,7 +1865,7 @@ fn update_dialog_footer(
         .child(
             frame_text_button(
                 "update-dialog-later",
-                "Later",
+                "稍后",
                 ButtonVariant::Ghost,
                 false,
                 !status.is_busy(),
@@ -1902,8 +1902,8 @@ fn update_dialog_primary_action(
         UpdateStatus::Available(_) => action_button(
             "update-dialog-download",
             assets::ICON_DOWNLOAD_02,
-            Some("Download"),
-            "Download",
+            Some("下载"),
+            "下载",
             ButtonVariant::Default,
             true,
             palette,
@@ -1917,7 +1917,7 @@ fn update_dialog_primary_action(
         })),
         UpdateStatus::ReadyToInstall(_) => frame_text_button(
             "update-dialog-install",
-            "Install and restart",
+            "安装并重启",
             ButtonVariant::Default,
             false,
             install_ready,
@@ -1932,7 +1932,7 @@ fn update_dialog_primary_action(
         })),
         UpdateStatus::Error(_) => frame_text_button(
             "update-dialog-dismiss",
-            "Dismiss",
+            "忽略",
             ButtonVariant::Secondary,
             false,
             true,
@@ -1948,7 +1948,7 @@ fn update_dialog_primary_action(
         })),
         UpdateStatus::Downloading { .. } | UpdateStatus::Installing => frame_text_button(
             "update-dialog-busy",
-            "Working",
+            "处理中",
             ButtonVariant::Secondary,
             false,
             false,
@@ -1961,7 +1961,7 @@ fn update_dialog_primary_action(
         | UpdateStatus::UpToDate
         | UpdateStatus::Disabled(_) => frame_text_button(
             "update-dialog-close",
-            "Close",
+            "关闭",
             ButtonVariant::Secondary,
             false,
             true,
@@ -1981,30 +1981,30 @@ fn update_dialog_primary_action(
 const fn update_dialog_kicker(status: &UpdateStatus) -> Option<&'static str> {
     match status {
         UpdateStatus::Available(_) => None,
-        UpdateStatus::Downloading { .. } => Some("Downloading update"),
-        UpdateStatus::ReadyToInstall(_) => Some("Ready to install"),
-        UpdateStatus::Installing => Some("Installing update"),
-        UpdateStatus::Error(_) => Some("Update error"),
-        UpdateStatus::Checking => Some("Checking for updates"),
-        UpdateStatus::UpToDate => Some("No update available"),
-        UpdateStatus::Disabled(_) => Some("Updates disabled"),
+        UpdateStatus::Downloading { .. } => Some("正在下载更新"),
+        UpdateStatus::ReadyToInstall(_) => Some("可安装"),
+        UpdateStatus::Installing => Some("正在安装更新"),
+        UpdateStatus::Error(_) => Some("更新错误"),
+        UpdateStatus::Checking => Some("正在检查更新"),
+        UpdateStatus::UpToDate => Some("无可用更新"),
+        UpdateStatus::Disabled(_) => Some("已禁用更新"),
         UpdateStatus::Idle => Some("Updates"),
     }
 }
 
 fn update_dialog_title(status: &UpdateStatus) -> String {
     match status {
-        UpdateStatus::Available(info) => format!("Frame {} is available", info.version),
-        UpdateStatus::Downloading { version, .. } => format!("Downloading Frame {version}"),
+        UpdateStatus::Available(info) => format!("有可用的 Frame {} 更新", info.version),
+        UpdateStatus::Downloading { version, .. } => format!("正在下载 Frame {version}"),
         UpdateStatus::ReadyToInstall(package) => {
-            format!("Frame {} is ready to install", package.version)
+            format!("Frame {} 已可安装", package.version)
         }
-        UpdateStatus::Installing => "Installing update and restarting".to_string(),
-        UpdateStatus::Error(_) => "Frame could not complete the update".to_string(),
-        UpdateStatus::Checking => "Checking for updates".to_string(),
-        UpdateStatus::UpToDate => "Frame is up to date".to_string(),
+        UpdateStatus::Installing => "正在安装更新并重启".to_string(),
+        UpdateStatus::Error(_) => "Frame 无法完成更新".to_string(),
+        UpdateStatus::Checking => "正在检查更新".to_string(),
+        UpdateStatus::UpToDate => "Frame 已是最新版本".to_string(),
         UpdateStatus::Disabled(explanation) => explanation.clone(),
-        UpdateStatus::Idle => "Frame updates".to_string(),
+        UpdateStatus::Idle => "Frame 更新".to_string(),
     }
 }
 
@@ -2016,31 +2016,31 @@ fn update_dialog_summary(
     match status {
         UpdateStatus::Available(_) if has_notes => None,
         UpdateStatus::Available(_) => Some(
-            "A signed update is available, but this release did not include notes.".to_string()
+            "有可用的签名更新，但此版本未包含更新说明。".to_string()
         ),
         UpdateStatus::Downloading { .. } => Some(
-            "Keep Frame open while the update package is downloaded and verified.".to_string()
+            "下载与校验更新包期间请保持 Frame 开启。".to_string()
         ),
         UpdateStatus::ReadyToInstall(_) if !install_ready => {
             Some(UPDATE_INSTALL_WAIT_MESSAGE.to_string())
         }
         UpdateStatus::ReadyToInstall(_) => Some(
-            "The update was downloaded and verified. Frame will restart to finish installation."
+            "更新已下载并校验。Frame 将重启以完成安装。"
                 .to_string()
         ),
         UpdateStatus::Installing => Some(
-            "Frame is handing installation to the bundled update helper.".to_string()
+            "Frame 正将安装交由内置更新助手处理。".to_string()
         ),
         UpdateStatus::Error(_) => Some(
-            "The updater stopped before installation completed. You can dismiss this and try again."
+            "更新器在安装完成前停止。可关闭此提示后重试。"
                 .to_string()
         ),
         UpdateStatus::Checking => Some(
-            "Frame is checking the latest signed release manifest.".to_string()
+            "Frame 正在检查最新签名版本清单。".to_string()
         ),
-        UpdateStatus::UpToDate => Some("No newer signed release is available.".to_string()),
+        UpdateStatus::UpToDate => Some("没有更新的签名版本。".to_string()),
         UpdateStatus::Disabled(explanation) => Some(explanation.clone()),
-        UpdateStatus::Idle => Some("No update check is running.".to_string()),
+        UpdateStatus::Idle => Some("没有正在进行的更新检查。".to_string()),
     }
 }
 
@@ -2135,7 +2135,7 @@ pub(super) fn app_settings_apply_button(
 ) -> gpui::Stateful<gpui::Div> {
     frame_text_button(
         "app-settings-max-concurrency-apply",
-        "Apply",
+        "应用",
         ButtonVariant::Secondary,
         false,
         enabled,
@@ -2204,7 +2204,7 @@ pub(super) fn drag_drop_overlay(
                     div()
                         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                         .text_color(color(palette.text_primary))
-                        .child(theme::ui_text("Import source files")),
+                        .child(theme::ui_text("导入源文件")),
                 ),
         )
 }
@@ -2235,7 +2235,7 @@ pub(super) fn windows_window_controls(
             titlebar_window_button(
                 "titlebar-windows-minimize",
                 assets::ICON_MINUS,
-                "Minimize window",
+                "最小化窗口",
                 TitlebarWindowButtonMetrics {
                     icon_size: TITLEBAR_WINDOWS_WINDOW_ICON_SIZE,
                     width: TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
@@ -2257,7 +2257,7 @@ pub(super) fn windows_window_controls(
             titlebar_window_button(
                 "titlebar-windows-maximize",
                 assets::ICON_SQUARE,
-                "Maximize window",
+                "最大化窗口",
                 TitlebarWindowButtonMetrics {
                     icon_size: TITLEBAR_WINDOWS_WINDOW_MAX_ICON_SIZE,
                     width: TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
@@ -2279,7 +2279,7 @@ pub(super) fn windows_window_controls(
             titlebar_window_button(
                 "titlebar-windows-close",
                 assets::ICON_CLOSE,
-                "Close window",
+                "关闭窗口",
                 TitlebarWindowButtonMetrics {
                     icon_size: TITLEBAR_WINDOWS_WINDOW_ICON_SIZE,
                     width: TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
@@ -2318,7 +2318,7 @@ pub(super) fn linux_window_controls(
             titlebar_window_button(
                 "titlebar-linux-minimize",
                 assets::ICON_MINUS,
-                "Minimize window",
+                "最小化窗口",
                 TitlebarWindowButtonMetrics {
                     icon_size: TITLEBAR_ACTION_ICON_SIZE,
                     width: TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
@@ -2340,7 +2340,7 @@ pub(super) fn linux_window_controls(
             titlebar_window_button(
                 "titlebar-linux-maximize",
                 assets::ICON_SQUARE,
-                "Maximize window",
+                "最大化窗口",
                 TitlebarWindowButtonMetrics {
                     icon_size: TITLEBAR_ACTION_ICON_SIZE,
                     width: TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
@@ -2362,7 +2362,7 @@ pub(super) fn linux_window_controls(
             titlebar_window_button(
                 "titlebar-linux-close",
                 assets::ICON_CLOSE,
-                "Close window",
+                "关闭窗口",
                 TitlebarWindowButtonMetrics {
                     icon_size: TITLEBAR_ACTION_ICON_SIZE,
                     width: TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
@@ -2496,7 +2496,7 @@ pub(super) fn titlebar_navigation(
     div()
         .id("titlebar-main-view-tabs")
         .role(gpui::Role::TabList)
-        .aria_label("Main view")
+        .aria_label("主视图")
         .h(theme::ui_rem(TITLEBAR_SEGMENT_HEIGHT))
         .flex()
         .items_center()
@@ -2508,7 +2508,7 @@ pub(super) fn titlebar_navigation(
         .shadow(input_highlight_shadows(palette))
         .child(titlebar_segment(
             assets::ICON_LAYOUT_LIST,
-            "Workspace",
+            "工作区",
             ActiveView::Workspace,
             active_view == ActiveView::Workspace,
             palette,
@@ -2517,7 +2517,7 @@ pub(super) fn titlebar_navigation(
         ))
         .child(titlebar_segment(
             assets::ICON_TERMINAL,
-            "Logs",
+            "日志",
             ActiveView::Logs,
             active_view == ActiveView::Logs,
             palette,
@@ -2537,12 +2537,12 @@ pub(super) fn titlebar_stats(
         .text_color(color(palette.text_muted))
         .child(titlebar_stat(
             assets::ICON_HARD_DRIVE,
-            format!("Storage {}", format_total_size(state.total_size_bytes)),
+            format!("存储 {}", format_total_size(state.total_size_bytes)),
             palette,
         ))
         .child(titlebar_stat(
             assets::ICON_FILE_VIDEO,
-            format!("Items {}", state.file_count),
+            format!("项目 {}", state.file_count),
             palette,
         ))
 }

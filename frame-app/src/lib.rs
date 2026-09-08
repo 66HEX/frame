@@ -172,24 +172,24 @@ impl StartAvailability {
     #[must_use]
     pub const fn button_label(self) -> &'static str {
         match self {
-            Self::Ready => "Start",
-            Self::Processing => "Processing",
-            Self::NoFiles => "Add a source",
-            Self::NoSelectedFiles => "Select files",
-            Self::NoActionableFiles => "Nothing pending",
-            Self::MissingOutputDirectory => "Choose output",
+            Self::Ready => "开始",
+            Self::Processing => "处理中",
+            Self::NoFiles => "添加源",
+            Self::NoSelectedFiles => "选择文件",
+            Self::NoActionableFiles => "无待处理项",
+            Self::MissingOutputDirectory => "选择输出位置",
         }
     }
 
     #[must_use]
     pub const fn accessibility_label(self) -> &'static str {
         match self {
-            Self::Ready => "Start conversion",
-            Self::Processing => "Conversion in progress",
-            Self::NoFiles => "Add a source to start a conversion",
-            Self::NoSelectedFiles => "Select at least one file to start a conversion",
-            Self::NoActionableFiles => "No selected files are ready to convert",
-            Self::MissingOutputDirectory => "Choose an output folder before starting",
+            Self::Ready => "开始转换",
+            Self::Processing => "转换进行中",
+            Self::NoFiles => "添加源以开始转换",
+            Self::NoSelectedFiles => "至少选择一个文件以开始转换",
+            Self::NoActionableFiles => "所选文件均不可转换",
+            Self::MissingOutputDirectory => "开始前请选择输出位置",
         }
     }
 
@@ -367,10 +367,10 @@ mod tests {
             let availability = StartAvailability::MissingOutputDirectory;
 
             assert!(availability.button_enabled());
-            assert_eq!(availability.button_label(), "Choose output");
+            assert_eq!(availability.button_label(), "选择输出位置");
             assert_eq!(
                 availability.accessibility_label(),
-                "Choose an output folder before starting"
+                "开始前请选择输出位置"
             );
         }
 

@@ -450,14 +450,14 @@ impl FrameRoot {
         };
 
         let detail = format!(
-            "This will apply \"{}\" to all pending files in the queue. Existing settings will be overwritten.",
+            "这将把“{}”应用到队列中所有待处理文件。现有设置将被覆盖。",
             preset.name
         );
         let receiver = window.prompt(
             PromptLevel::Warning,
-            "Apply to all?",
+            "应用到全部？",
             Some(&detail),
-            &[PromptButton::ok("Apply"), PromptButton::cancel("Cancel")],
+            &[PromptButton::ok("应用"), PromptButton::cancel("取消")],
             cx,
         );
 

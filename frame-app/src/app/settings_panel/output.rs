@@ -25,7 +25,7 @@ pub(in crate::app) fn settings_output_tab(
         .flex_col()
         .gap_4()
         .child(
-            settings_section("Processing mode", palette)
+            settings_section("处理模式", palette)
                 .child(settings_processing_mode_grid(
                     config,
                     metadata,
@@ -37,7 +37,7 @@ pub(in crate::app) fn settings_output_tab(
                 .child(settings_hint_text(config.processing_mode.hint(), palette)),
         )
         .child(
-            settings_section("Output name", palette)
+            settings_section("输出名称", palette)
                 .child(settings_output_name_field(
                     output_name,
                     settings_disabled,
@@ -47,12 +47,12 @@ pub(in crate::app) fn settings_output_tab(
                     cx,
                 ))
                 .child(settings_hint_text(
-                    "Output is saved to the default folder selected in Settings.",
+                    "输出将保存在设置中选择的默认文件夹。",
                     palette,
                 )),
         )
         .child(
-            settings_section("Output container", palette).child(settings_container_grid(
+            settings_section("输出封装格式", palette).child(settings_container_grid(
                 config,
                 metadata,
                 settings_disabled,

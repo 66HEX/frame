@@ -14,7 +14,7 @@ pub(in crate::app) fn settings_audio_tab(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let mut channels_section = settings_section("Channels / bitrate", palette)
+    let mut channels_section = settings_section("声道 / 码率", palette)
         .child(settings_audio_channels_grid(
             config,
             metadata,
@@ -33,12 +33,12 @@ pub(in crate::app) fn settings_audio_tab(
         ));
     if config.processing_mode == ProcessingMode::Copy {
         channels_section = channels_section.child(settings_hint_text(
-            "Stream copy keeps source audio settings.",
+            "流复制模式保留源音频设置。",
             palette,
         ));
     } else if mp2_original_channels_are_unsupported(config, metadata) {
         channels_section = channels_section.child(settings_hint_text(
-            "MP2 supports at most two channels; multichannel source tracks are exported as stereo.",
+            "MP2 最多支持两个声道；多声道源轨道将导出为立体声。",
             palette,
         ));
     }
@@ -49,7 +49,7 @@ pub(in crate::app) fn settings_audio_tab(
         .gap_4()
         .child(channels_section)
         .child(
-            settings_section("Codec", palette).child(settings_audio_codec_list(
+            settings_section("编码", palette).child(settings_audio_codec_list(
                 config,
                 available_encoders,
                 settings_disabled,
@@ -62,8 +62,8 @@ pub(in crate::app) fn settings_audio_tab(
     let track_options = audio_track_options(config, metadata, settings_disabled);
     if track_options.is_empty() {
         return content.child(
-            settings_section("Source tracks", palette)
-                .child(settings_hint_text("No audio tracks.", palette)),
+            settings_section("源轨道", palette)
+                .child(settings_hint_text("无音频轨道。", palette)),
         );
     }
 
@@ -72,7 +72,7 @@ pub(in crate::app) fn settings_audio_tab(
         list = list.child(settings_audio_track_button(option, palette, window, cx));
     }
 
-    content.child(settings_section("Source tracks", palette).child(list))
+    content.child(settings_section("源轨道", palette).child(list))
 }
 
 pub(in crate::app) fn settings_audio_channels_grid(
@@ -159,7 +159,7 @@ fn settings_audio_encoding_controls(
     let mut controls = div().flex().flex_col().gap_3();
     if show_vbr_toggle {
         controls = controls
-            .child(settings_field_label("Quality control", palette))
+            .child(settings_field_label("质量控制", palette))
             .child(settings_audio_bitrate_mode_grid(
                 config,
                 controls_disabled,
@@ -174,14 +174,14 @@ fn settings_audio_encoding_controls(
             let value = parse_audio_value(&config.audio_quality, range.default_value)
                 .clamp(range.min, range.max);
             let lower_label = if range.lower_is_better {
-                "Best"
+                "最佳"
             } else {
-                "Smallest"
+                "最小"
             };
             let upper_label = if range.lower_is_better {
-                "Smallest"
+                "最小"
             } else {
-                "Best"
+                "最佳"
             };
             controls = controls.child(settings_audio_range_field(
                 SettingsAudioRangeSpec {
@@ -222,7 +222,7 @@ fn settings_audio_bitrate_mode_grid(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let mut grid = div().grid().grid_cols(2).gap_2();
-    for (mode, label) in [("bitrate", "Target Bitrate"), ("vbr", "Variable Bitrate")] {
+    for (mode, label) in [("bitrate", "指定码率"), ("vbr", "可变码率")] {
         let selected = config.audio_bitrate_mode == mode;
         let enabled =
             !disabled && (mode == "bitrate" || audio_codec_supports_vbr(&config.audio_codec));
@@ -264,7 +264,7 @@ fn settings_audio_bitrate_field(
         .flex()
         .flex_col()
         .gap_2()
-        .child(settings_field_label("Bitrate (KB/s)", palette))
+        .child(settings_field_label("码率 (KB/s)", palette))
         .child(frame_text_input(
             FrameTextInputSpec {
                 id: "settings-audio-bitrate-field",
@@ -274,7 +274,7 @@ fn settings_audio_bitrate_field(
                     &config.audio_bitrate
                 },
                 placeholder: if is_lossless {
-                    "Bitrate ignored"
+                    "忽略码率"
                 } else {
                     "128"
                 },
@@ -345,7 +345,7 @@ fn settings_audio_range_slider(
             SettingsAudioRangeTarget::Quality => "settings-audio-quality-slider",
         },
         match target {
-            SettingsAudioRangeTarget::Quality => "Audio quality",
+            SettingsAudioRangeTarget::Quality => "音频质量",
         },
         fraction,
         disabled,

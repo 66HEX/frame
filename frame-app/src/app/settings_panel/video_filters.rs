@@ -53,11 +53,11 @@ pub(in crate::app) fn settings_video_filters_tab(
             .flex()
             .flex_col()
             .gap_3()
-            .child(settings_section("Video Filters", palette).child(
+            .child(settings_section("视频滤镜", palette).child(
                 settings_video_filters_reset_all(settings_disabled, palette, window, cx),
             ))
             .child(
-                settings_section("Color Adjustments", palette)
+                settings_section("色彩调整", palette)
                     .child(settings_video_filter_range_field(
                         video_filter_spec(
                             VideoFilterRangeTarget::Brightness,
@@ -108,7 +108,7 @@ pub(in crate::app) fn settings_video_filters_tab(
                     )),
             )
             .child(
-                settings_section("Tone", palette)
+                settings_section("色调", palette)
                     .child(settings_video_filter_range_field(
                         video_filter_spec(
                             VideoFilterRangeTarget::Hue,
@@ -135,7 +135,7 @@ pub(in crate::app) fn settings_video_filters_tab(
                     )),
             )
             .child(
-                settings_section("Detail", palette)
+                settings_section("细节", palette)
                     .child(settings_video_filter_range_field(
                         video_filter_spec(
                             VideoFilterRangeTarget::Sharpen,
@@ -162,7 +162,7 @@ pub(in crate::app) fn settings_video_filters_tab(
                     )),
             )
             .child(
-                settings_section("Cleanup", palette)
+                settings_section("清理", palette)
                     .child(settings_video_denoise_control(
                         filters.denoise_enabled,
                         filters.denoise_strength,
@@ -185,7 +185,7 @@ pub(in crate::app) fn settings_video_filters_tab(
                     )),
             )
             .child(
-                settings_section("Style", palette)
+                settings_section("风格", palette)
                     .child(settings_video_filter_range_field(
                         video_filter_spec(
                             VideoFilterRangeTarget::Vignette,
@@ -207,7 +207,7 @@ pub(in crate::app) fn settings_video_filters_tab(
             );
 
     if !is_image_source {
-        content = content.child(settings_section("Interlace", palette).child(
+        content = content.child(settings_section("隔行扫描", palette).child(
             settings_video_deinterlace_control(
                 filters.deinterlace,
                 settings_disabled || !available_filters.bwdif,
@@ -243,7 +243,7 @@ fn video_filter_spec(
     match target {
         VideoFilterRangeTarget::Brightness => video_spec(
             target,
-            "Brightness",
+            "亮度",
             enabled,
             available,
             value,
@@ -253,11 +253,11 @@ fn video_filter_spec(
             "%",
         ),
         VideoFilterRangeTarget::Contrast => video_spec(
-            target, "Contrast", enabled, available, value, 100, 0, 200, "%",
+            target, "对比度", enabled, available, value, 100, 0, 200, "%",
         ),
         VideoFilterRangeTarget::Saturation => video_spec(
             target,
-            "Saturation",
+            "饱和度",
             enabled,
             available,
             value,
@@ -270,11 +270,11 @@ fn video_filter_spec(
             target, "Gamma", enabled, available, value, 100, 10, 300, "%",
         ),
         VideoFilterRangeTarget::Hue => video_spec(
-            target, "Hue", enabled, available, value, 0, -180, 180, " deg",
+            target, "色相", enabled, available, value, 0, -180, 180, " deg",
         ),
         VideoFilterRangeTarget::Temperature => video_spec(
             target,
-            "Temperature",
+            "色温",
             enabled,
             available,
             value,
@@ -284,11 +284,11 @@ fn video_filter_spec(
             " K",
         ),
         VideoFilterRangeTarget::Sharpen => video_spec(
-            target, "Sharpen", enabled, available, value, 25, 0, 100, "%",
+            target, "锐化", enabled, available, value, 25, 0, 100, "%",
         ),
         VideoFilterRangeTarget::GaussianBlur => video_spec(
             target,
-            "Gaussian Blur",
+            "高斯模糊",
             enabled,
             available,
             value,
@@ -298,10 +298,10 @@ fn video_filter_spec(
             "%",
         ),
         VideoFilterRangeTarget::Deband => {
-            video_spec(target, "Deband", enabled, available, value, 25, 0, 100, "%")
+            video_spec(target, "去色带", enabled, available, value, 25, 0, 100, "%")
         }
         VideoFilterRangeTarget::Vignette => video_spec(
-            target, "Vignette", enabled, available, value, 35, 0, 100, "%",
+            target, "暗角", enabled, available, value, 35, 0, 100, "%",
         ),
     }
 }
@@ -385,7 +385,7 @@ fn settings_video_filter_range_field(
                         ),
                         spec.label,
                         if unavailable {
-                            "This FFmpeg runtime does not provide the required filter."
+                            "此 FFmpeg 运行时未提供所需滤镜。"
                         } else {
                             ""
                         },
@@ -546,7 +546,7 @@ fn settings_video_filter_reset(
     frame_icon_button(
         format!("settings-video-filter-{}-reset", video_target_id(target)),
         assets::ICON_REFRESH,
-        "Reset filter",
+        "重置",
         FrameIconButtonVariant::Ghost,
         !disabled,
         FrameIconButtonSize {
@@ -579,9 +579,9 @@ fn settings_video_denoise_control(
 ) -> gpui::Div {
     let mut grid = div().grid().grid_cols(3).mt_1().gap_2();
     for (candidate, label) in [
-        (FilterStrength::Low, "Low"),
-        (FilterStrength::Medium, "Medium"),
-        (FilterStrength::High, "High"),
+        (FilterStrength::Low, "低"),
+        (FilterStrength::Medium, "中"),
+        (FilterStrength::High, "高"),
     ] {
         grid = grid.child(
             frame_choice_button(
@@ -612,7 +612,7 @@ fn settings_video_denoise_control(
         .gap_2()
         .child(frame_checkbox_row(
             "settings-video-denoise-toggle",
-            "Denoise",
+            "降噪",
             "",
             enabled,
             disabled,
@@ -640,7 +640,7 @@ fn settings_video_grayscale_control(
 ) -> gpui::Stateful<gpui::Div> {
     frame_checkbox_row(
         "settings-video-grayscale-toggle",
-        "Grayscale",
+        "灰度",
         "",
         checked,
         disabled,
@@ -666,9 +666,9 @@ fn settings_video_deinterlace_control(
 ) -> gpui::Div {
     let mut grid = div().grid().grid_cols(3).gap_2();
     for (candidate, label) in [
-        (DeinterlaceMode::Off, "Off"),
-        (DeinterlaceMode::Auto, "Auto"),
-        (DeinterlaceMode::On, "On"),
+        (DeinterlaceMode::Off, "关闭"),
+        (DeinterlaceMode::Auto, "自动"),
+        (DeinterlaceMode::On, "开启"),
     ] {
         grid = grid.child(
             frame_choice_button(
@@ -702,7 +702,7 @@ fn settings_video_filters_reset_all(
 ) -> gpui::Stateful<gpui::Div> {
     frame_text_button(
         "settings-video-filters-reset-all",
-        "Reset video filters",
+        "重置",
         ButtonVariant::Secondary,
         false,
         !disabled,
@@ -827,16 +827,16 @@ const fn video_handle_id(target: VideoFilterRangeTarget) -> &'static str {
 
 const fn video_slider_label(target: VideoFilterRangeTarget) -> &'static str {
     match target {
-        VideoFilterRangeTarget::Brightness => "Brightness",
-        VideoFilterRangeTarget::Contrast => "Contrast",
-        VideoFilterRangeTarget::Saturation => "Saturation",
+        VideoFilterRangeTarget::Brightness => "亮度",
+        VideoFilterRangeTarget::Contrast => "对比度",
+        VideoFilterRangeTarget::Saturation => "饱和度",
         VideoFilterRangeTarget::Gamma => "Gamma",
-        VideoFilterRangeTarget::Hue => "Hue",
-        VideoFilterRangeTarget::Temperature => "Temperature",
-        VideoFilterRangeTarget::Sharpen => "Sharpen",
-        VideoFilterRangeTarget::GaussianBlur => "Gaussian blur",
-        VideoFilterRangeTarget::Deband => "Deband",
-        VideoFilterRangeTarget::Vignette => "Vignette",
+        VideoFilterRangeTarget::Hue => "色相",
+        VideoFilterRangeTarget::Temperature => "色温",
+        VideoFilterRangeTarget::Sharpen => "锐化",
+        VideoFilterRangeTarget::GaussianBlur => "高斯模糊",
+        VideoFilterRangeTarget::Deband => "去色带",
+        VideoFilterRangeTarget::Vignette => "暗角",
     }
 }
 

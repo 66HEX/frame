@@ -215,7 +215,7 @@ mod output_options {
 
         assert_eq!(
             mp4.disabled_reason,
-            Some("Video container unavailable for audio sources")
+            Some("音频源不支持视频封装")
         );
     }
 
@@ -227,7 +227,7 @@ mod output_options {
         assert!(
             options
                 .iter()
-                .all(|option| option.disabled_reason == Some("Locked"))
+                .all(|option| option.disabled_reason == Some("已锁定"))
         );
     }
 
@@ -835,7 +835,7 @@ mod preset_options {
             .iter()
             .find(|preset| preset.id == "m2ts-h264")
             .expect("M2TS H.264 preset should exist");
-        assert_eq!(m2ts.name, "M2TS H.264 (192-byte)");
+        assert_eq!(m2ts.name, "M2TS H.264（192-byte）");
         let m2t = presets
             .iter()
             .find(|preset| preset.id == "broadcast-m2t")
@@ -867,7 +867,7 @@ mod preset_options {
         let options = preset_options(&ConversionConfig::default(), &presets, None);
 
         assert!(options[0].is_selected);
-        assert_eq!(options[0].status, Some("Applied"));
+        assert_eq!(options[0].status, Some("已应用"));
     }
 
     #[test]
@@ -1020,7 +1020,7 @@ mod metadata_options {
         let options = metadata_mode_options(&config, false);
 
         assert!(options[1].is_selected);
-        assert_eq!(options[1].label, "Clean");
+        assert_eq!(options[1].label, "清除");
     }
 
     #[test]
@@ -1225,7 +1225,7 @@ mod audio_codec_options {
 
         assert_eq!(
             codec_option(&options, "flac").disabled_reason,
-            Some("Incompatible container")
+            Some("不兼容的封装格式")
         );
     }
 
@@ -1992,18 +1992,18 @@ mod source_info_sections {
         assert_eq!(
             sections,
             vec![SourceInfoSection::Rows {
-                title: "File information",
+                title: "文件信息",
                 rows: vec![
                     SourceInfoRow {
-                        label: "Image codec",
+                        label: "图像编码",
                         value: "png".to_string(),
                     },
                     SourceInfoRow {
-                        label: "Dimensions",
+                        label: "分辨率",
                         value: "640×480".to_string(),
                     },
                     SourceInfoRow {
-                        label: "Pixel format",
+                        label: "像素格式",
                         value: "rgba".to_string(),
                     },
                 ],
@@ -2031,35 +2031,35 @@ mod source_info_sections {
             sections,
             vec![
                 SourceInfoSection::Rows {
-                    title: "File information",
+                    title: "文件信息",
                     rows: vec![
                         SourceInfoRow {
-                            label: "Duration",
+                            label: "时长",
                             value: "00:00:10".to_string(),
                         },
                         SourceInfoRow {
-                            label: "Container bitrate",
+                            label: "封装码率",
                             value: "2.5 Mb/s".to_string(),
                         },
                     ],
                 },
                 SourceInfoSection::Rows {
-                    title: "Video stream",
+                    title: "视频流",
                     rows: vec![
                         SourceInfoRow {
-                            label: "Video codec",
+                            label: "视频编码",
                             value: "h264".to_string(),
                         },
                         SourceInfoRow {
-                            label: "Dimensions",
+                            label: "分辨率",
                             value: "1920×1080".to_string(),
                         },
                         SourceInfoRow {
-                            label: "Frame rate",
+                            label: "帧率",
                             value: "59.94 fps".to_string(),
                         },
                         SourceInfoRow {
-                            label: "Video bitrate",
+                            label: "视频码率",
                             value: "2.2 Mb/s".to_string(),
                         },
                     ],
@@ -2086,17 +2086,17 @@ mod source_info_sections {
         let rows = sections
             .iter()
             .find_map(|section| match section {
-                SourceInfoSection::Rows { title, rows } if *title == "Transport stream" => {
+                SourceInfoSection::Rows { title, rows } if *title == "传输流" => {
                     Some(rows)
                 }
                 _ => None,
             })
             .unwrap();
 
-        assert_eq!(row_value(rows, "Packet size"), Some("192 bytes"));
-        assert_eq!(row_value(rows, "Program ID"), Some("7"));
-        assert_eq!(row_value(rows, "Service name"), Some("Camera"));
-        assert_eq!(row_value(rows, "Service provider"), Some("Frame"));
+        assert_eq!(row_value(rows, "包大小"), Some("192 bytes"));
+        assert_eq!(row_value(rows, "节目 ID"), Some("7"));
+        assert_eq!(row_value(rows, "服务名称"), Some("Camera"));
+        assert_eq!(row_value(rows, "服务提供商"), Some("Frame"));
     }
 
     #[test]
@@ -2120,7 +2120,7 @@ mod source_info_sections {
             panic!("audio metadata should render audio tracks");
         };
 
-        assert_eq!(row_value(&tracks[0].rows, "Sample rate"), Some("48 kHz"));
+        assert_eq!(row_value(&tracks[0].rows, "采样率"), Some("48 kHz"));
     }
 }
 

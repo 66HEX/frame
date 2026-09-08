@@ -67,16 +67,16 @@ impl SettingsTab {
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
-            Self::Source => "Source",
-            Self::Output => "Output",
-            Self::Video => "Video",
-            Self::VideoFilters => "Video Filters",
-            Self::Images => "Images",
-            Self::Audio => "Audio",
-            Self::AudioFilters => "Audio Filters",
-            Self::Subtitles => "Subtitles",
-            Self::Metadata => "Metadata",
-            Self::Presets => "Presets",
+            Self::Source => "源",
+            Self::Output => "输出",
+            Self::Video => "视频",
+            Self::VideoFilters => "视频滤镜",
+            Self::Images => "图像",
+            Self::Audio => "音频",
+            Self::AudioFilters => "音频滤镜",
+            Self::Subtitles => "字幕",
+            Self::Metadata => "元数据",
+            Self::Presets => "预设",
         }
     }
 
@@ -304,8 +304,8 @@ impl ProcessingMode {
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
-            Self::Reencode => "Re-encode",
-            Self::Copy => "Cut / Stream Copy",
+            Self::Reencode => "重新编码",
+            Self::Copy => "剪切 / 流复制",
         }
     }
 
@@ -313,10 +313,10 @@ impl ProcessingMode {
     pub const fn hint(self) -> &'static str {
         match self {
             Self::Reencode => {
-                "Decodes and encodes media so all filters and codec settings are available."
+                "对媒体进行解码与重新编码，以启用全部滤镜与编码设置。"
             }
             Self::Copy => {
-                "Fast trim/remux without re-encoding. Cut precision depends on keyframes."
+                "快速剪切/重新封装，不重新编码。剪切精度取决于关键帧。"
             }
         }
     }
@@ -344,9 +344,9 @@ impl MetadataMode {
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
-            Self::Preserve => "Preserve",
-            Self::Clean => "Clean",
-            Self::Replace => "Replace",
+            Self::Preserve => "保留",
+            Self::Clean => "清除",
+            Self::Replace => "替换",
         }
     }
 
@@ -354,10 +354,10 @@ impl MetadataMode {
     pub const fn description(self) -> &'static str {
         match self {
             Self::Preserve => {
-                "Keeps original metadata. Values entered below will overwrite specific fields."
+                "保留原始元数据。下方填写的值将覆盖对应字段。"
             }
-            Self::Clean => "Removes all metadata tags from the output file.",
-            Self::Replace => "Removes original metadata and adds only the values entered below.",
+            Self::Clean => "移除输出文件中的所有元数据标签。",
+            Self::Replace => "移除原始元数据，仅添加下方填写的值。",
         }
     }
 
@@ -432,14 +432,14 @@ impl MetadataField {
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
-            Self::Title => "Title",
-            Self::Artist => "Artist",
-            Self::Album => "Album",
-            Self::Genre => "Genre",
-            Self::Date => "Date / Year",
-            Self::Comment => "Comment",
-            Self::ServiceName => "Service name",
-            Self::ServiceProvider => "Service provider",
+            Self::Title => "标题",
+            Self::Artist => "艺术家",
+            Self::Album => "专辑",
+            Self::Genre => "流派",
+            Self::Date => "日期 / 年份",
+            Self::Comment => "注释",
+            Self::ServiceName => "服务名称",
+            Self::ServiceProvider => "服务提供商",
         }
     }
 
@@ -487,9 +487,9 @@ impl SubtitlePosition {
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
-            Self::Bottom => "Bottom",
-            Self::Middle => "Middle",
-            Self::Top => "Top",
+            Self::Bottom => "底部",
+            Self::Middle => "居中",
+            Self::Top => "顶部",
         }
     }
 
@@ -907,9 +907,9 @@ impl SourceKind {
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
-            Self::Video => "Video",
-            Self::Audio => "Audio",
-            Self::Image => "Image",
+            Self::Video => "视频",
+            Self::Audio => "音频",
+            Self::Image => "图像",
         }
     }
 }
@@ -990,7 +990,7 @@ pub(super) struct AudioCodecDefinition {
 pub(super) const AUDIO_CODEC_DEFINITIONS: [AudioCodecDefinition; 9] = [
     AudioCodecDefinition {
         codec: "aac",
-        label: "AAC / Stereo",
+        label: "AAC / 立体声",
     },
     AudioCodecDefinition {
         codec: "ac3",
@@ -1006,11 +1006,11 @@ pub(super) const AUDIO_CODEC_DEFINITIONS: [AudioCodecDefinition; 9] = [
     },
     AudioCodecDefinition {
         codec: "alac",
-        label: "ALAC (Lossless)",
+        label: "ALAC（无损）",
     },
     AudioCodecDefinition {
         codec: "flac",
-        label: "FLAC (Lossless)",
+        label: "FLAC（无损）",
     },
     AudioCodecDefinition {
         codec: "pcm_s16le",
@@ -1022,7 +1022,7 @@ pub(super) const AUDIO_CODEC_DEFINITIONS: [AudioCodecDefinition; 9] = [
     },
     AudioCodecDefinition {
         codec: "pcm_bluray",
-        label: "Blu-ray PCM (Lossless)",
+        label: "Blu-ray PCM（无损）",
     },
 ];
 
@@ -1047,15 +1047,15 @@ pub(super) struct AudioChannelDefinition {
 pub(super) const AUDIO_CHANNEL_DEFINITIONS: [AudioChannelDefinition; 3] = [
     AudioChannelDefinition {
         id: "original",
-        label: "Original",
+        label: "原始",
     },
     AudioChannelDefinition {
         id: "stereo",
-        label: "Stereo",
+        label: "立体声",
     },
     AudioChannelDefinition {
         id: "mono",
-        label: "Mono",
+        label: "单声道",
     },
 ];
 
@@ -1089,7 +1089,7 @@ pub(super) const VIDEO_CODEC_DEFINITIONS: [VideoCodecDefinition; 12] = [
     },
     VideoCodecDefinition {
         codec: "vp9",
-        label: "VP9 / Web",
+        label: "VP9 / 网页",
         capability: None,
     },
     VideoCodecDefinition {
@@ -1104,12 +1104,12 @@ pub(super) const VIDEO_CODEC_DEFINITIONS: [VideoCodecDefinition; 12] = [
     },
     VideoCodecDefinition {
         codec: "mpeg2video",
-        label: "MPEG-2 Video",
+        label: "MPEG-2 视频",
         capability: Some(VideoCodecCapability::Mpeg2video),
     },
     VideoCodecDefinition {
         codec: "gif",
-        label: "GIF / Palette",
+        label: "GIF / 调色板",
         capability: None,
     },
     VideoCodecDefinition {
@@ -1148,7 +1148,7 @@ pub(super) struct VideoPixelFormatDefinition {
 pub(super) const VIDEO_PIXEL_FORMAT_DEFINITIONS: [VideoPixelFormatDefinition; 7] = [
     VideoPixelFormatDefinition {
         id: "auto",
-        label: "Auto",
+        label: "自动",
     },
     VideoPixelFormatDefinition {
         id: "yuv420p",
@@ -1186,46 +1186,46 @@ pub(super) struct ImageEncodingOptionDefinition {
 pub(super) const IMAGE_JPEG_HUFFMAN_OPTIONS: [ImageEncodingOptionDefinition; 2] = [
     ImageEncodingOptionDefinition {
         id: "optimal",
-        label: "Optimized",
-        caption: "Smaller files, slower encode",
+        label: "优化哈夫曼",
+        caption: "文件更小，编码更慢",
     },
     ImageEncodingOptionDefinition {
         id: "default",
-        label: "Default",
-        caption: "Fast standard tables",
+        label: "默认",
+        caption: "快速标准表",
     },
 ];
 
 pub(super) const IMAGE_WEBP_PRESET_OPTIONS: [ImageEncodingOptionDefinition; 6] = [
     ImageEncodingOptionDefinition {
         id: "default",
-        label: "Default",
-        caption: "Balanced encoder defaults",
+        label: "默认",
+        caption: "均衡的编码器默认值",
     },
     ImageEncodingOptionDefinition {
         id: "picture",
-        label: "Picture",
-        caption: "Portraits and indoor shots",
+        label: "图片",
+        caption: "人像与室内照片",
     },
     ImageEncodingOptionDefinition {
         id: "photo",
-        label: "Photo",
-        caption: "Natural outdoor images",
+        label: "照片",
+        caption: "自然户外图像",
     },
     ImageEncodingOptionDefinition {
         id: "drawing",
-        label: "Drawing",
-        caption: "Lines and high contrast",
+        label: "绘图",
+        caption: "线条与高对比度",
     },
     ImageEncodingOptionDefinition {
         id: "icon",
-        label: "Icon",
-        caption: "Small colorful graphics",
+        label: "图标",
+        caption: "小型彩色图形",
     },
     ImageEncodingOptionDefinition {
         id: "text",
-        label: "Text",
-        caption: "Text-like imagery",
+        label: "文本",
+        caption: "文本类图像",
     },
 ];
 
@@ -1233,32 +1233,32 @@ pub(super) const IMAGE_PNG_PREDICTION_OPTIONS: [ImageEncodingOptionDefinition; 6
     ImageEncodingOptionDefinition {
         id: "paeth",
         label: "Paeth",
-        caption: "PNG default",
+        caption: "PNG 默认",
     },
     ImageEncodingOptionDefinition {
         id: "mixed",
         label: "Mixed",
-        caption: "Adaptive prediction",
+        caption: "自适应预测",
     },
     ImageEncodingOptionDefinition {
         id: "sub",
         label: "Sub",
-        caption: "Horizontal predictor",
+        caption: "水平预测器",
     },
     ImageEncodingOptionDefinition {
         id: "up",
         label: "Up",
-        caption: "Vertical predictor",
+        caption: "垂直预测器",
     },
     ImageEncodingOptionDefinition {
         id: "avg",
         label: "Average",
-        caption: "Average predictor",
+        caption: "平均预测器",
     },
     ImageEncodingOptionDefinition {
         id: "none",
         label: "None",
-        caption: "No prediction",
+        caption: "无预测",
     },
 ];
 
@@ -1266,22 +1266,22 @@ pub(super) const IMAGE_TIFF_COMPRESSION_OPTIONS: [ImageEncodingOptionDefinition;
     ImageEncodingOptionDefinition {
         id: "packbits",
         label: "PackBits",
-        caption: "Fast lossless default",
+        caption: "快速无损默认",
     },
     ImageEncodingOptionDefinition {
         id: "lzw",
         label: "LZW",
-        caption: "Broad lossless support",
+        caption: "广泛的无损支持",
     },
     ImageEncodingOptionDefinition {
         id: "deflate",
         label: "Deflate",
-        caption: "Smaller lossless output",
+        caption: "更小的无损输出",
     },
     ImageEncodingOptionDefinition {
         id: "raw",
         label: "Raw",
-        caption: "Uncompressed pixels",
+        caption: "未压缩像素",
     },
 ];
 

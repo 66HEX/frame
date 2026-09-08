@@ -96,7 +96,7 @@ pub(super) fn welcome_view(
                             div()
                                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                                 .text_color(color(palette.text_muted))
-                                .child(theme::ui_text("Add media to start a conversion queue.")),
+                                .child(theme::ui_text("添加媒体以开始转换")),
                         ),
                 )
                 .child(
@@ -108,8 +108,8 @@ pub(super) fn welcome_view(
                             action_button(
                                 "welcome-open-file",
                                 assets::ICON_FILE_IMPORT,
-                                Some("Open File"),
-                                "Open file",
+                                Some("打开文件"),
+                                "打开文件",
                                 ButtonVariant::Default,
                                 true,
                                 palette,
@@ -127,8 +127,8 @@ pub(super) fn welcome_view(
                             action_button(
                                 "welcome-open-folder",
                                 assets::ICON_FOLDER_IMPORT,
-                                Some("Open Folder"),
-                                "Open folder",
+                                Some("打开文件夹"),
+                                "打开文件夹",
                                 ButtonVariant::Secondary,
                                 true,
                                 palette,
@@ -177,7 +177,7 @@ fn empty_settings_panel(palette: &'static theme::ThemePalette) -> gpui::Div {
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .text_color(color(palette.text_muted))
                 .child(theme::ui_text(
-                    "Select an item from the queue to access configuration",
+                    "从队列中选择项目以访问配置",
                 )),
         )
 }

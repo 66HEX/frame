@@ -314,8 +314,8 @@ pub(in crate::app) fn preview_viewport(
         let viewport_focus = focuses.viewport.clone();
         viewport = viewport
             .role(gpui::Role::Pane)
-            .aria_label("Preview canvas")
-            .aria_description("Use arrow keys to pan the zoomed preview.")
+            .aria_label("预览画布")
+            .aria_description("使用方向键平移缩放后的预览。")
             .focus_visible(move |style| focus_visible_ring(style, palette))
             .cursor_grab()
             .on_key_down(
@@ -448,20 +448,20 @@ pub(in crate::app) fn preview_viewport_content(
 
     if state.selected_file_name.is_none() {
         return content
-            .child(theme::ui_text("Drop files or use Add Source"))
+            .child(theme::ui_text("拖放文件，或点击“添加源”"))
             .into_any_element();
     }
 
     let content = match state.metadata_status {
         PreviewMetadataStatus::Idle | PreviewMetadataStatus::Loading => {
-            content.child(theme::ui_text("Analyzing source..."))
+            content.child(theme::ui_text("正在分析源..."))
         }
         PreviewMetadataStatus::Error => {
             let mut error = content
                 .role(gpui::Role::Alert)
-                .aria_label("Preview unavailable")
+                .aria_label("预览不可用")
                 .text_color(color(palette.danger))
-                .child(theme::ui_text("Preview unavailable"));
+                .child(theme::ui_text("预览不可用"));
             if let Some(message) = state.metadata_error.as_deref() {
                 error = error.child(
                     div()
@@ -477,9 +477,9 @@ pub(in crate::app) fn preview_viewport_content(
             if let Some(message) = state.runtime_error.as_deref() {
                 return content
                     .role(gpui::Role::Alert)
-                    .aria_label("Preview unavailable")
+                    .aria_label("预览不可用")
                     .text_color(color(palette.danger))
-                    .child(theme::ui_text("Preview unavailable"))
+                    .child(theme::ui_text("预览不可用"))
                     .child(
                         div()
                             .max_w(theme::ui_rem(320.0))
@@ -496,7 +496,7 @@ pub(in crate::app) fn preview_viewport_content(
 
             if state.availability.media_kind == PreviewMediaKind::Unknown {
                 return content
-                    .child(theme::ui_text("Preview unavailable"))
+                    .child(theme::ui_text("预览不可用"))
                     .into_any_element();
             }
 

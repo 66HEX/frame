@@ -19,8 +19,8 @@ impl ColorTheme {
     #[must_use]
     pub const fn display(self) -> &'static str {
         match self {
-            Self::Dark => "Dark",
-            Self::Light => "Light",
+            Self::Dark => "深色",
+            Self::Light => "浅色",
         }
     }
 

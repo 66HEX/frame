@@ -15,20 +15,20 @@ pub(in crate::app) fn settings_source_tab(
             return div()
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .text_color(color(palette.text_muted))
-                .child(theme::ui_text("Analyzing source..."))
+                .child(theme::ui_text("正在分析源..."))
                 .into_any_element();
         }
         MetadataStatus::Error => {
             let mut error_view = div()
                 .id("settings-source-metadata-error")
                 .role(gpui::Role::Alert)
-                .aria_label("Failed to read source metadata.")
+                .aria_label("读取源元数据失败。")
                 .flex()
                 .flex_col()
                 .gap_1()
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .text_color(color(palette.danger))
-                .child(theme::ui_text("Failed to read source metadata."));
+                .child(theme::ui_text("读取源元数据失败。"));
             if let Some(error) = error {
                 error_view = error_view.child(
                     div()
@@ -45,7 +45,7 @@ pub(in crate::app) fn settings_source_tab(
         return div()
             .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
             .text_color(color(palette.text_muted))
-            .child(theme::ui_text("Metadata unavailable."))
+            .child(theme::ui_text("元数据不可用。"))
             .into_any_element();
     };
 
@@ -54,7 +54,7 @@ pub(in crate::app) fn settings_source_tab(
         return div()
             .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
             .text_color(color(palette.text_muted))
-            .child(theme::ui_text("Metadata unavailable."))
+            .child(theme::ui_text("元数据不可用。"))
             .into_any_element();
     }
 

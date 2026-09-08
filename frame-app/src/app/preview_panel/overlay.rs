@@ -145,7 +145,7 @@ pub(in crate::app) fn preview_overlay_layer(
 
     if state.overlay.overlay_mode {
         let media = state.media;
-        layer = apply_accessible_button(layer, "Move overlay image", true, palette)
+        layer = apply_accessible_button(layer, "移动叠加图像", true, palette)
             .aria_description(overlay_keyboard_description())
             .on_key_down(
                 cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
@@ -267,7 +267,7 @@ pub(in crate::app) fn preview_overlay_controls(
             preview_overlay_icon_button_with_focus(
                 "replace",
                 assets::ICON_FILE_IMAGE,
-                "Replace overlay image",
+                "替换叠加图像",
                 ButtonVariant::Ghost,
                 enabled,
                 focuses.first,
@@ -284,7 +284,7 @@ pub(in crate::app) fn preview_overlay_controls(
             preview_overlay_icon_button(
                 "decrease",
                 assets::ICON_MINUS,
-                "Decrease overlay size",
+                "减小叠加尺寸",
                 ButtonVariant::Ghost,
                 enabled,
                 palette,
@@ -301,7 +301,7 @@ pub(in crate::app) fn preview_overlay_controls(
             preview_overlay_icon_button(
                 "increase",
                 assets::ICON_PLUS,
-                "Increase overlay size",
+                "增大叠加尺寸",
                 ButtonVariant::Ghost,
                 enabled,
                 palette,
@@ -325,7 +325,7 @@ pub(in crate::app) fn preview_overlay_controls(
             frame_icon_button(
                 "preview-overlay-remove",
                 assets::ICON_TRASH,
-                "Remove overlay",
+                "移除叠加",
                 FrameIconButtonVariant::DestructiveGhost,
                 enabled,
                 FrameIconButtonSize {
@@ -347,7 +347,7 @@ pub(in crate::app) fn preview_overlay_controls(
             preview_overlay_icon_button_with_focus(
                 "done",
                 assets::ICON_CHECK,
-                "Done editing overlay",
+                "完成叠加编辑",
                 ButtonVariant::Default,
                 enabled,
                 focuses.last,
@@ -516,11 +516,11 @@ const fn overlay_handle_id(handle: OverlayDragHandle) -> &'static str {
 
 const fn overlay_handle_label(handle: OverlayDragHandle) -> &'static str {
     match handle {
-        OverlayDragHandle::Move => "Move overlay image",
-        OverlayDragHandle::NorthWest => "Resize overlay top left corner",
-        OverlayDragHandle::NorthEast => "Resize overlay top right corner",
-        OverlayDragHandle::SouthEast => "Resize overlay bottom right corner",
-        OverlayDragHandle::SouthWest => "Resize overlay bottom left corner",
+        OverlayDragHandle::Move => "移动叠加图像",
+        OverlayDragHandle::NorthWest => "调整叠加左上角",
+        OverlayDragHandle::NorthEast => "调整叠加右上角",
+        OverlayDragHandle::SouthEast => "调整叠加右下角",
+        OverlayDragHandle::SouthWest => "调整叠加左下角",
     }
 }
 
@@ -661,7 +661,7 @@ fn preview_overlay_opacity_slider(
 
     frame_slider(
         "preview-overlay-opacity-slider",
-        "Overlay opacity",
+        "叠加不透明度",
         value,
         !enabled,
         palette,

@@ -111,7 +111,7 @@ mod file_item {
         let mut file = FileItem::from_path("1", "/tmp/video.mp4", 10);
         file.status = FileStatus::Completed;
 
-        assert_eq!(file.row_state_label(), "ready");
+        assert_eq!(file.row_state_label(), "就绪");
         assert_eq!(file.row_state_tone(), FileStateTone::Blue);
     }
 
@@ -120,7 +120,7 @@ mod file_item {
         let mut file = FileItem::from_path("1", "/tmp/video.mp4", 10);
         file.status = FileStatus::Error;
 
-        assert_eq!(file.row_state_label(), "error");
+        assert_eq!(file.row_state_label(), "错误");
         assert_eq!(file.row_state_tone(), FileStateTone::Red);
     }
 

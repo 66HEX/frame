@@ -26,7 +26,7 @@ pub(in crate::app) fn settings_panel(
     let mut tab_rail = div()
         .id("settings-tab-list")
         .role(gpui::Role::TabList)
-        .aria_label("Settings sections")
+        .aria_label("设置分区")
         .flex()
         .items_center()
         .justify_start()

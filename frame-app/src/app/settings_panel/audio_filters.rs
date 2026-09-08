@@ -53,7 +53,7 @@ pub(in crate::app) fn settings_audio_filters_tab(
         .flex_col()
         .gap_3()
         .child(
-            settings_section("Audio Filters", palette).child(settings_audio_filters_reset_all(
+            settings_section("音频滤镜", palette).child(settings_audio_filters_reset_all(
                 controls_disabled,
                 palette,
                 window,
@@ -61,7 +61,7 @@ pub(in crate::app) fn settings_audio_filters_tab(
             )),
         )
         .child(
-            settings_section("Level", palette)
+            settings_section("电平", palette)
                 .child(settings_audio_filter_range_field(
                     audio_filter_spec(
                         AudioFilterRangeTarget::Volume,
@@ -94,7 +94,7 @@ pub(in crate::app) fn settings_audio_filters_tab(
                 )),
         )
         .child(
-            settings_section("Dynamics", palette).child(settings_audio_compressor_control(
+            settings_section("动态", palette).child(settings_audio_compressor_control(
                 filters.compressor_enabled,
                 filters.compressor_strength,
                 controls_disabled || !available_filters.acompressor,
@@ -104,7 +104,7 @@ pub(in crate::app) fn settings_audio_filters_tab(
             )),
         )
         .child(
-            settings_section("Tone", palette)
+            settings_section("音色", palette)
                 .child(settings_audio_filter_range_field(
                     audio_filter_spec(
                         AudioFilterRangeTarget::Bass,
@@ -155,7 +155,7 @@ pub(in crate::app) fn settings_audio_filters_tab(
                 )),
         )
         .child(
-            settings_section("Cleanup", palette)
+            settings_section("清理", palette)
                 .child(settings_audio_filter_range_field(
                     audio_filter_spec(
                         AudioFilterRangeTarget::NoiseReduction,
@@ -182,7 +182,7 @@ pub(in crate::app) fn settings_audio_filters_tab(
                 )),
         )
         .child(
-            settings_section("Stereo", palette).child(settings_audio_filter_range_field(
+            settings_section("立体声", palette).child(settings_audio_filter_range_field(
                 audio_filter_spec(
                     AudioFilterRangeTarget::StereoWidth,
                     filters.stereo_width.enabled,
@@ -218,20 +218,20 @@ fn audio_filter_spec(
     let available = audio_filter_available(target, available_filters);
     match target {
         AudioFilterRangeTarget::Volume => {
-            audio_spec(target, "Volume", true, available, value, 100, 0, 200, "%")
+            audio_spec(target, "音量", true, available, value, 100, 0, 200, "%")
         }
         AudioFilterRangeTarget::Limiter => audio_spec(
-            target, "Limiter", enabled, available, value, -1, -12, 0, " dB",
+            target, "限幅器", enabled, available, value, -1, -12, 0, " dB",
         ),
         AudioFilterRangeTarget::Bass => {
-            audio_spec(target, "Bass", enabled, available, value, 0, -20, 20, " dB")
+            audio_spec(target, "低音", enabled, available, value, 0, -20, 20, " dB")
         }
         AudioFilterRangeTarget::Treble => audio_spec(
-            target, "Treble", enabled, available, value, 0, -20, 20, " dB",
+            target, "高音", enabled, available, value, 0, -20, 20, " dB",
         ),
         AudioFilterRangeTarget::HighPass => audio_spec(
             target,
-            "High-pass",
+            "高通",
             enabled,
             available,
             value,
@@ -241,11 +241,11 @@ fn audio_filter_spec(
             " Hz",
         ),
         AudioFilterRangeTarget::LowPass => audio_spec(
-            target, "Low-pass", enabled, available, value, 16_000, 1000, 20_000, " Hz",
+            target, "低通", enabled, available, value, 16_000, 1000, 20_000, " Hz",
         ),
         AudioFilterRangeTarget::NoiseReduction => audio_spec(
             target,
-            "Noise Reduction",
+            "降噪",
             enabled,
             available,
             value,
@@ -255,11 +255,11 @@ fn audio_filter_spec(
             " dB",
         ),
         AudioFilterRangeTarget::DeEsser => audio_spec(
-            target, "De-esser", enabled, available, value, 35, 0, 100, "%",
+            target, "去齿音", enabled, available, value, 35, 0, 100, "%",
         ),
         AudioFilterRangeTarget::StereoWidth => audio_spec(
             target,
-            "Stereo Width",
+            "立体声宽度",
             enabled,
             available,
             value,
@@ -350,7 +350,7 @@ fn settings_audio_filter_range_field(
                         ),
                         spec.label,
                         if unavailable {
-                            "This FFmpeg runtime does not provide the required filter."
+                            "此 FFmpeg 运行时未提供所需滤镜。"
                         } else {
                             ""
                         },
@@ -511,7 +511,7 @@ fn settings_audio_filter_reset(
     frame_icon_button(
         format!("settings-audio-filter-{}-reset", audio_target_id(target)),
         assets::ICON_REFRESH,
-        "Reset filter",
+        "重置",
         FrameIconButtonVariant::Ghost,
         !disabled,
         FrameIconButtonSize {
@@ -542,7 +542,7 @@ fn settings_audio_normalize_control(
 ) -> gpui::Stateful<gpui::Div> {
     frame_checkbox_row(
         "settings-audio-normalize-row",
-        "Normalize audio",
+        "响度标准化",
         "",
         checked,
         disabled,
@@ -569,9 +569,9 @@ fn settings_audio_compressor_control(
 ) -> gpui::Div {
     let mut grid = div().grid().grid_cols(3).mt_1().gap_2();
     for (candidate, label) in [
-        (FilterStrength::Low, "Gentle"),
-        (FilterStrength::Medium, "Balanced"),
-        (FilterStrength::High, "Strong"),
+        (FilterStrength::Low, "柔和"),
+        (FilterStrength::Medium, "均衡"),
+        (FilterStrength::High, "强力"),
     ] {
         grid = grid.child(
             frame_choice_button(
@@ -605,7 +605,7 @@ fn settings_audio_compressor_control(
         .gap_2()
         .child(frame_checkbox_row(
             "settings-audio-compressor-toggle",
-            "Compressor",
+            "压缩器",
             "",
             enabled,
             disabled,
@@ -633,7 +633,7 @@ fn settings_audio_filters_reset_all(
 ) -> gpui::Stateful<gpui::Div> {
     frame_text_button(
         "settings-audio-filters-reset-all",
-        "Reset audio filters",
+        "重置",
         ButtonVariant::Secondary,
         false,
         !disabled,
@@ -774,15 +774,15 @@ const fn audio_handle_id(target: AudioFilterRangeTarget) -> &'static str {
 
 const fn audio_slider_label(target: AudioFilterRangeTarget) -> &'static str {
     match target {
-        AudioFilterRangeTarget::Volume => "Volume",
-        AudioFilterRangeTarget::Limiter => "Limiter",
-        AudioFilterRangeTarget::Bass => "Bass",
-        AudioFilterRangeTarget::Treble => "Treble",
-        AudioFilterRangeTarget::HighPass => "High-pass",
-        AudioFilterRangeTarget::LowPass => "Low-pass",
-        AudioFilterRangeTarget::NoiseReduction => "Noise reduction",
-        AudioFilterRangeTarget::DeEsser => "De-esser",
-        AudioFilterRangeTarget::StereoWidth => "Stereo width",
+        AudioFilterRangeTarget::Volume => "音量",
+        AudioFilterRangeTarget::Limiter => "限幅器",
+        AudioFilterRangeTarget::Bass => "低音",
+        AudioFilterRangeTarget::Treble => "高音",
+        AudioFilterRangeTarget::HighPass => "高通",
+        AudioFilterRangeTarget::LowPass => "低通",
+        AudioFilterRangeTarget::NoiseReduction => "降噪",
+        AudioFilterRangeTarget::DeEsser => "去齿音",
+        AudioFilterRangeTarget::StereoWidth => "立体声宽度",
     }
 }
 

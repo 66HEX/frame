@@ -115,7 +115,7 @@ fn settings_images_pixel_format_section(
         );
     }
 
-    settings_section("Pixel format", palette).child(list)
+    settings_section("像素格式", palette).child(list)
 }
 
 fn settings_images_encoding_section(
@@ -130,10 +130,10 @@ fn settings_images_encoding_section(
         "webp" => settings_image_webp_section(config, settings_disabled, palette, window, cx),
         "png" => settings_image_png_section(config, settings_disabled, palette, window, cx),
         "tiff" => settings_image_tiff_section(config, settings_disabled, palette, window, cx),
-        "bmp" => settings_section("BMP encoding", palette)
-            .child(settings_hint_text("BMP output is uncompressed.", palette)),
-        _ => settings_section("Image encoding", palette).child(settings_hint_text(
-            "Select an image format to tune encoding.",
+        "bmp" => settings_section("BMP 编码", palette)
+            .child(settings_hint_text("BMP 输出为未压缩。", palette)),
+        _ => settings_section("图像编码", palette).child(settings_hint_text(
+            "选择图像格式以调整编码。",
             palette,
         )),
     }
@@ -146,15 +146,15 @@ fn settings_image_jpeg_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("JPEG encoding", palette)
+    settings_section("JPEG 编码", palette)
         .child(settings_image_range_field(
-            "Quality",
+            "质量",
             format!("{}%", config.image_jpeg_quality),
             config.image_jpeg_quality,
             1,
             100,
-            "Smallest",
-            "Best quality",
+            "最小",
+            "最佳质量",
             SettingsImageRangeTarget::JpegQuality,
             settings_disabled,
             palette,
@@ -177,7 +177,7 @@ fn settings_image_webp_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("WebP encoding", palette)
+    settings_section("WebP 编码", palette)
         .child(settings_image_webp_mode_grid(
             config,
             settings_disabled,
@@ -187,23 +187,23 @@ fn settings_image_webp_section(
         ))
         .child(settings_image_range_field(
             if config.image_webp_lossless {
-                "Effort"
+                "力度"
             } else {
-                "Quality"
+                "质量"
             },
             format!("{}%", config.image_webp_quality),
             config.image_webp_quality,
             0,
             100,
             if config.image_webp_lossless {
-                "Fastest"
+                "最快"
             } else {
-                "Smallest"
+                "最小"
             },
             if config.image_webp_lossless {
-                "Smallest"
+                "最小"
             } else {
-                "Best quality"
+                "最佳质量"
             },
             SettingsImageRangeTarget::WebpQuality,
             settings_disabled,
@@ -211,13 +211,13 @@ fn settings_image_webp_section(
             cx,
         ))
         .child(settings_image_range_field(
-            "Compression effort",
+            "压缩力度",
             config.image_webp_compression.to_string(),
             config.image_webp_compression,
             0,
             6,
-            "Fastest",
-            "Smallest",
+            "最快",
+            "最小",
             SettingsImageRangeTarget::WebpCompression,
             settings_disabled,
             palette,
@@ -240,15 +240,15 @@ fn settings_image_png_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("PNG compression", palette)
+    settings_section("PNG 压缩", palette)
         .child(settings_image_range_field(
-            "Compression level",
+            "压缩级别",
             config.image_png_compression.to_string(),
             config.image_png_compression,
             0,
             9,
-            "Fastest",
-            "Smallest",
+            "最快",
+            "最小",
             SettingsImageRangeTarget::PngCompression,
             settings_disabled,
             palette,
@@ -271,7 +271,7 @@ fn settings_image_tiff_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("TIFF compression", palette).child(settings_image_option_list(
+    settings_section("TIFF 压缩", palette).child(settings_image_option_list(
         image_tiff_compression_options(config, settings_disabled),
         "image-tiff-compression",
         palette,
@@ -289,7 +289,7 @@ fn settings_image_webp_mode_grid(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let mut grid = div().grid().grid_cols(2).gap_2();
-    for (lossless, label) in [(false, "Lossy"), (true, "Lossless")] {
+    for (lossless, label) in [(false, "有损"), (true, "无损")] {
         grid = grid.child(
             frame_choice_button(
                 format!("image-webp-mode-{label}"),
@@ -487,10 +487,10 @@ const fn settings_image_range_slider_id(target: SettingsImageRangeTarget) -> &'s
 
 const fn settings_image_range_slider_label(target: SettingsImageRangeTarget) -> &'static str {
     match target {
-        SettingsImageRangeTarget::JpegQuality => "JPEG quality",
-        SettingsImageRangeTarget::WebpQuality => "WebP quality",
-        SettingsImageRangeTarget::WebpCompression => "WebP compression",
-        SettingsImageRangeTarget::PngCompression => "PNG compression",
+        SettingsImageRangeTarget::JpegQuality => "JPEG 质量",
+        SettingsImageRangeTarget::WebpQuality => "WebP 质量",
+        SettingsImageRangeTarget::WebpCompression => "WebP 压缩",
+        SettingsImageRangeTarget::PngCompression => "PNG 压缩",
     }
 }
 

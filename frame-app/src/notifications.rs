@@ -29,7 +29,7 @@ use crate::{
 #[cfg(target_os = "linux")]
 use crate::runtime_environment;
 
-const CONVERSION_FINISHED_TITLE: &str = "Queue Finished";
+const CONVERSION_FINISHED_TITLE: &str = "队列已完成";
 const FRAME_NOTIFICATION_ICON: &str = "frame";
 #[cfg(target_os = "linux")]
 const CONVERSION_FINISHED_NOTIFICATION_ID: &str = "conversion-finished";
@@ -65,7 +65,7 @@ impl ConversionNotificationSummary {
         let error_suffix = if self.error_count == 1 { "" } else { "s" };
 
         format!(
-            "Processed {} file{file_suffix} with {} error{error_suffix}.",
+            "已处理 {} 个文件，含 {} 个错误。",
             processed_count, self.error_count,
         )
     }
@@ -374,12 +374,12 @@ mod tests {
     #[test]
     fn conversion_notification_summary_pluralizes_file_and_error_counts() {
         let cases = [
-            (2, 1, "Processed 3 files with 1 error."),
-            (1, 2, "Processed 3 files with 2 errors."),
-            (1, 1, "Processed 2 files with 1 error."),
-            (2, 2, "Processed 4 files with 2 errors."),
-            (1, 0, "Processed 1 file with 0 errors."),
-            (0, 1, "Processed 1 file with 1 error."),
+            (2, 1, "已处理 3 个文件，含 1 个错误。"),
+            (1, 2, "已处理 3 个文件，含 2 个错误。"),
+            (1, 1, "已处理 2 个文件，含 1 个错误。"),
+            (2, 2, "已处理 4 个文件，含 2 个错误。"),
+            (1, 0, "已处理 1 个文件，含 0 个错误。"),
+            (0, 1, "已处理 1 个文件，含 1 个错误。"),
         ];
 
         for (completed_count, error_count, expected) in cases {
@@ -388,7 +388,7 @@ mod tests {
                 error_count,
             };
 
-            assert_eq!(summary.title(), "Queue Finished");
+            assert_eq!(summary.title(), "队列已完成");
             assert_eq!(summary.body(), expected);
         }
     }

@@ -105,7 +105,7 @@ pub fn audio_codec_options(
                 label: definition.1,
                 is_selected: config.audio_codec.eq_ignore_ascii_case(definition.0),
                 is_disabled: encode_controls_disabled || !is_compatible,
-                disabled_reason: (!is_compatible).then_some("Incompatible container"),
+                disabled_reason: (!is_compatible).then_some("不兼容的封装格式"),
             }
         })
         .collect()
@@ -283,7 +283,7 @@ pub fn subtitle_burn_file_label(config: &ConversionConfig) -> String {
         .and_then(|path| path.rsplit(['/', '\\']).next())
         .filter(|name| !name.is_empty())
         .map_or_else(
-            || "Select .srt or .ass file".to_string(),
+            || "选择 .srt 或 .ass 文件".to_string(),
             ToString::to_string,
         )
 }
@@ -405,13 +405,13 @@ pub fn metadata_field_placeholder(
         return metadata
             .and_then(|value| value.transport_stream.as_ref())
             .and_then(|value| value.service_name.clone())
-            .unwrap_or_else(|| "Leave empty to keep source service name".to_string());
+            .unwrap_or_else(|| "留空以保留源服务名称".to_string());
     }
     if field == MetadataField::ServiceProvider {
         return metadata
             .and_then(|value| value.transport_stream.as_ref())
             .and_then(|value| value.service_provider.clone())
-            .unwrap_or_else(|| "Leave empty to keep source service provider".to_string());
+            .unwrap_or_else(|| "留空以保留源服务提供商".to_string());
     }
 
     metadata
@@ -419,7 +419,7 @@ pub fn metadata_field_placeholder(
         .and_then(|tags| tags.value(field))
         .filter(|value| !value.trim().is_empty())
         .map_or_else(
-            || "Leave empty to keep original".to_string(),
+            || "留空以保留原始值".to_string(),
             ToString::to_string,
         )
 }
@@ -431,10 +431,10 @@ pub fn metadata_field_placeholder(
 )]
 pub fn default_presets() -> Vec<PresetDefinition> {
     vec![
-        PresetDefinition::built_in("balanced-mp4", "Balanced MP4", preset_config("mp4")),
+        PresetDefinition::built_in("balanced-mp4", "均衡 MP4", preset_config("mp4")),
         PresetDefinition::built_in(
             "broadcast-m2t",
-            "M2T Broadcast (188-byte TS)",
+            "M2T 广播（188-byte TS）",
             ConversionConfig {
                 container: "m2t".to_string(),
                 video_codec: "mpeg2video".to_string(),
@@ -449,7 +449,7 @@ pub fn default_presets() -> Vec<PresetDefinition> {
         ),
         PresetDefinition::built_in(
             "m2ts-h264",
-            "M2TS H.264 (192-byte)",
+            "M2TS H.264（192-byte）",
             ConversionConfig {
                 container: "m2ts".to_string(),
                 video_codec: "libx264".to_string(),
@@ -463,7 +463,7 @@ pub fn default_presets() -> Vec<PresetDefinition> {
         ),
         PresetDefinition::built_in(
             "archive-hq",
-            "Archive H.265",
+            "归档 H.265",
             ConversionConfig {
                 container: "mkv".to_string(),
                 video_codec: "libx265".to_string(),
@@ -479,7 +479,7 @@ pub fn default_presets() -> Vec<PresetDefinition> {
         ),
         PresetDefinition::built_in(
             "web-share",
-            "Web Share",
+            "网页分享",
             ConversionConfig {
                 container: "webm".to_string(),
                 video_codec: "vp9".to_string(),
@@ -495,37 +495,37 @@ pub fn default_presets() -> Vec<PresetDefinition> {
         ),
         PresetDefinition::built_in(
             "gif-web-small",
-            "GIF Web Small",
+            "GIF 网页小体积",
             gif_preset_config("custom", Some("640"), Some("360"), "12", 128, "sierra2_4a"),
         ),
         PresetDefinition::built_in(
             "gif-quality",
-            "GIF High Quality",
+            "GIF 高质量",
             gif_preset_config("720p", None, None, "15", 256, "floyd_steinberg"),
         ),
         PresetDefinition::built_in(
             "audio-only",
-            "Audio MP3",
+            "音频 MP3",
             audio_preset_config("mp3", "mp3", "128", "stereo"),
         ),
         PresetDefinition::built_in(
             "audio-flac",
-            "Audio FLAC (Lossless)",
+            "音频 FLAC（无损）",
             audio_preset_config("flac", "flac", "0", "original"),
         ),
         PresetDefinition::built_in(
             "audio-alac",
-            "Audio ALAC (Apple)",
+            "音频 ALAC（Apple）",
             audio_preset_config("m4a", "alac", "0", "original"),
         ),
         PresetDefinition::built_in(
             "audio-wav",
-            "Audio WAV (Lossless)",
+            "音频 WAV（无损）",
             audio_preset_config("wav", "pcm_s16le", "0", "original"),
         ),
         PresetDefinition::built_in(
             "social-tiktok",
-            "Social (TikTok/Reels)",
+            "社交（TikTok/Reels）",
             social_preset_config("6000", "custom", Some("1080"), Some("1920"), "30", "slow"),
         ),
         PresetDefinition::built_in(
@@ -540,12 +540,12 @@ pub fn default_presets() -> Vec<PresetDefinition> {
         ),
         PresetDefinition::built_in(
             "x-landscape",
-            "X (Landscape)",
+            "X（横屏）",
             social_preset_config("2500", "720p", None, None, "30", "medium"),
         ),
         PresetDefinition::built_in(
             "x-portrait",
-            "X (Mobile/Portrait)",
+            "X（移动端/竖屏）",
             social_preset_config("2000", "custom", Some("720"), Some("1280"), "30", "medium"),
         ),
         PresetDefinition::built_in(
@@ -586,9 +586,9 @@ pub fn preset_options(
                 is_selected,
                 is_compatible,
                 status: if !is_compatible {
-                    Some("Incompatible container")
+                    Some("不兼容的封装格式")
                 } else if is_selected {
-                    Some("Applied")
+                    Some("已应用")
                 } else {
                     None
                 },
@@ -648,7 +648,7 @@ pub fn create_custom_preset(id: String, name: &str, config: &ConversionConfig) -
     PresetDefinition::custom(
         id,
         if name.trim().is_empty() {
-            "Untitled Preset".to_string()
+            "未命名预设".to_string()
         } else {
             name.trim().to_string()
         },
@@ -770,7 +770,7 @@ pub fn video_codec_options(
                 label: definition.label,
                 is_selected: allowed && config.video_codec.eq_ignore_ascii_case(definition.codec),
                 is_disabled: disabled || !allowed,
-                disabled_reason: (!allowed).then_some("Incompatible container"),
+                disabled_reason: (!allowed).then_some("不兼容的封装格式"),
             }
         })
         .collect()
@@ -792,11 +792,11 @@ pub fn video_pixel_format_options(config: &ConversionConfig) -> Vec<VideoPixelFo
                 is_selected: allowed && config.pixel_format.eq_ignore_ascii_case(definition.id),
                 is_disabled: !allowed,
                 caption: if definition.id == "auto" {
-                    "Encoder default"
+                    "编码器默认"
                 } else if allowed {
                     definition.id
                 } else {
-                    "Incompatible codec"
+                    "不兼容的编码"
                 },
             }
         })
@@ -815,7 +815,7 @@ pub fn video_preset_options(config: &ConversionConfig, disabled: bool) -> Vec<Vi
                 caption: if allowed {
                     video_preset_caption(preset)
                 } else {
-                    "Incompatible preset"
+                    "不兼容的预设"
                 },
                 is_selected: allowed && config.preset == *preset,
                 is_disabled: disabled || !allowed,
@@ -1000,16 +1000,16 @@ fn output_container_disabled_reason(
     let source_kind = source_kind_for(metadata);
 
     if disabled {
-        return Some("Locked");
+        return Some("已锁定");
     }
     if source_kind == SourceKind::Audio && !is_audio_only_container(container) {
-        return Some("Video container unavailable for audio sources");
+        return Some("音频源不支持视频封装");
     }
     if source_kind == SourceKind::Image && is_audio_only_container(container) {
-        return Some("Audio container unavailable for image sources");
+        return Some("图像源不支持音频封装");
     }
     if !is_container_compatible_for_stream_copy(config, metadata, container) {
-        return Some("Incompatible container");
+        return Some("不兼容的封装格式");
     }
 
     None
@@ -1140,29 +1140,29 @@ pub fn first_allowed_video_pixel_format(container: &str, encoder: &str) -> &'sta
 #[must_use]
 pub fn video_preset_label(preset: &str) -> &'static str {
     match preset {
-        "ultrafast" => "Ultrafast",
-        "superfast" => "Superfast",
-        "veryfast" => "Very Fast",
-        "faster" => "Faster",
-        "fast" => "Fast",
-        "slow" => "Slow",
-        "slower" => "Slower",
-        "veryslow" => "Very Slow",
-        _ => "Medium",
+        "ultrafast" => "极快",
+        "superfast" => "超快",
+        "veryfast" => "非常快",
+        "faster" => "较快",
+        "fast" => "快",
+        "slow" => "慢",
+        "slower" => "较慢",
+        "veryslow" => "极慢",
+        _ => "中速",
     }
 }
 
 #[must_use]
 pub fn video_preset_caption(preset: &str) -> &'static str {
     match preset {
-        "ultrafast" => "Fastest encode, largest file",
-        "superfast" => "Very fast encode",
-        "veryfast" => "Fast encode",
-        "faster" => "Faster than default",
-        "fast" => "Fast with reasonable compression",
-        "slow" => "Smaller file, slower encode",
-        "slower" => "High compression",
-        "veryslow" => "Smallest file, slowest encode",
-        _ => "Balanced default",
+        "ultrafast" => "编码最快，文件最大",
+        "superfast" => "编码非常快",
+        "veryfast" => "编码快",
+        "faster" => "比默认更快",
+        "fast" => "快速且压缩比合理",
+        "slow" => "文件更小，编码更慢",
+        "slower" => "高压缩比",
+        "veryslow" => "文件最小，编码最慢",
+        _ => "均衡默认",
     }
 }

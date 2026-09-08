@@ -297,15 +297,15 @@ pub(in crate::app) const fn crop_handle_id(handle: DragHandle) -> &'static str {
 
 pub(in crate::app) const fn crop_handle_label(handle: DragHandle) -> &'static str {
     match handle {
-        DragHandle::Move => "Move crop selection",
-        DragHandle::North => "Resize crop top edge",
-        DragHandle::South => "Resize crop bottom edge",
-        DragHandle::East => "Resize crop right edge",
-        DragHandle::West => "Resize crop left edge",
-        DragHandle::NorthEast => "Resize crop top right corner",
-        DragHandle::NorthWest => "Resize crop top left corner",
-        DragHandle::SouthEast => "Resize crop bottom right corner",
-        DragHandle::SouthWest => "Resize crop bottom left corner",
+        DragHandle::Move => "移动裁剪选区",
+        DragHandle::North => "调整裁剪上边缘",
+        DragHandle::South => "调整裁剪下边缘",
+        DragHandle::East => "调整裁剪右边缘",
+        DragHandle::West => "调整裁剪左边缘",
+        DragHandle::NorthEast => "调整裁剪右上角",
+        DragHandle::NorthWest => "调整裁剪左上角",
+        DragHandle::SouthEast => "调整裁剪右下角",
+        DragHandle::SouthWest => "调整裁剪左下角",
     }
 }
 
@@ -398,7 +398,7 @@ pub(in crate::app) fn preview_crop_aspect_bar(
     let bar = bar
         .child(preview_toolbar_vertical_separator(palette))
         .child(
-            compact_text_button("Reset", false, true, palette, window, cx).on_click(cx.listener(
+            compact_text_button("重置", false, true, palette, window, cx).on_click(cx.listener(
                 |root, _: &ClickEvent, _window, cx| {
                     if root.reset_preview_crop_selection() {
                         cx.notify();
@@ -408,7 +408,7 @@ pub(in crate::app) fn preview_crop_aspect_bar(
         )
         .child(
             compact_text_button_variant_inner(
-                "Apply",
+                "应用",
                 ButtonVariant::Default,
                 false,
                 state.crop.has_crop_dimensions,

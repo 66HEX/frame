@@ -105,7 +105,7 @@ pub(in crate::app) fn preview_timeline(
                 .gap_4()
                 .child(preview_timecode_field(
                     PreviewTimecodeFieldSpec {
-                        label: "Start time",
+                        label: "开始时间",
                         value: inputs.start_value.to_string(),
                         enabled: trim_enabled,
                         width: 128.0,
@@ -118,7 +118,7 @@ pub(in crate::app) fn preview_timeline(
                 ))
                 .child(preview_timecode_field(
                     PreviewTimecodeFieldSpec {
-                        label: "End time",
+                        label: "结束时间",
                         value: inputs.end_value.to_string(),
                         enabled: trim_enabled,
                         width: 128.0,
@@ -131,7 +131,7 @@ pub(in crate::app) fn preview_timeline(
                 ))
                 .child(preview_timecode_field(
                     PreviewTimecodeFieldSpec {
-                        label: "Duration",
+                        label: "时长",
                         value: labels.duration,
                         enabled: false,
                         width: 104.0,
@@ -150,7 +150,7 @@ pub(in crate::app) fn preview_timeline(
                 .flex()
                 .flex_col()
                 .gap(theme::ui_rem(6.0))
-                .child(preview_timeline_label("Trim", palette))
+                .child(preview_timeline_label("修剪", palette))
                 .child(preview_timeline_track(state, cx)),
         )
         .child(
@@ -349,7 +349,7 @@ pub(in crate::app) fn preview_timeline_track(
 
     apply_accessible_slider(
         track,
-        "Preview position",
+        "预览位置",
         enabled,
         current_time,
         0.0,
@@ -455,9 +455,9 @@ pub(in crate::app) fn preview_timeline_handle(
     cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let (handle_id, label) = match target {
-        TimelineDragTarget::Start => ("preview-timeline-start-handle", "Trim start"),
-        TimelineDragTarget::End => ("preview-timeline-end-handle", "Trim end"),
-        TimelineDragTarget::Scrub => ("preview-timeline-scrub-handle", "Preview position"),
+        TimelineDragTarget::Start => ("preview-timeline-start-handle", "修剪起点"),
+        TimelineDragTarget::End => ("preview-timeline-end-handle", "修剪终点"),
+        TimelineDragTarget::Scrub => ("preview-timeline-scrub-handle", "预览位置"),
     };
 
     let handle = div()
@@ -543,9 +543,9 @@ pub(in crate::app) fn preview_play_button(
         "preview-playback-toggle",
         icon,
         if state.playback.is_playing() {
-            "Pause preview"
+            "暂停预览"
         } else {
-            "Play preview"
+            "播放预览"
         },
         false,
         enabled,

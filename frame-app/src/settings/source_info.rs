@@ -10,21 +10,21 @@ pub fn source_info_sections(metadata: &SourceMetadata) -> Vec<SourceInfoSection>
 
     if is_image {
         sections.push(SourceInfoSection::Rows {
-            title: "File information",
+            title: "文件信息",
             rows: source_image_rows(metadata),
         });
     } else if has_duration_value(metadata.duration.as_deref())
         || has_bitrate_value(metadata.bitrate.as_deref())
     {
         sections.push(SourceInfoSection::Rows {
-            title: "File information",
+            title: "文件信息",
             rows: source_file_rows(metadata),
         });
     }
 
     if metadata.video_codec.is_some() && !is_image {
         sections.push(SourceInfoSection::Rows {
-            title: "Video stream",
+            title: "视频流",
             rows: source_video_rows(metadata),
         });
     }
@@ -33,25 +33,25 @@ pub fn source_info_sections(metadata: &SourceMetadata) -> Vec<SourceInfoSection>
         let mut rows = Vec::new();
         if let Some(packet_size) = transport.packet_size {
             rows.push(SourceInfoRow {
-                label: "Packet size",
+                label: "包大小",
                 value: format!("{packet_size} bytes"),
             });
         }
         if let Some(program_id) = transport.program_id {
             rows.push(SourceInfoRow {
-                label: "Program ID",
+                label: "节目 ID",
                 value: program_id.to_string(),
             });
         }
-        push_optional_row(&mut rows, "Service name", transport.service_name.as_deref());
+        push_optional_row(&mut rows, "服务名称", transport.service_name.as_deref());
         push_optional_row(
             &mut rows,
-            "Service provider",
+            "服务提供商",
             transport.service_provider.as_deref(),
         );
         if !rows.is_empty() {
             sections.push(SourceInfoSection::Rows {
-                title: "Transport stream",
+                title: "传输流",
                 rows,
             });
         }
@@ -59,7 +59,7 @@ pub fn source_info_sections(metadata: &SourceMetadata) -> Vec<SourceInfoSection>
 
     if !metadata.audio_tracks.is_empty() {
         sections.push(SourceInfoSection::Tracks {
-            title: "Audio stream",
+            title: "音频流",
             tracks: source_audio_track_sections(&metadata.audio_tracks),
         });
     }
@@ -196,18 +196,18 @@ pub fn format_source_hz(value: Option<&str>) -> String {
 
 fn source_image_rows(metadata: &SourceMetadata) -> Vec<SourceInfoRow> {
     let mut rows = Vec::new();
-    push_optional_row(&mut rows, "Image codec", metadata.video_codec.as_deref());
+    push_optional_row(&mut rows, "图像编码", metadata.video_codec.as_deref());
     rows.push(SourceInfoRow {
-        label: "Dimensions",
+        label: "分辨率",
         value: format_source_resolution(metadata),
     });
-    push_optional_row(&mut rows, "Pixel format", metadata.pixel_format.as_deref());
-    push_optional_row(&mut rows, "Profile", metadata.profile.as_deref());
-    push_optional_row(&mut rows, "Color space", metadata.color_space.as_deref());
-    push_optional_row(&mut rows, "Color range", metadata.color_range.as_deref());
+    push_optional_row(&mut rows, "像素格式", metadata.pixel_format.as_deref());
+    push_optional_row(&mut rows, "编码配置", metadata.profile.as_deref());
+    push_optional_row(&mut rows, "色彩空间", metadata.color_space.as_deref());
+    push_optional_row(&mut rows, "色彩范围", metadata.color_range.as_deref());
     push_optional_row(
         &mut rows,
-        "Color primaries",
+        "色彩原色",
         metadata.color_primaries.as_deref(),
     );
     rows
@@ -217,13 +217,13 @@ fn source_file_rows(metadata: &SourceMetadata) -> Vec<SourceInfoRow> {
     let mut rows = Vec::new();
     if has_duration_value(metadata.duration.as_deref()) {
         rows.push(SourceInfoRow {
-            label: "Duration",
+            label: "时长",
             value: format_source_duration(metadata.duration.as_deref()),
         });
     }
     if has_bitrate_value(metadata.bitrate.as_deref()) {
         rows.push(SourceInfoRow {
-            label: "Container bitrate",
+            label: "封装码率",
             value: format_source_container_bitrate(metadata.bitrate.as_deref()),
         });
     }
@@ -232,12 +232,12 @@ fn source_file_rows(metadata: &SourceMetadata) -> Vec<SourceInfoRow> {
 
 fn source_video_rows(metadata: &SourceMetadata) -> Vec<SourceInfoRow> {
     let mut rows = vec![SourceInfoRow {
-        label: "Video codec",
+        label: "视频编码",
         value: display_source_value(metadata.video_codec.as_deref()),
     }];
-    push_optional_row(&mut rows, "Profile", metadata.profile.as_deref());
+    push_optional_row(&mut rows, "编码配置", metadata.profile.as_deref());
     rows.push(SourceInfoRow {
-        label: "Dimensions",
+        label: "分辨率",
         value: format_source_resolution(metadata),
     });
     if metadata
@@ -245,16 +245,16 @@ fn source_video_rows(metadata: &SourceMetadata) -> Vec<SourceInfoRow> {
         .is_some_and(|frame_rate| frame_rate > 0.0)
     {
         rows.push(SourceInfoRow {
-            label: "Frame rate",
+            label: "帧率",
             value: format_source_frame_rate(metadata.frame_rate),
         });
     }
-    push_optional_row(&mut rows, "Pixel format", metadata.pixel_format.as_deref());
-    push_optional_row(&mut rows, "Color space", metadata.color_space.as_deref());
-    push_optional_row(&mut rows, "Color range", metadata.color_range.as_deref());
+    push_optional_row(&mut rows, "像素格式", metadata.pixel_format.as_deref());
+    push_optional_row(&mut rows, "色彩空间", metadata.color_space.as_deref());
+    push_optional_row(&mut rows, "色彩范围", metadata.color_range.as_deref());
     push_optional_row(
         &mut rows,
-        "Color primaries",
+        "色彩原色",
         metadata.color_primaries.as_deref(),
     );
     if metadata
@@ -262,7 +262,7 @@ fn source_video_rows(metadata: &SourceMetadata) -> Vec<SourceInfoRow> {
         .is_some_and(|bitrate| bitrate > 0.0)
     {
         rows.push(SourceInfoRow {
-            label: "Video bitrate",
+            label: "视频码率",
             value: format_source_bitrate_kbps(metadata.video_bitrate_kbps),
         });
     }
@@ -274,7 +274,7 @@ fn source_audio_track_sections(tracks: &[AudioTrack]) -> Vec<SourceTrackSection>
         .iter()
         .enumerate()
         .map(|(index, track)| SourceTrackSection {
-            label: format!("Track #{}", index + 1),
+            label: format!("轨道 #{}", index + 1),
             rows: source_audio_track_rows(track),
         })
         .collect()
@@ -283,28 +283,28 @@ fn source_audio_track_sections(tracks: &[AudioTrack]) -> Vec<SourceTrackSection>
 fn source_audio_track_rows(track: &AudioTrack) -> Vec<SourceInfoRow> {
     let mut rows = vec![
         SourceInfoRow {
-            label: "Codec",
+            label: "编码",
             value: display_source_value(Some(&track.codec)),
         },
         SourceInfoRow {
-            label: "Channels",
+            label: "声道",
             value: display_source_value(track.channels.as_deref()),
         },
     ];
 
     if track.sample_rate.is_some() {
         rows.push(SourceInfoRow {
-            label: "Sample rate",
+            label: "采样率",
             value: format_source_hz(track.sample_rate.as_deref()),
         });
     }
     if track.bitrate_kbps.is_some() {
         rows.push(SourceInfoRow {
-            label: "Bitrate",
+            label: "码率",
             value: format_source_bitrate_kbps(track.bitrate_kbps),
         });
     }
-    push_optional_row(&mut rows, "Language", track.language.as_deref());
+    push_optional_row(&mut rows, "语言", track.language.as_deref());
     rows
 }
 
@@ -321,7 +321,7 @@ pub(super) fn audio_track_detail(track: &AudioTrack) -> String {
     }
 
     if parts.is_empty() {
-        "Source track".to_string()
+        "源轨道".to_string()
     } else {
         parts.join(" • ")
     }

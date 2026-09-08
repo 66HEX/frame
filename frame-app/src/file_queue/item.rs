@@ -60,10 +60,10 @@ impl FileItem {
             FileStatus::Converting | FileStatus::Paused | FileStatus::Cancelling => {
                 format!("{}%", self.progress_percent)
             }
-            FileStatus::Completed => "ready".to_string(),
-            FileStatus::Queued => "queued".to_string(),
-            FileStatus::Error => "error".to_string(),
-            FileStatus::Idle => "idle".to_string(),
+            FileStatus::Completed => "就绪".to_string(),
+            FileStatus::Queued => "排队中".to_string(),
+            FileStatus::Error => "错误".to_string(),
+            FileStatus::Idle => "空闲".to_string(),
         }
     }
 

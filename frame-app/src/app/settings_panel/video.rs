@@ -162,7 +162,7 @@ pub(in crate::app) fn settings_video_resolution_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let mut section = settings_section("Resolution & framerate", palette).child(
+    let mut section = settings_section("分辨率与帧率", palette).child(
         settings_resolution_grid(config, settings_disabled, palette, window, cx),
     );
 
@@ -235,7 +235,7 @@ fn settings_custom_dimensions_grid(
                 .flex()
                 .flex_col()
                 .gap_1()
-                .child(settings_field_label("Width", palette))
+                .child(settings_field_label("宽度", palette))
                 .child(frame_text_input(
                     FrameTextInputSpec {
                         id: "settings-video-width-field",
@@ -255,7 +255,7 @@ fn settings_custom_dimensions_grid(
                 .flex()
                 .flex_col()
                 .gap_1()
-                .child(settings_field_label("Height", palette))
+                .child(settings_field_label("高度", palette))
                 .child(frame_text_input(
                     FrameTextInputSpec {
                         id: "settings-video-height-field",
@@ -305,7 +305,7 @@ pub(in crate::app) fn settings_video_scaling_section(
         );
     }
 
-    settings_section("Scaling algorithm", palette).child(grid)
+    settings_section("缩放算法", palette).child(grid)
 }
 
 pub(in crate::app) fn settings_video_fps_section(
@@ -340,7 +340,7 @@ pub(in crate::app) fn settings_video_fps_section(
         );
     }
 
-    settings_section("Framerate", palette).child(grid)
+    settings_section("帧率", palette).child(grid)
 }
 
 pub(in crate::app) fn settings_video_gif_colors_section(
@@ -374,7 +374,7 @@ pub(in crate::app) fn settings_video_gif_colors_section(
         );
     }
 
-    settings_section("Palette colors", palette).child(grid)
+    settings_section("调色板颜色", palette).child(grid)
 }
 
 pub(in crate::app) fn settings_video_gif_dither_section(
@@ -410,7 +410,7 @@ pub(in crate::app) fn settings_video_gif_dither_section(
         );
     }
 
-    settings_section("Dithering", palette).child(list)
+    settings_section("抖动", palette).child(list)
 }
 
 fn settings_video_gif_loop_section(
@@ -421,7 +421,7 @@ fn settings_video_gif_loop_section(
     window: &Window,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("Loop count", palette)
+    settings_section("循环次数", palette)
         .child(frame_text_input(
             FrameTextInputSpec {
                 id: "settings-gif-loop-field",
@@ -435,7 +435,7 @@ fn settings_video_gif_loop_section(
             window,
             cx,
         ))
-        .child(settings_hint_text("Use 0 for infinite looping.", palette))
+        .child(settings_hint_text("设为 0 表示无限循环。", palette))
 }
 
 fn settings_video_encoder_section(
@@ -473,7 +473,7 @@ fn settings_video_encoder_section(
         );
     }
 
-    settings_section("Video encoder", palette).child(list)
+    settings_section("视频编码器", palette).child(list)
 }
 
 fn settings_video_pixel_format_section(
@@ -510,7 +510,7 @@ fn settings_video_pixel_format_section(
         );
     }
 
-    settings_section("Pixel format", palette).child(list)
+    settings_section("像素格式", palette).child(list)
 }
 
 fn settings_video_preset_section(
@@ -547,7 +547,7 @@ fn settings_video_preset_section(
         );
     }
 
-    settings_section("Encoding speed", palette).child(list)
+    settings_section("编码速度·Preset", palette).child(list)
 }
 
 fn settings_video_quality_section(
@@ -558,7 +558,7 @@ fn settings_video_quality_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let mut section = settings_section("Quality control", palette);
+    let mut section = settings_section("质量控制", palette);
     if config.video_codec != "mpeg2video" {
         section = section.child(settings_video_bitrate_mode_grid(
             config,
@@ -573,9 +573,9 @@ fn settings_video_quality_section(
         let is_hardware = is_hardware_video_codec(&config.video_codec);
         section = section.child(settings_video_range_field(
             if is_hardware {
-                "Encoding quality"
+                "编码质量"
             } else {
-                "Quality factor"
+                "质量因子"
             },
             if is_hardware {
                 format!("Q {}", config.quality)
@@ -590,14 +590,14 @@ fn settings_video_quality_section(
             u32::from(is_hardware),
             if is_hardware { 100 } else { 51 },
             if is_hardware {
-                "Low quality"
+                "低质量"
             } else {
-                "Lossless"
+                "无损"
             },
             if is_hardware {
-                "Best quality"
+                "最佳质量"
             } else {
-                "Smallest"
+                "最小"
             },
             if is_hardware {
                 SettingsVideoRangeTarget::Quality
@@ -615,7 +615,7 @@ fn settings_video_quality_section(
                 .flex_col()
                 .gap_2()
                 .pt(theme::ui_rem(4.0))
-                .child(settings_field_label("Target bitrate (kbps)", palette))
+                .child(settings_field_label("指定码率 (kbps)", palette))
                 .child(frame_text_input(
                     FrameTextInputSpec {
                         id: "settings-video-bitrate-field",
@@ -643,7 +643,7 @@ fn settings_video_bitrate_mode_grid(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let mut grid = div().grid().grid_cols(2).gap_2();
-    for (mode, label) in [("crf", "Constant Quality"), ("bitrate", "Target Bitrate")] {
+    for (mode, label) in [("crf", "恒定质量"), ("bitrate", "指定码率")] {
         grid = grid.child(
             frame_choice_button(
                 format!("video-bitrate-mode-{mode}"),
@@ -732,8 +732,8 @@ fn settings_video_range_slider(
             SettingsVideoRangeTarget::Quality => "settings-video-quality-slider",
         },
         match target {
-            SettingsVideoRangeTarget::Crf => "Video CRF",
-            SettingsVideoRangeTarget::Quality => "Video quality",
+            SettingsVideoRangeTarget::Crf => "视频 CRF",
+            SettingsVideoRangeTarget::Quality => "视频质量",
         },
         fraction,
         disabled,
@@ -842,11 +842,11 @@ fn settings_video_nvenc_section(
     palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("NVENC options", palette)
+    settings_section("NVENC 选项", palette)
         .child(settings_video_checkbox_row(
             "video-nvenc-spatial-aq",
-            "Spatial AQ",
-            "Improves detail in scenes with high complexity",
+            "空间 AQ",
+            "提升高复杂度场景的细节",
             config.nvenc_spatial_aq,
             disabled,
             palette,
@@ -864,8 +864,8 @@ fn settings_video_nvenc_section(
         ))
         .child(settings_video_checkbox_row(
             "video-nvenc-temporal-aq",
-            "Temporal AQ",
-            "Stabilizes quality between frames",
+            "时间 AQ",
+            "稳定帧间质量",
             config.nvenc_temporal_aq,
             disabled,
             palette,
@@ -889,10 +889,10 @@ fn settings_video_videotoolbox_section(
     palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("VideoToolbox options", palette).child(settings_video_checkbox_row(
+    settings_section("VideoToolbox 选项", palette).child(settings_video_checkbox_row(
         "video-videotoolbox-allow-sw",
-        "Allow software fallback",
-        "Drop back to CPU encoding if hardware fails",
+        "允许软件回退",
+        "硬件失败时回退到 CPU 编码",
         config.videotoolbox_allow_sw,
         disabled,
         palette,
@@ -916,10 +916,10 @@ fn settings_video_hw_section(
     palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("Hardware acceleration", palette).child(settings_video_checkbox_row(
+    settings_section("硬件加速", palette).child(settings_video_checkbox_row(
         "video-hw-decode",
-        "Hardware decoding",
-        "Use GPU for decoding input video (faster)",
+        "硬件解码",
+        "使用 GPU 解码输入视频（更快）",
         config.hw_decode,
         disabled,
         palette,
@@ -954,11 +954,11 @@ fn settings_video_checkbox_row(
 
 fn resolution_label(resolution: &str) -> &'static str {
     match resolution {
-        "custom" => "Custom",
+        "custom" => "自定义",
         "1080p" => "1080p",
         "720p" => "720p",
         "480p" => "480p",
-        _ => "Original",
+        _ => "原始",
     }
 }
 
@@ -973,7 +973,7 @@ fn scaling_algorithm_label(algorithm: &str) -> &'static str {
 
 fn fps_label(fps: &str) -> String {
     if fps == "original" {
-        "Same as source".to_string()
+        "与源相同".to_string()
     } else {
         format!("{fps} fps")
     }
@@ -983,7 +983,7 @@ fn gif_dither_label(dither: &str) -> &'static str {
     match dither {
         "floyd_steinberg" => "Floyd-Steinberg",
         "bayer" => "Bayer",
-        "none" => "None",
+        "none" => "无",
         _ => "Sierra2_4a",
     }
 }
