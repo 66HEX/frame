@@ -9,6 +9,9 @@ updates:
       timezone: Europe/Warsaw
     open-pull-requests-limit: 10
     groups:
+      accesskit:
+        patterns:
+          - "accesskit*"
       windows-rs:
         patterns:
           - windows
@@ -28,5 +31,9 @@ updates:
       time: "04:30"
       timezone: Europe/Warsaw
     open-pull-requests-limit: 10
+    groups:
+      codeql:
+        patterns:
+          - "github/codeql-action/*"
     commit-message:
       prefix: "deps(actions)"
