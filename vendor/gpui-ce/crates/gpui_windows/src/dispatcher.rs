@@ -5,6 +5,7 @@ use std::{
 };
 
 use anyhow::Context;
+use parking_lot::Mutex;
 use ::util::ResultExt;
 use windows::{
     System::Threading::{
@@ -52,10 +53,12 @@ impl WindowsDispatcher {
 
     fn dispatch_on_threadpool(&self, priority: WorkItemPriority, runnable: RunnableVariant) {
         let handler = {
-            let mut task_wrapper = Some(runnable);
+            let task_wrapper = Mutex::new(Some(runnable));
             WorkItemHandler::new(move |_| {
-                let runnable = task_wrapper.take().unwrap();
-                Self::execute_runnable(runnable);
+                let runnable = task_wrapper.lock().take();
+                if let Some(runnable) = runnable {
+                    Self::execute_runnable(runnable);
+                }
                 Ok(())
             })
         };
@@ -65,10 +68,12 @@ impl WindowsDispatcher {
 
     fn dispatch_on_threadpool_after(&self, runnable: RunnableVariant, duration: Duration) {
         let handler = {
-            let mut task_wrapper = Some(runnable);
+            let task_wrapper = Mutex::new(Some(runnable));
             TimerElapsedHandler::new(move |_| {
-                let runnable = task_wrapper.take().unwrap();
-                Self::execute_runnable(runnable);
+                let runnable = task_wrapper.lock().take();
+                if let Some(runnable) = runnable {
+                    Self::execute_runnable(runnable);
+                }
                 Ok(())
             })
         };
