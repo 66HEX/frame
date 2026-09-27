@@ -1370,7 +1370,9 @@ fn preview_subtitle_burn_should_use_source_time_after_seek() -> TestResult {
     let input = sandbox.path("source.mp4");
     let subtitle = sandbox.path("delayed.srt");
 
-    generate_black_h264_source(&tools, &input, 2.0, 160, 90)?;
+    // Use a normal preview size so libass font fallback and rasterization on
+    // different platforms cannot reduce the subtitle to just a few pixels.
+    generate_black_h264_source(&tools, &input, 2.0, 640, 360)?;
     write_delayed_srt(&subtitle)?;
 
     let mut config = video_config("mp4", "libx264", "aac");
@@ -1380,38 +1382,47 @@ fn preview_subtitle_burn_should_use_source_time_after_seek() -> TestResult {
     config.subtitle_outline_color = Some("#000000".to_string());
     config.subtitle_position = Some("middle".to_string());
 
-    let plan = build_ffmpeg_preview_args(
-        &path_arg(&input),
-        &config,
-        &PreviewFfmpegOptions {
-            start_seconds: 1.0,
-            end_seconds: Some(1.2),
-            source_width: Some(160),
-            source_height: Some(90),
-            max_width: 160,
-            max_height: 90,
-            fps: 1,
-            realtime: false,
-            precise_seek: true,
-            source_is_image: false,
-        },
-    )
-    .map_err(|error| error.to_string())?;
+    let visible_pixels_at = |start_seconds: f64| -> TestResult<usize> {
+        let plan = build_ffmpeg_preview_args(
+            &path_arg(&input),
+            &config,
+            &PreviewFfmpegOptions {
+                start_seconds,
+                end_seconds: Some(start_seconds + 0.2),
+                source_width: Some(640),
+                source_height: Some(360),
+                max_width: 640,
+                max_height: 360,
+                fps: 1,
+                realtime: false,
+                precise_seek: true,
+                source_is_image: false,
+            },
+        )
+        .map_err(|error| error.to_string())?;
 
-    let mut args = plan.args.clone();
-    let insert_at = args.len().saturating_sub(1);
-    args.insert(insert_at, "-frames:v".to_string());
-    args.insert(insert_at + 1, "1".to_string());
-    let output = run_tool_output(&tools.ffmpeg, &args)?;
-    if output.len() < plan.frame_bytes {
-        return Err(format!(
-            "preview frame was too short: got {}, expected at least {}",
-            output.len(),
-            plan.frame_bytes
-        ));
-    }
+        let mut args = plan.args.clone();
+        let insert_at = args.len().saturating_sub(1);
+        args.insert(insert_at, "-frames:v".to_string());
+        args.insert(insert_at + 1, "1".to_string());
+        let output = run_tool_output(&tools.ffmpeg, &args)?;
+        if output.len() < plan.frame_bytes {
+            return Err(format!(
+                "preview frame was too short: got {}, expected at least {}",
+                output.len(),
+                plan.frame_bytes
+            ));
+        }
 
-    let visible_pixels = count_visible_bgra_pixels(&output[..plan.frame_bytes]);
+        Ok(count_visible_bgra_pixels(&output[..plan.frame_bytes]))
+    };
+
+    let before_subtitle = visible_pixels_at(0.0)?;
+    assert_eq!(
+        before_subtitle, 0,
+        "subtitle appeared before its source timestamp"
+    );
+    let visible_pixels = visible_pixels_at(1.0)?;
     if visible_pixels < 50 {
         return Err(format!(
             "seeked preview did not render delayed subtitle; visible pixel count was {visible_pixels}"
