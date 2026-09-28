@@ -549,6 +549,8 @@ pub(in crate::app) fn preview_play_button(
         },
         false,
         enabled,
+        state.tooltip_visible_id.as_deref(),
+        super::super::components::TooltipPlacement::Above,
         state.palette,
         window,
         cx,

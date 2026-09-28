@@ -42,6 +42,9 @@ windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_Storage_F
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSButton", "NSControl", "NSResponder", "NSView", "NSWindow"] }
 raw-window-handle = "0.6"
 
+[dev-dependencies]
+gpui = { package = "gpui", git = "https://github.com/gpui-ce/gpui-ce", features = ["test-support"] }
+
 [build-dependencies]
 embed-resource = "3.0.9"
 image = "0.25.10"

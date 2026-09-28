@@ -46,6 +46,8 @@ unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 allow-git = [
+  # Pinned by vendored GPUI; enabled only for rendered UI tests.
+  "https://github.com/proptest-rs/proptest",
   "https://github.com/zed-industries/font-kit",
   "https://github.com/zed-industries/wgpu.git",
   "https://github.com/zed-industries/xim-rs.git",

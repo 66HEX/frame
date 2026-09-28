@@ -1,3 +1,4 @@
+use super::super::components::{FrameTooltip, TooltipPlacement};
 use super::{
     ButtonVariant, ClickEvent, Context, FlipAxis, FluentBuilder, FrameRoot, InteractiveElement,
     PREVIEW_TOOLBAR_BUTTON_SIZE, PREVIEW_TOOLBAR_ICON_SIZE, PREVIEW_TOOLBAR_OFFSET, ParentElement,
@@ -60,6 +61,8 @@ pub(in crate::app) fn preview_toolbar(
                 "Rotate preview",
                 false,
                 transform_enabled,
+                state.tooltip_visible_id.as_deref(),
+                TooltipPlacement::Right,
                 palette,
                 window,
                 cx,
@@ -77,6 +80,8 @@ pub(in crate::app) fn preview_toolbar(
                 "Flip horizontally",
                 state.crop.flip_horizontal,
                 transform_enabled,
+                state.tooltip_visible_id.as_deref(),
+                TooltipPlacement::Right,
                 palette,
                 window,
                 cx,
@@ -94,6 +99,8 @@ pub(in crate::app) fn preview_toolbar(
                 "Flip vertically",
                 state.crop.flip_vertical,
                 transform_enabled,
+                state.tooltip_visible_id.as_deref(),
+                TooltipPlacement::Right,
                 palette,
                 window,
                 cx,
@@ -112,6 +119,8 @@ pub(in crate::app) fn preview_toolbar(
                 state.crop.crop_mode || state.crop.applied_crop.is_some(),
                 crop_enabled,
                 focuses.crop,
+                state.tooltip_visible_id.as_deref(),
+                TooltipPlacement::Right,
                 palette,
                 window,
                 cx,
@@ -130,6 +139,8 @@ pub(in crate::app) fn preview_toolbar(
                 state.overlay.overlay_mode || state.overlay.has_overlay,
                 overlay_enabled,
                 focuses.overlay,
+                state.tooltip_visible_id.as_deref(),
+                TooltipPlacement::Right,
                 palette,
                 window,
                 cx,
@@ -167,6 +178,8 @@ pub(in crate::app) fn preview_zoom_toolbar(
                 "Zoom out",
                 false,
                 enabled,
+                state.tooltip_visible_id.as_deref(),
+                TooltipPlacement::Above,
                 palette,
                 window,
                 cx,
@@ -184,6 +197,8 @@ pub(in crate::app) fn preview_zoom_toolbar(
                 "Zoom in",
                 false,
                 enabled,
+                state.tooltip_visible_id.as_deref(),
+                TooltipPlacement::Above,
                 palette,
                 window,
                 cx,
@@ -216,12 +231,24 @@ pub(in crate::app) fn preview_tool_button(
     label: impl Into<String>,
     selected: bool,
     enabled: bool,
+    tooltip_visible_id: Option<&str>,
+    tooltip_placement: TooltipPlacement,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     preview_tool_button_inner(
-        id, icon, label, selected, enabled, None, palette, window, cx,
+        id,
+        icon,
+        label,
+        selected,
+        enabled,
+        None,
+        tooltip_visible_id,
+        tooltip_placement,
+        palette,
+        window,
+        cx,
     )
 }
 
@@ -236,6 +263,8 @@ pub(in crate::app) fn preview_tool_button_with_focus(
     selected: bool,
     enabled: bool,
     focus: &FocusHandle,
+    tooltip_visible_id: Option<&str>,
+    tooltip_placement: TooltipPlacement,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
@@ -247,6 +276,8 @@ pub(in crate::app) fn preview_tool_button_with_focus(
         selected,
         enabled,
         Some(focus),
+        tooltip_visible_id,
+        tooltip_placement,
         palette,
         window,
         cx,
@@ -264,6 +295,8 @@ fn preview_tool_button_inner(
     selected: bool,
     enabled: bool,
     focus: Option<&FocusHandle>,
+    tooltip_visible_id: Option<&str>,
+    tooltip_placement: TooltipPlacement,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
@@ -282,7 +315,7 @@ fn preview_tool_button_inner(
     let motion = animated.motion;
 
     let button = div()
-        .id(button_id)
+        .id(format!("{button_id}-visual"))
         .w(theme::ui_rem(PREVIEW_TOOLBAR_BUTTON_SIZE))
         .h(theme::ui_rem(PREVIEW_TOOLBAR_BUTTON_SIZE))
         .flex()
@@ -306,18 +339,30 @@ fn preview_tool_button_inner(
         })
         .child(icon_svg(icon, PREVIEW_TOOLBAR_ICON_SIZE, foreground));
 
-    let button = apply_button_motion(button, motion, enabled);
+    let button = div()
+        .id(button_id.clone())
+        .rounded(theme::ui_rem(theme::RADIUS_SM))
+        .child(apply_button_motion(button, motion, enabled));
 
-    if let Some(focus) = focus {
-        let button = apply_accessible_button_with_focus(button, label, enabled, focus, palette);
+    let button = if let Some(focus) = focus {
+        let button =
+            apply_accessible_button_with_focus(button, label.clone(), enabled, focus, palette);
         if selected {
             button.aria_toggled(gpui::Toggled::True)
         } else {
             button
         }
     } else if selected {
-        apply_accessible_toggle_button(button, label, enabled, true, palette)
+        apply_accessible_toggle_button(button, label.clone(), enabled, true, palette)
     } else {
-        apply_accessible_button(button, label, enabled, palette)
+        apply_accessible_button(button, label.clone(), enabled, palette)
+    };
+    FrameTooltip {
+        hovered: tooltip_visible_id == Some(button_id.as_str()),
+        id: button_id,
+        label,
+        placement: tooltip_placement,
+        anchor_size: PREVIEW_TOOLBAR_BUTTON_SIZE,
     }
+    .for_control(button, focus, enabled, palette, window, cx)
 }
