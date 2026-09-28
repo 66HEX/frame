@@ -8,6 +8,10 @@ updates:
       time: "04:00"
       timezone: Europe/Warsaw
     open-pull-requests-limit: 10
+    ignore:
+      # windows 0.62.2 still requires windows-core 0.62; revisit with a compatible windows release.
+      - dependency-name: windows-core
+        versions: ["0.100.x"]
     groups:
       accesskit:
         patterns:
