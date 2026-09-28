@@ -102,7 +102,9 @@ uuid.workspace = true
 web-time.workspace = true
 
 [target.'cfg(target_family = "wasm")'.dependencies]
+# The scheduler still uses rand 0.9, so both getrandom versions need the JS backend.
 getrandom = { version = "0.3.4", features = ["wasm_js"] }
+getrandom_04 = { package = "getrandom", version = "0.4.3", features = ["wasm_js"] }
 uuid = { workspace = true, features = ["js"] }
 
 
