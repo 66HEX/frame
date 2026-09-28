@@ -13,8 +13,8 @@ const PREVIEW_TOOLBAR_PADDING: f32 = 4.0;
 const PREVIEW_TOOLBAR_GAP: f32 = 8.0;
 const PREVIEW_TOOLBAR_VERTICAL_SEPARATOR_HEIGHT: f32 = 18.0;
 const PREVIEW_TOOLBAR_VERTICAL_SEPARATOR_WIDTH: f32 = 1.0;
-const PREVIEW_TOOLBAR_BUTTON_COUNT: f32 = 5.0;
-const PREVIEW_TOOLBAR_GAP_COUNT: f32 = 4.0;
+const PREVIEW_TOOLBAR_BUTTON_COUNT: f32 = 6.0;
+const PREVIEW_TOOLBAR_GAP_COUNT: f32 = 5.0;
 
 pub(in crate::app) const fn preview_toolbar_height() -> f32 {
     (PREVIEW_TOOLBAR_PADDING * 2.0)
@@ -138,6 +138,21 @@ pub(in crate::app) fn preview_toolbar(
                 if root.trigger_selected_overlay(window, cx) {
                     cx.notify();
                 }
+            })),
+        )
+        .child(
+            preview_tool_button(
+                "preview-tool-export-frame",
+                assets::ICON_DOWNLOAD_02,
+                "Export frame",
+                false,
+                transform_enabled, // We enable this when transform/visual controls are enabled
+                palette,
+                window,
+                cx,
+            )
+            .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
+                root.trigger_export_frame(window, cx);
             })),
         )
 }

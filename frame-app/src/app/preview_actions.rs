@@ -1,12 +1,15 @@
 use super::*;
 use crate::app::preview_panel::preview_presented_frame;
 use crate::conversion_runner::core_config_from_gpui;
+use crate::native_dialogs::{export_frame_dialog, pick_export_frame_path};
 use crate::numeric::rounded_f64_to_u64;
 use crate::preview_engine::PreviewEngineError;
+use crate::runtime_binaries::ffmpeg_executable;
 use crate::settings::{AudioFiltersConfig, FilterValue, VideoFiltersConfig};
 use std::{
     collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
+    process::Command,
 };
 
 impl FrameRoot {
@@ -1993,6 +1996,80 @@ impl FrameRoot {
                 resolve_active_settings_tab(self.settings_ui.active_tab, config, metadata)
             });
         self.settings_ui.active_tab = next_tab;
+    }
+    pub(super) fn trigger_export_frame(&self, window: &Window, cx: &Context<Self>) {
+        let Some(session) = &self.preview_ui.session else {
+            return;
+        };
+        let snapshot = session.snapshot();
+        let position = snapshot.playback.position_seconds;
+
+        let Some(file_item) = self.file_queue.selected_file() else {
+            return;
+        };
+        let source_path = file_item.path.clone();
+        let source_name = file_item.name.clone();
+
+        let duration = std::time::Duration::from_secs_f64(position.max(0.0));
+        let hours = duration.as_secs() / 3600;
+        let minutes = (duration.as_secs() % 3600) / 60;
+        let seconds = duration.as_secs() % 60;
+        let ms = duration.subsec_millis();
+
+        let base_name = source_name
+            .rsplit_once('.')
+            .map_or(&source_name as &str, |(n, _)| n);
+        let default_name =
+            format!("{base_name}_frame_{hours:02}h{minutes:02}m{seconds:02}s{ms:03}ms.png");
+
+        let _ = session.command(crate::preview_engine::PreviewCommand::Pause);
+
+        let dialog = export_frame_dialog(window, &default_name);
+        cx.spawn(async move |_this, _cx| {
+            let Some(dest_path) = pick_export_frame_path(dialog).await else {
+                return;
+            };
+
+            let dest_path_str = dest_path.to_string_lossy().into_owned();
+
+            if let Err(error) = std::thread::Builder::new()
+                .name("export-frame".to_string())
+                .spawn(move || {
+                    let mut cmd = Command::new(ffmpeg_executable());
+                    cmd.arg("-y")
+                        .arg("-ss")
+                        .arg(position.to_string())
+                        .arg("-i")
+                        .arg(&source_path)
+                        .arg("-frames:v")
+                        .arg("1")
+                        .arg(&dest_path_str);
+
+                    match cmd.output() {
+                        Ok(output) if output.status.success() => {
+                            let _ = notify_rust::Notification::new()
+                                .appname(crate::app_info::FRAME_APP_NAME)
+                                .summary("Frame Exported")
+                                .body(&format!("Saved to {}", dest_path_str))
+                                .icon("frame")
+                                .show();
+                        }
+                        Ok(output) => {
+                            eprintln!(
+                                "Failed to export frame: {}",
+                                String::from_utf8_lossy(&output.stderr)
+                            );
+                        }
+                        Err(error) => {
+                            eprintln!("Failed to spawn ffmpeg for frame export: {error}");
+                        }
+                    }
+                })
+            {
+                eprintln!("Failed to spawn frame export thread: {error}");
+            }
+        })
+        .detach();
     }
 }
 
