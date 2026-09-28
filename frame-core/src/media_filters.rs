@@ -537,6 +537,7 @@ mod tests {
             videotoolbox_allow_sw: false,
             hw_decode: false,
             pixel_format: "auto".to_string(),
+            image_output_mode: "single".to_string(),
             image_jpeg_quality: 85,
             image_jpeg_huffman: "optimal".to_string(),
             image_webp_lossless: false,

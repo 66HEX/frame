@@ -1,5 +1,6 @@
 use std::{
     collections::VecDeque,
+    fs,
     io::Read,
     process::{Command, Stdio},
     sync::mpsc::{self, RecvTimeoutError},
@@ -8,7 +9,7 @@ use std::{
 };
 
 use frame_core::{
-    args::{build_ffmpeg_args, build_output_path, validate_task_input},
+    args::{build_ffmpeg_args, validate_task_input},
     error::ConversionError,
     events::ConversionEvent,
     probe::{ffprobe_json_args, parse_ffprobe_stdout},
@@ -18,7 +19,10 @@ use frame_core::{
 
 use crate::runtime_binaries::{ffmpeg_executable, ffprobe_executable};
 
-use super::{controller::ConversionProcessController, output_paths::disambiguate_output_paths};
+use super::{
+    controller::ConversionProcessController,
+    output_paths::{PreparedConversionTask, prepare_conversion_tasks},
+};
 
 /// Runs a single conversion task with a default process controller.
 ///
@@ -40,12 +44,11 @@ pub fn run_conversion_task(
 /// Returns an error when the controller state cannot be read or the worker
 /// channel disconnects before all tasks complete.
 pub fn run_conversion_batch_with_control(
-    mut tasks: Vec<ConversionTask>,
+    tasks: Vec<ConversionTask>,
     controller: &ConversionProcessController,
     mut emit: impl FnMut(ConversionEvent),
 ) -> Result<(), ConversionError> {
-    disambiguate_output_paths(&mut tasks);
-    let mut pending = VecDeque::from(tasks);
+    let mut pending = VecDeque::from(prepare_conversion_tasks(tasks));
     let mut running_count = 0_usize;
     let (event_tx, event_rx) = mpsc::channel::<ConversionEvent>();
     let (done_tx, done_rx) = mpsc::channel::<(String, Result<(), ConversionError>)>();
@@ -98,19 +101,24 @@ pub fn run_conversion_batch_with_control(
 /// Returns an error when task validation, probing, process spawning, process
 /// registration, log reading, cancellation handling, or `FFmpeg` execution fails.
 pub fn run_conversion_task_with_control(
-    mut task: ConversionTask,
-    controller: &ConversionProcessController,
-    emit: &mut impl FnMut(ConversionEvent),
-) -> Result<(), ConversionError> {
-    disambiguate_output_paths(std::slice::from_mut(&mut task));
-    run_prepared_conversion_task_with_control(task, controller, emit)
-}
-
-fn run_prepared_conversion_task_with_control(
     task: ConversionTask,
     controller: &ConversionProcessController,
     emit: &mut impl FnMut(ConversionEvent),
 ) -> Result<(), ConversionError> {
+    let Some(prepared) = prepare_conversion_tasks(vec![task]).into_iter().next() else {
+        return Err(ConversionError::Worker(
+            "conversion task could not be prepared".to_string(),
+        ));
+    };
+    run_prepared_conversion_task_with_control(prepared, controller, emit)
+}
+
+fn run_prepared_conversion_task_with_control(
+    prepared: PreparedConversionTask,
+    controller: &ConversionProcessController,
+    emit: &mut impl FnMut(ConversionEvent),
+) -> Result<(), ConversionError> {
+    let PreparedConversionTask { task, output } = prepared;
     if controller.take_cancelled(&task.id)? {
         emit_cancelled_task(&task.id, emit);
         return Ok(());
@@ -119,18 +127,22 @@ fn run_prepared_conversion_task_with_control(
     validate_task_input(&task.file_path, &task.config)?;
     let probe = probe_media_file(&task.file_path)?;
 
-    let output_path = build_output_path(
-        &task.output_directory,
-        &task.config.container,
-        task.output_name.as_deref(),
-    );
-    let args = build_ffmpeg_args(&task.file_path, &output_path, &task.config, &probe)?;
+    let args = build_ffmpeg_args(
+        &task.file_path,
+        &output.ffmpeg_sink_path,
+        &task.config,
+        &probe,
+    )?;
     let executable = ffmpeg_executable();
 
     emit(ConversionEvent::log(
         task.id.clone(),
         format!("[INFO] Running {executable} {}", args.join(" ")),
     ));
+
+    if let Some(directory) = &output.directory_to_create {
+        fs::create_dir(directory).map_err(ConversionError::Io)?;
+    }
 
     let mut child = Command::new(&executable)
         .args(&args)
@@ -167,7 +179,7 @@ fn run_prepared_conversion_task_with_control(
     stream_result?;
     let status = status?;
     if status.success() {
-        emit(ConversionEvent::completed(task.id, output_path));
+        emit(ConversionEvent::completed(task.id, output.result_path));
         Ok(())
     } else {
         Err(ConversionError::Worker(format!(
@@ -177,12 +189,12 @@ fn run_prepared_conversion_task_with_control(
 }
 
 fn spawn_batch_worker(
-    task: ConversionTask,
+    task: PreparedConversionTask,
     controller: ConversionProcessController,
     event_tx: mpsc::Sender<ConversionEvent>,
     done_tx: mpsc::Sender<(String, Result<(), ConversionError>)>,
 ) {
-    let task_id = task.id.clone();
+    let task_id = task.task.id.clone();
     thread::spawn(move || {
         let result = run_prepared_conversion_task_with_control(task, &controller, &mut |event| {
             let _ = event_tx.send(event);

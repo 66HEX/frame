@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::settings::{DeinterlaceMode, FilterStrength};
+use crate::settings::{DeinterlaceMode, FilterStrength, ImageOutputMode};
 use frame_updater::{PlatformAssetKey, UpdateAsset};
 use semver::Version;
 
@@ -58,6 +58,9 @@ impl FrameRoot {
                 self.apply_settings_audio_filters_fixture();
             }
             Some(VisualFixture::SettingsImages) => self.apply_settings_images_fixture(),
+            Some(VisualFixture::SettingsImageSequence) => {
+                self.apply_settings_image_sequence_fixture();
+            }
             Some(VisualFixture::SettingsMetadata) => self.apply_settings_metadata_fixture(),
             Some(VisualFixture::SettingsOutput) => self.apply_settings_output_fixture(),
             Some(VisualFixture::SettingsPresets) => self.apply_settings_presets_fixture(),
@@ -281,6 +284,30 @@ impl FrameRoot {
             file.config.resolution = "custom".to_string();
             file.config.custom_width = Some("2048".to_string());
             file.config.custom_height = Some("1080".to_string());
+        }
+        self.settings_ui.active_tab = SettingsTab::Images;
+    }
+    pub(super) fn apply_settings_image_sequence_fixture(&mut self) {
+        self.apply_preview_ready_fixture();
+        self.source_metadata.mark_ready(
+            "fixture-preview".to_string(),
+            SourceMetadata {
+                media_kind: Some(SourceKind::Video),
+                duration: Some("30.000000".to_string()),
+                bitrate: Some("12000000".to_string()),
+                video_codec: Some("h264".to_string()),
+                resolution: Some("1920x1080".to_string()),
+                frame_rate: Some(30.0),
+                width: Some(1920),
+                height: Some(1080),
+                ..SourceMetadata::default()
+            },
+        );
+        if let Some(file) = self.file_queue.selected_file_mut() {
+            file.config.container = "jpg".to_string();
+            file.config.video_codec = "mjpeg".to_string();
+            file.config.image_output_mode = ImageOutputMode::Sequence;
+            file.config.image_jpeg_quality = 88;
         }
         self.settings_ui.active_tab = SettingsTab::Images;
     }

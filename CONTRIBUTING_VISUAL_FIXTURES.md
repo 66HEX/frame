@@ -83,6 +83,7 @@ the final GPUI rendering.
 | `settings-video` | Video settings tab with custom resolution and CRF mode | Video codec controls, custom width and height inputs, CRF controls, bitrate mode layout, and dense control grouping. |
 | `settings-audio` | Audio settings tab with an audio source and tracks | Audio codec controls, VBR quality, channel selection, volume and normalize controls, track selection rows, and audio-only source treatment. |
 | `settings-images` | Image settings tab with a selected PNG source | Image output controls, custom image dimensions, image-source metadata, and non-video settings visibility. |
+| `settings-image-sequence` | Image settings tab with a 30-second, 30-fps video targeting JPEG | Single/sequence controls, an estimated 900-frame count, VFR guidance, and sequence size recommendations. |
 | `settings-metadata` | Metadata tab with source tags and output metadata drafts | Source metadata presentation, editable metadata fields, long value wrapping, and tag/value alignment. |
 | `settings-subtitles` | Subtitles tab with selectable sidecars, source tracks, and burn-in styling | External subtitle rows and metadata editor, default/forced states, source track rows, burn-in file state, font controls, color swatches, outline color, position controls, and selected track state. |
 | `settings-subtitles-popover` | Subtitles tab with the font color picker open | Color picker popover placement, swatch state, HSV draft color, popover layering, and focus treatment inside the settings panel. |
