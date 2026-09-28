@@ -19,6 +19,7 @@ pub(in crate::app) struct PreviewCropRenderState {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(in crate::app) struct PreviewShellState {
+    pub(in crate::app) tooltip_visible_id: Option<String>,
     pub(in crate::app) palette: &'static theme::ThemePalette,
     pub(in crate::app) selected_file_name: Option<String>,
     pub(in crate::app) metadata_status: PreviewMetadataStatus,
@@ -216,6 +217,7 @@ pub(in crate::app) fn preview_shell_state(input: PreviewShellStateInput<'_>) -> 
     });
     let duration_seconds = preview_duration_seconds(settings.metadata);
     PreviewShellState {
+        tooltip_visible_id: settings.tooltip_visible_id.map(str::to_string),
         palette: settings.palette,
         selected_file_name: selected_file.map(|file| file.name.clone()),
         metadata_status,
