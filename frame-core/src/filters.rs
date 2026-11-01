@@ -147,10 +147,10 @@ pub fn build_video_filters(config: &ConversionConfig, include_scale: bool) -> Ve
         }
 
         if style_parts.is_empty() {
-            filters.push(format!("subtitles='{escaped_path}'"));
+            filters.push(format!("subtitles=filename='{escaped_path}'"));
         } else {
             let style = style_parts.join(",");
-            filters.push(format!("subtitles='{escaped_path}':force_style='{style}'"));
+            filters.push(format!("subtitles=filename='{escaped_path}':force_style='{style}'"));
         }
     }
 
