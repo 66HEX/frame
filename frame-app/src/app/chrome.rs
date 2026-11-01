@@ -168,10 +168,20 @@ pub(super) fn linux_titlebar(
 fn titlebar_drag_surface(cx: &Context<FrameRoot>) -> gpui::Div {
     div()
         .window_control_area(WindowControlArea::Drag)
+        .capture_any_mouse_down(cx.listener(|root, _event, _window, _cx| {
+            root.titlebar_drag.should_move = false;
+        }))
         .on_mouse_down_out(cx.listener(|root, _event, _window, _cx| {
             root.titlebar_drag.should_move = false;
         }))
-        .on_mouse_up(
+        .capture_any_mouse_up(
+            cx.listener(|root, event: &gpui::MouseUpEvent, _window, _cx| {
+                if event.button == MouseButton::Left {
+                    root.titlebar_drag.should_move = false;
+                }
+            }),
+        )
+        .on_mouse_up_out(
             MouseButton::Left,
             cx.listener(|root, _event, _window, _cx| {
                 root.titlebar_drag.should_move = false;
@@ -179,17 +189,25 @@ fn titlebar_drag_surface(cx: &Context<FrameRoot>) -> gpui::Div {
         )
         .on_mouse_down(
             MouseButton::Left,
-            cx.listener(|root, _event, _window, _cx| {
-                root.titlebar_drag.should_move = true;
+            cx.listener(|root, _event, window, _cx| {
+                // Buttons consume the press with prevent_default before it bubbles here.
+                // Only a press on the remaining titlebar surface may start a window drag.
+                root.titlebar_drag.should_move = !window.default_prevented();
             }),
         )
-        .on_mouse_move(cx.listener(|root, _event, window, _cx| {
-            if root.titlebar_drag.should_move {
-                root.titlebar_drag.should_move = false;
-                window.start_window_move();
-            }
-        }))
+        .on_mouse_move(
+            cx.listener(|root, event: &gpui::MouseMoveEvent, window, _cx| {
+                let should_move = std::mem::take(&mut root.titlebar_drag.should_move);
+                if should_move && event.pressed_button == Some(MouseButton::Left) {
+                    window.start_window_move();
+                }
+            }),
+        )
 }
+
+#[cfg(test)]
+#[path = "titlebar_drag_tests.rs"]
+mod titlebar_drag_tests;
 
 pub(super) fn platform_titlebar_content(
     state: FrameAppState,
@@ -2431,6 +2449,7 @@ pub(super) fn titlebar_window_button(
 
     let button = div()
         .id(id)
+        .debug_selector(|| id.to_string())
         .w(theme::ui_rem(metrics.width))
         .h(theme::ui_rem(metrics.height))
         .flex()
@@ -2597,6 +2616,7 @@ pub(super) fn titlebar_segment(
 
     let button = div()
         .id(segment_id)
+        .debug_selector(|| segment_id.to_string())
         .h(theme::ui_rem(TITLEBAR_NAV_BUTTON_HEIGHT))
         .role(gpui::Role::Tab)
         .aria_label(label)

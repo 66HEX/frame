@@ -215,6 +215,7 @@ pub(super) fn action_button(
 
     let button = div()
         .id(id.clone())
+        .debug_selector(|| id.clone())
         .group(id)
         .min_h(theme::ui_rem(TITLEBAR_BUTTON_HEIGHT))
         .flex()
