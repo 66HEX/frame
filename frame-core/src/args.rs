@@ -1434,6 +1434,70 @@ mod tests {
     }
 
     #[test]
+    fn hevc_reencode_uses_hvc1_for_mp4_and_mov() {
+        for container in ["mp4", "mov"] {
+            for codec in ["libx265", "hevc_videotoolbox", "hevc_nvenc"] {
+                let config = sample_config(container, codec);
+                let args = build_ffmpeg_args(
+                    "input.mp4",
+                    &format!("output.{container}"),
+                    &config,
+                    &sample_probe(),
+                )
+                .unwrap();
+
+                assert!(args_contains_pair(&args, "-c:v", codec));
+                assert!(args_contains_pair(&args, "-tag:v", "hvc1"));
+            }
+        }
+    }
+
+    #[test]
+    fn video_tag_is_not_overridden_for_other_codecs_or_containers() {
+        let mut probe = sample_probe();
+        probe.video_codec = Some("hevc".to_string());
+        for (container, codec) in [
+            ("mp4", "libx264"),
+            ("mov", "h264_videotoolbox"),
+            ("mp4", "libsvtav1"),
+            ("mov", "prores"),
+            ("mkv", "libx265"),
+            ("mkv", "hevc_videotoolbox"),
+            ("m2ts", "hevc_nvenc"),
+            ("m4a", "hevc_videotoolbox"),
+        ] {
+            let mut config = sample_config(container, codec);
+            config.selected_audio_tracks = vec![1];
+            let args =
+                build_ffmpeg_args("input.mp4", &format!("output.{container}"), &config, &probe)
+                    .unwrap();
+
+            assert!(
+                !args.iter().any(|arg| arg == "-tag:v"),
+                "{container}/{codec}"
+            );
+        }
+    }
+
+    #[test]
+    fn stream_copy_keeps_video_tag_selection_with_the_muxer() {
+        for container in ["mp4", "mov"] {
+            for source_codec in ["h264", "hevc"] {
+                let mut config = sample_config(container, "hevc_videotoolbox");
+                config.processing_mode = "copy".to_string();
+                let mut probe = sample_probe();
+                probe.video_codec = Some(source_codec.to_string());
+                let args =
+                    build_ffmpeg_args("input.mp4", &format!("output.{container}"), &config, &probe)
+                        .unwrap();
+
+                assert!(args_contains_pair(&args, "-c", "copy"));
+                assert!(!args.iter().any(|arg| arg == "-tag:v"));
+            }
+        }
+    }
+
+    #[test]
     fn build_ffmpeg_args_adds_even_dimensions_guard_for_default_video_reencode() {
         let config = sample_config("mp4", "libx264");
 

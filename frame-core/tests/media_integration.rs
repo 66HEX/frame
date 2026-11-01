@@ -610,6 +610,62 @@ fn hevc_mkv_reencode_should_write_hevc_video() -> TestResult {
 
 #[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn hevc_mp4_mov_reencode_should_write_hvc1_video_and_aac_audio() -> TestResult {
+    assert_hevc_mp4_mov_tags("libx265")
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+#[ignore = "requires macOS HEVC VideoToolbox hardware and FFmpeg/FFprobe; run with --ignored"]
+fn hevc_videotoolbox_mp4_mov_reencode_should_write_hvc1_video_and_aac_audio() -> TestResult {
+    assert_hevc_mp4_mov_tags("hevc_videotoolbox")
+}
+
+fn assert_hevc_mp4_mov_tags(encoder: &str) -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new(&format!("hevc_mp4_mov_{encoder}"))?;
+    let input = sandbox.path("source.mp4");
+    generate_h264_aac_source(&tools, &input, 1.0, 640, 360)?;
+
+    for container in ["mp4", "mov"] {
+        for pixel_format in ["yuv420p", "yuv420p10le"] {
+            let output = sandbox.path(&format!("output-{pixel_format}.{container}"));
+            let mut config = video_config(container, encoder, "aac");
+            config.selected_audio_tracks = vec![1];
+            config.pixel_format = pixel_format.to_string();
+            convert(&tools, &input, &output, &config)?;
+
+            let metadata = probe_media(&tools, &output)?;
+            assert_eq!(metadata.video_codec.as_deref(), Some("hevc"));
+            assert_eq!(metadata.audio_codec.as_deref(), Some("aac"));
+            assert_eq!(metadata.pixel_format.as_deref(), Some(pixel_format));
+            assert_eq!(metadata.width, Some(640));
+            assert_eq!(metadata.height, Some(360));
+            let tag = run_tool_output(
+                &tools.ffprobe,
+                &args(&[
+                    "-v",
+                    "error",
+                    "-select_streams",
+                    "v:0",
+                    "-show_entries",
+                    "stream=codec_tag_string",
+                    "-of",
+                    "default=noprint_wrappers=1:nokey=1",
+                    &path_arg(&output),
+                ]),
+            )?;
+            let tag = String::from_utf8(tag)
+                .map_err(|error| format!("ffprobe video tag was not utf8: {error}"))?;
+            assert_eq!(tag.trim(), "hvc1", "{encoder}/{container}/{pixel_format}");
+            decode_media(&tools, &output)?;
+        }
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 fn vp9_webm_reencode_should_write_vp9_video_and_opus_audio() -> TestResult {
     let tools = Toolchain::discover()?;
     let sandbox = Sandbox::new("vp9_webm_reencode")?;

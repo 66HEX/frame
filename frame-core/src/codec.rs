@@ -16,6 +16,16 @@ pub fn add_video_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
     args.push("-c:v".to_string());
     args.push(config.video_codec.clone());
 
+    // Quick Look requires the hvc1 sample entry for newly encoded HEVC in MP4/MOV.
+    if matches!(
+        config.video_codec.as_str(),
+        "libx265" | "hevc_videotoolbox" | "hevc_nvenc"
+    ) && (config.container.eq_ignore_ascii_case("mp4")
+        || config.container.eq_ignore_ascii_case("mov"))
+    {
+        args.extend(["-tag:v".to_string(), "hvc1".to_string()]);
+    }
+
     if config.video_codec == "mpeg2video" {
         args.push("-b:v".to_string());
         args.push(format!("{}k", config.video_bitrate));
