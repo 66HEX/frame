@@ -12,6 +12,9 @@ ignore = [
   { id = "RUSTSEC-2026-0194", reason = "affected quick-xml versions are constrained by current Wayland build tooling and Windows notification code; inputs on these paths are trusted and upstream upgrades are required" },
   { id = "RUSTSEC-2026-0195", reason = "affected quick-xml versions are constrained by current Wayland build tooling and Windows notification code; inputs on these paths are trusted and upstream upgrades are required" },
   { id = "RUSTSEC-2026-0206", reason = "rustybuzz is pulled by vendored GPUI SVG rendering; no safe compatible upgrade is currently available" },
+  { id = "RUSTSEC-2026-0370", reason = "zvariant was merged into zbus 6; current AccessKit, ashpd, notify-rust, and oo7 require zbus 5, so migration must preserve Linux accessibility, portals, notifications, and credential storage together; this is an unmaintained advisory, not a reported vulnerability" },
+  { id = "RUSTSEC-2026-0371", reason = "zbus_names was merged into zbus 6; the Linux desktop dependency stack still requires zbus 5; remove with its coordinated migration; this is an unmaintained advisory, not a reported vulnerability" },
+  { id = "RUSTSEC-2026-0372", reason = "zvariant_derive was merged into zbus 6; the Linux desktop dependency stack still requires zbus 5; remove with its coordinated migration; this is an unmaintained advisory, not a reported vulnerability" },
 ]
 
 [licenses]

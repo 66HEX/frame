@@ -52,19 +52,19 @@ jobs:
         test "$actual" = "$expected"
         test -s target/release/Frame-x86_64.AppImage.zsync
     - name: run_bundling::upload_artifact
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: frame-linux-x86_64.tar.gz
         path: target/release/frame-linux-x86_64.tar.gz
         if-no-files-found: error
     - name: run_bundling::upload_appimage_artifact
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: Frame-x86_64.AppImage
         path: target/release/Frame-x86_64.AppImage
         if-no-files-found: error
     - name: run_bundling::upload_appimage_zsync_artifact
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: Frame-x86_64.AppImage.zsync
         path: target/release/Frame-x86_64.AppImage.zsync
@@ -110,19 +110,19 @@ jobs:
         test "$actual" = "$expected"
         test -s target/release/Frame-aarch64.AppImage.zsync
     - name: run_bundling::upload_artifact
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: frame-linux-aarch64.tar.gz
         path: target/release/frame-linux-aarch64.tar.gz
         if-no-files-found: error
     - name: run_bundling::upload_appimage_artifact
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: Frame-aarch64.AppImage
         path: target/release/Frame-aarch64.AppImage
         if-no-files-found: error
     - name: run_bundling::upload_appimage_zsync_artifact
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: Frame-aarch64.AppImage.zsync
         path: target/release/Frame-aarch64.AppImage.zsync
@@ -163,13 +163,13 @@ jobs:
         PYTHONPATH: target/dmgbuild
       run: ./script/bundle-mac x86_64-apple-darwin
     - name: run_bundling::upload_artifact
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: Frame-x86_64.dmg
         path: target/x86_64-apple-darwin/release/Frame-x86_64.dmg
         if-no-files-found: error
     - name: run_bundling::upload_update_artifact
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: Frame-x86_64.app.zip
         path: target/x86_64-apple-darwin/release/Frame-x86_64.app.zip
@@ -210,13 +210,13 @@ jobs:
         PYTHONPATH: target/dmgbuild
       run: ./script/bundle-mac aarch64-apple-darwin
     - name: run_bundling::upload_artifact
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: Frame-aarch64.dmg
         path: target/aarch64-apple-darwin/release/Frame-aarch64.dmg
         if-no-files-found: error
     - name: run_bundling::upload_update_artifact
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: Frame-aarch64.app.zip
         path: target/aarch64-apple-darwin/release/Frame-aarch64.app.zip
@@ -248,7 +248,7 @@ jobs:
       shell: pwsh
       run: ./script/bundle-windows.ps1 -Architecture x86_64
     - name: run_bundling::upload_artifact
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: Frame-x86_64.exe
         path: target/Frame-x86_64.exe

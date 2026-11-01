@@ -53,7 +53,10 @@ jobs:
           --ignore RUSTSEC-2026-0192 \
           --ignore RUSTSEC-2026-0194 \
           --ignore RUSTSEC-2026-0195 \
-          --ignore RUSTSEC-2026-0206
+          --ignore RUSTSEC-2026-0206 \
+          --ignore RUSTSEC-2026-0370 \
+          --ignore RUSTSEC-2026-0371 \
+          --ignore RUSTSEC-2026-0372
     - name: ci::run_documented_gate
       run: cargo xtask ci
     - name: ci::setup_ffmpeg
