@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Preview Control Tooltips:** Adds tooltips to preview tools, zoom, and playback controls on pointer hover and keyboard focus. Escape dismisses the tooltip. Resolves [#176](https://github.com/66HEX/frame/issues/176).
 
+### Fixed
+
+- **HEVC Quick Look Compatibility:** Uses the `hvc1` tag when encoding HEVC to MP4 or MOV so exported videos can be previewed on macOS. Resolves [#211](https://github.com/66HEX/frame/issues/211).
+
 ### Security
 
 - **Dependency Updates:** Updates TLS certificate validation, root certificates, QUIC, Tokio, ZIP tooling, and the pinned Nix installer to address newly reported advisories.
