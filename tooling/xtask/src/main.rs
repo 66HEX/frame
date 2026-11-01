@@ -2008,7 +2008,7 @@ jobs:
     timeout-minutes: 60
   cargo_check_macos:
     name: cargo check macos
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
     - name: steps::checkout_repo
       uses: actions/checkout@v7.0.0
