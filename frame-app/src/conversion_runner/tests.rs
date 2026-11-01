@@ -6,8 +6,8 @@
 use super::*;
 use crate::settings::{
     AudioFiltersConfig, CropSettings, DeinterlaceMode, ExternalSubtitleTrack, FilterStrength,
-    FilterValue, MetadataConfig, MetadataMode, ProcessingMode, VideoColorFiltersConfig,
-    VideoFiltersConfig,
+    FilterValue, ImageOutputMode, MetadataConfig, MetadataMode, ProcessingMode,
+    VideoColorFiltersConfig, VideoFiltersConfig,
 };
 use std::{
     fs,
@@ -167,6 +167,7 @@ fn core_config_from_gpui_preserves_active_conversion_fields() {
         quality: 60,
         preset: "slow".to_string(),
         pixel_format: "yuv420p10le".to_string(),
+        image_output_mode: ImageOutputMode::Sequence,
         image_jpeg_quality: 92,
         image_jpeg_huffman: "optimal".to_string(),
         image_webp_lossless: true,
@@ -205,6 +206,7 @@ fn core_config_from_gpui_preserves_active_conversion_fields() {
     assert_eq!(core.quality, 60);
     assert_eq!(core.preset, "slow");
     assert_eq!(core.pixel_format, "yuv420p10le");
+    assert_eq!(core.image_output_mode, "sequence");
     assert_eq!(core.image_jpeg_quality, 92);
     assert_eq!(core.image_jpeg_huffman, "optimal");
     assert!(core.image_webp_lossless);
@@ -356,6 +358,106 @@ fn disambiguate_output_paths_uses_next_free_suffix_deterministically() {
             tasks[1].output_name.as_deref()
         ),
         (Some("clip_converted_3"), Some("clip_converted_4"))
+    );
+}
+
+#[test]
+fn prepare_sequence_output_builds_folder_and_numbered_sink() {
+    let sandbox = ConversionRunnerSandbox::new("sequence-output-shape");
+    let mut file = FileItem::from_path("mov", "/A/clip.mov", 1);
+    file.config.container = "png".to_string();
+    file.config.video_codec = "png".to_string();
+    file.config.image_output_mode = ImageOutputMode::Sequence;
+    let output_directory = sandbox.root.to_string_lossy();
+
+    let prepared =
+        prepare_conversion_tasks(vec![conversion_task_from_file(&file, &output_directory)]);
+
+    assert_eq!(
+        prepared[0].output.result_path,
+        sandbox.path("clip_converted_frames").to_string_lossy()
+    );
+    assert_eq!(
+        prepared[0].output.ffmpeg_sink_path,
+        sandbox
+            .path("clip_converted_frames/frame_%06d.png")
+            .to_string_lossy()
+    );
+    assert_eq!(
+        prepared[0].output.directory_to_create.as_deref(),
+        Some(
+            sandbox
+                .path("clip_converted_frames")
+                .to_string_lossy()
+                .as_ref()
+        )
+    );
+}
+
+#[test]
+fn prepare_sequence_output_preserves_windows_style_separators() {
+    let mut config = core_config_from_gpui(&GpuiConversionConfig::default());
+    config.container = "jpg".to_string();
+    config.video_codec = "mjpeg".to_string();
+    config.image_output_mode = "sequence".to_string();
+    let task = ConversionTask {
+        id: "windows-sequence".to_string(),
+        file_path: r"C:\media\clip.mov".to_string(),
+        output_directory: r"\\server\share\exports".to_string(),
+        output_name: Some("clip".to_string()),
+        config,
+    };
+
+    let prepared = prepare_conversion_tasks(vec![task]);
+
+    assert_eq!(
+        prepared[0].output.result_path,
+        r"\\server\share\exports\clip_frames"
+    );
+    assert_eq!(
+        prepared[0].output.ffmpeg_sink_path,
+        r"\\server\share\exports\clip_frames\frame_%06d.jpg"
+    );
+}
+
+#[test]
+fn prepare_sequence_output_resolves_existing_and_batch_collisions() {
+    let sandbox = ConversionRunnerSandbox::new("sequence-output-collisions");
+    fs::create_dir(sandbox.path("clip_converted_frames"))
+        .expect("partial sequence folder should be created");
+    fs::write(
+        sandbox.path("clip_converted_frames/frame_000001.png"),
+        b"partial",
+    )
+    .expect("partial frame should be retained");
+    let mut first = FileItem::from_path("mov", "/A/clip.mov", 1);
+    let mut second = FileItem::from_path("mkv", "/B/clip.mkv", 1);
+    for file in [&mut first, &mut second] {
+        file.config.container = "png".to_string();
+        file.config.video_codec = "png".to_string();
+        file.config.image_output_mode = ImageOutputMode::Sequence;
+    }
+    let output_directory = sandbox.root.to_string_lossy();
+
+    let prepared = prepare_conversion_tasks(vec![
+        conversion_task_from_file(&first, &output_directory),
+        conversion_task_from_file(&second, &output_directory),
+    ]);
+
+    assert_eq!(
+        prepared
+            .iter()
+            .map(|task| task.output.result_path.as_str())
+            .collect::<Vec<_>>(),
+        vec![
+            sandbox.path("clip_converted_frames_2").to_string_lossy(),
+            sandbox.path("clip_converted_frames_3").to_string_lossy(),
+        ]
+    );
+    assert_eq!(
+        fs::read(sandbox.path("clip_converted_frames/frame_000001.png"))
+            .expect("partial frame should remain readable"),
+        b"partial"
     );
 }
 
@@ -603,6 +705,56 @@ fn run_conversion_task_should_emit_completed_for_real_image_encoding_job() {
             .any(|event| matches!(event, ConversionEvent::Completed(payload) if payload.output_path == output.to_string_lossy())),
         "runner should emit a Completed event for {}",
         output.display()
+    );
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn run_conversion_task_should_emit_numbered_image_sequence_and_folder_result() {
+    let sandbox = ConversionRunnerSandbox::new("real-image-sequence-job");
+    let input = sandbox.path("source.mp4");
+    let result = sandbox.path("runner-sequence_frames");
+    generate_runner_source(&input);
+    let config = GpuiConversionConfig {
+        container: "png".to_string(),
+        video_codec: "png".to_string(),
+        image_output_mode: ImageOutputMode::Sequence,
+        ..GpuiConversionConfig::default()
+    };
+    let task = ConversionTask {
+        id: "task-sequence-real".to_string(),
+        file_path: input.to_string_lossy().into_owned(),
+        output_directory: sandbox.root.to_string_lossy().into_owned(),
+        output_name: Some("runner-sequence".to_string()),
+        config: core_config_from_gpui(&config),
+    };
+    let mut events = Vec::new();
+
+    run_conversion_task(task, |event| events.push(event))
+        .expect("real ffmpeg image sequence conversion should succeed");
+
+    let mut frame_names = fs::read_dir(&result)
+        .expect("sequence result folder should be readable")
+        .map(|entry| {
+            entry
+                .expect("sequence frame entry should be readable")
+                .file_name()
+                .to_string_lossy()
+                .into_owned()
+        })
+        .collect::<Vec<_>>();
+    frame_names.sort();
+    assert_eq!(
+        frame_names,
+        (1..=6)
+            .map(|number| format!("frame_{number:06}.png"))
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        events.iter().any(
+            |event| matches!(event, ConversionEvent::Completed(payload) if payload.output_path == result.to_string_lossy())
+        ),
+        "completed event should report the sequence folder"
     );
 }
 

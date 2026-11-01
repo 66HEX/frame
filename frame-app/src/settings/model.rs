@@ -324,6 +324,32 @@ impl ProcessingMode {
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub enum ImageOutputMode {
+    #[default]
+    Single,
+    Sequence,
+}
+
+impl ImageOutputMode {
+    #[must_use]
+    pub const fn id(self) -> &'static str {
+        match self {
+            Self::Single => "single",
+            Self::Sequence => "sequence",
+        }
+    }
+
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Single => "Single image",
+            Self::Sequence => "Image sequence",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub enum MetadataMode {
     #[default]
     Preserve,
@@ -664,6 +690,7 @@ pub struct ConversionConfig {
     pub quality: u32,
     pub preset: String,
     pub pixel_format: String,
+    pub image_output_mode: ImageOutputMode,
     pub image_jpeg_quality: u32,
     pub image_jpeg_huffman: String,
     pub image_webp_lossless: bool,
@@ -725,6 +752,7 @@ impl Default for ConversionConfig {
             quality: DEFAULT_QUALITY,
             preset: DEFAULT_PRESET.to_string(),
             pixel_format: DEFAULT_PIXEL_FORMAT.to_string(),
+            image_output_mode: ImageOutputMode::Single,
             image_jpeg_quality: DEFAULT_IMAGE_JPEG_QUALITY,
             image_jpeg_huffman: DEFAULT_IMAGE_JPEG_HUFFMAN.to_string(),
             image_webp_lossless: false,

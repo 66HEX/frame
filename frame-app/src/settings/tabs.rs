@@ -5,7 +5,7 @@ use super::{
     },
     rules::{
         container_supports_audio, container_supports_subtitles, is_audio_only_container,
-        source_kind_for,
+        is_image_container, source_kind_for,
     },
 };
 
@@ -19,14 +19,19 @@ pub fn visible_settings_tabs(
     let is_source_image = source_kind == SourceKind::Image;
     let is_copy_mode = config.processing_mode == ProcessingMode::Copy;
     let is_audio_container = is_audio_only_container(&config.container);
+    let is_image_output = is_image_container(&config.container);
     let supports_audio = container_supports_audio(&config.container) && !is_source_image;
     let supports_subtitles = !is_source_audio_only
         && !is_source_image
         && container_supports_subtitles(&config.container);
-    let supports_video_tab =
-        !is_source_audio_only && !is_source_image && !is_audio_container && !is_copy_mode;
+    let supports_video_tab = !is_source_audio_only
+        && !is_source_image
+        && !is_audio_container
+        && !is_image_output
+        && !is_copy_mode;
     let supports_video_filters_tab = !is_source_audio_only && !is_audio_container && !is_copy_mode;
-    let supports_images_tab = is_source_image && !is_audio_container && !is_copy_mode;
+    let supports_images_tab =
+        !is_source_audio_only && is_image_output && !is_audio_container && !is_copy_mode;
     let supports_audio_filters_tab = supports_audio && !is_copy_mode;
 
     ALL_SETTINGS_TABS

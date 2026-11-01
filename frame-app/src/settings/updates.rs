@@ -7,7 +7,7 @@ use super::{
         DEFAULT_PIXEL_FORMAT, DEFAULT_RESOLUTION, DEFAULT_VIDEO_BITRATE_MODE,
         ExternalSubtitleTrack, FPS_OPTIONS, GIF_DITHER_OPTIONS, GIF_FPS_OPTIONS,
         IMAGE_JPEG_HUFFMAN_OPTIONS, IMAGE_PNG_PREDICTION_OPTIONS, IMAGE_TIFF_COMPRESSION_OPTIONS,
-        IMAGE_WEBP_PRESET_OPTIONS, MAX_AUDIO_VOLUME, MAX_GIF_COLORS, MAX_GIF_LOOP,
+        IMAGE_WEBP_PRESET_OPTIONS, ImageOutputMode, MAX_AUDIO_VOLUME, MAX_GIF_COLORS, MAX_GIF_LOOP,
         MAX_IMAGE_JPEG_QUALITY, MAX_IMAGE_PNG_COMPRESSION, MAX_IMAGE_WEBP_COMPRESSION,
         MAX_IMAGE_WEBP_QUALITY, MetadataField, MetadataMode, PresetDefinition, ProcessingMode,
         RESOLUTION_OPTIONS, SCALING_ALGORITHM_OPTIONS, SUBTITLE_FONT_SIZES, SourceKind,
@@ -756,6 +756,15 @@ pub fn apply_processing_mode(
     changed | normalize_output_config(config, metadata)
 }
 
+pub fn apply_image_output_mode(config: &mut ConversionConfig, mode: ImageOutputMode) -> bool {
+    if config.image_output_mode == mode {
+        return false;
+    }
+
+    config.image_output_mode = mode;
+    true
+}
+
 pub fn apply_output_container(config: &mut ConversionConfig, container: &str) -> bool {
     let changed = !config.container.eq_ignore_ascii_case(container);
     config.container = container.to_ascii_lowercase();
@@ -801,6 +810,7 @@ pub fn normalize_output_config(
 ) -> bool {
     let before = config.clone();
     let source_kind = source_kind_for(metadata);
+    let is_image_output = is_image_container(&config.container);
 
     if source_kind == SourceKind::Audio && !is_audio_only_container(&config.container) {
         config.container = "mp3".to_string();
@@ -830,10 +840,14 @@ pub fn normalize_output_config(
         reset_subtitle_settings(config);
     }
 
-    if (source_kind == SourceKind::Image || is_gif_container(&config.container))
+    if (source_kind == SourceKind::Image || is_gif_container(&config.container) || is_image_output)
         && config.processing_mode == ProcessingMode::Copy
     {
         config.processing_mode = ProcessingMode::Reencode;
+    }
+
+    if source_kind != SourceKind::Video || !is_image_output {
+        config.image_output_mode = ImageOutputMode::Single;
     }
 
     if config.processing_mode == ProcessingMode::Copy {

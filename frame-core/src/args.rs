@@ -647,10 +647,11 @@ pub fn build_ffmpeg_args(
         } else {
             "0:v:0".to_string()
         });
-        args.push("-frames:v".to_string());
-        args.push("1".to_string());
-        args.push("-update".to_string());
-        args.push("1".to_string());
+        if config.image_output_mode == "sequence" {
+            args.extend(["-fps_mode", "passthrough", "-start_number", "1"].map(str::to_string));
+        } else {
+            args.extend(["-frames:v", "1", "-update", "1"].map(str::to_string));
+        }
     } else {
         add_video_codec_args(&mut args, config);
         if has_custom_pixel_format(config) {
@@ -940,6 +941,12 @@ pub fn validate_task_input(
     if processing_mode != "reencode" && processing_mode != "copy" {
         return Err(ConversionError::InvalidInput(format!(
             "Invalid processing mode: {processing_mode}"
+        )));
+    }
+    if !matches!(config.image_output_mode.as_str(), "single" | "sequence") {
+        return Err(ConversionError::InvalidInput(format!(
+            "Invalid image output mode: {}",
+            config.image_output_mode
         )));
     }
     validate_media_filters(config)?;
@@ -1270,6 +1277,10 @@ pub fn validate_task_input(
 
     if is_image_output {
         validate_image_encoding_settings(config)?;
+    } else if config.image_output_mode == "sequence" {
+        return Err(ConversionError::InvalidInput(
+            "Image sequence mode requires a still-image output container".to_string(),
+        ));
     }
 
     Ok(())
@@ -1404,6 +1415,7 @@ mod tests {
             videotoolbox_allow_sw: false,
             hw_decode: false,
             pixel_format: "auto".to_string(),
+            image_output_mode: "single".to_string(),
             image_jpeg_quality: 85,
             image_jpeg_huffman: "optimal".to_string(),
             image_webp_lossless: false,
@@ -1431,6 +1443,45 @@ mod tests {
             }],
             ..ProbeMetadata::default()
         }
+    }
+
+    #[test]
+    fn single_image_arguments_keep_the_existing_one_frame_contract() {
+        let config = sample_config("png", "png");
+
+        let args = build_ffmpeg_args("input.mov", "output.png", &config, &sample_probe())
+            .expect("single-image arguments should build");
+
+        assert!(args.windows(2).any(|pair| pair == ["-frames:v", "1"]));
+        assert!(args.windows(2).any(|pair| pair == ["-update", "1"]));
+        assert!(!args.iter().any(|arg| arg == "-fps_mode"));
+        assert!(!args.iter().any(|arg| arg == "-start_number"));
+    }
+
+    #[test]
+    fn image_sequence_arguments_preserve_source_timing_and_number_from_one() {
+        let mut config = sample_config("png", "png");
+        config.image_output_mode = "sequence".to_string();
+
+        let args = build_ffmpeg_args(
+            "input.mov",
+            "output/frame_%06d.png",
+            &config,
+            &sample_probe(),
+        )
+        .expect("image-sequence arguments should build");
+
+        assert!(
+            args.windows(2)
+                .any(|pair| pair == ["-fps_mode", "passthrough"])
+        );
+        assert!(args.windows(2).any(|pair| pair == ["-start_number", "1"]));
+        assert!(!args.iter().any(|arg| arg == "-frames:v"));
+        assert!(!args.iter().any(|arg| arg == "-update"));
+        assert_eq!(
+            args.last().map(String::as_str),
+            Some("output/frame_%06d.png")
+        );
     }
 
     #[test]
@@ -2103,6 +2154,19 @@ mod tests {
 
         let _ = fs::remove_file(path);
         assert!(error.to_string().contains("WebP compression effort"));
+    }
+
+    #[test]
+    fn validate_task_input_rejects_unknown_image_output_mode() {
+        let path = temporary_input_file("invalid-image-output-mode");
+        let mut config = sample_config("png", "png");
+        config.image_output_mode = "every-frame-ish".to_string();
+
+        let error = validate_task_input(&path.to_string_lossy(), &config)
+            .expect_err("unknown image output mode should be rejected");
+
+        let _ = fs::remove_file(path);
+        assert!(error.to_string().contains("Invalid image output mode"));
     }
 
     fn args_contains_pair(args: &[String], key: &str, value: &str) -> bool {

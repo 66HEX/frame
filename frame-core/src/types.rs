@@ -374,6 +374,8 @@ pub struct ConversionConfig {
     pub hw_decode: bool,
     #[serde(default = "default_pixel_format")]
     pub pixel_format: String,
+    #[serde(default = "default_image_output_mode")]
+    pub image_output_mode: String,
     #[serde(default = "default_image_jpeg_quality")]
     pub image_jpeg_quality: u32,
     #[serde(default = "default_image_jpeg_huffman")]
@@ -434,6 +436,10 @@ const fn default_hw_decode() -> bool {
 
 fn default_pixel_format() -> String {
     "auto".to_string()
+}
+
+fn default_image_output_mode() -> String {
+    "single".to_string()
 }
 
 const fn default_image_jpeg_quality() -> u32 {
@@ -695,6 +701,7 @@ mod tests {
         assert_eq!(config.quality, 50);
         assert_eq!(config.rotation, "0");
         assert_eq!(config.pixel_format, "auto");
+        assert_eq!(config.image_output_mode, "single");
         assert_eq!(config.image_jpeg_quality, 85);
         assert_eq!(config.image_jpeg_huffman, "optimal");
         assert!(!config.image_webp_lossless);
@@ -720,6 +727,7 @@ mod tests {
 
         assert_eq!(serialized["processingMode"], "reencode");
         assert_eq!(serialized["audioBitrateMode"], "bitrate");
+        assert_eq!(serialized["imageOutputMode"], "single");
         assert_eq!(serialized["imageJpegQuality"], 85);
         assert_eq!(serialized["imageWebpPreset"], "default");
         assert_eq!(serialized["imagePngPrediction"], "paeth");

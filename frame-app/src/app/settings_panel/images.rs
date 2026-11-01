@@ -1,15 +1,18 @@
 use super::{
     ClickEvent, Context, ConversionConfig, DragMoveEvent, FocusHandle, FrameRoot, ParentElement,
-    Render, StatefulInteractiveElement, Styled, Window, apply_image_jpeg_huffman,
-    apply_image_jpeg_quality, apply_image_png_compression, apply_image_png_prediction,
-    apply_image_tiff_compression, apply_image_webp_compression, apply_image_webp_lossless,
-    apply_image_webp_preset, apply_image_webp_quality, apply_pixel_format, color, div,
-    frame_choice_button, frame_list_item_with_caption, frame_slider, frame_slider_handle,
-    image_jpeg_huffman_options, image_png_prediction_options, image_tiff_compression_options,
-    image_webp_preset_options, range_fraction, range_value_for_key, range_value_from_fraction,
-    settings_field_label, settings_hint_text, settings_section, settings_value_badge,
-    settings_video_resolution_section, settings_video_scaling_section, theme,
+    Render, SourceKind, SourceMetadata, StatefulInteractiveElement, Styled, Window,
+    apply_image_jpeg_huffman, apply_image_jpeg_quality, apply_image_png_compression,
+    apply_image_png_prediction, apply_image_tiff_compression, apply_image_webp_compression,
+    apply_image_webp_lossless, apply_image_webp_preset, apply_image_webp_quality,
+    apply_pixel_format, color, div, frame_choice_button, frame_list_item_with_caption,
+    frame_slider, frame_slider_handle, image_jpeg_huffman_options, image_png_prediction_options,
+    image_tiff_compression_options, image_webp_preset_options, range_fraction, range_value_for_key,
+    range_value_from_fraction, settings_field_label, settings_hint_text, settings_section,
+    settings_value_badge, settings_video_resolution_section, settings_video_scaling_section, theme,
     timeline_slider_percent_from_bounds, video_pixel_format_options,
+};
+use crate::settings::{
+    ImageOutputMode, apply_image_output_mode, estimated_image_sequence_frame_count, source_kind_for,
 };
 use gpui::{AppContext, InteractiveElement, prelude::FluentBuilder};
 
@@ -36,8 +39,13 @@ impl Render for SettingsImageRangeDragPreview {
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the images tab receives source metadata alongside its existing settings render contract"
+)]
 pub(in crate::app) fn settings_images_tab(
     config: &ConversionConfig,
+    metadata: Option<&SourceMetadata>,
     settings_disabled: bool,
     video_width_focus: Option<&FocusHandle>,
     video_height_focus: Option<&FocusHandle>,
@@ -49,6 +57,16 @@ pub(in crate::app) fn settings_images_tab(
         .flex()
         .flex_col()
         .gap_4()
+        .when(source_kind_for(metadata) == SourceKind::Video, |this| {
+            this.child(settings_image_output_mode_section(
+                config,
+                metadata,
+                settings_disabled,
+                palette,
+                window,
+                cx,
+            ))
+        })
         .child(settings_video_resolution_section(
             config,
             settings_disabled,
@@ -79,6 +97,65 @@ pub(in crate::app) fn settings_images_tab(
             window,
             cx,
         ))
+}
+
+fn settings_image_output_mode_section(
+    config: &ConversionConfig,
+    metadata: Option<&SourceMetadata>,
+    settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    let mut grid = div().grid().grid_cols(2).gap_2();
+    for mode in [ImageOutputMode::Single, ImageOutputMode::Sequence] {
+        let enabled = !settings_disabled;
+        grid = grid.child(
+            frame_choice_button(
+                format!("image-output-mode-{}", mode.id()),
+                mode.label(),
+                config.image_output_mode == mode,
+                enabled,
+                palette,
+                window,
+                cx,
+            )
+            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+                cx.stop_propagation();
+                if enabled
+                    && root.update_selected_config(|config| apply_image_output_mode(config, mode))
+                {
+                    cx.notify();
+                }
+            })),
+        );
+    }
+
+    settings_section("Image output", palette)
+        .child(grid)
+        .when(config.image_output_mode == ImageOutputMode::Sequence, |this| {
+            let estimate = estimated_image_sequence_frame_count(config, metadata)
+                .map_or_else(
+                    || "Estimated frame count unavailable".to_string(),
+                    |count| format!("Estimated frames: ≈ {count}"),
+                );
+            this.child(sequence_hint_text(estimate, palette))
+                .child(settings_hint_text(
+                    "Variable-frame-rate sources may produce a different actual frame count.",
+                    palette,
+                ))
+                .child(settings_hint_text(
+                    "JPEG and WebP are recommended for smaller sequences. PNG and TIFF can use substantial disk space.",
+                    palette,
+                ))
+        })
+}
+
+fn sequence_hint_text(text: String, palette: &'static theme::ThemePalette) -> gpui::Div {
+    div()
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
+        .text_color(color(palette.text_muted))
+        .child(text)
 }
 
 fn settings_images_pixel_format_section(
