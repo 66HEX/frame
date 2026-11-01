@@ -13,8 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Toolbar Window Dragging:** Pressing toolbar controls no longer starts a window drag on macOS or Linux. Empty titlebar space remains draggable, and releasing the mouse clears any pending drag. Resolves [#175](https://github.com/66HEX/frame/issues/175).
-- **HEVC Quick Look Compatibility:** Uses the `hvc1` tag when encoding HEVC to MP4 or MOV so exported videos can be previewed on macOS. Resolves [#211](https://github.com/66HEX/frame/issues/211).
+- **Toolbar Window Dragging:** Prevents toolbar buttons and tabs from dragging the window on macOS and Linux. Empty titlebar space stays draggable, and macOS retains its configured double-click action. Resolves [#175](https://github.com/66HEX/frame/issues/175).
+- **HEVC Quick Look Compatibility:** Fixes macOS Quick Look previews for HEVC videos encoded to MP4 or MOV with libx265, VideoToolbox, or NVENC by writing the `hvc1` tag. Resolves [#211](https://github.com/66HEX/frame/issues/211).
 
 ### Security
 
