@@ -91,6 +91,9 @@ pub fn frame_window_options(bounds: Bounds<Pixels>) -> WindowOptions {
         window_min_size: Some(size(px(WINDOW_MIN_WIDTH), px(WINDOW_MIN_HEIGHT))),
         window_background: WindowBackgroundAppearance::Opaque,
         window_decorations: Some(WindowDecorations::Client),
+        // Frame handles titlebar gestures itself. AppKit's automatic dragging would
+        // otherwise move the window even when a toolbar control consumes the press.
+        is_movable: !cfg!(target_os = "macos"),
         #[cfg(target_os = "linux")]
         client_side_frame: Some(gpui::ClientSideFrameOptions {
             corner_radius: px(theme::RADIUS_LG + LINUX_WINDOW_FRAME_INSET),

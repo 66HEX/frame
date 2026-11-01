@@ -3586,6 +3586,9 @@ mod frame_window_options {
             .expect("Frame keeps a transparent native titlebar host for macOS controls");
 
         assert!(titlebar.appears_transparent);
+        // AppKit must not drag the entire native titlebar over our interactive controls.
+        // Other platforms still need their normal native window movement enabled.
+        assert_eq!(options.is_movable, !cfg!(target_os = "macos"));
         assert_eq!(
             titlebar.traffic_light_position,
             Some(point(
