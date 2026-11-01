@@ -95,7 +95,7 @@ pub(super) fn macos_titlebar(
 ) -> gpui::Div {
     let show_workspace_controls = titlebar_shows_workspace_controls(state);
 
-    titlebar_drag_surface(cx)
+    titlebar_drag_surface(FrameTitlebarPlatform::Macos, cx)
         .h(theme::ui_rem(TITLEBAR_HEIGHT))
         .w_full()
         .flex()
@@ -139,7 +139,7 @@ pub(super) fn windows_titlebar(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    titlebar_drag_surface(cx)
+    titlebar_drag_surface(FrameTitlebarPlatform::Windows, cx)
         .relative()
         .h(theme::ui_rem(TITLEBAR_HEIGHT))
         .w_full()
@@ -155,7 +155,7 @@ pub(super) fn linux_titlebar(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    titlebar_drag_surface(cx)
+    titlebar_drag_surface(FrameTitlebarPlatform::Linux, cx)
         .relative()
         .h(theme::ui_rem(TITLEBAR_HEIGHT))
         .w_full()
@@ -165,7 +165,7 @@ pub(super) fn linux_titlebar(
         .child(linux_window_controls(palette, window, cx))
 }
 
-fn titlebar_drag_surface(cx: &Context<FrameRoot>) -> gpui::Div {
+fn titlebar_drag_surface(platform: FrameTitlebarPlatform, cx: &Context<FrameRoot>) -> gpui::Div {
     div()
         .window_control_area(WindowControlArea::Drag)
         .capture_any_mouse_down(cx.listener(|root, _event, _window, _cx| {
@@ -189,10 +189,18 @@ fn titlebar_drag_surface(cx: &Context<FrameRoot>) -> gpui::Div {
         )
         .on_mouse_down(
             MouseButton::Left,
-            cx.listener(|root, _event, window, _cx| {
+            cx.listener(move |root, event: &gpui::MouseDownEvent, window, _cx| {
                 // Buttons consume the press with prevent_default before it bubbles here.
                 // Only a press on the remaining titlebar surface may start a window drag.
-                root.titlebar_drag.should_move = !window.default_prevented();
+                if window.default_prevented() {
+                    return;
+                }
+                if platform == FrameTitlebarPlatform::Macos && event.click_count == 2 {
+                    // Preserve the system double-click action with native dragging disabled.
+                    window.titlebar_double_click();
+                } else {
+                    root.titlebar_drag.should_move = true;
+                }
             }),
         )
         .on_mouse_move(

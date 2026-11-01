@@ -212,6 +212,25 @@ fn blank_titlebar_press_is_cancelled_by_release_inside_or_outside() {
 }
 
 #[test]
+fn macos_blank_titlebar_double_click_does_not_arm_a_drag() {
+    let mut app = TestAppContext::single();
+    let (root, cx) = titlebar_window(&mut app, FrameTitlebarPlatform::Macos, false);
+    cx.simulate_event(gpui::MouseDownEvent {
+        position: blank_titlebar_point(),
+        button: MouseButton::Left,
+        modifiers: Modifiers::default(),
+        click_count: 2,
+        first_mouse: false,
+    });
+    assert!(!drag_is_armed(&root, cx));
+    cx.simulate_mouse_move(
+        blank_titlebar_point(),
+        MouseButton::Left,
+        Modifiers::default(),
+    );
+}
+
+#[test]
 fn titlebar_hover_without_a_pressed_button_cancels_a_missed_release() {
     let mut app = TestAppContext::single();
     let (root, cx) = titlebar_window(&mut app, FrameTitlebarPlatform::Macos, false);
