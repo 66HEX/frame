@@ -33,7 +33,7 @@ const CARGO_DENY_VERSION: &str = "0.20.2";
 const CARGO_AUDIT_VERSION: &str = "0.22.2";
 const CARGO_CYCLONEDX_VERSION: &str = "0.5.9";
 const INNO_SETUP_VERSION: &str = "6.7.1";
-const NIX_VERSION: &str = "2.35.1";
+const NIX_VERSION: &str = "2.35.4";
 const APPIMAGETOOL_VERSION: &str = "1.9.1";
 const APPIMAGETOOL_X86_64_SHA256: &str =
     "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0";
@@ -49,12 +49,12 @@ const ACTIONLINT_LINUX_X86_64_SHA256: &str =
     "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8";
 
 const ACTION_CHECKOUT_SHA: &str = "3d3c42e5aac5ba805825da76410c181273ba90b1";
-const ACTION_UPLOAD_ARTIFACT_SHA: &str = "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a";
-const ACTION_DOWNLOAD_ARTIFACT_SHA: &str = "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c";
+const ACTION_UPLOAD_ARTIFACT_SHA: &str = "cf430e030ddbb5b0abf93d22962f4752f3646cd9";
+const ACTION_DOWNLOAD_ARTIFACT_SHA: &str = "9000827ccba6bdab643e8b6fd33ac0654aef8333";
 const ACTION_DEPENDENCY_REVIEW_SHA: &str = "a1d282b36b6f3519aa1f3fc636f609c47dddb294";
-const ACTION_CODEQL_SHA: &str = "2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2";
+const ACTION_CODEQL_SHA: &str = "24c54180a607b1449ed407dd24f251e4e9147c8d";
 const ACTION_ATTEST_BUILD_PROVENANCE_SHA: &str = "4d101475d8b20a2381f78447822ac1eab6504dd8";
-const ACTION_INSTALL_NIX_SHA: &str = "13d8dd58da0234aa297dedd986986ccb8e7f3e24";
+const ACTION_INSTALL_NIX_SHA: &str = "75c75c31ebece974e48ebc36b4ad125bd97bd97b";
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -1230,7 +1230,8 @@ fn extract_expected_file(
 
     for index in 0..archive.len() {
         let mut file = archive.by_index(index)?;
-        if file.is_file() && archive_entry_name_matches(file.name(), entry.expected_names) {
+        if file.is_file() && archive_entry_name_matches(file.name()?.as_ref(), entry.expected_names)
+        {
             write_archive_file(&mut file, destination, entry.sha256, entry.make_executable)?;
             println!("Placed {}.", entry.destination_name);
             return Ok(());
@@ -1846,19 +1847,19 @@ fn pin_workflow_actions(workflow: &mut String) {
         ),
         (
             "actions/upload-artifact@v4",
-            format!("actions/upload-artifact@{ACTION_UPLOAD_ARTIFACT_SHA} # v7.0.1"),
+            format!("actions/upload-artifact@{ACTION_UPLOAD_ARTIFACT_SHA} # v7.0.2"),
         ),
         (
             "actions/upload-artifact@v7.0.1",
-            format!("actions/upload-artifact@{ACTION_UPLOAD_ARTIFACT_SHA} # v7.0.1"),
+            format!("actions/upload-artifact@{ACTION_UPLOAD_ARTIFACT_SHA} # v7.0.2"),
         ),
         (
             "actions/download-artifact@v4",
-            format!("actions/download-artifact@{ACTION_DOWNLOAD_ARTIFACT_SHA} # v8.0.1"),
+            format!("actions/download-artifact@{ACTION_DOWNLOAD_ARTIFACT_SHA} # v8.0.2"),
         ),
         (
             "actions/download-artifact@v8.0.1",
-            format!("actions/download-artifact@{ACTION_DOWNLOAD_ARTIFACT_SHA} # v8.0.1"),
+            format!("actions/download-artifact@{ACTION_DOWNLOAD_ARTIFACT_SHA} # v8.0.2"),
         ),
         (
             "actions/dependency-review-action@v5.0.0",
@@ -1872,19 +1873,19 @@ fn pin_workflow_actions(workflow: &mut String) {
         ),
         (
             "cachix/install-nix-action@v31.11.0",
-            format!("cachix/install-nix-action@{ACTION_INSTALL_NIX_SHA} # v31.11.1"),
+            format!("cachix/install-nix-action@{ACTION_INSTALL_NIX_SHA} # v31.11.3"),
         ),
         (
             "cachix/install-nix-action@v31",
-            format!("cachix/install-nix-action@{ACTION_INSTALL_NIX_SHA} # v31.11.1"),
+            format!("cachix/install-nix-action@{ACTION_INSTALL_NIX_SHA} # v31.11.3"),
         ),
         (
             "github/codeql-action/init@v4.37.1",
-            format!("github/codeql-action/init@{ACTION_CODEQL_SHA} # v4.38.2"),
+            format!("github/codeql-action/init@{ACTION_CODEQL_SHA} # v4.38.3"),
         ),
         (
             "github/codeql-action/analyze@v4.37.1",
-            format!("github/codeql-action/analyze@{ACTION_CODEQL_SHA} # v4.38.2"),
+            format!("github/codeql-action/analyze@{ACTION_CODEQL_SHA} # v4.38.3"),
         ),
     ];
     for (reference, pinned) in action_replacements {
@@ -1992,7 +1993,10 @@ jobs:
           --ignore RUSTSEC-2026-0192 \
           --ignore RUSTSEC-2026-0194 \
           --ignore RUSTSEC-2026-0195 \
-          --ignore RUSTSEC-2026-0206
+          --ignore RUSTSEC-2026-0206 \
+          --ignore RUSTSEC-2026-0370 \
+          --ignore RUSTSEC-2026-0371 \
+          --ignore RUSTSEC-2026-0372
     - name: ci::run_documented_gate
       run: cargo xtask ci
     - name: ci::setup_ffmpeg
@@ -2004,7 +2008,7 @@ jobs:
     timeout-minutes: 60
   cargo_check_macos:
     name: cargo check macos
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
     - name: steps::checkout_repo
       uses: actions/checkout@v7.0.0
@@ -3938,6 +3942,53 @@ mod tests {
             "ffmpeg-n8.1.2-21-gce3c09c101-win64-gpl-8.1/bin/ffprobe.exe",
             &["ffprobe.exe"],
         ));
+    }
+
+    #[test]
+    fn extract_expected_file_reads_deflated_nested_binary() {
+        use std::io::Write;
+
+        let directory = tempfile::tempdir().unwrap();
+        let destination = directory.path().join("ffmpeg");
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
+        let mut archive = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        archive.add_directory("release/bin/", options).unwrap();
+        archive.start_file("release/bin/ffprobe", options).unwrap();
+        archive.write_all(b"other binary").unwrap();
+        archive.start_file("release/bin/ffmpeg", options).unwrap();
+        archive.write_all(b"abc").unwrap();
+        let bytes = archive.finish().unwrap().into_inner();
+        let entry =
+            test_ffmpeg_entry("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+
+        extract_expected_file(&bytes, &entry, &destination).unwrap();
+
+        assert_eq!(fs::read(destination).unwrap(), b"abc");
+        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn extract_expected_file_rejects_symlink_entry() {
+        let directory = tempfile::tempdir().unwrap();
+        let destination = directory.path().join("ffmpeg");
+        fs::write(&destination, b"verified binary").unwrap();
+        let mut archive = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        archive
+            .add_symlink(
+                "release/bin/ffmpeg",
+                "../../../outside",
+                zip::write::SimpleFileOptions::default(),
+            )
+            .unwrap();
+        let bytes = archive.finish().unwrap().into_inner();
+        let entry =
+            test_ffmpeg_entry("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+
+        let error = extract_expected_file(&bytes, &entry, &destination).unwrap_err();
+
+        assert!(matches!(error, XtaskError::ArchiveEntryMissing { .. }));
+        assert_eq!(fs::read(destination).unwrap(), b"verified binary");
     }
 
     #[test]

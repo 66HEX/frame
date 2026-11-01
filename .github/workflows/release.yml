@@ -154,19 +154,19 @@ jobs:
         test "$actual" = "$expected"
         test -s target/release/Frame-x86_64.AppImage.zsync
     - name: release::upload_linux_x86_64
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: release-asset-frame-linux-x86_64
         path: target/release/frame-linux-x86_64.tar.gz
         if-no-files-found: error
     - name: release::upload_linux_x86_64_appimage
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: release-asset-Frame-x86_64-AppImage
         path: target/release/Frame-x86_64.AppImage
         if-no-files-found: error
     - name: release::upload_linux_x86_64_appimage_zsync
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: release-asset-Frame-x86_64-AppImage-zsync
         path: target/release/Frame-x86_64.AppImage.zsync
@@ -214,19 +214,19 @@ jobs:
         test "$actual" = "$expected"
         test -s target/release/Frame-aarch64.AppImage.zsync
     - name: release::upload_linux_aarch64
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: release-asset-frame-linux-aarch64
         path: target/release/frame-linux-aarch64.tar.gz
         if-no-files-found: error
     - name: release::upload_linux_aarch64_appimage
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: release-asset-Frame-aarch64-AppImage
         path: target/release/Frame-aarch64.AppImage
         if-no-files-found: error
     - name: release::upload_linux_aarch64_appimage_zsync
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: release-asset-Frame-aarch64-AppImage-zsync
         path: target/release/Frame-aarch64.AppImage.zsync
@@ -267,7 +267,7 @@ jobs:
           target/Frame-x86_64-unsigned.app.zip
         echo "sha256=$(shasum -a 256 target/Frame-x86_64-unsigned.app.zip | awk '{print $1}')" >> "$GITHUB_OUTPUT"
     - name: release::upload_macos_x86_64_unsigned
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: packaging-input-Frame-x86_64-app
         path: target/Frame-x86_64-unsigned.app.zip
@@ -287,7 +287,7 @@ jobs:
         persist-credentials: false
         ref: ${{ needs.prepare_release.outputs.commit_sha }}
     - name: release::download_macos_x86_64_unsigned
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
       with:
         name: packaging-input-Frame-x86_64-app
         path: target/packaging-input
@@ -312,13 +312,13 @@ jobs:
         PYTHONPATH: target/dmgbuild
       run: ./script/bundle-mac -p x86_64-apple-darwin
     - name: release::upload_macos_x86_64_dmg
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: release-asset-Frame-x86_64-dmg
         path: target/x86_64-apple-darwin/release/Frame-x86_64.dmg
         if-no-files-found: error
     - name: release::upload_macos_x86_64_update
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: release-asset-Frame-x86_64-app-zip
         path: target/x86_64-apple-darwin/release/Frame-x86_64.app.zip
@@ -359,7 +359,7 @@ jobs:
           target/Frame-aarch64-unsigned.app.zip
         echo "sha256=$(shasum -a 256 target/Frame-aarch64-unsigned.app.zip | awk '{print $1}')" >> "$GITHUB_OUTPUT"
     - name: release::upload_macos_aarch64_unsigned
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: packaging-input-Frame-aarch64-app
         path: target/Frame-aarch64-unsigned.app.zip
@@ -379,7 +379,7 @@ jobs:
         persist-credentials: false
         ref: ${{ needs.prepare_release.outputs.commit_sha }}
     - name: release::download_macos_aarch64_unsigned
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
       with:
         name: packaging-input-Frame-aarch64-app
         path: target/packaging-input
@@ -404,13 +404,13 @@ jobs:
         PYTHONPATH: target/dmgbuild
       run: ./script/bundle-mac -p aarch64-apple-darwin
     - name: release::upload_macos_aarch64_dmg
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: release-asset-Frame-aarch64-dmg
         path: target/aarch64-apple-darwin/release/Frame-aarch64.dmg
         if-no-files-found: error
     - name: release::upload_macos_aarch64_update
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: release-asset-Frame-aarch64-app-zip
         path: target/aarch64-apple-darwin/release/Frame-aarch64.app.zip
@@ -452,7 +452,7 @@ jobs:
         $sha256 = (Get-FileHash target/Frame-x86_64-inno-inputs.zip -Algorithm SHA256).Hash.ToLowerInvariant()
         "sha256=$sha256" >> $env:GITHUB_OUTPUT
     - name: release::upload_windows_x86_64_unsigned
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: packaging-input-Frame-x86_64-windows
         path: target/Frame-x86_64-inno-inputs.zip
@@ -472,7 +472,7 @@ jobs:
         persist-credentials: false
         ref: ${{ needs.prepare_release.outputs.commit_sha }}
     - name: release::download_windows_x86_64_unsigned
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
       with:
         name: packaging-input-Frame-x86_64-windows
         path: target/packaging-input
@@ -490,7 +490,7 @@ jobs:
       shell: pwsh
       run: ./script/bundle-windows.ps1 -Architecture x86_64 -PackageOnly
     - name: release::upload_windows_x86_64
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: release-asset-Frame-x86_64-exe
         path: target/Frame-x86_64.exe
@@ -521,7 +521,7 @@ jobs:
         rustup default 1.95.0
         test "$(rustc --version | awk '{print $2}')" = "1.95.0"
     - name: release::download_build_artifacts
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
       with:
         pattern: release-asset-*
         path: target/release-artifacts
@@ -575,14 +575,14 @@ jobs:
     - name: release::build_isolated_manifest_signer
       run: cargo build --manifest-path tooling/manifest-signer/Cargo.toml --release --locked
     - name: release::upload_unsigned_metadata
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: unsigned-release-metadata
         path: target/release-files
         if-no-files-found: error
         retention-days: 3
     - name: release::upload_manifest_signer
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: manifest-signer
         path: target/release/frame-manifest-signer
@@ -598,12 +598,12 @@ jobs:
     environment: production-release
     steps:
     - name: release::download_unsigned_metadata
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
       with:
         name: unsigned-release-metadata
         path: target/release-files
     - name: release::download_manifest_signer
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
       with:
         name: manifest-signer
         path: target/signer
@@ -620,7 +620,7 @@ jobs:
           --manifest target/release-files/update-manifest.json \
           --out target/release-files/update-manifest.json.sig
     - name: release::upload_manifest_signature
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: signed-update-manifest
         path: target/release-files/update-manifest.json.sig
@@ -645,18 +645,18 @@ jobs:
       attestations: write
     steps:
     - name: release::download_build_artifacts
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
       with:
         pattern: release-asset-*
         path: target/release-package
         merge-multiple: true
     - name: release::download_unsigned_metadata
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
       with:
         name: unsigned-release-metadata
         path: target/metadata
     - name: release::download_manifest_signature
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
       with:
         name: signed-update-manifest
         path: target/signature
@@ -712,7 +712,7 @@ jobs:
       with:
         subject-checksums: target/release-package/SHA256SUMS
     - name: release::upload_complete_release_package
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: complete-release-package
         path: target/release-package
@@ -735,7 +735,7 @@ jobs:
       VERSION: ${{ needs.prepare_release.outputs.version }}
     steps:
     - name: release::download_complete_release_package
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
       with:
         name: complete-release-package
         path: target/release-package
@@ -1007,9 +1007,9 @@ jobs:
         fi
     - name: steps::install_nix
       if: steps.token.outputs.configured == 'true'
-      uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+      uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
       with:
-        install_url: https://releases.nixos.org/nix/nix-2.35.1/install
+        install_url: https://releases.nixos.org/nix/nix-2.35.4/install
         extra_nix_config: |
           sandbox = true
     - name: release::checkout_nixpkgs
@@ -1240,9 +1240,9 @@ jobs:
       NIXPKGS_PACKAGE: frame-media-converter
     steps:
     - name: steps::install_nix
-      uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+      uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
       with:
-        install_url: https://releases.nixos.org/nix/nix-2.35.1/install
+        install_url: https://releases.nixos.org/nix/nix-2.35.4/install
         extra_nix_config: |
           sandbox = true
     - name: release::checkout_nixpkgs
