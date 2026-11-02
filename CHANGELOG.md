@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Async Executor:** Updates `async-executor` to 1.14.1 to fix a use-after-free when a task wakes during executor shutdown, replacing the withdrawn 1.14.0 release.
 - **Dependency Updates:** Updates TLS certificate validation, root certificates, QUIC, Tokio, ZIP tooling, and the pinned Nix installer to address newly reported advisories.
 
 ## [0.33.1] - 2026-08-27
