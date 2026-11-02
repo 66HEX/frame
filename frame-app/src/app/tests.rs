@@ -2356,7 +2356,7 @@ mod frame_root_config {
 
         assert!(changed);
         assert!(root.preview_ui.crop_mode);
-        assert_eq!(root.preview_ui.draft_crop, Some(default_crop_rect()));
+        assert_eq!(root.preview_ui.draft_crop, Some(full_crop_rect()));
         assert_eq!(root.preview_ui.crop_aspect, "free");
     }
 
@@ -3237,6 +3237,7 @@ mod frame_root_config {
 
         assert!(root.rotate_selected_preview());
         assert!(root.toggle_selected_crop_mode());
+        root.preview_ui.draft_crop = Some(default_crop_rect());
         assert!(root.select_preview_crop_aspect("1:1"));
 
         let config = &root.file_queue.file_by_id("video").unwrap().config;
@@ -3715,6 +3716,28 @@ mod visual_fixtures {
     }
 
     #[test]
+    fn crop_options_fixture_opens_ratio_list() {
+        let mut root = FrameRoot::new();
+        root.apply_visual_fixture(Some(VisualFixture::PreviewCropOptions));
+        assert!(root.preview_ui.crop_options.popover.is_some());
+        assert!(!root.preview_ui.crop_options.custom);
+        assert_eq!(root.custom_crop_values(), Some((1, 1)));
+        root.apply_visual_fixture(Some(VisualFixture::PreviewCropCustom));
+        assert!(root.preview_ui.crop_options.custom);
+        assert!(!root.preview_ui.crop_options.is_ratio);
+    }
+
+    #[test]
+    fn av1_fixture_selects_preset_four_and_ten_bit_pixels() {
+        let mut root = FrameRoot::new();
+        root.apply_visual_fixture(Some(VisualFixture::SettingsVideoAv1));
+        let config = root.selected_config().unwrap();
+        assert_eq!(config.video_codec, "libsvtav1");
+        assert_eq!(config.preset, "4");
+        assert_eq!(config.pixel_format, "yuv420p10le");
+    }
+
+    #[test]
     fn workspace_empty_fixture_clears_workspace_state() {
         let mut root = FrameRoot::new();
         root.apply_visual_fixture(Some(VisualFixture::PreviewReady));
@@ -4026,6 +4049,7 @@ mod preview_shell {
         let subtitle_font_size_select_scroll_handle = Box::leak(Box::new(ScrollHandle::new()));
 
         SettingsRenderState {
+            crop_editing: false,
             palette: theme::palette(crate::appearance::ColorTheme::Dark),
             active_tab: SettingsTab::Source,
             tooltip_visible_id: None,

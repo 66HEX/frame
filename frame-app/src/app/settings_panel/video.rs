@@ -42,7 +42,7 @@ pub(in crate::app) fn settings_video_tab(
         .gap_4()
         .child(settings_video_resolution_section(
             config,
-            settings_disabled,
+            settings_disabled || focuses.resolution_locked,
             focuses.width,
             focuses.height,
             palette,
@@ -510,7 +510,15 @@ fn settings_video_pixel_format_section(
         );
     }
 
-    settings_section("Pixel format", palette).child(list)
+    settings_section("Pixel format", palette).child(list).when(
+        config.video_codec == "libsvtav1",
+        |section| {
+            section.child(settings_hint_text(
+                "For 10-bit AV1, choose YUV 4:2:0 (10-bit). Auto uses the encoder default.",
+                palette,
+            ))
+        },
+    )
 }
 
 fn settings_video_preset_section(
@@ -547,7 +555,15 @@ fn settings_video_preset_section(
         );
     }
 
-    settings_section("Encoding speed", palette).child(list)
+    settings_section(
+        if config.video_codec == "libsvtav1" {
+            "AV1 preset"
+        } else {
+            "Encoding speed"
+        },
+        palette,
+    )
+    .child(list)
 }
 
 fn settings_video_quality_section(

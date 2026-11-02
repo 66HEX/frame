@@ -4,6 +4,7 @@ pub mod args;
 pub mod capabilities;
 pub mod codec;
 pub mod container;
+pub mod dimensions;
 pub mod error;
 pub mod events;
 pub mod filters;

@@ -344,6 +344,7 @@ pub(in crate::app) fn preview_viewport(
     if state.crop.crop_mode && state.crop.draft_crop.is_some() {
         viewport = viewport.child(preview_crop_aspect_bar(
             state,
+            focuses.crop_options,
             focuses.edit_toolbars.crop,
             window,
             cx,

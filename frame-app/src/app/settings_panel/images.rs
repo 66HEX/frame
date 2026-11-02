@@ -36,9 +36,14 @@ impl Render for SettingsImageRangeDragPreview {
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Image settings receive the crop editing lock alongside input focus and render context."
+)]
 pub(in crate::app) fn settings_images_tab(
     config: &ConversionConfig,
     settings_disabled: bool,
+    crop_editing: bool,
     video_width_focus: Option<&FocusHandle>,
     video_height_focus: Option<&FocusHandle>,
     palette: &'static theme::ThemePalette,
@@ -51,7 +56,7 @@ pub(in crate::app) fn settings_images_tab(
         .gap_4()
         .child(settings_video_resolution_section(
             config,
-            settings_disabled,
+            settings_disabled || crop_editing,
             video_width_focus,
             video_height_focus,
             palette,

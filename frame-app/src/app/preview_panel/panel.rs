@@ -128,8 +128,25 @@ pub(in crate::app) struct PreviewPanelProps<'a> {
 #[derive(Clone, Copy)]
 pub(in crate::app) struct PreviewViewportFocuses<'a> {
     pub(in crate::app) viewport: &'a FocusHandle,
+    pub(in crate::app) crop_options: PreviewCropOptionsProps<'a>,
     pub(in crate::app) tools: PreviewToolFocuses<'a>,
     pub(in crate::app) edit_toolbars: PreviewEditToolbarFocuses<'a>,
+}
+
+#[derive(Clone, Copy)]
+pub(in crate::app) struct PreviewCropOptionsProps<'a> {
+    pub(in crate::app) popover: Option<CropSelect>,
+    pub(in crate::app) custom: bool,
+    pub(in crate::app) ratio: bool,
+    pub(in crate::app) width: &'a str,
+    pub(in crate::app) height: &'a str,
+    pub(in crate::app) custom_values: Option<(u32, u32)>,
+    pub(in crate::app) scroll: &'a ScrollHandle,
+    pub(in crate::app) width_focus: &'a FocusHandle,
+    pub(in crate::app) height_focus: &'a FocusHandle,
+    pub(in crate::app) option_focuses: &'a [FocusHandle],
+    pub(in crate::app) unit_focus: &'a FocusHandle,
+    pub(in crate::app) unit_option_focuses: &'a [FocusHandle],
 }
 
 #[derive(Clone, Copy)]

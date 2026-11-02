@@ -2185,3 +2185,80 @@ fn sanitize_name(name: &str) -> String {
         .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '-' })
         .collect()
 }
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn output_geometry_matches_real_crop_rotate_and_scale_exports() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("output_geometry")?;
+    let input = sandbox.path("source.mp4");
+    generate_h264_aac_source(&tools, &input, 0.1, 640, 360)?;
+    let source = probe_media(&tools, &input)?;
+    for (index, rotation, crop, resolution, custom_width, custom_height) in [
+        (0, "0", Some((480.0, 360.0)), "original", None, None),
+        (1, "90", Some((240.0, 320.0)), "original", None, None),
+        (2, "0", Some((481.0, 359.0)), "original", None, None),
+        (3, "0", Some((480.0, 360.0)), "720p", None, None),
+        (4, "0", None, "custom", Some("320"), Some("240")),
+        (6, "0", None, "custom", Some("320"), None),
+        (
+            7,
+            "0",
+            Some((481.0, 359.0)),
+            "custom",
+            Some("480"),
+            Some("358"),
+        ),
+    ] {
+        let mut config = video_config("mp4", "libx264", "aac");
+        config.rotation = rotation.into();
+        config.resolution = resolution.into();
+        config.custom_width = custom_width.map(str::to_string);
+        config.custom_height = custom_height.map(str::to_string);
+        config.crop = crop.map(|(width, height)| CropConfig {
+            enabled: true,
+            x: 0.0,
+            y: 0.0,
+            width,
+            height,
+            source_width: Some(640.0),
+            source_height: Some(360.0),
+            aspect_ratio: None,
+        });
+        let expected = frame_core::dimensions::output_dimensions(
+            &config,
+            640,
+            360,
+            source.pixel_format.as_deref(),
+        );
+        let output = sandbox.path(&format!("geometry-{index}.mp4"));
+        convert(&tools, &input, &output, &config)?;
+        let actual = probe_media(&tools, &output)?;
+        assert_eq!(
+            expected,
+            actual.width.zip(actual.height),
+            "geometry case {index}"
+        );
+        decode_media(&tools, &output)?;
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn av1_native_preset_four_exports_ten_bit_video() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("av1_preset_four_ten_bit")?;
+    let input = sandbox.path("source.mp4");
+    generate_h264_aac_source(&tools, &input, 0.1, 64, 48)?;
+    let mut config = video_config("mp4", "libsvtav1", "aac");
+    config.preset = "4".into();
+    config.pixel_format = "yuv420p10le".into();
+    let output = sandbox.path("av1.mp4");
+    convert(&tools, &input, &output, &config)?;
+    let metadata = probe_media(&tools, &output)?;
+    assert_eq!(metadata.video_codec.as_deref(), Some("av1"));
+    assert_eq!(metadata.pixel_format.as_deref(), Some("yuv420p10le"));
+    decode_media(&tools, &output)?;
+    Ok(())
+}

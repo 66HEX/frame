@@ -464,6 +464,38 @@ impl Default for SubtitleUiState {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum CropSelect {
+    Aspect,
+    Units,
+}
+
+struct CropOptionsUiState {
+    popover: Option<CropSelect>,
+    custom: bool,
+    custom_dirty: bool,
+    custom_edit_base: Option<CropRect>,
+    is_ratio: bool,
+    width: String,
+    height: String,
+    scroll: ScrollHandle,
+}
+
+impl Default for CropOptionsUiState {
+    fn default() -> Self {
+        Self {
+            popover: None,
+            custom: false,
+            custom_dirty: false,
+            custom_edit_base: None,
+            is_ratio: true,
+            width: String::new(),
+            height: String::new(),
+            scroll: ScrollHandle::new(),
+        }
+    }
+}
+
 struct PreviewUiState {
     canvas_file_id: Option<String>,
     canvas: PreviewCanvasState,
@@ -473,6 +505,7 @@ struct PreviewUiState {
     crop_mode: bool,
     draft_crop: Option<CropRect>,
     crop_aspect: String,
+    crop_options: CropOptionsUiState,
     crop_drag: Option<PreviewCropDragState>,
     overlay_file_id: Option<String>,
     overlay: PreviewOverlayState,
@@ -510,6 +543,7 @@ impl Default for PreviewUiState {
             crop_mode: false,
             draft_crop: None,
             crop_aspect: "free".to_string(),
+            crop_options: CropOptionsUiState::default(),
             crop_drag: None,
             overlay_file_id: None,
             overlay: PreviewOverlayState::new(),
@@ -798,6 +832,7 @@ struct SettingsRenderState<'a> {
     active_tab: SettingsTab,
     tooltip_visible_id: Option<&'a str>,
     config: &'a ConversionConfig,
+    crop_editing: bool,
     metadata: Option<&'a SourceMetadata>,
     metadata_status: MetadataStatus,
     metadata_error: Option<&'a str>,
@@ -835,6 +870,7 @@ struct SettingsRenderState<'a> {
 
 #[derive(Clone, Copy)]
 struct SettingsVideoInputFocuses<'a> {
+    resolution_locked: bool,
     width: Option<&'a FocusHandle>,
     height: Option<&'a FocusHandle>,
     bitrate: Option<&'a FocusHandle>,

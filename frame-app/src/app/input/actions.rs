@@ -97,12 +97,19 @@ impl FrameRoot {
 
     pub(in crate::app) fn text_input_disabled(&self, kind: FrameTextInputKind) -> bool {
         self.update_installation_in_progress()
+            || (self.preview_ui.crop_mode
+                && matches!(
+                    kind,
+                    FrameTextInputKind::VideoCustomWidth | FrameTextInputKind::VideoCustomHeight
+                ))
             || (kind != FrameTextInputKind::MaxConcurrency
                 && self.file_queue.selected_file_locked())
     }
 
     pub(in crate::app) fn text_input_value(&self, kind: FrameTextInputKind) -> String {
         match kind {
+            FrameTextInputKind::CropWidth => self.preview_ui.crop_options.width.clone(),
+            FrameTextInputKind::CropHeight => self.preview_ui.crop_options.height.clone(),
             FrameTextInputKind::MaxConcurrency => self.settings_ui.max_concurrency_draft.clone(),
             FrameTextInputKind::OutputName => self
                 .file_queue
@@ -196,6 +203,23 @@ impl FrameRoot {
         candidate: &str,
     ) -> Option<String> {
         match kind {
+            FrameTextInputKind::CropWidth | FrameTextInputKind::CropHeight => {
+                if self.text_input_disabled(kind) || !self.preview_ui.crop_mode {
+                    return None;
+                }
+                let next = sanitize_number_input(candidate);
+                if !self.preview_ui.crop_options.custom_dirty {
+                    self.preview_ui.crop_options.custom_edit_base = self.preview_ui.draft_crop;
+                }
+                if kind == FrameTextInputKind::CropWidth {
+                    self.preview_ui.crop_options.width.clone_from(&next);
+                } else {
+                    self.preview_ui.crop_options.height.clone_from(&next);
+                }
+                self.preview_ui.crop_options.custom_dirty = true;
+                self.preview_custom_crop_values();
+                Some(next)
+            }
             FrameTextInputKind::MaxConcurrency => {
                 let next = sanitize_number_input(candidate);
                 if self.settings_ui.max_concurrency_draft != next {

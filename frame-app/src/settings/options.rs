@@ -804,8 +804,43 @@ pub fn video_pixel_format_options(config: &ConversionConfig) -> Vec<VideoPixelFo
         .collect()
 }
 
+const SVT_AV1_PRESETS: [(&str, &str); 14] = [
+    ("0", "Preset 0"),
+    ("1", "Preset 1"),
+    ("2", "Preset 2"),
+    ("3", "Preset 3"),
+    ("4", "Preset 4"),
+    ("5", "Preset 5"),
+    ("6", "Preset 6"),
+    ("7", "Preset 7"),
+    ("8", "Preset 8"),
+    ("9", "Preset 9"),
+    ("10", "Preset 10"),
+    ("11", "Preset 11"),
+    ("12", "Preset 12"),
+    ("13", "Preset 13"),
+];
+
 #[must_use]
 pub fn video_preset_options(config: &ConversionConfig, disabled: bool) -> Vec<VideoPresetOption> {
+    if config.video_codec == "libsvtav1" {
+        let selected = frame_core::utils::map_svt_av1_preset(&config.preset);
+        return SVT_AV1_PRESETS
+            .iter()
+            .map(|&(preset, label)| VideoPresetOption {
+                preset,
+                label,
+                caption: match preset {
+                    "0" => "Slowest encode, highest compression",
+                    "13" => "Fastest encode, lowest compression",
+                    "8" => "Balanced encoding speed",
+                    _ => "Lower numbers favor compression; higher numbers favor speed",
+                },
+                is_selected: selected == preset,
+                is_disabled: disabled,
+            })
+            .collect();
+    }
     VIDEO_PRESETS
         .iter()
         .map(|preset| {
@@ -1071,6 +1106,9 @@ pub fn is_hardware_video_codec(codec: &str) -> bool {
 
 #[must_use]
 pub fn is_video_preset_allowed(codec: &str, preset: &str) -> bool {
+    if codec == "libsvtav1" && SVT_AV1_PRESETS.iter().any(|(value, _)| *value == preset) {
+        return true;
+    }
     if is_videotoolbox_video_codec(codec) {
         return true;
     }

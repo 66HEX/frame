@@ -1,8 +1,7 @@
 use super::{
-    ASPECT_OPTIONS, ConversionConfig, CropRect, CropSettings, DEFAULT_CROP_SIZE, DEFAULT_CROP_X,
-    DEFAULT_CROP_Y, PreviewControlInput, PreviewMediaKind, PreviewMetadataStatus, PreviewRotation,
-    SourceMetadata, clamp_rect, preview_control_availability, preview_source_media_kind,
-    transform_crop_rect,
+    ConversionConfig, CropRect, CropSettings, DEFAULT_CROP_SIZE, DEFAULT_CROP_X, DEFAULT_CROP_Y,
+    PreviewControlInput, PreviewMediaKind, PreviewMetadataStatus, PreviewRotation, SourceMetadata,
+    clamp_rect, preview_control_availability, preview_source_media_kind, transform_crop_rect,
 };
 use crate::numeric::rounded_f64_to_u32;
 
@@ -170,7 +169,7 @@ pub(in crate::app) fn crop_aspect_id(crop: Option<&CropSettings>) -> &str {
 }
 
 pub(in crate::app) fn is_known_crop_aspect(aspect_id: &str) -> bool {
-    ASPECT_OPTIONS.iter().any(|option| option.id == aspect_id)
+    aspect_id == "free" || crate::preview::aspect_value(aspect_id).is_some()
 }
 
 pub(in crate::app) fn next_rotation(rotation: &str) -> String {

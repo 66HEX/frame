@@ -78,9 +78,12 @@ the final GPUI rendering.
 | `logs-active` | Logs tab with an active FFmpeg conversion | Log tab navigation, active file state, plain FFmpeg log rendering, progress line wrapping, monospaced text rendering, and scroll density. |
 | `preview-ready` | Workspace with a selected ready video source | Preview panel shell, selected video metadata, timeline controls, toolbar visibility, empty frame handling, and source video state. |
 | `preview-crop` | Preview panel with crop mode enabled | Crop aspect bar, crop overlay geometry, crop handles, preview toolbar coexistence, and canvas framing while editing crop bounds. |
+| `preview-crop-options` | Crop aspect ratio selector open | Standard select options, selected state, keyboard navigation, scrolling, and popover placement at different UI scales. |
+| `preview-crop-custom` | Custom crop fields with the Video tab visible | Ratio/pixel mode switching, width and height fields, validation, and live resolution synchronization. |
 | `settings-source` | Source settings tab with ready video metadata | File information rows, video stream metadata rows, source tab spacing, and selected source summary. |
 | `settings-output` | Output settings tab with a custom output name | Output filename field, container selection state, output tab layout, and long-name alignment. |
 | `settings-video` | Video settings tab with custom resolution and CRF mode | Video codec controls, custom width and height inputs, CRF controls, bitrate mode layout, and dense control grouping. |
+| `settings-video-av1` | SVT-AV1 selected with preset 4 and 10-bit pixels | Native preset numbers, encoding speed guidance, and the explicit 10-bit pixel format selection. |
 | `settings-audio` | Audio settings tab with an audio source and tracks | Audio codec controls, VBR quality, channel selection, volume and normalize controls, track selection rows, and audio-only source treatment. |
 | `settings-images` | Image settings tab with a selected PNG source | Image output controls, custom image dimensions, image-source metadata, and non-video settings visibility. |
 | `settings-metadata` | Metadata tab with source tags and output metadata drafts | Source metadata presentation, editable metadata fields, long value wrapping, and tag/value alignment. |

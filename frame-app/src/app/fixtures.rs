@@ -51,6 +51,26 @@ impl FrameRoot {
                 self.toggle_app_settings_appearance_popover(AppearancePopover::UiScale);
             }
             Some(VisualFixture::LogsActive) => self.apply_logs_active_fixture(),
+            Some(VisualFixture::PreviewCropOptions) => {
+                self.apply_preview_crop_fixture();
+                self.preview_ui.crop_options.popover = Some(CropSelect::Aspect);
+                self.set_crop_custom_mode(true);
+            }
+            Some(VisualFixture::PreviewCropCustom) => {
+                self.apply_preview_crop_fixture();
+                self.settings_ui.active_tab = SettingsTab::Video;
+                self.preview_ui.crop_options.popover = None;
+                self.preview_ui.crop_options.custom = true;
+                self.set_crop_custom_mode(false);
+            }
+            Some(VisualFixture::SettingsVideoAv1) => {
+                self.apply_settings_video_fixture();
+                if let Some(file) = self.file_queue.selected_file_mut() {
+                    file.config.video_codec = "libsvtav1".into();
+                    file.config.preset = "4".into();
+                    file.config.pixel_format = "yuv420p10le".into();
+                }
+            }
             Some(VisualFixture::PreviewCrop) => self.apply_preview_crop_fixture(),
             Some(VisualFixture::PreviewReady) => self.apply_preview_ready_fixture(),
             Some(VisualFixture::SettingsAudio) => self.apply_settings_audio_fixture(),
