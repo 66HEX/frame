@@ -1,8 +1,6 @@
 use dispatch2::{DispatchQueue, DispatchQueueGlobalPriority, DispatchTime, GlobalQueueIdentifier};
-use gpui::{
-    GLOBAL_THREAD_TIMINGS, PlatformDispatcher, Priority, RunnableMeta, RunnableVariant, TaskTiming,
-    ThreadTaskTimings, add_task_timing,
-};
+use gpui::{PlatformDispatcher, Priority, RunnableMeta, RunnableVariant};
+use gpui_util::ResultExt;
 use mach2::{
     kern_return::KERN_SUCCESS,
     mach_time::mach_timebase_info_data_t,
@@ -13,19 +11,10 @@ use mach2::{
         thread_precedence_policy_data_t, thread_time_constraint_policy_data_t,
     },
 };
-use util::ResultExt;
 
 use async_task::Runnable;
-use objc::{
-    class, msg_send,
-    runtime::{BOOL, YES},
-    sel, sel_impl,
-};
-use std::{
-    ffi::c_void,
-    ptr::NonNull,
-    time::{Duration, Instant},
-};
+use objc2_foundation::NSThread;
+use std::{ffi::c_void, ptr::NonNull, time::Duration};
 
 pub(crate) struct MacDispatcher;
 
@@ -36,18 +25,8 @@ impl MacDispatcher {
 }
 
 impl PlatformDispatcher for MacDispatcher {
-    fn get_all_timings(&self) -> Vec<ThreadTaskTimings> {
-        let global_timings = GLOBAL_THREAD_TIMINGS.lock();
-        ThreadTaskTimings::convert(&global_timings)
-    }
-
-    fn get_current_thread_timings(&self) -> ThreadTaskTimings {
-        gpui::profiler::get_current_thread_task_timings()
-    }
-
     fn is_main_thread(&self) -> bool {
-        let is_main_thread: BOOL = unsafe { msg_send![class!(NSThread), isMainThread] };
-        is_main_thread == YES
+        NSThread::isMainThread_class()
     }
 
     fn dispatch(&self, runnable: RunnableVariant, priority: Priority) {
@@ -184,18 +163,8 @@ extern "C" fn trampoline(context: *mut c_void) {
         unsafe { Runnable::<RunnableMeta>::from_raw(NonNull::new_unchecked(context as *mut ())) };
 
     let location = runnable.metadata().location;
-
-    let start = Instant::now();
-    let mut timing = TaskTiming {
-        location,
-        start,
-        end: None,
-    };
-
-    add_task_timing(timing);
-
+    let spawned = runnable.metadata().spawned;
+    gpui::profiler::update_running_task(spawned, location);
     runnable.run();
-
-    timing.end = Some(Instant::now());
-    add_task_timing(timing);
+    gpui::profiler::save_task_timing();
 }

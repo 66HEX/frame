@@ -2,17 +2,17 @@
 //!
 //! This replaces the macOS-only `HeadlessMetalAppContext` with a platform-neutral
 //! implementation backed by `TestPlatform`. Tests supply a real `PlatformTextSystem`
-//! (e.g. `DirectWriteTextSystem` on Windows, `MacTextSystem` on macOS) to get
-//! accurate glyph measurements while keeping everything else deterministic.
+//! to get accurate glyph measurements while keeping everything else deterministic.
 //!
 //! Optionally, a renderer factory can be provided to enable real GPU rendering
 //! and screenshot capture via [`HeadlessAppContext::capture_screenshot`].
 
 use crate::{
-    AnyView, AnyWindowHandle, App, AppCell, AppContext, AssetSource, BackgroundExecutor, Bounds,
-    Context, Entity, EntityId, ForegroundExecutor, Global, Pixels, PlatformHeadlessRenderer,
-    PlatformTextSystem, Render, Reservation, Size, Task, TestDispatcher, TestPlatform, TextSystem,
-    Window, WindowBounds, WindowHandle, WindowOptions,
+    AnyView, AnyWindowHandle, App, AppCell, AppContext, AssetRegistry, AssetSource,
+    BackgroundExecutor, Bounds, Context, Entity, EntityId, EventEmitter, ForegroundExecutor,
+    Global, Hsla, Pixels, PlatformHeadlessRenderer, PlatformTextSystem, Render, Reservation,
+    ScaledPixels, Size, Task, TestDispatcher, TestPlatform, TextSystem, Window, WindowBounds,
+    WindowHandle, WindowOptions,
     app::{GpuiBorrow, GpuiMode},
 };
 use anyhow::Result;
@@ -28,7 +28,9 @@ use std::{future::Future, rc::Rc, sync::Arc, time::Duration};
 /// # Usage
 ///
 /// ```ignore
-/// let text_system = Arc::new(gpui_wgpu::CosmicTextSystem::new("fallback"));
+/// let text_system = Arc::new(gpui_parley::ParleyTextSystem::new(
+///     gpui_parley::SystemFonts::Load,
+/// ));
 /// let mut cx = HeadlessAppContext::with_platform(
 ///     text_system,
 ///     Arc::new(Assets),
@@ -88,7 +90,11 @@ impl HeadlessAppContext {
 
         let text_system = Arc::new(TextSystem::new(platform_text_system));
         let http_client = crate::http_client::FakeHttpClient::with_404_response();
-        let app = App::new_app(platform, asset_source, http_client);
+        let app = App::new_app(
+            platform,
+            AssetRegistry::from(asset_source).into(),
+            http_client,
+        );
         app.borrow_mut().mode = GpuiMode::test();
 
         Self {
@@ -115,12 +121,10 @@ impl HeadlessAppContext {
 
         let mut cx = self.app.borrow_mut();
         cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                focus: false,
-                show: false,
-                ..Default::default()
-            },
+            WindowOptions::new()
+                .window_bounds(Some(WindowBounds::Windowed(bounds)))
+                .focus(false)
+                .show(false),
             build_root,
         )
     }
@@ -159,6 +163,74 @@ impl HeadlessAppContext {
     ) -> Result<R> {
         let mut app = self.app.borrow_mut();
         app.update_window(window, f)
+    }
+
+    /// Returns the most recently rendered bounds for an element's debug selector.
+    pub fn debug_bounds(
+        &mut self,
+        window: AnyWindowHandle,
+        selector: &str,
+    ) -> Result<Option<Bounds<Pixels>>> {
+        self.update_window(window, |_, window, _| {
+            window.rendered_frame.debug_bounds.get(selector).copied()
+        })
+    }
+
+    /// Returns the device-pixel bounds of rendered solid quads with the requested color.
+    pub fn solid_quad_bounds(
+        &mut self,
+        window: AnyWindowHandle,
+        color: Hsla,
+    ) -> Result<Vec<Bounds<ScaledPixels>>> {
+        let color = color.into();
+        self.update_window(window, |_, window, _| {
+            window
+                .rendered_frame
+                .scene
+                .quads
+                .iter()
+                .filter(|quad| quad.background.solid == color)
+                .map(|quad| quad.bounds)
+                .collect()
+        })
+    }
+
+    /// Returns the device-pixel bounds of painted monochrome glyphs of this color.
+    pub fn glyph_bounds(
+        &mut self,
+        window: AnyWindowHandle,
+        color: Hsla,
+    ) -> Result<Vec<Bounds<ScaledPixels>>> {
+        let color = color.into();
+        self.update_window(window, |_, window, _| {
+            window
+                .rendered_frame
+                .scene
+                .monochrome_sprites
+                .iter()
+                .filter(|sprite| sprite.color == color)
+                .map(|sprite| sprite.bounds)
+                .collect()
+        })
+    }
+
+    /// Returns the device-pixel bounds of painted underlines of this color.
+    pub fn underline_bounds(
+        &mut self,
+        window: AnyWindowHandle,
+        color: Hsla,
+    ) -> Result<Vec<Bounds<ScaledPixels>>> {
+        let color = color.into();
+        self.update_window(window, |_, window, _| {
+            window
+                .rendered_frame
+                .scene
+                .underlines
+                .iter()
+                .filter(|underline| underline.color == color)
+                .map(|underline| underline.bounds)
+                .collect()
+        })
     }
 
     /// Captures a screenshot from a window.
@@ -238,6 +310,20 @@ impl AppContext for HeadlessAppContext {
         app.read_entity(handle, read)
     }
 
+    fn notify(&mut self, entity_id: EntityId) {
+        let mut app = self.app.borrow_mut();
+        app.notify(entity_id);
+    }
+
+    fn emit<EntityType, EventType>(&mut self, entity: &Entity<EntityType>, event: EventType)
+    where
+        EntityType: EventEmitter<EventType>,
+        EventType: 'static,
+    {
+        let mut app = self.app.borrow_mut();
+        app.emit(entity, event)
+    }
+
     fn update_window<T, F>(&mut self, window: AnyWindowHandle, f: F) -> Result<T>
     where
         F: FnOnce(AnyView, &mut Window, &mut App) -> T,
@@ -280,5 +366,22 @@ impl AppContext for HeadlessAppContext {
     {
         let app = self.app.borrow();
         app.read_global(callback)
+    }
+
+    fn insert_global_entity<T: 'static>(&mut self, entity: Entity<T>) {
+        let mut app = self.app.borrow_mut();
+        app.insert_global_entity(entity)
+    }
+
+    fn remove_global_entity<T: 'static>(&mut self, entity: &Entity<T>) {
+        let mut app = self.app.borrow_mut();
+        app.remove_global_entity(entity)
+    }
+
+    fn global_entities<T: 'static>(&self) -> impl Iterator<Item = Entity<T>> {
+        let app = self.app.borrow();
+        let iter = app.global_entities();
+        // Cloning the iterator here so that lock can be released when function is going out of scope
+        iter.collect::<Vec<_>>().into_iter()
     }
 }

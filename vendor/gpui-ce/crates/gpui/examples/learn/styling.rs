@@ -8,9 +8,10 @@
 
 use gpui::colors::Colors;
 use gpui::{
-    App, Bounds, Context, FocusHandle, Hsla, KeyBinding, Menu, MenuItem, Render, Rgba, Window,
-    WindowBounds, WindowOptions, actions, div, prelude::*, px, rgb, size,
+    App, Bounds, ColorExt, Context, FocusHandle, Hsla, KeyBinding, Menu, MenuItem, Render, Rgba,
+    Window, WindowBounds, WindowOptions, actions, div, prelude::*, px, rgb, size,
 };
+use palette::{IntoColor, WithAlpha};
 
 actions!(styling_example, [Quit, Tab, TabPrev]);
 
@@ -35,8 +36,8 @@ fn interactive_button(
         .bg(accent)
         .text_color(text)
         .text_sm()
-        .hover(move |style| style.bg(accent_hover))
-        .active(move |style| style.bg(accent_active))
+        .hover_style(move |style| style.bg(accent_hover))
+        .active_style(move |style| style.bg(accent_active))
         .child(label)
 }
 
@@ -64,9 +65,9 @@ fn focus_button(
         .text_sm()
         .border_2()
         .border_color(gpui::transparent_black())
-        .hover(move |style| style.bg(surface_hover))
-        .focus(move |style| style.border_color(accent))
-        .focus_visible(move |style| style.border_color(focus_ring).shadow_sm())
+        .hover_style(move |style| style.bg(surface_hover))
+        .focus_style(move |style| style.border_color(accent))
+        .focus_visible_style(move |style| style.border_color(focus_ring).shadow_sm())
         .child(label)
 }
 
@@ -147,7 +148,7 @@ fn list_item(
                 .text_color(text_muted)
         })
         .when(!is_disabled && is_selected, move |el| {
-            let accent_bg: Hsla = accent.into();
+            let accent_bg: Hsla = accent.into_color();
             el.bg(accent_bg.opacity(0.2))
                 .border_color(accent)
                 .text_color(text)
@@ -155,7 +156,7 @@ fn list_item(
         .when(!is_disabled && !is_selected, move |el| {
             el.bg(surface)
                 .text_color(text)
-                .hover(move |style| style.bg(surface_hover))
+                .hover_style(move |style| style.bg(surface_hover))
         })
         .child(label)
 }
@@ -221,7 +222,7 @@ fn card_with_group_hover(
         .border_1()
         .border_color(border)
         .cursor_pointer()
-        .hover(move |style| style.border_color(accent))
+        .hover_style(move |style| style.border_color(accent))
         .child(
             div()
                 .flex()
@@ -239,7 +240,7 @@ fn card_with_group_hover(
                         .text_xs()
                         .text_color(text_muted)
                         .opacity(0.)
-                        .group_hover("card", |style| style.opacity(1.))
+                        .group_hover_style("card", |style| style.opacity(1.))
                         .child("→"),
                 ),
         )
@@ -438,8 +439,8 @@ impl Render for StylingExample {
 }
 
 fn section(colors: &Colors, title: &'static str, content: impl IntoElement) -> impl IntoElement {
-    let surface: Hsla = colors.container.into();
-    let border: Hsla = colors.border.into();
+    let surface: Hsla = colors.container.into_color();
+    let border: Hsla = colors.border.into_color();
 
     div()
         .flex()
@@ -474,7 +475,7 @@ fn color_swatch(colors: &Colors, name: &'static str, color: Rgba) -> impl IntoEl
                 .rounded_md()
                 .bg(color)
                 .border_1()
-                .border_color(gpui::white().opacity(0.2)),
+                .border_color(gpui::white().with_alpha(0.2)),
         )
         .child(div().text_xs().text_color(text_muted).child(name))
 }
@@ -502,10 +503,7 @@ fn main() {
 
         let bounds = Bounds::centered(None, size(px(550.), px(800.)), cx);
         cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                ..Default::default()
-            },
+            WindowOptions::new().window_bounds(Some(WindowBounds::Windowed(bounds))),
             |window, cx| cx.new(|cx| StylingExample::new(window, cx)),
         )
         .expect("Failed to open window");

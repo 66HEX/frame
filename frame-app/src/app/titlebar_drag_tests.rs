@@ -71,7 +71,7 @@ fn titlebar_window(
             _subscription: subscription,
         }
     });
-    cx.update(|window, _| window.activate_window());
+    cx.update(|window, _| window.activate());
     cx.simulate_resize(size(px(1800.0), px(500.0)));
     cx.run_until_parked();
     let root = view.read_with(cx, |view, _| view.root.clone());
@@ -80,9 +80,9 @@ fn titlebar_window(
 }
 
 fn draw(cx: &mut VisualTestContext) {
-    cx.update(|window, cx| window.draw(cx).clear());
+    cx.update(|window, cx| window.draw(cx).clear(cx));
     cx.run_until_parked();
-    cx.update(|window, cx| window.draw(cx).clear());
+    cx.update(|window, cx| window.draw(cx).clear(cx));
 }
 
 fn drag_is_armed(root: &Entity<FrameRoot>, cx: &VisualTestContext) -> bool {
@@ -231,17 +231,19 @@ fn macos_blank_titlebar_double_click_does_not_arm_a_drag() {
 }
 
 #[test]
-fn titlebar_hover_without_a_pressed_button_cancels_a_missed_release() {
+fn pointer_motion_inside_or_outside_titlebar_cancels_a_missed_release() {
     let mut app = TestAppContext::single();
     let (root, cx) = titlebar_window(&mut app, FrameTitlebarPlatform::Macos, false);
-    cx.simulate_mouse_down(
-        blank_titlebar_point(),
-        MouseButton::Left,
-        Modifiers::default(),
-    );
-    assert!(drag_is_armed(&root, cx));
-    cx.simulate_mouse_move(blank_titlebar_point(), None, Modifiers::default());
-    assert!(!drag_is_armed(&root, cx));
+    for position in [blank_titlebar_point(), point(px(600.0), px(200.0))] {
+        cx.simulate_mouse_down(
+            blank_titlebar_point(),
+            MouseButton::Left,
+            Modifiers::default(),
+        );
+        assert!(drag_is_armed(&root, cx));
+        cx.simulate_mouse_move(position, None, Modifiers::default());
+        assert!(!drag_is_armed(&root, cx));
+    }
     cx.simulate_mouse_down(
         blank_titlebar_point(),
         MouseButton::Right,

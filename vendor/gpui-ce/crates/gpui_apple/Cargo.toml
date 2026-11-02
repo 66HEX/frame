@@ -1,0 +1,45 @@
+[package]
+name = "gpui_ce_apple"
+version = "0.1.0"
+description.workspace = true
+edition.workspace = true
+publish.workspace = true
+license = "Apache-2.0"
+
+[lints]
+workspace = true
+
+[lib]
+name = "gpui_apple"
+path = "src/gpui_apple.rs"
+
+[features]
+default = []
+bench-support = ["gpui/bench-support"]
+test-support = ["gpui/test-support"]
+
+[dependencies]
+gpui.workspace = true
+gpui_render.workspace = true
+wgsl-rs.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+anyhow.workspace = true
+block.workspace = true
+collections.workspace = true
+core-foundation.workspace = true
+core-graphics.workspace = true
+core-video.workspace = true
+derive_more.workspace = true
+etagere.workspace = true
+foreign-types.workspace = true
+image.workspace = true
+log.workspace = true
+metal.workspace = true
+objc2.workspace = true
+objc2-quartz-core.workspace = true
+parking_lot.workspace = true
+smallvec.workspace = true
+
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+gpui = { workspace = true, features = ["test-support"] }

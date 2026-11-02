@@ -82,6 +82,22 @@ impl AppContext for AsyncApp {
         lock.read_entity(handle, callback)
     }
 
+    fn notify(&mut self, entity_id: EntityId) {
+        let app = self.app();
+        let mut lock = app.borrow_mut();
+        lock.notify(entity_id);
+    }
+
+    fn emit<EntityType, EventType>(&mut self, entity: &Entity<EntityType>, event: EventType)
+    where
+        EntityType: EventEmitter<EventType>,
+        EventType: 'static,
+    {
+        let app = self.app();
+        let mut lock = app.borrow_mut();
+        lock.emit(entity, event)
+    }
+
     fn update_window<T, F>(&mut self, window: AnyWindowHandle, f: F) -> Result<T>
     where
         F: FnOnce(AnyView, &mut Window, &mut App) -> T,
@@ -139,6 +155,26 @@ impl AppContext for AsyncApp {
         let mut lock = app.borrow_mut();
         lock.update(|this| this.read_global(callback))
     }
+
+    fn insert_global_entity<T: 'static>(&mut self, entity: Entity<T>) {
+        let app = self.app();
+        let mut lock = app.borrow_mut();
+        lock.insert_global_entity(entity)
+    }
+
+    fn remove_global_entity<T: 'static>(&mut self, entity: &Entity<T>) {
+        let app = self.app();
+        let mut lock = app.borrow_mut();
+        lock.remove_global_entity(entity)
+    }
+
+    fn global_entities<T: 'static>(&self) -> impl Iterator<Item = Entity<T>> {
+        let app = self.app();
+        let mut lock = app.borrow_mut();
+        let iter = lock.global_entities();
+        // Cloning the iterator here so that lock can be released when function is going out of scope
+        iter.collect::<Vec<_>>().into_iter()
+    }
 }
 
 impl AsyncApp {
@@ -146,7 +182,9 @@ impl AsyncApp {
     pub fn refresh(&self) {
         let app = self.app();
         let mut lock = app.borrow_mut();
-        lock.refresh_windows();
+        // A direct call would leave the refresh effect queued, which cannot wake
+        // a platform render loop that has already parked.
+        lock.update(|cx| cx.refresh_windows());
     }
 
     /// Get an executor which can be used to spawn futures in the background.
@@ -441,6 +479,18 @@ impl AppContext for AsyncWindowContext {
         self.app.read_entity(handle, read)
     }
 
+    fn notify(&mut self, entity_id: EntityId) {
+        self.app.notify(entity_id);
+    }
+
+    fn emit<EntityType, EventType>(&mut self, entity: &Entity<EntityType>, event: EventType)
+    where
+        EntityType: EventEmitter<EventType>,
+        EventType: 'static,
+    {
+        self.app.emit(entity, event)
+    }
+
     fn update_window<T, F>(&mut self, window: AnyWindowHandle, update: F) -> Result<T>
     where
         F: FnOnce(AnyView, &mut Window, &mut App) -> T,
@@ -480,6 +530,18 @@ impl AppContext for AsyncWindowContext {
         G: Global,
     {
         self.app.read_global(callback)
+    }
+
+    fn insert_global_entity<T: 'static>(&mut self, entity: Entity<T>) {
+        self.app.insert_global_entity(entity)
+    }
+
+    fn remove_global_entity<T: 'static>(&mut self, entity: &Entity<T>) {
+        self.app.remove_global_entity(entity)
+    }
+
+    fn global_entities<T: 'static>(&self) -> impl Iterator<Item = Entity<T>> {
+        self.app.global_entities()
     }
 }
 

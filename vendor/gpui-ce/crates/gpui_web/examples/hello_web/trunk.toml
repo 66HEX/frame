@@ -1,7 +1,13 @@
+[build]
+locked = true
+no_sri = true
+
 [serve]
 addresses = ["127.0.0.1"]
 port = 8080
 open = true
+no_spa = true
 
-# Headers required for WebGPU / SharedArrayBuffer support.
-headers = { "Cross-Origin-Embedder-Policy" = "require-corp", "Cross-Origin-Opener-Policy" = "same-origin" }
+# Headers required for WebGPU / SharedArrayBuffer support. Disable caching so
+# browser reloads cannot retain references to removed hashed build artifacts.
+headers = { "Cache-Control" = "no-store", "Cross-Origin-Embedder-Policy" = "require-corp", "Cross-Origin-Opener-Policy" = "same-origin" }

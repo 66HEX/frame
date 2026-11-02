@@ -1,5 +1,5 @@
 use crate::{
-    AnyView, AnyWindowHandle, AppContext, AsyncApp, DispatchPhase, Effect, EntityId, EventEmitter,
+    AnyView, AnyWindowHandle, AppContext, AsyncApp, DispatchPhase, EntityId, EventEmitter,
     FocusHandle, FocusOutEvent, Focusable, Global, KeystrokeObserver, Priority, Reservation,
     SubscriberSet, Subscription, Task, WeakEntity, WeakFocusHandle, Window, WindowHandle,
 };
@@ -767,15 +767,7 @@ impl<T> Context<'_, T> {
         T: EventEmitter<Evt>,
         Evt: 'static,
     {
-        let event = self
-            .event_arena
-            .alloc(|| event)
-            .map(|it| it as &mut dyn Any);
-        self.app.pending_effects.push_back(Effect::Emit {
-            emitter: self.entity_state.entity_id,
-            event_type: TypeId::of::<Evt>(),
-            event,
-        });
+        self.app.emit(&self.entity(), event);
     }
 }
 
@@ -825,6 +817,20 @@ impl<T> AppContext for Context<'_, T> {
     }
 
     #[inline]
+    fn notify(&mut self, entity_id: EntityId) {
+        self.app.notify(entity_id)
+    }
+
+    #[inline]
+    fn emit<EntityType, EventType>(&mut self, entity: &Entity<EntityType>, event: EventType)
+    where
+        EntityType: EventEmitter<EventType>,
+        EventType: 'static,
+    {
+        self.app.emit(entity, event)
+    }
+
+    #[inline]
     fn update_window<R, F>(&mut self, window: AnyWindowHandle, update: F) -> Result<R>
     where
         F: FnOnce(AnyView, &mut Window, &mut App) -> R,
@@ -867,6 +873,21 @@ impl<T> AppContext for Context<'_, T> {
         G: Global,
     {
         self.app.read_global(callback)
+    }
+
+    #[inline]
+    fn insert_global_entity<E: 'static>(&mut self, entity: Entity<E>) {
+        self.app.insert_global_entity(entity)
+    }
+
+    #[inline]
+    fn remove_global_entity<E: 'static>(&mut self, entity: &Entity<E>) {
+        self.app.remove_global_entity(entity)
+    }
+
+    #[inline]
+    fn global_entities<E: 'static>(&self) -> impl Iterator<Item = Entity<E>> {
+        self.app.global_entities()
     }
 }
 

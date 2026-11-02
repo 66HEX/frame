@@ -485,8 +485,8 @@ fn compact_text_button_variant_inner(
             this.shadow(button_highlight_shadows(palette))
         })
         .when(enabled, |this| {
-            this.hover(gpui::Styled::cursor_pointer)
-                .active(move |style| {
+            this.hover_style(gpui::Styled::cursor_pointer)
+                .active_style(move |style| {
                     style
                         .bg(color(colors.active_background))
                         .text_color(color(colors.hover_foreground))

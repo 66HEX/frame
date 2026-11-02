@@ -153,7 +153,7 @@ fn button(
         .text_color(colors.selected_text)
         .bg(colors.selected)
         .cursor_pointer()
-        .hover(move |style| style.bg(bg_hover))
+        .hover_style(move |style| style.bg(bg_hover))
         .child(label)
 }
 
@@ -163,10 +163,7 @@ fn main() {
 
         let bounds = Bounds::centered(None, size(px(500.), px(360.)), cx);
         cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                ..Default::default()
-            },
+            WindowOptions::new().window_bounds(Some(WindowBounds::Windowed(bounds))),
             |_, cx| cx.new(|_| KeyringExample::new()),
         )
         .expect("Failed to open window");

@@ -9,10 +9,11 @@
 
 use gpui::colors::Colors;
 use gpui::{
-    App, Bounds, Context, Hsla, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Path,
-    PathBuilder, Pixels, Point, Render, Rgba, Window, WindowBounds, WindowOptions, canvas, div,
-    fill, point, prelude::*, px, rgb, size,
+    App, Bounds, ColorExt, Context, Hsla, MouseButton, MouseDownEvent, MouseMoveEvent,
+    MouseUpEvent, PaintQuad, Path, PathBuilder, Pixels, Point, Render, Rgba, Window, WindowBounds,
+    WindowOptions, canvas, div, point, prelude::*, px, rgb, size,
 };
+use palette::IntoColor;
 
 #[path = "../shared/prelude.rs"]
 mod example_prelude;
@@ -32,31 +33,31 @@ fn basic_shapes_canvas(colors: &Colors) -> impl IntoElement {
         move |_bounds, _window, _cx| {},
         move |bounds, _prepaint_state, window, _cx| {
             // Draw a filled rectangle
-            window.paint_quad(fill(
-                Bounds {
+            window.paint_quad(
+                PaintQuad::new(Bounds {
                     origin: point(bounds.origin.x + px(10.), bounds.origin.y + px(10.)),
                     size: size(px(60.), px(40.)),
-                },
-                error,
-            ));
+                })
+                .background(error),
+            );
 
             // Draw another rectangle
-            window.paint_quad(fill(
-                Bounds {
+            window.paint_quad(
+                PaintQuad::new(Bounds {
                     origin: point(bounds.origin.x + px(80.), bounds.origin.y + px(10.)),
                     size: size(px(60.), px(40.)),
-                },
-                success,
-            ));
+                })
+                .background(success),
+            );
 
             // Draw a third rectangle
-            window.paint_quad(fill(
-                Bounds {
+            window.paint_quad(
+                PaintQuad::new(Bounds {
                     origin: point(bounds.origin.x + px(150.), bounds.origin.y + px(10.)),
                     size: size(px(60.), px(40.)),
-                },
-                accent,
-            ));
+                })
+                .background(accent),
+            );
         },
     )
     .size_full()
@@ -333,7 +334,7 @@ impl Render for DrawingCanvas {
                             .text_sm()
                             .text_color(text)
                             .cursor_pointer()
-                            .hover(move |s| s.bg(error_hover))
+                            .hover_style(move |s| s.bg(error_hover))
                             .child("Clear")
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.clear(cx);
@@ -430,7 +431,7 @@ fn section(
     content: impl IntoElement,
     height: Pixels,
 ) -> impl IntoElement {
-    let surface: Hsla = colors.container.into();
+    let surface: Hsla = colors.container.into_color();
 
     div()
         .flex()
@@ -467,10 +468,7 @@ fn main() {
     gpui_platform::application().run(|cx: &mut App| {
         let bounds = Bounds::centered(None, size(px(550.), px(800.)), cx);
         cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                ..Default::default()
-            },
+            WindowOptions::new().window_bounds(Some(WindowBounds::Windowed(bounds))),
             |_, cx| cx.new(|cx| CustomDrawingExample::new(cx)),
         )
         .expect("Failed to open window");

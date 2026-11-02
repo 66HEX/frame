@@ -89,14 +89,15 @@ impl Element for FrameTextInputElement {
         };
         let mut style = window.text_style();
         style.color = if is_placeholder || self.disabled {
-            color(self.palette.text_muted).into()
+            gpui::rgb_to_hsla(color(self.palette.text_muted))
         } else {
-            color(self.palette.text_primary).into()
+            gpui::rgb_to_hsla(color(self.palette.text_primary))
         };
 
         let run = TextRun {
             len: display_text.len(),
             font: style.font(),
+            letter_spacing: None,
             color: style.color,
             background_color: None,
             underline: None,
@@ -105,13 +106,13 @@ impl Element for FrameTextInputElement {
         let font_size = style.font_size.to_pixels(window.rem_size());
         let line = window
             .text_system()
-            .shape_line(display_text, font_size, &[run], None);
+            .shape_line(display_text, font_size, &[run]);
         let metrics = frame_text_input_metrics(root);
         let text_top = bounds.top() + (bounds.size.height - px(metrics.caret_height)) / 2.0;
         let focused = self.focus_handle.is_focused(window);
         let should_reveal_cursor =
             focused && root.text_input_ui.active == Some(self.kind) && !is_placeholder;
-        let cursor_x = line.x_for_index(cursor_offset);
+        let cursor_x = text_line_x_for_index(&line, cursor_offset);
         let scroll_x = if is_placeholder {
             Pixels::ZERO
         } else if should_reveal_cursor {
@@ -132,28 +133,24 @@ impl Element for FrameTextInputElement {
             && selected_range.is_empty();
 
         let cursor = show_cursor.then(|| {
-            fill(
-                Bounds::new(
-                    point(bounds.left() + cursor_x - scroll_x, text_top),
-                    size(px(metrics.caret_width), px(metrics.caret_height)),
-                ),
-                color(self.palette.text_primary),
-            )
+            gpui::PaintQuad::new(Bounds::new(
+                point(bounds.left() + cursor_x - scroll_x, text_top),
+                size(px(metrics.caret_width), px(metrics.caret_height)),
+            ))
+            .background(color(self.palette.text_primary))
         });
         let selection = (!selected_range.is_empty()).then(|| {
-            fill(
-                Bounds::from_corners(
-                    point(
-                        bounds.left() + line.x_for_index(selected_range.start) - scroll_x,
-                        text_top,
-                    ),
-                    point(
-                        bounds.left() + line.x_for_index(selected_range.end) - scroll_x,
-                        text_top + px(metrics.caret_height),
-                    ),
+            gpui::PaintQuad::new(Bounds::from_corners(
+                point(
+                    bounds.left() + text_line_x_for_index(&line, selected_range.start) - scroll_x,
+                    text_top,
                 ),
-                color(self.palette.accent.with_alpha(0.30)),
-            )
+                point(
+                    bounds.left() + text_line_x_for_index(&line, selected_range.end) - scroll_x,
+                    text_top + px(metrics.caret_height),
+                ),
+            ))
+            .background(color(self.palette.accent.with_alpha(0.30)))
         });
 
         FrameTextInputPrepaintState {
@@ -197,25 +194,31 @@ impl Element for FrameTextInputElement {
         let text_top =
             bounds.top() + (bounds.size.height - px(prepaint.metrics.caret_height)) / 2.0;
         let scroll_x = prepaint.scroll_x;
-        window.with_content_mask(Some(gpui::ContentMask { bounds }), |window| {
-            if let Some(selection) = prepaint.selection.take() {
-                window.paint_quad(selection);
-            }
+        window.with_content_mask(
+            Some(gpui::ContentMask {
+                bounds,
+                ..Default::default()
+            }),
+            |window| {
+                if let Some(selection) = prepaint.selection.take() {
+                    window.paint_quad(selection);
+                }
 
-            line.paint(
-                point(bounds.left() - scroll_x, text_top),
-                px(prepaint.metrics.caret_height),
-                gpui::TextAlign::Left,
-                None,
-                window,
-                cx,
-            )
-            .ok();
+                line.paint(
+                    point(bounds.left() - scroll_x, text_top),
+                    px(prepaint.metrics.caret_height),
+                    gpui::TextAlign::Left,
+                    None,
+                    window,
+                    cx,
+                )
+                .ok();
 
-            if let Some(cursor) = prepaint.cursor.take() {
-                window.paint_quad(cursor);
-            }
-        });
+                if let Some(cursor) = prepaint.cursor.take() {
+                    window.paint_quad(cursor);
+                }
+            },
+        );
 
         self.owner.update(cx, |root, _cx| {
             let runtime = root.text_input_runtime_mut(kind);

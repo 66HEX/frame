@@ -155,8 +155,8 @@ fn frame_text_button_inner(
             this.shadow(button_highlight_shadows(palette))
         })
         .when(enabled, |this| {
-            this.hover(gpui::Styled::cursor_pointer)
-                .active(move |style| style.bg(color(colors.active_background)))
+            this.hover_style(gpui::Styled::cursor_pointer)
+                .active_style(move |style| style.bg(color(colors.active_background)))
         })
         .when(!enabled, gpui::Styled::cursor_not_allowed)
         .child(display_label);
@@ -321,8 +321,8 @@ fn frame_icon_button_inner(
         .text_color(animated_foreground)
         .opacity(opacity)
         .when(enabled, |this| {
-            this.hover(gpui::Styled::cursor_pointer)
-                .active(move |style| style.bg(color(active_background)))
+            this.hover_style(gpui::Styled::cursor_pointer)
+                .active_style(move |style| style.bg(color(active_background)))
         })
         .when(!enabled, gpui::Styled::cursor_not_allowed)
         .child(icon);

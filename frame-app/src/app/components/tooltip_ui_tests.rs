@@ -93,7 +93,7 @@ fn preview_window(cx: &mut TestAppContext) -> (Entity<FrameRoot>, &mut VisualTes
             _subscription: subscription,
         }
     });
-    cx.update(|window, _| window.activate_window());
+    cx.update(|window, _| window.activate());
     cx.run_until_parked();
     let root = view.read_with(cx, |view, _| view.root.clone());
     (root, cx)
@@ -101,11 +101,11 @@ fn preview_window(cx: &mut TestAppContext) -> (Entity<FrameRoot>, &mut VisualTes
 
 fn draw(cx: &mut VisualTestContext) {
     cx.update(|window, cx| {
-        window.draw(cx).clear();
+        window.draw(cx).clear(cx);
     });
     cx.run_until_parked();
     cx.update(|window, cx| {
-        window.draw(cx).clear();
+        window.draw(cx).clear(cx);
     });
 }
 

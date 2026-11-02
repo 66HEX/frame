@@ -1,108 +1,141 @@
-# gpui - Community Edition
+<img src="assets/readme/banner.png" alt="GPUI Community Edition banner" width="100%">
 
-A community fork of [GPUI](https://gpui.rs), Zed's GPU-accelerated UI framework.
+<p align="center">
+  <a href="https://gpui-ce.github.io">Website</a> ​ · ​ <a href="crates/gpui/examples/learn">Examples</a> ​ · ​ <a href="https://discord.gg/ENGHGjrYEn">Discord</a>
+</p>
 
-## Usage
+# GPUI - Community Edition
 
-```toml
-[dependencies]
-gpui = { package = "gpui-ce", version = "0.3" }
-gpui_platform = { git = "https://github.com/gpui-ce/gpui-ce" }
+GPUI-CE is a fork of Zed's [GPUI](https://gpui.rs) UI Framework.
 
-# for test support...
-[dev-dependencies]
-gpui = { package = "gpui-ce", version = "0.3", features = ["test-support"] }
-```
+It's mostly API compatible with upstream, but that is changing!
 
-or for using the git version
+## Overview:
 
-```toml
-gpui = { package = "gpui", git = "https://github.com/gpui-ce/gpui-ce" }
-```
+- Web-inspired Styling & Layout
 
-Then use `gpui::{import}` as normal.
+  Build views with familiar elements, flex layouts, and Tailwind-style methods:
+
+  ```rust
+  div()
+      .id("some_id_123")
+      .flex()
+      .items_center()
+      .gap_2()
+      .rounded_lg()
+      .rounded_smoothing(0.8)
+      .bg(rgba(0xffffff30))
+      .backdrop_blur(px(12.0))
+      .transitions(|transitions| transitions.bg(millis(200)))
+      .hover_style(|style| style.bg(rgba(0xffffff60)))
+      .child("Hello, GPUI")
+  ```
+
+  [Layout example](crates/gpui/examples/learn/layout.rs) ​ · ​ [Styling example](crates/gpui/examples/learn/styling.rs)
+
+- State and events
+
+  Use `Entity<T>` to access view and shared application state. Observe changes and call `cx.notify()` when state changes to notify observers and update the view. For a view with a `count` field:
+
+  ```rust
+  div()
+      .id("counter")
+      .child(format!("Count: {}", self.count))
+      .on_click(cx.listener(|this, _event, _window, cx| {
+          this.count += 1;
+          cx.notify();
+      }))
+  ```
+
+  [Interaction example](crates/gpui/examples/learn/interactive_elements.rs)
+
+- Actions and keybinds
+
+  Define typed actions and bind them to keyboard shortcuts. Call `register_keybinds` during app setup to bind Space and Backspace in the focused counter:
+
+  ```rust
+  use gpui::{App, KeyBinding, actions};
+
+  actions!(keybinds_example, [Increment, Reset]);
+
+  fn register_keybinds(cx: &mut App) {
+      cx.bind_keys([
+          KeyBinding::new("space", Increment, Some("Counter")),
+          KeyBinding::new("backspace", Reset, Some("Counter")),
+      ]);
+  }
+  ```
+
+  Connect the view's focus handle and action handlers:
+
+  ```rust
+  div()
+      .key_context("Counter")
+      .track_focus(&self.focus_handle)
+      .on_action(cx.listener(Self::increment))
+      .on_action(cx.listener(Self::reset))
+      .child(format!("Count: {}", self.count))
+  ```
+
+  [Keybind example](crates/gpui/examples/learn/actions_and_keybinds.rs)
+
+- Virtualized lists
+
+  Use `uniform_list` for large collections of equal-height rows. GPUI requests the item ranges needed for the visible area as you scroll.
+
+  ```rust
+  uniform_list("items", 10_000, |range, _window, _cx| {
+      range
+          .map(|index| {
+              div()
+                  .h(px(24.0))
+                  .child(format!("Item {index}"))
+          })
+          .collect()
+  })
+  .h(px(300.0))
+  ```
+
+  [List example](crates/gpui/examples/learn/uniform_list.rs)
+
+- Custom drawing
+
+  Use `canvas` to paint directly within a view. Implement `Element` when you need control over layout and rendering, such as for a code editor or custom widget.
+
+  ```rust
+  canvas(
+      |_bounds, _window, _cx| {},
+      |bounds, _state, window, _cx| {
+          window.paint_quad(PaintQuad::new(bounds).background(rgb(0x5078f0)));
+      },
+  )
+  .size(px(80.0))
+  ```
+
+  [Drawing example](crates/gpui/examples/learn/custom_drawing.rs)
 
 ## FAQ
-#### How does the project compare to other forks in the ecosystem?
-Other efforts (namely WGPUI) are actively maintained, but have diverged quite a bit from mainline usage. They typically serve the interests of the projects that they're used within, leading to a diverse yet fragmented ecosystem. GPUI-CE strives to focus on the general use-case first, and over time, grow in the facilities to support the same outside adaptations through a single consistent API.
 
-#### What is the long-term goal of GPUI-CE?
-We'd like to be a premiere Rust GUI library! For the time being, we're working incrementally, in an effort to better understand the codebase and where is the right direction to take it, so we're okay being limited by mainline Zed. We will not stay this way forever! The spirit of the project is independence, so "limited" is loose, and we have and will continue to add features that mainline will never have. We will make your contribution work :)
+- Q: What is our AI Policy?
+  A: See the [genAI/LLM Policy document](AI_POLICY.md). GPUI-CE is a framework "Made by Humans". We value community participation and take time to understand contributors' intentions and offer guidance.
 
-If you'd like to join discussions and help us forge an path forward, please join the discord.
+- Q: What is the long-term goal of GPUI-CE?
+  A: To become the go-to Rust GUI library for applications of any size. We want reusable components, native platform integration, and control over performance. We build on Zed's work and continue to bring in upstream fixes.
 
-#### Can I use GPUI-CE with gpui-component?
-100% Because we're a drop-in for GPUI, any component library or surrounding project should work 1:1 through the use of a [patch block](https://doc.rust-lang.org/cargo/reference/overriding-dependencies.html). DO NOTE: We track the latest upstream -- if there's breaking changes and the library you're pulling in hasn't updated yet, gpui-ce cannot help you. Otherwise, we treat any mismatches as bugs.
+- Q: How does the project compare to other forks in the ecosystem?
+  A: Other forks often develop around the applications that use them. GPUI-CE aims to support a broad range of applications, with a focus on stability.
 
-Example:
-```toml
-# If they're using the crates release
-[patch.crates-io]
-gpui = { git = "https://github.com/gpui-ce/gpui-ce", package = "gpui-ce" }
+## Contributing
 
-# If they're using the git remote
-[patch."https://github.com/zed-industries/zed.git"]
-gpui = { git = "https://github.com/gpui-ce/gpui-ce" }
-```
+Read the [contributing](CONTRIBUTING.md) and [genAI/LLM Policy](AI_POLICY.md) documents, which fully outline everything you need to know about how this project is maintained and what maintainers expect from contributors and contributions.
 
-#### Is there a community I could... join?
-For sure! Join the [discord](https://discord.gg/vNdskJSfWd)
+While you will need to read both documents in full to contribute, they can be summarized as:
+- use github discussions to discuss potential bugs or feature requests
+- issue tracker is all actionable work for anyone to pick up
+- there is a vouch system for new contributors to get maintainer approval for changes
+- issues and PRs from non-vouched contributors will be automatically closed
+- all commits/PRs must update the changelog if they affect functionality
+- there are commit content and description guidelines (see contributing doc)
+- do not use genAI/LLMs to create code or prose, and all other forms of usage must be disclosed
 
-<!-- todo: rewrite below... -->
-
-# Welcome to GPUI!
-
-GPUI is a hybrid immediate and retained mode, GPU accelerated, UI framework
-for Rust, designed to support a wide variety of applications.
-
-Everything in GPUI starts with an `Application`. You can create one with `gpui_platform::application()`, and kick off your application by passing a callback to `Application::run()`. Inside this callback, you can create a new window with `App::open_window()`, and register your first root view. See [gpui.rs](https://www.gpui.rs/) for a complete example.
-
-### Dependencies
-
-GPUI has various system dependencies that it needs in order to work.
-
-#### macOS
-
-On macOS, GPUI uses Metal for rendering. In order to use Metal, you need to do the following:
-
-- Install [Xcode](https://apps.apple.com/us/app/xcode/id497799835?mt=12) from the macOS App Store, or from the [Apple Developer](https://developer.apple.com/download/all/) website. Note this requires a developer account.
-
-> Ensure you launch Xcode after installing, and install the macOS components, which is the default option.
-
-- Install [Xcode command line tools](https://developer.apple.com/xcode/resources/)
-
-  ```sh
-  xcode-select --install
-  ```
-
-- Ensure that the Xcode command line tools are using your newly installed copy of Xcode:
-
-  ```sh
-  sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
-  ```
-
-## The Big Picture
-
-GPUI offers three different [registers](<https://en.wikipedia.org/wiki/Register_(sociolinguistics)>) depending on your needs:
-
-- State management and communication with `Entity`'s. Whenever you need to store application state that communicates between different parts of your application, you'll want to use GPUI's entities. Entities are owned by GPUI and are only accessible through an owned smart pointer similar to an `Rc`. See the `app::context` module for more information.
-
-- High level, declarative UI with views. All UI in GPUI starts with a view. A view is simply an `Entity` that can be rendered, by implementing the `Render` trait. At the start of each frame, GPUI will call this render method on the root view of a given window. Views build a tree of `elements`, lay them out and style them with a tailwind-style API, and then give them to GPUI to turn into pixels. See the `div` element for an all purpose swiss-army knife of rendering.
-
-- Low level, imperative UI with Elements. Elements are the building blocks of UI in GPUI, and they provide a nice wrapper around an imperative API that provides as much flexibility and control as you need. Elements have total control over how they and their child elements are rendered and can be used for making efficient views into large lists, implement custom layouting for a code editor, and anything else you can think of. See the `element` module for more information.
-
-Each of these registers has one or more corresponding contexts that can be accessed from all GPUI services. This context is your main interface to GPUI, and is used extensively throughout the framework.
-
-## Other Resources
-
-In addition to the systems above, GPUI provides a range of smaller services that are useful for building complex applications:
-
-- Actions are user-defined structs that are used for converting keystrokes into logical operations in your UI. Use this for implementing keyboard shortcuts, such as cmd-q. See the `action` module for more information.
-
-- Platform services, such as `quit the app` or `open a URL` are available as methods on the `app::App`.
-
-- An async executor that is integrated with the platform's event loop. See the `executor` module for more information.,
-
-- The `[gpui::test]` macro provides a convenient way to write tests for your GPUI applications. Tests also have their own kind of context, a `TestAppContext` which provides ways of simulating common platform input. See `app::test_context` and `test` modules for more details.
-
-Currently, the best way to learn about these APIs is to read the Zed source code or drop a question in the [Zed Discord](https://zed.dev/community-links). We're working on improving the documentation, creating more examples, and will be publishing more guides to GPUI on our [blog](https://zed.dev/blog).
+Then read the [setup guide](SETUP.md) for installation instructions.

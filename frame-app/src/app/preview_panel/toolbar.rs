@@ -330,8 +330,8 @@ fn preview_tool_button_inner(
         })
         .when(!enabled, gpui::Styled::cursor_not_allowed)
         .when(enabled, |this| {
-            this.hover(gpui::Styled::cursor_pointer)
-                .active(move |style| {
+            this.hover_style(gpui::Styled::cursor_pointer)
+                .active_style(move |style| {
                     style
                         .bg(color(colors.active_background))
                         .text_color(color(colors.hover_foreground))

@@ -1,23 +1,27 @@
 [package]
-name = "gpui"
+name = "gpui-ce"
 version = "0.2.2"
 edition.workspace = true
 authors = ["Nathan Sobo <nathan@zed.dev>"]
-description = "Zed's GPU-accelerated UI framework"
-repository = "https://github.com/zed-industries/zed"
+description = "A community fork of Zed's GPU-accelerated UI framework"
+repository = "https://github.com/gpui-ce/gpui-ce"
 publish = true
 license = "Apache-2.0"
-homepage = "https://gpui.rs"
+homepage = "https://gpui-ce.github.io/"
 readme = "README.md"
 keywords = ["desktop", "gui", "immediate"]
 categories = ["gui"]
-
+rust-version = "1.95"                                                  # required for Vec::push_mut
 
 [lints]
 workspace = true
 
 [features]
-default = ["font-kit", "wayland", "x11", "windows-manifest"]
+default = ["font-kit", "wayland", "x11", "windows-manifest", "image-default-formats"]
+# Enables the opt-in custom WGPU control API on platforms that support shared
+# texture surfaces.
+custom-gpu = []
+wgpu-surfaces = []
 test-support = [
   "leak-detection",
   "collections/test-support",
@@ -25,29 +29,39 @@ test-support = [
   "x11",
   "proptest",
 ]
+bench-support = ["profiler", "dep:criterion"]
+# Preserve the published feature name while consumers migrate to `bench-support`.
+bench = ["bench-support"]
 inspector = ["gpui_macros/inspector"]
 leak-detection = ["backtrace"]
-wayland = ["bitflags"]
-x11 = ["scap?/x11"]
-screen-capture = ["scap"]
+wayland = ["gpui_platform/wayland"]
+x11 = ["gpui_platform/x11"]
+screen-capture = ["dep:windows-capture"]
 windows-manifest = ["dep:embed-resource"]
-input-latency-histogram = ["dep:hdrhistogram"]
+profiler = ["dep:hdrhistogram"]
+stacker = ["dep:stacksafe"]
+embedded-assets = ["dep:rust-embed"]
+hot-patching = ["dep:dioxus-devtools", "dep:subsecond"]
+image-default-formats = ["image/default-formats"]
 
 [lib]
+name = "gpui"
 path = "src/gpui.rs"
 doctest = false
 
 [dependencies]
 accesskit.workspace = true
 anyhow.workspace = true
-async-task = "4.7"
+async-task.workspace = true
 backtrace = { workspace = true, optional = true }
-bitflags = { workspace = true, optional = true }
+bitflags.workspace = true
 
 collections.workspace = true
+criterion = { workspace = true, optional = true }
 ctor.workspace = true
 derive_more.workspace = true
-etagere = "0.2"
+derive_setters.workspace = true
+etagere.workspace = true
 futures.workspace = true
 futures-concurrency.workspace = true
 gpui_macros.workspace = true
@@ -60,24 +74,26 @@ log.workspace = true
 num_cpus = "1.13"
 parking = "2.0.0"
 parking_lot.workspace = true
+palette.workspace = true
+phf.workspace = true
 postage.workspace = true
 proptest = { workspace = true, optional = true }
 chrono.workspace = true
 profiling.workspace = true
 rand.workspace = true
-raw-window-handle = "0.6"
+raw-window-handle.workspace = true
 regex.workspace = true
 refineable.workspace = true
 scheduler.workspace = true
-resvg = { version = "0.45.0", default-features = false, features = [
+resvg = { version = "0.48.1", default-features = false, features = [
   "text",
   "system-fonts",
   "memmap-fonts",
   "raster-images",
 ] }
-usvg = { version = "0.45.0", default-features = false }
-ttf-parser = "0.25"
-util_macros.workspace = true
+rust-embed = { version = "8.12", optional = true }
+usvg = { version = "0.48.1", default-features = false }
+skrifa.workspace = true
 schemars.workspace = true
 seahash = "4.1"
 serde.workspace = true
@@ -85,86 +101,94 @@ serde_json.workspace = true
 slotmap.workspace = true
 smallvec.workspace = true
 async-channel.workspace = true
-stacksafe.workspace = true
+stacksafe = { workspace = true, optional = true }
 strum.workspace = true
 sum_tree.workspace = true
-taffy = "=0.10.1"
+taffy = "=0.13.0"
 thiserror.workspace = true
+tracing.workspace = true
 gpui_util.workspace = true
+unicode-segmentation.workspace = true
+unicode-bidi.workspace = true
 hdrhistogram = { workspace = true, optional = true }
 waker-fn = "1.2.0"
 lyon = "1.0"
 pin-project = "1.1.10"
-spin = "0.12.2"
+spin = "0.10.0"
 pollster.workspace = true
 url.workspace = true
 uuid.workspace = true
 web-time.workspace = true
+heapless.workspace = true
 
 [target.'cfg(target_family = "wasm")'.dependencies]
-# The scheduler still uses rand 0.9, so both getrandom versions need the JS backend.
 getrandom = { version = "0.3.4", features = ["wasm_js"] }
-getrandom_04 = { package = "getrandom", version = "0.4.3", features = ["wasm_js"] }
 uuid = { workspace = true, features = ["js"] }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+dioxus-devtools = { version = "=0.7.10", features = ["serve"], optional = true }
+subsecond = { version = "=0.7.10", optional = true }
 
 
 [target.'cfg(target_os = "macos")'.dependencies]
-block = "0.1"
-cocoa.workspace = true
-cocoa-foundation.workspace = true
-core-foundation.workspace = true
-core-foundation-sys.workspace = true
-core-graphics = "0.24"
 core-video.workspace = true
 core-text = "21"
-# WARNING: If you change this, you must also publish a new version of zed-font-kit to crates.io
-font-kit = { git = "https://github.com/zed-industries/font-kit", rev = "94b0f28166665e8fd2f53ff6d268a14955c82269", package = "zed-font-kit", version = "0.14.1-zed", optional = true }
+font-kit = { version = "0.14.1-zed", package = "zed-font-kit", optional = true }
 foreign-types = "0.5"
 log.workspace = true
-media.workspace = true
-objc.workspace = true
-objc2 = { version = "0.6", optional = true }
+objc2 = { workspace = true, optional = true }
 objc2-metal = { version = "0.3", optional = true }
-mach2.workspace = true
-#TODO: replace with "objc2"
-metal.workspace = true
 
-[target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "macos"))'.dependencies]
-pathfinder_geometry = "0.5"
-
-[target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "windows"))'.dependencies]
-scap = { workspace = true, optional = true }
+[target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
 
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows = { version = "0.62", features = ["Win32_Foundation"] }
+windows = { workspace = true, features = [
+  "Win32_Foundation",
+  "Win32_System_Power",
+] }
+windows-capture = { workspace = true, optional = true }
+windows-061 = { workspace = true, features = ["Win32_Graphics_Direct3D11"] }
 
 
 [dev-dependencies]
+accesskit_consumer.workspace = true
 backtrace.workspace = true
 smol.workspace = true
 collections = { workspace = true, features = ["test-support"] }
 env_logger.workspace = true
-gpui_platform = { workspace = true, features = ["font-kit", "wayland", "x11"] }
+gpui_ce_elements = { path = "../gpui_elements" }
+gpui_platform = { workspace = true, features = ["font-kit"] }
+gpui_fonts = { path = "../gpui_ce_fonts", version = "0.2.2", package = "gpui-ce-fonts" }
 gpui_util = { workspace = true }
 lyon = { version = "1.0", features = ["extra"] }
-proptest = { workspace = true }
 rand.workspace = true
 scheduler = { workspace = true, features = ["test-support"] }
-unicode-segmentation = { workspace = true }
+image = { workspace = true, features = ["png"] }
 
+[target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
+proptest = { workspace = true }
 
 [target.'cfg(target_family = "wasm")'.dev-dependencies]
 wasm-bindgen = { workspace = true }
-gpui_web.workspace = true
+web-sys = { version = "0.3", features = ["console"] }
 
 [build-dependencies]
 embed-resource = { version = "3.0", optional = true }
 
 [target.'cfg(target_os = "macos")'.build-dependencies]
-bindgen = "0.71"
-cbindgen = { version = "0.28.0", default-features = false }
+bindgen = "0.72"
 
+[package.metadata.cargo-shear]
+ignored = [
+  "bindgen",
+  "font-kit",
+  "getrandom",
+  "objc2",
+  "objc2-metal",
+  "tracing",
+]
+ignored-paths = ["src/_ownership_and_data_flow.rs"]
 
 # ============================================================================
 # Learn Examples - Educational examples for learning GPUI
@@ -173,6 +197,14 @@ cbindgen = { version = "0.28.0", default-features = false }
 [[example]]
 name = "interactive_elements"
 path = "examples/learn/interactive_elements.rs"
+
+[[example]]
+name = "actions_and_keybinds"
+path = "examples/learn/actions_and_keybinds.rs"
+
+[[example]]
+name = "uniform_list"
+path = "examples/learn/uniform_list.rs"
 
 [[example]]
 name = "creating_components"
@@ -203,12 +235,28 @@ name = "text"
 path = "examples/learn/text.rs"
 
 [[example]]
-name = "transition"
-path = "examples/learn/transition.rs"
+name = "transitions"
+path = "examples/learn/transitions.rs"
+
+[[example]]
+name = "style_transitions"
+path = "examples/learn/style_transitions.rs"
+
+[[example]]
+name = "motion_showcase"
+path = "examples/learn/motion_showcase.rs"
+
+[[example]]
+name = "haptic_feedback"
+path = "examples/learn/haptic_feedback.rs"
 
 [[example]]
 name = "blur"
 path = "examples/learn/blur.rs"
+
+[[example]]
+name = "corner_smoothing"
+path = "examples/learn/corner_smoothing.rs"
 
 [[example]]
 name = "keyring"
@@ -259,8 +307,8 @@ name = "image_loading"
 path = "examples/legacy/image_loading.rs"
 
 [[example]]
-name = "input"
-path = "examples/legacy/input.rs"
+name = "inline_layout"
+path = "examples/legacy/inline_layout.rs"
 
 [[example]]
 name = "layer_shell"
@@ -289,10 +337,6 @@ path = "examples/legacy/tab_stop.rs"
 [[example]]
 name = "tree"
 path = "examples/legacy/tree.rs"
-
-[[example]]
-name = "uniform_list"
-path = "examples/legacy/uniform_list.rs"
 
 [[example]]
 name = "window"

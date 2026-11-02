@@ -203,7 +203,8 @@ impl Render for FrameRoot {
         if overlay_toolbar_active && !overlay_toolbar_panel_focus.contains_focused(window, cx) {
             overlay_toolbar_first_focus.focus(window, cx);
         }
-        let content = div().flex_1().p(theme::ui_rem(CONTENT_PADDING));
+        // Let the workspace shrink to the window even when settings have long content.
+        let content = div().flex_1().min_h_0().p(theme::ui_rem(CONTENT_PADDING));
         let active_content_view = if state.file_count == 0 {
             None
         } else {

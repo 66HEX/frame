@@ -32,13 +32,13 @@
 //! your own custom layout algorithm or rendering a code editor.
 
 use crate::{
-    App, ArenaBox, AvailableSpace, Bounds, Context, DispatchNodeId, ElementId, FocusHandle,
-    InspectorElementId, LayoutId, Pixels, Point, SharedString, Size, Style, Window,
+    A11ySubtreeBuilder, App, ArenaBox, AvailableSpace, Bounds, Context, DispatchNodeId, ElementId,
+    FocusHandle, InspectorElementId, LayoutId, Pixels, Point, Size, Style, Window,
     util::FluentBuilder, window::with_element_arena,
 };
 use derive_more::{Deref, DerefMut};
 use std::{
-    any::{Any, type_name},
+    any::Any,
     fmt::{self, Debug, Display},
     mem, panic,
     sync::Arc,
@@ -104,7 +104,8 @@ pub trait Element: 'static + IntoElement {
     );
 
     /// Returns the accessible role for this element, if any.
-    /// Elements that return `None` are not included in the accessibility tree.
+    /// Elements that return `None` have no accessibility node unless
+    /// [`Element::is_a11y_hidden`] returns `true`.
     ///
     /// Note: inclusion in accessibility tree requires non-`None` [`id`][Element::id].
     ///
@@ -113,11 +114,39 @@ pub trait Element: 'static + IntoElement {
         None
     }
 
+    /// Whether assistive technology should ignore this element and its
+    /// descendants.
+    ///
+    /// GPUI gives a hidden element without a role an internal container node.
+    /// AccessKit uses that node to omit the subtree.
+    fn is_a11y_hidden(&self) -> bool {
+        false
+    }
+
     /// Write accessibility properties to the given node.
-    /// Called only when `a11y_role()` returns `Some`.
+    /// GPUI calls this only when [`Element::a11y_role`] returns `Some` or
+    /// [`Element::is_a11y_hidden`] returns `true`.
     ///
     /// See the [accessibility guide](crate::_accessibility) for an overview.
     fn write_a11y_info(&self, _node: &mut accesskit::Node) {}
+
+    /// Add synthetic child nodes to an [`Element`]. The element must have an
+    /// [`.id()`][Element::id]. It must also have a
+    /// [`.role()`][Element::a11y_role] or return `true` from
+    /// [`Element::is_a11y_hidden`].
+    ///
+    /// Some elements may want to inject accessibility nodes that do not
+    /// correspond to any GPUI element. For example, a custom text field element
+    /// may want to inject synthetic child nodes for the text content.
+    ///
+    /// See [Synthetic children](crate::_accessibility#synthetic-children) in
+    /// the accessibility guide for more detail.
+    fn a11y_synthetic_children(
+        &mut self,
+        _prepaint: &mut Self::PrepaintState,
+        _builder: &mut A11ySubtreeBuilder,
+    ) {
+    }
 
     /// Convert this element into a dynamically-typed [`AnyElement`].
     fn into_any(self) -> AnyElement {
@@ -167,6 +196,33 @@ pub trait RenderOnce: 'static {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement;
 }
 
+/// A variation on [`ParentElement`] which only supports children of a particular type.
+pub trait ParentElementTyped {
+    /// The specific item type that this element accepts (could simply implement IntoElement or be an element itself).
+    type Child;
+
+    /// Extend this element's children with the given child elements.
+    fn extend(&mut self, elements: impl IntoIterator<Item = Self::Child>);
+
+    /// Add a single child element to this element.
+    fn child(mut self, child: Self::Child) -> Self
+    where
+        Self: Sized,
+    {
+        self.extend(std::iter::once(child));
+        self
+    }
+
+    /// Add multiple child elements to this element.
+    fn children(mut self, children: impl IntoIterator<Item = Self::Child>) -> Self
+    where
+        Self: Sized,
+    {
+        self.extend(children);
+        self
+    }
+}
+
 /// This is a helper trait to provide a uniform interface for constructing elements that
 /// can accept any number of any kind of child elements
 pub trait ParentElement {
@@ -188,116 +244,6 @@ pub trait ParentElement {
         Self: Sized,
     {
         self.extend(children.into_iter().map(|child| child.into_any_element()));
-        self
-    }
-}
-
-/// An element for rendering components. An implementation detail of the [`IntoElement`] derive macro
-/// for [`RenderOnce`]
-#[doc(hidden)]
-pub struct Component<C: RenderOnce> {
-    component: Option<C>,
-    #[cfg(debug_assertions)]
-    source: &'static core::panic::Location<'static>,
-}
-
-impl<C: RenderOnce> Component<C> {
-    /// Create a new component from the given RenderOnce type.
-    #[track_caller]
-    pub fn new(component: C) -> Self {
-        Component {
-            component: Some(component),
-            #[cfg(debug_assertions)]
-            source: core::panic::Location::caller(),
-        }
-    }
-}
-
-fn prepaint_component(
-    (element, name): &mut (AnyElement, &'static str),
-    window: &mut Window,
-    cx: &mut App,
-) {
-    window.with_id(ElementId::Name(SharedString::new_static(name)), |window| {
-        element.prepaint(window, cx);
-    })
-}
-
-fn paint_component(
-    (element, name): &mut (AnyElement, &'static str),
-    window: &mut Window,
-    cx: &mut App,
-) {
-    window.with_id(ElementId::Name(SharedString::new_static(name)), |window| {
-        element.paint(window, cx);
-    })
-}
-impl<C: RenderOnce> Element for Component<C> {
-    type RequestLayoutState = (AnyElement, &'static str);
-    type PrepaintState = ();
-
-    fn id(&self) -> Option<ElementId> {
-        None
-    }
-
-    fn source_location(&self) -> Option<&'static core::panic::Location<'static>> {
-        #[cfg(debug_assertions)]
-        return Some(self.source);
-
-        #[cfg(not(debug_assertions))]
-        return None;
-    }
-
-    fn request_layout(
-        &mut self,
-        _id: Option<&GlobalElementId>,
-        _inspector_id: Option<&InspectorElementId>,
-        window: &mut Window,
-        cx: &mut App,
-    ) -> (LayoutId, Self::RequestLayoutState) {
-        window.with_id(ElementId::Name(type_name::<C>().into()), |window| {
-            let mut element = self
-                .component
-                .take()
-                .unwrap()
-                .render(window, cx)
-                .into_any_element();
-
-            let layout_id = element.request_layout(window, cx);
-            (layout_id, (element, type_name::<C>()))
-        })
-    }
-
-    fn prepaint(
-        &mut self,
-        _id: Option<&GlobalElementId>,
-        _inspector_id: Option<&InspectorElementId>,
-        _: Bounds<Pixels>,
-        state: &mut Self::RequestLayoutState,
-        window: &mut Window,
-        cx: &mut App,
-    ) {
-        prepaint_component(state, window, cx);
-    }
-
-    fn paint(
-        &mut self,
-        _id: Option<&GlobalElementId>,
-        _inspector_id: Option<&InspectorElementId>,
-        _: Bounds<Pixels>,
-        state: &mut Self::RequestLayoutState,
-        _: &mut Self::PrepaintState,
-        window: &mut Window,
-        cx: &mut App,
-    ) {
-        paint_component(state, window, cx);
-    }
-}
-
-impl<C: RenderOnce> IntoElement for Component<C> {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
         self
     }
 }
@@ -375,6 +321,7 @@ enum ElementDrawPhase<RequestLayoutState, PrepaintState> {
         bounds: Bounds<Pixels>,
         request_layout: RequestLayoutState,
         prepaint: PrepaintState,
+        inline_fragments: Option<Arc<[Bounds<Pixels>]>>,
     },
     Painted,
 }
@@ -412,6 +359,24 @@ impl<E: Element> Drawable<E> {
                     inspector_id = None;
                 }
 
+                #[cfg(all(
+                    feature = "hot-patching",
+                    debug_assertions,
+                    not(target_family = "wasm")
+                ))]
+                let (layout_id, request_layout) = subsecond::HotFn::current(E::request_layout)
+                    .call((
+                        &mut self.element,
+                        global_id.as_ref(),
+                        inspector_id.as_ref(),
+                        window,
+                        cx,
+                    ));
+                #[cfg(not(all(
+                    feature = "hot-patching",
+                    debug_assertions,
+                    not(target_family = "wasm")
+                )))]
                 let (layout_id, request_layout) = self.element.request_layout(
                     global_id.as_ref(),
                     inspector_id.as_ref(),
@@ -459,7 +424,10 @@ impl<E: Element> Drawable<E> {
                 let mut pushed_a11y_node = false;
                 if window.a11y.is_active() {
                     if let Some(global_id) = global_id.as_ref() {
-                        if let Some(role) = self.element.a11y_role() {
+                        let hidden = self.element.is_a11y_hidden();
+                        let role = self.element.a11y_role();
+                        if role.is_some() || hidden {
+                            let role = role.unwrap_or(accesskit::Role::GenericContainer);
                             let node_id = global_id.accesskit_node_id();
                             let mut node = accesskit::Node::new(role);
                             let scale = window.scale_factor();
@@ -470,24 +438,102 @@ impl<E: Element> Drawable<E> {
                                 y1: ((bounds.origin.y.0 + bounds.size.height.0) * scale) as f64,
                             });
                             self.element.write_a11y_info(&mut node);
+                            if hidden {
+                                node.set_hidden();
+                            }
                             window.a11y.node_bounds.insert(node_id, bounds);
                             pushed_a11y_node = window.a11y.nodes.push(node_id, node);
+                            #[cfg(debug_assertions)]
+                            if pushed_a11y_node {
+                                let view = window
+                                    .a11y
+                                    .view_type_names
+                                    .get(&window.current_view())
+                                    .copied();
+                                let source_location = self.element.source_location();
+                                window.a11y.nodes.record_node_info(
+                                    node_id,
+                                    crate::window::a11y::debug::NodeDebugInfo {
+                                        synthetic: false,
+                                        view,
+                                        element_id: global_id.0.last().map(|id| format!("{id:?}")),
+                                        source_location,
+                                    },
+                                );
+                            }
                         }
                     }
                 }
 
                 let node_id = window.next_frame.dispatch_tree.push_node();
-                let prepaint = self.element.prepaint(
-                    global_id.as_ref(),
-                    inspector_id.as_ref(),
-                    bounds,
-                    &mut request_layout,
-                    window,
-                    cx,
+
+                let inline_fragments = window.inline_fragments(layout_id);
+                let previous_fragments = std::mem::replace(
+                    &mut window.current_inline_fragments,
+                    inline_fragments.clone(),
                 );
+
+                let mut prepaint = window.with_layout_direction_context(layout_id, |window| {
+                    #[cfg(all(
+                        feature = "hot-patching",
+                        debug_assertions,
+                        not(target_family = "wasm")
+                    ))]
+                    {
+                        subsecond::HotFn::current(E::prepaint).call((
+                            &mut self.element,
+                            global_id.as_ref(),
+                            inspector_id.as_ref(),
+                            bounds,
+                            &mut request_layout,
+                            window,
+                            cx,
+                        ))
+                    }
+
+                    #[cfg(not(all(
+                        feature = "hot-patching",
+                        debug_assertions,
+                        not(target_family = "wasm")
+                    )))]
+                    {
+                        self.element.prepaint(
+                            global_id.as_ref(),
+                            inspector_id.as_ref(),
+                            bounds,
+                            &mut request_layout,
+                            window,
+                            cx,
+                        )
+                    }
+                });
+
+                window.current_inline_fragments = previous_fragments;
                 window.next_frame.dispatch_tree.pop_node();
 
                 if pushed_a11y_node {
+                    if let Some(global_id) = global_id.as_ref() {
+                        #[cfg(debug_assertions)]
+                        let creator = crate::window::a11y::debug::NodeCreator {
+                            view: window
+                                .a11y
+                                .view_type_names
+                                .get(&window.current_view())
+                                .copied(),
+                            element_id: global_id.0.last().map(|id| format!("{id:?}")),
+                            source_location: self.element.source_location(),
+                        };
+                        let mut builder = A11ySubtreeBuilder::new(
+                            global_id.accesskit_node_id(),
+                            &mut window.a11y.nodes,
+                        );
+                        #[cfg(debug_assertions)]
+                        {
+                            builder = builder.with_creator(creator);
+                        }
+                        self.element
+                            .a11y_synthetic_children(&mut prepaint, &mut builder);
+                    }
                     window.a11y.nodes.pop();
                 }
 
@@ -502,6 +548,7 @@ impl<E: Element> Drawable<E> {
                     bounds,
                     request_layout,
                     prepaint,
+                    inline_fragments,
                 };
             }
             _ => panic!("must call request_layout before prepaint"),
@@ -521,6 +568,7 @@ impl<E: Element> Drawable<E> {
                 bounds,
                 mut request_layout,
                 mut prepaint,
+                inline_fragments,
                 ..
             } => {
                 if let Some(element_id) = self.element.id() {
@@ -529,6 +577,30 @@ impl<E: Element> Drawable<E> {
                 }
 
                 window.next_frame.dispatch_tree.set_active_node(node_id);
+
+                let previous_fragments =
+                    std::mem::replace(&mut window.current_inline_fragments, inline_fragments);
+
+                #[cfg(all(
+                    feature = "hot-patching",
+                    debug_assertions,
+                    not(target_family = "wasm")
+                ))]
+                subsecond::HotFn::current(E::paint).call((
+                    &mut self.element,
+                    global_id.as_ref(),
+                    inspector_id.as_ref(),
+                    bounds,
+                    &mut request_layout,
+                    &mut prepaint,
+                    window,
+                    cx,
+                ));
+                #[cfg(not(all(
+                    feature = "hot-patching",
+                    debug_assertions,
+                    not(target_family = "wasm")
+                )))]
                 self.element.paint(
                     global_id.as_ref(),
                     inspector_id.as_ref(),
@@ -543,6 +615,8 @@ impl<E: Element> Drawable<E> {
                     window.element_id_stack.pop();
                 }
 
+                window.current_inline_fragments = previous_fragments;
+
                 self.phase = ElementDrawPhase::Painted;
                 (request_layout, prepaint)
             }
@@ -550,12 +624,12 @@ impl<E: Element> Drawable<E> {
         }
     }
 
-    pub(crate) fn layout_as_root(
+    fn compute_layout_as_root(
         &mut self,
         available_space: Size<AvailableSpace>,
         window: &mut Window,
         cx: &mut App,
-    ) -> Size<Pixels> {
+    ) -> (LayoutId, Size<Pixels>) {
         if matches!(&self.phase, ElementDrawPhase::Start) {
             self.request_layout(window, cx);
         }
@@ -599,7 +673,16 @@ impl<E: Element> Drawable<E> {
             _ => panic!("cannot measure after painting"),
         };
 
-        window.layout_bounds(layout_id).size
+        (layout_id, window.layout_bounds(layout_id).size)
+    }
+
+    pub(crate) fn layout_as_root(
+        &mut self,
+        available_space: Size<AvailableSpace>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Size<Pixels> {
+        self.compute_layout_as_root(available_space, window, cx).1
     }
 }
 

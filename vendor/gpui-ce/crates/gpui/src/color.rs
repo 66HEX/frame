@@ -1,25 +1,37 @@
-use anyhow::{Context as _, bail};
+use palette::{IntoColor, OklabHue, Oklcha, RgbHue, WithAlpha};
 use schemars::{JsonSchema, json_schema};
-use serde::{
-    Deserialize, Deserializer, Serialize, Serializer,
-    de::{self, Visitor},
-};
-use std::borrow::Cow;
-use std::{
-    fmt::{self, Display, Formatter},
-    hash::{Hash, Hasher},
-};
+use serde::{Deserialize, Serialize};
+use std::fmt::{self, Display, Formatter};
+
+// Re-exported for api maintenance
+pub use palette::{Hsla, rgb::Rgba};
 
 /// Convert an RGB hex color code number to a color type
 pub fn rgb(hex: u32) -> Rgba {
     let [_, r, g, b] = hex.to_be_bytes().map(|b| (b as f32) / 255.0);
-    Rgba { r, g, b, a: 1.0 }
+    Rgba {
+        color: palette::rgb::Rgb::new(r, g, b),
+        alpha: 1.0,
+    }
 }
 
 /// Convert an RGBA hex color code number to [`Rgba`]
 pub fn rgba(hex: u32) -> Rgba {
     let [r, g, b, a] = hex.to_be_bytes().map(|b| (b as f32) / 255.0);
-    Rgba { r, g, b, a }
+    Rgba::new(r, g, b, a)
+}
+
+/// Convert an sRGB color to GPUI's HSL-with-alpha representation.
+///
+/// This is the explicit conversion boundary for APIs that store [`Hsla`]. It
+/// avoids exposing Palette's conversion traits to applications and examples.
+pub fn rgb_to_hsla(color: Rgba) -> Hsla {
+    color.into_color()
+}
+
+/// Convert GPUI's HSL-with-alpha representation to sRGB.
+pub fn hsla_to_rgba(color: Hsla) -> Rgba {
+    color.into_color()
 }
 
 /// Swap from RGBA with premultiplied alpha to BGRA
@@ -33,657 +45,252 @@ pub fn swap_rgba_pa_to_bgra(color: &mut [u8]) {
     }
 }
 
-/// An RGBA color
-#[derive(PartialEq, Clone, Copy, Default)]
-#[repr(C)]
-pub struct Rgba {
-    /// The red component of the color, in the range 0.0 to 1.0
-    pub r: f32,
-    /// The green component of the color, in the range 0.0 to 1.0
-    pub g: f32,
-    /// The blue component of the color, in the range 0.0 to 1.0
-    pub b: f32,
-    /// The alpha component of the color, in the range 0.0 to 1.0
-    pub a: f32,
-}
-
-impl fmt::Debug for Rgba {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "rgba({:#010x})", u32::from(*self))
-    }
-}
-
-impl Rgba {
-    /// Create a new [`Rgba`] color by blending this and another color together
-    pub fn blend(&self, other: Rgba) -> Self {
-        if other.a >= 1.0 {
-            other
-        } else if other.a <= 0.0 {
-            *self
-        } else {
-            Rgba {
-                r: (self.r * (1.0 - other.a)) + (other.r * other.a),
-                g: (self.g * (1.0 - other.a)) + (other.g * other.a),
-                b: (self.b * (1.0 - other.a)) + (other.b * other.a),
-                a: self.a,
-            }
-        }
-    }
-}
-
-impl From<Rgba> for u32 {
-    fn from(rgba: Rgba) -> Self {
-        let r = (rgba.r * 255.0) as u32;
-        let g = (rgba.g * 255.0) as u32;
-        let b = (rgba.b * 255.0) as u32;
-        let a = (rgba.a * 255.0) as u32;
-        (r << 24) | (g << 16) | (b << 8) | a
-    }
-}
-
-struct RgbaVisitor;
-
-impl Visitor<'_> for RgbaVisitor {
-    type Value = Rgba;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a string in the format #rrggbb or #rrggbbaa")
-    }
-
-    fn visit_str<E: de::Error>(self, value: &str) -> Result<Rgba, E> {
-        Rgba::try_from(value).map_err(E::custom)
-    }
-}
-
-impl JsonSchema for Rgba {
-    fn schema_name() -> Cow<'static, str> {
-        "Rgba".into()
-    }
-
-    fn json_schema(_generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        json_schema!({
-            "type": "string",
-            "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
-        })
-    }
-}
-
-impl<'de> Deserialize<'de> for Rgba {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        deserializer.deserialize_str(RgbaVisitor)
-    }
-}
-
-impl Serialize for Rgba {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let r = (self.r * 255.0).round() as u8;
-        let g = (self.g * 255.0).round() as u8;
-        let b = (self.b * 255.0).round() as u8;
-        let a = (self.a * 255.0).round() as u8;
-
-        let s = format!("#{r:02x}{g:02x}{b:02x}{a:02x}");
-        serializer.serialize_str(&s)
-    }
-}
-
-impl From<Hsla> for Rgba {
-    fn from(color: Hsla) -> Self {
-        let h = color.h;
-        let s = color.s;
-        let l = color.l;
-
-        let c = (1.0 - (2.0 * l - 1.0).abs()) * s;
-        let x = c * (1.0 - ((h * 6.0) % 2.0 - 1.0).abs());
-        let m = l - c / 2.0;
-        let cm = c + m;
-        let xm = x + m;
-
-        let (r, g, b) = match (h * 6.0).floor() as i32 {
-            0 | 6 => (cm, xm, m),
-            1 => (xm, cm, m),
-            2 => (m, cm, xm),
-            3 => (m, xm, cm),
-            4 => (xm, m, cm),
-            _ => (cm, m, xm),
-        };
-
-        Rgba {
-            r: r.clamp(0., 1.),
-            g: g.clamp(0., 1.),
-            b: b.clamp(0., 1.),
-            a: color.a,
-        }
-    }
-}
-
-impl TryFrom<&'_ str> for Rgba {
-    type Error = anyhow::Error;
-
-    fn try_from(value: &'_ str) -> Result<Self, Self::Error> {
-        const RGB: usize = "rgb".len();
-        const RGBA: usize = "rgba".len();
-        const RRGGBB: usize = "rrggbb".len();
-        const RRGGBBAA: usize = "rrggbbaa".len();
-
-        const EXPECTED_FORMATS: &str = "Expected #rgb, #rgba, #rrggbb, or #rrggbbaa";
-        const INVALID_UNICODE: &str = "invalid unicode characters in color";
-
-        let Some(("", hex)) = value.trim().split_once('#') else {
-            bail!("invalid RGBA hex color: '{value}'. {EXPECTED_FORMATS}");
-        };
-
-        let (r, g, b, a) = match hex.len() {
-            RGB | RGBA => {
-                let r = u8::from_str_radix(
-                    hex.get(0..1).with_context(|| {
-                        format!("{INVALID_UNICODE}: r component of #rgb/#rgba for value: '{value}'")
-                    })?,
-                    16,
-                )?;
-                let g = u8::from_str_radix(
-                    hex.get(1..2).with_context(|| {
-                        format!("{INVALID_UNICODE}: g component of #rgb/#rgba for value: '{value}'")
-                    })?,
-                    16,
-                )?;
-                let b = u8::from_str_radix(
-                    hex.get(2..3).with_context(|| {
-                        format!("{INVALID_UNICODE}: b component of #rgb/#rgba for value: '{value}'")
-                    })?,
-                    16,
-                )?;
-                let a = if hex.len() == RGBA {
-                    u8::from_str_radix(
-                        hex.get(3..4).with_context(|| {
-                            format!("{INVALID_UNICODE}: a component of #rgba for value: '{value}'")
-                        })?,
-                        16,
-                    )?
-                } else {
-                    0xf
-                };
-
-                /// Duplicates a given hex digit.
-                /// E.g., `0xf` -> `0xff`.
-                const fn duplicate(value: u8) -> u8 {
-                    (value << 4) | value
-                }
-
-                (duplicate(r), duplicate(g), duplicate(b), duplicate(a))
-            }
-            RRGGBB | RRGGBBAA => {
-                let r = u8::from_str_radix(
-                    hex.get(0..2).with_context(|| {
-                        format!(
-                            "{}: r component of #rrggbb/#rrggbbaa for value: '{}'",
-                            INVALID_UNICODE, value
-                        )
-                    })?,
-                    16,
-                )?;
-                let g = u8::from_str_radix(
-                    hex.get(2..4).with_context(|| {
-                        format!(
-                            "{INVALID_UNICODE}: g component of #rrggbb/#rrggbbaa for value: '{value}'"
-                        )
-                    })?,
-                    16,
-                )?;
-                let b = u8::from_str_radix(
-                    hex.get(4..6).with_context(|| {
-                        format!(
-                            "{INVALID_UNICODE}: b component of #rrggbb/#rrggbbaa for value: '{value}'"
-                        )
-                    })?,
-                    16,
-                )?;
-                let a = if hex.len() == RRGGBBAA {
-                    u8::from_str_radix(
-                        hex.get(6..8).with_context(|| {
-                            format!(
-                                "{INVALID_UNICODE}: a component of #rrggbbaa for value: '{value}'"
-                            )
-                        })?,
-                        16,
-                    )?
-                } else {
-                    0xff
-                };
-                (r, g, b, a)
-            }
-            _ => bail!("invalid RGBA hex color: '{value}'. {EXPECTED_FORMATS}"),
-        };
-
-        Ok(Rgba {
-            r: r as f32 / 255.,
-            g: g as f32 / 255.,
-            b: b as f32 / 255.,
-            a: a as f32 / 255.,
-        })
-    }
-}
-
-/// An HSLA color
-#[derive(Default, Copy, Clone, Debug)]
-#[repr(C)]
-pub struct Hsla {
-    /// Hue, in a range from 0 to 1
-    pub h: f32,
-
-    /// Saturation, in a range from 0 to 1
-    pub s: f32,
-
-    /// Lightness, in a range from 0 to 1
-    pub l: f32,
-
-    /// Alpha, in a range from 0 to 1
-    pub a: f32,
-}
-
-#[cfg(feature = "proptest")]
-mod property {
-    use super::Hsla;
-    use proptest::prelude::*;
-
-    impl Hsla {
-        /// Proptest [`Strategy`] that produces opaque colors (i.e. alpha = 1).
-        ///
-        /// For truly arbitrary colors, use the [`Arbitrary`] implementation.
-        pub fn opaque_strategy() -> impl Strategy<Value = Self> {
-            (0.0f32..=1.0, 0.0f32..=1.0, 0.0f32..=1.0).prop_map(|(h, s, l)| Hsla { h, s, l, a: 1. })
-        }
-    }
-
-    impl Arbitrary for Hsla {
-        type Strategy = BoxedStrategy<Self>;
-        type Parameters = ();
-
-        fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
-            (0.0f32..=1.0, 0.0f32..=1.0, 0.0f32..=1.0, 0.0f32..=1.0)
-                .prop_map(|(h, s, l, a)| Hsla { h, s, l, a })
-                .boxed()
-        }
-    }
-}
-
-impl PartialEq for Hsla {
-    fn eq(&self, other: &Self) -> bool {
-        self.h
-            .total_cmp(&other.h)
-            .then(self.s.total_cmp(&other.s))
-            .then(self.l.total_cmp(&other.l).then(self.a.total_cmp(&other.a)))
-            .is_eq()
-    }
-}
-
-impl PartialOrd for Hsla {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Hsla {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.h
-            .total_cmp(&other.h)
-            .then(self.s.total_cmp(&other.s))
-            .then(self.l.total_cmp(&other.l).then(self.a.total_cmp(&other.a)))
-    }
-}
-
-impl Eq for Hsla {}
-
-impl Hash for Hsla {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write_u32(u32::from_be_bytes(self.h.to_be_bytes()));
-        state.write_u32(u32::from_be_bytes(self.s.to_be_bytes()));
-        state.write_u32(u32::from_be_bytes(self.l.to_be_bytes()));
-        state.write_u32(u32::from_be_bytes(self.a.to_be_bytes()));
-    }
-}
-
-impl Display for Hsla {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "hsla({:.2}, {:.2}%, {:.2}%, {:.2})",
-            self.h * 360.,
-            self.s * 100.,
-            self.l * 100.,
-            self.a
-        )
-    }
-}
-
 /// Construct an [`Hsla`] object from plain values
-pub fn hsla(h: f32, s: f32, l: f32, a: f32) -> Hsla {
+pub const fn hsla(h: f32, s: f32, l: f32, a: f32) -> Hsla {
     Hsla {
-        h: h.clamp(0., 1.),
-        s: s.clamp(0., 1.),
-        l: l.clamp(0., 1.),
-        a: a.clamp(0., 1.),
+        color: palette::Hsl::new_const(
+            // `RgbHue` stores degrees, so the 0..1 fraction of the circle needs
+            // scaling to 0..360 before it's wrapped.
+            RgbHue::new(h.clamp(0., 1.) * 360.),
+            s.clamp(0., 1.),
+            l.clamp(0., 1.),
+        ),
+        alpha: a.clamp(0., 1.),
     }
+}
+
+/// Constructs a ['Oklcha'](palette::Oklcha) object from plain values.
+pub fn oklcha<T>(lightness: T, chroma: T, hue: impl Into<OklabHue<T>>, alpha: T) -> Oklcha<T> {
+    Oklcha::new(lightness, chroma, hue, alpha)
 }
 
 /// Pure black in [`Hsla`]
 pub const fn black() -> Hsla {
-    Hsla {
-        h: 0.,
-        s: 0.,
-        l: 0.,
-        a: 1.,
-    }
+    Hsla::new_const(RgbHue::new(0.), 0., 0., 1.)
 }
 
 /// Transparent black in [`Hsla`]
 pub const fn transparent_black() -> Hsla {
-    Hsla {
-        h: 0.,
-        s: 0.,
-        l: 0.,
-        a: 0.,
-    }
+    Hsla::new_const(RgbHue::new(0.), 0., 0., 0.)
 }
 
 /// Transparent white in [`Hsla`]
 pub const fn transparent_white() -> Hsla {
-    Hsla {
-        h: 0.,
-        s: 0.,
-        l: 1.,
-        a: 0.,
-    }
+    Hsla::new_const(RgbHue::new(0.), 0., 1., 0.)
 }
 
-/// Opaque grey in [`Hsla`], values will be clamped to the range [0, 1]
-pub fn opaque_grey(lightness: f32, opacity: f32) -> Hsla {
-    Hsla {
-        h: 0.,
-        s: 0.,
-        l: lightness.clamp(0., 1.),
-        a: opacity.clamp(0., 1.),
-    }
+/// Opaque grey in [`Hsla`], values must be provided in the range [0, 1]
+pub const fn opaque_grey(lightness: f32, opacity: f32) -> Hsla {
+    Hsla::new_const(RgbHue::new(0.), 0., lightness, opacity)
 }
 
 /// Pure white in [`Hsla`]
 pub const fn white() -> Hsla {
-    Hsla {
-        h: 0.,
-        s: 0.,
-        l: 1.,
-        a: 1.,
-    }
+    Hsla::new_const(RgbHue::new(0.), 0., 1., 1.)
 }
 
 /// The color red in [`Hsla`]
 pub const fn red() -> Hsla {
-    Hsla {
-        h: 0.,
-        s: 1.,
-        l: 0.5,
-        a: 1.,
-    }
+    Hsla::new_const(RgbHue::new(0.), 1., 0.5, 1.)
 }
 
 /// The color blue in [`Hsla`]
 pub const fn blue() -> Hsla {
-    Hsla {
-        h: 0.6666666667,
-        s: 1.,
-        l: 0.5,
-        a: 1.,
-    }
+    Hsla::new_const(RgbHue::new(240.), 1., 0.5, 1.)
 }
 
 /// The color green in [`Hsla`]
 pub const fn green() -> Hsla {
-    Hsla {
-        h: 0.3333333333,
-        s: 1.,
-        l: 0.25,
-        a: 1.,
-    }
+    Hsla::new_const(RgbHue::new(120.), 1., 0.25, 1.)
 }
 
 /// The color yellow in [`Hsla`]
 pub const fn yellow() -> Hsla {
-    Hsla {
-        h: 0.1666666667,
-        s: 1.,
-        l: 0.5,
-        a: 1.,
-    }
+    Hsla::new_const(RgbHue::new(60.), 1., 0.5, 1.)
 }
 
-impl Hsla {
-    /// Converts this HSLA color to an RGBA color.
-    pub fn to_rgb(self) -> Rgba {
-        self.into()
-    }
-
-    /// The color red
-    pub const fn red() -> Self {
-        red()
-    }
-
-    /// The color green
-    pub const fn green() -> Self {
-        green()
-    }
-
-    /// The color blue
-    pub const fn blue() -> Self {
-        blue()
-    }
-
-    /// The color black
-    pub const fn black() -> Self {
-        black()
-    }
-
-    /// The color white
-    pub const fn white() -> Self {
-        white()
-    }
-
-    /// The color transparent black
-    pub const fn transparent_black() -> Self {
-        transparent_black()
-    }
-
-    /// Returns true if the HSLA color is fully transparent, false otherwise.
-    pub fn is_transparent(&self) -> bool {
-        self.a == 0.0
-    }
-
-    /// Returns true if the HSLA color is fully opaque, false otherwise.
-    pub fn is_opaque(&self) -> bool {
-        self.a == 1.0
-    }
-
-    /// Blends `other` on top of `self` based on `other`'s alpha value. The resulting color is a combination of `self`'s and `other`'s colors.
-    ///
-    /// If `other`'s alpha value is 1.0 or greater, `other` color is fully opaque, thus `other` is returned as the output color.
-    /// If `other`'s alpha value is 0.0 or less, `other` color is fully transparent, thus `self` is returned as the output color.
-    /// Else, the output color is calculated as a blend of `self` and `other` based on their weighted alpha values.
-    ///
-    /// Assumptions:
-    /// - Alpha values are contained in the range [0, 1], with 1 as fully opaque and 0 as fully transparent.
-    /// - The relative contributions of `self` and `other` is based on `self`'s alpha value (`self.a`) and `other`'s  alpha value (`other.a`), `self` contributing `self.a * (1.0 - other.a)` and `other` contributing its own alpha value.
-    /// - RGB color components are contained in the range [0, 1].
-    /// - If `self` and `other` colors are out of the valid range, the blend operation's output and behavior is undefined.
-    pub fn blend(self, other: Hsla) -> Hsla {
-        let alpha = other.a;
-
-        if alpha >= 1.0 {
-            other
-        } else if alpha <= 0.0 {
-            self
-        } else {
-            let converted_self = Rgba::from(self);
-            let converted_other = Rgba::from(other);
-            let blended_rgb = converted_self.blend(converted_other);
-            Hsla::from(blended_rgb)
+/// Generates the JsonSchema for palette::Hsla
+pub fn hsla_schemar(_generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    // https://github.com/Ogeon/palette/blob/9aa1ac21a7da60db398e8c044a43dbf3fdaf4855/palette/src/hsl.rs#L633-L636
+    // https://github.com/Ogeon/palette/blob/9aa1ac21a7da60db398e8c044a43dbf3fdaf4855/palette/src/alpha/alpha.rs#L1197
+    json_schema!({
+        "type": "object",
+        "properties": {
+          "hue": {
+              "type": "number",
+              "format": "float"
+          },
+          "saturation": {
+              "type": "number",
+              "format": "float"
+          },
+          "lightness": {
+              "type": "number",
+              "format": "float"
+          },
+          "alpha": {
+              "type": "number",
+              "format": "float"
+          },
         }
-    }
+    })
+}
 
-    /// Returns a new HSLA color with the same hue, and lightness, but with no saturation.
-    pub fn grayscale(&self) -> Self {
-        Hsla {
-            h: self.h,
-            s: 0.,
-            l: self.l,
-            a: self.a,
+/// Generates the JsonSchema for palette::Rgba
+pub fn rgba_schemar(_generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    // https://github.com/Ogeon/palette/blob/9aa1ac21a7da60db398e8c044a43dbf3fdaf4855/palette/src/rgb/rgb.rs#L1690
+    // https://github.com/Ogeon/palette/blob/9aa1ac21a7da60db398e8c044a43dbf3fdaf4855/palette/src/alpha/alpha.rs#L1197
+    json_schema!({
+        "type": "object",
+        "properties": {
+          "red": {
+              "type": "number",
+              "format": "float"
+          },
+          "green": {
+              "type": "number",
+              "format": "float"
+          },
+          "blue": {
+              "type": "number",
+              "format": "float"
+          },
+          "alpha": {
+              "type": "number",
+              "format": "float"
+          },
         }
-    }
+    })
+}
+
+/// Wrapper methods to make alpha operations more convenient
+pub trait ColorExt {
+    /// Performs a `(1 - DstAlpha) + DstAlpha` blend, with custom considerations for DstAlpha <=0 and >=1.
+    ///
+    /// This is a nonstandard blend maintained for backwards compatibility. Its strongly recommended that users interface with the [palette crate blend ops](palette::blend) directly.
+    fn blend(&self, other: &Self) -> Self
+    where
+        Self: Sized;
 
     /// Fade out the color by a given factor. This factor should be between 0.0 and 1.0.
     /// Where 0.0 will leave the color unchanged, and 1.0 will completely fade out the color.
-    pub fn fade_out(&mut self, factor: f32) {
-        self.a *= 1.0 - factor.clamp(0., 1.);
-    }
+    fn fade_out(&mut self, factor: f32);
 
-    /// Multiplies the alpha value of the color by a given factor
-    /// and returns a new HSLA color.
+    /// Multiplies the alpha value of the color by a given factor and returns a new color.
+    /// If the color was previously opaque, then this is equivalent to
+    /// [`with_alpha`](palette::WithAlpha::with_alpha).
     ///
     /// Useful for transforming colors with dynamic opacity,
     /// like a color from an external source.
     ///
     /// Example:
     /// ```
+    /// use gpui::ColorExt;
     /// let color = gpui::red();
     /// let faded_color = color.opacity(0.5);
-    /// assert_eq!(faded_color.a, 0.5);
+    /// assert_eq!(faded_color.alpha, 0.5);
     /// ```
     ///
     /// This will return a red color with half the opacity.
     ///
     /// Example:
     /// ```
-    /// use gpui::hsla;
+    /// use gpui::{hsla, ColorExt};
     /// let color = hsla(0.7, 1.0, 0.5, 0.7); // A saturated blue
     /// let faded_color = color.opacity(0.16);
-    /// assert!((faded_color.a - 0.112).abs() < 1e-6);
+    /// assert!((faded_color.alpha - 0.112).abs() < 1e-6);
     /// ```
     ///
     /// This will return a blue color with around ~10% opacity,
     /// suitable for an element's hover or selected state.
     ///
-    pub fn opacity(&self, factor: f32) -> Self {
-        Hsla {
-            h: self.h,
-            s: self.s,
-            l: self.l,
-            a: self.a * factor.clamp(0., 1.),
-        }
-    }
-
-    /// Returns a new HSLA color with the same hue, saturation,
-    /// and lightness, but with a new alpha value.
-    ///
-    /// Example:
-    /// ```
-    /// let color = gpui::red();
-    /// let red_color = color.alpha(0.25);
-    /// assert_eq!(red_color.a, 0.25);
-    /// ```
-    ///
-    /// This will return a red color with half the opacity.
-    ///
-    /// Example:
-    /// ```
-    /// use gpui::hsla;
-    /// let color = hsla(0.7, 1.0, 0.5, 0.7); // A saturated blue
-    /// let faded_color = color.alpha(0.25);
-    /// assert_eq!(faded_color.a, 0.25);
-    /// ```
-    ///
-    /// This will return a blue color with 25% opacity.
-    pub fn alpha(&self, a: f32) -> Self {
-        Hsla {
-            h: self.h,
-            s: self.s,
-            l: self.l,
-            a: a.clamp(0., 1.),
-        }
-    }
-}
-
-impl From<Rgba> for Hsla {
-    fn from(color: Rgba) -> Self {
-        let r = color.r;
-        let g = color.g;
-        let b = color.b;
-
-        let max = r.max(g.max(b));
-        let min = r.min(g.min(b));
-        let delta = max - min;
-
-        let l = (max + min) / 2.0;
-        let s = if l == 0.0 || l == 1.0 {
-            0.0
-        } else if l < 0.5 {
-            delta / (2.0 * l)
-        } else {
-            delta / (2.0 - 2.0 * l)
-        };
-
-        let h = if delta == 0.0 {
-            0.0
-        } else if max == r {
-            ((g - b) / delta).rem_euclid(6.0) / 6.0
-        } else if max == g {
-            ((b - r) / delta + 2.0) / 6.0
-        } else {
-            ((r - g) / delta + 4.0) / 6.0
-        };
-
-        Hsla {
-            h,
-            s,
-            l,
-            a: color.a,
-        }
-    }
-}
-
-impl JsonSchema for Hsla {
-    fn schema_name() -> Cow<'static, str> {
-        Rgba::schema_name()
-    }
-
-    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        Rgba::json_schema(generator)
-    }
-}
-
-impl Serialize for Hsla {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn opacity(&self, factor: f32) -> Self
     where
-        S: Serializer,
-    {
-        Rgba::from(*self).serialize(serializer)
+        Self: Sized;
+}
+impl ColorExt for Rgba {
+    fn blend(&self, other: &Self) -> Self {
+        use palette::blend::{BlendFunction, Equation, Equations, Parameter, Parameters, PreAlpha};
+        let src = self.with_alpha(self.alpha.clamp(0f32, 1f32));
+        let dst = other.with_alpha(other.alpha.clamp(0f32, 1f32));
+        let blend_mode = Equations {
+            color_equation: Equation::Add,
+            alpha_equation: Equation::Add,
+            // color = [src.color * (1 - dst.alpha)] + [dst.color * dst.alpha]
+            color_parameters: Parameters {
+                source: Parameter::OneMinusDestinationAlpha,
+                destination: Parameter::DestinationAlpha,
+            },
+            alpha_parameters: match dst.alpha > 0f32 && dst.alpha < 1f32 {
+                // alpha = [src.alpha * One] + [dst.alpha * Zero] => src.alpha
+                true => Parameters {
+                    source: Parameter::One,
+                    destination: Parameter::Zero,
+                },
+                // alpha = [src.alpha * (1 - dst.alpha)] + [dst.alpha * dst.alpha]
+                //		=> dst.alpha when dst.alpha == 1
+                //		=> src.alpha when dst.alpha == 0
+                false => Parameters {
+                    source: Parameter::OneMinusDestinationAlpha,
+                    destination: Parameter::DestinationAlpha,
+                },
+            },
+        };
+        // in order to match original/upstream behavior, this blend does /not/ premultiply (as palette standard is)
+        let src = PreAlpha {
+            color: src.color,
+            alpha: src.alpha,
+        };
+        let dst = PreAlpha {
+            color: dst.color,
+            alpha: dst.alpha,
+        };
+        let premul = blend_mode.apply_to(src, dst);
+        Rgba {
+            color: premul.color,
+            alpha: premul.alpha,
+        }
+    }
+
+    fn fade_out(&mut self, factor: f32) {
+        self.alpha *= 1.0 - factor.clamp(0., 1.);
+    }
+
+    fn opacity(&self, factor: f32) -> Self {
+        let mut color = *self;
+        color.alpha *= factor.clamp(0., 1.);
+        color
+    }
+}
+impl ColorExt for Hsla {
+    fn blend(&self, other: &Self) -> Self {
+        let this: Rgba = (*self).into_color();
+        let other: Rgba = (*other).into_color();
+        this.blend(&other).into_color()
+    }
+
+    fn fade_out(&mut self, factor: f32) {
+        self.alpha *= 1.0 - factor.clamp(0., 1.);
+    }
+
+    fn opacity(&self, factor: f32) -> Self {
+        let mut color = *self;
+        color.alpha *= factor.clamp(0., 1.);
+        color
     }
 }
 
-impl<'de> Deserialize<'de> for Hsla {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        Ok(Rgba::deserialize(deserializer)?.into())
-    }
-}
-
+/// The storage-buffer discriminant for a [`Background`].
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[repr(C)]
-pub(crate) enum BackgroundTag {
+#[repr(u32)]
+pub enum BackgroundTag {
+    /// A flat color.
     Solid = 0,
+    /// A two-stop linear gradient.
     LinearGradient = 1,
+    /// Diagonal color stripes over transparency.
     PatternSlash = 2,
+    /// Alternating colored and transparent squares.
     Checkerboard = 3,
 }
 
@@ -693,7 +300,7 @@ pub(crate) enum BackgroundTag {
 /// - <https://developer.mozilla.org/en-US/docs/Web/CSS/color-interpolation-method>
 /// - <https://www.w3.org/TR/css-color-4/#typedef-color-space>
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
-#[repr(C)]
+#[repr(u32)]
 pub enum ColorSpace {
     #[default]
     /// The sRGB color space.
@@ -717,11 +324,11 @@ impl Display for ColorSpace {
 pub struct Background {
     pub(crate) tag: BackgroundTag,
     pub(crate) color_space: ColorSpace,
-    pub(crate) solid: Hsla,
+    pub(crate) solid: crate::SceneHsla,
     pub(crate) gradient_angle_or_pattern_height: f32,
     pub(crate) colors: [LinearColorStop; 2],
     /// Padding for alignment for repr(C) layout.
-    pad: u32,
+    pub(crate) padding: u32,
 }
 
 impl std::fmt::Debug for Background {
@@ -752,43 +359,46 @@ impl Default for Background {
     fn default() -> Self {
         Self {
             tag: BackgroundTag::Solid,
-            solid: Hsla::default(),
+            solid: Hsla::default().into(),
             color_space: ColorSpace::default(),
             gradient_angle_or_pattern_height: 0.0,
             colors: [LinearColorStop::default(), LinearColorStop::default()],
-            pad: 0,
+            padding: 0,
         }
     }
 }
 
 /// Creates a hash pattern background
-pub fn pattern_slash(color: impl Into<Hsla>, width: f32, interval: f32) -> Background {
-    let width_scaled = (width * 255.0) as u32;
-    let interval_scaled = (interval * 255.0) as u32;
-    let height = ((width_scaled * 0xFFFF) + interval_scaled) as f32;
+pub fn pattern_slash(color: impl IntoColor<Hsla>, width: f32, interval: f32) -> Background {
+    const PATTERN_COMPONENT_SCALE: f32 = u8::MAX as f32;
+    const PATTERN_PACKING_RADIX: u32 = u16::MAX as u32;
+
+    let width_scaled = (width * PATTERN_COMPONENT_SCALE) as u32;
+    let interval_scaled = (interval * PATTERN_COMPONENT_SCALE) as u32;
+    let height = (width_scaled * PATTERN_PACKING_RADIX + interval_scaled) as f32;
 
     Background {
         tag: BackgroundTag::PatternSlash,
-        solid: color.into(),
+        solid: color.into_color().into(),
         gradient_angle_or_pattern_height: height,
         ..Default::default()
     }
 }
 
 /// Creates a checkerboard pattern background
-pub fn checkerboard(color: impl Into<Hsla>, size: f32) -> Background {
+pub fn checkerboard(color: impl IntoColor<Hsla>, size: f32) -> Background {
     Background {
         tag: BackgroundTag::Checkerboard,
-        solid: color.into(),
+        solid: color.into_color().into(),
         gradient_angle_or_pattern_height: size,
         ..Default::default()
     }
 }
 
 /// Creates a solid background color.
-pub fn solid_background(color: impl Into<Hsla>) -> Background {
+pub fn solid_background(color: impl IntoColor<Hsla>) -> Background {
     Background {
-        solid: color.into(),
+        solid: color.into_color().into(),
         ..Default::default()
     }
 }
@@ -809,6 +419,7 @@ pub fn linear_gradient(
         tag: BackgroundTag::LinearGradient,
         gradient_angle_or_pattern_height: angle,
         colors: [from.into(), to.into()],
+        color_space: ColorSpace::Oklab,
         ..Default::default()
     }
 }
@@ -820,7 +431,7 @@ pub fn linear_gradient(
 #[repr(C)]
 pub struct LinearColorStop {
     /// The color of the color stop.
-    pub color: Hsla,
+    pub color: crate::SceneHsla,
     /// The percentage of the gradient, in the range 0.0 to 1.0.
     pub percentage: f32,
 }
@@ -828,9 +439,9 @@ pub struct LinearColorStop {
 /// Creates a new linear color stop.
 ///
 /// The percentage of the gradient, in the range 0.0 to 1.0.
-pub fn linear_color_stop(color: impl Into<Hsla>, percentage: f32) -> LinearColorStop {
+pub fn linear_color_stop(color: impl IntoColor<Hsla>, percentage: f32) -> LinearColorStop {
     LinearColorStop {
-        color: color.into(),
+        color: color.into_color().into(),
         percentage,
     }
 }
@@ -838,20 +449,79 @@ pub fn linear_color_stop(color: impl Into<Hsla>, percentage: f32) -> LinearColor
 impl LinearColorStop {
     /// Returns a new color stop with the same color, but with a modified alpha value.
     pub fn opacity(&self, factor: f32) -> Self {
+        let color: Hsla = self.color.into();
         Self {
             percentage: self.percentage,
-            color: self.color.opacity(factor),
+            color: color.opacity(factor).into(),
         }
     }
+}
+
+/// What a [`Background`] paints, decoded from its packed representation.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum BackgroundKind {
+    /// A flat color.
+    Solid(Hsla),
+    /// A linear gradient between two color stops.
+    LinearGradient {
+        /// The gradient line's angle in degrees, `0.0` pointing up, increasing clockwise.
+        angle: f32,
+        /// The two ends of the gradient.
+        stops: [LinearColorStop; 2],
+    },
+    /// A diagonal stripe pattern.
+    PatternSlash {
+        /// The stripe color.
+        color: Hsla,
+        /// The stripe width, in logical pixels.
+        width: f32,
+        /// The gap between stripes, in logical pixels.
+        interval: f32,
+    },
+    /// Alternating squares of one color and full transparency.
+    Checkerboard {
+        /// The color of one set of squares. The other set is fully transparent.
+        color: Hsla,
+        /// The width and height of each square, in logical pixels.
+        size: f32,
+    },
 }
 
 impl Background {
     /// Returns the solid color if this is a solid background, None otherwise.
     pub fn as_solid(&self) -> Option<Hsla> {
         if self.tag == BackgroundTag::Solid {
-            Some(self.solid)
+            Some(self.solid.into())
         } else {
             None
+        }
+    }
+
+    /// Returns the decoded form of this background.
+    pub fn kind(&self) -> BackgroundKind {
+        match self.tag {
+            BackgroundTag::Solid => BackgroundKind::Solid(self.solid.into()),
+            BackgroundTag::LinearGradient => BackgroundKind::LinearGradient {
+                angle: self.gradient_angle_or_pattern_height,
+                stops: self.colors,
+            },
+            BackgroundTag::PatternSlash => {
+                const PATTERN_COMPONENT_SCALE: f32 = u8::MAX as f32;
+                const PATTERN_PACKING_RADIX: f32 = u16::MAX as f32;
+
+                // `pattern_slash` packs both values into one exactly representable f32;
+                // floor + rem_euclid inverts it, since truncation and `%` give the wrong entry.
+                let packed = self.gradient_angle_or_pattern_height;
+                BackgroundKind::PatternSlash {
+                    color: self.solid.into(),
+                    width: (packed / PATTERN_PACKING_RADIX).floor() / PATTERN_COMPONENT_SCALE,
+                    interval: (packed.rem_euclid(PATTERN_PACKING_RADIX)) / PATTERN_COMPONENT_SCALE,
+                }
+            }
+            BackgroundTag::Checkerboard => BackgroundKind::Checkerboard {
+                color: self.solid.into(),
+                size: self.gradient_angle_or_pattern_height,
+            },
         }
     }
 
@@ -863,10 +533,16 @@ impl Background {
         self
     }
 
+    /// The color space used to interpolate this background, set by [`Background::color_space`].
+    pub fn interpolation_space(&self) -> ColorSpace {
+        self.color_space
+    }
+
     /// Returns a new background color with the same hue, saturation, and lightness, but with a modified alpha value.
     pub fn opacity(&self, factor: f32) -> Self {
         let mut background = *self;
-        background.solid = background.solid.opacity(factor);
+        let solid: Hsla = background.solid.into();
+        background.solid = solid.opacity(factor).into();
         background.colors = [
             self.colors[0].opacity(factor),
             self.colors[1].opacity(factor),
@@ -877,28 +553,19 @@ impl Background {
     /// Returns whether the background color is transparent.
     pub fn is_transparent(&self) -> bool {
         match self.tag {
-            BackgroundTag::Solid => self.solid.is_transparent(),
-            BackgroundTag::LinearGradient => self.colors.iter().all(|c| c.color.is_transparent()),
-            BackgroundTag::PatternSlash => self.solid.is_transparent(),
-            BackgroundTag::Checkerboard => self.solid.is_transparent(),
+            BackgroundTag::Solid => self.solid.a == 0.,
+            BackgroundTag::LinearGradient => self.colors.iter().all(|c| c.color.a == 0.),
+            BackgroundTag::PatternSlash => self.solid.a == 0.,
+            BackgroundTag::Checkerboard => self.solid.a == 0.,
         }
     }
 }
 
-impl From<Hsla> for Background {
-    fn from(value: Hsla) -> Self {
-        Background {
+impl<T: IntoColor<Hsla>> From<T> for Background {
+    fn from(value: T) -> Self {
+        Self {
             tag: BackgroundTag::Solid,
-            solid: value,
-            ..Default::default()
-        }
-    }
-}
-impl From<Rgba> for Background {
-    fn from(value: Rgba) -> Self {
-        Background {
-            tag: BackgroundTag::Solid,
-            solid: Hsla::from(value),
+            solid: value.into_color().into(),
             ..Default::default()
         }
     }
@@ -906,62 +573,18 @@ impl From<Rgba> for Background {
 
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
-
     use super::*;
 
     #[test]
-    fn test_deserialize_three_value_hex_to_rgba() {
-        let actual: Rgba = serde_json::from_value(json!("#f09")).unwrap();
-
-        assert_eq!(actual, rgba(0xff0099ff))
-    }
-
-    #[test]
-    fn test_deserialize_four_value_hex_to_rgba() {
-        let actual: Rgba = serde_json::from_value(json!("#f09f")).unwrap();
-
-        assert_eq!(actual, rgba(0xff0099ff))
-    }
-
-    #[test]
-    fn test_deserialize_six_value_hex_to_rgba() {
-        let actual: Rgba = serde_json::from_value(json!("#ff0099")).unwrap();
-
-        assert_eq!(actual, rgba(0xff0099ff))
-    }
-
-    #[test]
-    fn test_deserialize_eight_value_hex_to_rgba() {
-        let actual: Rgba = serde_json::from_value(json!("#ff0099ff")).unwrap();
-
-        assert_eq!(actual, rgba(0xff0099ff))
-    }
-
-    #[test]
-    fn test_deserialize_eight_value_hex_with_padding_to_rgba() {
-        let actual: Rgba = serde_json::from_value(json!(" #f5f5f5ff   ")).unwrap();
-
-        assert_eq!(actual, rgba(0xf5f5f5ff))
-    }
-
-    #[test]
-    fn test_deserialize_eight_value_hex_with_mixed_case_to_rgba() {
-        let actual: Rgba = serde_json::from_value(json!("#DeAdbEeF")).unwrap();
-
-        assert_eq!(actual, rgba(0xdeadbeef))
-    }
-
-    #[test]
     fn test_background_solid() {
-        let color = Hsla::from(rgba(0xff0099ff));
+        let color: Hsla = rgba(0xff0099ff).into_color();
         let mut background = Background::from(color);
         assert_eq!(background.tag, BackgroundTag::Solid);
-        assert_eq!(background.solid, color);
+        assert_eq!(background.solid, color.into());
 
-        assert_eq!(background.opacity(0.5).solid, color.opacity(0.5));
+        assert_eq!(background.opacity(0.5).solid, color.opacity(0.5).into());
         assert!(!background.is_transparent());
-        background.solid = hsla(0.0, 0.0, 0.0, 0.0);
+        background.solid = hsla(0.0, 0.0, 0.0, 0.0).into();
         assert!(background.is_transparent());
     }
 
@@ -978,5 +601,114 @@ mod tests {
         assert_eq!(background.opacity(0.5).colors[1], to.opacity(0.5));
         assert!(!background.is_transparent());
         assert!(background.opacity(0.0).is_transparent());
+    }
+
+    #[test]
+    fn test_background_kind() {
+        let color: Hsla = rgba(0xff0099ff).into_color();
+        assert_eq!(Background::from(color).kind(), BackgroundKind::Solid(color));
+
+        let from = linear_color_stop(rgba(0xff0099ff), 0.0);
+        let to = linear_color_stop(rgba(0x00ff99ff), 1.0);
+        assert_eq!(
+            linear_gradient(90.0, from, to).kind(),
+            BackgroundKind::LinearGradient {
+                angle: 90.0,
+                stops: [from, to],
+            }
+        );
+
+        assert_eq!(
+            checkerboard(color, 12.0).kind(),
+            BackgroundKind::Checkerboard { color, size: 12.0 }
+        );
+    }
+
+    #[test]
+    fn test_background_kind_unpacks_pattern_slash() {
+        let color: Hsla = rgba(0xff0099ff).into_color();
+        // Both values survive to the 1/255 the constructor quantizes them to.
+        for (width, interval) in [(1.0, 3.0), (0.5, 0.25), (2.0, 10.0)] {
+            let BackgroundKind::PatternSlash {
+                width: got_width,
+                interval: got_interval,
+                ..
+            } = pattern_slash(color, width, interval).kind()
+            else {
+                panic!("pattern_slash did not produce a PatternSlash");
+            };
+            assert!((got_width - width).abs() <= 1.0 / 255.0);
+            assert!((got_interval - interval).abs() <= 1.0 / 255.0);
+        }
+    }
+
+    #[test]
+    fn test_rgba_alpha() {
+        use palette::WithAlpha;
+        let color = Rgba::<palette::Srgb>::new(0.2, 0.6, 1.0, 0.8);
+        assert_eq!(color.with_alpha(0.25).alpha, 0.25);
+        // NOTE: diverging from upstream, where Rgba::alpha clamps. palette does not clamp alpha
+        assert_eq!(color.with_alpha(1.5).alpha, 1.5);
+    }
+
+    #[test]
+    fn test_rgba_opacity() {
+        use super::ColorExt;
+        let color = Rgba::new(0.2, 0.6, 1.0, 0.8);
+        assert!((color.opacity(0.5).alpha - 0.4).abs() < 1e-6);
+        assert_eq!(color.opacity(2.0).alpha, 0.8);
+    }
+
+    fn upstream_blend(src: Rgba, dst: Rgba) -> Rgba {
+        // per upstream logic;
+        // https://github.com/gpui-ce/gpui-ce/commit/c738623ffbcec2aeddc44a645cc6b74646d5cf97#diff-585dd80a91eb97df686c8d31dc27ebc33b0c678a4a98c2a70a3745cd36576aaaL57-L71
+        // if dst.alpha >= 1: blend with OneMinusDstAlpha (= 0) + DstAlpha (= 1)
+        // 		which reduces to be equivalent to dst itself
+        // if dst.alpha  < 0: blend with OneMinusDstAlpha (= 1) + DstAlpha (= 0)
+        // 		which reduces to be equivalent to src itself
+        // otherwise, blend color by OneMinusDstAlpha + DstAlpha, and take only the src alpha
+        let new_alpha = if dst.alpha > 0f32 && dst.alpha < 1f32 {
+            src.alpha
+        } else {
+            (src.alpha * (1f32 - dst.alpha)) + (dst.alpha * dst.alpha)
+        };
+        Rgba::new(
+            (src.red * (1f32 - dst.alpha)) + (dst.red * dst.alpha),
+            (src.green * (1f32 - dst.alpha)) + (dst.green * dst.alpha),
+            (src.blue * (1f32 - dst.alpha)) + (dst.blue * dst.alpha),
+            new_alpha,
+        )
+    }
+
+    // per original behavior, blending a dst color that is opaque should always return that destination color
+    #[test]
+    fn test_blend_dst_opaque() {
+        let src = Rgba::new(0f32, 0f32, 0f32, 0.5f32);
+        let dst = Rgba::new(1f32, 1f32, 1f32, 1f32);
+        let blended = src.blend(&dst);
+        assert_eq!(blended, dst);
+    }
+
+    // per original behavior, blending a dst color that is transparent should always return the source color
+    #[test]
+    fn test_blend_dst_transparent() {
+        let src = Rgba::new(0f32, 0f32, 0f32, 0.5f32);
+        let dst = Rgba::new(1f32, 1f32, 1f32, 0f32);
+        let blended = src.blend(&dst);
+        assert_eq!(blended, src);
+    }
+
+    #[test]
+    fn test_blend_opaque_white_black() {
+        let src = Rgba::new(0f32, 0f32, 0f32, 1f32);
+        let dst = Rgba::new(1f32, 1f32, 1f32, 1f32);
+        assert_eq!(src.blend(&dst), upstream_blend(src, dst));
+    }
+
+    #[test]
+    fn test_blend_translucent_on_opaquewhite() {
+        let src = Rgba::new(0f32, 0f32, 0f32, 1f32);
+        let dst = Rgba::new(0.3f32, 0.6f32, 1f32, 0.5f32);
+        assert_eq!(src.blend(&dst), upstream_blend(src, dst));
     }
 }

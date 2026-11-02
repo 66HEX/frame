@@ -1,0 +1,38 @@
+[package]
+name = "gpui_ce_render"
+version = "0.1.0"
+description.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+path = "src/gpui_render.rs"
+
+[dependencies]
+gpui = { path = "../gpui", version = "0.2.2", package = "gpui-ce", default-features = false }
+smallvec.workspace = true
+wgsl-rs.workspace = true
+
+[target.'cfg(windows)'.build-dependencies]
+windows.workspace = true
+
+[build-dependencies]
+naga = { version = "29.0.4", features = [
+  "glsl-out",
+  "hlsl-out",
+  "msl-out",
+  "wgsl-in",
+] }
+naga-old = { package = "naga", version = "24.0.0", features = [
+  "hlsl-out",
+  "wgsl-in",
+] }
+gpui = { path = "../gpui", version = "0.2.2", package = "gpui-ce", default-features = false }
+wgsl-rs.workspace = true
+
+[dev-dependencies]
+naga = { version = "29.0.4", features = ["wgsl-in"] }

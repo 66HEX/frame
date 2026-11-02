@@ -166,6 +166,12 @@ pub(super) fn linux_titlebar(
 }
 
 fn titlebar_drag_surface(platform: FrameTitlebarPlatform, cx: &Context<FrameRoot>) -> gpui::Div {
+    let move_window = cx.listener(|root, event: &gpui::MouseMoveEvent, window, _cx| {
+        let should_move = std::mem::take(&mut root.titlebar_drag.should_move);
+        if should_move && event.pressed_button == Some(MouseButton::Left) {
+            window.start_window_move();
+        }
+    });
     div()
         .window_control_area(WindowControlArea::Drag)
         .capture_any_mouse_down(cx.listener(|root, _event, _window, _cx| {
@@ -203,14 +209,13 @@ fn titlebar_drag_surface(platform: FrameTitlebarPlatform, cx: &Context<FrameRoot
                 }
             }),
         )
-        .on_mouse_move(
-            cx.listener(|root, event: &gpui::MouseMoveEvent, window, _cx| {
-                let should_move = std::mem::take(&mut root.titlebar_drag.should_move);
-                if should_move && event.pressed_button == Some(MouseButton::Left) {
-                    window.start_window_move();
-                }
-            }),
-        )
+        .on_mouse_move_all(move |event, phase, _hitbox, window, cx| {
+            // A native event batch can carry the first drag motion past the titlebar.
+            // Continue an armed gesture even over another control or the workspace.
+            if phase == gpui::DispatchPhase::Capture {
+                move_window(event, window, cx);
+            }
+        })
 }
 
 #[cfg(test)]
@@ -985,7 +990,7 @@ fn app_settings_appearance_select<T: AppSettingsAppearanceValue>(
                 palette,
             ));
         }
-        field = field.child(deferred(menu).with_priority(20));
+        field = field.child(deferred(menu).priority(20));
     }
 
     field
@@ -1401,7 +1406,7 @@ fn parse_update_release_note_emphasis(
     let mut highlights = Vec::new();
     let mut rest = input;
     let highlight_style = HighlightStyle {
-        color: Some(color(palette.text_primary).into()),
+        color: Some(gpui::rgb_to_hsla(color(palette.text_primary))),
         font_weight: Some(theme::TEXT_WEIGHT_MEDIUM),
         ..HighlightStyle::default()
     };
@@ -2139,9 +2144,11 @@ pub(super) fn app_settings_close_button(
         .rounded(theme::ui_rem(theme::RADIUS_SM))
         .bg(background)
         .text_color(foreground)
-        .when(enabled, |this| this.hover(gpui::Styled::cursor_pointer))
         .when(enabled, |this| {
-            this.active(move |style| style.bg(color(colors.active_background)))
+            this.hover_style(gpui::Styled::cursor_pointer)
+        })
+        .when(enabled, |this| {
+            this.active_style(move |style| style.bg(color(colors.active_background)))
         })
         .child(icon_svg(
             assets::ICON_CLOSE,
@@ -2466,8 +2473,8 @@ pub(super) fn titlebar_window_button(
         .rounded(theme::ui_rem(metrics.radius))
         .bg(background)
         .text_color(icon_color)
-        .hover(gpui::Styled::cursor_pointer)
-        .active(move |style| style.bg(color(active_background)))
+        .hover_style(gpui::Styled::cursor_pointer)
+        .active_style(move |style| style.bg(color(active_background)))
         .on_mouse_move(|_, _, cx| cx.stop_propagation())
         .child(icon_svg(icon, metrics.icon_size, icon_color));
     let button = apply_button_motion(button, motion, true);
@@ -2631,7 +2638,7 @@ pub(super) fn titlebar_segment(
         .aria_selected(selected)
         .focusable()
         .tab_stop(true)
-        .focus_visible(move |style| focus_visible_ring(style, palette))
+        .focus_visible_style(move |style| focus_visible_ring(style, palette))
         .flex()
         .items_center()
         .gap_2()
@@ -2644,8 +2651,8 @@ pub(super) fn titlebar_segment(
         .when(selected, |this| {
             this.shadow(button_highlight_shadows(palette))
         })
-        .hover(gpui::Styled::cursor_pointer)
-        .active(move |style| style.bg(color(colors.active_background)))
+        .hover_style(gpui::Styled::cursor_pointer)
+        .active_style(move |style| style.bg(color(colors.active_background)))
         .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
             if root.active_view != view {
                 root.active_view = view;
@@ -2749,7 +2756,7 @@ mod tests {
         assert_eq!(&text[highlights[0].0.clone()], "Native GPUI Application:");
         assert_eq!(
             highlights[0].1.color,
-            Some(color(palette.text_primary).into())
+            Some(gpui::rgb_to_hsla(color(palette.text_primary)))
         );
         assert_eq!(highlights[0].1.font_weight, Some(theme::TEXT_WEIGHT_MEDIUM));
     }

@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **AV1 Encoding Settings:** Exposes SVT-AV1 presets 0–13 directly and clarifies the 10-bit pixel format choice, while preserving existing preset selections. Resolves [#200](https://github.com/66HEX/frame/issues/200).
 - **Preview Control Tooltips:** Adds tooltips to preview tools, zoom, and playback controls on pointer hover and keyboard focus. Escape dismisses the tooltip. Resolves [#176](https://github.com/66HEX/frame/issues/176).
 
+### Changed
+
+- **GPUI Framework:** Updates the vendored GPUI-CE snapshot to `bc57747`, adapting Frame to the new text and rendering APIs while preserving GPU preview transforms, reusable video textures, keyboard focus and accessibility, toolbar drag handling, and rounded Linux window frames.
+
 ### Fixed
 
 - **Toolbar Window Dragging:** Prevents toolbar buttons and tabs from dragging the window on macOS and Linux. Empty titlebar space stays draggable, and macOS retains its configured double-click action. Resolves [#175](https://github.com/66HEX/frame/issues/175).

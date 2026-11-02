@@ -521,7 +521,7 @@ fn crop_select(
             state.palette,
         ));
     }
-    field = field.child(gpui::deferred(popover).with_priority(20));
+    field = field.child(gpui::deferred(popover).priority(20));
     field
 }
 
@@ -536,9 +536,9 @@ mod tests {
     use gpui::{Entity, Modifiers, TestAppContext, VisualTestContext, px, size};
 
     fn draw(cx: &mut VisualTestContext) {
-        cx.update(|window, cx| window.draw(cx).clear());
+        cx.update(|window, cx| window.draw(cx).clear(cx));
         cx.run_until_parked();
-        cx.update(|window, cx| window.draw(cx).clear());
+        cx.update(|window, cx| window.draw(cx).clear(cx));
     }
 
     fn click(cx: &mut VisualTestContext, id: &'static str) {
@@ -562,7 +562,7 @@ mod tests {
                 .map(|request| request.key);
             root
         });
-        cx.update(|window, _| window.activate_window());
+        cx.update(|window, _| window.activate());
         cx.simulate_resize(size(px(1440.0), px(900.0)));
         draw(cx);
         (root, cx)
@@ -584,6 +584,46 @@ mod tests {
         );
         assert!(root.toggle_selected_crop_mode());
         root
+    }
+
+    #[test]
+    fn loaded_preview_keeps_timeline_and_queue_inside_window() {
+        let mut app = TestAppContext::single();
+        let (root, cx) = crop_window(&mut app);
+        cx.simulate_resize(size(px(1200.0), px(800.0)));
+        root.update(cx, |root, cx| {
+            root.apply_visual_fixture(Some(crate::VisualFixture::PreviewCropCustom));
+            let metadata = root.selected_source_metadata_entry();
+            root.preview_ui.pending_runtime_key = root
+                .selected_preview_runtime_request(&metadata)
+                .map(|request| request.key);
+            let frame = crate::preview_engine::PreviewFrame::bgra(
+                1280,
+                720,
+                1280 * 4,
+                0,
+                vec![255; 1280 * 720 * 4],
+            )
+            .unwrap();
+            root.preview_ui.render_image =
+                Some(crate::preview_engine::render_image_from_frame(&frame).unwrap());
+            cx.notify();
+        });
+        draw(cx);
+        let viewport = cx.debug_bounds("preview-viewport").unwrap();
+        let queue = cx.debug_bounds("file-list-body").unwrap();
+        assert!(
+            viewport.bottom() < queue.top(),
+            "preview={viewport:?}, queue={queue:?}"
+        );
+        assert!(
+            queue.bottom() <= px(800.0),
+            "queue must remain visible: {queue:?}"
+        );
+        assert!(
+            viewport.size.height < px(500.0),
+            "preview must retain its workspace row share: {viewport:?}"
+        );
     }
 
     #[test]
@@ -627,6 +667,7 @@ mod tests {
         click(cx, "preview-crop-ratio");
         cx.simulate_keystrokes("end");
         draw(cx);
+        cx.simulate_keystrokes("enter");
         cx.simulate_event(gpui::KeyUpEvent {
             keystroke: gpui::Keystroke::parse("enter").unwrap(),
         });

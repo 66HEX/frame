@@ -52,7 +52,7 @@ pub(in crate::app) fn frame_vertical_scrollbar(
         .bottom_0()
         .w(theme::ui_rem(FRAME_SCROLLBAR_WIDTH))
         .cursor_default()
-        .hover(gpui::Styled::cursor_pointer)
+        .hover_style(gpui::Styled::cursor_pointer)
         .on_drag(drag, |_drag, _offset, window, cx| {
             window.refresh();
             cx.new(|_| FrameScrollbarDragPreview)
@@ -113,7 +113,8 @@ pub(in crate::app) fn frame_vertical_scrollbar(
                         size(px(track_width), bounds.size.height),
                     );
                     window.paint_quad(
-                        fill(track_bounds, color(palette.fill_subtle))
+                        gpui::PaintQuad::new(track_bounds)
+                            .background(color(palette.fill_subtle))
                             .corner_radii(px(track_width / 2.0)),
                     );
 
@@ -125,7 +126,8 @@ pub(in crate::app) fn frame_vertical_scrollbar(
                         size(px(thumb_width), px(metrics.thumb_height)),
                     );
                     window.paint_quad(
-                        fill(thumb_bounds, color(palette.control_muted))
+                        gpui::PaintQuad::new(thumb_bounds)
+                            .background(color(palette.control_muted))
                             .corner_radii(px(thumb_width / 2.0)),
                     );
                 },

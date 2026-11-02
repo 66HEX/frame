@@ -1,16 +1,35 @@
 use std::{
-    borrow::BorrowMut,
     cell::{Ref, RefCell},
-    rc::Rc,
-    time::{Duration, Instant},
+    time::Instant,
 };
 
-use crate::{App, Entity, EntityId, Window, lerp::Lerp, linear};
+use crate::{Animated, App, Entity, EntityId, Motion, Progress, Window, lerp::Lerp};
+
+#[derive(Clone)]
+struct TransitionCache<T> {
+    value: Option<T>,
+    progress: Progress,
+    is_active: bool,
+}
+
+impl<T> TransitionCache<T> {
+    fn empty() -> Self {
+        Self {
+            value: None,
+            progress: Progress::END,
+            is_active: false,
+        }
+    }
+
+    fn clear(&mut self) {
+        self.value = None;
+    }
+}
 
 /// An animated transition between values of type `T`.
 ///
 /// `Transition` manages the interpolation of a value from a start state to a goal
-/// state over a specified duration. It supports customizable easing functions and
+/// state using the supplied motion. It supports customizable easing functions and
 /// can operate in continuous or non-continuous mode.
 ///
 /// # Type Parameters
@@ -43,17 +62,12 @@ use crate::{App, Entity, EntityId, Window, lerp::Lerp, linear};
 /// ```
 #[derive(Clone)]
 pub struct Transition<T: Lerp + Clone + PartialEq + 'static> {
-    /// The amount of time for which this transition should run.
-    duration_secs: f32,
-
-    /// A function that takes a delta between 0 and 1 and returns a new delta
-    /// between 0 and 1 based on the given easing function.
-    easing: Rc<dyn Fn(f32) -> f32>,
+    motion: Motion,
 
     state: Entity<TransitionState<T>>,
 
-    /// A cached version of the transition's value.
-    cached_value: RefCell<Option<T>>,
+    /// The transition sample cached for this render.
+    cache: RefCell<TransitionCache<T>>,
 
     /// Whether to continue the transition from the current value when the goal changes.
     /// If true, transitions smoothly from current animated value to new goal.
@@ -62,22 +76,23 @@ pub struct Transition<T: Lerp + Clone + PartialEq + 'static> {
 }
 
 impl<T: Lerp + Clone + PartialEq + 'static> Transition<T> {
-    /// Create a new transition with the given duration using the specified state.
-    pub fn new(state: Entity<TransitionState<T>>, duration: Duration) -> Self {
+    /// Create a new transition with the given motion using the specified state.
+    pub fn new(state: Entity<TransitionState<T>>, motion: impl Into<Motion>) -> Self {
         Self {
-            duration_secs: duration.as_secs_f32(),
-            easing: Rc::new(linear),
+            motion: motion.into(),
             state,
-            cached_value: RefCell::new(None),
+            cache: RefCell::new(TransitionCache::empty()),
             continuous: true,
         }
     }
 
-    /// Set the easing function to use for this transition.
-    /// The easing function will take a time delta between 0 and 1 and return a new delta
-    /// between 0 and 1
+    /// Sets the forward pass's easing function for this transition.
+    ///
+    /// The easing function maps normalized local pass time to presentation
+    /// progress, which may be non-monotonic or overshoot zero through one.
     pub fn with_easing(mut self, easing: impl Fn(f32) -> f32 + 'static) -> Self {
-        self.easing = Rc::new(easing);
+        self.motion = self.motion.with_easing(easing);
+        self.clear_cache();
         self
     }
 
@@ -90,33 +105,23 @@ impl<T: Lerp + Clone + PartialEq + 'static> Transition<T> {
         self
     }
 
-    fn default_goal_updated_at(&self) -> Instant {
-        Instant::now() - Duration::from_secs_f32(self.duration_secs)
+    fn sample(&self, cx: &mut App) -> Ref<'_, TransitionCache<T>> {
+        if self.cache.borrow().value.is_none() {
+            let mut state = self.state.as_mut(cx);
+            let sample = state.sample(Instant::now());
+
+            *self.cache.borrow_mut() = TransitionCache {
+                value: Some(sample.value),
+                progress: sample.progress,
+                is_active: sample.is_active,
+            };
+        }
+
+        self.cache.borrow()
     }
 
-    /// Evaluates the value of the transition without using the cache.
-    /// Returns if the transition is finished (bool) and the evaluated value (T).
-    fn raw_evaluate(&self, cx: &mut App) -> (bool, T) {
-        let mut state_entity = self.state.as_mut(cx);
-        let state: &mut TransitionState<T> = state_entity.borrow_mut();
-
-        let elapsed_secs = state
-            .goal_last_updated_at
-            .unwrap_or_else(|| self.default_goal_updated_at())
-            .elapsed()
-            .as_secs_f32();
-        let delta = (self.easing)((elapsed_secs / self.duration_secs).min(1.));
-
-        debug_assert!(
-            (0.0..=1.0).contains(&delta),
-            "delta should always be between 0 and 1"
-        );
-
-        state.last_delta = delta;
-
-        let evaluated_value = state.start_goal.lerp(&state.end_goal, delta);
-
-        (delta != 1., evaluated_value)
+    fn clear_cache(&self) {
+        self.cache.borrow_mut().clear();
     }
 
     /// Evaluates and returns the current interpolated value of the transition.
@@ -129,43 +134,33 @@ impl<T: Lerp + Clone + PartialEq + 'static> Transition<T> {
     /// The returned value is cached for the duration of the current frame to avoid
     /// redundant calculations when called multiple times.
     pub fn evaluate(&self, window: &mut Window, cx: &mut App) -> Ref<'_, T> {
-        if self.cached_value.borrow().is_none() {
-            let (in_progress, evaluated_value) = self.raw_evaluate(cx);
-
-            if in_progress {
-                window.request_animation_frame();
-            }
-
-            *self.cached_value.borrow_mut() = Some(evaluated_value);
+        let sample = self.sample(cx);
+        if sample.is_active {
+            window.request_animation_frame();
         }
 
-        Ref::map(self.cached_value.borrow(), |opt| opt.as_ref().unwrap())
+        Ref::map(sample, |sample| sample.value.as_ref().unwrap())
     }
 
     /// Reads the end goal of the transitions.
     pub fn read_goal<'b>(&'b self, cx: &'b mut App) -> &'b T {
-        &self.state.read(cx).end_goal
+        self.state.read(cx).value()
     }
 
     /// Reads the current value of the cached transition, if it exists.
     pub fn read_cache(&self) -> Ref<'_, Option<T>> {
-        self.cached_value.borrow()
+        Ref::map(self.cache.borrow(), |cache| &cache.value)
     }
 
-    /// Evaluates and returns the current progress delta of the transition.
-    ///
-    /// Returns a value between 0.0 and 1.0 representing how far the transition
-    /// has progressed, after applying the easing function. A value of 0.0 means
-    /// the transition just started, and 1.0 means it has completed.
-    pub fn evaluate_delta<'b>(&'b self, cx: &'b App) -> f32 {
-        let goal_last_updated_at = self
-            .state
-            .read(cx)
-            .goal_last_updated_at
-            .unwrap_or_else(|| self.default_goal_updated_at());
+    /// Returns eased presentation progress, which may overshoot zero through one.
+    /// This does not indicate whole-run completion: restarting iterations begin
+    /// again and alternating iterations run in reverse.
+    pub fn evaluate_delta(&self, cx: &App) -> f32 {
+        if self.cache.borrow().value.is_some() {
+            return self.cache.borrow().progress.get();
+        }
 
-        let elapsed_secs = goal_last_updated_at.elapsed().as_secs_f32();
-        (self.easing)((elapsed_secs / self.duration_secs).min(1.))
+        self.state.read(cx).progress_at(Instant::now()).get()
     }
 
     /// Updates the goal value for the transition.
@@ -188,22 +183,18 @@ impl<T: Lerp + Clone + PartialEq + 'static> Transition<T> {
         let mut was_updated = false;
 
         self.state.update(cx, |state, cx| {
-            let last_end_goal = state.end_goal.clone();
-
-            update(&mut state.end_goal, cx);
-
-            if self.continuous && state.end_goal == last_end_goal {
-                return;
+            let mut value = state.value().clone();
+            update(&mut value, cx);
+            was_updated = if self.continuous {
+                state.set(value, &self.motion, Instant::now())
+            } else {
+                state.restart(value, &self.motion, Instant::now())
             };
-
-            state.goal_last_updated_at = Some(Instant::now());
-
-            if self.continuous {
-                state.start_goal = state.start_goal.lerp(&last_end_goal, state.last_delta);
-            }
-
-            was_updated = true;
         });
+
+        if was_updated {
+            self.clear_cache();
+        }
 
         was_updated
     }
@@ -214,12 +205,8 @@ impl<T: Lerp + Clone + PartialEq + 'static> Transition<T> {
     /// return `target` immediately. This is useful for transitions that require a
     /// different start value on each update.
     pub fn jump_to(&self, target: T, cx: &mut App) {
-        self.state.update(cx, |state, _cx| {
-            state.start_goal = target.clone();
-            state.end_goal = target;
-            state.goal_last_updated_at = Some(Instant::now());
-        });
-        self.cached_value.borrow_mut().take();
+        self.state.update(cx, |state, _cx| state.jump_to(target));
+        self.clear_cache();
     }
 
     /// Scale the transition's start and end goals by the given ratio.
@@ -232,11 +219,8 @@ impl<T: Lerp + Clone + PartialEq + 'static> Transition<T> {
     where
         T: std::ops::Mul<f32, Output = T>,
     {
-        self.state.update(cx, |state, _cx| {
-            state.start_goal = state.start_goal.clone() * ratio;
-            state.end_goal = state.end_goal.clone() * ratio;
-        });
-        self.cached_value.borrow_mut().take();
+        self.state.update(cx, |state, _cx| state.scale_by(ratio));
+        self.clear_cache();
     }
 
     /// Returns the entity ID associated with this transition's state.
@@ -252,505 +236,171 @@ impl<T: Lerp + Clone + PartialEq + 'static> Transition<T> {
     /// the initial value that was provided when the transition was created.
     /// The cache is also cleared.
     pub fn reset(&self, cx: &mut App) {
-        self.state.update(cx, |state, _cx| {
-            state.goal_last_updated_at = None;
-            state.start_goal = state.initial_goal.clone();
-            state.end_goal = state.initial_goal.clone();
-            state.last_delta = 0.0;
-        });
-        *self.cached_value.borrow_mut() = None;
+        self.state.update(cx, |state, _cx| state.reset());
+        self.clear_cache();
     }
 }
 
-// Internal state container for a [`Transition`](crate::Transition).
-///
-/// This struct holds the data necessary to track a transition's progress,
-/// including the start and end goals, timing information, and the last
-/// computed delta value.
-#[derive(Clone)]
-pub struct TransitionState<T: Lerp + Clone + PartialEq + 'static> {
-    pub(crate) goal_last_updated_at: Option<Instant>,
-    pub(crate) initial_goal: T,
-    pub(crate) start_goal: T,
-    pub(crate) end_goal: T,
-    pub(crate) last_delta: f32,
-}
-
-impl<T: Lerp + Clone + PartialEq + 'static> TransitionState<T> {
-    /// Creates a new transition state with the given initial goal.
-    ///
-    /// The start goal, end goal, and initial goal are all set to the provided value.
-    /// The transition begins in a "completed" state (delta = 1.0) until the goal
-    /// is updated.
-    pub fn new(initial_goal: T) -> Self {
-        Self {
-            goal_last_updated_at: None,
-            initial_goal: initial_goal.clone(),
-            start_goal: initial_goal.clone(),
-            end_goal: initial_goal,
-            last_delta: 1.,
-        }
-    }
-}
+/// The animated value stored by the legacy transition hooks.
+pub type TransitionState<T> = Animated<T, Instant>;
 
 #[cfg(all(test, feature = "test-support"))]
 mod tests {
-    use crate::AppContext;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use std::time::Duration;
+
+    use crate::{AppContext, Context, IntoElement, Render, canvas, px, size};
 
     use super::*;
-    use gpui::{Point, Rgba, TestAppContext, px};
+    use gpui::TestAppContext;
 
     /// Helper to create a Transition directly without using window hooks.
     /// This bypasses the render-phase restriction of use_transition/use_keyed_transition.
     fn create_transition<T: Lerp + Clone + PartialEq + 'static>(
         cx: &mut App,
-        duration: Duration,
+        motion: impl Into<Motion>,
         initial: T,
     ) -> Transition<T> {
-        let state = cx.new(|_| TransitionState::new(initial));
-        Transition::new(state, duration)
+        let motion = motion.into();
+        let state = cx.new(|_| TransitionState::new(initial, motion.clone()));
+        Transition::new(state, motion)
+    }
+
+    struct TransitionTestView {
+        transition: Transition<f32>,
+        rendered_values: Rc<RefCell<Vec<f32>>>,
+    }
+
+    impl Render for TransitionTestView {
+        fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+            let transition = self.transition.clone();
+            let rendered_values = self.rendered_values.clone();
+            canvas(
+                move |_, window, cx| {
+                    rendered_values
+                        .borrow_mut()
+                        .push(*transition.evaluate(window, cx));
+                },
+                |_, _, _, _| {},
+            )
+        }
     }
 
     #[gpui::test]
-    fn test_transition_creation(cx: &mut TestAppContext) {
+    fn transition_exercises_state_updates_and_cache(cx: &mut TestAppContext) {
         cx.update(|cx| {
-            let transition = create_transition(cx, Duration::from_millis(300), 0.0_f32);
+            let transition =
+                create_transition(cx, Duration::from_secs(1), 0.0_f32).with_easing(|_| 0.5);
 
-            // Read the goal - should be the initial value
-            let goal = transition.read_goal(cx);
-            assert_eq!(*goal, 0.0);
-        });
-    }
-
-    #[gpui::test]
-    fn test_transition_read_goal(cx: &mut TestAppContext) {
-        cx.update(|cx| {
-            let transition = create_transition(cx, Duration::from_millis(300), 42.0_f32);
-
-            let goal = transition.read_goal(cx);
-            assert_eq!(*goal, 42.0);
-        });
-    }
-
-    #[gpui::test]
-    fn test_transition_update_returns_true_on_change(cx: &mut TestAppContext) {
-        cx.update(|cx| {
-            let transition = create_transition(cx, Duration::from_millis(300), 0.0_f32);
-
-            let was_updated = transition.update(cx, |val, _cx| {
-                *val = 100.0;
-            });
-
-            assert!(was_updated);
-        });
-    }
-
-    #[gpui::test]
-    fn test_transition_update_returns_false_on_no_change(cx: &mut TestAppContext) {
-        cx.update(|cx| {
-            let transition = create_transition(cx, Duration::from_millis(300), 50.0_f32);
-
-            // Update to the same value
-            let was_updated = transition.update(cx, |val, _cx| {
-                *val = 50.0;
-            });
-
-            assert!(!was_updated);
-        });
-    }
-
-    #[gpui::test]
-    fn test_transition_goal_updated_after_update(cx: &mut TestAppContext) {
-        cx.update(|cx| {
-            let transition = create_transition(cx, Duration::from_millis(300), 0.0_f32);
-
-            transition.update(cx, |val, _cx| {
-                *val = 200.0;
-            });
-
-            let goal = transition.read_goal(cx);
-            assert_eq!(*goal, 200.0);
-        });
-    }
-
-    #[gpui::test]
-    fn test_transition_entity_id(cx: &mut TestAppContext) {
-        cx.update(|cx| {
-            let transition1 = create_transition(cx, Duration::from_millis(300), 0.0_f32);
-            let transition2 = create_transition(cx, Duration::from_millis(300), 0.0_f32);
-
-            // Different transitions should have different entity IDs
-            assert_ne!(transition1.entity_id(), transition2.entity_id());
-        });
-    }
-
-    #[gpui::test]
-    fn test_transition_reset(cx: &mut TestAppContext) {
-        cx.update(|cx| {
-            let transition = create_transition(cx, Duration::from_millis(300), 10.0_f32);
-
-            // Update the goal
-            transition.update(cx, |val, _cx| {
-                *val = 100.0;
-            });
-
-            assert_eq!(*transition.read_goal(cx), 100.0);
-
-            // Reset the transition
-            transition.reset(cx);
-
-            // Goal should be back to initial value
-            assert_eq!(*transition.read_goal(cx), 10.0);
-        });
-    }
-
-    #[gpui::test]
-    fn test_transition_cache_cleared_on_reset(cx: &mut TestAppContext) {
-        cx.update(|cx| {
-            let transition = create_transition(cx, Duration::from_millis(300), 25.0_f32);
-
-            // Manually populate the cache using raw_evaluate
-            let (_, value) = transition.raw_evaluate(cx);
-            *transition.cached_value.borrow_mut() = Some(value);
-            assert!(transition.read_cache().is_some());
-
-            // Reset
-            transition.reset(cx);
-
-            // Cache should be cleared
             assert!(transition.read_cache().is_none());
-        });
-    }
-
-    #[gpui::test]
-    fn test_transition_with_custom_easing(cx: &mut TestAppContext) {
-        cx.update(|cx| {
-            // Custom easing that always returns 0.5
-            let transition =
-                create_transition(cx, Duration::from_millis(300), 0.0_f32).with_easing(|_| 0.5);
-
-            // Update goal to trigger animation
-            transition.update(cx, |val, _cx| {
-                *val = 100.0;
-            });
-
-            // With our custom easing, the delta should be 0.5
-            // So the value should be lerp(0, 100, 0.5) = 50
-            let (_, value) = transition.raw_evaluate(cx);
-            assert_eq!(value, 50.0);
-        });
-    }
-
-    #[gpui::test]
-    fn test_transition_with_point(cx: &mut TestAppContext) {
-        cx.update(|cx| {
-            let initial: Point<f32> = Point { x: 0.0, y: 0.0 };
-            let transition = create_transition(cx, Duration::from_millis(300), initial);
-
-            let goal = transition.read_goal(cx);
-            assert_eq!(goal.x, 0.0);
-            assert_eq!(goal.y, 0.0);
-
-            transition.update(cx, |point, _cx| {
-                point.x = 100.0;
-                point.y = 200.0;
-            });
-
-            let goal = transition.read_goal(cx);
-            assert_eq!(goal.x, 100.0);
-            assert_eq!(goal.y, 200.0);
-        });
-    }
-
-    #[gpui::test]
-    fn test_transition_with_rgba(cx: &mut TestAppContext) {
-        cx.update(|cx| {
-            let initial = Rgba {
-                r: 1.0,
-                g: 0.0,
-                b: 0.0,
-                a: 1.0,
-            };
-            let transition = create_transition(cx, Duration::from_millis(300), initial);
-
-            let goal = transition.read_goal(cx);
-            assert_eq!(goal.r, 1.0);
-            assert_eq!(goal.g, 0.0);
-            assert_eq!(goal.b, 0.0);
-        });
-    }
-
-    #[gpui::test]
-    fn test_transition_continuous_mode_default(cx: &mut TestAppContext) {
-        cx.update(|cx| {
-            // By default, transitions are continuous
-            let transition = create_transition(cx, Duration::from_millis(300), 0.0_f32);
-
-            // First update
-            transition.update(cx, |val, _cx| {
-                *val = 50.0;
-            });
-
-            // Second update (in continuous mode, this should work from current interpolated position)
-            let was_updated = transition.update(cx, |val, _cx| {
-                *val = 100.0;
-            });
-
-            assert!(was_updated);
+            assert!(transition.update(cx, |value, _| *value = 100.0));
             assert_eq!(*transition.read_goal(cx), 100.0);
-        });
-    }
+            let entity_id = transition.entity_id();
+            assert_eq!(entity_id, transition.entity_id());
 
-    #[gpui::test]
-    fn test_transition_non_continuous_mode(cx: &mut TestAppContext) {
-        cx.update(|cx| {
-            let transition =
-                create_transition(cx, Duration::from_millis(300), 0.0_f32).continuous(false);
+            let value1 = *transition.sample(cx).value.as_ref().unwrap();
+            let value2 = *transition.sample(cx).value.as_ref().unwrap();
+            assert_eq!((value1, value2), (50.0, 50.0));
+            assert_eq!(transition.evaluate_delta(cx), 0.5);
 
-            // Update the goal
-            transition.update(cx, |val, _cx| {
-                *val = 100.0;
-            });
+            assert!(!transition.update(cx, |value, _| *value = 100.0));
+            assert!(transition.read_cache().is_some());
+            assert!(transition.update(cx, |value, _| *value = 200.0));
+            assert!(transition.read_cache().is_none());
 
-            assert_eq!(*transition.read_goal(cx), 100.0);
-        });
-    }
+            let transition = transition.with_easing(|_| 0.75);
+            assert!(transition.read_cache().is_none());
+            assert_eq!(*transition.sample(cx).value.as_ref().unwrap(), 125.0);
+            assert_eq!(transition.evaluate_delta(cx), 0.5);
 
-    #[gpui::test]
-    fn test_evaluate_delta_initial(cx: &mut TestAppContext) {
-        cx.update(|cx| {
-            let transition = create_transition(cx, Duration::from_millis(300), 0.0_f32);
+            let motion = Motion::new(Duration::from_secs(1)).with_easing(|_| 0.5);
+            let continuous = create_transition(cx, motion.clone(), 0.0_f32);
+            let restarting = create_transition(cx, motion, 0.0_f32).continuous(false);
 
-            // Without any update, the transition should be "complete" (delta = 1.0)
-            // because it starts in completed state
-            let delta = transition.evaluate_delta(cx);
-            assert_eq!(delta, 1.0);
-        });
-    }
-
-    #[gpui::test]
-    fn test_evaluate_delta_after_update(cx: &mut TestAppContext) {
-        cx.update(|cx| {
-            let transition = create_transition(cx, Duration::from_millis(300), 0.0_f32);
-
-            transition.update(cx, |val, _cx| {
-                *val = 100.0;
-            });
-
-            // Immediately after update, delta should be close to 0
-            let delta = transition.evaluate_delta(cx);
-            assert!(
-                delta < 0.1,
-                "delta should be small immediately after update"
-            );
-        });
-    }
-
-    #[gpui::test]
-    fn test_transition_clone(cx: &mut TestAppContext) {
-        cx.update(|cx| {
-            let transition = create_transition(cx, Duration::from_millis(300), 42.0_f32);
-
-            let cloned = transition.clone();
-
-            // Both should reference the same entity
-            assert_eq!(transition.entity_id(), cloned.entity_id());
-
-            // Updating one should affect the other
-            transition.update(cx, |val, _cx| {
-                *val = 100.0;
-            });
-
-            assert_eq!(*cloned.read_goal(cx), 100.0);
-        });
-    }
-
-    #[gpui::test]
-    fn test_transition_cache_consistency(cx: &mut TestAppContext) {
-        cx.update(|cx| {
-            let transition =
-                create_transition(cx, Duration::from_millis(300), 0.0_f32).with_easing(|_| 0.5); // Always return 0.5 for deterministic testing
-
-            transition.update(cx, |val, _cx| {
-                *val = 100.0;
-            });
-
-            // First evaluation using raw_evaluate
-            let (_, value1) = transition.raw_evaluate(cx);
-
-            // Second evaluation should return the same value
-            let (_, value2) = transition.raw_evaluate(cx);
-
-            assert_eq!(value1, value2);
-        });
-    }
-
-    #[gpui::test]
-    fn test_multiple_transitions_independent(cx: &mut TestAppContext) {
-        cx.update(|cx| {
-            let transition_a = create_transition(cx, Duration::from_millis(300), 0.0_f32);
-            let transition_b = create_transition(cx, Duration::from_millis(300), 100.0_f32);
-
-            // Update only transition_a
-            transition_a.update(cx, |val, _cx| {
-                *val = 50.0;
-            });
-
-            // transition_b should remain unchanged
-            assert_eq!(*transition_a.read_goal(cx), 50.0);
-            assert_eq!(*transition_b.read_goal(cx), 100.0);
-        });
-    }
-
-    #[gpui::test]
-    fn test_transition_with_pixels(cx: &mut TestAppContext) {
-        cx.update(|cx| {
-            let transition = create_transition(cx, Duration::from_millis(300), px(0.0));
-
-            let goal = transition.read_goal(cx);
-            assert_eq!(*goal, px(0.0));
-
-            transition.update(cx, |val, _cx| {
-                *val = px(100.0);
-            });
-
-            let goal = transition.read_goal(cx);
-            assert_eq!(*goal, px(100.0));
-        });
-    }
-
-    #[gpui::test]
-    fn test_transition_rapid_updates(cx: &mut TestAppContext) {
-        cx.update(|cx| {
-            let transition = create_transition(cx, Duration::from_millis(300), 0.0_f32);
-
-            // Rapidly update multiple times
-            for i in 1..=10 {
-                transition.update(cx, |val, _cx| {
-                    *val = i as f32 * 10.0;
-                });
+            for transition in [&continuous, &restarting] {
+                assert!(transition.update(cx, |value, _| *value = 100.0));
+                assert_eq!(*transition.sample(cx).value.as_ref().unwrap(), 50.0);
             }
 
-            // Final goal should be 100.0
-            assert_eq!(*transition.read_goal(cx), 100.0);
-        });
-    }
+            assert!(continuous.update(cx, |value, _| *value = 200.0));
+            assert!(restarting.update(cx, |value, _| *value = 200.0));
 
-    #[gpui::test]
-    fn test_raw_evaluate_in_progress(cx: &mut TestAppContext) {
-        cx.update(|cx| {
-            let transition = create_transition(cx, Duration::from_millis(300), 0.0_f32);
+            assert_eq!(*continuous.sample(cx).value.as_ref().unwrap(), 125.0);
+            assert_eq!(*restarting.sample(cx).value.as_ref().unwrap(), 100.0);
 
-            transition.update(cx, |val, _cx| {
-                *val = 100.0;
-            });
+            let motion = Motion::new(Duration::from_secs(1)).with_easing(|_| 0.5);
+            let mutators = create_transition(cx, motion, 2.0_f32);
 
-            // Immediately after update, the transition should be in progress
-            let (in_progress, _value) = transition.raw_evaluate(cx);
-            assert!(
-                in_progress,
-                "transition should be in progress immediately after update"
+            assert!(mutators.update(cx, |value, _| *value = 10.0));
+            assert_eq!(*mutators.sample(cx).value.as_ref().unwrap(), 6.0);
+
+            mutators.scale_by(2.0, cx);
+            assert_eq!(*mutators.read_goal(cx), 20.0);
+            assert_eq!(*mutators.sample(cx).value.as_ref().unwrap(), 12.0);
+
+            mutators.jump_to(7.0, cx);
+            assert_eq!(*mutators.read_goal(cx), 7.0);
+            assert_eq!(*mutators.sample(cx).value.as_ref().unwrap(), 7.0);
+
+            mutators.reset(cx);
+            assert_eq!(*mutators.read_goal(cx), 2.0);
+            assert!(mutators.read_cache().is_none());
+
+            let alternating = create_transition(
+                cx,
+                Motion::new(Duration::ZERO).iterations(2).alternate(),
+                0.0_f32,
             );
+            assert!(alternating.update(cx, |value, _| *value = 100.0));
+            let sample = alternating.sample(cx);
+            assert_eq!(sample.value, Some(0.0));
+            assert_eq!(sample.progress, Progress::START);
+            assert!(!sample.is_active);
+            drop(sample);
+            assert_eq!(alternating.evaluate_delta(cx), 0.0);
         });
     }
 
     #[gpui::test]
-    fn test_raw_evaluate_completed(cx: &mut TestAppContext) {
-        cx.update(|cx| {
-            let transition = create_transition(cx, Duration::from_millis(300), 50.0_f32);
-
-            // Without any update, the transition starts as "complete"
-            let (in_progress, value) = transition.raw_evaluate(cx);
-            assert!(
-                !in_progress,
-                "transition should be complete without updates"
-            );
-            assert_eq!(value, 50.0);
+    fn evaluate_uses_samples_and_requests_frames_while_active(cx: &mut TestAppContext) {
+        let transition = cx.update(|cx| {
+            create_transition(
+                cx,
+                Motion::new(Duration::from_secs(1)).with_easing(|_| 0.5),
+                0.0_f32,
+            )
         });
-    }
-
-    #[gpui::test]
-    fn test_transition_interpolation_with_easing(cx: &mut TestAppContext) {
         cx.update(|cx| {
-            // Test with different easing values
-            for expected_delta in [0.0, 0.25, 0.5, 0.75, 1.0] {
-                let transition = create_transition(cx, Duration::from_millis(300), 0.0_f32)
-                    .with_easing(move |_| expected_delta);
-
-                transition.update(cx, |val, _cx| {
-                    *val = 100.0;
-                });
-
-                let (_, value) = transition.raw_evaluate(cx);
-                let expected_value = 0.0_f32.lerp(&100.0_f32, expected_delta);
-                assert_eq!(value, expected_value);
+            assert!(transition.update(cx, |value, _| *value = 100.0));
+        });
+        let rendered_values = Rc::new(RefCell::new(Vec::new()));
+        let window = cx.open_window(size(px(100.0), px(100.0)), {
+            let transition = transition.clone();
+            let rendered_values = rendered_values.clone();
+            move |_, _| TransitionTestView {
+                transition,
+                rendered_values,
             }
         });
-    }
+        cx.run_until_parked();
 
-    #[test]
-    fn test_new_state_initialization() {
-        let state = TransitionState::new(42.0_f32);
+        assert_eq!(*rendered_values.borrow(), vec![50.0]);
+        cx.update(|cx| transition.jump_to(100.0, cx));
+        assert_eq!(
+            window
+                .update(cx, |_, window, cx| window.simulate_next_frame(cx))
+                .unwrap(),
+            1
+        );
+        cx.run_until_parked();
 
-        assert_eq!(state.initial_goal, 42.0);
-        assert_eq!(state.start_goal, 42.0);
-        assert_eq!(state.end_goal, 42.0);
-        assert_eq!(state.last_delta, 1.0);
-        assert!(state.goal_last_updated_at.is_none());
-    }
-
-    #[test]
-    fn test_state_with_point() {
-        let initial: Point<f32> = Point { x: 10.0, y: 20.0 };
-        let state = TransitionState::new(initial);
-
-        assert_eq!(state.initial_goal.x, 10.0);
-        assert_eq!(state.initial_goal.y, 20.0);
-        assert_eq!(state.start_goal.x, 10.0);
-        assert_eq!(state.end_goal.x, 10.0);
-    }
-
-    #[test]
-    fn test_state_with_rgba() {
-        let initial = Rgba {
-            r: 1.0,
-            g: 0.5,
-            b: 0.0,
-            a: 1.0,
-        };
-        let state = TransitionState::new(initial);
-
-        assert_eq!(state.initial_goal.r, 1.0);
-        assert_eq!(state.initial_goal.g, 0.5);
-        assert_eq!(state.initial_goal.b, 0.0);
-        assert_eq!(state.initial_goal.a, 1.0);
-    }
-
-    #[test]
-    fn test_state_clone() {
-        let state = TransitionState::new(100.0_f32);
-        let cloned = state.clone();
-
-        assert_eq!(state.initial_goal, cloned.initial_goal);
-        assert_eq!(state.start_goal, cloned.start_goal);
-        assert_eq!(state.end_goal, cloned.end_goal);
-        assert_eq!(state.last_delta, cloned.last_delta);
-    }
-
-    #[test]
-    fn test_state_with_integer() {
-        let state = TransitionState::new(50_i32);
-
-        assert_eq!(state.initial_goal, 50);
-        assert_eq!(state.start_goal, 50);
-        assert_eq!(state.end_goal, 50);
-    }
-
-    #[test]
-    fn test_state_starts_completed() {
-        let state = TransitionState::new(0.0_f32);
-
-        // last_delta should be 1.0 indicating the transition is "complete"
-        assert_eq!(state.last_delta, 1.0);
+        assert_eq!(*rendered_values.borrow(), vec![50.0, 100.0]);
+        assert_eq!(
+            window
+                .update(cx, |_, window, cx| window.simulate_next_frame(cx))
+                .unwrap(),
+            0
+        );
     }
 }

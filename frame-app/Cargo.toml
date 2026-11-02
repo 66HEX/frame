@@ -16,8 +16,8 @@ cpal = "0.18.1"
 directories = "6.0.0"
 frame-core = { path = "../frame-core" }
 frame-updater = { path = "../frame-updater" }
-gpui = { package = "gpui", git = "https://github.com/gpui-ce/gpui-ce" }
-gpui_platform = { git = "https://github.com/gpui-ce/gpui-ce", features = ["font-kit"] }
+gpui = { package = "gpui-ce", git = "https://github.com/gpui-ce/gpui-ce", rev = "bc577476a0eb55173ef985585cfb487f75ab1cab" }
+gpui_platform = { package = "gpui_ce_platform", git = "https://github.com/gpui-ce/gpui-ce", rev = "bc577476a0eb55173ef985585cfb487f75ab1cab", features = ["font-kit", "wayland", "x11"] }
 image = "0.25.10"
 notify-rust = "4.18.0"
 rfd = "0.17.2"
@@ -43,7 +43,7 @@ objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSBu
 raw-window-handle = "0.6"
 
 [dev-dependencies]
-gpui = { package = "gpui", git = "https://github.com/gpui-ce/gpui-ce", features = ["test-support"] }
+gpui = { package = "gpui-ce", git = "https://github.com/gpui-ce/gpui-ce", rev = "bc577476a0eb55173ef985585cfb487f75ab1cab", features = ["test-support"] }
 
 [build-dependencies]
 embed-resource = "3.0.9"

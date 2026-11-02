@@ -108,7 +108,7 @@ pub(in crate::app) fn settings_tab_button(
         .aria_selected(selected)
         .focusable()
         .tab_stop(true)
-        .focus_visible(move |style| focus_visible_ring(style, palette))
+        .focus_visible_style(move |style| focus_visible_ring(style, palette))
         .group(tab_id)
         .w(theme::ui_rem(SETTINGS_TAB_BUTTON_SIZE))
         .h(theme::ui_rem(SETTINGS_TAB_BUTTON_SIZE))
@@ -121,8 +121,8 @@ pub(in crate::app) fn settings_tab_button(
         .when(selected, |this| {
             this.shadow(button_highlight_shadows(palette))
         })
-        .hover(gpui::Styled::cursor_pointer)
-        .active(move |style| style.bg(color(colors.active_background)))
+        .hover_style(gpui::Styled::cursor_pointer)
+        .active_style(move |style| style.bg(color(colors.active_background)))
         .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
             root.settings_ui.active_tab = tab;
             cx.stop_propagation();

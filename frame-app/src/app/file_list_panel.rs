@@ -30,7 +30,7 @@ pub(super) fn file_list_panel(
         .flex_col()
         .overflow_hidden()
         .card_surface(palette)
-        .drag_over::<ExternalPaths>(|style, _paths, _window, _cx| {
+        .on_drag_over::<ExternalPaths>(|style, _paths, _window, _cx| {
             style
                 .border_1()
                 .border_dashed()
@@ -145,6 +145,7 @@ pub(super) fn file_list_body(
 ) -> impl IntoElement {
     let body = div()
         .id("file-list-body")
+        .debug_selector(|| "file-list-body".to_string())
         .role(gpui::Role::List)
         .aria_label("File queue")
         .relative()
@@ -230,7 +231,7 @@ pub(super) fn file_list_row(
         } else {
             color(palette.transparent)
         })
-        .hover(|style| style.bg(color(palette.fill_subtle)).cursor_pointer())
+        .hover_style(|style| style.bg(color(palette.fill_subtle)).cursor_pointer())
         .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
             if root.select_workspace_file(&select_id) {
                 cx.notify();
@@ -335,7 +336,7 @@ pub(super) fn row_actions_cell(
         .justify_end()
         .gap_2()
         .opacity(0.0)
-        .group_hover(group_name, |style| style.opacity(1.0))
+        .group_hover_style(group_name, |style| style.opacity(1.0))
         .focusable()
         .tab_stop(false)
         .contains_focus(|style| style.opacity(1.0))

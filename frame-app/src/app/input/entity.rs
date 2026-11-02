@@ -3,6 +3,7 @@ use super::{
     UTF16Selection, Window, point, px,
     text::{clamp_text_offset, text_offset_to_utf16, text_range_from_utf16, text_range_to_utf16},
 };
+use super::{text_line_closest_index_for_x, text_line_x_for_index};
 
 impl EntityInputHandler for FrameRoot {
     fn text_for_range(
@@ -106,11 +107,11 @@ impl EntityInputHandler for FrameRoot {
         let text_top = bounds.top() + (bounds.size.height - px(metrics.caret_height)) / 2.0;
         Some(Bounds::from_corners(
             point(
-                bounds.left() + line.x_for_index(range.start) - runtime.scroll_x,
+                bounds.left() + text_line_x_for_index(line, range.start) - runtime.scroll_x,
                 text_top,
             ),
             point(
-                bounds.left() + line.x_for_index(range.end) - runtime.scroll_x,
+                bounds.left() + text_line_x_for_index(line, range.end) - runtime.scroll_x,
                 text_top + px(metrics.caret_height),
             ),
         ))
@@ -129,7 +130,7 @@ impl EntityInputHandler for FrameRoot {
         let line = runtime.last_layout.as_ref()?;
         let offset = clamp_text_offset(
             &text,
-            line.closest_index_for_x(point.x - bounds.left() + runtime.scroll_x),
+            text_line_closest_index_for_x(line, point.x - bounds.left() + runtime.scroll_x),
         );
         Some(text_offset_to_utf16(&text, offset))
     }

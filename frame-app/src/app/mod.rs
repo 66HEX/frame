@@ -168,10 +168,9 @@ use gpui::{
     PromptLevel, Render, RenderImage, Rgba, ScrollDelta, ScrollHandle, ScrollStrategy,
     ScrollWheelEvent, ShapedLine, SharedString, StatefulInteractiveElement, Style, Task,
     TextRenderingMode, TextRun, TitlebarOptions, TransformationMatrix, UTF16Selection,
-    UniformListScrollHandle, Window, WindowBackgroundAppearance, WindowBounds, WindowControlArea,
-    WindowDecorations, WindowOptions, actions, canvas, deferred, div, ease_in_out, fill, hsla, img,
-    linear_color_stop, linear_gradient, point, prelude::*, px, radians, relative, size, svg,
-    uniform_list,
+    UniformListScrollHandle, Window, WindowBounds, WindowControlArea, WindowDecorations,
+    WindowOptions, actions, canvas, deferred, div, ease_in_out, hsla, img, linear_color_stop,
+    linear_gradient, point, prelude::*, px, radians, relative, size, svg, uniform_list,
 };
 use std::{
     ops::Range,

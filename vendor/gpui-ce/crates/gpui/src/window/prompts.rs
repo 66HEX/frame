@@ -147,6 +147,7 @@ impl Render for FallbackPromptRenderer {
             }));
 
         div()
+            .occlude()
             .size_full()
             .child(
                 div()

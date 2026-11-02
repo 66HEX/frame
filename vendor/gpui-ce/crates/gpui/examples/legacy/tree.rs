@@ -1,8 +1,14 @@
+#![cfg_attr(target_family = "wasm", no_main)]
+
 //! Renders a div with deep children hierarchy. This example is useful to exemplify that Zed can
 //! handle deep hierarchies (even though it cannot just yet!).
+#[path = "../example_support/fonts.rs"]
+mod example_support;
+
 use std::sync::LazyLock;
 
 use gpui::{App, Bounds, Context, Window, WindowBounds, WindowOptions, div, prelude::*, px, size};
+use gpui_platform::application;
 
 struct Tree {}
 
@@ -28,16 +34,29 @@ impl Render for Tree {
     }
 }
 
-fn main() {
-    gpui_platform::application().run(|cx: &mut App| {
+fn run_example() {
+    application().run(|cx: &mut App| {
+        if !example_support::load_fonts(cx) {
+            return;
+        }
         let bounds = Bounds::centered(None, size(px(300.0), px(300.0)), cx);
         cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                ..Default::default()
-            },
+            WindowOptions::new().window_bounds(Some(WindowBounds::Windowed(bounds))),
             |_, cx| cx.new(|_| Tree {}),
         )
         .unwrap();
     });
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn main() {
+    env_logger::init();
+    run_example();
+}
+
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen::prelude::wasm_bindgen(start)]
+pub fn start() {
+    gpui_platform::web_init();
+    run_example();
 }

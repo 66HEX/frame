@@ -1,5 +1,7 @@
+mod bench;
 mod derive_action;
 mod derive_app_context;
+mod derive_element_traits;
 mod derive_into_element;
 mod derive_render;
 mod derive_visual_context;
@@ -28,11 +30,35 @@ pub fn register_action(ident: TokenStream) -> TokenStream {
     register_action::register_action(ident)
 }
 
-/// #[derive(IntoElement)] is used to create a Component out of anything that implements
-/// the `RenderOnce` trait.
+/// #[derive(IntoElement)] generates an `IntoElement` impl for any `RenderOnce`
+/// type, wrapping it in a `ViewElement` so it can be used as a child.
 #[proc_macro_derive(IntoElement)]
 pub fn derive_into_element(input: TokenStream) -> TokenStream {
     derive_into_element::derive_into_element(input)
+}
+
+/// Implements `Styled` using the field marked `#[style]`.
+#[proc_macro_derive(Styled, attributes(style))]
+pub fn derive_styled(input: TokenStream) -> TokenStream {
+    derive_element_traits::derive_styled(input)
+}
+
+/// Implements `ParentElement` using the field marked `#[children]`.
+#[proc_macro_derive(ParentElement, attributes(children))]
+pub fn derive_parent_element(input: TokenStream) -> TokenStream {
+    derive_element_traits::derive_parent_element(input)
+}
+
+/// Implements `InteractiveElement` using the field marked `#[interactivity]`.
+#[proc_macro_derive(InteractiveElement, attributes(interactivity))]
+pub fn derive_interactive_element(input: TokenStream) -> TokenStream {
+    derive_element_traits::derive_interactive_element(input)
+}
+
+/// Implements the marker trait `StatefulInteractiveElement`.
+#[proc_macro_derive(StatefulInteractiveElement)]
+pub fn derive_stateful_interactive_element(input: TokenStream) -> TokenStream {
+    derive_element_traits::derive_stateful_interactive_element(input)
 }
 
 #[proc_macro_derive(Render)]
@@ -99,6 +125,13 @@ pub fn style_helpers(input: TokenStream) -> TokenStream {
     styles::style_helpers(input)
 }
 
+/// Generates the style transition builder and application code.
+#[proc_macro]
+#[doc(hidden)]
+pub fn style_transitions(input: TokenStream) -> TokenStream {
+    styles::style_transitions(input)
+}
+
 /// Generates methods for visibility styles.
 #[proc_macro]
 pub fn visibility_style_methods(input: TokenStream) -> TokenStream {
@@ -154,7 +187,7 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
 /// The output contains a `#[test]` annotation so this can be used with any existing
 /// test harness (`cargo test` or `cargo-nextest`).
 ///
-/// ```
+/// ```ignore
 /// #[gpui::test]
 /// async fn test_foo(mut cx: &TestAppContext) { }
 /// ```
@@ -189,11 +222,26 @@ pub fn test(args: TokenStream, function: TokenStream) -> TokenStream {
     test::test(args, function)
 }
 
+/// `#[gpui::bench]` annotates a Criterion benchmark that runs with GPUI support.
+///
+/// Use `#[gpui::bench(inputs = some_iterable())]` on benchmarks that take an
+/// additional input argument; the generated benchmark uses Criterion's
+/// `bench_with_input`. `group`, `input_name`, and `sample_size` can customize
+/// the generated input benchmark group.
+///
+/// The benchmark crate must add `criterion` and `gpui_platform` (with its
+/// `test-support` feature) to its dev-dependencies and enable gpui's `bench`
+/// feature, since the generated code references all three.
+#[proc_macro_attribute]
+pub fn bench(args: TokenStream, function: TokenStream) -> TokenStream {
+    bench::bench(args, function)
+}
+
 /// A variant of `#[gpui::test]` that supports property-based testing.
 ///
 /// A property test, much like a standard GPUI randomized test, allows testing
 /// claims of the form "for any possible X, Y should hold". For example:
-/// ```
+/// ```ignore
 /// #[gpui::property_test]
 /// fn test_arithmetic(x: i32, y: i32) {
 ///     assert!(x == y || x < y || x > y);
@@ -236,7 +284,7 @@ pub fn test(args: TokenStream, function: TokenStream) -> TokenStream {
 /// `Arbitrary`. Parameters to a `#[gpui::property_test]`, by default, use a
 /// type's `Arbitrary` implementation. If you'd like to provide a custom
 /// strategy, you can use `#[strategy = ...]` on the argument:
-/// ```
+/// ```ignore
 /// #[gpui::property_test]
 /// fn int_test(#[strategy = 1..10] x: i32, #[strategy = "[a-zA-Z0-9]{20}"] s: String) {
 ///   assert!(s.len() > (x as usize));

@@ -1,7 +1,7 @@
 use bitflags::bitflags;
 use thiserror::Error;
 
-use crate::Pixels;
+use crate::{Pixels, util::FluentBuilder};
 
 /// The layer the surface is rendered on. Multiple surfaces can share a layer, and ordering within
 /// a single layer is undefined.
@@ -55,7 +55,25 @@ pub enum KeyboardInteractivity {
 }
 
 /// Options for creating a layer_shell window.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+///
+/// Chain setters on [`LayerShellOptions::default`] to configure the surface.
+/// Pass `None` to clear the exclusive zone, exclusive edge, or margins.
+///
+/// ```
+/// use gpui::{
+///     layer_shell::{Anchor, KeyboardInteractivity, Layer, LayerShellOptions},
+///     px,
+/// };
+///
+/// let options = LayerShellOptions::default()
+///     .namespace("panel")
+///     .layer(Layer::Top)
+///     .anchor(Anchor::LEFT | Anchor::RIGHT | Anchor::BOTTOM)
+///     .exclusive_zone(px(40.0))
+///     .keyboard_interactivity(KeyboardInteractivity::None);
+/// ```
+#[derive(Clone, Debug, Default, PartialEq, Eq, derive_setters::Setters)]
+#[setters(into)]
 pub struct LayerShellOptions {
     /// The namespace for the surface, mostly used by compositors to apply rules, can not be
     /// changed after the surface is created.
@@ -75,6 +93,8 @@ pub struct LayerShellOptions {
     /// How keyboard events should be delivered to the surface.
     pub keyboard_interactivity: KeyboardInteractivity,
 }
+
+impl FluentBuilder for LayerShellOptions {}
 
 /// An error indicating that an action failed because the compositor doesn't support the required
 /// layer_shell protocol.

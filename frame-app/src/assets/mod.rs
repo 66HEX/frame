@@ -147,6 +147,17 @@ impl AssetSource for FrameAssets {
 
     fn list(&self, path: &str) -> Result<Vec<SharedString>> {
         let assets = match path {
+            "" => {
+                let mut paths = Vec::new();
+                for directory in ["fonts", "icons"] {
+                    paths.extend(
+                        self.list(directory)?
+                            .into_iter()
+                            .map(|name| SharedString::from(format!("{directory}/{name}"))),
+                    );
+                }
+                paths
+            }
             "fonts" => vec![
                 SharedString::from("OverusedGrotesk-Roman.ttf"),
                 SharedString::from("OverusedGrotesk-Medium.ttf"),

@@ -169,8 +169,8 @@ fn frame_select_trigger_content_inner(
         .opacity(colors.opacity)
         .shadow(button_highlight_shadows(palette))
         .when(enabled, |this| {
-            this.hover(gpui::Styled::cursor_pointer)
-                .active(move |style| style.bg(color(colors.active_background)))
+            this.hover_style(gpui::Styled::cursor_pointer)
+                .active_style(move |style| style.bg(color(colors.active_background)))
         })
         .when(!enabled, gpui::Styled::cursor_not_allowed)
         .child(content)
@@ -442,7 +442,7 @@ fn frame_select_option_inner(
         .text_color(color(text_color))
         .opacity(if enabled { 1.0 } else { 0.5 })
         .when(enabled, |this| {
-            this.hover(|style| {
+            this.hover_style(|style| {
                 style
                     .bg(color(palette.fill_subtle))
                     .text_color(color(palette.text_primary))

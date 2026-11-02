@@ -1,0 +1,74 @@
+[package]
+name = "gpui_ce_zed_util"
+version = "0.2.2"
+edition = "2024"
+license = "Apache-2.0"
+publish = true
+description = "OS/utility helpers used by gpui-ce platform backends (vendored from Zed's util)."
+repository = "https://github.com/gpui-ce/gpui-ce"
+
+[lib]
+name = "util"
+path = "src/util.rs"
+doctest = true
+
+[features]
+test-support = ["path/test-support"]
+# Embed `fs_embed!` assets at compile time even in debug builds.
+debug-embed = ["rust-embed/debug-embed"]
+
+[dependencies]
+anyhow = "1.0.86"
+async_zip = { version = "0.0.18", features = ["deflate", "deflate64"] }
+collections = { package = "gpui_ce_collections", version = "0.2.2", path = "../gpui_collections" }
+dunce = "1.0"
+futures-lite = "2.6.1"
+futures = "0.3.32"
+globset = "0.4"
+itertools = "0.14.0"
+log = { version = "0.4.16", features = ["kv_unstable_serde", "serde"] }
+regex = "1.5"
+rust-embed = { version = "8.11", features = ["include-exclude"] }
+schemars = { version = "1.0", features = ["indexmap2"] }
+serde = { version = "1.0.221", features = ["derive", "rc"] }
+serde_json = { version = "1.0.144", features = ["preserve_order", "raw_value"] }
+serde_json_lenient = { version = "0.2", features = [
+  "preserve_order",
+  "raw_value",
+] }
+shlex = "1.3.0"
+take-until = "0.2.0"
+tempfile = "3.20.0"
+unicase = "2.6"
+url = "2.2"
+percent-encoding = "2.3.2"
+gpui_util = { package = "gpui_ce_util", version = "0.2.6", path = "../gpui_ce_util" }
+path = { package = "gpui_ce_path", version = "0.2.2", path = "../gpui_path", features = [
+  "serde",
+] }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+smol = "2.0"
+which = "6.0.0"
+async-fs = "2.1"
+walkdir = "2.5"
+dirs = "6.0"
+
+[target.'cfg(unix)'.dependencies]
+command-fds = "0.3.1"
+libc = "0.2"
+nix = { version = "0.29", features = ["user"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+mach2 = "0.5"
+
+[target.'cfg(windows)'.dependencies]
+tendril = "0.5"
+windows.workspace = true
+
+[dev-dependencies]
+pretty_assertions = { version = "1.3.0", features = ["unstable"] }
+rand.workspace = true
+path = { package = "gpui_ce_path", version = "0.2.2", path = "../gpui_path", features = [
+  "test-support",
+] }

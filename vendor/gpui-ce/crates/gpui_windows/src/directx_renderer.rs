@@ -3,11 +3,28 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-use ::util::ResultExt;
 use anyhow::{Context, Result};
+use collections::FxHashMap;
+use gpui_render::{
+    InstanceRange, TargetStack,
+    artifacts::{Dx11DrawConstants, Dx11DrawConstantsBinding},
+    blur::{
+        BlurAxis, BlurKernel, BlurUniforms, FilterCompositeClip,
+        GAUSSIAN_CUTOFF_STANDARD_DEVIATIONS, downsampled_dimension,
+    },
+    path_types::{PathRasterizationVertex, PathSprite},
+    shaders::{
+        common::{FontRasterizationUniforms, GlobalUniforms, ShaderBool, SurfaceColorFormat},
+        interface as shader_interface,
+        surface::SurfaceUniforms,
+    },
+};
+use gpui_util::ResultExt;
+use smallvec::SmallVec;
+use wgsl_rs::std::{vec2f, vec4f};
 use windows::{
     Win32::{
-        Foundation::HWND,
+        Foundation::{FreeLibrary, HMODULE, HWND},
         Graphics::{
             Direct3D::*,
             Direct3D11::*,
@@ -15,36 +32,30 @@ use windows::{
             DirectWrite::*,
             Dxgi::{Common::*, *},
         },
+        System::LibraryLoader::LoadLibraryA,
     },
-    core::Interface,
+    core::{HSTRING, Interface, PCSTR},
 };
+use windows_061::core::Interface as _;
 
-use crate::directx_renderer::shader_resources::{RawShaderBytes, ShaderModule, ShaderTarget};
+use crate::directx_renderer::shader_resources::ShaderModule;
 use crate::*;
 use gpui::*;
-
-/// The largest blur radius in a scene-space filter chain, in device pixels — used to size the
-/// blur kernel and the dilated region the blur passes are scissored to.
-///
-/// The `match` is exhaustive on purpose: adding a [`ScaledFilter`] variant breaks it here,
-/// forcing this backend to handle (or deliberately ignore) the new filter rather than silently
-/// dropping it.
-fn max_blur_radius(filters: &[ScaledFilter]) -> f32 {
-    filters.iter().fold(0.0, |acc, filter| match filter {
-        ScaledFilter::Blur(radius) => acc.max(radius.0),
-    })
-}
 
 pub(crate) const DISABLE_DIRECT_COMPOSITION: &str = "GPUI_DISABLE_DIRECT_COMPOSITION";
 const RENDER_TARGET_FORMAT: DXGI_FORMAT = DXGI_FORMAT_B8G8R8A8_UNORM;
 // This configuration is used for MSAA rendering on paths only, and it's guaranteed to be supported by DirectX 11.
 const PATH_MULTISAMPLE_COUNT: u32 = 4;
-
-/// Number of content-filter (`filter`) nesting levels that get their own isolated group target.
-/// Two covers the realistic "a blurred element inside another blurred element" case; deeper nests
-/// render inline (unblurred at the inner level) rather than allocating unbounded VRAM. Must match
-/// the wgpu backend's `MAX_FILTER_DEPTH` so nested blur renders consistently across platforms.
-const MAX_FILTER_DEPTH: usize = 2;
+const MAX_INSTANCE_BUFFER_SIZE: usize = 256 * 1024 * 1024;
+// Group 0 occupies registers 0 and 1 in native shaders, so generated group-1 bindings start at 2.
+const GROUP_1_REGISTER_OFFSET: u32 = 2;
+const DATA_REGISTER: u32 = shader_interface::DATA_BUFFER_BINDING + GROUP_1_REGISTER_OFFSET;
+const PRIMARY_TEXTURE_REGISTER: u32 =
+    shader_interface::PRIMARY_TEXTURE_BINDING + GROUP_1_REGISTER_OFFSET;
+const PRIMARY_SAMPLER_REGISTER: u32 =
+    shader_interface::PRIMARY_SAMPLER_BINDING + GROUP_1_REGISTER_OFFSET;
+const SURFACE_SAMPLER_REGISTER: u32 =
+    shader_interface::SURFACE_SAMPLER_BINDING + GROUP_1_REGISTER_OFFSET;
 
 pub(crate) struct FontInfo {
     pub gamma_ratios: [f32; 4],
@@ -77,6 +88,8 @@ pub(crate) struct DirectXRenderer {
     /// group, or the swapchain otherwise). `draw_paths_to_intermediate` restores to this after
     /// its own pass so paths land on the correct target.
     active_render_target: Option<ID3D11RenderTargetView>,
+    path_rasterization_vertices: Vec<PathRasterizationVertex>,
+    path_sprites: Vec<PathSprite>,
 }
 
 /// Direct3D objects
@@ -87,6 +100,7 @@ pub(crate) struct DirectXRendererDevices {
     pub(crate) device: ID3D11Device,
     pub(crate) device_context: ID3D11DeviceContext,
     dxgi_device: Option<IDXGIDevice>,
+    annotation: Option<ID3DUserDefinedAnnotation>,
 }
 
 struct DirectXResources {
@@ -95,104 +109,130 @@ struct DirectXResources {
     render_target: Option<ID3D11Texture2D>,
     render_target_view: Option<ID3D11RenderTargetView>,
 
-    // Path intermediate textures (with MSAA)
-    path_intermediate_texture: ID3D11Texture2D,
-    path_intermediate_srv: Option<ID3D11ShaderResourceView>,
-    path_intermediate_msaa_texture: ID3D11Texture2D,
-    path_intermediate_msaa_view: Option<ID3D11RenderTargetView>,
+    // Path intermediates are absent until a scene contains a path batch.
+    path: Option<PathResources>,
 
-    // Offscreen targets for blur filters (each is render-target + shader-resource).
-    blur: BlurResources,
+    // Offscreen targets are absent until a scene actually needs a blur/filter pass.
+    blur: Option<BlurResources>,
+
+    // Views for capture textures that are referenced by the current scene. Keeping the
+    // underlying texture alive makes its COM pointer a stable cache key.
+    surface_views: FxHashMap<usize, CachedSurfaceView>,
 
     // Cached viewport
     viewport: D3D11_VIEWPORT,
 }
 
-/// Offscreen render targets used by the blur filters. The scene is rendered into `scene_color`
-/// (so filters can sample it), `ping`/`pong` are half-resolution scratch for the separable
-/// gaussian, and `groups` isolate content-filter (`filter`) subtrees — one per nesting level
-/// (indexed by isolation depth), up to [`MAX_FILTER_DEPTH`], so nested content blurs isolate
-/// correctly; deeper nests render inline.
-struct BlurResources {
+struct CachedSurfaceView {
     #[expect(dead_code)]
-    scene_color: ID3D11Texture2D,
-    scene_color_rtv: Option<ID3D11RenderTargetView>,
-    scene_color_srv: Option<ID3D11ShaderResourceView>,
-    #[expect(dead_code)]
-    ping: ID3D11Texture2D,
-    ping_rtv: Option<ID3D11RenderTargetView>,
-    ping_srv: Option<ID3D11ShaderResourceView>,
-    #[expect(dead_code)]
-    pong: ID3D11Texture2D,
-    pong_rtv: Option<ID3D11RenderTargetView>,
-    pong_srv: Option<ID3D11ShaderResourceView>,
-    // Kept alive for the lifetime of their views; indexed by isolation depth.
-    #[expect(dead_code)]
-    groups: Vec<ID3D11Texture2D>,
-    group_rtvs: Vec<Option<ID3D11RenderTargetView>>,
-    group_srvs: Vec<Option<ID3D11ShaderResourceView>>,
+    texture: ID3D11Texture2D,
+    srv: Option<ID3D11ShaderResourceView>,
 }
 
-impl BlurResources {
+struct PathResources {
+    texture: ID3D11Texture2D,
+    srv: Option<ID3D11ShaderResourceView>,
+    msaa_texture: ID3D11Texture2D,
+    msaa_view: Option<ID3D11RenderTargetView>,
+}
+
+impl PathResources {
     fn new(device: &ID3D11Device, width: u32, height: u32) -> Result<Self> {
-        let half_w = (width / 2).max(1);
-        let half_h = (height / 2).max(1);
-        let (scene_color, scene_color_rtv, scene_color_srv) =
-            create_color_target(device, width, height)?;
-        let (ping, ping_rtv, ping_srv) = create_color_target(device, half_w, half_h)?;
-        let (pong, pong_rtv, pong_srv) = create_color_target(device, half_w, half_h)?;
-        let mut groups = Vec::with_capacity(MAX_FILTER_DEPTH);
-        let mut group_rtvs = Vec::with_capacity(MAX_FILTER_DEPTH);
-        let mut group_srvs = Vec::with_capacity(MAX_FILTER_DEPTH);
-        for _ in 0..MAX_FILTER_DEPTH {
-            let (group, group_rtv, group_srv) = create_color_target(device, width, height)?;
-            groups.push(group);
-            group_rtvs.push(group_rtv);
-            group_srvs.push(group_srv);
-        }
+        let (texture, srv) = create_path_intermediate_texture(device, width, height)?;
+        let (msaa_texture, msaa_view) =
+            create_path_intermediate_msaa_texture_and_view(device, width, height)?;
         Ok(Self {
-            scene_color,
-            scene_color_rtv,
-            scene_color_srv,
-            ping,
-            ping_rtv,
-            ping_srv,
-            pong,
-            pong_rtv,
-            pong_srv,
-            groups,
-            group_rtvs,
-            group_srvs,
+            texture,
+            srv,
+            msaa_texture,
+            msaa_view,
         })
     }
+}
+
+struct ColorTarget {
+    #[expect(dead_code)]
+    texture: ID3D11Texture2D,
+    target: Option<ID3D11RenderTargetView>,
+    source: Option<ID3D11ShaderResourceView>,
+}
+
+/// The scene and isolated groups use full-resolution targets; blur scratch uses half resolution.
+struct BlurResources {
+    scene: ColorTarget,
+    scratch: Option<[ColorTarget; 2]>,
+    snapshot: Option<ColorTarget>,
+    groups: Vec<ColorTarget>,
 }
 
 struct DirectXRenderPipelines {
     shadow_pipeline: PipelineState<Shadow>,
     quad_pipeline: PipelineState<Quad>,
-    path_rasterization_pipeline: PipelineState<PathRasterizationSprite>,
+    path_rasterization_pipeline: PipelineState<PathRasterizationVertex>,
     path_sprite_pipeline: PipelineState<PathSprite>,
     underline_pipeline: PipelineState<Underline>,
     mono_sprites: PipelineState<MonochromeSprite>,
     subpixel_sprites: PipelineState<SubpixelSprite>,
     poly_sprites: PipelineState<PolychromeSprite>,
-    // Blur (backdrop-filter / filter). These don't use the generic PipelineState since they
-    // sample a texture rather than read a structured instance buffer; their parameters live in
-    // a dedicated constant buffer at register b1.
+    surfaces: SurfacePipeline,
+    // Blur: not the generic PipelineState, since these sample a texture instead of
+    // reading a structured instance buffer; parameters live in a cbuffer at b2.
     blur_downsample_vertex: ID3D11VertexShader,
     blur_downsample_fragment: ID3D11PixelShader,
     blur_vertex: ID3D11VertexShader,
     blur_fragment: ID3D11PixelShader,
     blur_composite_vertex: ID3D11VertexShader,
     blur_composite_fragment: ID3D11PixelShader,
+    smoothed_blur_composite_vertex: ID3D11VertexShader,
+    smoothed_blur_composite_fragment: ID3D11PixelShader,
     blur_params_buffer: ID3D11Buffer,
     blur_blend_replace: ID3D11BlendState,
     blur_blend_composite: ID3D11BlendState,
 }
 
+/// The generated `surfaces` pipeline: one draw per surface, per-draw uniforms.
+struct SurfacePipeline {
+    vertex: ID3D11VertexShader,
+    fragment: ID3D11PixelShader,
+    params_buffer: ID3D11Buffer,
+    blend: ID3D11BlendState,
+}
+
 struct DirectXGlobalElements {
-    global_params_buffer: Option<ID3D11Buffer>,
+    globals_buffer: Option<ID3D11Buffer>,
+    font_buffer: Option<ID3D11Buffer>,
+    /// Per-draw [`Dx11DrawConstants`]; rewritten before every instanced draw.
+    draw_constants_buffer: ID3D11Buffer,
     sampler: Option<ID3D11SamplerState>,
+}
+
+impl DirectXGlobalElements {
+    /// Global constant buffers at registers b0 (globals) and b1 (font rasterization).
+    fn cbuffers(&self) -> [Option<ID3D11Buffer>; 2] {
+        [self.globals_buffer.clone(), self.font_buffer.clone()]
+    }
+}
+
+/// Frame-wide state that every batch draw binds alongside its own pipeline.
+struct FrameBindings<'a> {
+    device_context: &'a ID3D11DeviceContext,
+    viewport: &'a D3D11_VIEWPORT,
+    globals: &'a DirectXGlobalElements,
+}
+
+struct Annotation<'a>(&'a ID3DUserDefinedAnnotation);
+
+impl<'a> Annotation<'a> {
+    fn new(annotation: &'a ID3DUserDefinedAnnotation, label: HSTRING) -> Self {
+        unsafe { annotation.BeginEvent(&label) };
+        Self(annotation)
+    }
+}
+
+impl Drop for Annotation<'_> {
+    fn drop(&mut self) {
+        unsafe { self.0.EndEvent() };
+    }
 }
 
 struct DirectComposition {
@@ -217,6 +257,7 @@ impl DirectXRendererDevices {
         } else {
             Some(device.cast().context("Creating DXGI device")?)
         };
+        let annotation = device_context.cast().ok();
 
         Ok(Self {
             adapter: adapter.clone(),
@@ -224,6 +265,7 @@ impl DirectXRendererDevices {
             device: device.clone(),
             device_context: device_context.clone(),
             dxgi_device,
+            annotation,
         })
     }
 }
@@ -273,6 +315,8 @@ impl DirectXRenderer {
             height: 1,
             skip_draws: false,
             active_render_target: None,
+            path_rasterization_vertices: Vec::new(),
+            path_sprites: Vec::new(),
         })
     }
 
@@ -289,14 +333,29 @@ impl DirectXRenderer {
             .device_context;
         update_buffer(
             device_context,
-            self.globals.global_params_buffer.as_ref().unwrap(),
-            &[GlobalParams {
-                gamma_ratios: self.font_info.gamma_ratios,
-                viewport_size: [resources.viewport.Width, resources.viewport.Height],
+            self.globals.globals_buffer.as_ref().unwrap(),
+            &[GlobalUniforms {
+                viewport_size: vec2f(resources.viewport.Width, resources.viewport.Height),
+                // DirectComposition wants premultiplied output, but path rasterization
+                // premultiplies in-shader; scene geometry blends straight alpha as before.
+                premultiplied_alpha: ShaderBool::Disabled,
+                padding: 0,
+            }],
+        )?;
+        update_buffer(
+            device_context,
+            self.globals.font_buffer.as_ref().unwrap(),
+            &[FontRasterizationUniforms {
+                gamma_ratios: vec4f(
+                    self.font_info.gamma_ratios[0],
+                    self.font_info.gamma_ratios[1],
+                    self.font_info.gamma_ratios[2],
+                    self.font_info.gamma_ratios[3],
+                ),
                 grayscale_enhanced_contrast: self.font_info.grayscale_enhanced_contrast,
                 subpixel_enhanced_contrast: self.font_info.subpixel_enhanced_contrast,
-                is_bgr: self.font_info.is_bgr as u32,
-                _pad: [0; 3],
+                uses_blue_green_red_subpixel_order: ShaderBool::from(self.font_info.is_bgr),
+                padding: 0,
             }],
         )?;
         unsafe {
@@ -410,28 +469,62 @@ impl DirectXRenderer {
             // and so likely do not have the textures anymore that are required for drawing
             return Ok(());
         }
+        self.render(scene, background_appearance)?;
+        self.present()
+    }
+
+    /// Encodes a complete frame without presenting it. Window drawing and test readback share
+    /// this path so batching, filters, and resource-retention behavior cannot diverge.
+    fn render(
+        &mut self,
+        scene: &Scene,
+        background_appearance: WindowBackgroundAppearance,
+    ) -> Result<()> {
         self.pre_draw(&match background_appearance {
-            WindowBackgroundAppearance::Opaque => [1.0f32; 4],
+            appearance if appearance.is_opaque() => [1.0f32; 4],
             _ => [0.0f32; 4],
         })?;
 
         self.upload_scene_buffers(scene)?;
 
-        // Only route through the offscreen scene texture when the scene contains blur filters;
-        // otherwise render straight to the swapchain exactly as before.
-        let use_offscreen =
-            !scene.backdrop_filters.is_empty() || !scene.filter_boundaries.is_empty();
+        let use_offscreen = scene.requires_offscreen_rendering();
+        let requirements = scene.render_plan().requirements();
+        let device = &self.devices.as_ref().context("devices missing")?.device;
+        let resources = self.resources.as_mut().context("resources missing")?;
+        resources.retain_surface_views(&scene.surfaces);
+
+        if requirements.uses_path_target {
+            resources.ensure_path_resources(device)?;
+        }
+
+        if use_offscreen {
+            resources.ensure_blur_resources(device, requirements)?;
+        }
 
         // Clone the views we need (AddRef) so the loop can rebind render targets without holding a
         // borrow of `self` across the `&mut self` draw_* calls.
-        let (scene_rtv, scene_srv, group_rtvs, group_srvs, swapchain_rtv) = {
-            let r = self.resources.as_ref().context("resources missing")?;
+        let (scene_rtv, scene_srv, groups, swapchain_rtv) = {
+            let resources = self.resources.as_ref().context("resources missing")?;
+            let (scene_rtv, scene_srv, groups) = resources
+                .blur
+                .as_ref()
+                .map(|blur| {
+                    (
+                        blur.scene.target.clone(),
+                        blur.scene.source.clone(),
+                        blur.groups
+                            .iter()
+                            .map(|group| (group.target.clone(), group.source.clone()))
+                            .collect::<SmallVec<[_; MAX_FILTER_GROUP_DEPTH]>>(),
+                    )
+                })
+                .unwrap_or_default();
+
             (
-                r.blur.scene_color_rtv.clone(),
-                r.blur.scene_color_srv.clone(),
-                r.blur.group_rtvs.clone(),
-                r.blur.group_srvs.clone(),
-                r.render_target_view.clone(),
+                scene_rtv,
+                scene_srv,
+                groups,
+                resources.render_target_view.clone(),
             )
         };
         let ctx = self
@@ -453,50 +546,81 @@ impl DirectXRenderer {
             self.active_render_target = swapchain_rtv.clone();
         }
 
-        // Current target for the main scene + a parent stack for content-filter groups.
-        let mut current_rtv = self.active_render_target.clone();
-        let mut current_srv = if use_offscreen {
-            scene_srv.clone()
-        } else {
-            None
-        };
-        // (parent_rtv, parent_srv, isolated)
-        let mut filter_stack: Vec<(
-            Option<ID3D11RenderTargetView>,
-            Option<ID3D11ShaderResourceView>,
-            bool,
-        )> = Vec::new();
+        let mut targets = TargetStack::new((
+            self.active_render_target.clone(),
+            use_offscreen.then(|| scene_srv.clone()).flatten(),
+        ));
 
-        for batch in scene.batches() {
-            match batch {
-                PrimitiveBatch::Shadows(range) => self.draw_shadows(range.start, range.len()),
-                PrimitiveBatch::Quads(range) => self.draw_quads(range.start, range.len()),
-                PrimitiveBatch::Paths(range) => {
-                    let paths = &scene.paths[range];
-                    self.draw_paths_to_intermediate(paths)?;
-                    self.draw_paths_from_intermediate(paths)
+        let annotation = self
+            .devices
+            .as_ref()
+            .and_then(|devices| devices.annotation.clone())
+            .filter(|annotation| unsafe { annotation.GetStatus().as_bool() });
+        for command in scene.render_commands() {
+            let _annotation = annotation
+                .as_ref()
+                .map(|annotation| Annotation::new(annotation, HSTRING::from(command.label())));
+            match command {
+                RenderCommand::Batch(PrimitiveBatch::Shadows { range, smoothed }) => {
+                    self.draw_shadows(instance_range(range)?, *smoothed)
                 }
-                PrimitiveBatch::Underlines(range) => self.draw_underlines(range.start, range.len()),
-                PrimitiveBatch::MonochromeSprites { texture_id, range } => {
-                    self.draw_monochrome_sprites(texture_id, range.start, range.len())
+                RenderCommand::Batch(PrimitiveBatch::Quads { range, smoothed }) => {
+                    self.draw_quads(instance_range(range)?, *smoothed)
                 }
-                PrimitiveBatch::SubpixelSprites { texture_id, range } => {
-                    self.draw_subpixel_sprites(texture_id, range.start, range.len())
+                RenderCommand::Batch(PrimitiveBatch::Paths {
+                    range,
+                    rasterization_vertex_count,
+                    sprite_count,
+                }) => {
+                    if *rasterization_vertex_count == 0 {
+                        continue;
+                    }
+                    let paths = &scene.paths[range.clone()];
+                    self.draw_paths_to_intermediate(paths, *rasterization_vertex_count)?;
+                    self.draw_paths_from_intermediate(paths, *sprite_count)
                 }
-                PrimitiveBatch::PolychromeSprites { texture_id, range } => {
-                    self.draw_polychrome_sprites(texture_id, range.start, range.len())
+                RenderCommand::Batch(PrimitiveBatch::Underlines(range)) => {
+                    self.draw_underlines(instance_range(range)?)
                 }
-                PrimitiveBatch::Surfaces(range) => self.draw_surfaces(&scene.surfaces[range]),
-                PrimitiveBatch::BackdropFilters(range) => {
+                RenderCommand::Batch(PrimitiveBatch::MonochromeSprites {
+                    texture_id,
+                    range,
+                }) => self.draw_monochrome_sprites(*texture_id, instance_range(range)?),
+                RenderCommand::Batch(PrimitiveBatch::SubpixelSprites {
+                    texture_id,
+                    range,
+                }) => self.draw_subpixel_sprites(*texture_id, instance_range(range)?),
+                RenderCommand::Batch(PrimitiveBatch::PolychromeSprites {
+                    texture_id,
+                    range,
+                    smoothed,
+                }) => self.draw_polychrome_sprites(
+                    *texture_id,
+                    instance_range(range)?,
+                    *smoothed,
+                ),
+                RenderCommand::Batch(PrimitiveBatch::Surfaces(range)) => {
+                    self.draw_surfaces(&scene.surfaces[range.clone()])
+                }
+                RenderCommand::Batch(PrimitiveBatch::BackdropFilters(range)) => {
+                    let (current_rtv, current_srv) = targets.current();
                     let result = (|| {
-                        for filter in &scene.backdrop_filters[range] {
+                        for filter in &scene.backdrop_filters[range.clone()] {
+                            let source = if targets.inherits_backdrop() {
+                                self.dx_snapshot_backdrop(
+                                    targets.backdrop_layers().map(|(_, source)| source),
+                                )?
+                            } else {
+                                current_srv.clone()
+                            };
                             self.dx_blur_and_composite(
-                                &current_srv,
-                                &current_rtv,
+                                &source,
+                                current_rtv,
                                 filter.bounds,
                                 filter.content_mask.bounds,
-                                corner_radii_array(filter.corner_radii),
-                                max_blur_radius(&filter.filters),
+                                filter.corner_radii,
+                                filter.corner_smoothing,
+                                filter.max_blur_radius(),
                                 filter.opacity,
                                 true,
                             )?;
@@ -505,80 +629,168 @@ impl DirectXRenderer {
                     })();
                     // Restore the current target for subsequent batches.
                     unsafe {
-                        ctx.OMSetRenderTargets(Some(slice::from_ref(&current_rtv)), None);
+                        ctx.OMSetRenderTargets(Some(slice::from_ref(current_rtv)), None);
                     }
+
                     result
                 }
-                PrimitiveBatch::FilterBoundary(ix) => {
-                    let boundary = scene.filter_boundaries[ix].clone();
-                    if boundary.is_start {
-                        // Each isolated nesting level uses its own group target from the pool
-                        // (indexed by current isolation depth). Beyond the pool size
-                        // (MAX_FILTER_DEPTH) deeper filters render inline without isolation rather
-                        // than corrupting an outer group.
-                        let depth = filter_stack.iter().filter(|entry| entry.2).count();
-                        if depth < group_rtvs.len() {
-                            filter_stack.push((current_rtv.clone(), current_srv.clone(), true));
-                            current_rtv = group_rtvs[depth].clone();
-                            current_srv = group_srvs[depth].clone();
-                            self.active_render_target = current_rtv.clone();
-                            unsafe {
-                                if let Some(rtv) = current_rtv.as_ref() {
-                                    ctx.ClearRenderTargetView(rtv, &[0.0; 4]);
-                                }
-                                ctx.OMSetRenderTargets(Some(slice::from_ref(&current_rtv)), None);
-                            }
-                        } else {
-                            filter_stack.push((current_rtv.clone(), current_srv.clone(), false));
+                RenderCommand::BeginFilter {
+                    boundary_index,
+                    target: FilterRenderTarget::Isolated(target_index),
+                } => {
+                    targets.enter(
+                        groups[target_index.as_usize()].clone(),
+                        scene.filter_boundaries[*boundary_index].filters.is_empty(),
+                    );
+                    let (current_rtv, _) = targets.current();
+                    self.active_render_target = current_rtv.clone();
+                    unsafe {
+                        if let Some(rtv) = current_rtv.as_ref() {
+                            ctx.ClearRenderTargetView(rtv, &[0.0; 4]);
                         }
-                        Ok(())
-                    } else if let Some((parent_rtv, parent_srv, isolated)) = filter_stack.pop() {
-                        let result = if isolated {
-                            self.dx_blur_and_composite(
-                                &current_srv,
-                                &parent_rtv,
-                                boundary.bounds,
-                                boundary.content_mask.bounds,
-                                corner_radii_array(boundary.corner_radii),
-                                max_blur_radius(&boundary.filters),
-                                boundary.opacity,
-                                false,
-                            )
-                        } else {
-                            Ok(())
-                        };
-                        current_rtv = parent_rtv;
-                        current_srv = parent_srv;
-                        self.active_render_target = current_rtv.clone();
-                        unsafe {
-                            ctx.OMSetRenderTargets(Some(slice::from_ref(&current_rtv)), None);
-                        }
-                        result
-                    } else {
-                        Ok(())
+
+                        ctx.OMSetRenderTargets(Some(slice::from_ref(current_rtv)), None);
                     }
+
+                    Ok(())
+                }
+                RenderCommand::EndFilter {
+                    boundary_index,
+                    target: FilterRenderTarget::Isolated(_),
+                    ..
+                } => {
+                    let boundary = &scene.filter_boundaries[*boundary_index];
+                    let ((_, source), (parent_rtv, _)) = targets.exit();
+                    let result = self.dx_blur_and_composite(
+                        &source,
+                        parent_rtv,
+                        boundary.bounds,
+                        boundary.content_mask.bounds,
+                        boundary.corner_radii,
+                        boundary.corner_smoothing,
+                        boundary.max_blur_radius(),
+                        boundary.opacity,
+                        false,
+                    );
+                    self.active_render_target = parent_rtv.clone();
+                    unsafe {
+                        ctx.OMSetRenderTargets(Some(slice::from_ref(parent_rtv)), None);
+                    }
+
+                    result
+                }
+                RenderCommand::BeginFilter {
+                    target: FilterRenderTarget::Inline,
+                    ..
+                }
+                | RenderCommand::EndFilter {
+                    target: FilterRenderTarget::Inline,
+                    ..
+                } => Ok(()),
+                RenderCommand::Batch(PrimitiveBatch::FilterBoundary(_)) => {
+                    unreachable!("filter boundaries are resolved by the render plan")
                 }
             }
-            .context(format!(
-                "scene too large:\
-                {} paths, {} shadows, {} quads, {} underlines, {} mono, {} subpixel, {} poly, {} surfaces",
-                scene.paths.len(),
-                scene.shadows.len(),
-                scene.quads.len(),
-                scene.underlines.len(),
-                scene.monochrome_sprites.len(),
-                scene.subpixel_sprites.len(),
-                scene.polychrome_sprites.len(),
-                scene.surfaces.len(),
-            ))?;
+            .with_context(|| {
+                format!(
+                    "scene too large:\
+                    {} paths, {} shadows, {} quads, {} underlines, {} mono, {} subpixel, {} poly, {} surfaces",
+                    scene.paths.len(),
+                    scene.shadows.len(),
+                    scene.quads.len(),
+                    scene.underlines.len(),
+                    scene.monochrome_sprites.len(),
+                    scene.subpixel_sprites.len(),
+                    scene.polychrome_sprites.len(),
+                    scene.surfaces.len(),
+                )
+            })?;
         }
+
+        targets.assert_balanced();
 
         // Present the offscreen scene by blitting it into the swapchain.
         if use_offscreen {
             self.dx_blit(&scene_srv, &swapchain_rtv)?;
         }
         self.active_render_target = None;
-        self.present()
+        Ok(())
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub(crate) fn render_to_image(
+        &mut self,
+        scene: &Scene,
+        background_appearance: WindowBackgroundAppearance,
+    ) -> Result<image::RgbaImage> {
+        anyhow::ensure!(
+            !self.skip_draws,
+            "render_to_image unavailable while recovering from a lost device"
+        );
+        self.render(scene, background_appearance)?;
+
+        let devices = self.devices.as_ref().context("devices missing")?;
+        let resources = self.resources.as_ref().context("resources missing")?;
+        let render_target = resources
+            .render_target
+            .as_ref()
+            .context("render target missing")?;
+
+        let mut source_desc = D3D11_TEXTURE2D_DESC::default();
+        unsafe { render_target.GetDesc(&mut source_desc) };
+        let width = source_desc.Width;
+        let height = source_desc.Height;
+        let staging_desc = D3D11_TEXTURE2D_DESC {
+            Usage: D3D11_USAGE_STAGING,
+            BindFlags: 0,
+            CPUAccessFlags: D3D11_CPU_ACCESS_READ.0 as u32,
+            MiscFlags: 0,
+            MipLevels: 1,
+            ArraySize: 1,
+            SampleDesc: DXGI_SAMPLE_DESC {
+                Count: 1,
+                Quality: 0,
+            },
+            ..source_desc
+        };
+        let mut staging = None;
+        unsafe {
+            devices
+                .device
+                .CreateTexture2D(&staging_desc, None, Some(&mut staging))?
+        };
+        let staging = staging.context("creating staging texture")?;
+        unsafe {
+            devices.device_context.CopyResource(&staging, render_target);
+        }
+
+        let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
+        unsafe {
+            devices
+                .device_context
+                .Map(&staging, 0, D3D11_MAP_READ, 0, Some(&mut mapped))?
+        };
+        let row_bytes = width as usize * 4;
+        let mut pixels = vec![0u8; row_bytes * height as usize];
+        // SAFETY: a successful `Map` exposes `RowPitch * height` readable bytes until `Unmap`.
+        // D3D11 guarantees RowPitch is at least the logical row width, and each destination row
+        // is disjoint within the exactly-sized output allocation.
+        unsafe {
+            let source = mapped.pData.cast::<u8>();
+            for row in 0..height as usize {
+                std::ptr::copy_nonoverlapping(
+                    source.add(row * mapped.RowPitch as usize),
+                    pixels.as_mut_ptr().add(row * row_bytes),
+                    row_bytes,
+                );
+            }
+            devices.device_context.Unmap(&staging, 0);
+        }
+        for pixel in pixels.chunks_exact_mut(4) {
+            pixel.swap(0, 2);
+        }
+        image::RgbaImage::from_raw(width, height, pixels)
+            .context("failed to build RGBA image from DirectX staging readback")
     }
 
     pub(crate) fn resize(&mut self, new_size: Size<DevicePixels>) -> Result<()> {
@@ -679,103 +891,102 @@ impl DirectXRenderer {
         Ok(())
     }
 
-    fn draw_shadows(&mut self, start: usize, len: usize) -> Result<()> {
-        if len == 0 {
-            return Ok(());
-        }
-        let devices = self.devices.as_ref().context("devices missing")?;
-        self.pipelines.shadow_pipeline.draw_range(
-            &devices.device,
-            &devices.device_context,
-            slice::from_ref(
-                &self
-                    .resources
-                    .as_ref()
-                    .context("resources missing")?
-                    .viewport,
-            ),
-            slice::from_ref(&self.globals.global_params_buffer),
-            4,
-            start as u32,
-            len as u32,
+    /// Frame-wide bindings for the batch draws of the current frame.
+    fn frame_bindings(&self) -> Result<FrameBindings<'_>> {
+        Ok(FrameBindings {
+            device_context: &self
+                .devices
+                .as_ref()
+                .context("devices missing")?
+                .device_context,
+            viewport: &self
+                .resources
+                .as_ref()
+                .context("resources missing")?
+                .viewport,
+            globals: &self.globals,
+        })
+    }
+
+    fn draw_shadows(&mut self, instances: InstanceRange, smoothed: bool) -> Result<()> {
+        self.pipelines.shadow_pipeline.draw_instances_variant(
+            &self.frame_bindings()?,
+            None,
+            instances,
+            smoothed,
         )
     }
 
-    fn draw_quads(&mut self, start: usize, len: usize) -> Result<()> {
-        if len == 0 {
-            return Ok(());
-        }
-        let devices = self.devices.as_ref().context("devices missing")?;
-        self.pipelines.quad_pipeline.draw_range(
-            &devices.device,
-            &devices.device_context,
-            slice::from_ref(
-                &self
-                    .resources
-                    .as_ref()
-                    .context("resources missing")?
-                    .viewport,
-            ),
-            slice::from_ref(&self.globals.global_params_buffer),
-            4,
-            start as u32,
-            len as u32,
+    fn draw_quads(&mut self, instances: InstanceRange, smoothed: bool) -> Result<()> {
+        self.pipelines.quad_pipeline.draw_instances_variant(
+            &self.frame_bindings()?,
+            None,
+            instances,
+            smoothed,
         )
     }
 
-    fn draw_paths_to_intermediate(&mut self, paths: &[Path<ScaledPixels>]) -> Result<()> {
+    fn draw_paths_to_intermediate(
+        &mut self,
+        paths: &[Path<ScaledPixels>],
+        rasterization_vertex_count: usize,
+    ) -> Result<()> {
         if paths.is_empty() {
             return Ok(());
         }
 
+        self.path_rasterization_vertices.clear();
+        self.path_rasterization_vertices
+            .reserve(rasterization_vertex_count);
+        for path in paths {
+            self.path_rasterization_vertices
+                .extend(path.vertices.iter().map(|vertex| PathRasterizationVertex {
+                    xy_position: vertex.xy_position,
+                    curve_position: vertex.st_position,
+                    color: path.color,
+                    bounds: path.clipped_bounds(),
+                }));
+        }
+        debug_assert_eq!(
+            self.path_rasterization_vertices.len(),
+            rasterization_vertex_count
+        );
+
         let devices = self.devices.as_ref().context("devices missing")?;
         let resources = self.resources.as_ref().context("resources missing")?;
+        let path = resources
+            .path
+            .as_ref()
+            .context("path resources were not prepared")?;
         // Clear intermediate MSAA texture
         unsafe {
             devices.device_context.ClearRenderTargetView(
-                resources.path_intermediate_msaa_view.as_ref().unwrap(),
+                path.msaa_view.as_ref().context("path MSAA view missing")?,
                 &[0.0; 4],
             );
             // Set intermediate MSAA texture as render target
-            devices.device_context.OMSetRenderTargets(
-                Some(slice::from_ref(&resources.path_intermediate_msaa_view)),
-                None,
-            );
-        }
-
-        // Collect all vertices and sprites for a single draw call
-        let mut vertices = Vec::new();
-
-        for path in paths {
-            vertices.extend(path.vertices.iter().map(|v| PathRasterizationSprite {
-                xy_position: v.xy_position,
-                st_position: v.st_position,
-                color: path.color,
-                bounds: path.clipped_bounds(),
-            }));
+            devices
+                .device_context
+                .OMSetRenderTargets(Some(slice::from_ref(&path.msaa_view)), None);
         }
 
         self.pipelines.path_rasterization_pipeline.update_buffer(
             &devices.device,
             &devices.device_context,
-            &vertices,
+            &self.path_rasterization_vertices,
         )?;
-
-        self.pipelines.path_rasterization_pipeline.draw(
-            &devices.device_context,
-            slice::from_ref(&resources.viewport),
-            slice::from_ref(&self.globals.global_params_buffer),
-            D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
-            vertices.len() as u32,
-            1,
+        self.pipelines.path_rasterization_pipeline.draw_vertices(
+            &self.frame_bindings()?,
+            u32::try_from(rasterization_vertex_count)
+                .context("path rasterization vertex count exceeds the D3D11 draw limit")?,
         )?;
 
         // Resolve MSAA to non-MSAA intermediate texture
         unsafe {
             devices.device_context.ResolveSubresource(
-                &resources.path_intermediate_texture,
+                &path.texture,
                 0,
-                &resources.path_intermediate_msaa_texture,
+                &path.msaa_texture,
                 0,
                 RENDER_TARGET_FORMAT,
             );
@@ -794,7 +1005,11 @@ impl DirectXRenderer {
         Ok(())
     }
 
-    fn draw_paths_from_intermediate(&mut self, paths: &[Path<ScaledPixels>]) -> Result<()> {
+    fn draw_paths_from_intermediate(
+        &mut self,
+        paths: &[Path<ScaledPixels>],
+        sprite_count: usize,
+    ) -> Result<()> {
         let Some(first_path) = paths.first() else {
             return Ok(());
         };
@@ -806,126 +1021,86 @@ impl DirectXRenderer {
         // disjoint, so we can copy each path's bounds individually. If this
         // batch combines different draw orders, we perform a single copy
         // for a minimal spanning rect.
-        let sprites = if paths.last().unwrap().order == first_path.order {
-            paths
-                .iter()
-                .map(|path| PathSprite {
+        self.path_sprites.clear();
+        self.path_sprites.reserve(sprite_count);
+        if paths.last().unwrap().order == first_path.order {
+            self.path_sprites
+                .extend(paths.iter().map(|path| PathSprite {
                     bounds: path.clipped_bounds(),
-                })
-                .collect::<Vec<_>>()
+                }));
         } else {
             let mut bounds = first_path.clipped_bounds();
             for path in paths.iter().skip(1) {
                 bounds = bounds.union(&path.clipped_bounds());
             }
-            vec![PathSprite { bounds }]
-        };
+            self.path_sprites.push(PathSprite { bounds });
+        }
+        debug_assert_eq!(self.path_sprites.len(), sprite_count);
 
         let devices = self.devices.as_ref().context("devices missing")?;
         let resources = self.resources.as_ref().context("resources missing")?;
+        let path = resources
+            .path
+            .as_ref()
+            .context("path resources were not prepared")?;
         self.pipelines.path_sprite_pipeline.update_buffer(
             &devices.device,
             &devices.device_context,
-            &sprites,
+            &self.path_sprites,
         )?;
-
-        // Draw the sprites with the path texture
-        self.pipelines.path_sprite_pipeline.draw_with_texture(
-            &devices.device_context,
-            slice::from_ref(&resources.path_intermediate_srv),
-            slice::from_ref(&resources.viewport),
-            slice::from_ref(&self.globals.global_params_buffer),
-            slice::from_ref(&self.globals.sampler),
-            sprites.len() as u32,
+        let instances = InstanceRange::from_start(sprite_count)
+            .context("path sprite count exceeds the D3D11 instance limit")?;
+        self.pipelines.path_sprite_pipeline.draw_instances(
+            &self.frame_bindings()?,
+            Some(slice::from_ref(&path.srv)),
+            instances,
         )
     }
 
-    fn draw_underlines(&mut self, start: usize, len: usize) -> Result<()> {
-        if len == 0 {
-            return Ok(());
-        }
-        let devices = self.devices.as_ref().context("devices missing")?;
-        let resources = self.resources.as_ref().context("resources missing")?;
-        self.pipelines.underline_pipeline.draw_range(
-            &devices.device,
-            &devices.device_context,
-            slice::from_ref(&resources.viewport),
-            slice::from_ref(&self.globals.global_params_buffer),
-            4,
-            start as u32,
-            len as u32,
-        )
+    fn draw_underlines(&mut self, instances: InstanceRange) -> Result<()> {
+        self.pipelines
+            .underline_pipeline
+            .draw_instances(&self.frame_bindings()?, None, instances)
     }
 
     fn draw_monochrome_sprites(
         &mut self,
         texture_id: AtlasTextureId,
-        start: usize,
-        len: usize,
+        instances: InstanceRange,
     ) -> Result<()> {
-        if len == 0 {
-            return Ok(());
-        }
-        let devices = self.devices.as_ref().context("devices missing")?;
-        let resources = self.resources.as_ref().context("resources missing")?;
         let texture_view = self.atlas.get_texture_view(texture_id);
-        self.pipelines.mono_sprites.draw_range_with_texture(
-            &devices.device,
-            &devices.device_context,
-            &texture_view,
-            slice::from_ref(&resources.viewport),
-            slice::from_ref(&self.globals.global_params_buffer),
-            slice::from_ref(&self.globals.sampler),
-            start as u32,
-            len as u32,
+        self.pipelines.mono_sprites.draw_instances(
+            &self.frame_bindings()?,
+            Some(&texture_view),
+            instances,
         )
     }
 
     fn draw_subpixel_sprites(
         &mut self,
         texture_id: AtlasTextureId,
-        start: usize,
-        len: usize,
+        instances: InstanceRange,
     ) -> Result<()> {
-        if len == 0 {
-            return Ok(());
-        }
-        let devices = self.devices.as_ref().context("devices missing")?;
-        let resources = self.resources.as_ref().context("resources missing")?;
         let texture_view = self.atlas.get_texture_view(texture_id);
-        self.pipelines.subpixel_sprites.draw_range_with_texture(
-            &devices.device,
-            &devices.device_context,
-            &texture_view,
-            slice::from_ref(&resources.viewport),
-            slice::from_ref(&self.globals.global_params_buffer),
-            slice::from_ref(&self.globals.sampler),
-            start as u32,
-            len as u32,
+        self.pipelines.subpixel_sprites.draw_instances(
+            &self.frame_bindings()?,
+            Some(&texture_view),
+            instances,
         )
     }
 
     fn draw_polychrome_sprites(
         &mut self,
         texture_id: AtlasTextureId,
-        start: usize,
-        len: usize,
+        instances: InstanceRange,
+        smoothed: bool,
     ) -> Result<()> {
-        if len == 0 {
-            return Ok(());
-        }
-        let devices = self.devices.as_ref().context("devices missing")?;
-        let resources = self.resources.as_ref().context("resources missing")?;
         let texture_view = self.atlas.get_texture_view(texture_id);
-        self.pipelines.poly_sprites.draw_range_with_texture(
-            &devices.device,
-            &devices.device_context,
-            &texture_view,
-            slice::from_ref(&resources.viewport),
-            slice::from_ref(&self.globals.global_params_buffer),
-            slice::from_ref(&self.globals.sampler),
-            start as u32,
-            len as u32,
+        self.pipelines.poly_sprites.draw_instances_variant(
+            &self.frame_bindings()?,
+            Some(&texture_view),
+            instances,
+            smoothed,
         )
     }
 
@@ -933,11 +1108,76 @@ impl DirectXRenderer {
         if surfaces.is_empty() {
             return Ok(());
         }
+        let devices = self.devices.as_ref().context("devices missing")?;
+        let resources = self.resources.as_mut().context("resources missing")?;
+        let ctx = &devices.device_context;
+        let cbuffers = self.globals.cbuffers();
+        let surface_cb = [Some(self.pipelines.surfaces.params_buffer.clone())];
+        let sampler = [self.globals.sampler.clone()];
+
+        for surface in surfaces {
+            let gpui::SurfaceSource::WindowsCapture(frame) = &surface.source else {
+                log::error!("DirectX renderer cannot import this surface source");
+                anyhow::bail!("unsupported surface source");
+            };
+            let key = frame.texture().as_raw() as usize;
+            if let std::collections::hash_map::Entry::Vacant(entry) =
+                resources.surface_views.entry(key)
+            {
+                let mut srv = None;
+                // Screen capture uses windows 0.61 while this renderer uses 0.62. COM interface
+                // pointers are ABI-stable; transferring an owned clone keeps the texture alive.
+                let texture =
+                    unsafe { ID3D11Texture2D::from_raw(frame.texture().clone().into_raw()) };
+                unsafe {
+                    devices
+                        .device
+                        .CreateShaderResourceView(&texture, None, Some(&mut srv))?
+                };
+                entry.insert(CachedSurfaceView { texture, srv });
+            }
+            let texture_srv = &resources
+                .surface_views
+                .get(&key)
+                .context("capture surface view cache insertion failed")?
+                .srv;
+            // The surface shader declares both planes; RGBA captures bind one view to both.
+            let texture_srvs = [texture_srv.clone(), texture_srv.clone()];
+
+            let uniforms = SurfaceUniforms {
+                bounds: surface.bounds.into(),
+                content_mask: surface.content_mask.into(),
+                color_format: SurfaceColorFormat::Rgba,
+                opacity: 1.0,
+                padding0: 0,
+                padding1: 0,
+                padding2: 0,
+                padding3: 0,
+                padding4: 0,
+                padding5: 0,
+            };
+            update_buffer(ctx, &self.pipelines.surfaces.params_buffer, &[uniforms])?;
+
+            unsafe {
+                ctx.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+                ctx.RSSetViewports(Some(slice::from_ref(&resources.viewport)));
+                ctx.VSSetShader(&self.pipelines.surfaces.vertex, None);
+                ctx.PSSetShader(&self.pipelines.surfaces.fragment, None);
+                ctx.VSSetConstantBuffers(0, Some(&cbuffers));
+                ctx.PSSetConstantBuffers(0, Some(&cbuffers));
+                ctx.VSSetConstantBuffers(DATA_REGISTER, Some(&surface_cb));
+                ctx.PSSetConstantBuffers(DATA_REGISTER, Some(&surface_cb));
+                ctx.PSSetShaderResources(PRIMARY_TEXTURE_REGISTER, Some(&texture_srvs));
+                ctx.PSSetSamplers(SURFACE_SAMPLER_REGISTER, Some(&sampler));
+                ctx.OMSetBlendState(&self.pipelines.surfaces.blend, None, 0xFFFFFFFF);
+                ctx.DrawInstanced(4, 1, 0, 0);
+            }
+        }
         Ok(())
     }
 
     /// Run a single blur pass: a full-screen (or composite) draw sampling `source_srv` into
-    /// `target_rtv`, with `params` in the blur constant buffer (b1).
+    /// `target_rtv`, with `params` in the blur constant buffer (register b2).
     #[allow(clippy::too_many_arguments)]
     fn dx_blur_pass(
         &self,
@@ -946,7 +1186,7 @@ impl DirectXRenderer {
         blend: &ID3D11BlendState,
         target_rtv: &Option<ID3D11RenderTargetView>,
         source_srv: &Option<ID3D11ShaderResourceView>,
-        params: BlurParams,
+        params: BlurUniforms,
         viewport: &D3D11_VIEWPORT,
         topology: D3D_PRIMITIVE_TOPOLOGY,
         vertex_count: u32,
@@ -956,10 +1196,11 @@ impl DirectXRenderer {
         let ctx = &devices.device_context;
         update_buffer(ctx, &self.pipelines.blur_params_buffer, &[params])?;
         let null_srv: [Option<ID3D11ShaderResourceView>; 1] = [None];
+        let cbuffers = self.globals.cbuffers();
         let blur_params = [Some(self.pipelines.blur_params_buffer.clone())];
         unsafe {
-            // Unbind any SRV at slot 0 so the target texture isn't simultaneously bound as input.
-            ctx.PSSetShaderResources(0, Some(&null_srv));
+            // Unbind any SRV at the blur slot; the target must not be bound as input.
+            ctx.PSSetShaderResources(PRIMARY_TEXTURE_REGISTER, Some(&null_srv));
             if clear {
                 ctx.ClearRenderTargetView(
                     target_rtv.as_ref().context("blur target view missing")?,
@@ -971,16 +1212,19 @@ impl DirectXRenderer {
             ctx.IASetPrimitiveTopology(topology);
             ctx.VSSetShader(vertex, None);
             ctx.PSSetShader(fragment, None);
-            ctx.VSSetConstantBuffers(0, Some(slice::from_ref(&self.globals.global_params_buffer)));
-            ctx.PSSetConstantBuffers(0, Some(slice::from_ref(&self.globals.global_params_buffer)));
-            ctx.VSSetConstantBuffers(1, Some(&blur_params));
-            ctx.PSSetConstantBuffers(1, Some(&blur_params));
-            ctx.PSSetSamplers(0, Some(slice::from_ref(&self.globals.sampler)));
-            ctx.PSSetShaderResources(0, Some(slice::from_ref(source_srv)));
+            ctx.VSSetConstantBuffers(0, Some(&cbuffers));
+            ctx.PSSetConstantBuffers(0, Some(&cbuffers));
+            ctx.VSSetConstantBuffers(DATA_REGISTER, Some(&blur_params));
+            ctx.PSSetConstantBuffers(DATA_REGISTER, Some(&blur_params));
+            ctx.PSSetSamplers(
+                PRIMARY_SAMPLER_REGISTER,
+                Some(slice::from_ref(&self.globals.sampler)),
+            );
+            ctx.PSSetShaderResources(PRIMARY_TEXTURE_REGISTER, Some(slice::from_ref(source_srv)));
             ctx.OMSetBlendState(blend, None, 0xFFFFFFFF);
             ctx.DrawInstanced(vertex_count, 1, 0, 0);
             // Unbind the source so the target can be rebound as a render target next.
-            ctx.PSSetShaderResources(0, Some(&null_srv));
+            ctx.PSSetShaderResources(PRIMARY_TEXTURE_REGISTER, Some(&null_srv));
         }
         Ok(())
     }
@@ -995,122 +1239,173 @@ impl DirectXRenderer {
         target_rtv: &Option<ID3D11RenderTargetView>,
         bounds: Bounds<ScaledPixels>,
         content_mask: Bounds<ScaledPixels>,
-        corner_radii: [f32; 4],
+        corner_radii: Corners<ScaledPixels>,
+        corner_smoothing: f32,
         blur_radius: f32,
         opacity: f32,
         // Backdrop clips to the rounded rect; content (`filter`) bleeds past its bounds.
         clip_rounded: bool,
     ) -> Result<()> {
-        // Sigma is halved because the blur runs at half resolution.
-        let sigma = (blur_radius * 0.5).max(0.0);
-        if sigma <= 0.0 {
+        if clip_rounded && blur_radius <= 0.0 {
             return Ok(());
         }
-        // Span ±3σ. If that needs more than 32 taps, spread the taps apart (tap_step > 1) rather
-        // than truncating the kernel — keeps very large radii from clipping. Matches wgpu.
-        let ideal_taps = (3.0 * sigma).ceil();
-        let tap_count = ideal_taps.clamp(1.0, 32.0);
-        let tap_step = (ideal_taps / tap_count).max(1.0);
-        // Content blur bleeds ~3·radius past the box, so its composite quad covers a dilated rect.
-        let composite_bounds = if clip_rounded {
-            bounds
+
+        let full_width = self.width;
+        let full_height = self.height;
+        let blur_size = [
+            downsampled_dimension(full_width) as f32,
+            downsampled_dimension(full_height) as f32,
+        ];
+        let clip = if clip_rounded {
+            FilterCompositeClip::RoundedBounds
         } else {
-            bounds.dilate(ScaledPixels(3.0 * blur_radius))
+            FilterCompositeClip::ContentShape
         };
-        let half_w = (self.width / 2).max(1);
-        let half_h = (self.height / 2).max(1);
         let half_vp = D3D11_VIEWPORT {
             TopLeftX: 0.0,
             TopLeftY: 0.0,
-            Width: half_w as f32,
-            Height: half_h as f32,
+            Width: blur_size[0],
+            Height: blur_size[1],
             MinDepth: 0.0,
             MaxDepth: 1.0,
         };
-        let (full_vp, ping_rtv, ping_srv, pong_rtv, pong_srv) = {
-            let r = self.resources.as_ref().context("resources missing")?;
+        let resources = self.resources.as_ref().context("resources missing")?;
+
+        let full_size = [full_width as f32, full_height as f32];
+        let (composite_source, source_size) =
+            if let Some(kernel) = BlurKernel::for_radius(blur_radius) {
+                let [ping, pong] = resources
+                    .blur
+                    .as_ref()
+                    .and_then(|blur| blur.scratch.as_ref())
+                    .context("blur resources were not prepared")?;
+                // Downsample source -> ping, then separable gaussian ping -> pong -> ping.
+                self.dx_blur_pass(
+                    &self.pipelines.blur_downsample_vertex,
+                    &self.pipelines.blur_downsample_fragment,
+                    &self.pipelines.blur_blend_replace,
+                    &ping.target,
+                    source_srv,
+                    BlurUniforms::downsample([full_width as f32, full_height as f32], blur_size),
+                    &half_vp,
+                    D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
+                    3,
+                    true,
+                )?;
+
+                for (axis, source, target) in [
+                    (BlurAxis::Horizontal, &ping.source, &pong.target),
+                    (BlurAxis::Vertical, &pong.source, &ping.target),
+                ] {
+                    self.dx_blur_pass(
+                        &self.pipelines.blur_vertex,
+                        &self.pipelines.blur_fragment,
+                        &self.pipelines.blur_blend_replace,
+                        target,
+                        source,
+                        BlurUniforms::gaussian(axis, blur_size, kernel),
+                        &half_vp,
+                        D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
+                        3,
+                        true,
+                    )?;
+                }
+
+                (&ping.source, blur_size)
+            } else {
+                (source_srv, full_size)
+            };
+
+        // Content blur bleeds ~3·radius past the box; composite over a dilated rect.
+        let composite_bounds = if clip_rounded {
+            bounds
+        } else {
+            bounds.dilate(ScaledPixels(
+                GAUSSIAN_CUTOFF_STANDARD_DEVIATIONS * blur_radius,
+            ))
+        };
+        let composite_uniforms = BlurUniforms::composite(
+            composite_bounds,
+            content_mask,
+            corner_radii,
+            corner_smoothing,
+            opacity,
+            clip,
+            source_size,
+            full_size,
+        );
+        let (composite_vertex, composite_fragment) = if composite_uniforms.corner_smoothing > 0.0 {
             (
-                r.viewport,
-                r.blur.ping_rtv.clone(),
-                r.blur.ping_srv.clone(),
-                r.blur.pong_rtv.clone(),
-                r.blur.pong_srv.clone(),
+                &self.pipelines.smoothed_blur_composite_vertex,
+                &self.pipelines.smoothed_blur_composite_fragment,
+            )
+        } else {
+            (
+                &self.pipelines.blur_composite_vertex,
+                &self.pipelines.blur_composite_fragment,
             )
         };
-
-        // Downsample source -> ping, then separable gaussian ping -> pong -> ping.
-        self.dx_blur_pass(
-            &self.pipelines.blur_downsample_vertex,
-            &self.pipelines.blur_downsample_fragment,
-            &self.pipelines.blur_blend_replace,
-            &ping_rtv,
-            source_srv,
-            BlurParams {
-                downsample: 1.0,
-                ..Default::default()
-            },
-            &half_vp,
-            D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
-            3,
-            true,
-        )?;
-        self.dx_blur_pass(
-            &self.pipelines.blur_vertex,
-            &self.pipelines.blur_fragment,
-            &self.pipelines.blur_blend_replace,
-            &pong_rtv,
-            &ping_srv,
-            BlurParams {
-                direction: [1.0 / half_w as f32, 0.0],
-                sigma,
-                tap_count,
-                tap_step,
-                ..Default::default()
-            },
-            &half_vp,
-            D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
-            3,
-            true,
-        )?;
-        self.dx_blur_pass(
-            &self.pipelines.blur_vertex,
-            &self.pipelines.blur_fragment,
-            &self.pipelines.blur_blend_replace,
-            &ping_rtv,
-            &pong_srv,
-            BlurParams {
-                direction: [0.0, 1.0 / half_h as f32],
-                sigma,
-                tap_count,
-                tap_step,
-                ..Default::default()
-            },
-            &half_vp,
-            D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
-            3,
-            true,
-        )?;
         // Composite the blurred result into the target (preserving its contents).
         self.dx_blur_pass(
-            &self.pipelines.blur_composite_vertex,
-            &self.pipelines.blur_composite_fragment,
+            composite_vertex,
+            composite_fragment,
             &self.pipelines.blur_blend_composite,
             target_rtv,
-            &ping_srv,
-            BlurParams {
-                bounds: composite_bounds,
-                content_mask,
-                corner_radii,
-                opacity,
-                clip_rounded: if clip_rounded { 1.0 } else { 0.0 },
-                ..Default::default()
-            },
-            &full_vp,
+            composite_source,
+            composite_uniforms,
+            &resources.viewport,
             D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP,
             4,
             false,
         )?;
         Ok(())
+    }
+
+    fn dx_snapshot_backdrop<'a>(
+        &self,
+        sources: impl Iterator<Item = &'a Option<ID3D11ShaderResourceView>>,
+    ) -> Result<Option<ID3D11ShaderResourceView>> {
+        let resources = self.resources.as_ref().context("resources missing")?;
+        let snapshot = resources
+            .blur
+            .as_ref()
+            .and_then(|blur| blur.snapshot.as_ref())
+            .context("backdrop snapshot missing")?;
+        let target = &snapshot.target;
+        let bounds = Bounds::new(
+            point(ScaledPixels(0.0), ScaledPixels(0.0)),
+            size(
+                ScaledPixels(self.width as f32),
+                ScaledPixels(self.height as f32),
+            ),
+        );
+        let ctx = &self
+            .devices
+            .as_ref()
+            .context("devices missing")?
+            .device_context;
+        unsafe {
+            ctx.ClearRenderTargetView(
+                target.as_ref().context("backdrop snapshot missing")?,
+                &[0.0; 4],
+            );
+        }
+
+        for source in sources {
+            self.dx_blur_and_composite(
+                source,
+                target,
+                bounds,
+                bounds,
+                Corners::default(),
+                0.0,
+                0.0,
+                1.0,
+                false,
+            )?;
+        }
+
+        Ok(snapshot.source.clone())
     }
 
     /// Copy the offscreen scene texture into the swapchain render target.
@@ -1130,7 +1425,7 @@ impl DirectXRenderer {
             &self.pipelines.blur_blend_replace,
             target_rtv,
             source_srv,
-            BlurParams::default(),
+            BlurUniforms::copy([self.width as f32, self.height as f32]),
             &full_vp,
             D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
             3,
@@ -1207,27 +1502,16 @@ impl DirectXResources {
             )?
         };
 
-        let (
-            render_target,
-            render_target_view,
-            path_intermediate_texture,
-            path_intermediate_srv,
-            path_intermediate_msaa_texture,
-            path_intermediate_msaa_view,
-            viewport,
-        ) = create_resources(devices, &swap_chain, width, height)?;
+        let (render_target, render_target_view, viewport) =
+            create_resources(devices, &swap_chain, width, height)?;
         set_rasterizer_state(&devices.device, &devices.device_context)?;
-        let blur = BlurResources::new(&devices.device, width, height)?;
-
         Ok(Self {
             swap_chain,
             render_target: Some(render_target),
             render_target_view,
-            path_intermediate_texture,
-            path_intermediate_msaa_texture,
-            path_intermediate_msaa_view,
-            path_intermediate_srv,
-            blur,
+            path: None,
+            blur: None,
+            surface_views: FxHashMap::default(),
             viewport,
         })
     }
@@ -1239,24 +1523,87 @@ impl DirectXResources {
         width: u32,
         height: u32,
     ) -> Result<()> {
-        let (
-            render_target,
-            render_target_view,
-            path_intermediate_texture,
-            path_intermediate_srv,
-            path_intermediate_msaa_texture,
-            path_intermediate_msaa_view,
-            viewport,
-        ) = create_resources(devices, &self.swap_chain, width, height)?;
+        let (render_target, render_target_view, viewport) =
+            create_resources(devices, &self.swap_chain, width, height)?;
         self.render_target = Some(render_target);
         self.render_target_view = render_target_view;
-        self.path_intermediate_texture = path_intermediate_texture;
-        self.path_intermediate_msaa_texture = path_intermediate_msaa_texture;
-        self.path_intermediate_msaa_view = path_intermediate_msaa_view;
-        self.path_intermediate_srv = path_intermediate_srv;
-        self.blur = BlurResources::new(&devices.device, width, height)?;
+        // Intermediate textures are size-dependent and recreated lazily if a later scene needs
+        // them. Ordinary scenes therefore pay neither the allocation nor resize cost.
+        self.path = None;
+        self.blur = None;
         self.viewport = viewport;
         Ok(())
+    }
+
+    fn ensure_blur_resources(
+        &mut self,
+        device: &ID3D11Device,
+        requirements: &ScenePlanRequirements,
+    ) -> Result<()> {
+        let width = self.viewport.Width as u32;
+        let height = self.viewport.Height as u32;
+
+        if self.blur.is_none() {
+            self.blur = Some(BlurResources {
+                scene: create_color_target(device, width, height)?,
+                scratch: None,
+                snapshot: None,
+                groups: Vec::with_capacity(requirements.isolated_target_count),
+            });
+        }
+
+        let blur = self
+            .blur
+            .as_mut()
+            .expect("blur resources were inserted above");
+
+        if requirements.uses_blur_target && blur.scratch.is_none() {
+            let half_width = downsampled_dimension(width);
+            let half_height = downsampled_dimension(height);
+            blur.scratch = Some([
+                create_color_target(device, half_width, half_height)?,
+                create_color_target(device, half_width, half_height)?,
+            ]);
+        }
+
+        if requirements.backdrop_filter_count > 0
+            && requirements.isolated_target_count > 0
+            && blur.snapshot.is_none()
+        {
+            blur.snapshot = Some(create_color_target(device, width, height)?);
+        }
+
+        while blur.groups.len() < requirements.isolated_target_count {
+            blur.groups
+                .push(create_color_target(device, width, height)?);
+        }
+
+        Ok(())
+    }
+
+    fn ensure_path_resources(&mut self, device: &ID3D11Device) -> Result<()> {
+        if self.path.is_none() {
+            self.path = Some(PathResources::new(
+                device,
+                self.viewport.Width as u32,
+                self.viewport.Height as u32,
+            )?);
+        }
+        Ok(())
+    }
+
+    fn retain_surface_views(&mut self, surfaces: &[PaintSurface]) {
+        let active_keys = surfaces
+            .iter()
+            .filter_map(|surface| match &surface.source {
+                gpui::SurfaceSource::WindowsCapture(frame) => {
+                    Some(frame.texture().as_raw() as usize)
+                }
+                _ => None,
+            })
+            .collect::<SmallVec<[usize; 4]>>();
+        self.surface_views
+            .retain(|key, _| active_keys.contains(key));
     }
 }
 
@@ -1268,27 +1615,29 @@ impl DirectXRenderPipelines {
             ShaderModule::Shadow,
             4,
             create_blend_state(device)?,
-        )?;
+        )?
+        .with_variant(device, ShaderModule::SmoothedShadow)?;
         let quad_pipeline = PipelineState::new(
             device,
             "quad_pipeline",
             ShaderModule::Quad,
             64,
             create_blend_state(device)?,
-        )?;
+        )?
+        .with_variant(device, ShaderModule::SmoothedQuad)?;
         let path_rasterization_pipeline = PipelineState::new(
             device,
             "path_rasterization_pipeline",
             ShaderModule::PathRasterization,
             32,
-            create_blend_state_for_path_rasterization(device)?,
+            create_premultiplied_blend_state(device)?,
         )?;
         let path_sprite_pipeline = PipelineState::new(
             device,
             "path_sprite_pipeline",
             ShaderModule::PathSprite,
             4,
-            create_blend_state_for_path_sprite(device)?,
+            create_premultiplied_blend_state(device)?,
         )?;
         let underline_pipeline = PipelineState::new(
             device,
@@ -1317,37 +1666,37 @@ impl DirectXRenderPipelines {
             ShaderModule::PolychromeSprite,
             16,
             create_blend_state(device)?,
-        )?;
+        )?
+        .with_variant(device, ShaderModule::SmoothedPolychromeSprite)?;
 
-        let blur_downsample_vertex = create_vertex_shader(
-            device,
-            RawShaderBytes::new(ShaderModule::BlurDownsample, ShaderTarget::Vertex)?.as_bytes(),
-        )?;
-        let blur_downsample_fragment = create_fragment_shader(
-            device,
-            RawShaderBytes::new(ShaderModule::BlurDownsample, ShaderTarget::Fragment)?.as_bytes(),
-        )?;
-        let blur_vertex = create_vertex_shader(
-            device,
-            RawShaderBytes::new(ShaderModule::Blur, ShaderTarget::Vertex)?.as_bytes(),
-        )?;
-        let blur_fragment = create_fragment_shader(
-            device,
-            RawShaderBytes::new(ShaderModule::Blur, ShaderTarget::Fragment)?.as_bytes(),
-        )?;
-        let blur_composite_vertex = create_vertex_shader(
-            device,
-            RawShaderBytes::new(ShaderModule::BlurComposite, ShaderTarget::Vertex)?.as_bytes(),
-        )?;
-        let blur_composite_fragment = create_fragment_shader(
-            device,
-            RawShaderBytes::new(ShaderModule::BlurComposite, ShaderTarget::Fragment)?.as_bytes(),
-        )?;
-        let blur_params_buffer = create_constant_buffer(device, std::mem::size_of::<BlurParams>())?;
+        let blur_downsample = ShaderModule::BlurDownsample.bytecode()?;
+        let blur_downsample_vertex = create_vertex_shader(device, blur_downsample.vertex)?;
+        let blur_downsample_fragment = create_fragment_shader(device, blur_downsample.fragment)?;
+        let blur = ShaderModule::Blur.bytecode()?;
+        let blur_vertex = create_vertex_shader(device, blur.vertex)?;
+        let blur_fragment = create_fragment_shader(device, blur.fragment)?;
+        let blur_composite = ShaderModule::BlurComposite.bytecode()?;
+        let blur_composite_vertex = create_vertex_shader(device, blur_composite.vertex)?;
+        let blur_composite_fragment = create_fragment_shader(device, blur_composite.fragment)?;
+        let smoothed_blur_composite = ShaderModule::SmoothedBlurComposite.bytecode()?;
+        let smoothed_blur_composite_vertex =
+            create_vertex_shader(device, smoothed_blur_composite.vertex)?;
+        let smoothed_blur_composite_fragment =
+            create_fragment_shader(device, smoothed_blur_composite.fragment)?;
+        let blur_params_buffer =
+            create_constant_buffer(device, std::mem::size_of::<BlurUniforms>())?;
         let blur_blend_replace = create_blend_state_no_blend(device)?;
         // Premultiplied (One / InvSrcAlpha) — the composite outputs a premultiplied blurred sample;
         // straight-alpha blending would darken the faded edges.
-        let blur_blend_composite = create_blend_state_for_path_sprite(device)?;
+        let blur_blend_composite = create_premultiplied_blend_state(device)?;
+
+        let surface = ShaderModule::Surface.bytecode()?;
+        let surfaces = SurfacePipeline {
+            vertex: create_vertex_shader(device, surface.vertex)?,
+            fragment: create_fragment_shader(device, surface.fragment)?,
+            params_buffer: create_constant_buffer(device, std::mem::size_of::<SurfaceUniforms>())?,
+            blend: create_premultiplied_blend_state(device)?,
+        };
 
         Ok(Self {
             shadow_pipeline,
@@ -1358,12 +1707,15 @@ impl DirectXRenderPipelines {
             mono_sprites,
             subpixel_sprites,
             poly_sprites,
+            surfaces,
             blur_downsample_vertex,
             blur_downsample_fragment,
             blur_vertex,
             blur_fragment,
             blur_composite_vertex,
             blur_composite_fragment,
+            smoothed_blur_composite_vertex,
+            smoothed_blur_composite_fragment,
             blur_params_buffer,
             blur_blend_replace,
             blur_blend_composite,
@@ -1396,18 +1748,11 @@ impl DirectComposition {
 
 impl DirectXGlobalElements {
     pub fn new(device: &ID3D11Device) -> Result<Self> {
-        let global_params_buffer = unsafe {
-            let desc = D3D11_BUFFER_DESC {
-                ByteWidth: std::mem::size_of::<GlobalParams>() as u32,
-                Usage: D3D11_USAGE_DYNAMIC,
-                BindFlags: D3D11_BIND_CONSTANT_BUFFER.0 as u32,
-                CPUAccessFlags: D3D11_CPU_ACCESS_WRITE.0 as u32,
-                ..Default::default()
-            };
-            let mut buffer = None;
-            device.CreateBuffer(&desc, None, Some(&mut buffer))?;
-            buffer
-        };
+        let globals_buffer = create_constant_buffer(device, std::mem::size_of::<GlobalUniforms>())?;
+        let font_buffer =
+            create_constant_buffer(device, std::mem::size_of::<FontRasterizationUniforms>())?;
+        let draw_constants_buffer =
+            create_constant_buffer(device, std::mem::size_of::<Dx11DrawConstants>())?;
 
         let sampler = unsafe {
             let desc = D3D11_SAMPLER_DESC {
@@ -1428,73 +1773,39 @@ impl DirectXGlobalElements {
         };
 
         Ok(Self {
-            global_params_buffer,
+            globals_buffer: Some(globals_buffer),
+            font_buffer: Some(font_buffer),
+            draw_constants_buffer,
             sampler,
         })
     }
 }
 
-#[derive(Debug, Default)]
-#[repr(C)]
-struct GlobalParams {
-    gamma_ratios: [f32; 4],
-    viewport_size: [f32; 2],
-    grayscale_enhanced_contrast: f32,
-    subpixel_enhanced_contrast: f32,
-    is_bgr: u32,
-    _pad: [u32; 3],
-}
-
-/// Mirrors the `BlurParams` cbuffer (register b1) in `shaders.hlsl`. 80 bytes (a multiple of 16,
-/// as constant buffers require). Updated per blur pass via `update_buffer`.
-#[repr(C)]
-#[derive(Clone, Copy)]
-struct BlurParams {
-    bounds: Bounds<ScaledPixels>,
-    content_mask: Bounds<ScaledPixels>,
-    corner_radii: [f32; 4],
-    direction: [f32; 2],
-    sigma: f32,
-    opacity: f32,
-    tap_count: f32,
-    /// 1.0 clips the composite to the rounded rect (backdrop); 0.0 lets content blur bleed past
-    /// its bounds like CSS `filter: blur`.
-    clip_rounded: f32,
-    /// 1.0 = snapped 2:1 box downsample (anchor the half-res grid to a fixed 2px grid at the
-    /// origin, so a stationary element blurs identically at every window size); 0.0 = 1:1 copy
-    /// (the scene blit, which must not downsample). Downsample pass only.
-    downsample: f32,
-    /// Spacing between taps in pixels (gaussian passes only); >1 lets `tap_count` taps span very
-    /// large radii without truncating the gaussian, matching the wgpu backend.
-    tap_step: f32,
-}
-
-impl Default for BlurParams {
-    fn default() -> Self {
-        BlurParams {
-            bounds: Bounds::default(),
-            content_mask: Bounds::default(),
-            corner_radii: [0.0; 4],
-            direction: [0.0, 0.0],
-            sigma: 0.0,
-            opacity: 1.0,
-            tap_count: 0.0,
-            clip_rounded: 0.0,
-            downsample: 0.0,
-            tap_step: 0.0,
-        }
-    }
-}
-
+/// One generated instanced pipeline plus its whole-frame instance buffer.
+///
+/// The scene uploads every `T` of the frame once; batches then address sub-ranges of that
+/// buffer. Direct3D 11 leaves `SV_InstanceID` zero-based for every draw regardless of
+/// `StartInstanceLocation`, so the batch base reaches the shader through the draw-constants
+/// cbuffer instead. [`PipelineState::draw`] is the single place that issues a draw, and it
+/// always writes those constants first.
 struct PipelineState<T> {
     label: &'static str,
+    specification: &'static shader_interface::Pipeline,
     vertex: ID3D11VertexShader,
     fragment: ID3D11PixelShader,
+    variant: Option<PipelineVariant>,
+    draw_constants: Dx11DrawConstantsBinding,
     buffer: ID3D11Buffer,
     buffer_size: usize,
     view: Option<ID3D11ShaderResourceView>,
     blend_state: ID3D11BlendState,
     _marker: std::marker::PhantomData<T>,
+}
+
+struct PipelineVariant {
+    specification: &'static shader_interface::Pipeline,
+    vertex: ID3D11VertexShader,
+    fragment: ID3D11PixelShader,
 }
 
 impl<T> PipelineState<T> {
@@ -1505,27 +1816,58 @@ impl<T> PipelineState<T> {
         buffer_size: usize,
         blend_state: ID3D11BlendState,
     ) -> Result<Self> {
-        let vertex = {
-            let raw_shader = RawShaderBytes::new(shader_module, ShaderTarget::Vertex)?;
-            create_vertex_shader(device, raw_shader.as_bytes())?
-        };
-        let fragment = {
-            let raw_shader = RawShaderBytes::new(shader_module, ShaderTarget::Fragment)?;
-            create_fragment_shader(device, raw_shader.as_bytes())?
-        };
+        let shader = shader_module.shader();
+        let bytecode = shader_module.bytecode()?;
+        let draw_constants = bytecode.draw_constants.with_context(|| {
+            format!("{label} was generated without DX11 draw constants and cannot draw batches")
+        })?;
+        let vertex = create_vertex_shader(device, bytecode.vertex)?;
+        let fragment = create_fragment_shader(device, bytecode.fragment)?;
         let buffer = create_buffer(device, std::mem::size_of::<T>(), buffer_size)?;
         let view = create_buffer_view(device, &buffer)?;
 
         Ok(PipelineState {
             label,
+            specification: shader.pipeline,
             vertex,
             fragment,
+            variant: None,
+            draw_constants,
             buffer,
             buffer_size,
             view,
             blend_state,
             _marker: std::marker::PhantomData,
         })
+    }
+
+    fn with_variant(mut self, device: &ID3D11Device, shader_module: ShaderModule) -> Result<Self> {
+        let shader = shader_module.shader();
+        let bytecode = shader_module.bytecode()?;
+        anyhow::ensure!(
+            shader.pipeline.data_layout == self.specification.data_layout
+                && shader.pipeline.topology == self.specification.topology
+                && shader.pipeline.vertex_count == self.specification.vertex_count,
+            "{} variant has an incompatible pipeline layout",
+            self.label,
+        );
+        let draw_constants = bytecode.draw_constants.with_context(|| {
+            format!(
+                "{} variant was generated without DX11 draw constants",
+                self.label
+            )
+        })?;
+        anyhow::ensure!(
+            draw_constants == self.draw_constants,
+            "{} variant uses a different DX11 draw-constants register",
+            self.label,
+        );
+        self.variant = Some(PipelineVariant {
+            specification: shader.pipeline,
+            vertex: create_vertex_shader(device, bytecode.vertex)?,
+            fragment: create_fragment_shader(device, bytecode.fragment)?,
+        });
+        Ok(self)
     }
 
     fn update_buffer(
@@ -1535,7 +1877,30 @@ impl<T> PipelineState<T> {
         data: &[T],
     ) -> Result<()> {
         if self.buffer_size < data.len() {
-            let new_buffer_size = data.len().next_power_of_two();
+            let element_size = std::mem::size_of::<T>();
+            anyhow::ensure!(
+                element_size > 0,
+                "{} cannot store zero-sized instances",
+                self.label
+            );
+            let required_size = element_size
+                .checked_mul(data.len())
+                .context("instance-buffer byte size overflow")?;
+            anyhow::ensure!(
+                required_size <= MAX_INSTANCE_BUFFER_SIZE,
+                "{} buffer needs {required_size} bytes, above the {MAX_INSTANCE_BUFFER_SIZE}-byte limit",
+                self.label,
+            );
+            let max_elements = MAX_INSTANCE_BUFFER_SIZE / element_size;
+            let new_buffer_size = data
+                .len()
+                .checked_next_power_of_two()
+                .unwrap_or(max_elements)
+                .min(max_elements);
+            anyhow::ensure!(
+                new_buffer_size >= data.len(),
+                "instance-buffer capacity overflow"
+            );
             log::debug!(
                 "Updating {} buffer size from {} to {}",
                 self.label,
@@ -1551,132 +1916,136 @@ impl<T> PipelineState<T> {
         update_buffer(device_context, &self.buffer, data)
     }
 
+    /// Draws `instances` of the uploaded frame data as the pipeline's fixed rectangle,
+    /// optionally sampling `texture` from the primary texture slot.
+    fn draw_instances(
+        &self,
+        frame: &FrameBindings<'_>,
+        texture: Option<&[Option<ID3D11ShaderResourceView>]>,
+        instances: InstanceRange,
+    ) -> Result<()> {
+        let vertex_count = self
+            .specification
+            .vertex_count
+            .fixed()
+            .with_context(|| format!("{} has no fixed vertex count", self.label))?;
+        self.draw(frame, texture, vertex_count, instances)
+    }
+
+    fn draw_instances_variant(
+        &self,
+        frame: &FrameBindings<'_>,
+        texture: Option<&[Option<ID3D11ShaderResourceView>]>,
+        instances: InstanceRange,
+        use_variant: bool,
+    ) -> Result<()> {
+        let variant = use_variant.then(|| {
+            self.variant
+                .as_ref()
+                .unwrap_or_else(|| panic!("{} has no shader variant", self.label))
+        });
+        let specification = variant
+            .map(|variant| variant.specification)
+            .unwrap_or(self.specification);
+        let vertex_count = specification
+            .vertex_count
+            .fixed()
+            .with_context(|| format!("{} has no fixed vertex count", self.label))?;
+        self.draw_with_variant(frame, texture, vertex_count, instances, variant)
+    }
+
+    /// Draws `vertex_count` vertex-pulled vertices as a single instance.
+    fn draw_vertices(&self, frame: &FrameBindings<'_>, vertex_count: u32) -> Result<()> {
+        anyhow::ensure!(
+            self.specification.vertex_count.fixed().is_none(),
+            "{} draws a fixed vertex count per instance",
+            self.label
+        );
+        self.draw(frame, None, vertex_count, InstanceRange::SINGLE)
+    }
+
     fn draw(
         &self,
-        device_context: &ID3D11DeviceContext,
-        viewport: &[D3D11_VIEWPORT],
-        global_params: &[Option<ID3D11Buffer>],
-        topology: D3D_PRIMITIVE_TOPOLOGY,
+        frame: &FrameBindings<'_>,
+        texture: Option<&[Option<ID3D11ShaderResourceView>]>,
         vertex_count: u32,
-        instance_count: u32,
+        instances: InstanceRange,
     ) -> Result<()> {
-        set_pipeline_state(
-            device_context,
-            slice::from_ref(&self.view),
-            topology,
-            viewport,
-            &self.vertex,
-            &self.fragment,
-            global_params,
-            &self.blend_state,
-        );
-        unsafe {
-            device_context.DrawInstanced(vertex_count, instance_count, 0, 0);
-        }
-        Ok(())
+        self.draw_with_variant(frame, texture, vertex_count, instances, None)
     }
 
-    fn draw_with_texture(
+    fn draw_with_variant(
         &self,
-        device_context: &ID3D11DeviceContext,
-        texture: &[Option<ID3D11ShaderResourceView>],
-        viewport: &[D3D11_VIEWPORT],
-        global_params: &[Option<ID3D11Buffer>],
-        sampler: &[Option<ID3D11SamplerState>],
-        instance_count: u32,
-    ) -> Result<()> {
-        set_pipeline_state(
-            device_context,
-            slice::from_ref(&self.view),
-            D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP,
-            viewport,
-            &self.vertex,
-            &self.fragment,
-            global_params,
-            &self.blend_state,
-        );
-        unsafe {
-            device_context.PSSetSamplers(0, Some(sampler));
-            device_context.VSSetShaderResources(0, Some(texture));
-            device_context.PSSetShaderResources(0, Some(texture));
-
-            device_context.DrawInstanced(4, instance_count, 0, 0);
-        }
-        Ok(())
-    }
-
-    fn draw_range(
-        &self,
-        device: &ID3D11Device,
-        device_context: &ID3D11DeviceContext,
-        viewport: &[D3D11_VIEWPORT],
-        global_params: &[Option<ID3D11Buffer>],
+        frame: &FrameBindings<'_>,
+        texture: Option<&[Option<ID3D11ShaderResourceView>]>,
         vertex_count: u32,
-        first_instance: u32,
-        instance_count: u32,
+        instances: InstanceRange,
+        variant: Option<&PipelineVariant>,
     ) -> Result<()> {
-        let view = create_buffer_view_range(device, &self.buffer, first_instance, instance_count)?;
-        set_pipeline_state(
-            device_context,
-            slice::from_ref(&view),
-            D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP,
-            viewport,
-            &self.vertex,
-            &self.fragment,
-            global_params,
-            &self.blend_state,
+        if instances.is_empty() || vertex_count == 0 {
+            return Ok(());
+        }
+        anyhow::ensure!(
+            instances.end() as usize <= self.buffer_size,
+            "DirectX instance range {}..{} exceeds the {} buffer of {} elements",
+            instances.first(),
+            instances.end(),
+            self.label,
+            self.buffer_size,
         );
+        let ctx = frame.device_context;
+        update_buffer(
+            ctx,
+            &frame.globals.draw_constants_buffer,
+            &[Dx11DrawConstants::for_instances(instances.first())],
+        )?;
+        let specification = variant
+            .map(|variant| variant.specification)
+            .unwrap_or(self.specification);
+        let topology = match specification.topology {
+            shader_interface::PrimitiveTopology::TriangleList => {
+                D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST
+            }
+            shader_interface::PrimitiveTopology::TriangleStrip => {
+                D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP
+            }
+        };
+        let draw_constants = [Some(frame.globals.draw_constants_buffer.clone())];
         unsafe {
-            device_context.DrawInstanced(vertex_count, instance_count, 0, 0);
+            ctx.VSSetShaderResources(DATA_REGISTER, Some(slice::from_ref(&self.view)));
+            ctx.PSSetShaderResources(DATA_REGISTER, Some(slice::from_ref(&self.view)));
+            ctx.IASetPrimitiveTopology(topology);
+            ctx.RSSetViewports(Some(slice::from_ref(frame.viewport)));
+            ctx.VSSetShader(
+                variant
+                    .map(|variant| &variant.vertex)
+                    .unwrap_or(&self.vertex),
+                None,
+            );
+            ctx.PSSetShader(
+                variant
+                    .map(|variant| &variant.fragment)
+                    .unwrap_or(&self.fragment),
+                None,
+            );
+            ctx.VSSetConstantBuffers(0, Some(&frame.globals.cbuffers()));
+            ctx.PSSetConstantBuffers(0, Some(&frame.globals.cbuffers()));
+            ctx.VSSetConstantBuffers(self.draw_constants.register, Some(&draw_constants));
+            ctx.OMSetBlendState(&self.blend_state, None, 0xFFFFFFFF);
+            if let Some(texture) = texture {
+                ctx.PSSetSamplers(
+                    PRIMARY_SAMPLER_REGISTER,
+                    Some(slice::from_ref(&frame.globals.sampler)),
+                );
+                // The vertex stage reads the atlas dimensions for tile coordinates.
+                ctx.VSSetShaderResources(PRIMARY_TEXTURE_REGISTER, Some(texture));
+                ctx.PSSetShaderResources(PRIMARY_TEXTURE_REGISTER, Some(texture));
+            }
+            // `StartInstanceLocation` stays zero: the shader adds the base itself.
+            ctx.DrawInstanced(vertex_count, instances.count(), 0, 0);
         }
         Ok(())
     }
-
-    fn draw_range_with_texture(
-        &self,
-        device: &ID3D11Device,
-        device_context: &ID3D11DeviceContext,
-        texture: &[Option<ID3D11ShaderResourceView>],
-        viewport: &[D3D11_VIEWPORT],
-        global_params: &[Option<ID3D11Buffer>],
-        sampler: &[Option<ID3D11SamplerState>],
-        first_instance: u32,
-        instance_count: u32,
-    ) -> Result<()> {
-        let view = create_buffer_view_range(device, &self.buffer, first_instance, instance_count)?;
-        set_pipeline_state(
-            device_context,
-            slice::from_ref(&view),
-            D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP,
-            viewport,
-            &self.vertex,
-            &self.fragment,
-            global_params,
-            &self.blend_state,
-        );
-        unsafe {
-            device_context.PSSetSamplers(0, Some(sampler));
-            device_context.VSSetShaderResources(0, Some(texture));
-            device_context.PSSetShaderResources(0, Some(texture));
-            device_context.DrawInstanced(4, instance_count, 0, 0);
-        }
-        Ok(())
-    }
-}
-
-#[derive(Clone, Copy)]
-#[repr(C)]
-struct PathRasterizationSprite {
-    xy_position: Point<ScaledPixels>,
-    st_position: Point<f32>,
-    color: Background,
-    bounds: Bounds<ScaledPixels>,
-}
-
-#[derive(Clone, Copy)]
-#[repr(C)]
-struct PathSprite {
-    bounds: Bounds<ScaledPixels>,
 }
 
 impl Drop for DirectXRenderer {
@@ -1759,39 +2128,12 @@ fn create_resources(
 ) -> Result<(
     ID3D11Texture2D,
     Option<ID3D11RenderTargetView>,
-    ID3D11Texture2D,
-    Option<ID3D11ShaderResourceView>,
-    ID3D11Texture2D,
-    Option<ID3D11RenderTargetView>,
     D3D11_VIEWPORT,
 )> {
     let (render_target, render_target_view) =
         create_render_target_and_its_view(swap_chain, &devices.device)?;
-    let (path_intermediate_texture, path_intermediate_srv) =
-        create_path_intermediate_texture(&devices.device, width, height)?;
-    let (path_intermediate_msaa_texture, path_intermediate_msaa_view) =
-        create_path_intermediate_msaa_texture_and_view(&devices.device, width, height)?;
     let viewport = set_viewport(&devices.device_context, width as f32, height as f32);
-    Ok((
-        render_target,
-        render_target_view,
-        path_intermediate_texture,
-        path_intermediate_srv,
-        path_intermediate_msaa_texture,
-        path_intermediate_msaa_view,
-        viewport,
-    ))
-}
-
-#[inline]
-/// Flatten a `Corners` into the `[tl, tr, br, bl]` order expected by the blur composite shader.
-fn corner_radii_array(corners: Corners<ScaledPixels>) -> [f32; 4] {
-    [
-        corners.top_left.0,
-        corners.top_right.0,
-        corners.bottom_right.0,
-        corners.bottom_left.0,
-    ]
+    Ok((render_target, render_target_view, viewport))
 }
 
 fn create_render_target_and_its_view(
@@ -1840,15 +2182,7 @@ fn create_path_intermediate_texture(
 /// Create a color texture usable as both a render target and a shader resource, returning both
 /// views. Used for the blur offscreen targets.
 #[inline]
-fn create_color_target(
-    device: &ID3D11Device,
-    width: u32,
-    height: u32,
-) -> Result<(
-    ID3D11Texture2D,
-    Option<ID3D11RenderTargetView>,
-    Option<ID3D11ShaderResourceView>,
-)> {
+fn create_color_target(device: &ID3D11Device, width: u32, height: u32) -> Result<ColorTarget> {
     let texture = unsafe {
         let mut output = None;
         let desc = D3D11_TEXTURE2D_DESC {
@@ -1873,7 +2207,12 @@ fn create_color_target(
     unsafe { device.CreateRenderTargetView(&texture, None, Some(&mut rtv))? };
     let mut srv = None;
     unsafe { device.CreateShaderResourceView(&texture, None, Some(&mut srv))? };
-    Ok((texture, rtv, srv))
+
+    Ok(ColorTarget {
+        texture,
+        target: rtv,
+        source: srv,
+    })
 }
 
 #[inline]
@@ -1954,7 +2293,7 @@ fn create_blend_state(device: &ID3D11Device) -> Result<ID3D11BlendState> {
     desc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
     desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
     desc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
-    desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
+    desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_INV_SRC_ALPHA;
     desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL.0 as u8;
     unsafe {
         let mut state = None;
@@ -1985,7 +2324,7 @@ fn create_blend_state_for_subpixel_rendering(device: &ID3D11Device) -> Result<ID
 }
 
 #[inline]
-fn create_blend_state_for_path_rasterization(device: &ID3D11Device) -> Result<ID3D11BlendState> {
+pub(crate) fn create_premultiplied_blend_state(device: &ID3D11Device) -> Result<ID3D11BlendState> {
     // If the feature level is set to greater than D3D_FEATURE_LEVEL_9_3, the display
     // device performs the blend in linear space, which is ideal.
     let mut desc = D3D11_BLEND_DESC::default();
@@ -2004,29 +2343,12 @@ fn create_blend_state_for_path_rasterization(device: &ID3D11Device) -> Result<ID
     }
 }
 
-#[inline]
-fn create_blend_state_for_path_sprite(device: &ID3D11Device) -> Result<ID3D11BlendState> {
-    // If the feature level is set to greater than D3D_FEATURE_LEVEL_9_3, the display
-    // device performs the blend in linear space, which is ideal.
-    let mut desc = D3D11_BLEND_DESC::default();
-    desc.RenderTarget[0].BlendEnable = true.into();
-    desc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-    desc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-    desc.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
-    desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-    desc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
-    desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
-    desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL.0 as u8;
-    unsafe {
-        let mut state = None;
-        device.CreateBlendState(&desc, Some(&mut state))?;
-        Ok(state.unwrap())
-    }
-}
-
 /// Create a CPU-writable dynamic constant buffer of the given byte size (rounded up to 16).
 #[inline]
-fn create_constant_buffer(device: &ID3D11Device, byte_size: usize) -> Result<ID3D11Buffer> {
+pub(crate) fn create_constant_buffer(
+    device: &ID3D11Device,
+    byte_size: usize,
+) -> Result<ID3D11Buffer> {
     let desc = D3D11_BUFFER_DESC {
         ByteWidth: byte_size.next_multiple_of(16) as u32,
         Usage: D3D11_USAGE_DYNAMIC,
@@ -2054,7 +2376,10 @@ fn create_blend_state_no_blend(device: &ID3D11Device) -> Result<ID3D11BlendState
 }
 
 #[inline]
-fn create_vertex_shader(device: &ID3D11Device, bytes: &[u8]) -> Result<ID3D11VertexShader> {
+pub(crate) fn create_vertex_shader(
+    device: &ID3D11Device,
+    bytes: &[u8],
+) -> Result<ID3D11VertexShader> {
     unsafe {
         let mut shader = None;
         device.CreateVertexShader(bytes, None, Some(&mut shader))?;
@@ -2063,7 +2388,10 @@ fn create_vertex_shader(device: &ID3D11Device, bytes: &[u8]) -> Result<ID3D11Ver
 }
 
 #[inline]
-fn create_fragment_shader(device: &ID3D11Device, bytes: &[u8]) -> Result<ID3D11PixelShader> {
+pub(crate) fn create_fragment_shader(
+    device: &ID3D11Device,
+    bytes: &[u8],
+) -> Result<ID3D11PixelShader> {
     unsafe {
         let mut shader = None;
         device.CreatePixelShader(bytes, None, Some(&mut shader))?;
@@ -2077,13 +2405,30 @@ fn create_buffer(
     element_size: usize,
     buffer_size: usize,
 ) -> Result<ID3D11Buffer> {
+    anyhow::ensure!(
+        element_size > 0,
+        "cannot create a buffer for zero-sized elements"
+    );
+    let byte_width = element_size
+        .checked_mul(buffer_size)
+        .context("instance-buffer byte size overflow")?;
+    anyhow::ensure!(
+        byte_width <= u32::MAX as usize,
+        "instance-buffer byte size exceeds the D3D11 buffer limit"
+    );
+    anyhow::ensure!(
+        byte_width % 4 == 0,
+        "instance-buffer byte size must be four-byte aligned"
+    );
     let desc = D3D11_BUFFER_DESC {
-        ByteWidth: (element_size * buffer_size) as u32,
+        // The HLSL reads instances through a raw `ByteAddressBuffer` view, which needs
+        // a raw-view-enabled buffer with 4-byte-aligned contents.
+        ByteWidth: byte_width as u32,
         Usage: D3D11_USAGE_DYNAMIC,
         BindFlags: D3D11_BIND_SHADER_RESOURCE.0 as u32,
         CPUAccessFlags: D3D11_CPU_ACCESS_WRITE.0 as u32,
-        MiscFlags: D3D11_RESOURCE_MISC_BUFFER_STRUCTURED.0 as u32,
-        StructureByteStride: element_size as u32,
+        MiscFlags: D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS.0 as u32,
+        ..Default::default()
     };
     let mut buffer = None;
     unsafe { device.CreateBuffer(&desc, None, Some(&mut buffer)) }?;
@@ -2095,29 +2440,16 @@ fn create_buffer_view(
     device: &ID3D11Device,
     buffer: &ID3D11Buffer,
 ) -> Result<Option<ID3D11ShaderResourceView>> {
-    let mut view = None;
-    unsafe { device.CreateShaderResourceView(buffer, None, Some(&mut view)) }?;
-    Ok(view)
-}
-
-#[inline]
-fn create_buffer_view_range(
-    device: &ID3D11Device,
-    buffer: &ID3D11Buffer,
-    first_element: u32,
-    num_elements: u32,
-) -> Result<Option<ID3D11ShaderResourceView>> {
+    let mut buffer_desc = D3D11_BUFFER_DESC::default();
+    unsafe { buffer.GetDesc(&mut buffer_desc) };
     let desc = D3D11_SHADER_RESOURCE_VIEW_DESC {
-        Format: DXGI_FORMAT_UNKNOWN,
-        ViewDimension: D3D11_SRV_DIMENSION_BUFFER,
+        Format: DXGI_FORMAT_R32_TYPELESS,
+        ViewDimension: D3D11_SRV_DIMENSION_BUFFEREX,
         Anonymous: D3D11_SHADER_RESOURCE_VIEW_DESC_0 {
-            Buffer: D3D11_BUFFER_SRV {
-                Anonymous1: D3D11_BUFFER_SRV_0 {
-                    FirstElement: first_element,
-                },
-                Anonymous2: D3D11_BUFFER_SRV_1 {
-                    NumElements: num_elements,
-                },
+            BufferEx: D3D11_BUFFEREX_SRV {
+                FirstElement: 0,
+                NumElements: buffer_desc.ByteWidth / 4,
+                Flags: D3D11_BUFFEREX_SRV_FLAG_RAW.0 as u32,
             },
         },
     };
@@ -2141,28 +2473,10 @@ fn update_buffer<T>(
     Ok(())
 }
 
-#[inline]
-fn set_pipeline_state(
-    device_context: &ID3D11DeviceContext,
-    buffer_view: &[Option<ID3D11ShaderResourceView>],
-    topology: D3D_PRIMITIVE_TOPOLOGY,
-    viewport: &[D3D11_VIEWPORT],
-    vertex_shader: &ID3D11VertexShader,
-    fragment_shader: &ID3D11PixelShader,
-    global_params: &[Option<ID3D11Buffer>],
-    blend_state: &ID3D11BlendState,
-) {
-    unsafe {
-        device_context.VSSetShaderResources(1, Some(buffer_view));
-        device_context.PSSetShaderResources(1, Some(buffer_view));
-        device_context.IASetPrimitiveTopology(topology);
-        device_context.RSSetViewports(Some(viewport));
-        device_context.VSSetShader(vertex_shader, None);
-        device_context.PSSetShader(fragment_shader, None);
-        device_context.VSSetConstantBuffers(0, Some(global_params));
-        device_context.PSSetConstantBuffers(0, Some(global_params));
-        device_context.OMSetBlendState(blend_state, None, 0xFFFFFFFF);
-    }
+/// Converts a render-plan slice into draw arguments, refusing ranges D3D11 cannot address.
+fn instance_range(range: &std::ops::Range<usize>) -> Result<InstanceRange> {
+    InstanceRange::new(range.clone())
+        .with_context(|| format!("batch {range:?} exceeds the D3D11 instance limit"))
 }
 
 #[cfg(debug_assertions)]
@@ -2177,213 +2491,121 @@ fn report_live_objects(device: &ID3D11Device) -> Result<()> {
 const BUFFER_COUNT: usize = 3;
 
 pub(crate) mod shader_resources {
-    use anyhow::Result;
+    //! D3D11 bytecode generated from the shared Rust shader sources at build time.
 
-    #[cfg(debug_assertions)]
-    use windows::{
-        Win32::Graphics::Direct3D::{
-            Fxc::{D3DCOMPILE_DEBUG, D3DCOMPILE_SKIP_OPTIMIZATION, D3DCompileFromFile},
-            ID3DBlob,
-        },
-        core::{HSTRING, PCSTR},
-    };
+    use anyhow::Result;
+    use gpui_render::artifacts::{Dx11Bytecode, Dx11Shader, NATIVE_SHADERS, NativeShader};
 
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     pub(crate) enum ShaderModule {
         Quad,
+        SmoothedQuad,
         Shadow,
+        SmoothedShadow,
         Underline,
         PathRasterization,
         PathSprite,
         MonochromeSprite,
         SubpixelSprite,
         PolychromeSprite,
-        EmojiRasterization,
+        SmoothedPolychromeSprite,
+        Surface,
         BlurDownsample,
         Blur,
         BlurComposite,
+        SmoothedBlurComposite,
     }
 
-    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-    pub(crate) enum ShaderTarget {
-        Vertex,
-        Fragment,
-    }
-
-    pub(crate) struct RawShaderBytes<'t> {
-        inner: &'t [u8],
-
-        #[cfg(debug_assertions)]
-        _blob: ID3DBlob,
-    }
-
-    impl<'t> RawShaderBytes<'t> {
-        pub(crate) fn new(module: ShaderModule, target: ShaderTarget) -> Result<Self> {
-            #[cfg(not(debug_assertions))]
-            {
-                Ok(Self::from_bytes(module, target))
-            }
-            #[cfg(debug_assertions)]
-            {
-                let blob = build_shader_blob(module, target)?;
-                let inner = unsafe {
-                    std::slice::from_raw_parts(
-                        blob.GetBufferPointer() as *const u8,
-                        blob.GetBufferSize(),
-                    )
-                };
-                Ok(Self { inner, _blob: blob })
-            }
-        }
-
-        pub(crate) fn as_bytes(&'t self) -> &'t [u8] {
-            self.inner
-        }
-
-        #[cfg(not(debug_assertions))]
-        fn from_bytes(module: ShaderModule, target: ShaderTarget) -> Self {
-            let bytes = match module {
-                ShaderModule::Quad => match target {
-                    ShaderTarget::Vertex => QUAD_VERTEX_BYTES,
-                    ShaderTarget::Fragment => QUAD_FRAGMENT_BYTES,
-                },
-                ShaderModule::Shadow => match target {
-                    ShaderTarget::Vertex => SHADOW_VERTEX_BYTES,
-                    ShaderTarget::Fragment => SHADOW_FRAGMENT_BYTES,
-                },
-                ShaderModule::Underline => match target {
-                    ShaderTarget::Vertex => UNDERLINE_VERTEX_BYTES,
-                    ShaderTarget::Fragment => UNDERLINE_FRAGMENT_BYTES,
-                },
-                ShaderModule::PathRasterization => match target {
-                    ShaderTarget::Vertex => PATH_RASTERIZATION_VERTEX_BYTES,
-                    ShaderTarget::Fragment => PATH_RASTERIZATION_FRAGMENT_BYTES,
-                },
-                ShaderModule::PathSprite => match target {
-                    ShaderTarget::Vertex => PATH_SPRITE_VERTEX_BYTES,
-                    ShaderTarget::Fragment => PATH_SPRITE_FRAGMENT_BYTES,
-                },
-                ShaderModule::MonochromeSprite => match target {
-                    ShaderTarget::Vertex => MONOCHROME_SPRITE_VERTEX_BYTES,
-                    ShaderTarget::Fragment => MONOCHROME_SPRITE_FRAGMENT_BYTES,
-                },
-                ShaderModule::SubpixelSprite => match target {
-                    ShaderTarget::Vertex => SUBPIXEL_SPRITE_VERTEX_BYTES,
-                    ShaderTarget::Fragment => SUBPIXEL_SPRITE_FRAGMENT_BYTES,
-                },
-                ShaderModule::PolychromeSprite => match target {
-                    ShaderTarget::Vertex => POLYCHROME_SPRITE_VERTEX_BYTES,
-                    ShaderTarget::Fragment => POLYCHROME_SPRITE_FRAGMENT_BYTES,
-                },
-                ShaderModule::EmojiRasterization => match target {
-                    ShaderTarget::Vertex => EMOJI_RASTERIZATION_VERTEX_BYTES,
-                    ShaderTarget::Fragment => EMOJI_RASTERIZATION_FRAGMENT_BYTES,
-                },
-                ShaderModule::BlurDownsample => match target {
-                    ShaderTarget::Vertex => BLUR_DOWNSAMPLE_VERTEX_BYTES,
-                    ShaderTarget::Fragment => BLUR_DOWNSAMPLE_FRAGMENT_BYTES,
-                },
-                ShaderModule::Blur => match target {
-                    ShaderTarget::Vertex => BLUR_VERTEX_BYTES,
-                    ShaderTarget::Fragment => BLUR_FRAGMENT_BYTES,
-                },
-                ShaderModule::BlurComposite => match target {
-                    ShaderTarget::Vertex => BLUR_COMPOSITE_VERTEX_BYTES,
-                    ShaderTarget::Fragment => BLUR_COMPOSITE_FRAGMENT_BYTES,
-                },
-            };
-            Self { inner: bytes }
-        }
-    }
-
-    #[cfg(debug_assertions)]
-    pub(super) fn build_shader_blob(entry: ShaderModule, target: ShaderTarget) -> Result<ID3DBlob> {
-        unsafe {
-            use windows::Win32::Graphics::{
-                Direct3D::ID3DInclude, Hlsl::D3D_COMPILE_STANDARD_FILE_INCLUDE,
-            };
-
-            let shader_name = if matches!(entry, ShaderModule::EmojiRasterization) {
-                "color_text_raster.hlsl"
-            } else {
-                "shaders.hlsl"
-            };
-
-            let entry = format!(
-                "{}_{}\0",
-                entry.as_str(),
-                match target {
-                    ShaderTarget::Vertex => "vertex",
-                    ShaderTarget::Fragment => "fragment",
-                }
-            );
-            let target = match target {
-                ShaderTarget::Vertex => "vs_4_1\0",
-                ShaderTarget::Fragment => "ps_4_1\0",
-            };
-
-            let mut compile_blob = None;
-            let mut error_blob = None;
-            let shader_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join(&format!("src/{}", shader_name))
-                .canonicalize()?;
-
-            let entry_point = PCSTR::from_raw(entry.as_ptr());
-            let target_cstr = PCSTR::from_raw(target.as_ptr());
-
-            // really dirty trick because winapi bindings are unhappy otherwise
-            let include_handler = &std::mem::transmute::<usize, ID3DInclude>(
-                D3D_COMPILE_STANDARD_FILE_INCLUDE as usize,
-            );
-
-            let ret = D3DCompileFromFile(
-                &HSTRING::from(shader_path.to_str().unwrap()),
-                None,
-                include_handler,
-                entry_point,
-                target_cstr,
-                D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
-                0,
-                &mut compile_blob,
-                Some(&mut error_blob),
-            );
-            if ret.is_err() {
-                let Some(error_blob) = error_blob else {
-                    return Err(anyhow::anyhow!("{ret:?}"));
-                };
-
-                let error_string =
-                    std::ffi::CStr::from_ptr(error_blob.GetBufferPointer() as *const i8)
-                        .to_string_lossy();
-                log::error!("Shader compile error: {}", error_string);
-                return Err(anyhow::anyhow!("Compile error: {}", error_string));
-            }
-            Ok(compile_blob.unwrap())
-        }
-    }
-
-    #[cfg(not(debug_assertions))]
-    include!(concat!(env!("OUT_DIR"), "/shaders_bytes.rs"));
-
-    #[cfg(debug_assertions)]
     impl ShaderModule {
-        pub fn as_str(self) -> &'static str {
-            match self {
-                ShaderModule::Quad => "quad",
-                ShaderModule::Shadow => "shadow",
-                ShaderModule::Underline => "underline",
-                ShaderModule::PathRasterization => "path_rasterization",
-                ShaderModule::PathSprite => "path_sprite",
-                ShaderModule::MonochromeSprite => "monochrome_sprite",
-                ShaderModule::SubpixelSprite => "subpixel_sprite",
-                ShaderModule::PolychromeSprite => "polychrome_sprite",
-                ShaderModule::EmojiRasterization => "emoji_rasterization",
-                ShaderModule::BlurDownsample => "blur_downsample",
-                ShaderModule::Blur => "blur",
-                ShaderModule::BlurComposite => "blur_composite",
+        pub(crate) fn shader(self) -> &'static NativeShader {
+            let label = match self {
+                Self::Quad => "quads",
+                Self::SmoothedQuad => "smoothed_quads",
+                Self::Shadow => "shadows",
+                Self::SmoothedShadow => "smoothed_shadows",
+                Self::Underline => "underlines",
+                Self::PathRasterization => "path_rasterization",
+                Self::PathSprite => "paths",
+                Self::MonochromeSprite => "monochrome_sprites",
+                Self::SubpixelSprite => "subpixel_sprites",
+                Self::PolychromeSprite => "polychrome_sprites",
+                Self::SmoothedPolychromeSprite => "smoothed_polychrome_sprites",
+                Self::Surface => "surfaces",
+                Self::BlurDownsample => "blur_downsample",
+                Self::Blur => "blur",
+                Self::BlurComposite => "blur_composite",
+                Self::SmoothedBlurComposite => "smoothed_blur_composite",
+            };
+            NATIVE_SHADERS
+                .iter()
+                .find(|shader| shader.label == label)
+                .unwrap_or_else(|| panic!("missing generated native shader {label}"))
+        }
+
+        /// Both compiled stages plus the draw-constants contract the vertex stage expects.
+        pub(crate) fn bytecode(self) -> Result<Dx11Bytecode> {
+            dx11_bytecode(self.shader())
+        }
+    }
+
+    fn dx11_bytecode(shader: &NativeShader) -> Result<Dx11Bytecode> {
+        match shader.dx11 {
+            Dx11Shader::Sm50(bytecode) => Ok(bytecode),
+            Dx11Shader::NativeWindowsBuildRequired => anyhow::bail!(
+                "{} has no DX11 bytecode: build the Windows target on a Windows host; runtime HLSL compilation is intentionally unsupported",
+                shader.label,
+            ),
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use gpui_render::shaders::interface::DataLayout;
+
+        #[test]
+        fn every_generated_dx11_artifact_is_available() {
+            for shader in NATIVE_SHADERS {
+                dx11_bytecode(shader).unwrap_or_else(|error| {
+                    panic!("missing bytecode for {}: {error:#}", shader.label)
+                });
+            }
+        }
+
+        /// Instanced pipelines index a whole-frame buffer, so they must carry the base.
+        #[test]
+        fn instanced_pipelines_declare_draw_constants() {
+            for shader in NATIVE_SHADERS {
+                let instanced = matches!(
+                    shader.pipeline.data_layout,
+                    DataLayout::Instances
+                        | DataLayout::TexturedInstances
+                        | DataLayout::MonochromeSprites
+                        | DataLayout::SubpixelSprites
+                );
+                let bytecode = dx11_bytecode(shader).unwrap();
+                assert_eq!(
+                    bytecode.draw_constants.is_some(),
+                    instanced,
+                    "{} draw-constants contract does not match its data layout",
+                    shader.label,
+                );
             }
         }
     }
+}
+
+fn with_dll_library<R>(dll_name: PCSTR, f: impl FnOnce(HMODULE) -> Result<R>) -> Result<R> {
+    let library = unsafe {
+        LoadLibraryA(dll_name).with_context(|| format!("Loading DLL: {}", dll_name.display()))?
+    };
+    let result = f(library);
+    unsafe {
+        FreeLibrary(library)
+            .with_context(|| format!("Freeing DLL: {}", dll_name.display()))
+            .log_err();
+    }
+    result
 }
 
 mod nvidia {
@@ -2395,7 +2617,7 @@ mod nvidia {
     use anyhow::Result;
     use windows::{Win32::System::LibraryLoader::GetProcAddress, core::s};
 
-    use crate::with_dll_library;
+    use super::with_dll_library;
 
     // https://github.com/NVIDIA/nvapi/blob/7cb76fce2f52de818b3da497af646af1ec16ce27/nvapi_lite_common.h#L180
     const NVAPI_SHORT_STRING_MAX: usize = 64;
@@ -2462,7 +2684,7 @@ mod amd {
     use anyhow::Result;
     use windows::{Win32::System::LibraryLoader::GetProcAddress, core::s};
 
-    use crate::with_dll_library;
+    use super::with_dll_library;
 
     // https://github.com/GPUOpen-LibrariesAndSDKs/AGS_SDK/blob/5d8812d703d0335741b6f7ffc37838eeb8b967f7/ags_lib/inc/amd_ags.h#L145
     const AGS_CURRENT_VERSION: i32 = (6 << 22) | (3 << 12);
@@ -2566,5 +2788,366 @@ mod dxgi {
             (number >> 16) & 0xFFFF,
             number & 0xFFFF
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! Draws through the real Direct3D 11 renderer on a hidden window and reads pixels back.
+    //! The scene deliberately splits one primitive kind across two batches so the second
+    //! batch starts past the beginning of the frame's instance buffer.
+
+    // Explicit imports: a glob of `super` would also pull in gpui's `#[test]` proc macro.
+    use super::DirectXRenderer;
+    use crate::directx_devices::DirectXDevices;
+    use anyhow::Result;
+    use gpui::{
+        AtlasKey, AtlasTile, BackdropFilter, BorderStyle, Bounds, ContentMask, Corners,
+        DevicePixels, Edges, FilterBoundary, ImageId, MonochromeSprite, PlatformAtlas, Point,
+        PolychromeSprite, PrimitiveBatch, Quad, RenderCommand, RenderImageParams, RenderSvgParams,
+        ScaledFilter, ScaledPixels, Scene, ShaderBool, Size, WindowBackgroundAppearance, hsla, rgb,
+        rgb_to_hsla, solid_background, white,
+    };
+    use smallvec::{SmallVec, smallvec};
+    use std::borrow::Cow;
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        CreateWindowExW, DestroyWindow, WINDOW_EX_STYLE, WS_OVERLAPPED,
+    };
+    use windows::core::w;
+
+    struct HiddenWindow(HWND);
+
+    impl HiddenWindow {
+        fn new() -> Result<Self> {
+            let hwnd = unsafe {
+                CreateWindowExW(
+                    WINDOW_EX_STYLE(0),
+                    w!("STATIC"),
+                    w!("gpui directx renderer test"),
+                    WS_OVERLAPPED,
+                    0,
+                    0,
+                    200,
+                    100,
+                    None,
+                    None,
+                    None,
+                    None,
+                )
+            }?;
+            Ok(Self(hwnd))
+        }
+    }
+
+    impl Drop for HiddenWindow {
+        fn drop(&mut self) {
+            unsafe { DestroyWindow(self.0) }.ok();
+        }
+    }
+
+    fn scaled(x: f32, y: f32, width: f32, height: f32) -> Bounds<ScaledPixels> {
+        Bounds {
+            origin: Point {
+                x: ScaledPixels(x),
+                y: ScaledPixels(y),
+            },
+            size: Size {
+                width: ScaledPixels(width),
+                height: ScaledPixels(height),
+            },
+        }
+    }
+
+    fn full_mask() -> ContentMask<ScaledPixels> {
+        ContentMask {
+            bounds: scaled(0.0, 0.0, 200.0, 100.0),
+            ..Default::default()
+        }
+    }
+
+    fn dashed_border_scene(dash_length: f32, dash_gap: f32) -> Scene {
+        let mut scene = Scene::default();
+
+        for (bounds, corner_smoothing) in [
+            (scaled(4.0, 4.0, 12.0, 12.0), 0.0),
+            (scaled(24.0, 4.0, 12.0, 12.0), 0.6),
+        ] {
+            scene.insert_primitive(Quad {
+                bounds,
+                content_mask: full_mask(),
+                background: solid_background(hsla(0.05, 0.8, 0.45, 1.0)),
+                border_style: BorderStyle::Dashed,
+                border_dashed_length: dash_length,
+                border_dashed_gap: dash_gap,
+                border_color: hsla(0.6, 0.9, 0.7, 1.0).into(),
+                corner_radii: Corners::all(ScaledPixels(4.0)),
+                border_widths: Edges::all(ScaledPixels(2.0)),
+                corner_smoothing,
+                ..Default::default()
+            });
+        }
+
+        scene.finish();
+
+        scene
+    }
+
+    fn images_differ_in_region(
+        first: &image::RgbaImage,
+        second: &image::RgbaImage,
+        left: u32,
+        right: u32,
+    ) -> bool {
+        (4..16).any(|y| (left..right).any(|x| first.get_pixel(x, y) != second.get_pixel(x, y)))
+    }
+
+    fn tile(atlas: &dyn PlatformAtlas, key: AtlasKey, bytes: Vec<u8>) -> AtlasTile {
+        atlas
+            .get_or_insert_with(&key, &mut || {
+                Ok(Some((
+                    Size {
+                        width: DevicePixels(8),
+                        height: DevicePixels(8),
+                    },
+                    Cow::Owned(bytes.clone()),
+                )))
+            })
+            .expect("atlas insert must succeed")
+            .expect("atlas insert must produce a tile")
+    }
+
+    fn opacity_group(
+        scene: &mut Scene,
+        bounds: Bounds<ScaledPixels>,
+        opacity: f32,
+        paint: impl FnOnce(&mut Scene),
+    ) {
+        let boundary = FilterBoundary {
+            order: 0,
+            bounds,
+            content_mask: ContentMask {
+                bounds,
+                ..Default::default()
+            },
+            corner_radii: Corners::default(),
+            corner_smoothing: 0.0,
+            filters: SmallVec::new(),
+            opacity,
+            is_start: true,
+        };
+        scene.insert_primitive(boundary.clone());
+        paint(scene);
+        scene.insert_primitive(FilterBoundary {
+            is_start: false,
+            ..boundary
+        });
+    }
+
+    #[test]
+    fn configurable_dashes_reach_both_directx_quad_pipelines() -> Result<()> {
+        let window = HiddenWindow::new()?;
+        let devices = DirectXDevices::new()?;
+        let mut renderer = DirectXRenderer::new(window.0, &devices, true)?;
+        renderer.resize(Size {
+            width: DevicePixels(40),
+            height: DevicePixels(20),
+        })?;
+
+        let default_image = renderer.render_to_image(
+            &dashed_border_scene(2.0, 1.0),
+            WindowBackgroundAppearance::Opaque,
+        )?;
+        let custom_image = renderer.render_to_image(
+            &dashed_border_scene(4.0, 0.5),
+            WindowBackgroundAppearance::Opaque,
+        )?;
+
+        assert!(
+            images_differ_in_region(&default_image, &custom_image, 4, 16),
+            "custom dash length and gap must change the ordinary quad pipeline"
+        );
+        assert!(
+            images_differ_in_region(&default_image, &custom_image, 24, 36),
+            "custom dash length and gap must change the smoothed quad pipeline"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn every_batch_reads_its_own_instances() -> Result<()> {
+        let window = HiddenWindow::new()?;
+        let devices = DirectXDevices::new()?;
+        let mut renderer = DirectXRenderer::new(window.0, &devices, true)?;
+        renderer.resize(Size {
+            width: DevicePixels(200),
+            height: DevicePixels(100),
+        })?;
+        let atlas = renderer.sprite_atlas();
+        let mono = tile(
+            atlas.as_ref(),
+            AtlasKey::Svg(RenderSvgParams {
+                path: "test-mono".into(),
+                size: Size {
+                    width: DevicePixels(8),
+                    height: DevicePixels(8),
+                },
+            }),
+            vec![255; 64],
+        );
+        let poly = tile(
+            atlas.as_ref(),
+            AtlasKey::Image(RenderImageParams {
+                image_id: ImageId(1),
+                frame_index: 0,
+            }),
+            // BGRA red, opaque.
+            (0..64).flat_map(|_| [0u8, 0, 255, 255]).collect(),
+        );
+
+        let green = rgb_to_hsla(rgb(0x00ff00));
+        let blue = rgb_to_hsla(rgb(0x0000ff));
+        let mut scene = Scene::default();
+        scene.insert_primitive(Quad {
+            order: 0,
+            bounds: scaled(10.0, 10.0, 30.0, 30.0),
+            content_mask: full_mask(),
+            background: solid_background(green),
+            ..Default::default()
+        });
+        scene.insert_primitive(MonochromeSprite {
+            order: 0,
+            padding: 0,
+            bounds: scaled(10.0, 60.0, 30.0, 30.0),
+            content_mask: full_mask(),
+            color: green.into(),
+            tile: mono,
+            transformation: Default::default(),
+        });
+        scene.insert_primitive(PolychromeSprite {
+            transformation: gpui::TransformationMatrix::unit(),
+            order: 0,
+            grayscale: ShaderBool::Disabled,
+            opacity: 1.0,
+            corner_smoothing: 0.0,
+            bounds: scaled(50.0, 60.0, 30.0, 30.0),
+            content_mask: full_mask(),
+            corner_radii: Default::default(),
+            tile: poly,
+        });
+        // Overlapping the image lifts this quad above it, splitting the quads into two
+        // batches. The second one starts at instance 1 of the frame's quad buffer.
+        scene.insert_primitive(Quad {
+            order: 0,
+            bounds: scaled(60.0, 70.0, 30.0, 30.0),
+            content_mask: full_mask(),
+            background: solid_background(blue),
+            ..Default::default()
+        });
+        scene.finish();
+        let quad_batches: Vec<_> = scene
+            .render_commands()
+            .iter()
+            .filter_map(|command| match command {
+                RenderCommand::Batch(PrimitiveBatch::Quads { range, .. }) => Some(range.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(quad_batches, vec![0..1, 1..2]);
+
+        let image = renderer.render_to_image(&scene, WindowBackgroundAppearance::Opaque)?;
+        let expect = |name: &str, x: u32, y: u32, expected: [u8; 3]| {
+            let [r, g, b, _] = image.get_pixel(x, y).0;
+            let close = |actual: u8, wanted: u8| actual.abs_diff(wanted) <= 8;
+            assert!(
+                close(r, expected[0]) && close(g, expected[1]) && close(b, expected[2]),
+                "{name} at ({x},{y}) rendered ({r},{g},{b}), expected {expected:?}"
+            );
+        };
+        expect("first quad batch", 25, 25, [0, 255, 0]);
+        expect("monochrome sprite", 25, 75, [0, 255, 0]);
+        expect("polychrome sprite", 55, 65, [255, 0, 0]);
+        expect("second quad batch", 85, 85, [0, 0, 255]);
+        expect("background", 190, 20, [255, 255, 255]);
+        Ok(())
+    }
+
+    #[test]
+    fn filter_targets_are_allocated_on_demand_and_reset_on_resize() -> Result<()> {
+        let window = HiddenWindow::new()?;
+        let devices = DirectXDevices::new()?;
+        let mut renderer = DirectXRenderer::new(window.0, &devices, true)?;
+        renderer.resize(Size {
+            width: DevicePixels(16),
+            height: DevicePixels(8),
+        })?;
+
+        let allocations = |renderer: &DirectXRenderer| {
+            renderer
+                .resources
+                .as_ref()
+                .unwrap()
+                .blur
+                .as_ref()
+                .map(|blur| {
+                    (
+                        blur.groups.len(),
+                        blur.scratch.is_some(),
+                        blur.snapshot.is_some(),
+                    )
+                })
+        };
+        let bounds = scaled(0.0, 0.0, 16.0, 8.0);
+        let mut ordinary = Scene::default();
+        ordinary.insert_primitive(Quad {
+            bounds,
+            content_mask: full_mask(),
+            background: solid_background(white()),
+            ..Default::default()
+        });
+        ordinary.finish();
+        renderer.render(&ordinary, WindowBackgroundAppearance::Opaque)?;
+        assert_eq!(allocations(&renderer), None);
+
+        let mut nested = Scene::default();
+        opacity_group(&mut nested, bounds, 0.5, |scene| {
+            opacity_group(scene, bounds, 0.5, |scene| {
+                opacity_group(scene, bounds, 0.5, |scene| {
+                    scene.insert_primitive(ordinary.quads[0]);
+                });
+            });
+        });
+        nested.finish();
+        renderer.render(&nested, WindowBackgroundAppearance::Opaque)?;
+        assert_eq!(allocations(&renderer), Some((3, false, false)));
+
+        let mut filtered = Scene::default();
+        opacity_group(&mut filtered, bounds, 0.5, |scene| {
+            scene.insert_primitive(BackdropFilter {
+                bounds,
+                content_mask: ContentMask {
+                    bounds,
+                    ..Default::default()
+                },
+                filters: smallvec![ScaledFilter::Blur(ScaledPixels(2.0))],
+                opacity: 1.0,
+                ..Default::default()
+            });
+        });
+        filtered.finish();
+        renderer.render(&filtered, WindowBackgroundAppearance::Opaque)?;
+        assert_eq!(allocations(&renderer), Some((3, true, true)));
+
+        renderer.resize(Size {
+            width: DevicePixels(20),
+            height: DevicePixels(10),
+        })?;
+        assert_eq!(allocations(&renderer), None);
+
+        renderer.render(&ordinary, WindowBackgroundAppearance::Opaque)?;
+        assert_eq!(allocations(&renderer), None);
+
+        Ok(())
     }
 }

@@ -98,21 +98,21 @@ pub(super) fn mix_rgba(from: Rgba, to: Rgba, progress: f32) -> Rgba {
         return to;
     }
 
-    let alpha = from.a.lerp(&to.a, progress);
+    let alpha = from.alpha.lerp(&to.alpha, progress);
     if alpha <= f32::EPSILON {
         return Rgba::default();
     }
 
     let premultiplied = |from_channel: f32, to_channel: f32| {
-        (from_channel * from.a).lerp(&(to_channel * to.a), progress) / alpha
+        (from_channel * from.alpha).lerp(&(to_channel * to.alpha), progress) / alpha
     };
 
-    Rgba {
-        r: premultiplied(from.r, to.r),
-        g: premultiplied(from.g, to.g),
-        b: premultiplied(from.b, to.b),
-        a: alpha,
-    }
+    Rgba::new(
+        premultiplied(from.red, to.red),
+        premultiplied(from.green, to.green),
+        premultiplied(from.blue, to.blue),
+        alpha,
+    )
 }
 
 pub(super) fn mix_scalar(from: f32, to: f32, progress: f32) -> f32 {
@@ -130,11 +130,11 @@ mod tests {
             let palette = theme::palette(color_theme);
             let midpoint = mix_color(palette.transparent, palette.fill_subtle, 0.5);
 
-            assert!((midpoint.r - palette.fill_subtle.red).abs() <= f32::EPSILON);
-            assert!((midpoint.g - palette.fill_subtle.green).abs() <= f32::EPSILON);
-            assert!((midpoint.b - palette.fill_subtle.blue).abs() <= f32::EPSILON);
+            assert!((midpoint.red - palette.fill_subtle.red).abs() <= f32::EPSILON);
+            assert!((midpoint.green - palette.fill_subtle.green).abs() <= f32::EPSILON);
+            assert!((midpoint.blue - palette.fill_subtle.blue).abs() <= f32::EPSILON);
             let expected_alpha = palette.fill_subtle.alpha * 0.5;
-            assert!((midpoint.a - expected_alpha).abs() <= f32::EPSILON);
+            assert!((midpoint.alpha - expected_alpha).abs() <= f32::EPSILON);
         }
     }
 }

@@ -1,0 +1,127 @@
+# Publish the development snapshots for the next committed gpui-ce release.
+# These are crates.io-only versions: no alpha tag or alpha-version commit is
+# created in this repository.
+name: Publish prerelease
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+concurrency:
+  # crates.io versions are IMMUTABLE, so alpha numbers must be allocated in
+  # order even when main receives several commits in quick succession!
+  group: gpui-ce-registry-publish
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  version:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.version.outputs.publish }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+      - id: version
+        name: Allocate the next crates.io alpha version
+        run: |
+          set -euo pipefail
+
+          # CI runs can finish out of order. A queued run for an older merge
+          # must never publish after main has advanced.
+          git fetch origin main
+          if [ "$(git rev-parse origin/main)" != "${{ github.event.workflow_run.head_sha }}" ]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          record_version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "gpui-ce") | .version')"
+          case "$record_version" in
+            [0-9]*.[0-9]*.[0-9]*)
+              ;;
+            *)
+              echo "gpui-ce's committed version must be stable SemVer, got $record_version" >&2
+              exit 1
+              ;;
+          esac
+          record_major="${record_version%%.*}"
+          release_version="$((record_major + 1)).0.0"
+
+          versions_json="$(curl --fail --retry 3 --silent --show-error \
+            --user-agent 'gpui-ce prerelease publisher' \
+            https://crates.io/api/v1/crates/gpui-ce)"
+          versions="$(jq -r '.versions[].num' <<< "$versions_json")"
+
+          last_alpha="$(sed -n "s/^${release_version}-alpha\\.\\([0-9][0-9]*\\)$/\\1/p" <<< "$versions" | sort -n | tail -1)"
+          next_alpha="$(( ${last_alpha:-0} + 1 ))"
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+          echo "version=${release_version}-alpha.${next_alpha}" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: version
+    if: needs.version.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Install package build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libxkbcommon-dev libwayland-dev libx11-dev \
+            libxcb-shape0-dev libxcb-xfixes0-dev libxcb-randr0-dev \
+            libxcb-xinput-dev libxkbcommon-x11-dev libfontconfig-dev
+      - name: Substitute the crates.io-only version
+        run: |
+          alpha_version='${{ needs.version.outputs.version }}'
+          record_version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "gpui-ce") | .version')"
+          sed -i "s/^version = \".*\"$/version = \"$alpha_version\"/" crates/gpui/Cargo.toml
+          sed -i "s/version = \"$record_version\", package = \"gpui-ce\"/version = \"$alpha_version\", package = \"gpui-ce\"/" Cargo.toml
+      - name: Package the archive that will be uploaded
+        # Full CI completed successfully before this workflow starts. gpui-ce's
+        # packaged test-only dependency cycle cannot be verified in isolation.
+        run: cargo package --manifest-path crates/gpui/Cargo.toml --allow-dirty --no-verify
+      - name: Compile the packaged library in isolation
+        run: |
+          set -euo pipefail
+          package_dir="$(mktemp -d)"
+          trap 'rm -rf "$package_dir"' EXIT
+          archive="$(find target/package -maxdepth 1 -name 'gpui-ce-*.crate' -print -quit)"
+          tar -xzf "$archive" -C "$package_dir"
+          manifest="$(find "$package_dir" -mindepth 2 -maxdepth 2 -name Cargo.toml -print -quit)"
+          cargo check --manifest-path "$manifest" --lib
+      - name: Publish only if this is still main's latest commit
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          if [ "$(git rev-parse origin/main)" != "${{ github.event.workflow_run.head_sha }}" ]; then
+            echo "main advanced while this snapshot was being prepared; skipping it."
+            exit 0
+          fi
+
+          cargo publish --manifest-path crates/gpui/Cargo.toml --allow-dirty --no-verify
+
+          version='${{ needs.version.outputs.version }}'
+          for attempt in {1..12}; do
+            if curl --fail --silent --show-error \
+              --user-agent 'gpui-ce prerelease publisher' \
+              "https://crates.io/api/v1/crates/gpui-ce/$version" >/dev/null; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "$version was published but did not become visible through the crates.io API" >&2
+          exit 1
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

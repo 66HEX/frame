@@ -167,7 +167,7 @@ impl FrameTooltip {
                             .shadow(card_surface_shadows(palette))
                             .child(theme::ui_text_owned(self.label)),
                     );
-                this.child(deferred(bubble).with_priority(TOOLTIP_DEFERRED_PRIORITY))
+                this.child(deferred(bubble).priority(TOOLTIP_DEFERRED_PRIORITY))
             })
     }
 }

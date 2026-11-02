@@ -764,8 +764,8 @@ fn settings_subtitle_load_button(
         .opacity(colors.opacity)
         .shadow(button_highlight_shadows(palette))
         .when(!disabled, |this| {
-            this.hover(gpui::Styled::cursor_pointer)
-                .active(move |style| style.bg(color(colors.active_background)))
+            this.hover_style(gpui::Styled::cursor_pointer)
+                .active_style(move |style| style.bg(color(colors.active_background)))
         })
         .when(disabled, gpui::Styled::cursor_not_allowed)
         .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
@@ -1171,7 +1171,7 @@ fn settings_subtitle_font_select(
             ));
         }
 
-        field = field.child(deferred(popover).with_priority(10));
+        field = field.child(deferred(popover).priority(10));
     }
 
     field
@@ -1365,7 +1365,7 @@ fn settings_subtitle_font_size_select(
             ));
         }
 
-        field = field.child(deferred(popover).with_priority(10));
+        field = field.child(deferred(popover).priority(10));
     }
 
     field
@@ -1757,7 +1757,7 @@ fn settings_subtitle_color_field(
                 window,
                 cx,
             ))
-            .with_priority(10),
+            .priority(10),
         );
     }
 
@@ -1926,12 +1926,12 @@ fn settings_subtitle_sv_square(
         square
             .track_focus(focus)
             .tab_stop(true)
-            .focus_visible(move |style| focus_visible_ring(style, palette))
+            .focus_visible_style(move |style| focus_visible_ring(style, palette))
     } else {
         square
             .focusable()
             .tab_stop(true)
-            .focus_visible(move |style| focus_visible_ring(style, palette))
+            .focus_visible_style(move |style| focus_visible_ring(style, palette))
     }
 }
 

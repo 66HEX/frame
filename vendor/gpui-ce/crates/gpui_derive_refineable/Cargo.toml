@@ -1,0 +1,18 @@
+[package]
+name = "gpui_ce_derive_refineable"
+version = "0.2.2"
+edition = "2024"
+license = "Apache-2.0"
+publish = true
+description = "Derive macro for gpui-ce's Refineable (vendored from Zed)."
+
+[lib]
+name = "derive_refineable"
+path = "src/derive_refineable.rs"
+proc-macro = true
+doctest = false
+
+[dependencies]
+proc-macro2 = "1.0.101"
+quote = "1.0.41"
+syn = { version = "2.0.117", features = ["full", "extra-traits", "visit-mut"] }

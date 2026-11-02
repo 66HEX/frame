@@ -200,7 +200,9 @@ impl Element for PreviewMediaImage {
 
         let _ = window.paint_image_transformed(
             source_bounds,
+            source_bounds,
             gpui::Corners::default(),
+            0.0,
             Arc::clone(&self.render_image),
             0,
             false,
@@ -295,6 +297,7 @@ pub(in crate::app) fn preview_viewport(
     let pan_enabled = preview_canvas_pan_enabled(state);
     let mut viewport = div()
         .id("preview-viewport")
+        .debug_selector(|| "preview-viewport".to_string())
         .relative()
         .flex_1()
         .min_h_0()
@@ -316,7 +319,7 @@ pub(in crate::app) fn preview_viewport(
             .role(gpui::Role::Pane)
             .aria_label("Preview canvas")
             .aria_description("Use arrow keys to pan the zoomed preview.")
-            .focus_visible(move |style| focus_visible_ring(style, palette))
+            .focus_visible_style(move |style| focus_visible_ring(style, palette))
             .cursor_grab()
             .on_key_down(
                 cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {

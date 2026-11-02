@@ -228,7 +228,9 @@ pub(super) fn action_button(
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
         .opacity(colors.opacity)
-        .when(enabled, |this| this.hover(gpui::Styled::cursor_pointer))
+        .when(enabled, |this| {
+            this.hover_style(gpui::Styled::cursor_pointer)
+        })
         .when(!enabled, gpui::Styled::cursor_not_allowed);
 
     let button = apply_button_motion(button, motion, enabled);
@@ -480,12 +482,7 @@ pub(super) fn drop_target_shadows(palette: &theme::ThemePalette) -> Vec<BoxShado
 }
 
 pub(super) const fn color(token: theme::RgbaToken) -> Rgba {
-    Rgba {
-        r: token.red,
-        g: token.green,
-        b: token.blue,
-        a: token.alpha,
-    }
+    Rgba::new(token.red, token.green, token.blue, token.alpha)
 }
 
 #[cfg(test)]

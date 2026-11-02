@@ -21,16 +21,17 @@ needless_collect = { level = "deny", priority = 8 }
 pedantic = { level = "warn", priority = 3 }
 nursery = { level = "warn", priority = 3 }
 
+# Upstream revision and downstream patch history: vendor/gpui-ce/FRAME_PATCHES.md
 [patch."https://github.com/gpui-ce/gpui-ce"]
-gpui = { path = "vendor/gpui-ce/crates/gpui" }
-gpui_linux = { path = "vendor/gpui-ce/crates/gpui_linux" }
-gpui_macos = { path = "vendor/gpui-ce/crates/gpui_macos" }
-gpui_macros = { path = "vendor/gpui-ce/crates/gpui_macros" }
-gpui_platform = { path = "vendor/gpui-ce/crates/gpui_platform" }
-gpui_shared_string = { path = "vendor/gpui-ce/crates/gpui_shared_string" }
-gpui_web = { path = "vendor/gpui-ce/crates/gpui_web" }
-gpui_wgpu = { path = "vendor/gpui-ce/crates/gpui_wgpu" }
-gpui_windows = { path = "vendor/gpui-ce/crates/gpui_windows" }
+gpui = { package = "gpui-ce", path = "vendor/gpui-ce/crates/gpui" }
+gpui_linux = { package = "gpui_ce_linux", path = "vendor/gpui-ce/crates/gpui_linux" }
+gpui_macos = { package = "gpui_ce_macos", path = "vendor/gpui-ce/crates/gpui_macos" }
+gpui_macros = { package = "gpui_ce_macros", path = "vendor/gpui-ce/crates/gpui_macros" }
+gpui_platform = { package = "gpui_ce_platform", path = "vendor/gpui-ce/crates/gpui_platform" }
+gpui_shared_string = { package = "gpui_ce_shared_string", path = "vendor/gpui-ce/crates/gpui_shared_string" }
+gpui_web = { package = "gpui_ce_web", path = "vendor/gpui-ce/crates/gpui_web" }
+gpui_wgpu = { package = "gpui_ce_wgpu", path = "vendor/gpui-ce/crates/gpui_wgpu" }
+gpui_windows = { package = "gpui_ce_windows", path = "vendor/gpui-ce/crates/gpui_windows" }
 
 [profile.release]
 opt-level = "z"

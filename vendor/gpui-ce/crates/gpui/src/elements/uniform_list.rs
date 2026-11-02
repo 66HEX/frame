@@ -5,13 +5,13 @@
 //! elements with uniform height.
 
 use crate::{
-    AnyElement, App, AvailableSpace, Bounds, ContentMask, Element, ElementId, Entity,
-    GlobalElementId, Hitbox, InspectorElementId, InteractiveElement, Interactivity, IntoElement,
-    IsZero, LayoutId, ListSizingBehavior, Overflow, Pixels, Point, ScrollHandle, Size,
-    StyleRefinement, Styled, Window, point, px, size,
+    AnyElement, App, AvailableSpace, Bounds, Element, ElementId, Entity, GlobalElementId, Hitbox,
+    InspectorElementId, InteractiveElement, Interactivity, IntoElement, IsZero, LayoutId,
+    ListSizingBehavior, Overflow, Pixels, Point, ScrollHandle, Size, StyleRefinement, Styled,
+    Window, point, px, size,
 };
 use smallvec::SmallVec;
-use std::{cell::RefCell, cmp, ops::Range, rc::Rc, usize};
+use std::{cell::RefCell, cmp, ops::Range, rc::Rc};
 
 use super::ListHorizontalSizingBehavior;
 
@@ -489,48 +489,52 @@ impl Element for UniformList {
                         (self.render_items)(visible_range.clone(), window, cx)
                     };
 
-                    let content_mask = ContentMask { bounds };
-                    window.with_content_mask(Some(content_mask), |window| {
-                        for (mut item, ix) in items.into_iter().zip(visible_range.clone()) {
-                            let item_origin = padded_bounds.origin
-                                + scroll_offset
-                                + point(Pixels::ZERO, item_height * ix);
+                    window.with_content_mask(
+                        Some(style.scroll_mask(bounds, window.rem_size())),
+                        |window| {
+                            for (mut item, ix) in items.into_iter().zip(visible_range.clone()) {
+                                let item_origin = padded_bounds.origin
+                                    + scroll_offset
+                                    + point(Pixels::ZERO, item_height * ix);
 
-                            let available_width = if can_scroll_horizontally {
-                                padded_bounds.size.width + scroll_offset.x.abs()
-                            } else {
-                                padded_bounds.size.width
-                            };
-                            let available_space = size(
-                                AvailableSpace::Definite(available_width),
-                                AvailableSpace::Definite(item_height),
-                            );
-                            item.layout_as_root(available_space, window, cx);
-                            item.prepaint_at(item_origin, window, cx);
-                            frame_state.items.push(item);
-                        }
+                                let available_width = if can_scroll_horizontally {
+                                    padded_bounds.size.width + scroll_offset.x.abs()
+                                } else {
+                                    padded_bounds.size.width
+                                };
+                                let available_space = size(
+                                    AvailableSpace::Definite(available_width),
+                                    AvailableSpace::Definite(item_height),
+                                );
+                                item.layout_as_root(available_space, window, cx);
+                                item.prepaint_at(item_origin, window, cx);
+                                frame_state.items.push(item);
+                            }
 
-                        let bounds =
-                            Bounds::new(padded_bounds.origin + scroll_offset, padded_bounds.size);
-                        for decoration in &self.decorations {
-                            let mut decoration = decoration.as_ref().compute(
-                                visible_range.clone(),
-                                bounds,
-                                scroll_offset,
-                                item_height,
-                                self.item_count,
-                                window,
-                                cx,
+                            let bounds = Bounds::new(
+                                padded_bounds.origin + scroll_offset,
+                                padded_bounds.size,
                             );
-                            let available_space = size(
-                                AvailableSpace::Definite(bounds.size.width),
-                                AvailableSpace::Definite(bounds.size.height),
-                            );
-                            decoration.layout_as_root(available_space, window, cx);
-                            decoration.prepaint_at(bounds.origin, window, cx);
-                            frame_state.decorations.push(decoration);
-                        }
-                    });
+                            for decoration in &self.decorations {
+                                let mut decoration = decoration.as_ref().compute(
+                                    visible_range.clone(),
+                                    bounds,
+                                    scroll_offset,
+                                    item_height,
+                                    self.item_count,
+                                    window,
+                                    cx,
+                                );
+                                let available_space = size(
+                                    AvailableSpace::Definite(bounds.size.width),
+                                    AvailableSpace::Definite(bounds.size.height),
+                                );
+                                decoration.layout_as_root(available_space, window, cx);
+                                decoration.prepaint_at(bounds.origin, window, cx);
+                                frame_state.decorations.push(decoration);
+                            }
+                        },
+                    );
                 }
 
                 hitbox
@@ -671,7 +675,7 @@ impl UniformList {
             return Size::default();
         };
         let available_space = size(
-            list_width.map_or(AvailableSpace::MinContent, |width| {
+            list_width.map_or(AvailableSpace::MaxContent, |width| {
                 AvailableSpace::Definite(width)
             }),
             AvailableSpace::MinContent,

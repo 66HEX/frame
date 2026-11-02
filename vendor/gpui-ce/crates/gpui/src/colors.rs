@@ -1,4 +1,5 @@
-use crate::{App, Global, Rgba, Window, WindowAppearance, rgb};
+use crate::{App, Global, Window, WindowAppearance, rgb};
+use palette::rgb::Rgba;
 use std::ops::Deref;
 use std::sync::Arc;
 

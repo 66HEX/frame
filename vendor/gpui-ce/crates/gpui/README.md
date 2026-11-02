@@ -5,16 +5,48 @@ for Rust, designed to support a wide variety of applications.
 
 ## Getting Started
 
-GPUI is still in active development as we work on the Zed code editor, and is still pre-1.0. There will often be breaking changes between versions. You'll also need to use the latest version of stable Rust and be on macOS or Linux. Add the following to your `Cargo.toml`:
+GPUI is still in active development as we work on the Zed code editor, and is still pre-1.0. There will often be breaking changes between versions. You'll also need to use the latest version of stable Rust. Add `gpui`, and optionally `gpui_platform`, to your `Cargo.toml`:
 
 ```toml
 gpui = { version = "*" }
+gpui_platform = { version = "*", features = ["wayland", "x11"] }
 ```
+
+Everything in a standalone GPUI app starts with an `Application`. You can create one with `gpui_platform::application()`, which picks the windowing and text backends for the host OS, and kick off your application by passing a callback to `Application::run()`. Inside this callback, you can create a new window with `App::open_window()` and register your first root view.
+
+```rust,no_run
+use gpui::*;
+
+fn main() {
+    gpui_platform::application().run(|cx: &mut App| {
+        // ..
+    });
+}
+```
+
+### `gpui_platform`
+
+GPUI uses Parley for shaping, wrapping, hit testing, and font fallback on every platform. The features on `gpui_platform` select windowing and rendering integrations. If you build for a single platform, you can trim them:
+
+- **macOS.** Rendering uses the shared renderer over Metal, and text uses the shared Parley backend. No text feature is required.
+
+    ```toml
+    gpui_platform = { version = "*" }
+    ```
+
+- **Linux / FreeBSD.** Enable at least one windowing backend for desktop windows: `wayland`, `x11`, or both. No separate text feature is needed.
+
+    ```toml
+    gpui_platform = { version = "*", features = ["wayland", "x11"] }
+    ```
+
+- **Windows.** No features are required. Windowing uses Win32, rendering uses DirectX, and text uses the shared Parley backend.
+
+### Additional Topics
 
 - [Ownership and data flow](_ownership_and_data_flow)
 - [Accessibility](_accessibility)
-
-Everything in GPUI starts with an `Application`. You can create one with `Application::new()`, and kick off your application by passing a callback to `Application::run()`. Inside this callback, you can create a new window with `App::open_window()`, and register your first root view. See [gpui.rs](https://www.gpui.rs/) for a complete example.
+- [Direction and bidirectional text](direction.md)
 
 ### Dependencies
 

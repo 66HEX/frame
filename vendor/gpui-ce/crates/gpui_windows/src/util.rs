@@ -1,8 +1,6 @@
 use std::sync::OnceLock;
 
-use ::util::ResultExt;
-#[cfg(not(feature = "wgpu"))]
-use anyhow::Context;
+use gpui_util::ResultExt;
 use windows::{
     UI::{
         Color,
@@ -11,8 +9,6 @@ use windows::{
     Win32::{Foundation::*, Graphics::Dwm::*, UI::WindowsAndMessaging::*},
     core::BOOL,
 };
-#[cfg(not(feature = "wgpu"))]
-use windows::{Win32::System::LibraryLoader::LoadLibraryA, core::PCSTR};
 
 use crate::*;
 use gpui::*;
@@ -114,6 +110,8 @@ pub(crate) fn load_cursor(style: CursorStyle) -> Option<HCURSOR> {
         | CursorStyle::ResizeRow => (&SIZENS, IDC_SIZENS),
         CursorStyle::ResizeUpLeftDownRight => (&SIZENWSE, IDC_SIZENWSE),
         CursorStyle::ResizeUpRightDownLeft => (&SIZENESW, IDC_SIZENESW),
+        CursorStyle::ResizeUpLeft | CursorStyle::ResizeDownRight => (&SIZENWSE, IDC_SIZENWSE),
+        CursorStyle::ResizeUpRight | CursorStyle::ResizeDownLeft => (&SIZENESW, IDC_SIZENESW),
         CursorStyle::OperationNotAllowed => (&NO, IDC_NO),
         _ => (&ARROW, IDC_ARROW),
     };
@@ -172,21 +170,4 @@ pub(crate) fn system_appearance() -> Result<WindowAppearance> {
 #[inline(always)]
 fn is_color_light(color: &Color) -> bool {
     ((5 * color.G as u32) + (2 * color.R as u32) + color.B as u32) > (8 * 128)
-}
-
-#[cfg(not(feature = "wgpu"))]
-pub(crate) fn with_dll_library<R, F>(dll_name: PCSTR, f: F) -> Result<R>
-where
-    F: FnOnce(HMODULE) -> Result<R>,
-{
-    let library = unsafe {
-        LoadLibraryA(dll_name).with_context(|| format!("Loading dll: {}", dll_name.display()))?
-    };
-    let result = f(library);
-    unsafe {
-        FreeLibrary(library)
-            .with_context(|| format!("Freeing dll: {}", dll_name.display()))
-            .log_err();
-    }
-    result
 }
