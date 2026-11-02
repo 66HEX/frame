@@ -16,6 +16,7 @@ use super::{
 };
 
 mod crop;
+mod crop_options;
 mod crop_overlay;
 mod overlay;
 mod panel;
@@ -24,6 +25,7 @@ mod toolbar;
 mod viewport;
 
 pub(super) use crop::*;
+pub(super) use crop_options::*;
 pub(super) use crop_overlay::*;
 pub(super) use overlay::*;
 pub(super) use panel::*;

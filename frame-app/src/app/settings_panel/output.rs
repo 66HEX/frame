@@ -1,9 +1,9 @@
 use super::{
-    ClickEvent, Context, ConversionConfig, FocusHandle, FrameRoot, FrameTextInputKind,
-    FrameTextInputSpec, ParentElement, SourceMetadata, StatefulInteractiveElement, Styled, Window,
-    apply_output_container, apply_processing_mode, div, frame_choice_button, frame_text_input,
-    normalize_output_config, output_container_options, output_processing_mode_options,
-    settings_hint_text, settings_section, theme,
+    ClickEvent, Context, ConversionConfig, FluentBuilder, FocusHandle, FrameRoot,
+    FrameTextInputKind, FrameTextInputSpec, ParentElement, SourceMetadata,
+    StatefulInteractiveElement, Styled, Window, apply_output_container, apply_processing_mode, div,
+    frame_choice_button, frame_text_input, normalize_output_config, output_container_options,
+    output_processing_mode_options, settings_hint_text, settings_section, theme,
 };
 
 #[expect(
@@ -20,6 +20,14 @@ pub(in crate::app) fn settings_output_tab(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let dimensions = metadata.and_then(|source| {
+        frame_core::dimensions::output_dimensions(
+            &crate::conversion_runner::core_config_from_gpui(config),
+            source.width?,
+            source.height?,
+            source.pixel_format.as_deref(),
+        )
+    });
     div()
         .flex()
         .flex_col()
@@ -51,6 +59,16 @@ pub(in crate::app) fn settings_output_tab(
                     palette,
                 )),
         )
+        .when_some(dimensions, |panel, (width, height)| {
+            panel.child(
+                settings_section("Output dimensions", palette)
+                    .child(div().child(format!("{width} × {height} px")))
+                    .child(settings_hint_text(
+                        "Estimated after crop, rotation and scaling.",
+                        palette,
+                    )),
+            )
+        })
         .child(
             settings_section("Output container", palette).child(settings_container_grid(
                 config,

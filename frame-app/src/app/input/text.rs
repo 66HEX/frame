@@ -8,6 +8,8 @@ pub(super) fn sanitize_replacement_text(kind: FrameTextInputKind, value: &str) -
     match kind {
         FrameTextInputKind::MaxConcurrency
         | FrameTextInputKind::AudioBitrate
+        | FrameTextInputKind::CropWidth
+        | FrameTextInputKind::CropHeight
         | FrameTextInputKind::VideoCustomWidth
         | FrameTextInputKind::VideoCustomHeight
         | FrameTextInputKind::VideoBitrate

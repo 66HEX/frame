@@ -53,7 +53,7 @@ pub struct AspectOption {
     pub ratio: Option<f64>,
 }
 
-pub const ASPECT_OPTIONS: [AspectOption; 5] = [
+pub const ASPECT_OPTIONS: [AspectOption; 16] = [
     AspectOption {
         id: "free",
         display: "Free",
@@ -63,6 +63,31 @@ pub const ASPECT_OPTIONS: [AspectOption; 5] = [
         id: "1:1",
         display: "1:1",
         ratio: Some(1.0),
+    },
+    AspectOption {
+        id: "4:3",
+        display: "4:3",
+        ratio: Some(4.0 / 3.0),
+    },
+    AspectOption {
+        id: "3:4",
+        display: "3:4",
+        ratio: Some(3.0 / 4.0),
+    },
+    AspectOption {
+        id: "3:2",
+        display: "3:2",
+        ratio: Some(3.0 / 2.0),
+    },
+    AspectOption {
+        id: "2:3",
+        display: "2:3",
+        ratio: Some(2.0 / 3.0),
+    },
+    AspectOption {
+        id: "5:4",
+        display: "5:4",
+        ratio: Some(5.0 / 4.0),
     },
     AspectOption {
         id: "4:5",
@@ -78,6 +103,36 @@ pub const ASPECT_OPTIONS: [AspectOption; 5] = [
         id: "9:16",
         display: "9:16",
         ratio: Some(9.0 / 16.0),
+    },
+    AspectOption {
+        id: "16:10",
+        display: "16:10",
+        ratio: Some(16.0 / 10.0),
+    },
+    AspectOption {
+        id: "10:16",
+        display: "10:16",
+        ratio: Some(10.0 / 16.0),
+    },
+    AspectOption {
+        id: "21:9",
+        display: "21:9",
+        ratio: Some(21.0 / 9.0),
+    },
+    AspectOption {
+        id: "9:21",
+        display: "9:21",
+        ratio: Some(9.0 / 21.0),
+    },
+    AspectOption {
+        id: "2:1",
+        display: "2:1",
+        ratio: Some(2.0 / 1.0),
+    },
+    AspectOption {
+        id: "1:2",
+        display: "1:2",
+        ratio: Some(1.0 / 2.0),
     },
 ];
 
@@ -101,10 +156,16 @@ pub struct VisualCropDrag<'a> {
 
 #[must_use]
 pub fn aspect_value(id: &str) -> Option<f64> {
-    ASPECT_OPTIONS
-        .iter()
-        .find(|option| option.id == id)
-        .and_then(|option| option.ratio)
+    let (width, height) = id.split_once(':')?;
+    let width = width
+        .parse::<u32>()
+        .ok()
+        .filter(|value| (1..=65_535).contains(value))?;
+    let height = height
+        .parse::<u32>()
+        .ok()
+        .filter(|value| (1..=65_535).contains(value))?;
+    Some(f64::from(width) / f64::from(height))
 }
 
 #[must_use]

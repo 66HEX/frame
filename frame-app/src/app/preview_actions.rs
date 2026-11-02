@@ -806,6 +806,8 @@ impl FrameRoot {
         if self.preview_ui.crop_file_id.as_deref() != selected_file_id {
             self.preview_ui.crop_file_id = selected_file_id.map(str::to_string);
             self.preview_ui.crop_mode = false;
+            self.preview_ui.crop_options.popover = None;
+            self.preview_ui.crop_options.custom = false;
             self.preview_ui.draft_crop = None;
             self.preview_ui.crop_drag = None;
         }
@@ -1098,6 +1100,7 @@ impl FrameRoot {
     const fn apply_preview_overlay_mode_change(&mut self, change: OverlayModeChange) -> bool {
         if change.should_deactivate_crop {
             self.preview_ui.crop_mode = false;
+            self.preview_ui.crop_options.popover = None;
             self.preview_ui.draft_crop = None;
             self.preview_ui.crop_drag = None;
         }
@@ -1205,14 +1208,22 @@ impl FrameRoot {
 
         if self.preview_ui.crop_mode {
             self.preview_ui.crop_mode = false;
+            self.preview_ui.crop_options.popover = None;
             self.preview_ui.draft_crop = None;
             self.preview_ui.crop_drag = None;
             return true;
         }
 
+        self.preview_ui.crop_options.popover = None;
         self.preview_ui.crop_mode = true;
-        self.preview_ui.draft_crop = Some(applied_crop.unwrap_or_else(default_crop_rect));
+        self.preview_ui.draft_crop = Some(applied_crop.unwrap_or_else(full_crop_rect));
         self.preview_ui.crop_aspect = crop_aspect;
+        self.preview_ui.crop_options.custom |= !ASPECT_OPTIONS
+            .iter()
+            .any(|option| option.id == self.preview_ui.crop_aspect);
+        if self.preview_ui.crop_options.custom {
+            self.set_crop_custom_mode(self.preview_ui.crop_options.is_ratio);
+        }
         true
     }
     pub(super) fn select_preview_crop_aspect(&mut self, aspect_id: &str) -> bool {
@@ -1271,6 +1282,11 @@ impl FrameRoot {
         if !self.preview_ui.crop_mode {
             return false;
         }
+        let was_custom = self.preview_ui.crop_options.custom;
+        self.preview_ui.crop_options.custom = false;
+        self.preview_ui.crop_options.custom_dirty = false;
+        self.preview_ui.crop_options.custom_edit_base = None;
+        self.preview_ui.crop_options.popover = None;
 
         let previous_rect = self.preview_ui.draft_crop;
         let previous_aspect = self.preview_ui.crop_aspect.clone();
@@ -1280,11 +1296,18 @@ impl FrameRoot {
             default_crop_rect()
         });
         self.preview_ui.crop_aspect = "free".to_string();
-        previous_rect != self.preview_ui.draft_crop
+        was_custom
+            || previous_rect != self.preview_ui.draft_crop
             || previous_aspect != self.preview_ui.crop_aspect
     }
     pub(super) fn apply_selected_crop(&mut self) -> bool {
         if !self.preview_ui.crop_mode {
+            return false;
+        }
+        if self.preview_ui.crop_options.custom
+            && self.preview_ui.crop_options.custom_dirty
+            && !self.apply_custom_crop_values()
+        {
             return false;
         }
         let Some(draft_crop) = self.preview_ui.draft_crop else {
@@ -1312,13 +1335,23 @@ impl FrameRoot {
             )
         };
         let cleared_crop = next_crop.is_none();
+        let crop_preview = self.crop_settings_preview();
 
         let _config_changed = self.update_selected_config(|config| {
-            let changed = config.crop != next_crop;
+            let mut changed = config.crop != next_crop;
             config.crop = next_crop;
+            if let Some(preview) = crop_preview {
+                changed |= config.resolution != preview.resolution
+                    || config.custom_width != preview.custom_width
+                    || config.custom_height != preview.custom_height;
+                config.resolution = preview.resolution;
+                config.custom_width = preview.custom_width;
+                config.custom_height = preview.custom_height;
+            }
             changed
         });
         self.preview_ui.crop_mode = false;
+        self.preview_ui.crop_options.popover = None;
         self.preview_ui.draft_crop = None;
         self.preview_ui.crop_drag = None;
         if cleared_crop {
@@ -1422,6 +1455,7 @@ impl FrameRoot {
         if !self.preview_ui.crop_mode {
             return false;
         }
+        self.finish_crop_custom_edit();
         let Some(current_rect) = self.preview_ui.draft_crop else {
             return false;
         };
@@ -1505,6 +1539,7 @@ impl FrameRoot {
         let Some(delta) = preview_crop_keyboard_delta(handle, key, large_step) else {
             return false;
         };
+        self.finish_crop_custom_edit();
 
         let metadata = self.selected_source_metadata();
         let Some(config) = self.selected_config() else {
@@ -2035,6 +2070,9 @@ fn preview_runtime_request(
     let mut preview_config = selected_file.config.clone();
     if !include_applied_crop {
         preview_config.crop = None;
+        preview_config.resolution = "original".to_string();
+        preview_config.custom_width = None;
+        preview_config.custom_height = None;
     }
     if !include_committed_overlay {
         preview_config.overlay = None;

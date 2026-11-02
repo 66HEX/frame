@@ -217,6 +217,7 @@ pub(in crate::app) fn settings_tab_content(
             settings.settings_disabled,
             settings.available_encoders,
             SettingsVideoInputFocuses {
+                resolution_locked: settings.crop_editing,
                 width: settings.video_width_focus,
                 height: settings.video_height_focus,
                 bitrate: settings.video_bitrate_focus,
@@ -238,6 +239,7 @@ pub(in crate::app) fn settings_tab_content(
         SettingsTab::Images => content.child(settings_images_tab(
             settings.config,
             settings.settings_disabled,
+            settings.crop_editing,
             settings.video_width_focus,
             settings.video_height_focus,
             palette,

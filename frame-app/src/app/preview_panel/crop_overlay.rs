@@ -340,6 +340,7 @@ const fn crop_keyboard_description() -> &'static str {
 
 pub(in crate::app) fn preview_crop_aspect_bar(
     state: &PreviewShellState,
+    options: PreviewCropOptionsProps<'_>,
     focuses: PreviewEditToolbarFocus<'_>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
@@ -348,10 +349,13 @@ pub(in crate::app) fn preview_crop_aspect_bar(
     let first_focus = focuses.first.clone();
     let last_focus = focuses.last.clone();
     let mut bar = div()
+        .relative()
         .id("preview-crop-toolbar")
         .track_focus(focuses.panel)
         .tab_stop(false)
         .flex()
+        .flex_wrap()
+        .max_w_full()
         .items_center()
         .gap_2()
         .rounded(theme::ui_rem(theme::RADIUS_MD))
@@ -364,35 +368,11 @@ pub(in crate::app) fn preview_crop_aspect_bar(
             }),
         );
 
-    for option in ASPECT_OPTIONS {
-        let id = option.id;
-        let button = if id == "free" {
-            compact_text_button_with_focus(
-                option.display,
-                state.crop.crop_aspect == id,
-                true,
-                focuses.first,
-                palette,
-                window,
-                cx,
-            )
-        } else {
-            compact_text_button(
-                option.display,
-                state.crop.crop_aspect == id,
-                true,
-                palette,
-                window,
-                cx,
-            )
-        };
-        bar = bar.child(
-            button.on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
-                if root.select_preview_crop_aspect(id) {
-                    cx.notify();
-                }
-            })),
-        );
+    bar = bar.child(preview_crop_options(state, focuses, options, window, cx));
+    if options.custom {
+        bar = bar.child(preview_crop_custom_fields(
+            state, focuses, options, window, cx,
+        ));
     }
 
     let bar = bar
@@ -411,7 +391,8 @@ pub(in crate::app) fn preview_crop_aspect_bar(
                 "Apply",
                 ButtonVariant::Default,
                 false,
-                state.crop.has_crop_dimensions,
+                state.crop.has_crop_dimensions
+                    && (!options.custom || options.custom_values.is_some()),
                 Some(focuses.last),
                 palette,
                 window,
@@ -430,6 +411,7 @@ pub(in crate::app) fn preview_crop_aspect_bar(
         .bottom(theme::ui_rem(16.0))
         .left_0()
         .right_0()
+        .px(theme::ui_rem(16.0))
         .flex()
         .justify_center()
         .child(bar)
@@ -450,33 +432,6 @@ pub(in crate::app) fn compact_text_button(
     };
 
     compact_text_button_variant(label, variant, selected, enabled, palette, window, cx)
-}
-
-pub(in crate::app) fn compact_text_button_with_focus(
-    label: &'static str,
-    selected: bool,
-    enabled: bool,
-    focus: &FocusHandle,
-    palette: &'static theme::ThemePalette,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
-) -> gpui::Stateful<gpui::Div> {
-    let variant = if selected {
-        ButtonVariant::Default
-    } else {
-        ButtonVariant::Ghost
-    };
-
-    compact_text_button_variant_inner(
-        label,
-        variant,
-        selected,
-        enabled,
-        Some(focus),
-        palette,
-        window,
-        cx,
-    )
 }
 
 pub(in crate::app) fn compact_text_button_variant(

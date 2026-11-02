@@ -106,6 +106,39 @@ impl Render for FrameRoot {
             overlay_tool_enabled,
             cx,
         );
+        let crop_width_focus = self.ensure_text_input_focus(FrameTextInputKind::CropWidth, cx);
+        let crop_height_focus = self.ensure_text_input_focus(FrameTextInputKind::CropHeight, cx);
+        let crop_option_focuses: Vec<_> = ASPECT_OPTIONS
+            .iter()
+            .map(|option| option.id)
+            .chain(std::iter::once("custom"))
+            .map(|id| {
+                self.ensure_focus(
+                    FrameFocusKey::Control(format!("crop-ratio-{id}")),
+                    self.preview_ui.crop_options.popover == Some(CropSelect::Aspect),
+                    cx,
+                )
+            })
+            .collect();
+        let crop_unit_focus = self.ensure_focus(
+            FrameFocusKey::Control("crop-units".into()),
+            self.preview_ui.crop_options.custom,
+            cx,
+        );
+        let crop_unit_option_focuses: Vec<_> = ["pixels", "ratio"]
+            .iter()
+            .map(|id| {
+                self.ensure_focus(
+                    FrameFocusKey::Control(format!("crop-units-{id}")),
+                    self.preview_ui.crop_options.popover == Some(CropSelect::Units),
+                    cx,
+                )
+            })
+            .collect();
+        if self.preview_ui.crop_options.custom && !self.preview_ui.crop_options.custom_dirty {
+            self.set_crop_custom_mode(self.preview_ui.crop_options.is_ratio);
+        }
+        let crop_custom_values = self.custom_crop_values();
         let crop_toolbar_active = preview_crop.crop_mode && preview_crop.draft_crop.is_some();
         let crop_toolbar_panel_focus = self.ensure_focus(
             FrameFocusKey::Control("preview-crop-toolbar".to_string()),
@@ -402,11 +435,15 @@ impl Render for FrameRoot {
                 {
                     subtitle_outline_color_sv_focus.focus(window, cx);
                 }
+                let crop_settings_preview = self.crop_settings_preview();
                 let settings = SettingsRenderState {
                     palette,
                     active_tab: self.settings_ui.active_tab,
                     tooltip_visible_id: self.tooltip_ui.visible_id.as_deref(),
-                    config: &selected_config_snapshot,
+                    config: crop_settings_preview
+                        .as_ref()
+                        .unwrap_or(&selected_config_snapshot),
+                    crop_editing: self.preview_ui.crop_mode,
                     metadata: source_metadata.as_ref(),
                     metadata_status: source_metadata_entry.status,
                     metadata_error: source_metadata_entry.error.as_deref(),
@@ -414,8 +451,9 @@ impl Render for FrameRoot {
                     output_name: &selected_output_name,
                     output_name_focus: Some(&output_name_focus),
                     audio_bitrate_focus: Some(&audio_bitrate_focus),
-                    video_width_focus: Some(&video_width_focus),
-                    video_height_focus: Some(&video_height_focus),
+                    // Draft crop dimensions are display-only until Apply commits them.
+                    video_width_focus: (!self.preview_ui.crop_mode).then_some(&video_width_focus),
+                    video_height_focus: (!self.preview_ui.crop_mode).then_some(&video_height_focus),
                     video_bitrate_focus: Some(&video_bitrate_focus),
                     gif_loop_focus: Some(&gif_loop_focus),
                     metadata_focuses: SettingsMetadataInputFocuses {
@@ -492,6 +530,20 @@ impl Render for FrameRoot {
                         overlay: preview_overlay,
                         viewport_focuses: PreviewViewportFocuses {
                             viewport: &preview_viewport_focus,
+                            crop_options: preview_panel::PreviewCropOptionsProps {
+                                popover: self.preview_ui.crop_options.popover,
+                                custom: self.preview_ui.crop_options.custom,
+                                ratio: self.preview_ui.crop_options.is_ratio,
+                                width: &self.preview_ui.crop_options.width,
+                                height: &self.preview_ui.crop_options.height,
+                                custom_values: crop_custom_values,
+                                scroll: &self.preview_ui.crop_options.scroll,
+                                width_focus: &crop_width_focus,
+                                height_focus: &crop_height_focus,
+                                option_focuses: &crop_option_focuses,
+                                unit_focus: &crop_unit_focus,
+                                unit_option_focuses: &crop_unit_option_focuses,
+                            },
                             tools: PreviewToolFocuses {
                                 crop: &preview_crop_tool_focus,
                                 overlay: &preview_overlay_tool_focus,

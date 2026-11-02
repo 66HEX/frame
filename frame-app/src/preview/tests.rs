@@ -35,7 +35,11 @@ mod aspect_value {
 
     #[test]
     fn returns_none_for_unknown_ratio() {
-        assert_eq!(aspect_value("2:1"), None);
+        for invalid in ["unknown", "0:1", "1:0", "-1:2", "65536:1", "1:2:3"] {
+            assert_eq!(aspect_value(invalid), None);
+        }
+        assert_close(aspect_value("2:1").unwrap(), 2.0);
+        assert_close(aspect_value("239:100").unwrap(), 2.39);
     }
 }
 
