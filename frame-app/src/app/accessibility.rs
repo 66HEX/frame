@@ -9,6 +9,47 @@ const FOCUS_RING_WIDTH: f32 = 3.0;
 const FOCUS_RING_ALPHA: f32 = 0.55;
 pub(in crate::app) const APP_ROOT_FOCUS_ID: &str = "app-root";
 
+/// One tab stop per rail; selection, pointer focus and arrow-key focus agree.
+pub(in crate::app) struct TabFocusGroup {
+    active: String,
+    handles: HashMap<String, FocusHandle>,
+}
+
+impl TabFocusGroup {
+    pub(in crate::app) fn render(
+        id: &'static str,
+        active: String,
+        tabs: impl IntoIterator<Item = String>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Self {
+        let state = window.use_keyed_state(id, cx, |_, _| HashMap::<String, FocusHandle>::new());
+        let handles = state.update(cx, |handles, cx| {
+            let mut next = HashMap::new();
+            for id in tabs {
+                let focus = handles.remove(&id).unwrap_or_else(|| cx.focus_handle());
+                next.insert(id.clone(), focus.tab_stop(id == active));
+            }
+            if handles.values().any(|handle| handle.is_focused(window))
+                && let Some(focus) = next.get(&active)
+            {
+                focus.focus(window, cx);
+            }
+            *handles = next;
+            handles.clone()
+        });
+        Self { active, handles }
+    }
+
+    pub(in crate::app) fn selected(&self, id: &str) -> bool {
+        self.active == id
+    }
+
+    pub(in crate::app) fn handle(&self, id: &str) -> FocusHandle {
+        self.handles[id].clone()
+    }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(in crate::app) enum FrameFocusKey {
     Control(String),

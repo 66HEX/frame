@@ -237,6 +237,7 @@ pub(in crate::app) fn frame_select_popover(
 pub(in crate::app) fn frame_select_options_list(
     id: &'static str,
     scroll_handle: &ScrollHandle,
+    scrollable: bool,
 ) -> gpui::Stateful<gpui::Div> {
     div()
         .id(id)
@@ -245,6 +246,9 @@ pub(in crate::app) fn frame_select_options_list(
         .overflow_y_scroll()
         .track_scroll(scroll_handle)
         .p(theme::ui_rem(FRAME_SELECT_CONTENT_PADDING))
+        .when(scrollable, |list| {
+            list.pr(theme::ui_rem(super::FRAME_SCROLLBAR_WIDTH))
+        })
         .on_scroll_wheel(refresh_select_hover_after_scroll)
 }
 

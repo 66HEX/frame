@@ -1,3 +1,4 @@
+use super::accessibility::TabFocusGroup;
 use super::accessibility::{
     apply_accessible_button, apply_accessible_button_with_focus, focus_visible_ring,
     handle_modal_tab_navigation,
@@ -937,7 +938,11 @@ fn app_settings_appearance_select<T: AppSettingsAppearanceValue>(
         let progress =
             app_settings_appearance_popover_progress::<T>(popover_state.is_open(), window, cx);
         let content_height = frame_select_content_height(options.len());
-        let mut list = frame_select_options_list(T::LIST_ID, scroll_handle);
+        let mut list = frame_select_options_list(
+            T::LIST_ID,
+            scroll_handle,
+            content_height > FRAME_SELECT_MAX_HEIGHT,
+        );
 
         for (index, option) in options.iter().copied().enumerate() {
             let focus = option_focuses.get(index);
@@ -1278,7 +1283,7 @@ fn update_release_notes_block(
         .overflow_y_scroll()
         .track_scroll(scroll_handle)
         .p_3()
-        .pr_5();
+        .pr(theme::ui_rem(super::components::FRAME_SCROLLBAR_WIDTH));
 
     for line in lines {
         content = content.child(update_release_note_line(&line, palette));
@@ -2495,6 +2500,13 @@ pub(super) fn titlebar_navigation(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
+    let focuses = TabFocusGroup::render(
+        "main-tabs-focus",
+        titlebar_tab_id(active_view).into(),
+        [ActiveView::Workspace, ActiveView::Logs].map(|view| titlebar_tab_id(view).into()),
+        window,
+        cx,
+    );
     div()
         .id("titlebar-main-view-tabs")
         .role(gpui::Role::TabList)
@@ -2512,7 +2524,7 @@ pub(super) fn titlebar_navigation(
             assets::ICON_LAYOUT_LIST,
             "Workspace",
             ActiveView::Workspace,
-            active_view == ActiveView::Workspace,
+            &focuses,
             palette,
             window,
             cx,
@@ -2521,7 +2533,7 @@ pub(super) fn titlebar_navigation(
             assets::ICON_TERMINAL,
             "Logs",
             ActiveView::Logs,
-            active_view == ActiveView::Logs,
+            &focuses,
             palette,
             window,
             cx,
@@ -2570,16 +2582,18 @@ pub(super) fn titlebar_segment(
     icon: &'static str,
     label: &'static str,
     view: ActiveView,
-    selected: bool,
+    focuses: &TabFocusGroup,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
+    let segment_id = titlebar_tab_id(view);
+    let selected = focuses.selected(segment_id);
+    let focus = focuses.handle(segment_id);
+    let click_focus = focus.clone();
+    let workspace_focus = focuses.handle("titlebar-workspace");
+    let logs_focus = focuses.handle("titlebar-logs");
     let colors = button_colors(ButtonVariant::Secondary, selected, true, palette);
-    let segment_id = match view {
-        ActiveView::Workspace => "titlebar-workspace",
-        ActiveView::Logs => "titlebar-logs",
-    };
     let motion = button_motion(format!("{segment_id}-hover"), window, cx);
     let hover_progress = *motion.hover_transition.evaluate(window, cx);
     let background = if selected {
@@ -2604,8 +2618,8 @@ pub(super) fn titlebar_segment(
         .role(gpui::Role::Tab)
         .aria_label(label)
         .aria_selected(selected)
-        .focusable()
-        .tab_stop(true)
+        .track_focus(&focus)
+        .tab_stop(selected)
         .focus_visible_style(move |style| focus_visible_ring(style, palette))
         .flex()
         .items_center()
@@ -2621,7 +2635,8 @@ pub(super) fn titlebar_segment(
         })
         .hover_style(gpui::Styled::cursor_pointer)
         .active_style(move |style| style.bg(color(colors.active_background)))
-        .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
+            click_focus.focus(window, cx);
             if root.active_view != view {
                 root.active_view = view;
                 cx.notify();
@@ -2629,11 +2644,16 @@ pub(super) fn titlebar_segment(
             cx.stop_propagation();
         }))
         .on_key_down(
-            cx.listener(move |root, event: &gpui::KeyDownEvent, _window, cx| {
+            cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
                 let Some(next_view) = titlebar_view_for_key(view, event.keystroke.key.as_str())
                 else {
                     return;
                 };
+                match next_view {
+                    ActiveView::Workspace => &workspace_focus,
+                    ActiveView::Logs => &logs_focus,
+                }
+                .focus(window, cx);
                 if root.active_view != next_view {
                     root.active_view = next_view;
                     cx.notify();
@@ -2645,6 +2665,13 @@ pub(super) fn titlebar_segment(
         .child(theme::ui_text(label));
 
     apply_button_motion(button, motion, true)
+}
+
+const fn titlebar_tab_id(view: ActiveView) -> &'static str {
+    match view {
+        ActiveView::Workspace => "titlebar-workspace",
+        ActiveView::Logs => "titlebar-logs",
+    }
 }
 
 fn titlebar_view_for_key(current: ActiveView, key: &str) -> Option<ActiveView> {

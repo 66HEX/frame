@@ -103,6 +103,7 @@ pub(super) fn file_list_header(
         .items_center()
         .relative()
         .px_4()
+        .pr(theme::ui_rem(super::components::FRAME_SCROLLBAR_WIDTH))
         .child(
             div()
                 .flex_1()
@@ -226,6 +227,7 @@ pub(super) fn file_list_row(
         .items_center()
         .relative()
         .px_4()
+        .pr(theme::ui_rem(super::components::FRAME_SCROLLBAR_WIDTH))
         .bg(if is_selected {
             color(palette.fill_subtle)
         } else {

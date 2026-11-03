@@ -1,4 +1,4 @@
-use super::super::accessibility::focus_visible_ring;
+use super::super::accessibility::{TabFocusGroup, focus_visible_ring};
 use super::{
     ButtonVariant, ClickEvent, Context, FluentBuilder, FrameRoot, FrameSurface, InteractiveElement,
     IntoElement, PANEL_HEADER_HEIGHT, ParentElement, SETTINGS_PANEL_PADDING,
@@ -23,6 +23,13 @@ pub(in crate::app) fn settings_panel(
     let active_tab =
         resolve_active_settings_tab(settings.active_tab, settings.config, settings.metadata);
     let visible_tabs = visible_settings_tabs(settings.config, settings.metadata);
+    let focuses = TabFocusGroup::render(
+        "settings-tabs-focus",
+        active_tab.id().into(),
+        visible_tabs.iter().map(|tab| tab.id().into()),
+        window,
+        cx,
+    );
     let mut tab_rail = div()
         .id("settings-tab-list")
         .role(gpui::Role::TabList)
@@ -34,7 +41,7 @@ pub(in crate::app) fn settings_panel(
     for tab in &visible_tabs {
         tab_rail = tab_rail.child(settings_tab_button(
             *tab,
-            active_tab == *tab,
+            &focuses,
             &visible_tabs,
             settings.tooltip_visible_id,
             palette,
@@ -74,13 +81,20 @@ pub(in crate::app) fn settings_panel(
 
 pub(in crate::app) fn settings_tab_button(
     tab: SettingsTab,
-    selected: bool,
+    focuses: &TabFocusGroup,
     visible_tabs: &[SettingsTab],
     tooltip_visible_id: Option<&str>,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
+    let selected = focuses.selected(tab.id());
+    let focus = focuses.handle(tab.id());
+    let click_focus = focus.clone();
+    let keyboard_focuses: Vec<_> = visible_tabs
+        .iter()
+        .map(|tab| (*tab, focuses.handle(tab.id())))
+        .collect();
     let colors = button_colors(ButtonVariant::Secondary, selected, true, palette);
     let tab_id = format!("settings-tab-{}", tab.id());
     let motion = button_motion(format!("{tab_id}-hover"), window, cx);
@@ -103,11 +117,15 @@ pub(in crate::app) fn settings_tab_button(
 
     let button = div()
         .id(tab_id.clone())
+        .debug_selector({
+            let id = tab_id.clone();
+            move || id
+        })
         .role(gpui::Role::Tab)
         .aria_label(tab.label())
         .aria_selected(selected)
-        .focusable()
-        .tab_stop(true)
+        .track_focus(&focus)
+        .tab_stop(selected)
         .focus_visible_style(move |style| focus_visible_ring(style, palette))
         .group(tab_id)
         .w(theme::ui_rem(SETTINGS_TAB_BUTTON_SIZE))
@@ -123,18 +141,23 @@ pub(in crate::app) fn settings_tab_button(
         })
         .hover_style(gpui::Styled::cursor_pointer)
         .active_style(move |style| style.bg(color(colors.active_background)))
-        .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
+            click_focus.focus(window, cx);
             root.settings_ui.active_tab = tab;
             cx.stop_propagation();
             cx.notify();
         }))
         .on_key_down(
-            cx.listener(move |root, event: &gpui::KeyDownEvent, _window, cx| {
+            cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
                 let Some(next_tab) =
                     settings_tab_for_key(tab, &keyboard_tabs, event.keystroke.key.as_str())
                 else {
                     return;
                 };
+                if let Some((_, focus)) = keyboard_focuses.iter().find(|(tab, _)| *tab == next_tab)
+                {
+                    focus.focus(window, cx);
+                }
                 root.settings_ui.active_tab = next_tab;
                 cx.stop_propagation();
                 cx.notify();

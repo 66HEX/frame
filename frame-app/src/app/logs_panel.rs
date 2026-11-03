@@ -282,6 +282,7 @@ pub(super) fn log_lines_list(
     }))
     .size_full()
     .p(theme::ui_rem(2.0))
+    .pr(theme::ui_rem(super::components::FRAME_SCROLLBAR_WIDTH))
     .text_color(color(palette.text_primary))
     .line_height(theme::ui_rem(LOG_LINE_HEIGHT));
 

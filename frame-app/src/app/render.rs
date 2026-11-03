@@ -61,6 +61,9 @@ impl Render for FrameRoot {
             cx,
         );
         self.sync_preview_canvas_auto_fit();
+        if cx.reduce_motion() {
+            self.settle_preview_canvas_animation();
+        }
         let preview_crop =
             self.preview_crop_render_state(source_metadata.as_ref(), &selected_config_snapshot);
         let preview_overlay = self.preview_overlay_render_state();

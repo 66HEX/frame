@@ -414,7 +414,11 @@ fn crop_select(
         return field;
     }
     let count = options.len();
-    let mut list = frame_select_options_list(list_id, props.scroll);
+    let mut list = frame_select_options_list(
+        list_id,
+        props.scroll,
+        frame_select_content_height(count) > FRAME_SELECT_MAX_HEIGHT,
+    );
     for (index, (value, label)) in options.into_iter().enumerate() {
         let key_focuses = option_focuses.to_vec();
         let key_scroll = props.scroll.clone();

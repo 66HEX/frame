@@ -1,6 +1,8 @@
 use super::*;
 
 pub fn init_app(cx: &mut App, name: impl Into<SharedString>) {
+    #[cfg(not(test))]
+    super::system_motion::observe(cx);
     cx.activate(true);
     cx.set_text_rendering_mode(TextRenderingMode::PlatformDefault);
     cx.on_action(|_: &Quit, cx| cx.quit());

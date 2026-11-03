@@ -1114,8 +1114,11 @@ fn settings_subtitle_font_select(
         let progress =
             subtitle_popover_progress(popover, state.active_popover == Some(popover), window, cx);
         let content_height = frame_select_content_height(options.len());
-        let mut list =
-            frame_select_options_list("settings-subtitle-font-options-list", state.scroll_handle);
+        let mut list = frame_select_options_list(
+            "settings-subtitle-font-options-list",
+            state.scroll_handle,
+            content_height > FRAME_SELECT_MAX_HEIGHT,
+        );
 
         let option_count = options.len();
         let option_keyboard_options = options.clone();
@@ -1310,6 +1313,7 @@ fn settings_subtitle_font_size_select(
         let mut list = frame_select_options_list(
             "settings-subtitle-font-size-options-list",
             state.scroll_handle,
+            content_height > FRAME_SELECT_MAX_HEIGHT,
         );
 
         let option_count = options.len();
@@ -1953,11 +1957,13 @@ fn settings_subtitle_hue_slider(
     let owner = cx.entity();
     let decrement_owner = owner.clone();
 
+    let id = match target {
+        SettingsSubtitleColorTarget::Font => "settings-subtitle-font-color-hue",
+        SettingsSubtitleColorTarget::Outline => "settings-subtitle-outline-color-hue",
+    };
     let slider = div()
-        .id(match target {
-            SettingsSubtitleColorTarget::Font => "settings-subtitle-font-color-hue",
-            SettingsSubtitleColorTarget::Outline => "settings-subtitle-outline-color-hue",
-        })
+        .id(id)
+        .debug_selector(move || id.to_string())
         .relative()
         .h(theme::ui_rem(FRAME_COLOR_PICKER_HUE_VISUAL_HEIGHT))
         .w_full()

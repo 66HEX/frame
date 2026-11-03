@@ -542,7 +542,7 @@ impl FrameRoot {
         .is_some_and(|delta| delta <= PREVIEW_CANVAS_VISUAL_SETTLE_EPSILON)
     }
 
-    fn settle_preview_canvas_animation(&mut self) -> bool {
+    pub(super) fn settle_preview_canvas_animation(&mut self) -> bool {
         let changed = (self.preview_ui.canvas.current_zoom - self.preview_ui.canvas.target_zoom)
             .abs()
             > f64::EPSILON
@@ -699,7 +699,11 @@ impl FrameRoot {
                     .await;
                 let keep_ticking = this
                     .update(cx, |root, cx| {
-                        let canvas_changed = root.tick_preview_canvas_animation();
+                        let canvas_changed = if cx.reduce_motion() {
+                            root.settle_preview_canvas_animation()
+                        } else {
+                            root.tick_preview_canvas_animation()
+                        };
                         let preview_dimensions_ready = root.tick_preview_dimensions_debounce();
                         let filter_preview_ready = root.tick_filter_preview_debounce();
                         if root.preview_ui.session.is_none() {

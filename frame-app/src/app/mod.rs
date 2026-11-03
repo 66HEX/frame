@@ -1,4 +1,6 @@
 mod accessibility;
+#[cfg(test)]
+mod accessibility_ui_tests;
 mod chrome;
 mod components;
 mod conversion;
@@ -18,6 +20,7 @@ mod runtime;
 mod settings_actions;
 mod settings_panel;
 mod state;
+mod system_motion;
 #[cfg(test)]
 mod tests;
 mod update_actions;

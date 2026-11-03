@@ -1,6 +1,7 @@
 use super::*;
 
-const FRAME_SCROLLBAR_WIDTH: f32 = 10.0;
+pub(in crate::app) const FRAME_SCROLLBAR_WIDTH: f32 = super::MIN_POINTER_TARGET;
+const FRAME_SCROLLBAR_VISUAL_WIDTH: f32 = 10.0;
 const FRAME_SCROLLBAR_TRACK_WIDTH: f32 = 6.0;
 const FRAME_SCROLLBAR_THUMB_WIDTH: f32 = 6.0;
 const FRAME_SCROLLBAR_MIN_THUMB_HEIGHT: f32 = 28.0;
@@ -37,6 +38,8 @@ pub(in crate::app) fn frame_vertical_scrollbar(
     content_height: f32,
     palette: &'static theme::ThemePalette,
 ) -> gpui::Stateful<gpui::Div> {
+    let id = id.into();
+    let debug_id = id.clone();
     let content_height = content_height.max(0.0);
     let drag = FrameScrollbarDrag {
         scroll_handle: scroll_handle.clone(),
@@ -45,7 +48,8 @@ pub(in crate::app) fn frame_vertical_scrollbar(
     let paint_handle = scroll_handle;
 
     div()
-        .id(id.into())
+        .id(id)
+        .debug_selector(move || debug_id)
         .absolute()
         .top_0()
         .right_0()
@@ -103,11 +107,11 @@ pub(in crate::app) fn frame_vertical_scrollbar(
                     };
                     let track_width = FRAME_SCROLLBAR_TRACK_WIDTH * state.ui_scale;
                     let thumb_width = FRAME_SCROLLBAR_THUMB_WIDTH * state.ui_scale;
-                    let scrollbar_width = FRAME_SCROLLBAR_WIDTH * state.ui_scale;
+                    let visual_width = FRAME_SCROLLBAR_VISUAL_WIDTH * state.ui_scale;
 
                     let track_bounds = Bounds::new(
                         point(
-                            bounds.origin.x + px((scrollbar_width - track_width) / 2.0),
+                            bounds.right() - px(visual_width.midpoint(track_width)),
                             bounds.origin.y,
                         ),
                         size(px(track_width), bounds.size.height),
@@ -120,7 +124,7 @@ pub(in crate::app) fn frame_vertical_scrollbar(
 
                     let thumb_bounds = Bounds::new(
                         point(
-                            bounds.origin.x + px((scrollbar_width - thumb_width) / 2.0),
+                            bounds.right() - px(visual_width.midpoint(thumb_width)),
                             bounds.origin.y + px(metrics.thumb_top),
                         ),
                         size(px(thumb_width), px(metrics.thumb_height)),
