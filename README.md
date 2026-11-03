@@ -272,6 +272,10 @@ cargo xtask setup-ffmpeg
 
 ## Development Checks
 
+Color hierarchy and Geist tokens: [colors](frame-app/docs/colors/README.md).
+
+UI elevation and component assignments: [shadow scale](frame-app/docs/ui-shadows/README.md).
+
 Run the main checks before submitting changes:
 
 ```bash

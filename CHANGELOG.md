@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Design System Reference:** Documents Geist color assignments, primary action states, the shared shadow scale, recessed controls, and component usage, with source tokens and light/dark previews.
 - **Crop Controls:** Adds an animated aspect ratio select with 4:3, 5:4, portrait variants, and custom ratio or pixel fields in the toolbar. Valid custom values update the preview immediately. Resolution follows the crop while editing and is saved as Custom on Apply; canceling preserves previous export settings. The Output tab shows estimated dimensions after crop, rotation, and scaling. Resolves [#167](https://github.com/66HEX/frame/issues/167).
 - **AV1 Encoding Settings:** Exposes SVT-AV1 presets 0–13 directly and clarifies the 10-bit pixel format choice, while preserving existing preset selections. Resolves [#200](https://github.com/66HEX/frame/issues/200).
 - **Preview Control Tooltips:** Adds tooltips to preview tools, zoom, and playback controls on pointer hover and keyboard focus. Escape dismisses the tooltip. Resolves [#176](https://github.com/66HEX/frame/issues/176).
