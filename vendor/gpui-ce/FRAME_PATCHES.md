@@ -55,6 +55,15 @@ Its crate manifests omit license metadata; `deny.toml` verifies the workspace's
 MIT license file by hash. Removed Git sources and obsolete advisory exceptions
 were removed from that configuration.
 
+### CSS shadow clipping (2026-11-03)
+
+The shared shadow shader clips outer shadows out of the element's rounded border
+box. This prevents multilayer shadows from darkening translucent control fills.
+Both ordinary and smoothed-corner paths use the element coverage; inset shadows
+keep their inner clipping. Tests cover clear interiors, outside edges, rounded
+corners, blur radii from 0 to 42.5, and preserved inset highlights. No shader ABI
+or platform-specific rendering code changes.
+
 ## Regression checks
 
 From Frame's repository root:
