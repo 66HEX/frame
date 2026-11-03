@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **UI Motion and Selects:** Shares a 120 ms enter/exit transition across dropdowns, color pickers, settings and dialogs, while keeping hover feedback at 75 ms. Selects retain keyboard focus after pointer activation, closing lists reject stale input, and reselecting the current subtitle font or size still closes the menu. Existing selections no longer animate on initial render.
 - **Development UI Performance:** Optimizes GPUI layout and text dependencies in development builds to reduce UI stalls with video loaded, including while paused. Frame's application code retains its debug settings.
 - **Toolbar Window Dragging:** Prevents toolbar buttons and tabs from dragging the window on macOS and Linux. Empty titlebar space stays draggable, and macOS retains its configured double-click action. Resolves [#175](https://github.com/66HEX/frame/issues/175).
 - **HEVC Quick Look Compatibility:** Fixes macOS Quick Look previews for HEVC videos encoded to MP4 or MOV with libx265, VideoToolbox, or NVENC by writing the `hvc1` tag. Resolves [#211](https://github.com/66HEX/frame/issues/211).

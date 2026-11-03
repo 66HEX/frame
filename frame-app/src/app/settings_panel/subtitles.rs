@@ -1009,7 +1009,7 @@ fn settings_subtitle_font_select(
             "Subtitle font",
             display,
             enabled,
-            state.rendered_popover == Some(popover),
+            state.active_popover == Some(popover),
             focus,
             state.palette,
             window,
@@ -1021,7 +1021,7 @@ fn settings_subtitle_font_select(
             "Subtitle font",
             display,
             enabled,
-            state.rendered_popover == Some(popover),
+            state.active_popover == Some(popover),
             state.palette,
             window,
             cx,
@@ -1047,7 +1047,7 @@ fn settings_subtitle_font_select(
             trigger
                 .on_click(cx.listener(move |root, event: &ClickEvent, _window, cx| {
                     cx.stop_propagation();
-                    if event.is_keyboard() {
+                    if event.is_keyboard() || !enabled {
                         return;
                     }
                     root.toggle_subtitle_popover(popover);
@@ -1131,6 +1131,7 @@ fn settings_subtitle_font_select(
             list = list.child(settings_subtitle_font_option(
                 option,
                 is_enabled,
+                state.active_popover == Some(popover),
                 name,
                 option_keyboard_options.clone(),
                 index,
@@ -1145,7 +1146,7 @@ fn settings_subtitle_font_select(
 
         let mut popover = frame_select_popover(
             "settings-subtitle-font-options",
-            SUBTITLE_POPOVER_TOP_OFFSET + subtitle_popover_slide_offset(progress),
+            SUBTITLE_POPOVER_TOP_OFFSET + popover_slide_offset(progress),
             progress,
             list,
             state.palette,
@@ -1201,7 +1202,7 @@ fn settings_subtitle_font_size_select(
             "Subtitle font size",
             display,
             enabled,
-            state.rendered_popover == Some(popover),
+            state.active_popover == Some(popover),
             focus,
             state.palette,
             window,
@@ -1213,7 +1214,7 @@ fn settings_subtitle_font_size_select(
             "Subtitle font size",
             display,
             enabled,
-            state.rendered_popover == Some(popover),
+            state.active_popover == Some(popover),
             state.palette,
             window,
             cx,
@@ -1239,7 +1240,7 @@ fn settings_subtitle_font_size_select(
             trigger
                 .on_click(cx.listener(move |root, event: &ClickEvent, _window, cx| {
                     cx.stop_propagation();
-                    if event.is_keyboard() {
+                    if event.is_keyboard() || !enabled {
                         return;
                     }
                     root.toggle_subtitle_popover(popover);
@@ -1325,6 +1326,7 @@ fn settings_subtitle_font_size_select(
             list = list.child(settings_subtitle_size_option(
                 option,
                 is_enabled,
+                state.active_popover == Some(popover),
                 size,
                 option_keyboard_options.clone(),
                 index,
@@ -1339,7 +1341,7 @@ fn settings_subtitle_font_size_select(
 
         let mut popover = frame_select_popover(
             "settings-subtitle-font-size-options",
-            SUBTITLE_POPOVER_TOP_OFFSET + subtitle_popover_slide_offset(progress),
+            SUBTITLE_POPOVER_TOP_OFFSET + popover_slide_offset(progress),
             progress,
             list,
             state.palette,
@@ -1378,6 +1380,7 @@ fn settings_subtitle_font_size_select(
 fn settings_subtitle_font_option(
     option: SubtitleFontOption,
     is_enabled: bool,
+    is_open: bool,
     name: String,
     keyboard_options: Vec<SubtitleFontOption>,
     index: usize,
@@ -1415,36 +1418,38 @@ fn settings_subtitle_font_option(
         )
     };
     option
+        .tab_stop(is_enabled && is_open)
+        .aria_disabled(!is_enabled || !is_open)
         .on_click(cx.listener(move |root, event: &ClickEvent, window, cx| {
             cx.stop_propagation();
             if event.is_keyboard() {
                 return;
             }
-            if !is_enabled {
+            if !is_enabled || root.subtitle_ui.popover != Some(SettingsSubtitlePopover::FontName) {
                 return;
             }
-            let changed =
-                root.update_selected_config(|config| apply_subtitle_font_name(config, &click_name));
+            root.update_selected_config(|config| apply_subtitle_font_name(config, &click_name));
             root.close_subtitle_popover();
             focus_optional(trigger_focus_for_click.as_ref(), window, cx);
-            if changed {
-                cx.notify();
-            }
+            cx.notify();
         }))
         .on_key_down(
             cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+                if !is_enabled
+                    || root.subtitle_ui.popover != Some(SettingsSubtitlePopover::FontName)
+                {
+                    return;
+                }
                 let key = event.keystroke.key.as_str();
                 match key {
                     "enter" | "space" if is_enabled => {
                         cx.stop_propagation();
-                        let changed = root.update_selected_config(|config| {
+                        root.update_selected_config(|config| {
                             apply_subtitle_font_name(config, &key_name)
                         });
                         root.close_subtitle_popover();
                         defer_focus_optional(trigger_focus_for_key.clone(), window, cx);
-                        if changed {
-                            cx.notify();
-                        }
+                        cx.notify();
                     }
                     "up" | "down" | "home" | "end" if is_enabled => {
                         let target_index = frame_select_target_index(
@@ -1489,6 +1494,7 @@ fn settings_subtitle_font_option(
 fn settings_subtitle_size_option(
     option: SubtitleFontSizeOption,
     is_enabled: bool,
+    is_open: bool,
     size: &'static str,
     keyboard_options: Vec<SubtitleFontSizeOption>,
     index: usize,
@@ -1524,36 +1530,38 @@ fn settings_subtitle_size_option(
         )
     };
     option
+        .tab_stop(is_enabled && is_open)
+        .aria_disabled(!is_enabled || !is_open)
         .on_click(cx.listener(move |root, event: &ClickEvent, window, cx| {
             cx.stop_propagation();
             if event.is_keyboard() {
                 return;
             }
-            if !is_enabled {
+            if !is_enabled || root.subtitle_ui.popover != Some(SettingsSubtitlePopover::FontSize) {
                 return;
             }
-            let changed =
-                root.update_selected_config(|config| apply_subtitle_font_size(config, size));
+            root.update_selected_config(|config| apply_subtitle_font_size(config, size));
             root.close_subtitle_popover();
             focus_optional(trigger_focus_for_click.as_ref(), window, cx);
-            if changed {
-                cx.notify();
-            }
+            cx.notify();
         }))
         .on_key_down(
             cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+                if !is_enabled
+                    || root.subtitle_ui.popover != Some(SettingsSubtitlePopover::FontSize)
+                {
+                    return;
+                }
                 let key = event.keystroke.key.as_str();
                 match key {
                     "enter" | "space" if is_enabled => {
                         cx.stop_propagation();
-                        let changed = root.update_selected_config(|config| {
+                        root.update_selected_config(|config| {
                             apply_subtitle_font_size(config, size)
                         });
                         root.close_subtitle_popover();
                         defer_focus_optional(trigger_focus_for_key.clone(), window, cx);
-                        if changed {
-                            cx.notify();
-                        }
+                        cx.notify();
                     }
                     "up" | "down" | "home" | "end" if is_enabled => {
                         let target_index = frame_select_target_index(
@@ -1596,17 +1604,7 @@ fn subtitle_popover_progress(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> f32 {
-    let transition = window
-        .use_keyed_transition(
-            subtitle_popover_motion_key(popover),
-            cx,
-            INTERACTION_MOTION_DURATION,
-            |_window, _cx| 0.0_f32,
-        )
-        .with_easing(ease_in_out);
-    let target = motion_target(is_open);
-    set_motion_target(&transition, target, cx);
-    let progress = *transition.evaluate(window, cx);
+    let progress = surface_motion(subtitle_popover_motion_key(popover), is_open, window, cx);
 
     if !is_open && motion_is_hidden(progress) {
         cx.defer_in(window, move |root, _window, cx| {
@@ -1665,7 +1663,7 @@ fn settings_subtitle_color_field(
             label,
             trigger_content,
             enabled,
-            rendered_popover == Some(popover),
+            active_popover == Some(popover),
             focus,
             palette,
             window,
@@ -1677,7 +1675,7 @@ fn settings_subtitle_color_field(
             label,
             trigger_content,
             enabled,
-            rendered_popover == Some(popover),
+            active_popover == Some(popover),
             palette,
             window,
             cx,
@@ -1789,7 +1787,7 @@ fn settings_subtitle_color_picker(
         SettingsSubtitleColorTarget::Outline => "settings-subtitle-outline-color-picker",
     };
     let panel = frame_color_picker_panel(
-        SUBTITLE_POPOVER_TOP_OFFSET + subtitle_popover_slide_offset(progress),
+        SUBTITLE_POPOVER_TOP_OFFSET + popover_slide_offset(progress),
         progress,
         settings_subtitle_sv_square(target, hsv, popover_focuses.sv, palette, cx),
         settings_subtitle_hue_slider(target, hsv, popover_focuses.hue, palette, cx),
@@ -1811,7 +1809,8 @@ fn settings_subtitle_color_picker(
         ),
         palette,
     )
-    .id(panel_id);
+    .id(panel_id)
+    .debug_selector(|| panel_id.to_string());
 
     let Some(panel_focus) = popover_focuses.panel else {
         return panel;

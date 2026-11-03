@@ -153,6 +153,7 @@ fn frame_select_trigger_content_inner(
 
     let trigger = div()
         .id(id.clone())
+        .debug_selector(|| id.clone())
         .group(id)
         .min_h(theme::ui_rem(SETTINGS_CONTROL_HEIGHT))
         .w_full()
@@ -180,9 +181,15 @@ fn frame_select_trigger_content_inner(
                 .child(icon_svg(assets::ICON_UNFOLD_MORE, 12.0, foreground)),
         );
 
+    let pointer_focus = focus.cloned();
     let trigger = apply_button_motion(trigger, motion, enabled).on_mouse_down(
         MouseButton::Left,
-        move |_, _window, cx| {
+        move |_, window, cx| {
+            // Button motion prevents GPUI's default mouse-down action. Explicitly
+            // focus this select so arrows after a pointer click address its menu.
+            if enabled && let Some(focus) = &pointer_focus {
+                focus.focus(window, cx);
+            }
             cx.stop_propagation();
         },
     );
@@ -206,6 +213,7 @@ pub(in crate::app) fn frame_select_popover(
     div()
         .absolute()
         .id(id)
+        .debug_selector(|| id.to_string())
         .top(theme::ui_rem(top))
         .left_0()
         .right_0()
@@ -419,6 +427,7 @@ fn frame_select_option_inner(
     focus: Option<&FocusHandle>,
     palette: &'static theme::ThemePalette,
 ) -> gpui::Stateful<gpui::Div> {
+    let id = id.into();
     let label = label.into();
     let display_label = theme::ui_text_owned(label.clone());
     let text_color = if selected {
@@ -428,7 +437,8 @@ fn frame_select_option_inner(
     };
 
     let option = div()
-        .id(id.into())
+        .id(id.clone())
+        .debug_selector(|| id)
         .min_h(theme::ui_rem(FRAME_SELECT_OPTION_HEIGHT))
         .w_full()
         .flex()

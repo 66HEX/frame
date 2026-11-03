@@ -33,9 +33,9 @@ use chrome::{
 use input::{FrameTextInputKind, FrameTextInputUiState};
 use logs_panel::logs_view;
 use motion::{
-    INTERACTION_MOTION_DURATION, SURFACE_MOTION_DURATION, contextual_icon_motion, hover_motion,
-    mix_color, mix_rgba, mix_scalar, motion_is_hidden, motion_target, retarget_hover_motion,
-    selected_motion, set_motion_target, settings_sheet_right_inset, subtitle_popover_slide_offset,
+    INTERACTION_MOTION_DURATION, contextual_icon_motion, hover_motion, mix_color, mix_rgba,
+    mix_scalar, motion_is_hidden, motion_target, popover_slide_offset, retarget_hover_motion,
+    selected_motion, set_motion_target, settings_sheet_right_inset, surface_motion,
 };
 use preview_panel::{
     FlipAxis, PreviewCanvasRenderState, PreviewCropRenderState, PreviewMediaRenderState,

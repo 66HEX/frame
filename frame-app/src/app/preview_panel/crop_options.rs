@@ -10,10 +10,7 @@ use crate::app::components::{
     frame_select_options_list, frame_select_popover, frame_select_target_index,
     frame_select_trigger_with_focus, frame_vertical_scrollbar,
 };
-use crate::app::motion::{
-    INTERACTION_MOTION_DURATION, motion_is_hidden, motion_target, set_motion_target,
-    subtitle_popover_slide_offset,
-};
+use crate::app::motion::{motion_is_hidden, popover_slide_offset, surface_motion};
 
 impl FrameRoot {
     pub(in crate::app) fn set_crop_custom_mode(&mut self, ratio: bool) {
@@ -343,18 +340,10 @@ fn crop_select(
     let selected_index = options.iter().position(|(value, _)| *value == selected);
     let display = selected_index.map_or(selected, |index| options[index].1);
     let open = props.popover == Some(kind);
-    let transition = window
-        .use_keyed_transition(
-            format!("{id}-popover-motion"),
-            cx,
-            INTERACTION_MOTION_DURATION,
-            |_, _| 0.0_f32,
-        )
-        .with_easing(gpui::ease_in_out);
-    set_motion_target(&transition, motion_target(open), cx);
-    let progress = *transition.evaluate(window, cx);
+    let progress = surface_motion(format!("{id}-popover-motion"), open, window, cx);
     let key_focuses = option_focuses.to_vec();
     let trigger_focus = focus.clone();
+    let pointer_focus = focus.clone();
     let trigger = frame_select_trigger_with_focus(
         id,
         label,
@@ -369,7 +358,8 @@ fn crop_select(
     .debug_selector(|| id.to_string())
     .on_mouse_down(
         MouseButton::Left,
-        cx.listener(move |root, _, _, cx| {
+        cx.listener(move |root, _, window, cx| {
+            pointer_focus.focus(window, cx);
             root.preview_ui.crop_options.popover = if open { None } else { Some(kind) };
             if !open {
                 root.preview_ui
@@ -463,7 +453,7 @@ fn crop_select(
                 }),
             )
             .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
-                if !open {
+                if !open || root.preview_ui.crop_options.popover != Some(kind) {
                     return;
                 }
                 match kind {
@@ -490,7 +480,7 @@ fn crop_select(
     }
     let mut popover = frame_select_popover(
         panel_id,
-        crate::SETTINGS_CONTROL_HEIGHT + 6.0 + subtitle_popover_slide_offset(progress),
+        crate::SETTINGS_CONTROL_HEIGHT + 6.0 + popover_slide_offset(progress),
         progress,
         list,
         state.palette,

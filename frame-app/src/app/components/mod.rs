@@ -20,6 +20,8 @@ mod color_picker;
 mod list_item;
 mod scrollbar;
 mod select;
+#[cfg(test)]
+mod select_ui_tests;
 mod slider;
 mod tooltip;
 

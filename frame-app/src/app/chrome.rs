@@ -19,21 +19,19 @@ use super::settings_panel::{settings_field_label, settings_hint_text, settings_s
 use super::{
     ActiveView, AppearancePopover, AppearanceSettings, ClickEvent, ColorTheme, Context,
     ExternalPaths, FILE_LIST_ACTION_ICON_SIZE, FRAME_APP_VERSION, FluentBuilder, FocusHandle,
-    FrameAppState, FrameRoot, FrameTextInputKind, INTERACTION_MOTION_DURATION, InteractiveElement,
-    IntoElement, LEFT_COLUMN_SPAN, MouseButton, PANEL_HEADER_HEIGHT, ParentElement, PopoverState,
-    RIGHT_COLUMN_SPAN, SETTINGS_CONTROL_HEIGHT, SURFACE_MOTION_DURATION, ScalePreset, ScrollHandle,
-    StartAvailability, StatefulInteractiveElement, Styled, TITLEBAR_ACTION_ICON_SIZE,
-    TITLEBAR_DIVIDER_HEIGHT, TITLEBAR_HEIGHT, TITLEBAR_ICON_SIZE,
-    TITLEBAR_LINUX_WINDOW_BUTTON_SIZE, TITLEBAR_LINUX_WINDOW_CONTROLS_GAP,
-    TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X, TITLEBAR_LOGO_SIZE,
-    TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_PLACEHOLDER_WIDTH, TITLEBAR_NAV_BUTTON_HEIGHT,
-    TITLEBAR_PLATFORM_DIVIDER_HEIGHT, TITLEBAR_SEGMENT_HEIGHT, TITLEBAR_TOP_PADDING,
-    TITLEBAR_TRAFFIC_LIGHT_SIZE, TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
+    FrameAppState, FrameRoot, FrameTextInputKind, InteractiveElement, IntoElement,
+    LEFT_COLUMN_SPAN, MouseButton, PANEL_HEADER_HEIGHT, ParentElement, PopoverState,
+    RIGHT_COLUMN_SPAN, SETTINGS_CONTROL_HEIGHT, ScalePreset, ScrollHandle, StartAvailability,
+    StatefulInteractiveElement, Styled, TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_DIVIDER_HEIGHT,
+    TITLEBAR_HEIGHT, TITLEBAR_ICON_SIZE, TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
+    TITLEBAR_LINUX_WINDOW_CONTROLS_GAP, TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X,
+    TITLEBAR_LOGO_SIZE, TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_PLACEHOLDER_WIDTH,
+    TITLEBAR_NAV_BUTTON_HEIGHT, TITLEBAR_PLATFORM_DIVIDER_HEIGHT, TITLEBAR_SEGMENT_HEIGHT,
+    TITLEBAR_TOP_PADDING, TITLEBAR_TRAFFIC_LIGHT_SIZE, TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
     TITLEBAR_WINDOWS_WINDOW_ICON_SIZE, TITLEBAR_WINDOWS_WINDOW_MAX_ICON_SIZE,
     UPDATE_INSTALL_WAIT_MESSAGE, UpdateInfo, UpdateStatus, WORKSPACE_COLUMNS, WORKSPACE_GAP,
-    Window, WindowControlArea, assets, div, ease_in_out, format_total_size, mix_color,
-    motion_is_hidden, motion_target, px, relative, set_motion_target, settings_sheet_right_inset,
-    subtitle_popover_slide_offset, svg, theme,
+    Window, WindowControlArea, assets, div, format_total_size, mix_color, motion_is_hidden,
+    popover_slide_offset, px, relative, settings_sheet_right_inset, surface_motion, svg, theme,
 };
 use gpui::{HighlightStyle, StyledText, deferred};
 
@@ -417,17 +415,7 @@ pub(super) fn app_settings_sheet(
     let palette = props.palette;
     let draft_is_dirty =
         props.draft_max_concurrency.trim() != props.current_max_concurrency.to_string();
-    let transition = window
-        .use_keyed_transition(
-            "app-settings-sheet-motion",
-            cx,
-            SURFACE_MOTION_DURATION,
-            |_window, _cx| 0.0_f32,
-        )
-        .with_easing(ease_in_out);
-    let target = motion_target(props.is_open);
-    set_motion_target(&transition, target, cx);
-    let progress = *transition.evaluate(window, cx);
+    let progress = surface_motion("app-settings-sheet-motion", props.is_open, window, cx);
     let right_inset = settings_sheet_right_inset(progress);
     let first_focus = props.close_focus.clone();
     let last_focus = props.last_focus.clone();
@@ -957,6 +945,7 @@ fn app_settings_appearance_select<T: AppSettingsAppearanceValue>(
                 option,
                 index,
                 selected,
+                popover_state.is_open(),
                 focus,
                 &option_focuses,
                 scroll_handle,
@@ -968,7 +957,7 @@ fn app_settings_appearance_select<T: AppSettingsAppearanceValue>(
 
         let mut menu = frame_select_popover(
             T::PANEL_ID,
-            54.0 + subtitle_popover_slide_offset(progress),
+            54.0 + popover_slide_offset(progress),
             progress,
             list,
             palette,
@@ -1004,6 +993,7 @@ fn app_settings_appearance_option<T: AppSettingsAppearanceValue>(
     option: T,
     index: usize,
     selected: T,
+    is_open: bool,
     focus: Option<&FocusHandle>,
     option_focuses: &[FocusHandle],
     scroll_handle: &ScrollHandle,
@@ -1036,9 +1026,11 @@ fn app_settings_appearance_option<T: AppSettingsAppearanceValue>(
     };
 
     element
+        .tab_stop(is_open)
+        .aria_disabled(!is_open)
         .on_click(cx.listener(move |root, event: &ClickEvent, window, cx| {
             cx.stop_propagation();
-            if event.is_keyboard() {
+            if event.is_keyboard() || !root.appearance_popover_state(T::POPOVER).is_open() {
                 return;
             }
             option.apply(root, window);
@@ -1048,6 +1040,9 @@ fn app_settings_appearance_option<T: AppSettingsAppearanceValue>(
         }))
         .on_key_down(
             cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+                if !root.appearance_popover_state(T::POPOVER).is_open() {
+                    return;
+                }
                 let key = event.keystroke.key.as_str();
                 match key {
                     "enter" | "space" => {
@@ -1094,16 +1089,7 @@ fn app_settings_appearance_popover_progress<T: AppSettingsAppearanceValue>(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> f32 {
-    let transition = window
-        .use_keyed_transition(
-            T::MOTION_ID,
-            cx,
-            INTERACTION_MOTION_DURATION,
-            |_window, _cx| 0.0_f32,
-        )
-        .with_easing(ease_in_out);
-    set_motion_target(&transition, motion_target(is_open), cx);
-    let progress = *transition.evaluate(window, cx);
+    let progress = surface_motion(T::MOTION_ID, is_open, window, cx);
     if !is_open && motion_is_hidden(progress) {
         cx.defer_in(window, move |root, _window, cx| {
             if root.finish_app_settings_appearance_popover_close(T::POPOVER) {
@@ -1628,16 +1614,7 @@ pub(super) fn update_dialog(
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
     let palette = view.palette;
-    let transition = window
-        .use_keyed_transition(
-            "update-dialog-motion",
-            cx,
-            SURFACE_MOTION_DURATION,
-            |_window, _cx| 0.0_f32,
-        )
-        .with_easing(ease_in_out);
-    set_motion_target(&transition, motion_target(is_open), cx);
-    let progress = *transition.evaluate(window, cx);
+    let progress = surface_motion("update-dialog-motion", is_open, window, cx);
     let panel_offset = (1.0 - progress.clamp(0.0, 1.0)) * 12.0;
 
     if !is_open && motion_is_hidden(progress) {
@@ -2184,16 +2161,7 @@ pub(super) fn drag_drop_overlay(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
-    let transition = window
-        .use_keyed_transition(
-            "drag-drop-overlay-motion",
-            cx,
-            SURFACE_MOTION_DURATION,
-            |_window, _cx| 0.0_f32,
-        )
-        .with_easing(ease_in_out);
-    set_motion_target(&transition, motion_target(is_open), cx);
-    let progress = *transition.evaluate(window, cx);
+    let progress = surface_motion("drag-drop-overlay-motion", is_open, window, cx);
 
     if !is_open && motion_is_hidden(progress) {
         cx.defer_in(window, |root, _window, cx| {
