@@ -2131,7 +2131,7 @@ pub(super) fn app_settings_close_button(
             this.hover_style(gpui::Styled::cursor_pointer)
         })
         .when(enabled, |this| {
-            this.active_style(move |style| style.bg(color(colors.active_background)))
+            this.active_style(move |style| style.bg(colors.active_fill()))
         })
         .child(icon_svg(
             assets::ICON_CLOSE,
@@ -2425,6 +2425,7 @@ pub(super) fn titlebar_window_button(
     };
     let foreground = palette.text_muted;
     let colors = ButtonColors {
+        gradient_to: None,
         background: palette.transparent,
         hover_background,
         active_background,
@@ -2636,7 +2637,7 @@ pub(super) fn titlebar_segment(
             this.shadow(theme::shadows::CONTROL.shadows())
         })
         .hover_style(gpui::Styled::cursor_pointer)
-        .active_style(move |style| style.bg(color(colors.active_background)))
+        .active_style(move |style| style.bg(colors.active_fill()))
         .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
             click_focus.focus(window, cx);
             if root.active_view != view {

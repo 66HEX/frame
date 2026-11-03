@@ -765,7 +765,7 @@ fn settings_subtitle_load_button(
         .shadow(theme::shadows::CONTROL.shadows())
         .when(!disabled, |this| {
             this.hover_style(gpui::Styled::cursor_pointer)
-                .active_style(move |style| style.bg(color(colors.active_background)))
+                .active_style(move |style| style.bg(colors.active_fill()))
         })
         .when(disabled, gpui::Styled::cursor_not_allowed)
         .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {

@@ -331,7 +331,7 @@ fn preview_tool_button_inner(
             this.hover_style(gpui::Styled::cursor_pointer)
                 .active_style(move |style| {
                     style
-                        .bg(color(colors.active_background))
+                        .bg(colors.active_fill())
                         .text_color(color(colors.hover_foreground))
                 })
         })

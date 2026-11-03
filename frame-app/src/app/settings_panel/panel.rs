@@ -139,7 +139,7 @@ pub(in crate::app) fn settings_tab_button(
             this.shadow(theme::shadows::CONTROL.shadows())
         })
         .hover_style(gpui::Styled::cursor_pointer)
-        .active_style(move |style| style.bg(color(colors.active_background)))
+        .active_style(move |style| style.bg(colors.active_fill()))
         .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
             click_focus.focus(window, cx);
             root.settings_ui.active_tab = tab;

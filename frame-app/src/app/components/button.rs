@@ -156,7 +156,7 @@ fn frame_text_button_inner(
         })
         .when(enabled, |this| {
             this.hover_style(gpui::Styled::cursor_pointer)
-                .active_style(move |style| style.bg(color(colors.active_background)))
+                .active_style(move |style| style.bg(colors.active_fill()))
         })
         .when(!enabled, gpui::Styled::cursor_not_allowed)
         .child(display_label);
@@ -293,6 +293,7 @@ fn frame_icon_button_inner(
     let animated = animated_button_colors(
         id.clone(),
         ButtonColors {
+            gradient_to: None,
             background,
             hover_background,
             active_background,

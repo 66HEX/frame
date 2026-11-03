@@ -172,7 +172,7 @@ fn frame_select_trigger_content_inner(
         .shadow(theme::shadows::CONTROL.shadows())
         .when(enabled, |this| {
             this.hover_style(gpui::Styled::cursor_pointer)
-                .active_style(move |style| style.bg(color(colors.active_background)))
+                .active_style(move |style| style.bg(colors.active_fill()))
         })
         .when(!enabled, gpui::Styled::cursor_not_allowed)
         .child(content)

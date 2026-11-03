@@ -23,10 +23,12 @@ pub(super) struct ButtonColors {
     pub(super) foreground: theme::RgbaToken,
     pub(super) hover_foreground: theme::RgbaToken,
     pub(super) opacity: f32,
+    /// Bottom stops for normal, hovered and pressed primary fills.
+    pub(super) gradient_to: Option<[theme::RgbaToken; 3]>,
 }
 
 pub(super) struct AnimatedButtonColors {
-    pub(super) background: Rgba,
+    pub(super) background: gpui::Background,
     pub(super) foreground: Rgba,
     pub(super) motion: ButtonMotion,
 }
@@ -55,6 +57,7 @@ pub(super) const fn button_colors(
             foreground: palette.text_disabled,
             hover_foreground: palette.text_disabled,
             opacity: 1.0,
+            gradient_to: None,
         };
     }
 
@@ -66,6 +69,7 @@ pub(super) const fn button_colors(
             foreground: palette.text_primary,
             hover_foreground: palette.text_primary,
             opacity: 1.0,
+            gradient_to: None,
         }
     } else if matches!(variant, ButtonVariant::Primary) {
         ButtonColors {
@@ -75,6 +79,11 @@ pub(super) const fn button_colors(
             foreground: palette.primary_foreground,
             hover_foreground: palette.primary_foreground,
             opacity: 1.0,
+            gradient_to: Some([
+                palette.primary_to,
+                palette.primary_hover_to,
+                palette.primary_active_to,
+            ]),
         }
     } else if matches!(variant, ButtonVariant::Ghost) {
         ButtonColors {
@@ -84,6 +93,7 @@ pub(super) const fn button_colors(
             foreground: palette.text_muted,
             hover_foreground: palette.text_primary,
             opacity: 1.0,
+            gradient_to: None,
         }
     } else {
         ButtonColors {
@@ -93,8 +103,35 @@ pub(super) const fn button_colors(
             foreground: palette.text_primary,
             hover_foreground: palette.text_primary,
             opacity: 1.0,
+            gradient_to: None,
         }
     }
+}
+
+impl ButtonColors {
+    pub(super) fn hover_fill(self, progress: f32) -> gpui::Background {
+        let top = mix_color(self.background, self.hover_background, progress);
+        self.gradient_to.map_or_else(
+            || top.into(),
+            |[normal, hover, _]| primary_gradient(top, mix_color(normal, hover, progress)),
+        )
+    }
+
+    pub(super) fn active_fill(self) -> gpui::Background {
+        let top = color(self.active_background);
+        self.gradient_to.map_or_else(
+            || top.into(),
+            |[_, _, bottom]| primary_gradient(top, color(bottom)),
+        )
+    }
+}
+
+fn primary_gradient(top: Rgba, bottom: Rgba) -> gpui::Background {
+    gpui::linear_gradient(
+        180.0,
+        gpui::linear_color_stop(top, 0.0),
+        gpui::linear_color_stop(bottom, 1.0),
+    )
 }
 
 pub(super) fn animated_button_colors(
@@ -106,7 +143,7 @@ pub(super) fn animated_button_colors(
     let motion = button_motion(id, window, cx);
     let hover_progress = *motion.hover_transition.evaluate(window, cx);
     AnimatedButtonColors {
-        background: mix_color(colors.background, colors.hover_background, hover_progress),
+        background: colors.hover_fill(hover_progress),
         foreground: mix_color(colors.foreground, colors.hover_foreground, hover_progress),
         motion,
     }
@@ -230,6 +267,7 @@ pub(super) fn action_button(
         .opacity(colors.opacity)
         .when(enabled, |this| {
             this.hover_style(gpui::Styled::cursor_pointer)
+                .active_style(move |style| style.bg(colors.active_fill()))
         })
         .when(!enabled, gpui::Styled::cursor_not_allowed);
 
@@ -347,6 +385,53 @@ pub(super) const fn color(token: theme::RgbaToken) -> Rgba {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn primary_fills_remain_gradients_during_hover_and_press() {
+        for mode in crate::appearance::ColorTheme::ALL {
+            let p = theme::palette(mode);
+            let colors = button_colors(ButtonVariant::Primary, false, true, p);
+            for fill in [
+                colors.hover_fill(0.0),
+                colors.hover_fill(0.5),
+                colors.hover_fill(1.0),
+                colors.active_fill(),
+            ] {
+                let gpui::BackgroundKind::LinearGradient { angle, stops } = fill.kind() else {
+                    panic!("primary fill lost its gradient");
+                };
+                assert!((angle - 180.0).abs() < f32::EPSILON);
+                assert!((stops[0].percentage).abs() < f32::EPSILON);
+                assert!((stops[1].percentage - 1.0).abs() < f32::EPSILON);
+                let top: gpui::Hsla = stops[0].color.into();
+                let bottom: gpui::Hsla = stops[1].color.into();
+                assert!(top.lightness > bottom.lightness);
+            }
+            assert_eq!(colors.foreground, p.primary_foreground);
+        }
+    }
+
+    #[test]
+    fn selection_and_disabled_states_do_not_inherit_primary_action_colors() {
+        for mode in crate::appearance::ColorTheme::ALL {
+            let p = theme::palette(mode);
+            for variant in [
+                ButtonVariant::Primary,
+                ButtonVariant::Secondary,
+                ButtonVariant::Ghost,
+            ] {
+                let selected = button_colors(variant, true, true, p);
+                assert_eq!(selected.gradient_to, None);
+                assert_eq!(selected.background, p.fill_strong);
+                assert_eq!(selected.foreground, p.text_primary);
+                let disabled = button_colors(variant, false, false, p);
+                assert_eq!(disabled.gradient_to, None);
+                assert_eq!(disabled.background, disabled.hover_background);
+                assert_eq!(disabled.background, disabled.active_background);
+                assert_eq!(disabled.foreground, p.text_disabled);
+            }
+        }
+    }
 
     #[test]
     fn button_motion_hover_target_ignores_synthetic_changes_while_pressed() {
