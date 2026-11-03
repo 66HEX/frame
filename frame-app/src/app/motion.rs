@@ -128,7 +128,9 @@ pub(super) fn mix_rgba(from: Rgba, to: Rgba, progress: f32) -> Rgba {
 
     let alpha = from.alpha.lerp(&to.alpha, progress);
     if alpha <= f32::EPSILON {
-        return Rgba::default();
+        // Palette's Rgba::default() is opaque black, which flashes on the first
+        // frame of a fade from transparent. Keep this near-zero-alpha frame clear.
+        return Rgba::new(0.0, 0.0, 0.0, 0.0);
     }
 
     let premultiplied = |from_channel: f32, to_channel: f32| {
@@ -247,6 +249,29 @@ mod tests {
             assert_eq!(probe.read_with(cx, |probe, _| probe.surface), expected);
             assert_eq!(probe.read_with(cx, |probe, _| probe.selection), expected);
             assert_eq!(probe.read_with(cx, |probe, _| probe.icon), expected);
+        }
+    }
+
+    #[test]
+    fn nearly_transparent_color_motion_never_flashes_opaque_black() {
+        for color_theme in [ColorTheme::Light, ColorTheme::Dark] {
+            let palette = theme::palette(color_theme);
+            for progress in [0.0, f32::EPSILON / 4.0, f32::EPSILON / 2.0, f32::EPSILON] {
+                let entering = mix_color(palette.transparent, palette.fill_subtle, progress);
+                let exiting = mix_color(palette.fill_subtle, palette.transparent, 1.0 - progress);
+                for color in [entering, exiting] {
+                    assert!(
+                        color.alpha <= f32::EPSILON,
+                        "unexpected opaque frame: {color:?}"
+                    );
+                }
+            }
+            let transparent = mix_color(
+                palette.transparent,
+                palette.text_primary.with_alpha(0.0),
+                0.5,
+            );
+            assert_eq!(transparent.alpha, 0.0);
         }
     }
 
