@@ -13,6 +13,13 @@ fn apply_preference(preference: Option<bool>, cx: &mut App) {
 }
 
 #[cfg(not(test))]
+#[cfg_attr(
+    target_os = "linux",
+    expect(
+        clippy::needless_pass_by_ref_mut,
+        reason = "Other platforms initialize App synchronously; keep one platform-independent entry point."
+    )
+)]
 pub(super) fn observe(cx: &mut App) {
     #[cfg(not(target_os = "linux"))]
     apply_preference(read_preference(), cx);
