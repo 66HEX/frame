@@ -401,7 +401,7 @@ pub(in crate::app) fn preview_crop_aspect_bar(
         .child(
             compact_text_button_variant_inner(
                 "Apply",
-                ButtonVariant::Default,
+                ButtonVariant::Primary,
                 false,
                 state.crop.has_crop_dimensions
                     && (!options.custom || options.custom_values.is_some()),
@@ -438,7 +438,7 @@ pub(in crate::app) fn compact_text_button(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let variant = if selected {
-        ButtonVariant::Default
+        ButtonVariant::Secondary
     } else {
         ButtonVariant::Ghost
     };
@@ -478,7 +478,7 @@ fn compact_text_button_variant_inner(
     let background = animated.background;
     let foreground = animated.foreground;
     let motion = animated.motion;
-    let highlighted = selected || matches!(variant, ButtonVariant::Default);
+    let highlighted = selected || matches!(variant, ButtonVariant::Primary);
 
     let button = div()
         .id(id)

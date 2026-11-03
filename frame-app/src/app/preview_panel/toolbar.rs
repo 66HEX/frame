@@ -300,7 +300,7 @@ fn preview_tool_button_inner(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let variant = if selected {
-        ButtonVariant::Default
+        ButtonVariant::Secondary
     } else {
         ButtonVariant::Ghost
     };

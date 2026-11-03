@@ -150,7 +150,7 @@ impl Element for FrameTextInputElement {
                     text_top + px(metrics.caret_height),
                 ),
             ))
-            .background(color(self.palette.accent.with_alpha(0.30)))
+            .background(color(self.palette.text_selection))
         });
 
         FrameTextInputPrepaintState {

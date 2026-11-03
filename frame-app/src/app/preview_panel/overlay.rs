@@ -349,7 +349,7 @@ pub(in crate::app) fn preview_overlay_controls(
                 "done",
                 assets::ICON_CHECK,
                 "Done editing overlay",
-                ButtonVariant::Default,
+                ButtonVariant::Primary,
                 enabled,
                 focuses.last,
                 palette,
@@ -615,7 +615,7 @@ fn preview_overlay_icon_button_inner(
     let background = animated.background;
     let foreground = animated.foreground;
     let motion = animated.motion;
-    let highlighted = matches!(variant, ButtonVariant::Default);
+    let highlighted = matches!(variant, ButtonVariant::Primary);
 
     let button = div()
         .id(button_id)

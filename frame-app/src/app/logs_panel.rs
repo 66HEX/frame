@@ -421,7 +421,7 @@ pub(super) fn log_line_row(
                 .w(theme::ui_rem(LOG_LINE_NUMBER_WIDTH))
                 .mr(theme::ui_rem(12.0))
                 .text_right()
-                .text_color(color(palette.border_subtle))
+                .text_color(color(palette.text_muted))
                 .font_features(assets::frame_tabular_number_font_features())
                 .group_hover_style(row_group.clone(), |style| {
                     style.text_color(color(palette.text_muted))

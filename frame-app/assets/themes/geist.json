@@ -1,0 +1,3518 @@
+{
+  "source": {
+    "page": "https://vercel.com/geist/colors",
+    "stylesheet": "https://vercel.com/vc-ap-b3331f/_next/static/immutable/chunks/32sjzx2_xsk_o.css",
+    "sha256": "159a0eafc71800fcb2922ee943a694a1031fdd12549a0b94242640e6e57b02cc",
+    "retrieved": "2026-11-03",
+    "render_space": "srgb",
+    "wide_gamut": "Official P3 OKLCH values are preserved, not gamut-clipped into sRGB."
+  },
+  "light": {
+    "accents-1": {
+      "css": "#fafafa",
+      "resolved_css": "#fafafa",
+      "srgb": [
+        0.9803921569,
+        0.9803921569,
+        0.9803921569,
+        1.0
+      ]
+    },
+    "accents-2": {
+      "css": "#eaeaea",
+      "resolved_css": "#eaeaea",
+      "srgb": [
+        0.9176470588,
+        0.9176470588,
+        0.9176470588,
+        1.0
+      ]
+    },
+    "accents-3": {
+      "css": "#999",
+      "resolved_css": "#999",
+      "srgb": [
+        0.6,
+        0.6,
+        0.6,
+        1.0
+      ]
+    },
+    "accents-4": {
+      "css": "#888",
+      "resolved_css": "#888",
+      "srgb": [
+        0.5333333333,
+        0.5333333333,
+        0.5333333333,
+        1.0
+      ]
+    },
+    "accents-5": {
+      "css": "#666",
+      "resolved_css": "#666",
+      "srgb": [
+        0.4,
+        0.4,
+        0.4,
+        1.0
+      ]
+    },
+    "accents-6": {
+      "css": "#444",
+      "resolved_css": "#444",
+      "srgb": [
+        0.2666666667,
+        0.2666666667,
+        0.2666666667,
+        1.0
+      ]
+    },
+    "accents-7": {
+      "css": "#333",
+      "resolved_css": "#333",
+      "srgb": [
+        0.2,
+        0.2,
+        0.2,
+        1.0
+      ]
+    },
+    "accents-8": {
+      "css": "#111",
+      "resolved_css": "#111",
+      "srgb": [
+        0.0666666667,
+        0.0666666667,
+        0.0666666667,
+        1.0
+      ]
+    },
+    "develop-end-gradient": {
+      "css": "#00dfd8",
+      "resolved_css": "#00dfd8",
+      "srgb": [
+        0.0,
+        0.8745098039,
+        0.8470588235,
+        1.0
+      ],
+      "p3": "oklch(81.58% .189 190.74)"
+    },
+    "develop-line-end": {
+      "css": "#019ae9",
+      "resolved_css": "#019ae9",
+      "srgb": [
+        0.0039215686,
+        0.6039215686,
+        0.9137254902,
+        1.0
+      ],
+      "p3": "oklch(65.84% .203 242.532)"
+    },
+    "develop-start-gradient": {
+      "css": "#007cf0",
+      "resolved_css": "#007cf0",
+      "srgb": [
+        0.0,
+        0.4862745098,
+        0.9411764706,
+        1.0
+      ],
+      "p3": "oklch(59.59% .24 255.092)"
+    },
+    "develop-text": {
+      "css": "#0a72ef",
+      "resolved_css": "#0a72ef",
+      "srgb": [
+        0.0392156863,
+        0.4470588235,
+        0.937254902,
+        1.0
+      ],
+      "p3": "oklch(57.49% .249 257.84)"
+    },
+    "dropdown-triangle-stroke": {
+      "css": "#fff",
+      "resolved_css": "#fff",
+      "srgb": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ds-amber-100": {
+      "css": "hsla(var(--ds-amber-100-value), 1)",
+      "resolved_css": "hsla(39, 100%, 95%, 1)",
+      "srgb": [
+        1.0,
+        0.965,
+        0.9,
+        1.0
+      ],
+      "p3": "oklch(97.48% .0331 85.79)"
+    },
+    "ds-amber-1000": {
+      "css": "hsla(var(--ds-amber-1000-value), 1)",
+      "resolved_css": "hsla(20, 79%, 17%, 1)",
+      "srgb": [
+        0.3043,
+        0.1252333333,
+        0.0357,
+        1.0
+      ],
+      "p3": "oklch(30.83% .099 45.48)"
+    },
+    "ds-amber-200": {
+      "css": "hsla(var(--ds-amber-200-value), 1)",
+      "resolved_css": "hsla(44, 100%, 92%, 1)",
+      "srgb": [
+        1.0,
+        0.9573333333,
+        0.84,
+        1.0
+      ],
+      "p3": "oklch(96.81% .0495 90.2423)"
+    },
+    "ds-amber-300": {
+      "css": "hsla(var(--ds-amber-300-value), 1)",
+      "resolved_css": "hsla(43, 96%, 90%, 1)",
+      "srgb": [
+        0.996,
+        0.9416,
+        0.804,
+        1.0
+      ],
+      "p3": "oklch(95.93% .0636 90.52)"
+    },
+    "ds-amber-400": {
+      "css": "hsla(var(--ds-amber-400-value), 1)",
+      "resolved_css": "hsla(42, 100%, 78%, 1)",
+      "srgb": [
+        1.0,
+        0.868,
+        0.56,
+        1.0
+      ],
+      "p3": "oklch(91.02% .1322 88.25)"
+    },
+    "ds-amber-500": {
+      "css": "hsla(var(--ds-amber-500-value), 1)",
+      "resolved_css": "hsla(38, 100%, 71%, 1)",
+      "srgb": [
+        1.0,
+        0.7873333333,
+        0.42,
+        1.0
+      ],
+      "p3": "oklch(86.55% .1583 79.63)"
+    },
+    "ds-amber-600": {
+      "css": "hsla(var(--ds-amber-600-value), 1)",
+      "resolved_css": "hsla(36, 90%, 62%, 1)",
+      "srgb": [
+        0.962,
+        0.6884,
+        0.278,
+        1.0
+      ],
+      "p3": "oklch(80.25% .1953 73.59)"
+    },
+    "ds-amber-700": {
+      "css": "hsla(var(--ds-amber-700-value), 1)",
+      "resolved_css": "hsla(39, 100%, 57%, 1)",
+      "srgb": [
+        1.0,
+        0.699,
+        0.14,
+        1.0
+      ],
+      "p3": "oklch(81.87% .1969 76.46)"
+    },
+    "ds-amber-800": {
+      "css": "hsla(var(--ds-amber-800-value), 1)",
+      "resolved_css": "hsla(35, 100%, 52%, 1)",
+      "srgb": [
+        1.0,
+        0.6,
+        0.04,
+        1.0
+      ],
+      "p3": "oklch(77.21% .1991 64.28)"
+    },
+    "ds-amber-900": {
+      "css": "hsla(var(--ds-amber-900-value), 1)",
+      "resolved_css": "hsla(30, 100%, 32%, 1)",
+      "srgb": [
+        0.64,
+        0.32,
+        0.0,
+        1.0
+      ],
+      "p3": "oklch(52.79% .1496 54.65)"
+    },
+    "ds-background-100": {
+      "css": "hsla(var(--ds-background-100-value), 1)",
+      "resolved_css": "hsla(0, 0%, 100%, 1)",
+      "srgb": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ds-background-200": {
+      "css": "hsla(var(--ds-background-200-value), 1)",
+      "resolved_css": "hsla(0, 0%, 98%, 1)",
+      "srgb": [
+        0.98,
+        0.98,
+        0.98,
+        1.0
+      ]
+    },
+    "ds-blue-100": {
+      "css": "hsla(var(--ds-blue-100-value), 1)",
+      "resolved_css": "hsla(212, 100%, 97%, 1)",
+      "srgb": [
+        0.94,
+        0.968,
+        1.0,
+        1.0
+      ],
+      "p3": "oklch(97.32% .0141 251.56)"
+    },
+    "ds-blue-1000": {
+      "css": "hsla(var(--ds-blue-1000-value), 1)",
+      "resolved_css": "hsla(211, 100%, 15%, 1)",
+      "srgb": [
+        0.0,
+        0.145,
+        0.3,
+        1.0
+      ],
+      "p3": "oklch(26.67% .1099 254.34)"
+    },
+    "ds-blue-200": {
+      "css": "hsla(var(--ds-blue-200-value), 1)",
+      "resolved_css": "hsla(210, 100%, 96%, 1)",
+      "srgb": [
+        0.92,
+        0.96,
+        1.0,
+        1.0
+      ],
+      "p3": "oklch(96.29% .0195 250.59)"
+    },
+    "ds-blue-300": {
+      "css": "hsla(var(--ds-blue-300-value), 1)",
+      "resolved_css": "hsla(210, 100%, 94%, 1)",
+      "srgb": [
+        0.88,
+        0.94,
+        1.0,
+        1.0
+      ],
+      "p3": "oklch(94.58% .0293 249.849)"
+    },
+    "ds-blue-400": {
+      "css": "hsla(var(--ds-blue-400-value), 1)",
+      "resolved_css": "hsla(209, 100%, 90%, 1)",
+      "srgb": [
+        0.8,
+        0.9033333333,
+        1.0,
+        1.0
+      ],
+      "p3": "oklch(91.58% .0473 245.116)"
+    },
+    "ds-blue-500": {
+      "css": "hsla(var(--ds-blue-500-value), 1)",
+      "resolved_css": "hsla(209, 100%, 80%, 1)",
+      "srgb": [
+        0.6,
+        0.8066666667,
+        1.0,
+        1.0
+      ],
+      "p3": "oklch(82.75% .0979 248.48)"
+    },
+    "ds-blue-600": {
+      "css": "hsla(var(--ds-blue-600-value), 1)",
+      "resolved_css": "hsla(208, 100%, 66%, 1)",
+      "srgb": [
+        0.32,
+        0.6826666667,
+        1.0,
+        1.0
+      ],
+      "p3": "oklch(73.08% .1583 248.133)"
+    },
+    "ds-blue-700": {
+      "css": "hsla(var(--ds-blue-700-value), 1)",
+      "resolved_css": "hsla(212, 100%, 48%, 1)",
+      "srgb": [
+        0.0,
+        0.448,
+        0.96,
+        1.0
+      ],
+      "p3": "oklch(57.61% .2508 258.23)"
+    },
+    "ds-blue-800": {
+      "css": "hsla(var(--ds-blue-800-value), 1)",
+      "resolved_css": "hsla(212, 100%, 41%, 1)",
+      "srgb": [
+        0.0,
+        0.3826666667,
+        0.82,
+        1.0
+      ],
+      "p3": "oklch(51.51% .2399 257.85)"
+    },
+    "ds-blue-900": {
+      "css": "hsla(var(--ds-blue-900-value), 1)",
+      "resolved_css": "hsla(211, 100%, 42%, 1)",
+      "srgb": [
+        0.0,
+        0.406,
+        0.84,
+        1.0
+      ],
+      "p3": "oklch(53.18% .2399 256.99)"
+    },
+    "ds-contrast-fg": {
+      "css": "#fff",
+      "resolved_css": "#fff",
+      "srgb": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ds-focus-color": {
+      "css": "var(--ds-blue-700)",
+      "resolved_css": "hsla(212, 100%, 48%, 1)",
+      "srgb": [
+        0.0,
+        0.448,
+        0.96,
+        1.0
+      ]
+    },
+    "ds-gray-100": {
+      "css": "hsla(var(--ds-gray-100-value), 1)",
+      "resolved_css": "hsla(0, 0%, 95%, 1)",
+      "srgb": [
+        0.95,
+        0.95,
+        0.95,
+        1.0
+      ]
+    },
+    "ds-gray-1000": {
+      "css": "hsla(var(--ds-gray-1000-value), 1)",
+      "resolved_css": "hsla(0, 0%, 9%, 1)",
+      "srgb": [
+        0.09,
+        0.09,
+        0.09,
+        1.0
+      ]
+    },
+    "ds-gray-200": {
+      "css": "hsla(var(--ds-gray-200-value), 1)",
+      "resolved_css": "hsla(0, 0%, 92%, 1)",
+      "srgb": [
+        0.92,
+        0.92,
+        0.92,
+        1.0
+      ]
+    },
+    "ds-gray-300": {
+      "css": "hsla(var(--ds-gray-300-value), 1)",
+      "resolved_css": "hsla(0, 0%, 90%, 1)",
+      "srgb": [
+        0.9,
+        0.9,
+        0.9,
+        1.0
+      ]
+    },
+    "ds-gray-400": {
+      "css": "hsla(var(--ds-gray-400-value), 1)",
+      "resolved_css": "hsla(0, 0%, 92%, 1)",
+      "srgb": [
+        0.92,
+        0.92,
+        0.92,
+        1.0
+      ]
+    },
+    "ds-gray-500": {
+      "css": "hsla(var(--ds-gray-500-value), 1)",
+      "resolved_css": "hsla(0, 0%, 79%, 1)",
+      "srgb": [
+        0.79,
+        0.79,
+        0.79,
+        1.0
+      ]
+    },
+    "ds-gray-600": {
+      "css": "hsla(var(--ds-gray-600-value), 1)",
+      "resolved_css": "hsla(0, 0%, 66%, 1)",
+      "srgb": [
+        0.66,
+        0.66,
+        0.66,
+        1.0
+      ]
+    },
+    "ds-gray-700": {
+      "css": "hsla(var(--ds-gray-700-value), 1)",
+      "resolved_css": "hsla(0, 0%, 56%, 1)",
+      "srgb": [
+        0.56,
+        0.56,
+        0.56,
+        1.0
+      ]
+    },
+    "ds-gray-800": {
+      "css": "hsla(var(--ds-gray-800-value), 1)",
+      "resolved_css": "hsla(0, 0%, 49%, 1)",
+      "srgb": [
+        0.49,
+        0.49,
+        0.49,
+        1.0
+      ]
+    },
+    "ds-gray-900": {
+      "css": "hsla(var(--ds-gray-900-value), 1)",
+      "resolved_css": "hsla(0, 0%, 30%, 1)",
+      "srgb": [
+        0.3,
+        0.3,
+        0.3,
+        1.0
+      ]
+    },
+    "ds-gray-alpha-100": {
+      "css": "#0000000d",
+      "resolved_css": "#0000000d",
+      "srgb": [
+        0.0,
+        0.0,
+        0.0,
+        0.0509803922
+      ]
+    },
+    "ds-gray-alpha-1000": {
+      "css": "#000000e8",
+      "resolved_css": "#000000e8",
+      "srgb": [
+        0.0,
+        0.0,
+        0.0,
+        0.9098039216
+      ]
+    },
+    "ds-gray-alpha-200": {
+      "css": "#00000014",
+      "resolved_css": "#00000014",
+      "srgb": [
+        0.0,
+        0.0,
+        0.0,
+        0.0784313725
+      ]
+    },
+    "ds-gray-alpha-300": {
+      "css": "#0000001a",
+      "resolved_css": "#0000001a",
+      "srgb": [
+        0.0,
+        0.0,
+        0.0,
+        0.1019607843
+      ]
+    },
+    "ds-gray-alpha-400": {
+      "css": "#00000014",
+      "resolved_css": "#00000014",
+      "srgb": [
+        0.0,
+        0.0,
+        0.0,
+        0.0784313725
+      ]
+    },
+    "ds-gray-alpha-500": {
+      "css": "#00000036",
+      "resolved_css": "#00000036",
+      "srgb": [
+        0.0,
+        0.0,
+        0.0,
+        0.2117647059
+      ]
+    },
+    "ds-gray-alpha-600": {
+      "css": "#00000057",
+      "resolved_css": "#00000057",
+      "srgb": [
+        0.0,
+        0.0,
+        0.0,
+        0.3411764706
+      ]
+    },
+    "ds-gray-alpha-700": {
+      "css": "#00000070",
+      "resolved_css": "#00000070",
+      "srgb": [
+        0.0,
+        0.0,
+        0.0,
+        0.4392156863
+      ]
+    },
+    "ds-gray-alpha-800": {
+      "css": "#00000082",
+      "resolved_css": "#00000082",
+      "srgb": [
+        0.0,
+        0.0,
+        0.0,
+        0.5098039216
+      ]
+    },
+    "ds-gray-alpha-900": {
+      "css": "#000000b3",
+      "resolved_css": "#000000b3",
+      "srgb": [
+        0.0,
+        0.0,
+        0.0,
+        0.7019607843
+      ]
+    },
+    "ds-green-100": {
+      "css": "hsla(var(--ds-green-100-value), 1)",
+      "resolved_css": "hsla(120, 60%, 96%, 1)",
+      "srgb": [
+        0.936,
+        0.984,
+        0.936,
+        1.0
+      ],
+      "p3": "oklch(97.59% .0289 145.42)"
+    },
+    "ds-green-1000": {
+      "css": "hsla(var(--ds-green-1000-value), 1)",
+      "resolved_css": "hsla(128, 29%, 15%, 1)",
+      "srgb": [
+        0.1065,
+        0.1935,
+        0.1181,
+        1.0
+      ],
+      "p3": "oklch(29.15% .1197 147.38)"
+    },
+    "ds-green-200": {
+      "css": "hsla(var(--ds-green-200-value), 1)",
+      "resolved_css": "hsla(120, 60%, 95%, 1)",
+      "srgb": [
+        0.92,
+        0.98,
+        0.92,
+        1.0
+      ],
+      "p3": "oklch(96.92% .037 147.15)"
+    },
+    "ds-green-300": {
+      "css": "hsla(var(--ds-green-300-value), 1)",
+      "resolved_css": "hsla(120, 60%, 91%, 1)",
+      "srgb": [
+        0.856,
+        0.964,
+        0.856,
+        1.0
+      ],
+      "p3": "oklch(94.6% .0674 144.23)"
+    },
+    "ds-green-400": {
+      "css": "hsla(var(--ds-green-400-value), 1)",
+      "resolved_css": "hsla(122, 60%, 86%, 1)",
+      "srgb": [
+        0.776,
+        0.944,
+        0.7816,
+        1.0
+      ],
+      "p3": "oklch(91.49% .0976 146.24)"
+    },
+    "ds-green-500": {
+      "css": "hsla(var(--ds-green-500-value), 1)",
+      "resolved_css": "hsla(124, 60%, 75%, 1)",
+      "srgb": [
+        0.6,
+        0.9,
+        0.62,
+        1.0
+      ],
+      "p3": "oklch(85.45% .1627 146.3)"
+    },
+    "ds-green-600": {
+      "css": "hsla(var(--ds-green-600-value), 1)",
+      "resolved_css": "hsla(125, 60%, 64%, 1)",
+      "srgb": [
+        0.424,
+        0.856,
+        0.46,
+        1.0
+      ],
+      "p3": "oklch(80.25% .214 145.18)"
+    },
+    "ds-green-700": {
+      "css": "hsla(var(--ds-green-700-value), 1)",
+      "resolved_css": "hsla(131, 41%, 46%, 1)",
+      "srgb": [
+        0.2714,
+        0.6486,
+        0.3405533333,
+        1.0
+      ],
+      "p3": "oklch(64.58% .1746 147.27)"
+    },
+    "ds-green-800": {
+      "css": "hsla(var(--ds-green-800-value), 1)",
+      "resolved_css": "hsla(132, 43%, 39%, 1)",
+      "srgb": [
+        0.2223,
+        0.5577,
+        0.28938,
+        1.0
+      ],
+      "p3": "oklch(57.81% .1507 147.5)"
+    },
+    "ds-green-900": {
+      "css": "hsla(var(--ds-green-900-value), 1)",
+      "resolved_css": "hsla(133, 50%, 32%, 1)",
+      "srgb": [
+        0.16,
+        0.48,
+        0.2293333333,
+        1.0
+      ],
+      "p3": "oklch(51.75% .1453 147.65)"
+    },
+    "ds-overlay-backdrop-color": {
+      "css": "var(--ds-gray-100)",
+      "resolved_css": "hsla(0, 0%, 95%, 1)",
+      "srgb": [
+        0.95,
+        0.95,
+        0.95,
+        1.0
+      ]
+    },
+    "ds-pink-100": {
+      "css": "hsla(var(--ds-pink-100-value), 1)",
+      "resolved_css": "hsla(330, 100%, 96%, 1)",
+      "srgb": [
+        1.0,
+        0.92,
+        0.96,
+        1.0
+      ],
+      "p3": "oklch(95.69% .0359 344.622)"
+    },
+    "ds-pink-1000": {
+      "css": "hsla(var(--ds-pink-1000-value), 1)",
+      "resolved_css": "hsla(333, 74%, 15%, 1)",
+      "srgb": [
+        0.261,
+        0.039,
+        0.1389,
+        1.0
+      ],
+      "p3": "oklch(26% .0977 359)"
+    },
+    "ds-pink-200": {
+      "css": "hsla(var(--ds-pink-200-value), 1)",
+      "resolved_css": "hsla(340, 90%, 96%, 1)",
+      "srgb": [
+        0.996,
+        0.924,
+        0.948,
+        1.0
+      ],
+      "p3": "oklch(95.71% .0321 353.14)"
+    },
+    "ds-pink-300": {
+      "css": "hsla(var(--ds-pink-300-value), 1)",
+      "resolved_css": "hsla(340, 82%, 94%, 1)",
+      "srgb": [
+        0.9892,
+        0.8908,
+        0.9236,
+        1.0
+      ],
+      "p3": "oklch(93.83% .0451 356.29)"
+    },
+    "ds-pink-400": {
+      "css": "hsla(var(--ds-pink-400-value), 1)",
+      "resolved_css": "hsla(341, 76%, 91%, 1)",
+      "srgb": [
+        0.9784,
+        0.8416,
+        0.88492,
+        1.0
+      ],
+      "p3": "oklch(91.12% .0573 358.82)"
+    },
+    "ds-pink-500": {
+      "css": "hsla(var(--ds-pink-500-value), 1)",
+      "resolved_css": "hsla(340, 75%, 84%, 1)",
+      "srgb": [
+        0.96,
+        0.72,
+        0.8,
+        1.0
+      ],
+      "p3": "oklch(84.28% .0915 356.99)"
+    },
+    "ds-pink-600": {
+      "css": "hsla(var(--ds-pink-600-value), 1)",
+      "resolved_css": "hsla(341, 75%, 73%, 1)",
+      "srgb": [
+        0.9325,
+        0.5275,
+        0.65575,
+        1.0
+      ],
+      "p3": "oklch(74.33% .1547 .24)"
+    },
+    "ds-pink-700": {
+      "css": "hsla(var(--ds-pink-700-value), 1)",
+      "resolved_css": "hsla(336, 80%, 58%, 1)",
+      "srgb": [
+        0.916,
+        0.244,
+        0.5128,
+        1.0
+      ],
+      "p3": "oklch(63.52% .238 1.01)"
+    },
+    "ds-pink-800": {
+      "css": "hsla(var(--ds-pink-800-value), 1)",
+      "resolved_css": "hsla(336, 74%, 51%, 1)",
+      "srgb": [
+        0.8726,
+        0.1474,
+        0.43748,
+        1.0
+      ],
+      "p3": "oklch(59.51% .2339 4.21)"
+    },
+    "ds-pink-900": {
+      "css": "hsla(var(--ds-pink-900-value), 1)",
+      "resolved_css": "hsla(336, 65%, 45%, 1)",
+      "srgb": [
+        0.7425,
+        0.1575,
+        0.3915,
+        1.0
+      ],
+      "p3": "oklch(53.5% .2058 2.84)"
+    },
+    "ds-purple-100": {
+      "css": "hsla(var(--ds-purple-100-value), 1)",
+      "resolved_css": "hsla(276, 100%, 97%, 1)",
+      "srgb": [
+        0.976,
+        0.94,
+        1.0,
+        1.0
+      ],
+      "p3": "oklch(96.65% .0244 312.189)"
+    },
+    "ds-purple-1000": {
+      "css": "hsla(var(--ds-purple-1000-value), 1)",
+      "resolved_css": "hsla(276, 100%, 15%, 1)",
+      "srgb": [
+        0.18,
+        0.0,
+        0.3,
+        1.0
+      ],
+      "p3": "oklch(23.96% .13 305.66)"
+    },
+    "ds-purple-200": {
+      "css": "hsla(var(--ds-purple-200-value), 1)",
+      "resolved_css": "hsla(277, 87%, 97%, 1)",
+      "srgb": [
+        0.97609,
+        0.9439,
+        0.9961,
+        1.0
+      ],
+      "p3": "oklch(96.73% .0228 309.8)"
+    },
+    "ds-purple-300": {
+      "css": "hsla(var(--ds-purple-300-value), 1)",
+      "resolved_css": "hsla(274, 78%, 95%, 1)",
+      "srgb": [
+        0.9552,
+        0.911,
+        0.989,
+        1.0
+      ],
+      "p3": "oklch(94.85% .0364 310.15)"
+    },
+    "ds-purple-400": {
+      "css": "hsla(var(--ds-purple-400-value), 1)",
+      "resolved_css": "hsla(276, 71%, 92%, 1)",
+      "srgb": [
+        0.93136,
+        0.8632,
+        0.9768,
+        1.0
+      ],
+      "p3": "oklch(91.77% .0614 312.82)"
+    },
+    "ds-purple-500": {
+      "css": "hsla(var(--ds-purple-500-value), 1)",
+      "resolved_css": "hsla(274, 70%, 82%, 1)",
+      "srgb": [
+        0.8368,
+        0.694,
+        0.946,
+        1.0
+      ],
+      "p3": "oklch(81.26% .1409 310.8)"
+    },
+    "ds-purple-600": {
+      "css": "hsla(var(--ds-purple-600-value), 1)",
+      "resolved_css": "hsla(273, 72%, 73%, 1)",
+      "srgb": [
+        0.74944,
+        0.5356,
+        0.9244,
+        1.0
+      ],
+      "p3": "oklch(72.07% .2083 308.19)"
+    },
+    "ds-purple-700": {
+      "css": "hsla(var(--ds-purple-700-value), 1)",
+      "resolved_css": "hsla(272, 51%, 54%, 1)",
+      "srgb": [
+        0.55564,
+        0.3054,
+        0.7746,
+        1.0
+      ],
+      "p3": "oklch(55.5% .3008 306.12)"
+    },
+    "ds-purple-800": {
+      "css": "hsla(var(--ds-purple-800-value), 1)",
+      "resolved_css": "hsla(272, 47%, 45%, 1)",
+      "srgb": [
+        0.4641,
+        0.2385,
+        0.6615,
+        1.0
+      ],
+      "p3": "oklch(48.58% .2638 305.73)"
+    },
+    "ds-purple-900": {
+      "css": "hsla(var(--ds-purple-900-value), 1)",
+      "resolved_css": "hsla(274, 71%, 43%, 1)",
+      "srgb": [
+        0.4707066667,
+        0.1247,
+        0.7353,
+        1.0
+      ],
+      "p3": "oklch(47.18% .2579 304)"
+    },
+    "ds-red-100": {
+      "css": "hsla(var(--ds-red-100-value), 1)",
+      "resolved_css": "hsla(0, 100%, 97%, 1)",
+      "srgb": [
+        1.0,
+        0.94,
+        0.94,
+        1.0
+      ],
+      "p3": "oklch(96.5% .0223 13.09)"
+    },
+    "ds-red-1000": {
+      "css": "hsla(var(--ds-red-1000-value), 1)",
+      "resolved_css": "hsla(355, 49%, 15%, 1)",
+      "srgb": [
+        0.2235,
+        0.0765,
+        0.08875,
+        1.0
+      ],
+      "p3": "oklch(24.8% .1041 18.86)"
+    },
+    "ds-red-200": {
+      "css": "hsla(var(--ds-red-200-value), 1)",
+      "resolved_css": "hsla(0, 100%, 96%, 1)",
+      "srgb": [
+        1.0,
+        0.92,
+        0.92,
+        1.0
+      ],
+      "p3": "oklch(95.41% .0299 14.2526)"
+    },
+    "ds-red-300": {
+      "css": "hsla(var(--ds-red-300-value), 1)",
+      "resolved_css": "hsla(0, 100%, 95%, 1)",
+      "srgb": [
+        1.0,
+        0.9,
+        0.9,
+        1.0
+      ],
+      "p3": "oklch(94.33% .0369 15.0115)"
+    },
+    "ds-red-400": {
+      "css": "hsla(var(--ds-red-400-value), 1)",
+      "resolved_css": "hsla(0, 90%, 92%, 1)",
+      "srgb": [
+        0.992,
+        0.848,
+        0.848,
+        1.0
+      ],
+      "p3": "oklch(91.51% .0471 19.8)"
+    },
+    "ds-red-500": {
+      "css": "hsla(var(--ds-red-500-value), 1)",
+      "resolved_css": "hsla(0, 82%, 85%, 1)",
+      "srgb": [
+        0.973,
+        0.727,
+        0.727,
+        1.0
+      ],
+      "p3": "oklch(84.47% .1018 17.71)"
+    },
+    "ds-red-600": {
+      "css": "hsla(var(--ds-red-600-value), 1)",
+      "resolved_css": "hsla(359, 90%, 71%, 1)",
+      "srgb": [
+        0.971,
+        0.449,
+        0.4577,
+        1.0
+      ],
+      "p3": "oklch(71.12% .1881 21.22)"
+    },
+    "ds-red-700": {
+      "css": "hsla(var(--ds-red-700-value), 1)",
+      "resolved_css": "hsla(358, 75%, 59%, 1)",
+      "srgb": [
+        0.8975,
+        0.2825,
+        0.303,
+        1.0
+      ],
+      "p3": "oklch(62.56% .2524 23.03)"
+    },
+    "ds-red-800": {
+      "css": "hsla(var(--ds-red-800-value), 1)",
+      "resolved_css": "hsla(358, 70%, 52%, 1)",
+      "srgb": [
+        0.856,
+        0.184,
+        0.2064,
+        1.0
+      ],
+      "p3": "oklch(58.19% .2482 25.15)"
+    },
+    "ds-red-900": {
+      "css": "hsla(var(--ds-red-900-value), 1)",
+      "resolved_css": "hsla(358, 66%, 48%, 1)",
+      "srgb": [
+        0.7968,
+        0.1632,
+        0.18432,
+        1.0
+      ],
+      "p3": "oklch(54.99% .232 25.29)"
+    },
+    "ds-teal-100": {
+      "css": "hsla(var(--ds-teal-100-value), 1)",
+      "resolved_css": "hsla(169, 70%, 96%, 1)",
+      "srgb": [
+        0.932,
+        0.988,
+        0.9777333333,
+        1.0
+      ],
+      "p3": "oklch(97.72% .0359 186.7)"
+    },
+    "ds-teal-1000": {
+      "css": "hsla(var(--ds-teal-1000-value), 1)",
+      "resolved_css": "hsla(171, 80%, 13%, 1)",
+      "srgb": [
+        0.026,
+        0.234,
+        0.2028,
+        1.0
+      ],
+      "p3": "oklch(32.11% .0788 179.82)"
+    },
+    "ds-teal-200": {
+      "css": "hsla(var(--ds-teal-200-value), 1)",
+      "resolved_css": "hsla(167, 70%, 94%, 1)",
+      "srgb": [
+        0.898,
+        0.982,
+        0.9638,
+        1.0
+      ],
+      "p3": "oklch(97.06% .0347 180.66)"
+    },
+    "ds-teal-300": {
+      "css": "hsla(var(--ds-teal-300-value), 1)",
+      "resolved_css": "hsla(168, 70%, 90%, 1)",
+      "srgb": [
+        0.83,
+        0.97,
+        0.942,
+        1.0
+      ],
+      "p3": "oklch(94.92% .0478 182.07)"
+    },
+    "ds-teal-400": {
+      "css": "hsla(var(--ds-teal-400-value), 1)",
+      "resolved_css": "hsla(170, 70%, 85%, 1)",
+      "srgb": [
+        0.745,
+        0.955,
+        0.92,
+        1.0
+      ],
+      "p3": "oklch(92.76% .0718 183.78)"
+    },
+    "ds-teal-500": {
+      "css": "hsla(var(--ds-teal-500-value), 1)",
+      "resolved_css": "hsla(170, 70%, 72%, 1)",
+      "srgb": [
+        0.524,
+        0.916,
+        0.8506666667,
+        1.0
+      ],
+      "p3": "oklch(86.88% .1344 182.42)"
+    },
+    "ds-teal-600": {
+      "css": "hsla(var(--ds-teal-600-value), 1)",
+      "resolved_css": "hsla(170, 70%, 57%, 1)",
+      "srgb": [
+        0.269,
+        0.871,
+        0.7706666667,
+        1.0
+      ],
+      "p3": "oklch(81.5% .161 178.96)"
+    },
+    "ds-teal-700": {
+      "css": "hsla(var(--ds-teal-700-value), 1)",
+      "resolved_css": "hsla(173, 80%, 36%, 1)",
+      "srgb": [
+        0.072,
+        0.648,
+        0.5808,
+        1.0
+      ],
+      "p3": "oklch(64.92% .1572 181.95)"
+    },
+    "ds-teal-800": {
+      "css": "hsla(var(--ds-teal-800-value), 1)",
+      "resolved_css": "hsla(173, 83%, 30%, 1)",
+      "srgb": [
+        0.051,
+        0.549,
+        0.4909,
+        1.0
+      ],
+      "p3": "oklch(57.53% .1392 181.66)"
+    },
+    "ds-teal-900": {
+      "css": "hsla(var(--ds-teal-900-value), 1)",
+      "resolved_css": "hsla(174, 91%, 25%, 1)",
+      "srgb": [
+        0.0225,
+        0.4775,
+        0.432,
+        1.0
+      ],
+      "p3": "oklch(52.08% .1251 182.93)"
+    },
+    "geist-background": {
+      "css": "#fff",
+      "resolved_css": "#fff",
+      "srgb": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "geist-code": {
+      "css": "var(--geist-foreground)",
+      "resolved_css": "#000",
+      "srgb": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "geist-console-header": {
+      "css": "#efe7ed",
+      "resolved_css": "#efe7ed",
+      "srgb": [
+        0.937254902,
+        0.9058823529,
+        0.9294117647,
+        1.0
+      ]
+    },
+    "geist-console-purple": {
+      "css": "#7928ca",
+      "resolved_css": "#7928ca",
+      "srgb": [
+        0.4745098039,
+        0.1568627451,
+        0.7921568627,
+        1.0
+      ]
+    },
+    "geist-console-text-color-blue": {
+      "css": "#0070f3",
+      "resolved_css": "#0070f3",
+      "srgb": [
+        0.0,
+        0.4392156863,
+        0.9529411765,
+        1.0
+      ]
+    },
+    "geist-console-text-color-default": {
+      "css": "var(--geist-foreground)",
+      "resolved_css": "#000",
+      "srgb": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "geist-console-text-color-pink": {
+      "css": "#eb367f",
+      "resolved_css": "#eb367f",
+      "srgb": [
+        0.9215686275,
+        0.2117647059,
+        0.4980392157,
+        1.0
+      ]
+    },
+    "geist-console-text-color-purple": {
+      "css": "#7928ca",
+      "resolved_css": "#7928ca",
+      "srgb": [
+        0.4745098039,
+        0.1568627451,
+        0.7921568627,
+        1.0
+      ]
+    },
+    "geist-cyan": {
+      "css": "#50e3c2",
+      "resolved_css": "#50e3c2",
+      "srgb": [
+        0.3137254902,
+        0.8901960784,
+        0.7607843137,
+        1.0
+      ]
+    },
+    "geist-cyan-dark": {
+      "css": "#29bc9b",
+      "resolved_css": "#29bc9b",
+      "srgb": [
+        0.1607843137,
+        0.737254902,
+        0.6078431373,
+        1.0
+      ]
+    },
+    "geist-cyan-light": {
+      "css": "#79ffe1",
+      "resolved_css": "#79ffe1",
+      "srgb": [
+        0.4745098039,
+        1.0,
+        0.8823529412,
+        1.0
+      ]
+    },
+    "geist-cyan-lighter": {
+      "css": "#aaffec",
+      "resolved_css": "#aaffec",
+      "srgb": [
+        0.6666666667,
+        1.0,
+        0.9254901961,
+        1.0
+      ]
+    },
+    "geist-error": {
+      "css": "#e00",
+      "resolved_css": "#e00",
+      "srgb": [
+        0.9333333333,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "geist-error-dark": {
+      "css": "#c50000",
+      "resolved_css": "#c50000",
+      "srgb": [
+        0.7725490196,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "geist-error-light": {
+      "css": "#ff1a1a",
+      "resolved_css": "#ff1a1a",
+      "srgb": [
+        1.0,
+        0.1019607843,
+        0.1019607843,
+        1.0
+      ]
+    },
+    "geist-error-lighter": {
+      "css": "#f7d4d6",
+      "resolved_css": "#f7d4d6",
+      "srgb": [
+        0.968627451,
+        0.831372549,
+        0.8392156863,
+        1.0
+      ]
+    },
+    "geist-foreground": {
+      "css": "#000",
+      "resolved_css": "#000",
+      "srgb": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "geist-highlight-magenta": {
+      "css": "#eb367f",
+      "resolved_css": "#eb367f",
+      "srgb": [
+        0.9215686275,
+        0.2117647059,
+        0.4980392157,
+        1.0
+      ]
+    },
+    "geist-highlight-pink": {
+      "css": "#ff0080",
+      "resolved_css": "#ff0080",
+      "srgb": [
+        1.0,
+        0.0,
+        0.5019607843,
+        1.0
+      ]
+    },
+    "geist-highlight-purple": {
+      "css": "#f81ce5",
+      "resolved_css": "#f81ce5",
+      "srgb": [
+        0.9725490196,
+        0.1098039216,
+        0.8980392157,
+        1.0
+      ]
+    },
+    "geist-highlight-yellow": {
+      "css": "#fff500",
+      "resolved_css": "#fff500",
+      "srgb": [
+        1.0,
+        0.9607843137,
+        0.0,
+        1.0
+      ]
+    },
+    "geist-link-color": {
+      "css": "var(--ds-blue-700)",
+      "resolved_css": "hsla(212, 100%, 48%, 1)",
+      "srgb": [
+        0.0,
+        0.448,
+        0.96,
+        1.0
+      ]
+    },
+    "geist-marketing-gray": {
+      "css": "#fafbfc",
+      "resolved_css": "#fafbfc",
+      "srgb": [
+        0.9803921569,
+        0.9843137255,
+        0.9882352941,
+        1.0
+      ]
+    },
+    "geist-secondary": {
+      "css": "var(--accents-5)",
+      "resolved_css": "#666",
+      "srgb": [
+        0.4,
+        0.4,
+        0.4,
+        1.0
+      ]
+    },
+    "geist-secondary-dark": {
+      "css": "var(--accents-7)",
+      "resolved_css": "#333",
+      "srgb": [
+        0.2,
+        0.2,
+        0.2,
+        1.0
+      ]
+    },
+    "geist-secondary-light": {
+      "css": "var(--accents-3)",
+      "resolved_css": "#999",
+      "srgb": [
+        0.6,
+        0.6,
+        0.6,
+        1.0
+      ]
+    },
+    "geist-secondary-lighter": {
+      "css": "var(--accents-2)",
+      "resolved_css": "#eaeaea",
+      "srgb": [
+        0.9176470588,
+        0.9176470588,
+        0.9176470588,
+        1.0
+      ]
+    },
+    "geist-selection": {
+      "css": "var(--ds-gray-1000)",
+      "resolved_css": "hsla(0, 0%, 9%, 1)",
+      "srgb": [
+        0.09,
+        0.09,
+        0.09,
+        1.0
+      ]
+    },
+    "geist-selection-text-color": {
+      "css": "var(--ds-gray-100)",
+      "resolved_css": "hsla(0, 0%, 95%, 1)",
+      "srgb": [
+        0.95,
+        0.95,
+        0.95,
+        1.0
+      ]
+    },
+    "geist-success": {
+      "css": "#0070f3",
+      "resolved_css": "#0070f3",
+      "srgb": [
+        0.0,
+        0.4392156863,
+        0.9529411765,
+        1.0
+      ]
+    },
+    "geist-success-dark": {
+      "css": "#0761d1",
+      "resolved_css": "#0761d1",
+      "srgb": [
+        0.0274509804,
+        0.3803921569,
+        0.8196078431,
+        1.0
+      ]
+    },
+    "geist-success-light": {
+      "css": "#3291ff",
+      "resolved_css": "#3291ff",
+      "srgb": [
+        0.1960784314,
+        0.568627451,
+        1.0,
+        1.0
+      ]
+    },
+    "geist-success-lighter": {
+      "css": "#d3e5ff",
+      "resolved_css": "#d3e5ff",
+      "srgb": [
+        0.8274509804,
+        0.8980392157,
+        1.0,
+        1.0
+      ]
+    },
+    "geist-violet": {
+      "css": "#7928ca",
+      "resolved_css": "#7928ca",
+      "srgb": [
+        0.4745098039,
+        0.1568627451,
+        0.7921568627,
+        1.0
+      ]
+    },
+    "geist-violet-background": {
+      "css": "#fff",
+      "resolved_css": "#fff",
+      "srgb": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "geist-violet-background-secondary": {
+      "css": "#291c3a",
+      "resolved_css": "#291c3a",
+      "srgb": [
+        0.1607843137,
+        0.1098039216,
+        0.2274509804,
+        1.0
+      ]
+    },
+    "geist-violet-background-tertiary": {
+      "css": "#eae5f4",
+      "resolved_css": "#eae5f4",
+      "srgb": [
+        0.9176470588,
+        0.8980392157,
+        0.9568627451,
+        1.0
+      ]
+    },
+    "geist-violet-dark": {
+      "css": "#4c2889",
+      "resolved_css": "#4c2889",
+      "srgb": [
+        0.2980392157,
+        0.1568627451,
+        0.537254902,
+        1.0
+      ]
+    },
+    "geist-violet-light": {
+      "css": "#8a63d2",
+      "resolved_css": "#8a63d2",
+      "srgb": [
+        0.5411764706,
+        0.3882352941,
+        0.8235294118,
+        1.0
+      ]
+    },
+    "geist-violet-lighter": {
+      "css": "#d8ccf1",
+      "resolved_css": "#d8ccf1",
+      "srgb": [
+        0.8470588235,
+        0.8,
+        0.9450980392,
+        1.0
+      ]
+    },
+    "geist-warning": {
+      "css": "#f5a623",
+      "resolved_css": "#f5a623",
+      "srgb": [
+        0.9607843137,
+        0.6509803922,
+        0.137254902,
+        1.0
+      ]
+    },
+    "geist-warning-dark": {
+      "css": "#ab570a",
+      "resolved_css": "#ab570a",
+      "srgb": [
+        0.6705882353,
+        0.3411764706,
+        0.0392156863,
+        1.0
+      ]
+    },
+    "geist-warning-light": {
+      "css": "#f7b955",
+      "resolved_css": "#f7b955",
+      "srgb": [
+        0.968627451,
+        0.7254901961,
+        0.3333333333,
+        1.0
+      ]
+    },
+    "geist-warning-lighter": {
+      "css": "#ffefcf",
+      "resolved_css": "#ffefcf",
+      "srgb": [
+        1.0,
+        0.937254902,
+        0.8117647059,
+        1.0
+      ]
+    },
+    "header-import-flow-background": {
+      "css": "#fafafacc",
+      "resolved_css": "#fafafacc",
+      "srgb": [
+        0.9803921569,
+        0.9803921569,
+        0.9803921569,
+        0.8
+      ]
+    },
+    "next-icon-border": {
+      "css": "#000",
+      "resolved_css": "#000",
+      "srgb": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "preview-end-gradient": {
+      "css": "#ff0080",
+      "resolved_css": "#ff0080",
+      "srgb": [
+        1.0,
+        0.0,
+        0.5019607843,
+        1.0
+      ],
+      "p3": "oklch(64.53% .292 2.47)"
+    },
+    "preview-line-end": {
+      "css": "#9a1fb8",
+      "resolved_css": "#9a1fb8",
+      "srgb": [
+        0.6039215686,
+        0.1215686275,
+        0.7215686275,
+        1.0
+      ],
+      "p3": "oklch(51.39% .267 318.36)"
+    },
+    "preview-start-gradient": {
+      "css": "#7928ca",
+      "resolved_css": "#7928ca",
+      "srgb": [
+        0.4745098039,
+        0.1568627451,
+        0.7921568627,
+        1.0
+      ],
+      "p3": "oklch(49.07% .272 300.45)"
+    },
+    "preview-text": {
+      "css": "#de1d8d",
+      "resolved_css": "#de1d8d",
+      "srgb": [
+        0.8705882353,
+        0.1137254902,
+        0.5529411765,
+        1.0
+      ],
+      "p3": "oklch(59.93% .274 352.55)"
+    },
+    "scroller-end": {
+      "css": "#fff0",
+      "resolved_css": "#fff0",
+      "srgb": [
+        1.0,
+        1.0,
+        1.0,
+        0.0
+      ]
+    },
+    "scroller-start": {
+      "css": "#fff",
+      "resolved_css": "#fff",
+      "srgb": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ship-end-gradient": {
+      "css": "#f9cb28",
+      "resolved_css": "#f9cb28",
+      "srgb": [
+        0.9764705882,
+        0.7960784314,
+        0.1568627451,
+        1.0
+      ],
+      "p3": "oklch(85.82% .201 91.19)"
+    },
+    "ship-line-end": {
+      "css": "#f9cb28",
+      "resolved_css": "#f9cb28",
+      "srgb": [
+        0.9764705882,
+        0.7960784314,
+        0.1568627451,
+        1.0
+      ],
+      "p3": "oklch(85.82% .201 91.19)"
+    },
+    "ship-start-gradient": {
+      "css": "#ff4d4d",
+      "resolved_css": "#ff4d4d",
+      "srgb": [
+        1.0,
+        0.3019607843,
+        0.3019607843,
+        1.0
+      ],
+      "p3": "oklch(67.3% .266 25.0397)"
+    },
+    "ship-text": {
+      "css": "#ff5b4f",
+      "resolved_css": "#ff5b4f",
+      "srgb": [
+        1.0,
+        0.3568627451,
+        0.3098039216,
+        1.0
+      ],
+      "p3": "oklch(68.79% .25 27.76)"
+    },
+    "wv-green": {
+      "css": "#0cce6b",
+      "resolved_css": "#0cce6b",
+      "srgb": [
+        0.0470588235,
+        0.8078431373,
+        0.4196078431,
+        1.0
+      ]
+    },
+    "wv-orange": {
+      "css": "#ffa400",
+      "resolved_css": "#ffa400",
+      "srgb": [
+        1.0,
+        0.6431372549,
+        0.0,
+        1.0
+      ]
+    },
+    "wv-red": {
+      "css": "#ff4e42",
+      "resolved_css": "#ff4e42",
+      "srgb": [
+        1.0,
+        0.3058823529,
+        0.2588235294,
+        1.0
+      ]
+    }
+  },
+  "dark": {
+    "accents-1": {
+      "css": "#111",
+      "resolved_css": "#111",
+      "srgb": [
+        0.0666666667,
+        0.0666666667,
+        0.0666666667,
+        1.0
+      ]
+    },
+    "accents-2": {
+      "css": "#333",
+      "resolved_css": "#333",
+      "srgb": [
+        0.2,
+        0.2,
+        0.2,
+        1.0
+      ]
+    },
+    "accents-3": {
+      "css": "#444",
+      "resolved_css": "#444",
+      "srgb": [
+        0.2666666667,
+        0.2666666667,
+        0.2666666667,
+        1.0
+      ]
+    },
+    "accents-4": {
+      "css": "#666",
+      "resolved_css": "#666",
+      "srgb": [
+        0.4,
+        0.4,
+        0.4,
+        1.0
+      ]
+    },
+    "accents-5": {
+      "css": "#888",
+      "resolved_css": "#888",
+      "srgb": [
+        0.5333333333,
+        0.5333333333,
+        0.5333333333,
+        1.0
+      ]
+    },
+    "accents-6": {
+      "css": "#999",
+      "resolved_css": "#999",
+      "srgb": [
+        0.6,
+        0.6,
+        0.6,
+        1.0
+      ]
+    },
+    "accents-7": {
+      "css": "#eaeaea",
+      "resolved_css": "#eaeaea",
+      "srgb": [
+        0.9176470588,
+        0.9176470588,
+        0.9176470588,
+        1.0
+      ]
+    },
+    "accents-8": {
+      "css": "#fafafa",
+      "resolved_css": "#fafafa",
+      "srgb": [
+        0.9803921569,
+        0.9803921569,
+        0.9803921569,
+        1.0
+      ]
+    },
+    "develop-end-gradient": {
+      "css": "#00dfd8",
+      "resolved_css": "#00dfd8",
+      "srgb": [
+        0.0,
+        0.8745098039,
+        0.8470588235,
+        1.0
+      ],
+      "p3": "oklch(81.58% .189 190.74)"
+    },
+    "develop-line-end": {
+      "css": "#019ae9",
+      "resolved_css": "#019ae9",
+      "srgb": [
+        0.0039215686,
+        0.6039215686,
+        0.9137254902,
+        1.0
+      ],
+      "p3": "oklch(65.84% .203 242.532)"
+    },
+    "develop-start-gradient": {
+      "css": "#007cf0",
+      "resolved_css": "#007cf0",
+      "srgb": [
+        0.0,
+        0.4862745098,
+        0.9411764706,
+        1.0
+      ],
+      "p3": "oklch(59.59% .24 255.092)"
+    },
+    "develop-text": {
+      "css": "#0a72ef",
+      "resolved_css": "#0a72ef",
+      "srgb": [
+        0.0392156863,
+        0.4470588235,
+        0.937254902,
+        1.0
+      ],
+      "p3": "oklch(57.49% .249 257.84)"
+    },
+    "dropdown-triangle-stroke": {
+      "css": "#333",
+      "resolved_css": "#333",
+      "srgb": [
+        0.2,
+        0.2,
+        0.2,
+        1.0
+      ]
+    },
+    "ds-amber-100": {
+      "css": "hsla(var(--ds-amber-100-value), 1)",
+      "resolved_css": "hsla(35, 100%, 8%, 1)",
+      "srgb": [
+        0.16,
+        0.0933333333,
+        0.0,
+        1.0
+      ],
+      "p3": "oklch(22.46% .0538 76.04)"
+    },
+    "ds-amber-1000": {
+      "css": "hsla(var(--ds-amber-1000-value), 1)",
+      "resolved_css": "hsla(40, 94%, 93%, 1)",
+      "srgb": [
+        0.9958,
+        0.9519333333,
+        0.8642,
+        1.0
+      ],
+      "p3": "oklch(96.7% .0418 84.59)"
+    },
+    "ds-amber-200": {
+      "css": "hsla(var(--ds-amber-200-value), 1)",
+      "resolved_css": "hsla(32, 100%, 10%, 1)",
+      "srgb": [
+        0.2,
+        0.1066666667,
+        0.0,
+        1.0
+      ],
+      "p3": "oklch(24.95% .0642 64.78)"
+    },
+    "ds-amber-300": {
+      "css": "hsla(var(--ds-amber-300-value), 1)",
+      "resolved_css": "hsla(33, 100%, 15%, 1)",
+      "srgb": [
+        0.3,
+        0.165,
+        0.0,
+        1.0
+      ],
+      "p3": "oklch(32.34% .0837 63.83)"
+    },
+    "ds-amber-400": {
+      "css": "hsla(var(--ds-amber-400-value), 1)",
+      "resolved_css": "hsla(35, 100%, 17%, 1)",
+      "srgb": [
+        0.34,
+        0.1983333333,
+        0.0,
+        1.0
+      ],
+      "p3": "oklch(35.53% .0903 66.2971)"
+    },
+    "ds-amber-500": {
+      "css": "hsla(var(--ds-amber-500-value), 1)",
+      "resolved_css": "hsla(35, 91%, 22%, 1)",
+      "srgb": [
+        0.4202,
+        0.2533666667,
+        0.0198,
+        1.0
+      ],
+      "p3": "oklch(41.55% .1044 67.98)"
+    },
+    "ds-amber-600": {
+      "css": "hsla(var(--ds-amber-600-value), 1)",
+      "resolved_css": "hsla(39, 85%, 49%, 1)",
+      "srgb": [
+        0.9065,
+        0.61495,
+        0.0735,
+        1.0
+      ],
+      "p3": "oklch(75.04% .1737 74.49)"
+    },
+    "ds-amber-700": {
+      "css": "hsla(var(--ds-amber-700-value), 1)",
+      "resolved_css": "hsla(39, 100%, 57%, 1)",
+      "srgb": [
+        1.0,
+        0.699,
+        0.14,
+        1.0
+      ],
+      "p3": "oklch(81.87% .1969 76.46)"
+    },
+    "ds-amber-800": {
+      "css": "hsla(var(--ds-amber-800-value), 1)",
+      "resolved_css": "hsla(35, 100%, 52%, 1)",
+      "srgb": [
+        1.0,
+        0.6,
+        0.04,
+        1.0
+      ],
+      "p3": "oklch(77.21% .1991 64.28)"
+    },
+    "ds-amber-900": {
+      "css": "hsla(var(--ds-amber-900-value), 1)",
+      "resolved_css": "hsla(39, 90%, 50%, 1)",
+      "srgb": [
+        0.95,
+        0.635,
+        0.05,
+        1.0
+      ],
+      "p3": "oklch(77.21% .1991 64.28)"
+    },
+    "ds-background-100": {
+      "css": "hsla(var(--ds-background-100-value), 1)",
+      "resolved_css": "hsla(0, 0%, 4%, 1)",
+      "srgb": [
+        0.04,
+        0.04,
+        0.04,
+        1.0
+      ]
+    },
+    "ds-background-200": {
+      "css": "hsla(var(--ds-background-200-value), 1)",
+      "resolved_css": "hsla(0, 0%, 0%, 1)",
+      "srgb": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "ds-blue-100": {
+      "css": "hsla(var(--ds-blue-100-value), 1)",
+      "resolved_css": "hsla(216, 50%, 12%, 1)",
+      "srgb": [
+        0.06,
+        0.108,
+        0.18,
+        1.0
+      ],
+      "p3": "oklch(22.17% .069 259.89)"
+    },
+    "ds-blue-1000": {
+      "css": "hsla(var(--ds-blue-1000-value), 1)",
+      "resolved_css": "hsla(206, 100%, 96%, 1)",
+      "srgb": [
+        0.92,
+        0.9653333333,
+        1.0,
+        1.0
+      ],
+      "p3": "oklch(96.75% .0179 242.423)"
+    },
+    "ds-blue-200": {
+      "css": "hsla(var(--ds-blue-200-value), 1)",
+      "resolved_css": "hsla(214, 59%, 15%, 1)",
+      "srgb": [
+        0.0615,
+        0.1382,
+        0.2385,
+        1.0
+      ],
+      "p3": "oklch(25.45% .0811 255.8)"
+    },
+    "ds-blue-300": {
+      "css": "hsla(var(--ds-blue-300-value), 1)",
+      "resolved_css": "hsla(213, 71%, 20%, 1)",
+      "srgb": [
+        0.058,
+        0.1858,
+        0.342,
+        1.0
+      ],
+      "p3": "oklch(30.86% .1022 255.21)"
+    },
+    "ds-blue-400": {
+      "css": "hsla(var(--ds-blue-400-value), 1)",
+      "resolved_css": "hsla(212, 78%, 23%, 1)",
+      "srgb": [
+        0.0506,
+        0.21804,
+        0.4094,
+        1.0
+      ],
+      "p3": "oklch(34.1% .121 254.74)"
+    },
+    "ds-blue-500": {
+      "css": "hsla(var(--ds-blue-500-value), 1)",
+      "resolved_css": "hsla(211, 86%, 27%, 1)",
+      "srgb": [
+        0.0378,
+        0.26226,
+        0.5022,
+        1.0
+      ],
+      "p3": "oklch(38.5% .1403 254.4)"
+    },
+    "ds-blue-600": {
+      "css": "hsla(var(--ds-blue-600-value), 1)",
+      "resolved_css": "hsla(206, 100%, 50%, 1)",
+      "srgb": [
+        0.0,
+        0.5666666667,
+        1.0,
+        1.0
+      ],
+      "p3": "oklch(64.94% .1982 251.813)"
+    },
+    "ds-blue-700": {
+      "css": "hsla(var(--ds-blue-700-value), 1)",
+      "resolved_css": "hsla(212, 100%, 48%, 1)",
+      "srgb": [
+        0.0,
+        0.448,
+        0.96,
+        1.0
+      ],
+      "p3": "oklch(57.61% .2321 258.23)"
+    },
+    "ds-blue-800": {
+      "css": "hsla(var(--ds-blue-800-value), 1)",
+      "resolved_css": "hsla(212, 100%, 41%, 1)",
+      "srgb": [
+        0.0,
+        0.3826666667,
+        0.82,
+        1.0
+      ],
+      "p3": "oklch(51.51% .2307 257.85)"
+    },
+    "ds-blue-900": {
+      "css": "hsla(var(--ds-blue-900-value), 1)",
+      "resolved_css": "hsla(210, 100%, 66%, 1)",
+      "srgb": [
+        0.32,
+        0.66,
+        1.0,
+        1.0
+      ],
+      "p3": "oklch(71.7% .1648 250.794)"
+    },
+    "ds-contrast-fg": {
+      "css": "#fff",
+      "resolved_css": "#fff",
+      "srgb": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ds-focus-color": {
+      "css": "var(--ds-blue-900)",
+      "resolved_css": "hsla(210, 100%, 66%, 1)",
+      "srgb": [
+        0.32,
+        0.66,
+        1.0,
+        1.0
+      ]
+    },
+    "ds-gray-100": {
+      "css": "hsla(var(--ds-gray-100-value), 1)",
+      "resolved_css": "hsla(0, 0%, 10%, 1)",
+      "srgb": [
+        0.1,
+        0.1,
+        0.1,
+        1.0
+      ]
+    },
+    "ds-gray-1000": {
+      "css": "hsla(var(--ds-gray-1000-value), 1)",
+      "resolved_css": "hsla(0, 0%, 93%, 1)",
+      "srgb": [
+        0.93,
+        0.93,
+        0.93,
+        1.0
+      ]
+    },
+    "ds-gray-200": {
+      "css": "hsla(var(--ds-gray-200-value), 1)",
+      "resolved_css": "hsla(0, 0%, 12%, 1)",
+      "srgb": [
+        0.12,
+        0.12,
+        0.12,
+        1.0
+      ]
+    },
+    "ds-gray-300": {
+      "css": "hsla(var(--ds-gray-300-value), 1)",
+      "resolved_css": "hsla(0, 0%, 16%, 1)",
+      "srgb": [
+        0.16,
+        0.16,
+        0.16,
+        1.0
+      ]
+    },
+    "ds-gray-400": {
+      "css": "hsla(var(--ds-gray-400-value), 1)",
+      "resolved_css": "hsla(0, 0%, 18%, 1)",
+      "srgb": [
+        0.18,
+        0.18,
+        0.18,
+        1.0
+      ]
+    },
+    "ds-gray-500": {
+      "css": "hsla(var(--ds-gray-500-value), 1)",
+      "resolved_css": "hsla(0, 0%, 27%, 1)",
+      "srgb": [
+        0.27,
+        0.27,
+        0.27,
+        1.0
+      ]
+    },
+    "ds-gray-600": {
+      "css": "hsla(var(--ds-gray-600-value), 1)",
+      "resolved_css": "hsla(0, 0%, 53%, 1)",
+      "srgb": [
+        0.53,
+        0.53,
+        0.53,
+        1.0
+      ]
+    },
+    "ds-gray-700": {
+      "css": "hsla(var(--ds-gray-700-value), 1)",
+      "resolved_css": "hsla(0, 0%, 56%, 1)",
+      "srgb": [
+        0.56,
+        0.56,
+        0.56,
+        1.0
+      ]
+    },
+    "ds-gray-800": {
+      "css": "hsla(var(--ds-gray-800-value), 1)",
+      "resolved_css": "hsla(0, 0%, 49%, 1)",
+      "srgb": [
+        0.49,
+        0.49,
+        0.49,
+        1.0
+      ]
+    },
+    "ds-gray-900": {
+      "css": "hsla(var(--ds-gray-900-value), 1)",
+      "resolved_css": "hsla(0, 0%, 63%, 1)",
+      "srgb": [
+        0.63,
+        0.63,
+        0.63,
+        1.0
+      ]
+    },
+    "ds-gray-alpha-100": {
+      "css": "#ffffff0f",
+      "resolved_css": "#ffffff0f",
+      "srgb": [
+        1.0,
+        1.0,
+        1.0,
+        0.0588235294
+      ]
+    },
+    "ds-gray-alpha-1000": {
+      "css": "#ffffffeb",
+      "resolved_css": "#ffffffeb",
+      "srgb": [
+        1.0,
+        1.0,
+        1.0,
+        0.9215686275
+      ]
+    },
+    "ds-gray-alpha-200": {
+      "css": "#ffffff17",
+      "resolved_css": "#ffffff17",
+      "srgb": [
+        1.0,
+        1.0,
+        1.0,
+        0.0901960784
+      ]
+    },
+    "ds-gray-alpha-300": {
+      "css": "#ffffff21",
+      "resolved_css": "#ffffff21",
+      "srgb": [
+        1.0,
+        1.0,
+        1.0,
+        0.1294117647
+      ]
+    },
+    "ds-gray-alpha-400": {
+      "css": "#ffffff24",
+      "resolved_css": "#ffffff24",
+      "srgb": [
+        1.0,
+        1.0,
+        1.0,
+        0.1411764706
+      ]
+    },
+    "ds-gray-alpha-500": {
+      "css": "#ffffff3d",
+      "resolved_css": "#ffffff3d",
+      "srgb": [
+        1.0,
+        1.0,
+        1.0,
+        0.2392156863
+      ]
+    },
+    "ds-gray-alpha-600": {
+      "css": "#ffffff82",
+      "resolved_css": "#ffffff82",
+      "srgb": [
+        1.0,
+        1.0,
+        1.0,
+        0.5098039216
+      ]
+    },
+    "ds-gray-alpha-700": {
+      "css": "#ffffff8a",
+      "resolved_css": "#ffffff8a",
+      "srgb": [
+        1.0,
+        1.0,
+        1.0,
+        0.5411764706
+      ]
+    },
+    "ds-gray-alpha-800": {
+      "css": "#ffffff78",
+      "resolved_css": "#ffffff78",
+      "srgb": [
+        1.0,
+        1.0,
+        1.0,
+        0.4705882353
+      ]
+    },
+    "ds-gray-alpha-900": {
+      "css": "#ffffff9c",
+      "resolved_css": "#ffffff9c",
+      "srgb": [
+        1.0,
+        1.0,
+        1.0,
+        0.6117647059
+      ]
+    },
+    "ds-green-100": {
+      "css": "hsla(var(--ds-green-100-value), 1)",
+      "resolved_css": "hsla(136, 50%, 9%, 1)",
+      "srgb": [
+        0.045,
+        0.135,
+        0.069,
+        1.0
+      ],
+      "p3": "oklch(23.09% .0716 149.68)"
+    },
+    "ds-green-1000": {
+      "css": "hsla(var(--ds-green-1000-value), 1)",
+      "resolved_css": "hsla(136, 73%, 94%, 1)",
+      "srgb": [
+        0.8962,
+        0.9838,
+        0.91956,
+        1.0
+      ],
+      "p3": "oklch(96.76% .056 154.18)"
+    },
+    "ds-green-200": {
+      "css": "hsla(var(--ds-green-200-value), 1)",
+      "resolved_css": "hsla(137, 50%, 12%, 1)",
+      "srgb": [
+        0.06,
+        0.18,
+        0.094,
+        1.0
+      ],
+      "p3": "oklch(27.12% .0895 150.09)"
+    },
+    "ds-green-300": {
+      "css": "hsla(var(--ds-green-300-value), 1)",
+      "resolved_css": "hsla(136, 50%, 14%, 1)",
+      "srgb": [
+        0.07,
+        0.21,
+        0.1073333333,
+        1.0
+      ],
+      "p3": "oklch(29.84% .096 149.25)"
+    },
+    "ds-green-400": {
+      "css": "hsla(var(--ds-green-400-value), 1)",
+      "resolved_css": "hsla(135, 70%, 16%, 1)",
+      "srgb": [
+        0.048,
+        0.272,
+        0.104,
+        1.0
+      ],
+      "p3": "oklch(34.39% .1039 147.78)"
+    },
+    "ds-green-500": {
+      "css": "hsla(var(--ds-green-500-value), 1)",
+      "resolved_css": "hsla(135, 70%, 23%, 1)",
+      "srgb": [
+        0.069,
+        0.391,
+        0.1495,
+        1.0
+      ],
+      "p3": "oklch(44.19% .1484 147.2)"
+    },
+    "ds-green-600": {
+      "css": "hsla(var(--ds-green-600-value), 1)",
+      "resolved_css": "hsla(135, 70%, 34%, 1)",
+      "srgb": [
+        0.102,
+        0.578,
+        0.221,
+        1.0
+      ],
+      "p3": "oklch(58.11% .1815 146.55)"
+    },
+    "ds-green-700": {
+      "css": "hsla(var(--ds-green-700-value), 1)",
+      "resolved_css": "hsla(131, 41%, 46%, 1)",
+      "srgb": [
+        0.2714,
+        0.6486,
+        0.3405533333,
+        1.0
+      ],
+      "p3": "oklch(64.58% .199 147.27)"
+    },
+    "ds-green-800": {
+      "css": "hsla(var(--ds-green-800-value), 1)",
+      "resolved_css": "hsla(132, 43%, 39%, 1)",
+      "srgb": [
+        0.2223,
+        0.5577,
+        0.28938,
+        1.0
+      ],
+      "p3": "oklch(57.81% .1776 147.5)"
+    },
+    "ds-green-900": {
+      "css": "hsla(var(--ds-green-900-value), 1)",
+      "resolved_css": "hsla(131, 43%, 57%, 1)",
+      "srgb": [
+        0.3851,
+        0.7549,
+        0.4528966667,
+        1.0
+      ],
+      "p3": "oklch(73.1% .2158 148.29)"
+    },
+    "ds-overlay-backdrop-color": {
+      "css": "var(--ds-background-200)",
+      "resolved_css": "hsla(0, 0%, 0%, 1)",
+      "srgb": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "ds-pink-100": {
+      "css": "hsla(var(--ds-pink-100-value), 1)",
+      "resolved_css": "hsla(335, 32%, 12%, 1)",
+      "srgb": [
+        0.1584,
+        0.0816,
+        0.1136,
+        1.0
+      ],
+      "p3": "oklch(22.67% .0628 354.73)"
+    },
+    "ds-pink-1000": {
+      "css": "hsla(var(--ds-pink-1000-value), 1)",
+      "resolved_css": "hsla(333, 90%, 96%, 1)",
+      "srgb": [
+        0.996,
+        0.924,
+        0.9564,
+        1.0
+      ],
+      "p3": "oklch(95.74% .0326 350.08)"
+    },
+    "ds-pink-200": {
+      "css": "hsla(var(--ds-pink-200-value), 1)",
+      "resolved_css": "hsla(335, 43%, 16%, 1)",
+      "srgb": [
+        0.2288,
+        0.0912,
+        0.1485333333,
+        1.0
+      ],
+      "p3": "oklch(26.2% .0859 356.68)"
+    },
+    "ds-pink-300": {
+      "css": "hsla(var(--ds-pink-300-value), 1)",
+      "resolved_css": "hsla(335, 47%, 21%, 1)",
+      "srgb": [
+        0.3087,
+        0.1113,
+        0.19355,
+        1.0
+      ],
+      "p3": "oklch(31.15% .1067 355.93)"
+    },
+    "ds-pink-400": {
+      "css": "hsla(var(--ds-pink-400-value), 1)",
+      "resolved_css": "hsla(335, 51%, 22%, 1)",
+      "srgb": [
+        0.3322,
+        0.1078,
+        0.2013,
+        1.0
+      ],
+      "p3": "oklch(32.13% .1174 356.71)"
+    },
+    "ds-pink-500": {
+      "css": "hsla(var(--ds-pink-500-value), 1)",
+      "resolved_css": "hsla(335, 57%, 27%, 1)",
+      "srgb": [
+        0.4239,
+        0.1161,
+        0.24435,
+        1.0
+      ],
+      "p3": "oklch(37.01% .1453 358.39)"
+    },
+    "ds-pink-600": {
+      "css": "hsla(var(--ds-pink-600-value), 1)",
+      "resolved_css": "hsla(336, 75%, 40%, 1)",
+      "srgb": [
+        0.7,
+        0.1,
+        0.34,
+        1.0
+      ],
+      "p3": "oklch(50.33% .2089 4.33)"
+    },
+    "ds-pink-700": {
+      "css": "hsla(var(--ds-pink-700-value), 1)",
+      "resolved_css": "hsla(336, 80%, 58%, 1)",
+      "srgb": [
+        0.916,
+        0.244,
+        0.5128,
+        1.0
+      ],
+      "p3": "oklch(63.52% .2346 1.01)"
+    },
+    "ds-pink-800": {
+      "css": "hsla(var(--ds-pink-800-value), 1)",
+      "resolved_css": "hsla(336, 74%, 51%, 1)",
+      "srgb": [
+        0.8726,
+        0.1474,
+        0.43748,
+        1.0
+      ],
+      "p3": "oklch(59.51% .2429 4.21)"
+    },
+    "ds-pink-900": {
+      "css": "hsla(var(--ds-pink-900-value), 1)",
+      "resolved_css": "hsla(341, 90%, 67%, 1)",
+      "srgb": [
+        0.967,
+        0.373,
+        0.5611,
+        1.0
+      ],
+      "p3": "oklch(69.36% .2223 3.91)"
+    },
+    "ds-purple-100": {
+      "css": "hsla(var(--ds-purple-100-value), 1)",
+      "resolved_css": "hsla(283, 30%, 12%, 1)",
+      "srgb": [
+        0.1356,
+        0.084,
+        0.156,
+        1.0
+      ],
+      "p3": "oklch(22.34% .0779 316.87)"
+    },
+    "ds-purple-1000": {
+      "css": "hsla(var(--ds-purple-1000-value), 1)",
+      "resolved_css": "hsla(281, 73%, 96%, 1)",
+      "srgb": [
+        0.9707066667,
+        0.9308,
+        0.9892,
+        1.0
+      ],
+      "p3": "oklch(96.1% .0304 316.46)"
+    },
+    "ds-purple-200": {
+      "css": "hsla(var(--ds-purple-200-value), 1)",
+      "resolved_css": "hsla(281, 38%, 16%, 1)",
+      "srgb": [
+        0.1822933333,
+        0.0992,
+        0.2208,
+        1.0
+      ],
+      "p3": "oklch(25.91% .0921 314.41)"
+    },
+    "ds-purple-300": {
+      "css": "hsla(var(--ds-purple-300-value), 1)",
+      "resolved_css": "hsla(279, 44%, 23%, 1)",
+      "srgb": [
+        0.26036,
+        0.1288,
+        0.3312,
+        1.0
+      ],
+      "p3": "oklch(31.98% .1219 312.41)"
+    },
+    "ds-purple-400": {
+      "css": "hsla(var(--ds-purple-400-value), 1)",
+      "resolved_css": "hsla(277, 46%, 28%, 1)",
+      "srgb": [
+        0.3100533333,
+        0.1512,
+        0.4088,
+        1.0
+      ],
+      "p3": "oklch(35.93% .1504 309.78)"
+    },
+    "ds-purple-500": {
+      "css": "hsla(var(--ds-purple-500-value), 1)",
+      "resolved_css": "hsla(274, 49%, 35%, 1)",
+      "srgb": [
+        0.3728666667,
+        0.1785,
+        0.5215,
+        1.0
+      ],
+      "p3": "oklch(40.99% .1721 307.92)"
+    },
+    "ds-purple-600": {
+      "css": "hsla(var(--ds-purple-600-value), 1)",
+      "resolved_css": "hsla(272, 51%, 54%, 1)",
+      "srgb": [
+        0.55564,
+        0.3054,
+        0.7746,
+        1.0
+      ],
+      "p3": "oklch(55.5% .2191 306.12)"
+    },
+    "ds-purple-700": {
+      "css": "hsla(var(--ds-purple-700-value), 1)",
+      "resolved_css": "hsla(272, 51%, 54%, 1)",
+      "srgb": [
+        0.55564,
+        0.3054,
+        0.7746,
+        1.0
+      ],
+      "p3": "oklch(55.5% .2186 306.12)"
+    },
+    "ds-purple-800": {
+      "css": "hsla(var(--ds-purple-800-value), 1)",
+      "resolved_css": "hsla(272, 47%, 45%, 1)",
+      "srgb": [
+        0.4641,
+        0.2385,
+        0.6615,
+        1.0
+      ],
+      "p3": "oklch(48.58% .2102 305.73)"
+    },
+    "ds-purple-900": {
+      "css": "hsla(var(--ds-purple-900-value), 1)",
+      "resolved_css": "hsla(275, 80%, 71%, 1)",
+      "srgb": [
+        0.7486666667,
+        0.478,
+        0.942,
+        1.0
+      ],
+      "p3": "oklch(69.87% .2037 309.51)"
+    },
+    "ds-red-100": {
+      "css": "hsla(var(--ds-red-100-value), 1)",
+      "resolved_css": "hsla(357, 37%, 12%, 1)",
+      "srgb": [
+        0.1644,
+        0.0756,
+        0.08004,
+        1.0
+      ],
+      "p3": "oklch(22.1% .0657 15.11)"
+    },
+    "ds-red-1000": {
+      "css": "hsla(var(--ds-red-1000-value), 1)",
+      "resolved_css": "hsla(353, 90%, 96%, 1)",
+      "srgb": [
+        0.996,
+        0.924,
+        0.9324,
+        1.0
+      ],
+      "p3": "oklch(95.6% .0293 6.61)"
+    },
+    "ds-red-200": {
+      "css": "hsla(var(--ds-red-200-value), 1)",
+      "resolved_css": "hsla(357, 46%, 16%, 1)",
+      "srgb": [
+        0.2336,
+        0.0864,
+        0.09376,
+        1.0
+      ],
+      "p3": "oklch(25.93% .0834 19.02)"
+    },
+    "ds-red-300": {
+      "css": "hsla(var(--ds-red-300-value), 1)",
+      "resolved_css": "hsla(356, 54%, 22%, 1)",
+      "srgb": [
+        0.3388,
+        0.1012,
+        0.11704,
+        1.0
+      ],
+      "p3": "oklch(31.47% .1105 20.96)"
+    },
+    "ds-red-400": {
+      "css": "hsla(var(--ds-red-400-value), 1)",
+      "resolved_css": "hsla(357, 55%, 26%, 1)",
+      "srgb": [
+        0.403,
+        0.117,
+        0.1313,
+        1.0
+      ],
+      "p3": "oklch(35.27% .1273 21.23)"
+    },
+    "ds-red-500": {
+      "css": "hsla(var(--ds-red-500-value), 1)",
+      "resolved_css": "hsla(357, 60%, 32%, 1)",
+      "srgb": [
+        0.512,
+        0.128,
+        0.1472,
+        1.0
+      ],
+      "p3": "oklch(40.68% .1479 23.16)"
+    },
+    "ds-red-600": {
+      "css": "hsla(var(--ds-red-600-value), 1)",
+      "resolved_css": "hsla(358, 75%, 59%, 1)",
+      "srgb": [
+        0.8975,
+        0.2825,
+        0.303,
+        1.0
+      ],
+      "p3": "oklch(62.56% .2277 23.03)"
+    },
+    "ds-red-700": {
+      "css": "hsla(var(--ds-red-700-value), 1)",
+      "resolved_css": "hsla(358, 75%, 59%, 1)",
+      "srgb": [
+        0.8975,
+        0.2825,
+        0.303,
+        1.0
+      ],
+      "p3": "oklch(62.56% .2234 23.03)"
+    },
+    "ds-red-800": {
+      "css": "hsla(var(--ds-red-800-value), 1)",
+      "resolved_css": "hsla(358, 69%, 52%, 1)",
+      "srgb": [
+        0.8512,
+        0.1888,
+        0.21088,
+        1.0
+      ],
+      "p3": "oklch(58.01% .227 25.12)"
+    },
+    "ds-red-900": {
+      "css": "hsla(var(--ds-red-900-value), 1)",
+      "resolved_css": "hsla(358, 100%, 69%, 1)",
+      "srgb": [
+        1.0,
+        0.38,
+        0.4006666667,
+        1.0
+      ],
+      "p3": "oklch(69.96% .2136 22.03)"
+    },
+    "ds-teal-100": {
+      "css": "hsla(var(--ds-teal-100-value), 1)",
+      "resolved_css": "hsla(169, 78%, 7%, 1)",
+      "srgb": [
+        0.0154,
+        0.1246,
+        0.10458,
+        1.0
+      ],
+      "p3": "oklch(22.1% .0544 178.74)"
+    },
+    "ds-teal-1000": {
+      "css": "hsla(var(--ds-teal-1000-value), 1)",
+      "resolved_css": "hsla(166, 71%, 93%, 1)",
+      "srgb": [
+        0.8803,
+        0.9797,
+        0.9565066667,
+        1.0
+      ],
+      "p3": "oklch(96.46% .056 180.29)"
+    },
+    "ds-teal-200": {
+      "css": "hsla(var(--ds-teal-200-value), 1)",
+      "resolved_css": "hsla(170, 74%, 9%, 1)",
+      "srgb": [
+        0.0234,
+        0.1566,
+        0.1344,
+        1.0
+      ],
+      "p3": "oklch(25.06% .062 178.76)"
+    },
+    "ds-teal-300": {
+      "css": "hsla(var(--ds-teal-300-value), 1)",
+      "resolved_css": "hsla(171, 75%, 13%, 1)",
+      "srgb": [
+        0.0325,
+        0.2275,
+        0.19825,
+        1.0
+      ],
+      "p3": "oklch(31.5% .0767 180.99)"
+    },
+    "ds-teal-400": {
+      "css": "hsla(var(--ds-teal-400-value), 1)",
+      "resolved_css": "hsla(171, 85%, 13%, 1)",
+      "srgb": [
+        0.0195,
+        0.2405,
+        0.20735,
+        1.0
+      ],
+      "p3": "oklch(32.43% .0763 180.13)"
+    },
+    "ds-teal-500": {
+      "css": "hsla(var(--ds-teal-500-value), 1)",
+      "resolved_css": "hsla(172, 85%, 20%, 1)",
+      "srgb": [
+        0.03,
+        0.37,
+        0.3246666667,
+        1.0
+      ],
+      "p3": "oklch(43.35% .1055 180.97)"
+    },
+    "ds-teal-600": {
+      "css": "hsla(var(--ds-teal-600-value), 1)",
+      "resolved_css": "hsla(172, 85%, 32%, 1)",
+      "srgb": [
+        0.048,
+        0.592,
+        0.5194666667,
+        1.0
+      ],
+      "p3": "oklch(60.71% .1485 180.24)"
+    },
+    "ds-teal-700": {
+      "css": "hsla(var(--ds-teal-700-value), 1)",
+      "resolved_css": "hsla(173, 80%, 36%, 1)",
+      "srgb": [
+        0.072,
+        0.648,
+        0.5808,
+        1.0
+      ],
+      "p3": "oklch(64.92% .1403 181.95)"
+    },
+    "ds-teal-800": {
+      "css": "hsla(var(--ds-teal-800-value), 1)",
+      "resolved_css": "hsla(173, 83%, 30%, 1)",
+      "srgb": [
+        0.051,
+        0.549,
+        0.4909,
+        1.0
+      ],
+      "p3": "oklch(57.53% .1392 181.66)"
+    },
+    "ds-teal-900": {
+      "css": "hsla(var(--ds-teal-900-value), 1)",
+      "resolved_css": "hsla(174, 90%, 41%, 1)",
+      "srgb": [
+        0.041,
+        0.779,
+        0.7052,
+        1.0
+      ],
+      "p3": "oklch(74.56% .1765 182.8)"
+    },
+    "geist-background": {
+      "css": "#000",
+      "resolved_css": "#000",
+      "srgb": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "geist-code": {
+      "css": "var(--geist-foreground)",
+      "resolved_css": "#fff",
+      "srgb": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "geist-console-header": {
+      "css": "#0f0310",
+      "resolved_css": "#0f0310",
+      "srgb": [
+        0.0588235294,
+        0.0117647059,
+        0.062745098,
+        1.0
+      ]
+    },
+    "geist-console-purple": {
+      "css": "#8a63d2",
+      "resolved_css": "#8a63d2",
+      "srgb": [
+        0.5411764706,
+        0.3882352941,
+        0.8235294118,
+        1.0
+      ]
+    },
+    "geist-console-text-color-blue": {
+      "css": "#3291ff",
+      "resolved_css": "#3291ff",
+      "srgb": [
+        0.1960784314,
+        0.568627451,
+        1.0,
+        1.0
+      ]
+    },
+    "geist-console-text-color-default": {
+      "css": "var(--geist-foreground)",
+      "resolved_css": "#fff",
+      "srgb": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "geist-console-text-color-pink": {
+      "css": "#eb367f",
+      "resolved_css": "#eb367f",
+      "srgb": [
+        0.9215686275,
+        0.2117647059,
+        0.4980392157,
+        1.0
+      ]
+    },
+    "geist-console-text-color-purple": {
+      "css": "#7928ca",
+      "resolved_css": "#7928ca",
+      "srgb": [
+        0.4745098039,
+        0.1568627451,
+        0.7921568627,
+        1.0
+      ]
+    },
+    "geist-cyan": {
+      "css": "#50e3c2",
+      "resolved_css": "#50e3c2",
+      "srgb": [
+        0.3137254902,
+        0.8901960784,
+        0.7607843137,
+        1.0
+      ]
+    },
+    "geist-cyan-dark": {
+      "css": "#29bc9b",
+      "resolved_css": "#29bc9b",
+      "srgb": [
+        0.1607843137,
+        0.737254902,
+        0.6078431373,
+        1.0
+      ]
+    },
+    "geist-cyan-light": {
+      "css": "#79ffe1",
+      "resolved_css": "#79ffe1",
+      "srgb": [
+        0.4745098039,
+        1.0,
+        0.8823529412,
+        1.0
+      ]
+    },
+    "geist-cyan-lighter": {
+      "css": "#aaffec",
+      "resolved_css": "#aaffec",
+      "srgb": [
+        0.6666666667,
+        1.0,
+        0.9254901961,
+        1.0
+      ]
+    },
+    "geist-error": {
+      "css": "red",
+      "resolved_css": "red",
+      "srgb": [
+        1.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "geist-error-dark": {
+      "css": "#e60000",
+      "resolved_css": "#e60000",
+      "srgb": [
+        0.9019607843,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "geist-error-light": {
+      "css": "#f33",
+      "resolved_css": "#f33",
+      "srgb": [
+        1.0,
+        0.2,
+        0.2,
+        1.0
+      ]
+    },
+    "geist-error-lighter": {
+      "css": "#f7d4d6",
+      "resolved_css": "#f7d4d6",
+      "srgb": [
+        0.968627451,
+        0.831372549,
+        0.8392156863,
+        1.0
+      ]
+    },
+    "geist-foreground": {
+      "css": "#fff",
+      "resolved_css": "#fff",
+      "srgb": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "geist-highlight-magenta": {
+      "css": "#eb367f",
+      "resolved_css": "#eb367f",
+      "srgb": [
+        0.9215686275,
+        0.2117647059,
+        0.4980392157,
+        1.0
+      ]
+    },
+    "geist-highlight-pink": {
+      "css": "#ff0080",
+      "resolved_css": "#ff0080",
+      "srgb": [
+        1.0,
+        0.0,
+        0.5019607843,
+        1.0
+      ]
+    },
+    "geist-highlight-purple": {
+      "css": "#f81ce5",
+      "resolved_css": "#f81ce5",
+      "srgb": [
+        0.9725490196,
+        0.1098039216,
+        0.8980392157,
+        1.0
+      ]
+    },
+    "geist-highlight-yellow": {
+      "css": "#fff500",
+      "resolved_css": "#fff500",
+      "srgb": [
+        1.0,
+        0.9607843137,
+        0.0,
+        1.0
+      ]
+    },
+    "geist-link-color": {
+      "css": "var(--ds-blue-900)",
+      "resolved_css": "hsla(210, 100%, 66%, 1)",
+      "srgb": [
+        0.32,
+        0.66,
+        1.0,
+        1.0
+      ]
+    },
+    "geist-marketing-gray": {
+      "css": "var(--accents-1)",
+      "resolved_css": "#111",
+      "srgb": [
+        0.0666666667,
+        0.0666666667,
+        0.0666666667,
+        1.0
+      ]
+    },
+    "geist-secondary": {
+      "css": "var(--accents-5)",
+      "resolved_css": "#888",
+      "srgb": [
+        0.5333333333,
+        0.5333333333,
+        0.5333333333,
+        1.0
+      ]
+    },
+    "geist-secondary-dark": {
+      "css": "var(--accents-7)",
+      "resolved_css": "#eaeaea",
+      "srgb": [
+        0.9176470588,
+        0.9176470588,
+        0.9176470588,
+        1.0
+      ]
+    },
+    "geist-secondary-light": {
+      "css": "var(--accents-3)",
+      "resolved_css": "#444",
+      "srgb": [
+        0.2666666667,
+        0.2666666667,
+        0.2666666667,
+        1.0
+      ]
+    },
+    "geist-secondary-lighter": {
+      "css": "var(--accents-2)",
+      "resolved_css": "#333",
+      "srgb": [
+        0.2,
+        0.2,
+        0.2,
+        1.0
+      ]
+    },
+    "geist-selection": {
+      "css": "var(--ds-gray-1000)",
+      "resolved_css": "hsla(0, 0%, 93%, 1)",
+      "srgb": [
+        0.93,
+        0.93,
+        0.93,
+        1.0
+      ]
+    },
+    "geist-selection-text-color": {
+      "css": "var(--ds-gray-100)",
+      "resolved_css": "hsla(0, 0%, 10%, 1)",
+      "srgb": [
+        0.1,
+        0.1,
+        0.1,
+        1.0
+      ]
+    },
+    "geist-success": {
+      "css": "#0070f3",
+      "resolved_css": "#0070f3",
+      "srgb": [
+        0.0,
+        0.4392156863,
+        0.9529411765,
+        1.0
+      ]
+    },
+    "geist-success-dark": {
+      "css": "#0761d1",
+      "resolved_css": "#0761d1",
+      "srgb": [
+        0.0274509804,
+        0.3803921569,
+        0.8196078431,
+        1.0
+      ]
+    },
+    "geist-success-light": {
+      "css": "#3291ff",
+      "resolved_css": "#3291ff",
+      "srgb": [
+        0.1960784314,
+        0.568627451,
+        1.0,
+        1.0
+      ]
+    },
+    "geist-success-lighter": {
+      "css": "#d3e5ff",
+      "resolved_css": "#d3e5ff",
+      "srgb": [
+        0.8274509804,
+        0.8980392157,
+        1.0,
+        1.0
+      ]
+    },
+    "geist-violet": {
+      "css": "#7928ca",
+      "resolved_css": "#7928ca",
+      "srgb": [
+        0.4745098039,
+        0.1568627451,
+        0.7921568627,
+        1.0
+      ]
+    },
+    "geist-violet-background": {
+      "css": "#291d3a",
+      "resolved_css": "#291d3a",
+      "srgb": [
+        0.1607843137,
+        0.1137254902,
+        0.2274509804,
+        1.0
+      ]
+    },
+    "geist-violet-background-secondary": {
+      "css": "#211830",
+      "resolved_css": "#211830",
+      "srgb": [
+        0.1294117647,
+        0.0941176471,
+        0.1882352941,
+        1.0
+      ]
+    },
+    "geist-violet-background-tertiary": {
+      "css": "#211830",
+      "resolved_css": "#211830",
+      "srgb": [
+        0.1294117647,
+        0.0941176471,
+        0.1882352941,
+        1.0
+      ]
+    },
+    "geist-violet-dark": {
+      "css": "#4c2889",
+      "resolved_css": "#4c2889",
+      "srgb": [
+        0.2980392157,
+        0.1568627451,
+        0.537254902,
+        1.0
+      ]
+    },
+    "geist-violet-light": {
+      "css": "#8a63d2",
+      "resolved_css": "#8a63d2",
+      "srgb": [
+        0.5411764706,
+        0.3882352941,
+        0.8235294118,
+        1.0
+      ]
+    },
+    "geist-violet-lighter": {
+      "css": "#d8ccf1",
+      "resolved_css": "#d8ccf1",
+      "srgb": [
+        0.8470588235,
+        0.8,
+        0.9450980392,
+        1.0
+      ]
+    },
+    "geist-warning": {
+      "css": "#f5a623",
+      "resolved_css": "#f5a623",
+      "srgb": [
+        0.9607843137,
+        0.6509803922,
+        0.137254902,
+        1.0
+      ]
+    },
+    "geist-warning-dark": {
+      "css": "#ab570a",
+      "resolved_css": "#ab570a",
+      "srgb": [
+        0.6705882353,
+        0.3411764706,
+        0.0392156863,
+        1.0
+      ]
+    },
+    "geist-warning-light": {
+      "css": "#f7b955",
+      "resolved_css": "#f7b955",
+      "srgb": [
+        0.968627451,
+        0.7254901961,
+        0.3333333333,
+        1.0
+      ]
+    },
+    "geist-warning-lighter": {
+      "css": "#ffefcf",
+      "resolved_css": "#ffefcf",
+      "srgb": [
+        1.0,
+        0.937254902,
+        0.8117647059,
+        1.0
+      ]
+    },
+    "header-import-flow-background": {
+      "css": "#111c",
+      "resolved_css": "#111c",
+      "srgb": [
+        0.0666666667,
+        0.0666666667,
+        0.0666666667,
+        0.8
+      ]
+    },
+    "next-icon-border": {
+      "css": "#fff",
+      "resolved_css": "#fff",
+      "srgb": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "preview-end-gradient": {
+      "css": "#ff0080",
+      "resolved_css": "#ff0080",
+      "srgb": [
+        1.0,
+        0.0,
+        0.5019607843,
+        1.0
+      ],
+      "p3": "oklch(64.53% .292 2.47)"
+    },
+    "preview-line-end": {
+      "css": "#9a1fb8",
+      "resolved_css": "#9a1fb8",
+      "srgb": [
+        0.6039215686,
+        0.1215686275,
+        0.7215686275,
+        1.0
+      ],
+      "p3": "oklch(51.39% .267 318.36)"
+    },
+    "preview-start-gradient": {
+      "css": "#7928ca",
+      "resolved_css": "#7928ca",
+      "srgb": [
+        0.4745098039,
+        0.1568627451,
+        0.7921568627,
+        1.0
+      ],
+      "p3": "oklch(49.07% .272 300.45)"
+    },
+    "preview-text": {
+      "css": "#de1d8d",
+      "resolved_css": "#de1d8d",
+      "srgb": [
+        0.8705882353,
+        0.1137254902,
+        0.5529411765,
+        1.0
+      ],
+      "p3": "oklch(59.93% .274 352.55)"
+    },
+    "scroller-end": {
+      "css": "#0000",
+      "resolved_css": "#0000",
+      "srgb": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "scroller-start": {
+      "css": "#000",
+      "resolved_css": "#000",
+      "srgb": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "ship-end-gradient": {
+      "css": "#f9cb28",
+      "resolved_css": "#f9cb28",
+      "srgb": [
+        0.9764705882,
+        0.7960784314,
+        0.1568627451,
+        1.0
+      ],
+      "p3": "oklch(85.82% .201 91.19)"
+    },
+    "ship-line-end": {
+      "css": "#f9cb28",
+      "resolved_css": "#f9cb28",
+      "srgb": [
+        0.9764705882,
+        0.7960784314,
+        0.1568627451,
+        1.0
+      ],
+      "p3": "oklch(85.82% .201 91.19)"
+    },
+    "ship-start-gradient": {
+      "css": "#ff4d4d",
+      "resolved_css": "#ff4d4d",
+      "srgb": [
+        1.0,
+        0.3019607843,
+        0.3019607843,
+        1.0
+      ],
+      "p3": "oklch(67.3% .266 25.0397)"
+    },
+    "ship-text": {
+      "css": "#ff5b4f",
+      "resolved_css": "#ff5b4f",
+      "srgb": [
+        1.0,
+        0.3568627451,
+        0.3098039216,
+        1.0
+      ],
+      "p3": "oklch(68.79% .25 27.76)"
+    },
+    "wv-green": {
+      "css": "#0cce6b",
+      "resolved_css": "#0cce6b",
+      "srgb": [
+        0.0470588235,
+        0.8078431373,
+        0.4196078431,
+        1.0
+      ]
+    },
+    "wv-orange": {
+      "css": "#ffa400",
+      "resolved_css": "#ffa400",
+      "srgb": [
+        1.0,
+        0.6431372549,
+        0.0,
+        1.0
+      ]
+    },
+    "wv-red": {
+      "css": "#ff4e42",
+      "resolved_css": "#ff4e42",
+      "srgb": [
+        1.0,
+        0.3058823529,
+        0.2588235294,
+        1.0
+      ]
+    }
+  }
+}

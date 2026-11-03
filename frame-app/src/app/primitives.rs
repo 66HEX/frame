@@ -10,7 +10,7 @@ use super::{
 
 #[derive(Clone, Copy)]
 pub(super) enum ButtonVariant {
-    Default,
+    Primary,
     Secondary,
     Ghost,
 }
@@ -42,40 +42,38 @@ pub(super) const fn button_colors(
     enabled: bool,
     palette: &'static theme::ThemePalette,
 ) -> ButtonColors {
-    let active_variant = matches!(variant, ButtonVariant::Default) || selected;
     if !enabled {
-        let (background, foreground, opacity) = if active_variant {
-            (
-                palette.border_subtle.with_alpha(0.10),
-                palette.text_primary.with_alpha(0.50),
-                1.0,
-            )
-        } else if matches!(variant, ButtonVariant::Ghost) {
-            (palette.transparent, palette.text_muted, 0.5)
+        let background = if matches!(variant, ButtonVariant::Ghost) && !selected {
+            palette.transparent
         } else {
-            (
-                palette.fill_subtle,
-                palette.text_primary.with_alpha(0.50),
-                0.5,
-            )
+            palette.fill_subtle
         };
         return ButtonColors {
             background,
             hover_background: background,
             active_background: background,
-            foreground,
-            hover_foreground: foreground,
-            opacity,
+            foreground: palette.text_disabled,
+            hover_foreground: palette.text_disabled,
+            opacity: 1.0,
         };
     }
 
-    if active_variant {
+    if selected {
         ButtonColors {
-            background: palette.border_subtle,
-            hover_background: palette.border_subtle.with_alpha(0.18),
-            active_background: palette.border_subtle.with_alpha(0.18),
+            background: palette.fill_strong,
+            hover_background: palette.fill_strong,
+            active_background: palette.fill_selected,
             foreground: palette.text_primary,
             hover_foreground: palette.text_primary,
+            opacity: 1.0,
+        }
+    } else if matches!(variant, ButtonVariant::Primary) {
+        ButtonColors {
+            background: palette.primary,
+            hover_background: palette.primary_hover,
+            active_background: palette.primary_active,
+            foreground: palette.primary_foreground,
+            hover_foreground: palette.primary_foreground,
             opacity: 1.0,
         }
     } else if matches!(variant, ButtonVariant::Ghost) {
@@ -91,7 +89,7 @@ pub(super) const fn button_colors(
         ButtonColors {
             background: palette.fill_subtle,
             hover_background: palette.fill_selected,
-            active_background: palette.fill_selected,
+            active_background: palette.fill_strong,
             foreground: palette.text_primary,
             hover_foreground: palette.text_primary,
             opacity: 1.0,
@@ -284,7 +282,12 @@ pub(super) fn vertical_separator(height: f32, palette: &theme::ThemePalette) -> 
             .h(theme::ui_rem(height))
             .w(px(2.0))
             .child(div().h_full().w(px(1.0)).bg(color(palette.canvas)))
-            .child(div().h_full().w(px(1.0)).bg(color(palette.fill_subtle)))
+            .child(
+                div()
+                    .h_full()
+                    .w(px(1.0))
+                    .bg(color(palette.highlight_subtle)),
+            )
     }
 }
 
@@ -325,7 +328,7 @@ pub(super) fn horizontal_separator_shadows(palette: &theme::ThemePalette) -> Vec
         (palette.border_subtle, frame_highlight_px())
     } else {
         // Dark separators intentionally pair their canvas base with a full-pixel light edge.
-        (palette.fill_subtle, 1.0)
+        (palette.highlight_subtle, 1.0)
     };
 
     vec![BoxShadow {

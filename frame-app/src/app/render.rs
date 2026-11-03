@@ -602,7 +602,7 @@ impl Render for FrameRoot {
             .flex_col()
             .overflow_hidden()
             .group(ROOT_DROP_GROUP)
-            .bg(color(palette.canvas))
+            .bg(color(palette.background))
             .text_color(color(palette.text_primary))
             .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
             .font_family(assets::FRAME_FONT_FAMILY)

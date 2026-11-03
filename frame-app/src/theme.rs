@@ -1,5 +1,6 @@
 //! Frame native visual tokens and resolved color palettes.
 
+pub mod geist;
 pub mod shadows;
 
 use std::sync::LazyLock;
@@ -34,144 +35,98 @@ impl RgbaToken {
     }
 }
 
-/// A source color expressed in OKLCH with an alpha channel.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct OklchToken {
-    pub lightness: f32,
-    pub chroma: f32,
-    pub hue: f32,
-    pub alpha: f32,
-}
-
-impl OklchToken {
-    #[must_use]
-    pub const fn new(lightness: f32, chroma: f32, hue: f32) -> Self {
-        Self {
-            lightness,
-            chroma,
-            hue,
-            alpha: 1.0,
-        }
-    }
-
-    #[must_use]
-    pub const fn with_alpha(self, alpha: f32) -> Self {
-        Self { alpha, ..self }
-    }
-
-    #[must_use]
-    pub fn to_rgba(self) -> RgbaToken {
-        oklch_to_rgba(self)
-    }
-}
-
-#[derive(Debug)]
-struct ThemeDefinition {
-    canvas: OklchToken,
-    surface: OklchToken,
-    surface_elevated: OklchToken,
-    text_primary: OklchToken,
-    text_muted: OklchToken,
-    fill_subtle: OklchToken,
-    fill_selected: OklchToken,
-    border_subtle: OklchToken,
-    control_muted: OklchToken,
-    accent: OklchToken,
-    danger: OklchToken,
-    warning: OklchToken,
-    shadow: OklchToken,
-    transparent: OklchToken,
-}
-
-/// Resolved semantic colors consumed by GPUI rendering code.
+/// Semantic roles selected from the exact Geist sRGB palette.
+/// See docs/colors/README.md for the shadcn hierarchy and component assignments.
 #[derive(Debug, PartialEq)]
 pub struct ThemePalette {
     color_theme: ColorTheme,
+    pub background: RgbaToken,
+    /// Recessed input, checkbox, slider and infinite-canvas background.
     pub canvas: RgbaToken,
     pub surface: RgbaToken,
     pub surface_elevated: RgbaToken,
+    pub tooltip_surface: RgbaToken,
+    pub tooltip_foreground: RgbaToken,
     pub text_primary: RgbaToken,
     pub text_muted: RgbaToken,
+    pub text_disabled: RgbaToken,
     pub fill_subtle: RgbaToken,
     pub fill_selected: RgbaToken,
+    pub fill_strong: RgbaToken,
+    pub highlight_subtle: RgbaToken,
     pub border_subtle: RgbaToken,
     pub control_muted: RgbaToken,
     pub accent: RgbaToken,
+    pub focus_ring: RgbaToken,
+    pub text_selection: RgbaToken,
     pub danger: RgbaToken,
+    pub danger_surface: RgbaToken,
     pub warning: RgbaToken,
-    /// Opaque neutral used as the source color for individually tuned shadow layers.
-    pub shadow: RgbaToken,
+    pub success: RgbaToken,
+    pub overlay_backdrop: RgbaToken,
+    pub primary: RgbaToken,
+    pub primary_to: RgbaToken,
+    pub primary_hover: RgbaToken,
+    pub primary_hover_to: RgbaToken,
+    pub primary_active: RgbaToken,
+    pub primary_active_to: RgbaToken,
+    pub primary_foreground: RgbaToken,
     pub transparent: RgbaToken,
 }
 
-const DARK_CANVAS: OklchToken = OklchToken::new(0.199_806, 0.008_602, 264.360);
-const DARK_SURFACE: OklchToken = OklchToken::new(0.230_343, 0.008_292, 264.399);
-const DARK_SURFACE_ELEVATED: OklchToken = OklchToken::new(0.272_751, 0.009_683, 268.319);
-const DARK_TEXT_PRIMARY: OklchToken = OklchToken::new(0.946_003, 0.026_830, 285.876);
-
-const DARK_DEFINITION: ThemeDefinition = ThemeDefinition {
-    canvas: DARK_CANVAS,
-    surface: DARK_SURFACE,
-    surface_elevated: DARK_SURFACE_ELEVATED,
-    text_primary: DARK_TEXT_PRIMARY,
-    text_muted: DARK_TEXT_PRIMARY.with_alpha(0.52),
-    fill_subtle: DARK_TEXT_PRIMARY.with_alpha(0.05),
-    fill_selected: DARK_TEXT_PRIMARY.with_alpha(0.10),
-    border_subtle: DARK_TEXT_PRIMARY.with_alpha(0.20),
-    control_muted: DARK_TEXT_PRIMARY.with_alpha(0.40),
-    accent: OklchToken::new(0.700, 0.170, 264.4),
-    danger: OklchToken::new(0.680, 0.180, 27.5),
-    warning: OklchToken::new(0.768_590, 0.164_659, 70.080),
-    shadow: OklchToken::new(0.0, 0.0, 0.0),
-    transparent: OklchToken::new(0.0, 0.0, 0.0).with_alpha(0.0),
-};
-
-const LIGHT_TEXT_PRIMARY: OklchToken = OklchToken::new(0.240, 0.020, 264.0);
-
-const LIGHT_DEFINITION: ThemeDefinition = ThemeDefinition {
-    canvas: OklchToken::new(0.975, 0.003, 264.0),
-    surface: OklchToken::new(1.0, 0.0, 0.0),
-    surface_elevated: OklchToken::new(1.0, 0.0, 0.0),
-    text_primary: LIGHT_TEXT_PRIMARY,
-    text_muted: LIGHT_TEXT_PRIMARY.with_alpha(0.63),
-    fill_subtle: OklchToken::new(0.975, 0.003, 264.0),
-    fill_selected: OklchToken::new(0.95, 0.003, 264.0),
-    border_subtle: LIGHT_TEXT_PRIMARY.with_alpha(0.16),
-    control_muted: LIGHT_TEXT_PRIMARY.with_alpha(0.50),
-    accent: OklchToken::new(0.488_198, 0.217_165, 264.376),
-    danger: OklchToken::new(0.505_420, 0.190_493, 27.518),
-    warning: OklchToken::new(0.540, 0.140, 70.0),
-    shadow: OklchToken::new(0.0, 0.0, 0.0),
-    transparent: OklchToken::new(0.0, 0.0, 0.0).with_alpha(0.0),
-};
-
 static DARK_PALETTE: LazyLock<ThemePalette> =
-    LazyLock::new(|| ThemePalette::resolve(ColorTheme::Dark, &DARK_DEFINITION));
+    LazyLock::new(|| ThemePalette::resolve(ColorTheme::Dark));
 static LIGHT_PALETTE: LazyLock<ThemePalette> =
-    LazyLock::new(|| ThemePalette::resolve(ColorTheme::Light, &LIGHT_DEFINITION));
+    LazyLock::new(|| ThemePalette::resolve(ColorTheme::Light));
 
 impl ThemePalette {
-    fn resolve(color_theme: ColorTheme, definition: &ThemeDefinition) -> Self {
+    fn resolve(color_theme: ColorTheme) -> Self {
+        let get = |name| geist::color(color_theme, name);
+        let pick = |light, dark| {
+            get(if matches!(color_theme, ColorTheme::Light) {
+                light
+            } else {
+                dark
+            })
+        };
         Self {
             color_theme,
-            canvas: definition.canvas.to_rgba(),
-            surface: definition.surface.to_rgba(),
-            surface_elevated: definition.surface_elevated.to_rgba(),
-            text_primary: definition.text_primary.to_rgba(),
-            text_muted: definition.text_muted.to_rgba(),
-            fill_subtle: definition.fill_subtle.to_rgba(),
-            fill_selected: definition.fill_selected.to_rgba(),
-            border_subtle: definition.border_subtle.to_rgba(),
-            control_muted: definition.control_muted.to_rgba(),
-            accent: definition.accent.to_rgba(),
-            danger: definition.danger.to_rgba(),
-            warning: definition.warning.to_rgba(),
-            shadow: definition.shadow.to_rgba(),
-            transparent: definition.transparent.to_rgba(),
+            background: get("ds-background-100"),
+            canvas: pick("ds-background-200", "ds-background-100"),
+            surface: pick("ds-background-100", "ds-gray-100"),
+            surface_elevated: pick("ds-background-100", "ds-gray-100"),
+            tooltip_surface: get("ds-gray-1000"),
+            tooltip_foreground: get("ds-background-100"),
+            text_primary: get("ds-gray-1000"),
+            text_muted: get("ds-gray-900"),
+            text_disabled: get("ds-gray-700"),
+            fill_subtle: pick("ds-gray-100", "ds-gray-200"),
+            fill_selected: pick("ds-gray-200", "ds-gray-300"),
+            fill_strong: pick("ds-gray-300", "ds-gray-400"),
+            highlight_subtle: get("ds-gray-alpha-100"),
+            border_subtle: get("ds-gray-400"),
+            control_muted: get("ds-gray-700"),
+            accent: get("ds-blue-900"),
+            focus_ring: get("ds-focus-color"),
+            text_selection: get("ds-blue-200"),
+            danger: get("ds-red-900"),
+            danger_surface: get("ds-red-100"),
+            warning: get("ds-amber-900"),
+            success: get("ds-green-900"),
+            overlay_backdrop: get("ds-overlay-backdrop-color"),
+            // Graphite raised action: the darker fill lets the shared xs
+            // inset edge and top highlight remain visible in both themes.
+            primary: pick("accents-6", "ds-gray-500"),
+            primary_to: pick("ds-gray-1000", "ds-gray-400"),
+            primary_hover: pick("accents-5", "accents-4"),
+            primary_hover_to: pick("accents-6", "ds-gray-500"),
+            primary_active: pick("accents-7", "ds-gray-400"),
+            primary_active_to: pick("ds-gray-1000", "ds-gray-200"),
+            primary_foreground: get("ds-contrast-fg"),
+            transparent: get("geist-background").with_alpha(0.0),
         }
     }
 
-    /// Returns the user-facing theme represented by this resolved palette.
     #[must_use]
     pub const fn color_theme(&self) -> ColorTheme {
         self.color_theme
@@ -189,53 +144,6 @@ pub fn palette(color_theme: ColorTheme) -> &'static ThemePalette {
     match color_theme {
         ColorTheme::Dark => &DARK_PALETTE,
         ColorTheme::Light => &LIGHT_PALETTE,
-    }
-}
-
-#[expect(
-    clippy::suboptimal_flops,
-    reason = "The reference OKLab matrices retain their published operation order for stable cross-build color rounding."
-)]
-fn oklch_to_rgba(token: OklchToken) -> RgbaToken {
-    let lightness = finite_or_zero(token.lightness);
-    let chroma = finite_or_zero(token.chroma);
-    let hue_radians = finite_or_zero(token.hue).rem_euclid(360.0).to_radians();
-    let oklab_a = chroma * hue_radians.cos();
-    let oklab_b = chroma * hue_radians.sin();
-
-    let l_root = lightness + 0.396_337_78 * oklab_a + 0.215_803_76 * oklab_b;
-    let m_root = lightness - 0.105_561_346 * oklab_a - 0.063_854_17 * oklab_b;
-    let s_root = lightness - 0.089_484_18 * oklab_a - 1.291_485_5 * oklab_b;
-    let l_linear = l_root * l_root * l_root;
-    let m_linear = m_root * m_root * m_root;
-    let s_linear = s_root * s_root * s_root;
-
-    let red = 4.076_741_7 * l_linear - 3.307_711_6 * m_linear + 0.230_969_94 * s_linear;
-    let green = -1.268_438 * l_linear + 2.609_757_4 * m_linear - 0.341_319_4 * s_linear;
-    let blue = -0.004_196_086_3 * l_linear - 0.703_418_6 * m_linear + 1.707_614_7 * s_linear;
-
-    RgbaToken {
-        red: linear_to_srgb(red),
-        green: linear_to_srgb(green),
-        blue: linear_to_srgb(blue),
-        alpha: finite_or_zero(token.alpha).clamp(0.0, 1.0),
-    }
-}
-
-const fn finite_or_zero(value: f32) -> f32 {
-    if value.is_finite() { value } else { 0.0 }
-}
-
-#[expect(
-    clippy::suboptimal_flops,
-    reason = "The standard sRGB transfer function keeps its canonical operation order for stable rounding."
-)]
-fn linear_to_srgb(channel: f32) -> f32 {
-    let channel = channel.clamp(0.0, 1.0);
-    if channel <= 0.003_130_8 {
-        channel * 12.92
-    } else {
-        1.055 * channel.powf(1.0 / 2.4) - 0.055
     }
 }
 
@@ -286,312 +194,149 @@ fn format_ui_text(text: &str, uppercase: bool) -> String {
 
 #[cfg(test)]
 mod tests {
-    #![expect(
-        clippy::float_cmp,
-        reason = "Theme tests compare exact color channel constants."
-    )]
+    #![expect(clippy::float_cmp, reason = "Tokens are exact cached source values.")]
     #![expect(
         clippy::suboptimal_flops,
-        reason = "Contrast helpers mirror the canonical WCAG formulas for auditability."
+        reason = "Contrast helpers follow the published WCAG formula."
     )]
 
     use super::*;
 
-    fn assert_token_matches_srgb(token: OklchToken, red: u8, green: u8, blue: u8) {
-        assert_rgba_matches_srgb(token.to_rgba(), red, green, blue);
-    }
-
-    fn assert_rgba_matches_srgb(actual: RgbaToken, red: u8, green: u8, blue: u8) {
-        let expected = RgbaToken::from_rgb(red, green, blue);
-        let tolerance = 0.5 / 255.0;
-
-        assert!((actual.red - expected.red).abs() <= tolerance);
-        assert!((actual.green - expected.green).abs() <= tolerance);
-        assert!((actual.blue - expected.blue).abs() <= tolerance);
-    }
-
-    fn composite(foreground: RgbaToken, background: RgbaToken) -> RgbaToken {
-        let alpha = foreground.alpha;
-        RgbaToken {
-            red: foreground.red * alpha + background.red * (1.0 - alpha),
-            green: foreground.green * alpha + background.green * (1.0 - alpha),
-            blue: foreground.blue * alpha + background.blue * (1.0 - alpha),
-            alpha: 1.0,
-        }
-    }
-
-    fn relative_luminance(token: RgbaToken) -> f32 {
-        fn linear(channel: f32) -> f32 {
-            if channel <= 0.04045 {
-                channel / 12.92
+    fn luminance(token: RgbaToken) -> f32 {
+        fn linear(c: f32) -> f32 {
+            if c <= 0.04045 {
+                c / 12.92
             } else {
-                ((channel + 0.055) / 1.055).powf(2.4)
+                ((c + 0.055) / 1.055).powf(2.4)
             }
         }
-
         0.2126 * linear(token.red) + 0.7152 * linear(token.green) + 0.0722 * linear(token.blue)
     }
 
-    fn contrast_ratio(foreground: RgbaToken, background: RgbaToken) -> f32 {
-        let foreground = composite(foreground, background);
-        let foreground_luminance = relative_luminance(foreground);
-        let background_luminance = relative_luminance(background);
-        let lighter = foreground_luminance.max(background_luminance);
-        let darker = foreground_luminance.min(background_luminance);
-        (lighter + 0.05) / (darker + 0.05)
+    fn contrast(fg: RgbaToken, bg: RgbaToken) -> f32 {
+        let a = luminance(fg);
+        let b = luminance(bg);
+        (a.max(b) + 0.05) / (a.min(b) + 0.05)
     }
 
-    mod rgba_token {
-        use super::*;
-
-        #[test]
-        fn from_rgb_normalizes_8_bit_channels() {
-            let color = RgbaToken::from_rgb(48, 49, 54);
-
-            assert_eq!(
-                color,
-                RgbaToken {
-                    red: 48.0 / 255.0,
-                    green: 49.0 / 255.0,
-                    blue: 54.0 / 255.0,
-                    alpha: 1.0,
-                }
-            );
-        }
-
-        #[test]
-        fn with_alpha_preserves_rgb_channels() {
-            let base = RgbaToken::from_rgb(235, 235, 255);
-            let color = base.with_alpha(0.4);
-
-            assert_eq!(color, RgbaToken { alpha: 0.4, ..base });
-        }
+    #[test]
+    fn rgba_channels_and_alpha_are_independent() {
+        let token = RgbaToken::from_rgb(48, 49, 54);
+        assert_eq!(token.red, 48.0 / 255.0);
+        assert_eq!(token.green, 49.0 / 255.0);
+        assert_eq!(token.blue, 54.0 / 255.0);
+        assert_eq!(
+            token.with_alpha(0.4),
+            RgbaToken {
+                alpha: 0.4,
+                ..token
+            }
+        );
     }
 
-    mod oklch_tokens {
-        use super::*;
-
-        #[test]
-        fn current_dark_solid_colors_round_trip_from_oklch() {
-            let references = [
-                (DARK_CANVAS, (20, 22, 26)),
-                (DARK_TEXT_PRIMARY, (235, 235, 255)),
-                (DARK_SURFACE, (27, 29, 33)),
-                (DARK_SURFACE_ELEVATED, (37, 39, 44)),
-                (
-                    OklchToken::new(0.488_198, 0.217_165, 264.376),
-                    (29, 78, 216),
-                ),
-                (OklchToken::new(0.505_420, 0.190_493, 27.518), (185, 28, 28)),
-                (
-                    OklchToken::new(0.768_590, 0.164_659, 70.080),
-                    (245, 158, 11),
-                ),
-            ];
-
-            for (token, (red, green, blue)) in references {
-                assert_token_matches_srgb(token, red, green, blue);
-            }
+    #[test]
+    fn palettes_are_cached_but_mode_does_not_depend_on_pointer_identity() {
+        for mode in ColorTheme::ALL {
+            assert!(std::ptr::eq(palette(mode), palette(mode)));
+            assert_eq!(ThemePalette::resolve(mode).color_theme(), mode);
         }
+        assert!(ThemePalette::resolve(ColorTheme::Light).is_light());
+    }
 
-        #[test]
-        fn hue_is_normalized_before_conversion() {
-            assert_eq!(
-                OklchToken::new(0.7, 0.1, -96.0).to_rgba(),
-                OklchToken::new(0.7, 0.1, 264.0).to_rgba()
-            );
-        }
-
-        #[test]
-        fn reference_vectors_cover_neutral_and_chromatic_colors() {
-            assert_token_matches_srgb(OklchToken::new(1.0, 0.0, 123.0), 255, 255, 255);
-            assert_token_matches_srgb(OklchToken::new(0.488_198, 0.217_165, 264.376), 29, 78, 216);
-        }
-
-        #[test]
-        fn conversion_preserves_alpha_and_clamps_out_of_gamut_channels() {
-            let converted = OklchToken::new(0.7, 1.0, 30.0).with_alpha(1.5).to_rgba();
-
-            assert_eq!(converted.alpha, 1.0);
-            assert!((0.0..=1.0).contains(&converted.red));
-            assert!((0.0..=1.0).contains(&converted.green));
-            assert!((0.0..=1.0).contains(&converted.blue));
-            assert_eq!(
-                OklchToken::new(0.7, 0.1, 30.0)
-                    .with_alpha(-0.5)
-                    .to_rgba()
-                    .alpha,
-                0.0
-            );
-        }
-
-        #[test]
-        fn non_finite_input_is_sanitized_before_conversion() {
-            let converted = OklchToken {
-                lightness: f32::NAN,
-                chroma: f32::INFINITY,
-                hue: f32::NEG_INFINITY,
-                alpha: f32::NAN,
-            }
-            .to_rgba();
-
-            assert!(converted.red.is_finite());
-            assert!(converted.green.is_finite());
-            assert!(converted.blue.is_finite());
-            assert_eq!(converted.alpha, 0.0);
-        }
-
-        #[test]
-        fn resolved_palettes_are_cached_per_theme() {
-            for color_theme in ColorTheme::ALL {
-                assert!(std::ptr::eq(palette(color_theme), palette(color_theme)));
-            }
-            assert!(!std::ptr::eq(
-                palette(ColorTheme::Dark),
-                palette(ColorTheme::Light)
-            ));
-        }
-
-        #[test]
-        fn palette_mode_is_resolved_from_value_instead_of_allocation_identity() {
-            let independently_resolved =
-                ThemePalette::resolve(ColorTheme::Light, &LIGHT_DEFINITION);
-
-            assert_eq!(independently_resolved.color_theme(), ColorTheme::Light);
-            assert!(independently_resolved.is_light());
-        }
-
-        #[test]
-        fn shadow_source_is_opaque_for_every_theme() {
-            for color_theme in ColorTheme::ALL {
-                assert_eq!(palette(color_theme).shadow.alpha, 1.0);
-            }
-        }
-
-        #[test]
-        fn resolved_solid_roles_match_the_approved_palette_values() {
-            let dark = palette(ColorTheme::Dark);
-            for (actual, expected) in [
-                (dark.canvas, (20, 22, 26)),
-                (dark.surface, (27, 29, 33)),
-                (dark.surface_elevated, (37, 39, 44)),
-                (dark.text_primary, (235, 235, 255)),
-                (dark.accent, (104, 153, 255)),
-                (dark.danger, (243, 99, 87)),
-                (dark.warning, (245, 158, 11)),
+    #[test]
+    fn surface_hierarchy_matches_the_documented_shadcn_adaptation() {
+        let dark = palette(ColorTheme::Dark);
+        assert!(luminance(dark.background) < luminance(dark.surface));
+        assert!(luminance(dark.surface) < luminance(dark.fill_subtle));
+        assert!(luminance(dark.fill_subtle) < luminance(dark.fill_selected));
+        assert!(luminance(dark.fill_selected) < luminance(dark.fill_strong));
+        let light = palette(ColorTheme::Light);
+        assert_eq!(light.background, light.surface);
+        assert!(luminance(light.surface) > luminance(light.fill_subtle));
+        assert!(luminance(light.fill_subtle) > luminance(light.fill_selected));
+        assert!(luminance(light.fill_selected) > luminance(light.fill_strong));
+        for mode in ColorTheme::ALL {
+            let p = palette(mode);
+            assert_eq!(p.surface, p.surface_elevated);
+            assert!(luminance(p.canvas) < luminance(p.surface));
+            for token in [
+                p.background,
+                p.canvas,
+                p.surface,
+                p.surface_elevated,
+                p.fill_subtle,
+                p.fill_selected,
+                p.fill_strong,
             ] {
-                assert_rgba_matches_srgb(actual, expected.0, expected.1, expected.2);
-            }
-
-            let light = palette(ColorTheme::Light);
-            for (actual, expected) in [
-                (light.canvas, (246, 247, 249)),
-                (light.surface, (255, 255, 255)),
-                (light.surface_elevated, (255, 255, 255)),
-                (light.text_primary, (26, 31, 41)),
-                (light.accent, (29, 78, 216)),
-                (light.danger, (185, 28, 28)),
-                (light.warning, (161, 92, 0)),
-            ] {
-                assert_rgba_matches_srgb(actual, expected.0, expected.1, expected.2);
-            }
-        }
-
-        #[test]
-        fn resolved_palettes_contain_only_finite_channels() {
-            for color_theme in ColorTheme::ALL {
-                let palette = palette(color_theme);
-                let tokens = [
-                    palette.canvas,
-                    palette.surface,
-                    palette.surface_elevated,
-                    palette.text_primary,
-                    palette.text_muted,
-                    palette.fill_subtle,
-                    palette.fill_selected,
-                    palette.border_subtle,
-                    palette.control_muted,
-                    palette.accent,
-                    palette.danger,
-                    palette.warning,
-                    palette.shadow,
-                    palette.transparent,
-                ];
-
-                assert!(tokens.into_iter().all(|token| {
-                    token.red.is_finite()
-                        && token.green.is_finite()
-                        && token.blue.is_finite()
-                        && token.alpha.is_finite()
-                }));
+                assert_eq!(token.alpha, 1.0);
+                assert_eq!(token.red, token.green);
+                assert_eq!(token.green, token.blue);
             }
         }
     }
 
-    mod palette_contrast {
-        use super::*;
-
-        #[test]
-        fn normal_text_roles_meet_wcag_on_every_surface() {
-            for color_theme in ColorTheme::ALL {
-                let palette = palette(color_theme);
-                for surface in [palette.canvas, palette.surface, palette.surface_elevated] {
-                    for text in [
-                        palette.text_primary,
-                        palette.text_muted,
-                        palette.danger,
-                        palette.warning,
-                    ] {
-                        let ratio = contrast_ratio(text, surface);
-                        assert!(
-                            ratio >= 4.5,
-                            "{color_theme:?} text contrast was {ratio:.2}:1"
-                        );
-                    }
+    #[test]
+    fn semantic_text_remains_readable_on_surfaces_and_control_states() {
+        for mode in ColorTheme::ALL {
+            let p = palette(mode);
+            for bg in [
+                p.background,
+                p.canvas,
+                p.surface,
+                p.surface_elevated,
+                p.fill_subtle,
+                p.fill_selected,
+                p.fill_strong,
+            ] {
+                for fg in [p.text_primary, p.text_muted] {
+                    assert!(contrast(fg, bg) >= 4.5, "{mode:?}: text {fg:?} on {bg:?}");
                 }
             }
-        }
-
-        #[test]
-        fn focus_accent_meets_non_text_contrast_on_every_surface() {
-            for color_theme in ColorTheme::ALL {
-                let palette = palette(color_theme);
-                for surface in [palette.canvas, palette.surface, palette.surface_elevated] {
-                    let ratio = contrast_ratio(palette.accent, surface);
+            for bg in [p.background, p.canvas, p.surface, p.surface_elevated] {
+                for fg in [p.accent, p.danger, p.warning, p.success] {
+                    assert!(contrast(fg, bg) >= 4.5, "{mode:?}: status {fg:?} on {bg:?}");
+                }
+                for fg in [p.control_muted, p.focus_ring] {
                     assert!(
-                        ratio >= 3.0,
-                        "{color_theme:?} focus contrast was {ratio:.2}:1"
+                        contrast(fg, bg) >= 3.0,
+                        "{mode:?}: control {fg:?} on {bg:?}"
                     );
                 }
             }
+            assert!(contrast(p.danger, p.danger_surface) >= 4.5);
+            assert!(contrast(p.tooltip_foreground, p.tooltip_surface) >= 4.5);
+            assert!(contrast(p.text_primary, p.text_selection) >= 4.5);
         }
+    }
 
-        #[test]
-        fn state_controls_meet_non_text_contrast_on_every_surface() {
-            for color_theme in ColorTheme::ALL {
-                let palette = palette(color_theme);
-                for surface in [palette.canvas, palette.surface, palette.surface_elevated] {
-                    let ratio = contrast_ratio(palette.control_muted, surface);
-                    assert!(
-                        ratio >= 3.0,
-                        "{color_theme:?} control contrast was {ratio:.2}:1"
-                    );
+    #[test]
+    fn primary_gradient_is_neutral_opaque_lighter_at_top_and_readable_in_all_states() {
+        for mode in ColorTheme::ALL {
+            let p = palette(mode);
+            for (top, bottom) in [
+                (p.primary, p.primary_to),
+                (p.primary_hover, p.primary_hover_to),
+                (p.primary_active, p.primary_active_to),
+            ] {
+                assert!(
+                    luminance(top) > luminance(bottom),
+                    "{mode:?}: gradient direction"
+                );
+                // Neutral interpolation is monotonic in sRGB and OKLab, so the
+                // least contrasting endpoint bounds the whole gradient.
+                for stop in [top, bottom] {
+                    assert_eq!(stop.alpha, 1.0);
+                    assert_eq!(stop.red, stop.green);
+                    assert_eq!(stop.green, stop.blue);
+                    assert!(contrast(p.primary_foreground, stop) >= 4.5);
                 }
             }
         }
     }
 
-    mod typography_tokens {
-        use super::*;
-
-        #[test]
-        fn ui_text_preserves_natural_case_by_default() {
-            assert_eq!(ui_text("Add source"), "Add source");
-        }
-
-        #[test]
-        fn ui_text_formatter_can_force_uppercase() {
-            assert_eq!(format_ui_text("Add source", true), "ADD SOURCE");
-        }
+    #[test]
+    fn ui_text_preserves_case_unless_explicitly_uppercase() {
+        assert_eq!(ui_text("Add source"), "Add source");
+        assert_eq!(format_ui_text("Add source", true), "ADD SOURCE");
     }
 }

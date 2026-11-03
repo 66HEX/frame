@@ -110,7 +110,7 @@ pub(super) fn welcome_view(
                                 assets::ICON_FILE_IMPORT,
                                 Some("Open File"),
                                 "Open file",
-                                ButtonVariant::Default,
+                                ButtonVariant::Primary,
                                 true,
                                 palette,
                                 window,

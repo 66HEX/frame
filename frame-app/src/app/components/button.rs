@@ -277,8 +277,8 @@ fn frame_icon_button_inner(
                 palette.fill_subtle,
                 palette.fill_subtle,
                 palette.fill_subtle,
-                palette.danger.with_alpha(0.5),
-                palette.danger.with_alpha(0.5),
+                palette.text_disabled,
+                palette.text_disabled,
                 1.0,
             ),
             (FrameIconButtonVariant::DestructiveGhost, true) => (

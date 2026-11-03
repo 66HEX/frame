@@ -341,7 +341,7 @@ pub(super) fn titlebar_start_button(
         icon,
         Some(availability.button_label()),
         availability.accessibility_label(),
-        ButtonVariant::Default,
+        ButtonVariant::Primary,
         availability.button_enabled(),
         palette,
         window,
@@ -463,7 +463,7 @@ pub(super) fn app_settings_sheet(
                 .id("app-settings-backdrop")
                 .absolute()
                 .inset_0()
-                .bg(color(palette.canvas.with_alpha(0.60 * progress)))
+                .bg(color(palette.overlay_backdrop.with_alpha(0.60 * progress)))
                 .backdrop_blur(theme::ui_rem(4.0 * progress).to_pixels(window.rem_size()))
                 .occlude()
                 .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
@@ -629,7 +629,7 @@ fn app_settings_version_label(palette: &'static theme::ThemePalette) -> gpui::Di
         .justify_end()
         .pt_4()
         .text_size(theme::ui_rem(11.0))
-        .text_color(color(palette.border_subtle))
+        .text_color(color(palette.text_muted))
         .child(theme::ui_text_owned(format!("Frame v{FRAME_APP_VERSION}")))
 }
 
@@ -1505,7 +1505,7 @@ fn update_action_row(
                     frame_text_button_with_focus(
                         "app-settings-update-download",
                         "Download",
-                        ButtonVariant::Default,
+                        ButtonVariant::Primary,
                         false,
                         true,
                         focuses.download,
@@ -1548,7 +1548,7 @@ fn update_action_row(
                 frame_text_button_with_focus(
                     "app-settings-update-install",
                     "Install and restart",
-                    ButtonVariant::Default,
+                    ButtonVariant::Primary,
                     false,
                     update_install_ready,
                     focuses.install,
@@ -1638,7 +1638,7 @@ pub(super) fn update_dialog(
         .items_center()
         .justify_center()
         .p_4()
-        .bg(color(palette.canvas.with_alpha(0.64 * progress)))
+        .bg(color(palette.overlay_backdrop.with_alpha(0.64 * progress)))
         .backdrop_blur(theme::ui_rem(4.0 * progress).to_pixels(window.rem_size()))
         .opacity(progress)
         .occlude()
@@ -1818,7 +1818,7 @@ fn update_dialog_body(
                 .role(gpui::Role::Alert)
                 .aria_label(error.clone())
                 .rounded(theme::ui_rem(theme::RADIUS_SM))
-                .bg(color(palette.danger.with_alpha(0.08)))
+                .bg(color(palette.danger_surface))
                 .shadow(theme::shadows::EMBEDDED_PANEL.shadows())
                 .p_3()
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
@@ -1918,7 +1918,7 @@ fn update_dialog_primary_action(
             assets::ICON_DOWNLOAD_02,
             Some("Download"),
             "Download",
-            ButtonVariant::Default,
+            ButtonVariant::Primary,
             true,
             palette,
             window,
@@ -1932,7 +1932,7 @@ fn update_dialog_primary_action(
         UpdateStatus::ReadyToInstall(_) => frame_text_button(
             "update-dialog-install",
             "Install and restart",
-            ButtonVariant::Default,
+            ButtonVariant::Primary,
             false,
             install_ready,
             palette,
@@ -2185,7 +2185,7 @@ pub(super) fn drag_drop_overlay(
         .items_center()
         .justify_center()
         .p_4()
-        .bg(color(palette.canvas.with_alpha(0.60 * progress)))
+        .bg(color(palette.overlay_backdrop.with_alpha(0.60 * progress)))
         .backdrop_blur(theme::ui_rem(4.0 * progress).to_pixels(window.rem_size()))
         .opacity(progress)
         .occlude()
@@ -2409,16 +2409,20 @@ pub(super) fn titlebar_window_button(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let hover_background = if destructive {
-        palette.danger
+        palette.danger_surface
     } else {
         palette.fill_subtle
     };
     let active_background = if destructive {
-        palette.danger
+        palette.danger_surface
     } else {
         palette.fill_selected
     };
-    let hover_foreground = palette.text_primary;
+    let hover_foreground = if destructive {
+        palette.danger
+    } else {
+        palette.text_primary
+    };
     let foreground = palette.text_muted;
     let colors = ButtonColors {
         background: palette.transparent,

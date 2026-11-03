@@ -21,7 +21,7 @@ pub(in crate::app) fn settings_value_badge(
         .flex()
         .items_center()
         .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .bg(color(palette.border_subtle))
+        .bg(color(palette.fill_strong))
         .px(theme::ui_rem(6.0))
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)

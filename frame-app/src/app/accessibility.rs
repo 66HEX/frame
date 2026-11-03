@@ -6,7 +6,6 @@ use gpui::{InteractiveElement, Orientation, Role, SharedString, StyleRefinement,
 use std::collections::HashMap;
 
 const FOCUS_RING_WIDTH: f32 = 3.0;
-const FOCUS_RING_ALPHA: f32 = 0.55;
 pub(in crate::app) const APP_ROOT_FOCUS_ID: &str = "app-root";
 
 /// One tab stop per rail; selection, pointer focus and arrow-key focus agree.
@@ -174,7 +173,7 @@ pub(in crate::app) fn focus_visible_ring(
 ) -> StyleRefinement {
     style
         .ring(px(FOCUS_RING_WIDTH))
-        .ring_color(color(palette.accent.with_alpha(FOCUS_RING_ALPHA)))
+        .ring_color(color(palette.focus_ring))
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -543,9 +542,7 @@ mod tests {
         assert_eq!(style.ring.width, Some(px(FOCUS_RING_WIDTH)));
         assert_eq!(
             style.ring.color,
-            Some(gpui::RingColor::Color(
-                color(palette.accent.with_alpha(FOCUS_RING_ALPHA)).into()
-            ))
+            Some(gpui::RingColor::Color(color(palette.focus_ring).into()))
         );
         assert!(style.box_shadow.is_none());
     }
