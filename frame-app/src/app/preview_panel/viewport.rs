@@ -308,7 +308,7 @@ pub(in crate::app) fn preview_viewport(
         .overflow_hidden()
         .rounded(theme::ui_rem(theme::RADIUS_MD))
         .bg(color(palette.canvas))
-        .shadow(input_highlight_shadows(palette))
+        .shadow(theme::shadows::recessed_control())
         .track_focus(focuses.viewport)
         .tab_stop(pan_enabled)
         .child(preview_viewport_content(state, cx));

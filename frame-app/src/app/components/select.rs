@@ -5,8 +5,7 @@ use super::{
     animated_button_colors, apply_accessible_select_option,
     apply_accessible_select_option_with_focus, apply_accessible_select_trigger,
     apply_accessible_select_trigger_with_focus, apply_button_motion, assets, button_colors,
-    button_highlight_shadows, button_mouse_down, card_surface_shadows, color, div, icon_svg,
-    input_highlight_shadows, parse_hex, theme,
+    button_mouse_down, color, div, icon_svg, parse_hex, theme,
 };
 use crate::app::accessibility::handle_modal_tab_navigation;
 use crate::numeric::usize_to_f32;
@@ -170,7 +169,7 @@ fn frame_select_trigger_content_inner(
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
         .opacity(colors.opacity)
-        .shadow(button_highlight_shadows(palette))
+        .shadow(theme::shadows::CONTROL.shadows())
         .when(enabled, |this| {
             this.hover_style(gpui::Styled::cursor_pointer)
                 .active_style(move |style| style.bg(color(colors.active_background)))
@@ -224,11 +223,7 @@ pub(in crate::app) fn frame_select_popover(
         .rounded(theme::ui_rem(theme::RADIUS_SM))
         .bg(color(palette.surface_elevated))
         .opacity(progress)
-        .shadow(if palette.is_light() {
-            card_surface_shadows(palette)
-        } else {
-            button_highlight_shadows(palette)
-        })
+        .shadow(theme::shadows::FLOATING.shadows())
         .occlude()
         .on_mouse_down(MouseButton::Left, move |_, _window, cx| {
             cx.stop_propagation();
@@ -506,7 +501,7 @@ pub(in crate::app) fn frame_color_select_value(
         .min_w_0()
         .items_center()
         .gap_2()
-        .child(frame_color_swatch(value, palette))
+        .child(frame_color_swatch(value))
         .child(
             div()
                 .flex_1()
@@ -518,17 +513,14 @@ pub(in crate::app) fn frame_color_select_value(
         )
 }
 
-pub(in crate::app) fn frame_color_swatch(
-    value: &str,
-    palette: &'static theme::ThemePalette,
-) -> gpui::Div {
+pub(in crate::app) fn frame_color_swatch(value: &str) -> gpui::Div {
     div()
         .w(theme::ui_rem(FRAME_COLOR_SWATCH_SIZE))
         .h(theme::ui_rem(FRAME_COLOR_SWATCH_SIZE))
         .flex_shrink_0()
         .rounded(theme::ui_rem(theme::RADIUS_XS))
         .bg(parse_hex(value))
-        .shadow(input_highlight_shadows(palette))
+        .shadow(theme::shadows::INDICATOR.shadows())
 }
 
 fn refresh_select_hover_after_scroll(

@@ -5,15 +5,13 @@ use super::{
     PreviewCanvasZoomDirection, PreviewShellState, PreviewToolFocuses, StatefulInteractiveElement,
     Styled, Window, animated_button_colors, apply_accessible_button,
     apply_accessible_button_with_focus, apply_accessible_toggle_button, apply_button_motion,
-    assets, button_colors, button_highlight_shadows, card_surface_shadows, color, div, icon_svg,
-    preview_visual_controls_enabled, relative, theme,
+    assets, button_colors, color, div, icon_svg, preview_visual_controls_enabled, relative, theme,
 };
-use gpui::FocusHandle;
+use gpui::{FocusHandle, px};
 
 const PREVIEW_TOOLBAR_PADDING: f32 = 4.0;
 const PREVIEW_TOOLBAR_GAP: f32 = 8.0;
 const PREVIEW_TOOLBAR_VERTICAL_SEPARATOR_HEIGHT: f32 = 18.0;
-const PREVIEW_TOOLBAR_VERTICAL_SEPARATOR_WIDTH: f32 = 1.0;
 const PREVIEW_TOOLBAR_BUTTON_COUNT: f32 = 5.0;
 const PREVIEW_TOOLBAR_GAP_COUNT: f32 = 4.0;
 
@@ -53,7 +51,7 @@ pub(in crate::app) fn preview_toolbar(
         .rounded(theme::ui_rem(theme::RADIUS_MD))
         .bg(color(palette.surface))
         .p(theme::ui_rem(PREVIEW_TOOLBAR_PADDING))
-        .shadow(card_surface_shadows(palette))
+        .shadow(theme::shadows::FLOATING.shadows())
         .child(
             preview_tool_button(
                 "preview-tool-rotate",
@@ -170,7 +168,7 @@ pub(in crate::app) fn preview_zoom_toolbar(
         .rounded(theme::ui_rem(theme::RADIUS_MD))
         .bg(color(palette.surface))
         .p(theme::ui_rem(4.0))
-        .shadow(card_surface_shadows(palette))
+        .shadow(theme::shadows::FLOATING.shadows())
         .child(
             preview_tool_button(
                 "preview-zoom-out",
@@ -217,7 +215,7 @@ pub(in crate::app) fn preview_toolbar_vertical_separator(
     div()
         .flex_none()
         .h(theme::ui_rem(PREVIEW_TOOLBAR_VERTICAL_SEPARATOR_HEIGHT))
-        .w(theme::ui_rem(PREVIEW_TOOLBAR_VERTICAL_SEPARATOR_WIDTH))
+        .w(px(theme::shadows::EDGE_WIDTH))
         .bg(color(palette.fill_selected))
 }
 
@@ -326,7 +324,7 @@ fn preview_tool_button_inner(
         .text_color(foreground)
         .opacity(colors.opacity)
         .when(selected, |this| {
-            this.shadow(button_highlight_shadows(palette))
+            this.shadow(theme::shadows::CONTROL.shadows())
         })
         .when(!enabled, gpui::Styled::cursor_not_allowed)
         .when(enabled, |this| {

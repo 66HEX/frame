@@ -1,6 +1,4 @@
-use super::{
-    ParentElement, SettingsTab, Styled, assets, button_highlight_shadows, color, div, theme,
-};
+use super::{ParentElement, SettingsTab, Styled, assets, color, div, theme};
 use crate::numeric::{rounded_f64_to_u32, u32_to_f32};
 
 pub(in crate::app) fn settings_field_label(
@@ -29,7 +27,7 @@ pub(in crate::app) fn settings_value_badge(
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(color(palette.text_primary))
         .font_features(assets::frame_tabular_number_font_features())
-        .shadow(button_highlight_shadows(palette))
+        .shadow(theme::shadows::CONTROL.shadows())
         .child(value)
 }
 

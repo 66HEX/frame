@@ -13,8 +13,7 @@ use super::components::{
 use super::input::{FrameTextInputSpec, frame_text_input};
 use super::primitives::{
     ButtonColors, ButtonVariant, action_button, animated_button_colors, apply_button_motion,
-    button_colors, button_highlight_shadows, button_motion, card_surface_shadows, color, icon_svg,
-    input_highlight_shadows, panel_bottom_separator, vertical_separator,
+    button_colors, button_motion, color, icon_svg, panel_bottom_separator, vertical_separator,
 };
 use super::settings_panel::{settings_field_label, settings_hint_text, settings_section};
 use super::{
@@ -492,7 +491,7 @@ pub(super) fn app_settings_sheet(
                 .rounded(theme::ui_rem(theme::RADIUS_LG))
                 .bg(color(palette.surface))
                 .opacity(progress)
-                .shadow(card_surface_shadows(palette))
+                .shadow(theme::shadows::MODAL.shadows())
                 .occlude()
                 .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
                     cx.stop_propagation();
@@ -1297,6 +1296,7 @@ fn update_release_notes_block(
         .overflow_hidden()
         .rounded(theme::ui_rem(theme::RADIUS_SM))
         .bg(color(palette.fill_subtle))
+        .shadow(theme::shadows::EMBEDDED_PANEL.shadows())
         .child(content)
         .child(frame_vertical_scrollbar(
             "update-dialog-release-notes-scrollbar",
@@ -1692,7 +1692,7 @@ fn update_dialog_panel(
         .overflow_hidden()
         .rounded(theme::ui_rem(theme::RADIUS_LG))
         .bg(color(palette.surface))
-        .shadow(card_surface_shadows(palette))
+        .shadow(theme::shadows::MODAL.shadows())
         .occlude()
         .on_click(cx.listener(|_, _: &ClickEvent, _window, cx| {
             cx.stop_propagation();
@@ -1819,6 +1819,7 @@ fn update_dialog_body(
                 .aria_label(error.clone())
                 .rounded(theme::ui_rem(theme::RADIUS_SM))
                 .bg(color(palette.danger.with_alpha(0.08)))
+                .shadow(theme::shadows::EMBEDDED_PANEL.shadows())
                 .p_3()
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .line_height(theme::ui_rem(16.0))
@@ -2201,11 +2202,8 @@ pub(super) fn drag_drop_overlay(
                 .items_center()
                 .justify_center()
                 .rounded(theme::ui_rem(theme::RADIUS_LG))
-                .border_1()
-                .border_dashed()
-                .border_color(color(palette.fill_subtle))
                 .bg(color(palette.fill_subtle))
-                .shadow(card_surface_shadows(palette))
+                .shadow(theme::shadows::MODAL.shadows())
                 .child(
                     div()
                         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
@@ -2516,10 +2514,10 @@ pub(super) fn titlebar_navigation(
         .items_center()
         .gap_1()
         .rounded(theme::ui_rem(theme::RADIUS_MD))
-        .bg(color(palette.surface))
+        .bg(color(palette.canvas))
         .px(theme::ui_rem(3.0))
         .py(theme::ui_rem(2.0))
-        .shadow(input_highlight_shadows(palette))
+        .shadow(theme::shadows::recessed_control())
         .child(titlebar_segment(
             assets::ICON_LAYOUT_LIST,
             "Workspace",
@@ -2631,7 +2629,7 @@ pub(super) fn titlebar_segment(
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
         .when(selected, |this| {
-            this.shadow(button_highlight_shadows(palette))
+            this.shadow(theme::shadows::CONTROL.shadows())
         })
         .hover_style(gpui::Styled::cursor_pointer)
         .active_style(move |style| style.bg(color(colors.active_background)))

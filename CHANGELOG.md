@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **UI Icons:** Replaces Hugeicons with bundled Nucleo UI outline icons that inherit theme colors, with rendering checks at supported sizes.
+- **UI Surfaces:** Uses a shared layered shadow scale in both themes, with inset inputs and checkboxes, opaque cards, two-tone separators, and one-logical-pixel edges on every platform. Decorative borders are supplied by the shadow layers.
 - **GPUI Framework:** Updates the vendored GPUI-CE snapshot to `bc57747`, adapting Frame to the new text and rendering APIs while preserving GPU preview transforms, reusable video textures, keyboard focus and accessibility, toolbar drag handling, and rounded Linux window frames.
 
 ### Fixed

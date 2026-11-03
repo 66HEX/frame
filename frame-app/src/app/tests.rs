@@ -3987,10 +3987,8 @@ mod surface_highlights {
     use super::*;
 
     #[test]
-    fn frame_highlight_width_matches_platform_renderer() {
-        let expected = if cfg!(target_os = "macos") { 0.5 } else { 1.0 };
-
-        assert_eq!(frame_highlight_px(), expected);
+    fn frame_edges_are_one_logical_pixel_on_every_platform() {
+        assert_eq!(frame_highlight_px(), 1.0);
     }
 }
 

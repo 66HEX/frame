@@ -129,15 +129,28 @@ pub(in crate::app) fn frame_vertical_scrollbar(
                         ),
                         size(px(thumb_width), px(metrics.thumb_height)),
                     );
-                    window.paint_quad(
-                        gpui::PaintQuad::new(thumb_bounds)
-                            .background(color(palette.control_muted))
-                            .corner_radii(px(thumb_width / 2.0)),
-                    );
+                    paint_scrollbar_thumb(thumb_bounds, thumb_width, palette, window);
                 },
             )
             .size_full(),
         )
+}
+
+fn paint_scrollbar_thumb(
+    bounds: Bounds<gpui::Pixels>,
+    width: f32,
+    palette: &theme::ThemePalette,
+    window: &mut Window,
+) {
+    let shadows = theme::shadows::INDICATOR.shadows();
+    let corners = gpui::Corners::all(px(width / 2.0));
+    window.paint_drop_shadows(bounds, corners, 0.0, &shadows);
+    window.paint_quad(
+        gpui::PaintQuad::new(bounds)
+            .background(color(palette.control_muted))
+            .corner_radii(corners),
+    );
+    window.paint_inset_shadows(bounds, corners, 0.0, &shadows);
 }
 
 fn frame_scrollbar_content_height(

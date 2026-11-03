@@ -859,7 +859,7 @@ impl Render for FrameRoot {
 fn linux_window_frame(
     root: gpui::Stateful<gpui::Div>,
     window: &Window,
-    palette: &'static theme::ThemePalette,
+    _palette: &'static theme::ThemePalette,
 ) -> impl IntoElement {
     let should_draw_frame = matches!(
         window.window_decorations(),
@@ -873,9 +873,7 @@ fn linux_window_frame(
 
     div().size_full().p(px(LINUX_WINDOW_FRAME_INSET)).child(
         root.rounded(px(theme::RADIUS_LG))
-            .border_1()
-            .border_color(color(palette.fill_selected))
-            .shadow(linux_window_frame_shadows(palette)),
+            .shadow(theme::shadows::FLOATING.shadows()),
     )
 }
 
@@ -886,31 +884,4 @@ fn linux_window_frame(
     _palette: &'static theme::ThemePalette,
 ) -> impl IntoElement {
     root
-}
-
-#[cfg(target_os = "linux")]
-fn linux_window_frame_shadows(palette: &'static theme::ThemePalette) -> Vec<BoxShadow> {
-    vec![
-        BoxShadow {
-            color: color(palette.shadow.with_alpha(0.28)).into(),
-            offset: point(px(0.0), px(8.0)),
-            blur_radius: px(8.0),
-            spread_radius: px(-7.0),
-            inset: false,
-        },
-        BoxShadow {
-            color: color(palette.shadow.with_alpha(0.18)).into(),
-            offset: point(px(0.0), px(3.0)),
-            blur_radius: px(5.0),
-            spread_radius: px(-3.0),
-            inset: false,
-        },
-        BoxShadow {
-            color: color(palette.fill_selected).into(),
-            offset: point(px(0.0), px(0.0)),
-            blur_radius: px(0.0),
-            spread_radius: px(1.0),
-            inset: true,
-        },
-    ]
 }

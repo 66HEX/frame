@@ -2,8 +2,8 @@ use super::{
     ButtonColors, ButtonVariant, Context, FluentBuilder, FrameRoot, InteractiveElement,
     ParentElement, SETTINGS_CONTROL_HEIGHT, StatefulInteractiveElement, Styled, Window,
     animated_button_colors, apply_accessible_button, apply_accessible_button_with_focus,
-    apply_accessible_toggle_button, apply_button_motion, button_colors, button_highlight_shadows,
-    color, contextual_icon_motion, div, icon_svg, px, theme,
+    apply_accessible_toggle_button, apply_button_motion, button_colors, color,
+    contextual_icon_motion, div, icon_svg, px, theme,
 };
 use gpui::{FocusHandle, Rgba, Svg, Transformation, size, svg};
 
@@ -152,7 +152,7 @@ fn frame_text_button_inner(
         .text_color(foreground)
         .opacity(colors.opacity)
         .when(text_button_uses_highlight(variant, selected), |this| {
-            this.shadow(button_highlight_shadows(palette))
+            this.shadow(theme::shadows::CONTROL.shadows())
         })
         .when(enabled, |this| {
             this.hover_style(gpui::Styled::cursor_pointer)

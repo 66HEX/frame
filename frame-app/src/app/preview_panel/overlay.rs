@@ -258,7 +258,7 @@ pub(in crate::app) fn preview_overlay_controls(
         .rounded(theme::ui_rem(theme::RADIUS_MD))
         .bg(color(palette.surface_elevated))
         .p(theme::ui_rem(4.0))
-        .shadow(card_surface_shadows(palette))
+        .shadow(theme::shadows::FLOATING.shadows())
         .on_key_down(
             cx.listener(move |_root, event: &gpui::KeyDownEvent, window, cx| {
                 handle_modal_tab_navigation(event, &first_focus, &last_focus, window, cx);
@@ -441,11 +441,8 @@ fn preview_overlay_handle(
                     .w(theme::ui_rem(OVERLAY_HANDLE_SIZE))
                     .h(theme::ui_rem(OVERLAY_HANDLE_SIZE))
                     .rounded_full()
-                    .border_1()
-                    // Contrast against arbitrary source pixels.
-                    .border_color(hsla(0.0, 0.0, 0.0, 0.45))
                     .bg(color(preview_handle_color(palette)))
-                    .shadow(card_surface_shadows(palette)),
+                    .shadow(theme::shadows::INDICATOR.shadows()),
             ),
         handle,
     )
@@ -632,7 +629,7 @@ fn preview_overlay_icon_button_inner(
         .text_color(foreground)
         .opacity(colors.opacity)
         .when(highlighted, |this| {
-            this.shadow(button_highlight_shadows(palette))
+            this.shadow(theme::shadows::CONTROL.shadows())
         })
         .when(!enabled, gpui::Styled::cursor_not_allowed)
         .when(enabled, |this| {

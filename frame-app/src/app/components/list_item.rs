@@ -1,8 +1,8 @@
 use super::{
     ButtonVariant, Context, FluentBuilder, FrameRoot, InteractiveElement, ParentElement,
     SETTINGS_CONTROL_HEIGHT, Styled, Window, apply_accessible_toggle_button, apply_button_motion,
-    button_colors, button_highlight_shadows, button_motion, color, div, frame_selection_dot,
-    mix_color, mix_rgba, mix_scalar, selected_motion, theme,
+    button_colors, button_motion, color, div, frame_selection_dot, mix_color, mix_rgba, mix_scalar,
+    selected_motion, theme,
 };
 
 pub(in crate::app) fn frame_list_item(
@@ -178,7 +178,7 @@ pub(in crate::app) fn frame_track_list_item(
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
         .opacity(opacity)
-        .shadow(button_highlight_shadows(palette))
+        .shadow(theme::shadows::CONTROL.shadows())
         .when(enabled, |this| {
             this.hover_style(gpui::Styled::cursor_pointer)
         })

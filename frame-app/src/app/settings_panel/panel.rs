@@ -4,13 +4,12 @@ use super::{
     IntoElement, PANEL_HEADER_HEIGHT, ParentElement, SETTINGS_PANEL_PADDING,
     SETTINGS_TAB_BUTTON_SIZE, SETTINGS_TAB_ICON_SIZE, SettingsPresetsTabState, SettingsRenderState,
     SettingsSubtitlesTabState, SettingsTab, SettingsVideoInputFocuses, SourceKind,
-    StatefulInteractiveElement, Styled, Window, apply_button_motion, button_colors,
-    button_highlight_shadows, button_motion, color, div, frame_tooltip, icon_svg, mix_color,
-    panel_bottom_separator, resolve_active_settings_tab, settings_audio_filters_tab,
-    settings_audio_tab, settings_images_tab, settings_metadata_tab, settings_output_tab,
-    settings_presets_tab, settings_section_label, settings_source_tab, settings_subtitles_tab,
-    settings_tab_icon, settings_video_filters_tab, settings_video_tab, theme,
-    visible_settings_tabs,
+    StatefulInteractiveElement, Styled, Window, apply_button_motion, button_colors, button_motion,
+    color, div, frame_tooltip, icon_svg, mix_color, panel_bottom_separator,
+    resolve_active_settings_tab, settings_audio_filters_tab, settings_audio_tab,
+    settings_images_tab, settings_metadata_tab, settings_output_tab, settings_presets_tab,
+    settings_section_label, settings_source_tab, settings_subtitles_tab, settings_tab_icon,
+    settings_video_filters_tab, settings_video_tab, theme, visible_settings_tabs,
 };
 use crate::settings::source_kind_for;
 
@@ -137,7 +136,7 @@ pub(in crate::app) fn settings_tab_button(
         .bg(background)
         .text_color(foreground)
         .when(selected, |this| {
-            this.shadow(button_highlight_shadows(palette))
+            this.shadow(theme::shadows::CONTROL.shadows())
         })
         .hover_style(gpui::Styled::cursor_pointer)
         .active_style(move |style| style.bg(color(colors.active_background)))

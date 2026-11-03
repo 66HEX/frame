@@ -1,5 +1,7 @@
 //! Frame native visual tokens and resolved color palettes.
 
+pub mod shadows;
+
 use std::sync::LazyLock;
 
 use gpui::{FontWeight, Rems, rems};

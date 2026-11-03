@@ -1,4 +1,3 @@
-use super::super::primitives::card_surface_shadows;
 use super::{
     Context, Duration, FluentBuilder, FrameRoot, INTERACTION_MOTION_DURATION, InteractiveElement,
     IntoElement, ParentElement, StatefulInteractiveElement, Styled, TooltipUiState, Window, color,
@@ -164,7 +163,7 @@ impl FrameTooltip {
                             .font_weight(theme::TEXT_WEIGHT_MEDIUM)
                             .text_color(color(palette.canvas))
                             .opacity(progress)
-                            .shadow(card_surface_shadows(palette))
+                            .shadow(theme::shadows::FLOATING.shadows())
                             .child(theme::ui_text_owned(self.label)),
                     );
                 this.child(deferred(bubble).priority(TOOLTIP_DEFERRED_PRIORITY))

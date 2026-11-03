@@ -1,7 +1,6 @@
 use super::{
-    BoxShadow, InteractiveElement, IntoElement, MouseButton, ParentElement, Rgba, Styled,
-    button_highlight_shadows, color, div, hsla, input_highlight_shadows, linear_color_stop,
-    linear_gradient, parse_hex, point, px, relative, theme,
+    InteractiveElement, IntoElement, MouseButton, ParentElement, Rgba, Styled, color, div, hsla,
+    linear_color_stop, linear_gradient, parse_hex, relative, theme,
 };
 use crate::numeric::{rounded_f64_to_u8, unit_f64_to_f32};
 
@@ -31,7 +30,7 @@ pub(in crate::app) fn frame_color_picker_panel(
         .bg(color(palette.surface_elevated))
         .opacity(progress)
         .p_2()
-        .shadow(button_highlight_shadows(palette))
+        .shadow(theme::shadows::FLOATING.shadows())
         .occlude()
         .on_mouse_down(MouseButton::Left, move |_, _window, cx| {
             cx.stop_propagation();
@@ -45,7 +44,6 @@ pub(in crate::app) fn frame_color_picker_sv_canvas(
     hue: f64,
     saturation: f64,
     value: f64,
-    palette: &'static theme::ThemePalette,
 ) -> gpui::Div {
     div()
         .absolute()
@@ -93,14 +91,10 @@ pub(in crate::app) fn frame_color_picker_sv_canvas(
                     linear_color_stop(hsla(0.0, 0.0, 0.0, 0.0), 1.0),
                 )),
         )
-        .child(frame_color_picker_sv_handle(
-            hue, saturation, value, palette,
-        ))
+        .child(frame_color_picker_sv_handle(hue, saturation, value))
 }
 
-pub(in crate::app) fn frame_color_picker_hue_track(
-    palette: &'static theme::ThemePalette,
-) -> gpui::Div {
+pub(in crate::app) fn frame_color_picker_hue_track() -> gpui::Div {
     let stops = [
         ("#ff0000", "#ffff00"),
         ("#ffff00", "#00ff00"),
@@ -121,7 +115,7 @@ pub(in crate::app) fn frame_color_picker_hue_track(
         .flex()
         .overflow_hidden()
         .rounded(theme::ui_rem(theme::RADIUS_XS))
-        .shadow(input_highlight_shadows(palette));
+        .shadow(theme::shadows::INDICATOR.shadows());
 
     for (from, to) in stops {
         row = row.child(div().flex_1().h_full().bg(linear_gradient(
@@ -149,7 +143,7 @@ pub(in crate::app) fn frame_color_picker_hue_handle(
         .w(theme::ui_rem(FRAME_COLOR_PICKER_HUE_HANDLE_WIDTH))
         .rounded(theme::ui_rem(1.5))
         .bg(color(palette.canvas))
-        .shadow(button_highlight_shadows(palette))
+        .shadow(theme::shadows::INDICATOR.shadows())
 }
 
 pub(in crate::app) fn frame_color_picker_hue_color(hue: f64) -> Rgba {
@@ -185,12 +179,7 @@ pub(in crate::app) fn frame_hsv_to_hex(hue_degrees: f64, saturation: f64, value:
     )
 }
 
-fn frame_color_picker_sv_handle(
-    hue: f64,
-    saturation: f64,
-    value: f64,
-    palette: &'static theme::ThemePalette,
-) -> gpui::Div {
+fn frame_color_picker_sv_handle(hue: f64, saturation: f64, value: f64) -> gpui::Div {
     div()
         .absolute()
         .left(relative(unit_f64_to_f32(saturation)))
@@ -203,13 +192,7 @@ fn frame_color_picker_sv_handle(
         .bg(parse_hex(&frame_hsv_to_hex(hue, saturation, value)))
         .border_1()
         .border_color(gpui::white())
-        .shadow(vec![BoxShadow {
-            color: color(palette.shadow.with_alpha(0.35)).into(),
-            offset: point(px(0.0), px(0.0)),
-            blur_radius: px(0.0),
-            spread_radius: px(1.0),
-            inset: false,
-        }])
+        .shadow(theme::shadows::INDICATOR.shadows())
 }
 
 fn frame_rgb_to_hex(r: f64, g: f64, b: f64) -> String {

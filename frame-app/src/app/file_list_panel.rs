@@ -12,10 +12,7 @@ use super::{
         FrameIconButtonSize, FrameIconButtonVariant, frame_checkbox_indicator, frame_icon_button,
         frame_vertical_uniform_scrollbar,
     },
-    primitives::{
-        FrameSurface, button_mouse_down, color, drop_target_shadows, element_id,
-        panel_bottom_separator,
-    },
+    primitives::{FrameSurface, button_mouse_down, color, element_id, panel_bottom_separator},
 };
 use crate::numeric::usize_to_f32;
 
@@ -32,10 +29,8 @@ pub(super) fn file_list_panel(
         .card_surface(palette)
         .on_drag_over::<ExternalPaths>(|style, _paths, _window, _cx| {
             style
-                .border_1()
-                .border_dashed()
-                .border_color(color(palette.control_muted))
-                .shadow(drop_target_shadows(palette))
+                .bg(color(palette.surface_elevated))
+                .shadow(theme::shadows::FLOATING.shadows())
         })
         .child(file_list_header(queue.batch_selection_state(), palette, cx))
         .child(file_list_body(queue, scroll_handle, palette, cx))

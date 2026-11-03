@@ -4,8 +4,7 @@ use super::components::{
     frame_icon_button, frame_icon_swap_button, frame_vertical_uniform_scrollbar,
 };
 use super::primitives::{
-    FrameSurface, apply_button_motion, button_motion, card_surface_shadows, color, element_id,
-    panel_bottom_separator,
+    FrameSurface, apply_button_motion, button_motion, color, element_id, panel_bottom_separator,
 };
 use super::{
     ActiveLogFile, ClickEvent, Context, ConversionEventState, FileQueue, FluentBuilder, FrameRoot,
@@ -452,9 +451,9 @@ pub(super) fn log_scroll_to_bottom_button(
         .right(theme::ui_rem(LOG_SCROLL_BUTTON_OFFSET))
         .bottom(theme::ui_rem(LOG_SCROLL_BUTTON_OFFSET))
         .rounded(theme::ui_rem(theme::RADIUS_MD))
-        .bg(color(palette.canvas))
+        .bg(color(palette.surface_elevated))
         .p(theme::ui_rem(LOG_SCROLL_BUTTON_PADDING))
-        .shadow(card_surface_shadows(palette))
+        .shadow(theme::shadows::FLOATING.shadows())
         .child(
             frame_icon_button(
                 "logs-scroll-to-bottom",

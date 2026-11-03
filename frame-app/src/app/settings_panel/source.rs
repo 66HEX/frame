@@ -1,7 +1,9 @@
+use crate::app::primitives::horizontal_separator_shadows;
+
 use super::{
     InteractiveElement, IntoElement, MetadataStatus, ParentElement, SourceInfoSection,
-    SourceMetadata, StatefulInteractiveElement, Styled, color, div, horizontal_separator_shadows,
-    px, settings_section, settings_value_row, source_info_sections, theme,
+    SourceMetadata, StatefulInteractiveElement, Styled, color, div, px, settings_section,
+    settings_value_row, source_info_sections, theme,
 };
 
 pub(in crate::app) fn settings_source_tab(

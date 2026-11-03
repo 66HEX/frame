@@ -762,7 +762,7 @@ fn settings_subtitle_load_button(
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
         .opacity(colors.opacity)
-        .shadow(button_highlight_shadows(palette))
+        .shadow(theme::shadows::CONTROL.shadows())
         .when(!disabled, |this| {
             this.hover_style(gpui::Styled::cursor_pointer)
                 .active_style(move |style| style.bg(color(colors.active_background)))
@@ -814,7 +814,7 @@ fn settings_subtitle_burn_file_row(
                 .font_weight(theme::TEXT_WEIGHT_MEDIUM)
                 .text_color(color(colors.foreground))
                 .opacity(colors.opacity)
-                .shadow(button_highlight_shadows(palette))
+                .shadow(theme::shadows::CONTROL.shadows())
                 .child(div().min_w_0().truncate().child(label)),
         )
         .child(settings_subtitle_clear_button(
@@ -1874,8 +1874,7 @@ fn settings_subtitle_sv_square(
         .w_full()
         .overflow_hidden()
         .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .border_1()
-        .border_color(color(palette.fill_selected))
+        .shadow(theme::shadows::INDICATOR.shadows())
         .bg(color(palette.fill_subtle))
         .cursor_crosshair()
         .occlude()
@@ -1908,7 +1907,7 @@ fn settings_subtitle_sv_square(
             target,
             kind: SettingsSubtitleColorDragKind::SaturationValue,
         })
-        .child(frame_color_picker_sv_canvas(hsv.h, hsv.s, hsv.v, palette))
+        .child(frame_color_picker_sv_canvas(hsv.h, hsv.s, hsv.v))
         .on_drag(drag, |_drag, _position, _window, cx| {
             cx.new(|_| SettingsSubtitleColorDragPreview)
         })
@@ -1997,7 +1996,7 @@ fn settings_subtitle_hue_slider(
             target,
             kind: SettingsSubtitleColorDragKind::Hue,
         })
-        .child(frame_color_picker_hue_track(palette))
+        .child(frame_color_picker_hue_track())
         .child(frame_color_picker_hue_handle(hsv.h, palette))
         .on_drag(drag, |_drag, _position, _window, cx| {
             cx.new(|_| SettingsSubtitleColorDragPreview)

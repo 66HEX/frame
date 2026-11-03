@@ -282,7 +282,7 @@ pub(in crate::app) fn frame_text_input(
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .text_color(color(label_color))
         .opacity(if disabled { 0.5 } else { 1.0 })
-        .shadow(input_highlight_shadows(palette))
+        .shadow(theme::shadows::recessed_control())
         .key_context(if kind.is_preview_timecode() {
             FRAME_TIMECODE_TEXT_INPUT_CONTEXT
         } else {

@@ -1,9 +1,11 @@
+use gpui::{BoxShadow, point};
+
 use super::{
-    App, BoxShadow, Context, FluentBuilder, FrameRoot, InteractiveElement, IntoElement,
-    MouseButton, ParentElement, Rgba, StatefulInteractiveElement, Styled,
-    TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_BUTTON_HEIGHT, TITLEBAR_ICON_BUTTON_SIZE,
-    TITLEBAR_ICON_SIZE, Window, accessibility::apply_accessible_button, div, hover_motion,
-    mix_color, point, px, retarget_hover_motion, svg, theme,
+    App, Context, FluentBuilder, FrameRoot, InteractiveElement, IntoElement, MouseButton,
+    ParentElement, Rgba, StatefulInteractiveElement, Styled, TITLEBAR_ACTION_ICON_SIZE,
+    TITLEBAR_BUTTON_HEIGHT, TITLEBAR_ICON_BUTTON_SIZE, TITLEBAR_ICON_SIZE, Window,
+    accessibility::apply_accessible_button, div, hover_motion, mix_color, px,
+    retarget_hover_motion, svg, theme,
 };
 
 #[derive(Clone, Copy)]
@@ -224,7 +226,7 @@ pub(super) fn action_button(
         .gap_2()
         .rounded(theme::ui_rem(theme::RADIUS_SM))
         .bg(background)
-        .shadow(button_highlight_shadows(palette))
+        .shadow(theme::shadows::CONTROL.shadows())
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
         .opacity(colors.opacity)
@@ -267,99 +269,7 @@ pub(super) fn parse_hex(hex: &str) -> Rgba {
 }
 
 pub(super) const fn frame_highlight_px() -> f32 {
-    if cfg!(target_os = "macos") { 0.5 } else { 1.0 }
-}
-
-pub(super) fn input_highlight_shadows(palette: &theme::ThemePalette) -> Vec<BoxShadow> {
-    let highlight_px = frame_highlight_px();
-
-    if palette.is_light() {
-        light_control_depth_shadows(palette, true)
-    } else {
-        vec![
-            BoxShadow {
-                color: color(palette.shadow.with_alpha(0.20)).into(),
-                offset: point(px(0.0), px(highlight_px)),
-                blur_radius: px(0.0),
-                spread_radius: px(0.0),
-                inset: true,
-            },
-            BoxShadow {
-                color: color(palette.border_subtle).into(),
-                offset: point(px(0.0), px(-highlight_px)),
-                blur_radius: px(0.0),
-                spread_radius: px(0.0),
-                inset: true,
-            },
-        ]
-    }
-}
-
-pub(super) fn button_highlight_shadows(palette: &theme::ThemePalette) -> Vec<BoxShadow> {
-    if palette.is_light() {
-        return light_control_depth_shadows(palette, true);
-    }
-
-    let highlight_px = frame_highlight_px();
-
-    vec![
-        BoxShadow {
-            color: color(palette.border_subtle).into(),
-            offset: point(px(0.0), px(highlight_px)),
-            blur_radius: px(0.0),
-            spread_radius: px(0.0),
-            inset: true,
-        },
-        BoxShadow {
-            color: color(palette.fill_subtle).into(),
-            offset: point(px(0.0), px(0.0)),
-            blur_radius: px(0.0),
-            spread_radius: px(highlight_px),
-            inset: true,
-        },
-    ]
-}
-
-fn light_control_depth_shadows(palette: &theme::ThemePalette, inset: bool) -> Vec<BoxShadow> {
-    let highlight_px = frame_highlight_px();
-
-    vec![
-        BoxShadow {
-            color: color(palette.shadow.with_alpha(0.06)).into(),
-            offset: point(px(0.0), px(1.0)),
-            blur_radius: px(1.0),
-            spread_radius: px(-0.5),
-            inset,
-        },
-        BoxShadow {
-            color: color(palette.shadow.with_alpha(0.06)).into(),
-            offset: point(px(0.0), px(3.0)),
-            blur_radius: px(3.0),
-            spread_radius: px(-1.5),
-            inset,
-        },
-        BoxShadow {
-            color: color(palette.shadow.with_alpha(0.06)).into(),
-            offset: point(px(0.0), px(6.0)),
-            blur_radius: px(6.0),
-            spread_radius: px(-3.0),
-            inset,
-        },
-        BoxShadow {
-            color: color(palette.surface.with_alpha(0.08)).into(),
-            offset: point(px(0.0), px(-highlight_px)),
-            blur_radius: px(0.0),
-            spread_radius: px(0.0),
-            inset,
-        },
-        BoxShadow {
-            color: color(palette.shadow.with_alpha(0.08)).into(),
-            offset: point(px(0.0), px(0.0)),
-            blur_radius: px(0.0),
-            spread_radius: px(highlight_px),
-            inset,
-        },
-    ]
+    theme::shadows::EDGE_WIDTH
 }
 
 pub(super) fn vertical_separator(height: f32, palette: &theme::ThemePalette) -> gpui::Div {
@@ -404,51 +314,9 @@ pub(super) trait FrameSurface {
 impl FrameSurface for gpui::Div {
     fn card_surface(self, palette: &theme::ThemePalette) -> Self {
         self.rounded(theme::ui_rem(theme::RADIUS_LG))
-            .bg(color(if palette.is_light() {
-                palette.surface
-            } else {
-                palette.fill_subtle
-            }))
-            .shadow(card_surface_shadows(palette))
-    }
-}
-
-pub(super) fn card_surface_shadows(palette: &theme::ThemePalette) -> Vec<BoxShadow> {
-    let highlight_px = frame_highlight_px();
-
-    if palette.is_light() {
-        light_control_depth_shadows(palette, false)
-    } else {
-        vec![
-            BoxShadow {
-                color: color(palette.shadow.with_alpha(0.10)).into(),
-                offset: point(px(0.0), px(4.0)),
-                blur_radius: px(6.0),
-                spread_radius: px(-1.0),
-                inset: false,
-            },
-            BoxShadow {
-                color: color(palette.shadow.with_alpha(0.10)).into(),
-                offset: point(px(0.0), px(2.0)),
-                blur_radius: px(4.0),
-                spread_radius: px(-2.0),
-                inset: false,
-            },
-            BoxShadow {
-                color: color(palette.fill_selected).into(),
-                offset: point(px(0.0), px(highlight_px)),
-                blur_radius: px(0.0),
-                spread_radius: px(0.0),
-                inset: true,
-            },
-            BoxShadow {
-                color: color(palette.fill_subtle).into(),
-                offset: point(px(0.0), px(0.0)),
-                blur_radius: px(0.0),
-                spread_radius: px(highlight_px),
-                inset: true,
-            },
-        ]
+            // Main UI cards keep a stable opaque fill.
+            .bg(color(palette.surface))
+            .shadow(theme::shadows::CARD.shadows())
     }
 }
 
@@ -467,18 +335,6 @@ pub(super) fn horizontal_separator_shadows(palette: &theme::ThemePalette) -> Vec
         spread_radius: px(0.0),
         inset: false,
     }]
-}
-
-pub(super) fn drop_target_shadows(palette: &theme::ThemePalette) -> Vec<BoxShadow> {
-    let mut shadows = card_surface_shadows(palette);
-    shadows.push(BoxShadow {
-        color: color(palette.text_muted.with_alpha(0.55)).into(),
-        offset: point(px(0.0), px(0.0)),
-        blur_radius: px(0.0),
-        spread_radius: px(frame_highlight_px()),
-        inset: true,
-    });
-    shadows
 }
 
 pub(super) const fn color(token: theme::RgbaToken) -> Rgba {

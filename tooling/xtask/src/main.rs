@@ -1368,7 +1368,7 @@ struct ApprovedUiColorLiteral {
     arguments: &'static [f64],
 }
 
-const APPROVED_UI_COLOR_LITERALS: [ApprovedUiColorLiteral; 7] = [
+const APPROVED_UI_COLOR_LITERALS: [ApprovedUiColorLiteral; 5] = [
     ApprovedUiColorLiteral {
         path: "frame-app/src/app/components/color_picker.rs",
         function: "frame_color_picker_sv_canvas",
@@ -1398,18 +1398,6 @@ const APPROVED_UI_COLOR_LITERALS: [ApprovedUiColorLiteral; 7] = [
         function: "crop_mask_rect",
         constructor: "hsla",
         arguments: &[0.0, 0.0, 0.0, 0.55],
-    },
-    ApprovedUiColorLiteral {
-        path: "frame-app/src/app/preview_panel/crop_overlay.rs",
-        function: "preview_crop_handle",
-        constructor: "hsla",
-        arguments: &[0.0, 0.0, 0.0, 0.45],
-    },
-    ApprovedUiColorLiteral {
-        path: "frame-app/src/app/preview_panel/overlay.rs",
-        function: "preview_overlay_handle",
-        constructor: "hsla",
-        arguments: &[0.0, 0.0, 0.0, 0.45],
     },
 ];
 

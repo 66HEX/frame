@@ -1,7 +1,7 @@
 use super::{
     ClickEvent, Context, FluentBuilder, FrameRoot, InteractiveElement, MouseButton, ParentElement,
     Styled, Window, apply_accessible_checkbox, apply_accessible_checkbox_with_focus, assets,
-    button_mouse_down, color, div, icon_svg, input_highlight_shadows, theme,
+    button_mouse_down, color, div, icon_svg, theme,
 };
 use gpui::{FocusHandle, StatefulInteractiveElement};
 use std::rc::Rc;
@@ -19,19 +19,13 @@ pub(in crate::app) fn frame_checkbox_indicator(
     disabled: bool,
     palette: &theme::ThemePalette,
 ) -> gpui::Div {
-    let active = checked || indeterminate;
     let mut mark = div()
         .w(theme::ui_rem(FRAME_CHECKBOX_SIZE))
         .h(theme::ui_rem(FRAME_CHECKBOX_SIZE))
         .flex()
         .items_center()
         .justify_center()
-        .rounded(theme::ui_rem(theme::RADIUS_XS))
-        .bg(if active {
-            color(palette.border_subtle)
-        } else {
-            color(palette.transparent)
-        });
+        .rounded(theme::ui_rem(theme::RADIUS_XS));
 
     if indeterminate {
         mark = mark.child(
@@ -59,7 +53,7 @@ pub(in crate::app) fn frame_checkbox_indicator(
         .rounded(theme::ui_rem(theme::RADIUS_XS))
         .bg(color(palette.canvas))
         .opacity(if disabled { 0.5 } else { 1.0 })
-        .shadow(input_highlight_shadows(palette))
+        .shadow(theme::shadows::recessed_control())
         .child(mark)
 }
 
@@ -76,7 +70,7 @@ pub(in crate::app) fn frame_selection_dot(
         .justify_center()
         .rounded_full()
         .bg(color(palette.canvas))
-        .shadow(input_highlight_shadows(palette))
+        .shadow(theme::shadows::recessed_control())
         .child(
             div()
                 .w(theme::ui_rem(FRAME_SELECTION_DOT_MARK_SIZE))
