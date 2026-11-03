@@ -11,7 +11,9 @@ struct PreviewCanvasBoundsProbe {
     owner: Entity<FrameRoot>,
 }
 
-struct PreviewViewportRoundedClip {
+/// Paint-only foreground: rounded media cutouts and the canvas inset finish.
+/// No hitbox, so pan, zoom and crop interactions pass through to the content.
+struct PreviewViewportFrame {
     color: Rgba,
 }
 
@@ -87,7 +89,7 @@ impl Element for PreviewCanvasBoundsProbe {
     }
 }
 
-impl IntoElement for PreviewViewportRoundedClip {
+impl IntoElement for PreviewViewportFrame {
     type Element = Self;
 
     fn into_element(self) -> Self::Element {
@@ -211,7 +213,7 @@ impl Element for PreviewMediaImage {
     }
 }
 
-impl Element for PreviewViewportRoundedClip {
+impl Element for PreviewViewportFrame {
     type RequestLayoutState = ();
     type PrepaintState = ();
 
@@ -260,12 +262,16 @@ impl Element for PreviewViewportRoundedClip {
         window: &mut Window,
         _cx: &mut App,
     ) {
-        // GPUI clips overflow to a rectangular content mask, so the media layer needs
-        // exact rounded-corner cutouts painted above it.
+        // GPUI clips overflow to a rectangular content mask. Cover media outside
+        // the rounded corners, then paint the inset finish above all canvas content.
+        // A shadow on the parent Div would be painted BEFORE its children, allowing
+        // an image touching the viewport edge to hide the shadow and highlight.
         let radius = theme::ui_rem(theme::RADIUS_MD).to_pixels(window.rem_size());
         if let Some(path) = preview_viewport_rounded_clip_path(bounds, radius) {
             window.paint_path(path, self.color);
         }
+        let corners = gpui::Corners::all(radius).clamp_radii_for_quad_size(bounds.size);
+        window.paint_inset_shadows(bounds, corners, 0.0, &theme::shadows::recessed_control());
     }
 }
 
@@ -308,10 +314,13 @@ pub(in crate::app) fn preview_viewport(
         .overflow_hidden()
         .rounded(theme::ui_rem(theme::RADIUS_MD))
         .bg(color(palette.canvas))
-        .shadow(theme::shadows::recessed_control())
         .track_focus(focuses.viewport)
         .tab_stop(pan_enabled)
-        .child(preview_viewport_content(state, cx));
+        .child(preview_viewport_content(state, cx))
+        // Fixed to the viewport, above media/crop layers and below floating controls.
+        .child(PreviewViewportFrame {
+            color: color(palette.surface),
+        });
 
     if pan_enabled {
         let viewport_focus = focuses.viewport.clone();
@@ -336,12 +345,6 @@ pub(in crate::app) fn preview_viewport(
                     }
                 }),
             );
-    }
-
-    if state.render_image.is_some() && state.media.is_some() {
-        viewport = viewport.child(PreviewViewportRoundedClip {
-            color: color(palette.surface),
-        });
     }
 
     if state.crop.crop_mode && state.crop.draft_crop.is_some() {
