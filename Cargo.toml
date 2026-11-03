@@ -33,6 +33,18 @@ gpui_web = { package = "gpui_ce_web", path = "vendor/gpui-ce/crates/gpui_web" }
 gpui_wgpu = { package = "gpui_ce_wgpu", path = "vendor/gpui-ce/crates/gpui_wgpu" }
 gpui_windows = { package = "gpui_ce_windows", path = "vendor/gpui-ce/crates/gpui_windows" }
 
+# GPUI instantiates Taffy's generic layout code. Both crates need optimization
+# to keep the video workspace within a frame budget during `cargo xtask run`.
+# Frame's own code retains the default debug profile, assertions and symbols.
+[profile.dev.package.gpui-ce]
+opt-level = 3
+
+[profile.dev.package.taffy]
+opt-level = 3
+
+[profile.dev.package.gpui_ce_parley]
+opt-level = 2
+
 [profile.release]
 opt-level = "z"
 lto = true

@@ -170,6 +170,11 @@ choco install innosetup --no-progress -y
    cargo xtask run
    ```
 
+   The development profile optimizes GPUI, its layout engine and its text backend
+   so dense video controls remain responsive. Frame's own code keeps the default
+   debug settings. For CPU frame measurements, see
+   [the render benchmark](CONTRIBUTING_VISUAL_FIXTURES.md#cpu-render-benchmark).
+
 4. **Build a release binary:**
 
    ```bash

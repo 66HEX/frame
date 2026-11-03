@@ -117,6 +117,36 @@ Before releasing, complete the broader native checklist:
 6. On Linux, check X11 and Wayland floating, maximized, tiled and fullscreen
    windows. On Windows, repeat preview transformations and playback with DirectX.
 
+### Development performance follow-up (2026-11-03)
+
+CPU sampling of full native redraws found most time in Taffy's layout code,
+including with playback tasks stopped. The video settings tree was much more
+expensive than the empty workspace. Frame's development profile now optimizes
+`gpui-ce` and `taffy` at level 3 and `gpui_ce_parley` at level 2; GPUI also needs
+optimization because it instantiates Taffy's generic code. Frame's own code
+retains the default debug profile. No runtime behavior or dependency versions
+change in this follow-up.
+
+Measured median CPU frame times on the same Mac at 1200 × 800, dark theme,
+100% scale:
+
+| Fixture | Unoptimized development build | Selectively optimized development build |
+| --- | --- | --- |
+| `workspace-empty` | 0.85 ms | 0.14 ms |
+| `workspace-image` | 43.82 ms | 4.50 ms |
+| `settings-source` | 52.15 ms | 5.35 ms |
+| `settings-video` | 127.51 ms | 13.01 ms |
+| `settings-output` | 40.54 ms | 4.30 ms |
+| `preview-ready` | 52.98 ms | 5.34 ms |
+| `preview-crop-custom` | 132.91 ms | 13.39 ms |
+
+The final build measured 120 frames after 20 warm-up frames. These numbers
+exclude playback and GPU presentation; they are not end-to-end FPS measurements.
+The native benchmark and its limits are documented in
+[`CONTRIBUTING_VISUAL_FIXTURES.md`](../../CONTRIBUTING_VISUAL_FIXTURES.md#cpu-render-benchmark).
+Frame's full `cargo xtask ci` passes with the new profile: 954 tests and all
+formatting, Clippy, shell, workflow and whitespace checks.
+
 ## Next update
 
 1. Record the new upstream SHA and preserve a copy of the working vendor tree.

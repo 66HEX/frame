@@ -68,6 +68,29 @@ intentional. The code-level WCAG contrast and focus behavior tests remain the
 automated safety net; this pair checks what those structural tests could not:
 the final GPUI rendering.
 
+## CPU Render Benchmark
+
+Use the native benchmark to compare the cost of rebuilding a complete window:
+
+```bash
+FRAME_GPUI_VISUAL_FIXTURE=settings-video \
+FRAME_GPUI_UI_SCALE=100 \
+FRAME_VISUAL_THEME=dark \
+cargo run --locked -p frame-app --example render-benchmark
+```
+
+The benchmark uses a 1200 × 800 window, native fonts and in-memory fixture state.
+It warms up for 20 frames, then reports the median, p95 and maximum CPU time over
+120 full redraws. Playback tasks do not advance during the synchronous loop;
+the measurement excludes GPU presentation and is not a playback FPS result.
+No persisted settings or media files are required.
+
+Compare `workspace-empty`, `workspace-image`, `settings-source`, `settings-video`
+and `preview-crop-custom` on the same machine, with the same scale and theme.
+The development profile optimizes both GPUI and Taffy because GPUI instantiates
+Taffy's generic layout code. Optimizing Taffy alone leaves that work unoptimized.
+Frame's application code retains its normal debug settings.
+
 ## Available Fixtures
 
 | Fixture | Visual scenario | What it is useful for checking |
