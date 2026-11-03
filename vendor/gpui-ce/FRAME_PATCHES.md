@@ -147,6 +147,28 @@ The native benchmark and its limits are documented in
 Frame's full `cargo xtask ci` passes with the new profile: 954 tests and all
 formatting, Clippy, shell, workflow and whitespace checks.
 
+### UI acceptance and merge validation (2026-11-03)
+
+Frame's follow-up UI changes unify select/picker transitions, honor system reduced
+motion (including preview zoom/pan), move focus with active tabs, and enlarge
+slider, scrollbar and editing-handle hit areas without overlapping neighbors.
+These application changes do not add further downstream GPUI patches.
+
+- The final local `cargo xtask ci` passes: 973 tests, formatting, Clippy with
+  warnings denied, shell syntax, generated workflows and whitespace checks.
+  Existing opt-in media/audio tests remain outside the default local gate.
+- Rendered GPUI tests cover all six selects and both color pickers in both themes
+  at 100%/200%, repeated tab navigation, disappearing tabs, live motion changes,
+  hit-area drags, disabled sliders and tightly spaced handles.
+- 40 further native macOS render scenarios pass. Video-settings median CPU draw
+  time is 13.2–14.1 ms at 100% and 16.7–16.8 ms at 200%; custom crop is
+  13.5 ms and 16.9 ms respectively. These are CPU timings, not playback FPS.
+- The repository owner confirmed all manual tests passed on the macOS review
+  build and authorized merging the GPUI update and UI fixes. Native Windows and
+  Linux runtime acceptance is not claimed.
+- A fresh `cargo deny check` passes. The known upstream WGPU color-tolerance
+  failure documented above remains unchanged.
+
 ## Next update
 
 1. Record the new upstream SHA and preserve a copy of the working vendor tree.
