@@ -1,21 +1,20 @@
 use anyhow::{Context, Result};
-use ::util::ResultExt;
+use gpui_util::ResultExt;
 use itertools::Itertools;
 use windows::Win32::{
     Foundation::HMODULE,
     Graphics::{
         Direct3D::{
-            D3D_DRIVER_TYPE_UNKNOWN, D3D_FEATURE_LEVEL, D3D_FEATURE_LEVEL_10_1,
-            D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_11_1,
+            D3D_DRIVER_TYPE_UNKNOWN, D3D_FEATURE_LEVEL, D3D_FEATURE_LEVEL_11_0,
+            D3D_FEATURE_LEVEL_11_1,
         },
         Direct3D11::{
-            D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_CREATE_DEVICE_DEBUG,
-            D3D11_FEATURE_D3D10_X_HARDWARE_OPTIONS, D3D11_FEATURE_DATA_D3D10_X_HARDWARE_OPTIONS,
-            D3D11_SDK_VERSION, D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext,
+            D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_CREATE_DEVICE_DEBUG, D3D11_SDK_VERSION,
+            D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext,
         },
         Dxgi::{
             CreateDXGIFactory2, DXGI_CREATE_FACTORY_DEBUG, DXGI_CREATE_FACTORY_FLAGS,
-            IDXGIAdapter1, IDXGIFactory6,
+            DXGI_ERROR_NOT_FOUND, IDXGIAdapter1, IDXGIFactory6,
         },
     },
 };
@@ -56,9 +55,6 @@ impl DirectXDevices {
             }
             D3D_FEATURE_LEVEL_11_0 => {
                 log::info!("Created device with Direct3D 11.0 feature level.")
-            }
-            D3D_FEATURE_LEVEL_10_1 => {
-                log::info!("Created device with Direct3D 10.1 feature level.")
             }
             _ => unreachable!(),
         }
@@ -113,7 +109,11 @@ fn get_adapter(
     D3D_FEATURE_LEVEL,
 )> {
     for adapter_index in 0.. {
-        let adapter: IDXGIAdapter1 = unsafe { dxgi_factory.EnumAdapters(adapter_index)?.cast()? };
+        let adapter: IDXGIAdapter1 = match unsafe { dxgi_factory.EnumAdapters(adapter_index) } {
+            Ok(adapter) => adapter.cast()?,
+            Err(error) if error.code() == DXGI_ERROR_NOT_FOUND => break,
+            Err(error) => return Err(error.into()),
+        };
         if let Ok(desc) = unsafe { adapter.GetDesc1() } {
             let gpu_name = String::from_utf16_lossy(&desc.Description)
                 .trim_matches(char::from(0))
@@ -132,11 +132,12 @@ fn get_adapter(
         )
         .log_err()
         {
-            return Ok((adapter, device, context.unwrap(), feature_level));
+            let context = context.context("D3D11CreateDevice returned no device context")?;
+            return Ok((adapter, device, context, feature_level));
         }
     }
 
-    unreachable!()
+    anyhow::bail!("No compatible Direct3D 11 adapter found")
 }
 
 #[inline]
@@ -158,37 +159,18 @@ fn get_device(
             D3D_DRIVER_TYPE_UNKNOWN,
             HMODULE::default(),
             device_flags,
-            // 4x MSAA is required for Direct3D Feature Level 10.1 or better
-            Some(&[
-                D3D_FEATURE_LEVEL_11_1,
-                D3D_FEATURE_LEVEL_11_0,
-                D3D_FEATURE_LEVEL_10_1,
-            ]),
+            // The generated shader corpus is Shader Model 5.0. Restrict device creation to
+            // feature levels that can execute it instead of accepting FL10.1 and failing later
+            // while constructing the renderer's first pipeline.
+            Some(&[D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0]),
             D3D11_SDK_VERSION,
             Some(&mut device),
             feature_level,
             context,
         )?;
     }
-    let device = device.unwrap();
-    let mut data = D3D11_FEATURE_DATA_D3D10_X_HARDWARE_OPTIONS::default();
-    unsafe {
-        device
-            .CheckFeatureSupport(
-                D3D11_FEATURE_D3D10_X_HARDWARE_OPTIONS,
-                &mut data as *mut _ as _,
-                std::mem::size_of::<D3D11_FEATURE_DATA_D3D10_X_HARDWARE_OPTIONS>() as u32,
-            )
-            .context("Checking GPU device feature support")?;
-    }
-    if data
-        .ComputeShaders_Plus_RawAndStructuredBuffers_Via_Shader_4_x
-        .as_bool()
-    {
-        Ok(device)
-    } else {
-        Err(anyhow::anyhow!(
-            "Required feature StructuredBuffer is not supported by GPU/driver"
-        ))
-    }
+    let device = device.context("D3D11CreateDevice returned no device")?;
+    // FL11.0/11.1 guarantees the compute/raw-buffer capabilities required by the SM5 DXBC
+    // artifacts, so no legacy D3D10.x optional-feature probe is needed here.
+    Ok(device)
 }

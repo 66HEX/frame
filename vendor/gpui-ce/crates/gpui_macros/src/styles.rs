@@ -47,6 +47,409 @@ pub fn style_helpers(input: TokenStream) -> TokenStream {
     output.into()
 }
 
+struct StyleTransitionSpec {
+    name: &'static str,
+    fields: Vec<StyleTransitionField>,
+}
+
+struct StyleTransitionField {
+    path: TokenStream2,
+    kind: StyleTransitionFieldKind,
+}
+
+struct CanonicalStyleTransitionField {
+    config_name: syn::Ident,
+    path: TokenStream2,
+    kind: StyleTransitionFieldKind,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum StyleTransitionFieldKind {
+    Required,
+    Optional,
+    InsetTop,
+    InsetRight,
+    InsetBottom,
+    InsetLeft,
+    AutoSizeWidth,
+    AutoSizeHeight,
+    CornerRadius,
+}
+
+impl StyleTransitionField {
+    fn required(path: TokenStream2) -> Self {
+        Self {
+            path,
+            kind: StyleTransitionFieldKind::Required,
+        }
+    }
+
+    fn optional(path: TokenStream2) -> Self {
+        Self {
+            path,
+            kind: StyleTransitionFieldKind::Optional,
+        }
+    }
+
+    fn required_or_special_length(path: TokenStream2) -> Self {
+        let kind = match style_transition_key(&path).as_str() {
+            "size.width" => StyleTransitionFieldKind::AutoSizeWidth,
+            "size.height" => StyleTransitionFieldKind::AutoSizeHeight,
+            "inset.top" => StyleTransitionFieldKind::InsetTop,
+            "inset.right" => StyleTransitionFieldKind::InsetRight,
+            "inset.bottom" => StyleTransitionFieldKind::InsetBottom,
+            "inset.left" => StyleTransitionFieldKind::InsetLeft,
+            _ => StyleTransitionFieldKind::Required,
+        };
+        Self { path, kind }
+    }
+
+    fn corner_radius(path: TokenStream2) -> Self {
+        Self {
+            path,
+            kind: StyleTransitionFieldKind::CornerRadius,
+        }
+    }
+}
+
+fn style_transition_key(path: &TokenStream2) -> String {
+    path.to_string().split_whitespace().collect()
+}
+
+fn style_transition_config_name(key: &str) -> syn::Ident {
+    format_ident!("transition_{}", key.replace('.', "_"))
+}
+
+fn canonical_style_transition_fields(
+    specs: &[StyleTransitionSpec],
+) -> Vec<CanonicalStyleTransitionField> {
+    let mut fields = Vec::<CanonicalStyleTransitionField>::new();
+    let mut field_indices = std::collections::HashMap::<String, usize>::new();
+    let mut config_names = std::collections::HashMap::<String, String>::new();
+
+    for field in specs.iter().flat_map(|spec| &spec.fields) {
+        let key = style_transition_key(&field.path);
+        if let Some(index) = field_indices.get(&key).copied() {
+            let canonical = &fields[index];
+            if canonical.kind != field.kind {
+                panic!("style transition field `{key}` has conflicting metadata");
+            }
+            continue;
+        }
+
+        let config_name = style_transition_config_name(&key);
+        let config_name_string = config_name.to_string();
+        if let Some(existing_key) = config_names.insert(config_name_string.clone(), key.clone())
+            && existing_key != key
+        {
+            panic!(
+                "style transition fields `{existing_key}` and `{key}` map to the same config field `{config_name_string}`"
+            );
+        }
+
+        field_indices.insert(key.clone(), fields.len());
+        fields.push(CanonicalStyleTransitionField {
+            config_name,
+            path: field.path.clone(),
+            kind: field.kind,
+        });
+    }
+
+    fields
+}
+
+pub fn style_transitions(input: TokenStream) -> TokenStream {
+    let _ = parse_macro_input!(input as StyleableMacroInput);
+    let specs = style_transition_specs();
+    let canonical_fields = canonical_style_transition_fields(&specs);
+
+    let config_fields = canonical_fields.iter().map(|field| {
+        let name = &field.config_name;
+        quote! {
+            #name: Option<crate::AnyMotion>
+        }
+    });
+
+    let builders = specs.iter().map(|spec| {
+        let name = format_ident!("{}", spec.name);
+        let config_names = spec
+            .fields
+            .iter()
+            .map(|field| style_transition_config_name(&style_transition_key(&field.path)));
+        quote! {
+            #[doc = concat!("Transitions changes made by [`Styled::", stringify!(#name), "`].")]
+            pub fn #name(mut self, motion: impl Into<crate::AnyMotion>) -> Self {
+                let motion = motion.into();
+                #(self.#config_names = Some(motion.clone());)*
+                self
+            }
+        }
+    });
+
+    let applications = canonical_fields.iter().map(generate_transition_application);
+
+    quote! {
+        /// Selects style properties to transition and configures their motion.
+        #[derive(Default)]
+        pub struct StyleTransitions {
+            #(#config_fields,)*
+        }
+
+        impl StyleTransitions {
+            /// Creates an empty set of style transitions.
+            pub fn new() -> Self {
+                Self::default()
+            }
+
+            #(#builders)*
+
+            /// Applies configured transitions to `style`.
+            ///
+            /// Returns whether any transition remains active and requires another frame.
+            pub(crate) fn apply(
+                &self,
+                style: &mut crate::Style,
+                state: &mut StyleTransitionState,
+                context: StyleTransitionContext,
+                now: scheduler::Instant,
+                reduce_motion: bool,
+            ) -> bool {
+                let mut in_progress = false;
+                #(#applications)*
+                in_progress
+            }
+        }
+
+    }
+    .into()
+}
+
+fn generate_transition_application(field: &CanonicalStyleTransitionField) -> TokenStream2 {
+    let motion_name = &field.config_name;
+    let path = &field.path;
+
+    match field.kind {
+        StyleTransitionFieldKind::Required => quote! {
+            in_progress |= apply_required(
+                &mut state.#path,
+                &mut style.#path,
+                self.#motion_name.as_ref(),
+                now,
+                reduce_motion,
+            );
+        },
+        StyleTransitionFieldKind::Optional => quote! {
+            in_progress |= apply_optional(
+                &mut state.#path,
+                &mut style.#path,
+                self.#motion_name.as_ref(),
+                now,
+                reduce_motion,
+            );
+        },
+        StyleTransitionFieldKind::InsetTop
+        | StyleTransitionFieldKind::InsetRight
+        | StyleTransitionFieldKind::InsetBottom
+        | StyleTransitionFieldKind::InsetLeft => {
+            let edge = match field.kind {
+                StyleTransitionFieldKind::InsetTop => quote! { StyleTransitionEdge::Top },
+                StyleTransitionFieldKind::InsetRight => quote! { StyleTransitionEdge::Right },
+                StyleTransitionFieldKind::InsetBottom => quote! { StyleTransitionEdge::Bottom },
+                StyleTransitionFieldKind::InsetLeft => quote! { StyleTransitionEdge::Left },
+                _ => unreachable!(),
+            };
+            quote! {
+            in_progress |= apply_inset(
+                &mut state.#path,
+                &mut style.#path,
+                #edge,
+                self.#motion_name.as_ref(),
+                context,
+                now,
+                reduce_motion,
+            );
+            }
+        }
+        StyleTransitionFieldKind::AutoSizeWidth => quote! {
+            in_progress |= apply_auto_size(
+                &mut state.#path,
+                &mut style.#path,
+                StyleTransitionAxis::Width,
+                self.#motion_name.as_ref(),
+                context,
+                now,
+                reduce_motion,
+            );
+        },
+        StyleTransitionFieldKind::AutoSizeHeight => quote! {
+            in_progress |= apply_auto_size(
+                &mut state.#path,
+                &mut style.#path,
+                StyleTransitionAxis::Height,
+                self.#motion_name.as_ref(),
+                context,
+                now,
+                reduce_motion,
+            );
+        },
+        StyleTransitionFieldKind::CornerRadius => quote! {
+            let target = context.bounds.map(|bounds| {
+                let max_corner_radius = std::cmp::min(
+                    bounds.size.width,
+                    bounds.size.height,
+                ) / 2.0;
+
+                crate::AbsoluteLength::Pixels(std::cmp::min(
+                    style.#path.to_pixels(context.rem_size),
+                    max_corner_radius,
+                ))
+            });
+
+            in_progress |= apply_required_target(
+                &mut state.#path,
+                &mut style.#path,
+                target,
+                self.#motion_name.as_ref(),
+                now,
+                reduce_motion,
+            );
+        },
+    }
+}
+
+fn style_transition_specs() -> Vec<StyleTransitionSpec> {
+    let mut specs = Vec::new();
+
+    for prefix in box_prefixes()
+        .into_iter()
+        .chain(margin_box_style_prefixes())
+        .chain(padding_box_style_prefixes())
+        .chain(position_box_style_prefixes())
+    {
+        specs.push(StyleTransitionSpec {
+            name: prefix.prefix,
+            fields: prefix
+                .fields
+                .into_iter()
+                .map(StyleTransitionField::required_or_special_length)
+                .collect(),
+        });
+    }
+
+    for prefix in corner_prefixes() {
+        specs.push(StyleTransitionSpec {
+            name: prefix.prefix,
+            fields: prefix
+                .fields
+                .into_iter()
+                .map(StyleTransitionField::corner_radius)
+                .collect(),
+        });
+    }
+
+    for prefix in border_prefixes() {
+        specs.push(StyleTransitionSpec {
+            name: prefix.prefix,
+            fields: prefix
+                .fields
+                .into_iter()
+                .map(StyleTransitionField::required)
+                .collect(),
+        });
+    }
+
+    specs.extend([
+        StyleTransitionSpec {
+            name: "scrollbar_width",
+            fields: vec![StyleTransitionField::required(quote! { scrollbar_width })],
+        },
+        StyleTransitionSpec {
+            name: "aspect_ratio",
+            fields: vec![StyleTransitionField::optional(quote! { aspect_ratio })],
+        },
+        StyleTransitionSpec {
+            name: "flex_basis",
+            fields: vec![StyleTransitionField::required(quote! { flex_basis })],
+        },
+        StyleTransitionSpec {
+            name: "flex_grow",
+            fields: vec![StyleTransitionField::required(quote! { flex_grow })],
+        },
+        StyleTransitionSpec {
+            name: "flex_shrink",
+            fields: vec![StyleTransitionField::required(quote! { flex_shrink })],
+        },
+        StyleTransitionSpec {
+            name: "bg",
+            fields: vec![StyleTransitionField::optional(quote! { background })],
+        },
+        StyleTransitionSpec {
+            name: "border_color",
+            fields: vec![StyleTransitionField::optional(quote! { border_color })],
+        },
+        StyleTransitionSpec {
+            name: "ring",
+            fields: vec![
+                StyleTransitionField::required(quote! { ring.width }),
+                StyleTransitionField::required(quote! { ring.color }),
+            ],
+        },
+        StyleTransitionSpec {
+            name: "ring_color",
+            fields: vec![StyleTransitionField::required(quote! { ring.color })],
+        },
+        StyleTransitionSpec {
+            name: "inset_ring",
+            fields: vec![
+                StyleTransitionField::required(quote! { inset_ring.width }),
+                StyleTransitionField::required(quote! { inset_ring.color }),
+            ],
+        },
+        StyleTransitionSpec {
+            name: "inset_ring_color",
+            fields: vec![StyleTransitionField::required(quote! { inset_ring.color })],
+        },
+        StyleTransitionSpec {
+            name: "text_color",
+            fields: vec![StyleTransitionField::optional(quote! { text.color })],
+        },
+        StyleTransitionSpec {
+            name: "text_bg",
+            fields: vec![StyleTransitionField::optional(
+                quote! { text.background_color },
+            )],
+        },
+        StyleTransitionSpec {
+            name: "text_size",
+            fields: vec![StyleTransitionField::optional(quote! { text.font_size })],
+        },
+        StyleTransitionSpec {
+            name: "line_height",
+            fields: vec![StyleTransitionField::optional(quote! { text.line_height })],
+        },
+        StyleTransitionSpec {
+            name: "letter_spacing",
+            fields: vec![StyleTransitionField::optional(
+                quote! { text.letter_spacing },
+            )],
+        },
+        StyleTransitionSpec {
+            name: "line_clamp",
+            fields: vec![StyleTransitionField::optional(quote! { text.line_clamp })],
+        },
+        StyleTransitionSpec {
+            name: "opacity",
+            fields: vec![StyleTransitionField::optional(quote! { opacity })],
+        },
+        StyleTransitionSpec {
+            name: "rounded_smoothing",
+            fields: vec![StyleTransitionField::optional(quote! { corner_smoothing })],
+        },
+    ]);
+
+    specs
+}
+
 pub fn visibility_style_methods(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as StyleableMacroInput);
     let visibility = input.method_visibility;
@@ -327,6 +730,30 @@ pub fn cursor_style_methods(input: TokenStream) -> TokenStream {
             self
         }
 
+        /// Sets the upper-left resize cursor.
+        #visibility fn cursor_nw_resize(mut self) -> Self {
+            self.style().mouse_cursor = Some(gpui::CursorStyle::ResizeUpLeft);
+            self
+        }
+
+        /// Sets the upper-right resize cursor.
+        #visibility fn cursor_ne_resize(mut self) -> Self {
+            self.style().mouse_cursor = Some(gpui::CursorStyle::ResizeUpRight);
+            self
+        }
+
+        /// Sets the lower-left resize cursor.
+        #visibility fn cursor_sw_resize(mut self) -> Self {
+            self.style().mouse_cursor = Some(gpui::CursorStyle::ResizeDownLeft);
+            self
+        }
+
+        /// Sets the lower-right resize cursor.
+        #visibility fn cursor_se_resize(mut self) -> Self {
+            self.style().mouse_cursor = Some(gpui::CursorStyle::ResizeDownRight);
+            self
+        }
+
     };
 
     output.into()
@@ -365,10 +792,10 @@ pub fn border_style_methods(input: TokenStream) -> TokenStream {
     }
 
     let output = quote! {
-        /// Sets the border color of the element.
+        /// Sets the background painted into the border of the element.
         #visibility fn border_color<C>(mut self, border_color: C) -> Self
         where
-            C: Into<gpui::Hsla>,
+            C: Into<gpui::Background>,
             Self: Sized,
         {
             self.style().border_color = Some(border_color.into());
@@ -384,6 +811,28 @@ pub fn border_style_methods(input: TokenStream) -> TokenStream {
 pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as StyleableMacroInput);
     let visibility = input.method_visibility;
+    let ring_width_methods = border_suffixes()
+        .into_iter()
+        .filter(|suffix| matches!(suffix.suffix, "0" | "1" | "2" | "4" | "8"))
+        .flat_map(|suffix| {
+            let visibility = visibility.clone();
+            ["ring", "inset_ring"].map(move |prefix| {
+                let visibility = visibility.clone();
+                let width = suffix.width_tokens.clone();
+                let method = format_ident!("{}_{}", prefix, suffix.suffix);
+                let field = format_ident!("{}", prefix);
+                quote! {
+                    #[doc = concat!("Sets the ", #prefix, " width to ", stringify!(#width), ".")]
+                    /// [Docs](https://tailwindcss.com/docs/box-shadow)
+                    #visibility fn #method(mut self) -> Self {
+                        use gpui::px;
+                        self.style().#field.width = Some(#width);
+                        self
+                    }
+                }
+            })
+        });
+
     let output = quote! {
         /// Sets the box shadow of the element.
         /// [Docs](https://tailwindcss.com/docs/box-shadow)
@@ -399,59 +848,77 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
             self
         }
 
+        /// Sets the outer ring width.
+        /// [Docs](https://tailwindcss.com/docs/box-shadow#using-a-custom-value)
+        #visibility fn ring(mut self, width: impl Into<gpui::Pixels>) -> Self {
+            self.style().ring.width = Some(width.into());
+            self
+        }
+
+        /// Sets the outer ring color or gradient.
+        /// [Docs](https://tailwindcss.com/docs/box-shadow#setting-the-ring-color)
+        #visibility fn ring_color<C>(mut self, color: C) -> Self
+        where
+            C: Into<gpui::Background>,
+            Self: Sized,
+        {
+            self.style().ring.color = Some(gpui::RingColor::Color(color.into()));
+            self
+        }
+
+        /// Sets the inset ring width.
+        /// [Docs](https://tailwindcss.com/docs/box-shadow#using-a-custom-value)
+        #visibility fn inset_ring(mut self, width: impl Into<gpui::Pixels>) -> Self {
+            self.style().inset_ring.width = Some(width.into());
+            self
+        }
+
+        /// Sets the inset ring color or gradient.
+        /// [Docs](https://tailwindcss.com/docs/box-shadow#setting-the-inset-ring-color)
+        #visibility fn inset_ring_color<C>(mut self, color: C) -> Self
+        where
+            C: Into<gpui::Background>,
+            Self: Sized,
+        {
+            self.style().inset_ring.color = Some(gpui::RingColor::Color(color.into()));
+            self
+        }
+
+        #(#ring_width_methods)*
+
         /// Sets the box shadow of the element.
         /// [Docs](https://tailwindcss.com/docs/box-shadow)
         #visibility fn shadow_2xs(mut self) -> Self {
-            use gpui::{BoxShadow, hsla, point, px};
+            use gpui::{BoxShadow, hsla, px};
             use std::vec;
 
-            self.style().box_shadow = Some(vec![BoxShadow {
-                color: hsla(0., 0., 0., 0.05),
-                offset: point(px(0.), px(1.)),
-                blur_radius: px(0.),
-                spread_radius: px(0.),
-                inset: false,
-            }]);
+            self.style().box_shadow = Some(vec![
+                BoxShadow::new(px(0.), px(1.), hsla(0., 0., 0., 0.05))
+            ]);
             self
         }
 
         /// Sets the box shadow of the element.
         /// [Docs](https://tailwindcss.com/docs/box-shadow)
         #visibility fn shadow_xs(mut self) -> Self {
-            use gpui::{BoxShadow, hsla, point, px};
+            use gpui::{BoxShadow, hsla, px};
             use std::vec;
 
-            self.style().box_shadow = Some(vec![BoxShadow {
-                color: hsla(0., 0., 0., 0.05),
-                offset: point(px(0.), px(1.)),
-                blur_radius: px(2.),
-                spread_radius: px(0.),
-                inset: false,
-            }]);
+            self.style().box_shadow = Some(vec![
+                BoxShadow::new(px(0.), px(1.), hsla(0., 0., 0., 0.05)).blur_radius(px(2.))
+            ]);
             self
         }
 
         /// Sets the box shadow of the element.
         /// [Docs](https://tailwindcss.com/docs/box-shadow)
         #visibility fn shadow_sm(mut self) -> Self {
-            use gpui::{BoxShadow, hsla, point, px};
+            use gpui::{BoxShadow, hsla, px};
             use std::vec;
 
             self.style().box_shadow = Some(vec![
-                BoxShadow {
-                    color: hsla(0., 0., 0., 0.1),
-                    offset: point(px(0.), px(1.)),
-                    blur_radius: px(3.),
-                    spread_radius: px(0.),
-                    inset: false,
-                },
-                BoxShadow {
-                    color: hsla(0., 0., 0., 0.1),
-                    offset: point(px(0.), px(1.)),
-                    blur_radius: px(2.),
-                    spread_radius: px(-1.),
-                    inset: false,
-                }
+                BoxShadow::new(px(0.), px(1.), hsla(0., 0., 0., 0.1)).blur_radius(px(3.)),
+                BoxShadow::new(px(0.), px(1.), hsla(0., 0., 0., 0.1)).blur_radius(px(2.)).spread_radius(px(-1.)),
             ]);
             self
         }
@@ -459,24 +926,12 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
         /// Sets the box shadow of the element.
         /// [Docs](https://tailwindcss.com/docs/box-shadow)
         #visibility fn shadow_md(mut self) -> Self {
-            use gpui::{BoxShadow, hsla, point, px};
+            use gpui::{BoxShadow, hsla, px};
             use std::vec;
 
             self.style().box_shadow = Some(vec![
-                BoxShadow {
-                    color: hsla(0., 0., 0., 0.1),
-                    offset: point(px(0.), px(4.)),
-                    blur_radius: px(6.),
-                    spread_radius: px(-1.),
-                    inset: false,
-                },
-                BoxShadow {
-                    color: hsla(0., 0., 0., 0.1),
-                    offset: point(px(0.), px(2.)),
-                    blur_radius: px(4.),
-                    spread_radius: px(-2.),
-                    inset: false,
-                }
+                BoxShadow::new(px(0.), px(4.), hsla(0., 0., 0., 0.1)).blur_radius(px(6.)).spread_radius(px(-1.)),
+                BoxShadow::new(px(0.), px(2.), hsla(0., 0., 0., 0.1)).blur_radius(px(4.)).spread_radius(px(-2.)),
             ]);
             self
         }
@@ -484,24 +939,12 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
         /// Sets the box shadow of the element.
         /// [Docs](https://tailwindcss.com/docs/box-shadow)
         #visibility fn shadow_lg(mut self) -> Self {
-            use gpui::{BoxShadow, hsla, point, px};
+            use gpui::{BoxShadow, hsla, px};
             use std::vec;
 
             self.style().box_shadow = Some(vec![
-                BoxShadow {
-                    color: hsla(0., 0., 0., 0.1),
-                    offset: point(px(0.), px(10.)),
-                    blur_radius: px(15.),
-                    spread_radius: px(-3.),
-                    inset: false,
-                },
-                BoxShadow {
-                    color: hsla(0., 0., 0., 0.1),
-                    offset: point(px(0.), px(4.)),
-                    blur_radius: px(6.),
-                    spread_radius: px(-4.),
-                    inset: false,
-                }
+                BoxShadow::new(px(0.), px(10.), hsla(0., 0., 0., 0.1)).blur_radius(px(15.)).spread_radius(px(-3.)),
+                BoxShadow::new(px(0.), px(4.), hsla(0., 0., 0., 0.1)).blur_radius(px(6.)).spread_radius(px(-4.)),
             ]);
             self
         }
@@ -509,24 +952,12 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
         /// Sets the box shadow of the element.
         /// [Docs](https://tailwindcss.com/docs/box-shadow)
         #visibility fn shadow_xl(mut self) -> Self {
-            use gpui::{BoxShadow, hsla, point, px};
+            use gpui::{BoxShadow, hsla, px};
             use std::vec;
 
             self.style().box_shadow = Some(vec![
-                BoxShadow {
-                    color: hsla(0., 0., 0., 0.1),
-                    offset: point(px(0.), px(20.)),
-                    blur_radius: px(25.),
-                    spread_radius: px(-5.),
-                    inset: false,
-                },
-                BoxShadow {
-                    color: hsla(0., 0., 0., 0.1),
-                    offset: point(px(0.), px(8.)),
-                    blur_radius: px(10.),
-                    spread_radius: px(-6.),
-                    inset: false,
-                }
+                BoxShadow::new(px(0.), px(20.), hsla(0., 0., 0., 0.1)).blur_radius(px(25.)).spread_radius(px(-5.)),
+                BoxShadow::new(px(0.), px(8.), hsla(0., 0., 0., 0.1)).blur_radius(px(10.)).spread_radius(px(-6.)),
             ]);
             self
         }
@@ -534,16 +965,12 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
         /// Sets the box shadow of the element.
         /// [Docs](https://tailwindcss.com/docs/box-shadow)
         #visibility fn shadow_2xl(mut self) -> Self {
-            use gpui::{BoxShadow, hsla, point, px};
+            use gpui::{BoxShadow, hsla, px};
             use std::vec;
 
-            self.style().box_shadow = Some(vec![BoxShadow {
-                color: hsla(0., 0., 0., 0.25),
-                offset: point(px(0.), px(25.)),
-                blur_radius: px(50.),
-                spread_radius: px(-12.),
-                inset: false,
-            }]);
+            self.style().box_shadow = Some(vec![
+                BoxShadow::new(px(0.), px(25.), hsla(0., 0., 0., 0.25)).blur_radius(px(50.)).spread_radius(px(-12.))
+            ]);
             self
         }
     };
@@ -574,6 +1001,12 @@ struct CornerStyleSuffix {
     suffix: &'static str,
     radius_tokens: TokenStream2,
     doc_string_suffix: &'static str,
+}
+
+struct CornerSmoothingStyleSuffix {
+    suffix: &'static str,
+    amount_tokens: TokenStream2,
+    doc_string: &'static str,
 }
 
 struct BorderStylePrefix {
@@ -677,7 +1110,29 @@ fn generate_methods() -> Vec<TokenStream2> {
         }
     }
 
+    methods.extend(generate_corner_smoothing_methods(visibility));
+
     methods
+}
+
+fn generate_corner_smoothing_methods(visibility: Visibility) -> Vec<TokenStream2> {
+    corner_smoothing_suffixes()
+        .into_iter()
+        .map(|suffix| {
+            let method_name = format_ident!("rounded_smoothing_{}", suffix.suffix);
+            let amount_tokens = suffix.amount_tokens;
+            let doc_string = suffix.doc_string;
+
+            quote! {
+                #[doc = #doc_string]
+                #visibility fn #method_name(mut self) -> Self {
+                    self.style().corner_smoothing = Some(#amount_tokens);
+
+                    self
+                }
+            }
+        })
+        .collect()
 }
 
 fn generate_predefined_setter(
@@ -1331,6 +1786,66 @@ fn corner_suffixes() -> Vec<CornerStyleSuffix> {
             suffix: "full",
             radius_tokens: quote! {  px(9999.) },
             doc_string_suffix: "9999px",
+        },
+    ]
+}
+
+fn corner_smoothing_suffixes() -> Vec<CornerSmoothingStyleSuffix> {
+    vec![
+        CornerSmoothingStyleSuffix {
+            suffix: "0",
+            amount_tokens: quote! { 0.0 },
+            doc_string: "Keeps circular corners by setting rounded corner smoothing to `0.0`.",
+        },
+        CornerSmoothingStyleSuffix {
+            suffix: "0p1",
+            amount_tokens: quote! { 0.1 },
+            doc_string: "Sets rounded corner smoothing to `0.1`.",
+        },
+        CornerSmoothingStyleSuffix {
+            suffix: "0p2",
+            amount_tokens: quote! { 0.2 },
+            doc_string: "Sets rounded corner smoothing to `0.2`.",
+        },
+        CornerSmoothingStyleSuffix {
+            suffix: "0p3",
+            amount_tokens: quote! { 0.3 },
+            doc_string: "Sets rounded corner smoothing to `0.3`.",
+        },
+        CornerSmoothingStyleSuffix {
+            suffix: "0p4",
+            amount_tokens: quote! { 0.4 },
+            doc_string: "Sets rounded corner smoothing to `0.4`.",
+        },
+        CornerSmoothingStyleSuffix {
+            suffix: "0p5",
+            amount_tokens: quote! { 0.5 },
+            doc_string: "Sets rounded corner smoothing to `0.5`.",
+        },
+        CornerSmoothingStyleSuffix {
+            suffix: "0p6",
+            amount_tokens: quote! { 0.6 },
+            doc_string: "Sets rounded corner smoothing to `0.6`.",
+        },
+        CornerSmoothingStyleSuffix {
+            suffix: "0p7",
+            amount_tokens: quote! { 0.7 },
+            doc_string: "Sets rounded corner smoothing to `0.7`.",
+        },
+        CornerSmoothingStyleSuffix {
+            suffix: "0p8",
+            amount_tokens: quote! { 0.8 },
+            doc_string: "Sets rounded corner smoothing to `0.8`.",
+        },
+        CornerSmoothingStyleSuffix {
+            suffix: "0p9",
+            amount_tokens: quote! { 0.9 },
+            doc_string: "Sets rounded corner smoothing to `0.9`.",
+        },
+        CornerSmoothingStyleSuffix {
+            suffix: "1",
+            amount_tokens: quote! { 1.0 },
+            doc_string: "Requests maximum rounded corner smoothing by setting it to `1.0`.",
         },
     ]
 }

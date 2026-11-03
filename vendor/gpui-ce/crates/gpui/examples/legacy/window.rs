@@ -1,7 +1,13 @@
+#![cfg_attr(target_family = "wasm", no_main)]
+
+#[path = "../example_support/fonts.rs"]
+mod example_support;
+
 use gpui::{
     App, Bounds, Context, KeyBinding, PromptButton, PromptLevel, Window, WindowBounds, WindowKind,
     WindowOptions, actions, div, prelude::*, px, rgb, size,
 };
+use gpui_platform::application;
 
 struct SubWindow {
     custom_titlebar: bool,
@@ -13,7 +19,7 @@ fn button(text: &str, on_click: impl Fn(&mut Window, &mut App) + 'static) -> imp
         .flex_none()
         .px_2()
         .bg(rgb(0xf7f7f7))
-        .active(|this| this.opacity(0.85))
+        .active_style(|this| this.opacity(0.85))
         .border_1()
         .border_color(rgb(0xe0e0e0))
         .rounded_sm()
@@ -79,10 +85,7 @@ impl Render for WindowDemo {
             .gap_2()
             .child(button("Normal", move |_, cx| {
                 cx.open_window(
-                    WindowOptions {
-                        window_bounds: Some(window_bounds),
-                        ..Default::default()
-                    },
+                    WindowOptions::new().window_bounds(Some(window_bounds)),
                     |_, cx| {
                         cx.new(|_| SubWindow {
                             custom_titlebar: false,
@@ -93,11 +96,9 @@ impl Render for WindowDemo {
             }))
             .child(button("Popup", move |_, cx| {
                 cx.open_window(
-                    WindowOptions {
-                        window_bounds: Some(window_bounds),
-                        kind: WindowKind::PopUp,
-                        ..Default::default()
-                    },
+                    WindowOptions::new()
+                        .window_bounds(Some(window_bounds))
+                        .kind(WindowKind::PopUp),
                     |_, cx| {
                         cx.new(|_| SubWindow {
                             custom_titlebar: false,
@@ -108,11 +109,9 @@ impl Render for WindowDemo {
             }))
             .child(button("Custom Titlebar", move |_, cx| {
                 cx.open_window(
-                    WindowOptions {
-                        titlebar: None,
-                        window_bounds: Some(window_bounds),
-                        ..Default::default()
-                    },
+                    WindowOptions::new()
+                        .titlebar(None)
+                        .window_bounds(Some(window_bounds)),
                     |_, cx| {
                         cx.new(|_| SubWindow {
                             custom_titlebar: true,
@@ -123,11 +122,9 @@ impl Render for WindowDemo {
             }))
             .child(button("Invisible", move |_, cx| {
                 cx.open_window(
-                    WindowOptions {
-                        show: false,
-                        window_bounds: Some(window_bounds),
-                        ..Default::default()
-                    },
+                    WindowOptions::new()
+                        .show(false)
+                        .window_bounds(Some(window_bounds)),
                     |_, cx| {
                         cx.new(|_| SubWindow {
                             custom_titlebar: false,
@@ -138,12 +135,10 @@ impl Render for WindowDemo {
             }))
             .child(button("Unmovable", move |_, cx| {
                 cx.open_window(
-                    WindowOptions {
-                        is_movable: false,
-                        titlebar: None,
-                        window_bounds: Some(window_bounds),
-                        ..Default::default()
-                    },
+                    WindowOptions::new()
+                        .is_movable(false)
+                        .titlebar(None)
+                        .window_bounds(Some(window_bounds)),
                     |_, cx| {
                         cx.new(|_| SubWindow {
                             custom_titlebar: false,
@@ -154,11 +149,9 @@ impl Render for WindowDemo {
             }))
             .child(button("Unresizable", move |_, cx| {
                 cx.open_window(
-                    WindowOptions {
-                        is_resizable: false,
-                        window_bounds: Some(window_bounds),
-                        ..Default::default()
-                    },
+                    WindowOptions::new()
+                        .is_resizable(false)
+                        .window_bounds(Some(window_bounds)),
                     |_, cx| {
                         cx.new(|_| SubWindow {
                             custom_titlebar: false,
@@ -169,11 +162,9 @@ impl Render for WindowDemo {
             }))
             .child(button("Unminimizable", move |_, cx| {
                 cx.open_window(
-                    WindowOptions {
-                        is_minimizable: false,
-                        window_bounds: Some(window_bounds),
-                        ..Default::default()
-                    },
+                    WindowOptions::new()
+                        .is_minimizable(false)
+                        .window_bounds(Some(window_bounds)),
                     |_, cx| {
                         cx.new(|_| SubWindow {
                             custom_titlebar: false,
@@ -204,7 +195,7 @@ impl Render for WindowDemo {
                     PromptLevel::Info,
                     "Are you sure?",
                     None,
-                    &["Ok", "Cancel"],
+                    &["OK", "Cancel"],
                     cx,
                 );
 
@@ -240,15 +231,15 @@ impl Render for WindowDemo {
 
 actions!(window, [Quit]);
 
-fn main() {
-    gpui_platform::application().run(|cx: &mut App| {
+fn run_example() {
+    application().run(|cx: &mut App| {
+        if !example_support::load_fonts(cx) {
+            return;
+        }
         let bounds = Bounds::centered(None, size(px(800.0), px(600.0)), cx);
 
         cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                ..Default::default()
-            },
+            WindowOptions::new().window_bounds(Some(WindowBounds::Windowed(bounds))),
             |window, cx| {
                 cx.new(|cx| {
                     cx.observe_window_bounds(window, move |_, window, _| {
@@ -266,4 +257,17 @@ fn main() {
         cx.on_action(|_: &Quit, cx| cx.quit());
         cx.bind_keys([KeyBinding::new("cmd-q", Quit, None)]);
     });
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn main() {
+    env_logger::init();
+    run_example();
+}
+
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen::prelude::wasm_bindgen(start)]
+pub fn start() {
+    gpui_platform::web_init();
+    run_example();
 }

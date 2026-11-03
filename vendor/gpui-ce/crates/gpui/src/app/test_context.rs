@@ -1,9 +1,10 @@
 use crate::{
-    Action, AnyView, AnyWindowHandle, App, AppCell, AppContext, AsyncApp, AvailableSpace,
-    BackgroundExecutor, BorrowAppContext, Bounds, Capslock, ClipboardItem, DrawPhase, Drawable,
-    Element, Empty, EntityId, EventEmitter, ForegroundExecutor, Global, InputEvent, Keystroke,
-    Modifiers, ModifiersChangedEvent, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
-    Pixels, Platform, Point, Render, Result, Size, Task, TestDispatcher, TestPlatform,
+    Action, AnyView, AnyWindowHandle, App, AppCell, AppContext, AssetRegistry, AsyncApp,
+    AvailableSpace, BackgroundExecutor, BorrowAppContext, Bounds, Capslock, ClipboardItem,
+    DrawPhase, Drawable, Element, Empty, EntityId, EventEmitter, ForegroundExecutor, Global,
+    InputEvent, Keystroke, Modifiers, ModifiersChangedEvent, MouseButton, MouseDownEvent,
+    MouseMoveEvent, MouseUpEvent, Pixels, Platform, Point, Render, Result, SharedString, Size,
+    SystemNotification, SystemNotificationResponse, Task, TestDispatcher, TestPlatform,
     TestScreenCaptureSource, TestWindow, TextSystem, VisualContext, Window, WindowBounds,
     WindowHandle, WindowOptions, app::GpuiMode, window::ElementArenaScope,
 };
@@ -76,6 +77,20 @@ impl AppContext for TestAppContext {
         app.read_entity(handle, read)
     }
 
+    fn notify(&mut self, entity_id: EntityId) {
+        let mut lock = self.app.borrow_mut();
+        lock.notify(entity_id)
+    }
+
+    fn emit<EntityType, EventType>(&mut self, entity: &Entity<EntityType>, event: EventType)
+    where
+        EntityType: EventEmitter<EventType>,
+        EventType: 'static,
+    {
+        let mut lock = self.app.borrow_mut();
+        lock.emit(entity, event)
+    }
+
     fn update_window<T, F>(&mut self, window: AnyWindowHandle, f: F) -> Result<T>
     where
         F: FnOnce(AnyView, &mut Window, &mut App) -> T,
@@ -119,6 +134,23 @@ impl AppContext for TestAppContext {
         let app = self.app.borrow();
         app.read_global(callback)
     }
+
+    fn insert_global_entity<T: 'static>(&mut self, entity: Entity<T>) {
+        let mut lock = self.app.borrow_mut();
+        lock.insert_global_entity(entity)
+    }
+
+    fn remove_global_entity<T: 'static>(&mut self, entity: &Entity<T>) {
+        let mut lock = self.app.borrow_mut();
+        lock.remove_global_entity(entity)
+    }
+
+    fn global_entities<T: 'static>(&self) -> impl Iterator<Item = Entity<T>> {
+        let lock = self.app.borrow();
+        let iter = lock.global_entities();
+        // Cloning the iterator here so that lock can be released when function is going out of scope
+        iter.collect::<Vec<_>>().into_iter()
+    }
 }
 
 impl TestAppContext {
@@ -128,11 +160,14 @@ impl TestAppContext {
         let background_executor = BackgroundExecutor::new(arc_dispatcher.clone());
         let foreground_executor = ForegroundExecutor::new(arc_dispatcher);
         let platform = TestPlatform::new(background_executor.clone(), foreground_executor.clone());
-        let asset_source = Arc::new(());
         let http_client = crate::http_client::FakeHttpClient::with_404_response();
         let text_system = Arc::new(TextSystem::new(platform.text_system()));
 
-        let app = App::new_app(platform.clone(), asset_source, http_client);
+        let app = App::new_app(
+            platform.clone(),
+            AssetRegistry::default().into(),
+            http_client,
+        );
         app.borrow_mut().mode = GpuiMode::test();
 
         Self {
@@ -226,10 +261,7 @@ impl TestAppContext {
         // Some tests rely on the window size matching the bounds of the test display
         let bounds = Bounds::maximized(None, &cx);
         cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                ..Default::default()
-            },
+            WindowOptions::new().window_bounds(Some(WindowBounds::Windowed(bounds))),
             |window, cx| cx.new(|cx| build_window(window, cx)),
         )
         .unwrap()
@@ -250,13 +282,10 @@ impl TestAppContext {
     {
         let mut cx = self.app.borrow_mut();
         cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(Bounds {
-                    origin: Point::default(),
-                    size: window_size,
-                })),
-                ..Default::default()
-            },
+            WindowOptions::new().window_bounds(Some(WindowBounds::Windowed(Bounds {
+                origin: Point::default(),
+                size: window_size,
+            }))),
             |window, cx| cx.new(|cx| build_window(window, cx)),
         )
         .unwrap()
@@ -268,10 +297,7 @@ impl TestAppContext {
         let bounds = Bounds::maximized(None, &cx);
         let window = cx
             .open_window(
-                WindowOptions {
-                    window_bounds: Some(WindowBounds::Windowed(bounds)),
-                    ..Default::default()
-                },
+                WindowOptions::new().window_bounds(Some(WindowBounds::Windowed(bounds))),
                 |_, cx| cx.new(|_| Empty),
             )
             .unwrap();
@@ -296,10 +322,7 @@ impl TestAppContext {
         let bounds = Bounds::maximized(None, &cx);
         let window = cx
             .open_window(
-                WindowOptions {
-                    window_bounds: Some(WindowBounds::Windowed(bounds)),
-                    ..Default::default()
-                },
+                WindowOptions::new().window_bounds(Some(WindowBounds::Windowed(bounds))),
                 |window, cx| cx.new(|cx| build_root_view(window, cx)),
             )
             .unwrap();
@@ -315,6 +338,11 @@ impl TestAppContext {
     /// returns the TextSystem
     pub fn text_system(&self) -> &Arc<TextSystem> {
         &self.text_system
+    }
+
+    /// Returns the cursor most recently applied to the test platform.
+    pub fn cursor_style(&self) -> crate::CursorStyle {
+        self.test_platform.cursor_style()
     }
 
     /// Simulates writing to the platform clipboard
@@ -371,13 +399,39 @@ impl TestAppContext {
         self.test_platform.opened_url.borrow().clone()
     }
 
+    /// Returns the application identity configured during this test.
+    pub fn app_identity(&self) -> Option<(SharedString, SharedString)> {
+        self.test_platform.app_identity()
+    }
+
+    /// Returns all system notifications shown during this test, in order.
+    pub fn shown_system_notifications(&self) -> Vec<SystemNotification> {
+        self.test_platform.shown_system_notifications()
+    }
+
+    /// Returns the system notifications currently delivered by the test platform.
+    pub fn delivered_system_notifications(&self) -> Vec<SystemNotification> {
+        self.test_platform.delivered_system_notifications()
+    }
+
+    /// Returns the tags of all system notifications dismissed during this test, in order.
+    pub fn dismissed_system_notifications(&self) -> Vec<SharedString> {
+        self.test_platform.dismissed_system_notifications()
+    }
+
+    /// Simulates the user activating a system notification.
+    pub fn simulate_system_notification_response(&self, response: SystemNotificationResponse) {
+        self.test_platform
+            .simulate_system_notification_response(response);
+    }
+
     /// Simulates the user resizing the window to the new size.
     pub fn simulate_window_resize(&self, window_handle: AnyWindowHandle, size: Size<Pixels>) {
         self.test_window(window_handle).simulate_resize(size);
     }
 
     /// Returns true if there's an alert dialog open.
-    pub fn expect_restart(&self) -> oneshot::Receiver<Option<PathBuf>> {
+    pub fn expect_restart(&self) -> oneshot::Receiver<(Option<PathBuf>, Vec<std::ffi::OsString>)> {
         let (tx, rx) = futures::channel::oneshot::channel();
         self.test_platform.expect_restart.borrow_mut().replace(tx);
         rx
@@ -873,7 +927,7 @@ impl VisualTestContext {
         E: Element,
     {
         self.update(|window, cx| {
-            let _arena_scope = ElementArenaScope::enter(&cx.element_arena);
+            let arena_scope = ElementArenaScope::enter(&cx.element_arena);
 
             window.invalidator.set_phase(DrawPhase::Prepaint);
             let mut element = Drawable::new(f(window, cx));
@@ -887,7 +941,7 @@ impl VisualTestContext {
             window.refresh();
 
             drop(element);
-            cx.element_arena.borrow_mut().clear();
+            arena_scope.exit(&cx.element_arena).clear(cx);
 
             (request_layout_state, prepaint_state)
         })
@@ -1003,6 +1057,18 @@ impl AppContext for VisualTestContext {
         self.cx.read_entity(handle, read)
     }
 
+    fn notify(&mut self, entity_id: EntityId) {
+        self.cx.notify(entity_id)
+    }
+
+    fn emit<EntityType, EventType>(&mut self, entity: &Entity<EntityType>, event: EventType)
+    where
+        EntityType: EventEmitter<EventType>,
+        EventType: 'static,
+    {
+        self.cx.emit(entity, event)
+    }
+
     fn update_window<T, F>(&mut self, window: AnyWindowHandle, f: F) -> Result<T>
     where
         F: FnOnce(AnyView, &mut Window, &mut App) -> T,
@@ -1041,6 +1107,18 @@ impl AppContext for VisualTestContext {
         G: Global,
     {
         self.cx.read_global(callback)
+    }
+
+    fn insert_global_entity<T: 'static>(&mut self, entity: Entity<T>) {
+        self.cx.insert_global_entity(entity)
+    }
+
+    fn remove_global_entity<T: 'static>(&mut self, entity: &Entity<T>) {
+        self.cx.remove_global_entity(entity)
+    }
+
+    fn global_entities<T: 'static>(&self) -> impl Iterator<Item = Entity<T>> {
+        self.cx.global_entities()
     }
 }
 
@@ -1115,8 +1193,153 @@ impl AnyWindowHandle {
 
 #[cfg(test)]
 mod tests {
-    use crate::{PathPromptOptions, TestAppContext};
+    use crate::{
+        PathPromptOptions, SystemNotification, SystemNotificationAction,
+        SystemNotificationResponse, TestAppContext,
+    };
+    use std::cell::RefCell;
     use std::path::PathBuf;
+    use std::rc::Rc;
+
+    #[gpui::test]
+    async fn test_system_notifications_require_identity_and_replace_matching_tags(
+        cx: &mut TestAppContext,
+    ) {
+        cx.update(|cx| {
+            cx.show_system_notification(SystemNotification {
+                tag: "thread-1".into(),
+                title: "Task started".into(),
+                body: "Running tests".into(),
+                actions: Vec::new(),
+            });
+        });
+        assert!(cx.shown_system_notifications().is_empty());
+        assert!(cx.delivered_system_notifications().is_empty());
+
+        cx.update(|cx| {
+            cx.set_app_identity("com.example.tasks", "Tasks");
+            cx.show_system_notification(SystemNotification {
+                tag: "thread-1".into(),
+                title: "Task started".into(),
+                body: "Running tests".into(),
+                actions: Vec::new(),
+            });
+            cx.show_system_notification(SystemNotification {
+                tag: "thread-1".into(),
+                title: "Task finished".into(),
+                body: "All tests passed".into(),
+                actions: vec![SystemNotificationAction {
+                    id: "open".into(),
+                    label: "Open".into(),
+                }],
+            });
+        });
+
+        assert_eq!(
+            cx.app_identity(),
+            Some(("com.example.tasks".into(), "Tasks".into()))
+        );
+        assert_eq!(cx.shown_system_notifications().len(), 2);
+        assert_eq!(
+            cx.delivered_system_notifications(),
+            [SystemNotification {
+                tag: "thread-1".into(),
+                title: "Task finished".into(),
+                body: "All tests passed".into(),
+                actions: vec![SystemNotificationAction {
+                    id: "open".into(),
+                    label: "Open".into(),
+                }],
+            }]
+        );
+
+        cx.update(|cx| cx.dismiss_system_notification("thread-1"));
+        assert!(cx.delivered_system_notifications().is_empty());
+        assert_eq!(cx.dismissed_system_notifications(), ["thread-1"]);
+    }
+
+    #[gpui::test]
+    async fn test_system_notification_body_and_action_responses(cx: &mut TestAppContext) {
+        let responses = Rc::new(RefCell::new(Vec::new()));
+        cx.update(|cx| {
+            cx.on_system_notification_response({
+                let responses = responses.clone();
+                move |response, _cx| responses.borrow_mut().push(response)
+            });
+        });
+
+        cx.simulate_system_notification_response(SystemNotificationResponse {
+            tag: "thread-1".into(),
+            action_id: None,
+        });
+        cx.simulate_system_notification_response(SystemNotificationResponse {
+            tag: "thread-1".into(),
+            action_id: Some("default".into()),
+        });
+
+        assert_eq!(
+            responses.borrow().as_slice(),
+            &[
+                SystemNotificationResponse {
+                    tag: "thread-1".into(),
+                    action_id: None,
+                },
+                SystemNotificationResponse {
+                    tag: "thread-1".into(),
+                    action_id: Some("default".into()),
+                },
+            ]
+        );
+    }
+
+    #[gpui::test]
+    async fn test_system_notification_response_handler_can_be_replaced(cx: &mut TestAppContext) {
+        let first_responses = Rc::new(RefCell::new(Vec::new()));
+        let second_responses = Rc::new(RefCell::new(Vec::new()));
+        cx.update(|cx| {
+            cx.on_system_notification_response({
+                let first_responses = first_responses.clone();
+                move |response, _cx| first_responses.borrow_mut().push(response)
+            });
+            cx.on_system_notification_response({
+                let second_responses = second_responses.clone();
+                move |response, _cx| second_responses.borrow_mut().push(response)
+            });
+        });
+
+        let response = SystemNotificationResponse {
+            tag: "thread-1".into(),
+            action_id: None,
+        };
+        cx.simulate_system_notification_response(response.clone());
+
+        assert!(first_responses.borrow().is_empty());
+        assert_eq!(second_responses.borrow().as_slice(), &[response]);
+    }
+
+    #[gpui::test]
+    async fn test_system_notification_response_handler_can_reenter_app(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            cx.set_app_identity("com.example.tasks", "Tasks");
+            cx.show_system_notification(SystemNotification {
+                tag: "thread-1".into(),
+                title: "Task finished".into(),
+                body: "All tests passed".into(),
+                actions: Vec::new(),
+            });
+            cx.on_system_notification_response(|response, cx| {
+                cx.dismiss_system_notification(&response.tag);
+            });
+        });
+
+        cx.simulate_system_notification_response(SystemNotificationResponse {
+            tag: "thread-1".into(),
+            action_id: None,
+        });
+
+        assert!(cx.delivered_system_notifications().is_empty());
+        assert_eq!(cx.dismissed_system_notifications(), ["thread-1"]);
+    }
 
     #[gpui::test]
     async fn test_simulate_path_prompt_response(cx: &mut TestAppContext) {

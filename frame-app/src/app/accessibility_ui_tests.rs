@@ -1,0 +1,474 @@
+use super::*;
+use gpui::{Entity, Modifiers, TestAppContext, VisualTestContext};
+
+fn draw(cx: &mut VisualTestContext) {
+    cx.update(|window, cx| window.draw(cx).clear(cx));
+    cx.run_until_parked();
+    cx.update(|window, cx| window.draw(cx).clear(cx));
+}
+
+fn test_window(
+    app: &mut TestAppContext,
+    fixture: VisualFixture,
+    scale: ScalePreset,
+) -> (Entity<FrameRoot>, &mut VisualTestContext) {
+    let (root, cx) = app.add_window_view(|_, cx| {
+        init_app(cx, "Frame accessibility test");
+        cx.set_reduce_motion(true);
+        let mut root = FrameRoot::new();
+        root.apply_visual_fixture(Some(fixture));
+        root.appearance.ui_scale = scale;
+        root.available_filters.eq = true;
+        root.preview_ui.render_image = Some(Arc::new(RenderImage::new(smallvec::smallvec![
+            image::Frame::new(image::RgbaImage::new(400, 225))
+        ])));
+        let metadata = root.selected_source_metadata_entry();
+        root.preview_ui.pending_runtime_key = root
+            .selected_preview_runtime_request(&metadata)
+            .map(|request| request.key);
+        root
+    });
+    cx.update(|window, _| window.activate());
+    cx.simulate_resize(size(px(2200.0), px(1800.0)));
+    draw(cx);
+    (root, cx)
+}
+
+fn click(cx: &mut VisualTestContext, id: &'static str) {
+    let bounds = cx
+        .debug_bounds(id)
+        .unwrap_or_else(|| panic!("missing {id}"));
+    cx.simulate_click(bounds.center(), Modifiers::default());
+    draw(cx);
+}
+
+fn press(cx: &mut VisualTestContext, key: &str) {
+    cx.simulate_keystrokes(key);
+    cx.simulate_event(gpui::KeyUpEvent {
+        keystroke: gpui::Keystroke::parse(key).unwrap(),
+    });
+    draw(cx);
+}
+
+fn focus(cx: &mut VisualTestContext) -> FocusHandle {
+    cx.update(|window, cx| window.focused(cx).expect("focus must stay in the window"))
+}
+
+#[test]
+fn tab_rails_move_focus_with_each_arrow_and_offer_one_tab_stop() {
+    for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+        let mut app = TestAppContext::single();
+        let (root, cx) = test_window(&mut app, VisualFixture::SettingsVideo, scale);
+        click(cx, "titlebar-workspace");
+        let workspace = focus(cx);
+        for (key, expected) in [
+            ("right", ActiveView::Logs),
+            ("right", ActiveView::Workspace),
+            ("end", ActiveView::Logs),
+            ("home", ActiveView::Workspace),
+            ("left", ActiveView::Logs),
+        ] {
+            press(cx, key);
+            assert_eq!(root.read_with(cx, |root, _| root.active_view), expected);
+            assert_eq!(focus(cx) == workspace, expected == ActiveView::Workspace);
+        }
+        let selected = focus(cx);
+        press(cx, "tab");
+        assert_ne!(focus(cx), selected);
+        assert_ne!(focus(cx), workspace);
+        press(cx, "shift-tab");
+        assert_eq!(focus(cx), selected);
+
+        click(cx, "titlebar-workspace");
+        click(cx, "settings-tab-source");
+        let source = focus(cx);
+        for (key, expected) in [
+            ("right", SettingsTab::Output),
+            ("right", SettingsTab::Video),
+            ("right", SettingsTab::VideoFilters),
+            ("left", SettingsTab::Video),
+            ("end", SettingsTab::Presets),
+            ("right", SettingsTab::Source),
+            ("left", SettingsTab::Presets),
+            ("home", SettingsTab::Source),
+        ] {
+            let previous = focus(cx);
+            press(cx, key);
+            assert_eq!(
+                root.read_with(cx, |root, _| root.settings_ui.active_tab),
+                expected
+            );
+            assert_ne!(focus(cx), previous, "focus did not move for {key}");
+            assert_eq!(focus(cx) == source, expected == SettingsTab::Source);
+        }
+        press(cx, "tab");
+        assert_ne!(focus(cx), source);
+        press(cx, "shift-tab");
+        assert_eq!(focus(cx), source);
+    }
+}
+
+#[test]
+fn removing_the_focused_settings_tab_focuses_the_fallback_tab() {
+    let mut app = TestAppContext::single();
+    let (root, cx) = test_window(
+        &mut app,
+        VisualFixture::SettingsVideo,
+        ScalePreset::Percent100,
+    );
+    click(cx, "settings-tab-video");
+    let video = focus(cx);
+    root.update(cx, |root, cx| {
+        root.update_selected_config(|config| {
+            config.processing_mode = ProcessingMode::Copy;
+            true
+        });
+        cx.notify();
+    });
+    draw(cx);
+    assert_eq!(
+        root.read_with(cx, |root, _| root.settings_ui.active_tab),
+        SettingsTab::Output
+    );
+    assert_ne!(focus(cx), video);
+    press(cx, "left");
+    assert_eq!(
+        root.read_with(cx, |root, _| root.settings_ui.active_tab),
+        SettingsTab::Source
+    );
+}
+
+#[test]
+fn enabling_reduced_motion_settles_an_in_flight_canvas_transform_on_the_next_draw() {
+    let mut app = TestAppContext::single();
+    let (root, cx) = test_window(
+        &mut app,
+        VisualFixture::PreviewReady,
+        ScalePreset::Percent100,
+    );
+    cx.update(|_, cx| cx.set_reduce_motion(false));
+    root.update(cx, |root, cx| {
+        root.preview_ui.canvas.auto_fit_pending = false;
+        root.preview_ui.canvas.target_zoom = 2.0;
+        root.preview_ui.canvas.target_pan_x = 0.1;
+        root.preview_ui.canvas.target_pan_y = -0.1;
+        cx.notify();
+    });
+    draw(cx);
+    assert!(
+        root.read_with(cx, |root, _| (root.preview_ui.canvas.current_zoom - 2.0)
+            .abs())
+            > 0.01
+    );
+    let playback = root.read_with(cx, |root, _| root.preview_ui.playback.clone());
+    cx.update(|_, cx| cx.set_reduce_motion(true));
+    draw(cx);
+    root.read_with(cx, |root, _| {
+        let canvas = &root.preview_ui.canvas;
+        assert!((canvas.current_zoom - 2.0).abs() < f64::EPSILON);
+        assert!((canvas.current_pan_x - 0.1).abs() < f64::EPSILON);
+        assert!((canvas.current_pan_y + 0.1).abs() < f64::EPSILON);
+        assert!(canvas.last_animation_tick.is_none());
+        assert_eq!(root.preview_ui.playback, playback);
+    });
+    cx.update(|_, cx| cx.set_reduce_motion(false));
+    root.update(cx, |root, _| {
+        root.preview_ui.canvas.target_zoom = 3.0;
+        root.tick_preview_canvas_animation();
+        assert!(root.preview_ui.canvas.current_zoom > 2.0);
+        assert!(root.preview_ui.canvas.current_zoom < 3.0);
+    });
+}
+
+fn drag(cx: &mut VisualTestContext, from: Point<Pixels>, to: Point<Pixels>) {
+    cx.simulate_mouse_move(from, None, Modifiers::default());
+    cx.simulate_mouse_down(from, MouseButton::Left, Modifiers::default());
+    cx.simulate_mouse_move(
+        from + point(px(4.0), px(4.0)),
+        MouseButton::Left,
+        Modifiers::default(),
+    );
+    cx.simulate_mouse_move(to, MouseButton::Left, Modifiers::default());
+    cx.simulate_mouse_move(
+        to + point(px(2.0), px(2.0)),
+        MouseButton::Left,
+        Modifiers::default(),
+    );
+    assert!(
+        cx.update(|_, cx| cx.has_active_drag()),
+        "expanded area did not start a drag"
+    );
+    cx.simulate_mouse_up(to, MouseButton::Left, Modifiers::default());
+    draw(cx);
+}
+
+#[test]
+fn crop_resize_and_scrollbar_drags_start_outside_the_visible_markers() {
+    for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+        let mut app = TestAppContext::single();
+        let (root, cx) = test_window(&mut app, VisualFixture::PreviewCropCustom, scale);
+        let factor = scale.factor();
+        let bounds = cx.debug_bounds("preview-crop-handle-ne").unwrap();
+        assert!((24.0_f32.mul_add(-factor, bounds.size.width.as_f32())).abs() < 0.01);
+        let before = root.read_with(cx, |root, _| root.preview_ui.draft_crop);
+        let from = bounds.center() + point(px(-9.0 * factor), px(0.0));
+        drag(cx, from, from + point(px(-60.0), px(50.0)));
+        assert_ne!(
+            root.read_with(cx, |root, _| root.preview_ui.draft_crop),
+            before
+        );
+
+        click(cx, "preview-crop-ratio");
+        let bounds = cx.debug_bounds("crop-options-scrollbar").unwrap();
+        let option = cx.debug_bounds("crop-ratio-free").unwrap();
+        assert!(
+            option.right() <= bounds.left(),
+            "scrollbar covers an option"
+        );
+        let before = root.read_with(cx, |root, _| root.preview_ui.crop_options.scroll.offset());
+        let from = point(bounds.left() + px(factor), bounds.top() + px(4.0 * factor));
+        drag(cx, from, from + point(px(0.0), px(70.0 * factor)));
+        assert_ne!(
+            root.read_with(cx, |root, _| root.preview_ui.crop_options.scroll.offset()),
+            before
+        );
+    }
+}
+
+#[test]
+fn slider_padding_starts_drags_but_disabled_sliders_ignore_it() {
+    for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+        let mut app = TestAppContext::single();
+        let (root, cx) = test_window(&mut app, VisualFixture::SettingsVideoFilters, scale);
+        let bounds = cx
+            .debug_bounds("settings-video-filter-brightness-slider")
+            .unwrap();
+        assert!((24.0_f32.mul_add(-scale.factor(), bounds.size.height.as_f32())).abs() < 0.01);
+        let before = root.read_with(cx, |root, _| {
+            root.selected_config()
+                .unwrap()
+                .video_filters
+                .color
+                .brightness
+        });
+        let from = point(
+            bounds.left() + bounds.size.width / 4.0,
+            bounds.top() + px(scale.factor()),
+        );
+        drag(cx, from, from + point(px(40.0), px(0.0)));
+        let after = root.read_with(cx, |root, _| {
+            root.selected_config()
+                .unwrap()
+                .video_filters
+                .color
+                .brightness
+        });
+        assert_ne!(after, before);
+        root.update(cx, |root, cx| {
+            root.update_selected_config(|config| {
+                config.video_filters.color.brightness.enabled = false;
+                true
+            });
+            cx.notify();
+        });
+        draw(cx);
+        cx.simulate_mouse_down(from, MouseButton::Left, Modifiers::default());
+        cx.simulate_mouse_move(
+            from + point(px(50.0), px(0.0)),
+            MouseButton::Left,
+            Modifiers::default(),
+        );
+        assert!(!cx.update(|_, cx| cx.has_active_drag()));
+        cx.simulate_mouse_up(from, MouseButton::Left, Modifiers::default());
+        assert_eq!(
+            root.read_with(cx, |root, _| root
+                .selected_config()
+                .unwrap()
+                .video_filters
+                .color
+                .brightness
+                .value),
+            after.value
+        );
+    }
+}
+
+fn assert_disjoint(a: Bounds<Pixels>, b: Bounds<Pixels>) {
+    let overlap_x = (a.right().min(b.right()) - a.left().max(b.left())).as_f32();
+    let overlap_y = (a.bottom().min(b.bottom()) - a.top().max(b.top())).as_f32();
+    assert!(
+        overlap_x < 0.01 || overlap_y < 0.01,
+        "overlapping targets: {a:?}, {b:?}"
+    );
+}
+
+#[test]
+fn tiny_crop_handles_remain_separate_at_both_interface_scales() {
+    for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+        let mut app = TestAppContext::single();
+        let (root, cx) = test_window(&mut app, VisualFixture::PreviewCrop, scale);
+        root.update(cx, |root, cx| {
+            root.preview_ui.draft_crop = Some(CropRect {
+                x: 0.4,
+                y: 0.4,
+                width: 0.001,
+                height: 0.001,
+            });
+            cx.notify();
+        });
+        draw(cx);
+        let bounds: Vec<_> = [
+            "preview-crop-handle-nw",
+            "preview-crop-handle-n",
+            "preview-crop-handle-ne",
+            "preview-crop-handle-e",
+            "preview-crop-handle-se",
+            "preview-crop-handle-s",
+            "preview-crop-handle-sw",
+            "preview-crop-handle-w",
+        ]
+        .map(|id| cx.debug_bounds(id).unwrap())
+        .into_iter()
+        .collect();
+        for (index, a) in bounds.iter().enumerate() {
+            assert!(a.size.width > px(0.0) && a.size.height > px(0.0));
+            for b in &bounds[index + 1..] {
+                assert_disjoint(*a, *b);
+            }
+        }
+    }
+}
+
+#[test]
+fn overlay_corner_padding_starts_resize() {
+    for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+        let mut app = TestAppContext::single();
+        let (root, cx) = test_window(&mut app, VisualFixture::PreviewReady, scale);
+        root.update(cx, |root, cx| {
+            root.update_selected_config(|config| {
+                config.overlay = Some(OverlaySettings {
+                    enabled: true,
+                    path: "/tmp/frame-overlay-hit-test.png".into(),
+                    x: 0.5,
+                    y: 0.5,
+                    width: 0.3,
+                    opacity: 1.0,
+                    anchor: "custom".into(),
+                });
+                true
+            });
+            cx.notify();
+        });
+        draw(cx);
+        root.update(cx, |root, cx| {
+            root.set_selected_overlay_mode(true);
+            cx.notify();
+        });
+        draw(cx);
+        let bounds = cx.debug_bounds("preview-overlay-handle-se").unwrap();
+        assert!((24.0_f32.mul_add(-scale.factor(), bounds.size.width.as_f32())).abs() < 0.01);
+        let before = root.read_with(cx, |root, _| root.preview_ui.overlay.overlay().cloned());
+        let from = bounds.center() + point(px(9.0 * scale.factor()), px(0.0));
+        drag(cx, from, from + point(px(35.0), px(25.0)));
+        assert_ne!(
+            root.read_with(cx, |root, _| root.preview_ui.overlay.overlay().cloned()),
+            before
+        );
+    }
+}
+
+#[test]
+fn trim_targets_stay_separate_and_do_not_cover_play() {
+    for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+        let mut app = TestAppContext::single();
+        let (root, cx) = test_window(&mut app, VisualFixture::PreviewReady, scale);
+        for (start, end) in [(0.0, 90.4), (45.0, 45.1), (0.0, 0.1), (90.3, 90.4)] {
+            root.update(cx, |root, cx| {
+                root.update_selected_config(|config| {
+                    config.start_time = Some(format_time(start));
+                    config.end_time = Some(format_time(end));
+                    true
+                });
+                cx.notify();
+            });
+            draw(cx);
+            let start = cx.debug_bounds("preview-timeline-start-handle").unwrap();
+            let end = cx.debug_bounds("preview-timeline-end-handle").unwrap();
+            assert_disjoint(start, end);
+            assert!(start.size.width > px(0.0) && end.size.width > px(0.0));
+            let play = cx.debug_bounds("preview-playback-toggle").unwrap();
+            assert_disjoint(end, play);
+        }
+    }
+}
+
+#[test]
+fn trim_handle_padding_changes_start_without_moving_end() {
+    let mut app = TestAppContext::single();
+    let (root, cx) = test_window(
+        &mut app,
+        VisualFixture::PreviewReady,
+        ScalePreset::Percent100,
+    );
+    let bounds = cx.debug_bounds("preview-timeline-start-handle").unwrap();
+    let end = root.read_with(cx, |root, _| root.preview_ui.playback.end_value());
+    let from = point(bounds.right() - px(1.0), bounds.center().y);
+    drag(cx, from, from + point(px(50.0), px(0.0)));
+    root.read_with(cx, |root, _| {
+        assert!(root.preview_ui.playback.start_value() > 0.0);
+        assert!((root.preview_ui.playback.end_value() - end).abs() < f64::EPSILON);
+    });
+}
+
+#[test]
+fn both_color_picker_hue_sliders_accept_clicks_in_the_new_padding() {
+    for (trigger, slider, outline) in [
+        (
+            "settings-subtitle-font-color",
+            "settings-subtitle-font-color-hue",
+            false,
+        ),
+        (
+            "settings-subtitle-outline-color",
+            "settings-subtitle-outline-color-hue",
+            true,
+        ),
+    ] {
+        for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+            let mut app = TestAppContext::single();
+            let (root, cx) = test_window(&mut app, VisualFixture::SettingsSubtitles, scale);
+            root.update(cx, |root, cx| {
+                root.subtitle_ui.mode = SettingsSubtitleMode::BurnIn;
+                root.update_selected_config(|config| {
+                    config.subtitle_font_color = Some("#ff0000".into());
+                    config.subtitle_outline_color = Some("#ff0000".into());
+                    true
+                });
+                cx.notify();
+            });
+            draw(cx);
+            click(cx, trigger);
+            let bounds = cx.debug_bounds(slider).unwrap();
+            assert!(
+                24.0_f32
+                    .mul_add(-scale.factor(), bounds.size.height.as_f32())
+                    .abs()
+                    < 0.01
+            );
+            cx.simulate_click(
+                point(bounds.center().x, bounds.top() + px(scale.factor())),
+                Modifiers::default(),
+            );
+            draw(cx);
+            let color = root.read_with(cx, |root, _| {
+                let config = root.selected_config().unwrap();
+                if outline {
+                    config.subtitle_outline_color.clone()
+                } else {
+                    config.subtitle_font_color.clone()
+                }
+            });
+            assert_ne!(color.as_deref(), Some("#ff0000"));
+        }
+    }
+}

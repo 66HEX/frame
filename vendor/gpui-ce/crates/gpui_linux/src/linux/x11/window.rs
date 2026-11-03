@@ -3,22 +3,23 @@ use x11rb::connection::RequestConnection;
 
 use crate::linux::X11ClientStatePtr;
 use gpui::{
-    AnyWindowHandle, Bounds, ClientSideFrameOptions, Decorations, DevicePixels,
-    ForegroundExecutor, GpuSpecs, Modifiers, Pixels, PlatformAtlas, PlatformDisplay, PlatformInput,
+    AnyWindowHandle, Bounds, ClientSideFrameOptions, Decorations, DevicePixels, ForegroundExecutor,
+    GpuSpecs, Modifiers, Pixels, PlatformAtlas, PlatformDisplay, PlatformInput,
     PlatformInputHandler, PlatformWindow, Point, PromptButton, PromptLevel, RequestFrameOptions,
     ResizeEdge, ScaledPixels, Scene, Size, Tiling, WindowAppearance, WindowBackgroundAppearance,
-    WindowBounds, WindowControlArea, WindowDecorations, WindowKind, WindowParams, px,
+    WindowBounds, WindowControlArea, WindowDecorations, WindowKind, WindowParams,
+    popup::PopupNotSupportedError, px,
 };
 use gpui_wgpu::{CompositorGpuHint, WgpuRenderer, WgpuSurfaceConfig};
 
 use collections::FxHashSet;
+use gpui_util::{ResultExt, maybe};
 use raw_window_handle as rwh;
-use util::{ResultExt, maybe};
 use x11rb::{
     connection::Connection,
     cookie::{Cookie, VoidCookie},
     errors::ConnectionError,
-    properties::WmSizeHints,
+    properties::{WmHints, WmSizeHints},
     protocol::{
         sync,
         xinput::{self, ConnectionExt as _},
@@ -276,6 +277,7 @@ pub struct X11WindowState {
     client_side_frame: Option<ClientSideFrameOptions>,
     maximized_vertical: bool,
     maximized_horizontal: bool,
+    visible: bool,
     hidden: bool,
     active: bool,
     hovered: bool,
@@ -291,18 +293,15 @@ pub struct X11WindowState {
 
 impl X11WindowState {
     fn is_transparent(&self) -> bool {
-        self.background_appearance != WindowBackgroundAppearance::Opaque
-            || self.client_frame_corner_radius().is_some()
+        self.background_appearance.is_transparent() || self.client_frame_corner_radius().is_some()
     }
 
     fn client_frame_corner_radius(&self) -> Option<ScaledPixels> {
         let is_tiled = self.edge_constraints.as_ref().is_some_and(|edges| {
             edges.top_tiled || edges.right_tiled || edges.bottom_tiled || edges.left_tiled
         });
-        let is_floating = !self.fullscreen
-            && !self.maximized_vertical
-            && !self.maximized_horizontal
-            && !is_tiled;
+        let is_floating =
+            !self.fullscreen && !self.maximized_vertical && !self.maximized_horizontal && !is_tiled;
         if self.decorations == WindowDecorations::Client && is_floating {
             self.client_side_frame
                 .map(|frame| ScaledPixels(f32::from(frame.corner_radius) * self.scale_factor))
@@ -412,6 +411,39 @@ where
         .with_context(failure_context)
 }
 
+/// Sets or clears the ICCCM WM_HINTS urgency flag, preserving the other hints.
+///
+/// Clearing when the flag isn't set is skipped: writing it back would create a
+/// WM_HINTS property on windows that never requested attention, and would add an
+/// X round trip to every window state change.
+fn set_wm_hints_urgency(xcb: &XCBConnection, x_window: xproto::Window, urgent: bool) {
+    let mut hints = WmHints::new();
+    match WmHints::get(xcb, x_window) {
+        Ok(cookie) => match cookie.reply() {
+            Ok(Some(existing_hints)) => hints = existing_hints,
+            Ok(None) => {}
+            Err(error) => {
+                log::debug!("failed to read X11 WM_HINTS before setting urgency: {error}")
+            }
+        },
+        Err(error) => {
+            log::debug!("failed to request X11 WM_HINTS before setting urgency: {error}")
+        }
+    }
+
+    if !urgent && !hints.urgent {
+        return;
+    }
+
+    hints.urgent = urgent;
+    check_reply(
+        || "X11 ChangeProperty for WM_HINTS urgency failed.",
+        hints.set(xcb, x_window),
+    )
+    .log_err();
+    xcb_flush(xcb);
+}
+
 /// Convert X11 connection errors to `anyhow::Error` and panic for unrecoverable errors.
 pub(crate) fn handle_connection_error(err: ConnectionError) -> anyhow::Error {
     match err {
@@ -452,6 +484,12 @@ impl X11WindowState {
         supports_xinput_gestures: bool,
         is_bgr: bool,
     ) -> anyhow::Result<Self> {
+        // Native popups are not implemented on X11 yet. Rejecting lets callers fall back to
+        // gpui's in-window popovers.
+        if let WindowKind::AnchoredPopup(_) = params.kind {
+            return Err(PopupNotSupportedError.into());
+        }
+
         let x_screen_index = params
             .display_id
             .map_or(x_main_screen_index, |did| u64::from(did) as usize);
@@ -823,11 +861,12 @@ impl X11WindowState {
                 fullscreen: false,
                 maximized_vertical: false,
                 maximized_horizontal: false,
+                visible: params.show,
                 hidden: false,
                 appearance,
-                client_side_frame: params.client_side_frame,
                 handle,
                 background_appearance: WindowBackgroundAppearance::Opaque,
+                client_side_frame: params.client_side_frame,
                 destroyed: false,
                 client_side_decorations_supported,
                 decorations: WindowDecorations::Server,
@@ -1107,6 +1146,7 @@ impl X11WindowStatePtr {
             .chunks_exact(4)
             .map(|chunk| u32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]));
 
+        let was_active = state.active;
         state.active = false;
         state.fullscreen = false;
         state.maximized_vertical = false;
@@ -1125,6 +1165,12 @@ impl X11WindowStatePtr {
             } else if atom == state.atoms._NET_WM_STATE_HIDDEN {
                 state.hidden = true;
             }
+        }
+
+        // The urgency hint has no withdrawal signal of its own; ICCCM leaves that to
+        // the client, and focus is the conventional means for the user to zero it.
+        if state.active && !was_active {
+            set_wm_hints_urgency(&self.xcb, self.x_window, false);
         }
 
         Ok(())
@@ -1329,6 +1375,7 @@ impl X11WindowStatePtr {
         let mut state = self.state.borrow_mut();
         state.appearance = appearance;
         let is_transparent = state.is_transparent();
+        state.update_client_frame_clip();
         state.renderer.update_transparency(is_transparent);
         state.appearance = appearance;
         drop(state);
@@ -1443,7 +1490,11 @@ impl PlatformWindow for X11Window {
         )
         .log_err()
         .map_or(Point::new(Pixels::ZERO, Pixels::ZERO), |reply| {
-            Point::new((reply.root_x as u32).into(), (reply.root_y as u32).into())
+            let scale_factor = self.0.state.borrow().scale_factor;
+            Point::new(
+                px(reply.win_x as f32 / scale_factor),
+                px(reply.win_y as f32 / scale_factor),
+            )
         })
     }
 
@@ -1477,6 +1528,14 @@ impl PlatformWindow for X11Window {
         self.0.state.borrow_mut().input_handler.take()
     }
 
+    fn show_character_palette(&self) {
+        let Some(client) = self.0.state.borrow().client.get_client() else {
+            return;
+        };
+        let executor = client.0.borrow().common.background_executor.clone();
+        crate::linux::character_palette::show_character_palette(executor, None);
+    }
+
     fn prompt(
         &self,
         _level: PromptLevel,
@@ -1487,7 +1546,10 @@ impl PlatformWindow for X11Window {
         None
     }
 
-    fn activate(&self) {
+    fn activate(&self, token: Option<&str>) -> bool {
+        if token.is_some() {
+            return false;
+        }
         let data = [1, xproto::Time::CURRENT_TIME.into(), 0, 0, 0];
         let message = xproto::ClientMessageEvent::new(
             32,
@@ -1504,15 +1566,16 @@ impl PlatformWindow for X11Window {
                 message,
             )
             .log_err();
-        self.0
-            .xcb
-            .set_input_focus(
-                xproto::InputFocus::POINTER_ROOT,
-                self.0.x_window,
-                xproto::Time::CURRENT_TIME,
-            )
-            .log_err();
         xcb_flush(&self.0.xcb);
+        true
+    }
+
+    fn request_attention(&self) {
+        if self.is_active() {
+            return;
+        }
+
+        set_wm_hints_urgency(&self.0.xcb, self.0.x_window, true);
     }
 
     fn is_active(&self) -> bool {
@@ -1551,10 +1614,11 @@ impl PlatformWindow for X11Window {
     }
 
     fn set_app_id(&mut self, app_id: &str) {
-        let mut data = Vec::with_capacity(app_id.len() * 2 + 1);
+        let mut data = Vec::with_capacity(app_id.len() * 2 + 2);
         data.extend(app_id.bytes()); // instance https://unix.stackexchange.com/a/494170
         data.push(b'\0');
         data.extend(app_id.bytes()); // class
+        data.push(b'\0');
 
         check_reply(
             || "X11 ChangeProperty8 for WM_CLASS failed.",
@@ -1570,23 +1634,52 @@ impl PlatformWindow for X11Window {
     }
 
     fn map_window(&mut self) -> anyhow::Result<()> {
-        check_reply(
-            || "X11 MapWindow failed.",
-            self.0.xcb.map_window(self.0.x_window),
-        )?;
+        if self.0.state.borrow().visible {
+            check_reply(
+                || "X11 MapWindow failed.",
+                self.0.xcb.map_window(self.0.x_window),
+            )?;
+        }
         Ok(())
     }
 
     fn set_background_appearance(&self, background_appearance: WindowBackgroundAppearance) {
         let mut state = self.0.state.borrow_mut();
         state.background_appearance = background_appearance;
-        state.update_client_frame_clip();
         let transparent = state.is_transparent();
+        state.update_client_frame_clip();
         state.renderer.update_transparency(transparent);
     }
 
     fn background_appearance(&self) -> WindowBackgroundAppearance {
         self.0.state.borrow().background_appearance
+    }
+
+    fn set_visible(&self, visible: bool) {
+        let mut state = self.0.state.borrow_mut();
+        if state.visible == visible {
+            return;
+        }
+        state.visible = visible;
+        drop(state);
+
+        let result = if visible {
+            self.0.xcb.map_window(self.0.x_window)
+        } else {
+            self.0.xcb.unmap_window(self.0.x_window)
+        };
+        check_reply(
+            || {
+                if visible {
+                    "X11 MapWindow failed."
+                } else {
+                    "X11 UnmapWindow failed."
+                }
+            },
+            result,
+        )
+        .log_err();
+        xcb_flush(&self.0.xcb);
     }
 
     fn is_subpixel_rendering_supported(&self) -> bool {
@@ -1686,7 +1779,8 @@ impl PlatformWindow for X11Window {
         self.0.callbacks.borrow_mut().close = Some(callback);
     }
 
-    fn on_hit_test_window_control(&self, _callback: Box<dyn FnMut() -> Option<WindowControlArea>>) {}
+    fn on_hit_test_window_control(&self, _callback: Box<dyn FnMut() -> Option<WindowControlArea>>) {
+    }
 
     fn on_appearance_changed(&self, callback: Box<dyn FnMut()>) {
         self.0.callbacks.borrow_mut().appearance_changed = Some(callback);
@@ -1698,6 +1792,7 @@ impl PlatformWindow for X11Window {
 
     fn draw(&self, scene: &Scene) {
         let mut inner = self.0.state.borrow_mut();
+        inner.update_client_frame_clip();
 
         if inner.renderer.device_lost() {
             let raw_window = RawWindow {
@@ -1892,14 +1987,14 @@ impl PlatformWindow for X11Window {
         match decorations {
             WindowDecorations::Server => {
                 state.decorations = WindowDecorations::Server;
-                state.update_client_frame_clip();
                 let is_transparent = state.is_transparent();
+                state.update_client_frame_clip();
                 state.renderer.update_transparency(is_transparent);
             }
             WindowDecorations::Client => {
                 state.decorations = WindowDecorations::Client;
-                state.update_client_frame_clip();
                 let is_transparent = state.is_transparent();
+                state.update_client_frame_clip();
                 state.renderer.update_transparency(is_transparent);
             }
         }
@@ -1925,6 +2020,15 @@ impl PlatformWindow for X11Window {
     fn gpu_context(&self) -> Option<Box<dyn std::any::Any>> {
         let (device, queue) = self.0.state.borrow().renderer.gpu_context();
         Some(Box::new((device, queue)))
+    }
+
+    fn gpu_context_info(&self) -> Option<Box<dyn std::any::Any>> {
+        self.0
+            .state
+            .borrow()
+            .renderer
+            .gpu_context_info()
+            .map(|context| Box::new(context) as Box<dyn std::any::Any>)
     }
 
     fn gpu_device_lost(&self) -> Option<bool> {

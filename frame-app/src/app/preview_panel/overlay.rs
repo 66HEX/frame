@@ -1,3 +1,4 @@
+use super::super::components::frame_handle_hit_region;
 use super::*;
 use crate::numeric::{f64_to_f32, unit_f64_to_f32};
 
@@ -423,26 +424,29 @@ fn preview_overlay_handle(
     media: Option<PreviewMediaRenderState>,
     palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
-) -> gpui::Stateful<gpui::Div> {
+) -> gpui::Div {
     let handle_element = overlay_handle_cursor(
         div()
             .id(format!(
                 "preview-overlay-handle-{}",
                 overlay_handle_id(handle)
             ))
-            .absolute()
-            .left(relative(x))
-            .top(relative(y))
-            .ml(theme::ui_rem(-(OVERLAY_HANDLE_SIZE / 2.0)))
-            .mt(theme::ui_rem(-(OVERLAY_HANDLE_SIZE / 2.0)))
-            .w(theme::ui_rem(OVERLAY_HANDLE_SIZE))
-            .h(theme::ui_rem(OVERLAY_HANDLE_SIZE))
-            .rounded_full()
-            .border_1()
-            // Media overlay: the handle outline contrasts with arbitrary source pixels.
-            .border_color(hsla(0.0, 0.0, 0.0, 0.45))
-            .bg(color(preview_handle_color(palette)))
-            .shadow(card_surface_shadows(palette)),
+            .debug_selector(move || format!("preview-overlay-handle-{}", overlay_handle_id(handle)))
+            .flex()
+            .items_center()
+            .justify_center()
+            .child(
+                div()
+                    .flex_shrink_0()
+                    .w(theme::ui_rem(OVERLAY_HANDLE_SIZE))
+                    .h(theme::ui_rem(OVERLAY_HANDLE_SIZE))
+                    .rounded_full()
+                    .border_1()
+                    // Contrast against arbitrary source pixels.
+                    .border_color(hsla(0.0, 0.0, 0.0, 0.45))
+                    .bg(color(preview_handle_color(palette)))
+                    .shadow(card_surface_shadows(palette)),
+            ),
         handle,
     )
     .on_drag(
@@ -454,43 +458,44 @@ fn preview_overlay_handle(
         |_drag, _position, _window, cx| cx.new(|_| PreviewTimelineDragPreview),
     );
 
-    apply_accessible_button(handle_element, overlay_handle_label(handle), true, palette)
-        .aria_description(overlay_keyboard_description())
-        .on_key_down(
-            cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
-                let key = event.keystroke.key.as_str();
-                let changed = match key {
-                    "enter" | "escape" => {
-                        let changed = root.set_selected_overlay_mode(false);
-                        root.focus_registered_control("preview-tool-overlay", window, cx);
-                        changed
+    let handle_element =
+        apply_accessible_button(handle_element, overlay_handle_label(handle), true, palette)
+            .aria_description(overlay_keyboard_description())
+            .on_key_down(
+                cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+                    let key = event.keystroke.key.as_str();
+                    let changed =
+                        match key {
+                            "enter" | "escape" => {
+                                let changed = root.set_selected_overlay_mode(false);
+                                root.focus_registered_control("preview-tool-overlay", window, cx);
+                                changed
+                            }
+                            "delete" | "backspace" => {
+                                let changed = root.remove_selected_overlay();
+                                root.focus_registered_control("preview-tool-overlay", window, cx);
+                                changed
+                            }
+                            "+" | "=" | "plus" => root
+                                .nudge_selected_overlay_size(OverlaySizeDirection::Increase, media),
+                            "-" | "minus" => root
+                                .nudge_selected_overlay_size(OverlaySizeDirection::Decrease, media),
+                            _ => root.adjust_preview_overlay_from_keyboard_with_step(
+                                handle,
+                                key,
+                                media,
+                                event.keystroke.modifiers.shift,
+                            ),
+                        };
+                    if changed {
+                        cx.notify();
                     }
-                    "delete" | "backspace" => {
-                        let changed = root.remove_selected_overlay();
-                        root.focus_registered_control("preview-tool-overlay", window, cx);
-                        changed
+                    if overlay_keyboard_key_is_handled(key) {
+                        cx.stop_propagation();
                     }
-                    "+" | "=" | "plus" => {
-                        root.nudge_selected_overlay_size(OverlaySizeDirection::Increase, media)
-                    }
-                    "-" | "minus" => {
-                        root.nudge_selected_overlay_size(OverlaySizeDirection::Decrease, media)
-                    }
-                    _ => root.adjust_preview_overlay_from_keyboard_with_step(
-                        handle,
-                        key,
-                        media,
-                        event.keystroke.modifiers.shift,
-                    ),
-                };
-                if changed {
-                    cx.notify();
-                }
-                if overlay_keyboard_key_is_handled(key) {
-                    cx.stop_propagation();
-                }
-            }),
-        )
+                }),
+            );
+    frame_handle_hit_region(x, y, 1.0, 1.0, handle_element)
 }
 
 fn overlay_handle_cursor(
@@ -631,8 +636,8 @@ fn preview_overlay_icon_button_inner(
         })
         .when(!enabled, gpui::Styled::cursor_not_allowed)
         .when(enabled, |this| {
-            this.hover(gpui::Styled::cursor_pointer)
-                .active(move |style| {
+            this.hover_style(gpui::Styled::cursor_pointer)
+                .active_style(move |style| {
                     style
                         .bg(color(colors.active_background))
                         .text_color(color(colors.hover_foreground))

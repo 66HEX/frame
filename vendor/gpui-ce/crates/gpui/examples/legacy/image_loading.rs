@@ -1,3 +1,8 @@
+#![cfg_attr(target_family = "wasm", no_main)]
+
+#[path = "../example_support/fonts.rs"]
+mod example_support;
+
 use std::{path::Path, sync::Arc, time::Duration};
 
 use gpui::{
@@ -6,6 +11,8 @@ use gpui::{
     Resource, SharedString, Window, WindowBounds, WindowOptions, black, div, img, prelude::*,
     pulsating_between, px, red, size,
 };
+use gpui_platform::application;
+use palette::WithAlpha;
 
 struct Assets {}
 
@@ -28,7 +35,10 @@ impl AssetSource for Assets {
     }
 }
 
-const IMAGE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/examples/image/app-icon.png");
+const IMAGE: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/examples/legacy/image/app-icon.png"
+);
 
 #[derive(Copy, Clone, Hash)]
 struct LoadImageParameters {
@@ -74,13 +84,13 @@ impl ImageLoadingExample {
                 Animation::new(Duration::from_secs(3))
                     .repeat()
                     .with_easing(pulsating_between(0.04, 0.24)),
-                move |this, delta| this.bg(black().opacity(delta)),
+                move |this, delta| this.bg(black().with_alpha(delta)),
             ),
         )
     }
 
     fn fallback_element() -> impl IntoElement {
-        let fallback_color: Hsla = black().opacity(0.5);
+        let fallback_color: Hsla = black().with_alpha(0.5);
 
         div().size_full().flex_none().p_0p5().child(
             div()
@@ -191,23 +201,31 @@ impl Render for ImageLoadingExample {
     }
 }
 
+fn run_example() {
+    application().with_assets(Assets {}).run(|cx: &mut App| {
+        if !example_support::load_fonts(cx) {
+            return;
+        }
+        let options = WindowOptions::new().window_bounds(Some(WindowBounds::Windowed(
+            Bounds::centered(None, size(px(300.), px(300.)), cx),
+        )));
+        cx.open_window(options, |_, cx| {
+            cx.activate(false);
+            cx.new(|_| ImageLoadingExample {})
+        })
+        .unwrap();
+    });
+}
+
+#[cfg(not(target_family = "wasm"))]
 fn main() {
     env_logger::init();
-    gpui_platform::application()
-        .with_assets(Assets {})
-        .run(|cx: &mut App| {
-            let options = WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
-                    None,
-                    size(px(300.), px(300.)),
-                    cx,
-                ))),
-                ..Default::default()
-            };
-            cx.open_window(options, |_, cx| {
-                cx.activate(false);
-                cx.new(|_| ImageLoadingExample {})
-            })
-            .unwrap();
-        });
+    run_example();
+}
+
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen::prelude::wasm_bindgen(start)]
+pub fn start() {
+    gpui_platform::web_init();
+    run_example();
 }

@@ -1,6 +1,7 @@
 use std::{
     cell::{Cell, RefCell},
-    ffi::OsStr,
+    ffi::{OsStr, OsString},
+    os::windows::ffi::{OsStrExt as _, OsStringExt as _},
     path::{Path, PathBuf},
     rc::{Rc, Weak},
     sync::{
@@ -9,13 +10,12 @@ use std::{
     },
 };
 
-use ::util::{ResultExt, paths::SanitizedPath};
 use anyhow::{Context as _, Result, anyhow};
 use futures::channel::oneshot::{self, Receiver};
+use gpui_util::{ResultExt, get_powershell, new_std_command};
 use itertools::Itertools;
 use parking_lot::RwLock;
 use smallvec::SmallVec;
-#[cfg(not(feature = "wgpu"))]
 use windows::Win32::Graphics::Direct3D11::ID3D11Device;
 use windows::{
     UI::ViewManagement::UISettings,
@@ -23,7 +23,7 @@ use windows::{
         Foundation::*,
         Graphics::Gdi::*,
         Security::Credentials::*,
-        System::{Com::*, LibraryLoader::*, Ole::*, SystemInformation::*},
+        System::{Com::*, LibraryLoader::*, Ole::*, Power::*, SystemInformation::*},
         UI::{Input::KeyboardAndMouse::*, Shell::*, WindowsAndMessaging::*},
     },
     core::*,
@@ -40,15 +40,17 @@ pub struct WindowsPlatform {
     icon: HICON,
     background_executor: BackgroundExecutor,
     foreground_executor: ForegroundExecutor,
-    text_system: Arc<dyn PlatformTextSystem>,
-    #[cfg(not(feature = "wgpu"))]
-    direct_write_text_system: Option<Arc<DirectWriteTextSystem>>,
+    text_system: Arc<DirectWriteTextSystem>,
     drop_target_helper: Option<IDropTargetHelper>,
     /// Flag to instruct the `VSyncProvider` thread to invalidate the directx devices
     /// as resizing them has failed, causing us to have lost at least the render target.
     invalidate_devices: Arc<AtomicBool>,
     handle: HWND,
+    suspend_resume_notification: RefCell<Option<HPOWERNOTIFY>>,
     disable_direct_composition: bool,
+    has_package_identity: bool,
+    app_identity: RefCell<Option<(String, String)>>,
+    system_notifications: RefCell<SystemNotificationState>,
 }
 
 struct WindowsPlatformInner {
@@ -68,23 +70,26 @@ pub(crate) struct WindowsPlatformState {
     pub(crate) current_cursor: Cell<Option<HCURSOR>>,
     /// Shared with each window so `WM_SETCURSOR` can read it directly.
     pub(crate) cursor_visible: Arc<AtomicBool>,
-    #[cfg(not(feature = "wgpu"))]
+    /// Shared with each window to coordinate draws across windows on the UI
+    /// thread; see [`DrawCoordinator`].
+    pub(crate) draw_coordinator: Rc<DrawCoordinator>,
     directx_devices: RefCell<Option<DirectXDevices>>,
 }
 
 #[derive(Default)]
 struct PlatformCallbacks {
     open_urls: Cell<Option<Box<dyn FnMut(Vec<String>)>>>,
-    quit: Cell<Option<Box<dyn FnMut()>>>,
+    quit: Cell<Option<Box<dyn FnMut() -> bool>>>,
     reopen: Cell<Option<Box<dyn FnMut()>>>,
     app_menu_action: Cell<Option<Box<dyn FnMut(&dyn Action)>>>,
     will_open_app_menu: Cell<Option<Box<dyn FnMut()>>>,
     validate_app_menu_command: Cell<Option<Box<dyn FnMut(&dyn Action) -> bool>>>,
     keyboard_layout_change: Cell<Option<Box<dyn FnMut()>>>,
+    system_wake: Cell<Option<Box<dyn FnMut()>>>,
 }
 
 impl WindowsPlatformState {
-    fn new(#[cfg(not(feature = "wgpu"))] directx_devices: Option<DirectXDevices>) -> Self {
+    fn new(directx_devices: Option<DirectXDevices>) -> Self {
         let callbacks = PlatformCallbacks::default();
         let jump_list = JumpList::new();
         let current_cursor = load_cursor(CursorStyle::Arrow);
@@ -94,7 +99,7 @@ impl WindowsPlatformState {
             jump_list: RefCell::new(jump_list),
             current_cursor: Cell::new(current_cursor),
             cursor_visible: Arc::new(AtomicBool::new(true)),
-            #[cfg(not(feature = "wgpu"))]
+            draw_coordinator: Rc::new(DrawCoordinator::new()),
             directx_devices: RefCell::new(directx_devices),
             menus: RefCell::new(Vec::new()),
         }
@@ -106,29 +111,22 @@ impl WindowsPlatform {
         unsafe {
             OleInitialize(None).context("unable to initialize Windows OLE")?;
         }
-        #[cfg(not(feature = "wgpu"))]
-        let (directx_devices, text_system, direct_write_text_system) = if !headless {
+        let (directx_devices, text_system) = if !headless {
             let devices = DirectXDevices::new().context("Creating DirectX devices")?;
-            let dw_text_system = Arc::new(
+            let text_system = Arc::new(
                 DirectWriteTextSystem::new(&devices)
                     .context("Error creating DirectWriteTextSystem")?,
             );
-            (
-                Some(devices),
-                dw_text_system.clone() as Arc<dyn PlatformTextSystem>,
-                Some(dw_text_system),
-            )
-        } else {
-            (
-                None,
-                Arc::new(gpui::NoopTextSystem::new()) as Arc<dyn PlatformTextSystem>,
-                None,
-            )
-        };
-        #[cfg(feature = "wgpu")]
-        let text_system =
-            Arc::new(gpui_wgpu::CosmicTextSystem::new("Segoe UI")) as Arc<dyn PlatformTextSystem>;
 
+            (Some(devices), text_system)
+        } else {
+            let text_system = Arc::new(
+                DirectWriteTextSystem::new_headless()
+                    .context("Error creating headless DirectWriteTextSystem")?,
+            );
+
+            (None, text_system)
+        };
         let (main_sender, main_receiver) = PriorityQueueReceiver::new();
         let validation_number = if usize::BITS == 64 {
             rand::random::<u64>() as usize
@@ -144,7 +142,6 @@ impl WindowsPlatform {
             validation_number,
             main_sender: Some(main_sender),
             main_receiver: Some(main_receiver),
-            #[cfg(not(feature = "wgpu"))]
             directx_devices,
             dispatcher: None,
         };
@@ -174,9 +171,6 @@ impl WindowsPlatform {
             .context("CreateWindowExW did not run correctly")?;
         let handle = result?;
 
-        #[cfg(feature = "wgpu")]
-        let disable_direct_composition = true;
-        #[cfg(not(feature = "wgpu"))]
         let disable_direct_composition = std::env::var(DISABLE_DIRECT_COMPOSITION)
             .is_ok_and(|value| value == "true" || value == "1");
         let background_executor = BackgroundExecutor::new(dispatcher.clone());
@@ -205,11 +199,13 @@ impl WindowsPlatform {
             background_executor,
             foreground_executor,
             text_system,
-            #[cfg(not(feature = "wgpu"))]
-            direct_write_text_system,
+            suspend_resume_notification: RefCell::new(None),
             disable_direct_composition,
+            has_package_identity: has_package_identity(),
             drop_target_helper,
             invalidate_devices: Arc::new(AtomicBool::new(false)),
+            app_identity: RefCell::new(None),
+            system_notifications: RefCell::new(SystemNotificationState::new()),
         })
     }
 
@@ -242,9 +238,9 @@ impl WindowsPlatform {
             main_receiver: self.inner.main_receiver.clone(),
             platform_window_handle: self.handle,
             disable_direct_composition: self.disable_direct_composition,
-            #[cfg(not(feature = "wgpu"))]
             directx_devices: self.inner.state.directx_devices.borrow().clone().unwrap(),
             invalidate_devices: self.invalidate_devices.clone(),
+            draw_coordinator: self.inner.state.draw_coordinator.clone(),
         }
     }
 
@@ -310,24 +306,14 @@ impl WindowsPlatform {
     }
 
     fn begin_vsync_thread(&self) {
-        #[cfg(not(feature = "wgpu"))]
         let Some(directx_devices) = self.inner.state.directx_devices.borrow().clone() else {
             return;
         };
-        #[cfg(not(feature = "wgpu"))]
-        let Some(direct_write_text_system) = &self.direct_write_text_system else {
-            return;
-        };
-        #[cfg(not(feature = "wgpu"))]
         let mut directx_device = directx_devices;
-        #[cfg(not(feature = "wgpu"))]
         let platform_window: SafeHwnd = self.handle.into();
-        #[cfg(not(feature = "wgpu"))]
         let validation_number = self.inner.validation_number;
         let all_windows = Arc::downgrade(&self.raw_window_handles);
-        #[cfg(not(feature = "wgpu"))]
-        let text_system = Arc::downgrade(direct_write_text_system);
-        #[cfg(not(feature = "wgpu"))]
+        let text_system = Arc::downgrade(&self.text_system);
         let invalidate_devices = self.invalidate_devices.clone();
 
         std::thread::Builder::new()
@@ -336,20 +322,17 @@ impl WindowsPlatform {
                 let vsync_provider = VSyncProvider::new();
                 loop {
                     vsync_provider.wait_for_vsync();
-                    #[cfg(not(feature = "wgpu"))]
+                    if check_device_lost(&directx_device.device)
+                        || invalidate_devices.fetch_and(false, Ordering::Acquire)
                     {
-                        if check_device_lost(&directx_device.device)
-                            || invalidate_devices.fetch_and(false, Ordering::Acquire)
-                        {
-                            if let Err(err) = handle_gpu_device_lost(
-                                &mut directx_device,
-                                platform_window.as_raw(),
-                                validation_number,
-                                &all_windows,
-                                &text_system,
-                            ) {
-                                panic!("Device lost: {err}");
-                            }
+                        if let Err(err) = handle_gpu_device_lost(
+                            &mut directx_device,
+                            platform_window.as_raw(),
+                            validation_number,
+                            &all_windows,
+                            &text_system,
+                        ) {
+                            panic!("Device lost: {err}");
                         }
                     }
                     let Some(all_windows) = all_windows.upgrade() else {
@@ -380,6 +363,39 @@ fn translate_accelerator(msg: &MSG) -> Option<()> {
         )
     };
     (result.0 == 0).then_some(())
+}
+
+fn encode_restart_arguments(arguments: &[OsString]) -> OsString {
+    // `Start-Process` accepts a single native command line, so quote each argument according to
+    // the Windows argv parsing rules before passing the complete string through the environment.
+    let mut encoded = Vec::new();
+
+    for (index, argument) in arguments.iter().enumerate() {
+        if index > 0 {
+            encoded.push(b' ' as u16);
+        }
+        encoded.push(b'"' as u16);
+
+        let mut backslash_count = 0;
+        for code_unit in argument.encode_wide() {
+            if code_unit == b'\\' as u16 {
+                backslash_count += 1;
+            } else {
+                if code_unit == b'"' as u16 {
+                    encoded.extend(std::iter::repeat_n(b'\\' as u16, backslash_count * 2 + 1));
+                } else {
+                    encoded.extend(std::iter::repeat_n(b'\\' as u16, backslash_count));
+                }
+                backslash_count = 0;
+                encoded.push(code_unit);
+            }
+        }
+
+        encoded.extend(std::iter::repeat_n(b'\\' as u16, backslash_count * 2));
+        encoded.push(b'"' as u16);
+    }
+
+    OsString::from_wide(&encoded)
 }
 
 impl Platform for WindowsPlatform {
@@ -437,19 +453,12 @@ impl Platform for WindowsPlatform {
             }
         }
 
-        self.inner
-            .with_callback(|callbacks| &callbacks.quit, |callback| callback());
-
-        // Bypass the CRT exit logic, which runs atexit handlers before calling ExitProcess.
-        // aws-lc registers an atexit handler that intentionally acquires a lock without releasing it.
-        // aws-lc also has thread_local objects which acquire this lock in their destructor.
-        // Destructors for thread_locals run under the loader lock, so there is a race condition
-        // where, if a thread exits after atexit handlers have run, the TLS destructors will block
-        // indefinitely on this lock while holding the loader lock. Since ExitProcess also requires
-        // the loader lock, process teardown will deadlock.
-        unsafe {
-            windows::Win32::System::Threading::ExitProcess(0);
-        }
+        self.inner.with_callback(
+            |callbacks| &callbacks.quit,
+            |callback| {
+                callback();
+            },
+        );
     }
 
     fn quit(&self) {
@@ -458,45 +467,58 @@ impl Platform for WindowsPlatform {
             .detach();
     }
 
-    fn restart(&self, binary_path: Option<PathBuf>) {
+    fn restart(&self, binary_path: Option<PathBuf>, arguments: Vec<OsString>) {
         let pid = std::process::id();
         let Some(app_path) = binary_path.or(self.app_path().log_err()) else {
             return;
         };
-        let script = format!(
-            r#"
-            $pidToWaitFor = {}
-            $exePath = "{}"
+        let script = r#"
+            $pidToWaitFor = $env:ZED_RESTART_PID
+            $exePath = $env:ZED_RESTART_EXECUTABLE
+            $argumentList = $env:ZED_RESTART_ARGUMENTS
 
-            while ($true) {{
+            [Environment]::SetEnvironmentVariable("ZED_RESTART_PID", $null)
+            [Environment]::SetEnvironmentVariable("ZED_RESTART_EXECUTABLE", $null)
+            [Environment]::SetEnvironmentVariable("ZED_RESTART_ARGUMENTS", $null)
+
+            while ($true) {
                 $process = Get-Process -Id $pidToWaitFor -ErrorAction SilentlyContinue
-                if (-not $process) {{
-                    Start-Process -FilePath $exePath
+                if (-not $process) {
+                    if ([string]::IsNullOrEmpty($argumentList)) {
+                        Start-Process -FilePath $exePath
+                    } else {
+                        Start-Process -FilePath $exePath -ArgumentList $argumentList
+                    }
                     break
-                }}
+                }
                 Start-Sleep -Seconds 0.1
-            }}
-            "#,
-            pid,
-            app_path.display(),
-        );
+            }
+            "#;
 
         // Defer spawning to the foreground executor so it runs after the
         // current `AppCell` borrow is released. On Windows, `Command::spawn()`
         // can pump the Win32 message loop (via `CreateProcessW`), which
         // re-enters message handling possibly resulting in another mutable
         // borrow of the `AppCell` ending up with a double borrow panic
+        let Some(powershell) = get_powershell() else {
+            log::error!("failed to restart: PowerShell is unavailable");
+            return;
+        };
         self.foreground_executor
             .spawn(async move {
+                let mut command = new_std_command(powershell);
+                let arguments = encode_restart_arguments(&arguments);
+                command
+                    .arg("-command")
+                    .arg(script)
+                    .env("ZED_RESTART_PID", pid.to_string())
+                    .env("ZED_RESTART_EXECUTABLE", app_path)
+                    .env("ZED_RESTART_ARGUMENTS", arguments);
                 #[allow(
                     clippy::disallowed_methods,
                     reason = "We are restarting ourselves, using std command thus is fine"
                 )]
-                let restart_process =
-                    ::util::command::new_std_command(::util::shell::get_windows_system_shell())
-                        .arg("-command")
-                        .arg(script)
-                        .spawn();
+                let restart_process = command.spawn();
 
                 match restart_process {
                     Ok(_) => unsafe { PostQuitMessage(0) },
@@ -537,7 +559,7 @@ impl Platform for WindowsPlatform {
     fn screen_capture_sources(
         &self,
     ) -> oneshot::Receiver<Result<Vec<Rc<dyn ScreenCaptureSource>>>> {
-        gpui::scap_screen_capture::scap_screen_sources(&self.foreground_executor)
+        gpui::screen_capture::screen_sources(&self.foreground_executor)
     }
 
     fn active_window(&self) -> Option<AnyWindowHandle> {
@@ -646,12 +668,72 @@ impl Platform for WindowsPlatform {
             .detach();
     }
 
-    fn on_quit(&self, callback: Box<dyn FnMut()>) {
+    fn on_quit(&self, callback: Box<dyn FnMut() -> bool>) {
         self.inner.state.callbacks.quit.set(Some(callback));
     }
 
     fn on_reopen(&self, callback: Box<dyn FnMut()>) {
         self.inner.state.callbacks.reopen.set(Some(callback));
+    }
+
+    fn on_system_wake(&self, callback: Box<dyn FnMut()>) {
+        self.inner.state.callbacks.system_wake.set(Some(callback));
+        let mut notification = self.suspend_resume_notification.borrow_mut();
+        if notification.is_none() {
+            *notification = unsafe {
+                // SAFETY: self.handle is the platform window receiving WM_POWERBROADCAST.
+                RegisterSuspendResumeNotification(
+                    HANDLE(self.handle.0),
+                    DEVICE_NOTIFY_WINDOW_HANDLE,
+                )
+                .log_err()
+            };
+        }
+    }
+
+    fn set_app_identity(&self, identifier: &str, name: &str) {
+        // If the process has package identity, it's automatally granted an AUMID by the system.
+        if self.has_package_identity {
+            return;
+        }
+
+        let identifier_utf16 = windows::core::HSTRING::from(identifier);
+        // SAFETY: `identifier_utf16` outlives the call and is null-terminated.
+        if let Err(error) = unsafe {
+            windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID(
+                windows::core::PCWSTR(identifier_utf16.as_ptr()),
+            )
+        } {
+            log::warn!("failed to set the process AppUserModelID: {error}");
+        }
+        *self.app_identity.borrow_mut() = Some((identifier.to_string(), name.to_string()));
+    }
+
+    fn show_system_notification(&self, notification: gpui::SystemNotification) {
+        let app_identity = self.app_identity.borrow().clone();
+        self.system_notifications
+            .borrow_mut()
+            .show(
+                self.has_package_identity,
+                app_identity
+                    .as_ref()
+                    .map(|(identifier, name)| (identifier.as_str(), name.as_str())),
+                notification,
+            )
+            .log_err();
+    }
+
+    fn dismiss_system_notification(&self, tag: &str) {
+        self.system_notifications.borrow_mut().dismiss(tag);
+    }
+
+    fn on_system_notification_response(
+        &self,
+        callback: Box<dyn FnMut(gpui::SystemNotificationResponse)>,
+    ) {
+        self.system_notifications
+            .borrow_mut()
+            .on_response(&self.foreground_executor, callback);
     }
 
     fn set_menus(&self, menus: Vec<Menu>, _keymap: &Keymap) {
@@ -749,6 +831,15 @@ impl Platform for WindowsPlatform {
     }
 
     fn write_credentials(&self, url: &str, username: &str, password: &[u8]) -> Task<Result<()>> {
+        // CredWriteW rejects larger blobs with the opaque RPC error
+        // 0x800706F7 "The stub received bad data", so fail with a clear
+        // message instead.
+        if password.len() > CRED_MAX_CREDENTIAL_BLOB_SIZE as usize {
+            return Task::ready(Err(anyhow!(
+                "credential for {url} is {} bytes, which exceeds the Windows Credential Manager limit of {CRED_MAX_CREDENTIAL_BLOB_SIZE} bytes",
+                password.len()
+            )));
+        }
         let password = password.to_vec();
         let mut username = username.encode_utf16().chain(Some(0)).collect_vec();
         let mut target_name = windows_credentials_target_name(url)
@@ -865,10 +956,7 @@ impl Platform for WindowsPlatform {
 
 impl WindowsPlatformInner {
     fn new(context: &mut PlatformWindowCreateContext) -> Result<Rc<Self>> {
-        #[cfg(not(feature = "wgpu"))]
         let state = WindowsPlatformState::new(context.directx_devices.take());
-        #[cfg(feature = "wgpu")]
-        let state = WindowsPlatformState::new();
         Ok(Rc::new(Self {
             state,
             raw_window_handles: context.raw_window_handles.clone(),
@@ -910,7 +998,9 @@ impl WindowsPlatformInner {
             | WM_GPUI_TASK_DISPATCHED_ON_MAIN_THREAD
             | WM_GPUI_DOCK_MENU_ACTION
             | WM_GPUI_KEYBOARD_LAYOUT_CHANGED
-            | WM_GPUI_GPU_DEVICE_LOST => self.handle_gpui_events(msg, wparam, lparam),
+            | WM_GPUI_GPU_DEVICE_LOST
+            | WM_GPUI_END_SESSION => self.handle_gpui_events(msg, wparam, lparam),
+            WM_POWERBROADCAST => self.handle_power_broadcast(wparam),
             _ => None,
         };
         if let Some(result) = handled {
@@ -933,14 +1023,28 @@ impl WindowsPlatformInner {
             WM_GPUI_TASK_DISPATCHED_ON_MAIN_THREAD => self.run_foreground_task(),
             WM_GPUI_DOCK_MENU_ACTION => self.handle_dock_action_event(lparam.0 as _),
             WM_GPUI_KEYBOARD_LAYOUT_CHANGED => self.handle_keyboard_layout_change(),
-            WM_GPUI_GPU_DEVICE_LOST => {
-                #[cfg(not(feature = "wgpu"))]
-                return self.handle_device_lost(lparam);
-                #[cfg(feature = "wgpu")]
-                Some(0)
-            }
+            WM_GPUI_GPU_DEVICE_LOST => self.handle_device_lost(lparam),
+            WM_GPUI_END_SESSION => self.handle_end_session(),
             _ => unreachable!(),
         }
+    }
+
+    fn handle_end_session(&self) -> Option<isize> {
+        let mut shutdown_completed = false;
+        self.with_callback(
+            |callbacks| &callbacks.quit,
+            |callback| shutdown_completed = callback(),
+        );
+        log::logger().flush();
+        if shutdown_completed {
+            std::process::exit(0);
+        }
+
+        // Shutdown couldn't run synchronously, since the AppCell is already borrowed.
+        // Windows may terminate the application as soon as we return from this handler, but if we post a WM_QUIT message now,
+        // we may get to gracefully shut down the app before we're terminated by the OS.
+        unsafe { PostQuitMessage(0) };
+        Some(0)
     }
 
     fn close_one_window(&self, target_window: HWND) -> bool {
@@ -1052,7 +1156,13 @@ impl WindowsPlatformInner {
         Some(0)
     }
 
-    #[cfg(not(feature = "wgpu"))]
+    fn handle_power_broadcast(&self, wparam: WPARAM) -> Option<isize> {
+        if wparam.0 as u32 == PBT_APMRESUMEAUTOMATIC {
+            self.with_callback(|callbacks| &callbacks.system_wake, |callback| callback());
+        }
+        Some(1)
+    }
+
     fn handle_device_lost(&self, lparam: LPARAM) -> Option<isize> {
         let directx_devices = lparam.0 as *const DirectXDevices;
         let directx_devices = unsafe { &*directx_devices };
@@ -1066,6 +1176,10 @@ impl WindowsPlatformInner {
 impl Drop for WindowsPlatform {
     fn drop(&mut self) {
         unsafe {
+            if let Some(notification) = self.suspend_resume_notification.borrow_mut().take() {
+                // SAFETY: notification was returned by RegisterSuspendResumeNotification.
+                UnregisterSuspendResumeNotification(notification).log_err();
+            }
             DestroyWindow(self.handle)
                 .context("Destroying platform window")
                 .log_err();
@@ -1084,11 +1198,12 @@ pub(crate) struct WindowCreationInfo {
     pub(crate) main_receiver: PriorityQueueReceiver<RunnableVariant>,
     pub(crate) platform_window_handle: HWND,
     pub(crate) disable_direct_composition: bool,
-    #[cfg(not(feature = "wgpu"))]
     pub(crate) directx_devices: DirectXDevices,
     /// Flag to instruct the `VSyncProvider` thread to invalidate the directx devices
     /// as resizing them has failed, causing us to have lost at least the render target.
     pub(crate) invalidate_devices: Arc<AtomicBool>,
+    /// Shared with [`WindowsPlatformState::draw_coordinator`] and every other window.
+    pub(crate) draw_coordinator: Rc<DrawCoordinator>,
 }
 
 struct PlatformWindowCreateContext {
@@ -1097,9 +1212,26 @@ struct PlatformWindowCreateContext {
     validation_number: usize,
     main_sender: Option<PriorityQueueSender<RunnableVariant>>,
     main_receiver: Option<PriorityQueueReceiver<RunnableVariant>>,
-    #[cfg(not(feature = "wgpu"))]
     directx_devices: Option<DirectXDevices>,
     dispatcher: Option<Arc<WindowsDispatcher>>,
+}
+
+fn has_package_identity() -> bool {
+    let mut package_full_name_length = 0;
+    let result = unsafe {
+        windows::Win32::Storage::Packaging::Appx::GetCurrentPackageFullName(
+            &mut package_full_name_length,
+            None,
+        )
+    };
+    if result == ERROR_INSUFFICIENT_BUFFER {
+        true
+    } else if result == APPMODEL_ERROR_NO_PACKAGE {
+        false
+    } else {
+        log::warn!("failed to determine whether the process has package identity: {result:?}");
+        false
+    }
 }
 
 fn open_target(target: impl AsRef<OsStr>) -> Result<()> {
@@ -1222,8 +1354,8 @@ fn file_save_dialog(
             .context("failed to canonicalize directory")
             .log_err()
     {
-        let full_path = SanitizedPath::new(&full_path);
-        let full_path_string = full_path.to_string();
+        let full_path = dunce::simplified(&full_path);
+        let full_path_string = full_path.display().to_string();
         let path_item: IShellItem =
             unsafe { SHCreateItemFromParsingName(&HSTRING::from(full_path_string), None)? };
         unsafe {
@@ -1285,7 +1417,6 @@ fn should_auto_hide_scrollbars() -> Result<bool> {
     Ok(ui_settings.AutoHideScrollBars()?)
 }
 
-#[cfg(not(feature = "wgpu"))]
 fn check_device_lost(device: &ID3D11Device) -> bool {
     let device_state = unsafe { device.GetDeviceRemovedReason() };
     match device_state {
@@ -1297,7 +1428,6 @@ fn check_device_lost(device: &ID3D11Device) -> bool {
     }
 }
 
-#[cfg(not(feature = "wgpu"))]
 fn handle_gpu_device_lost(
     directx_devices: &mut DirectXDevices,
     platform_window: HWND,
@@ -1428,8 +1558,28 @@ unsafe extern "system" fn window_procedure(
 
 #[cfg(test)]
 mod tests {
+    use std::ffi::{OsStr, OsString};
+
     use crate::{read_from_clipboard, write_to_clipboard};
     use gpui::ClipboardItem;
+
+    use super::encode_restart_arguments;
+
+    #[test]
+    fn test_encode_restart_arguments() {
+        assert_eq!(encode_restart_arguments(&[]), OsStr::new(""));
+        assert_eq!(
+            encode_restart_arguments(&[
+                OsString::from("--user-data-dir"),
+                OsString::from(r"C:\Zed Data"),
+            ]),
+            OsStr::new(r#""--user-data-dir" "C:\Zed Data""#)
+        );
+        assert_eq!(
+            encode_restart_arguments(&[OsString::from(r"C:\")]),
+            OsStr::new(r#""C:\\""#)
+        );
+    }
 
     #[test]
     fn test_clipboard() {

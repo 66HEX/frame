@@ -15,22 +15,26 @@ on:
     - cron: '0 0 * * 1'
   workflow_dispatch:
 
+permissions:
+  contents: read
+  checks: write
+
 jobs:
   # cargo-audit: vulnerability scanning (advisory DB)
   cargo-audit:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
-      - uses: taiki-e/install-action@cargo-audit
+      - uses: actions/checkout@v5
       - uses: rustsec/audit-check@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          working-directory: .
 
   # cargo-deny: license compliance + advisory + duplicate detection
   cargo-deny:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: ./Cargo.toml

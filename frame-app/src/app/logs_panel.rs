@@ -158,12 +158,12 @@ pub(super) fn log_tab_button(
         .aria_selected(selected)
         .focusable()
         .tab_stop(true)
-        .focus_visible(move |style| focus_visible_ring(style, palette))
+        .focus_visible_style(move |style| focus_visible_ring(style, palette))
         .flex_none()
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(foreground)
-        .hover(gpui::Styled::cursor_pointer)
+        .hover_style(gpui::Styled::cursor_pointer)
         .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
             if root.select_log_file_for_logs_view(&file_id) {
                 cx.notify();
@@ -282,6 +282,7 @@ pub(super) fn log_lines_list(
     }))
     .size_full()
     .p(theme::ui_rem(2.0))
+    .pr(theme::ui_rem(super::components::FRAME_SCROLLBAR_WIDTH))
     .text_color(color(palette.text_primary))
     .line_height(theme::ui_rem(LOG_LINE_HEIGHT));
 
@@ -292,7 +293,7 @@ pub(super) fn log_lines_list(
         .aria_label("Conversion log output")
         .focusable()
         .tab_stop(true)
-        .focus_visible(move |style| focus_visible_ring(style, palette))
+        .focus_visible_style(move |style| focus_visible_ring(style, palette))
         .size_full()
         .on_key_down(
             cx.listener(move |root, event: &gpui::KeyDownEvent, _window, cx| {
@@ -414,7 +415,7 @@ pub(super) fn log_line_row(
         .px_1()
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .line_height(theme::ui_rem(LOG_LINE_HEIGHT))
-        .hover(|style| style.bg(color(palette.fill_subtle)))
+        .hover_style(|style| style.bg(color(palette.fill_subtle)))
         .child(
             div()
                 .flex_none()
@@ -423,7 +424,7 @@ pub(super) fn log_line_row(
                 .text_right()
                 .text_color(color(palette.border_subtle))
                 .font_features(assets::frame_tabular_number_font_features())
-                .group_hover(row_group.clone(), |style| {
+                .group_hover_style(row_group.clone(), |style| {
                     style.text_color(color(palette.text_muted))
                 })
                 .child(line.index.to_string()),
@@ -434,7 +435,7 @@ pub(super) fn log_line_row(
                 .overflow_hidden()
                 .whitespace_nowrap()
                 .text_color(color(log_line_tone_color(tone, palette)))
-                .group_hover(row_group, move |style| {
+                .group_hover_style(row_group, move |style| {
                     style.text_color(color(log_line_hover_tone_color(tone, palette)))
                 })
                 .child(line.text),

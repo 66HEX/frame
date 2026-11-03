@@ -1,0 +1,21 @@
+[package]
+name = "gpui_ce_collections"
+version = "0.2.2"
+edition = "2024"
+license = "Apache-2.0"
+publish = true
+description = "Blessed hash collections used by gpui-ce (vendored from Zed)."
+repository = "https://github.com/gpui-ce/gpui-ce"
+
+[lib]
+name = "collections"
+path = "src/collections.rs"
+doctest = false
+
+[features]
+test-support = []
+
+[dependencies]
+indexmap = { version = "2", features = ["serde"] }
+rustc-hash = "2"
+gpui_util = { package = "gpui_ce_util", version = "0.2.6", path = "../gpui_ce_util" }

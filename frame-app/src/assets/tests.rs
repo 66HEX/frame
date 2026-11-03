@@ -4,6 +4,22 @@ mod frame_assets {
     use super::*;
 
     #[test]
+    fn asset_registry_resolves_all_bundled_icons_and_fonts() {
+        let registry: gpui::AssetRegistry = FrameAssets.into();
+        for directory in ["icons", "fonts"] {
+            for name in FrameAssets.list(directory).unwrap() {
+                let path = format!("{directory}/{name}");
+                let expected = FrameAssets.load(&path).unwrap().unwrap();
+                assert_eq!(
+                    registry.load(&path).as_deref(),
+                    Some(expected.as_ref()),
+                    "{path}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn load_returns_frame_icon_svg() {
         let loaded = FrameAssets
             .load(ICON_FRAME)
@@ -86,7 +102,7 @@ mod frame_assets {
 
     #[test]
     fn ui_icon_assets_use_hugeicons_stroke_style() {
-        let renderer = gpui::SvgRenderer::new(std::sync::Arc::new(FrameAssets));
+        let renderer = gpui::SvgRenderer::new(std::sync::Arc::new(FrameAssets.into()));
 
         for icon in [
             ICON_ARROW_DOWN,

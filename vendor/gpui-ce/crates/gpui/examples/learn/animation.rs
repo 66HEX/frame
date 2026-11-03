@@ -15,10 +15,11 @@ use std::time::Duration;
 use anyhow::Result;
 use gpui::colors::Colors;
 use gpui::{
-    Animation, AnimationExt as _, App, AssetSource, Bounds, Context, Hsla, SharedString,
+    Animation, AnimationExt as _, App, AssetSource, Bounds, ColorExt, Context, Hsla, SharedString,
     Transformation, Window, WindowBounds, WindowOptions, bounce, div, ease_in_out, linear,
     percentage, prelude::*, px, rgb, size as gpui_size, svg,
 };
+use palette::IntoColor;
 
 struct Assets {}
 
@@ -241,7 +242,7 @@ fn combined_example(colors: &Colors) -> impl IntoElement {
 }
 
 fn section(colors: &Colors, title: &'static str, content: impl IntoElement) -> impl IntoElement {
-    let surface: Hsla = colors.container.into();
+    let surface: Hsla = colors.container.into_color();
 
     div()
         .flex()
@@ -266,10 +267,7 @@ fn main() {
         .run(|cx: &mut App| {
             let bounds = Bounds::centered(None, gpui_size(px(500.), px(650.)), cx);
             cx.open_window(
-                WindowOptions {
-                    window_bounds: Some(WindowBounds::Windowed(bounds)),
-                    ..Default::default()
-                },
+                WindowOptions::new().window_bounds(Some(WindowBounds::Windowed(bounds))),
                 |_, cx| cx.new(|_| AnimationExample),
             )
             .expect("Failed to open window");

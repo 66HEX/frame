@@ -2,6 +2,7 @@ mod client;
 mod clipboard;
 mod cursor;
 mod display;
+mod popup;
 mod scroll;
 mod serial;
 mod window;
@@ -29,6 +30,10 @@ pub(super) fn to_shape(style: CursorStyle) -> Shape {
         CursorStyle::ResizeUp => Shape::NResize,
         CursorStyle::ResizeDown => Shape::SResize,
         CursorStyle::ResizeUpDown => Shape::NsResize,
+        CursorStyle::ResizeUpLeft => Shape::NwResize,
+        CursorStyle::ResizeUpRight => Shape::NeResize,
+        CursorStyle::ResizeDownLeft => Shape::SwResize,
+        CursorStyle::ResizeDownRight => Shape::SeResize,
         CursorStyle::ResizeUpLeftDownRight => Shape::NwseResize,
         CursorStyle::ResizeUpRightDownLeft => Shape::NeswResize,
         CursorStyle::ResizeColumn => Shape::ColResize,

@@ -1,0 +1,31 @@
+on:
+  issues:
+    types: [opened, reopened]
+
+name: "Vouch - Check Issue"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      # acquire a token that allows vouch actions to mutate repository
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app-token
+        with:
+          client-id: ${{ vars.VOUCH_CLIENT_ID }}
+          private-key: ${{ secrets.VOUCH_APP_PRIVATE_KEY }}
+
+      # grab the unvounched message file from the repository, so it can be used by the bot
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: .github/issue-unvouched-message
+
+      # bot checks the issue; if unvounched then add a comment and close+lock the issue
+      - uses: gpui-ce/vouch/action/check-issue@d66fa29a64600490892131ad87597c30c91fcac4 # v1.5.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          auto-close: true
+          auto-lock: true
+          template-file: .github/issue-unvouched-message
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}

@@ -3,12 +3,13 @@ use super::{
     relative, theme,
 };
 
-pub(in crate::app) const FRAME_SLIDER_VISUAL_HEIGHT: f32 = 20.0;
+pub(in crate::app) const FRAME_SLIDER_VISUAL_HEIGHT: f32 = super::MIN_POINTER_TARGET;
 pub(in crate::app) const FRAME_SLIDER_TRACK_HEIGHT: f32 = 6.0;
-pub(in crate::app) const FRAME_SLIDER_TRACK_TOP: f32 = 7.0;
+pub(in crate::app) const FRAME_SLIDER_TRACK_TOP: f32 =
+    (FRAME_SLIDER_VISUAL_HEIGHT - FRAME_SLIDER_TRACK_HEIGHT) / 2.0;
 pub(in crate::app) const FRAME_SLIDER_TRACK_RADIUS: f32 = 1.5;
 pub(in crate::app) const FRAME_SLIDER_FILL_RADIUS: f32 = 1.0;
-pub(in crate::app) const FRAME_SLIDER_HANDLE_WIDTH: f32 = 20.0;
+pub(in crate::app) const FRAME_SLIDER_HANDLE_WIDTH: f32 = super::MIN_POINTER_TARGET;
 pub(in crate::app) const FRAME_SLIDER_HANDLE_HEIGHT: f32 = FRAME_SLIDER_VISUAL_HEIGHT;
 pub(in crate::app) const FRAME_SLIDER_HANDLE_TOP: f32 = 0.0;
 
@@ -24,6 +25,7 @@ pub(in crate::app) fn frame_slider(
     let value_percent = f64::from(clamped_fraction) * 100.0;
     let slider = div()
         .id(id)
+        .debug_selector(move || id.to_string())
         .relative()
         .h(theme::ui_rem(FRAME_SLIDER_VISUAL_HEIGHT))
         .w_full()

@@ -1,3 +1,4 @@
+use super::super::components::frame_handle_hit_region;
 use super::*;
 use crate::numeric::unit_f64_to_f32;
 
@@ -45,6 +46,7 @@ pub(in crate::app) fn preview_crop_overlay(
             DragHandle::NorthWest,
             x,
             y,
+            (width / 2.0, height / 2.0),
             palette,
             cx,
         ))
@@ -52,6 +54,7 @@ pub(in crate::app) fn preview_crop_overlay(
             DragHandle::North,
             x + width / 2.0,
             y,
+            (width / 2.0, height / 2.0),
             palette,
             cx,
         ))
@@ -59,6 +62,7 @@ pub(in crate::app) fn preview_crop_overlay(
             DragHandle::NorthEast,
             right,
             y,
+            (width / 2.0, height / 2.0),
             palette,
             cx,
         ))
@@ -66,6 +70,7 @@ pub(in crate::app) fn preview_crop_overlay(
             DragHandle::East,
             right,
             y + height / 2.0,
+            (width / 2.0, height / 2.0),
             palette,
             cx,
         ))
@@ -73,6 +78,7 @@ pub(in crate::app) fn preview_crop_overlay(
             DragHandle::SouthEast,
             right,
             bottom,
+            (width / 2.0, height / 2.0),
             palette,
             cx,
         ))
@@ -80,6 +86,7 @@ pub(in crate::app) fn preview_crop_overlay(
             DragHandle::South,
             x + width / 2.0,
             bottom,
+            (width / 2.0, height / 2.0),
             palette,
             cx,
         ))
@@ -87,6 +94,7 @@ pub(in crate::app) fn preview_crop_overlay(
             DragHandle::SouthWest,
             x,
             bottom,
+            (width / 2.0, height / 2.0),
             palette,
             cx,
         ))
@@ -94,6 +102,7 @@ pub(in crate::app) fn preview_crop_overlay(
             DragHandle::West,
             x,
             y + height / 2.0,
+            (width / 2.0, height / 2.0),
             palette,
             cx,
         ))
@@ -203,25 +212,29 @@ pub(in crate::app) fn preview_crop_handle(
     handle: DragHandle,
     x: f32,
     y: f32,
+    spacing: (f32, f32),
     palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
-) -> gpui::Stateful<gpui::Div> {
+) -> gpui::Div {
     let handle_element = crop_handle_cursor(
         div()
             .id(format!("preview-crop-handle-{}", crop_handle_id(handle)))
-            .absolute()
-            .left(relative(x.clamp(0.0, 1.0)))
-            .top(relative(y.clamp(0.0, 1.0)))
-            .ml(theme::ui_rem(-(CROP_HANDLE_SIZE / 2.0)))
-            .mt(theme::ui_rem(-(CROP_HANDLE_SIZE / 2.0)))
-            .w(theme::ui_rem(CROP_HANDLE_SIZE))
-            .h(theme::ui_rem(CROP_HANDLE_SIZE))
-            .rounded_full()
-            .border_1()
-            // Media overlay: the handle outline contrasts with arbitrary source pixels.
-            .border_color(hsla(0.0, 0.0, 0.0, 0.45))
-            .bg(color(preview_handle_color(palette)))
-            .shadow(card_surface_shadows(palette)),
+            .debug_selector(move || format!("preview-crop-handle-{}", crop_handle_id(handle)))
+            .flex()
+            .items_center()
+            .justify_center()
+            .child(
+                div()
+                    .flex_shrink_0()
+                    .w(theme::ui_rem(CROP_HANDLE_SIZE))
+                    .h(theme::ui_rem(CROP_HANDLE_SIZE))
+                    .rounded_full()
+                    .border_1()
+                    // Contrast against arbitrary source pixels.
+                    .border_color(hsla(0.0, 0.0, 0.0, 0.45))
+                    .bg(color(preview_handle_color(palette)))
+                    .shadow(card_surface_shadows(palette)),
+            ),
         handle,
     )
     .on_drag(
@@ -229,39 +242,41 @@ pub(in crate::app) fn preview_crop_handle(
         |_drag, _position, _window, cx| cx.new(|_| PreviewTimelineDragPreview),
     );
 
-    apply_accessible_button(handle_element, crop_handle_label(handle), true, palette)
-        .aria_description(crop_keyboard_description())
-        .on_key_down(
-            cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
-                let key = event.keystroke.key.as_str();
-                let changed = match key {
-                    "enter" => {
-                        let changed = root.apply_selected_crop();
-                        root.focus_registered_control("preview-tool-crop", window, cx);
-                        changed
+    let handle_element =
+        apply_accessible_button(handle_element, crop_handle_label(handle), true, palette)
+            .aria_description(crop_keyboard_description())
+            .on_key_down(
+                cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+                    let key = event.keystroke.key.as_str();
+                    let changed = match key {
+                        "enter" => {
+                            let changed = root.apply_selected_crop();
+                            root.focus_registered_control("preview-tool-crop", window, cx);
+                            changed
+                        }
+                        "escape" => {
+                            let changed = root.toggle_selected_crop_mode();
+                            root.focus_registered_control("preview-tool-crop", window, cx);
+                            changed
+                        }
+                        "delete" | "backspace" => root.reset_preview_crop_selection(),
+                        _ => root.adjust_preview_crop_from_keyboard_with_step(
+                            handle,
+                            key,
+                            event.keystroke.modifiers.shift,
+                        ),
+                    };
+                    if changed {
+                        cx.notify();
                     }
-                    "escape" => {
-                        let changed = root.toggle_selected_crop_mode();
-                        root.focus_registered_control("preview-tool-crop", window, cx);
-                        changed
+                    if crop_keyboard_key_is_handled(handle, key)
+                        || matches!(key, "enter" | "escape" | "delete" | "backspace")
+                    {
+                        cx.stop_propagation();
                     }
-                    "delete" | "backspace" => root.reset_preview_crop_selection(),
-                    _ => root.adjust_preview_crop_from_keyboard_with_step(
-                        handle,
-                        key,
-                        event.keystroke.modifiers.shift,
-                    ),
-                };
-                if changed {
-                    cx.notify();
-                }
-                if crop_keyboard_key_is_handled(handle, key)
-                    || matches!(key, "enter" | "escape" | "delete" | "backspace")
-                {
-                    cx.stop_propagation();
-                }
-            }),
-        )
+                }),
+            );
+    frame_handle_hit_region(x, y, spacing.0, spacing.1, handle_element)
 }
 
 pub(in crate::app) fn crop_handle_cursor(
@@ -485,8 +500,8 @@ fn compact_text_button_variant_inner(
             this.shadow(button_highlight_shadows(palette))
         })
         .when(enabled, |this| {
-            this.hover(gpui::Styled::cursor_pointer)
-                .active(move |style| {
+            this.hover_style(gpui::Styled::cursor_pointer)
+                .active_style(move |style| {
                     style
                         .bg(color(colors.active_background))
                         .text_color(color(colors.hover_foreground))

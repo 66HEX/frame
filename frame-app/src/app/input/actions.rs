@@ -596,7 +596,10 @@ impl FrameRoot {
         let Some(line) = runtime.last_layout.as_ref() else {
             return text.len();
         };
-        clamp_text_offset(&text, line.closest_index_for_x(local_x + runtime.scroll_x))
+        clamp_text_offset(
+            &text,
+            text_line_closest_index_for_x(line, local_x + runtime.scroll_x),
+        )
     }
 
     pub(in crate::app) fn text_input_mouse_down(

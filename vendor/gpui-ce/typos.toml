@@ -12,6 +12,7 @@ extend-exclude = [
 
   # macOS APIs
   "crates/gpui/src/platform/mac/dispatcher.rs",
+
 ]
 
 [default]
@@ -20,10 +21,17 @@ extend-ignore-re = [
   "Big Sur",
   # Stripped version of reserved keyword `type`
   "typ",
+  "\\\\u\\{[0-9A-Fa-f]+\\}",
+  # OpenType width axis references and the Noto Sans variable font filename.
+  "`wdth`",
+  "'wdth'",
+  'NotoSans\[wdth[,-]wght\]\.subset\.ttf',
 ]
 check-filename = true
 
 [default.extend-words]
+# Test key prefix used in sum_tree tests (keys starting with "ba")
+ba = "ba"
 # Screen capture library (zed-scap)
 scap = "scap"
 # Win32 FORMATETC struct field: Pointer to DVTARGETDEVICE
@@ -37,3 +45,11 @@ ags = "ags"
 TME = "TME"
 # Level of Detail (DirectX/Graphics)
 LOD = "LOD"
+# Correct Italian singular of "command" in UI locales
+comando = "comando"
+# Deliberately misspelled manifest keys / error message test cases
+capabilites = "capabilites"
+backgrund = "backgrund"
+wtach = "wtach"
+netwrok = "netwrok"
+workspce = "workspce"

@@ -72,6 +72,18 @@ pub fn derive_app_context(input: TokenStream) -> TokenStream {
                 self.#app_variable.read_entity(handle, read)
             }
 
+            fn notify(&mut self, entity_id: gpui::EntityId) {
+                self.#app_variable.notify(entity_id);
+            }
+
+            fn emit<EntityType, EventType>(&mut self, entity: &gpui::Entity<EntityType>, event: EventType)
+            where
+                EntityType: gpui::EventEmitter<EventType>,
+                EventType: 'static,
+            {
+                self.#app_variable.emit(entity, event)
+            }
+
             fn update_window<T, F>(&mut self, window: gpui::AnyWindowHandle, f: F) -> gpui::Result<T>
             where
                 F: FnOnce(gpui::AnyView, &mut gpui::Window, &mut gpui::App) -> T,
@@ -111,6 +123,18 @@ pub fn derive_app_context(input: TokenStream) -> TokenStream {
                 G: gpui::Global,
             {
                 self.#app_variable.read_global(callback)
+            }
+
+            fn insert_global_entity<T: 'static>(&mut self, entity: gpui::Entity<T>) {
+                self.#app_variable.insert_global_entity(entity)
+            }
+
+            fn remove_global_entity<T: 'static>(&mut self, entity: &gpui::Entity<T>) {
+                self.#app_variable.remove_global_entity(entity)
+            }
+
+            fn global_entities<T: 'static>(&self) -> impl Iterator<Item = gpui::Entity<T>> {
+                self.#app_variable.global_entities()
             }
         }
     };

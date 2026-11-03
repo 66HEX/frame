@@ -3,14 +3,31 @@
 **/cargo-target
 *.wasm
 
-# IDE and editor
-.DS_Store
-.idea
-.vscode
+# IDEs & Editors
+.idea/       # JetBrains (CLion, IntelliJ, etc.)
+.vscode/
+.trae/
+.zed/
+*.swp        # Vim swap files
+*.swo        # Vim swap overflow files
 *.xcodeproj
 *.xcworkspace
 DerivedData/
 xcuserdata/
+
+# AI agents
+.claude/
+.cursor/
+.aider/
+.copilot/
+.codex/
+.gemini/
+.agents/
+
+# MacOS file system clutter.
+._*
+.DS_STORE
+.DS_Store
 
 # Python
 **/venv

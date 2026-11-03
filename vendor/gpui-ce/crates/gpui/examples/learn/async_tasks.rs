@@ -362,7 +362,7 @@ impl Render for AsyncTasksExample {
                                     .text_color(colors.text)
                                     .cursor_pointer()
                                     .bg(bg)
-                                    .hover(move |style| style.bg(bg_hover))
+                                    .hover_style(move |style| style.bg(bg_hover))
                                     .child(if is_running { "Stop" } else { "Start Counter" })
                                     .on_click(cx.listener(|this, _, _, cx| {
                                         this.cancellable_demo.update(cx, |demo, cx| {
@@ -497,8 +497,8 @@ fn button(
         .when(!disabled, |el| {
             el.bg(bg)
                 .cursor_pointer()
-                .hover(move |style| style.bg(bg_hover))
-                .active(move |style| style.bg(bg_active))
+                .hover_style(move |style| style.bg(bg_hover))
+                .active_style(move |style| style.bg(bg_active))
         })
         .child(label)
 }
@@ -521,7 +521,7 @@ fn secondary_button(
         .text_color(text)
         .bg(bg)
         .cursor_pointer()
-        .hover(move |style| style.bg(bg_hover))
+        .hover_style(move |style| style.bg(bg_hover))
         .child(label)
 }
 
@@ -549,10 +549,7 @@ fn main() {
     gpui_platform::application().run(|cx: &mut App| {
         let bounds = Bounds::centered(None, size(px(550.), px(850.)), cx);
         cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                ..Default::default()
-            },
+            WindowOptions::new().window_bounds(Some(WindowBounds::Windowed(bounds))),
             |_, cx| cx.new(|cx| AsyncTasksExample::new(cx)),
         )
         .expect("Failed to open window");

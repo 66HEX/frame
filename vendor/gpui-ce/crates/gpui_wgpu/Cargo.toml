@@ -1,6 +1,7 @@
 [package]
-name = "gpui_wgpu"
+name = "gpui_ce_wgpu"
 version = "0.1.0"
+description.workspace = true
 edition.workspace = true
 publish.workspace = true
 license = "Apache-2.0"
@@ -13,42 +14,78 @@ path = "src/gpui_wgpu.rs"
 
 [features]
 default = []
-font-kit = ["dep:font-kit"]
+test-support = ["gpui/test-support", "dep:image"]
+custom-gpu = ["gpui/custom-gpu"]
+wgpu-surfaces = ["gpui/wgpu-surfaces"]
 
 [dependencies]
-gpui.workspace = true
+gpui = { path = "../gpui", version = "0.2.2", package = "gpui-ce", default-features = false }
+gpui_render.workspace = true
 anyhow.workspace = true
-bytemuck = "1"
 collections.workspace = true
-cosmic-text = "0.19.0"
-etagere = "0.2"
-itertools.workspace = true
+etagere.workspace = true
+image = { workspace = true, optional = true }
 log.workspace = true
 parking_lot.workspace = true
 profiling.workspace = true
-raw-window-handle = "0.6"
+raw-window-handle.workspace = true
 smallvec.workspace = true
-swash = "0.2.6"
-unicode-segmentation.workspace = true
 gpui_util.workspace = true
 wgpu.workspace = true
-
-# Optional: only needed on platforms with multiple font sources (e.g. Linux)
-# WARNING: If you change this, you must also publish a new version of zed-font-kit to crates.io
-font-kit = { git = "https://github.com/zed-industries/font-kit", rev = "94b0f28166665e8fd2f53ff6d268a14955c82269", package = "zed-font-kit", version = "0.14.1-zed", optional = true }
+wgsl-rs.workspace = true
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 pollster.workspace = true
 
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation.workspace = true
+core-video.workspace = true
+metal.workspace = true
+objc2.workspace = true
+objc2-metal = "0.3"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { workspace = true, features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Direct3D12",
+] }
+windows-061 = { workspace = true, features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Direct3D",
+  "Win32_Graphics_Direct3D11",
+  "Win32_Graphics_Dxgi",
+  "Win32_Graphics_Dxgi_Common",
+  "Win32_Security",
+] }
+
 [target.'cfg(target_family = "wasm")'.dependencies]
+wgpu = { workspace = true, features = ["webgl"] }
 wasm-bindgen.workspace = true
-wasm-bindgen-futures = "0.4"
+wasm-bindgen-futures.workspace = true
 web-sys = { version = "0.3", features = ["HtmlCanvasElement"] }
-js-sys = "0.3"
+js-sys.workspace = true
 
 [dev-dependencies]
+bytemuck = { version = "1", features = ["derive"] }
 criterion.workspace = true
+env_logger.workspace = true
+gpui_platform = { workspace = true, features = ["wayland", "x11", "test-support"] }
+naga = { version = "29.0.4", features = ["wgsl-in"] }
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+wayland-backend = { version = "0.3.15", features = [
+  "client_system",
+  "dlopen",
+  "rwh_06",
+] }
+wayland-client = "0.31.11"
+wayland-protocols = { version = "0.32.9", features = ["client"] }
+
+[[example]]
+name = "custom_gpu"
+required-features = ["custom-gpu"]
 
 [[bench]]
-name = "layout_line"
+name = "renderer"
 harness = false
+required-features = ["test-support"]

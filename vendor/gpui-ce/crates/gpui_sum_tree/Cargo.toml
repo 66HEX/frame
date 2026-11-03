@@ -1,0 +1,29 @@
+[package]
+name = "gpui_ce_sum_tree"
+version = "0.2.2"
+edition = "2024"
+license = "Apache-2.0"
+description = "Copy-on-write B+ tree with monoidal summaries for gpui-ce (vendored from Zed)."
+publish = true
+
+[lib]
+name = "sum_tree"
+path = "src/sum_tree.rs"
+doctest = false
+
+[dependencies]
+heapless = "0.9.2"
+rayon = "1.11.0"
+log = "0.4.29"
+tracing = { version = "0.1.43", features = ["attributes"] }
+proptest = { version = "1.0", features = ["attr-macro"], optional = true }
+
+[dev-dependencies]
+rand = "0.9"
+proptest = { version = "1.0", features = ["attr-macro"] }
+
+[features]
+test-support = ["proptest"]
+
+[package.metadata.cargo-shear]
+ignored = ["tracing"]

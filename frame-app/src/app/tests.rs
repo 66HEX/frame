@@ -3590,6 +3590,7 @@ mod frame_window_options {
         // AppKit must not drag the entire native titlebar over our interactive controls.
         // Other platforms still need their normal native window movement enabled.
         assert_eq!(options.is_movable, !cfg!(target_os = "macos"));
+        assert!(options.app_owns_titlebar_drag);
         assert_eq!(
             titlebar.traffic_light_position,
             Some(point(

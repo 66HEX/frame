@@ -10,10 +10,7 @@ use crate::app::components::{
     frame_select_options_list, frame_select_popover, frame_select_target_index,
     frame_select_trigger_with_focus, frame_vertical_scrollbar,
 };
-use crate::app::motion::{
-    INTERACTION_MOTION_DURATION, motion_is_hidden, motion_target, set_motion_target,
-    subtitle_popover_slide_offset,
-};
+use crate::app::motion::{motion_is_hidden, popover_slide_offset, surface_motion};
 
 impl FrameRoot {
     pub(in crate::app) fn set_crop_custom_mode(&mut self, ratio: bool) {
@@ -343,18 +340,10 @@ fn crop_select(
     let selected_index = options.iter().position(|(value, _)| *value == selected);
     let display = selected_index.map_or(selected, |index| options[index].1);
     let open = props.popover == Some(kind);
-    let transition = window
-        .use_keyed_transition(
-            format!("{id}-popover-motion"),
-            cx,
-            INTERACTION_MOTION_DURATION,
-            |_, _| 0.0_f32,
-        )
-        .with_easing(gpui::ease_in_out);
-    set_motion_target(&transition, motion_target(open), cx);
-    let progress = *transition.evaluate(window, cx);
+    let progress = surface_motion(format!("{id}-popover-motion"), open, window, cx);
     let key_focuses = option_focuses.to_vec();
     let trigger_focus = focus.clone();
+    let pointer_focus = focus.clone();
     let trigger = frame_select_trigger_with_focus(
         id,
         label,
@@ -369,7 +358,8 @@ fn crop_select(
     .debug_selector(|| id.to_string())
     .on_mouse_down(
         MouseButton::Left,
-        cx.listener(move |root, _, _, cx| {
+        cx.listener(move |root, _, window, cx| {
+            pointer_focus.focus(window, cx);
             root.preview_ui.crop_options.popover = if open { None } else { Some(kind) };
             if !open {
                 root.preview_ui
@@ -424,7 +414,11 @@ fn crop_select(
         return field;
     }
     let count = options.len();
-    let mut list = frame_select_options_list(list_id, props.scroll);
+    let mut list = frame_select_options_list(
+        list_id,
+        props.scroll,
+        frame_select_content_height(count) > FRAME_SELECT_MAX_HEIGHT,
+    );
     for (index, (value, label)) in options.into_iter().enumerate() {
         let key_focuses = option_focuses.to_vec();
         let key_scroll = props.scroll.clone();
@@ -463,7 +457,7 @@ fn crop_select(
                 }),
             )
             .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
-                if !open {
+                if !open || root.preview_ui.crop_options.popover != Some(kind) {
                     return;
                 }
                 match kind {
@@ -490,7 +484,7 @@ fn crop_select(
     }
     let mut popover = frame_select_popover(
         panel_id,
-        crate::SETTINGS_CONTROL_HEIGHT + 6.0 + subtitle_popover_slide_offset(progress),
+        crate::SETTINGS_CONTROL_HEIGHT + 6.0 + popover_slide_offset(progress),
         progress,
         list,
         state.palette,
@@ -521,7 +515,7 @@ fn crop_select(
             state.palette,
         ));
     }
-    field = field.child(gpui::deferred(popover).with_priority(20));
+    field = field.child(gpui::deferred(popover).priority(20));
     field
 }
 
@@ -536,9 +530,9 @@ mod tests {
     use gpui::{Entity, Modifiers, TestAppContext, VisualTestContext, px, size};
 
     fn draw(cx: &mut VisualTestContext) {
-        cx.update(|window, cx| window.draw(cx).clear());
+        cx.update(|window, cx| window.draw(cx).clear(cx));
         cx.run_until_parked();
-        cx.update(|window, cx| window.draw(cx).clear());
+        cx.update(|window, cx| window.draw(cx).clear(cx));
     }
 
     fn click(cx: &mut VisualTestContext, id: &'static str) {
@@ -562,7 +556,7 @@ mod tests {
                 .map(|request| request.key);
             root
         });
-        cx.update(|window, _| window.activate_window());
+        cx.update(|window, _| window.activate());
         cx.simulate_resize(size(px(1440.0), px(900.0)));
         draw(cx);
         (root, cx)
@@ -584,6 +578,46 @@ mod tests {
         );
         assert!(root.toggle_selected_crop_mode());
         root
+    }
+
+    #[test]
+    fn loaded_preview_keeps_timeline_and_queue_inside_window() {
+        let mut app = TestAppContext::single();
+        let (root, cx) = crop_window(&mut app);
+        cx.simulate_resize(size(px(1200.0), px(800.0)));
+        root.update(cx, |root, cx| {
+            root.apply_visual_fixture(Some(crate::VisualFixture::PreviewCropCustom));
+            let metadata = root.selected_source_metadata_entry();
+            root.preview_ui.pending_runtime_key = root
+                .selected_preview_runtime_request(&metadata)
+                .map(|request| request.key);
+            let frame = crate::preview_engine::PreviewFrame::bgra(
+                1280,
+                720,
+                1280 * 4,
+                0,
+                vec![255; 1280 * 720 * 4],
+            )
+            .unwrap();
+            root.preview_ui.render_image =
+                Some(crate::preview_engine::render_image_from_frame(&frame).unwrap());
+            cx.notify();
+        });
+        draw(cx);
+        let viewport = cx.debug_bounds("preview-viewport").unwrap();
+        let queue = cx.debug_bounds("file-list-body").unwrap();
+        assert!(
+            viewport.bottom() < queue.top(),
+            "preview={viewport:?}, queue={queue:?}"
+        );
+        assert!(
+            queue.bottom() <= px(800.0),
+            "queue must remain visible: {queue:?}"
+        );
+        assert!(
+            viewport.size.height < px(500.0),
+            "preview must retain its workspace row share: {viewport:?}"
+        );
     }
 
     #[test]
@@ -627,6 +661,7 @@ mod tests {
         click(cx, "preview-crop-ratio");
         cx.simulate_keystrokes("end");
         draw(cx);
+        cx.simulate_keystrokes("enter");
         cx.simulate_event(gpui::KeyUpEvent {
             keystroke: gpui::Keystroke::parse("enter").unwrap(),
         });

@@ -82,7 +82,7 @@ fn use_state_counter(colors: &Colors, window: &mut Window, cx: &mut App) -> impl
                         .bg(error)
                         .text_color(colors.selected_text)
                         .cursor_pointer()
-                        .hover(move |style| style.bg(error_hover))
+                        .hover_style(move |style| style.bg(error_hover))
                         .child("−")
                         .on_click({
                             let state = state.clone();
@@ -103,7 +103,7 @@ fn use_state_counter(colors: &Colors, window: &mut Window, cx: &mut App) -> impl
                         .bg(success)
                         .text_color(colors.selected_text)
                         .cursor_pointer()
-                        .hover(move |style| style.bg(success_hover))
+                        .hover_style(move |style| style.bg(success_hover))
                         .child("+")
                         .on_click(move |_, _, cx| {
                             state.update(cx, |state, cx| {
@@ -203,7 +203,7 @@ impl RenderOnce for RenderOnceCounter {
                             .bg(error)
                             .text_color(colors.selected_text)
                             .cursor_pointer()
-                            .hover(move |style| style.bg(error_hover))
+                            .hover_style(move |style| style.bg(error_hover))
                             .child("−")
                             .when_some(self.on_decrement, |element, callback| {
                                 element.on_click(move |_, window, cx| callback(window, cx))
@@ -218,7 +218,7 @@ impl RenderOnce for RenderOnceCounter {
                             .bg(success)
                             .text_color(colors.selected_text)
                             .cursor_pointer()
-                            .hover(move |style| style.bg(success_hover))
+                            .hover_style(move |style| style.bg(success_hover))
                             .child("+")
                             .when_some(self.on_increment, |element, callback| {
                                 element.on_click(move |_, window, cx| callback(window, cx))
@@ -308,7 +308,7 @@ impl Render for RenderCounter {
                             .bg(error)
                             .text_color(colors.selected_text)
                             .cursor_pointer()
-                            .hover(move |style| style.bg(error_hover))
+                            .hover_style(move |style| style.bg(error_hover))
                             .child("−")
                             .on_click(cx.listener(|this, _, window, cx| {
                                 this.decrement(window, cx);
@@ -323,7 +323,7 @@ impl Render for RenderCounter {
                             .bg(success)
                             .text_color(colors.selected_text)
                             .cursor_pointer()
-                            .hover(move |style| style.bg(success_hover))
+                            .hover_style(move |style| style.bg(success_hover))
                             .child("+")
                             .on_click(cx.listener(|this, _, window, cx| {
                                 this.increment(window, cx);
@@ -422,10 +422,7 @@ fn main() {
     gpui_platform::application().run(|cx: &mut App| {
         let bounds = Bounds::centered(None, size(px(700.), px(400.)), cx);
         cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                ..Default::default()
-            },
+            WindowOptions::new().window_bounds(Some(WindowBounds::Windowed(bounds))),
             |_, cx| cx.new(|cx| CreatingComponentsExample::new(cx)),
         )
         .expect("Failed to open window");

@@ -13,9 +13,11 @@ mod example_prelude;
 use example_prelude::init_example;
 use gpui::colors::Colors;
 use gpui::{
-    App, Bounds, ClickEvent, Context, Entity, Half, Hsla, IntoElement, MouseButton, MouseMoveEvent,
-    Pixels, Point, Render, Window, WindowBounds, WindowOptions, div, prelude::*, px, rgb, size,
+    App, Bounds, ClickEvent, ColorExt, Context, Entity, Half, Hsla, IntoElement, MouseButton,
+    MouseMoveEvent, Pixels, Point, Render, Window, WindowBounds, WindowOptions, div, prelude::*,
+    px, rgb, size,
 };
+use palette::IntoColor;
 
 // ============================================================================
 // Click Events Demo
@@ -74,8 +76,8 @@ impl Render for ClickDemo {
                     .text_color(colors.selected_text)
                     .text_sm()
                     .cursor_pointer()
-                    .hover(|style| style.bg(colors.selected))
-                    .active(|style| style.bg(colors.selected))
+                    .hover_style(|style| style.bg(colors.selected))
+                    .active_style(|style| style.bg(colors.selected))
                     .child("Click Me!")
                     // on_click receives a ClickEvent with click_count() method
                     .on_click(cx.listener(|this, event: &ClickEvent, _window, cx| {
@@ -423,7 +425,7 @@ impl Render for DragDropDemo {
                     .flex()
                     .gap_2()
                     .children(item_colors.into_iter().enumerate().map(|(index, color)| {
-                        let drag_data = DragData::new(index, color.into());
+                        let drag_data = DragData::new(index, color.into_color());
 
                         div()
                             .id(("drag-item", index))
@@ -435,8 +437,8 @@ impl Render for DragDropDemo {
                             .text_color(color)
                             .text_xs()
                             .cursor_grab()
-                            .hover(move |style| {
-                                let c: Hsla = color.into();
+                            .hover_style(move |style| {
+                                let c: Hsla = color.into_color();
                                 style.bg(c.opacity(0.1))
                             })
                             .child(format!("Item {}", index + 1))
@@ -457,7 +459,7 @@ impl Render for DragDropDemo {
                     .border_color(
                         self.dropped_item
                             .map(|d| d.color)
-                            .unwrap_or_else(|| colors.border.into()),
+                            .unwrap_or_else(|| colors.border.into_color()),
                     )
                     .when_some(self.dropped_item, |el, data| el.bg(data.color.opacity(0.2)))
                     .flex()
@@ -554,10 +556,7 @@ fn main() {
     gpui_platform::application().run(|cx: &mut App| {
         let bounds = Bounds::centered(None, size(px(700.), px(650.)), cx);
         cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                ..Default::default()
-            },
+            WindowOptions::new().window_bounds(Some(WindowBounds::Windowed(bounds))),
             |_, cx| cx.new(|cx| InteractiveElementsExample::new(cx)),
         )
         .expect("Failed to open window");

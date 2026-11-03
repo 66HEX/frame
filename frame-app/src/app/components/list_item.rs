@@ -50,7 +50,9 @@ pub(in crate::app) fn frame_list_item(
             emphasis_progress,
         ))
         .opacity(if enabled { 1.0 } else { 0.5 })
-        .when(enabled, |this| this.hover(gpui::Styled::cursor_pointer))
+        .when(enabled, |this| {
+            this.hover_style(gpui::Styled::cursor_pointer)
+        })
         .when(!enabled, gpui::Styled::cursor_not_allowed);
 
     let item = apply_button_motion(item, motion, enabled);
@@ -177,7 +179,9 @@ pub(in crate::app) fn frame_track_list_item(
         .text_color(foreground)
         .opacity(opacity)
         .shadow(button_highlight_shadows(palette))
-        .when(enabled, |this| this.hover(gpui::Styled::cursor_pointer))
+        .when(enabled, |this| {
+            this.hover_style(gpui::Styled::cursor_pointer)
+        })
         .when(!enabled, gpui::Styled::cursor_not_allowed)
         .child(label)
         .child(frame_selection_dot(selected_progress, palette));

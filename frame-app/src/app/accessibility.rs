@@ -9,6 +9,47 @@ const FOCUS_RING_WIDTH: f32 = 3.0;
 const FOCUS_RING_ALPHA: f32 = 0.55;
 pub(in crate::app) const APP_ROOT_FOCUS_ID: &str = "app-root";
 
+/// One tab stop per rail; selection, pointer focus and arrow-key focus agree.
+pub(in crate::app) struct TabFocusGroup {
+    active: String,
+    handles: HashMap<String, FocusHandle>,
+}
+
+impl TabFocusGroup {
+    pub(in crate::app) fn render(
+        id: &'static str,
+        active: String,
+        tabs: impl IntoIterator<Item = String>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Self {
+        let state = window.use_keyed_state(id, cx, |_, _| HashMap::<String, FocusHandle>::new());
+        let handles = state.update(cx, |handles, cx| {
+            let mut next = HashMap::new();
+            for id in tabs {
+                let focus = handles.remove(&id).unwrap_or_else(|| cx.focus_handle());
+                next.insert(id.clone(), focus.tab_stop(id == active));
+            }
+            if handles.values().any(|handle| handle.is_focused(window))
+                && let Some(focus) = next.get(&active)
+            {
+                focus.focus(window, cx);
+            }
+            *handles = next;
+            handles.clone()
+        });
+        Self { active, handles }
+    }
+
+    pub(in crate::app) fn selected(&self, id: &str) -> bool {
+        self.active == id
+    }
+
+    pub(in crate::app) fn handle(&self, id: &str) -> FocusHandle {
+        self.handles[id].clone()
+    }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(in crate::app) enum FrameFocusKey {
     Control(String),
@@ -60,7 +101,7 @@ impl FrameFocusRegistry {
             if let Some(fallback) = fallback {
                 fallback.focus(window, cx);
             } else {
-                window.blur();
+                window.blur(cx);
             }
         }
     }
@@ -132,7 +173,7 @@ pub(in crate::app) fn focus_visible_ring(
     palette: &'static theme::ThemePalette,
 ) -> StyleRefinement {
     style
-        .ring_width(px(FOCUS_RING_WIDTH))
+        .ring(px(FOCUS_RING_WIDTH))
         .ring_color(color(palette.accent.with_alpha(FOCUS_RING_ALPHA)))
 }
 
@@ -227,7 +268,7 @@ pub(in crate::app) fn apply_accessible_button(
         element
             .focusable()
             .tab_stop(true)
-            .focus_visible(move |style| focus_visible_ring(style, palette))
+            .focus_visible_style(move |style| focus_visible_ring(style, palette))
     } else {
         element.tab_stop(false).aria_disabled(true)
     }
@@ -247,7 +288,7 @@ pub(in crate::app) fn apply_accessible_button_with_focus(
     if enabled {
         element
             .tab_stop(true)
-            .focus_visible(move |style| focus_visible_ring(style, palette))
+            .focus_visible_style(move |style| focus_visible_ring(style, palette))
     } else {
         element.tab_stop(false).aria_disabled(true)
     }
@@ -284,7 +325,7 @@ pub(in crate::app) fn apply_accessible_checkbox(
         element
             .focusable()
             .tab_stop(true)
-            .focus_visible(move |style| focus_visible_ring(style, palette))
+            .focus_visible_style(move |style| focus_visible_ring(style, palette))
     } else {
         element.tab_stop(false).aria_disabled(true)
     }
@@ -312,7 +353,7 @@ pub(in crate::app) fn apply_accessible_checkbox_with_focus(
     if enabled {
         element
             .tab_stop(true)
-            .focus_visible(move |style| focus_visible_ring(style, palette))
+            .focus_visible_style(move |style| focus_visible_ring(style, palette))
     } else {
         element.tab_stop(false).aria_disabled(true)
     }
@@ -333,7 +374,7 @@ pub(in crate::app) fn apply_accessible_select_trigger(
         element
             .focusable()
             .tab_stop(true)
-            .focus_visible(move |style| focus_visible_ring(style, palette))
+            .focus_visible_style(move |style| focus_visible_ring(style, palette))
     } else {
         element.tab_stop(false).aria_disabled(true)
     }
@@ -355,7 +396,7 @@ pub(in crate::app) fn apply_accessible_select_trigger_with_focus(
     if enabled {
         element
             .tab_stop(true)
-            .focus_visible(move |style| focus_visible_ring(style, palette))
+            .focus_visible_style(move |style| focus_visible_ring(style, palette))
     } else {
         element.tab_stop(false).aria_disabled(true)
     }
@@ -376,7 +417,7 @@ pub(in crate::app) fn apply_accessible_select_option(
         element
             .focusable()
             .tab_stop(true)
-            .focus_visible(move |style| focus_visible_ring(style, palette))
+            .focus_visible_style(move |style| focus_visible_ring(style, palette))
     } else {
         element.tab_stop(false).aria_disabled(true)
     }
@@ -398,7 +439,7 @@ pub(in crate::app) fn apply_accessible_select_option_with_focus(
     if enabled {
         element
             .tab_stop(true)
-            .focus_visible(move |style| focus_visible_ring(style, palette))
+            .focus_visible_style(move |style| focus_visible_ring(style, palette))
     } else {
         element.tab_stop(false).aria_disabled(true)
     }
@@ -425,12 +466,12 @@ pub(in crate::app) fn apply_accessible_slider(
         .aria_numeric_value(value)
         .aria_min_numeric_value(min)
         .aria_max_numeric_value(max)
-        .aria_value(value_text);
+        .aria_value(value_text.into());
     if enabled {
         element
             .focusable()
             .tab_stop(true)
-            .focus_visible(move |style| focus_visible_ring(style, palette))
+            .focus_visible_style(move |style| focus_visible_ring(style, palette))
     } else {
         element.tab_stop(false).aria_disabled(true)
     }
@@ -458,12 +499,12 @@ pub(in crate::app) fn apply_accessible_slider_with_focus(
         .aria_numeric_value(value)
         .aria_min_numeric_value(min)
         .aria_max_numeric_value(max)
-        .aria_value(value_text)
+        .aria_value(value_text.into())
         .track_focus(focus);
     if enabled {
         element
             .tab_stop(true)
-            .focus_visible(move |style| focus_visible_ring(style, palette))
+            .focus_visible_style(move |style| focus_visible_ring(style, palette))
     } else {
         element.tab_stop(false).aria_disabled(true)
     }
@@ -479,12 +520,12 @@ pub(in crate::app) fn apply_accessible_text_input(
     let element = element
         .role(Role::TextInput)
         .aria_label(label)
-        .aria_value(value);
+        .aria_value(value.into());
     if enabled {
         element
             .focusable()
             .tab_stop(true)
-            .focus_visible(move |style| focus_visible_ring(style, palette))
+            .focus_visible_style(move |style| focus_visible_ring(style, palette))
     } else {
         element.tab_stop(false).aria_disabled(true)
     }
@@ -499,10 +540,12 @@ mod tests {
         let palette = theme::palette(crate::appearance::ColorTheme::Dark);
         let style = focus_visible_ring(StyleRefinement::default(), palette);
 
-        assert_eq!(style.ring_width, Some(px(FOCUS_RING_WIDTH).into()));
+        assert_eq!(style.ring.width, Some(px(FOCUS_RING_WIDTH)));
         assert_eq!(
-            style.ring_color,
-            Some(color(palette.accent.with_alpha(FOCUS_RING_ALPHA)).into())
+            style.ring.color,
+            Some(gpui::RingColor::Color(
+                color(palette.accent.with_alpha(FOCUS_RING_ALPHA)).into()
+            ))
         );
         assert!(style.box_shadow.is_none());
     }

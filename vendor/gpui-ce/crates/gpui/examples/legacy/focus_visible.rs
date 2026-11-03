@@ -1,7 +1,13 @@
+#![cfg_attr(target_family = "wasm", no_main)]
+
+#[path = "../example_support/fonts.rs"]
+mod example_support;
+
 use gpui::{
     App, Bounds, Context, Div, ElementId, FocusHandle, KeyBinding, SharedString, Stateful, Window,
     WindowBounds, WindowOptions, actions, div, prelude::*, px, size,
 };
+use gpui_platform::application;
 
 actions!(example, [Tab, TabPrev, Quit]);
 
@@ -16,15 +22,15 @@ impl Example {
         let items = vec![
             (
                 cx.focus_handle().tab_index(1).tab_stop(true),
-                "Button with .focus() - always shows border when focused",
+                "Button with .focus_style() - always shows border when focused",
             ),
             (
                 cx.focus_handle().tab_index(2).tab_stop(true),
-                "Button with .focus_visible() - only shows border with keyboard",
+                "Button with .focus_visible_style() - only shows border with keyboard",
             ),
             (
                 cx.focus_handle().tab_index(3).tab_stop(true),
-                "Button with both .focus() and .focus_visible()",
+                "Button with both .focus_style() and .focus_visible_style()",
             ),
         ];
 
@@ -70,7 +76,7 @@ impl Render for Example {
                 .text_color(gpui::white())
                 .rounded_md()
                 .cursor_pointer()
-                .hover(|style| style.bg(gpui::rgb(0x1d4ed8)))
+                .hover_style(|style| style.bg(gpui::rgb(0x1d4ed8)))
                 .child(label)
         }
 
@@ -116,12 +122,12 @@ impl Render for Example {
                                     .text_sm()
                                     .font_weight(gpui::FontWeight::BOLD)
                                     .text_color(gpui::rgb(0x374151))
-                                    .child("1. Regular .focus() - always visible:"),
+                                    .child("1. Regular .focus_style() - always visible:"),
                             )
                             .child(
                                 button_base("button1", self.items[0].1)
                                     .track_focus(&self.items[0].0)
-                                    .focus(|style| {
+                                    .focus_style(|style| {
                                         style.border_4().border_color(gpui::rgb(0xfbbf24))
                                     })
                                     .on_click(cx.listener(|this, _, _, cx| {
@@ -141,12 +147,12 @@ impl Render for Example {
                                     .text_sm()
                                     .font_weight(gpui::FontWeight::BOLD)
                                     .text_color(gpui::rgb(0x374151))
-                                    .child("2. New .focus_visible() - only keyboard:"),
+                                    .child("2. New .focus_visible_style() - only keyboard:"),
                             )
                             .child(
                                 button_base("button2", self.items[1].1)
                                     .track_focus(&self.items[1].0)
-                                    .focus_visible(|style| {
+                                    .focus_visible_style(|style| {
                                         style.border_4().border_color(gpui::rgb(0x10b981))
                                     })
                                     .on_click(cx.listener(|this, _, _, cx| {
@@ -167,16 +173,16 @@ impl Render for Example {
                                     .font_weight(gpui::FontWeight::BOLD)
                                     .text_color(gpui::rgb(0x374151))
                                     .child(
-                                        "3. Both .focus() (yellow) and .focus_visible() (green):",
+                                        "3. Both .focus_style() (yellow) and .focus_visible_style() (green):",
                                     ),
                             )
                             .child(
                                 button_base("button3", self.items[2].1)
                                     .track_focus(&self.items[2].0)
-                                    .focus(|style| {
+                                    .focus_style(|style| {
                                         style.border_4().border_color(gpui::rgb(0xfbbf24))
                                     })
-                                    .focus_visible(|style| {
+                                    .focus_visible_style(|style| {
                                         style.border_4().border_color(gpui::rgb(0x10b981))
                                     })
                                     .on_click(cx.listener(|this, _, _, cx| {
@@ -191,8 +197,11 @@ impl Render for Example {
     }
 }
 
-fn main() {
-    gpui_platform::application().run(|cx: &mut App| {
+fn run_example() {
+    application().run(|cx: &mut App| {
+        if !example_support::load_fonts(cx) {
+            return;
+        }
         cx.bind_keys([
             KeyBinding::new("tab", Tab, None),
             KeyBinding::new("shift-tab", TabPrev, None),
@@ -201,14 +210,24 @@ fn main() {
 
         let bounds = Bounds::centered(None, size(px(800.), px(600.0)), cx);
         cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                ..Default::default()
-            },
+            WindowOptions::new().window_bounds(Some(WindowBounds::Windowed(bounds))),
             |window, cx| cx.new(|cx| Example::new(window, cx)),
         )
         .unwrap();
 
         cx.activate(true);
     });
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn main() {
+    env_logger::init();
+    run_example();
+}
+
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen::prelude::wasm_bindgen(start)]
+pub fn start() {
+    gpui_platform::web_init();
+    run_example();
 }

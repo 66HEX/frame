@@ -25,12 +25,15 @@
         pkgs = nixpkgs.legacyPackages.${system};
         inherit (pkgs) lib;
 
-        toolchain = fenix.packages.${system}.latest.withComponents [
-          "cargo"
-          "rustc"
-          "rust-src"
-          "rustfmt"
-          "clippy"
+        toolchain = fenix.packages.${system}.combine [
+          (fenix.packages.${system}.latest.withComponents [
+            "cargo"
+            "rustc"
+            "rust-src"
+            "rustfmt"
+            "clippy"
+          ])
+          fenix.packages.${system}.targets.wasm32-unknown-unknown.latest.rust-std
         ];
 
         craneLib = (crane.mkLib pkgs).overrideToolchain toolchain;
@@ -105,18 +108,41 @@
         packages.default = gpui;
 
         devShells.default = pkgs.mkShell {
-          inputsFrom = [ gpui ];
+          # Provide rustup's cargo/rustc proxy (so `cargo +toolchain` works for
+          # the MSRV and WASM-atomics CI checks) plus all the native build deps.
           packages = [
-            toolchain
+            pkgs.rustup
             pkgs.cargo-machete
             pkgs.taplo
             pkgs.typos
             pkgs.just
-          ];
+            pkgs.nushell
+            pkgs.cmake
+            pkgs.pkg-config
+            pkgs.rustPlatform.bindgenHook
+            pkgs.fontconfig
+            pkgs.freetype
+            pkgs.openssl
+            pkgs.zlib
+          ] ++ lib.optionals pkgs.stdenv.isDarwin [
+            pkgs.apple-sdk_15
+            (pkgs.darwinMinVersionHook "11.0")
+          ] ++ lib.optionals pkgs.stdenv.isLinux linuxLibs;
 
           shellHook = ''
             export RUST_BACKTRACE=1
-            export RUST_SRC_PATH="${toolchain}/lib/rustlib/src/rust/library"
+            ${lib.optionalString pkgs.stdenv.isDarwin ''
+              # Use the real Xcode SDK (not the nix apple-sdk stub) so that
+              # `xcrun` can find the system Metal toolchain used by gpui_macos
+              # to compile its .metal shaders.
+              export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+              # The nix `apple-sdk`/xcbuild package installs a stub `xcrun`
+              # that doesn't know about the system Metal toolchain. Prefer the
+              # real /usr/bin/xcrun.
+              mkdir -p /tmp/gpui-ce-bin
+              ln -sf /usr/bin/xcrun /tmp/gpui-ce-bin/xcrun
+              export PATH="/tmp/gpui-ce-bin:$PATH"
+            ''}
             ${lib.optionalString pkgs.stdenv.isLinux ''
               export LD_LIBRARY_PATH="${lib.makeLibraryPath linuxLibs}:$LD_LIBRARY_PATH"
             ''}

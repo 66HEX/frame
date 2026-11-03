@@ -9,7 +9,7 @@ pub(in crate::app) const FRAME_COLOR_PICKER_SV_HEIGHT: f32 = 96.0;
 pub(in crate::app) const FRAME_COLOR_PICKER_HUE_HEIGHT: f32 = 10.0;
 pub(in crate::app) const FRAME_COLOR_PICKER_HANDLE_SIZE: f32 = 12.0;
 pub(in crate::app) const FRAME_COLOR_PICKER_HUE_HANDLE_WIDTH: f32 = 6.0;
-pub(in crate::app) const FRAME_COLOR_PICKER_HUE_VISUAL_HEIGHT: f32 = 18.0;
+pub(in crate::app) const FRAME_COLOR_PICKER_HUE_VISUAL_HEIGHT: f32 = super::MIN_POINTER_TARGET;
 
 pub(in crate::app) fn frame_color_picker_panel(
     top: f32,
@@ -114,7 +114,9 @@ pub(in crate::app) fn frame_color_picker_hue_track(
         .absolute()
         .left_0()
         .right_0()
-        .top(theme::ui_rem(4.0))
+        .top(theme::ui_rem(
+            (FRAME_COLOR_PICKER_HUE_VISUAL_HEIGHT - FRAME_COLOR_PICKER_HUE_HEIGHT) / 2.0,
+        ))
         .h(theme::ui_rem(FRAME_COLOR_PICKER_HUE_HEIGHT))
         .flex()
         .overflow_hidden()
@@ -139,7 +141,9 @@ pub(in crate::app) fn frame_color_picker_hue_handle(
     div()
         .absolute()
         .left(relative(unit_f64_to_f32(hue / 360.0)))
-        .top(theme::ui_rem(1.0))
+        .top(theme::ui_rem(
+            (FRAME_COLOR_PICKER_HUE_VISUAL_HEIGHT - 16.0) / 2.0,
+        ))
         .ml(theme::ui_rem(-(FRAME_COLOR_PICKER_HUE_HANDLE_WIDTH / 2.0)))
         .h(theme::ui_rem(16.0))
         .w(theme::ui_rem(FRAME_COLOR_PICKER_HUE_HANDLE_WIDTH))

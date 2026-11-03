@@ -1,6 +1,7 @@
 [package]
-name = "gpui_linux"
+name = "gpui_ce_linux"
 version = "0.1.0"
+description.workspace = true
 edition.workspace = true
 publish.workspace = true
 license = "Apache-2.0"
@@ -20,6 +21,7 @@ wayland = [
   "ashpd/wayland",
 
   "calloop-wayland-source",
+  "memfd",
   "wayland-backend",
   "wayland-client",
   "wayland-cursor",
@@ -27,7 +29,7 @@ wayland = [
   "wayland-protocols-plasma",
   "wayland-protocols-wlr",
   "filedescriptor",
-  "xkbcommon",
+  "xkbcommon/wayland",
   "open",
   "gpui/wayland",
 ]
@@ -37,14 +39,12 @@ x11 = [
 
   "as-raw-xcb-connection",
   "x11rb",
-  "xkbcommon",
+  "xkbcommon/x11",
   "xim",
   "x11-clipboard",
   "filedescriptor",
   "open",
-  "scap?/x11",
 ]
-screen-capture = ["gpui/screen-capture", "scap"]
 
 
 [target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
@@ -55,20 +55,18 @@ bytemuck = "1"
 collections.workspace = true
 image.workspace = true
 futures.workspace = true
-gpui.workspace = true
-gpui_wgpu = { workspace = true, optional = true, features = ["font-kit"] }
+gpui = { workspace = true, default-features = false }
+gpui_util.workspace = true
+gpui_parley = { workspace = true, features = ["system-fonts"] }
+gpui_wgpu = { workspace = true, optional = true }
 itertools.workspace = true
 libc.workspace = true
 log.workspace = true
 parking_lot.workspace = true
-pathfinder_geometry = "0.5"
-pollster.workspace = true
-profiling.workspace = true
 smallvec.workspace = true
 smol.workspace = true
 strum.workspace = true
 url.workspace = true
-util.workspace = true
 uuid.workspace = true
 
 # Always used
@@ -77,27 +75,25 @@ oo7 = { version = "0.6", default-features = false, features = [
   "native_crypto",
 ] }
 calloop = "0.14.3"
-raw-window-handle = "0.6"
+notify-rust.workspace = true
+raw-window-handle.workspace = true
 
 # Used in both windowing options
 ashpd = { workspace = true, optional = true }
-swash = { version = "0.2.6" }
 bitflags = { workspace = true, optional = true }
 filedescriptor = { version = "0.8.2", optional = true }
 open = { version = "5.2.0", optional = true }
-xkbcommon = { version = "0.8.0", features = [
-  "wayland",
-  "x11",
-], optional = true }
+xkbcommon = { version = "0.8.0", default-features = false, optional = true }
 
 # Screen capture
-scap = { workspace = true, optional = true }
 
 # Wayland
 calloop-wayland-source = { version = "0.4.1", optional = true }
-wayland-backend = { version = "0.3.3", features = [
+memfd = { version = "0.6.5", optional = true }
+wayland-backend = { version = "0.3.15", features = [
   "client_system",
   "dlopen",
+  "log",
 ], optional = true }
 wayland-client = { version = "0.31.11", optional = true }
 wayland-cursor = { version = "0.31.11", optional = true }
@@ -125,9 +121,11 @@ x11rb = { version = "0.13.1", features = [
   "sync",
   "dri3",
 ], optional = true }
-# WARNING: If you change this, you must also publish a new version of zed-xim to crates.io
-xim = { git = "https://github.com/zed-industries/xim-rs.git", rev = "16f35a2c881b815a2b6cdfd6687988e84f8447d8", features = [
+xim = { version = "0.4.0-zed", package = "zed-xim", features = [
   "x11rb-xcb",
   "x11rb-client",
-], package = "zed-xim", version = "0.4.0-zed", optional = true }
+], optional = true }
 x11-clipboard = { version = "0.9.3", optional = true }
+
+[package.metadata.cargo-shear]
+ignored = ["bitflags", "scap", "x11-clipboard"]

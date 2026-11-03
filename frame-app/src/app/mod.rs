@@ -1,4 +1,6 @@
 mod accessibility;
+#[cfg(test)]
+mod accessibility_ui_tests;
 mod chrome;
 mod components;
 mod conversion;
@@ -18,6 +20,7 @@ mod runtime;
 mod settings_actions;
 mod settings_panel;
 mod state;
+mod system_motion;
 #[cfg(test)]
 mod tests;
 mod update_actions;
@@ -33,9 +36,9 @@ use chrome::{
 use input::{FrameTextInputKind, FrameTextInputUiState};
 use logs_panel::logs_view;
 use motion::{
-    INTERACTION_MOTION_DURATION, SURFACE_MOTION_DURATION, contextual_icon_motion, hover_motion,
-    mix_color, mix_rgba, mix_scalar, motion_is_hidden, motion_target, retarget_hover_motion,
-    selected_motion, set_motion_target, settings_sheet_right_inset, subtitle_popover_slide_offset,
+    INTERACTION_MOTION_DURATION, contextual_icon_motion, hover_motion, mix_color, mix_rgba,
+    mix_scalar, motion_is_hidden, motion_target, popover_slide_offset, retarget_hover_motion,
+    selected_motion, set_motion_target, settings_sheet_right_inset, surface_motion,
 };
 use preview_panel::{
     FlipAxis, PreviewCanvasRenderState, PreviewCropRenderState, PreviewMediaRenderState,
@@ -168,10 +171,9 @@ use gpui::{
     PromptLevel, Render, RenderImage, Rgba, ScrollDelta, ScrollHandle, ScrollStrategy,
     ScrollWheelEvent, ShapedLine, SharedString, StatefulInteractiveElement, Style, Task,
     TextRenderingMode, TextRun, TitlebarOptions, TransformationMatrix, UTF16Selection,
-    UniformListScrollHandle, Window, WindowBackgroundAppearance, WindowBounds, WindowControlArea,
-    WindowDecorations, WindowOptions, actions, canvas, deferred, div, ease_in_out, fill, hsla, img,
-    linear_color_stop, linear_gradient, point, prelude::*, px, radians, relative, size, svg,
-    uniform_list,
+    UniformListScrollHandle, Window, WindowBounds, WindowControlArea, WindowDecorations,
+    WindowOptions, actions, canvas, deferred, div, ease_in_out, hsla, img, linear_color_stop,
+    linear_gradient, point, prelude::*, px, radians, relative, size, svg, uniform_list,
 };
 use std::{
     ops::Range,

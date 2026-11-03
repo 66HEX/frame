@@ -1,0 +1,15 @@
+[package]
+name = "gpui_ce_refineable"
+version = "0.2.2"
+edition = "2024"
+license = "Apache-2.0"
+publish = true
+description = "Refineable trait + cascade for gpui-ce (vendored from Zed)."
+
+[lib]
+name = "refineable"
+path = "src/refineable.rs"
+doctest = false
+
+[dependencies]
+derive_refineable = { package = "gpui_ce_derive_refineable", version = "0.2.2", path = "../gpui_derive_refineable" }

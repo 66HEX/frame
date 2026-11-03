@@ -304,10 +304,7 @@ fn main() {
             size: size(px(1060.), px(760.)),
         };
         cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                ..Default::default()
-            },
+            WindowOptions::new().window_bounds(Some(WindowBounds::Windowed(bounds))),
             |_, cx| cx.new(|_| BlurExample),
         )
         .expect("failed to open window");

@@ -13,8 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **AV1 Encoding Settings:** Exposes SVT-AV1 presets 0–13 directly and clarifies the 10-bit pixel format choice, while preserving existing preset selections. Resolves [#200](https://github.com/66HEX/frame/issues/200).
 - **Preview Control Tooltips:** Adds tooltips to preview tools, zoom, and playback controls on pointer hover and keyboard focus. Escape dismisses the tooltip. Resolves [#176](https://github.com/66HEX/frame/issues/176).
 
+### Changed
+
+- **GPUI Framework:** Updates the vendored GPUI-CE snapshot to `bc57747`, adapting Frame to the new text and rendering APIs while preserving GPU preview transforms, reusable video textures, keyboard focus and accessibility, toolbar drag handling, and rounded Linux window frames.
+
 ### Fixed
 
+- **Reduced Motion:** Follows the system motion preference on macOS, Windows, and Linux desktops exposing the portal setting, including changes made while Frame is running. UI transitions and preview zoom/pan settle immediately when motion is reduced; media playback remains unchanged.
+- **Tab Navigation:** Moves keyboard focus with the selected settings or main-view tab, keeps one Tab stop per tab rail, and restores focus to the fallback tab when the focused section becomes unavailable.
+- **Pointer Targets:** Enlarges slider, scrollbar, crop, overlay, and trim hit areas while retaining their visible sizes. Scrollbars have reserved space beside list content, and neighboring resize handles stay separate on small selections.
+- **UI Motion and Selects:** Shares a 120 ms enter/exit transition across dropdowns, color pickers, settings and dialogs, while keeping hover feedback at 75 ms. Selects retain keyboard focus after pointer activation, closing lists reject stale input, and reselecting the current subtitle font or size still closes the menu. Existing selections no longer animate on initial render.
+- **Development UI Performance:** Optimizes GPUI layout and text dependencies in development builds to reduce UI stalls with video loaded, including while paused. Frame's application code retains its debug settings.
 - **Toolbar Window Dragging:** Prevents toolbar buttons and tabs from dragging the window on macOS and Linux. Empty titlebar space stays draggable, and macOS retains its configured double-click action. Resolves [#175](https://github.com/66HEX/frame/issues/175).
 - **HEVC Quick Look Compatibility:** Fixes macOS Quick Look previews for HEVC videos encoded to MP4 or MOV with libx265, VideoToolbox, or NVENC by writing the `hvc1` tag. Resolves [#211](https://github.com/66HEX/frame/issues/211).
 

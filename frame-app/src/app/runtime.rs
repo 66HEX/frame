@@ -1,6 +1,8 @@
 use super::*;
 
 pub fn init_app(cx: &mut App, name: impl Into<SharedString>) {
+    #[cfg(not(test))]
+    super::system_motion::observe(cx);
     cx.activate(true);
     cx.set_text_rendering_mode(TextRenderingMode::PlatformDefault);
     cx.on_action(|_: &Quit, cx| cx.quit());
@@ -89,11 +91,11 @@ pub fn frame_window_options(bounds: Bounds<Pixels>) -> WindowOptions {
             )),
         }),
         window_min_size: Some(size(px(WINDOW_MIN_WIDTH), px(WINDOW_MIN_HEIGHT))),
-        window_background: WindowBackgroundAppearance::Opaque,
         window_decorations: Some(WindowDecorations::Client),
         // Frame handles titlebar gestures itself. AppKit's automatic dragging would
         // otherwise move the window even when a toolbar control consumes the press.
         is_movable: !cfg!(target_os = "macos"),
+        app_owns_titlebar_drag: true,
         #[cfg(target_os = "linux")]
         client_side_frame: Some(gpui::ClientSideFrameOptions {
             corner_radius: px(theme::RADIUS_LG + LINUX_WINDOW_FRAME_INSET),

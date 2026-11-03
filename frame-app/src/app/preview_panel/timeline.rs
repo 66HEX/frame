@@ -151,7 +151,7 @@ pub(in crate::app) fn preview_timeline(
                 .flex_col()
                 .gap(theme::ui_rem(6.0))
                 .child(preview_timeline_label("Trim", palette))
-                .child(preview_timeline_track(state, cx)),
+                .child(preview_timeline_track(state, window, cx)),
         )
         .child(
             div()
@@ -280,8 +280,11 @@ pub(in crate::app) fn preview_timeline_label(
 )]
 pub(in crate::app) fn preview_timeline_track(
     state: &PreviewShellState,
-    cx: &Context<FrameRoot>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
+    let measured_width = window.use_keyed_state("timeline-hit-width", cx, |_, _| 0.0_f32);
+    let track_width = *measured_width.read(cx);
     let palette = state.palette;
     let enabled = preview_trim_enabled(state);
     let duration = state.playback.duration();
@@ -303,6 +306,8 @@ pub(in crate::app) fn preview_timeline_track(
             .playback
             .to_timeline_percent(state.playback.current_time()),
     );
+    let start_target = timeline_hit_target(start_fraction, end_fraction, track_width, false);
+    let end_target = timeline_hit_target(start_fraction, end_fraction, track_width, true);
 
     let track = div()
         .id("preview-timeline-track")
@@ -416,6 +421,23 @@ pub(in crate::app) fn preview_timeline_track(
     )
     .child(PreviewTimelineTrackBoundsProbe { owner: cx.entity() })
     .child(
+        canvas(
+            move |bounds, window, cx| {
+                let scale = window.rem_size().as_f32() / crate::appearance::BASE_REM_PX;
+                measured_width.update(cx, |width, cx| {
+                    let next = bounds.size.width.as_f32() / scale;
+                    if (*width - next).abs() > 0.01 {
+                        *width = next;
+                        cx.notify();
+                    }
+                });
+            },
+            |_, (), _, _| {},
+        )
+        .absolute()
+        .size_full(),
+    )
+    .child(
         div()
             .absolute()
             .left(relative(playhead_fraction))
@@ -427,7 +449,7 @@ pub(in crate::app) fn preview_timeline_track(
     )
     .child(preview_timeline_handle(
         TimelineDragTarget::Start,
-        start_fraction,
+        start_target,
         enabled,
         state.playback.start_value(),
         duration,
@@ -436,7 +458,7 @@ pub(in crate::app) fn preview_timeline_track(
     ))
     .child(preview_timeline_handle(
         TimelineDragTarget::End,
-        end_fraction,
+        end_target,
         enabled,
         state.playback.end_value(),
         duration,
@@ -447,7 +469,7 @@ pub(in crate::app) fn preview_timeline_track(
 
 pub(in crate::app) fn preview_timeline_handle(
     target: TimelineDragTarget,
-    fraction: f32,
+    hit_target: (f32, f32),
     enabled: bool,
     value: f64,
     duration: f64,
@@ -462,12 +484,12 @@ pub(in crate::app) fn preview_timeline_handle(
 
     let handle = div()
         .id(handle_id)
+        .debug_selector(move || handle_id.to_string())
         .absolute()
         .top_0()
-        .left(relative(fraction))
-        .ml(theme::ui_rem(-(PREVIEW_TIMELINE_HANDLE_WIDTH / 2.0)))
+        .left(theme::ui_rem(hit_target.0))
         .h(theme::ui_rem(PREVIEW_TIMELINE_CONTROL_HEIGHT))
-        .w(theme::ui_rem(PREVIEW_TIMELINE_HANDLE_WIDTH))
+        .w(theme::ui_rem(hit_target.1))
         .rounded(theme::ui_rem(theme::RADIUS_SM))
         .on_mouse_down(MouseButton::Left, |_event, _window, cx| {
             cx.stop_propagation();
@@ -525,6 +547,21 @@ pub(in crate::app) fn preview_timeline_handle(
             cx.stop_propagation();
         }),
     )
+}
+
+// Split nearby endpoints at their midpoint, moving extra hit space outwards.
+// Limit overhang to half a target so adjacent time fields and Play stay usable.
+fn timeline_hit_target(start: f32, end: f32, width: f32, is_end: bool) -> (f32, f32) {
+    let target = PREVIEW_TIMELINE_HANDLE_WIDTH;
+    let midpoint = start.midpoint(end) * width;
+    let (left, right) = if is_end {
+        let left = end.mul_add(width, -(target / 2.0)).max(midpoint);
+        (left, (left + target).min(width + target / 2.0))
+    } else {
+        let right = start.mul_add(width, target / 2.0).min(midpoint);
+        ((right - target).max(-target / 2.0), right)
+    };
+    (left, (right - left).max(0.0))
 }
 
 pub(in crate::app) fn preview_play_button(

@@ -1,3 +1,4 @@
+use super::accessibility::TabFocusGroup;
 use super::accessibility::{
     apply_accessible_button, apply_accessible_button_with_focus, focus_visible_ring,
     handle_modal_tab_navigation,
@@ -19,21 +20,19 @@ use super::settings_panel::{settings_field_label, settings_hint_text, settings_s
 use super::{
     ActiveView, AppearancePopover, AppearanceSettings, ClickEvent, ColorTheme, Context,
     ExternalPaths, FILE_LIST_ACTION_ICON_SIZE, FRAME_APP_VERSION, FluentBuilder, FocusHandle,
-    FrameAppState, FrameRoot, FrameTextInputKind, INTERACTION_MOTION_DURATION, InteractiveElement,
-    IntoElement, LEFT_COLUMN_SPAN, MouseButton, PANEL_HEADER_HEIGHT, ParentElement, PopoverState,
-    RIGHT_COLUMN_SPAN, SETTINGS_CONTROL_HEIGHT, SURFACE_MOTION_DURATION, ScalePreset, ScrollHandle,
-    StartAvailability, StatefulInteractiveElement, Styled, TITLEBAR_ACTION_ICON_SIZE,
-    TITLEBAR_DIVIDER_HEIGHT, TITLEBAR_HEIGHT, TITLEBAR_ICON_SIZE,
-    TITLEBAR_LINUX_WINDOW_BUTTON_SIZE, TITLEBAR_LINUX_WINDOW_CONTROLS_GAP,
-    TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X, TITLEBAR_LOGO_SIZE,
-    TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_PLACEHOLDER_WIDTH, TITLEBAR_NAV_BUTTON_HEIGHT,
-    TITLEBAR_PLATFORM_DIVIDER_HEIGHT, TITLEBAR_SEGMENT_HEIGHT, TITLEBAR_TOP_PADDING,
-    TITLEBAR_TRAFFIC_LIGHT_SIZE, TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
+    FrameAppState, FrameRoot, FrameTextInputKind, InteractiveElement, IntoElement,
+    LEFT_COLUMN_SPAN, MouseButton, PANEL_HEADER_HEIGHT, ParentElement, PopoverState,
+    RIGHT_COLUMN_SPAN, SETTINGS_CONTROL_HEIGHT, ScalePreset, ScrollHandle, StartAvailability,
+    StatefulInteractiveElement, Styled, TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_DIVIDER_HEIGHT,
+    TITLEBAR_HEIGHT, TITLEBAR_ICON_SIZE, TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
+    TITLEBAR_LINUX_WINDOW_CONTROLS_GAP, TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X,
+    TITLEBAR_LOGO_SIZE, TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_PLACEHOLDER_WIDTH,
+    TITLEBAR_NAV_BUTTON_HEIGHT, TITLEBAR_PLATFORM_DIVIDER_HEIGHT, TITLEBAR_SEGMENT_HEIGHT,
+    TITLEBAR_TOP_PADDING, TITLEBAR_TRAFFIC_LIGHT_SIZE, TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
     TITLEBAR_WINDOWS_WINDOW_ICON_SIZE, TITLEBAR_WINDOWS_WINDOW_MAX_ICON_SIZE,
     UPDATE_INSTALL_WAIT_MESSAGE, UpdateInfo, UpdateStatus, WORKSPACE_COLUMNS, WORKSPACE_GAP,
-    Window, WindowControlArea, assets, div, ease_in_out, format_total_size, mix_color,
-    motion_is_hidden, motion_target, px, relative, set_motion_target, settings_sheet_right_inset,
-    subtitle_popover_slide_offset, svg, theme,
+    Window, WindowControlArea, assets, div, format_total_size, mix_color, motion_is_hidden,
+    popover_slide_offset, px, relative, settings_sheet_right_inset, surface_motion, svg, theme,
 };
 use gpui::{HighlightStyle, StyledText, deferred};
 
@@ -166,6 +165,12 @@ pub(super) fn linux_titlebar(
 }
 
 fn titlebar_drag_surface(platform: FrameTitlebarPlatform, cx: &Context<FrameRoot>) -> gpui::Div {
+    let move_window = cx.listener(|root, event: &gpui::MouseMoveEvent, window, _cx| {
+        let should_move = std::mem::take(&mut root.titlebar_drag.should_move);
+        if should_move && event.pressed_button == Some(MouseButton::Left) {
+            window.start_window_move();
+        }
+    });
     div()
         .window_control_area(WindowControlArea::Drag)
         .capture_any_mouse_down(cx.listener(|root, _event, _window, _cx| {
@@ -203,14 +208,13 @@ fn titlebar_drag_surface(platform: FrameTitlebarPlatform, cx: &Context<FrameRoot
                 }
             }),
         )
-        .on_mouse_move(
-            cx.listener(|root, event: &gpui::MouseMoveEvent, window, _cx| {
-                let should_move = std::mem::take(&mut root.titlebar_drag.should_move);
-                if should_move && event.pressed_button == Some(MouseButton::Left) {
-                    window.start_window_move();
-                }
-            }),
-        )
+        .on_mouse_move_all(move |event, phase, _hitbox, window, cx| {
+            // A native event batch can carry the first drag motion past the titlebar.
+            // Continue an armed gesture even over another control or the workspace.
+            if phase == gpui::DispatchPhase::Capture {
+                move_window(event, window, cx);
+            }
+        })
 }
 
 #[cfg(test)]
@@ -412,17 +416,7 @@ pub(super) fn app_settings_sheet(
     let palette = props.palette;
     let draft_is_dirty =
         props.draft_max_concurrency.trim() != props.current_max_concurrency.to_string();
-    let transition = window
-        .use_keyed_transition(
-            "app-settings-sheet-motion",
-            cx,
-            SURFACE_MOTION_DURATION,
-            |_window, _cx| 0.0_f32,
-        )
-        .with_easing(ease_in_out);
-    let target = motion_target(props.is_open);
-    set_motion_target(&transition, target, cx);
-    let progress = *transition.evaluate(window, cx);
+    let progress = surface_motion("app-settings-sheet-motion", props.is_open, window, cx);
     let right_inset = settings_sheet_right_inset(progress);
     let first_focus = props.close_focus.clone();
     let last_focus = props.last_focus.clone();
@@ -944,7 +938,11 @@ fn app_settings_appearance_select<T: AppSettingsAppearanceValue>(
         let progress =
             app_settings_appearance_popover_progress::<T>(popover_state.is_open(), window, cx);
         let content_height = frame_select_content_height(options.len());
-        let mut list = frame_select_options_list(T::LIST_ID, scroll_handle);
+        let mut list = frame_select_options_list(
+            T::LIST_ID,
+            scroll_handle,
+            content_height > FRAME_SELECT_MAX_HEIGHT,
+        );
 
         for (index, option) in options.iter().copied().enumerate() {
             let focus = option_focuses.get(index);
@@ -952,6 +950,7 @@ fn app_settings_appearance_select<T: AppSettingsAppearanceValue>(
                 option,
                 index,
                 selected,
+                popover_state.is_open(),
                 focus,
                 &option_focuses,
                 scroll_handle,
@@ -963,7 +962,7 @@ fn app_settings_appearance_select<T: AppSettingsAppearanceValue>(
 
         let mut menu = frame_select_popover(
             T::PANEL_ID,
-            54.0 + subtitle_popover_slide_offset(progress),
+            54.0 + popover_slide_offset(progress),
             progress,
             list,
             palette,
@@ -985,7 +984,7 @@ fn app_settings_appearance_select<T: AppSettingsAppearanceValue>(
                 palette,
             ));
         }
-        field = field.child(deferred(menu).with_priority(20));
+        field = field.child(deferred(menu).priority(20));
     }
 
     field
@@ -999,6 +998,7 @@ fn app_settings_appearance_option<T: AppSettingsAppearanceValue>(
     option: T,
     index: usize,
     selected: T,
+    is_open: bool,
     focus: Option<&FocusHandle>,
     option_focuses: &[FocusHandle],
     scroll_handle: &ScrollHandle,
@@ -1031,9 +1031,11 @@ fn app_settings_appearance_option<T: AppSettingsAppearanceValue>(
     };
 
     element
+        .tab_stop(is_open)
+        .aria_disabled(!is_open)
         .on_click(cx.listener(move |root, event: &ClickEvent, window, cx| {
             cx.stop_propagation();
-            if event.is_keyboard() {
+            if event.is_keyboard() || !root.appearance_popover_state(T::POPOVER).is_open() {
                 return;
             }
             option.apply(root, window);
@@ -1043,6 +1045,9 @@ fn app_settings_appearance_option<T: AppSettingsAppearanceValue>(
         }))
         .on_key_down(
             cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+                if !root.appearance_popover_state(T::POPOVER).is_open() {
+                    return;
+                }
                 let key = event.keystroke.key.as_str();
                 match key {
                     "enter" | "space" => {
@@ -1089,16 +1094,7 @@ fn app_settings_appearance_popover_progress<T: AppSettingsAppearanceValue>(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> f32 {
-    let transition = window
-        .use_keyed_transition(
-            T::MOTION_ID,
-            cx,
-            INTERACTION_MOTION_DURATION,
-            |_window, _cx| 0.0_f32,
-        )
-        .with_easing(ease_in_out);
-    set_motion_target(&transition, motion_target(is_open), cx);
-    let progress = *transition.evaluate(window, cx);
+    let progress = surface_motion(T::MOTION_ID, is_open, window, cx);
     if !is_open && motion_is_hidden(progress) {
         cx.defer_in(window, move |root, _window, cx| {
             if root.finish_app_settings_appearance_popover_close(T::POPOVER) {
@@ -1287,7 +1283,7 @@ fn update_release_notes_block(
         .overflow_y_scroll()
         .track_scroll(scroll_handle)
         .p_3()
-        .pr_5();
+        .pr(theme::ui_rem(super::components::FRAME_SCROLLBAR_WIDTH));
 
     for line in lines {
         content = content.child(update_release_note_line(&line, palette));
@@ -1401,7 +1397,7 @@ fn parse_update_release_note_emphasis(
     let mut highlights = Vec::new();
     let mut rest = input;
     let highlight_style = HighlightStyle {
-        color: Some(color(palette.text_primary).into()),
+        color: Some(gpui::rgb_to_hsla(color(palette.text_primary))),
         font_weight: Some(theme::TEXT_WEIGHT_MEDIUM),
         ..HighlightStyle::default()
     };
@@ -1623,16 +1619,7 @@ pub(super) fn update_dialog(
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
     let palette = view.palette;
-    let transition = window
-        .use_keyed_transition(
-            "update-dialog-motion",
-            cx,
-            SURFACE_MOTION_DURATION,
-            |_window, _cx| 0.0_f32,
-        )
-        .with_easing(ease_in_out);
-    set_motion_target(&transition, motion_target(is_open), cx);
-    let progress = *transition.evaluate(window, cx);
+    let progress = surface_motion("update-dialog-motion", is_open, window, cx);
     let panel_offset = (1.0 - progress.clamp(0.0, 1.0)) * 12.0;
 
     if !is_open && motion_is_hidden(progress) {
@@ -2139,9 +2126,11 @@ pub(super) fn app_settings_close_button(
         .rounded(theme::ui_rem(theme::RADIUS_SM))
         .bg(background)
         .text_color(foreground)
-        .when(enabled, |this| this.hover(gpui::Styled::cursor_pointer))
         .when(enabled, |this| {
-            this.active(move |style| style.bg(color(colors.active_background)))
+            this.hover_style(gpui::Styled::cursor_pointer)
+        })
+        .when(enabled, |this| {
+            this.active_style(move |style| style.bg(color(colors.active_background)))
         })
         .child(icon_svg(
             assets::ICON_CLOSE,
@@ -2177,16 +2166,7 @@ pub(super) fn drag_drop_overlay(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
-    let transition = window
-        .use_keyed_transition(
-            "drag-drop-overlay-motion",
-            cx,
-            SURFACE_MOTION_DURATION,
-            |_window, _cx| 0.0_f32,
-        )
-        .with_easing(ease_in_out);
-    set_motion_target(&transition, motion_target(is_open), cx);
-    let progress = *transition.evaluate(window, cx);
+    let progress = surface_motion("drag-drop-overlay-motion", is_open, window, cx);
 
     if !is_open && motion_is_hidden(progress) {
         cx.defer_in(window, |root, _window, cx| {
@@ -2466,8 +2446,8 @@ pub(super) fn titlebar_window_button(
         .rounded(theme::ui_rem(metrics.radius))
         .bg(background)
         .text_color(icon_color)
-        .hover(gpui::Styled::cursor_pointer)
-        .active(move |style| style.bg(color(active_background)))
+        .hover_style(gpui::Styled::cursor_pointer)
+        .active_style(move |style| style.bg(color(active_background)))
         .on_mouse_move(|_, _, cx| cx.stop_propagation())
         .child(icon_svg(icon, metrics.icon_size, icon_color));
     let button = apply_button_motion(button, motion, true);
@@ -2520,6 +2500,13 @@ pub(super) fn titlebar_navigation(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
+    let focuses = TabFocusGroup::render(
+        "main-tabs-focus",
+        titlebar_tab_id(active_view).into(),
+        [ActiveView::Workspace, ActiveView::Logs].map(|view| titlebar_tab_id(view).into()),
+        window,
+        cx,
+    );
     div()
         .id("titlebar-main-view-tabs")
         .role(gpui::Role::TabList)
@@ -2537,7 +2524,7 @@ pub(super) fn titlebar_navigation(
             assets::ICON_LAYOUT_LIST,
             "Workspace",
             ActiveView::Workspace,
-            active_view == ActiveView::Workspace,
+            &focuses,
             palette,
             window,
             cx,
@@ -2546,7 +2533,7 @@ pub(super) fn titlebar_navigation(
             assets::ICON_TERMINAL,
             "Logs",
             ActiveView::Logs,
-            active_view == ActiveView::Logs,
+            &focuses,
             palette,
             window,
             cx,
@@ -2595,16 +2582,18 @@ pub(super) fn titlebar_segment(
     icon: &'static str,
     label: &'static str,
     view: ActiveView,
-    selected: bool,
+    focuses: &TabFocusGroup,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
+    let segment_id = titlebar_tab_id(view);
+    let selected = focuses.selected(segment_id);
+    let focus = focuses.handle(segment_id);
+    let click_focus = focus.clone();
+    let workspace_focus = focuses.handle("titlebar-workspace");
+    let logs_focus = focuses.handle("titlebar-logs");
     let colors = button_colors(ButtonVariant::Secondary, selected, true, palette);
-    let segment_id = match view {
-        ActiveView::Workspace => "titlebar-workspace",
-        ActiveView::Logs => "titlebar-logs",
-    };
     let motion = button_motion(format!("{segment_id}-hover"), window, cx);
     let hover_progress = *motion.hover_transition.evaluate(window, cx);
     let background = if selected {
@@ -2629,9 +2618,9 @@ pub(super) fn titlebar_segment(
         .role(gpui::Role::Tab)
         .aria_label(label)
         .aria_selected(selected)
-        .focusable()
-        .tab_stop(true)
-        .focus_visible(move |style| focus_visible_ring(style, palette))
+        .track_focus(&focus)
+        .tab_stop(selected)
+        .focus_visible_style(move |style| focus_visible_ring(style, palette))
         .flex()
         .items_center()
         .gap_2()
@@ -2644,9 +2633,10 @@ pub(super) fn titlebar_segment(
         .when(selected, |this| {
             this.shadow(button_highlight_shadows(palette))
         })
-        .hover(gpui::Styled::cursor_pointer)
-        .active(move |style| style.bg(color(colors.active_background)))
-        .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        .hover_style(gpui::Styled::cursor_pointer)
+        .active_style(move |style| style.bg(color(colors.active_background)))
+        .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
+            click_focus.focus(window, cx);
             if root.active_view != view {
                 root.active_view = view;
                 cx.notify();
@@ -2654,11 +2644,16 @@ pub(super) fn titlebar_segment(
             cx.stop_propagation();
         }))
         .on_key_down(
-            cx.listener(move |root, event: &gpui::KeyDownEvent, _window, cx| {
+            cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
                 let Some(next_view) = titlebar_view_for_key(view, event.keystroke.key.as_str())
                 else {
                     return;
                 };
+                match next_view {
+                    ActiveView::Workspace => &workspace_focus,
+                    ActiveView::Logs => &logs_focus,
+                }
+                .focus(window, cx);
                 if root.active_view != next_view {
                     root.active_view = next_view;
                     cx.notify();
@@ -2670,6 +2665,13 @@ pub(super) fn titlebar_segment(
         .child(theme::ui_text(label));
 
     apply_button_motion(button, motion, true)
+}
+
+const fn titlebar_tab_id(view: ActiveView) -> &'static str {
+    match view {
+        ActiveView::Workspace => "titlebar-workspace",
+        ActiveView::Logs => "titlebar-logs",
+    }
 }
 
 fn titlebar_view_for_key(current: ActiveView, key: &str) -> Option<ActiveView> {
@@ -2749,7 +2751,7 @@ mod tests {
         assert_eq!(&text[highlights[0].0.clone()], "Native GPUI Application:");
         assert_eq!(
             highlights[0].1.color,
-            Some(color(palette.text_primary).into())
+            Some(gpui::rgb_to_hsla(color(palette.text_primary)))
         );
         assert_eq!(highlights[0].1.font_weight, Some(theme::TEXT_WEIGHT_MEDIUM));
     }

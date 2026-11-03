@@ -1,0 +1,25 @@
+[package]
+name = "gpui_ce_media"
+version = "0.2.2"
+edition = "2024"
+license = "Apache-2.0"
+publish = true
+description = "macOS CoreMedia/CoreVideo bindings for gpui-ce (vendored from Zed)."
+
+[lib]
+name = "media"
+path = "src/media.rs"
+doctest = false
+
+[dependencies]
+anyhow = "1.0.86"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation.workspace = true
+foreign-types.workspace = true
+metal.workspace = true
+core-video.workspace = true
+objc.workspace = true
+
+[build-dependencies]
+bindgen = "0.72"

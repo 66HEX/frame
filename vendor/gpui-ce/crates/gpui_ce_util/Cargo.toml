@@ -1,0 +1,19 @@
+[package]
+name = "gpui_ce_util"
+version = "0.2.6"
+edition = "2024"
+license = "Apache-2.0"
+publish = true
+description = "Utility structs and functions used by gpui-ce (vendored from Zed's gpui_util)."
+repository = "https://github.com/gpui-ce/gpui-ce"
+
+[lib]
+name = "gpui_util"
+path = "src/lib.rs"
+
+[dependencies]
+log = { version = "0.4.16", features = ["kv_unstable_serde", "serde"] }
+anyhow = "1.0.86"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+which = "6.0.0"

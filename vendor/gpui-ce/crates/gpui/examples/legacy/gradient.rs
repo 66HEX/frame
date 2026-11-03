@@ -1,7 +1,13 @@
+#![cfg_attr(target_family = "wasm", no_main)]
+
+#[path = "../example_support/fonts.rs"]
+mod example_support;
+
 use gpui::{
     App, Bounds, ColorSpace, Context, Half, Render, Window, WindowOptions, canvas, div,
     linear_color_stop, linear_gradient, point, prelude::*, px, size,
 };
+use gpui_platform::application;
 
 struct GradientViewer {
     color_space: ColorSpace,
@@ -44,7 +50,7 @@ impl Render for GradientViewer {
                                 .bg(gpui::black())
                                 .text_color(gpui::white())
                                 .child(format!("{}", color_space))
-                                .active(|this| this.opacity(0.8))
+                                .active_style(|this| this.opacity(0.8))
                                 .on_click(cx.listener(move |this, _, _, cx| {
                                     this.color_space = match this.color_space {
                                         ColorSpace::Oklab => ColorSpace::Srgb,
@@ -242,16 +248,28 @@ impl Render for GradientViewer {
     }
 }
 
-fn main() {
-    gpui_platform::application().run(|cx: &mut App| {
-        cx.open_window(
-            WindowOptions {
-                focus: true,
-                ..Default::default()
-            },
-            |_, cx| cx.new(|_| GradientViewer::new()),
-        )
+fn run_example() {
+    application().run(|cx: &mut App| {
+        if !example_support::load_fonts(cx) {
+            return;
+        }
+        cx.open_window(WindowOptions::new().focus(true), |_, cx| {
+            cx.new(|_| GradientViewer::new())
+        })
         .unwrap();
         cx.activate(true);
     });
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn main() {
+    env_logger::init();
+    run_example();
+}
+
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen::prelude::wasm_bindgen(start)]
+pub fn start() {
+    gpui_platform::web_init();
+    run_example();
 }

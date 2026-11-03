@@ -1,13 +1,14 @@
 # Main CI workflow
 name: CI
 
-# TODO: Setup coverage using cargo-mutants, but only for minor/major version bumps (would probably take hours :() -- also our testing infra sucks
+permissions:
+  contents: read
 
 on:
   push:
-    branches: [main, 'v[0-9]+.[0-9]+.x']
+    branches: [main, "v[0-9]+.[0-9]+.x"]
   pull_request:
-    branches: ['**']
+    branches: ["**"]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.ref_name == 'main' && github.sha || 'anysha' }}
@@ -25,9 +26,8 @@ jobs:
     outputs:
       run_tests: ${{ steps.filter.outputs.run_tests }}
       run_style: ${{ steps.filter.outputs.run_style }}
-      run_docs:  ${{ steps.filter.outputs.run_docs }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: ${{ github.ref == 'refs/heads/main' && 2 || 350 }}
       - id: filter
@@ -35,7 +35,7 @@ jobs:
           if [ -z "$GITHUB_BASE_REF" ]; then
             COMPARE_REV="$(git rev-parse HEAD~1)"
           else
-            git fetch origin "$GITHUB_BASE_REF" --depth=350
+            git fetch --update-head-ok origin "$GITHUB_BASE_REF" --depth=350 || true
             COMPARE_REV="$(git merge-base "origin/${GITHUB_BASE_REF}" HEAD)"
           fi
           CHANGED_FILES="$(git diff --name-only "$COMPARE_REV" "$GITHUB_SHA")"
@@ -43,21 +43,22 @@ jobs:
           check_pattern() {
             local name="$1" pattern="$2" invert="${3:-false}"
             if [ "$invert" = "true" ]; then
-              echo "$CHANGED_FILES" | grep -qvP "$pattern" && echo "${name}=true" >> "$GITHUB_OUTPUT" || echo "${name}=false" >> "$GITHUB_OUTPUT"
+              echo "$CHANGED_FILES" | grep -qvE "$pattern" && echo "${name}=true" >> "$GITHUB_OUTPUT" || echo "${name}=false" >> "$GITHUB_OUTPUT"
             else
-              echo "$CHANGED_FILES" | grep -qP  "$pattern" && echo "${name}=true" >> "$GITHUB_OUTPUT" || echo "${name}=false" >> "$GITHUB_OUTPUT"
+              echo "$CHANGED_FILES" | grep -qE  "$pattern" && echo "${name}=true" >> "$GITHUB_OUTPUT" || echo "${name}=false" >> "$GITHUB_OUTPUT"
             fi
           }
 
           check_pattern "run_tests" '^(docs/|\.github/(ISSUE_TEMPLATE|workflows/)|README\.md|CHANGELOG\.md)' true
           check_pattern "run_style" '\.(rs|toml)$|rust-toolchain\.toml|\.cargo/|clippy\.toml|typos\.toml'
-          check_pattern "run_docs"  '^docs/|\.rs$'
 
   # Formatting
   fmt:
     runs-on: ubuntu-latest
+    needs: [orchestrate]
+    if: needs.orchestrate.outputs.run_style == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: rustfmt
@@ -68,8 +69,10 @@ jobs:
   # Clippy
   clippy:
     runs-on: ubuntu-latest
+    needs: [orchestrate]
+    if: needs.orchestrate.outputs.run_style == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: clippy
@@ -86,24 +89,39 @@ jobs:
   typos:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: crate-ci/typos@v1.47.2
         with:
           config: typos.toml
 
-  # TOML formatting
-  taplo:
+  # Lockfile freshness is advisory: dependency resolution changes often come
+  # from upstream releases and should be reviewed, not block unrelated work.
+  lockfile:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: uncenter/setup-taplo@v1
-      - run: taplo fmt --check
+      - uses: actions/checkout@v5
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Check root lockfile freshness (warning only)
+        shell: bash
+        run: |
+          warn() {
+            echo "::warning title=Lockfile freshness::$1"
+          }
+
+          if ! cargo update; then
+            warn "Could not refresh Cargo.lock; inspect dependency resolution."
+          elif ! git diff --quiet -- Cargo.lock; then
+            git diff -- Cargo.lock
+            warn "Cargo.lock changed after cargo update; refresh it in a dedicated dependency update."
+          fi
 
   # Unused dependencies
   machete:
     runs-on: ubuntu-latest
+    needs: [orchestrate]
+    if: needs.orchestrate.outputs.run_style == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@cargo-machete
       - uses: hustcer/setup-nu@v3
@@ -112,12 +130,14 @@ jobs:
 
   # MSRV
   msrv:
+    if: github.event_name == 'pull_request' && needs.orchestrate.outputs.run_style == 'true'
+    needs: [orchestrate]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.92.0
+          toolchain: 1.95.0
       - uses: Swatinem/rust-cache@v2
       - name: Install system deps
         run: |
@@ -129,9 +149,11 @@ jobs:
 
   # WASM target (nightly + atomics)
   check-wasm:
+    if: github.event_name == 'pull_request' && needs.orchestrate.outputs.run_style == 'true'
+    needs: [orchestrate]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install nightly toolchain with rust-src and WASM target
         run: rustup toolchain install nightly --component rust-src --target wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
@@ -145,7 +167,7 @@ jobs:
     needs: [orchestrate]
     if: needs.orchestrate.outputs.run_tests == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions-rust-lang/setup-rust-toolchain@v1
       - uses: Swatinem/rust-cache@v2
       - name: Install system deps
@@ -169,14 +191,16 @@ jobs:
     needs: [orchestrate]
     if: needs.orchestrate.outputs.run_tests == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions-rust-lang/setup-rust-toolchain@v1
       - uses: Swatinem/rust-cache@v2
       - uses: hustcer/setup-nu@v3
       - uses: extractions/setup-just@v2
       - run: just build
-      - run: just test
+      - run: just test --features gpui_ce_wgpu/test-support
       - run: just test-doc
+      - name: Test Parley rendering invariants
+        run: GPUI_RUN_RENDERING_TESTS=1 cargo test -p gpui_ce_platform --test parley_render
 
   # Windows build + test
   test-windows:
@@ -184,21 +208,24 @@ jobs:
     needs: [orchestrate]
     if: needs.orchestrate.outputs.run_tests == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions-rust-lang/setup-rust-toolchain@v1
       - uses: Swatinem/rust-cache@v2
       - uses: hustcer/setup-nu@v3
       - uses: extractions/setup-just@v2
       - run: just build
       - run: just test
+      - run: just test-doc
+      - name: Test Parley rendering invariants
+        run: $env:GPUI_RUN_RENDERING_TESTS=1; cargo test -p gpui_ce_platform --test parley_render
 
   # Examples
   check-examples:
     runs-on: ubuntu-latest
     needs: [orchestrate]
-    if: needs.orchestrate.outputs.run_tests == 'true'
+    if: github.event_name == 'pull_request' && needs.orchestrate.outputs.run_tests == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions-rust-lang/setup-rust-toolchain@v1
       - uses: Swatinem/rust-cache@v2
       - name: Install system deps
@@ -210,58 +237,3 @@ jobs:
       - uses: hustcer/setup-nu@v3
       - uses: extractions/setup-just@v2
       - run: just check-examples
-
-  # Beta toolchain (scheduled only)
-  beta-test:
-    if: github.event_name == 'schedule'
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - run: rustup update beta && rustup default beta
-      - uses: Swatinem/rust-cache@v2
-      - name: Install system deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libxcb-shape0-dev libxcb-xfixes0-dev libfontconfig-dev
-      - uses: hustcer/setup-nu@v3
-      - uses: extractions/setup-just@v2
-      - run: just check
-      - run: just test
-
-  # Gate job
-  tests-pass:
-    if: always()
-    needs:
-      - fmt
-      - clippy
-      - typos
-      - taplo
-      - machete
-      - msrv
-      - check-wasm
-      - test-linux
-      - test-mac
-      - test-windows
-      - check-examples
-    runs-on: ubuntu-latest
-    steps:
-      - run: |
-          set +e
-          EXIT_CODE=0
-          check_result() {
-            echo "* $1: $2"
-            if [[ "$2" != "skipped" && "$2" != "success" ]]; then EXIT_CODE=1; fi
-          }
-          check_result fmt            ${{ needs.fmt.result }}
-          check_result clippy         ${{ needs.clippy.result }}
-          check_result typos          ${{ needs.typos.result }}
-          check_result taplo          ${{ needs.taplo.result }}
-          check_result machete        ${{ needs.machete.result }}
-          check_result msrv           ${{ needs.msrv.result }}
-          check_result check-wasm     ${{ needs.check-wasm.result }}
-          check_result test-linux     ${{ needs.test-linux.result }}
-          check_result test-mac       ${{ needs.test-mac.result }}
-          check_result test-windows   ${{ needs.test-windows.result }}
-          check_result check-examples ${{ needs.check-examples.result }}
-          exit $EXIT_CODE

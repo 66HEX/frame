@@ -24,11 +24,25 @@ allow = [
   "0BSD",
   "MPL-2.0",
   "CC0-1.0",
-  "bzip2-1.0.6",
   "NCSA",
 ]
 confidence-threshold = 0.8
 exceptions = []
+
+[[licenses.clarify]]
+crate = "wgsl-rs"
+expression = "MIT"
+license-files = [{ path = "../../LICENSE", hash = 0x0 }]
+
+[[licenses.clarify]]
+crate = "wgsl-rs-ir"
+expression = "MIT"
+license-files = [{ path = "../../LICENSE", hash = 0x0 }]
+
+[[licenses.clarify]]
+crate = "wgsl-rs-macros"
+expression = "MIT"
+license-files = [{ path = "../../LICENSE", hash = 0x0 }]
 
 [licenses.private]
 ignore = true
@@ -52,9 +66,9 @@ skip-tree = []
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-allow-git = []
+allow-git = ["https://github.com/schell/wgsl-rs"]
 
 [sources.allow-org]
-github = ["zed-industries", "proptest-rs"]
+github = ["zed-industries"]
 gitlab = []
 bitbucket = []

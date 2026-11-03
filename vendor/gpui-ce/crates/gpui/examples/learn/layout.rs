@@ -12,9 +12,10 @@ mod example_prelude;
 use example_prelude::init_example;
 use gpui::colors::Colors;
 use gpui::{
-    Bounds, Context, Div, Hsla, Render, Rgba, Window, WindowBounds, WindowOptions, div, prelude::*,
-    px, size,
+    Bounds, ColorExt, Context, Div, Hsla, Render, Rgba, Window, WindowBounds, WindowOptions, div,
+    prelude::*, px, size,
 };
+use palette::{IntoColor, WithAlpha};
 
 // Helper: Colored block for visualization
 
@@ -25,7 +26,7 @@ fn block(label: &'static str, color: Hsla, text_color: Rgba) -> Div {
         .justify_center()
         .bg(color)
         .border_1()
-        .border_color(gpui::white().opacity(0.3))
+        .border_color(gpui::white().with_alpha(0.3))
         .rounded_md()
         .text_xs()
         .text_color(text_color)
@@ -363,7 +364,7 @@ fn stack_pattern(colors: &Colors) -> impl IntoElement {
                         .top_2()
                         .left_2()
                         .size_10()
-                        .bg(gpui::red().opacity(0.7))
+                        .bg(gpui::red().with_alpha(0.7))
                         .rounded_md(),
                 )
                 .child(
@@ -372,7 +373,7 @@ fn stack_pattern(colors: &Colors) -> impl IntoElement {
                         .top_4()
                         .left_4()
                         .size_10()
-                        .bg(gpui::green().opacity(0.7))
+                        .bg(gpui::green().with_alpha(0.7))
                         .rounded_md(),
                 )
                 .child(
@@ -381,7 +382,7 @@ fn stack_pattern(colors: &Colors) -> impl IntoElement {
                         .top_6()
                         .left_6()
                         .size_10()
-                        .bg(gpui::blue().opacity(0.7))
+                        .bg(gpui::blue().with_alpha(0.7))
                         .rounded_md(),
                 ),
         )
@@ -464,7 +465,7 @@ impl Render for LayoutExample {
 }
 
 fn section(colors: &Colors, title: &'static str, content: impl IntoElement) -> impl IntoElement {
-    let surface: Hsla = colors.container.into();
+    let surface: Hsla = colors.container.into_color();
 
     div()
         .flex()
@@ -487,10 +488,7 @@ fn main() {
     gpui_platform::application().run(|cx| {
         let bounds = Bounds::centered(None, size(px(650.), px(700.)), cx);
         cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                ..Default::default()
-            },
+            WindowOptions::new().window_bounds(Some(WindowBounds::Windowed(bounds))),
             |_, cx| cx.new(|_| LayoutExample),
         )
         .expect("Failed to open window");
