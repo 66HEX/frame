@@ -101,7 +101,7 @@ mod frame_assets {
     }
 
     #[test]
-    fn ui_icon_assets_use_hugeicons_stroke_style() {
+    fn ui_icon_assets_render_with_nucleo_outline_style() {
         let renderer = gpui::SvgRenderer::new(std::sync::Arc::new(FrameAssets.into()));
 
         for icon in [
@@ -149,8 +149,8 @@ mod frame_assets {
             let svg = std::str::from_utf8(loaded.as_ref()).expect("svg should be utf8");
 
             assert!(
-                svg.contains(r#"viewBox="0 0 24 24""#),
-                "{icon} should use the Hugeicons 24px grid"
+                svg.contains(r#"viewBox="0 0 18 18""#),
+                "{icon} should use the Nucleo UI 18px grid"
             );
             assert!(
                 svg.contains(r#"fill="none""#),
@@ -162,15 +162,25 @@ mod frame_assets {
             );
             assert!(
                 svg.contains(r#"stroke-width="1.5""#),
-                "{icon} should use the Hugeicons stroke weight"
+                "{icon} should use the Nucleo UI stroke weight"
             );
             assert!(
-                !svg.contains(r#" key=""#),
-                "{icon} should not include React-only metadata"
+                !svg.contains(r##"="#000""##) && !svg.contains(r#"="black""#),
+                "{icon} should not retain fixed colors from the source SVG"
             );
-            renderer
-                .render_single_frame(loaded.as_ref(), 1.0)
-                .unwrap_or_else(|error| panic!("{icon} should render: {error}"));
+            for size in [12.0, 16.0, 18.0, 20.0, 24.0] {
+                let image = renderer
+                    .render_single_frame(loaded.as_ref(), size / 18.0)
+                    .unwrap_or_else(|error| panic!("{icon} should render at {size}px: {error}"));
+                assert!(
+                    image
+                        .as_bytes(0)
+                        .expect("rendered icon should have a frame")
+                        .chunks_exact(4)
+                        .any(|pixel| pixel[3] > 0),
+                    "{icon} should have visible pixels at {size}px"
+                );
+            }
         }
     }
 
