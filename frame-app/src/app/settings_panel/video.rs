@@ -789,9 +789,13 @@ fn settings_video_range_slider(
         })
     })
     .on_drag_move(cx.listener(
-        |root, event: &DragMoveEvent<SettingsVideoRangeDrag>, _window, cx| {
+        |root, event: &DragMoveEvent<SettingsVideoRangeDrag>, window, cx| {
             let drag = *event.drag(cx);
-            let fraction = timeline_slider_percent_from_bounds(event.event.position, event.bounds);
+            let fraction = frame_slider_fraction_from_bounds(
+                event.event.position,
+                event.bounds,
+                window.rem_size(),
+            );
             let value = range_value_from_fraction(fraction, drag.min, drag.max);
             let changed = root.update_selected_config(|config| {
                 apply_settings_video_range_value(config, drag.target, value)

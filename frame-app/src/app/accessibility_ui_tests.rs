@@ -293,6 +293,75 @@ fn slider_padding_starts_drags_but_disabled_sliders_ignore_it() {
     }
 }
 
+#[test]
+fn slider_values_reach_both_inset_endpoints_at_each_scale() {
+    for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+        let mut app = TestAppContext::single();
+        let (root, cx) = test_window(&mut app, VisualFixture::SettingsVideoFilters, scale);
+        let bounds = cx
+            .debug_bounds("settings-video-filter-brightness-slider")
+            .unwrap();
+        let inset = px(2.0 * scale.factor());
+        let left = bounds.left() + inset;
+        let width = bounds.size.width - inset * 2.0;
+        for (fraction, expected) in [(0.0, -100), (0.25, -50), (0.75, 50), (1.0, 100)] {
+            let from = bounds.center();
+            let to = point(left + width * fraction, from.y);
+            cx.simulate_mouse_down(from, MouseButton::Left, Modifiers::default());
+            cx.simulate_mouse_move(
+                from + point(px(5.0), px(0.0)),
+                MouseButton::Left,
+                Modifiers::default(),
+            );
+            cx.simulate_mouse_move(to, MouseButton::Left, Modifiers::default());
+            cx.simulate_mouse_up(to, MouseButton::Left, Modifiers::default());
+            draw(cx);
+            assert_eq!(
+                root.read_with(cx, |root, _| root
+                    .selected_config()
+                    .unwrap()
+                    .video_filters
+                    .color
+                    .brightness
+                    .value),
+                expected
+            );
+        }
+    }
+}
+
+#[test]
+fn timeline_seek_and_trim_targets_follow_the_inset_value_range() {
+    for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+        let mut app = TestAppContext::single();
+        let (root, cx) = test_window(&mut app, VisualFixture::PreviewReady, scale);
+        let bounds = cx.debug_bounds("preview-timeline-track").unwrap();
+        let inset = px(2.0 * scale.factor());
+        let inner = root.read_with(cx, |root, _| root.preview_ui.timeline_track_bounds.unwrap());
+        assert!((inner.left() - bounds.left() - inset).abs() < px(0.01));
+        assert!((bounds.right() - inner.right() - inset).abs() < px(0.01));
+        for (id, endpoint) in [
+            ("preview-timeline-start-handle", inner.left()),
+            ("preview-timeline-end-handle", inner.right()),
+        ] {
+            let handle = cx.debug_bounds(id).unwrap();
+            assert!((handle.center().x - endpoint).abs() < px(0.01));
+        }
+        for fraction in [0.25, 0.75] {
+            cx.simulate_click(
+                point(inner.left() + inner.size.width * fraction, inner.center().y),
+                Modifiers::default(),
+            );
+            draw(cx);
+            root.read_with(cx, |root, _| {
+                let playback = &root.preview_ui.playback;
+                let expected = playback.duration() * f64::from(fraction);
+                assert!((playback.current_time() - expected).abs() < 0.01);
+            });
+        }
+    }
+}
+
 fn assert_disjoint(a: Bounds<Pixels>, b: Bounds<Pixels>) {
     let overlap_x = (a.right().min(b.right()) - a.left().max(b.left())).as_f32();
     let overlap_y = (a.bottom().min(b.bottom()) - a.top().max(b.top())).as_f32();

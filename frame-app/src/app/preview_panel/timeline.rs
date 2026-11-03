@@ -311,6 +311,7 @@ pub(in crate::app) fn preview_timeline_track(
 
     let track = div()
         .id("preview-timeline-track")
+        .debug_selector(|| "preview-timeline-track".to_string())
         .relative()
         .h(theme::ui_rem(PREVIEW_TIMELINE_CONTROL_HEIGHT))
         .w_full()
@@ -334,10 +335,13 @@ pub(in crate::app) fn preview_timeline_track(
             )
         })
         .on_drag_move(cx.listener(
-            |root, event: &DragMoveEvent<PreviewTimelineDrag>, _window, cx| {
+            |root, event: &DragMoveEvent<PreviewTimelineDrag>, window, cx| {
                 let drag = *event.drag(cx);
-                let percent =
-                    timeline_slider_percent_from_bounds(event.event.position, event.bounds);
+                let percent = frame_slider_fraction_from_bounds(
+                    event.event.position,
+                    event.bounds,
+                    window.rem_size(),
+                );
                 if root.apply_preview_timeline_drag_with_context(drag.target, percent, cx) {
                     cx.notify();
                 }
@@ -400,71 +404,67 @@ pub(in crate::app) fn preview_timeline_track(
         }),
     )
     .child(
-        div()
+        frame_range_track(start_fraction, end_fraction, palette)
             .absolute()
             .left_0()
             .right_0()
-            .top(theme::ui_rem(track_top))
-            .h(theme::ui_rem(PREVIEW_TRACK_HEIGHT))
-            .rounded(theme::ui_rem(1.5))
-            .bg(color(palette.fill_subtle)),
+            .top(theme::ui_rem(track_top)),
     )
+    // Position measurements, playhead, and trim targets share the inset value range.
     .child(
         div()
             .absolute()
-            .left(relative(start_fraction))
-            .right(relative((1.0 - end_fraction).max(0.0)))
-            .top(theme::ui_rem(track_top))
-            .h(theme::ui_rem(PREVIEW_TRACK_HEIGHT))
-            .rounded(theme::ui_rem(1.0))
-            .bg(color(palette.text_primary)),
+            .top_0()
+            .bottom_0()
+            .left(theme::ui_rem(theme::RANGE_TRACK_INSET))
+            .right(theme::ui_rem(theme::RANGE_TRACK_INSET))
+            .child(PreviewTimelineTrackBoundsProbe { owner: cx.entity() })
+            .child(
+                canvas(
+                    move |bounds, window, cx| {
+                        let scale = window.rem_size().as_f32() / crate::appearance::BASE_REM_PX;
+                        measured_width.update(cx, |width, cx| {
+                            let next = bounds.size.width.as_f32() / scale;
+                            if (*width - next).abs() > 0.01 {
+                                *width = next;
+                                cx.notify();
+                            }
+                        });
+                    },
+                    |_, (), _, _| {},
+                )
+                .absolute()
+                .size_full(),
+            )
+            .child(
+                div()
+                    .absolute()
+                    .left(relative(playhead_fraction))
+                    .ml(px(-0.5))
+                    .top(theme::ui_rem(playhead_top))
+                    .h(theme::ui_rem(PREVIEW_PLAYHEAD_HEIGHT))
+                    .w(px(1.0))
+                    .bg(color(palette.text_primary)),
+            )
+            .child(preview_timeline_handle(
+                TimelineDragTarget::Start,
+                start_target,
+                enabled,
+                state.playback.start_value(),
+                duration,
+                palette,
+                cx,
+            ))
+            .child(preview_timeline_handle(
+                TimelineDragTarget::End,
+                end_target,
+                enabled,
+                state.playback.end_value(),
+                duration,
+                palette,
+                cx,
+            )),
     )
-    .child(PreviewTimelineTrackBoundsProbe { owner: cx.entity() })
-    .child(
-        canvas(
-            move |bounds, window, cx| {
-                let scale = window.rem_size().as_f32() / crate::appearance::BASE_REM_PX;
-                measured_width.update(cx, |width, cx| {
-                    let next = bounds.size.width.as_f32() / scale;
-                    if (*width - next).abs() > 0.01 {
-                        *width = next;
-                        cx.notify();
-                    }
-                });
-            },
-            |_, (), _, _| {},
-        )
-        .absolute()
-        .size_full(),
-    )
-    .child(
-        div()
-            .absolute()
-            .left(relative(playhead_fraction))
-            .ml(px(-0.5))
-            .top(theme::ui_rem(playhead_top))
-            .h(theme::ui_rem(PREVIEW_PLAYHEAD_HEIGHT))
-            .w(px(1.0))
-            .bg(color(palette.text_primary)),
-    )
-    .child(preview_timeline_handle(
-        TimelineDragTarget::Start,
-        start_target,
-        enabled,
-        state.playback.start_value(),
-        duration,
-        palette,
-        cx,
-    ))
-    .child(preview_timeline_handle(
-        TimelineDragTarget::End,
-        end_target,
-        enabled,
-        state.playback.end_value(),
-        duration,
-        palette,
-        cx,
-    ))
 }
 
 pub(in crate::app) fn preview_timeline_handle(

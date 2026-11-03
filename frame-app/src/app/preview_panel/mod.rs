@@ -5,7 +5,8 @@ use super::{
         apply_accessible_toggle_button, focus_visible_ring, handle_modal_tab_navigation,
     },
     components::{
-        FrameIconButtonSize, FrameIconButtonVariant, frame_icon_button, frame_slider,
+        FrameIconButtonSize, FrameIconButtonVariant, frame_icon_button, frame_range_track,
+        frame_slider, frame_slider_content_bounds, frame_slider_fraction_from_bounds,
         frame_slider_handle,
     },
     input::{FrameTextInputSpec, frame_text_input},

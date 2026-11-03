@@ -4,12 +4,12 @@ use super::{
     apply_image_jpeg_quality, apply_image_png_compression, apply_image_png_prediction,
     apply_image_tiff_compression, apply_image_webp_compression, apply_image_webp_lossless,
     apply_image_webp_preset, apply_image_webp_quality, apply_pixel_format, color, div,
-    frame_choice_button, frame_list_item_with_caption, frame_slider, frame_slider_handle,
-    image_jpeg_huffman_options, image_png_prediction_options, image_tiff_compression_options,
-    image_webp_preset_options, range_fraction, range_value_for_key, range_value_from_fraction,
-    settings_field_label, settings_hint_text, settings_section, settings_value_badge,
-    settings_video_resolution_section, settings_video_scaling_section, theme,
-    timeline_slider_percent_from_bounds, video_pixel_format_options,
+    frame_choice_button, frame_list_item_with_caption, frame_slider,
+    frame_slider_fraction_from_bounds, frame_slider_handle, image_jpeg_huffman_options,
+    image_png_prediction_options, image_tiff_compression_options, image_webp_preset_options,
+    range_fraction, range_value_for_key, range_value_from_fraction, settings_field_label,
+    settings_hint_text, settings_section, settings_value_badge, settings_video_resolution_section,
+    settings_video_scaling_section, theme, video_pixel_format_options,
 };
 use gpui::{AppContext, InteractiveElement, prelude::FluentBuilder};
 
@@ -419,9 +419,13 @@ fn settings_image_range_slider(
         })
     })
     .on_drag_move(cx.listener(
-        |root, event: &DragMoveEvent<SettingsImageRangeDrag>, _window, cx| {
+        |root, event: &DragMoveEvent<SettingsImageRangeDrag>, window, cx| {
             let drag = *event.drag(cx);
-            let fraction = timeline_slider_percent_from_bounds(event.event.position, event.bounds);
+            let fraction = frame_slider_fraction_from_bounds(
+                event.event.position,
+                event.bounds,
+                window.rem_size(),
+            );
             let value = range_value_from_fraction(fraction, drag.min, drag.max);
             let changed = root.update_selected_config(|config| {
                 apply_settings_image_range_value(config, drag.target, value)

@@ -18,11 +18,10 @@ use super::{
         frame_select_popover, frame_select_scrollbar, frame_select_target_index,
         frame_select_trigger, frame_select_trigger_content,
         frame_select_trigger_content_with_focus, frame_select_trigger_with_focus, frame_slider,
-        frame_slider_handle, frame_text_button, frame_text_button_with_focus, frame_tooltip,
-        frame_track_list_item,
+        frame_slider_fraction_from_bounds, frame_slider_handle, frame_text_button,
+        frame_text_button_with_focus, frame_tooltip, frame_track_list_item,
     },
     input::{FrameTextInputSpec, frame_text_input},
-    preview_panel::timeline_slider_percent_from_bounds,
     primitives::{
         ButtonVariant, FrameSurface, animated_button_colors, apply_button_motion, button_colors,
         button_motion, color, icon_svg, panel_bottom_separator,

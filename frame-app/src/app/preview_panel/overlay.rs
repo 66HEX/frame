@@ -63,11 +63,14 @@ impl Element for PreviewOverlayOpacityBoundsProbe {
         _inspector_id: Option<&gpui::InspectorElementId>,
         bounds: Bounds<Pixels>,
         _request_layout: &mut Self::RequestLayoutState,
-        _window: &mut Window,
+        window: &mut Window,
         cx: &mut App,
     ) -> Self::PrepaintState {
         self.owner.update(cx, |root, _cx| {
-            root.set_preview_overlay_opacity_slider_bounds(bounds);
+            root.set_preview_overlay_opacity_slider_bounds(frame_slider_content_bounds(
+                bounds,
+                window.rem_size(),
+            ));
         });
     }
 
@@ -722,8 +725,12 @@ fn preview_overlay_opacity_slider(
         )
     })
     .on_drag_move(cx.listener(
-        |root, event: &DragMoveEvent<PreviewOverlayOpacityDrag>, _window, cx| {
-            let opacity = timeline_slider_percent_from_bounds(event.event.position, event.bounds);
+        |root, event: &DragMoveEvent<PreviewOverlayOpacityDrag>, window, cx| {
+            let opacity = frame_slider_fraction_from_bounds(
+                event.event.position,
+                event.bounds,
+                window.rem_size(),
+            );
             if root.set_selected_overlay_opacity(opacity) {
                 cx.notify();
             }

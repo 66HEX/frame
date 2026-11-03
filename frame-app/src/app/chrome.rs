@@ -5,10 +5,10 @@ use super::accessibility::{
 };
 use super::components::{
     FRAME_SELECT_MAX_HEIGHT, apply_frame_select_popover_focus_trap, frame_checkbox_row_with_focus,
-    frame_select_content_height, frame_select_option, frame_select_option_with_focus,
-    frame_select_options_list, frame_select_popover, frame_select_scrollbar,
-    frame_select_target_index, frame_select_trigger_with_focus, frame_text_button,
-    frame_text_button_with_focus, frame_vertical_scrollbar,
+    frame_range_track, frame_select_content_height, frame_select_option,
+    frame_select_option_with_focus, frame_select_options_list, frame_select_popover,
+    frame_select_scrollbar, frame_select_target_index, frame_select_trigger_with_focus,
+    frame_text_button, frame_text_button_with_focus, frame_vertical_scrollbar,
 };
 use super::input::{FrameTextInputSpec, frame_text_input};
 use super::primitives::{
@@ -1438,7 +1438,7 @@ fn update_progress_bar(
         |percent| format!("{percent}%"),
     );
 
-    div()
+    frame_range_track(0.0, fraction, palette)
         .id("app-settings-update-progress")
         .role(gpui::Role::ProgressIndicator)
         .aria_label("Update download progress")
@@ -1446,18 +1446,6 @@ fn update_progress_bar(
         .aria_min_numeric_value(0.0)
         .aria_max_numeric_value(100.0)
         .aria_value(value_text)
-        .h(theme::ui_rem(6.0))
-        .w_full()
-        .overflow_hidden()
-        .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .bg(color(palette.fill_subtle))
-        .child(
-            div()
-                .h_full()
-                .w(relative(fraction.clamp(0.0, 1.0)))
-                .rounded(theme::ui_rem(theme::RADIUS_SM))
-                .bg(color(palette.accent)),
-        )
 }
 
 fn update_download_detail(

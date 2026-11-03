@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **UI Surfaces:** Uses a shared layered shadow scale in both themes, with inset inputs and checkboxes, opaque cards, two-tone separators, and one-logical-pixel edges on every platform. Decorative borders are supplied by the shadow layers.
 - **Theme Colors:** Imports the complete Geist color palette and assigns semantic roles for backgrounds, cards, controls, text, focus, and status feedback. Light and dark themes use exact source values, without additional dark-mode dimming.
 - **Primary Actions:** Adds a neutral vertical gradient with a lighter top, the shared control shadow, and an inset highlight. Hover and pressed states retain the gradient in both themes; selected and disabled controls keep separate colors.
+- **Sliders and Progress:** Shares a rounded 10 px recessed track and 2 px fill inset across settings sliders, the trim timeline, and update progress. Pointer values, trim handles, and the playhead follow the inner range while keeping their larger hit areas.
 - **GPUI Framework:** Updates the vendored GPUI-CE snapshot to `bc57747`, adapting Frame to the new text and rendering APIs while preserving GPU preview transforms, reusable video textures, keyboard focus and accessibility, toolbar drag handling, and rounded Linux window frames.
 
 ### Fixed

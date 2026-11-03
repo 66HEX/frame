@@ -460,9 +460,13 @@ fn settings_audio_filter_range_slider(
         })
     })
     .on_drag_move(cx.listener(
-        |root, event: &DragMoveEvent<AudioFilterRangeDrag>, _window, cx| {
+        |root, event: &DragMoveEvent<AudioFilterRangeDrag>, window, cx| {
             let drag = *event.drag(cx);
-            let fraction = timeline_slider_percent_from_bounds(event.event.position, event.bounds);
+            let fraction = frame_slider_fraction_from_bounds(
+                event.event.position,
+                event.bounds,
+                window.rem_size(),
+            );
             let value = signed_range_value_from_fraction(fraction, drag.min, drag.max);
             if root.update_selected_config(|config| {
                 apply_audio_filter_range(config, drag.target, true, value)

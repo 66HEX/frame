@@ -154,6 +154,9 @@ pub const RADIUS_MD: f32 = RADIUS_BASE * 3.0;
 pub const RADIUS_LG: f32 = RADIUS_BASE * 4.0;
 pub const RADIUS_XL: f32 = RADIUS_BASE * 6.0;
 
+pub const RANGE_TRACK_HEIGHT: f32 = 10.0;
+pub const RANGE_TRACK_INSET: f32 = 2.0;
+
 pub const TEXT_UI_BASE_SIZE: f32 = 12.0;
 pub const TEXT_ROW_BASE_SIZE: f32 = 14.0;
 pub const TEXT_MARKDOWN_BASE_SIZE: f32 = 14.0;

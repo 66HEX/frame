@@ -75,7 +75,7 @@ pub const PREVIEW_TIMELINE_HANDLE_WIDTH: f32 = 24.0;
 pub const PREVIEW_TOOLBAR_OFFSET: f32 = 16.0;
 pub const PREVIEW_TOOLBAR_BUTTON_SIZE: f32 = 30.0;
 pub const PREVIEW_TOOLBAR_ICON_SIZE: f32 = 16.0;
-pub const PREVIEW_TRACK_HEIGHT: f32 = 6.0;
+pub const PREVIEW_TRACK_HEIGHT: f32 = theme::RANGE_TRACK_HEIGHT;
 pub const PREVIEW_PLAYHEAD_HEIGHT: f32 = 16.0;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
