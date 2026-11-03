@@ -1167,7 +1167,7 @@ fn settings_subtitle_font_select(
         );
 
         if content_height > FRAME_SELECT_MAX_HEIGHT {
-            popover = popover.child(frame_vertical_scrollbar(
+            popover = popover.child(frame_select_scrollbar(
                 "settings-subtitle-font-options-scrollbar",
                 state.scroll_handle.clone(),
                 content_height,
@@ -1363,7 +1363,7 @@ fn settings_subtitle_font_size_select(
         );
 
         if content_height > FRAME_SELECT_MAX_HEIGHT {
-            popover = popover.child(frame_vertical_scrollbar(
+            popover = popover.child(frame_select_scrollbar(
                 "settings-subtitle-font-size-options-scrollbar",
                 state.scroll_handle.clone(),
                 content_height,

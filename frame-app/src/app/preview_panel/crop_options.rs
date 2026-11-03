@@ -7,8 +7,8 @@ use super::{
 };
 use crate::app::components::{
     FRAME_SELECT_MAX_HEIGHT, frame_select_content_height, frame_select_option_with_focus,
-    frame_select_options_list, frame_select_popover, frame_select_target_index,
-    frame_select_trigger_with_focus, frame_vertical_scrollbar,
+    frame_select_options_list, frame_select_popover, frame_select_scrollbar,
+    frame_select_target_index, frame_select_trigger_with_focus,
 };
 use crate::app::motion::{motion_is_hidden, popover_slide_offset, surface_motion};
 
@@ -508,7 +508,7 @@ fn crop_select(
     );
     let content_height = frame_select_content_height(count);
     if content_height > FRAME_SELECT_MAX_HEIGHT {
-        popover = popover.child(frame_vertical_scrollbar(
+        popover = popover.child(frame_select_scrollbar(
             "crop-options-scrollbar",
             props.scroll.clone(),
             content_height,

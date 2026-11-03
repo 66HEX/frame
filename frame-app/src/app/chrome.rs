@@ -6,9 +6,9 @@ use super::accessibility::{
 use super::components::{
     FRAME_SELECT_MAX_HEIGHT, apply_frame_select_popover_focus_trap, frame_checkbox_row_with_focus,
     frame_select_content_height, frame_select_option, frame_select_option_with_focus,
-    frame_select_options_list, frame_select_popover, frame_select_target_index,
-    frame_select_trigger_with_focus, frame_text_button, frame_text_button_with_focus,
-    frame_vertical_scrollbar,
+    frame_select_options_list, frame_select_popover, frame_select_scrollbar,
+    frame_select_target_index, frame_select_trigger_with_focus, frame_text_button,
+    frame_text_button_with_focus, frame_vertical_scrollbar,
 };
 use super::input::{FrameTextInputSpec, frame_text_input};
 use super::primitives::{
@@ -977,7 +977,7 @@ fn app_settings_appearance_select<T: AppSettingsAppearanceValue>(
             );
         }
         if content_height > FRAME_SELECT_MAX_HEIGHT {
-            menu = menu.child(frame_vertical_scrollbar(
+            menu = menu.child(frame_select_scrollbar(
                 T::SCROLLBAR_ID,
                 scroll_handle.clone(),
                 content_height,
