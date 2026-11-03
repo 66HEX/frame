@@ -94,6 +94,23 @@ pub const OVERLAY_IMAGE_DIALOG_SPEC: NativeDialogSpec = NativeDialogSpec {
     allows_multiple: false,
 };
 
+pub const EXPORT_FRAME_DIALOG_FILTERS: [NativeDialogFilterSpec; 2] = [
+    NativeDialogFilterSpec {
+        label: "PNG Image",
+        extensions: &["png"],
+    },
+    NativeDialogFilterSpec {
+        label: "WebP Image",
+        extensions: &["webp"],
+    },
+];
+
+pub const EXPORT_FRAME_DIALOG_SPEC: NativeDialogSpec = NativeDialogSpec {
+    title: "Export Frame",
+    filters: &EXPORT_FRAME_DIALOG_FILTERS,
+    allows_multiple: false,
+};
+
 pub async fn pick_source_files(dialog: AsyncFileDialog) -> Option<Vec<PathBuf>> {
     dialog
         .pick_files()
@@ -160,6 +177,17 @@ pub fn external_subtitle_file_dialog(parent: &Window, container: &str) -> AsyncF
 #[must_use]
 pub fn overlay_image_dialog(parent: &Window) -> AsyncFileDialog {
     file_dialog_from_spec(OVERLAY_IMAGE_DIALOG_SPEC).set_parent(parent)
+}
+
+pub async fn pick_export_frame_path(dialog: AsyncFileDialog) -> Option<PathBuf> {
+    dialog.save_file().await.as_ref().map(file_handle_to_path)
+}
+
+#[must_use]
+pub fn export_frame_dialog(parent: &Window, default_name: &str) -> AsyncFileDialog {
+    file_dialog_from_spec(EXPORT_FRAME_DIALOG_SPEC)
+        .set_parent(parent)
+        .set_file_name(default_name)
 }
 
 fn file_dialog_from_spec(spec: NativeDialogSpec) -> AsyncFileDialog {
@@ -254,6 +282,7 @@ mod tests {
             assert!(!SUBTITLE_FILE_DIALOG_SPEC.allows_multiple);
             assert!(EXTERNAL_SUBTITLE_FILE_DIALOG_SPEC.allows_multiple);
             assert!(!OVERLAY_IMAGE_DIALOG_SPEC.allows_multiple);
+            assert!(!EXPORT_FRAME_DIALOG_SPEC.allows_multiple);
         }
     }
 
