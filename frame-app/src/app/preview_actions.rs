@@ -97,7 +97,14 @@ impl FrameRoot {
             return;
         }
 
-        if self.preview_ui.pending_runtime_key.is_some() {
+        // Keep one rebuild per source in flight. On completion the next render
+        // requests the latest preset, skipping intermediate selections.
+        if self
+            .preview_ui
+            .pending_runtime_key
+            .as_ref()
+            .is_some_and(|pending| pending.can_reconfigure_to(&request.key))
+        {
             return;
         }
 
@@ -105,84 +112,81 @@ impl FrameRoot {
             return;
         }
 
-        if let (Some(session), Some(current_key)) = (
-            self.preview_ui.session.clone(),
-            self.preview_ui.runtime_key.as_ref(),
-        ) && current_key.can_reconfigure_to(&request.key)
-        {
-            let key = request.key.clone();
-            self.preview_ui.pending_runtime_key = Some(key.clone());
-            cx.spawn(async move |this, cx| {
-                let config = request.config;
-                let result = cx
-                    .background_spawn({
-                        let session = Arc::clone(&session);
-                        async move { session.reconfigure(config) }
-                    })
-                    .await;
-
-                this.update(cx, move |root, cx| {
-                    if root.preview_ui.pending_runtime_key.as_ref() != Some(&key) {
-                        return;
-                    }
-
-                    root.preview_ui.pending_runtime_key = None;
-                    match result {
-                        Ok(()) => {
-                            root.preview_ui.runtime_key = Some(key);
-                            root.preview_ui.session = Some(session);
-                            root.preview_ui.runtime_error = None;
-                            root.refresh_preview_render_image(cx);
-                            root.schedule_preview_frame_tick(cx);
-                        }
-                        Err(error) => {
-                            root.preview_ui.runtime_error = Some(error.to_string());
-                        }
-                    }
-                    cx.notify();
-                })
-                .ok();
-            })
-            .detach();
-            return;
+        let session = self.preview_ui.session.clone().filter(|_| {
+            self.preview_ui
+                .runtime_key
+                .as_ref()
+                .is_some_and(|current| current.can_reconfigure_to(&request.key))
+        });
+        if session.is_none() {
+            self.clear_preview_runtime_for_selection(cx);
         }
 
-        self.clear_preview_runtime_for_selection(cx);
-
         let key = request.key.clone();
+        self.preview_ui.runtime_request_generation =
+            self.preview_ui.runtime_request_generation.wrapping_add(1);
+        let generation = self.preview_ui.runtime_request_generation;
         self.preview_ui.pending_runtime_key = Some(key.clone());
         cx.spawn(async move |this, cx| {
             let config = request.config;
             let result = cx
-                .background_spawn(async move { PreviewSession::start(config).map(Arc::new) })
+                .background_spawn(async move {
+                    if let Some(session) = session {
+                        session.reconfigure(config)?;
+                        Ok(session)
+                    } else {
+                        PreviewSession::start(config).map(Arc::new)
+                    }
+                })
                 .await;
 
-            this.update(cx, move |root, cx| {
-                if root.preview_ui.pending_runtime_key.as_ref() != Some(&key) {
-                    if let Ok(session) = result {
-                        session.stop().ok();
+            // Retain ownership outside the UI callback: a rejected result (or
+            // a closed window) must also release its processes in the background.
+            let accepted = this
+                .update(cx, |root, cx| {
+                    root.finish_preview_runtime_request(generation, &key, &result, cx)
+                })
+                .unwrap_or(false);
+            if !accepted && let Ok(session) = result {
+                cx.background_spawn(async move {
+                    if let Err(error) = session.stop() {
+                        eprintln!("Failed to stop the stale FFmpeg preview runtime: {error}");
                     }
-                    return;
-                }
-
-                root.preview_ui.pending_runtime_key = None;
-                match result {
-                    Ok(session) => {
-                        root.preview_ui.runtime_key = Some(key);
-                        root.preview_ui.session = Some(session);
-                        root.preview_ui.runtime_error = None;
-                        root.refresh_preview_render_image(cx);
-                        root.schedule_preview_frame_tick(cx);
-                    }
-                    Err(error) => {
-                        root.preview_ui.runtime_error = Some(error.to_string());
-                    }
-                }
-                cx.notify();
-            })
-            .ok();
+                })
+                .detach();
+            }
         })
         .detach();
+    }
+
+    fn finish_preview_runtime_request(
+        &mut self,
+        generation: u64,
+        key: &PreviewRuntimeKey,
+        result: &Result<Arc<PreviewSession>, PreviewEngineError>,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        if self.preview_ui.runtime_request_generation != generation
+            || self.preview_ui.pending_runtime_key.as_ref() != Some(key)
+        {
+            return false;
+        }
+
+        self.preview_ui.pending_runtime_key = None;
+        match result {
+            Ok(session) => {
+                self.preview_ui.runtime_key = Some(key.clone());
+                self.preview_ui.session = Some(Arc::clone(session));
+                self.preview_ui.runtime_error = None;
+                self.refresh_preview_render_image(cx);
+                self.schedule_preview_frame_tick(cx);
+            }
+            Err(error) => {
+                self.preview_ui.runtime_error = Some(error.to_string());
+            }
+        }
+        cx.notify();
+        true
     }
 
     pub(super) fn preview_render_image(&self) -> Option<Arc<RenderImage>> {
@@ -631,12 +635,8 @@ impl FrameRoot {
     pub(super) fn clear_preview_runtime(
         &mut self,
         cx: &mut Context<Self>,
-    ) -> Result<(), crate::preview_engine::PreviewEngineError> {
-        let stop_result = self
-            .preview_ui
-            .session
-            .take()
-            .map_or(Ok(()), |session| session.stop());
+    ) -> gpui::Task<Result<(), PreviewEngineError>> {
+        let session = self.preview_ui.session.take();
         if let Some(image) = self.preview_ui.render_image.take() {
             cx.drop_image(image, None);
         }
@@ -644,16 +644,27 @@ impl FrameRoot {
         self.preview_ui.preview_dimensions_debounce_until = None;
         self.preview_ui.runtime_key = None;
         self.preview_ui.pending_runtime_key = None;
+        self.preview_ui.runtime_request_generation =
+            self.preview_ui.runtime_request_generation.wrapping_add(1);
+        self.preview_ui.media_command_generation =
+            self.preview_ui.media_command_generation.wrapping_add(1);
         self.preview_ui.trim_preview_seek.reset();
         self.preview_ui.render_generation = 0;
         self.preview_ui.runtime_error = None;
-        stop_result
+        session.map_or_else(
+            || gpui::Task::ready(Ok(())),
+            |session| cx.background_spawn(async move { session.stop() }),
+        )
     }
 
     fn clear_preview_runtime_for_selection(&mut self, cx: &mut Context<Self>) {
-        if let Err(error) = self.clear_preview_runtime(cx) {
-            eprintln!("Failed to stop the FFmpeg preview runtime: {error}");
-        }
+        let stop = self.clear_preview_runtime(cx);
+        cx.background_spawn(async move {
+            if let Err(error) = stop.await {
+                eprintln!("Failed to stop the FFmpeg preview runtime: {error}");
+            }
+        })
+        .detach();
     }
 
     fn refresh_preview_render_image(&mut self, cx: &mut Context<Self>) -> bool {
@@ -2636,4 +2647,95 @@ pub(in crate::app) fn preview_canvas_transform_settled(
     (target_zoom - current_zoom).abs() <= PREVIEW_CANVAS_ZOOM_SNAP_EPSILON
         && (target_pan_x - current_pan_x).abs() <= PREVIEW_CANVAS_PAN_SNAP_EPSILON
         && (target_pan_y - current_pan_y).abs() <= PREVIEW_CANVAS_PAN_SNAP_EPSILON
+}
+
+#[cfg(test)]
+mod runtime_tests {
+    use super::*;
+    use gpui::{AppContext, TestAppContext};
+
+    #[test]
+    fn stale_preview_completion_cannot_replace_a_new_request_for_the_same_key() {
+        let mut app = TestAppContext::single();
+        let root = app.new(|_| FrameRoot::new());
+        root.update(&mut app, |root, cx| {
+            root.apply_visual_fixture(Some(VisualFixture::PreviewReady));
+            let metadata = root.selected_source_metadata_entry();
+            let request = root.selected_preview_runtime_request(&metadata).unwrap();
+            let old_generation = root.preview_ui.runtime_request_generation;
+            root.preview_ui.pending_runtime_key = Some(request.key.clone());
+            let old_command_generation = root.preview_ui.media_command_generation;
+
+            root.clear_preview_runtime(cx).detach();
+            assert_ne!(
+                root.preview_ui.media_command_generation,
+                old_command_generation
+            );
+            root.preview_ui.pending_runtime_key = Some(request.key.clone());
+            let new_generation = root.preview_ui.runtime_request_generation;
+            let result = Ok(Arc::new(PreviewSession::new_for_test(request.config)));
+            assert!(!root.finish_preview_runtime_request(
+                old_generation,
+                &request.key,
+                &result,
+                cx
+            ));
+            assert!(root.preview_ui.session.is_none());
+            assert_eq!(
+                root.preview_ui.pending_runtime_key.as_ref(),
+                Some(&request.key)
+            );
+
+            let error = Err(PreviewEngineError::Ffmpeg("stale failure".to_string()));
+            assert!(!root.finish_preview_runtime_request(old_generation, &request.key, &error, cx));
+            assert!(root.preview_ui.runtime_error.is_none());
+
+            root.preview_ui.frame_tick_active = true;
+            assert!(root.finish_preview_runtime_request(new_generation, &request.key, &result, cx));
+            assert_eq!(root.preview_ui.runtime_key, Some(request.key));
+            assert!(root.preview_ui.pending_runtime_key.is_none());
+            assert!(Arc::ptr_eq(
+                root.preview_ui.session.as_ref().unwrap(),
+                result.as_ref().unwrap()
+            ));
+        });
+    }
+
+    #[test]
+    fn preset_changes_coalesce_while_a_rebuild_is_pending_and_keep_the_old_frame() {
+        let mut app = TestAppContext::single();
+        let root = app.new(|_| FrameRoot::new());
+        root.update(&mut app, |root, cx| {
+            root.apply_visual_fixture(Some(VisualFixture::PreviewReady));
+            let metadata = root.selected_source_metadata_entry();
+            let current = root.selected_preview_runtime_request(&metadata).unwrap();
+            let session = Arc::new(PreviewSession::new_for_test(current.config));
+            let frame =
+                crate::preview_engine::rendered_frame_from_bgra_payload(1, 1, 4, 0, vec![0; 4])
+                    .unwrap();
+            let _ = session.frame_store().publish(frame);
+            root.preview_ui.session = Some(Arc::clone(&session));
+            root.refresh_preview_render_image(cx);
+            let image = root.preview_ui.render_image.clone().unwrap();
+            root.preview_ui.runtime_key = Some(current.key.clone());
+            let mut pending_key = current.key.clone();
+            pending_key.visual_hash = current.key.visual_hash.wrapping_add(1);
+            root.preview_ui.pending_runtime_key = Some(pending_key.clone());
+
+            let mut latest = root.selected_preview_runtime_request(&metadata).unwrap();
+            latest.key.visual_hash = current.key.visual_hash.wrapping_add(2);
+            root.sync_preview_runtime_for_selection(Some(latest), cx);
+
+            assert_eq!(root.preview_ui.runtime_key, Some(current.key));
+            assert_eq!(root.preview_ui.pending_runtime_key, Some(pending_key));
+            assert!(Arc::ptr_eq(
+                root.preview_ui.session.as_ref().unwrap(),
+                &session
+            ));
+            assert!(Arc::ptr_eq(
+                root.preview_ui.render_image.as_ref().unwrap(),
+                &image
+            ));
+        });
+    }
 }

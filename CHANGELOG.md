@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Shadow Rendering:** Prevents layered outer shadows from darkening translucent fills by clipping them outside rounded surface bounds, including smoothed corners.
 - **Canvas Edges:** Keeps the recessed shadow and highlight visible when media reaches the viewport edge by painting them above media and crop content, below floating controls.
 - **Selection Animation:** Removes the black flash at the start and end of list selection transitions by preserving transparency when the interpolated alpha is near zero.
+- **Preview Responsiveness:** Separates playback snapshots from FFmpeg rebuild locks and stops old sessions in the background. Preset changes retain the last frame, skip intermediate rebuild requests, and reject stale results after a source change.
 - **Reduced Motion:** Follows the system motion preference on macOS, Windows, and Linux desktops exposing the portal setting, including changes made while Frame is running. UI transitions and preview zoom/pan settle immediately when motion is reduced; media playback remains unchanged.
 - **Tab Navigation:** Moves keyboard focus with the selected settings or main-view tab, keeps one Tab stop per tab rail, and restores focus to the fallback tab when the focused section becomes unavailable.
 - **Pointer Targets:** Enlarges slider, scrollbar, crop, overlay, and trim hit areas while retaining their visible sizes. Scrollbars have reserved space beside list content, and neighboring resize handles stay separate on small selections.

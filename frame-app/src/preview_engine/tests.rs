@@ -314,6 +314,30 @@ fn ffmpeg_preview_session_reconfigure_preserves_playback_position() {
 }
 
 #[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn ffmpeg_preview_session_reports_eof_through_read_only_snapshots() {
+    let path = temp_preview_video("read-only-eof");
+    let session = PreviewSession::start(real_video_preview_config(path.clone())).expect("session");
+    session.command(PreviewCommand::Play).expect("play");
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let ended = loop {
+        let playback = session.snapshot().playback;
+        if !playback.playing || Instant::now() >= deadline {
+            break playback;
+        }
+        thread::sleep(Duration::from_millis(10));
+    };
+    session.stop().expect("stop");
+    let _ = std::fs::remove_file(&path);
+
+    assert!(
+        !ended.playing,
+        "the worker must publish EOF without UI process polling"
+    );
+    assert_eq!(ended.position_seconds, ended.duration_seconds);
+}
+
+#[test]
 #[ignore = "requires FFmpeg plus a default audio output device; run with --ignored"]
 fn ffmpeg_preview_session_collects_audio_video_metrics_for_sync_fixture() {
     let path = temp_preview_av_sync_video("av-sync");

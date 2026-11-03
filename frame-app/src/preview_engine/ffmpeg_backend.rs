@@ -28,8 +28,9 @@ use crate::{
 
 use super::metrics::{PreviewRuntimeMetricsStore, log_preview_runtime_metrics};
 use super::{
-    LatestFrameStore, PreviewDimensions, PreviewEngineError, PreviewRenderedFrame,
-    PreviewSessionConfig, PreviewSourceKind, rendered_frame_from_bgra_payload_with_image_id,
+    LatestFrameStore, PreviewDimensions, PreviewEngineError, PreviewPlaybackSnapshot,
+    PreviewRenderedFrame, PreviewSessionConfig, PreviewSourceKind,
+    rendered_frame_from_bgra_payload_with_image_id,
 };
 
 const STDERR_RING_LINES: usize = 24;
@@ -71,6 +72,32 @@ struct PreviewPlaybackClock {
     started_at: Instant,
     playing: bool,
     ended: bool,
+}
+
+/// Read-only clock access for UI snapshots. It never owns or reaps `FFmpeg` processes.
+#[derive(Clone)]
+pub(super) struct PreviewPlaybackReader {
+    clock: Arc<Mutex<PreviewPlaybackClock>>,
+}
+
+impl PreviewPlaybackReader {
+    pub(super) fn snapshot(&self, duration_seconds: f64, playing: bool) -> PreviewPlaybackSnapshot {
+        let clock = *lock_playback(&self.clock);
+        let position_seconds = if clock.ended {
+            duration_seconds
+        } else if clock.playing {
+            (clock.base_seconds + clock.started_at.elapsed().as_secs_f64())
+                .max(clock.last_frame_seconds)
+        } else {
+            clock.last_frame_seconds
+        };
+        PreviewPlaybackSnapshot {
+            position_seconds,
+            duration_seconds,
+            // Rebuilding briefly parks the clock while retaining playback intent.
+            playing: playing && !clock.ended,
+        }
+    }
 }
 
 struct ProcessHandles {
@@ -452,6 +479,13 @@ impl RunningPreviewProcess {
         }
 
         self.start_streaming(seconds, precise)
+    }
+
+    #[must_use]
+    pub(super) fn playback_reader(&self) -> PreviewPlaybackReader {
+        PreviewPlaybackReader {
+            clock: Arc::clone(&self.playback),
+        }
     }
 
     #[must_use]
@@ -2062,6 +2096,41 @@ mod tests {
         assert!((clock.last_frame_seconds - 2.5).abs() <= f64::EPSILON);
         assert!(!clock.playing);
         assert!(!clock.ended);
+    }
+
+    #[test]
+    fn playback_reader_tracks_pause_play_and_eof_without_process_access() {
+        let reader = PreviewPlaybackReader {
+            clock: Arc::new(Mutex::new(PreviewPlaybackClock {
+                generation: 0,
+                base_seconds: 2.5,
+                last_frame_seconds: 2.5,
+                started_at: Instant::now()
+                    .checked_sub(Duration::from_millis(500))
+                    .unwrap(),
+                playing: false,
+                ended: false,
+            })),
+        };
+        let paused = reader.snapshot(12.5, false);
+        assert!((paused.position_seconds - 2.5).abs() <= f64::EPSILON);
+        assert!(!paused.playing);
+
+        lock_playback(&reader.clock).playing = true;
+        let playing = reader.snapshot(12.5, true);
+        assert!(playing.position_seconds >= 3.0);
+        assert!(playing.playing);
+
+        lock_playback(&reader.clock).playing = false;
+        assert!(
+            reader.snapshot(12.5, true).playing,
+            "a parked rebuild keeps playback intent"
+        );
+
+        lock_playback(&reader.clock).ended = true;
+        let ended = reader.snapshot(12.5, true);
+        assert!((ended.position_seconds - 12.5).abs() <= f64::EPSILON);
+        assert!(!ended.playing);
     }
 
     #[test]

@@ -302,16 +302,20 @@ impl FrameRoot {
                 return;
             }
 
-            let preview_result = this
+            let preview_stop = this
                 .update(cx, |root, cx| {
                     if !root.update_installation_in_progress() {
                         return Err(UpdateInstallationError::ConversionStateChanged);
                     }
-                    root.clear_preview_runtime(cx)?;
+                    let stop = root.clear_preview_runtime(cx);
                     cx.notify();
-                    Ok(())
+                    Ok(stop)
                 })
                 .unwrap_or(Err(UpdateInstallationError::ConversionStateChanged));
+            let preview_result = match preview_stop {
+                Ok(stop) => stop.await.map_err(UpdateInstallationError::from),
+                Err(error) => Err(error),
+            };
             if let Err(error) = preview_result {
                 let rollback_result = cx
                     .background_spawn(async move { store.discard_pending() })
