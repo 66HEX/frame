@@ -1,18 +1,13 @@
 //! Source metadata state and ffprobe integration for the GPUI app.
 
-use std::{collections::HashMap, process::Command};
-
-use frame_core::{
-    error::ConversionError,
-    probe::{ffprobe_json_args, parse_ffprobe_stdout},
-    types::{FfprobeTags, ProbeMetadata},
-};
-
-use crate::{
-    file_queue::FileQueue,
-    runtime_binaries::ffprobe_executable,
-    settings::{AudioTrack, SourceKind, SourceMetadata, SourceTags, SubtitleTrack},
-};
+use crate::file_queue::FileQueue;
+use crate::runtime_binaries::ffprobe_executable;
+use crate::settings::{AudioTrack, SourceKind, SourceMetadata, SourceTags, SubtitleTrack};
+use frame_core::error::ConversionError;
+use frame_core::probe::{ffprobe_json_args, parse_ffprobe_stdout};
+use frame_core::types::{FfprobeTags, ProbeMetadata};
+use std::collections::HashMap;
+use std::process::Command;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum MetadataStatus {

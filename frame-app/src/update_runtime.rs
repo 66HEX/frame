@@ -1,14 +1,13 @@
 //! Runtime configuration for Frame update checks.
 
-use std::time::{SystemTime, UNIX_EPOCH};
-
+use crate::app_info::FRAME_APP_ID;
+use crate::runtime_environment;
 use frame_updater::{
     InstallContext, UpdateChannel, UpdateClient, UpdateClientConfig, UpdateError,
     default_cache_dir, default_manifest_url, detect_install_context,
 };
 use semver::Version;
-
-use crate::{app_info::FRAME_APP_ID, runtime_environment};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const AUTO_UPDATE_CHECK_INTERVAL_SECS: u64 = 24 * 60 * 60;
 const UPDATE_EXPLANATION_ENV: &str = "FRAME_UPDATE_EXPLANATION";

@@ -1,12 +1,9 @@
-use std::{
-    collections::{HashMap, HashSet},
-    sync::{Arc, Mutex, MutexGuard},
-};
-
-use frame_core::{error::ConversionError, types::DEFAULT_MAX_CONCURRENCY};
-use sysinfo::{Pid, ProcessesToUpdate, System};
-
 use super::process::{pause_process, resume_process, terminate_process};
+use frame_core::error::ConversionError;
+use frame_core::types::DEFAULT_MAX_CONCURRENCY;
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex, MutexGuard};
+use sysinfo::{Pid, ProcessesToUpdate, System};
 
 #[derive(Clone, Debug, Default)]
 pub struct ConversionProcessController {

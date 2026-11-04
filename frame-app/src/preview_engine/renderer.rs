@@ -1,13 +1,11 @@
-use std::sync::Arc;
-
-use gpui::{ImageId, RenderImage};
-use image::{Frame, RgbaImage};
-use smallvec::SmallVec;
-
 use super::{
     PreviewEngineError, PreviewFrame, PreviewPixelFormat, PreviewRenderedFrame,
     validate_frame_layout,
 };
+use gpui::{ImageId, RenderImage};
+use image::{Frame, RgbaImage};
+use smallvec::SmallVec;
+use std::sync::Arc;
 
 /// Converts a preview frame into a GPUI render image.
 ///

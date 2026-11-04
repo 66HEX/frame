@@ -1,8 +1,7 @@
-use frame_app::{
-    app::{init_app, open_frame_window},
-    app_info::FRAME_APP_NAME,
-    assets::{self, FrameAssets},
-};
+use frame_app::app::{init_app, open_frame_window};
+use frame_app::app_info::FRAME_APP_NAME;
+use frame_app::assets;
+use frame_app::assets::FrameAssets;
 
 fn main() {
     gpui_platform::application()

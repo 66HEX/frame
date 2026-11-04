@@ -1,7 +1,5 @@
-use std::{
-    sync::{Arc, Mutex, MutexGuard, OnceLock},
-    time::{Duration, Instant},
-};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
+use std::time::{Duration, Instant};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PreviewRuntimeMetrics {

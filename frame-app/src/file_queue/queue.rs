@@ -1,10 +1,7 @@
+use super::format::derive_output_name;
+use super::item::FileItem;
+use super::status::{BatchSelectionState, FileStatus};
 use crate::settings::sanitize_output_name;
-
-use super::{
-    format::derive_output_name,
-    item::FileItem,
-    status::{BatchSelectionState, FileStatus},
-};
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FileQueue {

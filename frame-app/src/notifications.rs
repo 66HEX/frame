@@ -1,33 +1,24 @@
 //! Native desktop notifications for app-level events.
 
-use std::{sync::Arc, thread};
-
-#[cfg(target_os = "macos")]
-use std::{
-    sync::Once,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
-
-use notify_rust::{Notification, Timeout};
-
-#[cfg(target_os = "linux")]
-use ashpd::{
-    Error as PortalError,
-    desktop::{
-        Icon,
-        notification::{
-            Notification as PortalNotification, NotificationProxy, Priority as PortalPriority,
-        },
-    },
-};
-
-use crate::{
-    app_info::FRAME_APP_NAME,
-    file_queue::{FileQueue, FileStatus},
-};
-
+use crate::app_info::FRAME_APP_NAME;
+use crate::file_queue::{FileQueue, FileStatus};
 #[cfg(target_os = "linux")]
 use crate::runtime_environment;
+#[cfg(target_os = "linux")]
+use ashpd::Error as PortalError;
+#[cfg(target_os = "linux")]
+use ashpd::desktop::Icon;
+#[cfg(target_os = "linux")]
+use ashpd::desktop::notification::{
+    Notification as PortalNotification, NotificationProxy, Priority as PortalPriority,
+};
+use notify_rust::{Notification, Timeout};
+use std::sync::Arc;
+#[cfg(target_os = "macos")]
+use std::sync::Once;
+use std::thread;
+#[cfg(target_os = "macos")]
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const CONVERSION_FINISHED_TITLE: &str = "Queue Finished";
 const FRAME_NOTIFICATION_ICON: &str = "frame";
@@ -324,10 +315,9 @@ fn macos_delivery_timestamp() -> f64 {
 
 #[cfg(test)]
 mod tests {
-    use std::cell::Cell;
-
     use super::*;
     use crate::file_queue::FileItem;
+    use std::cell::Cell;
 
     fn queue_with_statuses(statuses: &[(&str, FileStatus)]) -> FileQueue {
         let mut queue = FileQueue::new();

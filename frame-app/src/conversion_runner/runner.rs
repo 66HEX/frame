@@ -1,24 +1,19 @@
-use std::{
-    collections::VecDeque,
-    io::Read,
-    process::{Command, Stdio},
-    sync::mpsc::{self, RecvTimeoutError},
-    thread,
-    time::Duration,
-};
-
-use frame_core::{
-    args::{build_ffmpeg_args, build_output_path, validate_task_input},
-    error::ConversionError,
-    events::ConversionEvent,
-    probe::{ffprobe_json_args, parse_ffprobe_stdout},
-    types::{ConversionConfig as CoreConversionConfig, ConversionTask, ProbeMetadata},
-    utils::{DURATION_REGEX, TIME_REGEX, parse_time},
-};
-
+use super::controller::ConversionProcessController;
+use super::output_paths::disambiguate_output_paths;
 use crate::runtime_binaries::{ffmpeg_executable, ffprobe_executable};
-
-use super::{controller::ConversionProcessController, output_paths::disambiguate_output_paths};
+use frame_core::args::{build_ffmpeg_args, build_output_path, validate_task_input};
+use frame_core::error::ConversionError;
+use frame_core::events::ConversionEvent;
+use frame_core::probe::{ffprobe_json_args, parse_ffprobe_stdout};
+use frame_core::types::{ConversionConfig as CoreConversionConfig, ConversionTask, ProbeMetadata};
+use frame_core::utils::{DURATION_REGEX, TIME_REGEX, parse_time};
+use std::collections::VecDeque;
+use std::io::Read;
+use std::process::{Command, Stdio};
+use std::sync::mpsc;
+use std::sync::mpsc::RecvTimeoutError;
+use std::thread;
+use std::time::Duration;
 
 /// Runs a single conversion task with a default process controller.
 ///

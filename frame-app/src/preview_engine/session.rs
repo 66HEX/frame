@@ -1,5 +1,3 @@
-use std::sync::{Mutex, MutexGuard};
-
 use super::ffmpeg_backend::PreviewPlaybackReader;
 use super::metrics::PreviewRuntimeMetricsStore;
 use super::{
@@ -7,6 +5,7 @@ use super::{
     PreviewPlaybackSnapshot, PreviewSessionConfig, PreviewSessionSnapshot, PreviewSessionStatus,
     PreviewSourceKind, RunningPreviewProcess, start_ffmpeg_preview_process,
 };
+use std::sync::{Mutex, MutexGuard};
 
 pub struct PreviewSession {
     config: Mutex<PreviewSessionConfig>,
@@ -222,12 +221,10 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{
-        path::PathBuf,
-        sync::{Arc, mpsc},
-        thread,
-        time::Duration,
-    };
+    use std::path::PathBuf;
+    use std::sync::{Arc, mpsc};
+    use std::thread;
+    use std::time::Duration;
 
     fn test_config() -> PreviewSessionConfig {
         PreviewSessionConfig {

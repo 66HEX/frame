@@ -3,15 +3,12 @@
     reason = "Preview engine tests compare exact deterministic timestamps and dimensions."
 )]
 
-use std::{
-    path::PathBuf,
-    process::Command,
-    sync::Arc,
-    thread,
-    time::{Duration, Instant},
-};
-
 use super::*;
+use std::path::PathBuf;
+use std::process::Command;
+use std::sync::Arc;
+use std::thread;
+use std::time::{Duration, Instant};
 
 fn default_core_config() -> frame_core::types::ConversionConfig {
     crate::conversion_runner::core_config_from_gpui(&crate::settings::ConversionConfig::default())

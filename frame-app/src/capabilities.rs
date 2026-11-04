@@ -1,16 +1,12 @@
 //! Runtime encoder capability detection for the native app.
 
-use std::{
-    io,
-    process::{Command, Stdio},
-};
-
+use crate::runtime_binaries::ffmpeg_executable;
 use frame_core::capabilities::{
     AvailableEncoders, AvailableFilters, ffmpeg_encoder_list_args, ffmpeg_filter_list_args,
     parse_available_encoders, parse_available_filters,
 };
-
-use crate::runtime_binaries::ffmpeg_executable;
+use std::io;
+use std::process::{Command, Stdio};
 
 #[derive(Debug, thiserror::Error)]
 pub enum CapabilityDetectionError {

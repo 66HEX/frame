@@ -1,11 +1,8 @@
 //! Bundled assets for the GPUI app.
 
-use std::{
-    borrow::Cow,
-    sync::{Arc, OnceLock},
-};
-
 use gpui::{App, AssetSource, FontFeatures, Result, SharedString};
+use std::borrow::Cow;
+use std::sync::{Arc, OnceLock};
 
 pub const FRAME_FONT_FAMILY: &str = "Overused Grotesk";
 pub const FRAME_FONT_ALIAS: &str = "OverusedGrotesk";

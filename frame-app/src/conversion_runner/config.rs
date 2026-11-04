@@ -1,29 +1,24 @@
-use frame_core::{
-    media_rules,
-    types::{
-        AudioFiltersConfig as CoreAudioFiltersConfig, ConversionConfig as CoreConversionConfig,
-        ConversionTask, CropConfig, DeinterlaceMode as CoreDeinterlaceMode,
-        FilterStrength as CoreFilterStrength, FilterValue as CoreFilterValue,
-        MetadataConfig as CoreMetadataConfig, MetadataMode as CoreMetadataMode, OverlayConfig,
-        VideoColorFiltersConfig as CoreVideoColorFiltersConfig,
-        VideoFiltersConfig as CoreVideoFiltersConfig,
-    },
+use crate::file_queue::FileItem;
+use crate::settings::{
+    AudioFiltersConfig as GpuiAudioFiltersConfig, ConversionConfig as GpuiConversionConfig,
+    CropSettings, DEFAULT_AUDIO_BITRATE, DEFAULT_AUDIO_BITRATE_MODE, DEFAULT_AUDIO_CHANNELS,
+    DEFAULT_AUDIO_QUALITY, DEFAULT_FPS, DEFAULT_GIF_COLORS, DEFAULT_GIF_DITHER,
+    DEFAULT_PIXEL_FORMAT, DEFAULT_PRESET, DEFAULT_RESOLUTION, DEFAULT_SCALING_ALGORITHM,
+    DEFAULT_VIDEO_BITRATE, DEFAULT_VIDEO_BITRATE_MODE, DEFAULT_VIDEO_CODEC,
+    DeinterlaceMode as GpuiDeinterlaceMode, FilterStrength as GpuiFilterStrength,
+    FilterValue as GpuiFilterValue, MetadataConfig as GpuiMetadataConfig,
+    MetadataMode as GpuiMetadataMode, OverlaySettings,
+    VideoColorFiltersConfig as GpuiVideoColorFiltersConfig,
+    VideoFiltersConfig as GpuiVideoFiltersConfig,
 };
-
-use crate::{
-    file_queue::FileItem,
-    settings::{
-        AudioFiltersConfig as GpuiAudioFiltersConfig, ConversionConfig as GpuiConversionConfig,
-        CropSettings, DEFAULT_AUDIO_BITRATE, DEFAULT_AUDIO_BITRATE_MODE, DEFAULT_AUDIO_CHANNELS,
-        DEFAULT_AUDIO_QUALITY, DEFAULT_FPS, DEFAULT_GIF_COLORS, DEFAULT_GIF_DITHER,
-        DEFAULT_PIXEL_FORMAT, DEFAULT_PRESET, DEFAULT_RESOLUTION, DEFAULT_SCALING_ALGORITHM,
-        DEFAULT_VIDEO_BITRATE, DEFAULT_VIDEO_BITRATE_MODE, DEFAULT_VIDEO_CODEC,
-        DeinterlaceMode as GpuiDeinterlaceMode, FilterStrength as GpuiFilterStrength,
-        FilterValue as GpuiFilterValue, MetadataConfig as GpuiMetadataConfig,
-        MetadataMode as GpuiMetadataMode, OverlaySettings,
-        VideoColorFiltersConfig as GpuiVideoColorFiltersConfig,
-        VideoFiltersConfig as GpuiVideoFiltersConfig,
-    },
+use frame_core::media_rules;
+use frame_core::types::{
+    AudioFiltersConfig as CoreAudioFiltersConfig, ConversionConfig as CoreConversionConfig,
+    ConversionTask, CropConfig, DeinterlaceMode as CoreDeinterlaceMode,
+    FilterStrength as CoreFilterStrength, FilterValue as CoreFilterValue,
+    MetadataConfig as CoreMetadataConfig, MetadataMode as CoreMetadataMode, OverlayConfig,
+    VideoColorFiltersConfig as CoreVideoColorFiltersConfig,
+    VideoFiltersConfig as CoreVideoFiltersConfig,
 };
 
 #[must_use]

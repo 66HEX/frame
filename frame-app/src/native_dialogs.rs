@@ -1,7 +1,5 @@
 //! Cross-platform native dialogs used by the GPUI frontend.
 
-use std::path::PathBuf;
-
 use crate::file_filters::{
     AUDIO_FILE_EXTENSIONS, BURN_SUBTITLE_FILE_EXTENSIONS, IMAGE_FILE_EXTENSIONS,
     SELECTABLE_SUBTITLE_FILE_EXTENSIONS, SOURCE_FILE_EXTENSIONS, VIDEO_FILE_EXTENSIONS,
@@ -9,6 +7,7 @@ use crate::file_filters::{
 };
 use gpui::Window;
 use rfd::{AsyncFileDialog, FileHandle};
+use std::path::PathBuf;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct NativeDialogFilterSpec {

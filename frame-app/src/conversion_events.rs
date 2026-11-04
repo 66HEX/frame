@@ -1,10 +1,9 @@
 //! GPUI-side reducers for backend conversion events.
 
-use std::{collections::BTreeMap, ops::Range};
-
-use frame_core::events::ConversionEvent;
-
 use crate::file_queue::{FileQueue, FileStatus};
+use frame_core::events::ConversionEvent;
+use std::collections::BTreeMap;
+use std::ops::Range;
 
 pub const LOG_STICKY_BOTTOM_THRESHOLD_PX: f64 = 25.0;
 
