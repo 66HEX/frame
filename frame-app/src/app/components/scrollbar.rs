@@ -1,4 +1,10 @@
-use super::*;
+use crate::app::primitives::color;
+use crate::theme;
+use gpui::prelude::*;
+use gpui::{
+    Bounds, Context, DragMoveEvent, IntoElement, Render, ScrollHandle, UniformListScrollHandle,
+    Window, canvas, div, point, px, size,
+};
 
 pub(in crate::app) const FRAME_SCROLLBAR_WIDTH: f32 = super::MIN_POINTER_TARGET;
 const FRAME_SCROLLBAR_VISUAL_WIDTH: f32 = 10.0;

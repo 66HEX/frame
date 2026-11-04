@@ -1,10 +1,68 @@
-use super::accessibility::{APP_ROOT_FOCUS_ID, handle_tab_navigation};
-use super::files::FileDropLifecycleProbe;
-use super::preview_panel::{
-    PreviewEditToolbarFocus, PreviewEditToolbarFocuses, PreviewToolFocuses, PreviewViewportFocuses,
-};
-use super::*;
-use crate::app::chrome::UpdateDialogView;
+use crate::app::accessibility::APP_ROOT_FOCUS_ID;
+use crate::app::accessibility::FrameFocusKey;
+use crate::app::accessibility::handle_tab_navigation;
+use crate::app::chrome::titlebar;
+use crate::app::input::FrameTextInputKind;
+use crate::app::inspector::state::SettingsMetadataInputFocuses;
+use crate::app::inspector::state::SettingsRenderState;
+use crate::app::inspector::subtitles::state::SettingsSubtitleColorInputFocuses;
+use crate::app::inspector::subtitles::state::SettingsSubtitleColorPopoverFocuses;
+use crate::app::inspector::subtitles::state::SettingsSubtitleFocuses;
+use crate::app::inspector::subtitles::state::SettingsSubtitlePopover;
+use crate::app::inspector::subtitles::state::SettingsSubtitleSelectFocuses;
+use crate::app::layout::CONTENT_PADDING;
+#[cfg(target_os = "linux")]
+use crate::app::layout::LINUX_WINDOW_FRAME_INSET;
+use crate::app::logs::view::logs_view;
+use crate::app::model::ActiveView;
+use crate::app::preferences::state::AppearancePopover;
+use crate::app::preferences::view::AppSettingsSelectFocuses;
+use crate::app::preferences::view::AppSettingsSheetProps;
+use crate::app::preferences::view::app_settings_sheet;
+use crate::app::preview;
+use crate::app::preview::PreviewEditToolbarFocus;
+use crate::app::preview::PreviewEditToolbarFocuses;
+use crate::app::preview::PreviewPanelProps;
+use crate::app::preview::PreviewTimecodeInputFocuses;
+use crate::app::preview::PreviewToolFocuses;
+use crate::app::preview::PreviewViewportFocuses;
+use crate::app::preview::preview_source_media_kind;
+use crate::app::preview::state::CropSelect;
+use crate::app::primitives::color;
+use crate::app::queue::drop_overlay::drag_drop_overlay;
+use crate::app::queue::import::FileDropLifecycleProbe;
+use crate::app::queue::state::ROOT_DROP_GROUP;
+use crate::app::root::FrameRoot;
+use crate::app::updates::dialog::UpdateDialogView;
+use crate::app::updates::dialog::update_dialog;
+use crate::app::updates::state::UpdateStatus;
+use crate::app::workspace::welcome_view;
+use crate::app::workspace::workspace_view;
+use crate::appearance::ColorTheme;
+use crate::appearance::ScalePreset;
+use crate::assets;
+use crate::preview::ASPECT_OPTIONS;
+use crate::preview::MetadataStatus as PreviewMetadataStatus;
+use crate::preview::PreviewControlInput;
+use crate::preview::PreviewMediaKind;
+use crate::preview::preview_control_availability;
+use crate::settings::ConversionConfig;
+use crate::settings::ProcessingMode;
+use crate::settings::SettingsTab;
+use crate::settings::subtitle_font_options;
+use crate::settings::subtitle_font_size_options;
+use crate::theme;
+use gpui::Context;
+use gpui::DragMoveEvent;
+use gpui::ExternalPaths;
+use gpui::IntoElement;
+use gpui::MouseButton;
+use gpui::MouseDownEvent;
+use gpui::Render;
+use gpui::Window;
+use gpui::div;
+use gpui::prelude::*;
+use gpui::px;
 
 impl Render for FrameRoot {
     #[expect(
@@ -534,7 +592,7 @@ impl Render for FrameRoot {
                         overlay: preview_overlay,
                         viewport_focuses: PreviewViewportFocuses {
                             viewport: &preview_viewport_focus,
-                            crop_options: preview_panel::PreviewCropOptionsProps {
+                            crop_options: preview::PreviewCropOptionsProps {
                                 popover: self.preview_ui.crop_options.popover,
                                 custom: self.preview_ui.crop_options.custom,
                                 ratio: self.preview_ui.crop_options.is_ratio,

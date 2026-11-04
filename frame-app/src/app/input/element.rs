@@ -1,4 +1,22 @@
-use super::{super::accessibility::apply_accessible_text_input, text::clamp_text_range, *};
+use crate::app::accessibility::apply_accessible_text_input;
+use crate::app::input::constants::{FRAME_TEXT_INPUT_CONTEXT, FRAME_TIMECODE_TEXT_INPUT_CONTEXT};
+use crate::app::input::runtime::{
+    FrameTextInputKind, FrameTextInputMetrics, clamp_text_input_scroll_x,
+    text_input_scroll_x_for_cursor,
+};
+use crate::app::input::text::clamp_text_range;
+use crate::app::input::text_line_x_for_index;
+use crate::app::layout::SETTINGS_CONTROL_HEIGHT;
+use crate::app::primitives::color;
+use crate::app::root::FrameRoot;
+use crate::theme;
+use gpui::prelude::*;
+use gpui::{
+    App, Bounds, Context, Element, ElementId, ElementInputHandler, Entity, FocusHandle,
+    GlobalElementId, IntoElement, LayoutId, MouseButton, MouseDownEvent, MouseMoveEvent,
+    MouseUpEvent, PaintQuad, Pixels, ShapedLine, SharedString, Style, TextRun, Window, div, point,
+    px, relative, size,
+};
 
 pub(super) struct FrameTextInputElement {
     owner: Entity<FrameRoot>,

@@ -1,7 +1,20 @@
-use super::*;
-
-use crate::settings::{DeinterlaceMode, FilterStrength};
-use frame_updater::{PlatformAssetKey, UpdateAsset};
+use crate::app::inspector;
+use crate::app::inspector::subtitles::state::{SettingsSubtitleMode, SettingsSubtitlePopover};
+use crate::app::model::{ActiveView, VisualFixture};
+use crate::app::preferences::state::AppearancePopover;
+use crate::app::preview::state::CropSelect;
+use crate::app::root::FrameRoot;
+use crate::app::updates::state::UpdateStatus;
+use crate::appearance::{AppearanceSettings, ScalePreset};
+use crate::file_queue::{FileItem, FileQueue, FileStatus};
+use crate::preview::CropRect;
+use crate::settings::{
+    ConversionConfig, DeinterlaceMode, FilterStrength, PresetDefinition, SettingsTab, SourceKind,
+    SourceMetadata, SourceTags,
+};
+use crate::source_metadata::SourceMetadataStore;
+use frame_core::events::ConversionEvent;
+use frame_updater::{PlatformAssetKey, UpdateAsset, UpdateChannel, UpdateInfo};
 use semver::Version;
 
 const UPDATE_AVAILABLE_RELEASE_NOTES: &str = r"
@@ -408,7 +421,7 @@ impl FrameRoot {
         self.subtitle_ui.popover = Some(SettingsSubtitlePopover::FontColor);
         self.subtitle_ui.rendered_popover = Some(SettingsSubtitlePopover::FontColor);
         self.subtitle_ui.font_color_draft = "#FFD166".to_string();
-        self.subtitle_ui.font_color_hsv_draft = settings_panel::hex_to_subtitle_hsv("#ffd166");
+        self.subtitle_ui.font_color_hsv_draft = inspector::hex_to_subtitle_hsv("#ffd166");
     }
     pub(super) fn apply_settings_presets_fixture(&mut self) {
         self.apply_preview_ready_fixture();

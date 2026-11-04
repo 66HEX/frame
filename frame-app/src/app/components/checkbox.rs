@@ -1,9 +1,12 @@
-use super::{
-    ClickEvent, Context, FluentBuilder, FrameRoot, InteractiveElement, MouseButton, ParentElement,
-    Styled, Window, apply_accessible_checkbox, apply_accessible_checkbox_with_focus, assets,
-    button_mouse_down, color, div, icon_svg, theme,
+use crate::app::accessibility::{apply_accessible_checkbox, apply_accessible_checkbox_with_focus};
+use crate::app::primitives::{button_mouse_down, color, icon_svg};
+use crate::app::root::FrameRoot;
+use crate::{assets, theme};
+use gpui::prelude::{FluentBuilder, ParentElement, Styled};
+use gpui::{
+    ClickEvent, Context, FocusHandle, InteractiveElement, MouseButton, StatefulInteractiveElement,
+    Window, div,
 };
-use gpui::{FocusHandle, StatefulInteractiveElement};
 use std::rc::Rc;
 
 pub(in crate::app) const FRAME_CHECKBOX_SIZE: f32 = 16.0;

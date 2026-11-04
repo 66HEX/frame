@@ -1,8 +1,11 @@
-use super::{
-    InteractiveElement, IntoElement, MouseButton, ParentElement, Rgba, Styled, color, div, hsla,
-    linear_color_stop, linear_gradient, parse_hex, relative, theme,
-};
+use crate::app::primitives::{color, parse_hex};
 use crate::numeric::{rounded_f64_to_u8, unit_f64_to_f32};
+use crate::theme;
+use gpui::prelude::{ParentElement, Styled};
+use gpui::{
+    InteractiveElement, IntoElement, MouseButton, Rgba, div, hsla, linear_color_stop,
+    linear_gradient, relative,
+};
 
 pub(in crate::app) const FRAME_COLOR_PICKER_SV_HEIGHT: f32 = 96.0;
 pub(in crate::app) const FRAME_COLOR_PICKER_HUE_HEIGHT: f32 = 10.0;

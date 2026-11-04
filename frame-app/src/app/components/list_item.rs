@@ -1,9 +1,14 @@
-use super::{
-    ButtonVariant, Context, FluentBuilder, FrameRoot, InteractiveElement, ParentElement,
-    SETTINGS_CONTROL_HEIGHT, Styled, Window, apply_accessible_toggle_button, apply_button_motion,
-    button_colors, button_motion, color, div, frame_selection_dot, mix_color, mix_rgba, mix_scalar,
-    selected_motion, theme,
+use crate::app::accessibility::apply_accessible_toggle_button;
+use crate::app::components::checkbox::frame_selection_dot;
+use crate::app::layout::SETTINGS_CONTROL_HEIGHT;
+use crate::app::motion::{mix_color, mix_rgba, mix_scalar, selected_motion};
+use crate::app::primitives::{
+    ButtonVariant, apply_button_motion, button_colors, button_motion, color,
 };
+use crate::app::root::FrameRoot;
+use crate::theme;
+use gpui::prelude::{FluentBuilder, ParentElement, Styled};
+use gpui::{Context, InteractiveElement, Window, div};
 
 pub(in crate::app) fn frame_list_item(
     id: impl Into<String>,

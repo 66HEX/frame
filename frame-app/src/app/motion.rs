@@ -1,4 +1,7 @@
-use super::{App, Duration, ElementId, Lerp, Rgba, Window, color, ease_in_out, theme};
+use crate::app::primitives::color;
+use crate::theme;
+use gpui::{App, ElementId, Lerp, Rgba, Window, ease_in_out};
+use std::time::Duration;
 
 // Panels, selects and color pickers share one enter/exit timing. Hover and
 // selection feedback stays shorter because it happens on every interaction.

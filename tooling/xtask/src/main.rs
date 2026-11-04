@@ -1394,7 +1394,7 @@ const APPROVED_UI_COLOR_LITERALS: [ApprovedUiColorLiteral; 5] = [
         arguments: &[0.0, 0.0, 0.0, 0.0],
     },
     ApprovedUiColorLiteral {
-        path: "frame-app/src/app/preview_panel/crop_overlay.rs",
+        path: "frame-app/src/app/preview/crop_overlay.rs",
         function: "crop_mask_rect",
         constructor: "hsla",
         arguments: &[0.0, 0.0, 0.0, 0.55],
@@ -3852,10 +3852,7 @@ mod tests {
         let literal = audit.color_literals.first().unwrap();
 
         assert_eq!(
-            approved_ui_color_literal_index(
-                "frame-app/src/app/preview_panel/crop_overlay.rs",
-                literal,
-            ),
+            approved_ui_color_literal_index("frame-app/src/app/preview/crop_overlay.rs", literal,),
             None
         );
     }

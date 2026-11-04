@@ -1,11 +1,15 @@
-use gpui::{BoxShadow, point};
-
-use super::{
-    App, Context, FluentBuilder, FrameRoot, InteractiveElement, IntoElement, MouseButton,
-    ParentElement, Rgba, StatefulInteractiveElement, Styled, TITLEBAR_ACTION_ICON_SIZE,
-    TITLEBAR_BUTTON_HEIGHT, TITLEBAR_ICON_BUTTON_SIZE, TITLEBAR_ICON_SIZE, Window,
-    accessibility::apply_accessible_button, div, hover_motion, mix_color, px,
-    retarget_hover_motion, svg, theme,
+use crate::app::accessibility::apply_accessible_button;
+use crate::app::layout::{
+    TITLEBAR_ACTION_ICON_SIZE, TITLEBAR_BUTTON_HEIGHT, TITLEBAR_ICON_BUTTON_SIZE,
+    TITLEBAR_ICON_SIZE,
+};
+use crate::app::motion::{hover_motion, mix_color, retarget_hover_motion};
+use crate::app::root::FrameRoot;
+use crate::theme;
+use gpui::prelude::{FluentBuilder, ParentElement, Styled};
+use gpui::{
+    App, BoxShadow, Context, InteractiveElement, IntoElement, MouseButton, Rgba,
+    StatefulInteractiveElement, Window, div, point, px, svg,
 };
 
 #[derive(Clone, Copy)]

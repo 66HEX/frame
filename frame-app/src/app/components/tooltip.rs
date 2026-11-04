@@ -1,10 +1,14 @@
-use super::{
-    Context, Duration, FluentBuilder, FrameRoot, INTERACTION_MOTION_DURATION, InteractiveElement,
-    IntoElement, ParentElement, StatefulInteractiveElement, Styled, TooltipUiState, Window, color,
-    deferred, div, ease_in_out, motion_target, set_motion_target, theme,
+use crate::app::components::tooltip_state::TooltipUiState;
+use crate::app::motion::{INTERACTION_MOTION_DURATION, motion_target, set_motion_target};
+use crate::app::primitives::color;
+use crate::app::root::FrameRoot;
+use crate::theme;
+use gpui::prelude::{FluentBuilder, ParentElement, Styled};
+use gpui::{
+    Context, Entity, FocusHandle, InteractiveElement, IntoElement, StatefulInteractiveElement,
+    Subscription, Window, deferred, div, ease_in_out,
 };
-use gpui::{Entity, FocusHandle, Subscription};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 const TOOLTIP_HOVER_DELAY: Duration = Duration::from_millis(500);
 const TOOLTIP_HYSTERESIS_WINDOW: Duration = Duration::from_millis(300);
@@ -187,7 +191,7 @@ pub(in crate::app) fn frame_tooltip(
         label: label.into(),
         hovered: is_visible,
         placement: TooltipPlacement::Above,
-        anchor_size: super::super::SETTINGS_TAB_BUTTON_SIZE,
+        anchor_size: crate::app::layout::SETTINGS_TAB_BUTTON_SIZE,
     }
     .render(anchor, is_visible, None, palette, window, cx)
 }

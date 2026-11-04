@@ -1,5 +1,6 @@
 use super::*;
-use crate::{VisualFixture, app::FrameRoot};
+use crate::VisualFixture;
+use crate::app::FrameRoot;
 use gpui::{AppContext, Modifiers, TestAppContext, VisualTestContext, point, px};
 
 struct TooltipTestView {
@@ -48,7 +49,7 @@ impl gpui::Render for TooltipTestView {
                     TooltipPlacement::Above,
                 ),
             ] {
-                let button = crate::app::preview_panel::preview_tool_button(
+                let button = crate::app::preview::preview_tool_button(
                     id,
                     crate::assets::ICON_PLUS,
                     label,

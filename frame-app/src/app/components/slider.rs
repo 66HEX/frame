@@ -1,7 +1,8 @@
-use super::{
-    FluentBuilder, InteractiveElement, ParentElement, Styled, apply_accessible_slider, color, div,
-    relative, theme,
-};
+use crate::app::accessibility::apply_accessible_slider;
+use crate::app::primitives::color;
+use crate::theme;
+use gpui::prelude::{FluentBuilder, ParentElement, Styled};
+use gpui::{InteractiveElement, div, relative};
 
 pub(in crate::app) const FRAME_SLIDER_VISUAL_HEIGHT: f32 = super::MIN_POINTER_TARGET;
 pub(in crate::app) const FRAME_SLIDER_TRACK_TOP: f32 =

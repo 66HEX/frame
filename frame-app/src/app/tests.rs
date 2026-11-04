@@ -6,6 +6,17 @@
 use super::input::{
     should_capture_text_input_drag, should_handle_text_input, text_input_scroll_x_for_cursor,
 };
+use super::inspector::{hex_to_subtitle_hsv, subtitle_hsv_to_hex};
+use super::preview::{
+    PreviewCanvasRenderState, PreviewCropRenderState, PreviewOverlayRenderState, default_crop_rect,
+    full_crop_rect, preview_duration_seconds, preview_playback_state,
+};
+use super::preview::{
+    centered_offset, preview_crop_visual_rect, preview_presented_frame, preview_scroll_delta_y,
+    preview_shell_state, preview_timeline_labels, preview_trim_enabled,
+    preview_visual_controls_visible, timeline_fraction_from_percent,
+    timeline_keyboard_time_for_key, timeline_slider_percent_from_bounds,
+};
 use super::preview_actions::{
     lerp_preview_canvas_value, lerp_preview_canvas_value_for_elapsed, preview_canvas_initial_zoom,
     preview_canvas_keyboard_pan_delta, preview_canvas_layout_metrics, preview_canvas_pan_limits,
@@ -13,14 +24,7 @@ use super::preview_actions::{
     preview_canvas_wheel_zoom_multiplier, preview_crop_keyboard_delta,
     preview_overlay_keyboard_delta, preview_runtime_dimensions,
 };
-use super::preview_panel::{
-    centered_offset, preview_crop_visual_rect, preview_presented_frame, preview_scroll_delta_y,
-    preview_shell_state, preview_timeline_labels, preview_trim_enabled,
-    preview_visual_controls_visible, timeline_fraction_from_percent,
-    timeline_keyboard_time_for_key, timeline_slider_percent_from_bounds,
-};
 use super::primitives::frame_highlight_px;
-use super::settings_panel::{hex_to_subtitle_hsv, subtitle_hsv_to_hex};
 use super::*;
 use crate::app_persistence::{AppPersistence, AppSettings};
 use crate::notifications::{AppNotifier, ConversionNotificationSummary};
@@ -3993,7 +3997,7 @@ mod surface_highlights {
 }
 
 mod preview_shell {
-    use super::preview_panel::PreviewShellStateInput;
+    use super::preview::PreviewShellStateInput;
     use super::*;
 
     fn empty_encoders() -> &'static AvailableEncoders {
@@ -4370,20 +4374,17 @@ mod visual_contract {
 
     #[test]
     fn audio_slider_helpers_map_values_to_original_range() {
-        assert_eq!(settings_panel::range_fraction(100, 0, 200), 0.5);
-        assert_eq!(settings_panel::range_value_from_fraction(0.5, 0, 200), 100);
+        assert_eq!(inspector::range_fraction(100, 0, 200), 0.5);
+        assert_eq!(inspector::range_value_from_fraction(0.5, 0, 200), 100);
         assert_eq!(
-            settings_panel::range_value_for_key(100, 0, 200, "right"),
+            inspector::range_value_for_key(100, 0, 200, "right"),
             Some(101)
         );
         assert_eq!(
-            settings_panel::range_value_for_key(100, 0, 200, "pageup"),
+            inspector::range_value_for_key(100, 0, 200, "pageup"),
             Some(80)
         );
-        assert_eq!(
-            settings_panel::range_value_for_key(100, 0, 200, "home"),
-            Some(0)
-        );
+        assert_eq!(inspector::range_value_for_key(100, 0, 200, "home"), Some(0));
     }
 
     #[test]
@@ -4435,11 +4436,11 @@ mod visual_contract {
     #[test]
     fn preview_crop_handles_use_screen_space_cursors() {
         assert_eq!(
-            preview_panel::crop_handle_screen_cursor(DragHandle::NorthEast),
+            preview::crop_handle_screen_cursor(DragHandle::NorthEast),
             "nesw-resize"
         );
         assert_eq!(
-            preview_panel::crop_handle_screen_cursor(DragHandle::NorthWest),
+            preview::crop_handle_screen_cursor(DragHandle::NorthWest),
             "nwse-resize"
         );
     }
@@ -4457,3 +4458,6 @@ fn test_settings_path() -> PathBuf {
         .join(format!("{}-{millis}-{sequence}", std::process::id()))
         .join("settings.json")
 }
+
+// Shared imports for component and feature tests after ownership migration.
+pub(super) mod support;

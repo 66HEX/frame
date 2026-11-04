@@ -1,8 +1,11 @@
-use super::{
-    App, Context, FocusHandle, FrameRoot, StatefulInteractiveElement, Styled, Window, color, px,
-    theme,
+use crate::app::primitives::color;
+use crate::app::root::FrameRoot;
+use crate::theme;
+use gpui::prelude::Styled;
+use gpui::{
+    App, Context, FocusHandle, InteractiveElement, Orientation, Role, SharedString,
+    StatefulInteractiveElement, StyleRefinement, Toggled, Window, px,
 };
-use gpui::{InteractiveElement, Orientation, Role, SharedString, StyleRefinement, Toggled};
 use std::collections::HashMap;
 
 const FOCUS_RING_WIDTH: f32 = 3.0;

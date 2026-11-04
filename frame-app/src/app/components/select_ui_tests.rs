@@ -1,8 +1,6 @@
-use crate::{
-    VisualFixture,
-    app::{FrameRoot, SettingsSubtitleMode},
-    appearance::{ColorTheme, ScalePreset},
-};
+use crate::VisualFixture;
+use crate::app::{FrameRoot, SettingsSubtitleMode};
+use crate::appearance::{ColorTheme, ScalePreset};
 use gpui::{Entity, Modifiers, TestAppContext, VisualTestContext, px, size};
 
 struct SelectCase {

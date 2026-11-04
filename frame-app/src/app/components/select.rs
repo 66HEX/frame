@@ -1,15 +1,21 @@
-use super::{
-    App, ButtonVariant, Context, FluentBuilder, FrameRoot, InteractiveElement, IntoElement,
-    MouseButton, MouseMoveEvent, ParentElement, PlatformInput, SETTINGS_CONTROL_HEIGHT,
-    ScrollHandle, ScrollWheelEvent, StatefulInteractiveElement, Styled, Window,
-    animated_button_colors, apply_accessible_select_option,
-    apply_accessible_select_option_with_focus, apply_accessible_select_trigger,
-    apply_accessible_select_trigger_with_focus, apply_button_motion, assets, button_colors,
-    button_mouse_down, color, div, icon_svg, parse_hex, theme,
+use crate::app::accessibility::{
+    apply_accessible_select_option, apply_accessible_select_option_with_focus,
+    apply_accessible_select_trigger, apply_accessible_select_trigger_with_focus,
+    handle_modal_tab_navigation,
 };
-use crate::app::accessibility::handle_modal_tab_navigation;
+use crate::app::layout::SETTINGS_CONTROL_HEIGHT;
+use crate::app::primitives::{
+    ButtonVariant, animated_button_colors, apply_button_motion, button_colors, button_mouse_down,
+    color, icon_svg, parse_hex,
+};
+use crate::app::root::FrameRoot;
 use crate::numeric::usize_to_f32;
-use gpui::FocusHandle;
+use crate::{assets, theme};
+use gpui::prelude::{FluentBuilder, ParentElement, Styled};
+use gpui::{
+    App, Context, FocusHandle, InteractiveElement, IntoElement, MouseButton, MouseMoveEvent,
+    PlatformInput, ScrollHandle, ScrollWheelEvent, StatefulInteractiveElement, Window, div,
+};
 
 pub(in crate::app) const FRAME_SELECT_MAX_HEIGHT: f32 = 192.0;
 pub(in crate::app) const FRAME_SELECT_CONTENT_PADDING: f32 = 4.0;

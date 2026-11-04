@@ -1,4 +1,22 @@
-use super::*;
+use crate::app::input::constants::{FRAME_TEXT_INPUT_CONTEXT, FRAME_TIMECODE_INPUT_CONTEXT};
+#[cfg(target_os = "linux")]
+use crate::app::layout::LINUX_WINDOW_FRAME_INSET;
+use crate::app::layout::{WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH};
+use crate::app::root::FrameRoot;
+use crate::app::{
+    DecreaseUiScale, IncreaseUiScale, Quit, ResetUiScale, TextInputBackspace, TextInputCancel,
+    TextInputCommit, TextInputCopy, TextInputCut, TextInputDelete, TextInputEnd, TextInputHome,
+    TextInputLeft, TextInputPaste, TextInputRight, TextInputSelectAll, TextInputSelectLeft,
+    TextInputSelectRight,
+};
+use crate::app_info::FRAME_APP_ID;
+#[cfg(target_os = "linux")]
+use crate::theme;
+use gpui::prelude::*;
+use gpui::{
+    App, Bounds, KeyBinding, Menu, MenuItem, Pixels, SharedString, TextRenderingMode,
+    TitlebarOptions, WindowBounds, WindowDecorations, WindowOptions, point, px, size,
+};
 
 pub fn init_app(cx: &mut App, name: impl Into<SharedString>) {
     #[cfg(not(test))]

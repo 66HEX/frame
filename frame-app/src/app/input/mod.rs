@@ -1,19 +1,16 @@
-use super::primitives::color;
-use super::*;
+pub(super) use element::{FrameTextInputSpec, frame_text_input};
+#[cfg(test)]
+pub(super) use element::{should_capture_text_input_drag, should_handle_text_input};
+use gpui::{Pixels, ShapedLine, point};
+#[cfg(test)]
+pub(super) use runtime::text_input_scroll_x_for_cursor;
+pub(super) use runtime::{FrameTextInputKind, FrameTextInputUiState};
 
 mod actions;
 mod element;
 mod entity;
 mod runtime;
 mod text;
-
-pub(super) use element::{FrameTextInputSpec, frame_text_input};
-#[cfg(test)]
-pub(super) use element::{should_capture_text_input_drag, should_handle_text_input};
-pub(super) use runtime::{
-    FrameTextInputKind, FrameTextInputMetrics, FrameTextInputRuntime, FrameTextInputUiState,
-    FrameTimecodeInputDraft, clamp_text_input_scroll_x, text_input_scroll_x_for_cursor,
-};
 
 // Inputs are single-line. GPUI's text backend reports caret positions in two
 // dimensions; only the horizontal coordinate affects scrolling and selection.
@@ -32,3 +29,5 @@ fn text_line_closest_index_for_x(line: &ShapedLine, x: Pixels) -> usize {
         .unwrap_or_else(|caret| caret)
         .index
 }
+
+pub(in crate::app) mod constants;

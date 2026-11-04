@@ -1,11 +1,19 @@
-use super::{
-    ButtonColors, ButtonVariant, Context, FluentBuilder, FrameRoot, InteractiveElement,
-    ParentElement, SETTINGS_CONTROL_HEIGHT, StatefulInteractiveElement, Styled, Window,
-    animated_button_colors, apply_accessible_button, apply_accessible_button_with_focus,
-    apply_accessible_toggle_button, apply_button_motion, button_colors, color,
-    contextual_icon_motion, div, icon_svg, px, theme,
+use crate::app::accessibility::{
+    apply_accessible_button, apply_accessible_button_with_focus, apply_accessible_toggle_button,
 };
-use gpui::{FocusHandle, Rgba, Svg, Transformation, size, svg};
+use crate::app::layout::SETTINGS_CONTROL_HEIGHT;
+use crate::app::motion::contextual_icon_motion;
+use crate::app::primitives::{
+    ButtonColors, ButtonVariant, animated_button_colors, apply_button_motion, button_colors, color,
+    icon_svg,
+};
+use crate::app::root::FrameRoot;
+use crate::theme;
+use gpui::prelude::{FluentBuilder, ParentElement, Styled};
+use gpui::{
+    Context, FocusHandle, InteractiveElement, Rgba, StatefulInteractiveElement, Svg,
+    Transformation, Window, div, px, size, svg,
+};
 
 pub(in crate::app) const FRAME_ICON_BUTTON_SM_SIZE: f32 = 24.0;
 pub(in crate::app) const FRAME_ICON_SM_SIZE: f32 = 16.0;

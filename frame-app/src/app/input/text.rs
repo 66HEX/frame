@@ -1,4 +1,5 @@
-use super::{FrameTextInputKind, Range};
+use crate::app::input::runtime::FrameTextInputKind;
+use std::ops::Range;
 
 pub(super) fn sanitize_number_input(value: &str) -> String {
     value.chars().filter(char::is_ascii_digit).collect()

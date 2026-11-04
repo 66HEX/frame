@@ -1,14 +1,18 @@
-use super::{
-    ClickEvent, Context, FILE_LIST_ROW_SPAN, FileQueue, FrameRoot, LEFT_COLUMN_SPAN,
-    LEFT_GRID_ROWS, PREVIEW_ROW_SPAN, ParentElement, PreviewPanelProps, RIGHT_COLUMN_SPAN,
-    SettingsRenderState, StatefulInteractiveElement, Styled, UniformListScrollHandle,
-    WORKSPACE_COLUMNS, WORKSPACE_GAP, Window, assets, color, div, svg, theme,
+use crate::app::inspector::settings_panel;
+use crate::app::inspector::state::SettingsRenderState;
+use crate::app::layout::{
+    FILE_LIST_ROW_SPAN, LEFT_COLUMN_SPAN, LEFT_GRID_ROWS, PREVIEW_ROW_SPAN, RIGHT_COLUMN_SPAN,
+    WORKSPACE_COLUMNS, WORKSPACE_GAP,
 };
-use super::{
-    file_list_panel::file_list_panel,
-    preview_panel::preview_panel,
-    primitives::{ButtonVariant, FrameSurface, action_button},
-    settings_panel::settings_panel,
+use crate::app::preview::{PreviewPanelProps, preview_panel};
+use crate::app::primitives::{ButtonVariant, FrameSurface, action_button, color};
+use crate::app::queue::view::file_list_panel;
+use crate::app::root::FrameRoot;
+use crate::file_queue::FileQueue;
+use crate::{assets, theme};
+use gpui::prelude::{ParentElement, Styled};
+use gpui::{
+    ClickEvent, Context, StatefulInteractiveElement, UniformListScrollHandle, Window, div, svg,
 };
 
 const EMPTY_SETTINGS_HINT_MAX_WIDTH: f32 = 200.0;
