@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Application Structure:** Groups native adapter and domain imports consistently without changing behavior.
+- **Application Structure:** Groups native imports and separates conversion settings types and defaults into domain modules without changing behavior.
 - **UI Icons:** Replaces Hugeicons with bundled Nucleo UI outline icons that inherit theme colors, with rendering checks at supported sizes.
 - **UI Surfaces:** Uses a shared layered shadow scale in both themes, with inset inputs and checkboxes, opaque cards, two-tone separators, and one-logical-pixel edges on every platform. Decorative borders are supplied by the shadow layers.
 - **Theme Colors:** Imports the complete Geist color palette and assigns semantic roles for backgrounds, cards, controls, text, focus, and status feedback. Light and dark themes use exact source values, without additional dark-mode dimming.

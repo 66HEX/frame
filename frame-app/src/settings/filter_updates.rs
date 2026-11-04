@@ -1,4 +1,4 @@
-use super::model::{
+use crate::settings::model::{
     AudioFiltersConfig, ConversionConfig, DeinterlaceMode, FilterStrength, FilterValue,
     VideoFiltersConfig,
 };

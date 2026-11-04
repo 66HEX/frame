@@ -1,6 +1,5 @@
+use crate::settings::model::{SourceKind, SourceMetadata};
 use frame_core::media_rules;
-
-use super::model::{SourceKind, SourceMetadata};
 
 #[must_use]
 pub fn source_kind_for(metadata: Option<&SourceMetadata>) -> SourceKind {

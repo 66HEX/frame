@@ -1,4 +1,4 @@
-use super::model::{
+use crate::settings::model::{
     AudioTrack, SourceInfoRow, SourceInfoSection, SourceKind, SourceMetadata, SourceTrackSection,
 };
 
