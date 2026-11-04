@@ -1,0 +1,496 @@
+use crate::appearance::{AppearanceSettings, ColorTheme, ScalePreset};
+use crate::settings::PresetDefinition;
+use directories::{BaseDirs, ProjectDirs};
+use frame_core::types::DEFAULT_MAX_CONCURRENCY;
+use frame_updater::UpdateChannel;
+use serde::{Deserialize, Deserializer, Serialize};
+use std::collections::HashSet;
+use std::fs::File;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::{fs, io};
+use thiserror::Error;
+
+const APP_SETTINGS_VERSION: u32 = 5;
+const SETTINGS_FILE_NAME: &str = "settings.json";
+const LEGACY_APP_SETTINGS_FILE_NAME: &str = "app-settings.dat";
+const LEGACY_PRESETS_FILE_NAME: &str = "presets.dat";
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AppSettings {
+    pub appearance: AppearanceSettings,
+    pub max_concurrency: usize,
+    pub default_output_directory: Option<PathBuf>,
+    pub custom_presets: Vec<PresetDefinition>,
+    pub auto_update_check: bool,
+    pub update_channel: UpdateChannel,
+    pub skipped_update_version: Option<String>,
+    pub last_update_check_at: Option<u64>,
+}
+
+impl AppSettings {
+    #[must_use]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "Persistence snapshots explicitly include each independent runtime settings domain."
+    )]
+    pub fn from_runtime(
+        appearance: AppearanceSettings,
+        max_concurrency: usize,
+        default_output_directory: Option<PathBuf>,
+        presets: &[PresetDefinition],
+        auto_update_check: bool,
+        update_channel: UpdateChannel,
+        skipped_update_version: Option<String>,
+        last_update_check_at: Option<u64>,
+    ) -> Self {
+        Self {
+            appearance,
+            max_concurrency: valid_max_concurrency(max_concurrency),
+            default_output_directory,
+            custom_presets: normalize_custom_presets(
+                presets
+                    .iter()
+                    .filter(|preset| !preset.built_in)
+                    .cloned()
+                    .collect(),
+            ),
+            auto_update_check,
+            update_channel,
+            skipped_update_version,
+            last_update_check_at,
+        }
+    }
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            appearance: AppearanceSettings::default(),
+            max_concurrency: DEFAULT_MAX_CONCURRENCY,
+            default_output_directory: None,
+            custom_presets: Vec::new(),
+            auto_update_check: true,
+            update_channel: UpdateChannel::Stable,
+            skipped_update_version: None,
+            last_update_check_at: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AppPersistence {
+    settings_path: PathBuf,
+}
+
+impl AppPersistence {
+    /// Builds a persistence handle for Frame's platform config directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AppPersistenceError::ConfigDirectoryUnavailable`] when the
+    /// operating system does not expose a usable config directory.
+    pub fn platform() -> Result<Self, AppPersistenceError> {
+        let project_dirs = ProjectDirs::from("", "", "Frame")
+            .ok_or(AppPersistenceError::ConfigDirectoryUnavailable)?;
+        Ok(Self::from_settings_path(
+            project_dirs.config_dir().join(SETTINGS_FILE_NAME),
+        ))
+    }
+
+    #[must_use]
+    pub fn from_settings_path(path: impl Into<PathBuf>) -> Self {
+        Self {
+            settings_path: path.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn settings_path(&self) -> &Path {
+        &self.settings_path
+    }
+
+    /// Loads persisted app settings, including legacy settings files.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the settings file cannot be read, decoded, or
+    /// migrated from the legacy format.
+    pub fn load(&self) -> Result<AppSettings, AppPersistenceError> {
+        let bytes = match fs::read(&self.settings_path) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                return self.load_legacy();
+            }
+            Err(error) => {
+                return Err(AppPersistenceError::io(
+                    AppPersistenceOperation::ReadSettings,
+                    &self.settings_path,
+                    error,
+                ));
+            }
+        };
+
+        let persisted: PersistedAppSettings = serde_json::from_slice(&bytes)?;
+        Ok(persisted.into_app_settings())
+    }
+
+    /// Saves app settings atomically to the configured settings path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the settings cannot be encoded, the config
+    /// directory cannot be created, or the temp file cannot replace the target.
+    pub fn save(&self, settings: &AppSettings) -> Result<(), AppPersistenceError> {
+        let persisted = PersistedAppSettings::from_app_settings(settings);
+        let json = serde_json::to_vec_pretty(&persisted)?;
+
+        write_bytes_atomically_with_context(&self.settings_path, &json)
+            .map_err(AppPersistenceError::from_atomic_write)?;
+
+        Ok(())
+    }
+
+    fn load_legacy(&self) -> Result<AppSettings, AppPersistenceError> {
+        let mut settings = AppSettings::default();
+        let legacy_settings_path = self
+            .settings_path
+            .with_file_name(LEGACY_APP_SETTINGS_FILE_NAME);
+
+        match fs::read(&legacy_settings_path) {
+            Ok(bytes) => {
+                let legacy: LegacyAppSettings = serde_json::from_slice(&bytes)?;
+                if let Some(max_concurrency) = legacy.max_concurrency {
+                    settings.max_concurrency = valid_max_concurrency(max_concurrency);
+                }
+                if let Some(auto_update_check) = legacy.auto_update_check {
+                    settings.auto_update_check = auto_update_check;
+                }
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(AppPersistenceError::io(
+                    AppPersistenceOperation::ReadLegacySettings,
+                    &legacy_settings_path,
+                    error,
+                ));
+            }
+        }
+
+        let legacy_presets_path = self.settings_path.with_file_name(LEGACY_PRESETS_FILE_NAME);
+        match fs::read(&legacy_presets_path) {
+            Ok(bytes) => {
+                let legacy: LegacyPresetStore = serde_json::from_slice(&bytes)?;
+                settings.custom_presets = normalize_custom_presets(legacy.presets);
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(AppPersistenceError::io(
+                    AppPersistenceOperation::ReadLegacySettings,
+                    &legacy_presets_path,
+                    error,
+                ));
+            }
+        }
+
+        Ok(settings)
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum AppPersistenceError {
+    #[error("config directory is unavailable")]
+    ConfigDirectoryUnavailable,
+    #[error("update installation is in progress")]
+    InstallationInProgress,
+    #[error("failed to {operation} at {path}: {source}")]
+    Io {
+        operation: AppPersistenceOperation,
+        path: String,
+        #[source]
+        source: io::Error,
+    },
+    #[error("failed to parse app settings: {0}")]
+    Json(#[from] serde_json::Error),
+}
+
+impl AppPersistenceError {
+    fn io(operation: AppPersistenceOperation, path: &Path, source: io::Error) -> Self {
+        Self::Io {
+            operation,
+            path: redacted_path(path),
+            source,
+        }
+    }
+
+    fn from_atomic_write(error: AtomicWriteError) -> Self {
+        Self::io(error.operation, &error.path, error.source)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AppPersistenceOperation {
+    ReadSettings,
+    ReadLegacySettings,
+    CreateSettingsDirectory,
+    CreateTemporaryFile,
+    WriteTemporaryFile,
+    SyncTemporaryFile,
+    ReplaceSettingsFile,
+}
+
+impl std::fmt::Display for AppPersistenceOperation {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::ReadSettings => "read app settings",
+            Self::ReadLegacySettings => "read legacy app settings",
+            Self::CreateSettingsDirectory => "create the settings directory",
+            Self::CreateTemporaryFile => "create the temporary settings file",
+            Self::WriteTemporaryFile => "write the temporary settings file",
+            Self::SyncTemporaryFile => "sync the temporary settings file",
+            Self::ReplaceSettingsFile => "replace the settings file",
+        })
+    }
+}
+
+#[derive(Debug)]
+struct AtomicWriteError {
+    operation: AppPersistenceOperation,
+    path: PathBuf,
+    source: io::Error,
+}
+
+impl AtomicWriteError {
+    fn new(operation: AppPersistenceOperation, path: &Path, source: io::Error) -> Self {
+        Self {
+            operation,
+            path: path.to_path_buf(),
+            source,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(default, rename_all = "camelCase")]
+struct PersistedAppSettings {
+    version: u32,
+    ui_scale_percent: u16,
+    #[serde(deserialize_with = "deserialize_optional_string")]
+    color_theme: Option<String>,
+    max_concurrency: usize,
+    default_output_directory: Option<PathBuf>,
+    custom_presets: Vec<PresetDefinition>,
+    auto_update_check: bool,
+    update_channel: UpdateChannel,
+    skipped_update_version: Option<String>,
+    last_update_check_at: Option<u64>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct LegacyAppSettings {
+    max_concurrency: Option<usize>,
+    auto_update_check: Option<bool>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct LegacyPresetStore {
+    presets: Vec<PresetDefinition>,
+}
+
+impl PersistedAppSettings {
+    fn from_app_settings(settings: &AppSettings) -> Self {
+        Self {
+            version: APP_SETTINGS_VERSION,
+            ui_scale_percent: settings.appearance.ui_scale.percent(),
+            color_theme: Some(settings.appearance.color_theme.persisted().to_string()),
+            max_concurrency: valid_max_concurrency(settings.max_concurrency),
+            default_output_directory: settings.default_output_directory.clone(),
+            custom_presets: normalize_custom_presets(settings.custom_presets.clone()),
+            auto_update_check: settings.auto_update_check,
+            update_channel: settings.update_channel,
+            skipped_update_version: settings.skipped_update_version.clone(),
+            last_update_check_at: settings.last_update_check_at,
+        }
+    }
+
+    fn into_app_settings(self) -> AppSettings {
+        AppSettings {
+            appearance: AppearanceSettings {
+                ui_scale: ScalePreset::from_percent(self.ui_scale_percent).unwrap_or_default(),
+                color_theme: ColorTheme::from_persisted(self.color_theme.as_deref()),
+            },
+            max_concurrency: valid_max_concurrency(self.max_concurrency),
+            default_output_directory: self.default_output_directory,
+            custom_presets: normalize_custom_presets(self.custom_presets),
+            auto_update_check: self.auto_update_check,
+            update_channel: self.update_channel,
+            skipped_update_version: self.skipped_update_version,
+            last_update_check_at: self.last_update_check_at,
+        }
+    }
+}
+
+impl Default for PersistedAppSettings {
+    fn default() -> Self {
+        Self {
+            version: APP_SETTINGS_VERSION,
+            ui_scale_percent: ScalePreset::Percent100.percent(),
+            color_theme: None,
+            max_concurrency: DEFAULT_MAX_CONCURRENCY,
+            default_output_directory: None,
+            custom_presets: Vec::new(),
+            auto_update_check: true,
+            update_channel: UpdateChannel::Stable,
+            skipped_update_version: None,
+            last_update_check_at: None,
+        }
+    }
+}
+
+fn deserialize_optional_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    Ok(value.as_str().map(str::to_string))
+}
+
+const fn valid_max_concurrency(value: usize) -> usize {
+    if value == 0 {
+        DEFAULT_MAX_CONCURRENCY
+    } else {
+        value
+    }
+}
+
+fn normalize_custom_presets(presets: Vec<PresetDefinition>) -> Vec<PresetDefinition> {
+    let mut seen_ids = HashSet::new();
+
+    presets
+        .into_iter()
+        .filter_map(|mut preset| {
+            preset.id = preset.id.trim().to_string();
+            preset.name = preset.name.trim().to_string();
+            preset.built_in = false;
+
+            if preset.id.is_empty() || preset.name.is_empty() || !seen_ids.insert(preset.id.clone())
+            {
+                return None;
+            }
+
+            Some(preset)
+        })
+        .collect()
+}
+
+pub(crate) fn write_bytes_atomically(path: &Path, bytes: &[u8]) -> Result<(), io::Error> {
+    write_bytes_atomically_with_context(path, bytes).map_err(|error| error.source)
+}
+
+fn write_bytes_atomically_with_context(path: &Path, bytes: &[u8]) -> Result<(), AtomicWriteError> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|source| {
+            AtomicWriteError::new(
+                AppPersistenceOperation::CreateSettingsDirectory,
+                parent,
+                source,
+            )
+        })?;
+    }
+
+    let temp_path = temp_path_for(path);
+    let mut file = File::create(&temp_path).map_err(|source| {
+        AtomicWriteError::new(
+            AppPersistenceOperation::CreateTemporaryFile,
+            &temp_path,
+            source,
+        )
+    })?;
+    file.write_all(bytes).map_err(|source| {
+        AtomicWriteError::new(
+            AppPersistenceOperation::WriteTemporaryFile,
+            &temp_path,
+            source,
+        )
+    })?;
+    file.sync_all().map_err(|source| {
+        AtomicWriteError::new(
+            AppPersistenceOperation::SyncTemporaryFile,
+            &temp_path,
+            source,
+        )
+    })?;
+    drop(file);
+    replace_file(&temp_path, path).map_err(|source| {
+        AtomicWriteError::new(AppPersistenceOperation::ReplaceSettingsFile, path, source)
+    })?;
+
+    #[cfg(unix)]
+    if let Some(parent) = path.parent() {
+        let _ = File::open(parent).and_then(|directory| directory.sync_all());
+    }
+
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn replace_file(temp_path: &Path, final_path: &Path) -> Result<(), io::Error> {
+    fs::rename(temp_path, final_path)
+}
+
+#[cfg(windows)]
+fn replace_file(temp_path: &Path, final_path: &Path) -> Result<(), io::Error> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows::{
+        Win32::Storage::FileSystem::{
+            MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, MoveFileExW,
+        },
+        core::PCWSTR,
+    };
+
+    let temp_path = temp_path
+        .as_os_str()
+        .encode_wide()
+        .chain(Some(0))
+        .collect::<Vec<_>>();
+    let final_path = final_path
+        .as_os_str()
+        .encode_wide()
+        .chain(Some(0))
+        .collect::<Vec<_>>();
+
+    // SAFETY: Both UTF-16 buffers are NUL-terminated and remain alive for the call.
+    unsafe {
+        MoveFileExW(
+            PCWSTR(temp_path.as_ptr()),
+            PCWSTR(final_path.as_ptr()),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+        )
+    }
+    .map_err(io::Error::other)
+}
+
+fn temp_path_for(path: &Path) -> PathBuf {
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map_or_else(|| SETTINGS_FILE_NAME.to_string(), ToString::to_string);
+    path.with_file_name(format!("{file_name}.tmp"))
+}
+
+fn redacted_path(path: &Path) -> String {
+    BaseDirs::new()
+        .and_then(|base_dirs| {
+            path.strip_prefix(base_dirs.home_dir())
+                .ok()
+                .map(|relative| Path::new("$HOME").join(relative))
+        })
+        .unwrap_or_else(|| path.to_path_buf())
+        .display()
+        .to_string()
+}
+
+#[cfg(test)]
+mod tests;
