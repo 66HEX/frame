@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Test Organization:** Keeps component tests with their feature owners and splits domain regression suites, with adjacent persistence/session tests. Assertions and serialized formats are preserved.
+- **Test Organization:** Groups domain and UI regression suites by responsibility, with shared test helpers and adjacent persistence/session tests. Assertions, coverage and serialized formats are preserved.
 - **Application Structure:** Organizes native UI code by feature, with state and actions beside their views, explicit imports and stable public entry points. Settings and FFmpeg internals use focused domain modules; application behavior is preserved.
 - **UI Icons:** Replaces Hugeicons with bundled Nucleo UI outline icons that inherit theme colors, with rendering checks at supported sizes.
 - **UI Surfaces:** Uses a shared layered shadow scale in both themes, with inset inputs and checkboxes, opaque cards, two-tone separators, and one-logical-pixel edges on every platform. Decorative borders are supplied by the shadow layers.

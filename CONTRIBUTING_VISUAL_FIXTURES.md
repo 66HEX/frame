@@ -125,7 +125,8 @@ When adding or changing a visual fixture:
 1. Add the enum case in `VisualFixture`.
 2. Add the environment key in `visual_fixture_from_env_value`.
 3. Seed the state in `FrameRoot::apply_visual_fixture`.
-4. Add or update focused coverage in `frame-app/src/app/tests.rs`.
+4. Add or update focused coverage under `frame-app/src/app/tests/` or beside the
+   owning UI component.
 5. Update this document with the fixture key and the scenario it covers.
 
 Keep fixture data realistic enough to exercise layout pressure: long labels,
