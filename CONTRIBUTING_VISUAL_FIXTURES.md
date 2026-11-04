@@ -4,7 +4,7 @@ Frame includes runtime visual fixtures for manual GPUI review. They seed the app
 with deterministic state so contributors can inspect UI surfaces without finding
 matching media files, waiting for conversions, or triggering update checks.
 
-The source of truth is `frame-app/src/lib.rs` for fixture names and
+The source of truth is `frame-app/src/app/model.rs` for fixture names and
 `frame-app/src/app/fixtures.rs` for seeded state.
 
 ## Running a Fixture
