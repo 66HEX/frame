@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Test Organization:** Groups domain and UI regression suites by responsibility, with shared test helpers and adjacent persistence/session tests. Assertions, coverage and serialized formats are preserved.
-- **Application Structure:** Organizes native UI code by feature, with state and actions beside their views, explicit imports and stable public entry points. Settings and FFmpeg internals use focused domain modules; application behavior is preserved.
+- **Application Structure:** Organizes native UI code by feature and settings/FFmpeg internals by responsibility, with explicit imports and stable public entry points. Separates root rendering, focus registration and overlay composition while preserving their order and behavior.
 - **UI Icons:** Replaces Hugeicons with bundled Nucleo UI outline icons that inherit theme colors, with rendering checks at supported sizes.
 - **UI Surfaces:** Uses a shared layered shadow scale in both themes, with inset inputs and checkboxes, opaque cards, two-tone separators, and one-logical-pixel edges on every platform. Decorative borders are supplied by the shadow layers.
 - **Theme Colors:** Imports the complete Geist color palette and assigns semantic roles for backgrounds, cards, controls, text, focus, and status feedback. Light and dark themes use exact source values, without additional dark-mode dimming.
