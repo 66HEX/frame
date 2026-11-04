@@ -1,11 +1,10 @@
 //! Pinned official Geist colors. Components consume semantic `ThemePalette` roles.
 
-use std::{collections::BTreeMap, sync::LazyLock};
-
-use serde::Deserialize;
-
 use super::RgbaToken;
 use crate::appearance::ColorTheme;
+use serde::Deserialize;
+use std::collections::BTreeMap;
+use std::sync::LazyLock;
 
 /// An original CSS color and its normalized sRGB rendering equivalent.
 #[derive(Debug, Deserialize)]

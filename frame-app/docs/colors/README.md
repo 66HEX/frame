@@ -12,7 +12,7 @@ choices. There is no additional 10% dark-mode dimming.
   resolved sRGB channels, available P3 expressions, source URL and SHA-256.
 - [CSS reference](geist-source.css): the imported colors in light and dark modes.
 - [Native source adapter](../../src/theme/geist.rs) and
-  [semantic mapping](../../src/theme.rs).
+  [semantic mapping](../../src/theme/mod.rs).
 
 The snapshot includes 167 color variables per mode: all 92 modern scale entries
 (two backgrounds and ten steps each of gray, gray-alpha, blue, red, amber, green,

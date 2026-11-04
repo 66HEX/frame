@@ -3,12 +3,9 @@
 pub mod geist;
 pub mod shadows;
 
-use std::sync::LazyLock;
-
+use crate::appearance::{BASE_REM_PX, ColorTheme};
 use gpui::{FontWeight, Rems, rems};
-
-use crate::appearance::BASE_REM_PX;
-use crate::appearance::ColorTheme;
+use std::sync::LazyLock;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RgbaToken {
