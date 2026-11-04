@@ -31,6 +31,29 @@ cargo xtask run
 Use a clean app window for visual review when possible. Fixtures run at startup
 and intentionally override only the state they need for the target scenario.
 
+## Deterministic Native PNG Capture
+
+The `render-snapshot` example draws a hidden 1200 × 800 logical-pixel window,
+settles motion, moves the simulated pointer outside the window, and draws three
+frames synchronously before GPU readback. It uses in-memory settings and does
+not advance asynchronous preview work while capturing.
+
+```bash
+cargo build --locked -p frame-app --example render-snapshot \
+  --features gpui_platform/test-support
+
+FRAME_GPUI_VISUAL_FIXTURE=settings-video \
+FRAME_GPUI_UI_SCALE=100 \
+FRAME_VISUAL_THEME=dark \
+target/debug/examples/render-snapshot /tmp/frame-settings-video.png
+```
+
+For exact comparisons, capture both builds on the same machine, display scale,
+font environment and graphics backend. Compare the PNG bytes or SHA-256 hashes.
+The example deliberately fixes hover position: a physical pointer over the file
+list otherwise changes the visibility of row actions even in a hidden window.
+Use the interactive fixtures above to review motion, hover and asynchronous media.
+
 ## Appearance Regression Pair
 
 Run this pair after changing shared card, button, input, or separator styling.
