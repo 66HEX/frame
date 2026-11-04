@@ -205,6 +205,8 @@ choco install innosetup --no-progress -y
   binary lookup, bundled assets, native app identity, and package app icons.
 - `frame-app/src/app/`: `FrameRoot`, workspace/logs rendering, settings panels,
   preview shell, import flow, conversion actions, and UI primitives.
+- [frame-app architecture](frame-app/docs/architecture.md): feature ownership,
+  module boundaries, test organization, and the migration map for older paths.
 - `frame-app/src/file_queue/`, `frame-app/src/settings/`, `frame-app/src/preview/`,
   and `frame-app/src/conversion_runner/`: tested domain logic kept outside
   rendering code where possible.

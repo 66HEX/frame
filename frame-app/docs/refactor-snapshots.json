@@ -1,0 +1,429 @@
+{
+  "reference_commit": "4af1f0076790fd2b8045aafca1996fd28e81f053",
+  "comparison": "PNG bytes and SHA-256; all 100 pairs identical",
+  "platform": "macOS / native GPUI Metal",
+  "logical_window": [
+    1200,
+    800
+  ],
+  "png_dimensions": [
+    2400,
+    1600
+  ],
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "ui_scales": [
+    100,
+    200
+  ],
+  "pointer": [
+    -1000,
+    -1000
+  ],
+  "draw_passes": 3,
+  "reduce_motion": true,
+  "snapshots": [
+    {
+      "file": "app-settings-dark-100.png",
+      "sha256": "4212de4706e296e211a18b1b3fc868a9193e8393b8873a8972b719d3fff2a35d"
+    },
+    {
+      "file": "app-settings-dark-200.png",
+      "sha256": "e50c0364fcdfb86239c617e84e0a398627b2ee59499550748e722f8df4a417df"
+    },
+    {
+      "file": "app-settings-light-100.png",
+      "sha256": "8860d9f8b0d3e74729bc57b9e42c9db226fe8436b67c1fe2ea13fc9819ac3996"
+    },
+    {
+      "file": "app-settings-light-200.png",
+      "sha256": "8bf0f8a56d34eae0640ae8c8ef6ee1c836afdac686d9131dfc30cc81bed536fd"
+    },
+    {
+      "file": "app-settings-theme-open-dark-100.png",
+      "sha256": "7d7a325e5a52f7a9236ae83df31a935b7c9a9d41357b00b9eb563e8e8738e4de"
+    },
+    {
+      "file": "app-settings-theme-open-dark-200.png",
+      "sha256": "642233781e70e9bce8c1b379587872bbe12a185aaa088d91031c1e6a0aa86303"
+    },
+    {
+      "file": "app-settings-theme-open-light-100.png",
+      "sha256": "cddf1cda5155565f1adef81f57a2561b3e2101fab08879f694994392b75ee379"
+    },
+    {
+      "file": "app-settings-theme-open-light-200.png",
+      "sha256": "92a4ef96eff1c0e9b642481c7d02d077389dac123934659560da57aeb287344e"
+    },
+    {
+      "file": "app-settings-ui-open-dark-100.png",
+      "sha256": "acd567788183265c33f7dda98dab3deaa8bdd609b75a8289396ab67652887af4"
+    },
+    {
+      "file": "app-settings-ui-open-dark-200.png",
+      "sha256": "4e8c32bd69acef69073113185fdb4909ea3458f516090820a2b59ea1b7e71ee8"
+    },
+    {
+      "file": "app-settings-ui-open-light-100.png",
+      "sha256": "258e2ac2887bb32b2cea0bab4a758615cc5330ea881f2f730f92a0204417143e"
+    },
+    {
+      "file": "app-settings-ui-open-light-200.png",
+      "sha256": "e530ed3455b30d5ac3b305aaf484b5924d41c51c8055f25d44be34142a3e8666"
+    },
+    {
+      "file": "logs-active-dark-100.png",
+      "sha256": "39575b74ad7878606d78880d1473aead59848d31ad703899d3fa86ffb6466afd"
+    },
+    {
+      "file": "logs-active-dark-200.png",
+      "sha256": "8d9106783631b652735fc7662e0fafcacfdae26d496e7ab4d7af14a7e226c095"
+    },
+    {
+      "file": "logs-active-light-100.png",
+      "sha256": "d27f6689c8dc31aa519650dbdd55d78e26b8e7e1a15db0f21f2b7176d8269e2e"
+    },
+    {
+      "file": "logs-active-light-200.png",
+      "sha256": "276c0a4288d26f1045a4dcbae1bf759699ac1f0cc7dd1c34207ec7b6bae087de"
+    },
+    {
+      "file": "preview-crop-options-dark-100.png",
+      "sha256": "f7d7c64fc5e3deb1f771c3966ce98704a0df09d154e2de7d1f0a88f92926b872"
+    },
+    {
+      "file": "preview-crop-options-dark-200.png",
+      "sha256": "9ac1215f95e751133f0911a7c43191338783c305b9c848557fb75c78ef9948b4"
+    },
+    {
+      "file": "preview-crop-options-light-100.png",
+      "sha256": "a3eb3c397c0db1d2bc4c1261d94853917461cd1c17ea38ff53817cc5e02a3b03"
+    },
+    {
+      "file": "preview-crop-options-light-200.png",
+      "sha256": "fd8ab302142f104f63f2da324a100ccf826379e774d8390456422f9bddb029ce"
+    },
+    {
+      "file": "preview-crop-custom-dark-100.png",
+      "sha256": "115811b041a94cd17a148c8d31c627b9d62d2f4945340a897aa026bd38589f9c"
+    },
+    {
+      "file": "preview-crop-custom-dark-200.png",
+      "sha256": "61f4249a0b7de8b6a38496c5ca6b4f0312851fd0ed1b549bf520945dc0c6668b"
+    },
+    {
+      "file": "preview-crop-custom-light-100.png",
+      "sha256": "54436cde80deeabfa16d1fd201263e91293323f675295217e4e85b3309655f32"
+    },
+    {
+      "file": "preview-crop-custom-light-200.png",
+      "sha256": "9ae4b507a1269acabbeccf7fb7a12647af3f4ca7441c329241d2afacf0fca748"
+    },
+    {
+      "file": "settings-video-av1-dark-100.png",
+      "sha256": "f19aa94f8e14d404bf7e87e71e342580d7472e8950f596f4c59de12b3c2fd3b8"
+    },
+    {
+      "file": "settings-video-av1-dark-200.png",
+      "sha256": "eaa29c44e0cafc339fb5fb06b0c0b79999f046d52babc07f7583b05c98d6508c"
+    },
+    {
+      "file": "settings-video-av1-light-100.png",
+      "sha256": "8b48f66e2f35bd3819490b3a9a5500ae7843baae6ffc68ebc18c031734f11b4d"
+    },
+    {
+      "file": "settings-video-av1-light-200.png",
+      "sha256": "6031b5f79b6f4e9f939e87ace826e7685998b837f83c3aa962e1da94109192c0"
+    },
+    {
+      "file": "preview-crop-dark-100.png",
+      "sha256": "8fa8841e31ea4b334e0fabd7a2e803a1982f4b208da4b561dd56d85692078bd6"
+    },
+    {
+      "file": "preview-crop-dark-200.png",
+      "sha256": "951994271fddf68812b1a0d368a7f79d6636d409abd6873d236f4a52448fafdd"
+    },
+    {
+      "file": "preview-crop-light-100.png",
+      "sha256": "9941c88aba8c69c5febb405b87d5306e620fede26e59f81f52816ab2eb5c1036"
+    },
+    {
+      "file": "preview-crop-light-200.png",
+      "sha256": "75b644bcbd9a6486b02d0088def30cb41a3145a369ccf1467dee71a77396e79b"
+    },
+    {
+      "file": "preview-ready-dark-100.png",
+      "sha256": "6af2e7956db963865ecb941f65ea9841daafdef90ab9057f6fd8cf2b105d3217"
+    },
+    {
+      "file": "preview-ready-dark-200.png",
+      "sha256": "bb920f03769c7811722b36316e5ef2327626d56aff441ac901e79019cd6cf691"
+    },
+    {
+      "file": "preview-ready-light-100.png",
+      "sha256": "cb7c8332d2e7a2195a32d8a2ee72f786bdb0466865accf9d37453537e70846e6"
+    },
+    {
+      "file": "preview-ready-light-200.png",
+      "sha256": "67eddf85b0fadaa5acb9bfc5d5ea9c4d71f1d9704c125a2875f0e32dbffc66e6"
+    },
+    {
+      "file": "settings-audio-dark-100.png",
+      "sha256": "d80bbde2bd8c7bd889f56e13b7cc1ac1e53be5fc2ec9ec207faca7072f881946"
+    },
+    {
+      "file": "settings-audio-dark-200.png",
+      "sha256": "3620cb2efe66e7fe813a52f242b39bb4f64fb5ea2541a806eb908010a98032d4"
+    },
+    {
+      "file": "settings-audio-light-100.png",
+      "sha256": "9a713fd4021bd7cd937d660f736a17876c71c4f3b8f320db4733372a21f5ef01"
+    },
+    {
+      "file": "settings-audio-light-200.png",
+      "sha256": "c465b7711f0e6d9e4842047e6833e689eb7bb9622fabe9027b3681267af4e687"
+    },
+    {
+      "file": "settings-audio-filters-dark-100.png",
+      "sha256": "534271fdc670d2640f35eca4e0ab4f3c465085ac767e7317fe1d5050d93c7a23"
+    },
+    {
+      "file": "settings-audio-filters-dark-200.png",
+      "sha256": "432d2eb409f4fa71b935550de9b956301c87d3b30bbe558bbfd46de6283883cb"
+    },
+    {
+      "file": "settings-audio-filters-light-100.png",
+      "sha256": "512cee06538d902c16e14d20ebcd55f61caf1cd684cd6a75c5e318378b3cf819"
+    },
+    {
+      "file": "settings-audio-filters-light-200.png",
+      "sha256": "2eb88174299cbc24605e74403fddaabc4a729d9fde61bd1a2b50dd3b15fe6580"
+    },
+    {
+      "file": "settings-images-dark-100.png",
+      "sha256": "70e62e4ba3fc3750db7310639a9732564484fd01490aacaca6898ffb258dd7ca"
+    },
+    {
+      "file": "settings-images-dark-200.png",
+      "sha256": "63e5fc5e09fbbf0237b4583f91a5f3863c403c5e022c6d795ac2762537eb9a2a"
+    },
+    {
+      "file": "settings-images-light-100.png",
+      "sha256": "3c3262ce128c0b301a89838856fa1a098074d8de97dcbaa51a77df549107724f"
+    },
+    {
+      "file": "settings-images-light-200.png",
+      "sha256": "c726cfbb97936bb8244af18f3089cc4e99b02d38cecc0bd154351a46e0313b72"
+    },
+    {
+      "file": "settings-metadata-dark-100.png",
+      "sha256": "7134efd63a6ac2259ab3952467466ae690c1b64ffc9424b2cc96309b4337cb92"
+    },
+    {
+      "file": "settings-metadata-dark-200.png",
+      "sha256": "0905f63ca3cf7e938b8a08adcc3ab2f60619a445bc3b6aa7e3a21ecb02d61693"
+    },
+    {
+      "file": "settings-metadata-light-100.png",
+      "sha256": "0d99965aaa1a88df80b8224eb49b925926f66f6d331fc01de4fdfae1423ee1f0"
+    },
+    {
+      "file": "settings-metadata-light-200.png",
+      "sha256": "97ec68bfd0e63f14120df9e1729ef1cb28b5a2ad3e2826f972c82c3fb10e2ac9"
+    },
+    {
+      "file": "settings-output-dark-100.png",
+      "sha256": "1b1d11a3c137e7fdeacf29aab9d2a13fbe0d0065cd2d575a256dfe6b4005e4ff"
+    },
+    {
+      "file": "settings-output-dark-200.png",
+      "sha256": "0a2f046015d5b4623af4db8be22cf8cbc9ace1185327c05e9477d8be6e45cb4e"
+    },
+    {
+      "file": "settings-output-light-100.png",
+      "sha256": "fa98fdc530acc35711b2c645d10ce509571b5ebb5933151e2129a19f6aa9a421"
+    },
+    {
+      "file": "settings-output-light-200.png",
+      "sha256": "b002e980e8ce2d9185d1295d15191b4b05ba6d9e6b6e83463a62c057fd4b0681"
+    },
+    {
+      "file": "settings-presets-dark-100.png",
+      "sha256": "fe7134e22965cbed135c2f7650be50986e0c82a48510490bc0af6af1f9d4f7ea"
+    },
+    {
+      "file": "settings-presets-dark-200.png",
+      "sha256": "159ca14d4c251eaff4efe1b733d4c8f3102e0e7ecb9c991e1dc7dfcf57e22261"
+    },
+    {
+      "file": "settings-presets-light-100.png",
+      "sha256": "8bee087bedd8b3c18b476b4f59c5c153b1420471c446a98c4e201c910fc54a31"
+    },
+    {
+      "file": "settings-presets-light-200.png",
+      "sha256": "9ebd63d3b127cddba76d40e2f1c162bea25fb5c231a0a0b3a6a7a692c304f07a"
+    },
+    {
+      "file": "settings-source-dark-100.png",
+      "sha256": "6af2e7956db963865ecb941f65ea9841daafdef90ab9057f6fd8cf2b105d3217"
+    },
+    {
+      "file": "settings-source-dark-200.png",
+      "sha256": "bb920f03769c7811722b36316e5ef2327626d56aff441ac901e79019cd6cf691"
+    },
+    {
+      "file": "settings-source-light-100.png",
+      "sha256": "cb7c8332d2e7a2195a32d8a2ee72f786bdb0466865accf9d37453537e70846e6"
+    },
+    {
+      "file": "settings-source-light-200.png",
+      "sha256": "67eddf85b0fadaa5acb9bfc5d5ea9c4d71f1d9704c125a2875f0e32dbffc66e6"
+    },
+    {
+      "file": "settings-subtitles-dark-100.png",
+      "sha256": "249ca8cd2c0fb579f4fe79b2ea0872dc324c1fa30d6df8880ec6924c70cf1056"
+    },
+    {
+      "file": "settings-subtitles-dark-200.png",
+      "sha256": "d3b49282deaf0f00c39f42258efa7f7ad0c4ac800ef7837c4d7ad0a5254b6fbb"
+    },
+    {
+      "file": "settings-subtitles-light-100.png",
+      "sha256": "6fe312b96deb02e3965c013410567d59fa294a44b62f6b1e88023d4fe45adb30"
+    },
+    {
+      "file": "settings-subtitles-light-200.png",
+      "sha256": "c9c9e1e9d064ff111bcc57fa3049214161b30eb5ae2e43ea3d4bc0528bfcc7e2"
+    },
+    {
+      "file": "settings-subtitles-popover-dark-100.png",
+      "sha256": "7ffb6398f9fa07e185cdda42c15d36487e1069646cb2d52105104bef39699e5c"
+    },
+    {
+      "file": "settings-subtitles-popover-dark-200.png",
+      "sha256": "b33c82713e543a5b16b305098ebae2d53d6b13daa326890de0538e0d48b3308b"
+    },
+    {
+      "file": "settings-subtitles-popover-light-100.png",
+      "sha256": "7b6801f4c9e6c10cdf8cd5b14bfd34cf890093c9a4e15a9da0f77445902a378c"
+    },
+    {
+      "file": "settings-subtitles-popover-light-200.png",
+      "sha256": "b51f1cc4e509da3b70462b7bd4ebbba3c762550553b064c22caa18d91e8d5841"
+    },
+    {
+      "file": "settings-video-dark-100.png",
+      "sha256": "92fdbdeb9fa1b7639ca1207b0e110e4c8abe804b902deb475bc499698952ceb4"
+    },
+    {
+      "file": "settings-video-dark-200.png",
+      "sha256": "eaa29c44e0cafc339fb5fb06b0c0b79999f046d52babc07f7583b05c98d6508c"
+    },
+    {
+      "file": "settings-video-light-100.png",
+      "sha256": "7b5872edffc2f3f5f2d1bb7958a943976f80e8f92a3f44156b584c0d9c8ccf6b"
+    },
+    {
+      "file": "settings-video-light-200.png",
+      "sha256": "6031b5f79b6f4e9f939e87ace826e7685998b837f83c3aa962e1da94109192c0"
+    },
+    {
+      "file": "settings-video-filters-dark-100.png",
+      "sha256": "0864a88b3d4d78eaf9a533d0a24bd410d452e095dc0edda74f53478fbb9c70ca"
+    },
+    {
+      "file": "settings-video-filters-dark-200.png",
+      "sha256": "655b3e12e4d685e10779d494e4fade2676b863810711fe74abe14abbe1c2aa16"
+    },
+    {
+      "file": "settings-video-filters-light-100.png",
+      "sha256": "268a513b422f60b75113016cb3a923edb53ba854d09015f5f387ab241d230e9d"
+    },
+    {
+      "file": "settings-video-filters-light-200.png",
+      "sha256": "c50a2fb3262faadb681574ee54d187877ff8830938840c1bbddec5f79958d77a"
+    },
+    {
+      "file": "update-available-dark-100.png",
+      "sha256": "896e271689b18ae49bac0cfd2a9fe0b37b073309e811656f36de0240012b031e"
+    },
+    {
+      "file": "update-available-dark-200.png",
+      "sha256": "4c974f5c8eb01a5d6da6bd8345f3f218f9efdbd104d9d3e42de497343634d576"
+    },
+    {
+      "file": "update-available-light-100.png",
+      "sha256": "636522e8b8347bfbe400219e4c548d13cc7b6764b73bf0d07fca69c520d7a97d"
+    },
+    {
+      "file": "update-available-light-200.png",
+      "sha256": "906f8bb48990696efa49664637b8eb34db80e395247c73645ebb73c06cb64da2"
+    },
+    {
+      "file": "workspace-audio-dark-100.png",
+      "sha256": "44d42ad1754a57edb76b49b06068c54ee13af52dfc4b15ee6d9150394ed27ef1"
+    },
+    {
+      "file": "workspace-audio-dark-200.png",
+      "sha256": "b49775b15c53081064c2740391db19b833a0b3e491dd406aed6a1ea42e69c725"
+    },
+    {
+      "file": "workspace-audio-light-100.png",
+      "sha256": "24400004f9ef8dba790093b1d222a796c879c4e3f7c2c527e4860526a8539eb6"
+    },
+    {
+      "file": "workspace-audio-light-200.png",
+      "sha256": "be0d6f10e98465349ddf3df5b3215f88910ae5670393f9c4c036716cae9820b8"
+    },
+    {
+      "file": "workspace-empty-dark-100.png",
+      "sha256": "f2e8669f17e3ac43d27c21d15fc3bd0f9a8883f7bd1799a5563708861fcc80da"
+    },
+    {
+      "file": "workspace-empty-dark-200.png",
+      "sha256": "ac10f4e9ebe82969d3993ad264b724d0d049a66a7657efb965a0b432f8add066"
+    },
+    {
+      "file": "workspace-empty-light-100.png",
+      "sha256": "2204cb996280adf72c5bef5ab3c27e536a530e74e30049e968123ac17808ba10"
+    },
+    {
+      "file": "workspace-empty-light-200.png",
+      "sha256": "a1161162f5767e0fa93f8b53dbeca09a4a784c27d33686578f918197c1c92618"
+    },
+    {
+      "file": "workspace-image-dark-100.png",
+      "sha256": "1553ff95a2516cf8d012d47a72c99a6e451a13aabec60e5529a9826f663b7773"
+    },
+    {
+      "file": "workspace-image-dark-200.png",
+      "sha256": "7f9505323086652e10d00f9d27007fad380931cabe42b8e0786030f827ab48a9"
+    },
+    {
+      "file": "workspace-image-light-100.png",
+      "sha256": "7f32f7b92a8d530ee58122510f4702b74cbf9bb2f3aff29afe2a4c3935ec29c5"
+    },
+    {
+      "file": "workspace-image-light-200.png",
+      "sha256": "ea2a9ebd49fb76c40b0f49dd7715e890d419ab707c1c674ef326eebc64272e78"
+    },
+    {
+      "file": "workspace-large-queue-dark-100.png",
+      "sha256": "24fcc90a61d1f2c186e89f4958e64998d53653ed135e16005f7ee2508131f3c9"
+    },
+    {
+      "file": "workspace-large-queue-dark-200.png",
+      "sha256": "f0f455602147a477cd3c1bc23733088054b40e7637b1da1819b7fcce73a7e785"
+    },
+    {
+      "file": "workspace-large-queue-light-100.png",
+      "sha256": "cc9246f50c2cf32a760a5a52f6bacf4a347b82028fe6bfd74ebc262daa3ef287"
+    },
+    {
+      "file": "workspace-large-queue-light-200.png",
+      "sha256": "c9c2435134390d9348b8850ae99dd5b029b27d75470bb5a304acf87e371c41f2"
+    }
+  ]
+}

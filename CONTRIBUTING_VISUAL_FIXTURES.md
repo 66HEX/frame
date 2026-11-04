@@ -54,6 +54,9 @@ The example deliberately fixes hover position: a physical pointer over the file
 list otherwise changes the visibility of row actions even in a hidden window.
 Use the interactive fixtures above to review motion, hover and asynchronous media.
 
+The [structural refactor verification](frame-app/docs/refactor-verification.md)
+records a complete light/dark, 100%/200% comparison.
+
 ## Appearance Regression Pair
 
 Run this pair after changing shared card, button, input, or separator styling.
