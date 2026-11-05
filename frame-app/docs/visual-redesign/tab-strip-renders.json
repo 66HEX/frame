@@ -1,0 +1,66 @@
+{
+  "date": "2026-11-04",
+  "renderer": "native GPUI render_to_image",
+  "captures": [
+    {
+      "fixture": "settings-images",
+      "theme": "dark",
+      "scale": 100,
+      "dimensions": [
+        2400,
+        1600
+      ],
+      "sha256": "a9a92a759cc451b2158903c827511eea7514345c185c3a12332dc981b0947321"
+    },
+    {
+      "fixture": "settings-images",
+      "theme": "light",
+      "scale": 100,
+      "dimensions": [
+        2400,
+        1600
+      ],
+      "sha256": "83675be098291cc3c1ebc679f7e0519256842217e82ef4bd5a93f5145d1b67f4"
+    },
+    {
+      "fixture": "settings-presets",
+      "theme": "dark",
+      "scale": 100,
+      "dimensions": [
+        2400,
+        1600
+      ],
+      "sha256": "b014c81279c4ce1827efe3ac2822cc5f46274be56add009a0d19ec01599de071"
+    },
+    {
+      "fixture": "settings-presets",
+      "theme": "light",
+      "scale": 100,
+      "dimensions": [
+        2400,
+        1600
+      ],
+      "sha256": "db0634b6f591869875dc5138e2798cc20c2978b8fddeac76f152959bf1f6bf79"
+    },
+    {
+      "fixture": "settings-video",
+      "theme": "dark",
+      "scale": 100,
+      "dimensions": [
+        2400,
+        1600
+      ],
+      "sha256": "b883b90f806513b83adeae4d8fe2970a30af3af033c3bbbedaf09157555beb74"
+    },
+    {
+      "fixture": "settings-video",
+      "theme": "light",
+      "scale": 100,
+      "dimensions": [
+        2400,
+        1600
+      ],
+      "sha256": "b0e491bbbcc9a57ed284f7c06fcc40467416afceb47396de717fb7fba3c6149d"
+    }
+  ]
+}

@@ -1,0 +1,5900 @@
+{
+  "scope": "Rust UI builders and call sites, excluding tests. Dynamic lists are indexed as builders/patterns, not a fixed runtime count.",
+  "text_inputs": [
+    {
+      "kind": "MaxConcurrency",
+      "label": "Maximum concurrent conversions"
+    },
+    {
+      "kind": "OutputName",
+      "label": "Output name"
+    },
+    {
+      "kind": "AudioBitrate",
+      "label": "Audio bitrate"
+    },
+    {
+      "kind": "CropWidth",
+      "label": "Crop width"
+    },
+    {
+      "kind": "CropHeight",
+      "label": "Crop height"
+    },
+    {
+      "kind": "VideoCustomWidth",
+      "label": "Video width"
+    },
+    {
+      "kind": "VideoCustomHeight",
+      "label": "Video height"
+    },
+    {
+      "kind": "VideoBitrate",
+      "label": "Video bitrate"
+    },
+    {
+      "kind": "GifLoop",
+      "label": "GIF loop count"
+    },
+    {
+      "kind": "PreviewStartTime",
+      "label": "Preview start time"
+    },
+    {
+      "kind": "PreviewEndTime",
+      "label": "Preview end time"
+    },
+    {
+      "kind": "MetadataTitle",
+      "label": "Metadata title"
+    },
+    {
+      "kind": "MetadataArtist",
+      "label": "Metadata artist"
+    },
+    {
+      "kind": "MetadataAlbum",
+      "label": "Metadata album"
+    },
+    {
+      "kind": "MetadataGenre",
+      "label": "Metadata genre"
+    },
+    {
+      "kind": "MetadataDate",
+      "label": "Metadata date"
+    },
+    {
+      "kind": "MetadataComment",
+      "label": "Metadata comment"
+    },
+    {
+      "kind": "MetadataServiceName",
+      "label": "MPEG transport stream service name"
+    },
+    {
+      "kind": "MetadataServiceProvider",
+      "label": "MPEG transport stream service provider"
+    },
+    {
+      "kind": "PresetName",
+      "label": "Preset name"
+    },
+    {
+      "kind": "ExternalSubtitleLanguage",
+      "label": "Selectable subtitle language"
+    },
+    {
+      "kind": "ExternalSubtitleTitle",
+      "label": "Selectable subtitle title"
+    },
+    {
+      "kind": "SubtitleFontColorHex",
+      "label": "Subtitle font color"
+    },
+    {
+      "kind": "SubtitleOutlineColorHex",
+      "label": "Subtitle outline color"
+    }
+  ],
+  "dynamic_targets": [
+    {
+      "name": "FrameTextInputKind",
+      "variants": [
+        "MaxConcurrency",
+        "OutputName",
+        "AudioBitrate",
+        "CropWidth",
+        "CropHeight",
+        "VideoCustomWidth",
+        "VideoCustomHeight",
+        "VideoBitrate",
+        "GifLoop",
+        "PreviewStartTime",
+        "PreviewEndTime",
+        "MetadataTitle",
+        "MetadataArtist",
+        "MetadataAlbum",
+        "MetadataGenre",
+        "MetadataDate",
+        "MetadataComment",
+        "MetadataServiceName",
+        "MetadataServiceProvider",
+        "PresetName",
+        "ExternalSubtitleLanguage",
+        "ExternalSubtitleTitle",
+        "SubtitleFontColorHex",
+        "SubtitleOutlineColorHex"
+      ],
+      "path": "frame-app/src/app/input/runtime.rs"
+    },
+    {
+      "name": "AudioFilterRangeTarget",
+      "variants": [
+        "Volume",
+        "Limiter",
+        "Bass",
+        "Treble",
+        "HighPass",
+        "LowPass",
+        "NoiseReduction",
+        "DeEsser",
+        "StereoWidth"
+      ],
+      "path": "frame-app/src/app/inspector/audio_filters/range.rs"
+    },
+    {
+      "name": "VideoFilterRangeTarget",
+      "variants": [
+        "Brightness",
+        "Contrast",
+        "Saturation",
+        "Gamma",
+        "Hue",
+        "Temperature",
+        "Sharpen",
+        "GaussianBlur",
+        "Deband",
+        "Vignette"
+      ],
+      "path": "frame-app/src/app/inspector/video_filters/range.rs"
+    },
+    {
+      "name": "SettingsVideoRangeTarget",
+      "variants": [
+        "Crf",
+        "Quality"
+      ],
+      "path": "frame-app/src/app/inspector/video/quality.rs"
+    },
+    {
+      "name": "SettingsAudioRangeTarget",
+      "variants": [
+        "Quality"
+      ],
+      "path": "frame-app/src/app/inspector/audio.rs"
+    },
+    {
+      "name": "SettingsImageRangeTarget",
+      "variants": [
+        "JpegQuality",
+        "WebpQuality",
+        "WebpCompression",
+        "PngCompression"
+      ],
+      "path": "frame-app/src/app/inspector/images.rs"
+    }
+  ],
+  "builders": [
+    {
+      "name": "apply_accessible_toggle_button",
+      "path": "frame-app/src/app/accessibility.rs",
+      "line": 450
+    },
+    {
+      "name": "apply_accessible_checkbox",
+      "path": "frame-app/src/app/accessibility.rs",
+      "line": 462
+    },
+    {
+      "name": "apply_accessible_checkbox_with_focus",
+      "path": "frame-app/src/app/accessibility.rs",
+      "line": 490
+    },
+    {
+      "name": "apply_accessible_select_trigger",
+      "path": "frame-app/src/app/accessibility.rs",
+      "line": 519
+    },
+    {
+      "name": "apply_accessible_select_trigger_with_focus",
+      "path": "frame-app/src/app/accessibility.rs",
+      "line": 545
+    },
+    {
+      "name": "apply_accessible_select_option",
+      "path": "frame-app/src/app/accessibility.rs",
+      "line": 572
+    },
+    {
+      "name": "apply_accessible_select_option_with_focus",
+      "path": "frame-app/src/app/accessibility.rs",
+      "line": 597
+    },
+    {
+      "name": "apply_accessible_slider",
+      "path": "frame-app/src/app/accessibility.rs",
+      "line": 625
+    },
+    {
+      "name": "apply_accessible_slider_with_focus",
+      "path": "frame-app/src/app/accessibility.rs",
+      "line": 657
+    },
+    {
+      "name": "apply_accessible_text_input",
+      "path": "frame-app/src/app/accessibility.rs",
+      "line": 686
+    },
+    {
+      "name": "titlebar_navigation",
+      "path": "frame-app/src/app/chrome/navigation.rs",
+      "line": 14
+    },
+    {
+      "name": "titlebar_stats",
+      "path": "frame-app/src/app/chrome/navigation.rs",
+      "line": 51
+    },
+    {
+      "name": "titlebar_stat",
+      "path": "frame-app/src/app/chrome/navigation.rs",
+      "line": 72
+    },
+    {
+      "name": "titlebar_segment",
+      "path": "frame-app/src/app/chrome/navigation.rs",
+      "line": 89
+    },
+    {
+      "name": "current",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 28
+    },
+    {
+      "name": "titlebar_for_platform",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 48
+    },
+    {
+      "name": "macos_titlebar",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 62
+    },
+    {
+      "name": "windows_titlebar",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 108
+    },
+    {
+      "name": "linux_titlebar",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 124
+    },
+    {
+      "name": "titlebar_drag_surface",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 140
+    },
+    {
+      "name": "platform_titlebar_content",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 196
+    },
+    {
+      "name": "titlebar_shows_workspace_controls",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 248
+    },
+    {
+      "name": "titlebar_add_source_button",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 280
+    },
+    {
+      "name": "titlebar_start_button",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 302
+    },
+    {
+      "name": "frame_logo",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 340
+    },
+    {
+      "name": "platform_frame_logo",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 356
+    },
+    {
+      "name": "titlebar_divider",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 371
+    },
+    {
+      "name": "platform_titlebar_divider",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 375
+    },
+    {
+      "name": "macos_native_window_controls_placeholder",
+      "path": "frame-app/src/app/chrome/window_controls.rs",
+      "line": 18
+    },
+    {
+      "name": "windows_window_controls",
+      "path": "frame-app/src/app/chrome/window_controls.rs",
+      "line": 27
+    },
+    {
+      "name": "linux_window_controls",
+      "path": "frame-app/src/app/chrome/window_controls.rs",
+      "line": 108
+    },
+    {
+      "name": "titlebar_window_button",
+      "path": "frame-app/src/app/chrome/window_controls.rs",
+      "line": 203
+    },
+    {
+      "name": "frame_toggle_button_base",
+      "path": "frame-app/src/app/components/button.rs",
+      "line": 44
+    },
+    {
+      "name": "frame_choice_button",
+      "path": "frame-app/src/app/components/button.rs",
+      "line": 70
+    },
+    {
+      "name": "frame_text_button",
+      "path": "frame-app/src/app/components/button.rs",
+      "line": 94
+    },
+    {
+      "name": "frame_text_button_with_focus",
+      "path": "frame-app/src/app/components/button.rs",
+      "line": 113
+    },
+    {
+      "name": "frame_text_button_inner",
+      "path": "frame-app/src/app/components/button.rs",
+      "line": 141
+    },
+    {
+      "name": "frame_button_base",
+      "path": "frame-app/src/app/components/button.rs",
+      "line": 176
+    },
+    {
+      "name": "frame_control_base",
+      "path": "frame-app/src/app/components/button.rs",
+      "line": 209
+    },
+    {
+      "name": "frame_icon_button",
+      "path": "frame-app/src/app/components/button.rs",
+      "line": 323
+    },
+    {
+      "name": "frame_icon_swap_button",
+      "path": "frame-app/src/app/components/button.rs",
+      "line": 353
+    },
+    {
+      "name": "frame_icon_button_inner",
+      "path": "frame-app/src/app/components/button.rs",
+      "line": 389
+    },
+    {
+      "name": "frame_icon_button_content",
+      "path": "frame-app/src/app/components/button.rs",
+      "line": 422
+    },
+    {
+      "name": "frame_checkbox_indicator",
+      "path": "frame-app/src/app/components/checkbox.rs",
+      "line": 18
+    },
+    {
+      "name": "frame_selection_dot",
+      "path": "frame-app/src/app/components/checkbox.rs",
+      "line": 69
+    },
+    {
+      "name": "frame_checkbox_row",
+      "path": "frame-app/src/app/components/checkbox.rs",
+      "line": 108
+    },
+    {
+      "name": "frame_checkbox_row_with_focus",
+      "path": "frame-app/src/app/components/checkbox.rs",
+      "line": 127
+    },
+    {
+      "name": "frame_checkbox_row_inner",
+      "path": "frame-app/src/app/components/checkbox.rs",
+      "line": 155
+    },
+    {
+      "name": "new",
+      "path": "frame-app/src/app/components/choice_group.rs",
+      "line": 18
+    },
+    {
+      "name": "frame_color_picker_panel",
+      "path": "frame-app/src/app/components/color_picker.rs",
+      "line": 17
+    },
+    {
+      "name": "frame_color_picker_sv_canvas",
+      "path": "frame-app/src/app/components/color_picker.rs",
+      "line": 45
+    },
+    {
+      "name": "frame_color_picker_hue_track",
+      "path": "frame-app/src/app/components/color_picker.rs",
+      "line": 99
+    },
+    {
+      "name": "frame_color_picker_hue_handle",
+      "path": "frame-app/src/app/components/color_picker.rs",
+      "line": 132
+    },
+    {
+      "name": "frame_color_picker_hue_color",
+      "path": "frame-app/src/app/components/color_picker.rs",
+      "line": 149
+    },
+    {
+      "name": "frame_handle_hit_region",
+      "path": "frame-app/src/app/components/hit_target.rs",
+      "line": 10
+    },
+    {
+      "name": "frame_list_group",
+      "path": "frame-app/src/app/components/list_item.rs",
+      "line": 11
+    },
+    {
+      "name": "frame_list_item",
+      "path": "frame-app/src/app/components/list_item.rs",
+      "line": 19
+    },
+    {
+      "name": "frame_list_item_with_caption",
+      "path": "frame-app/src/app/components/list_item.rs",
+      "line": 64
+    },
+    {
+      "name": "frame_track_list_item",
+      "path": "frame-app/src/app/components/list_item.rs",
+      "line": 123
+    },
+    {
+      "name": "interactive_item",
+      "path": "frame-app/src/app/components/list_item.rs",
+      "line": 167
+    },
+    {
+      "name": "input_surface",
+      "path": "frame-app/src/app/components/patterns.rs",
+      "line": 9
+    },
+    {
+      "name": "frame_field_group",
+      "path": "frame-app/src/app/components/patterns.rs",
+      "line": 80
+    },
+    {
+      "name": "frame_label",
+      "path": "frame-app/src/app/components/patterns.rs",
+      "line": 88
+    },
+    {
+      "name": "frame_description",
+      "path": "frame-app/src/app/components/patterns.rs",
+      "line": 97
+    },
+    {
+      "name": "frame_section",
+      "path": "frame-app/src/app/components/patterns.rs",
+      "line": 108
+    },
+    {
+      "name": "frame_badge",
+      "path": "frame-app/src/app/components/patterns.rs",
+      "line": 115
+    },
+    {
+      "name": "frame_panel_header",
+      "path": "frame-app/src/app/components/patterns.rs",
+      "line": 135
+    },
+    {
+      "name": "frame_toolbar",
+      "path": "frame-app/src/app/components/patterns.rs",
+      "line": 146
+    },
+    {
+      "name": "frame_empty",
+      "path": "frame-app/src/app/components/patterns.rs",
+      "line": 155
+    },
+    {
+      "name": "frame_tabs_list",
+      "path": "frame-app/src/app/components/patterns.rs",
+      "line": 173
+    },
+    {
+      "name": "frame_vertical_scrollbar",
+      "path": "frame-app/src/app/components/scrollbar.rs",
+      "line": 41
+    },
+    {
+      "name": "paint_scrollbar_thumb",
+      "path": "frame-app/src/app/components/scrollbar.rs",
+      "line": 145
+    },
+    {
+      "name": "frame_select_trigger_with_focus",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 30
+    },
+    {
+      "name": "frame_select_trigger_content",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 63
+    },
+    {
+      "name": "frame_select_trigger_content_with_focus",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 82
+    },
+    {
+      "name": "frame_select_trigger_content_inner",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 110
+    },
+    {
+      "name": "frame_select_popover",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 175
+    },
+    {
+      "name": "frame_select_options_list",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 201
+    },
+    {
+      "name": "frame_select_scrollbar",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 219
+    },
+    {
+      "name": "frame_select_content_height",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 229
+    },
+    {
+      "name": "frame_select_option_inner",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 269
+    },
+    {
+      "name": "frame_color_select_value",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 326
+    },
+    {
+      "name": "frame_color_swatch",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 348
+    },
+    {
+      "name": "search",
+      "path": "frame-app/src/app/components/select_control.rs",
+      "line": 52
+    },
+    {
+      "name": "frame_range_track",
+      "path": "frame-app/src/app/components/slider.rs",
+      "line": 22
+    },
+    {
+      "name": "frame_progress_track",
+      "path": "frame-app/src/app/components/slider.rs",
+      "line": 30
+    },
+    {
+      "name": "range_track",
+      "path": "frame-app/src/app/components/slider.rs",
+      "line": 37
+    },
+    {
+      "name": "frame_slider_content_bounds",
+      "path": "frame-app/src/app/components/slider.rs",
+      "line": 75
+    },
+    {
+      "name": "frame_slider_handle",
+      "path": "frame-app/src/app/components/slider.rs",
+      "line": 225
+    },
+    {
+      "name": "new",
+      "path": "frame-app/src/app/components/tooltip.rs",
+      "line": 41
+    },
+    {
+      "name": "frame_tooltip",
+      "path": "frame-app/src/app/components/tooltip.rs",
+      "line": 252
+    },
+    {
+      "name": "should_handle_text_input",
+      "path": "frame-app/src/app/input/element.rs",
+      "line": 38
+    },
+    {
+      "name": "settings_audio_tab",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 29
+    },
+    {
+      "name": "settings_audio_channels_grid",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 97
+    },
+    {
+      "name": "settings_audio_encoding_controls",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 168
+    },
+    {
+      "name": "settings_audio_bitrate_mode_grid",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 240
+    },
+    {
+      "name": "settings_audio_bitrate_field",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 283
+    },
+    {
+      "name": "settings_audio_range_field",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 317
+    },
+    {
+      "name": "settings_audio_range_slider",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 361
+    },
+    {
+      "name": "apply_settings_audio_range_value",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 456
+    },
+    {
+      "name": "settings_audio_codec_list",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 488
+    },
+    {
+      "name": "settings_audio_codec_button",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 511
+    },
+    {
+      "name": "settings_audio_track_button",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 544
+    },
+    {
+      "name": "settings_audio_filter_reset",
+      "path": "frame-app/src/app/inspector/audio_filters/controls.rs",
+      "line": 18
+    },
+    {
+      "name": "settings_audio_normalize_control",
+      "path": "frame-app/src/app/inspector/audio_filters/controls.rs",
+      "line": 52
+    },
+    {
+      "name": "settings_audio_compressor_control",
+      "path": "frame-app/src/app/inspector/audio_filters/controls.rs",
+      "line": 77
+    },
+    {
+      "name": "settings_audio_filters_reset_all",
+      "path": "frame-app/src/app/inspector/audio_filters/controls.rs",
+      "line": 149
+    },
+    {
+      "name": "settings_audio_filter_range_field",
+      "path": "frame-app/src/app/inspector/audio_filters/range.rs",
+      "line": 47
+    },
+    {
+      "name": "settings_audio_filter_range_slider",
+      "path": "frame-app/src/app/inspector/audio_filters/range.rs",
+      "line": 135
+    },
+    {
+      "name": "settings_audio_filters_tab",
+      "path": "frame-app/src/app/inspector/audio_filters/view.rs",
+      "line": 21
+    },
+    {
+      "name": "settings_images_pixel_format_section",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 98
+    },
+    {
+      "name": "settings_images_encoding_section",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 141
+    },
+    {
+      "name": "settings_image_jpeg_section",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 162
+    },
+    {
+      "name": "settings_image_webp_section",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 194
+    },
+    {
+      "name": "settings_image_png_section",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 259
+    },
+    {
+      "name": "settings_image_tiff_section",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 291
+    },
+    {
+      "name": "settings_image_webp_mode_grid",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 308
+    },
+    {
+      "name": "settings_image_range_field",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 350
+    },
+    {
+      "name": "settings_image_range_slider",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 394
+    },
+    {
+      "name": "apply_settings_image_range_value",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 485
+    },
+    {
+      "name": "settings_image_range_slider_id",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 518
+    },
+    {
+      "name": "settings_metadata_tab",
+      "path": "frame-app/src/app/inspector/metadata.rs",
+      "line": 15
+    },
+    {
+      "name": "settings_metadata_mode_grid",
+      "path": "frame-app/src/app/inspector/metadata.rs",
+      "line": 56
+    },
+    {
+      "name": "settings_metadata_fields",
+      "path": "frame-app/src/app/inspector/metadata.rs",
+      "line": 95
+    },
+    {
+      "name": "settings_output_tab",
+      "path": "frame-app/src/app/inspector/output.rs",
+      "line": 18
+    },
+    {
+      "name": "settings_processing_mode_grid",
+      "path": "frame-app/src/app/inspector/output.rs",
+      "line": 86
+    },
+    {
+      "name": "settings_container_grid",
+      "path": "frame-app/src/app/inspector/output.rs",
+      "line": 130
+    },
+    {
+      "name": "settings_output_name_field",
+      "path": "frame-app/src/app/inspector/output.rs",
+      "line": 176
+    },
+    {
+      "name": "settings_panel",
+      "path": "frame-app/src/app/inspector/panel.rs",
+      "line": 32
+    },
+    {
+      "name": "settings_tab_button",
+      "path": "frame-app/src/app/inspector/panel.rs",
+      "line": 141
+    },
+    {
+      "name": "settings_tab_for_key",
+      "path": "frame-app/src/app/inspector/panel.rs",
+      "line": 235
+    },
+    {
+      "name": "settings_section",
+      "path": "frame-app/src/app/inspector/panel.rs",
+      "line": 391
+    },
+    {
+      "name": "settings_presets_tab",
+      "path": "frame-app/src/app/inspector/presets/view.rs",
+      "line": 31
+    },
+    {
+      "name": "settings_presets_header",
+      "path": "frame-app/src/app/inspector/presets/view.rs",
+      "line": 61
+    },
+    {
+      "name": "settings_presets_save_row",
+      "path": "frame-app/src/app/inspector/presets/view.rs",
+      "line": 93
+    },
+    {
+      "name": "settings_save_preset_button",
+      "path": "frame-app/src/app/inspector/presets/view.rs",
+      "line": 126
+    },
+    {
+      "name": "settings_preset_row",
+      "path": "frame-app/src/app/inspector/presets/view.rs",
+      "line": 150
+    },
+    {
+      "name": "settings_preset_icon_button",
+      "path": "frame-app/src/app/inspector/presets/view.rs",
+      "line": 241
+    },
+    {
+      "name": "settings_field_label",
+      "path": "frame-app/src/app/inspector/shared.rs",
+      "line": 9
+    },
+    {
+      "name": "settings_value_badge",
+      "path": "frame-app/src/app/inspector/shared.rs",
+      "line": 16
+    },
+    {
+      "name": "settings_hint_text",
+      "path": "frame-app/src/app/inspector/shared.rs",
+      "line": 23
+    },
+    {
+      "name": "settings_value_row",
+      "path": "frame-app/src/app/inspector/shared.rs",
+      "line": 30
+    },
+    {
+      "name": "settings_source_tab",
+      "path": "frame-app/src/app/inspector/source.rs",
+      "line": 10
+    },
+    {
+      "name": "settings_source_tracks",
+      "path": "frame-app/src/app/inspector/source.rs",
+      "line": 88
+    },
+    {
+      "name": "settings_track_header",
+      "path": "frame-app/src/app/inspector/source.rs",
+      "line": 106
+    },
+    {
+      "name": "settings_section_label",
+      "path": "frame-app/src/app/inspector/source.rs",
+      "line": 126
+    },
+    {
+      "name": "settings_subtitle_burn_file_row",
+      "path": "frame-app/src/app/inspector/subtitles/burn_in.rs",
+      "line": 28
+    },
+    {
+      "name": "settings_subtitle_clear_button",
+      "path": "frame-app/src/app/inspector/subtitles/burn_in.rs",
+      "line": 63
+    },
+    {
+      "name": "settings_subtitle_style_controls",
+      "path": "frame-app/src/app/inspector/subtitles/burn_in.rs",
+      "line": 99
+    },
+    {
+      "name": "settings_subtitle_position_grid",
+      "path": "frame-app/src/app/inspector/subtitles/burn_in.rs",
+      "line": 208
+    },
+    {
+      "name": "into_element",
+      "path": "frame-app/src/app/inspector/subtitles/color_picker.rs",
+      "line": 53
+    },
+    {
+      "name": "settings_subtitle_color_picker",
+      "path": "frame-app/src/app/inspector/subtitles/color_picker.rs",
+      "line": 260
+    },
+    {
+      "name": "settings_subtitle_sv_square",
+      "path": "frame-app/src/app/inspector/subtitles/color_picker.rs",
+      "line": 345
+    },
+    {
+      "name": "settings_subtitle_hue_slider",
+      "path": "frame-app/src/app/inspector/subtitles/color_picker.rs",
+      "line": 436
+    },
+    {
+      "name": "settings_subtitle_file_button",
+      "path": "frame-app/src/app/inspector/subtitles/file_button.rs",
+      "line": 10
+    },
+    {
+      "name": "settings_subtitle_font_select",
+      "path": "frame-app/src/app/inspector/subtitles/font_select.rs",
+      "line": 10
+    },
+    {
+      "name": "settings_subtitle_font_size_select",
+      "path": "frame-app/src/app/inspector/subtitles/size_select.rs",
+      "line": 10
+    },
+    {
+      "name": "settings_external_subtitles_section",
+      "path": "frame-app/src/app/inspector/subtitles/tracks.rs",
+      "line": 21
+    },
+    {
+      "name": "has_any",
+      "path": "frame-app/src/app/inspector/subtitles/tracks.rs",
+      "line": 101
+    },
+    {
+      "name": "settings_external_subtitle_editor",
+      "path": "frame-app/src/app/inspector/subtitles/tracks.rs",
+      "line": 250
+    },
+    {
+      "name": "settings_subtitle_track_button",
+      "path": "frame-app/src/app/inspector/subtitles/tracks.rs",
+      "line": 379
+    },
+    {
+      "name": "settings_subtitles_tab",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 108
+    },
+    {
+      "name": "settings_subtitle_mode_grid",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 129
+    },
+    {
+      "name": "settings_selectable_subtitles_content",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 179
+    },
+    {
+      "name": "settings_burn_in_subtitles_content",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 209
+    },
+    {
+      "name": "settings_video_encoder_section",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 20
+    },
+    {
+      "name": "settings_video_pixel_format_section",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 64
+    },
+    {
+      "name": "settings_video_preset_section",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 115
+    },
+    {
+      "name": "settings_video_quality_section",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 166
+    },
+    {
+      "name": "settings_video_bitrate_mode_grid",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 252
+    },
+    {
+      "name": "settings_video_nvenc_section",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 291
+    },
+    {
+      "name": "settings_video_videotoolbox_section",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 338
+    },
+    {
+      "name": "settings_video_hw_section",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 365
+    },
+    {
+      "name": "settings_video_checkbox_row",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 394
+    },
+    {
+      "name": "settings_video_resolution_section",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 18
+    },
+    {
+      "name": "settings_resolution_grid",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 46
+    },
+    {
+      "name": "settings_custom_dimensions_grid",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 84
+    },
+    {
+      "name": "settings_video_scaling_section",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 140
+    },
+    {
+      "name": "settings_video_fps_section",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 179
+    },
+    {
+      "name": "settings_video_gif_colors_section",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 217
+    },
+    {
+      "name": "settings_video_gif_dither_section",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 257
+    },
+    {
+      "name": "settings_video_gif_loop_section",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 299
+    },
+    {
+      "name": "settings_video_range_field",
+      "path": "frame-app/src/app/inspector/video/quality.rs",
+      "line": 41
+    },
+    {
+      "name": "settings_video_range_slider",
+      "path": "frame-app/src/app/inspector/video/quality.rs",
+      "line": 86
+    },
+    {
+      "name": "apply_settings_video_range_value",
+      "path": "frame-app/src/app/inspector/video/quality.rs",
+      "line": 183
+    },
+    {
+      "name": "settings_video_tab",
+      "path": "frame-app/src/app/inspector/video/view.rs",
+      "line": 26
+    },
+    {
+      "name": "settings_video_filter_reset",
+      "path": "frame-app/src/app/inspector/video_filters/controls.rs",
+      "line": 19
+    },
+    {
+      "name": "settings_video_denoise_control",
+      "path": "frame-app/src/app/inspector/video_filters/controls.rs",
+      "line": 53
+    },
+    {
+      "name": "settings_video_grayscale_control",
+      "path": "frame-app/src/app/inspector/video_filters/controls.rs",
+      "line": 119
+    },
+    {
+      "name": "settings_video_deinterlace_control",
+      "path": "frame-app/src/app/inspector/video_filters/controls.rs",
+      "line": 144
+    },
+    {
+      "name": "settings_video_filters_reset_all",
+      "path": "frame-app/src/app/inspector/video_filters/controls.rs",
+      "line": 187
+    },
+    {
+      "name": "settings_video_filter_range_field",
+      "path": "frame-app/src/app/inspector/video_filters/range.rs",
+      "line": 48
+    },
+    {
+      "name": "settings_video_filter_range_slider",
+      "path": "frame-app/src/app/inspector/video_filters/range.rs",
+      "line": 135
+    },
+    {
+      "name": "settings_video_filters_tab",
+      "path": "frame-app/src/app/inspector/video_filters/view.rs",
+      "line": 21
+    },
+    {
+      "name": "logs_view",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 30
+    },
+    {
+      "name": "logs_tab_strip",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 73
+    },
+    {
+      "name": "log_tab_button",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 140
+    },
+    {
+      "name": "logs_body",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 221
+    },
+    {
+      "name": "log_lines_list",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 276
+    },
+    {
+      "name": "log_tab_id_for_key",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 350
+    },
+    {
+      "name": "log_scroll_to_bottom_button",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 473
+    },
+    {
+      "name": "logs_copy_button",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 510
+    },
+    {
+      "name": "log_line_tone",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 551
+    },
+    {
+      "name": "css_ease",
+      "path": "frame-app/src/app/motion.rs",
+      "line": 14
+    },
+    {
+      "name": "app_settings_appearance_section",
+      "path": "frame-app/src/app/preferences/appearance.rs",
+      "line": 22
+    },
+    {
+      "name": "options",
+      "path": "frame-app/src/app/preferences/appearance.rs",
+      "line": 92
+    },
+    {
+      "name": "app_settings_sheet",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 71
+    },
+    {
+      "name": "app_settings_version_label",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 291
+    },
+    {
+      "name": "app_settings_output_directory_section",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 304
+    },
+    {
+      "name": "app_settings_concurrency_control",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 362
+    },
+    {
+      "name": "app_settings_close_button",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 407
+    },
+    {
+      "name": "app_settings_apply_button",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 437
+    },
+    {
+      "name": "crop_select",
+      "path": "frame-app/src/app/preview/crop_options/select.rs",
+      "line": 16
+    },
+    {
+      "name": "preview_crop_options",
+      "path": "frame-app/src/app/preview/crop_options/view.rs",
+      "line": 12
+    },
+    {
+      "name": "preview_crop_custom_fields",
+      "path": "frame-app/src/app/preview/crop_options/view.rs",
+      "line": 22
+    },
+    {
+      "name": "preview_crop_overlay",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 33
+    },
+    {
+      "name": "preview_crop_visual_rect",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 128
+    },
+    {
+      "name": "crop_outline_rect",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 150
+    },
+    {
+      "name": "crop_vertical_guide_line",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 208
+    },
+    {
+      "name": "crop_horizontal_guide_line",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 218
+    },
+    {
+      "name": "preview_crop_handle",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 228
+    },
+    {
+      "name": "crop_handle_cursor",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 295
+    },
+    {
+      "name": "crop_handle_screen_cursor",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 308
+    },
+    {
+      "name": "compact_text_button",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 440
+    },
+    {
+      "name": "compact_text_button_variant",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 457
+    },
+    {
+      "name": "compact_text_button_variant_inner",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 473
+    },
+    {
+      "name": "preview_overlay_controls",
+      "path": "frame-app/src/app/preview/overlay/controls.rs",
+      "line": 19
+    },
+    {
+      "name": "preview_overlay_icon_button_with_focus",
+      "path": "frame-app/src/app/preview/overlay/controls.rs",
+      "line": 177
+    },
+    {
+      "name": "preview_overlay_icon_button_inner",
+      "path": "frame-app/src/app/preview/overlay/controls.rs",
+      "line": 205
+    },
+    {
+      "name": "preview_overlay_layer",
+      "path": "frame-app/src/app/preview/overlay/layer.rs",
+      "line": 34
+    },
+    {
+      "name": "overlay_handle_cursor",
+      "path": "frame-app/src/app/preview/overlay/layer.rs",
+      "line": 295
+    },
+    {
+      "name": "into_element",
+      "path": "frame-app/src/app/preview/overlay/opacity.rs",
+      "line": 27
+    },
+    {
+      "name": "default",
+      "path": "frame-app/src/app/preview/panel.rs",
+      "line": 68
+    },
+    {
+      "name": "preview_timecode_field",
+      "path": "frame-app/src/app/preview/timeline/timecode.rs",
+      "line": 18
+    },
+    {
+      "name": "preview_timeline_label",
+      "path": "frame-app/src/app/preview/timeline/timecode.rs",
+      "line": 77
+    },
+    {
+      "name": "into_element",
+      "path": "frame-app/src/app/preview/timeline/track.rs",
+      "line": 41
+    },
+    {
+      "name": "preview_timeline_handle",
+      "path": "frame-app/src/app/preview/timeline/track.rs",
+      "line": 296
+    },
+    {
+      "name": "preview_timeline",
+      "path": "frame-app/src/app/preview/timeline/view.rs",
+      "line": 15
+    },
+    {
+      "name": "preview_timeline_labels",
+      "path": "frame-app/src/app/preview/timeline/view.rs",
+      "line": 103
+    },
+    {
+      "name": "preview_toolbar_height",
+      "path": "frame-app/src/app/preview/toolbar.rs",
+      "line": 25
+    },
+    {
+      "name": "preview_zoom_toolbar",
+      "path": "frame-app/src/app/preview/toolbar.rs",
+      "line": 157
+    },
+    {
+      "name": "preview_toolbar_vertical_separator",
+      "path": "frame-app/src/app/preview/toolbar.rs",
+      "line": 215
+    },
+    {
+      "name": "preview_tool_button",
+      "path": "frame-app/src/app/preview/toolbar.rs",
+      "line": 229
+    },
+    {
+      "name": "preview_tool_button_with_focus",
+      "path": "frame-app/src/app/preview/toolbar.rs",
+      "line": 260
+    },
+    {
+      "name": "preview_tool_button_inner",
+      "path": "frame-app/src/app/preview/toolbar.rs",
+      "line": 292
+    },
+    {
+      "name": "into_element",
+      "path": "frame-app/src/app/preview/viewport/media.rs",
+      "line": 19
+    },
+    {
+      "name": "preview_viewport",
+      "path": "frame-app/src/app/preview/viewport/view.rs",
+      "line": 34
+    },
+    {
+      "name": "preview_viewport_content",
+      "path": "frame-app/src/app/preview/viewport/view.rs",
+      "line": 144
+    },
+    {
+      "name": "preview_canvas_pan_enabled",
+      "path": "frame-app/src/app/preview/viewport/view.rs",
+      "line": 357
+    },
+    {
+      "name": "button_colors",
+      "path": "frame-app/src/app/primitives.rs",
+      "line": 32
+    },
+    {
+      "name": "icon_svg",
+      "path": "frame-app/src/app/primitives.rs",
+      "line": 142
+    },
+    {
+      "name": "parse_hex",
+      "path": "frame-app/src/app/primitives.rs",
+      "line": 150
+    },
+    {
+      "name": "panel_bottom_separator",
+      "path": "frame-app/src/app/primitives.rs",
+      "line": 170
+    },
+    {
+      "name": "drag_drop_overlay",
+      "path": "frame-app/src/app/queue/drop_overlay.rs",
+      "line": 8
+    },
+    {
+      "name": "file_list_panel",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 27
+    },
+    {
+      "name": "file_list_header",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 48
+    },
+    {
+      "name": "queue_navigation_state",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 139
+    },
+    {
+      "name": "file_list_row",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 282
+    },
+    {
+      "name": "header_label",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 386
+    },
+    {
+      "name": "row_label",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 395
+    },
+    {
+      "name": "row_actions_cell",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 410
+    },
+    {
+      "name": "row_primary_action_button",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 456
+    },
+    {
+      "name": "row_checkbox_control",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 630
+    },
+    {
+      "name": "render_overlays",
+      "path": "frame-app/src/app/render/overlays.rs",
+      "line": 20
+    },
+    {
+      "name": "linux_window_frame",
+      "path": "frame-app/src/app/render/window_frame.rs",
+      "line": 11
+    },
+    {
+      "name": "linux_window_frame",
+      "path": "frame-app/src/app/render/window_frame.rs",
+      "line": 33
+    },
+    {
+      "name": "update_dialog",
+      "path": "frame-app/src/app/updates/dialog.rs",
+      "line": 30
+    },
+    {
+      "name": "update_dialog_panel",
+      "path": "frame-app/src/app/updates/dialog.rs",
+      "line": 93
+    },
+    {
+      "name": "update_dialog_header",
+      "path": "frame-app/src/app/updates/dialog.rs",
+      "line": 146
+    },
+    {
+      "name": "update_dialog_body",
+      "path": "frame-app/src/app/updates/dialog.rs",
+      "line": 203
+    },
+    {
+      "name": "update_dialog_download_state",
+      "path": "frame-app/src/app/updates/dialog.rs",
+      "line": 250
+    },
+    {
+      "name": "update_dialog_footer",
+      "path": "frame-app/src/app/updates/dialog.rs",
+      "line": 279
+    },
+    {
+      "name": "update_dialog_primary_action",
+      "path": "frame-app/src/app/updates/dialog.rs",
+      "line": 324
+    },
+    {
+      "name": "app_settings_updates_section",
+      "path": "frame-app/src/app/updates/preferences.rs",
+      "line": 25
+    },
+    {
+      "name": "update_status_label",
+      "path": "frame-app/src/app/updates/preferences.rs",
+      "line": 94
+    },
+    {
+      "name": "update_status_text",
+      "path": "frame-app/src/app/updates/preferences.rs",
+      "line": 115
+    },
+    {
+      "name": "update_download_detail",
+      "path": "frame-app/src/app/updates/preferences.rs",
+      "line": 167
+    },
+    {
+      "name": "update_action_row",
+      "path": "frame-app/src/app/updates/preferences.rs",
+      "line": 194
+    },
+    {
+      "name": "update_release_notes_text",
+      "path": "frame-app/src/app/updates/release_notes.rs",
+      "line": 25
+    },
+    {
+      "name": "update_release_notes_content_height",
+      "path": "frame-app/src/app/updates/release_notes.rs",
+      "line": 90
+    },
+    {
+      "name": "workspace_view",
+      "path": "frame-app/src/app/workspace.rs",
+      "line": 24
+    },
+    {
+      "name": "welcome_view",
+      "path": "frame-app/src/app/workspace.rs",
+      "line": 68
+    },
+    {
+      "name": "settings_panel_for_selection",
+      "path": "frame-app/src/app/workspace.rs",
+      "line": 162
+    },
+    {
+      "name": "empty_settings_panel",
+      "path": "frame-app/src/app/workspace.rs",
+      "line": 175
+    }
+  ],
+  "call_sites": [
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/root.rs",
+      "line": 74
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/root.rs",
+      "line": 82
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/root.rs",
+      "line": 114
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/root.rs",
+      "line": 140
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/root.rs",
+      "line": 153
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/root.rs",
+      "line": 161
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/root.rs",
+      "line": 162
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/root.rs",
+      "line": 163
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/root.rs",
+      "line": 164
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/root.rs",
+      "line": 165
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/root.rs",
+      "line": 166
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/root.rs",
+      "line": 174
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/root.rs",
+      "line": 175
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/root.rs",
+      "line": 178
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/root.rs",
+      "line": 179
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/root.rs",
+      "line": 181
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/root.rs",
+      "line": 182
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/root.rs",
+      "line": 183
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/root.rs",
+      "line": 187
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/root.rs",
+      "line": 188
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/root.rs",
+      "line": 195
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/root.rs",
+      "line": 256
+    },
+    {
+      "builder": "welcome_view",
+      "path": "frame-app/src/app/workspace.rs",
+      "line": 33
+    },
+    {
+      "builder": "file_list_panel",
+      "path": "frame-app/src/app/workspace.rs",
+      "line": 53
+    },
+    {
+      "builder": "settings_panel_for_selection",
+      "path": "frame-app/src/app/workspace.rs",
+      "line": 63
+    },
+    {
+      "builder": "settings_panel",
+      "path": "frame-app/src/app/workspace.rs",
+      "line": 169
+    },
+    {
+      "builder": "empty_settings_panel",
+      "path": "frame-app/src/app/workspace.rs",
+      "line": 171
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/accessibility.rs",
+      "line": 32
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/accessibility.rs",
+      "line": 34
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/accessibility.rs",
+      "line": 719
+    },
+    {
+      "builder": "current",
+      "path": "frame-app/src/app/fixtures.rs",
+      "line": 118
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/fixtures.rs",
+      "line": 121
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/fixtures.rs",
+      "line": 122
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/fixtures.rs",
+      "line": 140
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/fixtures.rs",
+      "line": 141
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/fixtures.rs",
+      "line": 209
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/fixtures.rs",
+      "line": 344
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/fixtures.rs",
+      "line": 388
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/fixtures.rs",
+      "line": 440
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/fixtures.rs",
+      "line": 487
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/fixtures.rs",
+      "line": 514
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/fixtures.rs",
+      "line": 536
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 28
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 29
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 34
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 35
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 36
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 37
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 42
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 47
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 48
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 49
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 50
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 51
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 52
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 53
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 54
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 55
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 56
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 61
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 62
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 63
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 64
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 65
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 88
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 126
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 134
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 136
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/runtime.rs",
+      "line": 136
+    },
+    {
+      "builder": "button_colors",
+      "path": "frame-app/src/app/primitives.rs",
+      "line": 117
+    },
+    {
+      "builder": "frame_button_base",
+      "path": "frame-app/src/app/primitives.rs",
+      "line": 118
+    },
+    {
+      "builder": "icon_svg",
+      "path": "frame-app/src/app/primitives.rs",
+      "line": 132
+    },
+    {
+      "builder": "icon_svg",
+      "path": "frame-app/src/app/primitives.rs",
+      "line": 138
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/primitives.rs",
+      "line": 208
+    },
+    {
+      "builder": "button_colors",
+      "path": "frame-app/src/app/primitives.rs",
+      "line": 227
+    },
+    {
+      "builder": "button_colors",
+      "path": "frame-app/src/app/primitives.rs",
+      "line": 228
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/motion.rs",
+      "line": 46
+    },
+    {
+      "builder": "css_ease",
+      "path": "frame-app/src/app/motion.rs",
+      "line": 174
+    },
+    {
+      "builder": "css_ease",
+      "path": "frame-app/src/app/motion.rs",
+      "line": 177
+    },
+    {
+      "builder": "css_ease",
+      "path": "frame-app/src/app/motion.rs",
+      "line": 178
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/motion.rs",
+      "line": 186
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/motion.rs",
+      "line": 230
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/motion.rs",
+      "line": 241
+    },
+    {
+      "builder": "logs_tab_strip",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 52
+    },
+    {
+      "builder": "logs_body",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 61
+    },
+    {
+      "builder": "frame_tabs_list",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 89
+    },
+    {
+      "builder": "log_tab_button",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 104
+    },
+    {
+      "builder": "frame_panel_header",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 124
+    },
+    {
+      "builder": "logs_copy_button",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 127
+    },
+    {
+      "builder": "panel_bottom_separator",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 137
+    },
+    {
+      "builder": "log_tab_id_for_key",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 194
+    },
+    {
+      "builder": "log_lines_list",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 262
+    },
+    {
+      "builder": "log_scroll_to_bottom_button",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 272
+    },
+    {
+      "builder": "log_tab_id_for_key",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 404
+    },
+    {
+      "builder": "log_line_tone",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 431
+    },
+    {
+      "builder": "frame_icon_button",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 487
+    },
+    {
+      "builder": "frame_icon_swap_button",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 519
+    },
+    {
+      "builder": "log_line_tone",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 620
+    },
+    {
+      "builder": "log_line_tone",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 626
+    },
+    {
+      "builder": "log_line_tone",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 633
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/logs/actions.rs",
+      "line": 160
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/logs/actions.rs",
+      "line": 197
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/preferences/appearance.rs",
+      "line": 35
+    },
+    {
+      "builder": "settings_hint_text",
+      "path": "frame-app/src/app/preferences/appearance.rs",
+      "line": 64
+    },
+    {
+      "builder": "options",
+      "path": "frame-app/src/app/preferences/appearance.rs",
+      "line": 171
+    },
+    {
+      "builder": "settings_field_label",
+      "path": "frame-app/src/app/preferences/appearance.rs",
+      "line": 185
+    },
+    {
+      "builder": "options",
+      "path": "frame-app/src/app/preferences/appearance.rs",
+      "line": 211
+    },
+    {
+      "builder": "app_settings_close_button",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 187
+    },
+    {
+      "builder": "panel_bottom_separator",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 205
+    },
+    {
+      "builder": "app_settings_output_directory_section",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 223
+    },
+    {
+      "builder": "app_settings_appearance_section",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 231
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 245
+    },
+    {
+      "builder": "app_settings_concurrency_control",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 246
+    },
+    {
+      "builder": "settings_hint_text",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 255
+    },
+    {
+      "builder": "app_settings_updates_section",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 270
+    },
+    {
+      "builder": "app_settings_version_label",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 286
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 321
+    },
+    {
+      "builder": "frame_text_button_with_focus",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 323
+    },
+    {
+      "builder": "app_settings_apply_button",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 396
+    },
+    {
+      "builder": "frame_button_base",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 416
+    },
+    {
+      "builder": "icon_svg",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 429
+    },
+    {
+      "builder": "frame_text_button",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 443
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/system_motion.rs",
+      "line": 57
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/system_motion.rs",
+      "line": 79
+    },
+    {
+      "builder": "app_settings_sheet",
+      "path": "frame-app/src/app/render/overlays.rs",
+      "line": 138
+    },
+    {
+      "builder": "drag_drop_overlay",
+      "path": "frame-app/src/app/render/overlays.rs",
+      "line": 187
+    },
+    {
+      "builder": "update_dialog",
+      "path": "frame-app/src/app/render/overlays.rs",
+      "line": 210
+    },
+    {
+      "builder": "welcome_view",
+      "path": "frame-app/src/app/render/mod.rs",
+      "line": 156
+    },
+    {
+      "builder": "workspace_view",
+      "path": "frame-app/src/app/render/mod.rs",
+      "line": 317
+    },
+    {
+      "builder": "logs_view",
+      "path": "frame-app/src/app/render/mod.rs",
+      "line": 373
+    },
+    {
+      "builder": "render_overlays",
+      "path": "frame-app/src/app/render/mod.rs",
+      "line": 444
+    },
+    {
+      "builder": "linux_window_frame",
+      "path": "frame-app/src/app/render/mod.rs",
+      "line": 448
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/input/element.rs",
+      "line": 78
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/input/element.rs",
+      "line": 154
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/input/element.rs",
+      "line": 154
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/input/element.rs",
+      "line": 161
+    },
+    {
+      "builder": "should_handle_text_input",
+      "path": "frame-app/src/app/input/element.rs",
+      "line": 197
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/input/element.rs",
+      "line": 200
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/input/element.rs",
+      "line": 218
+    },
+    {
+      "builder": "apply_accessible_text_input",
+      "path": "frame-app/src/app/input/element.rs",
+      "line": 384
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/input/runtime.rs",
+      "line": 405
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/input/runtime.rs",
+      "line": 406
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/components/tooltip.rs",
+      "line": 71
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/components/tooltip.rs",
+      "line": 116
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/components/tooltip.rs",
+      "line": 116
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/components/tooltip.rs",
+      "line": 116
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/components/tooltip.rs",
+      "line": 118
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/components/tooltip.rs",
+      "line": 118
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/components/tooltip.rs",
+      "line": 118
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/components/tooltip.rs",
+      "line": 128
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/components/tooltip.rs",
+      "line": 289
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/components/tooltip.rs",
+      "line": 371
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/components/tooltip.rs",
+      "line": 385
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/components/tooltip.rs",
+      "line": 398
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/components/tooltip.rs",
+      "line": 408
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/components/select_control.rs",
+      "line": 130
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/components/select_control.rs",
+      "line": 131
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/components/select_control.rs",
+      "line": 133
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/components/select_control.rs",
+      "line": 157
+    },
+    {
+      "builder": "frame_select_trigger_with_focus",
+      "path": "frame-app/src/app/components/select_control.rs",
+      "line": 177
+    },
+    {
+      "builder": "search",
+      "path": "frame-app/src/app/components/select_control.rs",
+      "line": 205
+    },
+    {
+      "builder": "frame_select_content_height",
+      "path": "frame-app/src/app/components/select_control.rs",
+      "line": 225
+    },
+    {
+      "builder": "frame_select_options_list",
+      "path": "frame-app/src/app/components/select_control.rs",
+      "line": 227
+    },
+    {
+      "builder": "search",
+      "path": "frame-app/src/app/components/select_control.rs",
+      "line": 280
+    },
+    {
+      "builder": "frame_select_popover",
+      "path": "frame-app/src/app/components/select_control.rs",
+      "line": 304
+    },
+    {
+      "builder": "frame_select_scrollbar",
+      "path": "frame-app/src/app/components/select_control.rs",
+      "line": 342
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/components/select_control.rs",
+      "line": 377
+    },
+    {
+      "builder": "search",
+      "path": "frame-app/src/app/components/select_control.rs",
+      "line": 378
+    },
+    {
+      "builder": "search",
+      "path": "frame-app/src/app/components/select_control.rs",
+      "line": 379
+    },
+    {
+      "builder": "search",
+      "path": "frame-app/src/app/components/select_control.rs",
+      "line": 380
+    },
+    {
+      "builder": "search",
+      "path": "frame-app/src/app/components/select_control.rs",
+      "line": 382
+    },
+    {
+      "builder": "search",
+      "path": "frame-app/src/app/components/select_control.rs",
+      "line": 386
+    },
+    {
+      "builder": "interactive_item",
+      "path": "frame-app/src/app/components/list_item.rs",
+      "line": 57
+    },
+    {
+      "builder": "frame_list_item",
+      "path": "frame-app/src/app/components/list_item.rs",
+      "line": 83
+    },
+    {
+      "builder": "button_colors",
+      "path": "frame-app/src/app/components/list_item.rs",
+      "line": 133
+    },
+    {
+      "builder": "frame_selection_dot",
+      "path": "frame-app/src/app/components/list_item.rs",
+      "line": 158
+    },
+    {
+      "builder": "interactive_item",
+      "path": "frame-app/src/app/components/list_item.rs",
+      "line": 163
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/components/list_item.rs",
+      "line": 174
+    },
+    {
+      "builder": "apply_accessible_toggle_button",
+      "path": "frame-app/src/app/components/list_item.rs",
+      "line": 176
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/components/list_item.rs",
+      "line": 255
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/components/choice_group.rs",
+      "line": 20
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/components/choice_group.rs",
+      "line": 44
+    },
+    {
+      "builder": "frame_field_group",
+      "path": "frame-app/src/app/components/patterns.rs",
+      "line": 112
+    },
+    {
+      "builder": "frame_label",
+      "path": "frame-app/src/app/components/patterns.rs",
+      "line": 112
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/components/scrollbar.rs",
+      "line": 68
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/components/scrollbar.rs",
+      "line": 118
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/components/scrollbar.rs",
+      "line": 126
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/components/scrollbar.rs",
+      "line": 131
+    },
+    {
+      "builder": "paint_scrollbar_thumb",
+      "path": "frame-app/src/app/components/scrollbar.rs",
+      "line": 138
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/components/scrollbar.rs",
+      "line": 153
+    },
+    {
+      "builder": "frame_vertical_scrollbar",
+      "path": "frame-app/src/app/components/scrollbar.rs",
+      "line": 190
+    },
+    {
+      "builder": "frame_control_base",
+      "path": "frame-app/src/app/components/button.rs",
+      "line": 53
+    },
+    {
+      "builder": "apply_accessible_toggle_button",
+      "path": "frame-app/src/app/components/button.rs",
+      "line": 63
+    },
+    {
+      "builder": "frame_toggle_button_base",
+      "path": "frame-app/src/app/components/button.rs",
+      "line": 84
+    },
+    {
+      "builder": "frame_text_button_inner",
+      "path": "frame-app/src/app/components/button.rs",
+      "line": 104
+    },
+    {
+      "builder": "frame_text_button_inner",
+      "path": "frame-app/src/app/components/button.rs",
+      "line": 124
+    },
+    {
+      "builder": "frame_button_base",
+      "path": "frame-app/src/app/components/button.rs",
+      "line": 153
+    },
+    {
+      "builder": "frame_control_base",
+      "path": "frame-app/src/app/components/button.rs",
+      "line": 187
+    },
+    {
+      "builder": "button_colors",
+      "path": "frame-app/src/app/components/button.rs",
+      "line": 220
+    },
+    {
+      "builder": "frame_icon_button_inner",
+      "path": "frame-app/src/app/components/button.rs",
+      "line": 336
+    },
+    {
+      "builder": "frame_icon_button_inner",
+      "path": "frame-app/src/app/components/button.rs",
+      "line": 368
+    },
+    {
+      "builder": "button_colors",
+      "path": "frame-app/src/app/components/button.rs",
+      "line": 404
+    },
+    {
+      "builder": "frame_button_base",
+      "path": "frame-app/src/app/components/button.rs",
+      "line": 405
+    },
+    {
+      "builder": "frame_icon_button_content",
+      "path": "frame-app/src/app/components/button.rs",
+      "line": 419
+    },
+    {
+      "builder": "icon_svg",
+      "path": "frame-app/src/app/components/button.rs",
+      "line": 433
+    },
+    {
+      "builder": "frame_color_picker_hue_color",
+      "path": "frame-app/src/app/components/color_picker.rs",
+      "line": 66
+    },
+    {
+      "builder": "parse_hex",
+      "path": "frame-app/src/app/components/color_picker.rs",
+      "line": 124
+    },
+    {
+      "builder": "parse_hex",
+      "path": "frame-app/src/app/components/color_picker.rs",
+      "line": 125
+    },
+    {
+      "builder": "parse_hex",
+      "path": "frame-app/src/app/components/color_picker.rs",
+      "line": 150
+    },
+    {
+      "builder": "parse_hex",
+      "path": "frame-app/src/app/components/color_picker.rs",
+      "line": 192
+    },
+    {
+      "builder": "range_track",
+      "path": "frame-app/src/app/components/slider.rs",
+      "line": 27
+    },
+    {
+      "builder": "range_track",
+      "path": "frame-app/src/app/components/slider.rs",
+      "line": 34
+    },
+    {
+      "builder": "frame_slider_content_bounds",
+      "path": "frame-app/src/app/components/slider.rs",
+      "line": 92
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/components/slider.rs",
+      "line": 124
+    },
+    {
+      "builder": "frame_range_track",
+      "path": "frame-app/src/app/components/slider.rs",
+      "line": 188
+    },
+    {
+      "builder": "apply_accessible_slider",
+      "path": "frame-app/src/app/components/slider.rs",
+      "line": 212
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/components/slider.rs",
+      "line": 289
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/components/slider.rs",
+      "line": 289
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/components/slider.rs",
+      "line": 296
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/components/slider.rs",
+      "line": 305
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/components/tooltip_position.rs",
+      "line": 165
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/components/tooltip_position.rs",
+      "line": 192
+    },
+    {
+      "builder": "frame_select_trigger_content_inner",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 41
+    },
+    {
+      "builder": "frame_select_trigger_content_inner",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 73
+    },
+    {
+      "builder": "frame_select_trigger_content_inner",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 93
+    },
+    {
+      "builder": "button_colors",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 123
+    },
+    {
+      "builder": "input_surface",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 138
+    },
+    {
+      "builder": "icon_svg",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 150
+    },
+    {
+      "builder": "apply_accessible_select_trigger_with_focus",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 167
+    },
+    {
+      "builder": "apply_accessible_select_trigger",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 171
+    },
+    {
+      "builder": "frame_vertical_scrollbar",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 225
+    },
+    {
+      "builder": "frame_select_option_inner",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 266
+    },
+    {
+      "builder": "icon_svg",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 312
+    },
+    {
+      "builder": "apply_accessible_select_option_with_focus",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 320
+    },
+    {
+      "builder": "apply_accessible_select_option",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 322
+    },
+    {
+      "builder": "frame_color_swatch",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 336
+    },
+    {
+      "builder": "parse_hex",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 354
+    },
+    {
+      "builder": "frame_select_content_height",
+      "path": "frame-app/src/app/components/select.rs",
+      "line": 385
+    },
+    {
+      "builder": "icon_svg",
+      "path": "frame-app/src/app/components/checkbox.rs",
+      "line": 33
+    },
+    {
+      "builder": "frame_checkbox_row_inner",
+      "path": "frame-app/src/app/components/checkbox.rs",
+      "line": 118
+    },
+    {
+      "builder": "frame_checkbox_row_inner",
+      "path": "frame-app/src/app/components/checkbox.rs",
+      "line": 138
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/components/checkbox.rs",
+      "line": 173
+    },
+    {
+      "builder": "frame_checkbox_indicator",
+      "path": "frame-app/src/app/components/checkbox.rs",
+      "line": 176
+    },
+    {
+      "builder": "apply_accessible_checkbox_with_focus",
+      "path": "frame-app/src/app/components/checkbox.rs",
+      "line": 186
+    },
+    {
+      "builder": "apply_accessible_checkbox",
+      "path": "frame-app/src/app/components/checkbox.rs",
+      "line": 190
+    },
+    {
+      "builder": "titlebar_for_platform",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 45
+    },
+    {
+      "builder": "current",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 45
+    },
+    {
+      "builder": "macos_titlebar",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 56
+    },
+    {
+      "builder": "windows_titlebar",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 57
+    },
+    {
+      "builder": "linux_titlebar",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 58
+    },
+    {
+      "builder": "titlebar_shows_workspace_controls",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 68
+    },
+    {
+      "builder": "titlebar_drag_surface",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 70
+    },
+    {
+      "builder": "macos_native_window_controls_placeholder",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 85
+    },
+    {
+      "builder": "frame_logo",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 87
+    },
+    {
+      "builder": "titlebar_divider",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 88
+    },
+    {
+      "builder": "titlebar_navigation",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 89
+    },
+    {
+      "builder": "titlebar_divider",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 90
+    },
+    {
+      "builder": "titlebar_stats",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 91
+    },
+    {
+      "builder": "titlebar_add_source_button",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 102
+    },
+    {
+      "builder": "titlebar_start_button",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 103
+    },
+    {
+      "builder": "titlebar_drag_surface",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 114
+    },
+    {
+      "builder": "platform_titlebar_content",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 120
+    },
+    {
+      "builder": "windows_window_controls",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 121
+    },
+    {
+      "builder": "titlebar_drag_surface",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 130
+    },
+    {
+      "builder": "platform_titlebar_content",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 136
+    },
+    {
+      "builder": "linux_window_controls",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 137
+    },
+    {
+      "builder": "titlebar_shows_workspace_controls",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 202
+    },
+    {
+      "builder": "platform_frame_logo",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 225
+    },
+    {
+      "builder": "platform_titlebar_divider",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 226
+    },
+    {
+      "builder": "titlebar_navigation",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 227
+    },
+    {
+      "builder": "platform_titlebar_divider",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 228
+    },
+    {
+      "builder": "titlebar_stats",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 229
+    },
+    {
+      "builder": "titlebar_add_source_button",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 241
+    },
+    {
+      "builder": "titlebar_start_button",
+      "path": "frame-app/src/app/chrome/titlebar.rs",
+      "line": 242
+    },
+    {
+      "builder": "titlebar_window_button",
+      "path": "frame-app/src/app/chrome/window_controls.rs",
+      "line": 41
+    },
+    {
+      "builder": "titlebar_window_button",
+      "path": "frame-app/src/app/chrome/window_controls.rs",
+      "line": 63
+    },
+    {
+      "builder": "titlebar_window_button",
+      "path": "frame-app/src/app/chrome/window_controls.rs",
+      "line": 85
+    },
+    {
+      "builder": "titlebar_window_button",
+      "path": "frame-app/src/app/chrome/window_controls.rs",
+      "line": 124
+    },
+    {
+      "builder": "titlebar_window_button",
+      "path": "frame-app/src/app/chrome/window_controls.rs",
+      "line": 146
+    },
+    {
+      "builder": "titlebar_window_button",
+      "path": "frame-app/src/app/chrome/window_controls.rs",
+      "line": 168
+    },
+    {
+      "builder": "frame_tabs_list",
+      "path": "frame-app/src/app/chrome/navigation.rs",
+      "line": 27
+    },
+    {
+      "builder": "titlebar_segment",
+      "path": "frame-app/src/app/chrome/navigation.rs",
+      "line": 31
+    },
+    {
+      "builder": "titlebar_segment",
+      "path": "frame-app/src/app/chrome/navigation.rs",
+      "line": 40
+    },
+    {
+      "builder": "titlebar_stat",
+      "path": "frame-app/src/app/chrome/navigation.rs",
+      "line": 60
+    },
+    {
+      "builder": "titlebar_stat",
+      "path": "frame-app/src/app/chrome/navigation.rs",
+      "line": 65
+    },
+    {
+      "builder": "icon_svg",
+      "path": "frame-app/src/app/chrome/navigation.rs",
+      "line": 81
+    },
+    {
+      "builder": "update_dialog_panel",
+      "path": "frame-app/src/app/updates/dialog.rs",
+      "line": 87
+    },
+    {
+      "builder": "update_dialog_header",
+      "path": "frame-app/src/app/updates/dialog.rs",
+      "line": 117
+    },
+    {
+      "builder": "update_dialog_body",
+      "path": "frame-app/src/app/updates/dialog.rs",
+      "line": 124
+    },
+    {
+      "builder": "update_dialog_footer",
+      "path": "frame-app/src/app/updates/dialog.rs",
+      "line": 131
+    },
+    {
+      "builder": "update_dialog_download_state",
+      "path": "frame-app/src/app/updates/dialog.rs",
+      "line": 140
+    },
+    {
+      "builder": "app_settings_close_button",
+      "path": "frame-app/src/app/updates/dialog.rs",
+      "line": 182
+    },
+    {
+      "builder": "panel_bottom_separator",
+      "path": "frame-app/src/app/updates/dialog.rs",
+      "line": 200
+    },
+    {
+      "builder": "update_release_notes_text",
+      "path": "frame-app/src/app/updates/dialog.rs",
+      "line": 210
+    },
+    {
+      "builder": "update_download_detail",
+      "path": "frame-app/src/app/updates/dialog.rs",
+      "line": 271
+    },
+    {
+      "builder": "frame_text_button",
+      "path": "frame-app/src/app/updates/dialog.rs",
+      "line": 296
+    },
+    {
+      "builder": "update_dialog_primary_action",
+      "path": "frame-app/src/app/updates/dialog.rs",
+      "line": 315
+    },
+    {
+      "builder": "frame_text_button",
+      "path": "frame-app/src/app/updates/dialog.rs",
+      "line": 348
+    },
+    {
+      "builder": "frame_text_button",
+      "path": "frame-app/src/app/updates/dialog.rs",
+      "line": 363
+    },
+    {
+      "builder": "frame_text_button",
+      "path": "frame-app/src/app/updates/dialog.rs",
+      "line": 379
+    },
+    {
+      "builder": "frame_text_button",
+      "path": "frame-app/src/app/updates/dialog.rs",
+      "line": 392
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/updates/session.rs",
+      "line": 58
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/updates/session.rs",
+      "line": 59
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/updates/preferences.rs",
+      "line": 35
+    },
+    {
+      "builder": "frame_checkbox_row_with_focus",
+      "path": "frame-app/src/app/updates/preferences.rs",
+      "line": 36
+    },
+    {
+      "builder": "update_status_label",
+      "path": "frame-app/src/app/updates/preferences.rs",
+      "line": 58
+    },
+    {
+      "builder": "update_download_detail",
+      "path": "frame-app/src/app/updates/preferences.rs",
+      "line": 72
+    },
+    {
+      "builder": "update_action_row",
+      "path": "frame-app/src/app/updates/preferences.rs",
+      "line": 80
+    },
+    {
+      "builder": "update_status_text",
+      "path": "frame-app/src/app/updates/preferences.rs",
+      "line": 104
+    },
+    {
+      "builder": "frame_progress_track",
+      "path": "frame-app/src/app/updates/preferences.rs",
+      "line": 157
+    },
+    {
+      "builder": "frame_text_button_with_focus",
+      "path": "frame-app/src/app/updates/preferences.rs",
+      "line": 209
+    },
+    {
+      "builder": "frame_text_button_with_focus",
+      "path": "frame-app/src/app/updates/preferences.rs",
+      "line": 229
+    },
+    {
+      "builder": "frame_text_button_with_focus",
+      "path": "frame-app/src/app/updates/preferences.rs",
+      "line": 252
+    },
+    {
+      "builder": "frame_text_button_with_focus",
+      "path": "frame-app/src/app/updates/preferences.rs",
+      "line": 287
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/updates/actions.rs",
+      "line": 227
+    },
+    {
+      "builder": "update_release_notes_content_height",
+      "path": "frame-app/src/app/updates/release_notes.rs",
+      "line": 50
+    },
+    {
+      "builder": "frame_vertical_scrollbar",
+      "path": "frame-app/src/app/updates/release_notes.rs",
+      "line": 82
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/updates/release_notes.rs",
+      "line": 170
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/updates/release_notes.rs",
+      "line": 181
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/updates/release_notes.rs",
+      "line": 186
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/updates/state.rs",
+      "line": 20
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/updates/state.rs",
+      "line": 24
+    },
+    {
+      "builder": "preview_toolbar_height",
+      "path": "frame-app/src/app/preview/toolbar.rs",
+      "line": 32
+    },
+    {
+      "builder": "frame_toolbar",
+      "path": "frame-app/src/app/preview/toolbar.rs",
+      "line": 50
+    },
+    {
+      "builder": "preview_tool_button",
+      "path": "frame-app/src/app/preview/toolbar.rs",
+      "line": 59
+    },
+    {
+      "builder": "preview_tool_button",
+      "path": "frame-app/src/app/preview/toolbar.rs",
+      "line": 78
+    },
+    {
+      "builder": "preview_tool_button",
+      "path": "frame-app/src/app/preview/toolbar.rs",
+      "line": 97
+    },
+    {
+      "builder": "preview_tool_button_with_focus",
+      "path": "frame-app/src/app/preview/toolbar.rs",
+      "line": 116
+    },
+    {
+      "builder": "preview_tool_button_with_focus",
+      "path": "frame-app/src/app/preview/toolbar.rs",
+      "line": 136
+    },
+    {
+      "builder": "frame_toolbar",
+      "path": "frame-app/src/app/preview/toolbar.rs",
+      "line": 165
+    },
+    {
+      "builder": "preview_tool_button",
+      "path": "frame-app/src/app/preview/toolbar.rs",
+      "line": 176
+    },
+    {
+      "builder": "preview_tool_button",
+      "path": "frame-app/src/app/preview/toolbar.rs",
+      "line": 195
+    },
+    {
+      "builder": "preview_tool_button_inner",
+      "path": "frame-app/src/app/preview/toolbar.rs",
+      "line": 241
+    },
+    {
+      "builder": "preview_tool_button_inner",
+      "path": "frame-app/src/app/preview/toolbar.rs",
+      "line": 273
+    },
+    {
+      "builder": "frame_button_base",
+      "path": "frame-app/src/app/preview/toolbar.rs",
+      "line": 307
+    },
+    {
+      "builder": "file_list_header",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 44
+    },
+    {
+      "builder": "apply_accessible_checkbox",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 74
+    },
+    {
+      "builder": "frame_checkbox_indicator",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 75
+    },
+    {
+      "builder": "frame_panel_header",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 103
+    },
+    {
+      "builder": "header_label",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 121
+    },
+    {
+      "builder": "header_label",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 122
+    },
+    {
+      "builder": "header_label",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 123
+    },
+    {
+      "builder": "header_label",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 124
+    },
+    {
+      "builder": "panel_bottom_separator",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 136
+    },
+    {
+      "builder": "queue_navigation_state",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 165
+    },
+    {
+      "builder": "frame_empty",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 234
+    },
+    {
+      "builder": "file_list_row",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 249
+    },
+    {
+      "builder": "row_checkbox_control",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 341
+    },
+    {
+      "builder": "row_label",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 349
+    },
+    {
+      "builder": "row_label",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 355
+    },
+    {
+      "builder": "row_label",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 361
+    },
+    {
+      "builder": "row_label",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 367
+    },
+    {
+      "builder": "row_actions_cell",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 374
+    },
+    {
+      "builder": "panel_bottom_separator",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 383
+    },
+    {
+      "builder": "row_primary_action_button",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 438
+    },
+    {
+      "builder": "frame_icon_button",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 615
+    },
+    {
+      "builder": "apply_accessible_checkbox",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 660
+    },
+    {
+      "builder": "frame_checkbox_indicator",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 661
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/queue/import.rs",
+      "line": 48
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/queue/import.rs",
+      "line": 174
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/queue/conversion.rs",
+      "line": 22
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/queue/conversion.rs",
+      "line": 29
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/queue/conversion.rs",
+      "line": 296
+    },
+    {
+      "builder": "frame_field_group",
+      "path": "frame-app/src/app/inspector/output.rs",
+      "line": 36
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/output.rs",
+      "line": 38
+    },
+    {
+      "builder": "settings_processing_mode_grid",
+      "path": "frame-app/src/app/inspector/output.rs",
+      "line": 39
+    },
+    {
+      "builder": "settings_hint_text",
+      "path": "frame-app/src/app/inspector/output.rs",
+      "line": 47
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/output.rs",
+      "line": 50
+    },
+    {
+      "builder": "settings_output_name_field",
+      "path": "frame-app/src/app/inspector/output.rs",
+      "line": 51
+    },
+    {
+      "builder": "settings_hint_text",
+      "path": "frame-app/src/app/inspector/output.rs",
+      "line": 59
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/output.rs",
+      "line": 66
+    },
+    {
+      "builder": "settings_hint_text",
+      "path": "frame-app/src/app/inspector/output.rs",
+      "line": 68
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/output.rs",
+      "line": 75
+    },
+    {
+      "builder": "settings_container_grid",
+      "path": "frame-app/src/app/inspector/output.rs",
+      "line": 75
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/output.rs",
+      "line": 95
+    },
+    {
+      "builder": "frame_choice_button",
+      "path": "frame-app/src/app/inspector/output.rs",
+      "line": 101
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/output.rs",
+      "line": 139
+    },
+    {
+      "builder": "frame_choice_button",
+      "path": "frame-app/src/app/inspector/output.rs",
+      "line": 145
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/state.rs",
+      "line": 45
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/state.rs",
+      "line": 46
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/state.rs",
+      "line": 47
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/state.rs",
+      "line": 48
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/source.rs",
+      "line": 68
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/source.rs",
+      "line": 70
+    },
+    {
+      "builder": "settings_source_tracks",
+      "path": "frame-app/src/app/inspector/source.rs",
+      "line": 70
+    },
+    {
+      "builder": "settings_value_row",
+      "path": "frame-app/src/app/inspector/source.rs",
+      "line": 83
+    },
+    {
+      "builder": "frame_field_group",
+      "path": "frame-app/src/app/inspector/source.rs",
+      "line": 92
+    },
+    {
+      "builder": "settings_track_header",
+      "path": "frame-app/src/app/inspector/source.rs",
+      "line": 99
+    },
+    {
+      "builder": "frame_label",
+      "path": "frame-app/src/app/inspector/source.rs",
+      "line": 130
+    },
+    {
+      "builder": "preview_crop_visual_rect",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 38
+    },
+    {
+      "builder": "crop_outline_rect",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 53
+    },
+    {
+      "builder": "crop_vertical_guide_line",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 54
+    },
+    {
+      "builder": "crop_vertical_guide_line",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 55
+    },
+    {
+      "builder": "crop_horizontal_guide_line",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 56
+    },
+    {
+      "builder": "crop_horizontal_guide_line",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 57
+    },
+    {
+      "builder": "preview_crop_handle",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 62
+    },
+    {
+      "builder": "preview_crop_handle",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 70
+    },
+    {
+      "builder": "preview_crop_handle",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 78
+    },
+    {
+      "builder": "preview_crop_handle",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 86
+    },
+    {
+      "builder": "preview_crop_handle",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 94
+    },
+    {
+      "builder": "preview_crop_handle",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 102
+    },
+    {
+      "builder": "preview_crop_handle",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 110
+    },
+    {
+      "builder": "preview_crop_handle",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 118
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 172
+    },
+    {
+      "builder": "crop_handle_cursor",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 236
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 255
+    },
+    {
+      "builder": "frame_handle_hit_region",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 292
+    },
+    {
+      "builder": "crop_handle_screen_cursor",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 299
+    },
+    {
+      "builder": "preview_crop_options",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 391
+    },
+    {
+      "builder": "preview_crop_custom_fields",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 393
+    },
+    {
+      "builder": "preview_toolbar_vertical_separator",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 399
+    },
+    {
+      "builder": "compact_text_button",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 401
+    },
+    {
+      "builder": "compact_text_button_variant_inner",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 410
+    },
+    {
+      "builder": "compact_text_button_variant",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 454
+    },
+    {
+      "builder": "compact_text_button_variant_inner",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 466
+    },
+    {
+      "builder": "frame_text_button_inner",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 484
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/audio_filters/view.rs",
+      "line": 37
+    },
+    {
+      "builder": "settings_audio_filters_reset_all",
+      "path": "frame-app/src/app/inspector/audio_filters/view.rs",
+      "line": 37
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/audio_filters/view.rs",
+      "line": 45
+    },
+    {
+      "builder": "settings_audio_filter_range_field",
+      "path": "frame-app/src/app/inspector/audio_filters/view.rs",
+      "line": 46
+    },
+    {
+      "builder": "settings_audio_normalize_control",
+      "path": "frame-app/src/app/inspector/audio_filters/view.rs",
+      "line": 58
+    },
+    {
+      "builder": "settings_audio_filter_range_field",
+      "path": "frame-app/src/app/inspector/audio_filters/view.rs",
+      "line": 64
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/audio_filters/view.rs",
+      "line": 78
+    },
+    {
+      "builder": "settings_audio_compressor_control",
+      "path": "frame-app/src/app/inspector/audio_filters/view.rs",
+      "line": 78
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/audio_filters/view.rs",
+      "line": 88
+    },
+    {
+      "builder": "settings_audio_filter_range_field",
+      "path": "frame-app/src/app/inspector/audio_filters/view.rs",
+      "line": 89
+    },
+    {
+      "builder": "settings_audio_filter_range_field",
+      "path": "frame-app/src/app/inspector/audio_filters/view.rs",
+      "line": 101
+    },
+    {
+      "builder": "settings_audio_filter_range_field",
+      "path": "frame-app/src/app/inspector/audio_filters/view.rs",
+      "line": 113
+    },
+    {
+      "builder": "settings_audio_filter_range_field",
+      "path": "frame-app/src/app/inspector/audio_filters/view.rs",
+      "line": 125
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/audio_filters/view.rs",
+      "line": 139
+    },
+    {
+      "builder": "settings_audio_filter_range_field",
+      "path": "frame-app/src/app/inspector/audio_filters/view.rs",
+      "line": 140
+    },
+    {
+      "builder": "settings_audio_filter_range_field",
+      "path": "frame-app/src/app/inspector/audio_filters/view.rs",
+      "line": 152
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/audio_filters/view.rs",
+      "line": 166
+    },
+    {
+      "builder": "settings_audio_filter_range_field",
+      "path": "frame-app/src/app/inspector/audio_filters/view.rs",
+      "line": 166
+    },
+    {
+      "builder": "frame_icon_button",
+      "path": "frame-app/src/app/inspector/audio_filters/controls.rs",
+      "line": 26
+    },
+    {
+      "builder": "frame_checkbox_row",
+      "path": "frame-app/src/app/inspector/audio_filters/controls.rs",
+      "line": 58
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/audio_filters/controls.rs",
+      "line": 85
+    },
+    {
+      "builder": "frame_choice_button",
+      "path": "frame-app/src/app/inspector/audio_filters/controls.rs",
+      "line": 97
+    },
+    {
+      "builder": "frame_checkbox_row",
+      "path": "frame-app/src/app/inspector/audio_filters/controls.rs",
+      "line": 127
+    },
+    {
+      "builder": "frame_text_button",
+      "path": "frame-app/src/app/inspector/audio_filters/controls.rs",
+      "line": 155
+    },
+    {
+      "builder": "frame_checkbox_row",
+      "path": "frame-app/src/app/inspector/audio_filters/range.rs",
+      "line": 70
+    },
+    {
+      "builder": "settings_value_badge",
+      "path": "frame-app/src/app/inspector/audio_filters/range.rs",
+      "line": 108
+    },
+    {
+      "builder": "settings_audio_filter_reset",
+      "path": "frame-app/src/app/inspector/audio_filters/range.rs",
+      "line": 109
+    },
+    {
+      "builder": "settings_audio_filter_range_slider",
+      "path": "frame-app/src/app/inspector/audio_filters/range.rs",
+      "line": 119
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/audio_filters/range.rs",
+      "line": 191
+    },
+    {
+      "builder": "frame_slider_handle",
+      "path": "frame-app/src/app/inspector/audio_filters/range.rs",
+      "line": 228
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/audio_filters/range.rs",
+      "line": 232
+    },
+    {
+      "builder": "frame_label",
+      "path": "frame-app/src/app/inspector/shared.rs",
+      "line": 13
+    },
+    {
+      "builder": "frame_badge",
+      "path": "frame-app/src/app/inspector/shared.rs",
+      "line": 20
+    },
+    {
+      "builder": "frame_description",
+      "path": "frame-app/src/app/inspector/shared.rs",
+      "line": 27
+    },
+    {
+      "builder": "preview_timeline_labels",
+      "path": "frame-app/src/app/preview/timeline/view.rs",
+      "line": 22
+    },
+    {
+      "builder": "preview_timecode_field",
+      "path": "frame-app/src/app/preview/timeline/view.rs",
+      "line": 35
+    },
+    {
+      "builder": "preview_timecode_field",
+      "path": "frame-app/src/app/preview/timeline/view.rs",
+      "line": 48
+    },
+    {
+      "builder": "preview_timecode_field",
+      "path": "frame-app/src/app/preview/timeline/view.rs",
+      "line": 61
+    },
+    {
+      "builder": "preview_timeline_label",
+      "path": "frame-app/src/app/preview/timeline/view.rs",
+      "line": 82
+    },
+    {
+      "builder": "preview_timeline_label",
+      "path": "frame-app/src/app/preview/timeline/view.rs",
+      "line": 91
+    },
+    {
+      "builder": "preview_tool_button",
+      "path": "frame-app/src/app/preview/timeline/view.rs",
+      "line": 138
+    },
+    {
+      "builder": "preview_timeline_label",
+      "path": "frame-app/src/app/preview/timeline/timecode.rs",
+      "line": 68
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/preview/timeline/track.rs",
+      "line": 70
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/preview/timeline/track.rs",
+      "line": 160
+    },
+    {
+      "builder": "apply_accessible_slider",
+      "path": "frame-app/src/app/preview/timeline/track.rs",
+      "line": 185
+    },
+    {
+      "builder": "frame_range_track",
+      "path": "frame-app/src/app/preview/timeline/track.rs",
+      "line": 233
+    },
+    {
+      "builder": "preview_timeline_handle",
+      "path": "frame-app/src/app/preview/timeline/track.rs",
+      "line": 275
+    },
+    {
+      "builder": "preview_timeline_handle",
+      "path": "frame-app/src/app/preview/timeline/track.rs",
+      "line": 284
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/preview/timeline/track.rs",
+      "line": 328
+    },
+    {
+      "builder": "apply_accessible_slider",
+      "path": "frame-app/src/app/preview/timeline/track.rs",
+      "line": 337
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/video_filters/view.rs",
+      "line": 36
+    },
+    {
+      "builder": "settings_video_filters_reset_all",
+      "path": "frame-app/src/app/inspector/video_filters/view.rs",
+      "line": 37
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/video_filters/view.rs",
+      "line": 40
+    },
+    {
+      "builder": "settings_video_filter_range_field",
+      "path": "frame-app/src/app/inspector/video_filters/view.rs",
+      "line": 41
+    },
+    {
+      "builder": "settings_video_filter_range_field",
+      "path": "frame-app/src/app/inspector/video_filters/view.rs",
+      "line": 53
+    },
+    {
+      "builder": "settings_video_filter_range_field",
+      "path": "frame-app/src/app/inspector/video_filters/view.rs",
+      "line": 65
+    },
+    {
+      "builder": "settings_video_filter_range_field",
+      "path": "frame-app/src/app/inspector/video_filters/view.rs",
+      "line": 77
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/video_filters/view.rs",
+      "line": 91
+    },
+    {
+      "builder": "settings_video_filter_range_field",
+      "path": "frame-app/src/app/inspector/video_filters/view.rs",
+      "line": 92
+    },
+    {
+      "builder": "settings_video_filter_range_field",
+      "path": "frame-app/src/app/inspector/video_filters/view.rs",
+      "line": 104
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/video_filters/view.rs",
+      "line": 118
+    },
+    {
+      "builder": "settings_video_filter_range_field",
+      "path": "frame-app/src/app/inspector/video_filters/view.rs",
+      "line": 119
+    },
+    {
+      "builder": "settings_video_filter_range_field",
+      "path": "frame-app/src/app/inspector/video_filters/view.rs",
+      "line": 131
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/video_filters/view.rs",
+      "line": 145
+    },
+    {
+      "builder": "settings_video_denoise_control",
+      "path": "frame-app/src/app/inspector/video_filters/view.rs",
+      "line": 146
+    },
+    {
+      "builder": "settings_video_filter_range_field",
+      "path": "frame-app/src/app/inspector/video_filters/view.rs",
+      "line": 154
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/video_filters/view.rs",
+      "line": 168
+    },
+    {
+      "builder": "settings_video_filter_range_field",
+      "path": "frame-app/src/app/inspector/video_filters/view.rs",
+      "line": 169
+    },
+    {
+      "builder": "settings_video_grayscale_control",
+      "path": "frame-app/src/app/inspector/video_filters/view.rs",
+      "line": 181
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/video_filters/view.rs",
+      "line": 190
+    },
+    {
+      "builder": "settings_video_deinterlace_control",
+      "path": "frame-app/src/app/inspector/video_filters/view.rs",
+      "line": 191
+    },
+    {
+      "builder": "frame_icon_button",
+      "path": "frame-app/src/app/inspector/video_filters/controls.rs",
+      "line": 27
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/video_filters/controls.rs",
+      "line": 62
+    },
+    {
+      "builder": "frame_choice_button",
+      "path": "frame-app/src/app/inspector/video_filters/controls.rs",
+      "line": 70
+    },
+    {
+      "builder": "frame_checkbox_row",
+      "path": "frame-app/src/app/inspector/video_filters/controls.rs",
+      "line": 97
+    },
+    {
+      "builder": "frame_checkbox_row",
+      "path": "frame-app/src/app/inspector/video_filters/controls.rs",
+      "line": 125
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/video_filters/controls.rs",
+      "line": 151
+    },
+    {
+      "builder": "frame_choice_button",
+      "path": "frame-app/src/app/inspector/video_filters/controls.rs",
+      "line": 163
+    },
+    {
+      "builder": "frame_text_button",
+      "path": "frame-app/src/app/inspector/video_filters/controls.rs",
+      "line": 193
+    },
+    {
+      "builder": "frame_checkbox_row",
+      "path": "frame-app/src/app/inspector/video_filters/range.rs",
+      "line": 70
+    },
+    {
+      "builder": "settings_value_badge",
+      "path": "frame-app/src/app/inspector/video_filters/range.rs",
+      "line": 108
+    },
+    {
+      "builder": "settings_video_filter_reset",
+      "path": "frame-app/src/app/inspector/video_filters/range.rs",
+      "line": 109
+    },
+    {
+      "builder": "settings_video_filter_range_slider",
+      "path": "frame-app/src/app/inspector/video_filters/range.rs",
+      "line": 119
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/video_filters/range.rs",
+      "line": 191
+    },
+    {
+      "builder": "frame_slider_handle",
+      "path": "frame-app/src/app/inspector/video_filters/range.rs",
+      "line": 228
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/video_filters/range.rs",
+      "line": 232
+    },
+    {
+      "builder": "frame_field_group",
+      "path": "frame-app/src/app/inspector/metadata.rs",
+      "line": 24
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/metadata.rs",
+      "line": 25
+    },
+    {
+      "builder": "settings_metadata_mode_grid",
+      "path": "frame-app/src/app/inspector/metadata.rs",
+      "line": 26
+    },
+    {
+      "builder": "settings_hint_text",
+      "path": "frame-app/src/app/inspector/metadata.rs",
+      "line": 33
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/metadata.rs",
+      "line": 40
+    },
+    {
+      "builder": "settings_metadata_fields",
+      "path": "frame-app/src/app/inspector/metadata.rs",
+      "line": 41
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/metadata.rs",
+      "line": 64
+    },
+    {
+      "builder": "frame_choice_button",
+      "path": "frame-app/src/app/inspector/metadata.rs",
+      "line": 70
+    },
+    {
+      "builder": "settings_field_label",
+      "path": "frame-app/src/app/inspector/metadata.rs",
+      "line": 111
+    },
+    {
+      "builder": "frame_list_group",
+      "path": "frame-app/src/app/inspector/presets/view.rs",
+      "line": 37
+    },
+    {
+      "builder": "settings_preset_row",
+      "path": "frame-app/src/app/inspector/presets/view.rs",
+      "line": 39
+    },
+    {
+      "builder": "frame_field_group",
+      "path": "frame-app/src/app/inspector/presets/view.rs",
+      "line": 48
+    },
+    {
+      "builder": "settings_presets_header",
+      "path": "frame-app/src/app/inspector/presets/view.rs",
+      "line": 49
+    },
+    {
+      "builder": "settings_presets_save_row",
+      "path": "frame-app/src/app/inspector/presets/view.rs",
+      "line": 50
+    },
+    {
+      "builder": "settings_section_label",
+      "path": "frame-app/src/app/inspector/presets/view.rs",
+      "line": 68
+    },
+    {
+      "builder": "settings_save_preset_button",
+      "path": "frame-app/src/app/inspector/presets/view.rs",
+      "line": 118
+    },
+    {
+      "builder": "frame_text_button",
+      "path": "frame-app/src/app/inspector/presets/view.rs",
+      "line": 132
+    },
+    {
+      "builder": "frame_list_item",
+      "path": "frame-app/src/app/inspector/presets/view.rs",
+      "line": 165
+    },
+    {
+      "builder": "settings_preset_icon_button",
+      "path": "frame-app/src/app/inspector/presets/view.rs",
+      "line": 203
+    },
+    {
+      "builder": "settings_preset_icon_button",
+      "path": "frame-app/src/app/inspector/presets/view.rs",
+      "line": 218
+    },
+    {
+      "builder": "frame_icon_button",
+      "path": "frame-app/src/app/inspector/presets/view.rs",
+      "line": 252
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/preview/overlay/layer.rs",
+      "line": 63
+    },
+    {
+      "builder": "overlay_handle_cursor",
+      "path": "frame-app/src/app/preview/overlay/layer.rs",
+      "line": 226
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/preview/overlay/layer.rs",
+      "line": 252
+    },
+    {
+      "builder": "frame_handle_hit_region",
+      "path": "frame-app/src/app/preview/overlay/layer.rs",
+      "line": 292
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/preview/overlay/opacity.rs",
+      "line": 56
+    },
+    {
+      "builder": "frame_slider_content_bounds",
+      "path": "frame-app/src/app/preview/overlay/opacity.rs",
+      "line": 72
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/preview/overlay/opacity.rs",
+      "line": 162
+    },
+    {
+      "builder": "frame_slider_handle",
+      "path": "frame-app/src/app/preview/overlay/opacity.rs",
+      "line": 177
+    },
+    {
+      "builder": "preview_overlay_icon_button_with_focus",
+      "path": "frame-app/src/app/preview/overlay/controls.rs",
+      "line": 44
+    },
+    {
+      "builder": "preview_toolbar_vertical_separator",
+      "path": "frame-app/src/app/preview/overlay/controls.rs",
+      "line": 59
+    },
+    {
+      "builder": "preview_toolbar_vertical_separator",
+      "path": "frame-app/src/app/preview/overlay/controls.rs",
+      "line": 101
+    },
+    {
+      "builder": "frame_icon_button",
+      "path": "frame-app/src/app/preview/overlay/controls.rs",
+      "line": 103
+    },
+    {
+      "builder": "preview_overlay_icon_button_with_focus",
+      "path": "frame-app/src/app/preview/overlay/controls.rs",
+      "line": 125
+    },
+    {
+      "builder": "preview_overlay_icon_button_inner",
+      "path": "frame-app/src/app/preview/overlay/controls.rs",
+      "line": 170
+    },
+    {
+      "builder": "preview_overlay_icon_button_inner",
+      "path": "frame-app/src/app/preview/overlay/controls.rs",
+      "line": 188
+    },
+    {
+      "builder": "frame_button_base",
+      "path": "frame-app/src/app/preview/overlay/controls.rs",
+      "line": 216
+    },
+    {
+      "builder": "icon_svg",
+      "path": "frame-app/src/app/preview/overlay/controls.rs",
+      "line": 229
+    },
+    {
+      "builder": "button_colors",
+      "path": "frame-app/src/app/preview/overlay/controls.rs",
+      "line": 232
+    },
+    {
+      "builder": "preview_viewport",
+      "path": "frame-app/src/app/preview/panel.rs",
+      "line": 227
+    },
+    {
+      "builder": "preview_timeline",
+      "path": "frame-app/src/app/preview/panel.rs",
+      "line": 228
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/preview/panel.rs",
+      "line": 408
+    },
+    {
+      "builder": "frame_field_group",
+      "path": "frame-app/src/app/inspector/video/view.rs",
+      "line": 36
+    },
+    {
+      "builder": "settings_video_resolution_section",
+      "path": "frame-app/src/app/inspector/video/view.rs",
+      "line": 37
+    },
+    {
+      "builder": "settings_video_scaling_section",
+      "path": "frame-app/src/app/inspector/video/view.rs",
+      "line": 46
+    },
+    {
+      "builder": "settings_video_fps_section",
+      "path": "frame-app/src/app/inspector/video/view.rs",
+      "line": 54
+    },
+    {
+      "builder": "settings_video_gif_colors_section",
+      "path": "frame-app/src/app/inspector/video/view.rs",
+      "line": 64
+    },
+    {
+      "builder": "settings_video_gif_dither_section",
+      "path": "frame-app/src/app/inspector/video/view.rs",
+      "line": 71
+    },
+    {
+      "builder": "settings_video_gif_loop_section",
+      "path": "frame-app/src/app/inspector/video/view.rs",
+      "line": 78
+    },
+    {
+      "builder": "settings_video_encoder_section",
+      "path": "frame-app/src/app/inspector/video/view.rs",
+      "line": 89
+    },
+    {
+      "builder": "settings_video_pixel_format_section",
+      "path": "frame-app/src/app/inspector/video/view.rs",
+      "line": 97
+    },
+    {
+      "builder": "settings_video_preset_section",
+      "path": "frame-app/src/app/inspector/video/view.rs",
+      "line": 107
+    },
+    {
+      "builder": "settings_video_quality_section",
+      "path": "frame-app/src/app/inspector/video/view.rs",
+      "line": 116
+    },
+    {
+      "builder": "settings_video_nvenc_section",
+      "path": "frame-app/src/app/inspector/video/view.rs",
+      "line": 125
+    },
+    {
+      "builder": "settings_video_videotoolbox_section",
+      "path": "frame-app/src/app/inspector/video/view.rs",
+      "line": 133
+    },
+    {
+      "builder": "settings_video_hw_section",
+      "path": "frame-app/src/app/inspector/video/view.rs",
+      "line": 141
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 27
+    },
+    {
+      "builder": "settings_resolution_grid",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 28
+    },
+    {
+      "builder": "settings_custom_dimensions_grid",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 32
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 54
+    },
+    {
+      "builder": "frame_choice_button",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 60
+    },
+    {
+      "builder": "settings_field_label",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 103
+    },
+    {
+      "builder": "settings_field_label",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 123
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 148
+    },
+    {
+      "builder": "frame_choice_button",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 153
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 176
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 187
+    },
+    {
+      "builder": "frame_choice_button",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 192
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 214
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 224
+    },
+    {
+      "builder": "frame_choice_button",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 232
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 254
+    },
+    {
+      "builder": "frame_list_group",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 269
+    },
+    {
+      "builder": "frame_list_item_with_caption",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 273
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 296
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 307
+    },
+    {
+      "builder": "settings_hint_text",
+      "path": "frame-app/src/app/inspector/video/geometry.rs",
+      "line": 321
+    },
+    {
+      "builder": "settings_field_label",
+      "path": "frame-app/src/app/inspector/video/quality.rs",
+      "line": 65
+    },
+    {
+      "builder": "settings_value_badge",
+      "path": "frame-app/src/app/inspector/video/quality.rs",
+      "line": 66
+    },
+    {
+      "builder": "settings_video_range_slider",
+      "path": "frame-app/src/app/inspector/video/quality.rs",
+      "line": 68
+    },
+    {
+      "builder": "apply_settings_video_range_value",
+      "path": "frame-app/src/app/inspector/video/quality.rs",
+      "line": 123
+    },
+    {
+      "builder": "apply_settings_video_range_value",
+      "path": "frame-app/src/app/inspector/video/quality.rs",
+      "line": 137
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/video/quality.rs",
+      "line": 146
+    },
+    {
+      "builder": "apply_settings_video_range_value",
+      "path": "frame-app/src/app/inspector/video/quality.rs",
+      "line": 159
+    },
+    {
+      "builder": "apply_settings_video_range_value",
+      "path": "frame-app/src/app/inspector/video/quality.rs",
+      "line": 173
+    },
+    {
+      "builder": "frame_slider_handle",
+      "path": "frame-app/src/app/inspector/video/quality.rs",
+      "line": 199
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/video/quality.rs",
+      "line": 210
+    },
+    {
+      "builder": "frame_list_group",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 33
+    },
+    {
+      "builder": "frame_list_item_with_caption",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 38
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 61
+    },
+    {
+      "builder": "frame_list_group",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 76
+    },
+    {
+      "builder": "frame_list_item_with_caption",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 81
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 104
+    },
+    {
+      "builder": "settings_hint_text",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 107
+    },
+    {
+      "builder": "frame_list_group",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 127
+    },
+    {
+      "builder": "frame_list_item_with_caption",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 132
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 155
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 174
+    },
+    {
+      "builder": "settings_video_bitrate_mode_grid",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 176
+    },
+    {
+      "builder": "settings_video_range_field",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 187
+    },
+    {
+      "builder": "settings_field_label",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 232
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 259
+    },
+    {
+      "builder": "frame_choice_button",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 267
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 297
+    },
+    {
+      "builder": "settings_video_checkbox_row",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 298
+    },
+    {
+      "builder": "settings_video_checkbox_row",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 317
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 344
+    },
+    {
+      "builder": "settings_video_checkbox_row",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 344
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 371
+    },
+    {
+      "builder": "settings_video_checkbox_row",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 371
+    },
+    {
+      "builder": "frame_checkbox_row",
+      "path": "frame-app/src/app/inspector/video/encoding.rs",
+      "line": 404
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/panel.rs",
+      "line": 61
+    },
+    {
+      "builder": "frame_tabs_list",
+      "path": "frame-app/src/app/inspector/panel.rs",
+      "line": 67
+    },
+    {
+      "builder": "settings_tab_button",
+      "path": "frame-app/src/app/inspector/panel.rs",
+      "line": 75
+    },
+    {
+      "builder": "panel_bottom_separator",
+      "path": "frame-app/src/app/inspector/panel.rs",
+      "line": 101
+    },
+    {
+      "builder": "settings_tab_for_key",
+      "path": "frame-app/src/app/inspector/panel.rs",
+      "line": 202
+    },
+    {
+      "builder": "frame_tooltip",
+      "path": "frame-app/src/app/inspector/panel.rs",
+      "line": 224
+    },
+    {
+      "builder": "frame_field_group",
+      "path": "frame-app/src/app/inspector/panel.rs",
+      "line": 265
+    },
+    {
+      "builder": "settings_source_tab",
+      "path": "frame-app/src/app/inspector/panel.rs",
+      "line": 271
+    },
+    {
+      "builder": "settings_output_tab",
+      "path": "frame-app/src/app/inspector/panel.rs",
+      "line": 277
+    },
+    {
+      "builder": "settings_video_tab",
+      "path": "frame-app/src/app/inspector/panel.rs",
+      "line": 287
+    },
+    {
+      "builder": "settings_video_filters_tab",
+      "path": "frame-app/src/app/inspector/panel.rs",
+      "line": 302
+    },
+    {
+      "builder": "settings_audio_tab",
+      "path": "frame-app/src/app/inspector/panel.rs",
+      "line": 321
+    },
+    {
+      "builder": "settings_audio_filters_tab",
+      "path": "frame-app/src/app/inspector/panel.rs",
+      "line": 331
+    },
+    {
+      "builder": "settings_subtitles_tab",
+      "path": "frame-app/src/app/inspector/panel.rs",
+      "line": 339
+    },
+    {
+      "builder": "settings_metadata_tab",
+      "path": "frame-app/src/app/inspector/panel.rs",
+      "line": 365
+    },
+    {
+      "builder": "settings_presets_tab",
+      "path": "frame-app/src/app/inspector/panel.rs",
+      "line": 374
+    },
+    {
+      "builder": "frame_section",
+      "path": "frame-app/src/app/inspector/panel.rs",
+      "line": 395
+    },
+    {
+      "builder": "settings_tab_for_key",
+      "path": "frame-app/src/app/inspector/panel.rs",
+      "line": 416
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 39
+    },
+    {
+      "builder": "settings_audio_channels_grid",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 40
+    },
+    {
+      "builder": "settings_audio_encoding_controls",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 48
+    },
+    {
+      "builder": "settings_hint_text",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 57
+    },
+    {
+      "builder": "settings_hint_text",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 62
+    },
+    {
+      "builder": "frame_field_group",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 68
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 71
+    },
+    {
+      "builder": "settings_audio_codec_list",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 71
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 84
+    },
+    {
+      "builder": "settings_hint_text",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 85
+    },
+    {
+      "builder": "frame_list_group",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 89
+    },
+    {
+      "builder": "settings_audio_track_button",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 91
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 94
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 106
+    },
+    {
+      "builder": "frame_choice_button",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 112
+    },
+    {
+      "builder": "settings_field_label",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 184
+    },
+    {
+      "builder": "settings_audio_bitrate_mode_grid",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 185
+    },
+    {
+      "builder": "settings_audio_range_field",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 208
+    },
+    {
+      "builder": "settings_audio_bitrate_field",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 226
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 247
+    },
+    {
+      "builder": "frame_choice_button",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 258
+    },
+    {
+      "builder": "settings_field_label",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 293
+    },
+    {
+      "builder": "settings_field_label",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 333
+    },
+    {
+      "builder": "settings_value_badge",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 334
+    },
+    {
+      "builder": "settings_audio_range_slider",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 336
+    },
+    {
+      "builder": "apply_settings_audio_range_value",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 396
+    },
+    {
+      "builder": "apply_settings_audio_range_value",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 410
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 419
+    },
+    {
+      "builder": "apply_settings_audio_range_value",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 432
+    },
+    {
+      "builder": "apply_settings_audio_range_value",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 446
+    },
+    {
+      "builder": "frame_slider_handle",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 471
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 481
+    },
+    {
+      "builder": "frame_list_group",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 497
+    },
+    {
+      "builder": "settings_audio_codec_button",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 499
+    },
+    {
+      "builder": "frame_list_item_with_caption",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 522
+    },
+    {
+      "builder": "frame_track_list_item",
+      "path": "frame-app/src/app/inspector/audio.rs",
+      "line": 553
+    },
+    {
+      "builder": "frame_field_group",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 65
+    },
+    {
+      "builder": "settings_video_resolution_section",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 66
+    },
+    {
+      "builder": "settings_video_scaling_section",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 75
+    },
+    {
+      "builder": "settings_images_pixel_format_section",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 82
+    },
+    {
+      "builder": "settings_images_encoding_section",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 89
+    },
+    {
+      "builder": "frame_list_group",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 110
+    },
+    {
+      "builder": "frame_list_item_with_caption",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 115
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 138
+    },
+    {
+      "builder": "settings_image_jpeg_section",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 149
+    },
+    {
+      "builder": "settings_image_webp_section",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 150
+    },
+    {
+      "builder": "settings_image_png_section",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 151
+    },
+    {
+      "builder": "settings_image_tiff_section",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 152
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 153
+    },
+    {
+      "builder": "settings_hint_text",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 154
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 155
+    },
+    {
+      "builder": "settings_hint_text",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 155
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 169
+    },
+    {
+      "builder": "settings_image_range_field",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 170
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 201
+    },
+    {
+      "builder": "settings_image_webp_mode_grid",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 202
+    },
+    {
+      "builder": "settings_image_range_field",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 209
+    },
+    {
+      "builder": "settings_image_range_field",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 235
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 266
+    },
+    {
+      "builder": "settings_image_range_field",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 267
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 298
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 316
+    },
+    {
+      "builder": "frame_choice_button",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 320
+    },
+    {
+      "builder": "settings_field_label",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 373
+    },
+    {
+      "builder": "settings_value_badge",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 374
+    },
+    {
+      "builder": "settings_image_range_slider",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 376
+    },
+    {
+      "builder": "settings_image_range_slider_id",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 410
+    },
+    {
+      "builder": "apply_settings_image_range_value",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 425
+    },
+    {
+      "builder": "apply_settings_image_range_value",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 439
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 448
+    },
+    {
+      "builder": "apply_settings_image_range_value",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 461
+    },
+    {
+      "builder": "apply_settings_image_range_value",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 475
+    },
+    {
+      "builder": "frame_slider_handle",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 503
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 511
+    },
+    {
+      "builder": "frame_list_group",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 554
+    },
+    {
+      "builder": "frame_list_item_with_caption",
+      "path": "frame-app/src/app/inspector/images.rs",
+      "line": 559
+    },
+    {
+      "builder": "frame_field_group",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 114
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 115
+    },
+    {
+      "builder": "settings_subtitle_mode_grid",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 116
+    },
+    {
+      "builder": "settings_selectable_subtitles_content",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 121
+    },
+    {
+      "builder": "settings_burn_in_subtitles_content",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 124
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 136
+    },
+    {
+      "builder": "frame_choice_button",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 142
+    },
+    {
+      "builder": "frame_choice_button",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 160
+    },
+    {
+      "builder": "frame_field_group",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 185
+    },
+    {
+      "builder": "settings_external_subtitles_section",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 186
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 196
+    },
+    {
+      "builder": "settings_hint_text",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 197
+    },
+    {
+      "builder": "frame_list_group",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 201
+    },
+    {
+      "builder": "settings_subtitle_track_button",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 203
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 206
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 218
+    },
+    {
+      "builder": "settings_subtitle_file_button",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 219
+    },
+    {
+      "builder": "settings_hint_text",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 227
+    },
+    {
+      "builder": "settings_subtitle_burn_file_row",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 237
+    },
+    {
+      "builder": "frame_field_group",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 246
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 253
+    },
+    {
+      "builder": "settings_subtitle_style_controls",
+      "path": "frame-app/src/app/inspector/subtitles/view.rs",
+      "line": 253
+    },
+    {
+      "builder": "crop_select",
+      "path": "frame-app/src/app/preview/crop_options/view.rs",
+      "line": 19
+    },
+    {
+      "builder": "crop_select",
+      "path": "frame-app/src/app/preview/crop_options/view.rs",
+      "line": 91
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/preview/actions/canvas.rs",
+      "line": 26
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/preview/actions/overlay.rs",
+      "line": 30
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/preview/actions/runtime.rs",
+      "line": 34
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/preview/actions/runtime.rs",
+      "line": 35
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/inspector/subtitles/color_picker.rs",
+      "line": 82
+    },
+    {
+      "builder": "frame_color_select_value",
+      "path": "frame-app/src/app/inspector/subtitles/color_picker.rs",
+      "line": 145
+    },
+    {
+      "builder": "frame_select_trigger_content_with_focus",
+      "path": "frame-app/src/app/inspector/subtitles/color_picker.rs",
+      "line": 147
+    },
+    {
+      "builder": "frame_select_trigger_content",
+      "path": "frame-app/src/app/inspector/subtitles/color_picker.rs",
+      "line": 159
+    },
+    {
+      "builder": "settings_field_label",
+      "path": "frame-app/src/app/inspector/subtitles/color_picker.rs",
+      "line": 178
+    },
+    {
+      "builder": "settings_subtitle_color_picker",
+      "path": "frame-app/src/app/inspector/subtitles/color_picker.rs",
+      "line": 234
+    },
+    {
+      "builder": "frame_color_picker_panel",
+      "path": "frame-app/src/app/inspector/subtitles/color_picker.rs",
+      "line": 281
+    },
+    {
+      "builder": "settings_subtitle_sv_square",
+      "path": "frame-app/src/app/inspector/subtitles/color_picker.rs",
+      "line": 289
+    },
+    {
+      "builder": "settings_subtitle_hue_slider",
+      "path": "frame-app/src/app/inspector/subtitles/color_picker.rs",
+      "line": 290
+    },
+    {
+      "builder": "frame_color_picker_sv_canvas",
+      "path": "frame-app/src/app/inspector/subtitles/color_picker.rs",
+      "line": 402
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/subtitles/color_picker.rs",
+      "line": 404
+    },
+    {
+      "builder": "frame_color_picker_hue_track",
+      "path": "frame-app/src/app/inspector/subtitles/color_picker.rs",
+      "line": 491
+    },
+    {
+      "builder": "frame_color_picker_hue_handle",
+      "path": "frame-app/src/app/inspector/subtitles/color_picker.rs",
+      "line": 492
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/subtitles/color_picker.rs",
+      "line": 494
+    },
+    {
+      "builder": "apply_accessible_slider_with_focus",
+      "path": "frame-app/src/app/inspector/subtitles/color_picker.rs",
+      "line": 498
+    },
+    {
+      "builder": "apply_accessible_slider",
+      "path": "frame-app/src/app/inspector/subtitles/color_picker.rs",
+      "line": 510
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/preview/actions/request.rs",
+      "line": 50
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/preview/actions/request.rs",
+      "line": 134
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/preview/actions/request.rs",
+      "line": 161
+    },
+    {
+      "builder": "frame_label",
+      "path": "frame-app/src/app/inspector/subtitles/font_select.rs",
+      "line": 45
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/subtitles/state.rs",
+      "line": 26
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/subtitles/state.rs",
+      "line": 27
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/inspector/subtitles/state.rs",
+      "line": 32
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/preview/state.rs",
+      "line": 92
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/preview/state.rs",
+      "line": 93
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/preview/state.rs",
+      "line": 94
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/preview/state.rs",
+      "line": 140
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/preview/state.rs",
+      "line": 147
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/preview/state.rs",
+      "line": 150
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/preview/state.rs",
+      "line": 157
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/preview/state.rs",
+      "line": 164
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/preview/state.rs",
+      "line": 165
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/preview/state.rs",
+      "line": 167
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/preview/state.rs",
+      "line": 206
+    },
+    {
+      "builder": "button_colors",
+      "path": "frame-app/src/app/inspector/subtitles/burn_in.rs",
+      "line": 36
+    },
+    {
+      "builder": "settings_subtitle_clear_button",
+      "path": "frame-app/src/app/inspector/subtitles/burn_in.rs",
+      "line": 58
+    },
+    {
+      "builder": "frame_icon_button",
+      "path": "frame-app/src/app/inspector/subtitles/burn_in.rs",
+      "line": 69
+    },
+    {
+      "builder": "settings_subtitle_font_select",
+      "path": "frame-app/src/app/inspector/subtitles/burn_in.rs",
+      "line": 113
+    },
+    {
+      "builder": "settings_subtitle_font_size_select",
+      "path": "frame-app/src/app/inspector/subtitles/burn_in.rs",
+      "line": 128
+    },
+    {
+      "builder": "settings_field_label",
+      "path": "frame-app/src/app/inspector/subtitles/burn_in.rs",
+      "line": 193
+    },
+    {
+      "builder": "settings_subtitle_position_grid",
+      "path": "frame-app/src/app/inspector/subtitles/burn_in.rs",
+      "line": 194
+    },
+    {
+      "builder": "settings_hint_text",
+      "path": "frame-app/src/app/inspector/subtitles/burn_in.rs",
+      "line": 202
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/subtitles/burn_in.rs",
+      "line": 215
+    },
+    {
+      "builder": "frame_choice_button",
+      "path": "frame-app/src/app/inspector/subtitles/burn_in.rs",
+      "line": 225
+    },
+    {
+      "builder": "settings_section",
+      "path": "frame-app/src/app/inspector/subtitles/tracks.rs",
+      "line": 31
+    },
+    {
+      "builder": "settings_subtitle_file_button",
+      "path": "frame-app/src/app/inspector/subtitles/tracks.rs",
+      "line": 32
+    },
+    {
+      "builder": "settings_hint_text",
+      "path": "frame-app/src/app/inspector/subtitles/tracks.rs",
+      "line": 40
+    },
+    {
+      "builder": "settings_hint_text",
+      "path": "frame-app/src/app/inspector/subtitles/tracks.rs",
+      "line": 50
+    },
+    {
+      "builder": "frame_list_group",
+      "path": "frame-app/src/app/inspector/subtitles/tracks.rs",
+      "line": 56
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/subtitles/tracks.rs",
+      "line": 59
+    },
+    {
+      "builder": "has_any",
+      "path": "frame-app/src/app/inspector/subtitles/tracks.rs",
+      "line": 77
+    },
+    {
+      "builder": "settings_external_subtitle_editor",
+      "path": "frame-app/src/app/inspector/subtitles/tracks.rs",
+      "line": 79
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/subtitles/tracks.rs",
+      "line": 143
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/subtitles/tracks.rs",
+      "line": 148
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/subtitles/tracks.rs",
+      "line": 162
+    },
+    {
+      "builder": "frame_track_list_item",
+      "path": "frame-app/src/app/inspector/subtitles/tracks.rs",
+      "line": 177
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/subtitles/tracks.rs",
+      "line": 183
+    },
+    {
+      "builder": "frame_icon_button",
+      "path": "frame-app/src/app/inspector/subtitles/tracks.rs",
+      "line": 202
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/subtitles/tracks.rs",
+      "line": 260
+    },
+    {
+      "builder": "settings_field_label",
+      "path": "frame-app/src/app/inspector/subtitles/tracks.rs",
+      "line": 278
+    },
+    {
+      "builder": "settings_field_label",
+      "path": "frame-app/src/app/inspector/subtitles/tracks.rs",
+      "line": 297
+    },
+    {
+      "builder": "frame_choice_button",
+      "path": "frame-app/src/app/inspector/subtitles/tracks.rs",
+      "line": 327
+    },
+    {
+      "builder": "frame_choice_button",
+      "path": "frame-app/src/app/inspector/subtitles/tracks.rs",
+      "line": 351
+    },
+    {
+      "builder": "frame_track_list_item",
+      "path": "frame-app/src/app/inspector/subtitles/tracks.rs",
+      "line": 394
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/inspector/subtitles/tracks.rs",
+      "line": 400
+    },
+    {
+      "builder": "frame_text_button_inner",
+      "path": "frame-app/src/app/inspector/subtitles/file_button.rs",
+      "line": 24
+    },
+    {
+      "builder": "frame_label",
+      "path": "frame-app/src/app/inspector/subtitles/size_select.rs",
+      "line": 48
+    },
+    {
+      "builder": "preview_canvas_pan_enabled",
+      "path": "frame-app/src/app/preview/viewport/view.rs",
+      "line": 41
+    },
+    {
+      "builder": "preview_viewport_content",
+      "path": "frame-app/src/app/preview/viewport/view.rs",
+      "line": 82
+    },
+    {
+      "builder": "preview_overlay_controls",
+      "path": "frame-app/src/app/preview/viewport/view.rs",
+      "line": 126
+    },
+    {
+      "builder": "preview_zoom_toolbar",
+      "path": "frame-app/src/app/preview/viewport/view.rs",
+      "line": 134
+    },
+    {
+      "builder": "preview_canvas_pan_enabled",
+      "path": "frame-app/src/app/preview/viewport/view.rs",
+      "line": 158
+    },
+    {
+      "builder": "new",
+      "path": "frame-app/src/app/preview/viewport/view.rs",
+      "line": 162
+    },
+    {
+      "builder": "preview_overlay_layer",
+      "path": "frame-app/src/app/preview/viewport/view.rs",
+      "line": 346
+    },
+    {
+      "builder": "preview_crop_overlay",
+      "path": "frame-app/src/app/preview/viewport/view.rs",
+      "line": 351
+    },
+    {
+      "builder": "icon_svg",
+      "path": "frame-app/src/app/preview/viewport/view.rs",
+      "line": 377
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/preview/viewport/frame.rs",
+      "line": 44
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/preview/viewport/bounds.rs",
+      "line": 48
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/preview/viewport/media.rs",
+      "line": 47
+    },
+    {
+      "builder": "default",
+      "path": "frame-app/src/app/preview/viewport/media.rs",
+      "line": 122
+    }
+  ],
+  "explicit_ids": [
+    {
+      "id_or_pattern": "logs-tab-list",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 90
+    },
+    {
+      "id_or_pattern": "logs-body",
+      "path": "frame-app/src/app/logs/view.rs",
+      "line": 232
+    },
+    {
+      "id_or_pattern": "app-settings-appearance-error",
+      "path": "frame-app/src/app/preferences/appearance.rs",
+      "line": 72
+    },
+    {
+      "id_or_pattern": "app-settings-sheet",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 97
+    },
+    {
+      "id_or_pattern": "app-settings-backdrop",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 126
+    },
+    {
+      "id_or_pattern": "app-settings-panel",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 142
+    },
+    {
+      "id_or_pattern": "app-settings-scroll-body",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 209
+    },
+    {
+      "id_or_pattern": "app-settings-max-concurrency-error",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 263
+    },
+    {
+      "id_or_pattern": "app-settings-output-directory-path",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 342
+    },
+    {
+      "id_or_pattern": "app-settings-output-directory-error",
+      "path": "frame-app/src/app/preferences/view.rs",
+      "line": 351
+    },
+    {
+      "id_or_pattern": "tooltip-{}",
+      "path": "frame-app/src/app/components/tooltip.rs",
+      "line": 199
+    },
+    {
+      "id_or_pattern": "tooltip-{id}-anchor",
+      "path": "frame-app/src/app/components/tooltip.rs",
+      "line": 262
+    },
+    {
+      "id_or_pattern": "range-fill",
+      "path": "frame-app/src/app/components/slider.rs",
+      "line": 58
+    },
+    {
+      "id_or_pattern": "{id}-thumb",
+      "path": "frame-app/src/app/components/slider.rs",
+      "line": 196
+    },
+    {
+      "id_or_pattern": "{id}-indicator",
+      "path": "frame-app/src/app/components/checkbox.rs",
+      "line": 177
+    },
+    {
+      "id_or_pattern": "titlebar-main-view-tabs",
+      "path": "frame-app/src/app/chrome/navigation.rs",
+      "line": 28
+    },
+    {
+      "id_or_pattern": "update-dialog",
+      "path": "frame-app/src/app/updates/dialog.rs",
+      "line": 49
+    },
+    {
+      "id_or_pattern": "update-dialog-panel",
+      "path": "frame-app/src/app/updates/dialog.rs",
+      "line": 101
+    },
+    {
+      "id_or_pattern": "update-dialog-error-alert",
+      "path": "frame-app/src/app/updates/dialog.rs",
+      "line": 234
+    },
+    {
+      "id_or_pattern": "app-settings-update-status",
+      "path": "frame-app/src/app/updates/preferences.rs",
+      "line": 107
+    },
+    {
+      "id_or_pattern": "app-settings-update-progress",
+      "path": "frame-app/src/app/updates/preferences.rs",
+      "line": 158
+    },
+    {
+      "id_or_pattern": "update-dialog-release-notes-content",
+      "path": "frame-app/src/app/updates/release_notes.rs",
+      "line": 52
+    },
+    {
+      "id_or_pattern": "update-dialog-release-notes",
+      "path": "frame-app/src/app/updates/release_notes.rs",
+      "line": 65
+    },
+    {
+      "id_or_pattern": "file-list-header-checkbox-hit-area",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 55
+    },
+    {
+      "id_or_pattern": "file-list-header-checkbox",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 81
+    },
+    {
+      "id_or_pattern": "file-list-body",
+      "path": "frame-app/src/app/queue/view.rs",
+      "line": 188
+    },
+    {
+      "id_or_pattern": "drag-drop-overlay",
+      "path": "frame-app/src/app/queue/drop_overlay.rs",
+      "line": 25
+    },
+    {
+      "id_or_pattern": "settings-source-metadata-error",
+      "path": "frame-app/src/app/inspector/source.rs",
+      "line": 26
+    },
+    {
+      "id_or_pattern": "preview-crop-move-handle",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 159
+    },
+    {
+      "id_or_pattern": "preview-crop-handle-{}",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 238
+    },
+    {
+      "id_or_pattern": "preview-crop-toolbar",
+      "path": "frame-app/src/app/preview/crop_overlay.rs",
+      "line": 379
+    },
+    {
+      "id_or_pattern": "preview-timeline-track",
+      "path": "frame-app/src/app/preview/timeline/track.rs",
+      "line": 139
+    },
+    {
+      "id_or_pattern": "settings-presets-notice",
+      "path": "frame-app/src/app/inspector/presets/view.rs",
+      "line": 72
+    },
+    {
+      "id_or_pattern": "preview-overlay-layer",
+      "path": "frame-app/src/app/preview/overlay/layer.rs",
+      "line": 54
+    },
+    {
+      "id_or_pattern": "preview-overlay-handle-{}",
+      "path": "frame-app/src/app/preview/overlay/layer.rs",
+      "line": 228
+    },
+    {
+      "id_or_pattern": "preview-overlay-toolbar",
+      "path": "frame-app/src/app/preview/overlay/controls.rs",
+      "line": 34
+    },
+    {
+      "id_or_pattern": "settings-tab-list",
+      "path": "frame-app/src/app/inspector/panel.rs",
+      "line": 68
+    },
+    {
+      "id_or_pattern": "settings-panel-body",
+      "path": "frame-app/src/app/inspector/panel.rs",
+      "line": 105
+    },
+    {
+      "id_or_pattern": "preview-viewport",
+      "path": "frame-app/src/app/preview/viewport/view.rs",
+      "line": 43
+    },
+    {
+      "id_or_pattern": "preview-canvas-pan-layer",
+      "path": "frame-app/src/app/preview/viewport/view.rs",
+      "line": 151
+    },
+    {
+      "id_or_pattern": "preview-empty-state",
+      "path": "frame-app/src/app/preview/viewport/view.rs",
+      "line": 210
+    },
+    {
+      "id_or_pattern": "preview-media-stage",
+      "path": "frame-app/src/app/preview/viewport/view.rs",
+      "line": 293
+    }
+  ]
+}
