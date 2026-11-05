@@ -47,6 +47,20 @@ This applies to bundled paths, raw data and external SVGs; explicit icon colors
 still take precedence. `svg_current_color_inherits_and_updates_while_explicit_colors_win`
 asserts actual painted sprites for direct/nested inheritance and color changes.
 
+## Fractional focus rings and outlines
+
+`RingStyle` opts out of quad pixel snapping. Bounds, border width and corner
+radii retain the same fractional spread, and animated rings are submitted as
+one quad to avoid seams between fractional clip strips. Ordinary borders retain
+pixel snapping. Quad vertices cover the half-pixel antialias fringe so fractional
+outer edges are not cut off by triangle rasterization. The transparent fill uses
+the ring RGB rather than black, avoiding a dark inner antialias fringe.
+
+`Style::outline` paints a concentric outside outline above the ring and content,
+with independent width/color transitions. Frame's tabs use a fixed 1px outline
+with animated color instead of approximating it with an unanimated box shadow.
+`gpui_ce_wgpu/tests/focus_rings.rs` exercises actual Style -> Window -> GPU pixels.
+
 ## Integration changes
 
 Upstream renamed Cargo packages to `gpui-ce` / `gpui_ce_*`, moved Apple's renderer
@@ -100,6 +114,12 @@ On this Mac, upstream's WGPU test
 `quad_border_backgrounds_use_the_fill_coordinate_space` fails its two-level color
 tolerance: red is 228 instead of 225 at (10, 10). The identical failure was reproduced
 in the unmodified `bc57747` checkout. Its assertion is retained unchanged.
+
+The broader `headless_primitives::every_primitive_kind_renders` smoke test also
+expects outer-shadow color inside the shadow's element bounds. The retained CSS
+shadow clipping patch deliberately leaves that interior clear. The three shadow
+assertions fail identically with the pre-ring-fix quad shader (verified 2026-11-05);
+the other three primitive tests and both focus-ring pixel tests pass.
 
 Windows can be type-checked from macOS with
 `GPUI_RENDER_ALLOW_MISSING_DXBC=1 cargo check --locked -p frame-app --target x86_64-pc-windows-gnu`.

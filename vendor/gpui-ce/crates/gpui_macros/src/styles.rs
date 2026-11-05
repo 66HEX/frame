@@ -399,6 +399,17 @@ fn style_transition_specs() -> Vec<StyleTransitionSpec> {
             fields: vec![StyleTransitionField::required(quote! { ring.color })],
         },
         StyleTransitionSpec {
+            name: "outline",
+            fields: vec![
+                StyleTransitionField::required(quote! { outline.width }),
+                StyleTransitionField::required(quote! { outline.color }),
+            ],
+        },
+        StyleTransitionSpec {
+            name: "outline_color",
+            fields: vec![StyleTransitionField::required(quote! { outline.color })],
+        },
+        StyleTransitionSpec {
             name: "inset_ring",
             fields: vec![
                 StyleTransitionField::required(quote! { inset_ring.width }),
@@ -863,6 +874,18 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
             Self: Sized,
         {
             self.style().ring.color = Some(gpui::RingColor::Color(color.into()));
+            self
+        }
+
+        /// Sets the outside outline width (offset zero, above the ring).
+        #visibility fn outline(mut self, width: impl Into<gpui::Pixels>) -> Self {
+            self.style().outline.width = Some(width.into());
+            self
+        }
+
+        /// Sets the outside outline color or gradient.
+        #visibility fn outline_color<C: Into<gpui::Background>>(mut self, color: C) -> Self {
+            self.style().outline.color = Some(gpui::RingColor::Color(color.into()));
             self
         }
 

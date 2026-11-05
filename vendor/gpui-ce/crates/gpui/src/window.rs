@@ -4821,8 +4821,17 @@ impl Window {
     pub fn paint_quad(&mut self, quad: PaintQuad) {
         self.invalidator.debug_assert_paint();
 
-        let snapped_bounds = self.snap_bounds(quad.bounds);
-        let snapped_border_widths = self.snap_border_widths(quad.border_widths);
+        let pixel_snap = quad.pixel_snap;
+        let snapped_bounds = if pixel_snap {
+            self.snap_bounds(quad.bounds)
+        } else {
+            quad.bounds.scale(self.scale_factor())
+        };
+        let snapped_border_widths = if pixel_snap {
+            self.snap_border_widths(quad.border_widths)
+        } else {
+            quad.border_widths.scale(self.scale_factor())
+        };
         let quad = Quad {
             order: 0,
             bounds: snapped_bounds,
@@ -4838,7 +4847,9 @@ impl Window {
             padding: 0,
         };
 
-        if !quad.background.is_transparent() {
+        // Fractional strip boundaries would clip the same antialiased pixel in two
+        // separate draws, introducing seams. Keep animated outlines in one draw.
+        if !pixel_snap || !quad.background.is_transparent() {
             self.next_frame.scene.insert_primitive(quad);
             return;
         }
@@ -8136,6 +8147,8 @@ impl From<[u8; 20]> for ElementId {
 pub struct PaintQuad {
     /// The bounds of the quad within the window.
     pub bounds: Bounds<Pixels>,
+    /// Whether to snap bounds and border widths to device pixels. Disable for animated rings.
+    pub pixel_snap: bool,
     /// The radii of the quad's corners.
     #[setters(generate)]
     pub corner_radii: Corners<Pixels>,
@@ -8164,6 +8177,7 @@ impl PaintQuad {
     pub fn new(bounds: impl Into<Bounds<Pixels>>) -> Self {
         Self {
             bounds: bounds.into(),
+            pixel_snap: true,
             corner_radii: (0.).into(),
             corner_smoothing: 0.0,
             background: transparent_black().into(),
@@ -8173,6 +8187,12 @@ impl PaintQuad {
             border_dashed_length: crate::scene::DEFAULT_BORDER_DASHED_LENGTH,
             border_dashed_gap: crate::scene::DEFAULT_BORDER_DASHED_GAP,
         }
+    }
+
+    /// Controls device-pixel snapping. Fractional geometry is antialiased by the renderer.
+    pub fn pixel_snap(mut self, enabled: bool) -> Self {
+        self.pixel_snap = enabled;
+        self
     }
 
     /// Sets the corner smoothing, clamped to the range `0.0..=1.0`.

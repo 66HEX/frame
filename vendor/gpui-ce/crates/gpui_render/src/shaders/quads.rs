@@ -511,7 +511,14 @@ pub mod quad {
     }
 
     pub fn prepare_quad_vertex(vertex_id: u32, instance_id: u32, quad: Quad) -> QuadVertexData {
-        let vertex = rectangle_vertex(vertex_id, quad.bounds);
+        let mut vertex_bounds = quad.bounds;
+        if !Edges::is_zero(quad.border_widths) || !Corners::is_zero(quad.corner_radii) {
+            vertex_bounds.origin =
+                vertex_bounds.origin - vec2f(PIXEL_ANTIALIAS_RADIUS, PIXEL_ANTIALIAS_RADIUS);
+            vertex_bounds.size = vertex_bounds.size
+                + vec2f(2.0 * PIXEL_ANTIALIAS_RADIUS, 2.0 * PIXEL_ANTIALIAS_RADIUS);
+        }
+        let vertex = rectangle_vertex(vertex_id, vertex_bounds);
         QuadVertexData {
             position: vertex.clip_position,
             border: prepare_paint(Paint::new(quad.border_color, quad.bounds)),

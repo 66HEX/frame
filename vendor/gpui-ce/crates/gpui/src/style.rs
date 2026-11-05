@@ -210,8 +210,12 @@ impl RingStyle {
             // Quad borders are painted inward, so expanding the quad by the ring width leaves
             // its transparent interior aligned with the element's original bounds.
             PaintQuad::new(bounds.dilate(self.width))
+                .pixel_snap(false)
                 .corner_radii(corner_radii.map(|radius| *radius + self.width))
                 .border_widths(Edges::all(self.width))
+                // The quad shader interpolates fill/border before compositing.
+                // Transparent black would darken the antialiased inner contour.
+                .background(self.color.resolve(current_color).opacity(0.0))
                 .border_color(self.color.resolve(current_color))
         })
     }
@@ -370,6 +374,10 @@ pub struct Style {
     /// A solid ring painted outside the element.
     #[refineable]
     pub ring: RingStyle,
+
+    /// An outline at offset zero, painted above the element and its ring.
+    #[refineable]
+    pub outline: RingStyle,
 
     /// A solid ring painted inside the element.
     #[refineable]
@@ -1085,6 +1093,10 @@ impl Style {
             );
         }
 
+        if let Some(outline) = self.outline.outer_quad(bounds, corner_radii, current_color) {
+            window.paint_quad(outline.corner_smoothing(corner_smoothing));
+        }
+
         #[cfg(debug_assertions)]
         if self.debug_below {
             cx.remove_global::<DebugBelow>();
@@ -1145,6 +1157,7 @@ impl Default for Style {
             corner_smoothing: None,
             box_shadow: Default::default(),
             ring: Default::default(),
+            outline: Default::default(),
             inset_ring: Default::default(),
             filter: Default::default(),
             backdrop_filter: Default::default(),
