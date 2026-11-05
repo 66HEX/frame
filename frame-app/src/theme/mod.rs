@@ -1,7 +1,11 @@
 //! Frame native visual tokens and resolved color palettes.
 
 pub mod geist;
+pub mod mira;
 pub mod shadows;
+
+#[cfg(test)]
+mod css;
 
 use crate::appearance::{BASE_REM_PX, ColorTheme};
 use gpui::{FontWeight, Rems, rems};
