@@ -3082,6 +3082,17 @@ impl Interactivity {
                 );
 
                 if let Some(element_state) = element_state.as_mut() {
+                    if self
+                        .tracked_focus_handle
+                        .as_ref()
+                        .is_some_and(|focus| focus.is_focused(window))
+                        && window.last_input_was_keyboard()
+                        && element_state.revealed_focus_generation != Some(window.focus_generation)
+                    {
+                        element_state.revealed_focus_generation = Some(window.focus_generation);
+                        // Include focus indicators, not just the control's border box.
+                        window.request_autoscroll(bounds.dilate(px(4.0)));
+                    }
                     if let Some(clicked_state) = element_state.clicked_state.as_ref() {
                         let clicked_state = clicked_state.borrow();
                         self.active = Some(clicked_state.element);
@@ -3118,13 +3129,93 @@ impl Interactivity {
 
                             let scroll_offset =
                                 self.clamp_scroll_position(bounds, &style, window, cx);
+                            let previous_autoscroll = window.take_autoscroll();
                             let result = f(&style, scroll_offset, hitbox, window, cx);
+                            if let Some(mut target) = window.take_autoscroll() {
+                                self.reveal_descendant(
+                                    &mut target,
+                                    bounds,
+                                    &style,
+                                    scroll_offset,
+                                    window,
+                                );
+                                window.request_autoscroll(target);
+                            } else if let Some(target) = previous_autoscroll {
+                                window.request_autoscroll(target);
+                            }
                             (result, element_state)
                         },
                     )
                 })
             },
         )
+    }
+
+    /// Bubble a focus reveal through nested scroll containers. Apply offsets
+    /// next frame so paint and hit testing use the same layout for this frame.
+    fn reveal_descendant(
+        &self,
+        target: &mut Bounds<Pixels>,
+        bounds: Bounds<Pixels>,
+        style: &Style,
+        scroll_offset: Point<Pixels>,
+        window: &mut Window,
+    ) {
+        let Some(offset) = self.scroll_offset.as_ref() else {
+            return;
+        };
+        let padding = style
+            .padding
+            .to_pixels(bounds.size.into(), window.rem_size());
+        let max = Point::from(
+            self.content_size + size(padding.left + padding.right, padding.top + padding.bottom)
+                - bounds.size,
+        )
+        .max(&Point::default());
+        let reveal_axis = |value: Pixels,
+                           limit: Pixels,
+                           start: Pixels,
+                           end: Pixels,
+                           view_start: Pixels,
+                           view_end: Pixels| {
+            let delta = if start < view_start {
+                view_start - start
+            } else if end > view_end {
+                view_end - end
+            } else {
+                px(0.0)
+            };
+            (value + delta).clamp(-limit, px(0.0))
+        };
+        let mut next = scroll_offset;
+        if style.overflow.x == Overflow::Scroll {
+            next.x = reveal_axis(
+                next.x,
+                max.x,
+                target.left(),
+                target.right(),
+                bounds.left(),
+                bounds.right(),
+            );
+        }
+        if style.overflow.y == Overflow::Scroll {
+            next.y = reveal_axis(
+                next.y,
+                max.y,
+                target.top(),
+                target.bottom(),
+                bounds.top(),
+                bounds.bottom(),
+            );
+        }
+        if next != scroll_offset {
+            target.origin += next - scroll_offset;
+            let offset = offset.clone();
+            window.on_next_frame(move |window, _| {
+                *offset.borrow_mut() = next;
+                window.refresh();
+            });
+        }
     }
 
     fn should_insert_hitbox(&self, style: &Style, window: &Window, cx: &App) -> bool {
@@ -4477,6 +4568,8 @@ impl Interactivity {
 /// and scroll offsets.
 #[derive(Default)]
 pub struct InteractiveElementState {
+    /// Reveal keyboard focus once per move; manual scrolling must remain possible.
+    revealed_focus_generation: Option<u64>,
     pub(crate) focus_handle: Option<FocusHandle>,
     pub(crate) clicked_state: Option<Rc<RefCell<ElementClickedState>>>,
     pub(crate) hover_state: Option<Rc<RefCell<ElementHoverState>>>,
@@ -6844,3 +6937,7 @@ mod tests {
         assert_eq!(bounds("cell-2").origin.x, px(300.));
     }
 }
+
+#[cfg(test)]
+#[path = "div/focus_scroll_tests.rs"]
+mod focus_scroll_tests;

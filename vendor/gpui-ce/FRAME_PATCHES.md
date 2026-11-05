@@ -72,6 +72,17 @@ partially transparent colors, zero alpha, and the CSS Color 4 example. Frame's
 inspector regression test exercises pointer/keyboard switching and mid-transition
 reversal in both themes at 100% and 200% scale.
 
+## Revealing keyboard focus
+
+Interactive divs request autoscroll once per new keyboard focus generation.
+Scrollable ancestors reveal the descendant with a small ring margin, then pass
+the adjusted target to outer scroll areas. Each subtree isolates its request so
+unrelated sibling panes do not move. Scroll offsets are applied on the next frame
+to keep layout, painting and hit testing in agreement. Pointer focus and manually
+scrolling away from an already focused control do not trigger repeated reveals.
+`elements/div/focus_scroll_tests.rs` covers nested areas, siblings, refocusing
+and pointer modality. Frame adds full forward/reverse traversal across its views.
+
 ## Integration changes
 
 Upstream renamed Cargo packages to `gpui-ce` / `gpui_ce_*`, moved Apple's renderer
