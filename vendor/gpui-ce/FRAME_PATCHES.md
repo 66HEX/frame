@@ -61,6 +61,17 @@ with independent width/color transitions. Frame's tabs use a fixed 1px outline
 with animated color instead of approximating it with an unanimated box shadow.
 `gpui_ce_wgpu/tests/focus_rings.rs` exercises actual Style -> Window -> GPU pixels.
 
+## Alpha-aware color transitions
+
+`Rgba::lerp` interpolates premultiplied channels, then returns an unpremultiplied
+color for rendering. `Hsla`, background, border, text and ring transitions share
+this path. Previously a white-to-transparent tab background faded through gray,
+causing a dark flash in the light theme. Opaque endpoints retain their existing
+interpolation and authored endpoints remain exact. Tests cover transparent and
+partially transparent colors, zero alpha, and the CSS Color 4 example. Frame's
+inspector regression test exercises pointer/keyboard switching and mid-transition
+reversal in both themes at 100% and 200% scale.
+
 ## Integration changes
 
 Upstream renamed Cargo packages to `gpui-ce` / `gpui_ce_*`, moved Apple's renderer

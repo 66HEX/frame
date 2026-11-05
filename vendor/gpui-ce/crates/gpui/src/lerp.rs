@@ -90,7 +90,6 @@ struct_lerps!(
     Edges<T> { top, right, bottom, left },
     Corners<T> { top_left, top_right, bottom_right, bottom_left },
     Bounds<T> { origin, size },
-    Rgba { color, alpha },
     Colors { text, selected_text, background, disabled, selected, border, separator, container }
 );
 
@@ -136,6 +135,36 @@ new_constructor_lerps!(
     Oklab::new(l, a, b),
     Oklaba::new(l, a, b, alpha)
 );
+
+impl Lerp for Rgba {
+    fn lerp(&self, to: &Self, delta: f32) -> Self {
+        if delta <= 0.0 {
+            return *self;
+        }
+        if delta >= 1.0 {
+            return *to;
+        }
+
+        // CSS interpolates colors with premultiplied alpha. Interpolating RGB
+        // independently would tint a white -> transparent fade toward black.
+        // Keep the returned color unpremultiplied, as expected by the renderer.
+        let alpha = self.alpha.lerp(&to.alpha, delta);
+        let channel = |from: f32, target: f32| {
+            let premultiplied = (from * self.alpha).lerp(&(target * to.alpha), delta);
+            if alpha == 0.0 {
+                premultiplied
+            } else {
+                premultiplied / alpha
+            }
+        };
+        Self::new(
+            channel(self.red, to.red),
+            channel(self.green, to.green),
+            channel(self.blue, to.blue),
+            alpha,
+        )
+    }
+}
 
 impl Lerp for Hsla {
     fn lerp(&self, to: &Self, delta: f32) -> Self {
@@ -237,4 +266,64 @@ where
     T: Copy + Add<Output = T> + Sub<Output = T> + Mul<Output = T>,
 {
     from + (to - from) * alpha
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_color(actual: Rgba, expected: Rgba) {
+        for (actual, expected) in [
+            (actual.red, expected.red),
+            (actual.green, expected.green),
+            (actual.blue, expected.blue),
+            (actual.alpha, expected.alpha),
+        ] {
+            assert!(
+                (actual - expected).abs() < 0.00001,
+                "{actual} != {expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn transparent_color_endpoints_do_not_tint_fades() {
+        let clear = Rgba::new(0.0, 0.0, 0.0, 0.0);
+        for opaque in [Rgba::new(1.0, 1.0, 1.0, 1.0), Rgba::new(0.1, 0.4, 0.9, 1.0)] {
+            for step in 1..120 {
+                let progress = step as f32 / 120.0;
+                let mut expected = opaque;
+                expected.alpha = progress;
+                assert_color(clear.lerp(&opaque, progress), expected);
+                assert_color(opaque.lerp(&clear, 1.0 - progress), expected);
+
+                // Styles (backgrounds, borders, text and rings) pass through Hsla.
+                let from: Hsla = clear.into_color();
+                let to: Hsla = opaque.into_color();
+                assert_color(from.lerp(&to, progress).into_color(), expected);
+            }
+        }
+    }
+
+    #[test]
+    fn partial_alpha_matches_the_css_color_interpolation_example() {
+        // https://www.w3.org/TR/css-color-4/#interpolation-alpha
+        let from = Rgba::new(0.24, 0.12, 0.98, 0.4);
+        let to = Rgba::new(0.62, 0.26, 0.64, 0.6);
+        assert_color(from.lerp(&to, 0.5), Rgba::new(0.468, 0.204, 0.776, 0.5));
+        assert_color(from.lerp(&to, 0.0), from);
+        assert_color(from.lerp(&to, 1.0), to);
+    }
+
+    #[test]
+    fn zero_alpha_is_finite_and_opaque_colors_keep_linear_interpolation() {
+        assert_color(
+            Rgba::new(1.0, 0.0, 0.0, 0.0).lerp(&Rgba::new(0.0, 0.0, 1.0, 0.0), 0.5),
+            Rgba::new(0.0, 0.0, 0.0, 0.0),
+        );
+        assert_color(
+            Rgba::new(1.0, 0.0, 0.0, 1.0).lerp(&Rgba::new(0.0, 0.0, 1.0, 1.0), 0.5),
+            Rgba::new(0.5, 0.0, 0.5, 1.0),
+        );
+    }
 }
