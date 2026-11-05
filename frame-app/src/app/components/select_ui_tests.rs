@@ -231,3 +231,93 @@ fn selecting_the_current_font_or_size_still_closes_the_menu() {
         assert!(cx.debug_bounds(case.panel).is_none());
     }
 }
+
+#[test]
+fn toggle_group_arrows_move_focus_and_enter_activates_without_changing_value_on_focus() {
+    let case = SelectCase {
+        fixture: VisualFixture::SettingsOutput,
+        trigger: "output-mode-reencode",
+        panel: "unused",
+    };
+    let mut app = TestAppContext::single();
+    let (root, cx) = select_window(&mut app, &case, ColorTheme::Dark, ScalePreset::Percent100);
+    click(cx, case.trigger);
+    let original = root.read_with(cx, |root, _| {
+        root.selected_config().unwrap().processing_mode
+    });
+    press(cx, "right");
+    assert_eq!(
+        root.read_with(cx, |root, _| root
+            .selected_config()
+            .unwrap()
+            .processing_mode),
+        original
+    );
+    press(cx, "enter");
+    assert_ne!(
+        root.read_with(cx, |root, _| root
+            .selected_config()
+            .unwrap()
+            .processing_mode),
+        original
+    );
+    press(cx, "right");
+    press(cx, "enter");
+    assert_eq!(
+        root.read_with(cx, |root, _| root
+            .selected_config()
+            .unwrap()
+            .processing_mode),
+        original
+    );
+}
+
+#[test]
+fn every_select_and_color_picker_finishes_enter_and_exit_before_unmounting() {
+    let colors = [
+        SelectCase {
+            fixture: VisualFixture::SettingsSubtitles,
+            trigger: "settings-subtitle-font-color",
+            panel: "settings-subtitle-font-color-picker",
+        },
+        SelectCase {
+            fixture: VisualFixture::SettingsSubtitles,
+            trigger: "settings-subtitle-outline-color",
+            panel: "settings-subtitle-outline-color-picker",
+        },
+    ];
+    for case in SELECTS.iter().chain(&colors) {
+        let mut app = TestAppContext::single();
+        let (_, cx) = select_window(&mut app, case, ColorTheme::Dark, ScalePreset::Percent100);
+        cx.update(|_, cx| cx.set_reduce_motion(false));
+        click(cx, case.trigger);
+        let entering = cx.debug_bounds(case.panel).expect(case.trigger);
+        std::thread::sleep(crate::app::motion::SURFACE_MOTION_DURATION);
+        draw(cx);
+        let settled = cx.debug_bounds(case.panel).expect(case.trigger);
+        assert!(
+            entering.top() < settled.top(),
+            "{} must slide into place",
+            case.trigger
+        );
+        press(cx, "escape");
+        assert!(
+            cx.debug_bounds(case.panel).is_some(),
+            "{} must retain its exit frame",
+            case.trigger
+        );
+        std::thread::sleep(crate::app::motion::SURFACE_MOTION_DURATION);
+        draw(cx);
+        assert!(
+            cx.debug_bounds(case.panel).is_none(),
+            "{} must unmount after its exit",
+            case.trigger
+        );
+        click(cx, case.trigger);
+        assert!(
+            cx.debug_bounds(case.panel).is_some(),
+            "{} must reopen",
+            case.trigger
+        );
+    }
+}

@@ -27,6 +27,9 @@ mod tooltip;
 pub(in crate::app) mod popover_state;
 pub(in crate::app) mod tooltip_state;
 
+mod select_control;
+pub(in crate::app) use select_control::*;
+
 mod choice_group;
 pub(in crate::app) use choice_group::FrameChoiceFocus;
 

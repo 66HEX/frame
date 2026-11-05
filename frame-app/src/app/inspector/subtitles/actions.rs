@@ -27,6 +27,7 @@ impl FrameRoot {
         true
     }
 
+    #[cfg(test)]
     pub(in crate::app) fn toggle_subtitle_popover(&mut self, popover: SettingsSubtitlePopover) {
         if self.subtitle_ui.popover == Some(popover) {
             self.subtitle_ui.popover = None;

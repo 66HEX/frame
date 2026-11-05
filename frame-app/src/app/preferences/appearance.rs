@@ -1,12 +1,9 @@
 use crate::app::components::popover_state::PopoverState;
 use crate::app::components::{
-    FRAME_SELECT_MAX_HEIGHT, apply_frame_select_popover_focus_trap, frame_select_content_height,
-    frame_select_option, frame_select_option_with_focus, frame_select_options_list,
-    frame_select_popover, frame_select_scrollbar, frame_select_target_index,
-    frame_select_trigger_with_focus,
+    FrameSelectItem, FrameSelectProps, frame_field, frame_select_control,
 };
 use crate::app::inspector::{settings_field_label, settings_hint_text, settings_section};
-use crate::app::motion::{motion_is_hidden, popover_slide_offset, surface_motion};
+use crate::app::motion::{motion_is_hidden, surface_motion};
 use crate::app::preferences::state::AppearancePopover;
 use crate::app::preferences::view::AppSettingsSelectFocuses;
 use crate::app::primitives::color;
@@ -15,8 +12,7 @@ use crate::appearance::{AppearanceSettings, ColorTheme, ScalePreset};
 use crate::theme;
 use gpui::prelude::{ParentElement, Styled};
 use gpui::{
-    ClickEvent, Context, FocusHandle, InteractiveElement, ScrollHandle, StatefulInteractiveElement,
-    Window, deferred, div, px,
+    Context, InteractiveElement, ScrollHandle, StatefulInteractiveElement, Window, div, px,
 };
 
 #[expect(
@@ -160,10 +156,6 @@ pub(in crate::app) struct AppSettingsAppearanceSelectProps<'a, T> {
     pub(in crate::app) palette: &'static theme::ThemePalette,
 }
 
-#[expect(
-    clippy::too_many_lines,
-    reason = "The shared appearance select keeps its trigger, animated popover, keyboard navigation, and options together."
-)]
 pub(in crate::app) fn app_settings_appearance_select<T: AppSettingsAppearanceValue>(
     props: AppSettingsAppearanceSelectProps<'_, T>,
     window: &mut Window,
@@ -176,244 +168,50 @@ pub(in crate::app) fn app_settings_appearance_select<T: AppSettingsAppearanceVal
         focuses,
         palette,
     } = props;
-    let options = T::options();
-    let selected_index = options
+    let items = T::options()
         .iter()
-        .position(|option| *option == selected)
-        .unwrap_or_default();
-    let option_focuses = focuses.options.to_vec();
-    let key_option_focuses = option_focuses.clone();
-    let key_scroll_handle = scroll_handle.clone();
-    let trigger = frame_select_trigger_with_focus(
-        T::TRIGGER_ID,
-        T::LABEL,
-        selected.display(),
-        true,
-        popover_state.is_open(),
-        focuses.trigger,
-        palette,
-        window,
-        cx,
-    )
-    .on_click(cx.listener(move |root, event: &ClickEvent, _window, cx| {
-        cx.stop_propagation();
-        if event.is_keyboard() {
-            return;
-        }
-        root.toggle_app_settings_appearance_popover(T::POPOVER);
-        cx.notify();
-    }))
-    .on_key_down(
-        cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
-            let key = event.keystroke.key.as_str();
-            match key {
-                "down" | "up" | "home" | "end" => {
-                    cx.stop_propagation();
-                    root.open_app_settings_appearance_popover(T::POPOVER);
-                    let target = frame_select_target_index(
-                        key_option_focuses.len(),
-                        Some(selected_index),
-                        key,
-                        |_| true,
-                    )
-                    .unwrap_or(selected_index);
-                    focus_app_settings_select_option(
-                        target,
-                        &key_option_focuses,
-                        &key_scroll_handle,
-                        window,
-                        cx,
-                    );
-                    cx.notify();
-                }
-                "enter" | "space" if root.appearance_popover_state(T::POPOVER).is_open() => {
-                    cx.stop_propagation();
-                    root.close_app_settings_appearance_popover(T::POPOVER);
-                    cx.notify();
-                }
-                "enter" | "space" => {
-                    cx.stop_propagation();
-                    root.open_app_settings_appearance_popover(T::POPOVER);
-                    let focus = key_option_focuses.get(selected_index).cloned();
-                    key_scroll_handle.scroll_to_item(selected_index);
-                    if let Some(focus) = focus {
-                        cx.defer_in(window, move |_root, window, cx| {
-                            focus.focus(window, cx);
-                        });
-                    }
-                    cx.notify();
-                }
-                "escape" => {
-                    cx.stop_propagation();
-                    root.close_app_settings_appearance_popover(T::POPOVER);
-                    cx.notify();
-                }
-                _ => {}
-            }
-        }),
-    );
-
-    let mut field = div()
-        .relative()
-        .flex()
-        .flex_col()
-        .gap_2()
+        .enumerate()
+        .map(|(index, option)| FrameSelectItem {
+            id: option.option_id(),
+            label: option.display().into(),
+            selected: *option == selected,
+            enabled: true,
+            focus: focuses.options.get(index).cloned(),
+        })
+        .collect();
+    let progress =
+        app_settings_appearance_popover_progress::<T>(popover_state.is_open(), window, cx);
+    frame_field()
         .child(settings_field_label(T::LABEL, palette))
-        .child(trigger);
-
-    if popover_state.is_rendered() {
-        let progress =
-            app_settings_appearance_popover_progress::<T>(popover_state.is_open(), window, cx);
-        let content_height = frame_select_content_height(options.len());
-        let mut list = frame_select_options_list(
-            T::LIST_ID,
-            scroll_handle,
-            content_height > FRAME_SELECT_MAX_HEIGHT,
-        );
-
-        for (index, option) in options.iter().copied().enumerate() {
-            let focus = option_focuses.get(index);
-            list = list.child(app_settings_appearance_option(
-                option,
-                index,
-                selected,
-                popover_state.is_open(),
-                focus,
-                &option_focuses,
-                scroll_handle,
-                focuses.trigger,
+        .child(frame_select_control(
+            FrameSelectProps {
+                id: T::TRIGGER_ID,
+                panel_id: T::PANEL_ID,
+                list_id: T::LIST_ID,
+                scrollbar_id: T::SCROLLBAR_ID,
+                label: T::LABEL,
+                display: selected.display(),
+                items,
+                enabled: true,
+                open: popover_state.is_open(),
+                rendered: popover_state.is_rendered(),
+                progress,
+                trigger_focus: Some(focuses.trigger),
+                panel_focus: Some(focuses.panel),
+                scroll: scroll_handle,
                 palette,
-                cx,
-            ));
-        }
-
-        let mut menu = frame_select_popover(
-            T::PANEL_ID,
-            54.0 + popover_slide_offset(progress),
-            progress,
-            list,
-            palette,
-        );
-        if let (Some(first), Some(last)) = (option_focuses.first(), option_focuses.last()) {
-            menu = apply_frame_select_popover_focus_trap(
-                menu,
-                Some(focuses.panel),
-                Some(first),
-                Some(last),
-                cx,
-            );
-        }
-        if content_height > FRAME_SELECT_MAX_HEIGHT {
-            menu = menu.child(frame_select_scrollbar(
-                T::SCROLLBAR_ID,
-                scroll_handle.clone(),
-                content_height,
-                palette,
-            ));
-        }
-        field = field.child(deferred(menu).priority(20));
-    }
-
-    field
-}
-
-#[expect(
-    clippy::too_many_arguments,
-    reason = "Each option needs its selection, focus, navigation, scrolling, and root action context."
-)]
-pub(in crate::app) fn app_settings_appearance_option<T: AppSettingsAppearanceValue>(
-    option: T,
-    index: usize,
-    selected: T,
-    is_open: bool,
-    focus: Option<&FocusHandle>,
-    option_focuses: &[FocusHandle],
-    scroll_handle: &ScrollHandle,
-    trigger_focus: &FocusHandle,
-    palette: &'static theme::ThemePalette,
-    cx: &Context<FrameRoot>,
-) -> gpui::Stateful<gpui::Div> {
-    let option_id = option.option_id();
-    let option_focuses_for_key = option_focuses.to_vec();
-    let scroll_handle_for_key = scroll_handle.clone();
-    let trigger_focus_for_click = trigger_focus.clone();
-    let trigger_focus_for_key = trigger_focus.clone();
-    let element = if let Some(focus) = focus {
-        frame_select_option_with_focus(
-            option_id,
-            option.display(),
-            option == selected,
-            true,
-            focus,
-            palette,
-        )
-    } else {
-        frame_select_option(
-            option_id,
-            option.display(),
-            option == selected,
-            true,
-            palette,
-        )
-    };
-
-    element
-        .tab_stop(is_open)
-        .aria_disabled(!is_open)
-        .on_click(cx.listener(move |root, event: &ClickEvent, window, cx| {
-            cx.stop_propagation();
-            if event.is_keyboard() || !root.appearance_popover_state(T::POPOVER).is_open() {
-                return;
-            }
-            option.apply(root, window);
-            root.close_app_settings_appearance_popover(T::POPOVER);
-            trigger_focus_for_click.focus(window, cx);
-            cx.notify();
-        }))
-        .on_key_down(
-            cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
-                if !root.appearance_popover_state(T::POPOVER).is_open() {
-                    return;
+            },
+            |root, open, _, _| {
+                if open {
+                    root.open_app_settings_appearance_popover(T::POPOVER);
+                } else {
+                    root.close_app_settings_appearance_popover(T::POPOVER);
                 }
-                let key = event.keystroke.key.as_str();
-                match key {
-                    "enter" | "space" => {
-                        cx.stop_propagation();
-                        option.apply(root, window);
-                        root.close_app_settings_appearance_popover(T::POPOVER);
-                        let focus = trigger_focus_for_key.clone();
-                        cx.defer_in(window, move |_root, window, cx| {
-                            focus.focus(window, cx);
-                        });
-                        cx.notify();
-                    }
-                    "up" | "down" | "home" | "end" => {
-                        cx.stop_propagation();
-                        if let Some(target) = frame_select_target_index(
-                            option_focuses_for_key.len(),
-                            Some(index),
-                            key,
-                            |_| true,
-                        ) {
-                            focus_app_settings_select_option(
-                                target,
-                                &option_focuses_for_key,
-                                &scroll_handle_for_key,
-                                window,
-                                cx,
-                            );
-                        }
-                    }
-                    "escape" => {
-                        cx.stop_propagation();
-                        root.close_app_settings_appearance_popover(T::POPOVER);
-                        trigger_focus_for_key.focus(window, cx);
-                        cx.notify();
-                    }
-                    _ => {}
-                }
-            }),
-        )
+            },
+            |root, index, window, _| T::options()[index].apply(root, window),
+            window,
+            cx,
+        ))
 }
 
 pub(in crate::app) fn app_settings_appearance_popover_progress<T: AppSettingsAppearanceValue>(
@@ -430,19 +228,6 @@ pub(in crate::app) fn app_settings_appearance_popover_progress<T: AppSettingsApp
         });
     }
     progress
-}
-
-pub(in crate::app) fn focus_app_settings_select_option(
-    index: usize,
-    option_focuses: &[FocusHandle],
-    scroll_handle: &ScrollHandle,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
-) {
-    scroll_handle.scroll_to_item(index);
-    if let Some(focus) = option_focuses.get(index) {
-        focus.focus(window, cx);
-    }
 }
 
 pub(in crate::app) fn apply_app_settings_ui_scale(

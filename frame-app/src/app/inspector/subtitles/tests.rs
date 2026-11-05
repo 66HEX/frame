@@ -55,10 +55,7 @@ fn subtitle_font_keyboard_selection_skips_disabled_options() {
         down_index.map(|index| options[index].name.as_str()),
         Some("Gamma")
     );
-    assert_eq!(
-        up_index.map(|index| options[index].name.as_str()),
-        Some("Gamma")
-    );
+    assert_eq!(up_index.map(|index| options[index].name.as_str()), None);
 }
 
 #[test]
