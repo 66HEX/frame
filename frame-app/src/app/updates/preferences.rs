@@ -1,5 +1,5 @@
 use crate::app::components::{
-    frame_checkbox_row_with_focus, frame_range_track, frame_text_button_with_focus,
+    frame_checkbox_row_with_focus, frame_progress_track, frame_text_button_with_focus,
 };
 use crate::app::inspector::settings_section;
 use crate::app::model::format_total_size;
@@ -154,7 +154,7 @@ pub(in crate::app) fn update_progress_bar(
         |percent| format!("{percent}%"),
     );
 
-    frame_range_track(0.0, fraction, palette)
+    frame_progress_track(fraction, palette)
         .id("app-settings-update-progress")
         .role(gpui::Role::ProgressIndicator)
         .aria_label("Update download progress")

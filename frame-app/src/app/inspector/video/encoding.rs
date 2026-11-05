@@ -25,12 +25,18 @@ pub(super) fn settings_video_encoder_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let mut list = div().grid().grid_cols(1);
+    let list_focus = crate::app::components::FrameChoiceFocus::vertical(
+        "settings_video_encoder_section",
+        window,
+        cx,
+    );
+    let mut list = crate::app::components::frame_list_group();
     for option in video_codec_options(config, available_encoders, settings_disabled) {
         let codec = option.codec;
         let enabled = !option.is_disabled;
         list = list.child(
             frame_list_item_with_caption(
+                &list_focus,
                 format!("video-codec-{codec}"),
                 codec,
                 option.disabled_reason.unwrap_or(option.label).to_string(),
@@ -62,12 +68,18 @@ pub(super) fn settings_video_pixel_format_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let mut list = div().grid().grid_cols(1);
+    let list_focus = crate::app::components::FrameChoiceFocus::vertical(
+        "settings_video_pixel_format_section",
+        window,
+        cx,
+    );
+    let mut list = crate::app::components::frame_list_group();
     for option in video_pixel_format_options(config) {
         let pixel_format = option.id;
         let enabled = !settings_disabled && !option.is_disabled;
         list = list.child(
             frame_list_item_with_caption(
+                &list_focus,
                 format!("video-pixel-format-{pixel_format}"),
                 option.label,
                 option.caption,
@@ -107,12 +119,18 @@ pub(super) fn settings_video_preset_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let mut list = div().grid().grid_cols(1);
+    let list_focus = crate::app::components::FrameChoiceFocus::vertical(
+        "settings_video_preset_section",
+        window,
+        cx,
+    );
+    let mut list = crate::app::components::frame_list_group();
     for option in video_preset_options(config, settings_disabled) {
         let preset = option.preset;
         let enabled = !option.is_disabled;
         list = list.child(
             frame_list_item_with_caption(
+                &list_focus,
                 format!("video-preset-{preset}"),
                 option.label,
                 option.caption,
@@ -201,6 +219,7 @@ pub(super) fn settings_video_quality_section(
             },
             settings_disabled,
             palette,
+            window,
             cx,
         ));
     } else {
@@ -237,10 +256,16 @@ pub(super) fn settings_video_bitrate_mode_grid(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let choice_focus = crate::app::components::FrameChoiceFocus::new(
+        "settings_video_bitrate_mode_grid",
+        window,
+        cx,
+    );
     let mut grid = div().grid().grid_cols(2).gap_2();
     for (mode, label) in [("crf", "Constant Quality"), ("bitrate", "Target Bitrate")] {
         grid = grid.child(
             frame_choice_button(
+                &choice_focus,
                 format!("video-bitrate-mode-{mode}"),
                 label,
                 config.video_bitrate_mode == mode,

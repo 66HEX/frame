@@ -83,10 +83,11 @@ pub(in crate::app) fn preview_timeline(
                 .child(preview_timeline_track(state, window, cx)),
         )
         .child(
-            div()
-                .flex()
-                .flex_col()
-                .gap(theme::ui_rem(6.0))
+            crate::app::components::frame_field()
+                .w(theme::ui_rem(
+                    crate::app::layout::PREVIEW_TOOLBAR_BUTTON_SIZE,
+                ))
+                .flex_shrink_0()
                 .child(preview_timeline_label(" ", palette))
                 .child(preview_play_button(state, window, cx)),
         )
@@ -142,7 +143,7 @@ pub(in crate::app) fn preview_play_button(
         } else {
             "Play preview"
         },
-        false,
+        None,
         enabled,
         state.tooltip_visible_id.as_deref(),
         crate::app::components::TooltipPlacement::Above,

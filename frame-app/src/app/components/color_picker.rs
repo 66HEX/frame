@@ -1,3 +1,4 @@
+use super::FrameStyle;
 use crate::app::primitives::{color, parse_hex};
 use crate::numeric::{rounded_f64_to_u8, unit_f64_to_f32};
 use crate::theme;
@@ -28,12 +29,10 @@ pub(in crate::app) fn frame_color_picker_panel(
         .right_0()
         .flex()
         .flex_col()
-        .gap_2()
-        .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .bg(color(palette.surface_elevated))
+        .gap(theme::ui_rem(theme::metrics::GROUP_GAP))
+        .popover_surface(palette)
         .opacity(progress)
-        .p_2()
-        .shadow(theme::shadows::FLOATING.shadows())
+        .p(theme::ui_rem(theme::metrics::POPOVER_PADDING))
         .occlude()
         .on_mouse_down(MouseButton::Left, move |_, _window, cx| {
             cx.stop_propagation();
@@ -117,8 +116,7 @@ pub(in crate::app) fn frame_color_picker_hue_track() -> gpui::Div {
         .h(theme::ui_rem(FRAME_COLOR_PICKER_HUE_HEIGHT))
         .flex()
         .overflow_hidden()
-        .rounded(theme::ui_rem(theme::RADIUS_XS))
-        .shadow(theme::shadows::INDICATOR.shadows());
+        .rounded(theme::ui_rem(theme::RADIUS_XS));
 
     for (from, to) in stops {
         row = row.child(div().flex_1().h_full().bg(linear_gradient(
@@ -146,7 +144,6 @@ pub(in crate::app) fn frame_color_picker_hue_handle(
         .w(theme::ui_rem(FRAME_COLOR_PICKER_HUE_HANDLE_WIDTH))
         .rounded(theme::ui_rem(1.5))
         .bg(color(palette.canvas))
-        .shadow(theme::shadows::INDICATOR.shadows())
 }
 
 pub(in crate::app) fn frame_color_picker_hue_color(hue: f64) -> Rgba {
@@ -195,7 +192,6 @@ fn frame_color_picker_sv_handle(hue: f64, saturation: f64, value: f64) -> gpui::
         .bg(parse_hex(&frame_hsv_to_hex(hue, saturation, value)))
         .border_1()
         .border_color(gpui::white())
-        .shadow(theme::shadows::INDICATOR.shadows())
 }
 
 fn frame_rgb_to_hex(r: f64, g: f64, b: f64) -> String {

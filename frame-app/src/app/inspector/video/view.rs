@@ -17,7 +17,7 @@ use crate::settings::{
 use crate::theme;
 use frame_core::capabilities::AvailableEncoders;
 use gpui::prelude::*;
-use gpui::{Context, Window, div};
+use gpui::{Context, Window};
 
 #[expect(
     clippy::too_many_lines,
@@ -33,10 +33,7 @@ pub(in crate::app) fn settings_video_tab(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let is_gif_mode = is_gif_container(&config.container);
-    let mut content = div()
-        .flex()
-        .flex_col()
-        .gap_4()
+    let mut content = crate::app::components::frame_field_group()
         .child(settings_video_resolution_section(
             config,
             settings_disabled || focuses.resolution_locked,

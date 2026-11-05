@@ -6,9 +6,7 @@ use crate::app::layout::{
     TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH, TITLEBAR_WINDOWS_WINDOW_ICON_SIZE,
     TITLEBAR_WINDOWS_WINDOW_MAX_ICON_SIZE,
 };
-use crate::app::primitives::{
-    ButtonColors, animated_button_colors, apply_button_motion, color, icon_svg,
-};
+use crate::app::primitives::{button_mouse_down, color};
 use crate::app::root::FrameRoot;
 use crate::{assets, theme};
 use gpui::prelude::Styled;
@@ -209,8 +207,8 @@ pub(in crate::app) fn titlebar_window_button(
     metrics: TitlebarWindowButtonMetrics,
     destructive: bool,
     palette: &'static theme::ThemePalette,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
+    _window: &mut Window,
+    _cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let hover_background = if destructive {
         palette.danger_surface
@@ -228,20 +226,6 @@ pub(in crate::app) fn titlebar_window_button(
         palette.text_primary
     };
     let foreground = palette.text_muted;
-    let colors = ButtonColors {
-        gradient_to: None,
-        background: palette.transparent,
-        hover_background,
-        active_background,
-        foreground,
-        hover_foreground,
-        opacity: 1.0,
-    };
-    let animated = animated_button_colors(id, colors, window, cx);
-    let background = animated.background;
-    let icon_color = animated.foreground;
-    let motion = animated.motion;
-
     let button = div()
         .id(id)
         .debug_selector(|| id.to_string())
@@ -251,13 +235,24 @@ pub(in crate::app) fn titlebar_window_button(
         .items_center()
         .justify_center()
         .rounded(theme::ui_rem(metrics.radius))
-        .bg(background)
-        .text_color(icon_color)
-        .hover_style(gpui::Styled::cursor_pointer)
+        .bg(color(hover_background.with_alpha(0.0)))
+        .text_color(color(foreground))
+        .hover_style(move |style| {
+            style
+                .cursor_default()
+                .bg(color(hover_background))
+                .text_color(color(hover_foreground))
+        })
         .active_style(move |style| style.bg(color(active_background)))
         .on_mouse_move(|_, _, cx| cx.stop_propagation())
-        .child(icon_svg(icon, metrics.icon_size, icon_color));
-    let button = apply_button_motion(button, motion, true);
+        .child(
+            gpui::svg()
+                .path(icon)
+                .size(theme::ui_rem(metrics.icon_size)),
+        )
+        .on_mouse_down(gpui::MouseButton::Left, |_, window, cx| {
+            button_mouse_down(true, window, cx);
+        });
 
     apply_accessible_button(button, label, true, palette).tab_stop(false)
 }

@@ -63,7 +63,7 @@ pub(super) fn settings_audio_filter_range_field(
         .child(
             div()
                 .flex()
-                .items_end()
+                .items_start()
                 .justify_between()
                 .gap_2()
                 .child(
@@ -123,10 +123,15 @@ pub(super) fn settings_audio_filter_range_field(
             slider_disabled,
             spec.target,
             palette,
+            window,
             cx,
         ))
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Range controls require domain limits, target, state and rendering context."
+)]
 pub(super) fn settings_audio_filter_range_slider(
     value: i32,
     min: i32,
@@ -134,7 +139,8 @@ pub(super) fn settings_audio_filter_range_slider(
     disabled: bool,
     target: AudioFilterRangeTarget,
     palette: &'static theme::ThemePalette,
-    cx: &Context<FrameRoot>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let fraction = signed_range_fraction(value, min, max);
     let drag = AudioFilterRangeDrag { target, min, max };
@@ -147,6 +153,8 @@ pub(super) fn settings_audio_filter_range_slider(
         fraction,
         disabled,
         palette,
+        window,
+        cx,
     )
     .on_a11y_action(gpui::AccessibleAction::Increment, move |_, _window, cx| {
         if disabled {

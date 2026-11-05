@@ -226,20 +226,25 @@ pub(super) fn settings_subtitle_color_field(
                 ),
         );
 
+    let open = active_popover == Some(popover);
+    let progress = subtitle_popover_progress(popover, open, window, cx);
     if rendered_popover == Some(popover) {
-        let progress =
-            subtitle_popover_progress(popover, active_popover == Some(popover), window, cx);
         field = field.child(
-            deferred(settings_subtitle_color_picker(
-                target,
-                hsv,
-                draft,
-                focus,
-                popover_focuses,
+            deferred(crate::app::components::frame_surface_motion(
+                settings_subtitle_color_picker(
+                    target,
+                    hsv,
+                    draft,
+                    focus,
+                    popover_focuses,
+                    progress,
+                    open,
+                    palette,
+                    window,
+                    cx,
+                ),
                 progress,
-                palette,
-                window,
-                cx,
+                crate::app::components::SurfaceOrigin::Top,
             ))
             .priority(10),
         );
@@ -259,6 +264,7 @@ pub(super) fn settings_subtitle_color_picker(
     focus: Option<&FocusHandle>,
     popover_focuses: SettingsSubtitleColorPopoverFocuses<'_>,
     progress: f32,
+    open: bool,
     palette: &'static theme::ThemePalette,
     window: &Window,
     cx: &Context<FrameRoot>,
@@ -273,7 +279,12 @@ pub(super) fn settings_subtitle_color_picker(
         SettingsSubtitleColorTarget::Outline => "settings-subtitle-outline-color-picker",
     };
     let panel = frame_color_picker_panel(
-        SUBTITLE_POPOVER_TOP_OFFSET + popover_slide_offset(progress),
+        SUBTITLE_POPOVER_TOP_OFFSET
+            + if open {
+                popover_slide_offset(progress)
+            } else {
+                0.0
+            },
         progress,
         settings_subtitle_sv_square(target, hsv, popover_focuses.sv, palette, cx),
         settings_subtitle_hue_slider(target, hsv, popover_focuses.hue, palette, cx),
@@ -355,8 +366,7 @@ pub(super) fn settings_subtitle_sv_square(
         .h(theme::ui_rem(FRAME_COLOR_PICKER_SV_HEIGHT))
         .w_full()
         .overflow_hidden()
-        .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .shadow(theme::shadows::INDICATOR.shadows())
+        .rounded(theme::ui_rem(theme::RADIUS_MD))
         .bg(color(palette.fill_subtle))
         .cursor_crosshair()
         .occlude()
@@ -448,7 +458,7 @@ pub(super) fn settings_subtitle_hue_slider(
         .relative()
         .h(theme::ui_rem(FRAME_COLOR_PICKER_HUE_VISUAL_HEIGHT))
         .w_full()
-        .cursor_ew_resize()
+        .cursor_default()
         .on_mouse_down(
             MouseButton::Left,
             cx.listener(move |root, event: &MouseDownEvent, _window, cx| {

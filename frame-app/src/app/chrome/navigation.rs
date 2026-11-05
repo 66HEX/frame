@@ -1,14 +1,11 @@
-use crate::app::accessibility::{TabFocusGroup, focus_visible_ring};
-use crate::app::layout::{TITLEBAR_ICON_SIZE, TITLEBAR_NAV_BUTTON_HEIGHT, TITLEBAR_SEGMENT_HEIGHT};
+use crate::app::accessibility::{TabFocusGroup, tab_focus_base, tab_focus_ring};
+use crate::app::components::{FrameStyle, frame_tabs_list};
+use crate::app::layout::{TITLEBAR_ICON_SIZE, TITLEBAR_NAV_BUTTON_HEIGHT};
 use crate::app::model::{ActiveView, FrameAppState, format_total_size};
-use crate::app::motion::mix_color;
-use crate::app::primitives::{
-    ButtonVariant, apply_button_motion, button_colors, button_motion, color, icon_svg,
-};
+use crate::app::primitives::{button_mouse_down, color, icon_svg};
 use crate::app::root::FrameRoot;
 use crate::{assets, theme};
-use gpui::prelude::Styled;
-use gpui::prelude::*;
+use gpui::prelude::{FluentBuilder, Styled};
 use gpui::{
     ClickEvent, Context, InteractiveElement, IntoElement, ParentElement,
     StatefulInteractiveElement, Window, div,
@@ -27,19 +24,10 @@ pub(in crate::app) fn titlebar_navigation(
         window,
         cx,
     );
-    div()
+    frame_tabs_list(palette)
         .id("titlebar-main-view-tabs")
         .role(gpui::Role::TabList)
         .aria_label("Main view")
-        .h(theme::ui_rem(TITLEBAR_SEGMENT_HEIGHT))
-        .flex()
-        .items_center()
-        .gap_1()
-        .rounded(theme::ui_rem(theme::RADIUS_MD))
-        .bg(color(palette.canvas))
-        .px(theme::ui_rem(3.0))
-        .py(theme::ui_rem(2.0))
-        .shadow(theme::shadows::recessed_control())
         .child(titlebar_segment(
             assets::ICON_LAYOUT_LIST,
             "Workspace",
@@ -104,8 +92,8 @@ pub(in crate::app) fn titlebar_segment(
     view: ActiveView,
     focuses: &TabFocusGroup,
     palette: &'static theme::ThemePalette,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
+    _window: &mut Window,
+    cx: &Context<FrameRoot>,
 ) -> impl IntoElement {
     let segment_id = titlebar_tab_id(view);
     let selected = focuses.selected(segment_id);
@@ -113,24 +101,6 @@ pub(in crate::app) fn titlebar_segment(
     let click_focus = focus.clone();
     let workspace_focus = focuses.handle("titlebar-workspace");
     let logs_focus = focuses.handle("titlebar-logs");
-    let colors = button_colors(ButtonVariant::Secondary, selected, true, palette);
-    let motion = button_motion(format!("{segment_id}-hover"), window, cx);
-    let hover_progress = *motion.hover_transition.evaluate(window, cx);
-    let background = if selected {
-        mix_color(colors.background, colors.hover_background, hover_progress)
-    } else {
-        mix_color(palette.transparent, palette.fill_subtle, hover_progress)
-    };
-    let foreground = mix_color(
-        if selected {
-            palette.text_primary
-        } else {
-            palette.text_muted
-        },
-        palette.text_primary,
-        hover_progress,
-    );
-
     let button = div()
         .id(segment_id)
         .debug_selector(|| segment_id.to_string())
@@ -140,21 +110,28 @@ pub(in crate::app) fn titlebar_segment(
         .aria_selected(selected)
         .track_focus(&focus)
         .tab_stop(selected)
-        .focus_visible_style(move |style| focus_visible_ring(style, palette))
+        .map(|element| tab_focus_base(element, palette))
+        .focus_visible_style(move |style| tab_focus_ring(style, palette))
+        .transitions(|t| {
+            t.ring(crate::app::motion::interaction_motion())
+                .outline_color(crate::app::motion::interaction_motion())
+                .bg(crate::app::motion::interaction_motion())
+                .text_color(crate::app::motion::interaction_motion())
+                .border_color(crate::app::motion::interaction_motion())
+        })
         .flex()
         .items_center()
-        .gap_2()
-        .rounded(theme::ui_rem(theme::RADIUS_SM))
+        .gap(theme::ui_rem(6.0))
+        .rounded(theme::ui_rem(theme::RADIUS_MD))
         .group(segment_id)
-        .px_2()
-        .bg(background)
+        .px(theme::ui_rem(6.0))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-        .text_color(foreground)
-        .when(selected, |this| {
-            this.shadow(theme::shadows::CONTROL.shadows())
+        .tab_surface(selected, palette)
+        .hover_style(move |style| {
+            style
+                .cursor_default()
+                .text_color(color(palette.text_primary))
         })
-        .hover_style(gpui::Styled::cursor_pointer)
-        .active_style(move |style| style.bg(colors.active_fill()))
         .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
             click_focus.focus(window, cx);
             if root.active_view != view {
@@ -181,10 +158,16 @@ pub(in crate::app) fn titlebar_segment(
                 cx.stop_propagation();
             }),
         )
-        .child(icon_svg(icon, TITLEBAR_ICON_SIZE, foreground))
+        .child(
+            gpui::svg()
+                .path(icon)
+                .size(theme::ui_rem(TITLEBAR_ICON_SIZE)),
+        )
         .child(theme::ui_text(label));
 
-    apply_button_motion(button, motion, true)
+    button.on_mouse_down(gpui::MouseButton::Left, |_, window, cx| {
+        button_mouse_down(true, window, cx);
+    })
 }
 
 pub(super) const fn titlebar_tab_id(view: ActiveView) -> &'static str {
@@ -196,7 +179,7 @@ pub(super) const fn titlebar_tab_id(view: ActiveView) -> &'static str {
 
 pub(super) fn titlebar_view_for_key(current: ActiveView, key: &str) -> Option<ActiveView> {
     match key {
-        "left" | "right" | "up" | "down" => Some(match current {
+        "left" | "right" => Some(match current {
             ActiveView::Workspace => ActiveView::Logs,
             ActiveView::Logs => ActiveView::Workspace,
         }),

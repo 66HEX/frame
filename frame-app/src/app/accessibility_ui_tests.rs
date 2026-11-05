@@ -4,7 +4,10 @@ use gpui::{Entity, Modifiers, TestAppContext, VisualTestContext};
 fn draw(cx: &mut VisualTestContext) {
     cx.update(|window, cx| window.draw(cx).clear(cx));
     cx.run_until_parked();
-    cx.update(|window, cx| window.draw(cx).clear(cx));
+    cx.update(|window, cx| {
+        window.simulate_next_frame(cx);
+        window.draw(cx).clear(cx);
+    });
 }
 
 fn test_window(
@@ -52,6 +55,70 @@ fn press(cx: &mut VisualTestContext, key: &str) {
 
 fn focus(cx: &mut VisualTestContext) -> FocusHandle {
     cx.update(|window, cx| window.focused(cx).expect("focus must stay in the window"))
+}
+
+#[path = "accessibility/preview_motion_tests.rs"]
+mod preview_motion_tests;
+
+#[test]
+fn inspector_tab_backgrounds_fade_without_darkening_even_when_reversed() {
+    for theme in crate::appearance::ColorTheme::ALL {
+        for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+            let mut app = TestAppContext::single();
+            let (root, cx) = test_window(&mut app, VisualFixture::SettingsVideo, scale);
+            root.update(cx, |root, cx| {
+                root.appearance.color_theme = theme;
+                cx.notify();
+            });
+            click(cx, "settings-tab-source");
+            cx.update(|_, cx| cx.set_reduce_motion(false));
+            click(cx, "settings-tab-video-filters");
+            let mut saw_intermediate_fill = false;
+            for frame in 0..=30 {
+                // Reverse an unfinished pointer transition, then switch by keyboard.
+                if frame == 4 {
+                    click(cx, "settings-tab-source");
+                } else if frame == 8 {
+                    press(cx, "right");
+                }
+                for id in [
+                    "settings-tab-source",
+                    "settings-tab-video-filters",
+                    "settings-tab-output",
+                ] {
+                    let bounds = cx.debug_bounds(id).unwrap();
+                    cx.update(|window, _| {
+                        let bounds = bounds.scale(window.scale_factor());
+                        for quad in window.painted_quads() {
+                            if quad.bounds != bounds {
+                                continue;
+                            }
+                            let fill = gpui::hsla_to_rgba(quad.background.as_solid().unwrap());
+                            if fill.alpha <= 0.0 {
+                                continue;
+                            }
+                            let expected = theme::palette(theme).tab_active;
+                            saw_intermediate_fill |= fill.alpha < expected.alpha * 0.99;
+                            for (actual, expected) in [
+                                (fill.red, expected.red),
+                                (fill.green, expected.green),
+                                (fill.blue, expected.blue),
+                            ] {
+                                assert!(
+                                    (actual - expected).abs() < 0.001,
+                                    "{id} at frame {frame}: fading must only change alpha, got {fill:?}"
+                                );
+                            }
+                        }
+                    });
+                }
+                cx.executor()
+                    .advance_clock(std::time::Duration::from_millis(8));
+                draw(cx);
+            }
+            assert!(saw_intermediate_fill, "must inspect actual animated fills");
+        }
+    }
 }
 
 #[test]
@@ -301,7 +368,7 @@ fn slider_values_reach_both_inset_endpoints_at_each_scale() {
         let bounds = cx
             .debug_bounds("settings-video-filter-brightness-slider")
             .unwrap();
-        let inset = px(2.0 * scale.factor());
+        let inset = px(theme::metrics::SLIDER_THUMB / 2.0 * scale.factor());
         let left = bounds.left() + inset;
         let width = bounds.size.width - inset * 2.0;
         for (fraction, expected) in [(0.0, -100), (0.25, -50), (0.75, 50), (1.0, 100)] {
@@ -336,7 +403,7 @@ fn timeline_seek_and_trim_targets_follow_the_inset_value_range() {
         let mut app = TestAppContext::single();
         let (root, cx) = test_window(&mut app, VisualFixture::PreviewReady, scale);
         let bounds = cx.debug_bounds("preview-timeline-track").unwrap();
-        let inset = px(2.0 * scale.factor());
+        let inset = px(theme::metrics::SLIDER_THUMB / 2.0 * scale.factor());
         let inner = root.read_with(cx, |root, _| root.preview_ui.timeline_track_bounds.unwrap());
         assert!((inner.left() - bounds.left() - inset).abs() < px(0.01));
         assert!((bounds.right() - inner.right() - inset).abs() < px(0.01));

@@ -1,12 +1,6 @@
-use crate::app::accessibility::{
-    apply_accessible_button, apply_accessible_button_with_focus, apply_accessible_toggle_button,
-};
-use crate::app::layout::SETTINGS_CONTROL_HEIGHT;
+use crate::app::accessibility::{apply_accessible_button, apply_accessible_toggle_button};
 use crate::app::motion::contextual_icon_motion;
-use crate::app::primitives::{
-    ButtonColors, ButtonVariant, animated_button_colors, apply_button_motion, button_colors, color,
-    icon_svg,
-};
+use crate::app::primitives::{ButtonVariant, button_colors, button_mouse_down, color, icon_svg};
 use crate::app::root::FrameRoot;
 use crate::theme;
 use gpui::prelude::{FluentBuilder, ParentElement, Styled};
@@ -16,7 +10,7 @@ use gpui::{
 };
 
 pub(in crate::app) const FRAME_ICON_BUTTON_SM_SIZE: f32 = 24.0;
-pub(in crate::app) const FRAME_ICON_SM_SIZE: f32 = 16.0;
+pub(in crate::app) const FRAME_ICON_SM_SIZE: f32 = 12.0;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::app) enum FrameIconButtonVariant {
@@ -47,7 +41,34 @@ struct ContextualIconVisuals {
     blur_radius: f32,
 }
 
+pub(in crate::app) fn frame_toggle_button_base(
+    id: impl Into<String>,
+    label: &str,
+    selected: bool,
+    enabled: bool,
+    palette: &'static theme::ThemePalette,
+    _window: &mut Window,
+    _cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    let button = frame_control_base(
+        id,
+        label,
+        ButtonVariant::Ghost,
+        selected,
+        enabled,
+        theme::metrics::ControlSize::Default,
+        palette,
+        ControlBehavior::Toggle,
+    );
+    apply_accessible_toggle_button(button, label.to_owned(), enabled, selected, palette)
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Toggle items share their group focus, state, palette and rendering context."
+)]
 pub(in crate::app) fn frame_choice_button(
+    group: &super::FrameChoiceFocus,
     id: impl Into<String>,
     label: impl Into<String>,
     selected: bool,
@@ -56,24 +77,14 @@ pub(in crate::app) fn frame_choice_button(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
+    let id = id.into();
+    let focus = group.register(&id, selected, enabled, cx);
     let label = label.into();
-    apply_accessible_toggle_button(
-        frame_text_button(
-            id,
-            label.clone(),
-            ButtonVariant::Secondary,
-            selected,
-            enabled,
-            palette,
-            window,
-            cx,
-        )
-        .w_full(),
-        label,
-        enabled,
-        selected,
-        palette,
-    )
+    let button =
+        frame_toggle_button_base(id.clone(), &label, selected, enabled, palette, window, cx)
+            .w_full()
+            .child(theme::ui_text_owned(label));
+    group.apply(button, id, enabled, &focus, cx)
 }
 
 #[expect(
@@ -127,7 +138,7 @@ pub(in crate::app) fn frame_text_button_with_focus(
     clippy::too_many_arguments,
     reason = "The shared implementation preserves the existing explicit button builder contract."
 )]
-fn frame_text_button_inner(
+pub(in crate::app) fn frame_text_button_inner(
     id: impl Into<String>,
     label: impl Into<String>,
     variant: ButtonVariant,
@@ -138,48 +149,184 @@ fn frame_text_button_inner(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    let id = id.into();
     let label = label.into();
-    let display_label = theme::ui_text_owned(label.clone());
-    let colors = button_colors(variant, selected, enabled, palette);
-    let animated = animated_button_colors(id.clone(), colors, window, cx);
-    let background = animated.background;
-    let foreground = animated.foreground;
-    let motion = animated.motion;
-    let button = div()
-        .id(id)
-        .min_h(theme::ui_rem(SETTINGS_CONTROL_HEIGHT))
-        .flex()
-        .items_center()
-        .justify_center()
-        .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .px(theme::ui_rem(10.0))
-        .bg(background)
-        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-        .text_color(foreground)
-        .opacity(colors.opacity)
-        .when(text_button_uses_highlight(variant, selected), |this| {
-            this.shadow(theme::shadows::CONTROL.shadows())
-        })
-        .when(enabled, |this| {
-            this.hover_style(gpui::Styled::cursor_pointer)
-                .active_style(move |style| style.bg(colors.active_fill()))
-        })
-        .when(!enabled, gpui::Styled::cursor_not_allowed)
-        .child(display_label);
-
-    let button = apply_button_motion(button, motion, enabled);
-
+    let button = frame_button_base(
+        id,
+        &label,
+        variant,
+        selected,
+        enabled,
+        theme::metrics::ControlSize::Default,
+        palette,
+        window,
+        cx,
+    )
+    .child(theme::ui_text_owned(label.clone()));
     if let Some(focus) = focus {
-        apply_accessible_button_with_focus(button, label, enabled, focus, palette)
+        button.track_focus(focus)
     } else {
-        apply_accessible_button(button, label, enabled, palette)
+        button
     }
 }
 
-const fn text_button_uses_highlight(variant: ButtonVariant, selected: bool) -> bool {
-    !matches!(variant, ButtonVariant::Ghost) || selected
+#[expect(
+    clippy::too_many_arguments,
+    reason = "One shared button constructor owns all Mira variants and sizes."
+)]
+pub(in crate::app) fn frame_button_base(
+    id: impl Into<String>,
+    label: &str,
+    variant: ButtonVariant,
+    selected: bool,
+    enabled: bool,
+    size: theme::metrics::ControlSize,
+    palette: &'static theme::ThemePalette,
+    _window: &mut Window,
+    _cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    frame_control_base(
+        id,
+        label,
+        variant,
+        selected,
+        enabled,
+        size,
+        palette,
+        ControlBehavior::Button,
+    )
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ControlBehavior {
+    Button,
+    Toggle,
+}
+
+impl ControlBehavior {
+    fn transitions(self, t: gpui::StyleTransitions) -> gpui::StyleTransitions {
+        let t = crate::app::motion::control_style_transitions(t);
+        match self {
+            // Only Button has Mira's 1px pressed offset. Drag handles use the
+            // accessibility helper and must not inherit position transitions.
+            Self::Button => t.top(crate::app::motion::interaction_motion()),
+            Self::Toggle => t,
+        }
+    }
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Shared visual implementation for the Mira Button and Toggle contracts."
+)]
+fn frame_control_base(
+    id: impl Into<String>,
+    label: &str,
+    variant: ButtonVariant,
+    selected: bool,
+    enabled: bool,
+    size: theme::metrics::ControlSize,
+    palette: &'static theme::ThemePalette,
+    behavior: ControlBehavior,
+) -> gpui::Stateful<gpui::Div> {
+    let id = id.into();
+    let mut colors = button_colors(variant, selected, enabled, palette);
+    if behavior == ControlBehavior::Toggle {
+        colors.background = palette.fill_selected.with_alpha(if selected {
+            palette.fill_selected.alpha
+        } else {
+            0.0
+        });
+        colors.hover_background = if enabled {
+            palette.fill_selected
+        } else {
+            colors.background
+        };
+    }
+
+    let button = div()
+        .id(id.clone())
+        .debug_selector(|| id.clone())
+        .group(id)
+        .h(theme::ui_rem(size.height()))
+        .flex_shrink_0()
+        .flex()
+        .items_center()
+        .justify_center()
+        .gap(theme::ui_rem(theme::metrics::CONTROL_GAP))
+        .rounded(theme::ui_rem(size.radius()))
+        .border_1()
+        .when(behavior == ControlBehavior::Toggle, gpui::Styled::border_0)
+        .border_color(color(if matches!(variant, ButtonVariant::Outline) {
+            palette.border_subtle
+        } else {
+            palette.transparent
+        }))
+        .px(theme::ui_rem(size.padding()))
+        .bg(color(if colors.background.alpha == 0.0 {
+            colors.hover_background.with_alpha(0.0)
+        } else {
+            colors.background
+        }))
+        .text_size(theme::ui_rem(size.text()))
+        .line_height(gpui::relative(theme::metrics::TEXT_LINE_HEIGHT))
+        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
+        .whitespace_nowrap()
+        .text_color(color(colors.foreground))
+        .opacity(colors.opacity)
+        .disabled(!enabled)
+        .relative()
+        .top_0()
+        .when(enabled, |this| {
+            this.cursor_default()
+                .hover_style(move |style| {
+                    let style = style
+                        .bg(color(colors.hover_background))
+                        .text_color(color(colors.hover_foreground));
+                    if matches!(variant, ButtonVariant::Link) {
+                        style.underline()
+                    } else {
+                        style
+                    }
+                })
+                .when(behavior == ControlBehavior::Button, |button| {
+                    button.active_style(move |style| style.relative().top(px(1.0)))
+                })
+        })
+        .when(!enabled, |button| {
+            button.cursor_not_allowed().relative().child(
+                // Disabled GPUI callbacks do not consume native titlebar gestures.
+                div().absolute().inset_0().on_mouse_down(
+                    gpui::MouseButton::Left,
+                    |_, window, cx| {
+                        window.prevent_default();
+                        cx.stop_propagation();
+                    },
+                ),
+            )
+        });
+    apply_accessible_button(
+        button.on_mouse_down(gpui::MouseButton::Left, move |_, window, cx| {
+            button_mouse_down(enabled, window, cx);
+        }),
+        label.to_string(),
+        enabled,
+        palette,
+    )
+    .transitions(|t| behavior.transitions(t))
+    .when(matches!(variant, ButtonVariant::Destructive), |button| {
+        button
+            .ring_color(color(palette.danger.with_alpha(0.0)))
+            .focus_visible_style(move |style| {
+                style
+                    .border_color(color(palette.danger.with_opacity(0.4)))
+                    .ring(gpui::px(2.0))
+                    .ring_color(color(palette.danger.with_opacity(if palette.is_light() {
+                        0.2
+                    } else {
+                        0.4
+                    })))
+            })
+    })
 }
 
 #[expect(
@@ -202,7 +349,7 @@ pub(in crate::app) fn frame_icon_button(
     frame_icon_button_inner(
         id,
         FrameIconButtonContent::Static(icon),
-        label,
+        &label,
         variant,
         enabled,
         size,
@@ -238,7 +385,7 @@ pub(in crate::app) fn frame_icon_swap_button(
             active: active_icon,
             progress,
         },
-        label.into(),
+        &label.into(),
         variant,
         enabled,
         size,
@@ -255,7 +402,7 @@ pub(in crate::app) fn frame_icon_swap_button(
 fn frame_icon_button_inner(
     id: String,
     content: FrameIconButtonContent,
-    label: String,
+    label: &str,
     variant: FrameIconButtonVariant,
     enabled: bool,
     size: FrameIconButtonSize,
@@ -263,82 +410,26 @@ fn frame_icon_button_inner(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    let (background, hover_background, active_background, foreground, hover_foreground, opacity) =
-        match (variant, enabled) {
-            (FrameIconButtonVariant::Ghost, true) => (
-                palette.transparent,
-                palette.fill_subtle,
-                palette.fill_selected,
-                palette.text_muted,
-                palette.text_primary,
-                1.0,
-            ),
-            (FrameIconButtonVariant::Ghost, false) => (
-                palette.transparent,
-                palette.transparent,
-                palette.transparent,
-                palette.text_muted,
-                palette.text_muted,
-                0.5,
-            ),
-            (FrameIconButtonVariant::DestructiveGhost, false) => (
-                palette.fill_subtle,
-                palette.fill_subtle,
-                palette.fill_subtle,
-                palette.text_disabled,
-                palette.text_disabled,
-                1.0,
-            ),
-            (FrameIconButtonVariant::DestructiveGhost, true) => (
-                palette.transparent,
-                palette.fill_subtle,
-                palette.fill_selected,
-                palette.danger,
-                palette.danger,
-                1.0,
-            ),
-        };
-    let animated = animated_button_colors(
-        id.clone(),
-        ButtonColors {
-            gradient_to: None,
-            background,
-            hover_background,
-            active_background,
-            foreground,
-            hover_foreground,
-            opacity,
-        },
+    let variant = match variant {
+        FrameIconButtonVariant::Ghost => ButtonVariant::Ghost,
+        FrameIconButtonVariant::DestructiveGhost => ButtonVariant::Destructive,
+    };
+    let foreground = color(button_colors(variant, false, enabled, palette).foreground);
+    frame_button_base(
+        id,
+        label,
+        variant,
+        false,
+        enabled,
+        theme::metrics::ControlSize::Default,
+        palette,
         window,
         cx,
-    );
-    let animated_background = animated.background;
-    let animated_foreground = animated.foreground;
-    let motion = animated.motion;
-    let icon = frame_icon_button_content(content, size.icon, animated_foreground);
-
-    let button = div()
-        .id(id.clone())
-        .group(id)
-        .w(theme::ui_rem(size.button))
-        .h(theme::ui_rem(size.button))
-        .flex()
-        .items_center()
-        .justify_center()
-        .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .bg(animated_background)
-        .text_color(animated_foreground)
-        .opacity(opacity)
-        .when(enabled, |this| {
-            this.hover_style(gpui::Styled::cursor_pointer)
-                .active_style(move |style| style.bg(color(active_background)))
-        })
-        .when(!enabled, gpui::Styled::cursor_not_allowed)
-        .child(icon);
-
-    let button = apply_button_motion(button, motion, enabled);
-
-    apply_accessible_button(button, label, enabled, palette)
+    )
+    .w(theme::ui_rem(size.button))
+    .h(theme::ui_rem(size.button))
+    .p_0()
+    .child(frame_icon_button_content(content, size.icon, foreground))
 }
 
 fn frame_icon_button_content(
@@ -395,23 +486,6 @@ fn contextual_icon_visuals(progress: f32) -> ContextualIconVisuals {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn text_button_highlight_follows_variant_and_selection() {
-        let cases = [
-            ("ghost-unselected", ButtonVariant::Ghost, false, false),
-            ("ghost-selected", ButtonVariant::Ghost, true, true),
-            ("secondary", ButtonVariant::Secondary, false, true),
-        ];
-
-        for (name, variant, selected, expected) in cases {
-            assert_eq!(
-                text_button_uses_highlight(variant, selected),
-                expected,
-                "highlight mismatch for case={name}, selected={selected}"
-            );
-        }
-    }
 
     #[test]
     fn contextual_icon_visuals_use_hidden_endpoint_for_zero_progress() {

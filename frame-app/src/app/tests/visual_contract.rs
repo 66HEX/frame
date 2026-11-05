@@ -27,7 +27,7 @@ fn audio_slider_helpers_map_values_to_original_range() {
     );
     assert_eq!(
         inspector::range_value_for_key(100, 0, 200, "pageup"),
-        Some(80)
+        Some(120)
     );
     assert_eq!(inspector::range_value_for_key(100, 0, 200, "home"), Some(0));
 }
@@ -40,7 +40,7 @@ fn timeline_keyboard_helper_maps_standard_slider_keys() {
     );
     assert_eq!(
         timeline_keyboard_time_for_key(30.0, 60.0, "pageup"),
-        Some(24.0)
+        Some(36.0)
     );
     assert_eq!(
         timeline_keyboard_time_for_key(30.0, 60.0, "end"),

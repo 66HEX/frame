@@ -82,6 +82,11 @@ pub(super) fn settings_audio_compressor_control(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let choice_focus = crate::app::components::FrameChoiceFocus::new(
+        "settings_audio_compressor_control",
+        window,
+        cx,
+    );
     let mut grid = div().grid().grid_cols(3).mt_1().gap_2();
     for (candidate, label) in [
         (FilterStrength::Low, "Gentle"),
@@ -90,6 +95,7 @@ pub(super) fn settings_audio_compressor_control(
     ] {
         grid = grid.child(
             frame_choice_button(
+                &choice_focus,
                 format!(
                     "settings-audio-compressor-{}",
                     filter_strength_id(candidate)

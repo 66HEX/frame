@@ -1,15 +1,11 @@
-use crate::app::accessibility::{
-    apply_accessible_button, apply_accessible_button_with_focus, handle_modal_tab_navigation,
-};
+use crate::app::components::FrameStyle;
 use crate::app::components::{FrameIconButtonSize, FrameIconButtonVariant, frame_icon_button};
 use crate::app::layout::{PREVIEW_TOOLBAR_BUTTON_SIZE, PREVIEW_TOOLBAR_ICON_SIZE};
 use crate::app::preview::overlay::opacity::preview_overlay_opacity_slider;
 use crate::app::preview::panel::{PreviewEditToolbarFocus, PreviewShellState};
 use crate::app::preview::preview_visual_controls_enabled;
 use crate::app::preview::toolbar::preview_toolbar_vertical_separator;
-use crate::app::primitives::{
-    ButtonVariant, animated_button_colors, apply_button_motion, button_colors, color, icon_svg,
-};
+use crate::app::primitives::{ButtonVariant, button_colors, color, icon_svg};
 use crate::app::root::FrameRoot;
 use crate::preview::OverlaySizeDirection;
 use crate::{assets, theme};
@@ -33,8 +29,6 @@ pub(in crate::app) fn preview_overlay_controls(
     }
     let enabled = preview_visual_controls_enabled(state);
     let media = state.media;
-    let first_focus = focuses.first.clone();
-    let last_focus = focuses.last.clone();
 
     let bar = div()
         .id("preview-overlay-toolbar")
@@ -43,15 +37,9 @@ pub(in crate::app) fn preview_overlay_controls(
         .flex()
         .items_center()
         .gap_2()
-        .rounded(theme::ui_rem(theme::RADIUS_MD))
-        .bg(color(palette.surface_elevated))
+        .popover_surface(palette)
         .p(theme::ui_rem(4.0))
         .shadow(theme::shadows::FLOATING.shadows())
-        .on_key_down(
-            cx.listener(move |_root, event: &gpui::KeyDownEvent, window, cx| {
-                handle_modal_tab_navigation(event, &first_focus, &last_focus, window, cx);
-            }),
-        )
         .child(
             preview_overlay_icon_button_with_focus(
                 "replace",
@@ -107,6 +95,7 @@ pub(in crate::app) fn preview_overlay_controls(
             overlay.opacity,
             enabled,
             palette,
+            window,
             cx,
         ))
         .child(preview_toolbar_vertical_separator(palette))
@@ -224,44 +213,28 @@ pub(super) fn preview_overlay_icon_button_inner(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    let colors = button_colors(variant, false, enabled, palette);
-    let button_id = format!("preview-overlay-{id}");
-    let animated = animated_button_colors(button_id.clone(), colors, window, cx);
-    let background = animated.background;
-    let foreground = animated.foreground;
-    let motion = animated.motion;
-    let highlighted = matches!(variant, ButtonVariant::Primary);
-
-    let button = div()
-        .id(button_id)
-        .w(theme::ui_rem(PREVIEW_TOOLBAR_BUTTON_SIZE))
-        .h(theme::ui_rem(PREVIEW_TOOLBAR_BUTTON_SIZE))
-        .flex()
-        .items_center()
-        .justify_center()
-        .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .bg(background)
-        .text_color(foreground)
-        .opacity(colors.opacity)
-        .when(highlighted, |this| {
-            this.shadow(theme::shadows::CONTROL.shadows())
-        })
-        .when(!enabled, gpui::Styled::cursor_not_allowed)
-        .when(enabled, |this| {
-            this.hover_style(gpui::Styled::cursor_pointer)
-                .active_style(move |style| {
-                    style
-                        .bg(colors.active_fill())
-                        .text_color(color(colors.hover_foreground))
-                })
-        })
-        .child(icon_svg(icon, PREVIEW_TOOLBAR_ICON_SIZE, foreground));
-
-    let button = apply_button_motion(button, motion, enabled);
+    let button = crate::app::components::frame_button_base(
+        format!("preview-overlay-{id}"),
+        label,
+        variant,
+        false,
+        enabled,
+        theme::metrics::ControlSize::Default,
+        palette,
+        window,
+        cx,
+    )
+    .w(theme::ui_rem(PREVIEW_TOOLBAR_BUTTON_SIZE))
+    .px_0()
+    .child(icon_svg(
+        icon,
+        PREVIEW_TOOLBAR_ICON_SIZE,
+        color(button_colors(variant, false, enabled, palette).foreground),
+    ));
 
     if let Some(focus) = focus {
-        apply_accessible_button_with_focus(button, label, enabled, focus, palette)
+        button.track_focus(focus)
     } else {
-        apply_accessible_button(button, label, enabled, palette)
+        button
     }
 }

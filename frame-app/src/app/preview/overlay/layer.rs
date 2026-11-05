@@ -52,6 +52,7 @@ pub(in crate::app) fn preview_overlay_layer(
 
     let mut layer = div()
         .id("preview-overlay-layer")
+        .debug_selector(|| "preview-overlay-layer".into())
         .absolute()
         .left(relative(unit_f64_to_f32(left)))
         .top(relative(unit_f64_to_f32(top)))
@@ -239,8 +240,7 @@ pub(super) fn preview_overlay_handle(
                     .w(theme::ui_rem(OVERLAY_HANDLE_SIZE))
                     .h(theme::ui_rem(OVERLAY_HANDLE_SIZE))
                     .rounded_full()
-                    .bg(color(preview_handle_color(palette)))
-                    .shadow(theme::shadows::INDICATOR.shadows()),
+                    .bg(color(preview_handle_color(palette))),
             ),
         handle,
     )

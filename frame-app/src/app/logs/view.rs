@@ -1,15 +1,16 @@
-use crate::app::accessibility::focus_visible_ring;
+use crate::app::accessibility::{TabFocusGroup, tab_focus_base, tab_focus_ring};
+use crate::app::accessibility::{focus_ring_base, focus_visible_ring};
 use crate::app::components::{
     FRAME_ICON_BUTTON_SM_SIZE, FRAME_ICON_SM_SIZE, FrameIconButtonSize, FrameIconButtonVariant,
     frame_icon_button, frame_icon_swap_button, frame_vertical_uniform_scrollbar,
 };
-use crate::app::layout::PANEL_HEADER_HEIGHT;
+use crate::app::components::{FrameStyle, frame_panel_header, frame_tabs_list};
 use crate::app::logs::state::{
     LOG_LINE_HEIGHT, LOG_LINE_NUMBER_WIDTH, LOG_SCROLL_BUTTON_OFFSET, LOG_SCROLL_BUTTON_PADDING,
     LOG_SCROLL_BUTTON_SIZE, LOG_SCROLL_ICON_SIZE,
 };
 use crate::app::primitives::{
-    FrameSurface, apply_button_motion, button_motion, color, element_id, panel_bottom_separator,
+    FrameSurface, button_mouse_down, color, element_id, panel_bottom_separator,
 };
 use crate::app::root::FrameRoot;
 use crate::conversion_events::{ActiveLogFile, ConversionEventState, LogLine};
@@ -18,7 +19,7 @@ use crate::numeric::usize_to_f32;
 use crate::{assets, theme};
 use gpui::prelude::{FluentBuilder, ParentElement, Styled};
 use gpui::{
-    ClickEvent, Context, InteractiveElement, IntoElement, Lerp, ScrollStrategy, ScrollWheelEvent,
+    ClickEvent, Context, InteractiveElement, IntoElement, ScrollStrategy, ScrollWheelEvent,
     StatefulInteractiveElement, UniformListScrollHandle, Window, div, uniform_list,
 };
 
@@ -78,17 +79,22 @@ pub(in crate::app) fn logs_tab_strip(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let mut tabs = div()
+    let focuses = TabFocusGroup::render(
+        "logs-tabs-focus",
+        selected_id.unwrap_or_default().into(),
+        active_files.iter().map(|file| file.id.clone()),
+        window,
+        cx,
+    );
+    let mut tabs = frame_tabs_list(palette)
         .id("logs-tab-list")
         .role(gpui::Role::TabList)
         .aria_label("Log files")
-        .h_full()
         .flex_1()
         .min_w_0()
         .flex()
         .items_center()
-        .gap_6()
-        .overflow_hidden();
+        .overflow_x_scroll();
 
     let tab_ids = active_files
         .iter()
@@ -99,6 +105,7 @@ pub(in crate::app) fn logs_tab_strip(
             file,
             selected_id.is_some_and(|id| id == file.id),
             &tab_ids,
+            &focuses,
             palette,
             window,
             cx,
@@ -114,14 +121,7 @@ pub(in crate::app) fn logs_tab_strip(
         );
     }
 
-    let header = div()
-        .h(theme::ui_rem(PANEL_HEADER_HEIGHT))
-        .w_full()
-        .relative()
-        .flex()
-        .items_center()
-        .gap_2()
-        .px_4()
+    let header = frame_panel_header()
         .child(tabs)
         .when_some(selected_id, |this, selected_id| {
             this.child(logs_copy_button(
@@ -141,42 +141,56 @@ pub(in crate::app) fn log_tab_button(
     file: &ActiveLogFile,
     selected: bool,
     active_file_ids: &[String],
+    focuses: &TabFocusGroup,
     palette: &'static theme::ThemePalette,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
+    _window: &mut Window,
+    cx: &Context<FrameRoot>,
 ) -> impl IntoElement {
+    let focus = focuses.handle(&file.id);
+    let click_focus = focus.clone();
+    let keyboard_focuses: Vec<_> = active_file_ids
+        .iter()
+        .map(|id| (id.clone(), focuses.handle(id)))
+        .collect();
     let file_id = file.id.clone();
     let key_file_id = file.id.clone();
     let keyboard_file_ids = active_file_ids.to_vec();
-    let motion = button_motion(element_id("logs-tab-hover", &file.id), window, cx);
-    let hover_progress = *motion.hover_transition.evaluate(window, cx);
-    let foreground = if selected {
-        color(palette.text_primary)
-    } else {
-        color(palette.text_muted).lerp(&color(palette.text_primary), hover_progress)
-    };
-
     let button = div()
         .id(element_id("logs-tab", &file.id))
         .role(gpui::Role::Tab)
         .aria_label(file.name.clone())
         .aria_selected(selected)
-        .focusable()
-        .tab_stop(true)
-        .focus_visible_style(move |style| focus_visible_ring(style, palette))
+        .track_focus(&focus)
+        .tab_stop(selected)
+        .map(|element| tab_focus_base(element, palette))
+        .focus_visible_style(move |style| tab_focus_ring(style, palette))
+        .transitions(|t| {
+            t.ring(crate::app::motion::interaction_motion())
+                .outline_color(crate::app::motion::interaction_motion())
+                .bg(crate::app::motion::interaction_motion())
+                .text_color(crate::app::motion::interaction_motion())
+                .border_color(crate::app::motion::interaction_motion())
+        })
+        .h(theme::ui_rem(theme::metrics::TAB_HEIGHT))
+        .px(theme::ui_rem(6.0))
+        .tab_surface(selected, palette)
         .flex_none()
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-        .text_color(foreground)
-        .hover_style(gpui::Styled::cursor_pointer)
-        .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        .hover_style(move |style| {
+            style
+                .cursor_default()
+                .text_color(color(palette.text_primary))
+        })
+        .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
+            click_focus.focus(window, cx);
             if root.select_log_file_for_logs_view(&file_id) {
                 cx.notify();
             }
             cx.stop_propagation();
         }))
         .on_key_down(
-            cx.listener(move |root, event: &gpui::KeyDownEvent, _window, cx| {
+            cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
                 let Some(next_id) = log_tab_id_for_key(
                     key_file_id.as_str(),
                     &keyboard_file_ids,
@@ -184,6 +198,9 @@ pub(in crate::app) fn log_tab_button(
                 ) else {
                     return;
                 };
+                if let Some((_, focus)) = keyboard_focuses.iter().find(|(id, _)| id == next_id) {
+                    focus.focus(window, cx);
+                }
                 if root.select_log_file_for_logs_view(next_id) {
                     cx.notify();
                 }
@@ -192,7 +209,9 @@ pub(in crate::app) fn log_tab_button(
         )
         .child(file.name.clone());
 
-    apply_button_motion(button, motion, true)
+    button.on_mouse_down(gpui::MouseButton::Left, |_, window, cx| {
+        button_mouse_down(true, window, cx);
+    })
 }
 
 #[expect(
@@ -211,6 +230,7 @@ pub(in crate::app) fn logs_body(
 ) -> impl IntoElement {
     let body = div()
         .id("logs-body")
+        .p(gpui::px(theme::metrics::FOCUS_WIDTH))
         .relative()
         .flex_1()
         .flex()
@@ -294,10 +314,12 @@ pub(in crate::app) fn log_lines_list(
     div()
         .relative()
         .id(element_id("logs-scroll-area", &selected_id))
+        .debug_selector(|| "logs-output".to_string())
         .role(gpui::Role::Log)
         .aria_label("Conversion log output")
         .focusable()
         .tab_stop(true)
+        .map(|element| focus_ring_base(element, palette))
         .focus_visible_style(move |style| focus_visible_ring(style, palette))
         .size_full()
         .on_key_down(

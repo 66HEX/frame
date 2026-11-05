@@ -395,6 +395,7 @@ impl Render for FrameRoot {
             .text_color(color(palette.text_primary))
             .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
             .font_family(assets::FRAME_FONT_FAMILY)
+            .line_height(gpui::relative(theme::metrics::TEXT_LINE_HEIGHT))
             .font_weight(theme::TEXT_WEIGHT_REGULAR)
             .font_features(assets::frame_font_features())
             .on_action(cx.listener(Self::increase_ui_scale))

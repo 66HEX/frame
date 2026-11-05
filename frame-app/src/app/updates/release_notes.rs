@@ -65,9 +65,8 @@ pub(in crate::app) fn update_release_notes_block(
         .min_h(theme::ui_rem(UPDATE_RELEASE_NOTES_MIN_HEIGHT))
         .max_h(theme::ui_rem(UPDATE_RELEASE_NOTES_MAX_HEIGHT))
         .overflow_hidden()
-        .rounded(theme::ui_rem(theme::RADIUS_SM))
+        .rounded(theme::ui_rem(theme::RADIUS_MD))
         .bg(color(palette.fill_subtle))
-        .shadow(theme::shadows::EMBEDDED_PANEL.shadows())
         .child(content)
         .child(frame_vertical_scrollbar(
             "update-dialog-release-notes-scrollbar",

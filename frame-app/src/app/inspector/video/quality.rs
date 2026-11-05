@@ -49,7 +49,8 @@ pub(super) fn settings_video_range_field(
     target: SettingsVideoRangeTarget,
     disabled: bool,
     palette: &'static theme::ThemePalette,
-    cx: &Context<FrameRoot>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     div()
         .flex()
@@ -65,7 +66,7 @@ pub(super) fn settings_video_range_field(
                 .child(settings_value_badge(value_label, palette)),
         )
         .child(settings_video_range_slider(
-            value, min, max, disabled, target, palette, cx,
+            value, min, max, disabled, target, palette, window, cx,
         ))
         .child(
             div()
@@ -78,6 +79,10 @@ pub(super) fn settings_video_range_field(
         )
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Range controls require domain limits, target, state and rendering context."
+)]
 pub(super) fn settings_video_range_slider(
     value: u32,
     min: u32,
@@ -85,7 +90,8 @@ pub(super) fn settings_video_range_slider(
     disabled: bool,
     target: SettingsVideoRangeTarget,
     palette: &'static theme::ThemePalette,
-    cx: &Context<FrameRoot>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let fraction = range_fraction(value, min, max);
     let drag = SettingsVideoRangeDrag { target, min, max };
@@ -104,6 +110,8 @@ pub(super) fn settings_video_range_slider(
         fraction,
         disabled,
         palette,
+        window,
+        cx,
     )
     .on_a11y_action(gpui::AccessibleAction::Increment, move |_, _window, cx| {
         if disabled {

@@ -1,3 +1,4 @@
+use super::FrameStyle;
 use crate::app::accessibility::{
     apply_accessible_select_option, apply_accessible_select_option_with_focus,
     apply_accessible_select_trigger, apply_accessible_select_trigger_with_focus,
@@ -5,8 +6,7 @@ use crate::app::accessibility::{
 };
 use crate::app::layout::SETTINGS_CONTROL_HEIGHT;
 use crate::app::primitives::{
-    ButtonVariant, animated_button_colors, apply_button_motion, button_colors, button_mouse_down,
-    color, icon_svg, parse_hex,
+    ButtonVariant, button_colors, button_mouse_down, color, icon_svg, parse_hex,
 };
 use crate::app::root::FrameRoot;
 use crate::numeric::usize_to_f32;
@@ -147,17 +147,14 @@ fn frame_select_trigger_content_inner(
     expanded: bool,
     focus: Option<&FocusHandle>,
     palette: &'static theme::ThemePalette,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
+    _window: &mut Window,
+    _cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let id = id.into();
     let label = label.into();
-    let colors = button_colors(ButtonVariant::Secondary, false, enabled, palette);
-    let animated = animated_button_colors(id.clone(), colors, window, cx);
-    let background = animated.background;
-    let foreground = animated.foreground;
-    let motion = animated.motion;
-
+    let mut colors = button_colors(ButtonVariant::Outline, false, enabled, palette);
+    colors.background = palette.input_background;
+    colors.hover_background = palette.input_hover;
     let trigger = div()
         .id(id.clone())
         .debug_selector(|| id.clone())
@@ -168,38 +165,35 @@ fn frame_select_trigger_content_inner(
         .items_center()
         .justify_between()
         .min_w_0()
-        .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .px(theme::ui_rem(10.0))
-        .bg(background)
+        .rounded(theme::ui_rem(theme::RADIUS_MD))
+        .px(theme::ui_rem(theme::metrics::CONTROL_PADDING_X))
+        .input_surface(palette)
+        .bg(color(colors.background))
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-        .text_color(foreground)
+        .font_weight(theme::TEXT_WEIGHT_REGULAR)
+        .text_color(color(colors.foreground))
         .opacity(colors.opacity)
-        .shadow(theme::shadows::CONTROL.shadows())
         .when(enabled, |this| {
-            this.hover_style(gpui::Styled::cursor_pointer)
-                .active_style(move |style| style.bg(colors.active_fill()))
+            this.cursor_default()
+                .hover_style(move |style| style.bg(color(colors.hover_background)))
         })
         .when(!enabled, gpui::Styled::cursor_not_allowed)
         .child(content)
-        .child(
-            div()
-                .flex_shrink_0()
-                .child(icon_svg(assets::ICON_UNFOLD_MORE, 12.0, foreground)),
-        );
+        .child(div().flex_shrink_0().child(icon_svg(
+            assets::ICON_UNFOLD_MORE,
+            14.0,
+            color(palette.text_muted),
+        )));
 
     let pointer_focus = focus.cloned();
-    let trigger = apply_button_motion(trigger, motion, enabled).on_mouse_down(
-        MouseButton::Left,
-        move |_, window, cx| {
-            // Button motion prevents GPUI's default mouse-down action. Explicitly
-            // focus this select so arrows after a pointer click address its menu.
-            if enabled && let Some(focus) = &pointer_focus {
-                focus.focus(window, cx);
-            }
-            cx.stop_propagation();
-        },
-    );
+    let trigger = trigger.on_mouse_down(MouseButton::Left, move |_, window, cx| {
+        button_mouse_down(enabled, window, cx);
+        // Explicit focus lets arrows address the menu after a pointer click.
+        if enabled && let Some(focus) = &pointer_focus {
+            focus.focus(window, cx);
+        }
+        cx.stop_propagation();
+    });
 
     if let Some(focus) = focus {
         apply_accessible_select_trigger_with_focus(
@@ -226,8 +220,7 @@ pub(in crate::app) fn frame_select_popover(
         .right_0()
         .max_h(theme::ui_rem(FRAME_SELECT_MAX_HEIGHT))
         .overflow_hidden()
-        .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .bg(color(palette.surface_elevated))
+        .popover_surface(palette)
         .opacity(progress)
         .shadow(theme::shadows::FLOATING.shadows())
         .occlude()
@@ -447,11 +440,7 @@ fn frame_select_option_inner(
     let id = id.into();
     let label = label.into();
     let display_label = theme::ui_text_owned(label.clone());
-    let text_color = if selected {
-        palette.text_primary
-    } else {
-        palette.text_muted
-    };
+    let text_color = palette.text_primary;
 
     let option = div()
         .id(id.clone())
@@ -462,10 +451,10 @@ fn frame_select_option_inner(
         .items_center()
         .justify_between()
         .gap_2()
-        .rounded(theme::ui_rem(theme::RADIUS_XS))
-        .px(theme::ui_rem(12.0))
+        .rounded(theme::ui_rem(theme::RADIUS_MD))
+        .px(theme::ui_rem(8.0))
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
+        .font_weight(theme::TEXT_WEIGHT_REGULAR)
         .text_color(color(text_color))
         .opacity(if enabled { 1.0 } else { 0.5 })
         .when(enabled, |this| {
@@ -473,7 +462,7 @@ fn frame_select_option_inner(
                 style
                     .bg(color(palette.fill_subtle))
                     .text_color(color(palette.text_primary))
-                    .cursor_pointer()
+                    .cursor_default()
             })
         })
         .when(!enabled, gpui::Styled::cursor_not_allowed)
@@ -485,7 +474,7 @@ fn frame_select_option_inner(
         .when(selected, |this| {
             this.child(icon_svg(
                 assets::ICON_CHECK,
-                12.0,
+                14.0,
                 color(palette.text_primary),
             ))
         });
@@ -526,7 +515,6 @@ pub(in crate::app) fn frame_color_swatch(value: &str) -> gpui::Div {
         .flex_shrink_0()
         .rounded(theme::ui_rem(theme::RADIUS_XS))
         .bg(parse_hex(value))
-        .shadow(theme::shadows::INDICATOR.shadows())
 }
 
 fn refresh_select_hover_after_scroll(

@@ -1,12 +1,13 @@
-use crate::app::accessibility::{TabFocusGroup, focus_visible_ring};
+use crate::app::accessibility::{TabFocusGroup, tab_focus_base, tab_focus_ring};
 use crate::app::components::frame_tooltip;
+use crate::app::components::{FrameStyle, frame_section};
 use crate::app::inspector::audio::settings_audio_tab;
 use crate::app::inspector::images::settings_images_tab;
 use crate::app::inspector::metadata::settings_metadata_tab;
 use crate::app::inspector::output::settings_output_tab;
 use crate::app::inspector::presets::{SettingsPresetsTabState, settings_presets_tab};
 use crate::app::inspector::shared::settings_tab_icon;
-use crate::app::inspector::source::{settings_section_label, settings_source_tab};
+use crate::app::inspector::source::settings_source_tab;
 use crate::app::inspector::state::{SettingsRenderState, SettingsVideoInputFocuses};
 use crate::app::inspector::{
     SettingsSubtitlesTabState, settings_audio_filters_tab, settings_subtitles_tab,
@@ -15,11 +16,7 @@ use crate::app::inspector::{
 use crate::app::layout::{
     PANEL_HEADER_HEIGHT, SETTINGS_PANEL_PADDING, SETTINGS_TAB_BUTTON_SIZE, SETTINGS_TAB_ICON_SIZE,
 };
-use crate::app::motion::mix_color;
-use crate::app::primitives::{
-    ButtonVariant, FrameSurface, apply_button_motion, button_colors, button_motion, color,
-    icon_svg, panel_bottom_separator,
-};
+use crate::app::primitives::{FrameSurface, button_mouse_down, color, panel_bottom_separator};
 use crate::app::root::FrameRoot;
 use crate::settings::{
     SettingsTab, SourceKind, resolve_active_settings_tab, source_kind_for, visible_settings_tabs,
@@ -46,14 +43,23 @@ pub(in crate::app) fn settings_panel(
         window,
         cx,
     );
-    let mut tab_rail = div()
+    let scroll = window
+        .use_keyed_state(
+            format!("settings-panel-{}-scroll", active_tab.id()),
+            cx,
+            |_, _| gpui::ScrollHandle::new(),
+        )
+        .read(cx)
+        .clone();
+    let key_scroll = scroll.clone();
+    let key_focus = focuses.handle(active_tab.id());
+    let mut tab_rail = crate::app::components::frame_tabs_list(palette)
         .id("settings-tab-list")
         .role(gpui::Role::TabList)
         .aria_label("Settings sections")
         .flex()
         .items_center()
-        .justify_start()
-        .gap_1();
+        .justify_start();
     for tab in &visible_tabs {
         tab_rail = tab_rail.child(settings_tab_button(
             *tab,
@@ -71,6 +77,13 @@ pub(in crate::app) fn settings_panel(
         .flex_col()
         .overflow_hidden()
         .card_surface(palette)
+        .on_key_down(move |event, window, cx| {
+            // Read-only panels remain keyboard-scrollable from their selected
+            // tab, without inserting a container into the Tab sequence.
+            if key_focus.is_focused(window) {
+                crate::app::accessibility::handle_scroll_area_key(event, &key_scroll, window, cx);
+            }
+        })
         .child(
             div()
                 .min_h(theme::ui_rem(PANEL_HEADER_HEIGHT))
@@ -86,10 +99,14 @@ pub(in crate::app) fn settings_panel(
         .child(
             div()
                 .id("settings-panel-body")
+                .debug_selector(|| "settings-panel-body".into())
+                .role(gpui::Role::TabPanel)
+                .aria_label(active_tab.label())
                 .flex_1()
                 .flex()
                 .flex_col()
                 .overflow_y_scroll()
+                .track_scroll(&scroll)
                 .p(theme::ui_rem(SETTINGS_PANEL_PADDING))
                 .child(settings_tab_content(active_tab, settings, window, cx)),
         )
@@ -111,24 +128,7 @@ pub(in crate::app) fn settings_tab_button(
         .iter()
         .map(|tab| (*tab, focuses.handle(tab.id())))
         .collect();
-    let colors = button_colors(ButtonVariant::Secondary, selected, true, palette);
     let tab_id = format!("settings-tab-{}", tab.id());
-    let motion = button_motion(format!("{tab_id}-hover"), window, cx);
-    let hover_progress = *motion.hover_transition.evaluate(window, cx);
-    let background = if selected {
-        mix_color(colors.background, colors.hover_background, hover_progress)
-    } else {
-        mix_color(palette.transparent, palette.fill_subtle, hover_progress)
-    };
-    let foreground = mix_color(
-        if selected {
-            palette.text_primary
-        } else {
-            palette.text_muted
-        },
-        palette.text_primary,
-        hover_progress,
-    );
     let keyboard_tabs = visible_tabs.to_vec();
 
     let button = div()
@@ -142,21 +142,28 @@ pub(in crate::app) fn settings_tab_button(
         .aria_selected(selected)
         .track_focus(&focus)
         .tab_stop(selected)
-        .focus_visible_style(move |style| focus_visible_ring(style, palette))
+        .map(|element| tab_focus_base(element, palette))
+        .focus_visible_style(move |style| tab_focus_ring(style, palette))
+        .transitions(|t| {
+            t.ring(crate::app::motion::interaction_motion())
+                .outline_color(crate::app::motion::interaction_motion())
+                .bg(crate::app::motion::interaction_motion())
+                .text_color(crate::app::motion::interaction_motion())
+                .border_color(crate::app::motion::interaction_motion())
+        })
         .group(tab_id)
         .w(theme::ui_rem(SETTINGS_TAB_BUTTON_SIZE))
-        .h(theme::ui_rem(SETTINGS_TAB_BUTTON_SIZE))
+        .h(theme::ui_rem(theme::metrics::TAB_HEIGHT))
         .flex()
         .items_center()
         .justify_center()
-        .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .bg(background)
-        .text_color(foreground)
-        .when(selected, |this| {
-            this.shadow(theme::shadows::CONTROL.shadows())
+        .rounded(theme::ui_rem(theme::RADIUS_MD))
+        .tab_surface(selected, palette)
+        .hover_style(move |style| {
+            style
+                .cursor_default()
+                .text_color(color(palette.text_primary))
         })
-        .hover_style(gpui::Styled::cursor_pointer)
-        .active_style(move |style| style.bg(colors.active_fill()))
         .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
             click_focus.focus(window, cx);
             root.settings_ui.active_tab = tab;
@@ -179,12 +186,14 @@ pub(in crate::app) fn settings_tab_button(
                 cx.notify();
             }),
         )
-        .child(icon_svg(
-            settings_tab_icon(tab),
-            SETTINGS_TAB_ICON_SIZE,
-            foreground,
-        ));
-    let button = apply_button_motion(button, motion, true);
+        .child(
+            gpui::svg()
+                .path(settings_tab_icon(tab))
+                .size(theme::ui_rem(SETTINGS_TAB_ICON_SIZE)),
+        );
+    let button = button.on_mouse_down(gpui::MouseButton::Left, |_, window, cx| {
+        button_mouse_down(true, window, cx);
+    });
 
     frame_tooltip(
         tab.id(),
@@ -227,10 +236,8 @@ pub(in crate::app) fn settings_tab_content(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let palette = settings.palette;
-    let content = div()
-        .flex()
-        .flex_col()
-        .gap_4()
+    let content = crate::app::components::frame_field_group()
+        .flex_shrink_0()
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .text_color(color(palette.text_muted));
 
@@ -359,11 +366,7 @@ pub(in crate::app) fn settings_section(
     label: &'static str,
     palette: &'static theme::ThemePalette,
 ) -> gpui::Div {
-    div()
-        .flex()
-        .flex_col()
-        .gap_3()
-        .child(settings_section_label(label, palette))
+    frame_section(theme::ui_text(label), palette)
 }
 
 #[cfg(test)]

@@ -1,14 +1,20 @@
 use crate::app::accessibility::apply_accessible_toggle_button;
 use crate::app::components::checkbox::frame_selection_dot;
 use crate::app::layout::SETTINGS_CONTROL_HEIGHT;
-use crate::app::motion::{mix_color, mix_rgba, mix_scalar, selected_motion};
-use crate::app::primitives::{
-    ButtonVariant, apply_button_motion, button_colors, button_motion, color,
-};
+use crate::app::primitives::{ButtonVariant, button_colors, button_mouse_down, color};
 use crate::app::root::FrameRoot;
 use crate::theme;
 use gpui::prelude::{FluentBuilder, ParentElement, Styled};
 use gpui::{Context, InteractiveElement, Window, div};
+
+/// Shared spacing for compact option, track and preset lists.
+pub(in crate::app) fn frame_list_group() -> gpui::Div {
+    div()
+        .w_full()
+        .grid()
+        .grid_cols(1)
+        .gap(theme::ui_rem(theme::metrics::LIST_GAP))
+}
 
 pub(in crate::app) fn frame_list_item(
     id: impl Into<String>,
@@ -16,16 +22,11 @@ pub(in crate::app) fn frame_list_item(
     selected: bool,
     enabled: bool,
     palette: &'static theme::ThemePalette,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
+    _window: &mut Window,
+    _cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let id = id.into();
     let label = label.into();
-    let selected_progress = selected_motion(format!("{id}-selected"), selected, window, cx);
-    let motion = button_motion(format!("{id}-hover"), window, cx);
-    let hover_progress = *motion.hover_transition.evaluate(window, cx);
-    let emphasis_progress = selected_progress.max(hover_progress);
-
     let item = div()
         .id(id)
         .min_h(theme::ui_rem(SETTINGS_CONTROL_HEIGHT))
@@ -33,36 +34,27 @@ pub(in crate::app) fn frame_list_item(
         .flex()
         .items_center()
         .justify_between()
-        .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .border_l(theme::ui_rem(2.0))
-        .border_color(mix_color(
-            palette.transparent,
-            palette.text_muted,
-            selected_progress,
-        ))
-        .bg(mix_color(
-            palette.transparent,
-            palette.fill_subtle,
-            selected_progress,
-        ))
-        .pl(theme::ui_rem(mix_scalar(8.0, 12.0, selected_progress)))
-        .pr(theme::ui_rem(12.0))
+        .gap_3()
+        .rounded(theme::ui_rem(theme::RADIUS_MD))
+        .border_1()
+        .border_color(color(palette.input))
+        .bg(color(palette.fill_strong.with_alpha(if selected {
+            palette.fill_strong.alpha
+        } else {
+            0.0
+        })))
+        .px(theme::ui_rem(theme::metrics::CONTROL_PADDING_X))
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-        .text_color(mix_color(
-            palette.text_muted,
-            palette.text_primary,
-            emphasis_progress,
-        ))
+        .text_color(color(palette.text_primary))
         .opacity(if enabled { 1.0 } else { 0.5 })
         .when(enabled, |this| {
-            this.hover_style(gpui::Styled::cursor_pointer)
+            this.cursor_default()
+                .hover_style(move |style| style.bg(color(palette.fill_strong)))
         })
         .when(!enabled, gpui::Styled::cursor_not_allowed);
 
-    let item = apply_button_motion(item, motion, enabled);
-
-    apply_accessible_toggle_button(item, label, enabled, selected, palette)
+    interactive_item(item, label, enabled, selected, palette)
 }
 
 #[expect(
@@ -70,6 +62,7 @@ pub(in crate::app) fn frame_list_item(
     reason = "The list-item builder keeps content, interaction state, palette, and render context explicit."
 )]
 pub(in crate::app) fn frame_list_item_with_caption(
+    group: &super::FrameChoiceFocus,
     id: impl Into<String>,
     title: impl Into<String>,
     caption: impl Into<String>,
@@ -79,12 +72,20 @@ pub(in crate::app) fn frame_list_item_with_caption(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
+    let id = id.into();
+    let focus = group.register(&id, selected, enabled, cx);
     let title = title.into();
     let display_title = theme::ui_text_owned(title.clone());
     let caption = theme::ui_text_owned(caption.into());
 
-    frame_list_item(id, title, selected, enabled, palette, window, cx)
-        .gap_3()
+    group
+        .apply(
+            frame_list_item(id.clone(), title, selected, enabled, palette, window, cx),
+            id,
+            enabled,
+            &focus,
+            cx,
+        )
         .child(
             div()
                 .flex_none()
@@ -125,46 +126,11 @@ pub(in crate::app) fn frame_track_list_item(
     selected: bool,
     enabled: bool,
     palette: &'static theme::ThemePalette,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
+    _window: &mut Window,
+    _cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let id = id.into();
-    let resting_colors = button_colors(ButtonVariant::Secondary, false, enabled, palette);
-    let selected_colors = button_colors(ButtonVariant::Secondary, true, enabled, palette);
-    let selected_progress = selected_motion(format!("{id}-selected"), selected, window, cx);
-    let motion = button_motion(id.clone(), window, cx);
-    let hover_progress = *motion.hover_transition.evaluate(window, cx);
-    let background = mix_rgba(
-        mix_color(
-            resting_colors.background,
-            selected_colors.background,
-            selected_progress,
-        ),
-        mix_color(
-            resting_colors.hover_background,
-            selected_colors.hover_background,
-            selected_progress,
-        ),
-        hover_progress,
-    );
-    let foreground = mix_rgba(
-        mix_color(
-            resting_colors.foreground,
-            selected_colors.foreground,
-            selected_progress,
-        ),
-        mix_color(
-            resting_colors.hover_foreground,
-            selected_colors.hover_foreground,
-            selected_progress,
-        ),
-        hover_progress,
-    );
-    let opacity = mix_scalar(
-        resting_colors.opacity,
-        selected_colors.opacity,
-        selected_progress,
-    );
+    let colors = button_colors(ButtonVariant::Outline, selected, enabled, palette);
     let (label, accessible_label) = frame_track_list_item_label(text, palette);
 
     let item = div()
@@ -175,25 +141,47 @@ pub(in crate::app) fn frame_track_list_item(
         .items_center()
         .justify_between()
         .gap_3()
-        .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .px(theme::ui_rem(10.0))
+        .rounded(theme::ui_rem(theme::RADIUS_MD))
+        .px(theme::ui_rem(theme::metrics::CONTROL_PADDING_X))
         .py(theme::ui_rem(6.0))
-        .bg(background)
+        .bg(color(colors.background))
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-        .text_color(foreground)
-        .opacity(opacity)
-        .shadow(theme::shadows::CONTROL.shadows())
+        .text_color(color(colors.foreground))
+        .opacity(colors.opacity)
         .when(enabled, |this| {
-            this.hover_style(gpui::Styled::cursor_pointer)
+            this.cursor_default()
+                .hover_style(move |style| style.bg(color(colors.hover_background)))
         })
         .when(!enabled, gpui::Styled::cursor_not_allowed)
         .child(label)
-        .child(frame_selection_dot(selected_progress, palette));
+        .child(frame_selection_dot(
+            crate::app::motion::motion_target(selected),
+            palette,
+        ));
 
-    let item = apply_button_motion(item, motion, enabled);
+    interactive_item(item, accessible_label, enabled, selected, palette)
+}
 
-    apply_accessible_toggle_button(item, accessible_label, enabled, selected, palette)
+// Mira Item has transition-colors duration-100; its 3px ring appears immediately.
+fn interactive_item(
+    item: gpui::Stateful<gpui::Div>,
+    label: String,
+    enabled: bool,
+    selected: bool,
+    palette: &'static theme::ThemePalette,
+) -> gpui::Stateful<gpui::Div> {
+    let motion = gpui::Motion::new(std::time::Duration::from_millis(100))
+        .with_easing(crate::app::motion::css_transition_ease);
+    apply_accessible_toggle_button(item, label, enabled, selected, palette)
+        .transitions(|t| {
+            t.bg(motion.clone())
+                .text_color(motion.clone())
+                .border_color(motion)
+        })
+        .on_mouse_down(gpui::MouseButton::Left, move |_, window, cx| {
+            button_mouse_down(enabled, window, cx);
+        })
 }
 
 fn frame_track_list_item_label(

@@ -169,10 +169,22 @@ impl FrameRoot {
         if !preview_viewport_pan_enabled && preview_viewport_focus.is_focused(window) {
             app_root_focus.focus(window, cx);
         }
-        if crop_toolbar_active && !crop_toolbar_panel_focus.contains_focused(window, cx) {
+        // Editing toolbars are non-modal. Focus their first control only when
+        // opening; subsequent Tab presses must also reach the canvas handles.
+        let edit_modes =
+            window.use_keyed_state("preview-edit-focus-modes", cx, |_, _| (false, false));
+        let (entering_crop, entering_overlay) = edit_modes.update(cx, |previous, _| {
+            let entering = (
+                crop_toolbar_active && !previous.0,
+                overlay_toolbar_active && !previous.1,
+            );
+            *previous = (crop_toolbar_active, overlay_toolbar_active);
+            entering
+        });
+        if entering_crop {
             crop_toolbar_first_focus.focus(window, cx);
         }
-        if overlay_toolbar_active && !overlay_toolbar_panel_focus.contains_focused(window, cx) {
+        if entering_overlay {
             overlay_toolbar_first_focus.focus(window, cx);
         }
         PreviewFocusHandles {

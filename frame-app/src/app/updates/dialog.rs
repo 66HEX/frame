@@ -1,3 +1,4 @@
+use crate::app::components::FrameStyle;
 use crate::app::components::frame_text_button;
 use crate::app::layout::PANEL_HEADER_HEIGHT;
 use crate::app::motion::{motion_is_hidden, surface_motion};
@@ -34,7 +35,6 @@ pub(in crate::app) fn update_dialog(
 ) -> impl IntoElement {
     let palette = view.palette;
     let progress = surface_motion("update-dialog-motion", is_open, window, cx);
-    let panel_offset = (1.0 - progress.clamp(0.0, 1.0)) * 12.0;
 
     if !is_open && motion_is_hidden(progress) {
         cx.defer_in(window, |root, _window, cx| {
@@ -52,9 +52,9 @@ pub(in crate::app) fn update_dialog(
         .items_center()
         .justify_center()
         .p_4()
-        .bg(color(palette.overlay_backdrop.with_alpha(0.64 * progress)))
-        .backdrop_blur(theme::ui_rem(4.0 * progress).to_pixels(window.rem_size()))
+        .bg(color(palette.overlay_backdrop))
         .opacity(progress)
+        .backdrop_blur(theme::ui_rem(4.0).to_pixels(window.rem_size()))
         .occlude()
         .on_key_down(cx.listener(|root, event: &gpui::KeyDownEvent, window, cx| {
             match event.keystroke.key.as_str() {
@@ -83,7 +83,11 @@ pub(in crate::app) fn update_dialog(
                 cx.notify();
             }
         }))
-        .child(update_dialog_panel(panel_offset, view, window, cx))
+        .child(crate::app::components::frame_surface_motion(
+            update_dialog_panel(0.0, view, window, cx),
+            progress,
+            crate::app::components::SurfaceOrigin::Center,
+        ))
 }
 
 pub(in crate::app) fn update_dialog_panel(
@@ -96,6 +100,7 @@ pub(in crate::app) fn update_dialog_panel(
     let mut panel = div()
         .id("update-dialog-panel")
         .role(gpui::Role::AlertDialog)
+        .aria_modal(true)
         .aria_label(update_dialog_title(view.status))
         .track_focus(view.panel_focus)
         .tab_stop(false)
@@ -104,9 +109,7 @@ pub(in crate::app) fn update_dialog_panel(
         .max_w(theme::ui_rem(640.0))
         .max_h(relative(0.86))
         .overflow_hidden()
-        .rounded(theme::ui_rem(theme::RADIUS_LG))
-        .bg(color(palette.surface))
-        .shadow(theme::shadows::MODAL.shadows())
+        .dialog_surface(palette)
         .occlude()
         .on_click(cx.listener(|_, _: &ClickEvent, _window, cx| {
             cx.stop_propagation();
@@ -231,9 +234,8 @@ pub(in crate::app) fn update_dialog_body(
                 .id("update-dialog-error-alert")
                 .role(gpui::Role::Alert)
                 .aria_label(error.clone())
-                .rounded(theme::ui_rem(theme::RADIUS_SM))
+                .rounded(theme::ui_rem(theme::RADIUS_MD))
                 .bg(color(palette.danger_surface))
-                .shadow(theme::shadows::EMBEDDED_PANEL.shadows())
                 .p_3()
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .line_height(theme::ui_rem(16.0))

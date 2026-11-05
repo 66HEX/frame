@@ -1,9 +1,9 @@
+use super::file_button::settings_subtitle_file_button;
 use crate::app::components::frame_choice_button;
 use crate::app::inspector::panel::settings_section;
 use crate::app::inspector::shared::settings_hint_text;
 use crate::app::inspector::subtitles::burn_in::{
-    settings_subtitle_burn_file_row, settings_subtitle_load_button,
-    settings_subtitle_style_controls,
+    settings_subtitle_burn_file_row, settings_subtitle_style_controls,
 };
 use crate::app::inspector::subtitles::state::{
     SettingsSubtitleColorInputFocuses, SettingsSubtitleColorPopoverFocuses,
@@ -111,7 +111,7 @@ pub(in crate::app) fn settings_subtitles_tab(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let palette = state.palette;
-    let content = div().flex().flex_col().gap_4().child(
+    let content = crate::app::components::frame_field_group().child(
         settings_section("Subtitle type", palette)
             .child(settings_subtitle_mode_grid(state.mode, palette, window, cx)),
     );
@@ -132,12 +132,15 @@ pub(super) fn settings_subtitle_mode_grid(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let choice_focus =
+        crate::app::components::FrameChoiceFocus::new("settings_subtitle_mode_grid", window, cx);
     div()
         .grid()
         .grid_cols(2)
         .gap_2()
         .child(
             frame_choice_button(
+                &choice_focus,
                 "settings-subtitle-mode-selectable",
                 "Selectable",
                 mode == SettingsSubtitleMode::Selectable,
@@ -155,6 +158,7 @@ pub(super) fn settings_subtitle_mode_grid(
         )
         .child(
             frame_choice_button(
+                &choice_focus,
                 "settings-subtitle-mode-burn-in",
                 "Burn-in",
                 mode == SettingsSubtitleMode::BurnIn,
@@ -178,10 +182,7 @@ pub(super) fn settings_selectable_subtitles_content(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let palette = state.palette;
-    let content = div()
-        .flex()
-        .flex_col()
-        .gap_4()
+    let content = crate::app::components::frame_field_group()
         .child(settings_external_subtitles_section(state, window, cx));
 
     let track_options = subtitle_track_options(
@@ -197,7 +198,7 @@ pub(super) fn settings_selectable_subtitles_content(
         );
     }
 
-    let mut list = div().grid().grid_cols(1).gap_2();
+    let mut list = crate::app::components::frame_list_group();
     for option in track_options {
         list = list.child(settings_subtitle_track_button(option, palette, window, cx));
     }
@@ -215,8 +216,9 @@ pub(super) fn settings_burn_in_subtitles_content(
     let copy_mode = config.processing_mode == ProcessingMode::Copy;
     let burn_in_disabled = state.settings_disabled || copy_mode;
     let mut burn_in_section = settings_section("Burn-in file", palette)
-        .child(settings_subtitle_load_button(
-            burn_in_disabled,
+        .child(settings_subtitle_file_button(
+            SettingsSubtitleMode::BurnIn,
+            !burn_in_disabled,
             state.focuses.burn_file,
             palette,
             window,
@@ -241,7 +243,7 @@ pub(super) fn settings_burn_in_subtitles_content(
         ));
     }
 
-    let content = div().flex().flex_col().gap_4().child(burn_in_section);
+    let content = crate::app::components::frame_field_group().child(burn_in_section);
 
     if copy_mode {
         return content;

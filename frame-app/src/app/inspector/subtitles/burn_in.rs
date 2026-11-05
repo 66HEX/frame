@@ -1,4 +1,3 @@
-use crate::app::accessibility::{apply_accessible_button, apply_accessible_button_with_focus};
 use crate::app::components::{
     FRAME_ICON_SM_SIZE, FrameIconButtonSize, FrameIconButtonVariant, frame_choice_button,
     frame_icon_button,
@@ -15,9 +14,7 @@ use crate::app::inspector::subtitles::view::{
     SettingsSubtitleFontSizeSelectState, SettingsSubtitleStyleState,
 };
 use crate::app::layout::SETTINGS_CONTROL_HEIGHT;
-use crate::app::primitives::{
-    ButtonVariant, animated_button_colors, apply_button_motion, button_colors, color,
-};
+use crate::app::primitives::{ButtonVariant, button_colors, color};
 use crate::app::root::FrameRoot;
 use crate::settings::{
     ConversionConfig, DEFAULT_SUBTITLE_FONT_COLOR, DEFAULT_SUBTITLE_OUTLINE_COLOR,
@@ -26,59 +23,7 @@ use crate::settings::{
 };
 use crate::{assets, theme};
 use gpui::prelude::*;
-use gpui::{ClickEvent, Context, FocusHandle, Window, div};
-
-pub(super) fn settings_subtitle_load_button(
-    disabled: bool,
-    focus: Option<&FocusHandle>,
-    palette: &'static theme::ThemePalette,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
-) -> gpui::Stateful<gpui::Div> {
-    let colors = button_colors(ButtonVariant::Secondary, false, !disabled, palette);
-    let animated = animated_button_colors("settings-subtitle-burn-file", colors, window, cx);
-    let background = animated.background;
-    let foreground = animated.foreground;
-    let motion = animated.motion;
-    let label = "Add subtitle file";
-
-    let button = div()
-        .id("settings-subtitle-burn-file")
-        .h(theme::ui_rem(SETTINGS_CONTROL_HEIGHT))
-        .w_full()
-        .flex()
-        .items_center()
-        .justify_center()
-        .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .px(theme::ui_rem(10.0))
-        .bg(background)
-        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-        .text_color(foreground)
-        .opacity(colors.opacity)
-        .shadow(theme::shadows::CONTROL.shadows())
-        .when(!disabled, |this| {
-            this.hover_style(gpui::Styled::cursor_pointer)
-                .active_style(move |style| style.bg(colors.active_fill()))
-        })
-        .when(disabled, gpui::Styled::cursor_not_allowed)
-        .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
-            cx.stop_propagation();
-            if disabled {
-                return;
-            }
-            root.prompt_subtitle_burn_file(window, cx);
-        }))
-        .child(theme::ui_text(label));
-
-    let button = apply_button_motion(button, motion, !disabled);
-
-    if let Some(focus) = focus {
-        apply_accessible_button_with_focus(button, label, !disabled, focus, palette)
-    } else {
-        apply_accessible_button(button, label, !disabled, palette)
-    }
-}
+use gpui::{ClickEvent, Context, Window, div};
 
 pub(super) fn settings_subtitle_burn_file_row(
     config: &ConversionConfig,
@@ -101,14 +46,13 @@ pub(super) fn settings_subtitle_burn_file_row(
                 .flex_1()
                 .flex()
                 .items_center()
-                .rounded(theme::ui_rem(theme::RADIUS_SM))
-                .px(theme::ui_rem(10.0))
+                .rounded(theme::ui_rem(theme::RADIUS_MD))
+                .px(theme::ui_rem(theme::metrics::CONTROL_PADDING_X))
                 .bg(color(colors.background))
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .font_weight(theme::TEXT_WEIGHT_MEDIUM)
                 .text_color(color(colors.foreground))
                 .opacity(colors.opacity)
-                .shadow(theme::shadows::CONTROL.shadows())
                 .child(div().min_w_0().truncate().child(label)),
         )
         .child(settings_subtitle_clear_button(
@@ -245,10 +189,7 @@ pub(super) fn settings_subtitle_style_controls(
                 )),
         )
         .child(
-            div()
-                .flex()
-                .flex_col()
-                .gap_2()
+            crate::app::components::frame_field()
                 .child(settings_field_label("Position", state.palette))
                 .child(settings_subtitle_position_grid(
                     state.config,
@@ -271,12 +212,18 @@ pub(super) fn settings_subtitle_position_grid(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let choice_focus = crate::app::components::FrameChoiceFocus::new(
+        "settings_subtitle_position_grid",
+        window,
+        cx,
+    );
     let mut grid = div().grid().grid_cols(3).gap_2();
     for option in subtitle_position_options(config, disabled) {
         let position = option.position;
         let is_enabled = !option.is_disabled;
         grid = grid.child(
             frame_choice_button(
+                &choice_focus,
                 format!("subtitle-position-{}", position.id()),
                 option.label,
                 option.is_selected,

@@ -6,11 +6,11 @@ use gpui::{
     Window, canvas, div, point, px, size,
 };
 
-pub(in crate::app) const FRAME_SCROLLBAR_WIDTH: f32 = super::MIN_POINTER_TARGET;
+pub(in crate::app) const FRAME_SCROLLBAR_WIDTH: f32 = 10.0;
 const FRAME_SCROLLBAR_VISUAL_WIDTH: f32 = 10.0;
-const FRAME_SCROLLBAR_TRACK_WIDTH: f32 = 6.0;
-const FRAME_SCROLLBAR_THUMB_WIDTH: f32 = 6.0;
-const FRAME_SCROLLBAR_MIN_THUMB_HEIGHT: f32 = 28.0;
+const FRAME_SCROLLBAR_TRACK_WIDTH: f32 = 7.0;
+const FRAME_SCROLLBAR_THUMB_WIDTH: f32 = 7.0;
+const FRAME_SCROLLBAR_MIN_THUMB_HEIGHT: f32 = 18.0;
 
 #[derive(Clone, Debug)]
 pub(in crate::app) struct FrameScrollbarDrag {
@@ -62,7 +62,7 @@ pub(in crate::app) fn frame_vertical_scrollbar(
         .bottom_0()
         .w(theme::ui_rem(FRAME_SCROLLBAR_WIDTH))
         .cursor_default()
-        .hover_style(gpui::Styled::cursor_pointer)
+        .hover_style(gpui::Styled::cursor_default)
         .on_drag(drag, |_drag, _offset, window, cx| {
             window.refresh();
             cx.new(|_| FrameScrollbarDragPreview)
@@ -124,7 +124,7 @@ pub(in crate::app) fn frame_vertical_scrollbar(
                     );
                     window.paint_quad(
                         gpui::PaintQuad::new(track_bounds)
-                            .background(color(palette.fill_subtle))
+                            .background(color(palette.transparent))
                             .corner_radii(px(track_width / 2.0)),
                     );
 
@@ -148,15 +148,12 @@ fn paint_scrollbar_thumb(
     palette: &theme::ThemePalette,
     window: &mut Window,
 ) {
-    let shadows = theme::shadows::INDICATOR.shadows();
     let corners = gpui::Corners::all(px(width / 2.0));
-    window.paint_drop_shadows(bounds, corners, 0.0, &shadows);
     window.paint_quad(
         gpui::PaintQuad::new(bounds)
-            .background(color(palette.control_muted))
+            .background(color(palette.border_subtle))
             .corner_radii(corners),
     );
-    window.paint_inset_shadows(bounds, corners, 0.0, &shadows);
 }
 
 fn frame_scrollbar_content_height(

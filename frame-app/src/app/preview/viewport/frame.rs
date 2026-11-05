@@ -5,7 +5,7 @@ use gpui::{
     Rgba, Style, Window, point, px, relative, size,
 };
 
-/// Paint-only foreground: rounded media cutouts and the canvas inset finish.
+/// Paint-only foreground for rounded media cutouts.
 /// No hitbox, so pan, zoom and crop interactions pass through to the content.
 pub(super) struct PreviewViewportFrame {
     pub(super) color: Rgba,
@@ -69,15 +69,11 @@ impl Element for PreviewViewportFrame {
         _cx: &mut App,
     ) {
         // GPUI clips overflow to a rectangular content mask. Cover media outside
-        // the rounded corners, then paint the inset finish above all canvas content.
-        // A shadow on the parent Div would be painted BEFORE its children, allowing
-        // an image touching the viewport edge to hide the shadow and highlight.
+        // the rounded corners; the viewport paints its focus ring above this mask.
         let radius = theme::ui_rem(theme::RADIUS_MD).to_pixels(window.rem_size());
         if let Some(path) = preview_viewport_rounded_clip_path(bounds, radius) {
             window.paint_path(path, self.color);
         }
-        let corners = gpui::Corners::all(radius).clamp_radii_for_quad_size(bounds.size);
-        window.paint_inset_shadows(bounds, corners, 0.0, &theme::shadows::recessed_control());
     }
 }
 

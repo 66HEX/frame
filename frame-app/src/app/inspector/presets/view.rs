@@ -34,7 +34,7 @@ pub(in crate::app) fn settings_presets_tab(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let palette = state.palette;
-    let mut list = div().grid().grid_cols(1);
+    let mut list = crate::app::components::frame_list_group();
     for option in preset_options(state.config, state.presets, state.metadata) {
         list = list.child(settings_preset_row(
             option,
@@ -45,10 +45,7 @@ pub(in crate::app) fn settings_presets_tab(
         ));
     }
 
-    div()
-        .flex()
-        .flex_col()
-        .gap_3()
+    crate::app::components::frame_field_group()
         .child(settings_presets_header(state.notice, palette))
         .child(settings_presets_save_row(
             state.preset_name,
@@ -174,7 +171,6 @@ fn settings_preset_row(
         window,
         cx,
     )
-    .pr(theme::ui_rem(4.0))
     .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
         cx.stop_propagation();
         if is_enabled && root.apply_preset_to_selected(&preset_id) {
@@ -194,14 +190,15 @@ fn settings_preset_row(
             .flex()
             .items_center()
             .gap_2()
-            .child(
-                div()
-                    .pr(theme::ui_rem(8.0))
-                    .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-                    .font_weight(theme::TEXT_WEIGHT_REGULAR)
-                    .text_color(color(palette.text_muted))
-                    .child(theme::ui_text(status.unwrap_or_default())),
-            )
+            .when_some(status, |this, status| {
+                this.child(
+                    div()
+                        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
+                        .font_weight(theme::TEXT_WEIGHT_REGULAR)
+                        .text_color(color(palette.text_muted))
+                        .child(theme::ui_text(status)),
+                )
+            })
             .when(option.is_compatible, |this| {
                 this.child(settings_preset_icon_button(
                     format!("settings-preset-apply-all-{apply_all_id}"),

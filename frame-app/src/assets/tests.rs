@@ -162,7 +162,7 @@ mod frame_assets {
             );
             assert!(
                 svg.contains(r#"stroke-width="1.5""#),
-                "{icon} should use the Nucleo UI stroke weight"
+                "{icon} should use the Mira stroke weight"
             );
             assert!(
                 !svg.contains(r##"="#000""##) && !svg.contains(r#"="black""#),

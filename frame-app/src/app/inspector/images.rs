@@ -62,10 +62,7 @@ pub(in crate::app) fn settings_images_tab(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    div()
-        .flex()
-        .flex_col()
-        .gap_4()
+    crate::app::components::frame_field_group()
         .child(settings_video_resolution_section(
             config,
             settings_disabled || crop_editing,
@@ -105,12 +102,18 @@ fn settings_images_pixel_format_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let mut list = div().grid().grid_cols(1);
+    let list_focus = crate::app::components::FrameChoiceFocus::vertical(
+        "settings_images_pixel_format_section",
+        window,
+        cx,
+    );
+    let mut list = crate::app::components::frame_list_group();
     for option in video_pixel_format_options(config) {
         let pixel_format = option.id;
         let enabled = !settings_disabled && !option.is_disabled;
         list = list.child(
             frame_list_item_with_caption(
+                &list_focus,
                 format!("images-pixel-format-{pixel_format}"),
                 option.label,
                 option.caption,
@@ -175,6 +178,7 @@ fn settings_image_jpeg_section(
             SettingsImageRangeTarget::JpegQuality,
             settings_disabled,
             palette,
+            window,
             cx,
         ))
         .child(settings_image_option_list(
@@ -225,6 +229,7 @@ fn settings_image_webp_section(
             SettingsImageRangeTarget::WebpQuality,
             settings_disabled,
             palette,
+            window,
             cx,
         ))
         .child(settings_image_range_field(
@@ -238,6 +243,7 @@ fn settings_image_webp_section(
             SettingsImageRangeTarget::WebpCompression,
             settings_disabled,
             palette,
+            window,
             cx,
         ))
         .child(settings_image_option_list(
@@ -269,6 +275,7 @@ fn settings_image_png_section(
             SettingsImageRangeTarget::PngCompression,
             settings_disabled,
             palette,
+            window,
             cx,
         ))
         .child(settings_image_option_list(
@@ -305,10 +312,13 @@ fn settings_image_webp_mode_grid(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let choice_focus =
+        crate::app::components::FrameChoiceFocus::new("settings_image_webp_mode_grid", window, cx);
     let mut grid = div().grid().grid_cols(2).gap_2();
     for (lossless, label) in [(false, "Lossy"), (true, "Lossless")] {
         grid = grid.child(
             frame_choice_button(
+                &choice_focus,
                 format!("image-webp-mode-{label}"),
                 label,
                 config.image_webp_lossless == lossless,
@@ -348,7 +358,8 @@ fn settings_image_range_field(
     target: SettingsImageRangeTarget,
     disabled: bool,
     palette: &'static theme::ThemePalette,
-    cx: &Context<FrameRoot>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     div()
         .flex()
@@ -363,7 +374,7 @@ fn settings_image_range_field(
                 .child(settings_value_badge(value_label, palette)),
         )
         .child(settings_image_range_slider(
-            value, min, max, disabled, target, palette, cx,
+            value, min, max, disabled, target, palette, window, cx,
         ))
         .child(
             div()
@@ -376,6 +387,10 @@ fn settings_image_range_field(
         )
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Range controls require domain limits, target, state and rendering context."
+)]
 fn settings_image_range_slider(
     value: u32,
     min: u32,
@@ -383,7 +398,8 @@ fn settings_image_range_slider(
     disabled: bool,
     target: SettingsImageRangeTarget,
     palette: &'static theme::ThemePalette,
-    cx: &Context<FrameRoot>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let fraction = range_fraction(value, min, max);
     let drag = SettingsImageRangeDrag { target, min, max };
@@ -396,6 +412,8 @@ fn settings_image_range_slider(
         fraction,
         disabled,
         palette,
+        window,
+        cx,
     )
     .on_a11y_action(gpui::AccessibleAction::Increment, move |_, _window, cx| {
         if disabled {
@@ -532,12 +550,14 @@ fn settings_image_option_list(
     cx: &mut Context<FrameRoot>,
     apply: fn(&mut ConversionConfig, &str) -> bool,
 ) -> gpui::Div {
-    let mut list = div().grid().grid_cols(1);
+    let list_focus = crate::app::components::FrameChoiceFocus::vertical(id_prefix, window, cx);
+    let mut list = crate::app::components::frame_list_group();
     for option in options {
         let id = option.id;
         let enabled = !option.is_disabled;
         list = list.child(
             frame_list_item_with_caption(
+                &list_focus,
                 format!("{id_prefix}-{id}"),
                 option.label,
                 option.caption,

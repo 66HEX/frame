@@ -50,12 +50,15 @@ pub(in crate::app) fn settings_resolution_grid(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let choice_focus =
+        crate::app::components::FrameChoiceFocus::new("settings_resolution_grid", window, cx);
     let mut grid = div().grid().grid_cols(2).gap_2();
     for resolution in resolution_options() {
         let selected = config.resolution == *resolution;
         let label = resolution_label(resolution);
         grid = grid.child(
             frame_choice_button(
+                &choice_focus,
                 format!("video-resolution-{resolution}"),
                 label,
                 selected,
@@ -141,11 +144,14 @@ pub(in crate::app) fn settings_video_scaling_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let choice_focus =
+        crate::app::components::FrameChoiceFocus::new("settings_video_scaling_section", window, cx);
     let disabled = settings_disabled || config.resolution == "original";
     let mut grid = div().grid().grid_cols(2).gap_2();
     for algorithm in scaling_algorithm_options() {
         grid = grid.child(
             frame_choice_button(
+                &choice_focus,
                 format!("video-scaling-{algorithm}"),
                 scaling_algorithm_label(algorithm),
                 config.scaling_algorithm == *algorithm,
@@ -177,11 +183,14 @@ pub(in crate::app) fn settings_video_fps_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let choice_focus =
+        crate::app::components::FrameChoiceFocus::new("settings_video_fps_section", window, cx);
     let is_gif = is_gif_container(&config.container);
     let mut grid = div().grid().grid_cols(2).gap_2();
     for fps in fps_options(is_gif) {
         grid = grid.child(
             frame_choice_button(
+                &choice_focus,
                 format!("video-fps-{fps}"),
                 fps_label(fps),
                 config.fps == *fps,
@@ -212,10 +221,16 @@ pub(in crate::app) fn settings_video_gif_colors_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let choice_focus = crate::app::components::FrameChoiceFocus::new(
+        "settings_video_gif_colors_section",
+        window,
+        cx,
+    );
     let mut grid = div().grid().grid_cols(2).gap_2();
     for colors in gif_color_options() {
         grid = grid.child(
             frame_choice_button(
+                &choice_focus,
                 format!("video-gif-colors-{colors}"),
                 colors.to_string(),
                 config.gif_colors == *colors,
@@ -246,11 +261,17 @@ pub(in crate::app) fn settings_video_gif_dither_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let mut list = div().grid().grid_cols(1);
+    let list_focus = crate::app::components::FrameChoiceFocus::vertical(
+        "settings_video_gif_dither_section",
+        window,
+        cx,
+    );
+    let mut list = crate::app::components::frame_list_group();
     for dither in gif_dither_options() {
         let dither = *dither;
         list = list.child(
             frame_list_item_with_caption(
+                &list_focus,
                 format!("video-gif-dither-{dither}"),
                 gif_dither_label(dither),
                 dither.to_string(),

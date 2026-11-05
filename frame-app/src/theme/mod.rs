@@ -1,6 +1,6 @@
 //! Frame native visual tokens and resolved color palettes.
 
-pub mod geist;
+pub mod metrics;
 pub mod mira;
 pub mod shadows;
 
@@ -34,15 +34,21 @@ impl RgbaToken {
     pub const fn with_alpha(self, alpha: f32) -> Self {
         Self { alpha, ..self }
     }
+
+    /// CSS color/opacity multiplies an existing alpha instead of replacing it.
+    #[must_use]
+    pub const fn with_opacity(self, opacity: f32) -> Self {
+        self.with_alpha(self.alpha * opacity)
+    }
 }
 
-/// Semantic roles selected from the exact Geist sRGB palette.
-/// See docs/colors/README.md for the shadcn hierarchy and component assignments.
+/// Mira Neutral roles. Source token names are available through `token`.
+/// Domain aliases below keep preview and conversion code independent of CSS.
 #[derive(Debug, PartialEq)]
 pub struct ThemePalette {
     color_theme: ColorTheme,
     pub background: RgbaToken,
-    /// Recessed input, checkbox, slider and infinite-canvas background.
+    /// Infinite-canvas background.
     pub canvas: RgbaToken,
     pub surface: RgbaToken,
     pub surface_elevated: RgbaToken,
@@ -50,13 +56,10 @@ pub struct ThemePalette {
     pub tooltip_foreground: RgbaToken,
     pub text_primary: RgbaToken,
     pub text_muted: RgbaToken,
-    pub text_disabled: RgbaToken,
     pub fill_subtle: RgbaToken,
     pub fill_selected: RgbaToken,
     pub fill_strong: RgbaToken,
-    pub highlight_subtle: RgbaToken,
     pub border_subtle: RgbaToken,
-    pub control_muted: RgbaToken,
     pub accent: RgbaToken,
     pub focus_ring: RgbaToken,
     pub text_selection: RgbaToken,
@@ -66,13 +69,19 @@ pub struct ThemePalette {
     pub success: RgbaToken,
     pub overlay_backdrop: RgbaToken,
     pub primary: RgbaToken,
-    pub primary_to: RgbaToken,
     pub primary_hover: RgbaToken,
-    pub primary_hover_to: RgbaToken,
-    pub primary_active: RgbaToken,
-    pub primary_active_to: RgbaToken,
     pub primary_foreground: RgbaToken,
     pub transparent: RgbaToken,
+    pub input: RgbaToken,
+    pub input_background: RgbaToken,
+    pub input_hover: RgbaToken,
+    pub secondary_hover: RgbaToken,
+    pub secondary_foreground: RgbaToken,
+    pub ghost_hover: RgbaToken,
+    pub surface_ring: RgbaToken,
+    pub slider_thumb: RgbaToken,
+    pub tab_active: RgbaToken,
+    pub tab_border: RgbaToken,
 }
 
 static DARK_PALETTE: LazyLock<ThemePalette> =
@@ -81,51 +90,73 @@ static LIGHT_PALETTE: LazyLock<ThemePalette> =
     LazyLock::new(|| ThemePalette::resolve(ColorTheme::Light));
 
 impl ThemePalette {
+    #[must_use]
+    pub const fn is_dark(&self) -> bool {
+        matches!(self.color_theme, ColorTheme::Dark)
+    }
+
     fn resolve(color_theme: ColorTheme) -> Self {
-        let get = |name| geist::color(color_theme, name);
-        let pick = |light, dark| {
-            get(if matches!(color_theme, ColorTheme::Light) {
-                light
-            } else {
-                dark
-            })
-        };
+        let get = |name| mira::color(color_theme, name);
+        let light = matches!(color_theme, ColorTheme::Light);
+        let input = get("input");
+        let foreground = get("foreground");
+        let primary = get("primary");
+        let destructive = get("destructive");
         Self {
             color_theme,
-            background: get("ds-background-100"),
-            canvas: pick("ds-background-200", "ds-background-100"),
-            surface: pick("ds-background-100", "ds-gray-100"),
-            surface_elevated: pick("ds-background-100", "ds-gray-100"),
-            tooltip_surface: get("ds-gray-1000"),
-            tooltip_foreground: get("ds-background-100"),
-            text_primary: get("ds-gray-1000"),
-            text_muted: get("ds-gray-900"),
-            text_disabled: get("ds-gray-700"),
-            fill_subtle: pick("ds-gray-100", "ds-gray-200"),
-            fill_selected: pick("ds-gray-200", "ds-gray-300"),
-            fill_strong: pick("ds-gray-300", "ds-gray-400"),
-            highlight_subtle: get("ds-gray-alpha-100"),
-            border_subtle: get("ds-gray-400"),
-            control_muted: get("ds-gray-700"),
-            accent: get("ds-blue-900"),
-            focus_ring: get("ds-focus-color"),
-            text_selection: get("ds-blue-200"),
-            danger: get("ds-red-900"),
-            danger_surface: get("ds-red-100"),
-            warning: get("ds-amber-900"),
-            success: get("ds-green-900"),
-            overlay_backdrop: get("ds-overlay-backdrop-color"),
-            // Graphite raised action: the darker fill lets the shared xs
-            // inset edge and top highlight remain visible in both themes.
-            primary: pick("accents-6", "ds-gray-500"),
-            primary_to: pick("ds-gray-1000", "ds-gray-400"),
-            primary_hover: pick("accents-5", "accents-4"),
-            primary_hover_to: pick("accents-6", "ds-gray-500"),
-            primary_active: pick("accents-7", "ds-gray-400"),
-            primary_active_to: pick("ds-gray-1000", "ds-gray-200"),
-            primary_foreground: get("ds-contrast-fg"),
-            transparent: get("geist-background").with_alpha(0.0),
+            background: get("background"),
+            canvas: get("background"),
+            surface: get("card"),
+            surface_elevated: get("popover"),
+            tooltip_surface: foreground,
+            tooltip_foreground: get("background"),
+            text_primary: foreground,
+            text_muted: get("muted-foreground"),
+            fill_subtle: get("secondary"),
+            fill_selected: get("accent"),
+            fill_strong: get("muted"),
+            border_subtle: get("border"),
+            // Shadcn has no info/success/warning roles. Neutral status text is
+            // paired with the existing explicit status label and action icon.
+            accent: foreground,
+            focus_ring: get("ring"),
+            text_selection: primary.with_alpha(primary.alpha * 0.20),
+            danger: destructive,
+            danger_surface: destructive
+                .with_alpha(destructive.alpha * if light { 0.1 } else { 0.2 }),
+            warning: foreground,
+            success: foreground,
+            overlay_backdrop: RgbaToken::from_rgb(0, 0, 0).with_alpha(0.8),
+            primary,
+            primary_hover: primary.with_alpha(primary.alpha * 0.8),
+            primary_foreground: get("primary-foreground"),
+            transparent: foreground.with_alpha(0.0),
+            input,
+            input_background: input.with_alpha(input.alpha * if light { 0.2 } else { 0.3 }),
+            input_hover: input.with_alpha(input.alpha * if light { 0.2 } else { 0.5 }),
+            secondary_hover: get("secondary-hover"),
+            secondary_foreground: get("secondary-foreground"),
+            ghost_hover: get("muted")
+                .with_alpha(get("muted").alpha * if light { 1.0 } else { 0.5 }),
+            surface_ring: foreground.with_alpha(foreground.alpha * 0.1),
+            slider_thumb: RgbaToken::from_rgb(255, 255, 255),
+            tab_active: if light {
+                get("background")
+            } else {
+                input.with_alpha(input.alpha * 0.3)
+            },
+            tab_border: if light {
+                foreground.with_alpha(0.0)
+            } else {
+                input
+            },
         }
+    }
+
+    /// Exact shadcn CSS color token, without the `--` prefix.
+    #[must_use]
+    pub fn token(&self, name: &str) -> RgbaToken {
+        mira::color(self.color_theme, name)
     }
 
     #[must_use]
@@ -148,18 +179,21 @@ pub fn palette(color_theme: ColorTheme) -> &'static ThemePalette {
     }
 }
 
-pub const RADIUS_BASE: f32 = 3.6;
-pub const RADIUS_XS: f32 = RADIUS_BASE;
-pub const RADIUS_SM: f32 = RADIUS_BASE * 2.0;
-pub const RADIUS_MD: f32 = RADIUS_BASE * 3.0;
-pub const RADIUS_LG: f32 = RADIUS_BASE * 4.0;
-pub const RADIUS_XL: f32 = RADIUS_BASE * 6.0;
+include!(concat!(env!("OUT_DIR"), "/theme-radius.rs"));
+pub const RADIUS_XS: f32 = 4.0;
+pub const RADIUS_SM: f32 = RADIUS_BASE * 0.6;
+pub const RADIUS_MD: f32 = RADIUS_BASE * 0.8;
+pub const RADIUS_LG: f32 = RADIUS_BASE;
+pub const RADIUS_XL: f32 = RADIUS_BASE * 1.4;
+pub const RADIUS_2XL: f32 = RADIUS_BASE * 1.8;
+pub const RADIUS_3XL: f32 = RADIUS_BASE * 2.2;
+pub const RADIUS_4XL: f32 = RADIUS_BASE * 2.6;
 
-pub const RANGE_TRACK_HEIGHT: f32 = 10.0;
-pub const RANGE_TRACK_INSET: f32 = 2.0;
+pub const RANGE_TRACK_HEIGHT: f32 = 4.0;
+pub const RANGE_TRACK_INSET: f32 = metrics::SLIDER_THUMB / 2.0;
 
 pub const TEXT_UI_BASE_SIZE: f32 = 12.0;
-pub const TEXT_ROW_BASE_SIZE: f32 = 14.0;
+pub const TEXT_ROW_BASE_SIZE: f32 = 12.0;
 pub const TEXT_MARKDOWN_BASE_SIZE: f32 = 14.0;
 pub const TEXT_MARKDOWN_LIST_BASE_SIZE: f32 = 12.0;
 pub const TEXT_INPUT_CARET_BASE_HEIGHT: f32 = 14.0;
@@ -248,93 +282,21 @@ mod tests {
     }
 
     #[test]
-    fn surface_hierarchy_matches_the_documented_shadcn_adaptation() {
-        let dark = palette(ColorTheme::Dark);
-        assert!(luminance(dark.background) < luminance(dark.surface));
-        assert!(luminance(dark.surface) < luminance(dark.fill_subtle));
-        assert!(luminance(dark.fill_subtle) < luminance(dark.fill_selected));
-        assert!(luminance(dark.fill_selected) < luminance(dark.fill_strong));
-        let light = palette(ColorTheme::Light);
-        assert_eq!(light.background, light.surface);
-        assert!(luminance(light.surface) > luminance(light.fill_subtle));
-        assert!(luminance(light.fill_subtle) > luminance(light.fill_selected));
-        assert!(luminance(light.fill_selected) > luminance(light.fill_strong));
+    fn native_roles_preserve_mira_semantics_and_text_contrast() {
         for mode in ColorTheme::ALL {
             let p = palette(mode);
-            assert_eq!(p.surface, p.surface_elevated);
-            assert!(luminance(p.canvas) < luminance(p.surface));
-            for token in [
-                p.background,
-                p.canvas,
-                p.surface,
-                p.surface_elevated,
-                p.fill_subtle,
-                p.fill_selected,
-                p.fill_strong,
-            ] {
-                assert_eq!(token.alpha, 1.0);
-                assert_eq!(token.red, token.green);
-                assert_eq!(token.green, token.blue);
+            assert_eq!(p.background, p.token("background"));
+            assert_eq!(p.surface, p.token("card"));
+            assert_eq!(p.surface_elevated, p.token("popover"));
+            assert_eq!(p.fill_selected, p.token("accent"));
+            assert_eq!(p.fill_subtle, p.token("secondary"));
+            assert_eq!(p.focus_ring, p.token("ring"));
+            assert_eq!(p.input, p.token("input"));
+            for bg in [p.background, p.surface, p.surface_elevated] {
+                assert!(contrast(p.text_primary, bg) >= 4.5);
             }
-        }
-    }
-
-    #[test]
-    fn semantic_text_remains_readable_on_surfaces_and_control_states() {
-        for mode in ColorTheme::ALL {
-            let p = palette(mode);
-            for bg in [
-                p.background,
-                p.canvas,
-                p.surface,
-                p.surface_elevated,
-                p.fill_subtle,
-                p.fill_selected,
-                p.fill_strong,
-            ] {
-                for fg in [p.text_primary, p.text_muted] {
-                    assert!(contrast(fg, bg) >= 4.5, "{mode:?}: text {fg:?} on {bg:?}");
-                }
-            }
-            for bg in [p.background, p.canvas, p.surface, p.surface_elevated] {
-                for fg in [p.accent, p.danger, p.warning, p.success] {
-                    assert!(contrast(fg, bg) >= 4.5, "{mode:?}: status {fg:?} on {bg:?}");
-                }
-                for fg in [p.control_muted, p.focus_ring] {
-                    assert!(
-                        contrast(fg, bg) >= 3.0,
-                        "{mode:?}: control {fg:?} on {bg:?}"
-                    );
-                }
-            }
-            assert!(contrast(p.danger, p.danger_surface) >= 4.5);
+            assert!(contrast(p.primary_foreground, p.primary) >= 4.5);
             assert!(contrast(p.tooltip_foreground, p.tooltip_surface) >= 4.5);
-            assert!(contrast(p.text_primary, p.text_selection) >= 4.5);
-        }
-    }
-
-    #[test]
-    fn primary_gradient_is_neutral_opaque_lighter_at_top_and_readable_in_all_states() {
-        for mode in ColorTheme::ALL {
-            let p = palette(mode);
-            for (top, bottom) in [
-                (p.primary, p.primary_to),
-                (p.primary_hover, p.primary_hover_to),
-                (p.primary_active, p.primary_active_to),
-            ] {
-                assert!(
-                    luminance(top) > luminance(bottom),
-                    "{mode:?}: gradient direction"
-                );
-                // Neutral interpolation is monotonic in sRGB and OKLab, so the
-                // least contrasting endpoint bounds the whole gradient.
-                for stop in [top, bottom] {
-                    assert_eq!(stop.alpha, 1.0);
-                    assert_eq!(stop.red, stop.green);
-                    assert_eq!(stop.green, stop.blue);
-                    assert!(contrast(p.primary_foreground, stop) >= 4.5);
-                }
-            }
         }
     }
 

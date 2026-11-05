@@ -62,10 +62,9 @@ pub(in crate::app) fn preview_timecode_field(
             .into_any_element()
     };
 
-    div()
-        .flex()
-        .flex_col()
-        .gap(theme::ui_rem(6.0))
+    crate::app::components::frame_field()
+        .w(theme::ui_rem(width))
+        .flex_shrink_0()
         .child(preview_timeline_label(label, palette))
         .child(
             div()

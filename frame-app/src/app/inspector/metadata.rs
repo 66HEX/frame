@@ -21,7 +21,7 @@ pub(in crate::app) fn settings_metadata_tab(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let mut content = div().flex().flex_col().gap_4().child(
+    let mut content = crate::app::components::frame_field_group().child(
         settings_section("Metadata mode", palette)
             .child(settings_metadata_mode_grid(
                 config,
@@ -60,12 +60,15 @@ fn settings_metadata_mode_grid(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let choice_focus =
+        crate::app::components::FrameChoiceFocus::new("settings_metadata_mode_grid", window, cx);
     let mut grid = div().grid().grid_cols(3).gap_2();
     for option in metadata_mode_options(config, settings_disabled) {
         let mode = option.mode;
         let is_enabled = !option.is_disabled;
         grid = grid.child(
             frame_choice_button(
+                &choice_focus,
                 format!("metadata-mode-{}", mode.id()),
                 option.label,
                 option.is_selected,
@@ -104,10 +107,7 @@ fn settings_metadata_fields(
         let placeholder = option.placeholder;
         let field = option.field;
         fields = fields.child(
-            div()
-                .flex()
-                .flex_col()
-                .gap_2()
+            crate::app::components::frame_field()
                 .child(settings_field_label(option.label, palette))
                 .child(frame_text_input(
                     FrameTextInputSpec {

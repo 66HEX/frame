@@ -33,10 +33,7 @@ pub(in crate::app) fn settings_output_tab(
             source.pixel_format.as_deref(),
         )
     });
-    div()
-        .flex()
-        .flex_col()
-        .gap_4()
+    crate::app::components::frame_field_group()
         .child(
             settings_section("Processing mode", palette)
                 .child(settings_processing_mode_grid(
@@ -94,12 +91,15 @@ pub(in crate::app) fn settings_processing_mode_grid(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let choice_focus =
+        crate::app::components::FrameChoiceFocus::new("settings_processing_mode_grid", window, cx);
     let mut grid = div().grid().grid_cols(2).gap_2();
     for option in output_processing_mode_options(config, metadata, settings_disabled) {
         let mode = option.mode;
         let is_enabled = !option.is_disabled;
         grid = grid.child(
             frame_choice_button(
+                &choice_focus,
                 format!("output-mode-{}", option.mode.id()),
                 option.label,
                 option.is_selected,
@@ -135,12 +135,15 @@ pub(in crate::app) fn settings_container_grid(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let choice_focus =
+        crate::app::components::FrameChoiceFocus::new("settings_container_grid", window, cx);
     let mut grid = div().grid().grid_cols(2).gap_2();
     for option in output_container_options(config, metadata, settings_disabled) {
         let container = option.container;
         let is_enabled = !option.is_disabled;
         grid = grid.child(
             frame_choice_button(
+                &choice_focus,
                 format!("output-container-{container}"),
                 &container,
                 option.is_selected,

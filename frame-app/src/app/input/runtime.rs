@@ -194,7 +194,7 @@ mod metrics_tests {
     #[test]
     fn ui_scale_resizes_control_and_caret_together() {
         let metrics = FrameTextInputMetrics::from_ui_scale(2.0);
-        assert_eq!(metrics.control_height, 60.0);
+        assert_eq!(metrics.control_height, 56.0);
         assert_eq!(metrics.caret_height, 28.0);
         assert_eq!(metrics.caret_width, 3.0);
     }

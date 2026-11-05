@@ -89,7 +89,7 @@ pub(in crate::app) fn settings_source_tracks(
     tracks: Vec<crate::settings::SourceTrackSection>,
     palette: &'static theme::ThemePalette,
 ) -> gpui::Div {
-    let mut list = div().flex().flex_col().gap_4();
+    let mut list = crate::app::components::frame_field_group();
     for track in tracks {
         list = list.child(
             div()
@@ -127,20 +127,6 @@ pub(in crate::app) fn settings_section_label(
     label: &'static str,
     palette: &'static theme::ThemePalette,
 ) -> gpui::Div {
-    div()
-        .w_full()
-        .flex()
-        .flex_col()
-        .gap_1()
-        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-        .text_color(color(palette.text_muted))
-        .child(theme::ui_text(label))
-        .child(
-            div()
-                .h(px(1.0))
-                .w_full()
-                .bg(color(palette.canvas))
-                .shadow(horizontal_separator_shadows(palette)),
-        )
+    crate::app::components::frame_label(theme::ui_text(label), palette)
+        .text_size(theme::ui_rem(14.0))
 }

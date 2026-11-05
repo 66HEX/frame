@@ -1,3 +1,5 @@
+pub(in crate::app) use patterns::*;
+mod patterns;
 pub(in crate::app) use button::*;
 pub(in crate::app) use checkbox::*;
 pub(in crate::app) use color_picker::*;
@@ -11,6 +13,8 @@ pub(in crate::app) use tooltip::*;
 mod button;
 mod checkbox;
 mod color_picker;
+#[cfg(test)]
+mod control_motion_tests;
 mod hit_target;
 mod list_item;
 mod scrollbar;
@@ -22,3 +26,9 @@ mod tooltip;
 
 pub(in crate::app) mod popover_state;
 pub(in crate::app) mod tooltip_state;
+
+mod choice_group;
+pub(in crate::app) use choice_group::FrameChoiceFocus;
+
+mod surface_motion;
+pub(in crate::app) use surface_motion::{SurfaceOrigin, frame_surface_motion};

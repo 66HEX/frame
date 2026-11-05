@@ -1,13 +1,13 @@
-//! Shared light/dark elevation scale, transcribed from the supplied Figma CSS.
-//! See frame-app/docs/ui-shadows/README.md for component assignments and border exceptions.
+//! Tailwind v4 shadow scale used by Mira. Borders and surface rings are separate.
 
-use gpui::{BoxShadow, point, px, rgba};
+use gpui::{BoxShadow, Rgba, point, px};
 
 /// Logical pixels, identical on macOS, Windows and Linux (independent of UI zoom).
 pub const EDGE_WIDTH: f32 = 1.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ShadowLevel {
+    None,
     Xxs,
     Xs,
     Sm,
@@ -17,123 +17,46 @@ pub enum ShadowLevel {
     Xxl,
 }
 
-pub const INDICATOR: ShadowLevel = ShadowLevel::Xxs;
-pub const CONTROL: ShadowLevel = ShadowLevel::Xs;
-pub const EMBEDDED_PANEL: ShadowLevel = ShadowLevel::Sm;
-pub const CARD: ShadowLevel = ShadowLevel::Md;
-pub const FLOATING: ShadowLevel = ShadowLevel::Lg;
-pub const MODAL: ShadowLevel = ShadowLevel::Xl;
-
-/// Shared inset treatment for fields, sliders, checkboxes and the canvas.
-///
-/// Reuses every xs layer. Dark shadows keep their downward offset and become
-/// inset; the existing white inset highlight moves to the bottom.
-#[must_use]
-pub fn recessed_control() -> Vec<BoxShadow> {
-    CONTROL
-        .shadows()
-        .into_iter()
-        .map(|mut shadow| {
-            if shadow.inset {
-                shadow.offset.y = -shadow.offset.y;
-            }
-            shadow.inset = true;
-            shadow
-        })
-        .collect()
-}
+pub const FLOATING: ShadowLevel = ShadowLevel::Md;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Layer {
     y: f32,
     blur: f32,
     spread: f32,
-    rgba: u32,
+    alpha: f32,
     inset: bool,
 }
 
-const fn layer(y: f32, blur: f32, spread: f32, rgba: u32, inset: bool) -> Layer {
+const fn layer(y: f32, blur: f32, spread: f32, alpha: f32, inset: bool) -> Layer {
     Layer {
         y,
         blur,
         spread,
-        rgba,
+        alpha,
         inset,
     }
 }
 
-const XXS: &[Layer] = &[
-    layer(1.0, 0.0, 0.0, 0x03_03_02_13, false),
-    layer(0.0, 0.0, 1.0, 0xFF_FF_FF_0D, true),
-    layer(1.0, 0.0, 0.0, 0xFF_FF_FF_1F, true),
-    layer(0.0, 0.0, 1.0, 0x03_03_02_12, false),
-];
-
-const XS: &[Layer] = &[
-    layer(1.0, 1.0, -0.5, 0x03_03_02_30, false),
-    layer(2.0, 2.0, -1.0, 0x03_03_02_0A, false),
-    layer(4.0, 4.0, -2.0, 0x03_03_02_05, false),
-    layer(8.0, 4.0, -3.0, 0x03_03_02_03, false),
-    layer(0.0, 0.0, 1.0, 0x03_03_02_12, false),
-    layer(1.0, 0.0, 0.0, 0x03_03_02_0A, false),
-    layer(0.0, 0.0, 1.0, 0xFF_FF_FF_0D, true),
-    layer(1.0, 0.0, 0.0, 0xFF_FF_FF_1F, true),
-];
-
+const XXS: &[Layer] = &[layer(1.0, 0.0, 0.0, 0.05, false)];
+const XS: &[Layer] = &[layer(1.0, 2.0, 0.0, 0.05, false)];
 const SM: &[Layer] = &[
-    layer(1.0, 2.0, -0.5, 0x03_03_02_30, false),
-    layer(3.0, 3.0, -1.0, 0x03_03_02_0A, false),
-    layer(6.0, 5.0, -2.0, 0x03_03_02_05, false),
-    layer(15.0, 6.0, -3.0, 0x03_03_02_03, false),
-    layer(0.0, 0.0, 1.0, 0x03_03_02_12, false),
-    layer(1.0, 0.0, 0.0, 0x03_03_02_0A, false),
-    layer(0.0, 0.0, 1.0, 0xFF_FF_FF_0D, true),
-    layer(1.0, 0.0, 0.0, 0xFF_FF_FF_1F, true),
+    layer(1.0, 3.0, 0.0, 0.1, false),
+    layer(1.0, 2.0, -1.0, 0.1, false),
 ];
-
 const MD: &[Layer] = &[
-    layer(1.0, 3.0, 0.0, 0x03_03_02_0D, false),
-    layer(5.0, 5.0, -1.0, 0x03_03_02_0D, false),
-    layer(11.0, 6.0, -2.0, 0x03_03_02_08, false),
-    layer(19.0, 8.0, -3.0, 0x03_03_02_03, false),
-    layer(0.0, 0.0, 1.0, 0xFF_FF_FF_0D, true),
-    layer(1.0, 0.0, 0.0, 0xFF_FF_FF_1F, true),
-    layer(0.0, 0.0, 1.0, 0x03_03_02_12, false),
-    layer(1.0, 0.0, 0.0, 0x03_03_02_0A, false),
+    layer(4.0, 6.0, -1.0, 0.1, false),
+    layer(2.0, 4.0, -2.0, 0.1, false),
 ];
-
 const LG: &[Layer] = &[
-    layer(0.0, 0.0, 1.0, 0xFF_FF_FF_0D, true),
-    layer(1.0, 0.0, 0.0, 0xFF_FF_FF_1F, true),
-    layer(0.0, 0.0, 1.0, 0x03_03_02_1A, false),
-    layer(1.0, 0.0, 0.0, 0x03_03_02_1A, false),
-    layer(2.0, 5.0, -1.0, 0x03_03_02_0F, false),
-    layer(8.0, 12.0, -1.0, 0x03_03_02_0D, false),
-    layer(22.0, 16.0, -2.0, 0x03_03_02_0A, false),
-    layer(32.0, 18.0, -2.0, 0x03_03_02_03, false),
+    layer(10.0, 15.0, -3.0, 0.1, false),
+    layer(4.0, 6.0, -4.0, 0.1, false),
 ];
-
 const XL: &[Layer] = &[
-    layer(0.0, 0.0, 1.0, 0xFF_FF_FF_0D, true),
-    layer(1.0, 0.0, 0.0, 0xFF_FF_FF_1F, true),
-    layer(0.0, 0.0, 1.0, 0x03_03_02_1A, false),
-    layer(1.0, 0.0, 0.0, 0x03_03_02_1A, false),
-    layer(4.0, 8.0, -1.0, 0x03_03_02_0F, false),
-    layer(15.0, 15.0, -1.0, 0x03_03_02_0D, false),
-    layer(33.0, 20.0, -2.0, 0x03_03_02_0A, false),
-    layer(58.0, 23.0, -2.0, 0x03_03_02_03, false),
+    layer(20.0, 25.0, -5.0, 0.1, false),
+    layer(8.0, 10.0, -6.0, 0.1, false),
 ];
-
-const XXL: &[Layer] = &[
-    layer(13.0, 29.0, 0.0, 0x03_03_02_12, false),
-    layer(53.0, 53.0, 0.0, 0x03_03_02_0F, false),
-    layer(119.0, 71.0, 0.0, 0x03_03_02_08, false),
-    layer(211.0, 85.0, 0.0, 0x03_03_02_03, false),
-    layer(0.0, 0.0, 1.0, 0x03_03_02_1A, false),
-    layer(1.0, 0.0, 0.0, 0x03_03_02_1A, false),
-    layer(0.0, 0.0, 1.0, 0xFF_FF_FF_0D, true),
-    layer(1.0, 0.0, 0.0, 0xFF_FF_FF_1F, true),
-];
+const XXL: &[Layer] = &[layer(25.0, 50.0, -12.0, 0.25, false)];
 
 impl ShadowLevel {
     /// CSS lists its top layer first; GPUI paints the last layer on top.
@@ -145,7 +68,7 @@ impl ShadowLevel {
             .iter()
             .rev()
             .map(|layer| BoxShadow {
-                color: rgba(layer.rgba).into(),
+                color: Rgba::new(0.0, 0.0, 0.0, layer.alpha).into(),
                 offset: point(px(0.0), px(layer.y)),
                 // GPUI consumes Gaussian sigma; CSS box-shadow specifies 2 * sigma.
                 blur_radius: px(layer.blur / 2.0),
@@ -157,6 +80,7 @@ impl ShadowLevel {
 
     const fn layers(self) -> &'static [Layer] {
         match self {
+            Self::None => &[],
             Self::Xxs => XXS,
             Self::Xs => XS,
             Self::Sm => SM,
@@ -206,8 +130,8 @@ mod tests {
                         y: pixels(1),
                         blur: pixels(2),
                         spread: pixels(3),
-                        rgba: u32::from_str_radix(fields[4].trim_start_matches('#'), 16).unwrap(),
-                        inset: fields.get(5) == Some(&"inset"),
+                        alpha: fields[8].trim_end_matches(')').parse().unwrap(),
+                        inset: fields.get(9) == Some(&"inset"),
                     }
                 })
                 .collect();
@@ -220,51 +144,15 @@ mod tests {
         for level in LEVELS {
             let shadows = level.shadows();
             for (native, source) in shadows.iter().rev().zip(level.layers()) {
-                assert_eq!(native.color, rgba(source.rgba).into());
+                assert_eq!(native.color, Rgba::new(0.0, 0.0, 0.0, source.alpha).into());
                 assert_eq!(native.offset, point(px(0.0), px(source.y)));
                 assert_eq!(native.blur_radius, px(source.blur / 2.0));
                 assert_eq!(native.spread_radius, px(source.spread));
                 assert_eq!(native.inset, source.inset);
             }
             assert_eq!(shadows.len(), level.layers().len());
-            assert!(
-                level
-                    .layers()
-                    .iter()
-                    .any(|layer| layer.inset && layer.y == EDGE_WIDTH)
-            );
-            assert!(
-                level
-                    .layers()
-                    .iter()
-                    .any(|layer| !layer.inset && layer.spread == EDGE_WIDTH)
-            );
+            assert!(shadows.iter().all(|shadow| !shadow.inset));
         }
-        assert_eq!(ShadowLevel::Xs.layers()[0].spread, -0.5);
-        assert_eq!(ShadowLevel::Sm.layers()[0].spread, -0.5);
-    }
-
-    #[test]
-    fn recessed_controls_have_only_inner_layers_and_a_bottom_highlight() {
-        let recessed = recessed_control();
-        assert_eq!(recessed.len(), 8);
-        assert!(recessed.iter().all(|layer| layer.inset));
-        let highlight = recessed
-            .iter()
-            .find(|layer| layer.color == rgba(0xFF_FF_FF_1F).into())
-            .unwrap();
-        assert_eq!(highlight.offset, point(px(0.0), px(-1.0)));
-        let top_shadow = recessed
-            .iter()
-            .find(|layer| layer.color == rgba(0x03_03_02_30).into())
-            .unwrap();
-        assert_eq!(top_shadow.offset, point(px(0.0), px(1.0)));
-        assert_eq!(top_shadow.blur_radius, px(0.5));
-        assert_eq!(top_shadow.spread_radius, px(-0.5));
-        for (inner, source) in recessed.iter().zip(CONTROL.shadows()) {
-            assert_eq!(inner.color, source.color);
-            assert_eq!(inner.blur_radius, source.blur_radius);
-            assert_eq!(inner.spread_radius, source.spread_radius);
-        }
+        assert!(ShadowLevel::None.shadows().is_empty());
     }
 }

@@ -93,7 +93,8 @@ pub(super) fn preview_overlay_opacity_slider(
     value: f64,
     enabled: bool,
     palette: &'static theme::ThemePalette,
-    cx: &Context<FrameRoot>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let value = f64_to_f32(value.clamp(0.0, 1.0));
     let owner = cx.entity();
@@ -105,6 +106,8 @@ pub(super) fn preview_overlay_opacity_slider(
         value,
         !enabled,
         palette,
+        window,
+        cx,
     )
     .w(theme::ui_rem(OVERLAY_OPACITY_SLIDER_WIDTH))
     .on_a11y_action(gpui::AccessibleAction::Increment, move |_, _window, cx| {
@@ -154,7 +157,7 @@ pub(super) fn preview_overlay_opacity_slider(
         }),
     )
     .when(enabled, |this| {
-        this.cursor_ew_resize().on_drag(
+        this.cursor_default().on_drag(
             PreviewOverlayOpacityDrag,
             |_drag, _position, _window, cx| cx.new(|_| PreviewTimelineDragPreview),
         )
@@ -183,8 +186,8 @@ pub(in crate::app) fn overlay_opacity_for_key(value: f64, key: &str) -> Option<f
     let next = match key {
         "left" | "down" => value - 0.01,
         "right" | "up" => value + 0.01,
-        "pageup" => value - 0.10,
-        "pagedown" => value + 0.10,
+        "pageup" => value + 0.10,
+        "pagedown" => value - 0.10,
         "home" => 0.0,
         "end" => 1.0,
         _ => return None,

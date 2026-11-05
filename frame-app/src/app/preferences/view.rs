@@ -1,17 +1,16 @@
-use crate::app::accessibility::{apply_accessible_button_with_focus, handle_modal_tab_navigation};
+use crate::app::accessibility::handle_modal_tab_navigation;
+use crate::app::components::FrameStyle;
 use crate::app::components::popover_state::PopoverState;
 use crate::app::components::{frame_text_button, frame_text_button_with_focus};
 use crate::app::input::{FrameTextInputKind, FrameTextInputSpec, frame_text_input};
 use crate::app::inspector::{settings_hint_text, settings_section};
-use crate::app::layout::{PANEL_HEADER_HEIGHT, SETTINGS_CONTROL_HEIGHT};
-use crate::app::motion::{motion_is_hidden, settings_sheet_right_inset, surface_motion};
+use crate::app::layout::PANEL_HEADER_HEIGHT;
+use crate::app::motion::{
+    motion_is_hidden, settings_sheet_right_inset, sheet_motion, surface_motion,
+};
 use crate::app::preferences::appearance::app_settings_appearance_section;
 use crate::app::preferences::state::AppearancePopover;
-use crate::app::primitives::{
-    ButtonVariant, animated_button_colors, apply_button_motion, button_colors, color, icon_svg,
-    panel_bottom_separator,
-};
-use crate::app::queue::state::FILE_LIST_ACTION_ICON_SIZE;
+use crate::app::primitives::{ButtonVariant, color, icon_svg, panel_bottom_separator};
 use crate::app::root::FrameRoot;
 use crate::app::updates::preferences::{AppSettingsUpdateFocuses, app_settings_updates_section};
 use crate::app::updates::state::UpdateStatus;
@@ -77,7 +76,9 @@ pub(in crate::app) fn app_settings_sheet(
     let palette = props.palette;
     let draft_is_dirty =
         props.draft_max_concurrency.trim() != props.current_max_concurrency.to_string();
-    let progress = surface_motion("app-settings-sheet-motion", props.is_open, window, cx);
+    let progress = sheet_motion(props.is_open, window, cx);
+    let backdrop_progress =
+        surface_motion("app-settings-backdrop-motion", props.is_open, window, cx);
     let right_inset = settings_sheet_right_inset(progress);
     let first_focus = props.close_focus.clone();
     let last_focus = props.last_focus.clone();
@@ -125,8 +126,9 @@ pub(in crate::app) fn app_settings_sheet(
                 .id("app-settings-backdrop")
                 .absolute()
                 .inset_0()
-                .bg(color(palette.overlay_backdrop.with_alpha(0.60 * progress)))
-                .backdrop_blur(theme::ui_rem(4.0 * progress).to_pixels(window.rem_size()))
+                .bg(color(palette.overlay_backdrop))
+                .opacity(backdrop_progress)
+                .backdrop_blur(theme::ui_rem(4.0).to_pixels(window.rem_size()))
                 .occlude()
                 .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
                     cx.stop_propagation();
@@ -139,21 +141,23 @@ pub(in crate::app) fn app_settings_sheet(
             div()
                 .id("app-settings-panel")
                 .role(gpui::Role::Dialog)
+                .aria_modal(true)
                 .aria_label("Settings")
                 .track_focus(props.panel_focus)
                 .tab_stop(false)
                 .absolute()
-                .top_2()
+                .top_0()
                 .right(theme::ui_rem(right_inset))
-                .bottom_2()
-                .w(theme::ui_rem(360.0))
-                .max_w(relative(0.95))
+                .bottom_0()
+                .w(theme::ui_rem(384.0))
+                .max_w(relative(0.75))
                 .flex()
                 .flex_col()
-                .rounded(theme::ui_rem(theme::RADIUS_LG))
-                .bg(color(palette.surface))
+                .border_l_1()
+                .border_color(color(palette.border_subtle))
+                .bg(color(palette.surface_elevated))
+                .shadow(theme::shadows::ShadowLevel::Lg.shadows())
                 .opacity(progress)
-                .shadow(theme::shadows::MODAL.shadows())
                 .occlude()
                 .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
                     cx.stop_propagation();
@@ -378,7 +382,9 @@ pub(in crate::app) fn app_settings_concurrency_control(
         cx,
     )
     .when_some(error.map(str::to_string), |this, error| {
-        this.aria_invalid(true).aria_description(error)
+        this.aria_invalid(true)
+            .aria_description(error)
+            .invalid_surface(palette)
     });
 
     div()
@@ -407,37 +413,25 @@ pub(in crate::app) fn app_settings_close_button(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    let colors = button_colors(ButtonVariant::Ghost, false, enabled, palette);
-    let animated = animated_button_colors(id, colors, window, cx);
-    let background = animated.background;
-    let foreground = animated.foreground;
-    let motion = animated.motion;
-
-    let button = div()
-        .id(id)
-        .group(id)
-        .w(theme::ui_rem(SETTINGS_CONTROL_HEIGHT))
-        .h(theme::ui_rem(SETTINGS_CONTROL_HEIGHT))
-        .flex()
-        .items_center()
-        .justify_center()
-        .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .bg(background)
-        .text_color(foreground)
-        .when(enabled, |this| {
-            this.hover_style(gpui::Styled::cursor_pointer)
-        })
-        .when(enabled, |this| {
-            this.active_style(move |style| style.bg(colors.active_fill()))
-        })
-        .child(icon_svg(
-            assets::ICON_CLOSE,
-            FILE_LIST_ACTION_ICON_SIZE,
-            foreground,
-        ));
-    let button = apply_button_motion(button, motion, enabled);
-
-    apply_accessible_button_with_focus(button, label, enabled, focus, palette)
+    let button = crate::app::components::frame_button_base(
+        id,
+        label,
+        ButtonVariant::Ghost,
+        false,
+        enabled,
+        theme::metrics::ControlSize::Sm,
+        palette,
+        window,
+        cx,
+    )
+    .w(theme::ui_rem(24.0))
+    .p_0()
+    .child(icon_svg(
+        assets::ICON_CLOSE,
+        12.0,
+        color(palette.text_primary),
+    ));
+    button.track_focus(focus)
 }
 
 pub(in crate::app) fn app_settings_apply_button(

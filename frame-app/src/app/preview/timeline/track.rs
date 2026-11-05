@@ -141,9 +141,9 @@ pub(in crate::app) fn preview_timeline_track(
         .relative()
         .h(theme::ui_rem(PREVIEW_TIMELINE_CONTROL_HEIGHT))
         .w_full()
-        .rounded(theme::ui_rem(theme::RADIUS_SM))
+        .rounded(theme::ui_rem(theme::RADIUS_MD))
         .opacity(if enabled { 1.0 } else { 0.5 })
-        .when(enabled, gpui::Styled::cursor_pointer)
+        .when(enabled, gpui::Styled::cursor_default)
         .on_mouse_down(
             MouseButton::Left,
             cx.listener(|root, event: &MouseDownEvent, _window, cx| {
@@ -316,11 +316,11 @@ pub(in crate::app) fn preview_timeline_handle(
         .left(theme::ui_rem(hit_target.0))
         .h(theme::ui_rem(PREVIEW_TIMELINE_CONTROL_HEIGHT))
         .w(theme::ui_rem(hit_target.1))
-        .rounded(theme::ui_rem(theme::RADIUS_SM))
+        .rounded(theme::ui_rem(theme::RADIUS_MD))
         .on_mouse_down(MouseButton::Left, |_event, _window, cx| {
             cx.stop_propagation();
         })
-        .when(enabled, gpui::Styled::cursor_ew_resize);
+        .when(enabled, gpui::Styled::cursor_default);
 
     let handle = if enabled {
         handle.on_drag(
@@ -425,8 +425,8 @@ pub(in crate::app) fn timeline_keyboard_time_for_key(
     let next = match key {
         "left" | "down" => current_time - small_step,
         "right" | "up" => current_time + small_step,
-        "pageup" => current_time - large_step,
-        "pagedown" => current_time + large_step,
+        "pageup" => current_time + large_step,
+        "pagedown" => current_time - large_step,
         "home" => 0.0,
         "end" => duration,
         _ => return None,

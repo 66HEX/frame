@@ -1,9 +1,6 @@
-use crate::app::accessibility::{
-    apply_accessible_button, apply_accessible_button_with_focus, apply_accessible_toggle_button,
-    handle_modal_tab_navigation,
-};
+use crate::app::accessibility::apply_accessible_button;
+use crate::app::components::FrameStyle;
 use crate::app::components::frame_handle_hit_region;
-use crate::app::layout::PREVIEW_TIMELINE_CONTROL_HEIGHT;
 use crate::app::preview::crop::default_crop_rect;
 use crate::app::preview::panel::{
     PreviewCropOptionsProps, PreviewCropRenderState, PreviewEditToolbarFocus, PreviewShellState,
@@ -14,9 +11,7 @@ use crate::app::preview::{
     PreviewTimelineDragPreview, preview_crop_custom_fields, preview_crop_options,
     preview_handle_color, preview_selection_line_color,
 };
-use crate::app::primitives::{
-    ButtonVariant, animated_button_colors, apply_button_motion, button_colors, color,
-};
+use crate::app::primitives::{ButtonVariant, color};
 use crate::app::root::FrameRoot;
 use crate::numeric::unit_f64_to_f32;
 use crate::preview::{CropRect, DragHandle, PreviewRotation, clamp_rect, transform_crop_rect};
@@ -162,6 +157,7 @@ pub(in crate::app) fn crop_outline_rect(
 ) -> gpui::Stateful<gpui::Div> {
     let outline = div()
         .id("preview-crop-move-handle")
+        .debug_selector(|| "preview-crop-move-handle".into())
         .absolute()
         .left(relative(left.clamp(0.0, 1.0)))
         .top(relative(top.clamp(0.0, 1.0)))
@@ -251,8 +247,7 @@ pub(in crate::app) fn preview_crop_handle(
                     .w(theme::ui_rem(CROP_HANDLE_SIZE))
                     .h(theme::ui_rem(CROP_HANDLE_SIZE))
                     .rounded_full()
-                    .bg(color(preview_handle_color(palette)))
-                    .shadow(theme::shadows::INDICATOR.shadows()),
+                    .bg(color(preview_handle_color(palette))),
             ),
         handle,
     )
@@ -380,8 +375,6 @@ pub(in crate::app) fn preview_crop_aspect_bar(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let palette = state.palette;
-    let first_focus = focuses.first.clone();
-    let last_focus = focuses.last.clone();
     let mut bar = div()
         .relative()
         .id("preview-crop-toolbar")
@@ -392,15 +385,9 @@ pub(in crate::app) fn preview_crop_aspect_bar(
         .max_w_full()
         .items_center()
         .gap_2()
-        .rounded(theme::ui_rem(theme::RADIUS_MD))
-        .bg(color(palette.surface_elevated))
+        .popover_surface(palette)
         .p(theme::ui_rem(4.0))
-        .shadow(theme::shadows::FLOATING.shadows())
-        .on_key_down(
-            cx.listener(move |_root, event: &gpui::KeyDownEvent, window, cx| {
-                handle_modal_tab_navigation(event, &first_focus, &last_focus, window, cx);
-            }),
-        );
+        .shadow(theme::shadows::FLOATING.shadows());
 
     bar = bar.child(preview_crop_options(state, focuses, options, window, cx));
     if options.custom {
@@ -494,53 +481,13 @@ fn compact_text_button_variant_inner(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    let colors = button_colors(variant, selected, enabled, palette);
     let id = format!("preview-crop-action-{}", label.to_ascii_lowercase());
-    let animated = animated_button_colors(id.clone(), colors, window, cx);
-    let background = animated.background;
-    let foreground = animated.foreground;
-    let motion = animated.motion;
-    let highlighted = selected || matches!(variant, ButtonVariant::Primary);
-
-    let button = div()
-        .id(id)
-        .h(theme::ui_rem(PREVIEW_TIMELINE_CONTROL_HEIGHT))
-        .px(theme::ui_rem(10.0))
-        .flex()
-        .items_center()
-        .justify_center()
-        .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .bg(background)
-        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-        .text_color(foreground)
-        .opacity(colors.opacity)
-        .when(highlighted, |this| {
-            this.shadow(theme::shadows::CONTROL.shadows())
-        })
-        .when(enabled, |this| {
-            this.hover_style(gpui::Styled::cursor_pointer)
-                .active_style(move |style| {
-                    style
-                        .bg(colors.active_fill())
-                        .text_color(color(colors.hover_foreground))
-                })
-        })
-        .when(!enabled, gpui::Styled::cursor_not_allowed)
-        .child(theme::ui_text(label));
-
-    let button = apply_button_motion(button, motion, enabled);
-
-    if let Some(focus) = focus {
-        let button = apply_accessible_button_with_focus(button, label, enabled, focus, palette);
-        if selected {
-            button.aria_toggled(gpui::Toggled::True)
-        } else {
-            button
-        }
-    } else if selected {
-        apply_accessible_toggle_button(button, label, enabled, true, palette)
+    let button = crate::app::components::frame_text_button_inner(
+        id, label, variant, selected, enabled, focus, palette, window, cx,
+    );
+    if selected {
+        button.aria_toggled(gpui::Toggled::True)
     } else {
-        apply_accessible_button(button, label, enabled, palette)
+        button
     }
 }

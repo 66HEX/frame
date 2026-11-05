@@ -281,7 +281,7 @@ pub(in crate::app) fn frame_text_input(
     } else {
         value.to_string()
     };
-    let label_color = if disabled || is_placeholder {
+    let label_color = if is_placeholder {
         palette.text_muted
     } else {
         palette.text_primary
@@ -294,13 +294,14 @@ pub(in crate::app) fn frame_text_input(
         .flex()
         .items_center()
         .min_w_0()
-        .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .bg(color(palette.canvas))
-        .px(theme::ui_rem(10.0))
+        .rounded(theme::ui_rem(theme::RADIUS_MD))
+        .bg(color(palette.input_background))
+        .border_1()
+        .border_color(color(palette.input))
+        .px(theme::ui_rem(theme::metrics::CONTROL_PADDING_X))
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .text_color(color(label_color))
         .opacity(if disabled { 0.5 } else { 1.0 })
-        .shadow(theme::shadows::recessed_control())
         .key_context(if kind.is_preview_timecode() {
             FRAME_TIMECODE_TEXT_INPUT_CONTEXT
         } else {

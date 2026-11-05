@@ -13,6 +13,7 @@ mod actions;
 mod burn_in;
 mod color;
 mod color_picker;
+mod file_button;
 mod font_select;
 mod popover;
 mod size_select;

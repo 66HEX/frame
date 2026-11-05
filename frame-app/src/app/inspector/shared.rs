@@ -1,3 +1,4 @@
+use crate::app::components::{frame_badge, frame_description, frame_label};
 use crate::app::primitives::color;
 use crate::numeric::{rounded_f64_to_u32, u32_to_f32};
 use crate::settings::SettingsTab;
@@ -9,40 +10,21 @@ pub(in crate::app) fn settings_field_label(
     label: &'static str,
     palette: &'static theme::ThemePalette,
 ) -> gpui::Div {
-    div()
-        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-        .text_color(color(palette.text_muted))
-        .child(theme::ui_text(label))
+    frame_label(theme::ui_text(label), palette)
 }
 
 pub(in crate::app) fn settings_value_badge(
     value: String,
     palette: &'static theme::ThemePalette,
 ) -> gpui::Div {
-    div()
-        .min_h(theme::ui_rem(18.0))
-        .flex()
-        .items_center()
-        .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .bg(color(palette.fill_strong))
-        .px(theme::ui_rem(6.0))
-        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-        .text_color(color(palette.text_primary))
-        .font_features(assets::frame_tabular_number_font_features())
-        .shadow(theme::shadows::CONTROL.shadows())
-        .child(value)
+    frame_badge(value, palette)
 }
 
 pub(in crate::app) fn settings_hint_text(
     text: &'static str,
     palette: &'static theme::ThemePalette,
 ) -> gpui::Div {
-    div()
-        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-        .text_color(color(palette.text_muted))
-        .child(theme::ui_text(text))
+    frame_description(theme::ui_text(text), palette)
 }
 
 pub(in crate::app) fn settings_value_row(
@@ -121,8 +103,8 @@ pub(in crate::app) fn range_value_for_key(
     let next = match key {
         "left" | "down" => value.saturating_sub(1),
         "right" | "up" => value.saturating_add(1),
-        "pageup" => value.saturating_sub(page_step),
-        "pagedown" => value.saturating_add(page_step),
+        "pageup" => value.saturating_add(page_step),
+        "pagedown" => value.saturating_sub(page_step),
         "home" => min,
         "end" => max,
         _ => return None,

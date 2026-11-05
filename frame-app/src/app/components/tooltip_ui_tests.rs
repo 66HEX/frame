@@ -53,7 +53,7 @@ impl gpui::Render for TooltipTestView {
                     id,
                     crate::assets::ICON_PLUS,
                     label,
-                    false,
+                    None,
                     enabled,
                     root.tooltip_ui.visible_id.as_deref(),
                     placement,
@@ -249,7 +249,7 @@ fn tooltip_hover_delay_is_cancelled_when_the_pointer_leaves() {
 }
 
 #[test]
-fn tooltip_disabled_controls_remain_described_without_becoming_tab_stops() {
+fn disabled_mira_buttons_do_not_activate_or_open_tooltips() {
     let mut app = TestAppContext::single();
     let (root, cx) = preview_window(&mut app);
     root.update(cx, |root, cx| {
@@ -258,6 +258,8 @@ fn tooltip_disabled_controls_remain_described_without_becoming_tab_stops() {
     });
     draw(cx);
     cx.simulate_keystrokes("tab");
+    draw(cx);
+    std::thread::sleep(INTERACTION_MOTION_DURATION);
     draw(cx);
     assert!(cx.debug_bounds("frame-tooltip-bubble").is_none());
     let flip = cx.debug_bounds("preview-tool-flip-horizontal").unwrap();
@@ -268,7 +270,7 @@ fn tooltip_disabled_controls_remain_described_without_becoming_tab_stops() {
     draw(cx);
     assert!(
         cx.debug_bounds("tooltip-preview-tool-flip-horizontal")
-            .is_some()
+            .is_none()
     );
     assert!(!root.read_with(cx, |root, _| {
         root.file_queue

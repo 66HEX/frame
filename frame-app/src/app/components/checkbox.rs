@@ -12,9 +12,8 @@ use std::rc::Rc;
 pub(in crate::app) const FRAME_CHECKBOX_SIZE: f32 = 16.0;
 pub(in crate::app) const FRAME_CHECK_ICON_SIZE: f32 = 14.0;
 pub(in crate::app) const FRAME_CHECKBOX_ROW_INDICATOR_OFFSET_Y: f32 = 2.0;
-const FRAME_CHECKBOX_MARK_SIZE: f32 = 8.0;
-const FRAME_SELECTION_DOT_SIZE: f32 = 12.0;
-const FRAME_SELECTION_DOT_MARK_SIZE: f32 = 6.0;
+const FRAME_SELECTION_DOT_SIZE: f32 = 16.0;
+const FRAME_SELECTION_DOT_MARK_SIZE: f32 = 8.0;
 
 pub(in crate::app) fn frame_checkbox_indicator(
     checked: bool,
@@ -30,19 +29,15 @@ pub(in crate::app) fn frame_checkbox_indicator(
         .justify_center()
         .rounded(theme::ui_rem(theme::RADIUS_XS));
 
-    if indeterminate {
-        mark = mark.child(
-            div()
-                .w(theme::ui_rem(FRAME_CHECKBOX_MARK_SIZE))
-                .h(theme::ui_rem(2.0))
-                .rounded(theme::ui_rem(theme::RADIUS_XS))
-                .bg(color(palette.text_primary)),
-        );
-    } else if checked {
+    if checked || indeterminate {
         mark = mark.child(icon_svg(
             assets::ICON_CHECK,
             FRAME_CHECK_ICON_SIZE,
-            color(palette.text_primary),
+            color(if checked {
+                palette.primary_foreground
+            } else {
+                palette.text_primary
+            }),
         ));
     }
 
@@ -54,9 +49,20 @@ pub(in crate::app) fn frame_checkbox_indicator(
         .items_center()
         .justify_center()
         .rounded(theme::ui_rem(theme::RADIUS_XS))
-        .bg(color(palette.canvas))
+        .border_1()
+        .border_color(color(if checked {
+            palette.primary
+        } else {
+            palette.input
+        }))
+        .bg(color(if checked {
+            palette.primary
+        } else if palette.is_light() {
+            palette.transparent
+        } else {
+            palette.input_background
+        }))
         .opacity(if disabled { 0.5 } else { 1.0 })
-        .shadow(theme::shadows::recessed_control())
         .child(mark)
 }
 
@@ -72,14 +78,25 @@ pub(in crate::app) fn frame_selection_dot(
         .items_center()
         .justify_center()
         .rounded_full()
-        .bg(color(palette.canvas))
-        .shadow(theme::shadows::recessed_control())
+        .border_1()
+        .border_color(color(if selected_progress > 0.5 {
+            palette.primary
+        } else {
+            palette.input
+        }))
+        .bg(color(if selected_progress > 0.5 {
+            palette.primary
+        } else if palette.is_light() {
+            palette.transparent
+        } else {
+            palette.input_background
+        }))
         .child(
             div()
                 .w(theme::ui_rem(FRAME_SELECTION_DOT_MARK_SIZE))
                 .h(theme::ui_rem(FRAME_SELECTION_DOT_MARK_SIZE))
                 .rounded_full()
-                .bg(color(palette.control_muted))
+                .bg(color(palette.primary_foreground))
                 .opacity(selected_progress.clamp(0.0, 1.0)),
         )
 }
@@ -156,12 +173,14 @@ fn frame_checkbox_row_inner(
     let action = Rc::new(action);
     let row_action = Rc::clone(&action);
     let indicator_action = Rc::clone(&action);
-    let indicator = frame_checkbox_indicator(checked, false, disabled, palette)
+    let indicator = frame_checkbox_indicator(checked, false, false, palette)
         .id(format!("{id}-indicator"))
         .mt(theme::ui_rem(FRAME_CHECKBOX_ROW_INDICATOR_OFFSET_Y))
         .on_click(cx.listener(move |root, event: &ClickEvent, window, cx| {
             cx.stop_propagation();
-            indicator_action(root, event, window, cx);
+            if enabled {
+                indicator_action(root, event, window, cx);
+            }
         }));
     let indicator = if let Some(focus) = focus {
         apply_accessible_checkbox_with_focus(
@@ -173,22 +192,28 @@ fn frame_checkbox_row_inner(
 
     div()
         .id(id)
+        .min_w_0()
+        .flex_1()
         .flex()
         .items_start()
         .gap_2()
         .opacity(if disabled { 0.5 } else { 1.0 })
-        .when(enabled, gpui::Styled::cursor_pointer)
+        .when(enabled, gpui::Styled::cursor_default)
         .when(!enabled, gpui::Styled::cursor_not_allowed)
         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
             button_mouse_down(enabled, window, cx);
         })
         .on_click(cx.listener(move |root, event: &ClickEvent, window, cx| {
             cx.stop_propagation();
-            row_action(root, event, window, cx);
+            if enabled {
+                row_action(root, event, window, cx);
+            }
         }))
         .child(indicator)
         .child(
             div()
+                .min_w_0()
+                .flex_1()
                 .flex()
                 .flex_col()
                 .when(has_hint, gpui::Styled::gap_1)
@@ -196,7 +221,7 @@ fn frame_checkbox_row_inner(
                     div()
                         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-                        .text_color(color(palette.text_muted))
+                        .text_color(color(palette.text_primary))
                         .child(display_label),
                 )
                 .when(has_hint, |this| {

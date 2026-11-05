@@ -47,7 +47,6 @@ pub(in crate::app) fn drag_drop_overlay(
                 .justify_center()
                 .rounded(theme::ui_rem(theme::RADIUS_LG))
                 .bg(color(palette.fill_subtle))
-                .shadow(theme::shadows::MODAL.shadows())
                 .child(
                     div()
                         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))

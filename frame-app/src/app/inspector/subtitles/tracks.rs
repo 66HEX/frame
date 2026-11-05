@@ -1,14 +1,14 @@
+use super::file_button::settings_subtitle_file_button;
+use super::state::SettingsSubtitleMode;
 use crate::app::components::{
     FRAME_ICON_SM_SIZE, FrameIconButtonSize, FrameIconButtonVariant, FrameTrackListItemLayout,
-    FrameTrackListItemText, frame_choice_button, frame_icon_button, frame_text_button,
-    frame_text_button_with_focus, frame_track_list_item,
+    FrameTrackListItemText, frame_choice_button, frame_icon_button, frame_track_list_item,
 };
 use crate::app::input::{FrameTextInputKind, FrameTextInputSpec, frame_text_input};
 use crate::app::inspector::panel::settings_section;
 use crate::app::inspector::shared::{settings_field_label, settings_hint_text};
 use crate::app::inspector::subtitles::view::SettingsSubtitlesTabState;
 use crate::app::layout::SETTINGS_CONTROL_HEIGHT;
-use crate::app::primitives::ButtonVariant;
 use crate::app::root::FrameRoot;
 use crate::settings::{
     ConversionConfig, apply_external_subtitle_default, apply_external_subtitle_forced,
@@ -29,7 +29,8 @@ pub(super) fn settings_external_subtitles_section(
         config.container.eq_ignore_ascii_case("m2t") && !state.available_encoders.dvbsub;
     let enabled = !state.settings_disabled && !needs_unavailable_dvbsub;
     let mut section = settings_section("External files", palette)
-        .child(settings_external_subtitle_add_button(
+        .child(settings_subtitle_file_button(
+            SettingsSubtitleMode::Selectable,
             enabled,
             state.focuses.add_external_files,
             palette,
@@ -52,7 +53,7 @@ pub(super) fn settings_external_subtitles_section(
     let selected_index = state
         .external_track_index
         .filter(|index| *index < config.external_subtitle_tracks.len());
-    let mut list = div().flex().flex_col().gap_2();
+    let mut list = crate::app::components::frame_list_group();
     for (index, track) in config.external_subtitle_tracks.iter().enumerate() {
         let track_requires_dvbsub = config.container.eq_ignore_ascii_case("m2t")
             && std::path::Path::new(&track.path)
@@ -123,48 +124,6 @@ pub(super) const fn external_subtitle_metadata_visibility(
             descriptive: true,
         },
     }
-}
-
-pub(super) fn settings_external_subtitle_add_button(
-    enabled: bool,
-    focus: Option<&FocusHandle>,
-    palette: &'static theme::ThemePalette,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
-) -> gpui::Stateful<gpui::Div> {
-    let button = if let Some(focus) = focus {
-        frame_text_button_with_focus(
-            "settings-subtitle-add-external",
-            "Add subtitle files",
-            ButtonVariant::Secondary,
-            false,
-            enabled,
-            focus,
-            palette,
-            window,
-            cx,
-        )
-    } else {
-        frame_text_button(
-            "settings-subtitle-add-external",
-            "Add subtitle files",
-            ButtonVariant::Secondary,
-            false,
-            enabled,
-            palette,
-            window,
-            cx,
-        )
-    };
-
-    button
-        .w_full()
-        .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
-            cx.stop_propagation();
-            if enabled {
-                root.prompt_external_subtitle_files(window, cx);
-            }
-        }))
 }
 
 #[expect(
@@ -298,6 +257,11 @@ pub(super) fn settings_external_subtitle_editor(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let choice_focus = crate::app::components::FrameChoiceFocus::new(
+        "settings_external_subtitle_editor",
+        window,
+        cx,
+    );
     let track = &config.external_subtitle_tracks[index];
     let language = track.language.as_deref().unwrap_or_default();
     let title = track.title.as_deref().unwrap_or_default();
@@ -310,10 +274,7 @@ pub(super) fn settings_external_subtitle_editor(
         .gap_2();
     if visibility.language {
         fields = fields.child(
-            div()
-                .flex()
-                .flex_col()
-                .gap_2()
+            crate::app::components::frame_field()
                 .child(settings_field_label("Language", palette))
                 .child(frame_text_input(
                     FrameTextInputSpec {
@@ -332,10 +293,7 @@ pub(super) fn settings_external_subtitle_editor(
     }
     if visibility.descriptive {
         fields = fields.child(
-            div()
-                .flex()
-                .flex_col()
-                .gap_2()
+            crate::app::components::frame_field()
                 .child(settings_field_label("Title", palette))
                 .child(frame_text_input(
                     FrameTextInputSpec {
@@ -367,6 +325,7 @@ pub(super) fn settings_external_subtitle_editor(
                 .gap_2()
                 .child(
                     frame_choice_button(
+                        &choice_focus,
                         "settings-external-subtitle-default",
                         "Default",
                         is_default,
@@ -390,6 +349,7 @@ pub(super) fn settings_external_subtitle_editor(
                 )
                 .child(
                     frame_choice_button(
+                        &choice_focus,
                         "settings-external-subtitle-forced",
                         "Forced",
                         is_forced,

@@ -58,6 +58,8 @@ pub(super) fn settings_video_denoise_control(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let choice_focus =
+        crate::app::components::FrameChoiceFocus::new("settings_video_denoise_control", window, cx);
     let mut grid = div().grid().grid_cols(3).mt_1().gap_2();
     for (candidate, label) in [
         (FilterStrength::Low, "Low"),
@@ -66,6 +68,7 @@ pub(super) fn settings_video_denoise_control(
     ] {
         grid = grid.child(
             frame_choice_button(
+                &choice_focus,
                 format!("settings-video-denoise-{}", filter_strength_id(candidate)),
                 label,
                 enabled && strength == candidate,
@@ -145,6 +148,11 @@ pub(super) fn settings_video_deinterlace_control(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let choice_focus = crate::app::components::FrameChoiceFocus::new(
+        "settings_video_deinterlace_control",
+        window,
+        cx,
+    );
     let mut grid = div().grid().grid_cols(3).gap_2();
     for (candidate, label) in [
         (DeinterlaceMode::Off, "Off"),
@@ -153,6 +161,7 @@ pub(super) fn settings_video_deinterlace_control(
     ] {
         grid = grid.child(
             frame_choice_button(
+                &choice_focus,
                 format!("settings-video-deinterlace-{}", deinterlace_id(candidate)),
                 label,
                 mode == candidate,
