@@ -1,4 +1,4 @@
-use crate::app::accessibility::focus_visible_ring;
+use crate::app::accessibility::{focus_ring_above_content, focus_ring_base, focus_visible_ring};
 use crate::app::preview::actions::{
     preview_canvas_keyboard_pan_delta, preview_canvas_layout_metrics,
 };
@@ -52,8 +52,33 @@ pub(in crate::app) fn preview_viewport(
         .overflow_hidden()
         .rounded(theme::ui_rem(theme::RADIUS_MD))
         .bg(color(palette.canvas))
+        // The corner cutouts below must cover media, never the focus ring.
+        .map(|element| focus_ring_above_content(focus_ring_base(element, palette)))
+        .transitions(|t| {
+            t.outline(crate::app::motion::interaction_motion())
+                .border_color(crate::app::motion::interaction_motion())
+        })
         .track_focus(focuses.viewport)
         .tab_stop(pan_enabled)
+        .on_key_down(cx.listener(|root, event: &gpui::KeyDownEvent, window, cx| {
+            if event.keystroke.key != "escape" {
+                return;
+            }
+            let tool = if root.preview_ui.crop_mode {
+                root.toggle_selected_crop_mode();
+                Some("preview-tool-crop")
+            } else if root.preview_ui.overlay.overlay_mode() {
+                root.set_selected_overlay_mode(false);
+                Some("preview-tool-overlay")
+            } else {
+                None
+            };
+            if let Some(tool) = tool {
+                root.focus_registered_control(tool, window, cx);
+                cx.stop_propagation();
+                cx.notify();
+            }
+        }))
         .child(preview_viewport_content(state, cx))
         // Fixed to the viewport, above media/crop layers and below floating controls.
         .child(PreviewViewportFrame {
@@ -66,7 +91,9 @@ pub(in crate::app) fn preview_viewport(
             .role(gpui::Role::Pane)
             .aria_label("Preview canvas")
             .aria_description("Use arrow keys to pan the zoomed preview.")
-            .focus_visible_style(move |style| focus_visible_ring(style, palette))
+            .focus_visible_style(move |style| {
+                focus_ring_above_content(focus_visible_ring(style, palette))
+            })
             .cursor_grab()
             .on_key_down(
                 cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {

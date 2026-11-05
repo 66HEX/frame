@@ -187,6 +187,14 @@ pub(in crate::app) fn focus_ring_base<T: Styled>(
     element
 }
 
+/// Keep the shared ring appearance, but paint it above custom media/corner masks.
+/// GPUI's outline uses the same geometry as its ring, with a foreground paint pass.
+pub(in crate::app) fn focus_ring_above_content<T: Styled>(mut element: T) -> T {
+    let style = element.style();
+    style.outline = std::mem::take(&mut style.ring);
+    element
+}
+
 pub(in crate::app) fn focus_visible_ring(
     style: StyleRefinement,
     palette: &'static theme::ThemePalette,

@@ -61,6 +61,56 @@ fn focus(cx: &mut VisualTestContext) -> FocusHandle {
 mod preview_motion_tests;
 
 #[test]
+fn preview_canvas_focus_ring_paints_above_the_clipped_content() {
+    for theme in crate::appearance::ColorTheme::ALL {
+        for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+            let mut app = TestAppContext::single();
+            let (root, cx) = test_window(&mut app, VisualFixture::SettingsVideo, scale);
+            root.update(cx, |root, cx| {
+                root.appearance.color_theme = theme;
+                cx.notify();
+            });
+            press(cx, "tab");
+            cx.update(|window, cx| {
+                root.update(cx, |root, cx| {
+                    assert!(root.focus_registered_control("preview-viewport", window, cx));
+                });
+            });
+            draw(cx);
+            let viewport = cx.debug_bounds("preview-viewport").unwrap();
+            cx.update(|window, _| {
+                let scale = window.scale_factor();
+                let viewport = viewport.scale(scale);
+                let quads = window.painted_quads();
+                let background = quads
+                    .iter()
+                    .find(|q| q.bounds == viewport && !q.background.is_transparent())
+                    .expect("canvas background");
+                let ring_bounds =
+                    viewport.dilate(gpui::ScaledPixels(theme::metrics::FOCUS_WIDTH * scale));
+                let ring = quads
+                    .iter()
+                    .find(|q| q.bounds == ring_bounds)
+                    .expect("canvas ring");
+                assert!(
+                    ring.order > background.order,
+                    "the ring must paint after canvas content and its corner cutouts"
+                );
+                assert_eq!(
+                    ring.bounds.intersect(&ring.content_mask.bounds),
+                    ring.bounds,
+                    "the full outside ring must remain inside its ancestor clip"
+                );
+                assert_eq!(
+                    ring.border_widths.top,
+                    gpui::ScaledPixels(theme::metrics::FOCUS_WIDTH * scale)
+                );
+            });
+        }
+    }
+}
+
+#[test]
 fn inspector_tab_backgrounds_fade_without_darkening_even_when_reversed() {
     for theme in crate::appearance::ColorTheme::ALL {
         for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
