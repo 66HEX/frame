@@ -8241,6 +8241,10 @@ pub fn outline(
 mod pointer_tests;
 
 #[cfg(test)]
+#[path = "window/svg_tests.rs"]
+mod svg_current_color_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::util::FluentBuilder;
