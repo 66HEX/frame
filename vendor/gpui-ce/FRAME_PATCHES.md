@@ -83,6 +83,21 @@ scrolling away from an already focused control do not trigger repeated reveals.
 `elements/div/focus_scroll_tests.rs` covers nested areas, siblings, refocusing
 and pointer modality. Frame adds full forward/reverse traversal across its views.
 
+## macOS font smoothing
+
+`TextRenderingMode::Antialiased` requests grayscale coverage without CoreGraphics'
+luminance-dependent font-smoothing dilation. Frame selects this mode globally on
+macOS, matching Tailwind's `antialiased` (`-webkit-font-smoothing: antialiased` /
+`-moz-osx-font-smoothing: grayscale`). Windows and Linux retain PlatformDefault.
+WebKit uses `CGContextSetShouldSmoothFonts(false)` while keeping antialiasing on;
+the existing native rasterizer's Independent mask path uses the same settings.
+Glyph positioning, layout, authored font weights, SVGs and preblended color glyphs
+are unchanged. Normalization runs before the atlas lookup, so dilated and
+undilated masks cannot alias in the cache. The raster contract tests cover mask
+reuse across foreground colors and preserve color glyph RGB/alpha.
+
+Source: [WebKit FontCascadeCoreText.cpp](https://github.com/WebKit/WebKit/blob/main/Source/WebCore/platform/graphics/coretext/FontCascadeCoreText.cpp).
+
 ## Integration changes
 
 Upstream renamed Cargo packages to `gpui-ce` / `gpui_ce_*`, moved Apple's renderer

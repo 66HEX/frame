@@ -5007,9 +5007,13 @@ impl Window {
         } else {
             GlyphRenderMode::Grayscale
         };
-        let raster_style =
-            self.text_system()
-                .prepare_raster_style(font_id, glyph_id, color, requested_mode);
+        let raster_style = self.text_system().prepare_raster_style(
+            font_id,
+            glyph_id,
+            color,
+            requested_mode,
+            self.text_rendering_mode.get(),
+        );
         let params = RenderGlyphParams {
             font_id,
             glyph_id,
@@ -5147,6 +5151,7 @@ impl Window {
             glyph_id,
             color,
             GlyphRenderMode::Color,
+            self.text_rendering_mode.get(),
         );
         let params = RenderGlyphParams {
             font_id,

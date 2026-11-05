@@ -22,7 +22,13 @@ pub fn init_app(cx: &mut App, name: impl Into<SharedString>) {
     #[cfg(not(test))]
     super::system_motion::observe(cx);
     cx.activate(true);
-    cx.set_text_rendering_mode(TextRenderingMode::PlatformDefault);
+    // Tailwind's `antialiased` is a macOS font-smoothing override. Apply it once
+    // for all text, including custom-painted inputs and deferred popovers.
+    cx.set_text_rendering_mode(if cfg!(target_os = "macos") {
+        TextRenderingMode::Antialiased
+    } else {
+        TextRenderingMode::PlatformDefault
+    });
     cx.on_action(|_: &Quit, cx| cx.quit());
     cx.bind_keys([
         KeyBinding::new("cmd-q", Quit, None),

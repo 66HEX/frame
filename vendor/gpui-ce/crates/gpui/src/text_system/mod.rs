@@ -169,7 +169,7 @@ mod raster_contract_tests {
     use super::*;
     use crate::{
         AtlasKey, AtlasTextureKind, Bounds, DevicePixels, PlatformAtlas, PlatformTextSystem, Point,
-        Result, Size, TestAtlas, TestTextSystem, hsla, point, px, size,
+        Result, Size, TestAtlas, TestTextSystem, TextRenderingMode, hsla, point, px, size,
     };
     use std::{
         borrow::Cow,
@@ -310,6 +310,60 @@ mod raster_contract_tests {
     }
 
     #[test]
+    fn antialiased_masks_are_color_independent_and_separate_from_smoothed_atlas_entries() {
+        let text_system = TextSystem::new(Arc::new(SequencedRasterizer::default()));
+        let mut reference = None;
+        for luminance in [0.0, 0.24, 0.55, 1.0] {
+            let color = hsla(0.0, 0.0, luminance, 0.7);
+            let prepare = |mode| {
+                text_system.prepare_raster_style(
+                    FontId(7),
+                    GlyphId(42),
+                    color,
+                    GlyphRenderMode::Grayscale,
+                    mode,
+                )
+            };
+            let antialiased = prepare(TextRenderingMode::Antialiased);
+            assert_eq!(
+                antialiased,
+                PreparedRasterStyle::independent(GlyphRenderMode::Grayscale)
+            );
+            let default = prepare(TextRenderingMode::PlatformDefault);
+            assert_eq!(default, prepare(TextRenderingMode::Grayscale));
+            let key = |style| AtlasKey::from((params(style), RasterizedGlyphFormat::AlphaMask));
+            assert!(key(antialiased) != key(default));
+            if let Some(reference) = reference {
+                assert_eq!(antialiased, reference);
+            }
+            reference = Some(antialiased);
+        }
+    }
+
+    #[test]
+    fn antialiased_preserves_color_glyph_foreground_and_opacity() {
+        let text_system = TextSystem::new(Arc::new(SequencedRasterizer::default()));
+        for color in [hsla(0.6, 0.7, 0.4, 0.8), hsla(0.1, 0.6, 0.3, 0.2)] {
+            let prepare = |mode| {
+                text_system.prepare_raster_style(
+                    FontId(7),
+                    GlyphId(42),
+                    color,
+                    GlyphRenderMode::Color,
+                    mode,
+                )
+            };
+            let default = prepare(TextRenderingMode::PlatformDefault);
+            let antialiased = prepare(TextRenderingMode::Antialiased);
+            assert_eq!(default, antialiased);
+            assert!(matches!(
+                antialiased.color_effect,
+                RasterColorEffect::Preblend(_)
+            ));
+        }
+    }
+
+    #[test]
     fn prepared_style_and_format_drive_atlas_keys_without_caching_pixels() {
         let backend = Arc::new(SequencedRasterizer::default());
         let text_system = TextSystem::new(backend.clone());
@@ -318,18 +372,21 @@ mod raster_contract_tests {
             GlyphId(42),
             hsla(0.0, 0.0, 0.20, 1.0),
             GlyphRenderMode::Grayscale,
+            TextRenderingMode::PlatformDefault,
         );
         let style_b = text_system.prepare_raster_style(
             FontId(7),
             GlyphId(42),
             hsla(0.0, 0.0, 0.24, 1.0),
             GlyphRenderMode::Grayscale,
+            TextRenderingMode::PlatformDefault,
         );
         let style_c = text_system.prepare_raster_style(
             FontId(7),
             GlyphId(42),
             hsla(0.0, 0.0, 0.30, 1.0),
             GlyphRenderMode::Grayscale,
+            TextRenderingMode::PlatformDefault,
         );
         assert_eq!(style_a, style_b, "nearby scene colors share a mask style");
         assert_ne!(
@@ -649,6 +706,9 @@ mod raster_contract_tests {
         }
 
         fn prepare_raster_style(&self, request: RasterStyleRequest) -> PreparedRasterStyle {
+            if request.requested_mode == GlyphRenderMode::Color {
+                return PreparedRasterStyle::preblend(request);
+            }
             PreparedRasterStyle {
                 mode: request.requested_mode,
                 color_effect: RasterColorEffect::Dilation(
