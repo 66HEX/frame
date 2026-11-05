@@ -210,8 +210,8 @@ mod frame_assets {
         assert_eq!(
             listed,
             [
-                SharedString::from("OverusedGrotesk-Roman.ttf"),
-                SharedString::from("OverusedGrotesk-Medium.ttf"),
+                SharedString::from("Inter-Regular.ttf"),
+                SharedString::from("Inter-Medium.ttf"),
             ]
         );
     }

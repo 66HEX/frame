@@ -4,10 +4,10 @@ use gpui::{App, AssetSource, FontFeatures, Result, SharedString};
 use std::borrow::Cow;
 use std::sync::{Arc, OnceLock};
 
-pub const FRAME_FONT_FAMILY: &str = "Overused Grotesk";
-pub const FRAME_FONT_ALIAS: &str = "OverusedGrotesk";
-pub const FRAME_FONT_REGULAR_PATH: &str = "fonts/OverusedGrotesk-Roman.ttf";
-pub const FRAME_FONT_MEDIUM_PATH: &str = "fonts/OverusedGrotesk-Medium.ttf";
+pub const FRAME_FONT_FAMILY: &str = "Inter";
+pub const FRAME_FONT_ALIAS: &str = "Inter";
+pub const FRAME_FONT_REGULAR_PATH: &str = "fonts/Inter-Regular.ttf";
+pub const FRAME_FONT_MEDIUM_PATH: &str = "fonts/Inter-Medium.ttf";
 pub const FRAME_FONT_FEATURE_TAGS: [(&str, u32); 1] = [("kern", 1)];
 pub const FRAME_TABULAR_NUMBER_FONT_FEATURE_TAG: (&str, u32) = ("tnum", 1);
 pub const ICON_FRAME: &str = "icons/frame.svg";
@@ -49,10 +49,8 @@ pub const ICON_SQUARE: &str = "icons/square.svg";
 pub const ICON_TRASH: &str = "icons/trash.svg";
 
 const FRAME_ICON_SVG: &str = include_str!("../../assets/icons/frame.svg");
-const FRAME_FONT_REGULAR_BYTES: &[u8] =
-    include_bytes!("../../assets/fonts/OverusedGrotesk-Roman.ttf");
-const FRAME_FONT_MEDIUM_BYTES: &[u8] =
-    include_bytes!("../../assets/fonts/OverusedGrotesk-Medium.ttf");
+const FRAME_FONT_REGULAR_BYTES: &[u8] = include_bytes!("../../assets/fonts/Inter-Regular.ttf");
+const FRAME_FONT_MEDIUM_BYTES: &[u8] = include_bytes!("../../assets/fonts/Inter-Medium.ttf");
 
 // Nucleo UI 1.9.0, Outline, native 18px grid and 1.5px strokes.
 // SVG colors inherit the theme; source mapping and copyright notice live with the assets.
@@ -160,8 +158,8 @@ impl AssetSource for FrameAssets {
                 paths
             }
             "fonts" => vec![
-                SharedString::from("OverusedGrotesk-Roman.ttf"),
-                SharedString::from("OverusedGrotesk-Medium.ttf"),
+                SharedString::from("Inter-Regular.ttf"),
+                SharedString::from("Inter-Medium.ttf"),
             ],
             "icons" => vec![
                 SharedString::from("arrow-down.svg"),
