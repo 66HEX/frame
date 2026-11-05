@@ -12,7 +12,8 @@ use crate::file_queue::FileQueue;
 use crate::{assets, theme};
 use gpui::prelude::{ParentElement, Styled};
 use gpui::{
-    ClickEvent, Context, StatefulInteractiveElement, UniformListScrollHandle, Window, div, svg,
+    ClickEvent, Context, InteractiveElement, StatefulInteractiveElement, UniformListScrollHandle,
+    Window, div, svg,
 };
 
 const EMPTY_SETTINGS_HINT_MAX_WIDTH: f32 = 200.0;
@@ -49,8 +50,14 @@ pub(super) fn workspace_view(
                         .row_span(PREVIEW_ROW_SPAN),
                 )
                 .child(
-                    file_list_panel(file_queue, file_list_scroll_handle, settings.palette, cx)
-                        .row_span(FILE_LIST_ROW_SPAN),
+                    file_list_panel(
+                        file_queue,
+                        file_list_scroll_handle,
+                        settings.palette,
+                        window,
+                        cx,
+                    )
+                    .row_span(FILE_LIST_ROW_SPAN),
                 ),
         )
         .child(settings_panel_for_selection(
@@ -63,6 +70,7 @@ pub(super) fn welcome_view(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
+    let open_file_focus = crate::app::accessibility::welcome_open_file_focus(window, cx);
     div()
         .size_full()
         .flex()
@@ -120,6 +128,7 @@ pub(super) fn welcome_view(
                                 window,
                                 cx,
                             )
+                            .track_focus(&open_file_focus)
                             .on_click(cx.listener(
                                 |_root, _: &ClickEvent, window, cx| {
                                     cx.stop_propagation();

@@ -152,6 +152,24 @@ pub(in crate::app) fn frame_toolbar(palette: &theme::ThemePalette) -> Div {
         .popover_surface(palette)
 }
 
+pub(in crate::app) fn frame_empty(content: impl IntoElement, palette: &theme::ThemePalette) -> Div {
+    div()
+        .flex_1()
+        .min_w_0()
+        .w_full()
+        .flex()
+        .flex_col()
+        .items_center()
+        .justify_center()
+        .gap(theme::ui_rem(16.0))
+        .p(theme::ui_rem(24.0))
+        .rounded(theme::ui_rem(theme::RADIUS_XL))
+        .text_center()
+        .text_size(theme::ui_rem(12.0))
+        .text_color(color(palette.text_muted))
+        .child(content)
+}
+
 pub(in crate::app) fn frame_tabs_list(palette: &theme::ThemePalette) -> Div {
     div()
         .flex()

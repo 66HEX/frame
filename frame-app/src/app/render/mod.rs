@@ -51,6 +51,7 @@ impl Render for FrameRoot {
         ));
         let palette = theme::palette(self.appearance.color_theme);
         self.begin_accessibility_frame();
+        self.register_shell_focus(window, cx);
         let app_root_focus = self.ensure_focus(
             FrameFocusKey::Control(APP_ROOT_FOCUS_ID.to_string()),
             false,

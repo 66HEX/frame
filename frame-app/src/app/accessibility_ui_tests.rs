@@ -57,6 +57,9 @@ fn focus(cx: &mut VisualTestContext) -> FocusHandle {
     cx.update(|window, cx| window.focused(cx).expect("focus must stay in the window"))
 }
 
+#[path = "accessibility/keyboard_tests.rs"]
+mod keyboard_tests;
+
 #[path = "accessibility/preview_motion_tests.rs"]
 mod preview_motion_tests;
 
@@ -222,6 +225,44 @@ fn tab_rails_move_focus_with_each_arrow_and_offer_one_tab_stop() {
         assert_ne!(focus(cx), source);
         press(cx, "shift-tab");
         assert_eq!(focus(cx), source);
+    }
+}
+
+#[test]
+fn inspector_tab_enters_controls_directly_and_shift_tab_returns_to_the_selected_tab() {
+    for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+        let mut app = TestAppContext::single();
+        let (_, cx) = test_window(&mut app, VisualFixture::SettingsVideo, scale);
+        cx.update(|window, _| window.set_a11y_forced(true));
+        draw(cx);
+        for (id, expected) in [
+            ("settings-tab-source", None),
+            ("settings-tab-output", Some("Re-encode")),
+            ("settings-tab-video", Some("Custom")),
+            ("settings-tab-presets", Some("Preset name")),
+        ] {
+            click(cx, id);
+            let selected_tab = focus(cx);
+            press(cx, "tab");
+            let control = focus(cx);
+            assert_ne!(control, selected_tab);
+            let node = cx.update(|window, _| {
+                let tree: serde_json::Value =
+                    serde_json::from_str(&window.debug_a11y_tree_json().unwrap()).unwrap();
+                tree["nodes"][tree["gpui_focus"].as_str().unwrap()].clone()
+            });
+            assert_ne!(
+                node["aria"]["role"], "TabPanel",
+                "panel must not be a tab stop"
+            );
+            if let Some(label) = expected {
+                assert_eq!(node["aria"]["label"], label, "first control of {id}");
+            }
+            press(cx, "shift-tab");
+            assert_eq!(focus(cx), selected_tab);
+            press(cx, "tab");
+            assert_eq!(focus(cx), control);
+        }
     }
 }
 

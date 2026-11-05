@@ -34,6 +34,7 @@ pub(in crate::app) fn update_dialog(
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
     let palette = view.palette;
+    let scope = view.panel_focus.clone();
     let progress = surface_motion("update-dialog-motion", is_open, window, cx);
 
     if !is_open && motion_is_hidden(progress) {
@@ -56,25 +57,24 @@ pub(in crate::app) fn update_dialog(
         .opacity(progress)
         .backdrop_blur(theme::ui_rem(4.0).to_pixels(window.rem_size()))
         .occlude()
-        .on_key_down(cx.listener(|root, event: &gpui::KeyDownEvent, window, cx| {
-            match event.keystroke.key.as_str() {
-                "escape" if !root.update_ui.status.is_busy() => {
-                    root.close_update_dialog();
-                    root.restore_focus_after_update_dialog_close(window, cx);
-                    cx.stop_propagation();
-                    cx.notify();
-                }
-                "tab" => {
-                    if event.keystroke.modifiers.shift {
-                        window.focus_prev(cx);
-                    } else {
-                        window.focus_next(cx);
+        .on_key_down(
+            cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+                match event.keystroke.key.as_str() {
+                    "escape" if !root.update_ui.status.is_busy() => {
+                        root.close_update_dialog();
+                        root.restore_focus_after_update_dialog_close(window, cx);
+                        cx.stop_propagation();
+                        cx.notify();
                     }
-                    cx.stop_propagation();
+                    "tab" => {
+                        crate::app::accessibility::handle_focus_scope_tab_navigation(
+                            event, &scope, window, cx,
+                        );
+                    }
+                    _ => {}
                 }
-                _ => {}
-            }
-        }))
+            }),
+        )
         .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
             cx.stop_propagation();
             if !root.update_ui.status.is_busy() {

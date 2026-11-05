@@ -150,13 +150,41 @@ impl FrameRoot {
         true
     }
 
+    pub(in crate::app) fn register_shell_focus(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        // Keyed state is render-only. Keep the same handle in the registry so
+        // dialog event handlers can restore it without touching render state.
+        let handle = titlebar_settings_focus(window, cx);
+        self.focus_registry.handles.insert(
+            FrameFocusKey::Control("titlebar-settings".into()),
+            FrameFocusEntry {
+                handle,
+                last_seen_epoch: self.focus_registry.frame_epoch,
+            },
+        );
+        let handle = welcome_open_file_focus(window, cx);
+        self.focus_registry.handles.insert(
+            FrameFocusKey::Control("welcome-open-file".into()),
+            FrameFocusEntry {
+                handle,
+                last_seen_epoch: self.focus_registry.frame_epoch,
+            },
+        );
+    }
+
     pub(in crate::app) fn restore_focus_after_settings_close(
         &self,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> bool {
-        self.focus_registered_control("titlebar-settings", window, cx)
-            || self.focus_registered_control(APP_ROOT_FOCUS_ID, window, cx)
+        if self.file_queue.files().is_empty() {
+            self.focus_registered_control("welcome-open-file", window, cx)
+        } else {
+            self.focus_registered_control("titlebar-settings", window, cx)
+        }
     }
 
     pub(in crate::app) fn restore_focus_after_update_dialog_close(
@@ -169,9 +197,30 @@ impl FrameRoot {
         {
             return true;
         }
-        self.focus_registered_control("titlebar-settings", window, cx)
-            || self.focus_registered_control(APP_ROOT_FOCUS_ID, window, cx)
+        self.restore_focus_after_settings_close(window, cx)
     }
+}
+
+pub(in crate::app) fn titlebar_settings_focus(
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> FocusHandle {
+    window
+        .use_keyed_state("titlebar-settings-focus", cx, |_, cx| cx.focus_handle())
+        .read(cx)
+        .clone()
+        .tab_stop(true)
+}
+
+pub(in crate::app) fn welcome_open_file_focus(
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> FocusHandle {
+    window
+        .use_keyed_state("welcome-open-file-focus", cx, |_, cx| cx.focus_handle())
+        .read(cx)
+        .clone()
+        .tab_stop(true)
 }
 
 /// An absent CSS box shadow starts transparent, not at `currentColor`.
@@ -336,6 +385,41 @@ pub(in crate::app) fn handle_scroll_area_key(
 }
 
 /// Move through the rendered stops inside a dialog, including dynamic actions.
+pub(in crate::app) fn handle_focus_scope_tab_navigation(
+    event: &gpui::KeyDownEvent,
+    scope: &FocusHandle,
+    window: &mut Window,
+    cx: &mut App,
+) -> bool {
+    let Some(navigation) = tab_navigation_for_key(
+        event.keystroke.key.as_str(),
+        event.keystroke.modifiers.shift,
+    ) else {
+        return false;
+    };
+    let mut first = None;
+    loop {
+        if navigation == TabNavigation::Previous {
+            window.focus_prev(cx);
+        } else {
+            window.focus_next(cx);
+        }
+        if scope.contains_focused(window, cx) {
+            break;
+        }
+        let candidate = window.focused(cx);
+        if candidate.is_none() || candidate == first {
+            scope.focus(window, cx);
+            break;
+        }
+        if first.is_none() {
+            first = candidate;
+        }
+    }
+    cx.stop_propagation();
+    true
+}
+
 pub(in crate::app) fn apply_accessible_button(
     element: gpui::Stateful<gpui::Div>,
     label: impl Into<SharedString>,

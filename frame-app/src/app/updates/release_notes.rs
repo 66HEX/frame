@@ -1,8 +1,9 @@
+use crate::app::accessibility::{focus_ring_base, focus_visible_ring, handle_scroll_area_key};
 use crate::app::components::frame_vertical_scrollbar;
 use crate::app::primitives::color;
 use crate::theme;
 use frame_updater::UpdateInfo;
-use gpui::prelude::{ParentElement, Styled};
+use gpui::prelude::{FluentBuilder, ParentElement, Styled};
 use gpui::{
     HighlightStyle, InteractiveElement, ScrollHandle, StatefulInteractiveElement, StyledText, div,
 };
@@ -44,6 +45,7 @@ pub(in crate::app) fn update_release_notes_block(
     scroll_handle: &ScrollHandle,
     palette: &'static theme::ThemePalette,
 ) -> gpui::Stateful<gpui::Div> {
+    let key_scroll = scroll_handle.clone();
     let lines = normalized_release_note_lines(notes);
     let content_height = update_release_notes_content_height(&lines);
     let mut content = div()
@@ -61,6 +63,15 @@ pub(in crate::app) fn update_release_notes_block(
 
     div()
         .id("update-dialog-release-notes")
+        .role(gpui::Role::Pane)
+        .aria_label("Release notes")
+        .focusable()
+        .tab_stop(true)
+        .map(|element| focus_ring_base(element, palette))
+        .focus_visible_style(move |style| focus_visible_ring(style, palette))
+        .on_key_down(move |event, window, cx| {
+            handle_scroll_area_key(event, &key_scroll, window, cx);
+        })
         .relative()
         .min_h(theme::ui_rem(UPDATE_RELEASE_NOTES_MIN_HEIGHT))
         .max_h(theme::ui_rem(UPDATE_RELEASE_NOTES_MAX_HEIGHT))

@@ -254,6 +254,7 @@ pub(in crate::app) fn titlebar_settings_button(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
+    let focus = crate::app::accessibility::titlebar_settings_focus(window, cx);
     action_button(
         "titlebar-settings",
         assets::ICON_SETTINGS,
@@ -265,6 +266,7 @@ pub(in crate::app) fn titlebar_settings_button(
         window,
         cx,
     )
+    .track_focus(&focus)
     .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
         if root.settings_ui.is_open {
             root.close_app_settings();

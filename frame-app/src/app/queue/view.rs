@@ -3,7 +3,8 @@ use crate::app::components::{
     FrameIconButtonSize, FrameIconButtonVariant, frame_checkbox_indicator, frame_icon_button,
     frame_vertical_uniform_scrollbar,
 };
-use crate::app::layout::{FILE_ROW_HEIGHT, PANEL_HEADER_HEIGHT, WORKSPACE_GAP};
+use crate::app::components::{frame_empty, frame_panel_header};
+use crate::app::layout::{FILE_ROW_HEIGHT, WORKSPACE_GAP};
 use crate::app::primitives::{
     FrameSurface, button_mouse_down, color, element_id, panel_bottom_separator,
 };
@@ -27,7 +28,8 @@ pub(in crate::app) fn file_list_panel(
     queue: &FileQueue,
     scroll_handle: &UniformListScrollHandle,
     palette: &'static theme::ThemePalette,
-    cx: &Context<FrameRoot>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     div()
         .flex()
@@ -40,7 +42,7 @@ pub(in crate::app) fn file_list_panel(
                 .shadow(theme::shadows::FLOATING.shadows())
         })
         .child(file_list_header(queue.batch_selection_state(), palette, cx))
-        .child(file_list_body(queue, scroll_handle, palette, cx))
+        .child(file_list_body(queue, scroll_handle, palette, window, cx))
 }
 
 pub(in crate::app) fn file_list_header(
@@ -56,7 +58,7 @@ pub(in crate::app) fn file_list_header(
         .flex()
         .items_center()
         .justify_start()
-        .when(selection_enabled, gpui::Styled::cursor_pointer)
+        .when(selection_enabled, gpui::Styled::cursor_default)
         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
             button_mouse_down(selection_enabled, window, cx);
         })
@@ -98,13 +100,7 @@ pub(in crate::app) fn file_list_header(
             palette,
         ));
 
-    div()
-        .h(theme::ui_rem(PANEL_HEADER_HEIGHT))
-        .w_full()
-        .flex()
-        .items_center()
-        .relative()
-        .px_4()
+    frame_panel_header()
         .pr(theme::ui_rem(crate::app::components::FRAME_SCROLLBAR_WIDTH))
         .child(
             div()
@@ -140,33 +136,105 @@ pub(in crate::app) fn file_list_header(
         .child(panel_bottom_separator(palette))
 }
 
+fn queue_navigation_state(
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Entity<(gpui::FocusHandle, bool)> {
+    window.use_keyed_state("file-list-navigation", cx, |_, cx| {
+        (cx.focus_handle().tab_stop(true), false)
+    })
+}
+
+#[derive(Clone)]
+pub(in crate::app) struct QueueReturnFocus {
+    list: gpui::FocusHandle,
+    welcome: gpui::FocusHandle,
+}
+
+#[expect(
+    clippy::too_many_lines,
+    reason = "The virtual list keeps keyboard selection and visible-row rendering together."
+)]
 pub(in crate::app) fn file_list_body(
     queue: &FileQueue,
     scroll_handle: &UniformListScrollHandle,
     palette: &'static theme::ThemePalette,
-    cx: &Context<FrameRoot>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
+    let navigation = queue_navigation_state(window, cx);
+    let (focus, entered) = navigation.update(cx, |(focus, was_focused), _| {
+        let focused = focus.is_focused(window);
+        let entered = focused && !*was_focused;
+        *was_focused = focused;
+        (focus.clone(), entered)
+    });
+    if entered
+        && let Some(index) = queue
+            .files()
+            .iter()
+            .position(|file| Some(file.id.as_str()) == queue.selected_file_id())
+    {
+        scroll_handle.scroll_to_item(index, gpui::ScrollStrategy::Nearest);
+    }
+    let keyboard_focus = focus.is_focused(window) && window.last_input_was_keyboard();
+    let return_focus = QueueReturnFocus {
+        list: focus.clone(),
+        welcome: crate::app::accessibility::welcome_open_file_focus(window, cx),
+    };
+    let key_focus = focus.clone();
+    let key_scroll = scroll_handle.clone();
     let body = div()
         .id("file-list-body")
         .debug_selector(|| "file-list-body".to_string())
         .role(gpui::Role::List)
         .aria_label("File queue")
+        .aria_description(
+            "Use Up and Down to select a file; Space toggles its conversion selection.",
+        )
+        .track_focus(&focus)
+        .on_key_down(
+            cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+                let files = root.file_queue.files();
+                if files.is_empty() {
+                    return;
+                }
+                let current = files
+                    .iter()
+                    .position(|file| Some(file.id.as_str()) == root.file_queue.selected_file_id())
+                    .unwrap_or(0);
+                let next = match event.keystroke.key.as_str() {
+                    "up" => current.saturating_sub(1),
+                    "down" => (current + 1).min(files.len() - 1),
+                    "home" => 0,
+                    "end" => files.len() - 1,
+                    "space" if key_focus.is_focused(window) => {
+                        let id = files[current].id.clone();
+                        root.toggle_file_batch_selection(&id);
+                        cx.stop_propagation();
+                        cx.notify();
+                        return;
+                    }
+                    _ => return,
+                };
+                let id = files[next].id.clone();
+                root.select_workspace_file(&id);
+                key_scroll.scroll_to_item(next, gpui::ScrollStrategy::Nearest);
+                key_focus.focus(window, cx);
+                cx.stop_propagation();
+                cx.notify();
+            }),
+        )
         .relative()
         .flex_1()
         .flex()
         .flex_col()
         .overflow_hidden();
     if queue.files().is_empty() {
-        return body.child(
-            div()
-                .flex_1()
-                .flex()
-                .items_center()
-                .justify_center()
-                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-                .text_color(color(palette.text_muted))
-                .child(theme::ui_text("Drop files or use Add Source")),
-        );
+        return body.child(frame_empty(
+            theme::ui_text("Drop files or use Add Source"),
+            palette,
+        ));
     }
 
     let file_count = queue.files().len();
@@ -181,9 +249,20 @@ pub(in crate::app) fn file_list_body(
                     file_list_row(
                         file,
                         selected_id == Some(file.id.as_str()),
+                        &return_focus,
                         palette,
                         window,
                         cx,
+                    )
+                    .when(
+                        keyboard_focus && selected_id == Some(file.id.as_str()),
+                        |row| {
+                            row.inset_ring(gpui::px(theme::metrics::FOCUS_WIDTH))
+                                .inset_ring_color(color(
+                                    palette.focus_ring.with_opacity(theme::metrics::FOCUS_ALPHA),
+                                ))
+                                .aria_active_descendant()
+                        },
                     )
                 })
                 .collect()
@@ -203,6 +282,7 @@ pub(in crate::app) fn file_list_body(
 pub(in crate::app) fn file_list_row(
     file: &FileItem,
     is_selected: bool,
+    return_focus: &QueueReturnFocus,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
@@ -221,6 +301,10 @@ pub(in crate::app) fn file_list_row(
         .h(theme::ui_rem(FILE_ROW_HEIGHT))
         .w_full()
         .id(element_id("file-list-row", &select_id))
+        .debug_selector({
+            let id = select_id.clone();
+            move || format!("file-list-row-{id}")
+        })
         .role(gpui::Role::ListItem)
         .aria_label(row_accessible_label)
         .aria_selected(is_selected)
@@ -235,7 +319,7 @@ pub(in crate::app) fn file_list_row(
         } else {
             color(palette.transparent)
         })
-        .hover_style(|style| style.bg(color(palette.fill_subtle)).cursor_pointer())
+        .hover_style(|style| style.bg(color(palette.fill_subtle)).cursor_default())
         .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
             if root.select_workspace_file(&select_id) {
                 cx.notify();
@@ -291,6 +375,7 @@ pub(in crate::app) fn file_list_row(
             file.id.clone(),
             file.row_actions(),
             group_name,
+            return_focus,
             palette,
             window,
             cx,
@@ -326,6 +411,7 @@ pub(in crate::app) fn row_actions_cell(
     file_id: String,
     actions: RowActionAvailability,
     group_name: String,
+    return_focus: &QueueReturnFocus,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
@@ -353,9 +439,14 @@ pub(in crate::app) fn row_actions_cell(
     {
         cell = cell.child(primary);
     }
-    if let Some(secondary) =
-        row_secondary_action_button(file_id, actions.secondary, palette, window, cx)
-    {
+    if let Some(secondary) = row_secondary_action_button(
+        file_id,
+        actions.secondary,
+        return_focus,
+        palette,
+        window,
+        cx,
+    ) {
         cell = cell.child(secondary);
     }
 
@@ -369,8 +460,16 @@ fn row_primary_action_button(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> Option<gpui::Stateful<gpui::Div>> {
+    // Pause, Resume and Convert again occupy one keyboard position even when
+    // a conversion event changes their label or removes the primary action.
+    let focus = row_action_focus(&file_id, "primary", window, cx);
     let (id_prefix, icon, label) = match action {
-        RowPrimaryAction::None => return None,
+        RowPrimaryAction::None => {
+            if focus.is_focused(window) {
+                row_action_focus(&file_id, "secondary", window, cx).focus(window, cx);
+            }
+            return None;
+        }
         RowPrimaryAction::Pause => (
             "file-row-action-pause",
             assets::ICON_PAUSE,
@@ -399,6 +498,7 @@ fn row_primary_action_button(
             window,
             cx,
         )
+        .track_focus(&focus)
         .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
             cx.stop_propagation();
             let changed = match action {
@@ -417,12 +517,21 @@ fn row_primary_action_button(
 fn row_secondary_action_button(
     file_id: String,
     action: RowSecondaryAction,
+    return_focus: &QueueReturnFocus,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> Option<gpui::Stateful<gpui::Div>> {
+    let focus = row_action_focus(&file_id, "secondary", window, cx);
+    let queue_focus = return_focus.list.clone();
+    let welcome_focus = return_focus.welcome.clone();
     let (id_prefix, icon, label) = match action {
-        RowSecondaryAction::None => return None,
+        RowSecondaryAction::None => {
+            if focus.is_focused(window) {
+                queue_focus.focus(window, cx);
+            }
+            return None;
+        }
         RowSecondaryAction::Cancel => (
             "file-row-action-cancel",
             assets::ICON_SQUARE,
@@ -442,7 +551,8 @@ fn row_secondary_action_button(
             window,
             cx,
         )
-        .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        .track_focus(&focus)
+        .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
             cx.stop_propagation();
             let changed = match action {
                 RowSecondaryAction::None => false,
@@ -450,10 +560,31 @@ fn row_secondary_action_button(
                 RowSecondaryAction::Delete => root.remove_file_from_queue(&id),
             };
             if changed {
+                if action == RowSecondaryAction::Delete && focus.is_focused(window) {
+                    if root.file_queue.files().is_empty() {
+                        welcome_focus.focus(window, cx);
+                    } else {
+                        queue_focus.focus(window, cx);
+                    }
+                }
                 cx.notify();
             }
         })),
     )
+}
+
+fn row_action_focus(
+    file_id: &str,
+    slot: &str,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::FocusHandle {
+    window
+        .use_keyed_state(format!("file-row-{slot}-focus-{file_id}"), cx, |_, cx| {
+            cx.focus_handle().tab_stop(true)
+        })
+        .read(cx)
+        .clone()
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -514,7 +645,7 @@ pub(in crate::app) fn row_checkbox_control(
         .flex()
         .items_center()
         .justify_start()
-        .cursor_pointer()
+        .cursor_default()
         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
             button_mouse_down(true, window, cx);
         })
