@@ -335,7 +335,6 @@ fn preview_tool_button_inner(
         id: button_id,
         label,
         placement: tooltip_placement,
-        anchor_size: PREVIEW_TOOLBAR_BUTTON_SIZE,
     }
     .for_control(button, focus, enabled, palette, window, cx)
 }

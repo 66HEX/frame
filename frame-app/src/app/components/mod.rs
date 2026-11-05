@@ -23,6 +23,8 @@ mod select;
 mod select_ui_tests;
 mod slider;
 mod tooltip;
+mod tooltip_grace;
+mod tooltip_position;
 
 pub(in crate::app) mod popover_state;
 pub(in crate::app) mod tooltip_state;

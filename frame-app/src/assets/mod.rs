@@ -10,6 +10,7 @@ pub const FRAME_FONT_REGULAR_PATH: &str = "fonts/Inter-Regular.ttf";
 pub const FRAME_FONT_MEDIUM_PATH: &str = "fonts/Inter-Medium.ttf";
 pub const FRAME_FONT_FEATURE_TAGS: [(&str, u32); 1] = [("kern", 1)];
 pub const FRAME_TABULAR_NUMBER_FONT_FEATURE_TAG: (&str, u32) = ("tnum", 1);
+pub const TOOLTIP_ARROW: &str = "ui/tooltip-arrow.svg";
 pub const ICON_FRAME: &str = "icons/frame.svg";
 pub const ICON_ARROW_DOWN: &str = "icons/arrow-down.svg";
 pub const ICON_LAYOUT_LIST: &str = "icons/layout-list.svg";
@@ -98,7 +99,8 @@ pub struct FrameAssets;
 
 impl AssetSource for FrameAssets {
     fn load(&self, path: &str) -> Result<Option<Cow<'static, [u8]>>> {
-        let asset = match path {
+        let asset: Cow<'static, [u8]> = match path {
+            TOOLTIP_ARROW => Cow::Borrowed(include_bytes!("../../assets/ui/tooltip-arrow.svg")),
             FRAME_FONT_REGULAR_PATH => Cow::Borrowed(FRAME_FONT_REGULAR_BYTES),
             FRAME_FONT_MEDIUM_PATH => Cow::Borrowed(FRAME_FONT_MEDIUM_BYTES),
             ICON_FRAME => Cow::Borrowed(FRAME_ICON_SVG.as_bytes()),

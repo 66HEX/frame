@@ -6,4 +6,5 @@ pub(in crate::app) struct TooltipUiState {
     pub(in crate::app) visible_id: Option<String>,
     pub(in crate::app) warm_until: Option<Instant>,
     pub(in crate::app) hover_epoch: u64,
+    pub(super) grace_area: Option<super::tooltip_grace::TooltipGraceArea>,
 }
