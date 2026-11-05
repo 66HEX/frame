@@ -4523,6 +4523,65 @@ impl Window {
         });
     }
 
+    /// Paint a subtree at a uniform scale around a window-space origin, without
+    /// changing its layout. Nested scopes and cached paint replay retain the transform.
+    /// Call during paint; use `with_prepaint_scale` for the matching pointer geometry.
+    pub fn with_paint_scale<R>(
+        &mut self,
+        origin: Point<Pixels>,
+        factor: f32,
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        self.invalidator.debug_assert_paint();
+        assert!(factor.is_finite() && factor > 0.0);
+        if factor == 1.0 {
+            return f(self);
+        }
+        let scale = crate::scene::PaintScale {
+            origin: origin.scale(self.scale_factor()),
+            factor,
+            outer_mask: self.content_mask().bounds.scale(self.scale_factor()),
+        };
+        self.next_frame.scene.push_scale(scale);
+        let result = f(self);
+        self.next_frame.scene.pop_scale();
+        result
+    }
+
+    /// Match pointer hitboxes to a `with_paint_scale` subtree. Call during prepaint.
+    pub fn with_prepaint_scale<R>(
+        &mut self,
+        origin: Point<Pixels>,
+        factor: f32,
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        self.invalidator.debug_assert_prepaint();
+        assert!(factor.is_finite() && factor > 0.0);
+        if factor == 1.0 {
+            return f(self);
+        }
+        let start = self.next_frame.hitboxes.len();
+        let outer_mask = self.content_mask().bounds;
+        let result = f(self);
+        let transform = |b: Bounds<Pixels>| {
+            Bounds::new(
+                origin + (b.origin - origin) * factor,
+                b.size.map(|v| v * factor),
+            )
+        };
+        for hitbox in &mut self.next_frame.hitboxes[start..] {
+            hitbox.bounds = transform(hitbox.bounds);
+            if hitbox.content_mask.bounds != outer_mask {
+                hitbox.content_mask.bounds =
+                    transform(hitbox.content_mask.bounds).intersect(&outer_mask);
+            }
+            if let Some(fragments) = &mut hitbox.fragments {
+                *fragments = fragments.iter().copied().map(transform).collect();
+            }
+        }
+        result
+    }
+
     /// Creates a new painting layer for the specified bounds. A "layer" is a batch
     /// of geometry that are non-overlapping and have the same draw order. This is typically used
     /// for performance reasons.

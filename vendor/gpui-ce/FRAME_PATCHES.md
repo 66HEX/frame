@@ -35,6 +35,10 @@ interception, while retaining its existing `is_movable` policy. Once a blank-are
 press arms a drag, Frame handles the first pointer move even if a native event
 batch carries it beyond the titlebar. Buttons still cannot arm that gesture.
 
+## Subtree animation scale
+
+`Window::with_paint_scale` and `with_prepaint_scale` support Frame's Mira enter/exit zoom without reflowing text. Scene operations retain untransformed primitives and explicit scale scopes so cached replay and nested scopes do not double-transform. Quads, glyph/image sprites, paths, rings, shadows, filters and pointer hitboxes follow the same origin. Ancestor clipping remains in window coordinates. The scene regression test covers nested scaling, scope restoration and cached replay under a new scale. Frame's integration test exercises opening/closing all six selects and both color pickers with motion enabled.
+
 ## Integration changes
 
 Upstream renamed Cargo packages to `gpui-ce` / `gpui_ce_*`, moved Apple's renderer
