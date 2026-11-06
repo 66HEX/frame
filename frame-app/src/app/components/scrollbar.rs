@@ -6,9 +6,10 @@ use gpui::{
     Window, canvas, div, point, px, size,
 };
 
+mod clip;
+
 pub(in crate::app) const FRAME_SCROLLBAR_WIDTH: f32 = 10.0;
 const FRAME_SCROLLBAR_VISUAL_WIDTH: f32 = 10.0;
-const FRAME_SCROLLBAR_TRACK_WIDTH: f32 = 7.0;
 const FRAME_SCROLLBAR_THUMB_WIDTH: f32 = 7.0;
 const FRAME_SCROLLBAR_MIN_THUMB_HEIGHT: f32 = 18.0;
 
@@ -36,12 +37,23 @@ pub(in crate::app) struct FrameScrollbarMetrics {
 struct FrameScrollbarPaintState {
     metrics: Option<FrameScrollbarMetrics>,
     ui_scale: f32,
+    viewport: Bounds<gpui::Pixels>,
 }
 
 pub(in crate::app) fn frame_vertical_scrollbar(
     id: impl Into<String>,
     scroll_handle: ScrollHandle,
     content_height: f32,
+    palette: &'static theme::ThemePalette,
+) -> gpui::Stateful<gpui::Div> {
+    frame_vertical_scrollbar_clipped(id, scroll_handle, content_height, 0.0, palette)
+}
+
+pub(super) fn frame_vertical_scrollbar_clipped(
+    id: impl Into<String>,
+    scroll_handle: ScrollHandle,
+    content_height: f32,
+    viewport_radius: f32,
     palette: &'static theme::ThemePalette,
 ) -> gpui::Stateful<gpui::Div> {
     let id = id.into();
@@ -105,28 +117,15 @@ pub(in crate::app) fn frame_vertical_scrollbar(
                             FRAME_SCROLLBAR_MIN_THUMB_HEIGHT * ui_scale,
                         ),
                         ui_scale,
+                        viewport: paint_handle.bounds(),
                     }
                 },
-                |bounds, state, window, _cx| {
+                move |bounds, state, window, _cx| {
                     let Some(metrics) = state.metrics else {
                         return;
                     };
-                    let track_width = FRAME_SCROLLBAR_TRACK_WIDTH * state.ui_scale;
                     let thumb_width = FRAME_SCROLLBAR_THUMB_WIDTH * state.ui_scale;
                     let visual_width = FRAME_SCROLLBAR_VISUAL_WIDTH * state.ui_scale;
-
-                    let track_bounds = Bounds::new(
-                        point(
-                            bounds.right() - px(visual_width.midpoint(track_width)),
-                            bounds.origin.y,
-                        ),
-                        size(px(track_width), bounds.size.height),
-                    );
-                    window.paint_quad(
-                        gpui::PaintQuad::new(track_bounds)
-                            .background(color(palette.transparent))
-                            .corner_radii(px(track_width / 2.0)),
-                    );
 
                     let thumb_bounds = Bounds::new(
                         point(
@@ -135,7 +134,20 @@ pub(in crate::app) fn frame_vertical_scrollbar(
                         ),
                         size(px(thumb_width), px(metrics.thumb_height)),
                     );
-                    paint_scrollbar_thumb(thumb_bounds, thumb_width, palette, window);
+                    let radius = px(viewport_radius * state.ui_scale);
+                    if radius > px(0.0)
+                        && (thumb_bounds.top() < state.viewport.top() + radius
+                            || thumb_bounds.bottom() > state.viewport.bottom() - radius)
+                    {
+                        // GPUI's overflow mask is rectangular. Intersect the thumb
+                        // with the rounded viewport before painting, leaving the
+                        // underlying content visible outside the popover's corners.
+                        if let Some(path) = clip::thumb_path(thumb_bounds, state.viewport, radius) {
+                            window.paint_path(path, color(palette.border_subtle));
+                        }
+                    } else {
+                        paint_scrollbar_thumb(thumb_bounds, thumb_width, palette, window);
+                    }
                 },
             )
             .size_full(),

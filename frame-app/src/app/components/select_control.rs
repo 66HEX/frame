@@ -226,8 +226,7 @@ pub(in crate::app) fn frame_select_control(
         return control;
     }
     let content_height = frame_select_content_height(items.len());
-    let mut list =
-        frame_select_options_list(list_id, scroll, content_height > FRAME_SELECT_MAX_HEIGHT);
+    let mut list = frame_select_options_list(list_id, scroll);
     for (index, item) in items.iter().enumerate() {
         let focus = item.focus.as_ref().unwrap();
         let item_enabled = enabled && item.enabled && open;

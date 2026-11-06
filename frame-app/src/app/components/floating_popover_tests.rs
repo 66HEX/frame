@@ -29,13 +29,12 @@ impl gpui::Render for PopoverTestView {
             .overflow_y_scroll()
             .track_scroll(&self.scroll)
         } else {
-            let list = frame_select_options_list("list", &self.scroll, false).children((0..4).map(
-                |index| {
+            let list =
+                frame_select_options_list("list", &self.scroll).children((0..4).map(|index| {
                     div().h(px(28.0)).when(index == 3, |item| {
                         item.debug_selector(|| "last-content".into())
                     })
-                },
-            ));
+                }));
             frame_select_popover("panel", 1.0, list, palette)
         };
         div()

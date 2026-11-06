@@ -443,6 +443,37 @@ fn selects_and_color_pickers_stay_in_view_when_opened_near_the_bottom() {
 }
 
 #[test]
+fn select_scrollbars_overlay_full_width_options_without_reserving_a_gutter() {
+    for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+        let mut app = TestAppContext::single();
+        let case = &SELECTS[3];
+        let (_, cx) = select_window(&mut app, case, ColorTheme::Dark, scale);
+        click(cx, case.trigger);
+        for key in ["home", "end"] {
+            press(cx, key);
+            let panel = cx.debug_bounds(case.panel).unwrap();
+            let item = cx.debug_bounds("subtitle-size-8").unwrap();
+            let scrollbar = cx
+                .debug_bounds("settings-subtitle-font-size-options-scrollbar")
+                .unwrap();
+            let left = item.left() - panel.left();
+            let right = panel.right() - item.right();
+            assert!(
+                (left - right).abs() < px(0.1),
+                "asymmetric item inset: {item:?}, {panel:?}"
+            );
+            assert!(
+                item.right() > scrollbar.left(),
+                "scrollbar must overlay the options"
+            );
+            assert_eq!(scrollbar.right(), panel.right());
+            assert_eq!(scrollbar.top(), panel.top());
+            assert_eq!(scrollbar.bottom(), panel.bottom());
+        }
+    }
+}
+
+#[test]
 fn flipped_select_and_color_picker_animate_toward_the_trigger_on_exit() {
     for case in [
         SelectCase {

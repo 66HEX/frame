@@ -382,8 +382,8 @@ fn crop_resize_and_scrollbar_drags_start_outside_the_visible_markers() {
         let bounds = cx.debug_bounds("crop-options-scrollbar").unwrap();
         let option = cx.debug_bounds("crop-ratio-free").unwrap();
         assert!(
-            option.right() <= bounds.left(),
-            "scrollbar covers an option"
+            option.right() > bounds.left(),
+            "scrollbar must overlay the option instead of reserving a gutter"
         );
         let before = root.read_with(cx, |root, _| root.preview_ui.crop_options.scroll.offset());
         let from = point(bounds.left() + px(factor), bounds.top() + px(4.0 * factor));

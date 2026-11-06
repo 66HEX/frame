@@ -20,7 +20,7 @@ pub(in crate::app) const FRAME_SELECT_MAX_HEIGHT: f32 = 192.0;
 pub(in crate::app) const FRAME_SELECT_CONTENT_PADDING: f32 = 4.0;
 pub(in crate::app) const FRAME_SELECT_OPTION_HEIGHT: f32 = 28.0;
 pub(in crate::app) const FRAME_COLOR_SWATCH_SIZE: f32 = 14.0;
-// Compact selects reserve one gutter for both the scrollbar and its pointer target.
+// The pointer target overlays the options; it never reserves a layout gutter.
 const FRAME_SELECT_SCROLLBAR_WIDTH: f32 = 12.0;
 
 #[expect(
@@ -203,7 +203,6 @@ pub(in crate::app) fn frame_select_popover(
 pub(in crate::app) fn frame_select_options_list(
     id: &str,
     scroll_handle: &ScrollHandle,
-    scrollable: bool,
 ) -> gpui::Stateful<gpui::Div> {
     div()
         .id(id.to_owned())
@@ -213,9 +212,6 @@ pub(in crate::app) fn frame_select_options_list(
         .overflow_y_scroll()
         .track_scroll(scroll_handle)
         .p(theme::ui_rem(FRAME_SELECT_CONTENT_PADDING))
-        .when(scrollable, |list| {
-            list.pr(theme::ui_rem(FRAME_SELECT_SCROLLBAR_WIDTH))
-        })
         .on_scroll_wheel(refresh_select_hover_after_scroll)
 }
 
@@ -225,8 +221,14 @@ pub(in crate::app) fn frame_select_scrollbar(
     content_height: f32,
     palette: &'static theme::ThemePalette,
 ) -> gpui::Stateful<gpui::Div> {
-    super::frame_vertical_scrollbar(id, scroll_handle, content_height, palette)
-        .w(theme::ui_rem(FRAME_SELECT_SCROLLBAR_WIDTH))
+    super::scrollbar::frame_vertical_scrollbar_clipped(
+        id,
+        scroll_handle,
+        content_height,
+        theme::RADIUS_LG,
+        palette,
+    )
+    .w(theme::ui_rem(FRAME_SELECT_SCROLLBAR_WIDTH))
 }
 
 pub(in crate::app) fn frame_select_content_height(option_count: usize) -> f32 {
