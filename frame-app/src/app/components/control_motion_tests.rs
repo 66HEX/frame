@@ -333,9 +333,9 @@ fn reduced_motion_settles_real_button_and_toggle_styles_immediately() {
         near(
             fill(cx).alpha,
             if matches!(control, Control::Toggle) {
-                1.0
+                theme::palette(ColorTheme::Dark).fill_selected.alpha
             } else {
-                0.5
+                theme::palette(ColorTheme::Dark).ghost_hover.alpha
             },
         );
         cx.simulate_keystrokes("tab");

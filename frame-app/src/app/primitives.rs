@@ -54,12 +54,8 @@ pub(super) const fn button_colors(
                 palette.secondary_foreground,
             ),
             ButtonVariant::Outline => (
-                if palette.is_light() {
-                    palette.transparent
-                } else {
-                    palette.input_background
-                },
-                palette.input.with_alpha(palette.input.alpha * 0.5),
+                palette.fill_subtle,
+                palette.secondary_hover,
                 palette.text_primary,
             ),
             ButtonVariant::Ghost => (
@@ -71,7 +67,7 @@ pub(super) const fn button_colors(
                 palette.danger_surface,
                 palette
                     .danger
-                    .with_opacity(if palette.is_light() { 0.2 } else { 0.3 }),
+                    .with_opacity(if palette.is_light() { 0.15 } else { 0.1 }),
                 palette.danger,
             ),
             ButtonVariant::Link => (palette.transparent, palette.transparent, palette.primary),
@@ -188,9 +184,8 @@ pub(super) trait FrameSurface {
 impl FrameSurface for gpui::Div {
     fn card_surface(self, palette: &theme::ThemePalette) -> Self {
         self.rounded(theme::ui_rem(theme::RADIUS_LG))
-            .bg(color(palette.surface))
-            .ring(px(1.0))
-            .ring_color(color(palette.surface_ring))
+            .bg(theme::shadows::surface_fill(palette.surface, palette))
+            .shadow(theme::shadows::ShadowLevel::Sm.shadows())
     }
 }
 

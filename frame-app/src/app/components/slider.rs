@@ -49,7 +49,7 @@ fn range_track(
         .h(theme::ui_rem(theme::RANGE_TRACK_HEIGHT))
         .w_full()
         .rounded(theme::ui_rem(radius))
-        .bg(color(palette.fill_strong))
+        .bg(color(palette.input_background))
         .child(div().absolute().top_0().bottom_0().left_0().right_0().when(
             end > start || animate,
             |this| {
@@ -201,8 +201,9 @@ pub(in crate::app) fn frame_slider(
                 .size(theme::ui_rem(thumb))
                 .rounded(theme::ui_rem(theme::RADIUS_MD))
                 .border_1()
-                .border_color(color(palette.focus_ring))
-                .bg(color(palette.slider_thumb))
+                .border_color(color(palette.transparent))
+                .bg(theme::shadows::surface_fill(palette.slider_thumb, palette))
+                .shadow(theme::shadows::ShadowLevel::Xs.shadows())
                 .ring(gpui::px(theme::metrics::FOCUS_WIDTH * ring_progress))
                 .ring_color(color(palette.focus_ring.with_alpha(
                     palette.focus_ring.alpha * theme::metrics::FOCUS_ALPHA * ring_progress,

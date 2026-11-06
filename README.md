@@ -272,7 +272,7 @@ cargo xtask setup-ffmpeg
 
 ## Development Checks
 
-Shadcn Mira components, tokens, and theme customization: [design system](frame-app/docs/design-system/README.md).
+Graphite theme, Mira component geometry, and customization: [design system](frame-app/docs/design-system/README.md).
 
 UI elevation and component assignments: [shadow scale](frame-app/docs/ui-shadows/README.md).
 

@@ -479,8 +479,11 @@ pub(in crate::app) fn log_scroll_to_bottom_button(
         .absolute()
         .right(theme::ui_rem(LOG_SCROLL_BUTTON_OFFSET))
         .bottom(theme::ui_rem(LOG_SCROLL_BUTTON_OFFSET))
-        .rounded(theme::ui_rem(theme::RADIUS_MD))
-        .bg(color(palette.surface_elevated))
+        .rounded(theme::ui_rem(theme::RADIUS_MD + LOG_SCROLL_BUTTON_PADDING))
+        .bg(theme::shadows::surface_fill(
+            palette.surface_elevated,
+            palette,
+        ))
         .p(theme::ui_rem(LOG_SCROLL_BUTTON_PADDING))
         .shadow(theme::shadows::FLOATING.shadows())
         .child(

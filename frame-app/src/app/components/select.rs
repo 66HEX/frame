@@ -121,8 +121,8 @@ fn frame_select_trigger_content_inner(
     let id = id.into();
     let label = label.into();
     let mut colors = button_colors(ButtonVariant::Outline, false, enabled, palette);
-    colors.background = palette.input_background;
-    colors.hover_background = palette.input_hover;
+    colors.background = palette.fill_subtle;
+    colors.hover_background = palette.secondary_hover;
     let trigger = div()
         .id(id.clone())
         .debug_selector(|| id.clone())
@@ -137,6 +137,7 @@ fn frame_select_trigger_content_inner(
         .px(theme::ui_rem(theme::metrics::CONTROL_PADDING_X))
         .input_surface(palette)
         .bg(color(colors.background))
+        .shadow(theme::shadows::ShadowLevel::Xxs.shadows())
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .font_weight(theme::TEXT_WEIGHT_REGULAR)
         .text_color(color(colors.foreground))

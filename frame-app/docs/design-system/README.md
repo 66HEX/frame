@@ -1,20 +1,28 @@
-# Mira Neutral we Frame
+# Graphite we Frame
 
-Frame używa natywnego adaptera shadcn/ui Mira Neutral. Źródłem są pliki wygenerowane przez CLI `shadcn@4.23.0`, preset `b1D0eCA4`, baza Radix, kolor Neutral i Inter. Aplikacja używa ikon Nucleo UI 1.9.0, outline 18 px / stroke 1.5. To świadome odstępstwo od ikon oryginalnego presetu. Oryginały CLI znajdują się w [reference](reference).
+Frame używa motywu Graphite inspirowanego powierzchniami Sebastiano Guerriero: neutralnej, lekko chłodnej grafitowej palety, warstwowych cieni z highlightem i zagłębionych pól. Układ, odstępy, typografia, wymiary kontrolek i obsługa pozostają oparte na natywnym adapterze shadcn/ui Mira. Źródłem są pliki wygenerowane przez CLI `shadcn@4.23.0`, preset `b1D0eCA4`, baza Radix, kolor Neutral i Inter. Aplikacja używa ikon Nucleo UI 1.9.0, outline 18 px / stroke 1.5. To świadome odstępstwo od ikon oryginalnego presetu. Oryginały CLI znajdują się w [reference](reference).
 
 Repozytorium React znajduje się obok Frame: `../frame-shadcn-mira`. Zawiera działającą galerię light/dark i komponenty zainstalowane przez CLI. Nie jest zależnością wykonawczą aplikacji Rust.
+
+## Wygląd powierzchni
+
+Referencje: [Lab01, eksperyment 3](https://lab01.dev/#ui-experiment-3), obrazy dostarczone do zadania i podana skala cieni 2xs–2xl. Dostęp do pliku Figma przez konektor był niedostępny; nie stanowił źródła odczytanych tokenów.
+
+CSS definiuje paletę light/dark oraz bazowy promień 14 px. [Skala cieni](../ui-shadows/README.md) opisuje natywne warstwy: karty Sm, przyciski Xs, selecty 2xs, popovery Md, dialogi Xl. Pola tekstowe i tło tabs są zagłębione. Badge’e, nieaktywne ghost buttons, separatory i zwykłe wiersze pozostają płaskie. W dark mode hover i rozwinięte nagłówki Collapsible używają jasnej warstwy 8%, aby odróżniały się od rozświetlonej karty. Dekoracyjne obwódki zastępują cienie; istniejące szerokości przezroczystych borderów zachowują geometrię treści. Ringi fokusu i obrysy błędów zachowują swoją funkcję.
+
+Promienie są współśrodkowe przy zachowaniu istniejącego paddingu: kontrolka 10 px, toolbar/menu 14 px przy 4 px insetu, tabs 13 px przy 3 px insetu. Statyczne powierzchnie mają subtelne światło od góry. Animowane tła pozostają jednolite, ponieważ GPUI interpoluje tylko jednolite kolory; relief tych kontrolek tworzą inset shadows.
 
 ## Zmiana motywu przez kopiuj–wklej
 
 Edytuj wyłącznie [assets/themes/theme.css](../../assets/themes/theme.css). Zastąp bloki `:root { ... }` i `.dark { ... }` blokami z edytora motywów shadcn, zapisz plik i uruchom `cargo run -p frame-app`. Cargo automatycznie przeliczy kolory i przebuduje aplikację. Nie trzeba uruchamiać Node ani eksportować JSON.
 
-Importer przyjmuje OKLCH, HSL, RGB, hex, kolory nazwane, alfa, aliasy `var(...)` i starszy zapis HSL bez funkcji. Można wkleić cały arkusz zawierający te bloki, również wewnątrz `@layer base`. `.dark` dziedziczy nieprzepisane wartości z `:root`. `--radius` przyjmuje `rem`, `px` lub `0`; promienie pochodne używają mnożników Mira. Błędny wymagany token zatrzymuje build z nazwą zmiennej zamiast wracać do Neutral.
+Importer przyjmuje OKLCH, HSL, RGB, hex, kolory nazwane, alfa, aliasy `var(...)` i starszy zapis HSL bez funkcji. Można wkleić cały arkusz zawierający te bloki, również wewnątrz `@layer base`. `.dark` dziedziczy nieprzepisane wartości z `:root`. `--radius` przyjmuje `rem`, `px` lub `0`; promienie pochodne odejmują istniejący inset od bazowego promienia, z minimum 0 px. Błędny wymagany token zatrzymuje build z nazwą zmiennej zamiast wracać do Neutral.
 
 To importer tokenów kolorów i promienia, nie silnik przeglądarkowy: selektory komponentów, fonty zewnętrzne, breakpointy i dowolne reguły CSS nie zmieniają natywnych komponentów. Promień musi być wspólny dla light/dark. [reference/mira-neutral.json](reference/mira-neutral.json) jest tylko niezmiennym wzorcem testowym, nie konfiguracją aplikacji.
 
 ## Timingi komponentów
 
-Porównanie ze źródłami CLI i `getComputedStyle` działającej galerii, 2026-11-05:
+Timingi natywnego adaptera, oparte na źródłach CLI i porównaniu z działającą galerią:
 
 | Komponent | Czas i krzywa | Właściwości |
 | --- | --- | --- |
@@ -78,13 +86,13 @@ oraz odwrócenie przejścia w trakcie animacji, w obu motywach i skalach UI.
 | Range | Trim start/end i bieżąca pozycja odtwarzania | `preview/timeline`; wspólny rail i przeliczanie współrzędnych, trzy wartości domenowe |
 | Item | Wybór presetów, pliki w kolejce | `list_item.rs`; treść i akcje pozostają we współdzielonych konstruktorach wierszy |
 | Tabs | Workspace/Logs, Metadata/Output/Presets, krótkie wybory i tryby Output, pliki logów | `frame_tabs_list`, `frame_tab_trigger`, `frame_option_tabs`, `TabFocusGroup`; aktywacja strzałkami, Home/End, jeden tab stop |
-| Card | Preview, kolejka, inspektor, logi, welcome | `FrameSurface::card_surface`; card, radius-lg, ring foreground/10 |
+| Card | Preview, kolejka, inspektor, logi, welcome | `FrameSurface::card_surface`; card, radius-lg, shadow-sm |
 | Badge | Wartości suwaków i kompaktowe wskaźniki wartości | `frame_badge`, wariant secondary, 20 px, tekst 10 px |
 | Separator | Podziały nagłówków i toolbarów | Jeden piksel tokenu border, bez tłoczeń i dodatkowego highlightu |
-| Tooltip | Przyciski narzędziowe, playback, zoom | `tooltip.rs`; delay 0, foreground/background, radius-md, strzałka, keyboard focus/Escape, kolizje z brzegiem okna i hoverable content |
-| Popover | Selecty, color pickery, narzędzia crop/overlay | `popover_surface`, `frame_toolbar`; popover, ring foreground/10, shadow-md |
+| Tooltip | Przyciski narzędziowe, playback, zoom | `tooltip.rs`; delay 0, popover/foreground, radius-md, strzałka, keyboard focus/Escape, kolizje z brzegiem okna i hoverable content |
+| Popover | Selecty, color pickery, narzędzia crop/overlay | `popover_surface`, `frame_toolbar`; popover, shadow-md z krawędzią i highlightem |
 | Dialog / AlertDialog | Dostępna aktualizacja, pobieranie i potwierdzenia instalacji | `updates/dialog.rs`; wspólna powierzchnia dialogu i kontrolki |
-| Sheet | Ustawienia aplikacji | `preferences/view.rs`; prawy brzeg, 384 px maks., 75% wąskiego okna, border-left, shadow-lg, backdrop black/80 + blur4 |
+| Sheet | Ustawienia aplikacji | `preferences/view.rs`; prawy brzeg, 384 px maks., 75% wąskiego okna, przezroczysty border-left, shadow-lg, backdrop black/80 + blur4 |
 | ScrollArea | Fonty, selecty, logi, treści z przewijaniem | `scrollbar.rs`; szerokość 10, thumb 7, minimalna długość 18; wariant `type="always"` |
 | Progress / Spinner | Aktualizacja, konwersja, ładowanie | Wspólny rail 4 px i spinner Nucleo |
 | Empty / Alert | Pusta kolejka, brak danych, błędy runtime i aktualizacji | `frame_empty`, opisy i semantyka Alert; kolory semantic foreground/destructive |
@@ -96,24 +104,24 @@ Crop, pan/zoom, overlay resize, HSV canvas, miniatury, timecode i strumień log�
 
 Każdy token kolorystyczny CSS light/dark jest dostępny pod oryginalną nazwą przez `ThemePalette::token`. Adapter konwertuje OKLCH do zmiennoprzecinkowego sRGB. Nie zaokrągla do 8-bitowego hex. Alfa `border` i `input` zostaje zachowana; modyfikatory typu `input/30` mnożą alfę koloru. Secondary hover jest obliczony w OKLCH, zgodnie z `color-mix` źródła.
 
-| Wartość | Mira przy rem=16 / scale=100% |
+| Wartość | Graphite przy rem=16 / scale=100% |
 | --- | --- |
 | spacing | 4 px; półkroki 2 px |
-| radius | base 10; sm 6; md 8; lg 10; xl 14; 2xl 18; 3xl 22; 4xl 26 |
+| radius | base 14; sm 6; md 10; lg 14; xl 18; 2xl 22; 3xl 26; 4xl 30 |
 | Button | xs 20; sm 24; default 28; lg 32; icon = kwadrat odpowiedniej wysokości |
 | Tekst kontrolek | Inter 12 px / 19.5 px, weight 400/500; xs/badge 10 px |
-| Input / Select trigger | 28 px, padding-x 8, border 1, radius 8 |
+| Input / Select trigger | 28 px, padding-x 8, border 1 przezroczysty, radius 10 |
 | Checkbox | 16 px, radius 4, check 14 |
-| Slider / Progress | track 4 px; slider thumb 12 px, border-ring, biały |
-| Tabs | list 32 px, padding 3; trigger 25 px, px6, radius8 |
+| Slider / Progress | track 4 px; slider thumb 12 px, jasny, shadow-xs |
+| Tabs | list 32 px, padding 3, radius13; trigger 25 px, px6, radius10 |
 | Field / FieldGroup | gap8 / gap16 |
-| Card / Popover / Dialog | padding16 / 10 / 16; radius10 / 10 / 14 |
+| Card / Popover / Dialog | padding16 / 10 / 16; radius14 / 14 / 18 |
 | Focus | button/input/checkbox/select/slider 2 px ring/30; toggle/tab 3 px ring/50 |
 | Disabled | opacity .5, wyłączona aktywacja i tab stop |
 
 Skalowanie Frame mnoży wymiary rem przez wybraną skalę UI. Obrysy 1 px i focus rings są wymiarami CSS px. Podgląd mediów ma własną skalę i nie zmienia skali kontrolek.
 
-Nie ma dekoracyjnych gradientów, tłoczonych separatorów ani inset shadows wcześniejszego motywu. Button, Card i Dialog nie dziedziczą dawnego cienia Frame. Popover używa Tailwind shadow-md, Sheet shadow-lg. [scale.css](../ui-shadows/scale.css) jest sprawdzany testem adaptera cieni.
+Separatory pozostają płaskie. Wspólna [scale.css](../ui-shadows/scale.css) zawiera dokładne wartości Guerriero i jest sprawdzana testem adaptera cieni, łącznie z kolorem, alfą, kolejnością, spreadem i inset. Blur CSS jest dzielony przez 2 zgodnie z parametrem Gaussian sigma w GPUI.
 
 ## Wygładzanie tekstu
 
@@ -161,13 +169,15 @@ Archiwalny snapshot CLI zachowuje oryginalne importy Hugeicons wyłącznie jako 
 
 ## Weryfikacja i granice porównania
 
+Graphite, 2026-11-06: `cargo xtask ci` zaliczył 1008 testów, przy 50 istniejących testach ignored, oraz formatowanie, Clippy, audyt kolorów i kontrolę workflow. Po końcowej korekcie neutralnej palety i stanów hover ponownie zaliczono 10 testów motywu, 6 testów rzeczywistych interakcji kontrolek i Clippy. Zbudowano aplikację oraz natywny renderer. Przejrzano świeże zrzuty głównych widoków w dark/light oraz selecty przy skali 200%. Porównanie układu wykonano z osobno skompilowanym HEAD `76d7ba4b`, a nie z wcześniej istniejącym plikiem wykonywalnym. Sprawdzenie diffu potwierdziło zachowanie layoutu, spacingu, fontów i ikon.
+
 Testy obejmują komplet tokenów CSS i alf, geometrię cieni, fonty i ikony, disabled, fokus, klawiaturę, selecty ustawień aplikacji, napisów, crop i nowych pól Output, oba motywy, skale 100/200%, geometrię timeline i obsługę crop. Pełne sprawdzenie repo: `cargo xtask ci`. Galeria React: `npm run build`.
 
 Pakiet poprawek 2026-11-05: `cargo xtask ci` — 982 testy zaliczone, 50 istniejących testów ignored; Clippy, formatowanie, audyt kolorów i workflow bez błędów. Osobny test GPUI sprawdza skalowanie i replay sceny; `cargo deny check licenses` również przechodzi. Testy obejmują animacje wszystkich selectów i pickerów, ring suwaka oraz przejście Tab/Shift+Tab przez panel inspectora. Sprawdzono natywny build z Nucleo.
 
 Pierwotna migracja: 975 testów zaliczonych i 50 oznaczonych w repo jako ignored; brak błędów Clippy, formatowania, audytu kolorów i kontroli workflow. Build produkcyjny galerii również przeszedł. W desktopowym podglądzie przeglądarki potwierdzono dla Input wysokość 28, radius 8, padding 2×8 i Inter 12 / 19.5; dla SelectItem wysokość 28, radius 8 i padding 4×8.
 
-Podglądy: [Frame dark](previews/frame-mira-dark.png), [galeria dark](previews/react-mira-dark.png), [galeria light](previews/react-mira-light.png). Są zapisem wybranych widoków, nie automatycznym porównaniem wszystkich stanów.
+Archiwalne podglądy Mira: [Frame dark](previews/frame-mira-dark.png), [galeria dark](previews/react-mira-dark.png), [galeria light](previews/react-mira-light.png). Są zapisem wybranych widoków, nie automatycznym porównaniem wszystkich stanów.
 
 To port między DOM/Radix a GPUI. Zgodność tokenów i parametrów nie stanowi dowodu identyczności każdego piksela: rasteryzacja fontów, compositing, antyaliasing i backend dostępności zależą od silnika oraz systemu. Snapshot i testy umożliwiają sprawdzanie konkretnych stanów; nie deklarują automatycznie pełnej zgodności wizualnej wszystkich ekranów. Niestandardowe media widgets oraz wybrane przez Frame szerokości paneli, zakresy danych i kompozycje nie są komponentami dostarczanymi przez shadcn.
 

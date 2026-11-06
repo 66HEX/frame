@@ -168,8 +168,7 @@ pub(in crate::app) fn preview_zoom_toolbar(
         .bottom(theme::ui_rem(PREVIEW_TOOLBAR_OFFSET))
         .flex()
         .gap_2()
-        .rounded(theme::ui_rem(theme::RADIUS_MD))
-        .bg(color(palette.surface))
+        .rounded(theme::ui_rem(theme::RADIUS_MD + PREVIEW_TOOLBAR_PADDING))
         .p(theme::ui_rem(4.0))
         .shadow(theme::shadows::FLOATING.shadows())
         .child(

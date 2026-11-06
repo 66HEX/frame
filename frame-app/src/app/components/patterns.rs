@@ -1,4 +1,4 @@
-//! Composed Mira patterns shared by every Frame surface.
+//! Graphite surface hierarchy on the existing compact component geometry.
 
 use crate::app::primitives::color;
 use crate::theme::{self, metrics};
@@ -9,8 +9,9 @@ pub(in crate::app) trait FrameStyle: Styled + Sized {
     fn input_surface(self, palette: &theme::ThemePalette) -> Self {
         self.rounded(theme::ui_rem(theme::RADIUS_MD))
             .border_1()
-            .border_color(color(palette.input))
+            .border_color(color(palette.transparent))
             .bg(color(palette.input_background))
+            .shadow(theme::shadows::recessed(palette))
             .text_color(color(palette.text_primary))
     }
 
@@ -30,29 +31,33 @@ pub(in crate::app) trait FrameStyle: Styled + Sized {
 
     fn popover_surface(self, palette: &theme::ThemePalette) -> Self {
         self.rounded(theme::ui_rem(theme::RADIUS_LG))
-            .bg(color(palette.surface_elevated))
+            .bg(theme::shadows::surface_fill(
+                palette.surface_elevated,
+                palette,
+            ))
             .text_color(color(palette.token("popover-foreground")))
-            .ring(px(1.0))
-            .ring_color(color(palette.surface_ring))
             .shadow(theme::shadows::FLOATING.shadows())
     }
 
     fn dialog_surface(self, palette: &theme::ThemePalette) -> Self {
         self.rounded(theme::ui_rem(theme::RADIUS_XL))
-            .bg(color(palette.surface_elevated))
+            .bg(theme::shadows::surface_fill(
+                palette.surface_elevated,
+                palette,
+            ))
             .text_color(color(palette.token("popover-foreground")))
-            .ring(px(1.0))
-            .ring_color(color(palette.surface_ring))
+            .shadow(theme::shadows::ShadowLevel::Xl.shadows())
     }
 
     fn tab_surface(self, selected: bool, palette: &theme::ThemePalette) -> Self {
         self.rounded(theme::ui_rem(theme::RADIUS_MD))
             .border_1()
-            .border_color(color(if selected {
-                palette.tab_border
+            .border_color(color(palette.transparent))
+            .shadow(if selected {
+                theme::shadows::ShadowLevel::Xs.shadows()
             } else {
-                palette.transparent
-            }))
+                Vec::new()
+            })
             .bg(color(if selected {
                 palette.tab_active
             } else {
@@ -150,6 +155,7 @@ pub(in crate::app) fn frame_toolbar(palette: &theme::ThemePalette) -> Div {
         .gap(theme::ui_rem(metrics::CONTROL_GAP))
         .p(theme::ui_rem(4.0))
         .popover_surface(palette)
+        .rounded(theme::ui_rem(theme::RADIUS_MD + 4.0))
 }
 
 pub(in crate::app) fn frame_empty(content: impl IntoElement, palette: &theme::ThemePalette) -> Div {
@@ -176,6 +182,7 @@ pub(in crate::app) fn frame_tabs_list(palette: &theme::ThemePalette) -> Div {
         .items_center()
         .h(theme::ui_rem(metrics::TABS_HEIGHT))
         .p(theme::ui_rem(metrics::TABS_PADDING))
-        .rounded(theme::ui_rem(theme::RADIUS_LG))
-        .bg(color(palette.fill_strong))
+        .rounded(theme::ui_rem(theme::RADIUS_MD + metrics::TABS_PADDING))
+        .bg(color(palette.input_background))
+        .shadow(theme::shadows::recessed(palette))
 }

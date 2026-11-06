@@ -48,18 +48,17 @@ pub(in crate::app) fn frame_checkbox_indicator(
         .justify_center()
         .rounded(theme::ui_rem(theme::RADIUS_XS))
         .border_1()
-        .border_color(color(if checked {
-            palette.primary
+        .border_color(color(palette.transparent))
+        .bg(if checked {
+            theme::shadows::surface_fill(palette.primary, palette)
         } else {
-            palette.input
-        }))
-        .bg(color(if checked {
-            palette.primary
-        } else if palette.is_light() {
-            palette.transparent
+            color(palette.input_background).into()
+        })
+        .shadow(if checked {
+            theme::shadows::ShadowLevel::Xxs.shadows()
         } else {
-            palette.input_background
-        }))
+            theme::shadows::recessed(palette)
+        })
         .opacity(if disabled { 0.5 } else { 1.0 })
         .child(mark)
 }

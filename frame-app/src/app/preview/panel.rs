@@ -2,7 +2,7 @@ use crate::app::inspector::state::SettingsRenderState;
 use crate::app::layout::PREVIEW_PANEL_PADDING;
 use crate::app::preview::state::{CropSelect, PreviewOverlayImageDimensions};
 use crate::app::preview::{preview_timeline, preview_viewport};
-use crate::app::primitives::FrameSurface;
+use crate::app::primitives::{FrameSurface, color};
 use crate::app::root::FrameRoot;
 use crate::file_queue::{FileItem, FileQueue};
 use crate::numeric::{f64_to_u32, u32_to_f32};
@@ -223,6 +223,8 @@ pub(in crate::app) fn preview_panel(
         .flex_col()
         .overflow_hidden()
         .card_surface(palette)
+        // The media corner mask uses this same solid surface color.
+        .bg(color(palette.surface))
         .p(theme::ui_rem(PREVIEW_PANEL_PADDING))
         .child(preview_viewport(&state, props.viewport_focuses, window, cx))
         .child(preview_timeline(&state, props.timecode_focuses, window, cx))

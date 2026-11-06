@@ -217,6 +217,7 @@ impl FrameTooltip {
                                 .line_height(theme::ui_rem(16.0))
                                 .rounded(theme::ui_rem(theme::RADIUS_MD))
                                 .bg(color(palette.tooltip_surface))
+                                .shadow(theme::shadows::ShadowLevel::Sm.shadows())
                                 .px_3()
                                 .py(theme::ui_rem(6.0))
                                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))

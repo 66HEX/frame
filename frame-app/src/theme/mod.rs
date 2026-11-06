@@ -42,7 +42,7 @@ impl RgbaToken {
     }
 }
 
-/// Mira Neutral roles. Source token names are available through `token`.
+/// Graphite surface roles. Source token names are available through `token`.
 /// Domain aliases below keep preview and conversion code independent of CSS.
 #[derive(Debug, PartialEq)]
 pub struct ThemePalette {
@@ -108,8 +108,8 @@ impl ThemePalette {
             canvas: get("background"),
             surface: get("card"),
             surface_elevated: get("popover"),
-            tooltip_surface: foreground,
-            tooltip_foreground: get("background"),
+            tooltip_surface: get("popover"),
+            tooltip_foreground: foreground,
             text_primary: foreground,
             text_muted: get("muted-foreground"),
             fill_subtle: get("secondary"),
@@ -123,7 +123,7 @@ impl ThemePalette {
             text_selection: primary.with_alpha(primary.alpha * 0.20),
             danger: destructive,
             danger_surface: destructive
-                .with_alpha(destructive.alpha * if light { 0.1 } else { 0.2 }),
+                .with_alpha(destructive.alpha * if light { 0.1 } else { 0.08 }),
             warning: foreground,
             success: foreground,
             overlay_backdrop: RgbaToken::from_rgb(0, 0, 0).with_alpha(0.8),
@@ -132,24 +132,21 @@ impl ThemePalette {
             primary_foreground: get("primary-foreground"),
             transparent: foreground.with_alpha(0.0),
             input,
-            input_background: input.with_alpha(input.alpha * if light { 0.2 } else { 0.3 }),
-            input_hover: input.with_alpha(input.alpha * if light { 0.2 } else { 0.5 }),
+            input_background: get("background"),
+            input_hover: get("muted"),
             secondary_hover: get("secondary-hover"),
             secondary_foreground: get("secondary-foreground"),
-            ghost_hover: get("muted")
-                .with_alpha(get("muted").alpha * if light { 1.0 } else { 0.5 }),
+            // A light overlay stays visible over the top-lit dark card. Mixing
+            // muted/50 into that surface can match the card and hide open rows.
+            ghost_hover: if light {
+                get("muted")
+            } else {
+                foreground.with_opacity(0.08)
+            },
             surface_ring: foreground.with_alpha(foreground.alpha * 0.1),
-            slider_thumb: RgbaToken::from_rgb(255, 255, 255),
-            tab_active: if light {
-                get("background")
-            } else {
-                input.with_alpha(input.alpha * 0.3)
-            },
-            tab_border: if light {
-                foreground.with_alpha(0.0)
-            } else {
-                input
-            },
+            slider_thumb: if light { get("popover") } else { primary },
+            tab_active: get("accent"),
+            tab_border: foreground.with_alpha(0.0),
         }
     }
 
@@ -181,13 +178,18 @@ pub fn palette(color_theme: ColorTheme) -> &'static ThemePalette {
 
 include!(concat!(env!("OUT_DIR"), "/theme-radius.rs"));
 pub const RADIUS_XS: f32 = 4.0;
-pub const RADIUS_SM: f32 = RADIUS_BASE * 0.6;
-pub const RADIUS_MD: f32 = RADIUS_BASE * 0.8;
+// Subtract the existing inset: changing corner styling must never change spacing.
+pub const RADIUS_SM: f32 = nested_radius(RADIUS_BASE, 8.0);
+pub const RADIUS_MD: f32 = nested_radius(RADIUS_BASE, metrics::MENU_PADDING);
 pub const RADIUS_LG: f32 = RADIUS_BASE;
-pub const RADIUS_XL: f32 = RADIUS_BASE * 1.4;
-pub const RADIUS_2XL: f32 = RADIUS_BASE * 1.8;
-pub const RADIUS_3XL: f32 = RADIUS_BASE * 2.2;
-pub const RADIUS_4XL: f32 = RADIUS_BASE * 2.6;
+pub const RADIUS_XL: f32 = RADIUS_BASE + 4.0;
+pub const RADIUS_2XL: f32 = RADIUS_BASE + 8.0;
+pub const RADIUS_3XL: f32 = RADIUS_BASE + 12.0;
+pub const RADIUS_4XL: f32 = RADIUS_BASE + 16.0;
+
+const fn nested_radius(outer: f32, inset: f32) -> f32 {
+    if outer > inset { outer - inset } else { 0.0 }
+}
 
 pub const RANGE_TRACK_HEIGHT: f32 = 4.0;
 pub const RANGE_TRACK_INSET: f32 = metrics::SLIDER_THUMB / 2.0;

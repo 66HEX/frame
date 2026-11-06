@@ -36,20 +36,28 @@ pub(in crate::app) fn frame_list_item(
         .gap_3()
         .rounded(theme::ui_rem(theme::RADIUS_MD))
         .border_1()
-        .border_color(color(palette.input))
-        .bg(color(palette.fill_strong.with_alpha(if selected {
-            palette.fill_strong.alpha
+        .border_color(color(palette.transparent))
+        .bg(color(palette.fill_selected.with_alpha(if selected {
+            palette.fill_selected.alpha
         } else {
             0.0
         })))
+        .when(selected, |item| {
+            item.shadow(theme::shadows::ShadowLevel::Xxs.shadows())
+        })
         .px(theme::ui_rem(theme::metrics::CONTROL_PADDING_X))
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(color(palette.text_primary))
         .opacity(if enabled { 1.0 } else { 0.5 })
         .when(enabled, |this| {
-            this.cursor_default()
-                .hover_style(move |style| style.bg(color(palette.fill_strong)))
+            this.cursor_default().hover_style(move |style| {
+                style.bg(color(if selected {
+                    palette.fill_selected
+                } else {
+                    palette.ghost_hover
+                }))
+            })
         })
         .when(!enabled, gpui::Styled::cursor_not_allowed);
 

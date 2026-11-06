@@ -154,8 +154,11 @@ pub(in crate::app) fn app_settings_sheet(
                 .flex()
                 .flex_col()
                 .border_l_1()
-                .border_color(color(palette.border_subtle))
-                .bg(color(palette.surface_elevated))
+                .border_color(color(palette.transparent))
+                .bg(theme::shadows::surface_fill(
+                    palette.surface_elevated,
+                    palette,
+                ))
                 .shadow(theme::shadows::ShadowLevel::Lg.shadows())
                 .opacity(progress)
                 .occlude()

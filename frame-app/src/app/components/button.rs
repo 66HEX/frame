@@ -193,6 +193,29 @@ impl ControlBehavior {
     }
 }
 
+fn control_colors(
+    variant: ButtonVariant,
+    selected: bool,
+    enabled: bool,
+    palette: &'static theme::ThemePalette,
+    behavior: ControlBehavior,
+) -> crate::app::primitives::ButtonColors {
+    let mut colors = button_colors(variant, selected, enabled, palette);
+    if behavior == ControlBehavior::Toggle {
+        colors.background = palette.fill_selected.with_alpha(if selected {
+            palette.fill_selected.alpha
+        } else {
+            0.0
+        });
+        colors.hover_background = if enabled {
+            palette.fill_selected
+        } else {
+            colors.background
+        };
+    }
+    colors
+}
+
 #[expect(
     clippy::too_many_arguments,
     reason = "Shared visual implementation for the Mira Button and Toggle contracts."
@@ -208,19 +231,17 @@ fn frame_control_base(
     behavior: ControlBehavior,
 ) -> gpui::Stateful<gpui::Div> {
     let id = id.into();
-    let mut colors = button_colors(variant, selected, enabled, palette);
-    if behavior == ControlBehavior::Toggle {
-        colors.background = palette.fill_selected.with_alpha(if selected {
-            palette.fill_selected.alpha
-        } else {
-            0.0
-        });
-        colors.hover_background = if enabled {
-            palette.fill_selected
-        } else {
-            colors.background
-        };
-    }
+    let colors = control_colors(variant, selected, enabled, palette, behavior);
+    let raised = selected
+        || matches!(
+            variant,
+            ButtonVariant::Primary | ButtonVariant::Secondary | ButtonVariant::Outline
+        );
+    let background = if colors.background.alpha == 0.0 {
+        colors.hover_background.with_alpha(0.0)
+    } else {
+        colors.background
+    };
 
     let button = div()
         .id(id.clone())
@@ -235,17 +256,13 @@ fn frame_control_base(
         .rounded(theme::ui_rem(size.radius()))
         .border_1()
         .when(behavior == ControlBehavior::Toggle, gpui::Styled::border_0)
-        .border_color(color(if matches!(variant, ButtonVariant::Outline) {
-            palette.border_subtle
-        } else {
-            palette.transparent
-        }))
+        // Keep the existing border allocation; the edge is painted by shadows.
+        .border_color(color(palette.transparent))
         .px(theme::ui_rem(size.padding()))
-        .bg(color(if colors.background.alpha == 0.0 {
-            colors.hover_background.with_alpha(0.0)
-        } else {
-            colors.background
-        }))
+        .bg(color(background))
+        .when(raised, |button| {
+            button.shadow(theme::shadows::ShadowLevel::Xs.shadows())
+        })
         .text_size(theme::ui_rem(size.text()))
         .line_height(gpui::relative(theme::metrics::TEXT_LINE_HEIGHT))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
@@ -268,7 +285,14 @@ fn frame_control_base(
                     }
                 })
                 .when(behavior == ControlBehavior::Button, |button| {
-                    button.active_style(move |style| style.relative().top(px(1.0)))
+                    button.active_style(move |style| {
+                        let style = style.relative().top(px(1.0));
+                        if raised {
+                            style.shadow(theme::shadows::recessed(palette))
+                        } else {
+                            style
+                        }
+                    })
                 })
         })
         .when(!enabled, |button| {
