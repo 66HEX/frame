@@ -19,18 +19,6 @@ pub struct PresetOption {
     pub status: Option<&'static str>,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum PresetNoticeTone {
-    Success,
-    Error,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PresetNotice {
-    pub text: String,
-    pub tone: PresetNoticeTone,
-}
-
 impl PresetDefinition {
     #[must_use]
     pub fn built_in(id: &str, name: &str, config: ConversionConfig) -> Self {

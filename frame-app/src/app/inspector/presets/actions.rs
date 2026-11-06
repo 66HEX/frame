@@ -1,7 +1,5 @@
 use crate::app::root::FrameRoot;
-use crate::settings::{
-    PresetDefinition, PresetNotice, PresetNoticeTone, apply_preset, create_custom_preset,
-};
+use crate::settings::{PresetDefinition, apply_preset, create_custom_preset};
 use gpui::{Context, PromptButton, PromptLevel, Window};
 
 impl FrameRoot {
@@ -11,38 +9,22 @@ impl FrameRoot {
         }
         let name = self.settings_ui.preset_name_draft.trim();
         if name.is_empty() {
-            self.settings_ui.preset_notice = Some(PresetNotice {
-                text: "Name required".to_string(),
-                tone: PresetNoticeTone::Error,
-            });
             return false;
         }
 
         let Some(config) = self.selected_config().cloned() else {
-            self.settings_ui.preset_notice = Some(PresetNotice {
-                text: "Preset not saved".to_string(),
-                tone: PresetNoticeTone::Error,
-            });
             return false;
         };
 
         let (id, next_sequence) = self.next_custom_preset_identity();
         self.presets.push(create_custom_preset(id, name, &config));
-        if let Err(error) = self.persist_app_settings() {
+        if self.persist_app_settings().is_err() {
             self.presets.pop();
-            self.settings_ui.preset_notice = Some(PresetNotice {
-                text: format!("Preset not saved: {error}"),
-                tone: PresetNoticeTone::Error,
-            });
             return false;
         }
 
         self.settings_ui.next_custom_preset_sequence = next_sequence;
         self.settings_ui.preset_name_draft.clear();
-        self.settings_ui.preset_notice = Some(PresetNotice {
-            text: "Preset saved".to_string(),
-            tone: PresetNoticeTone::Success,
-        });
         true
     }
 
@@ -55,27 +37,15 @@ impl FrameRoot {
             .iter()
             .position(|preset| preset.id == preset_id && !preset.built_in)
         else {
-            self.settings_ui.preset_notice = Some(PresetNotice {
-                text: "Unable to delete".to_string(),
-                tone: PresetNoticeTone::Error,
-            });
             return false;
         };
 
         let removed = self.presets.remove(index);
-        if let Err(error) = self.persist_app_settings() {
+        if self.persist_app_settings().is_err() {
             self.presets.insert(index, removed);
-            self.settings_ui.preset_notice = Some(PresetNotice {
-                text: format!("Unable to delete: {error}"),
-                tone: PresetNoticeTone::Error,
-            });
             return false;
         }
 
-        self.settings_ui.preset_notice = Some(PresetNotice {
-            text: "Preset removed".to_string(),
-            tone: PresetNoticeTone::Success,
-        });
         true
     }
 
@@ -95,15 +65,7 @@ impl FrameRoot {
         if !crate::settings::preset_is_compatible(&preset, metadata.as_ref()) {
             return false;
         }
-        let changed =
-            self.update_selected_config(|config| apply_preset(config, &preset, metadata.as_ref()));
-        if changed {
-            self.settings_ui.preset_notice = Some(PresetNotice {
-                text: format!("Applied {}", preset.name),
-                tone: PresetNoticeTone::Success,
-            });
-        }
-        changed
+        self.update_selected_config(|config| apply_preset(config, &preset, metadata.as_ref()))
     }
 
     pub(in crate::app) fn confirm_apply_preset_to_all(
@@ -173,13 +135,6 @@ impl FrameRoot {
             if apply_preset(&mut file.config, preset, metadata.as_ref()) {
                 changed = true;
             }
-        }
-
-        if changed {
-            self.settings_ui.preset_notice = Some(PresetNotice {
-                text: "Applied to all items".to_string(),
-                tone: PresetNoticeTone::Success,
-            });
         }
 
         changed

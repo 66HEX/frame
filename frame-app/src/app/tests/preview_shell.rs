@@ -102,7 +102,6 @@ fn settings_state<'a>(
         preset_name: "",
         preset_name_focus: None,
         presets: &[],
-        preset_notice: None,
         subtitle_fonts: &[],
         available_encoders: empty_encoders(),
         available_filters: empty_filters(),

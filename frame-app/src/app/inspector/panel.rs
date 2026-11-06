@@ -247,7 +247,6 @@ pub(in crate::app) fn settings_tab_content(
                 preset_name: settings.preset_name,
                 preset_name_focus: settings.preset_name_focus,
                 presets: settings.presets,
-                notice: settings.preset_notice,
                 palette,
             },
             window,

@@ -116,7 +116,7 @@ impl ThemePalette {
             fill_selected: get("accent"),
             fill_strong: get("muted"),
             border_subtle: get("border"),
-            // Shadcn has no info/success/warning roles. Neutral status text is
+            // Shadcn has no info/warning roles. Neutral status text is
             // paired with the existing explicit status label and action icon.
             accent: foreground,
             focus_ring: get("ring"),
@@ -125,7 +125,12 @@ impl ThemePalette {
             danger_surface: destructive
                 .with_alpha(destructive.alpha * if light { 0.1 } else { 0.08 }),
             warning: foreground,
-            success: foreground,
+            // Optional extension; standard shadcn themes retain neutral feedback.
+            success: if mira::colors(color_theme).contains_key("success") {
+                get("success")
+            } else {
+                foreground
+            },
             overlay_backdrop: RgbaToken::from_rgb(0, 0, 0).with_alpha(0.8),
             primary,
             primary_hover: primary.with_alpha(primary.alpha * 0.8),

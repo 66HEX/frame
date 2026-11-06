@@ -56,7 +56,7 @@ pub use options::{
     OutputContainerOption, OutputModeOption, VideoCodecOption, VideoPixelFormatOption,
     VideoPresetOption,
 };
-pub use presets::{PresetDefinition, PresetNotice, PresetNoticeTone, PresetOption};
+pub use presets::{PresetDefinition, PresetOption};
 pub use processing::ProcessingMode;
 pub use source::{
     AudioTrack, SourceInfoRow, SourceInfoSection, SourceKind, SourceMetadata, SourceTags,

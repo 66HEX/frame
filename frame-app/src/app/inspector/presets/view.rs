@@ -6,14 +6,11 @@ use crate::app::input::{FrameTextInputKind, FrameTextInputSpec, frame_text_input
 use crate::app::primitives::{ButtonVariant, color};
 use crate::app::root::FrameRoot;
 use crate::settings::{
-    ConversionConfig, PresetDefinition, PresetNotice, PresetNoticeTone, PresetOption,
-    SourceMetadata, preset_options,
+    ConversionConfig, PresetDefinition, PresetOption, SourceMetadata, preset_options,
 };
 use crate::{assets, theme};
 use gpui::prelude::{FluentBuilder, ParentElement, Styled};
-use gpui::{
-    ClickEvent, Context, FocusHandle, InteractiveElement, StatefulInteractiveElement, Window, div,
-};
+use gpui::{ClickEvent, Context, FocusHandle, StatefulInteractiveElement, Window, div};
 
 #[derive(Clone, Copy)]
 pub(in crate::app) struct SettingsPresetsTabState<'a> {
@@ -23,7 +20,6 @@ pub(in crate::app) struct SettingsPresetsTabState<'a> {
     pub(in crate::app) preset_name: &'a str,
     pub(in crate::app) preset_name_focus: Option<&'a FocusHandle>,
     pub(in crate::app) presets: &'a [PresetDefinition],
-    pub(in crate::app) notice: Option<&'a PresetNotice>,
     pub(in crate::app) palette: &'static theme::ThemePalette,
 }
 
@@ -53,30 +49,7 @@ pub(in crate::app) fn settings_presets_tab(
             window,
             cx,
         ))
-        .when_some(state.notice, |content, notice| {
-            content.child(settings_presets_notice(notice, palette))
-        })
         .child(list)
-}
-
-fn settings_presets_notice(
-    notice: &PresetNotice,
-    palette: &'static theme::ThemePalette,
-) -> gpui::Stateful<gpui::Div> {
-    div()
-        .id("settings-presets-notice")
-        .w_full()
-        .role(match notice.tone {
-            PresetNoticeTone::Success => gpui::Role::Status,
-            PresetNoticeTone::Error => gpui::Role::Alert,
-        })
-        .aria_label(notice.text.clone())
-        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-        .text_color(color(match notice.tone {
-            PresetNoticeTone::Success => palette.text_primary,
-            PresetNoticeTone::Error => palette.danger,
-        }))
-        .child(theme::ui_text_owned(notice.text.clone()))
 }
 
 fn settings_presets_save_row(
@@ -184,7 +157,11 @@ fn settings_preset_row(
                     div()
                         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                         .font_weight(theme::TEXT_WEIGHT_REGULAR)
-                        .text_color(color(palette.text_muted))
+                        .text_color(color(if selected && option.is_compatible {
+                            palette.success
+                        } else {
+                            palette.text_muted
+                        }))
                         .child(theme::ui_text(status)),
                 )
             })

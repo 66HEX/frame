@@ -227,7 +227,6 @@ impl FrameRoot {
                 }
                 let next: String = candidate.chars().filter(|ch| !ch.is_control()).collect();
                 self.settings_ui.preset_name_draft.clone_from(&next);
-                self.settings_ui.preset_notice = None;
                 Some(next)
             }
             FrameTextInputKind::ExternalSubtitleLanguage

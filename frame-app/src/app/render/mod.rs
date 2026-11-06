@@ -310,7 +310,6 @@ impl Render for FrameRoot {
                     preset_name: &self.settings_ui.preset_name_draft,
                     preset_name_focus: Some(&preset_name_focus),
                     presets: &self.presets,
-                    preset_notice: self.settings_ui.preset_notice.as_ref(),
                     subtitle_fonts: &self.subtitle_font_families,
                     available_encoders: &self.available_encoders,
                     available_filters: &self.available_filters,

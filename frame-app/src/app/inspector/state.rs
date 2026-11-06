@@ -4,7 +4,7 @@ use crate::app::inspector::subtitles::state::{
     SettingsSubtitleMode, SettingsSubtitlePopover,
 };
 use crate::settings::{
-    ConversionConfig, OutputSection, PresetDefinition, PresetNotice, SettingsTab, SourceMetadata,
+    ConversionConfig, OutputSection, PresetDefinition, SettingsTab, SourceMetadata,
 };
 use crate::source_metadata::MetadataStatus;
 use crate::theme;
@@ -27,7 +27,6 @@ pub(in crate::app) struct SettingsUiState {
     pub(in crate::app) theme_scroll_handle: ScrollHandle,
     pub(in crate::app) ui_scale_scroll_handle: ScrollHandle,
     pub(in crate::app) preset_name_draft: String,
-    pub(in crate::app) preset_notice: Option<PresetNotice>,
     pub(in crate::app) next_custom_preset_sequence: u64,
 }
 
@@ -48,7 +47,6 @@ impl Default for SettingsUiState {
             theme_scroll_handle: ScrollHandle::new(),
             ui_scale_scroll_handle: ScrollHandle::new(),
             preset_name_draft: String::new(),
-            preset_notice: None,
             next_custom_preset_sequence: 0,
         }
     }
@@ -91,7 +89,6 @@ pub(in crate::app) struct SettingsRenderState<'a> {
     pub(in crate::app) preset_name: &'a str,
     pub(in crate::app) preset_name_focus: Option<&'a FocusHandle>,
     pub(in crate::app) presets: &'a [PresetDefinition],
-    pub(in crate::app) preset_notice: Option<&'a PresetNotice>,
     pub(in crate::app) subtitle_fonts: &'a [String],
     pub(in crate::app) available_encoders: &'a AvailableEncoders,
     pub(in crate::app) available_filters: &'a AvailableFilters,
