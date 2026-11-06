@@ -6,7 +6,8 @@ use crate::app::input::{FrameTextInputKind, FrameTextInputSpec, frame_text_input
 use crate::app::inspector::{settings_hint_text, settings_section};
 use crate::app::layout::PANEL_HEADER_HEIGHT;
 use crate::app::motion::{
-    motion_is_hidden, settings_sheet_right_inset, sheet_motion, surface_motion,
+    SETTINGS_DRAWER_EDGE_INSET, drawer_motion, motion_is_hidden, settings_drawer_right_inset,
+    surface_motion,
 };
 use crate::app::preferences::appearance::app_settings_appearance_section;
 use crate::app::preferences::state::AppearancePopover;
@@ -24,7 +25,7 @@ use gpui::{
 };
 
 #[derive(Clone, Copy)]
-pub(in crate::app) struct AppSettingsSheetProps<'a> {
+pub(in crate::app) struct AppSettingsDrawerProps<'a> {
     pub(in crate::app) is_open: bool,
     pub(in crate::app) current_max_concurrency: usize,
     pub(in crate::app) draft_max_concurrency: &'a str,
@@ -68,18 +69,18 @@ pub(in crate::app) struct AppSettingsSelectFocuses<'a> {
     clippy::large_types_passed_by_value,
     reason = "The declarative settings render consumes a copyable bundle so all render inputs remain explicit."
 )]
-pub(in crate::app) fn app_settings_sheet(
-    props: AppSettingsSheetProps<'_>,
+pub(in crate::app) fn app_settings_drawer(
+    props: AppSettingsDrawerProps<'_>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
     let palette = props.palette;
     let draft_is_dirty =
         props.draft_max_concurrency.trim() != props.current_max_concurrency.to_string();
-    let progress = sheet_motion(props.is_open, window, cx);
+    let progress = drawer_motion(props.is_open, window, cx);
     let backdrop_progress =
         surface_motion("app-settings-backdrop-motion", props.is_open, window, cx);
-    let right_inset = settings_sheet_right_inset(progress);
+    let right_inset = settings_drawer_right_inset(progress);
     let first_focus = props.close_focus.clone();
     let last_focus = props.last_focus.clone();
     let theme_trigger_focus = props.theme_focuses.trigger.clone();
@@ -94,7 +95,8 @@ pub(in crate::app) fn app_settings_sheet(
     }
 
     div()
-        .id("app-settings-sheet")
+        .id("app-settings-drawer")
+        .debug_selector(|| "app-settings-drawer".to_owned())
         .absolute()
         .inset_0()
         .on_key_down(cx.listener(
@@ -124,6 +126,7 @@ pub(in crate::app) fn app_settings_sheet(
         .child(
             div()
                 .id("app-settings-backdrop")
+                .debug_selector(|| "app-settings-backdrop".to_owned())
                 .absolute()
                 .inset_0()
                 .bg(color(palette.overlay_backdrop))
@@ -140,25 +143,23 @@ pub(in crate::app) fn app_settings_sheet(
         .child(
             div()
                 .id("app-settings-panel")
+                .debug_selector(|| "app-settings-panel".to_owned())
                 .role(gpui::Role::Dialog)
                 .aria_modal(true)
                 .aria_label("Settings")
                 .track_focus(props.panel_focus)
                 .tab_stop(false)
                 .absolute()
-                .top_0()
+                .top(theme::ui_rem(SETTINGS_DRAWER_EDGE_INSET))
                 .right(theme::ui_rem(right_inset))
-                .bottom_0()
+                .bottom(theme::ui_rem(SETTINGS_DRAWER_EDGE_INSET))
                 .w(theme::ui_rem(384.0))
                 .max_w(relative(0.75))
                 .flex()
                 .flex_col()
-                .border_l_1()
-                .border_color(color(palette.transparent))
-                .bg(theme::shadows::surface_fill(
-                    palette.surface_elevated,
-                    palette,
-                ))
+                .rounded(theme::ui_rem(theme::RADIUS_XL))
+                .bg(theme::shadows::surface_fill(palette.surface, palette))
+                .text_color(color(palette.token("card-foreground")))
                 .shadow(theme::shadows::ShadowLevel::Lg.shadows())
                 .opacity(progress)
                 .occlude()
@@ -210,6 +211,7 @@ pub(in crate::app) fn app_settings_sheet(
                 .child(
                     div()
                         .id("app-settings-scroll-body")
+                        .debug_selector(|| "app-settings-scroll-body".to_owned())
                         .flex_1()
                         .flex()
                         .flex_col()

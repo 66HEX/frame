@@ -256,7 +256,7 @@ Dodatkowo: pozycja odtwarzania, początek i koniec przycięcia, przezroczystoś�
 | `css_ease` | [motion.rs](../../src/app/motion.rs#L14) | 3 |
 | `app_settings_appearance_section` | [preferences/appearance.rs](../../src/app/preferences/appearance.rs#L22) | 1 |
 | `options` | [preferences/appearance.rs](../../src/app/preferences/appearance.rs#L92) | 2 |
-| `app_settings_sheet` | [preferences/view.rs](../../src/app/preferences/view.rs#L71) | 1 |
+| `app_settings_drawer` | [preferences/view.rs](../../src/app/preferences/view.rs#L72) | 1 |
 | `app_settings_version_label` | [preferences/view.rs](../../src/app/preferences/view.rs#L291) | 1 |
 | `app_settings_output_directory_section` | [preferences/view.rs](../../src/app/preferences/view.rs#L304) | 1 |
 | `app_settings_concurrency_control` | [preferences/view.rs](../../src/app/preferences/view.rs#L362) | 1 |
@@ -343,7 +343,7 @@ Identyfikatory obejmują również kontenery, które mają znaczenie dla testów
 | --- | --- |
 | `logs-tab-list` | [logs/view.rs](../../src/app/logs/view.rs#L90) |
 | `logs-body` | [logs/view.rs](../../src/app/logs/view.rs#L232) |
-| `app-settings-sheet` | [preferences/view.rs](../../src/app/preferences/view.rs#L97) |
+| `app-settings-drawer` | [preferences/view.rs](../../src/app/preferences/view.rs#L98) |
 | `app-settings-backdrop` | [preferences/view.rs](../../src/app/preferences/view.rs#L126) |
 | `app-settings-panel` | [preferences/view.rs](../../src/app/preferences/view.rs#L142) |
 | `app-settings-scroll-body` | [preferences/view.rs](../../src/app/preferences/view.rs#L209) |

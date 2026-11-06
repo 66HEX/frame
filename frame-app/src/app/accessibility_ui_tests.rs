@@ -63,6 +63,9 @@ mod keyboard_tests;
 #[path = "accessibility/preview_motion_tests.rs"]
 mod preview_motion_tests;
 
+#[path = "accessibility/settings_drawer_tests.rs"]
+mod settings_drawer_tests;
+
 #[test]
 fn preview_canvas_focus_ring_paints_above_the_clipped_content() {
     for theme in crate::appearance::ColorTheme::ALL {

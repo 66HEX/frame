@@ -1233,9 +1233,9 @@
       "line": 92
     },
     {
-      "name": "app_settings_sheet",
+      "name": "app_settings_drawer",
       "path": "frame-app/src/app/preferences/view.rs",
-      "line": 71
+      "line": 72
     },
     {
       "name": "app_settings_version_label",
@@ -2000,7 +2000,7 @@
       "line": 197
     },
     {
-      "builder": "app_settings_sheet",
+      "builder": "app_settings_drawer",
       "path": "frame-app/src/app/render/overlays.rs",
       "line": 138
     },
@@ -5802,9 +5802,9 @@
       "line": 232
     },
     {
-      "id_or_pattern": "app-settings-sheet",
+      "id_or_pattern": "app-settings-drawer",
       "path": "frame-app/src/app/preferences/view.rs",
-      "line": 97
+      "line": 98
     },
     {
       "id_or_pattern": "app-settings-backdrop",

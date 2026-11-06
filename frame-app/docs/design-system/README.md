@@ -29,8 +29,8 @@ Timingi natywnego adaptera, oparte na źródłach CLI i porównaniu z działają
 | Select / Popover / color picker | 100 ms, CSS `ease` = cubic-bezier(.25,.1,.25,1) | opacity, skala .95–1; wejście od strony triggera o 8 px, wyjście w jego kierunku; strona i środek skalowania zależą od dostępnego miejsca |
 | Dialog | 100 ms, CSS `ease` | opacity i skala .95–1, środek panelu |
 | Tooltip | zwłoka hover 400 ms; wejście i wyjście 150 ms, CSS `ease` | opacity, skala .95–1 i przesunięcie 8 px od strony triggera; fokus klawiatury bez zwłoki |
-| Sheet | 200 ms, cubic-bezier(.4,0,.2,1) | opacity i przesunięcie o 10% szerokości w obie strony |
-| Overlay Dialog/Sheet | 100 ms, CSS `ease` | opacity; blur 4 px jest stały |
+| Settings Drawer | 200 ms, cubic-bezier(.4,0,.2,1) | opacity i przesunięcie o 10% szerokości w obie strony; końcowy inset 8 px |
+| Overlay Dialog/Drawer | 100 ms, CSS `ease` | opacity; blur 4 px jest stały |
 | Slider | 150 ms, cubic-bezier(.4,0,.2,1) | ring 0–2 px, kolor ring/30, hover/focus-visible/active; kursor domyślny |
 | Button / Toggle | 150 ms, cubic-bezier(.4,0,.2,1) | przejścia kolorów i ringu; przycisk dodatkowo przesunięcie nacisku 1 px |
 | Tabs | tło 180 ms, cubic-bezier(.2,0,0,1); tekst i ring 150 ms | jedna powierzchnia przesuwa się i zmienia szerokość między triggerami, bez odbicia |
@@ -98,7 +98,7 @@ oraz odwrócenie przejścia w trakcie animacji, w obu motywach i skalach UI.
 | Tooltip | Przyciski narzędziowe, playback, zoom | `tooltip.rs`; delay 400 ms, popover/foreground, radius-md, strzałka, keyboard focus/Escape, kolizje z brzegiem okna i hoverable content |
 | Popover | Selecty, color pickery, narzędzia crop/overlay | `popover_surface`, `frame_toolbar`; popover, shadow-md z krawędzią i highlightem |
 | Dialog / AlertDialog | Dostępna aktualizacja, pobieranie i potwierdzenia instalacji | `updates/dialog.rs`; wspólna powierzchnia dialogu i kontrolki |
-| Sheet | Ustawienia aplikacji | `preferences/view.rs`; prawy brzeg, 384 px maks., 75% wąskiego okna, przezroczysty border-left, shadow-lg, backdrop black/80 + blur4 |
+| Drawer | Ustawienia aplikacji | `preferences/view.rs`; prawa strona, odstęp 8 px od góry, prawego i dolnego brzegu, 384 px maks., 75% wąskiego okna, radius-xl 18 px, card/card-foreground, shadow-lg, backdrop black/80 + blur4 |
 | ScrollArea | Fonty, selecty, logi, treści z przewijaniem | `scrollbar.rs`; szerokość 10, thumb 7, minimalna długość 18; wariant `type="always"` |
 | Progress / Spinner | Aktualizacja, konwersja, ładowanie | Wspólny rail 4 px i spinner Nucleo |
 | Empty / Alert | Pusta kolejka, brak danych, błędy runtime i aktualizacji | `frame_empty`, opisy i semantyka Alert; kolory semantic foreground/destructive |
@@ -169,11 +169,13 @@ W katalogu sąsiadującym z Frame:
 ```sh
 npx shadcn@4.23.0 init --template vite --base radix --preset mira --name frame-shadcn-mira --no-monorepo --yes
 cd frame-shadcn-mira
-npx shadcn@4.23.0 add button input label field checkbox radio-group select slider toggle toggle-group tabs card badge separator tooltip popover dialog alert-dialog sheet scroll-area progress empty alert button-group input-group item spinner kbd collapsible --yes
+npx shadcn@4.23.0 add button input label field checkbox radio-group select slider toggle toggle-group tabs card badge separator tooltip popover dialog alert-dialog sheet drawer scroll-area progress empty alert button-group input-group item spinner kbd collapsible --yes
 npm install --save-dev culori@4.0.2
 ```
 
-CLI doinstalował także `textarea` jako zależność. Łącznie snapshot zawiera 30 plików komponentów. `components.json`, lockfile, oryginały komponentów, CSS, licencja, SHA-256 i [provenance.json](reference/provenance.json) identyfikują źródło. Inter 4.1 jest osadzony jako instancje 400/500, opsz14.
+CLI doinstalował także `textarea` jako zależność. Łącznie snapshot zawiera 31 plików komponentów. `components.json`, lockfile, oryginały komponentów, CSS, licencja, SHA-256 i [provenance.json](reference/provenance.json) identyfikują źródło. Inter 4.1 jest osadzony jako instancje 400/500, opsz14.
+
+Drawer dodano przez CLI do tego samego presetu Radix Mira wraz z zależnością `vaul`. Oryginalny [drawer.tsx](reference/drawer.tsx) zachowuje `before:bg-popover`, warstwę tła odsuniętą przez `before:inset-2` i `before:rounded-xl`. Wariant ustawień Frame używa zamiast tego `card` / `card-foreground`; galeria React pokazuje tę zmianę przez klasę `before:bg-card`. Natywny drawer zachowuje modalny fokus, Tab/Shift+Tab, Escape zamykający najpierw otwarty select, kliknięcie na backdrop oraz powrót fokusu do triggera. Nagłówek pozostaje widoczny, a treść jest przewijalna.
 
 Archiwalny snapshot CLI zachowuje oryginalne importy Hugeicons wyłącznie jako materiał porównawczy. Frame nie ładuje ich i nie ma już generatora tych assetów. Galeria React zachowuje poprawkę typów `spinner.tsx` (liczbowe `size` i `strokeWidth`); oryginał w snapshotcie pozostaje bez zmian.
 

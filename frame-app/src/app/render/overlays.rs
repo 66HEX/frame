@@ -1,7 +1,7 @@
 use crate::app::accessibility::FrameFocusKey;
 use crate::app::input::FrameTextInputKind;
 use crate::app::preferences::view::{
-    AppSettingsSelectFocuses, AppSettingsSheetProps, app_settings_sheet,
+    AppSettingsDrawerProps, AppSettingsSelectFocuses, app_settings_drawer,
 };
 use crate::app::queue::drop_overlay::drag_drop_overlay;
 use crate::app::root::FrameRoot;
@@ -135,8 +135,8 @@ impl FrameRoot {
             {
                 close_focus.focus(window, cx);
             }
-            root = root.child(app_settings_sheet(
-                AppSettingsSheetProps {
+            root = root.child(app_settings_drawer(
+                AppSettingsDrawerProps {
                     is_open: self.settings_ui.is_open,
                     current_max_concurrency: self.max_concurrency,
                     draft_max_concurrency: &self.settings_ui.max_concurrency_draft,

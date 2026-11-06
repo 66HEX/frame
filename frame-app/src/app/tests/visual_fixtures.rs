@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn app_settings_fixture_opens_runtime_settings_sheet() {
+fn app_settings_fixture_opens_runtime_settings_drawer() {
     let mut root = FrameRoot::new();
 
     root.apply_visual_fixture(Some(VisualFixture::AppSettings));

@@ -6,8 +6,8 @@ pub(super) const SURFACE_MOTION_DURATION: Duration = Duration::from_millis(100);
 pub(super) const INTERACTION_MOTION_DURATION: Duration = Duration::from_millis(150);
 pub(super) const MOTION_DONE_EPSILON: f32 = 0.001;
 
-const SETTINGS_SHEET_SLIDE_DISTANCE: f32 = 384.0 * 0.1;
-const SETTINGS_SHEET_EDGE_INSET: f32 = 0.0;
+const SETTINGS_DRAWER_SLIDE_DISTANCE: f32 = 384.0 * 0.1;
+pub(super) const SETTINGS_DRAWER_EDGE_INSET: f32 = 8.0;
 const POPOVER_SLIDE_DISTANCE: f32 = 8.0;
 
 /// CSS `ease`, the default timing function of tw-animate-css enter/exit keyframes.
@@ -15,7 +15,7 @@ pub(super) fn css_ease(progress: f32) -> f32 {
     cubic_bezier(progress, 0.25, 0.1, 0.25, 1.0)
 }
 
-/// Tailwind's default transition timing, also used by Mira's sheet.
+/// Tailwind's default transition timing, also used by the settings drawer.
 pub(super) fn css_transition_ease(progress: f32) -> f32 {
     cubic_bezier(progress, 0.4, 0.0, 0.2, 1.0)
 }
@@ -89,12 +89,12 @@ pub(super) fn motion_is_hidden(progress: f32) -> bool {
     progress <= MOTION_DONE_EPSILON
 }
 
-pub(super) fn settings_sheet_slide_offset(progress: f32) -> f32 {
-    (1.0 - progress.clamp(0.0, 1.0)) * SETTINGS_SHEET_SLIDE_DISTANCE
+pub(super) fn settings_drawer_slide_offset(progress: f32) -> f32 {
+    (1.0 - progress.clamp(0.0, 1.0)) * SETTINGS_DRAWER_SLIDE_DISTANCE
 }
 
-pub(super) fn settings_sheet_right_inset(progress: f32) -> f32 {
-    SETTINGS_SHEET_EDGE_INSET - settings_sheet_slide_offset(progress)
+pub(super) fn settings_drawer_right_inset(progress: f32) -> f32 {
+    SETTINGS_DRAWER_EDGE_INSET - settings_drawer_slide_offset(progress)
 }
 
 pub(super) fn popover_slide_offset(progress: f32) -> f32 {
@@ -114,10 +114,10 @@ pub(super) fn surface_motion(
     *transition.evaluate(window, cx)
 }
 
-pub(super) fn sheet_motion(is_open: bool, window: &mut Window, cx: &mut App) -> f32 {
+pub(super) fn drawer_motion(is_open: bool, window: &mut Window, cx: &mut App) -> f32 {
     let transition = window
         .use_keyed_transition(
-            "app-settings-sheet-motion",
+            "app-settings-drawer-motion",
             cx,
             Duration::from_millis(200),
             |_, _| 0.0_f32,

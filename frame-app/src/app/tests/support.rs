@@ -14,7 +14,7 @@ pub(in crate::app) use crate::app::inspector::subtitles::state::{
 pub(in crate::app) use crate::app::layout::LINUX_WINDOW_FRAME_INSET;
 pub(in crate::app) use crate::app::layout::{WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH};
 pub(in crate::app) use crate::app::model::{ActiveView, VisualFixture};
-pub(in crate::app) use crate::app::motion::settings_sheet_right_inset;
+pub(in crate::app) use crate::app::motion::settings_drawer_right_inset;
 pub(in crate::app) use crate::app::preferences::state::AppearancePopover;
 pub(in crate::app) use crate::app::preview::state::{
     PREVIEW_CANVAS_VISUAL_SETTLE_EPSILON, PREVIEW_CANVAS_WHEEL_ZOOM_STEP,
