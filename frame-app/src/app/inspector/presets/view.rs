@@ -3,7 +3,6 @@ use crate::app::components::{
     frame_icon_button, frame_list_item, frame_text_button,
 };
 use crate::app::input::{FrameTextInputKind, FrameTextInputSpec, frame_text_input};
-use crate::app::inspector::source::settings_section_label;
 use crate::app::primitives::{ButtonVariant, color};
 use crate::app::root::FrameRoot;
 use crate::settings::{
@@ -46,7 +45,6 @@ pub(in crate::app) fn settings_presets_tab(
     }
 
     crate::app::components::frame_field_group()
-        .child(settings_presets_header(state.notice, palette))
         .child(settings_presets_save_row(
             state.preset_name,
             state.settings_disabled,
@@ -55,39 +53,30 @@ pub(in crate::app) fn settings_presets_tab(
             window,
             cx,
         ))
+        .when_some(state.notice, |content, notice| {
+            content.child(settings_presets_notice(notice, palette))
+        })
         .child(list)
 }
 
-fn settings_presets_header(
-    notice: Option<&PresetNotice>,
+fn settings_presets_notice(
+    notice: &PresetNotice,
     palette: &'static theme::ThemePalette,
-) -> gpui::Div {
-    let mut header = div()
-        .relative()
+) -> gpui::Stateful<gpui::Div> {
+    div()
+        .id("settings-presets-notice")
         .w_full()
-        .child(settings_section_label("Preset library", palette));
-    if let Some(notice) = notice {
-        header = header.child(
-            div()
-                .id("settings-presets-notice")
-                .absolute()
-                .top_0()
-                .right_0()
-                .role(match notice.tone {
-                    PresetNoticeTone::Success => gpui::Role::Status,
-                    PresetNoticeTone::Error => gpui::Role::Alert,
-                })
-                .aria_label(notice.text.clone())
-                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-                .text_color(color(match notice.tone {
-                    PresetNoticeTone::Success => palette.text_primary,
-                    PresetNoticeTone::Error => palette.danger,
-                }))
-                .child(theme::ui_text_owned(notice.text.clone())),
-        );
-    }
-
-    header
+        .role(match notice.tone {
+            PresetNoticeTone::Success => gpui::Role::Status,
+            PresetNoticeTone::Error => gpui::Role::Alert,
+        })
+        .aria_label(notice.text.clone())
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
+        .text_color(color(match notice.tone {
+            PresetNoticeTone::Success => palette.text_primary,
+            PresetNoticeTone::Error => palette.danger,
+        }))
+        .child(theme::ui_text_owned(notice.text.clone()))
 }
 
 fn settings_presets_save_row(

@@ -122,11 +122,3 @@ pub(in crate::app) fn settings_track_header(
                 .shadow(horizontal_separator_shadows(palette)),
         )
 }
-
-pub(in crate::app) fn settings_section_label(
-    label: &'static str,
-    palette: &'static theme::ThemePalette,
-) -> gpui::Div {
-    crate::app::components::frame_label(theme::ui_text(label), palette)
-        .text_size(theme::ui_rem(14.0))
-}
