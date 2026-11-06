@@ -28,7 +28,7 @@ Timingi natywnego adaptera, oparte na źródłach CLI i porównaniu z działają
 | --- | --- | --- |
 | Select / Popover / color picker | 100 ms, CSS `ease` = cubic-bezier(.25,.1,.25,1) | opacity, skala .95–1; wejście od strony triggera o 8 px, wyjście w jego kierunku; strona i środek skalowania zależą od dostępnego miejsca |
 | Dialog | 100 ms, CSS `ease` | opacity i skala .95–1, środek panelu |
-| Tooltip | wejście natychmiastowe; wyjście 150 ms, CSS `ease` | domyślny delay=0 daje Radix `instant-open` bez animacji wejścia; wyjście opacity, skala 1–.95 i przesunięcie w stronę triggera |
+| Tooltip | zwłoka hover 400 ms; wejście i wyjście 150 ms, CSS `ease` | opacity, skala .95–1 i przesunięcie 8 px od strony triggera; fokus klawiatury bez zwłoki |
 | Sheet | 200 ms, cubic-bezier(.4,0,.2,1) | opacity i przesunięcie o 10% szerokości w obie strony |
 | Overlay Dialog/Sheet | 100 ms, CSS `ease` | opacity; blur 4 px jest stały |
 | Slider | 150 ms, cubic-bezier(.4,0,.2,1) | ring 0–2 px, kolor ring/30, hover/focus-visible/active; kursor domyślny |
@@ -39,7 +39,7 @@ Timingi natywnego adaptera, oparte na źródłach CLI i porównaniu z działają
 | Progress | 150 ms, cubic-bezier(.4,0,.2,1) | zmiana długości wypełnienia |
 | Spinner | 1 s, linear, powtarzanie | obrót |
 
-Timingi tooltipa uwzględniają rzeczywisty stan `instant-open`, a nie samą obecność klas `animate-in` w źródle. Zamykanie zachowuje element do końca animacji. Ustawienie systemowe reduced motion natychmiast kończy przejścia. Natywna transformacja skaluje także glyphy, obrysy, cienie i obszary trafienia, bez zmiany układu tekstu.
+Tooltip ma celowo dłuższą zwłokę niż oryginalny preset Mira. Szybkie przechodzenie między tooltipami zachowuje okno 300 ms bez ponownego oczekiwania; animacja wejścia działa także wtedy. Opuszczenie kontrolki przed upływem zwłoki anuluje oczekujący tooltip. Zamykanie zachowuje element do końca animacji. Ustawienie systemowe reduced motion natychmiast kończy przejścia, zachowując zwłokę hover. Natywna transformacja skaluje także glyphy, obrysy, cienie i obszary trafienia, bez zmiany układu tekstu.
 
 ### Focus i stany kontrolek
 
@@ -89,7 +89,7 @@ oraz odwrócenie przejścia w trakcie animacji, w obu motywach i skalach UI.
 | Card | Preview, kolejka, inspektor, logi, welcome | `FrameSurface::card_surface`; card, radius-lg, shadow-sm |
 | Badge | Wartości suwaków i kompaktowe wskaźniki wartości | `frame_badge`, wariant secondary, 20 px, tekst 10 px |
 | Separator | Podziały nagłówków i toolbarów | Jeden piksel tokenu border, bez tłoczeń i dodatkowego highlightu |
-| Tooltip | Przyciski narzędziowe, playback, zoom | `tooltip.rs`; delay 0, popover/foreground, radius-md, strzałka, keyboard focus/Escape, kolizje z brzegiem okna i hoverable content |
+| Tooltip | Przyciski narzędziowe, playback, zoom | `tooltip.rs`; delay 400 ms, popover/foreground, radius-md, strzałka, keyboard focus/Escape, kolizje z brzegiem okna i hoverable content |
 | Popover | Selecty, color pickery, narzędzia crop/overlay | `popover_surface`, `frame_toolbar`; popover, shadow-md z krawędzią i highlightem |
 | Dialog / AlertDialog | Dostępna aktualizacja, pobieranie i potwierdzenia instalacji | `updates/dialog.rs`; wspólna powierzchnia dialogu i kontrolki |
 | Sheet | Ustawienia aplikacji | `preferences/view.rs`; prawy brzeg, 384 px maks., 75% wąskiego okna, przezroczysty border-left, shadow-lg, backdrop black/80 + blur4 |

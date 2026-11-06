@@ -14,7 +14,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const TOOLTIP_HOVER_DELAY: Duration = Duration::from_millis(0);
+const TOOLTIP_HOVER_DELAY: Duration = Duration::from_millis(400);
 const TOOLTIP_HYSTERESIS_WINDOW: Duration = Duration::from_millis(300);
 const TOOLTIP_DEFERRED_PRIORITY: usize = 20;
 
@@ -65,15 +65,20 @@ impl FrameTooltip {
         window: &mut Window,
         cx: &mut Context<FrameRoot>,
     ) -> gpui::Stateful<gpui::Div> {
+        if !enabled {
+            let id = self.id.clone();
+            cx.defer_in(window, move |root, _, cx| root.end_tooltip_hover(&id, cx));
+        }
         let focus_state =
             window.use_keyed_state(format!("tooltip-{}-focus", self.id), cx, |window, cx| {
                 let focus = focus.cloned().unwrap_or_else(|| cx.focus_handle());
                 TooltipFocusState::new(focus, window, cx)
             });
         let state = focus_state.read(cx);
-        let visible = !state.dismissed
+        let visible = enabled
+            && !state.dismissed
             && if window.last_input_was_keyboard() {
-                enabled && state.focus.is_focused(window)
+                state.focus.is_focused(window)
             } else {
                 self.hovered
             };
@@ -107,11 +112,6 @@ impl FrameTooltip {
             )
             .with_easing(crate::app::motion::css_ease);
         set_motion_target(&motion, motion_target(visible), cx);
-        // Mira's zero-delay Radix tooltip enters `instant-open`, which has no
-        // enter keyframe. Its `closed` state still uses the 150 ms exit animation.
-        if visible {
-            motion.jump_to(1.0, cx);
-        }
         let progress = *motion.evaluate(window, cx);
         let anchor_bounds = Rc::new(Cell::new(gpui::Bounds::default()));
         let measured_anchor = anchor_bounds.clone();
@@ -279,7 +279,8 @@ impl FrameRoot {
 
     fn begin_tooltip_hover(&mut self, id: String, cx: &mut Context<Self>) {
         let now = Instant::now();
-        let show_without_delay = self.tooltip_ui.is_warm(now);
+        let show_without_delay =
+            self.tooltip_ui.visible_id.is_some() || self.tooltip_ui.is_warm(now);
         let epoch = self.tooltip_ui.begin_hover(id.clone());
 
         if show_without_delay {
