@@ -23,5 +23,7 @@
       }
     ]
   },
-  "referenceGalleryTypeFix": "spinner.tsx: omit SVG size/strokeWidth string union, then accept numeric size/strokeWidth required by HugeiconsIcon. No visual or behavior changes."
+  "referenceGalleryTypeFix": "spinner.tsx: omit SVG size/strokeWidth string union, then accept numeric size/strokeWidth required by HugeiconsIcon. No visual or behavior changes.",
+  "addCollapsible": "npx shadcn@4.23.0 add collapsible --yes",
+  "collapsibleAdded": "2026-11-06"
 }

@@ -145,11 +145,11 @@ W katalogu sąsiadującym z Frame:
 ```sh
 npx shadcn@4.23.0 init --template vite --base radix --preset mira --name frame-shadcn-mira --no-monorepo --yes
 cd frame-shadcn-mira
-npx shadcn@4.23.0 add button input label field checkbox radio-group select slider toggle toggle-group tabs card badge separator tooltip popover dialog alert-dialog sheet scroll-area progress empty alert button-group input-group item spinner kbd --yes
+npx shadcn@4.23.0 add button input label field checkbox radio-group select slider toggle toggle-group tabs card badge separator tooltip popover dialog alert-dialog sheet scroll-area progress empty alert button-group input-group item spinner kbd collapsible --yes
 npm install --save-dev culori@4.0.2
 ```
 
-CLI doinstalował także `textarea` jako zależność. Łącznie snapshot zawiera 29 plików komponentów. `components.json`, lockfile, oryginały komponentów, CSS, licencja, SHA-256 i [provenance.json](reference/provenance.json) identyfikują źródło. Inter 4.1 jest osadzony jako instancje 400/500, opsz14.
+CLI doinstalował także `textarea` jako zależność. Łącznie snapshot zawiera 30 plików komponentów. `components.json`, lockfile, oryginały komponentów, CSS, licencja, SHA-256 i [provenance.json](reference/provenance.json) identyfikują źródło. Inter 4.1 jest osadzony jako instancje 400/500, opsz14.
 
 Archiwalny snapshot CLI zachowuje oryginalne importy Hugeicons wyłącznie jako materiał porównawczy. Frame nie ładuje ich i nie ma już generatora tych assetów. Galeria React zachowuje poprawkę typów `spinner.tsx` (liczbowe `size` i `strokeWidth`); oryginał w snapshotcie pozostaje bez zmian.
 
