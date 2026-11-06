@@ -319,11 +319,14 @@ fn preview_tool_button_inner(
     })
     .w(theme::ui_rem(PREVIEW_TOOLBAR_BUTTON_SIZE))
     .px_0()
-    .child(
-        gpui::svg()
-            .path(icon)
-            .size(theme::ui_rem(PREVIEW_TOOLBAR_ICON_SIZE)),
-    );
+    .child(crate::app::components::frame_animated_icon(
+        button_id.clone(),
+        Some(icon),
+        PREVIEW_TOOLBAR_ICON_SIZE,
+        None,
+        window,
+        cx,
+    ));
     let button = if let Some(focus) = focus {
         button.track_focus(focus)
     } else {

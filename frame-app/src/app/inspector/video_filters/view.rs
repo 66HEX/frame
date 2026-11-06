@@ -184,6 +184,7 @@ pub(in crate::app) fn settings_video_filters_tab(
                     filters.grayscale,
                     settings_disabled || !available_filters.hue,
                     palette,
+                    window,
                     cx,
                 )),
         );

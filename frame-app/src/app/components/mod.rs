@@ -1,4 +1,6 @@
 pub(in crate::app) use patterns::*;
+mod animated_icon;
+pub(in crate::app) use animated_icon::frame_animated_icon;
 mod patterns;
 pub(in crate::app) use button::*;
 pub(in crate::app) use checkbox::*;

@@ -57,6 +57,7 @@ pub(in crate::app) fn settings_audio_filters_tab(
                     config.audio_normalize,
                     controls_disabled || !available_filters.loudnorm,
                     palette,
+                    window,
                     cx,
                 ))
                 .child(settings_audio_filter_range_field(

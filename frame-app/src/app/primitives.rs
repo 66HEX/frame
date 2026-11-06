@@ -109,10 +109,11 @@ pub(super) fn action_button(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
+    let id = id.into();
     let accessibility_label = accessibility_label.into();
     let foreground = color(button_colors(variant, false, enabled, palette).foreground);
     let button = crate::app::components::frame_button_base(
-        id,
+        id.clone(),
         &accessibility_label,
         variant,
         false,
@@ -122,16 +123,24 @@ pub(super) fn action_button(
         window,
         cx,
     );
+    let icon = crate::app::components::frame_animated_icon(
+        id,
+        Some(icon),
+        theme::metrics::CONTROL_ICON,
+        Some(foreground),
+        window,
+        cx,
+    );
     if let Some(label) = label {
         button
             .pl(theme::ui_rem(6.0))
-            .child(icon_svg(icon, theme::metrics::CONTROL_ICON, foreground))
+            .child(icon)
             .child(theme::ui_text(label))
     } else {
         button
             .w(theme::ui_rem(theme::metrics::CONTROL_HEIGHT))
             .p_0()
-            .child(icon_svg(icon, theme::metrics::CONTROL_ICON, foreground))
+            .child(icon)
     }
 }
 

@@ -35,13 +35,16 @@ Timingi natywnego adaptera, oparte na źródłach CLI i porównaniu z działają
 | Button / Toggle / Tabs | 150 ms, cubic-bezier(.4,0,.2,1) | przejścia kolorów i ringu; przycisk dodatkowo przesunięcie nacisku 1 px |
 | Input / Select trigger | 150 ms, cubic-bezier(.4,0,.2,1) | kolory; ring pojawia się bez animacji szerokości, zgodnie z `transition-colors` |
 | Item / wiersz presetu lub ścieżki | 100 ms, cubic-bezier(.4,0,.2,1) | kolory; ring natychmiastowy (`transition-colors duration-100`) |
-| Checkbox | 150 ms, cubic-bezier(.4,0,.2,1) | ring (`transition-shadow`); zaznaczenie bez fade |
+| Checkbox | 150 ms, cubic-bezier(.4,0,.2,1) | ring (`transition-shadow`); znacznik korzysta ze wspólnego przejścia ikon |
+| Zmiana ikony po akcji | 150 ms, cubic-bezier(.4,0,.2,1) | cross-fade, skala .25–1 i blur 4–0 px; wzorcem jest Copy → Check w logach |
 | Progress | 150 ms, cubic-bezier(.4,0,.2,1) | zmiana długości wypełnienia |
 | Spinner | 1 s, linear, powtarzanie | obrót |
 
 Tooltip ma celowo dłuższą zwłokę niż oryginalny preset Mira. Szybkie przechodzenie między tooltipami zachowuje okno 300 ms bez ponownego oczekiwania; animacja wejścia działa także wtedy. Opuszczenie kontrolki przed upływem zwłoki anuluje oczekujący tooltip. Zamykanie zachowuje element do końca animacji. Ustawienie systemowe reduced motion natychmiast kończy przejścia, zachowując zwłokę hover. Natywna transformacja skaluje także glyphy, obrysy, cienie i obszary trafienia, bez zmiany układu tekstu.
 
 ### Focus i stany kontrolek
+
+`frame_animated_icon` obsługuje zmiany ikon w przyciskach, narzędziach preview, akcjach kolejki, nagłówkach Collapsible i checkboxach. Zachowuje rozmiar miejsca na ikonę oraz obie warstwy podczas przejścia. Szybkie ponowne kliknięcie odwraca animację od bieżącej klatki. Pierwsze renderowanie i reduced motion pokazują od razu stan końcowy. Akcje kolejki używają stałego klucza pliku i pozycji przycisku, mimo zmieniającej się akcji. Check potwierdzający skopiowanie logów używa `palette.success` z tokenu `--success`, tak jak napis Applied przy presecie.
 
 [Audyt klawiatury](KEYBOARD_AUDIT.md) opisuje poprawki przechodzenia Tab/Shift+Tab,
 odsłaniania focusu, powrotów z dialogów i nawigacji w kolejce oraz preview.

@@ -81,6 +81,7 @@ pub(super) fn settings_audio_filter_range_field(
                         spec.enabled,
                         control_disabled || is_volume,
                         palette,
+                        window,
                         cx,
                         move |root, _event, _window, cx| {
                             if control_disabled || is_volume {

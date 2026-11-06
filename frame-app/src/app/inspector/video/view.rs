@@ -131,6 +131,7 @@ pub(in crate::app) fn settings_video_tab(
                 config,
                 settings_disabled,
                 palette,
+                window,
                 cx,
             ))
         })
@@ -139,6 +140,7 @@ pub(in crate::app) fn settings_video_tab(
                 config,
                 settings_disabled,
                 palette,
+                window,
                 cx,
             ))
         })
@@ -147,6 +149,7 @@ pub(in crate::app) fn settings_video_tab(
                 config,
                 settings_disabled,
                 palette,
+                window,
                 cx,
             ))
         })

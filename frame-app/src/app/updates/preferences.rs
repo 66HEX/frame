@@ -41,6 +41,7 @@ pub(in crate::app) fn app_settings_updates_section(
             false,
             focuses.auto_update,
             palette,
+            window,
             cx,
             |root, _event, _window, cx| {
                 if root.toggle_auto_update_check(cx) {

@@ -81,6 +81,7 @@ pub(super) fn settings_video_filter_range_field(
                         spec.enabled,
                         control_disabled,
                         palette,
+                        window,
                         cx,
                         move |root, _event, _window, cx| {
                             if control_disabled {

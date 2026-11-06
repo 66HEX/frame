@@ -136,12 +136,13 @@ pub(super) fn hover_motion(
 pub(super) fn contextual_icon_motion(
     key: impl Into<ElementId>,
     active: bool,
+    initially_active: bool,
     window: &mut Window,
     cx: &mut App,
 ) -> f32 {
     let transition = window
         .use_keyed_transition(key, cx, INTERACTION_MOTION_DURATION, |_, _| {
-            motion_target(active)
+            motion_target(initially_active)
         })
         .with_easing(css_transition_ease);
     set_motion_target(&transition, motion_target(active), cx);
@@ -168,7 +169,7 @@ mod tests {
     impl Render for MotionProbe {
         fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
             self.surface = surface_motion("panel", self.open, window, cx);
-            self.icon = contextual_icon_motion("icon", self.selected, window, cx);
+            self.icon = contextual_icon_motion("icon", self.selected, self.selected, window, cx);
             div()
         }
     }

@@ -1,7 +1,7 @@
 use crate::app::accessibility::apply_accessible_checkbox;
 use crate::app::components::{
-    FrameIconButtonSize, FrameIconButtonVariant, frame_checkbox_indicator, frame_icon_button,
-    frame_vertical_uniform_scrollbar,
+    FrameIconButtonSize, FrameIconButtonVariant, frame_checkbox_indicator,
+    frame_icon_button_with_motion_key, frame_vertical_uniform_scrollbar,
 };
 use crate::app::components::{frame_empty, frame_panel_header};
 use crate::app::layout::{FILE_ROW_HEIGHT, WORKSPACE_GAP};
@@ -41,14 +41,20 @@ pub(in crate::app) fn file_list_panel(
                 .bg(color(palette.surface_elevated))
                 .shadow(theme::shadows::FLOATING.shadows())
         })
-        .child(file_list_header(queue.batch_selection_state(), palette, cx))
+        .child(file_list_header(
+            queue.batch_selection_state(),
+            palette,
+            window,
+            cx,
+        ))
         .child(file_list_body(queue, scroll_handle, palette, window, cx))
 }
 
 pub(in crate::app) fn file_list_header(
     selection: BatchSelectionState,
     palette: &'static theme::ThemePalette,
-    cx: &Context<FrameRoot>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let selection_enabled = selection.is_enabled;
     let header_checkbox = div()
@@ -73,10 +79,13 @@ pub(in crate::app) fn file_list_header(
         }))
         .child(apply_accessible_checkbox(
             frame_checkbox_indicator(
+                "file-list-header-checkbox",
                 selection.is_checked,
                 selection.is_indeterminate,
                 !selection_enabled,
                 palette,
+                window,
+                cx,
             )
             .id("file-list-header-checkbox")
             .on_key_down(cx.listener(
@@ -343,6 +352,7 @@ pub(in crate::app) fn file_list_row(
                             file.name.as_str(),
                             file.is_selected_for_conversion,
                             palette,
+                            window,
                             cx,
                         )),
                 )
@@ -490,6 +500,7 @@ fn row_primary_action_button(
     Some(
         row_action_button(
             element_id(id_prefix, &id),
+            element_id("file-row-action-primary", &id),
             icon,
             label,
             true,
@@ -543,6 +554,7 @@ fn row_secondary_action_button(
     Some(
         row_action_button(
             element_id(id_prefix, &id),
+            element_id("file-row-action-secondary", &id),
             icon,
             label,
             true,
@@ -599,6 +611,7 @@ pub(in crate::app) enum RowActionTone {
 )]
 pub(in crate::app) fn row_action_button(
     id: String,
+    motion_key: String,
     icon: &'static str,
     label: &'static str,
     enabled: bool,
@@ -612,8 +625,9 @@ pub(in crate::app) fn row_action_button(
         RowActionTone::Destructive => FrameIconButtonVariant::DestructiveGhost,
     };
 
-    frame_icon_button(
+    frame_icon_button_with_motion_key(
         id,
+        motion_key,
         icon,
         label,
         variant,
@@ -632,7 +646,8 @@ pub(in crate::app) fn row_checkbox_control(
     file_name: &str,
     is_checked: bool,
     palette: &'static theme::ThemePalette,
-    cx: &Context<FrameRoot>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
     let label = format!("Select {file_name} for conversion");
     let click_id = file_id.to_string();
@@ -658,21 +673,29 @@ pub(in crate::app) fn row_checkbox_control(
             }
         }))
         .child(apply_accessible_checkbox(
-            frame_checkbox_indicator(is_checked, false, false, palette)
-                .id(element_id("file-row-checkbox", file_id))
-                .on_key_down(
-                    cx.listener(move |root, event: &gpui::KeyDownEvent, _window, cx| {
-                        if !matches!(event.keystroke.key.as_str(), "space" | "enter") {
-                            return;
-                        }
-                        cx.stop_propagation();
-                        let mut changed = root.select_workspace_file(&key_id);
-                        changed |= root.toggle_file_batch_selection(&key_id).is_some();
-                        if changed {
-                            cx.notify();
-                        }
-                    }),
-                ),
+            frame_checkbox_indicator(
+                format!("file-row-checkbox-{file_id}"),
+                is_checked,
+                false,
+                false,
+                palette,
+                window,
+                cx,
+            )
+            .id(element_id("file-row-checkbox", file_id))
+            .on_key_down(cx.listener(
+                move |root, event: &gpui::KeyDownEvent, _window, cx| {
+                    if !matches!(event.keystroke.key.as_str(), "space" | "enter") {
+                        return;
+                    }
+                    cx.stop_propagation();
+                    let mut changed = root.select_workspace_file(&key_id);
+                    changed |= root.toggle_file_batch_selection(&key_id).is_some();
+                    if changed {
+                        cx.notify();
+                    }
+                },
+            )),
             label,
             true,
             is_checked,

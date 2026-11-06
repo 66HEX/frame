@@ -102,6 +102,7 @@ pub(super) fn settings_video_denoise_control(
             enabled,
             disabled,
             palette,
+            window,
             cx,
             move |root, _event, _window, cx| {
                 if disabled {
@@ -121,7 +122,8 @@ pub(super) fn settings_video_grayscale_control(
     checked: bool,
     disabled: bool,
     palette: &'static theme::ThemePalette,
-    cx: &Context<FrameRoot>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     frame_checkbox_row(
         "settings-video-grayscale-toggle",
@@ -130,6 +132,7 @@ pub(super) fn settings_video_grayscale_control(
         checked,
         disabled,
         palette,
+        window,
         cx,
         move |root, _event, _window, cx| {
             if disabled {

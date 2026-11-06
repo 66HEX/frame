@@ -1,6 +1,6 @@
 //! Controlled Radix Collapsible contract. Closed content is unmounted, so it
 //! cannot receive keyboard focus. Mira's primitive has no height animation.
-use super::{frame_button_base, frame_field_group};
+use super::{frame_animated_icon, frame_button_base, frame_field_group};
 use crate::app::{
     motion,
     primitives::{ButtonVariant, color},
@@ -66,15 +66,18 @@ pub(in crate::app) fn frame_collapsible(
     .transitions(|t| motion::control_style_transitions(t).inset_ring(motion::interaction_motion()))
     .active_style(gpui::Styled::top_0)
     .child(label)
-    .child(
-        gpui::svg()
-            .path(if open {
-                assets::ICON_MINUS
-            } else {
-                assets::ICON_PLUS
-            })
-            .size(theme::ui_rem(14.0)),
-    )
+    .child(frame_animated_icon(
+        format!("{id}-trigger"),
+        Some(if open {
+            assets::ICON_MINUS
+        } else {
+            assets::ICON_PLUS
+        }),
+        14.0,
+        None,
+        window,
+        cx,
+    ))
     .on_click(cx.listener(move |root, _, window, cx| {
         cx.stop_propagation();
         click_focus.focus(window, cx);

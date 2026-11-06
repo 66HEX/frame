@@ -54,7 +54,8 @@ pub(super) fn settings_audio_normalize_control(
     checked: bool,
     disabled: bool,
     palette: &'static theme::ThemePalette,
-    cx: &Context<FrameRoot>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     frame_checkbox_row(
         "settings-audio-normalize-row",
@@ -63,6 +64,7 @@ pub(super) fn settings_audio_normalize_control(
         checked,
         disabled,
         palette,
+        window,
         cx,
         move |root, _event, _window, cx| {
             if disabled {
@@ -129,6 +131,7 @@ pub(super) fn settings_audio_compressor_control(
             enabled,
             disabled,
             palette,
+            window,
             cx,
             move |root, _event, _window, cx| {
                 if disabled {

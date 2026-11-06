@@ -549,6 +549,7 @@ pub(in crate::app) fn logs_copy_button(
         assets::ICON_COPY,
         assets::ICON_CHECK,
         copied,
+        color(palette.success),
         if copied { "Logs copied" } else { "Copy logs" },
         FrameIconButtonVariant::Ghost,
         enabled,

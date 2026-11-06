@@ -278,7 +278,8 @@ pub(super) fn settings_video_nvenc_section(
     config: &ConversionConfig,
     disabled: bool,
     palette: &'static theme::ThemePalette,
-    cx: &Context<FrameRoot>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     settings_field("NVENC options", palette)
         .child(settings_video_checkbox_row(
@@ -288,6 +289,7 @@ pub(super) fn settings_video_nvenc_section(
             config.nvenc_spatial_aq,
             disabled,
             palette,
+            window,
             cx,
             move |root, _event, _window, cx| {
                 if disabled {
@@ -307,6 +309,7 @@ pub(super) fn settings_video_nvenc_section(
             config.nvenc_temporal_aq,
             disabled,
             palette,
+            window,
             cx,
             move |root, _event, _window, cx| {
                 if disabled {
@@ -325,7 +328,8 @@ pub(super) fn settings_video_videotoolbox_section(
     config: &ConversionConfig,
     disabled: bool,
     palette: &'static theme::ThemePalette,
-    cx: &Context<FrameRoot>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     settings_field("VideoToolbox options", palette).child(settings_video_checkbox_row(
         "video-videotoolbox-allow-sw",
@@ -334,6 +338,7 @@ pub(super) fn settings_video_videotoolbox_section(
         config.videotoolbox_allow_sw,
         disabled,
         palette,
+        window,
         cx,
         move |root, _event, _window, cx| {
             if disabled {
@@ -352,7 +357,8 @@ pub(super) fn settings_video_hw_section(
     config: &ConversionConfig,
     disabled: bool,
     palette: &'static theme::ThemePalette,
-    cx: &Context<FrameRoot>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     settings_field("Hardware acceleration", palette).child(settings_video_checkbox_row(
         "video-hw-decode",
@@ -361,6 +367,7 @@ pub(super) fn settings_video_hw_section(
         config.hw_decode,
         disabled,
         palette,
+        window,
         cx,
         move |root, _event, _window, cx| {
             if disabled {
@@ -384,10 +391,13 @@ pub(super) fn settings_video_checkbox_row(
     checked: bool,
     disabled: bool,
     palette: &'static theme::ThemePalette,
-    cx: &Context<FrameRoot>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
     action: impl Fn(&mut FrameRoot, &ClickEvent, &mut Window, &mut Context<FrameRoot>) + 'static,
 ) -> gpui::Stateful<gpui::Div> {
-    frame_checkbox_row(id, label, hint, checked, disabled, palette, cx, action)
+    frame_checkbox_row(
+        id, label, hint, checked, disabled, palette, window, cx, action,
+    )
 }
 
 pub(super) fn resolution_label(resolution: &str) -> &'static str {

@@ -1,14 +1,13 @@
+use super::frame_animated_icon;
 use crate::app::accessibility::apply_accessible_button;
 #[cfg(test)]
 use crate::app::accessibility::apply_accessible_toggle_button;
-use crate::app::motion::contextual_icon_motion;
-use crate::app::primitives::{ButtonVariant, button_colors, button_mouse_down, color, icon_svg};
+use crate::app::primitives::{ButtonVariant, button_colors, button_mouse_down, color};
 use crate::app::root::FrameRoot;
 use crate::theme;
 use gpui::prelude::{FluentBuilder, ParentElement, Styled};
 use gpui::{
-    Context, FocusHandle, InteractiveElement, Rgba, StatefulInteractiveElement, Svg,
-    Transformation, Window, div, px, size, svg,
+    Context, FocusHandle, InteractiveElement, Rgba, StatefulInteractiveElement, Window, div, px,
 };
 
 pub(in crate::app) const FRAME_ICON_BUTTON_SM_SIZE: f32 = 24.0;
@@ -24,23 +23,6 @@ pub(in crate::app) enum FrameIconButtonVariant {
 pub(in crate::app) struct FrameIconButtonSize {
     pub(in crate::app) button: f32,
     pub(in crate::app) icon: f32,
-}
-
-#[derive(Clone, Copy, Debug)]
-enum FrameIconButtonContent {
-    Static(&'static str),
-    Swap {
-        inactive: &'static str,
-        active: &'static str,
-        progress: f32,
-    },
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct ContextualIconVisuals {
-    opacity: f32,
-    scale: f32,
-    blur_radius: f32,
 }
 
 #[cfg(test)]
@@ -348,11 +330,41 @@ pub(in crate::app) fn frame_icon_button(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let id = id.into();
-    let label = label.into();
-    frame_icon_button_inner(
+    frame_icon_button_with_motion_key(
+        id.clone(),
         id,
-        FrameIconButtonContent::Static(icon),
-        &label,
+        icon,
+        label,
+        variant,
+        enabled,
+        size,
+        palette,
+        window,
+        cx,
+    )
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Queue action slots retain animation identity while their accessible action IDs change."
+)]
+pub(in crate::app) fn frame_icon_button_with_motion_key(
+    id: impl Into<String>,
+    motion_key: impl Into<String>,
+    icon: &'static str,
+    label: impl Into<String>,
+    variant: FrameIconButtonVariant,
+    enabled: bool,
+    size: FrameIconButtonSize,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    let content = frame_animated_icon(motion_key, Some(icon), size.icon, None, window, cx);
+    frame_icon_button_inner(
+        id.into(),
+        content,
+        &label.into(),
         variant,
         enabled,
         size,
@@ -371,6 +383,7 @@ pub(in crate::app) fn frame_icon_swap_button(
     inactive_icon: &'static str,
     active_icon: &'static str,
     active: bool,
+    active_color: Rgba,
     label: impl Into<String>,
     variant: FrameIconButtonVariant,
     enabled: bool,
@@ -380,14 +393,18 @@ pub(in crate::app) fn frame_icon_swap_button(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let id = id.into();
-    let progress = contextual_icon_motion(format!("{id}-icon-motion"), active, window, cx);
+    let icon = if active { active_icon } else { inactive_icon };
+    let content = frame_animated_icon(
+        id.clone(),
+        Some(icon),
+        size.icon,
+        active.then_some(active_color),
+        window,
+        cx,
+    );
     frame_icon_button_inner(
         id,
-        FrameIconButtonContent::Swap {
-            inactive: inactive_icon,
-            active: active_icon,
-            progress,
-        },
+        content,
         &label.into(),
         variant,
         enabled,
@@ -404,7 +421,7 @@ pub(in crate::app) fn frame_icon_swap_button(
 )]
 fn frame_icon_button_inner(
     id: String,
-    content: FrameIconButtonContent,
+    content: gpui::Div,
     label: &str,
     variant: FrameIconButtonVariant,
     enabled: bool,
@@ -417,7 +434,6 @@ fn frame_icon_button_inner(
         FrameIconButtonVariant::Ghost => ButtonVariant::Ghost,
         FrameIconButtonVariant::DestructiveGhost => ButtonVariant::Destructive,
     };
-    let foreground = color(button_colors(variant, false, enabled, palette).foreground);
     frame_button_base(
         id,
         label,
@@ -432,85 +448,5 @@ fn frame_icon_button_inner(
     .w(theme::ui_rem(size.button))
     .h(theme::ui_rem(size.button))
     .p_0()
-    .child(frame_icon_button_content(content, size.icon, foreground))
-}
-
-fn frame_icon_button_content(
-    content: FrameIconButtonContent,
-    icon_size: f32,
-    icon_color: Rgba,
-) -> gpui::Div {
-    let container = div()
-        .relative()
-        .w(theme::ui_rem(icon_size))
-        .h(theme::ui_rem(icon_size));
-    match content {
-        FrameIconButtonContent::Static(icon) => {
-            container.child(icon_svg(icon, icon_size, icon_color))
-        }
-        FrameIconButtonContent::Swap {
-            inactive,
-            active,
-            progress,
-        } => container
-            .child(contextual_icon_svg(
-                inactive,
-                1.0 - progress,
-                icon_size,
-                icon_color,
-            ))
-            .child(contextual_icon_svg(active, progress, icon_size, icon_color)),
-    }
-}
-
-fn contextual_icon_svg(icon: &'static str, progress: f32, icon_size: f32, icon_color: Rgba) -> Svg {
-    let visuals = contextual_icon_visuals(progress);
-    svg()
-        .absolute()
-        .inset_0()
-        .path(icon)
-        .w(theme::ui_rem(icon_size))
-        .h(theme::ui_rem(icon_size))
-        .text_color(icon_color)
-        .opacity(visuals.opacity)
-        .blur(px(visuals.blur_radius))
-        .with_transformation(Transformation::scale(size(visuals.scale, visuals.scale)))
-}
-
-fn contextual_icon_visuals(progress: f32) -> ContextualIconVisuals {
-    let progress = progress.clamp(0.0, 1.0);
-    ContextualIconVisuals {
-        opacity: progress,
-        scale: progress.mul_add(0.75, 0.25),
-        blur_radius: (1.0 - progress) * 4.0,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn contextual_icon_visuals_use_hidden_endpoint_for_zero_progress() {
-        assert_eq!(
-            contextual_icon_visuals(0.0),
-            ContextualIconVisuals {
-                opacity: 0.0,
-                scale: 0.25,
-                blur_radius: 4.0,
-            }
-        );
-    }
-
-    #[test]
-    fn contextual_icon_visuals_use_visible_endpoint_for_full_progress() {
-        assert_eq!(
-            contextual_icon_visuals(1.0),
-            ContextualIconVisuals {
-                opacity: 1.0,
-                scale: 1.0,
-                blur_radius: 0.0,
-            }
-        );
-    }
+    .child(content)
 }

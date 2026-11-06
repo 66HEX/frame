@@ -1,5 +1,6 @@
 use crate::app::accessibility::{apply_accessible_checkbox, apply_accessible_checkbox_with_focus};
-use crate::app::primitives::{button_mouse_down, color, icon_svg};
+use crate::app::components::frame_animated_icon;
+use crate::app::primitives::{button_mouse_down, color};
 use crate::app::root::FrameRoot;
 use crate::{assets, theme};
 use gpui::prelude::{FluentBuilder, ParentElement, Styled};
@@ -14,30 +15,34 @@ pub(in crate::app) const FRAME_CHECK_ICON_SIZE: f32 = 14.0;
 pub(in crate::app) const FRAME_CHECKBOX_ROW_INDICATOR_OFFSET_Y: f32 = 2.0;
 
 pub(in crate::app) fn frame_checkbox_indicator(
+    id: impl Into<String>,
     checked: bool,
     indeterminate: bool,
     disabled: bool,
     palette: &theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut gpui::App,
 ) -> gpui::Div {
-    let mut mark = div()
+    let mark = div()
         .w(theme::ui_rem(FRAME_CHECKBOX_SIZE))
         .h(theme::ui_rem(FRAME_CHECKBOX_SIZE))
         .flex()
         .items_center()
         .justify_center()
-        .rounded(theme::ui_rem(theme::RADIUS_XS));
-
-    if checked || indeterminate {
-        mark = mark.child(icon_svg(
-            assets::ICON_CHECK,
+        .rounded(theme::ui_rem(theme::RADIUS_XS))
+        .text_color(color(if checked {
+            palette.primary_foreground
+        } else {
+            palette.text_primary
+        }))
+        .child(frame_animated_icon(
+            id,
+            (checked || indeterminate).then_some(assets::ICON_CHECK),
             FRAME_CHECK_ICON_SIZE,
-            color(if checked {
-                palette.primary_foreground
-            } else {
-                palette.text_primary
-            }),
+            None,
+            window,
+            cx,
         ));
-    }
 
     div()
         .w(theme::ui_rem(FRAME_CHECKBOX_SIZE))
@@ -74,11 +79,12 @@ pub(in crate::app) fn frame_checkbox_row(
     checked: bool,
     disabled: bool,
     palette: &'static theme::ThemePalette,
-    cx: &Context<FrameRoot>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
     action: impl Fn(&mut FrameRoot, &ClickEvent, &mut Window, &mut Context<FrameRoot>) + 'static,
 ) -> gpui::Stateful<gpui::Div> {
     frame_checkbox_row_inner(
-        id, label, hint, checked, disabled, None, palette, cx, action,
+        id, label, hint, checked, disabled, None, palette, window, cx, action,
     )
 }
 
@@ -94,7 +100,8 @@ pub(in crate::app) fn frame_checkbox_row_with_focus(
     disabled: bool,
     focus: &FocusHandle,
     palette: &'static theme::ThemePalette,
-    cx: &Context<FrameRoot>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
     action: impl Fn(&mut FrameRoot, &ClickEvent, &mut Window, &mut Context<FrameRoot>) + 'static,
 ) -> gpui::Stateful<gpui::Div> {
     frame_checkbox_row_inner(
@@ -105,6 +112,7 @@ pub(in crate::app) fn frame_checkbox_row_with_focus(
         disabled,
         Some(focus),
         palette,
+        window,
         cx,
         action,
     )
@@ -122,7 +130,8 @@ fn frame_checkbox_row_inner(
     disabled: bool,
     focus: Option<&FocusHandle>,
     palette: &'static theme::ThemePalette,
-    cx: &Context<FrameRoot>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
     action: impl Fn(&mut FrameRoot, &ClickEvent, &mut Window, &mut Context<FrameRoot>) + 'static,
 ) -> gpui::Stateful<gpui::Div> {
     let id = id.into();
@@ -135,15 +144,23 @@ fn frame_checkbox_row_inner(
     let action = Rc::new(action);
     let row_action = Rc::clone(&action);
     let indicator_action = Rc::clone(&action);
-    let indicator = frame_checkbox_indicator(checked, false, false, palette)
-        .id(format!("{id}-indicator"))
-        .mt(theme::ui_rem(FRAME_CHECKBOX_ROW_INDICATOR_OFFSET_Y))
-        .on_click(cx.listener(move |root, event: &ClickEvent, window, cx| {
-            cx.stop_propagation();
-            if enabled {
-                indicator_action(root, event, window, cx);
-            }
-        }));
+    let indicator = frame_checkbox_indicator(
+        format!("{id}-indicator"),
+        checked,
+        false,
+        false,
+        palette,
+        window,
+        cx,
+    )
+    .id(format!("{id}-indicator"))
+    .mt(theme::ui_rem(FRAME_CHECKBOX_ROW_INDICATOR_OFFSET_Y))
+    .on_click(cx.listener(move |root, event: &ClickEvent, window, cx| {
+        cx.stop_propagation();
+        if enabled {
+            indicator_action(root, event, window, cx);
+        }
+    }));
     let indicator = if let Some(focus) = focus {
         apply_accessible_checkbox_with_focus(
             indicator, label, enabled, checked, false, focus, palette,
