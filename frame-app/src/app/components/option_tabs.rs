@@ -1,5 +1,5 @@
 //! Mira Tabs for compact choices and forms whose selection changes the view.
-use super::{FrameOption, FrameStyle, frame_tabs_list};
+use super::{FrameOption, FrameStyle, FrameTabIndicator, frame_tabs_list};
 use crate::app::accessibility::{TabFocusGroup, tab_focus_base, tab_focus_ring};
 use crate::app::{motion, primitives::color, root::FrameRoot};
 use crate::theme;
@@ -43,12 +43,14 @@ pub(in crate::app) fn frame_option_tabs(
             .collect(),
     );
     let selector = id.clone();
+    let indicator = FrameTabIndicator::new(id.clone(), window, cx);
     let mut list = frame_tabs_list(palette)
         .id(id)
         .debug_selector(move || selector)
         .role(gpui::Role::TabList)
         .aria_label(label)
-        .w_full();
+        .w_full()
+        .child(indicator.background(palette));
     for choice in choices {
         let item = choice.item;
         let focus = group
@@ -58,46 +60,51 @@ pub(in crate::app) fn frame_option_tabs(
         let keys = enabled.clone();
         let key_id = item.id.clone();
         list = list.child(
-            frame_tab_trigger(
-                item.id.clone(),
-                choice.display.clone(),
-                item.selected,
-                item.enabled,
-                &focus,
-                palette,
-            )
-            .on_click(cx.listener(move |root, _, window, cx| {
-                if item.enabled {
-                    pointer_focus.focus(window, cx);
-                    (choice.action)(root, window, cx);
-                    cx.notify();
-                }
-                cx.stop_propagation();
-            }))
-            .on_key_down(
-                cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
-                    let Some(current) = keys.iter().position(|(id, _, _)| id == &key_id) else {
-                        return;
-                    };
-                    let next = match event.keystroke.key.as_str() {
-                        "left" => (current + keys.len() - 1) % keys.len(),
-                        "right" => (current + 1) % keys.len(),
-                        "home" => 0,
-                        "end" => keys.len() - 1,
-                        _ => return,
-                    };
-                    keys[next].1.focus(window, cx);
-                    (keys[next].2)(root, window, cx);
+            indicator
+                .track_with_opacity(
+                    frame_tab_trigger(
+                        item.id.clone(),
+                        choice.display.clone(),
+                        item.selected,
+                        item.enabled,
+                        &focus,
+                        palette,
+                    ),
+                    item.selected.then(|| item.id.clone()),
+                    if item.enabled { 1.0 } else { 0.5 },
+                )
+                .on_click(cx.listener(move |root, _, window, cx| {
+                    if item.enabled {
+                        pointer_focus.focus(window, cx);
+                        (choice.action)(root, window, cx);
+                        cx.notify();
+                    }
                     cx.stop_propagation();
-                    cx.notify();
-                }),
-            )
-            .child(
-                div()
-                    .min_w_0()
-                    .truncate()
-                    .child(theme::ui_text_owned(choice.display)),
-            ),
+                }))
+                .on_key_down(
+                    cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+                        let Some(current) = keys.iter().position(|(id, _, _)| id == &key_id) else {
+                            return;
+                        };
+                        let next = match event.keystroke.key.as_str() {
+                            "left" => (current + keys.len() - 1) % keys.len(),
+                            "right" => (current + 1) % keys.len(),
+                            "home" => 0,
+                            "end" => keys.len() - 1,
+                            _ => return,
+                        };
+                        keys[next].1.focus(window, cx);
+                        (keys[next].2)(root, window, cx);
+                        cx.stop_propagation();
+                        cx.notify();
+                    }),
+                )
+                .child(
+                    div()
+                        .min_w_0()
+                        .truncate()
+                        .child(theme::ui_text_owned(choice.display)),
+                ),
         );
     }
     div().w_full().min_w_0().child(list)
@@ -126,7 +133,7 @@ pub(in crate::app) fn frame_tab_trigger(
         .transitions(|t| {
             motion::control_style_transitions(t).outline_color(motion::interaction_motion())
         })
-        .flex_1()
+        .flex_auto()
         .min_w_0()
         .h(theme::ui_rem(theme::metrics::TAB_HEIGHT))
         .flex()

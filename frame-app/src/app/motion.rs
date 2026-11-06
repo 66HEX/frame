@@ -46,6 +46,15 @@ pub(super) fn interaction_motion() -> gpui::Motion {
     gpui::Motion::new(INTERACTION_MOTION_DURATION).with_easing(css_transition_ease)
 }
 
+/// A quick departure and soft landing for the shared tab surface, without bounce.
+pub(super) fn tab_indicator_ease(progress: f32) -> f32 {
+    cubic_bezier(progress, 0.2, 0.0, 0.0, 1.0)
+}
+
+pub(super) fn tab_indicator_motion() -> gpui::Motion {
+    gpui::Motion::new(Duration::from_millis(180)).with_easing(tab_indicator_ease)
+}
+
 pub(super) fn control_style_transitions(t: gpui::StyleTransitions) -> gpui::StyleTransitions {
     let motion = interaction_motion();
     t.ring(motion.clone())

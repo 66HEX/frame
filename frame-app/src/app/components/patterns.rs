@@ -53,16 +53,7 @@ pub(in crate::app) trait FrameStyle: Styled + Sized {
         self.rounded(theme::ui_rem(theme::RADIUS_MD))
             .border_1()
             .border_color(color(palette.transparent))
-            .shadow(if selected {
-                theme::shadows::ShadowLevel::Xs.shadows()
-            } else {
-                Vec::new()
-            })
-            .bg(color(if selected {
-                palette.tab_active
-            } else {
-                palette.transparent
-            }))
+            .bg(color(palette.transparent))
             .text_color(color(if selected {
                 palette.text_primary
             } else if palette.is_dark() {
@@ -178,6 +169,7 @@ pub(in crate::app) fn frame_empty(content: impl IntoElement, palette: &theme::Th
 
 pub(in crate::app) fn frame_tabs_list(palette: &theme::ThemePalette) -> Div {
     div()
+        .relative()
         .flex()
         .items_center()
         .h(theme::ui_rem(metrics::TABS_HEIGHT))

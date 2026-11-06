@@ -1,5 +1,5 @@
 use crate::app::accessibility::{TabFocusGroup, tab_focus_base, tab_focus_ring};
-use crate::app::components::{FrameStyle, frame_tabs_list};
+use crate::app::components::{FrameStyle, FrameTabIndicator, frame_tabs_list};
 use crate::app::layout::{TITLEBAR_ICON_SIZE, TITLEBAR_NAV_BUTTON_HEIGHT};
 use crate::app::model::{ActiveView, FrameAppState, format_total_size};
 use crate::app::primitives::{button_mouse_down, color, icon_svg};
@@ -7,8 +7,7 @@ use crate::app::root::FrameRoot;
 use crate::{assets, theme};
 use gpui::prelude::{FluentBuilder, Styled};
 use gpui::{
-    ClickEvent, Context, InteractiveElement, IntoElement, ParentElement,
-    StatefulInteractiveElement, Window, div,
+    ClickEvent, Context, InteractiveElement, ParentElement, StatefulInteractiveElement, Window, div,
 };
 
 pub(in crate::app) fn titlebar_navigation(
@@ -24,17 +23,20 @@ pub(in crate::app) fn titlebar_navigation(
         window,
         cx,
     );
+    let indicator = FrameTabIndicator::new("titlebar-main-view-tabs", window, cx);
     frame_tabs_list(palette)
         .id("titlebar-main-view-tabs")
+        .debug_selector(|| "titlebar-main-view-tabs".to_owned())
         .role(gpui::Role::TabList)
         .aria_label("Main view")
+        .child(indicator.background(palette))
         .child(titlebar_segment(
             assets::ICON_LAYOUT_LIST,
             "Workspace",
             ActiveView::Workspace,
             &focuses,
             palette,
-            window,
+            &indicator,
             cx,
         ))
         .child(titlebar_segment(
@@ -43,7 +45,7 @@ pub(in crate::app) fn titlebar_navigation(
             ActiveView::Logs,
             &focuses,
             palette,
-            window,
+            &indicator,
             cx,
         ))
 }
@@ -92,9 +94,9 @@ pub(in crate::app) fn titlebar_segment(
     view: ActiveView,
     focuses: &TabFocusGroup,
     palette: &'static theme::ThemePalette,
-    _window: &mut Window,
+    indicator: &FrameTabIndicator,
     cx: &Context<FrameRoot>,
-) -> impl IntoElement {
+) -> gpui::Stateful<gpui::Div> {
     let segment_id = titlebar_tab_id(view);
     let selected = focuses.selected(segment_id);
     let focus = focuses.handle(segment_id);
@@ -115,7 +117,6 @@ pub(in crate::app) fn titlebar_segment(
         .transitions(|t| {
             t.ring(crate::app::motion::interaction_motion())
                 .outline_color(crate::app::motion::interaction_motion())
-                .bg(crate::app::motion::interaction_motion())
                 .text_color(crate::app::motion::interaction_motion())
                 .border_color(crate::app::motion::interaction_motion())
         })
@@ -165,9 +166,11 @@ pub(in crate::app) fn titlebar_segment(
         )
         .child(theme::ui_text(label));
 
-    button.on_mouse_down(gpui::MouseButton::Left, |_, window, cx| {
-        button_mouse_down(true, window, cx);
-    })
+    indicator
+        .track(button, selected.then(|| segment_id.to_owned()))
+        .on_mouse_down(gpui::MouseButton::Left, |_, window, cx| {
+            button_mouse_down(true, window, cx);
+        })
 }
 
 pub(super) const fn titlebar_tab_id(view: ActiveView) -> &'static str {

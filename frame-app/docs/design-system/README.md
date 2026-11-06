@@ -32,7 +32,8 @@ Timingi natywnego adaptera, oparte na źródłach CLI i porównaniu z działają
 | Sheet | 200 ms, cubic-bezier(.4,0,.2,1) | opacity i przesunięcie o 10% szerokości w obie strony |
 | Overlay Dialog/Sheet | 100 ms, CSS `ease` | opacity; blur 4 px jest stały |
 | Slider | 150 ms, cubic-bezier(.4,0,.2,1) | ring 0–2 px, kolor ring/30, hover/focus-visible/active; kursor domyślny |
-| Button / Toggle / Tabs | 150 ms, cubic-bezier(.4,0,.2,1) | przejścia kolorów i ringu; przycisk dodatkowo przesunięcie nacisku 1 px |
+| Button / Toggle | 150 ms, cubic-bezier(.4,0,.2,1) | przejścia kolorów i ringu; przycisk dodatkowo przesunięcie nacisku 1 px |
+| Tabs | tło 180 ms, cubic-bezier(.2,0,0,1); tekst i ring 150 ms | jedna powierzchnia przesuwa się i zmienia szerokość między triggerami, bez odbicia |
 | Input / Select trigger | 150 ms, cubic-bezier(.4,0,.2,1) | kolory; ring pojawia się bez animacji szerokości, zgodnie z `transition-colors` |
 | Item / wiersz presetu lub ścieżki | 100 ms, cubic-bezier(.4,0,.2,1) | kolory; ring natychmiastowy (`transition-colors duration-100`) |
 | Checkbox | 150 ms, cubic-bezier(.4,0,.2,1) | ring (`transition-shadow`); znacznik korzysta ze wspólnego przejścia ikon |
@@ -45,6 +46,8 @@ Tooltip ma celowo dłuższą zwłokę niż oryginalny preset Mira. Szybkie przec
 ### Focus i stany kontrolek
 
 `frame_animated_icon` obsługuje zmiany ikon w przyciskach, narzędziach preview, akcjach kolejki, nagłówkach Collapsible i checkboxach. Zachowuje rozmiar miejsca na ikonę oraz obie warstwy podczas przejścia. Szybkie ponowne kliknięcie odwraca animację od bieżącej klatki. Pierwsze renderowanie i reduced motion pokazują od razu stan końcowy. Akcje kolejki używają stałego klucza pliku i pozycji przycisku, mimo zmieniającej się akcji. Check potwierdzający skopiowanie logów używa `palette.success` z tokenu `--success`, tak jak napis Applied przy presecie.
+
+`FrameTabIndicator` maluje jedno wspólne tło z cieniem Xs pod triggerami Workspace/Logs, inspectora, opcji i plików logów. Mierzy faktyczne granice aktywnego triggera po układzie, uwzględniając tekst, ikonę i skalę UI. Triggery opcji i inspectora dzielą dostępną szerokość z bazą wynikającą z treści. Tylko dekoracja zmienia pozycję i rozmiar; tekst, hit targety i fokus pozostają nieruchome. Kolejna zmiana w trakcie ruchu zaczyna się od bieżącej pozycji. Pierwsze renderowanie, zmiana rozmiaru i reduced motion ustawiają od razu docelową geometrię. Przewijanie logów przesuwa tło razem z tabami, bez opóźnienia i dodatkowego overflow.
 
 [Audyt klawiatury](KEYBOARD_AUDIT.md) opisuje poprawki przechodzenia Tab/Shift+Tab,
 odsłaniania focusu, powrotów z dialogów i nawigacji w kolejce oraz preview.

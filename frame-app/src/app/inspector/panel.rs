@@ -1,6 +1,7 @@
 use crate::app::accessibility::TabFocusGroup;
 use crate::app::components::{
-    frame_collapsible, frame_field, frame_label, frame_section, frame_tab_trigger,
+    FrameTabIndicator, frame_collapsible, frame_field, frame_label, frame_section,
+    frame_tab_trigger,
 };
 use crate::app::inspector::audio::settings_audio_tab;
 use crate::app::inspector::images::settings_images_tab;
@@ -23,9 +24,7 @@ use crate::settings::{
 };
 use crate::theme;
 use gpui::prelude::{FluentBuilder, ParentElement, Styled};
-use gpui::{
-    ClickEvent, Context, InteractiveElement, IntoElement, StatefulInteractiveElement, Window, div,
-};
+use gpui::{ClickEvent, Context, InteractiveElement, StatefulInteractiveElement, Window, div};
 
 pub(in crate::app) fn settings_panel(
     settings: &SettingsRenderState<'_>,
@@ -52,21 +51,24 @@ pub(in crate::app) fn settings_panel(
         .clone();
     let key_scroll = scroll.clone();
     let key_focus = focuses.handle(active_tab.id());
+    let indicator = FrameTabIndicator::new("settings-tab-list", window, cx);
     let mut tab_rail = crate::app::components::frame_tabs_list(palette)
         .id("settings-tab-list")
+        .debug_selector(|| "settings-tab-list".to_owned())
         .role(gpui::Role::TabList)
         .aria_label("Inspector")
         .w_full()
         .flex()
         .items_center()
-        .justify_start();
+        .justify_start()
+        .child(indicator.background(palette));
     for tab in &visible_tabs {
         tab_rail = tab_rail.child(settings_tab_button(
             *tab,
             &focuses,
             &visible_tabs,
             palette,
-            window,
+            &indicator,
             cx,
         ));
     }
@@ -118,9 +120,9 @@ pub(in crate::app) fn settings_tab_button(
     focuses: &TabFocusGroup,
     visible_tabs: &[SettingsTab],
     palette: &'static theme::ThemePalette,
-    _window: &mut Window,
+    indicator: &FrameTabIndicator,
     cx: &Context<FrameRoot>,
-) -> impl IntoElement {
+) -> gpui::Stateful<gpui::Div> {
     let selected = focuses.selected(tab.id());
     let focus = focuses.handle(tab.id());
     let click_focus = focus.clone();
@@ -170,9 +172,11 @@ pub(in crate::app) fn settings_tab_button(
             .size(theme::ui_rem(SETTINGS_TAB_ICON_SIZE)),
     )
     .child(tab.label());
-    button.on_mouse_down(gpui::MouseButton::Left, |_, window, cx| {
-        button_mouse_down(true, window, cx);
-    })
+    indicator
+        .track(button, selected.then(|| tab.id().to_owned()))
+        .on_mouse_down(gpui::MouseButton::Left, |_, window, cx| {
+            button_mouse_down(true, window, cx);
+        })
 }
 
 fn settings_tab_for_key(

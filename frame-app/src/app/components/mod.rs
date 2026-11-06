@@ -46,5 +46,7 @@ pub(in crate::app) use select_field::{
 mod collapsible;
 pub(in crate::app) use collapsible::frame_collapsible;
 mod option_tabs;
+mod tab_indicator;
+pub(in crate::app) use tab_indicator::FrameTabIndicator;
 
 pub(in crate::app) use option_tabs::{frame_option_tabs, frame_tab_trigger};

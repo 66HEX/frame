@@ -113,64 +113,158 @@ fn preview_canvas_focus_ring_paints_above_the_clipped_content() {
     }
 }
 
+fn assert_active_tab_background(
+    cx: &mut VisualTestContext,
+    rail_id: &'static str,
+    trigger_id: &'static str,
+    mode: crate::appearance::ColorTheme,
+) {
+    let rail = cx.debug_bounds(rail_id).expect("tab rail bounds");
+    let trigger = cx.debug_bounds(trigger_id).expect("tab trigger bounds");
+    cx.update(|window, _| {
+        let scale = window.scale_factor();
+        let rail = rail.scale(scale);
+        let expected = theme::palette(mode).tab_active;
+        let backgrounds: Vec<_> = window
+            .painted_quads()
+            .into_iter()
+            .filter(|quad| {
+                quad.background.as_solid().is_some_and(|fill| {
+                    let fill = gpui::hsla_to_rgba(fill);
+                    (fill.red - expected.red).abs() < 0.001
+                        && (fill.green - expected.green).abs() < 0.001
+                        && (fill.blue - expected.blue).abs() < 0.001
+                        && (fill.alpha - expected.alpha).abs() < 0.001
+                }) && rail.contains(&quad.bounds.center())
+            })
+            .collect();
+        assert_eq!(backgrounds.len(), 1, "one shared background in {rail_id}");
+        assert_eq!(backgrounds[0].bounds, trigger.scale(scale));
+        assert_eq!(
+            backgrounds[0]
+                .bounds
+                .intersect(&backgrounds[0].content_mask.bounds),
+            backgrounds[0].bounds,
+            "the selected background remains inside the rail clip"
+        );
+    });
+}
+
 #[test]
-fn inspector_tab_backgrounds_fade_without_darkening_even_when_reversed() {
-    for theme in crate::appearance::ColorTheme::ALL {
+fn tab_rails_paint_one_active_background_matching_the_selected_trigger() {
+    for mode in crate::appearance::ColorTheme::ALL {
         for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
             let mut app = TestAppContext::single();
             let (root, cx) = test_window(&mut app, VisualFixture::SettingsVideo, scale);
             root.update(cx, |root, cx| {
-                root.appearance.color_theme = theme;
+                root.appearance.color_theme = mode;
                 cx.notify();
             });
-            click(cx, "settings-tab-metadata");
-            cx.update(|_, cx| cx.set_reduce_motion(false));
-            click(cx, "settings-tab-presets");
-            let mut saw_intermediate_fill = false;
-            for frame in 0..=30 {
-                // Reverse an unfinished pointer transition, then switch by keyboard.
-                if frame == 4 {
-                    click(cx, "settings-tab-metadata");
-                } else if frame == 8 {
-                    press(cx, "right");
-                }
-                for id in [
-                    "settings-tab-metadata",
-                    "settings-tab-presets",
-                    "settings-tab-output",
-                ] {
-                    let bounds = cx.debug_bounds(id).unwrap();
-                    cx.update(|window, _| {
-                        let bounds = bounds.scale(window.scale_factor());
-                        for quad in window.painted_quads() {
-                            if quad.bounds != bounds {
-                                continue;
-                            }
-                            let fill = gpui::hsla_to_rgba(quad.background.as_solid().unwrap());
-                            if fill.alpha <= 0.0 {
-                                continue;
-                            }
-                            let expected = theme::palette(theme).tab_active;
-                            saw_intermediate_fill |= fill.alpha < expected.alpha * 0.99;
-                            for (actual, expected) in [
-                                (fill.red, expected.red),
-                                (fill.green, expected.green),
-                                (fill.blue, expected.blue),
-                            ] {
-                                assert!(
-                                    (actual - expected).abs() < 0.001,
-                                    "{id} at frame {frame}: fading must only change alpha, got {fill:?}"
-                                );
-                            }
-                        }
-                    });
-                }
-                cx.executor()
-                    .advance_clock(std::time::Duration::from_millis(8));
-                draw(cx);
+            for trigger in ["titlebar-logs", "titlebar-workspace"] {
+                click(cx, trigger);
+                assert_active_tab_background(cx, "titlebar-main-view-tabs", trigger, mode);
             }
-            assert!(saw_intermediate_fill, "must inspect actual animated fills");
+            assert!(
+                cx.debug_bounds("titlebar-workspace").unwrap().size.width
+                    > cx.debug_bounds("titlebar-logs").unwrap().size.width,
+                "the moving background must fit different label widths"
+            );
+            for trigger in [
+                "settings-tab-metadata",
+                "settings-tab-presets",
+                "settings-tab-output",
+            ] {
+                click(cx, trigger);
+                assert_active_tab_background(cx, "settings-tab-list", trigger, mode);
+            }
+            press(cx, "home");
+            assert_active_tab_background(cx, "settings-tab-list", "settings-tab-metadata", mode);
+            press(cx, "right");
+            assert_active_tab_background(cx, "settings-tab-list", "settings-tab-output", mode);
         }
+    }
+}
+
+#[test]
+fn logs_tab_indicator_does_not_make_fitted_rails_scrollable() {
+    let mut app = TestAppContext::single();
+    let (root, cx) = test_window(&mut app, VisualFixture::LogsActive, ScalePreset::Percent100);
+    for count in [1, 3] {
+        root.update(cx, |root, cx| {
+            for index in root.file_queue.files().len()..count {
+                let id = format!("fitted-log-{index}");
+                root.file_queue
+                    .add_file(crate::file_queue::FileItem::from_path(
+                        &id,
+                        format!("/tmp/clip_{index}.mov"),
+                        1000,
+                    ));
+                root.file_queue
+                    .update_status(&id, crate::file_queue::FileStatus::Converting, 50);
+                root.conversion_events.apply_conversion_event(
+                    &mut root.file_queue,
+                    frame_core::events::ConversionEvent::log(&id, "Progress"),
+                );
+            }
+            cx.notify();
+        });
+        draw(cx);
+        let selected = cx.debug_bounds("logs-tab-fixture-video").unwrap();
+        let rail = cx.debug_bounds("logs-tab-list").unwrap();
+        for direction in [-1.0, 1.0] {
+            cx.simulate_event(gpui::ScrollWheelEvent {
+                position: rail.center(),
+                delta: gpui::ScrollDelta::Pixels(point(px(direction * 1000.0), px(0.0))),
+                ..Default::default()
+            });
+            draw(cx);
+            assert_eq!(
+                cx.debug_bounds("logs-tab-fixture-video").unwrap(),
+                selected,
+                "the decorative indicator cannot add overflow to a fitted {count}-tab rail"
+            );
+        }
+    }
+}
+
+#[test]
+fn logs_tab_indicator_tracks_the_selected_file_after_keyboard_scroll() {
+    for mode in crate::appearance::ColorTheme::ALL {
+        let mut app = TestAppContext::single();
+        let (root, cx) = test_window(&mut app, VisualFixture::LogsActive, ScalePreset::Percent100);
+        cx.simulate_resize(size(px(1200.0), px(800.0)));
+        root.update(cx, |root, cx| {
+            root.appearance.color_theme = mode;
+            for index in 0..30 {
+                let id = format!("indicator-log-{index:02}");
+                root.file_queue
+                    .add_file(crate::file_queue::FileItem::from_path(
+                        &id,
+                        format!("/tmp/long_conversion_filename_{index:02}.mov"),
+                        1000,
+                    ));
+                root.file_queue
+                    .update_status(&id, crate::file_queue::FileStatus::Converting, 50);
+                root.conversion_events.apply_conversion_event(
+                    &mut root.file_queue,
+                    frame_core::events::ConversionEvent::log(&id, "Progress"),
+                );
+            }
+            cx.notify();
+        });
+        draw(cx);
+        click(cx, "logs-tab-fixture-video");
+        press(cx, "end");
+        assert_eq!(
+            root.read_with(cx, |root, _| root
+                .conversion_events
+                .selected_log_file_id()
+                .map(str::to_owned)),
+            Some("indicator-log-29".to_owned())
+        );
+        assert_active_tab_background(cx, "logs-tab-list", "logs-tab-indicator-log-29", mode);
+        press(cx, "home");
+        assert_active_tab_background(cx, "logs-tab-list", "logs-tab-fixture-video", mode);
     }
 }
 

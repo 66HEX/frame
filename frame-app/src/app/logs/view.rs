@@ -4,7 +4,7 @@ use crate::app::components::{
     FRAME_ICON_BUTTON_SM_SIZE, FRAME_ICON_SM_SIZE, FrameIconButtonSize, FrameIconButtonVariant,
     frame_icon_button, frame_icon_swap_button, frame_vertical_uniform_scrollbar,
 };
-use crate::app::components::{FrameStyle, frame_panel_header, frame_tabs_list};
+use crate::app::components::{FrameStyle, FrameTabIndicator, frame_panel_header, frame_tabs_list};
 use crate::app::logs::state::{
     LOG_LINE_HEIGHT, LOG_LINE_NUMBER_WIDTH, LOG_SCROLL_BUTTON_OFFSET, LOG_SCROLL_BUTTON_PADDING,
     LOG_SCROLL_BUTTON_SIZE, LOG_SCROLL_ICON_SIZE, LOG_TAB_ICON_SIZE,
@@ -88,6 +88,7 @@ pub(in crate::app) fn logs_tab_strip(
         window,
         cx,
     );
+    let indicator = FrameTabIndicator::new("logs-tab-list", window, cx);
     let mut tabs = frame_tabs_list(palette)
         .when(active_files.is_empty(), |this| {
             this.bg(color(palette.transparent)).shadow(Vec::new())
@@ -100,7 +101,8 @@ pub(in crate::app) fn logs_tab_strip(
         .min_w_0()
         .flex()
         .items_center()
-        .overflow_x_scroll();
+        .overflow_x_scroll()
+        .child(indicator.background(palette));
 
     let tab_ids = active_files
         .iter()
@@ -113,7 +115,7 @@ pub(in crate::app) fn logs_tab_strip(
             &tab_ids,
             &focuses,
             palette,
-            window,
+            &indicator,
             cx,
         ));
     }
@@ -150,9 +152,9 @@ pub(in crate::app) fn log_tab_button(
     active_file_ids: &[String],
     focuses: &TabFocusGroup,
     palette: &'static theme::ThemePalette,
-    _window: &mut Window,
+    indicator: &FrameTabIndicator,
     cx: &Context<FrameRoot>,
-) -> impl IntoElement {
+) -> gpui::Stateful<gpui::Div> {
     let focus = focuses.handle(&file.id);
     let click_focus = focus.clone();
     let keyboard_focuses: Vec<_> = active_file_ids
@@ -162,8 +164,10 @@ pub(in crate::app) fn log_tab_button(
     let file_id = file.id.clone();
     let key_file_id = file.id.clone();
     let keyboard_file_ids = active_file_ids.to_vec();
+    let selector = element_id("logs-tab", &file.id);
     let button = div()
         .id(element_id("logs-tab", &file.id))
+        .debug_selector(move || selector)
         .role(gpui::Role::Tab)
         .aria_label(file.name.clone())
         .aria_selected(selected)
@@ -174,7 +178,6 @@ pub(in crate::app) fn log_tab_button(
         .transitions(|t| {
             t.ring(crate::app::motion::interaction_motion())
                 .outline_color(crate::app::motion::interaction_motion())
-                .bg(crate::app::motion::interaction_motion())
                 .text_color(crate::app::motion::interaction_motion())
                 .border_color(crate::app::motion::interaction_motion())
         })
@@ -225,9 +228,11 @@ pub(in crate::app) fn log_tab_button(
         )
         .child(file.name.clone());
 
-    button.on_mouse_down(gpui::MouseButton::Left, |_, window, cx| {
-        button_mouse_down(true, window, cx);
-    })
+    indicator
+        .track(button, selected.then(|| file.id.clone()))
+        .on_mouse_down(gpui::MouseButton::Left, |_, window, cx| {
+            button_mouse_down(true, window, cx);
+        })
 }
 
 fn log_file_icon(extension: &str) -> &'static str {
