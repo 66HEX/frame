@@ -1,4 +1,6 @@
-use crate::app::accessibility::{apply_accessible_button, apply_accessible_toggle_button};
+use crate::app::accessibility::apply_accessible_button;
+#[cfg(test)]
+use crate::app::accessibility::apply_accessible_toggle_button;
 use crate::app::motion::contextual_icon_motion;
 use crate::app::primitives::{ButtonVariant, button_colors, button_mouse_down, color, icon_svg};
 use crate::app::root::FrameRoot;
@@ -41,6 +43,7 @@ struct ContextualIconVisuals {
     blur_radius: f32,
 }
 
+#[cfg(test)]
 pub(in crate::app) fn frame_toggle_button_base(
     id: impl Into<String>,
     label: &str,
@@ -61,30 +64,6 @@ pub(in crate::app) fn frame_toggle_button_base(
         ControlBehavior::Toggle,
     );
     apply_accessible_toggle_button(button, label.to_owned(), enabled, selected, palette)
-}
-
-#[expect(
-    clippy::too_many_arguments,
-    reason = "Toggle items share their group focus, state, palette and rendering context."
-)]
-pub(in crate::app) fn frame_choice_button(
-    group: &super::FrameChoiceFocus,
-    id: impl Into<String>,
-    label: impl Into<String>,
-    selected: bool,
-    enabled: bool,
-    palette: &'static theme::ThemePalette,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
-) -> gpui::Stateful<gpui::Div> {
-    let id = id.into();
-    let focus = group.register(&id, selected, enabled, cx);
-    let label = label.into();
-    let button =
-        frame_toggle_button_base(id.clone(), &label, selected, enabled, palette, window, cx)
-            .w_full()
-            .child(theme::ui_text_owned(label));
-    group.apply(button, id, enabled, &focus, cx)
 }
 
 #[expect(

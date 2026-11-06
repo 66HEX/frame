@@ -173,7 +173,7 @@ fn frame_select_trigger_content_inner(
 }
 
 pub(in crate::app) fn frame_select_popover(
-    id: &'static str,
+    id: &str,
     top: f32,
     progress: f32,
     list: impl IntoElement,
@@ -181,8 +181,11 @@ pub(in crate::app) fn frame_select_popover(
 ) -> gpui::Stateful<gpui::Div> {
     div()
         .absolute()
-        .id(id)
-        .debug_selector(|| id.to_string())
+        .id(id.to_owned())
+        .debug_selector({
+            let id = id.to_owned();
+            move || id
+        })
         .top(theme::ui_rem(top))
         .left_0()
         .right_0()
@@ -199,12 +202,12 @@ pub(in crate::app) fn frame_select_popover(
 }
 
 pub(in crate::app) fn frame_select_options_list(
-    id: &'static str,
+    id: &str,
     scroll_handle: &ScrollHandle,
     scrollable: bool,
 ) -> gpui::Stateful<gpui::Div> {
     div()
-        .id(id)
+        .id(id.to_owned())
         .role(gpui::Role::ListBox)
         .max_h(theme::ui_rem(FRAME_SELECT_MAX_HEIGHT))
         .overflow_y_scroll()

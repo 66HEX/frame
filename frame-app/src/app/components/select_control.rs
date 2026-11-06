@@ -24,11 +24,11 @@ pub(in crate::app) struct FrameSelectItem {
 }
 
 pub(in crate::app) struct FrameSelectProps<'a> {
-    pub id: &'static str,
-    pub panel_id: &'static str,
-    pub list_id: &'static str,
-    pub scrollbar_id: &'static str,
-    pub label: &'static str,
+    pub id: &'a str,
+    pub panel_id: &'a str,
+    pub list_id: &'a str,
+    pub scrollbar_id: &'a str,
+    pub label: &'a str,
     pub display: &'a str,
     pub items: Vec<FrameSelectItem>,
     pub enabled: bool,

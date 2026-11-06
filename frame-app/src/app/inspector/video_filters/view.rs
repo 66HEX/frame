@@ -1,4 +1,4 @@
-use crate::app::inspector::panel::settings_section;
+use crate::app::inspector::panel::settings_field;
 use crate::app::inspector::video_filters::controls::{
     settings_video_deinterlace_control, settings_video_denoise_control,
     settings_video_filters_reset_all, settings_video_grayscale_control,
@@ -39,7 +39,7 @@ pub(in crate::app) fn settings_video_filters_tab(
             cx,
         ))
         .child(
-            settings_section("Color Adjustments", palette)
+            settings_field("Color Adjustments", palette)
                 .child(settings_video_filter_range_field(
                     video_filter_spec(
                         VideoFilterRangeTarget::Brightness,
@@ -90,7 +90,7 @@ pub(in crate::app) fn settings_video_filters_tab(
                 )),
         )
         .child(
-            settings_section("Tone", palette)
+            settings_field("Tone", palette)
                 .child(settings_video_filter_range_field(
                     video_filter_spec(
                         VideoFilterRangeTarget::Hue,
@@ -117,7 +117,7 @@ pub(in crate::app) fn settings_video_filters_tab(
                 )),
         )
         .child(
-            settings_section("Detail", palette)
+            settings_field("Detail", palette)
                 .child(settings_video_filter_range_field(
                     video_filter_spec(
                         VideoFilterRangeTarget::Sharpen,
@@ -144,7 +144,7 @@ pub(in crate::app) fn settings_video_filters_tab(
                 )),
         )
         .child(
-            settings_section("Cleanup", palette)
+            settings_field("Cleanup", palette)
                 .child(settings_video_denoise_control(
                     filters.denoise_enabled,
                     filters.denoise_strength,
@@ -167,7 +167,7 @@ pub(in crate::app) fn settings_video_filters_tab(
                 )),
         )
         .child(
-            settings_section("Style", palette)
+            settings_field("Style", palette)
                 .child(settings_video_filter_range_field(
                     video_filter_spec(
                         VideoFilterRangeTarget::Vignette,
@@ -189,7 +189,7 @@ pub(in crate::app) fn settings_video_filters_tab(
         );
 
     if !is_image_source {
-        content = content.child(settings_section("Interlace", palette).child(
+        content = content.child(settings_field("Interlace", palette).child(
             settings_video_deinterlace_control(
                 filters.deinterlace,
                 settings_disabled || !available_filters.bwdif,

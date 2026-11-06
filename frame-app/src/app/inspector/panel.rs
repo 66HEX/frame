@@ -1,5 +1,7 @@
 use crate::app::accessibility::TabFocusGroup;
-use crate::app::components::{frame_collapsible, frame_section, frame_tab_trigger};
+use crate::app::components::{
+    frame_collapsible, frame_field, frame_label, frame_section, frame_tab_trigger,
+};
 use crate::app::inspector::audio::settings_audio_tab;
 use crate::app::inspector::images::settings_images_tab;
 use crate::app::inspector::metadata::settings_metadata_tab;
@@ -372,6 +374,22 @@ pub(in crate::app) fn settings_section(
     palette: &'static theme::ThemePalette,
 ) -> gpui::Div {
     frame_section(theme::ui_text(label), palette)
+}
+
+/// Compact labelled fields inside Output; sections own their outer spacing.
+pub(in crate::app) fn settings_field(
+    label: &'static str,
+    palette: &'static theme::ThemePalette,
+) -> gpui::Div {
+    frame_field()
+        .min_w_0()
+        .child(frame_label(theme::ui_text(label), palette))
+}
+pub(in crate::app) fn settings_fields_grid() -> gpui::Div {
+    div()
+        .grid()
+        .grid_cols(2)
+        .gap(theme::ui_rem(theme::metrics::GROUP_GAP))
 }
 
 #[cfg(test)]

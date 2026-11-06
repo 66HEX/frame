@@ -1,6 +1,6 @@
-use crate::app::components::frame_choice_button;
+use crate::app::components::{FrameOption, frame_option_field};
 use crate::app::input::{FrameTextInputKind, FrameTextInputSpec, frame_text_input};
-use crate::app::inspector::panel::settings_section;
+use crate::app::inspector::panel::settings_field;
 use crate::app::inspector::shared::{settings_field_label, settings_hint_text};
 use crate::app::inspector::state::SettingsMetadataInputFocuses;
 use crate::app::root::FrameRoot;
@@ -9,8 +9,8 @@ use crate::settings::{
     metadata_mode_description, metadata_mode_options,
 };
 use crate::theme;
-use gpui::prelude::{ParentElement, Styled};
-use gpui::{ClickEvent, Context, FocusHandle, StatefulInteractiveElement, Window, div};
+use gpui::prelude::ParentElement;
+use gpui::{Context, FocusHandle, Window};
 
 pub(in crate::app) fn settings_metadata_tab(
     config: &ConversionConfig,
@@ -22,7 +22,7 @@ pub(in crate::app) fn settings_metadata_tab(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let mut content = crate::app::components::frame_field_group().child(
-        settings_section("Metadata mode", palette)
+        settings_field("Metadata mode", palette)
             .child(settings_metadata_mode_grid(
                 config,
                 settings_disabled,
@@ -37,7 +37,7 @@ pub(in crate::app) fn settings_metadata_tab(
     );
 
     if config.metadata.mode != crate::settings::MetadataMode::Clean {
-        content = content.child(settings_section("Metadata fields", palette).child(
+        content = content.child(settings_field("Metadata fields", palette).child(
             settings_metadata_fields(
                 config,
                 metadata,
@@ -60,24 +60,16 @@ fn settings_metadata_mode_grid(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let choice_focus =
-        crate::app::components::FrameChoiceFocus::new("settings_metadata_mode_grid", window, cx);
-    let mut grid = div().grid().grid_cols(3).gap_2();
+    let mut grid = Vec::new();
     for option in metadata_mode_options(config, settings_disabled) {
         let mode = option.mode;
         let is_enabled = !option.is_disabled;
-        grid = grid.child(
-            frame_choice_button(
-                &choice_focus,
-                format!("metadata-mode-{}", mode.id()),
-                option.label,
-                option.is_selected,
-                is_enabled,
-                palette,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        grid.push(FrameOption::new(
+            format!("metadata-mode-{}", mode.id()),
+            option.label,
+            option.is_selected,
+            is_enabled,
+            move |root, _window, cx| {
                 cx.stop_propagation();
                 if !is_enabled {
                     return;
@@ -85,11 +77,17 @@ fn settings_metadata_mode_grid(
                 if root.update_selected_config(|config| apply_metadata_mode(config, mode)) {
                     cx.notify();
                 }
-            })),
-        );
+            },
+        ));
     }
-
-    grid
+    frame_option_field(
+        "metadata-mode-select",
+        "Metadata mode",
+        grid,
+        palette,
+        window,
+        cx,
+    )
 }
 
 fn settings_metadata_fields(
@@ -101,7 +99,7 @@ fn settings_metadata_fields(
     window: &Window,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
-    let mut fields = div().flex().flex_col().gap_3();
+    let mut fields = crate::app::components::frame_field_group();
     for option in metadata_field_options(config, metadata, settings_disabled) {
         let value = option.value;
         let placeholder = option.placeholder;

@@ -1,7 +1,8 @@
 use crate::app::components::{
     FRAME_ICON_BUTTON_SM_SIZE, FRAME_ICON_SM_SIZE, FrameIconButtonSize, FrameIconButtonVariant,
-    frame_checkbox_row, frame_choice_button, frame_icon_button, frame_text_button,
+    frame_checkbox_row, frame_icon_button, frame_text_button,
 };
+use crate::app::components::{FrameOption, frame_option_field};
 use crate::app::inspector::audio_filters::range::AudioFilterRangeTarget;
 use crate::app::inspector::audio_filters::spec::{
     apply_audio_filter_range, audio_target_id, filter_strength_id,
@@ -82,32 +83,21 @@ pub(super) fn settings_audio_compressor_control(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let choice_focus = crate::app::components::FrameChoiceFocus::new(
-        "settings_audio_compressor_control",
-        window,
-        cx,
-    );
-    let mut grid = div().grid().grid_cols(3).mt_1().gap_2();
+    let mut grid = Vec::new();
     for (candidate, label) in [
         (FilterStrength::Low, "Gentle"),
         (FilterStrength::Medium, "Balanced"),
         (FilterStrength::High, "Strong"),
     ] {
-        grid = grid.child(
-            frame_choice_button(
-                &choice_focus,
-                format!(
-                    "settings-audio-compressor-{}",
-                    filter_strength_id(candidate)
-                ),
-                label,
-                enabled && strength == candidate,
-                !disabled,
-                palette,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        grid.push(FrameOption::new(
+            format!(
+                "settings-audio-compressor-{}",
+                filter_strength_id(candidate)
+            ),
+            label,
+            strength == candidate,
+            !disabled,
+            move |root, _window, cx| {
                 if disabled {
                     return;
                 }
@@ -116,9 +106,17 @@ pub(super) fn settings_audio_compressor_control(
                 }) {
                     cx.notify();
                 }
-            })),
-        );
+            },
+        ));
     }
+    let grid = frame_option_field(
+        "audio-compressor-control-select",
+        "Audio compressor control",
+        grid,
+        palette,
+        window,
+        cx,
+    );
 
     div()
         .flex()

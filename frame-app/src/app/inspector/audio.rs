@@ -1,10 +1,9 @@
+use crate::app::components::{FrameOption, frame_option_field, frame_select_field};
 use crate::app::components::{
-    FrameTrackListItemLayout, FrameTrackListItemText, frame_choice_button,
-    frame_list_item_with_caption, frame_slider, frame_slider_fraction_from_bounds,
-    frame_slider_handle, frame_track_list_item,
+    frame_slider, frame_slider_fraction_from_bounds, frame_slider_handle,
 };
 use crate::app::input::{FrameTextInputKind, FrameTextInputSpec, frame_text_input};
-use crate::app::inspector::panel::settings_section;
+use crate::app::inspector::panel::settings_field;
 use crate::app::inspector::shared::{
     is_lossless_audio_codec, parse_audio_value, range_fraction, range_value_for_key,
     range_value_from_fraction, settings_field_label, settings_hint_text, settings_value_badge,
@@ -20,7 +19,7 @@ use crate::settings::{
 use crate::theme;
 use frame_core::capabilities::AvailableEncoders;
 use gpui::prelude::*;
-use gpui::{ClickEvent, Context, DragMoveEvent, FocusHandle, IntoElement, Render, Window, div};
+use gpui::{Context, DragMoveEvent, FocusHandle, IntoElement, Render, Window, div};
 
 #[expect(
     clippy::too_many_arguments,
@@ -36,39 +35,28 @@ pub(in crate::app) fn settings_audio_tab(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let mut channels_section = settings_section("Channels / bitrate", palette)
-        .child(settings_audio_channels_grid(
-            config,
-            metadata,
-            settings_disabled,
-            palette,
-            window,
-            cx,
-        ))
-        .child(settings_audio_encoding_controls(
-            config,
-            settings_disabled,
-            audio_bitrate_focus,
-            palette,
-            window,
-            cx,
-        ));
+    let mut encoding = settings_audio_encoding_controls(
+        config,
+        settings_disabled,
+        audio_bitrate_focus,
+        palette,
+        window,
+        cx,
+    );
     if config.processing_mode == ProcessingMode::Copy {
-        channels_section = channels_section.child(settings_hint_text(
+        encoding = encoding.child(settings_hint_text(
             "Stream copy keeps source audio settings.",
             palette,
         ));
     } else if mp2_original_channels_are_unsupported(config, metadata) {
-        channels_section = channels_section.child(settings_hint_text(
+        encoding = encoding.child(settings_hint_text(
             "MP2 supports at most two channels; multichannel source tracks are exported as stereo.",
             palette,
         ));
     }
-
     let content = crate::app::components::frame_field_group()
-        .child(channels_section)
         .child(
-            settings_section("Codec", palette).child(settings_audio_codec_list(
+            settings_field("Codec", palette).child(settings_audio_codec_list(
                 config,
                 available_encoders,
                 settings_disabled,
@@ -76,22 +64,33 @@ pub(in crate::app) fn settings_audio_tab(
                 window,
                 cx,
             )),
-        );
+        )
+        .child(
+            settings_field("Channels", palette).child(settings_audio_channels_grid(
+                config,
+                metadata,
+                settings_disabled,
+                palette,
+                window,
+                cx,
+            )),
+        )
+        .child(encoding);
 
     let track_options = audio_track_options(config, metadata, settings_disabled);
     if track_options.is_empty() {
         return content.child(
-            settings_section("Source tracks", palette)
+            settings_field("Source tracks", palette)
                 .child(settings_hint_text("No audio tracks.", palette)),
         );
     }
 
     let mut list = crate::app::components::frame_list_group();
     for option in track_options {
-        list = list.child(settings_audio_track_button(option, palette, window, cx));
+        list = list.child(settings_audio_track_button(&option, palette, window, cx));
     }
 
-    content.child(settings_section("Source tracks", palette).child(list))
+    content.child(settings_field("Source tracks", palette).child(list))
 }
 
 pub(in crate::app) fn settings_audio_channels_grid(
@@ -102,24 +101,16 @@ pub(in crate::app) fn settings_audio_channels_grid(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let choice_focus =
-        crate::app::components::FrameChoiceFocus::new("settings_audio_channels_grid", window, cx);
-    let mut grid = div().grid().grid_cols(3).gap_2();
+    let mut grid = Vec::new();
     for option in audio_channel_options(config, metadata, settings_disabled) {
         let channels = option.id;
         let is_enabled = !option.is_disabled;
-        grid = grid.child(
-            frame_choice_button(
-                &choice_focus,
-                format!("audio-channels-{channels}"),
-                option.label,
-                option.is_selected,
-                is_enabled,
-                palette,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        grid.push(FrameOption::new(
+            format!("audio-channels-{channels}"),
+            option.label,
+            option.is_selected,
+            is_enabled,
+            move |root, _window, cx| {
                 cx.stop_propagation();
                 if !is_enabled {
                     return;
@@ -127,11 +118,17 @@ pub(in crate::app) fn settings_audio_channels_grid(
                 if root.update_selected_config(|config| apply_audio_channels(config, channels)) {
                     cx.notify();
                 }
-            })),
-        );
+            },
+        ));
     }
-
-    grid
+    frame_option_field(
+        "audio-channels-select",
+        "Channels",
+        grid,
+        palette,
+        window,
+        cx,
+    )
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -244,28 +241,17 @@ fn settings_audio_bitrate_mode_grid(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let choice_focus = crate::app::components::FrameChoiceFocus::new(
-        "settings_audio_bitrate_mode_grid",
-        window,
-        cx,
-    );
-    let mut grid = div().grid().grid_cols(2).gap_2();
+    let mut grid = Vec::new();
     for (mode, label) in [("bitrate", "Target Bitrate"), ("vbr", "Variable Bitrate")] {
         let selected = config.audio_bitrate_mode == mode;
         let enabled =
             !disabled && (mode == "bitrate" || audio_codec_supports_vbr(&config.audio_codec));
-        grid = grid.child(
-            frame_choice_button(
-                &choice_focus,
-                format!("audio-bitrate-mode-{mode}"),
-                label,
-                selected,
-                enabled,
-                palette,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        grid.push(FrameOption::new(
+            format!("audio-bitrate-mode-{mode}"),
+            label,
+            selected,
+            enabled,
+            move |root, _window, cx| {
                 cx.stop_propagation();
                 if !enabled {
                     return;
@@ -273,11 +259,17 @@ fn settings_audio_bitrate_mode_grid(
                 if root.update_selected_config(|config| apply_audio_bitrate_mode(config, mode)) {
                     cx.notify();
                 }
-            })),
-        );
+            },
+        ));
     }
-
-    grid
+    frame_option_field(
+        "audio-bitrate-mode-select",
+        "Quality control",
+        grid,
+        palette,
+        window,
+        cx,
+    )
 }
 
 fn settings_audio_bitrate_field(
@@ -493,85 +485,54 @@ pub(in crate::app) fn settings_audio_codec_list(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let list_focus = crate::app::components::FrameChoiceFocus::vertical("audio-codecs", window, cx);
-    let mut list = crate::app::components::frame_list_group();
-    for option in audio_codec_options(config, available_encoders, settings_disabled) {
-        list = list.child(settings_audio_codec_button(
-            &list_focus,
-            option,
-            palette,
-            window,
-            cx,
-        ));
-    }
-
-    list
-}
-
-pub(in crate::app) fn settings_audio_codec_button(
-    group: &crate::app::components::FrameChoiceFocus,
-    option: crate::settings::AudioCodecOption,
-    palette: &'static theme::ThemePalette,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
-) -> gpui::Stateful<gpui::Div> {
-    let codec = option.codec;
-    let is_enabled = !option.is_disabled;
-    let caption = option.disabled_reason.unwrap_or(option.label);
-
-    frame_list_item_with_caption(
-        group,
-        format!("audio-codec-{codec}"),
-        codec,
-        caption,
-        option.is_selected,
-        is_enabled,
+    let choices = audio_codec_options(config, available_encoders, settings_disabled)
+        .into_iter()
+        .map(|option| {
+            let codec = option.codec;
+            FrameOption::with_caption(
+                format!("audio-codec-{codec}"),
+                codec,
+                option.disabled_reason.unwrap_or(option.label),
+                option.is_selected,
+                !option.is_disabled,
+                move |root, _, cx| {
+                    if root.update_selected_config(|config| apply_audio_codec(config, codec)) {
+                        cx.notify();
+                    }
+                },
+            )
+        })
+        .collect();
+    frame_select_field(
+        "audio-codec-select",
+        "Audio codec",
+        choices,
         palette,
         window,
         cx,
     )
-    .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
-        cx.stop_propagation();
-        if !is_enabled {
-            return;
-        }
-        if root.update_selected_config(|config| apply_audio_codec(config, codec)) {
-            cx.notify();
-        }
-    }))
 }
 
 pub(in crate::app) fn settings_audio_track_button(
-    option: crate::settings::AudioTrackOption,
+    option: &crate::settings::AudioTrackOption,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
-) -> gpui::Stateful<gpui::Div> {
+) -> gpui::Div {
     let index = option.index;
-    let is_enabled = !option.is_disabled;
-
-    frame_track_list_item(
+    crate::app::inspector::shared::settings_track_choice(
         format!("audio-track-{index}"),
-        FrameTrackListItemText {
-            index_label: option.index_label,
-            primary: option.codec,
-            detail: option.detail,
-            trailing: option.bitrate,
-            layout: FrameTrackListItemLayout::Detailed,
-        },
+        format!("{} · {}", option.index_label, option.codec),
+        format!("{} · {}", option.detail, option.bitrate),
         option.is_selected,
-        is_enabled,
+        !option.is_disabled,
+        move |root, _, cx| {
+            if root.update_selected_config(|config| toggle_audio_track_selection(config, index)) {
+                cx.notify();
+            }
+        },
         palette,
         window,
         cx,
     )
-    .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
-        cx.stop_propagation();
-        if !is_enabled {
-            return;
-        }
-        if root.update_selected_config(|config| toggle_audio_track_selection(config, index)) {
-            cx.notify();
-        }
-    }))
 }

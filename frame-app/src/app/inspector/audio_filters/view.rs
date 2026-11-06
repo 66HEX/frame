@@ -6,7 +6,7 @@ use crate::app::inspector::audio_filters::range::{
     AudioFilterRangeTarget, settings_audio_filter_range_field,
 };
 use crate::app::inspector::audio_filters::spec::audio_filter_spec;
-use crate::app::inspector::panel::settings_section;
+use crate::app::inspector::panel::settings_field;
 use crate::app::root::FrameRoot;
 use crate::settings::{ConversionConfig, ProcessingMode};
 use crate::theme;
@@ -40,7 +40,7 @@ pub(in crate::app) fn settings_audio_filters_tab(
             cx,
         ))
         .child(
-            settings_section("Level", palette)
+            settings_field("Level", palette)
                 .child(settings_audio_filter_range_field(
                     audio_filter_spec(
                         AudioFilterRangeTarget::Volume,
@@ -73,7 +73,7 @@ pub(in crate::app) fn settings_audio_filters_tab(
                 )),
         )
         .child(
-            settings_section("Dynamics", palette).child(settings_audio_compressor_control(
+            settings_field("Dynamics", palette).child(settings_audio_compressor_control(
                 filters.compressor_enabled,
                 filters.compressor_strength,
                 controls_disabled || !available_filters.acompressor,
@@ -83,7 +83,7 @@ pub(in crate::app) fn settings_audio_filters_tab(
             )),
         )
         .child(
-            settings_section("Tone", palette)
+            settings_field("Tone", palette)
                 .child(settings_audio_filter_range_field(
                     audio_filter_spec(
                         AudioFilterRangeTarget::Bass,
@@ -134,7 +134,7 @@ pub(in crate::app) fn settings_audio_filters_tab(
                 )),
         )
         .child(
-            settings_section("Cleanup", palette)
+            settings_field("Cleanup", palette)
                 .child(settings_audio_filter_range_field(
                     audio_filter_spec(
                         AudioFilterRangeTarget::NoiseReduction,
@@ -161,7 +161,7 @@ pub(in crate::app) fn settings_audio_filters_tab(
                 )),
         )
         .child(
-            settings_section("Stereo", palette).child(settings_audio_filter_range_field(
+            settings_field("Stereo", palette).child(settings_audio_filter_range_field(
                 audio_filter_spec(
                     AudioFilterRangeTarget::StereoWidth,
                     filters.stereo_width.enabled,

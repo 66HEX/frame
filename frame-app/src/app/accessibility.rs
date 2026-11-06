@@ -23,7 +23,7 @@ pub(in crate::app) struct TabFocusGroup {
 
 impl TabFocusGroup {
     pub(in crate::app) fn render(
-        id: &'static str,
+        id: impl Into<gpui::ElementId>,
         active: String,
         tabs: impl IntoIterator<Item = String>,
         window: &mut Window,

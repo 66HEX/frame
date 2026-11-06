@@ -1,8 +1,8 @@
+use crate::app::components::{FrameOption, frame_option_field};
 use crate::app::components::{
-    frame_choice_button, frame_list_item_with_caption, frame_slider,
-    frame_slider_fraction_from_bounds, frame_slider_handle,
+    frame_slider, frame_slider_fraction_from_bounds, frame_slider_handle,
 };
-use crate::app::inspector::panel::settings_section;
+use crate::app::inspector::panel::settings_field;
 use crate::app::inspector::shared::{
     range_fraction, range_value_for_key, range_value_from_fraction, settings_field_label,
     settings_hint_text, settings_value_badge,
@@ -21,7 +21,7 @@ use crate::settings::{
 use crate::theme;
 use gpui::prelude::{FluentBuilder, ParentElement, Styled};
 use gpui::{
-    AppContext, ClickEvent, Context, DragMoveEvent, FocusHandle, InteractiveElement, Render,
+    AppContext, Context, DragMoveEvent, FocusHandle, InteractiveElement, Render,
     StatefulInteractiveElement, Window, div,
 };
 
@@ -72,20 +72,23 @@ pub(in crate::app) fn settings_images_tab(
             window,
             cx,
         ))
-        .child(settings_video_scaling_section(
-            config,
-            settings_disabled,
-            palette,
-            window,
-            cx,
-        ))
-        .child(settings_images_pixel_format_section(
-            config,
-            settings_disabled,
-            palette,
-            window,
-            cx,
-        ))
+        .child(
+            crate::app::inspector::panel::settings_fields_grid()
+                .child(settings_video_scaling_section(
+                    config,
+                    settings_disabled,
+                    palette,
+                    window,
+                    cx,
+                ))
+                .child(settings_images_pixel_format_section(
+                    config,
+                    settings_disabled,
+                    palette,
+                    window,
+                    cx,
+                )),
+        )
         .child(settings_images_encoding_section(
             config,
             settings_disabled,
@@ -102,28 +105,17 @@ fn settings_images_pixel_format_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let list_focus = crate::app::components::FrameChoiceFocus::vertical(
-        "settings_images_pixel_format_section",
-        window,
-        cx,
-    );
-    let mut list = crate::app::components::frame_list_group();
+    let mut list = Vec::new();
     for option in video_pixel_format_options(config) {
         let pixel_format = option.id;
         let enabled = !settings_disabled && !option.is_disabled;
-        list = list.child(
-            frame_list_item_with_caption(
-                &list_focus,
-                format!("images-pixel-format-{pixel_format}"),
-                option.label,
-                option.caption,
-                option.is_selected,
-                enabled,
-                palette,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        list.push(FrameOption::with_caption(
+            format!("images-pixel-format-{pixel_format}"),
+            option.label,
+            option.caption,
+            option.is_selected,
+            enabled,
+            move |root, _window, cx| {
                 cx.stop_propagation();
                 if !enabled {
                     return;
@@ -131,11 +123,19 @@ fn settings_images_pixel_format_section(
                 if root.update_selected_config(|config| apply_pixel_format(config, pixel_format)) {
                     cx.notify();
                 }
-            })),
-        );
+            },
+        ));
     }
+    let list = frame_option_field(
+        "images-pixel-format-select",
+        "Pixel format",
+        list,
+        palette,
+        window,
+        cx,
+    );
 
-    settings_section("Pixel format", palette).child(list)
+    settings_field("Pixel format", palette).child(list)
 }
 
 fn settings_images_encoding_section(
@@ -150,9 +150,9 @@ fn settings_images_encoding_section(
         "webp" => settings_image_webp_section(config, settings_disabled, palette, window, cx),
         "png" => settings_image_png_section(config, settings_disabled, palette, window, cx),
         "tiff" => settings_image_tiff_section(config, settings_disabled, palette, window, cx),
-        "bmp" => settings_section("BMP encoding", palette)
+        "bmp" => settings_field("BMP encoding", palette)
             .child(settings_hint_text("BMP output is uncompressed.", palette)),
-        _ => settings_section("Image encoding", palette).child(settings_hint_text(
+        _ => settings_field("Image encoding", palette).child(settings_hint_text(
             "Select an image format to tune encoding.",
             palette,
         )),
@@ -166,7 +166,7 @@ fn settings_image_jpeg_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("JPEG encoding", palette)
+    settings_field("JPEG encoding", palette)
         .child(settings_image_range_field(
             "Quality",
             format!("{}%", config.image_jpeg_quality),
@@ -184,6 +184,7 @@ fn settings_image_jpeg_section(
         .child(settings_image_option_list(
             image_jpeg_huffman_options(config, settings_disabled),
             "image-jpeg-huffman",
+            "JPEG Huffman coding",
             palette,
             window,
             cx,
@@ -198,7 +199,7 @@ fn settings_image_webp_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("WebP encoding", palette)
+    settings_field("WebP encoding", palette)
         .child(settings_image_webp_mode_grid(
             config,
             settings_disabled,
@@ -249,6 +250,7 @@ fn settings_image_webp_section(
         .child(settings_image_option_list(
             image_webp_preset_options(config, settings_disabled),
             "image-webp-preset",
+            "WebP preset",
             palette,
             window,
             cx,
@@ -263,7 +265,7 @@ fn settings_image_png_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("PNG compression", palette)
+    settings_field("PNG compression", palette)
         .child(settings_image_range_field(
             "Compression level",
             config.image_png_compression.to_string(),
@@ -281,6 +283,7 @@ fn settings_image_png_section(
         .child(settings_image_option_list(
             image_png_prediction_options(config, settings_disabled),
             "image-png-prediction",
+            "PNG prediction",
             palette,
             window,
             cx,
@@ -295,9 +298,10 @@ fn settings_image_tiff_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("TIFF compression", palette).child(settings_image_option_list(
+    settings_field("TIFF compression", palette).child(settings_image_option_list(
         image_tiff_compression_options(config, settings_disabled),
         "image-tiff-compression",
+        "TIFF compression",
         palette,
         window,
         cx,
@@ -312,22 +316,14 @@ fn settings_image_webp_mode_grid(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let choice_focus =
-        crate::app::components::FrameChoiceFocus::new("settings_image_webp_mode_grid", window, cx);
-    let mut grid = div().grid().grid_cols(2).gap_2();
+    let mut grid = Vec::new();
     for (lossless, label) in [(false, "Lossy"), (true, "Lossless")] {
-        grid = grid.child(
-            frame_choice_button(
-                &choice_focus,
-                format!("image-webp-mode-{label}"),
-                label,
-                config.image_webp_lossless == lossless,
-                !disabled,
-                palette,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        grid.push(FrameOption::new(
+            format!("image-webp-mode-{label}"),
+            label,
+            config.image_webp_lossless == lossless,
+            !disabled,
+            move |root, _window, cx| {
                 cx.stop_propagation();
                 if disabled {
                     return;
@@ -336,11 +332,17 @@ fn settings_image_webp_mode_grid(
                 {
                     cx.notify();
                 }
-            })),
-        );
+            },
+        ));
     }
-
-    grid
+    frame_option_field(
+        "image-webp-mode-select",
+        "WebP compression mode",
+        grid,
+        palette,
+        window,
+        cx,
+    )
 }
 
 #[expect(
@@ -545,29 +547,23 @@ const fn settings_image_range_handle_id(target: SettingsImageRangeTarget) -> &'s
 fn settings_image_option_list(
     options: Vec<crate::settings::ImageEncodingOption>,
     id_prefix: &'static str,
+    label: &'static str,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
     apply: fn(&mut ConversionConfig, &str) -> bool,
 ) -> gpui::Div {
-    let list_focus = crate::app::components::FrameChoiceFocus::vertical(id_prefix, window, cx);
-    let mut list = crate::app::components::frame_list_group();
+    let mut list = Vec::new();
     for option in options {
         let id = option.id;
         let enabled = !option.is_disabled;
-        list = list.child(
-            frame_list_item_with_caption(
-                &list_focus,
-                format!("{id_prefix}-{id}"),
-                option.label,
-                option.caption,
-                option.is_selected,
-                enabled,
-                palette,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        list.push(FrameOption::with_caption(
+            format!("{id_prefix}-{id}"),
+            option.label,
+            option.caption,
+            option.is_selected,
+            enabled,
+            move |root, _window, cx| {
                 cx.stop_propagation();
                 if !enabled {
                     return;
@@ -575,9 +571,15 @@ fn settings_image_option_list(
                 if root.update_selected_config(|config| apply(config, id)) {
                     cx.notify();
                 }
-            })),
-        );
+            },
+        ));
     }
-
-    list
+    frame_option_field(
+        format!("{id_prefix}-select"),
+        label,
+        list,
+        palette,
+        window,
+        cx,
+    )
 }

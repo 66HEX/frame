@@ -1,6 +1,6 @@
-use crate::app::components::{frame_choice_button, frame_list_item_with_caption};
+use crate::app::components::{FrameOption, frame_option_field, frame_option_tabs};
 use crate::app::input::{FrameTextInputKind, FrameTextInputSpec, frame_text_input};
-use crate::app::inspector::panel::settings_section;
+use crate::app::inspector::panel::settings_field;
 use crate::app::inspector::shared::{settings_field_label, settings_hint_text};
 use crate::app::inspector::video::encoding::{
     fps_label, gif_dither_label, resolution_label, scaling_algorithm_label,
@@ -13,7 +13,7 @@ use crate::settings::{
 };
 use crate::theme;
 use gpui::prelude::*;
-use gpui::{ClickEvent, Context, FocusHandle, Window, div};
+use gpui::{Context, FocusHandle, Window, div};
 
 pub(in crate::app) fn settings_video_resolution_section(
     config: &ConversionConfig,
@@ -24,9 +24,13 @@ pub(in crate::app) fn settings_video_resolution_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let mut section = settings_section("Resolution & framerate", palette).child(
-        settings_resolution_grid(config, settings_disabled, palette, window, cx),
-    );
+    let mut section = settings_field("Resolution", palette).child(settings_resolution_grid(
+        config,
+        settings_disabled,
+        palette,
+        window,
+        cx,
+    ));
 
     if config.resolution == "custom" {
         section = section.child(settings_custom_dimensions_grid(
@@ -50,24 +54,16 @@ pub(in crate::app) fn settings_resolution_grid(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let choice_focus =
-        crate::app::components::FrameChoiceFocus::new("settings_resolution_grid", window, cx);
-    let mut grid = div().grid().grid_cols(2).gap_2();
+    let mut grid = Vec::new();
     for resolution in resolution_options() {
         let selected = config.resolution == *resolution;
         let label = resolution_label(resolution);
-        grid = grid.child(
-            frame_choice_button(
-                &choice_focus,
-                format!("video-resolution-{resolution}"),
-                label,
-                selected,
-                !disabled,
-                palette,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        grid.push(FrameOption::new(
+            format!("video-resolution-{resolution}"),
+            label,
+            selected,
+            !disabled,
+            move |root, _window, cx| {
                 cx.stop_propagation();
                 if disabled {
                     return;
@@ -75,10 +71,10 @@ pub(in crate::app) fn settings_resolution_grid(
                 if root.update_selected_config(|config| apply_resolution(config, resolution)) {
                     cx.notify();
                 }
-            })),
-        );
+            },
+        ));
     }
-    grid
+    frame_option_tabs("resolution-tabs", "Resolution", grid, palette, window, cx)
 }
 
 pub(super) fn settings_custom_dimensions_grid(
@@ -144,23 +140,15 @@ pub(in crate::app) fn settings_video_scaling_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let choice_focus =
-        crate::app::components::FrameChoiceFocus::new("settings_video_scaling_section", window, cx);
     let disabled = settings_disabled || config.resolution == "original";
-    let mut grid = div().grid().grid_cols(2).gap_2();
+    let mut grid = Vec::new();
     for algorithm in scaling_algorithm_options() {
-        grid = grid.child(
-            frame_choice_button(
-                &choice_focus,
-                format!("video-scaling-{algorithm}"),
-                scaling_algorithm_label(algorithm),
-                config.scaling_algorithm == *algorithm,
-                !disabled,
-                palette,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        grid.push(FrameOption::new(
+            format!("video-scaling-{algorithm}"),
+            scaling_algorithm_label(algorithm),
+            config.scaling_algorithm == *algorithm,
+            !disabled,
+            move |root, _window, cx| {
                 cx.stop_propagation();
                 if disabled {
                     return;
@@ -169,11 +157,19 @@ pub(in crate::app) fn settings_video_scaling_section(
                 {
                     cx.notify();
                 }
-            })),
-        );
+            },
+        ));
     }
+    let grid = frame_option_field(
+        "video-scaling-select",
+        "Scaling algorithm",
+        grid,
+        palette,
+        window,
+        cx,
+    );
 
-    settings_section("Scaling algorithm", palette).child(grid)
+    settings_field("Scaling algorithm", palette).child(grid)
 }
 
 pub(in crate::app) fn settings_video_fps_section(
@@ -183,23 +179,15 @@ pub(in crate::app) fn settings_video_fps_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let choice_focus =
-        crate::app::components::FrameChoiceFocus::new("settings_video_fps_section", window, cx);
     let is_gif = is_gif_container(&config.container);
-    let mut grid = div().grid().grid_cols(2).gap_2();
+    let mut grid = Vec::new();
     for fps in fps_options(is_gif) {
-        grid = grid.child(
-            frame_choice_button(
-                &choice_focus,
-                format!("video-fps-{fps}"),
-                fps_label(fps),
-                config.fps == *fps,
-                !settings_disabled,
-                palette,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        grid.push(FrameOption::new(
+            format!("video-fps-{fps}"),
+            fps_label(fps),
+            config.fps == *fps,
+            !settings_disabled,
+            move |root, _window, cx| {
                 cx.stop_propagation();
                 if settings_disabled {
                     return;
@@ -207,11 +195,12 @@ pub(in crate::app) fn settings_video_fps_section(
                 if root.update_selected_config(|config| apply_fps(config, fps)) {
                     cx.notify();
                 }
-            })),
-        );
+            },
+        ));
     }
+    let grid = frame_option_field("video-fps-select", "Framerate", grid, palette, window, cx);
 
-    settings_section("Framerate", palette).child(grid)
+    settings_field("Framerate", palette).child(grid)
 }
 
 pub(in crate::app) fn settings_video_gif_colors_section(
@@ -221,25 +210,14 @@ pub(in crate::app) fn settings_video_gif_colors_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let choice_focus = crate::app::components::FrameChoiceFocus::new(
-        "settings_video_gif_colors_section",
-        window,
-        cx,
-    );
-    let mut grid = div().grid().grid_cols(2).gap_2();
+    let mut grid = Vec::new();
     for colors in gif_color_options() {
-        grid = grid.child(
-            frame_choice_button(
-                &choice_focus,
-                format!("video-gif-colors-{colors}"),
-                colors.to_string(),
-                config.gif_colors == *colors,
-                !settings_disabled,
-                palette,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        grid.push(FrameOption::new(
+            format!("video-gif-colors-{colors}"),
+            colors.to_string(),
+            config.gif_colors == *colors,
+            !settings_disabled,
+            move |root, _window, cx| {
                 cx.stop_propagation();
                 if settings_disabled {
                     return;
@@ -247,11 +225,19 @@ pub(in crate::app) fn settings_video_gif_colors_section(
                 if root.update_selected_config(|config| apply_gif_colors(config, *colors)) {
                     cx.notify();
                 }
-            })),
-        );
+            },
+        ));
     }
+    let grid = frame_option_field(
+        "video-gif-colors-select",
+        "Palette colors",
+        grid,
+        palette,
+        window,
+        cx,
+    );
 
-    settings_section("Palette colors", palette).child(grid)
+    settings_field("Palette colors", palette).child(grid)
 }
 
 pub(in crate::app) fn settings_video_gif_dither_section(
@@ -261,27 +247,16 @@ pub(in crate::app) fn settings_video_gif_dither_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let list_focus = crate::app::components::FrameChoiceFocus::vertical(
-        "settings_video_gif_dither_section",
-        window,
-        cx,
-    );
-    let mut list = crate::app::components::frame_list_group();
+    let mut list = Vec::new();
     for dither in gif_dither_options() {
         let dither = *dither;
-        list = list.child(
-            frame_list_item_with_caption(
-                &list_focus,
-                format!("video-gif-dither-{dither}"),
-                gif_dither_label(dither),
-                dither.to_string(),
-                config.gif_dither == dither,
-                !settings_disabled,
-                palette,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        list.push(FrameOption::with_caption(
+            format!("video-gif-dither-{dither}"),
+            gif_dither_label(dither),
+            dither.to_string(),
+            config.gif_dither == dither,
+            !settings_disabled,
+            move |root, _window, cx| {
                 cx.stop_propagation();
                 if settings_disabled {
                     return;
@@ -289,11 +264,19 @@ pub(in crate::app) fn settings_video_gif_dither_section(
                 if root.update_selected_config(|config| apply_gif_dither(config, dither)) {
                     cx.notify();
                 }
-            })),
-        );
+            },
+        ));
     }
+    let list = frame_option_field(
+        "video-gif-dither-select",
+        "Dithering",
+        list,
+        palette,
+        window,
+        cx,
+    );
 
-    settings_section("Dithering", palette).child(list)
+    settings_field("Dithering", palette).child(list)
 }
 
 pub(super) fn settings_video_gif_loop_section(
@@ -304,7 +287,7 @@ pub(super) fn settings_video_gif_loop_section(
     window: &Window,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("Loop count", palette)
+    settings_field("Loop count", palette)
         .child(frame_text_input(
             FrameTextInputSpec {
                 id: "settings-gif-loop-field",

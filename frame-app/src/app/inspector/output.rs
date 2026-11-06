@@ -1,6 +1,6 @@
-use crate::app::components::frame_choice_button;
+use crate::app::components::{FrameOption, frame_option_field, frame_select_field};
 use crate::app::input::{FrameTextInputKind, FrameTextInputSpec, frame_text_input};
-use crate::app::inspector::panel::settings_section;
+use crate::app::inspector::panel::settings_field;
 use crate::app::inspector::shared::settings_hint_text;
 use crate::app::root::FrameRoot;
 use crate::settings::{
@@ -8,8 +8,8 @@ use crate::settings::{
     normalize_output_config, output_container_options, output_processing_mode_options,
 };
 use crate::theme;
-use gpui::prelude::{FluentBuilder, ParentElement, Styled};
-use gpui::{ClickEvent, Context, FocusHandle, StatefulInteractiveElement, Window, div};
+use gpui::prelude::{FluentBuilder, ParentElement};
+use gpui::{Context, FocusHandle, Window};
 
 #[expect(
     clippy::too_many_arguments,
@@ -35,7 +35,7 @@ pub(in crate::app) fn settings_output_tab(
     });
     crate::app::components::frame_field_group()
         .child(
-            settings_section("Processing mode", palette)
+            settings_field("Processing mode", palette)
                 .child(settings_processing_mode_grid(
                     config,
                     metadata,
@@ -47,40 +47,39 @@ pub(in crate::app) fn settings_output_tab(
                 .child(settings_hint_text(config.processing_mode.hint(), palette)),
         )
         .child(
-            settings_section("Output name", palette)
-                .child(settings_output_name_field(
-                    output_name,
-                    settings_disabled,
-                    output_name_focus,
-                    palette,
-                    window,
-                    cx,
-                ))
-                .child(settings_hint_text(
-                    "Output is saved to the default folder selected in Settings.",
-                    palette,
-                )),
-        )
-        .when_some(dimensions, |panel, (width, height)| {
-            panel.child(
-                settings_section("Output dimensions", palette)
-                    .child(div().child(format!("{width} × {height} px")))
-                    .child(settings_hint_text(
-                        "Estimated after crop, rotation and scaling.",
+            crate::app::inspector::panel::settings_fields_grid()
+                .child(
+                    settings_field("Output name", palette).child(settings_output_name_field(
+                        output_name,
+                        settings_disabled,
+                        output_name_focus,
                         palette,
+                        window,
+                        cx,
                     )),
-            )
-        })
-        .child(
-            settings_section("Output container", palette).child(settings_container_grid(
-                config,
-                metadata,
-                settings_disabled,
-                palette,
-                window,
-                cx,
-            )),
+                )
+                .child(
+                    settings_field("Container", palette).child(settings_container_grid(
+                        config,
+                        metadata,
+                        settings_disabled,
+                        palette,
+                        window,
+                        cx,
+                    )),
+                ),
         )
+        .child(settings_hint_text(
+            "Output is saved to the default folder selected in Settings.",
+            palette,
+        ))
+        .when_some(dimensions, |panel, (width, height)| {
+            panel.child(crate::app::inspector::shared::settings_value_row(
+                "Output dimensions",
+                format!("{width} × {height} px"),
+                palette,
+            ))
+        })
 }
 
 pub(in crate::app) fn settings_processing_mode_grid(
@@ -91,24 +90,16 @@ pub(in crate::app) fn settings_processing_mode_grid(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let choice_focus =
-        crate::app::components::FrameChoiceFocus::new("settings_processing_mode_grid", window, cx);
-    let mut grid = div().grid().grid_cols(2).gap_2();
+    let mut grid = Vec::new();
     for option in output_processing_mode_options(config, metadata, settings_disabled) {
         let mode = option.mode;
         let is_enabled = !option.is_disabled;
-        grid = grid.child(
-            frame_choice_button(
-                &choice_focus,
-                format!("output-mode-{}", option.mode.id()),
-                option.label,
-                option.is_selected,
-                is_enabled,
-                palette,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        grid.push(FrameOption::new(
+            format!("output-mode-{}", option.mode.id()),
+            option.label,
+            option.is_selected,
+            is_enabled,
+            move |root, _window, cx| {
                 cx.stop_propagation();
                 if !is_enabled {
                     return;
@@ -121,10 +112,17 @@ pub(in crate::app) fn settings_processing_mode_grid(
                     root.sync_inspector_availability(metadata.as_ref());
                     cx.notify();
                 }
-            })),
-        );
+            },
+        ));
     }
-    grid
+    frame_option_field(
+        "processing-mode-select",
+        "Processing mode",
+        grid,
+        palette,
+        window,
+        cx,
+    )
 }
 
 pub(in crate::app) fn settings_container_grid(
@@ -135,24 +133,16 @@ pub(in crate::app) fn settings_container_grid(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let choice_focus =
-        crate::app::components::FrameChoiceFocus::new("settings_container_grid", window, cx);
-    let mut grid = div().grid().grid_cols(2).gap_2();
+    let mut grid = Vec::new();
     for option in output_container_options(config, metadata, settings_disabled) {
         let container = option.container;
         let is_enabled = !option.is_disabled;
-        grid = grid.child(
-            frame_choice_button(
-                &choice_focus,
-                format!("output-container-{container}"),
-                &container,
-                option.is_selected,
-                is_enabled,
-                palette,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        grid.push(FrameOption::new(
+            format!("output-container-{container}"),
+            container.clone(),
+            option.is_selected,
+            is_enabled,
+            move |root, _window, cx| {
                 cx.stop_propagation();
                 if !is_enabled {
                     return;
@@ -167,10 +157,10 @@ pub(in crate::app) fn settings_container_grid(
                     root.sync_inspector_availability(metadata.as_ref());
                     cx.notify();
                 }
-            })),
-        );
+            },
+        ));
     }
-    grid
+    frame_select_field("container-select", "Container", grid, palette, window, cx)
 }
 
 pub(in crate::app) fn settings_output_name_field(

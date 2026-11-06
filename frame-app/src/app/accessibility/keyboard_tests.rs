@@ -1,6 +1,6 @@
 use super::*;
 
-fn focused_node(cx: &mut VisualTestContext) -> serde_json::Value {
+pub(super) fn focused_node(cx: &mut VisualTestContext) -> serde_json::Value {
     cx.update(|window, _| {
         let tree: serde_json::Value =
             serde_json::from_str(&window.debug_a11y_tree_json().unwrap()).unwrap();
@@ -201,7 +201,7 @@ fn every_view_has_named_visible_tab_stops_and_reversible_traversal() {
             );
             // Expected landmarks prevent an accidentally shortened cycle passing.
             let landmarks: &[&str] = match fixture {
-                VisualFixture::SettingsOutput => &["Re-encode", "mov", "Output name"],
+                VisualFixture::SettingsOutput => &["Re-encode", "Container", "Output name"],
                 VisualFixture::SettingsVideo => &["Custom", "Video CRF"],
                 VisualFixture::SettingsPresets => &["Preset name", "Discord"],
                 VisualFixture::PreviewCrop | VisualFixture::PreviewCropCustom => &[

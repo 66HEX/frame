@@ -1,8 +1,7 @@
-use crate::app::components::{
-    frame_checkbox_row, frame_choice_button, frame_list_item_with_caption,
-};
+use crate::app::components::frame_checkbox_row;
+use crate::app::components::{FrameOption, frame_option_field, frame_select_field};
 use crate::app::input::{FrameTextInputKind, FrameTextInputSpec, frame_text_input};
-use crate::app::inspector::panel::settings_section;
+use crate::app::inspector::panel::settings_field;
 use crate::app::inspector::shared::{settings_field_label, settings_hint_text};
 use crate::app::inspector::video::quality::{SettingsVideoRangeTarget, settings_video_range_field};
 use crate::app::root::FrameRoot;
@@ -25,28 +24,17 @@ pub(super) fn settings_video_encoder_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let list_focus = crate::app::components::FrameChoiceFocus::vertical(
-        "settings_video_encoder_section",
-        window,
-        cx,
-    );
-    let mut list = crate::app::components::frame_list_group();
+    let mut list = Vec::new();
     for option in video_codec_options(config, available_encoders, settings_disabled) {
         let codec = option.codec;
         let enabled = !option.is_disabled;
-        list = list.child(
-            frame_list_item_with_caption(
-                &list_focus,
-                format!("video-codec-{codec}"),
-                codec,
-                option.disabled_reason.unwrap_or(option.label).to_string(),
-                option.is_selected,
-                enabled,
-                palette,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        list.push(FrameOption::with_caption(
+            format!("video-codec-{codec}"),
+            codec,
+            option.disabled_reason.unwrap_or(option.label).to_string(),
+            option.is_selected,
+            enabled,
+            move |root, _window, cx| {
                 cx.stop_propagation();
                 if !enabled {
                     return;
@@ -54,11 +42,19 @@ pub(super) fn settings_video_encoder_section(
                 if root.update_selected_config(|config| apply_video_codec(config, codec)) {
                     cx.notify();
                 }
-            })),
-        );
+            },
+        ));
     }
+    let list = frame_select_field(
+        "video-encoder-select",
+        "Video encoder",
+        list,
+        palette,
+        window,
+        cx,
+    );
 
-    settings_section("Video encoder", palette).child(list)
+    settings_field("Video encoder", palette).child(list)
 }
 
 pub(super) fn settings_video_pixel_format_section(
@@ -68,28 +64,17 @@ pub(super) fn settings_video_pixel_format_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let list_focus = crate::app::components::FrameChoiceFocus::vertical(
-        "settings_video_pixel_format_section",
-        window,
-        cx,
-    );
-    let mut list = crate::app::components::frame_list_group();
+    let mut list = Vec::new();
     for option in video_pixel_format_options(config) {
         let pixel_format = option.id;
         let enabled = !settings_disabled && !option.is_disabled;
-        list = list.child(
-            frame_list_item_with_caption(
-                &list_focus,
-                format!("video-pixel-format-{pixel_format}"),
-                option.label,
-                option.caption,
-                option.is_selected,
-                enabled,
-                palette,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        list.push(FrameOption::with_caption(
+            format!("video-pixel-format-{pixel_format}"),
+            option.label,
+            option.caption,
+            option.is_selected,
+            enabled,
+            move |root, _window, cx| {
                 cx.stop_propagation();
                 if !enabled {
                     return;
@@ -97,11 +82,19 @@ pub(super) fn settings_video_pixel_format_section(
                 if root.update_selected_config(|config| apply_pixel_format(config, pixel_format)) {
                     cx.notify();
                 }
-            })),
-        );
+            },
+        ));
     }
+    let list = frame_option_field(
+        "video-pixel-format-select",
+        "Pixel format",
+        list,
+        palette,
+        window,
+        cx,
+    );
 
-    settings_section("Pixel format", palette).child(list).when(
+    settings_field("Pixel format", palette).child(list).when(
         config.video_codec == "libsvtav1",
         |section| {
             section.child(settings_hint_text(
@@ -119,28 +112,17 @@ pub(super) fn settings_video_preset_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let list_focus = crate::app::components::FrameChoiceFocus::vertical(
-        "settings_video_preset_section",
-        window,
-        cx,
-    );
-    let mut list = crate::app::components::frame_list_group();
+    let mut list = Vec::new();
     for option in video_preset_options(config, settings_disabled) {
         let preset = option.preset;
         let enabled = !option.is_disabled;
-        list = list.child(
-            frame_list_item_with_caption(
-                &list_focus,
-                format!("video-preset-{preset}"),
-                option.label,
-                option.caption,
-                option.is_selected,
-                enabled,
-                palette,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        list.push(FrameOption::with_caption(
+            format!("video-preset-{preset}"),
+            option.label,
+            option.caption,
+            option.is_selected,
+            enabled,
+            move |root, _window, cx| {
                 cx.stop_propagation();
                 if !enabled {
                     return;
@@ -148,11 +130,19 @@ pub(super) fn settings_video_preset_section(
                 if root.update_selected_config(|config| apply_video_preset(config, preset)) {
                     cx.notify();
                 }
-            })),
-        );
+            },
+        ));
     }
+    let list = frame_option_field(
+        "video-preset-select",
+        "Encoding speed",
+        list,
+        palette,
+        window,
+        cx,
+    );
 
-    settings_section(
+    settings_field(
         if config.video_codec == "libsvtav1" {
             "AV1 preset"
         } else {
@@ -171,7 +161,7 @@ pub(super) fn settings_video_quality_section(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let mut section = settings_section("Quality control", palette);
+    let mut section = settings_field("Quality control", palette);
     if config.video_codec != "mpeg2video" {
         section = section.child(settings_video_bitrate_mode_grid(
             config,
@@ -256,25 +246,14 @@ pub(super) fn settings_video_bitrate_mode_grid(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let choice_focus = crate::app::components::FrameChoiceFocus::new(
-        "settings_video_bitrate_mode_grid",
-        window,
-        cx,
-    );
-    let mut grid = div().grid().grid_cols(2).gap_2();
+    let mut grid = Vec::new();
     for (mode, label) in [("crf", "Constant Quality"), ("bitrate", "Target Bitrate")] {
-        grid = grid.child(
-            frame_choice_button(
-                &choice_focus,
-                format!("video-bitrate-mode-{mode}"),
-                label,
-                config.video_bitrate_mode == mode,
-                !disabled,
-                palette,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        grid.push(FrameOption::new(
+            format!("video-bitrate-mode-{mode}"),
+            label,
+            config.video_bitrate_mode == mode,
+            !disabled,
+            move |root, _window, cx| {
                 cx.stop_propagation();
                 if disabled {
                     return;
@@ -282,10 +261,17 @@ pub(super) fn settings_video_bitrate_mode_grid(
                 if root.update_selected_config(|config| apply_video_bitrate_mode(config, mode)) {
                     cx.notify();
                 }
-            })),
-        );
+            },
+        ));
     }
-    grid
+    frame_option_field(
+        "video-bitrate-mode-select",
+        "Quality control",
+        grid,
+        palette,
+        window,
+        cx,
+    )
 }
 
 pub(super) fn settings_video_nvenc_section(
@@ -294,7 +280,7 @@ pub(super) fn settings_video_nvenc_section(
     palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("NVENC options", palette)
+    settings_field("NVENC options", palette)
         .child(settings_video_checkbox_row(
             "video-nvenc-spatial-aq",
             "Spatial AQ",
@@ -341,7 +327,7 @@ pub(super) fn settings_video_videotoolbox_section(
     palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("VideoToolbox options", palette).child(settings_video_checkbox_row(
+    settings_field("VideoToolbox options", palette).child(settings_video_checkbox_row(
         "video-videotoolbox-allow-sw",
         "Allow software fallback",
         "Drop back to CPU encoding if hardware fails",
@@ -368,7 +354,7 @@ pub(super) fn settings_video_hw_section(
     palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
-    settings_section("Hardware acceleration", palette).child(settings_video_checkbox_row(
+    settings_field("Hardware acceleration", palette).child(settings_video_checkbox_row(
         "video-hw-decode",
         "Hardware decoding",
         "Use GPU for decoding input video (faster)",

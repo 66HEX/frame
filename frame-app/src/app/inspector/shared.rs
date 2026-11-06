@@ -105,3 +105,50 @@ pub(in crate::app) fn range_value_for_key(
 
     Some(next.clamp(min, max))
 }
+
+/// Track inclusion retains multi-track export while using the same compact
+/// binary Tabs pattern as every other two-option setting.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Track fields receive their accessible identity, metadata, selection and render context explicitly."
+)]
+pub(in crate::app) fn settings_track_choice(
+    id: String,
+    title: String,
+    detail: String,
+    selected: bool,
+    enabled: bool,
+    on_change: impl Fn(
+        &mut crate::app::root::FrameRoot,
+        &mut gpui::Window,
+        &mut gpui::Context<crate::app::root::FrameRoot>,
+    ) + 'static,
+    palette: &'static theme::ThemePalette,
+    window: &mut gpui::Window,
+    cx: &mut gpui::Context<crate::app::root::FrameRoot>,
+) -> gpui::Div {
+    let control = crate::app::components::frame_boolean_field(
+        id,
+        title.clone(),
+        selected,
+        enabled,
+        ["Exclude", "Include"],
+        move |root, _, window, cx| on_change(root, window, cx),
+        palette,
+        window,
+        cx,
+    );
+    div()
+        .flex()
+        .items_center()
+        .gap(theme::ui_rem(8.0))
+        .min_w_0()
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .child(frame_label(title, palette))
+                .child(frame_description(detail, palette)),
+        )
+        .child(div().w(theme::ui_rem(144.0)).flex_shrink_0().child(control))
+}

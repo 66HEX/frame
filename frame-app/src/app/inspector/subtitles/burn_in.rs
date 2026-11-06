@@ -1,7 +1,7 @@
 use crate::app::components::{
-    FRAME_ICON_SM_SIZE, FrameIconButtonSize, FrameIconButtonVariant, frame_choice_button,
-    frame_icon_button,
+    FRAME_ICON_SM_SIZE, FrameIconButtonSize, FrameIconButtonVariant, frame_icon_button,
 };
+use crate::app::components::{FrameOption, frame_option_field};
 use crate::app::inspector::shared::{settings_field_label, settings_hint_text};
 use crate::app::inspector::subtitles::color_picker::settings_subtitle_color_field;
 use crate::app::inspector::subtitles::font_select::settings_subtitle_font_select;
@@ -212,27 +212,16 @@ pub(super) fn settings_subtitle_position_grid(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let choice_focus = crate::app::components::FrameChoiceFocus::new(
-        "settings_subtitle_position_grid",
-        window,
-        cx,
-    );
-    let mut grid = div().grid().grid_cols(3).gap_2();
+    let mut grid = Vec::new();
     for option in subtitle_position_options(config, disabled) {
         let position = option.position;
         let is_enabled = !option.is_disabled;
-        grid = grid.child(
-            frame_choice_button(
-                &choice_focus,
-                format!("subtitle-position-{}", position.id()),
-                option.label,
-                option.is_selected,
-                is_enabled,
-                palette,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        grid.push(FrameOption::new(
+            format!("subtitle-position-{}", position.id()),
+            option.label,
+            option.is_selected,
+            is_enabled,
+            move |root, _window, cx| {
                 cx.stop_propagation();
                 if !is_enabled {
                     return;
@@ -240,9 +229,15 @@ pub(super) fn settings_subtitle_position_grid(
                 if root.update_selected_config(|config| apply_subtitle_position(config, position)) {
                     cx.notify();
                 }
-            })),
-        );
+            },
+        ));
     }
-
-    grid
+    frame_option_field(
+        "subtitle-position-select",
+        "Position",
+        grid,
+        palette,
+        window,
+        cx,
+    )
 }

@@ -32,13 +32,15 @@ pub(in crate::app) mod tooltip_state;
 mod select_control;
 pub(in crate::app) use select_control::*;
 
-mod choice_group;
-pub(in crate::app) use choice_group::FrameChoiceFocus;
-
 mod surface_motion;
 pub(in crate::app) use surface_motion::{SurfaceOrigin, frame_surface_motion};
 
+mod select_field;
+pub(in crate::app) use select_field::{
+    FrameOption, frame_boolean_field, frame_option_field, frame_select_field,
+};
 mod collapsible;
 pub(in crate::app) use collapsible::frame_collapsible;
 mod option_tabs;
-pub(in crate::app) use option_tabs::frame_tab_trigger;
+
+pub(in crate::app) use option_tabs::{frame_option_tabs, frame_tab_trigger};

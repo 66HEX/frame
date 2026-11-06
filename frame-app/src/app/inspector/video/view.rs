@@ -33,17 +33,24 @@ pub(in crate::app) fn settings_video_tab(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let is_gif_mode = is_gif_container(&config.container);
-    let mut content = crate::app::components::frame_field_group()
-        .child(settings_video_resolution_section(
+    let resolution = settings_video_resolution_section(
+        config,
+        settings_disabled || focuses.resolution_locked,
+        focuses.width,
+        focuses.height,
+        palette,
+        window,
+        cx,
+    );
+    let content = crate::app::inspector::panel::settings_fields_grid()
+        .child(settings_video_scaling_section(
             config,
-            settings_disabled || focuses.resolution_locked,
-            focuses.width,
-            focuses.height,
+            settings_disabled,
             palette,
             window,
             cx,
         ))
-        .child(settings_video_scaling_section(
+        .child(settings_video_fps_section(
             config,
             settings_disabled,
             palette,
@@ -51,16 +58,8 @@ pub(in crate::app) fn settings_video_tab(
             cx,
         ));
 
-    content = content.child(settings_video_fps_section(
-        config,
-        settings_disabled,
-        palette,
-        window,
-        cx,
-    ));
-
     if is_gif_mode {
-        return content
+        let controls = content
             .child(settings_video_gif_colors_section(
                 config,
                 settings_disabled,
@@ -83,9 +82,12 @@ pub(in crate::app) fn settings_video_tab(
                 window,
                 cx,
             ));
+        return crate::app::components::frame_field_group()
+            .child(resolution)
+            .child(controls);
     }
 
-    content
+    let controls = content
         .child(settings_video_encoder_section(
             config,
             settings_disabled,
@@ -112,7 +114,10 @@ pub(in crate::app) fn settings_video_tab(
                     cx,
                 ))
             },
-        )
+        );
+    crate::app::components::frame_field_group()
+        .child(resolution)
+        .child(controls)
         .child(settings_video_quality_section(
             config,
             settings_disabled,

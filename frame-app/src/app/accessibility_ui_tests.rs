@@ -701,3 +701,110 @@ fn both_color_picker_hue_sliders_accept_clicks_in_the_new_padding() {
         }
     }
 }
+
+#[test]
+fn output_sections_start_closed_and_keyboard_enters_only_expanded_controls() {
+    for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+        let mut app = TestAppContext::single();
+        let (root, cx) = test_window(&mut app, VisualFixture::PreviewReady, scale);
+        assert!(root.read_with(cx, |root, _| {
+            root.settings_ui.expanded_output_sections.is_empty()
+        }));
+        click(cx, "settings-tab-output");
+        for id in [
+            "output-mode-reencode",
+            "resolution-tabs",
+            "audio-codec-select",
+            "subtitle-type",
+            "metadata-title-field",
+        ] {
+            assert!(cx.debug_bounds(id).is_none(), "closed section mounted {id}");
+        }
+        let tab = focus(cx);
+        press(cx, "tab");
+        let general = focus(cx);
+        press(cx, "space");
+        assert!(cx.debug_bounds("output-mode-reencode").is_some());
+        assert_eq!(focus(cx), general);
+        press(cx, "tab");
+        assert_ne!(focus(cx), general);
+        press(cx, "shift-tab");
+        assert_eq!(focus(cx), general);
+        press(cx, "enter");
+        assert!(cx.debug_bounds("output-mode-reencode").is_none());
+        press(cx, "shift-tab");
+        assert_eq!(focus(cx), tab);
+        press(cx, "tab");
+        press(cx, "tab");
+        let video = focus(cx);
+        press(cx, "enter");
+        assert!(cx.debug_bounds("resolution-tabs").is_some());
+        press(cx, "tab");
+        let resolution = focus(cx);
+        assert_ne!(resolution, video);
+        press(cx, "end");
+        assert_eq!(
+            root.read_with(cx, |root, _| root
+                .selected_config()
+                .unwrap()
+                .resolution
+                .clone()),
+            "custom"
+        );
+        press(cx, "shift-tab");
+        assert_eq!(focus(cx), video);
+        press(cx, "space");
+        assert!(cx.debug_bounds("resolution-tabs").is_none());
+    }
+}
+
+#[test]
+fn resolution_tabs_preserve_value_and_focus_when_reopened_after_section_collapse() {
+    let mut app = TestAppContext::single();
+    let (root, cx) = test_window(
+        &mut app,
+        VisualFixture::SettingsVideo,
+        ScalePreset::Percent100,
+    );
+    cx.update(|window, _| window.set_a11y_forced(true));
+    draw(cx);
+    click(cx, "video-resolution-custom");
+    press(cx, "home");
+    assert_eq!(
+        root.read_with(cx, |root, _| root
+            .selected_config()
+            .unwrap()
+            .resolution
+            .clone()),
+        "original"
+    );
+    press(cx, "tab");
+    assert_ne!(
+        keyboard_tests::focused_node(cx)["aria"]["label"],
+        "Video width"
+    );
+    click(cx, "output-section-video-trigger");
+    assert!(cx.debug_bounds("resolution-tabs").is_none());
+    press(cx, "enter");
+    assert!(
+        cx.debug_bounds("resolution-tabs").is_some(),
+        "Enter must reopen the focused section"
+    );
+    press(cx, "tab");
+    press(cx, "end");
+    assert_eq!(
+        root.read_with(cx, |root, _| root
+            .selected_config()
+            .unwrap()
+            .resolution
+            .clone()),
+        "custom"
+    );
+    press(cx, "shift-tab");
+    press(cx, "tab");
+    press(cx, "tab");
+    assert_eq!(
+        keyboard_tests::focused_node(cx)["aria"]["label"],
+        "Video width"
+    );
+}

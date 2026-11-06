@@ -42,6 +42,29 @@ const SELECTS: [SelectCase; 6] = [
     },
 ];
 
+const OUTPUT_SELECTS: [SelectCase; 4] = [
+    SelectCase {
+        fixture: VisualFixture::SettingsOutput,
+        trigger: "container-select",
+        panel: "container-select-options",
+    },
+    SelectCase {
+        fixture: VisualFixture::SettingsVideo,
+        trigger: "video-encoder-select",
+        panel: "video-encoder-select-options",
+    },
+    SelectCase {
+        fixture: VisualFixture::SettingsVideo,
+        trigger: "video-pixel-format-select",
+        panel: "video-pixel-format-select-options",
+    },
+    SelectCase {
+        fixture: VisualFixture::SettingsAudio,
+        trigger: "audio-codec-select",
+        panel: "audio-codec-select-options",
+    },
+];
+
 fn draw(cx: &mut VisualTestContext) {
     cx.update(|window, cx| window.draw(cx).clear(cx));
     cx.run_until_parked();
@@ -233,7 +256,7 @@ fn selecting_the_current_font_or_size_still_closes_the_menu() {
 }
 
 #[test]
-fn toggle_group_arrows_move_focus_and_enter_activates_without_changing_value_on_focus() {
+fn processing_tabs_activate_on_arrow_focus_and_wrap() {
     let case = SelectCase {
         fixture: VisualFixture::SettingsOutput,
         trigger: "output-mode-reencode",
@@ -246,7 +269,7 @@ fn toggle_group_arrows_move_focus_and_enter_activates_without_changing_value_on_
         root.selected_config().unwrap().processing_mode
     });
     press(cx, "right");
-    assert_eq!(
+    assert_ne!(
         root.read_with(cx, |root, _| root
             .selected_config()
             .unwrap()
@@ -286,7 +309,7 @@ fn every_select_and_color_picker_finishes_enter_and_exit_before_unmounting() {
             panel: "settings-subtitle-outline-color-picker",
         },
     ];
-    for case in SELECTS.iter().chain(&colors) {
+    for case in SELECTS.iter().chain(&OUTPUT_SELECTS).chain(&colors) {
         let mut app = TestAppContext::single();
         let (_, cx) = select_window(&mut app, case, ColorTheme::Dark, ScalePreset::Percent100);
         cx.update(|_, cx| cx.set_reduce_motion(false));
@@ -319,5 +342,40 @@ fn every_select_and_color_picker_finishes_enter_and_exit_before_unmounting() {
             "{} must reopen",
             case.trigger
         );
+    }
+}
+
+#[test]
+fn output_selects_restore_focus_and_preserve_keyboard_selection_on_reopen() {
+    for theme in [ColorTheme::Dark, ColorTheme::Light] {
+        for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+            for case in &OUTPUT_SELECTS {
+                let mut app = TestAppContext::single();
+                let (_, cx) = select_window(&mut app, case, theme, scale);
+                click(cx, case.trigger);
+                assert!(cx.debug_bounds(case.panel).is_some(), "{}", case.trigger);
+                press(cx, "escape");
+                let trigger = cx.update(|window, cx| window.focused(cx).unwrap());
+                press(cx, "enter");
+                assert!(cx.debug_bounds(case.panel).is_some());
+                press(cx, "end");
+                let selected_option = cx.update(|window, cx| window.focused(cx).unwrap());
+                press(cx, "enter");
+                assert!(cx.debug_bounds(case.panel).is_none());
+                assert!(cx.update(|window, _| trigger.is_focused(window)));
+                press(cx, "enter");
+                assert!(cx.debug_bounds(case.panel).is_some());
+                assert!(
+                    cx.update(|window, _| selected_option.is_focused(window)),
+                    "selection not retained: {}",
+                    case.trigger
+                );
+                press(cx, "escape");
+                press(cx, "shift-tab");
+                assert!(!cx.update(|window, _| trigger.is_focused(window)));
+                press(cx, "tab");
+                assert!(cx.update(|window, _| trigger.is_focused(window)));
+            }
+        }
     }
 }

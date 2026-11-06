@@ -1,6 +1,6 @@
 use super::file_button::settings_subtitle_file_button;
-use crate::app::components::frame_choice_button;
-use crate::app::inspector::panel::settings_section;
+use crate::app::components::{FrameOption, frame_option_field};
+use crate::app::inspector::panel::settings_field;
 use crate::app::inspector::shared::settings_hint_text;
 use crate::app::inspector::subtitles::burn_in::{
     settings_subtitle_burn_file_row, settings_subtitle_style_controls,
@@ -17,7 +17,7 @@ use crate::app::root::FrameRoot;
 use crate::settings::{ConversionConfig, ProcessingMode, SourceMetadata, subtitle_track_options};
 use crate::theme;
 use gpui::prelude::*;
-use gpui::{ClickEvent, Context, FocusHandle, ScrollHandle, Window, div};
+use gpui::{Context, FocusHandle, ScrollHandle, Window};
 
 #[derive(Clone, Copy)]
 pub(in crate::app) struct SettingsSubtitlesTabState<'a> {
@@ -112,7 +112,7 @@ pub(in crate::app) fn settings_subtitles_tab(
 ) -> gpui::Div {
     let palette = state.palette;
     let content = crate::app::components::frame_field_group().child(
-        settings_section("Subtitle type", palette)
+        settings_field("Subtitle type", palette)
             .child(settings_subtitle_mode_grid(state.mode, palette, window, cx)),
     );
 
@@ -132,48 +132,35 @@ pub(super) fn settings_subtitle_mode_grid(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let choice_focus =
-        crate::app::components::FrameChoiceFocus::new("settings_subtitle_mode_grid", window, cx);
-    div()
-        .grid()
-        .grid_cols(2)
-        .gap_2()
-        .child(
-            frame_choice_button(
-                &choice_focus,
-                "settings-subtitle-mode-selectable",
-                "Selectable",
-                mode == SettingsSubtitleMode::Selectable,
-                true,
-                palette,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
-                cx.stop_propagation();
-                if root.select_subtitle_mode(SettingsSubtitleMode::Selectable) {
-                    cx.notify();
-                }
-            })),
-        )
-        .child(
-            frame_choice_button(
-                &choice_focus,
-                "settings-subtitle-mode-burn-in",
-                "Burn-in",
-                mode == SettingsSubtitleMode::BurnIn,
-                true,
-                palette,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
-                cx.stop_propagation();
-                if root.select_subtitle_mode(SettingsSubtitleMode::BurnIn) {
-                    cx.notify();
-                }
-            })),
-        )
+    let choices = [
+        (
+            SettingsSubtitleMode::Selectable,
+            "Selectable",
+            "settings-subtitle-mode-selectable",
+        ),
+        (
+            SettingsSubtitleMode::BurnIn,
+            "Burn-in",
+            "settings-subtitle-mode-burn-in",
+        ),
+    ]
+    .into_iter()
+    .map(|(candidate, label, id)| {
+        FrameOption::new(id, label, mode == candidate, true, move |root, _, cx| {
+            if root.select_subtitle_mode(candidate) {
+                cx.notify();
+            }
+        })
+    })
+    .collect();
+    frame_option_field(
+        "subtitle-type",
+        "Subtitle type",
+        choices,
+        palette,
+        window,
+        cx,
+    )
 }
 
 pub(super) fn settings_selectable_subtitles_content(
@@ -193,7 +180,7 @@ pub(super) fn settings_selectable_subtitles_content(
     );
     if track_options.is_empty() {
         return content.child(
-            settings_section("Source tracks", palette)
+            settings_field("Source tracks", palette)
                 .child(settings_hint_text("No subtitles", palette)),
         );
     }
@@ -203,7 +190,7 @@ pub(super) fn settings_selectable_subtitles_content(
         list = list.child(settings_subtitle_track_button(option, palette, window, cx));
     }
 
-    content.child(settings_section("Source tracks", palette).child(list))
+    content.child(settings_field("Source tracks", palette).child(list))
 }
 
 pub(super) fn settings_burn_in_subtitles_content(
@@ -215,7 +202,7 @@ pub(super) fn settings_burn_in_subtitles_content(
     let palette = state.palette;
     let copy_mode = config.processing_mode == ProcessingMode::Copy;
     let burn_in_disabled = state.settings_disabled || copy_mode;
-    let mut burn_in_section = settings_section("Burn-in file", palette)
+    let mut burn_in_section = settings_field("Burn-in file", palette)
         .child(settings_subtitle_file_button(
             SettingsSubtitleMode::BurnIn,
             !burn_in_disabled,
@@ -250,7 +237,7 @@ pub(super) fn settings_burn_in_subtitles_content(
     }
 
     content.child(
-        settings_section("Style", palette).child(settings_subtitle_style_controls(
+        settings_field("Style", palette).child(settings_subtitle_style_controls(
             SettingsSubtitleStyleState {
                 config,
                 disabled: burn_in_disabled,
