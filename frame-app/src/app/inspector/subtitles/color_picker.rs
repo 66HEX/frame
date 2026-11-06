@@ -14,15 +14,12 @@ use crate::app::inspector::subtitles::color::{
     settings_subtitle_hue_label, settings_subtitle_sv_label, settings_subtitle_sv_value,
     subtitle_hue_hsv_for_key, subtitle_sv_hsv_for_key,
 };
-use crate::app::inspector::subtitles::popover::{
-    SUBTITLE_POPOVER_TOP_OFFSET, subtitle_popover_progress,
-};
+use crate::app::inspector::subtitles::popover::subtitle_popover_progress;
 use crate::app::inspector::subtitles::state::{
     SettingsSubtitleColorDrag, SettingsSubtitleColorDragKind, SettingsSubtitleColorPopoverFocuses,
     SettingsSubtitleColorTarget, SettingsSubtitleHsv, SettingsSubtitlePopover,
 };
 use crate::app::inspector::subtitles::view::SettingsSubtitleColorFieldSpec;
-use crate::app::motion::popover_slide_offset;
 use crate::app::primitives::color;
 use crate::app::root::FrameRoot;
 use crate::theme;
@@ -169,6 +166,8 @@ pub(super) fn settings_subtitle_color_field(
     };
     let click_first_focus = popover_focuses.sv.cloned();
     let key_first_focus = popover_focuses.sv.cloned();
+    let anchor = crate::app::components::PopoverAnchor::default();
+    let measured_anchor = anchor.clone();
 
     let mut field = div()
         .relative()
@@ -178,6 +177,7 @@ pub(super) fn settings_subtitle_color_field(
         .child(settings_field_label(label, palette))
         .child(
             trigger
+                .on_prepaint(move |info, _, _| measured_anchor.measure(info.bounds))
                 .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
                     cx.stop_propagation();
                     if !enabled {
@@ -230,7 +230,7 @@ pub(super) fn settings_subtitle_color_field(
     let progress = subtitle_popover_progress(popover, open, window, cx);
     if rendered_popover == Some(popover) {
         field = field.child(
-            deferred(crate::app::components::frame_surface_motion(
+            deferred(crate::app::components::frame_floating_popover(
                 settings_subtitle_color_picker(
                     target,
                     hsv,
@@ -238,13 +238,14 @@ pub(super) fn settings_subtitle_color_field(
                     focus,
                     popover_focuses,
                     progress,
-                    open,
                     palette,
                     window,
                     cx,
                 ),
+                anchor,
                 progress,
-                crate::app::components::SurfaceOrigin::Top,
+                0.0,
+                window,
             ))
             .priority(10),
         );
@@ -264,7 +265,6 @@ pub(super) fn settings_subtitle_color_picker(
     focus: Option<&FocusHandle>,
     popover_focuses: SettingsSubtitleColorPopoverFocuses<'_>,
     progress: f32,
-    open: bool,
     palette: &'static theme::ThemePalette,
     window: &Window,
     cx: &Context<FrameRoot>,
@@ -279,12 +279,6 @@ pub(super) fn settings_subtitle_color_picker(
         SettingsSubtitleColorTarget::Outline => "settings-subtitle-outline-color-picker",
     };
     let panel = frame_color_picker_panel(
-        SUBTITLE_POPOVER_TOP_OFFSET
-            + if open {
-                popover_slide_offset(progress)
-            } else {
-                0.0
-            },
         progress,
         settings_subtitle_sv_square(target, hsv, popover_focuses.sv, palette, cx),
         settings_subtitle_hue_slider(target, hsv, popover_focuses.hue, palette, cx),
@@ -307,6 +301,7 @@ pub(super) fn settings_subtitle_color_picker(
         palette,
     )
     .id(panel_id)
+    .overflow_y_scroll()
     .debug_selector(|| panel_id.to_string());
 
     let Some(panel_focus) = popover_focuses.panel else {

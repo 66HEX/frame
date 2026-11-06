@@ -174,6 +174,8 @@ pub(in crate::app) fn frame_select_control(
     let key_select = on_select.clone();
     let key_items = items.clone();
     let key_interaction = interaction.clone();
+    let anchor = super::PopoverAnchor::default();
+    let measured_anchor = anchor.clone();
     let trigger = frame_select_trigger_with_focus(
         id,
         label,
@@ -185,6 +187,7 @@ pub(in crate::app) fn frame_select_control(
         window,
         cx,
     )
+    .on_prepaint(move |info, _, _| measured_anchor.measure(info.bounds))
     .on_mouse_down(
         gpui::MouseButton::Left,
         cx.listener(move |root, _, window, cx| {
@@ -301,40 +304,28 @@ pub(in crate::app) fn frame_select_control(
     }
     let outside_open = on_open.clone();
     let outside_trigger = trigger_focus.clone();
-    let mut menu = frame_select_popover(
-        panel_id,
-        crate::SETTINGS_CONTROL_HEIGHT
-            + 4.0
-            + if open {
-                crate::app::motion::popover_slide_offset(progress)
-            } else {
-                0.0
-            },
-        progress,
-        list,
-        palette,
-    )
-    .on_mouse_down_out(cx.listener(move |root, _, window, cx| {
-        if open {
-            outside_open(root, false, window, cx);
-            outside_trigger.focus(window, cx);
-            cx.notify();
-        }
-    }))
-    .on_key_down(
-        cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
-            match event.keystroke.key.as_str() {
-                "tab" => cx.stop_propagation(),
-                "escape" if open => {
-                    on_open(root, false, window, cx);
-                    trigger_focus.focus(window, cx);
-                    cx.stop_propagation();
-                    cx.notify();
-                }
-                _ => {}
+    let mut menu = frame_select_popover(panel_id, progress, list, palette)
+        .on_mouse_down_out(cx.listener(move |root, _, window, cx| {
+            if open {
+                outside_open(root, false, window, cx);
+                outside_trigger.focus(window, cx);
+                cx.notify();
             }
-        }),
-    );
+        }))
+        .on_key_down(
+            cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+                match event.keystroke.key.as_str() {
+                    "tab" => cx.stop_propagation(),
+                    "escape" if open => {
+                        on_open(root, false, window, cx);
+                        trigger_focus.focus(window, cx);
+                        cx.stop_propagation();
+                        cx.notify();
+                    }
+                    _ => {}
+                }
+            }),
+        );
     if let Some(focus) = panel_focus {
         menu = menu.track_focus(focus).tab_stop(false);
     }
@@ -347,10 +338,8 @@ pub(in crate::app) fn frame_select_control(
         ));
     }
     control = control.child(
-        gpui::deferred(super::frame_surface_motion(
-            menu,
-            progress,
-            super::SurfaceOrigin::Top,
+        gpui::deferred(super::frame_floating_popover(
+            menu, anchor, progress, 10.0, window,
         ))
         .priority(20),
     );

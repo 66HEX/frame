@@ -18,7 +18,7 @@ Porównanie ze źródłami CLI i `getComputedStyle` działającej galerii, 2026-
 
 | Komponent | Czas i krzywa | Właściwości |
 | --- | --- | --- |
-| Select / Popover / color picker | 100 ms, CSS `ease` = cubic-bezier(.25,.1,.25,1) | opacity, skala .95–1; wejście od strony triggera o 8 px; wyjście bez przesunięcia |
+| Select / Popover / color picker | 100 ms, CSS `ease` = cubic-bezier(.25,.1,.25,1) | opacity, skala .95–1; wejście od strony triggera o 8 px, wyjście w jego kierunku; strona i środek skalowania zależą od dostępnego miejsca |
 | Dialog | 100 ms, CSS `ease` | opacity i skala .95–1, środek panelu |
 | Tooltip | wejście natychmiastowe; wyjście 150 ms, CSS `ease` | domyślny delay=0 daje Radix `instant-open` bez animacji wejścia; wyjście opacity i skala 1–.95 |
 | Sheet | 200 ms, cubic-bezier(.4,0,.2,1) | opacity i przesunięcie o 10% szerokości w obie strony |
@@ -133,6 +133,8 @@ silnikami. GPUI i przeglądarki mogą inaczej pozycjonować i składać glify.
 Kompaktowe listy opcji, ścieżek i presetów używają `frame_list_group` z odstępem 8 px. Padding i odstęp między treścią a akcjami należą do wspólnego wiersza. Dodawanie napisów w trybach Selectable i Burn-in używa jednego `settings_subtitle_file_button`, zawsze w wariancie Outline; tryb zmienia tylko podpis i wybór jednego lub wielu plików.
 
 Selecty mają wspólny kod dla kliknięć, Enter/Space, strzałek bez zawijania listy, Home/End, Escape i wyszukiwania prefiksowego z timeoutem 1 s. Powtórzenie tej samej litery przechodzi do kolejnego dopasowania. Otwarty select blokuje Tab, a zamknięcie przywraca fokus triggera. Używana kompozycja odpowiada `SelectContent position="popper"` z limitem wysokości 192 px; domyślny Radix `item-aligned` jest odrębnym wariantem układu.
+
+Selecty i color pickery używają wspólnego `FloatingPopover`. Komponent mierzy trigger i zawartość przed pierwszym malowaniem, otwiera popup nad triggerem, jeśli pod nim brakuje miejsca, oraz ogranicza wysokość do większej dostępnej przestrzeni, gdy nie mieści się po żadnej stronie. Zawartość pozostaje przewijalna. Pozycja uwzględnia szerokość okna, zmianę jego rozmiaru i skalę UI. Odstęp od triggera wynosi 4 px; margines kolizji Select wynosi 10 px, a Popover 0 px. Zgodnie z wymaganiem Frame animacja zamykania również przesuwa popup ku triggerowi; to rozszerzenie klas wyjścia zapisanych w referencji CLI.
 
 Przyciski dzielą obsługę hover/press i disabled. Zwykły przycisk przesuwa się o 1 px podczas nacisku; Toggle i trigger selecta nie mają tego przesunięcia. Suwaki zachowują domenowe zakresy, wartości i kroki; Home/End wybierają granice, PageUp zwiększa wartość, PageDown ją zmniejsza. Wartości są dostępne dla technologii asystujących.
 

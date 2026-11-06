@@ -1,15 +1,7 @@
 use crate::app::inspector::subtitles::state::SettingsSubtitlePopover;
-use crate::app::layout::SETTINGS_CONTROL_HEIGHT;
 use crate::app::motion::{motion_is_hidden, surface_motion};
 use crate::app::root::FrameRoot;
 use gpui::{Context, Window};
-
-pub(super) const SUBTITLE_FIELD_LABEL_STACK_HEIGHT: f32 = 20.0;
-
-pub(super) const SUBTITLE_POPOVER_TRIGGER_GAP: f32 = 8.0;
-
-pub(super) const SUBTITLE_POPOVER_TOP_OFFSET: f32 =
-    SUBTITLE_FIELD_LABEL_STACK_HEIGHT + SETTINGS_CONTROL_HEIGHT + SUBTITLE_POPOVER_TRIGGER_GAP;
 
 pub(super) fn subtitle_popover_progress(
     popover: SettingsSubtitlePopover,

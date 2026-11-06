@@ -34,6 +34,8 @@ pub(in crate::app) use select_control::*;
 
 mod surface_motion;
 pub(in crate::app) use surface_motion::{SurfaceOrigin, frame_surface_motion};
+mod floating_popover;
+pub(in crate::app) use floating_popover::{PopoverAnchor, frame_floating_popover};
 
 mod select_field;
 pub(in crate::app) use select_field::{

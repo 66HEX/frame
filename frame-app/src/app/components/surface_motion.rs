@@ -1,12 +1,11 @@
 //! CSS zoom-in/out-95 without reflowing the contents or changing typography.
 use gpui::{
     AnyElement, App, Bounds, Element, GlobalElementId, InspectorElementId, IntoElement, LayoutId,
-    Pixels, Point, Window, point,
+    Pixels, Point, Window,
 };
 
 #[derive(Clone, Copy)]
 pub(in crate::app) enum SurfaceOrigin {
-    Top,
     Center,
 }
 
@@ -67,7 +66,6 @@ impl Element for SurfaceMotion {
         cx: &mut App,
     ) -> Point<Pixels> {
         let origin = match self.origin {
-            SurfaceOrigin::Top => point(bounds.center().x, bounds.top()),
             SurfaceOrigin::Center => bounds.center(),
         };
         let factor = surface_scale(self.progress);

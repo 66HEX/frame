@@ -379,3 +379,112 @@ fn output_selects_restore_focus_and_preserve_keyboard_selection_on_reopen() {
         }
     }
 }
+
+#[test]
+fn selects_and_color_pickers_stay_in_view_when_opened_near_the_bottom() {
+    let colors = [
+        SelectCase {
+            fixture: VisualFixture::SettingsSubtitles,
+            trigger: "settings-subtitle-font-color",
+            panel: "settings-subtitle-font-color-picker",
+        },
+        SelectCase {
+            fixture: VisualFixture::SettingsSubtitles,
+            trigger: "settings-subtitle-outline-color",
+            panel: "settings-subtitle-outline-color-picker",
+        },
+    ];
+    for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+        for case in SELECTS.iter().chain(&OUTPUT_SELECTS).chain(&colors) {
+            let mut app = TestAppContext::single();
+            let (_, cx) = select_window(&mut app, case, ColorTheme::Dark, scale);
+            click(cx, case.trigger);
+            let natural_height = cx.debug_bounds(case.panel).unwrap().size.height;
+            press(cx, "escape");
+            let trigger = cx.debug_bounds(case.trigger).unwrap();
+            let viewport = size(px(1800.0), trigger.bottom() + px(40.0));
+            cx.simulate_resize(viewport);
+            draw(cx);
+            click(cx, case.trigger);
+            let trigger = cx.debug_bounds(case.trigger).unwrap();
+            let panel = cx.debug_bounds(case.panel).unwrap();
+            assert!(panel.top() >= px(0.0), "{}: {panel:?}", case.trigger);
+            assert!(
+                panel.bottom() <= viewport.height,
+                "{}: {panel:?}, viewport={viewport:?}",
+                case.trigger
+            );
+            assert!(
+                panel.left() >= px(0.0) && panel.right() <= viewport.width,
+                "{}: {panel:?}",
+                case.trigger
+            );
+            if viewport.height - trigger.bottom() < natural_height && trigger.top() > natural_height
+            {
+                assert!(
+                    panel.bottom() < trigger.top(),
+                    "{} must flip above: {panel:?}, trigger={trigger:?}",
+                    case.trigger
+                );
+            }
+            cx.simulate_resize(size(px(1800.0), px(1800.0)));
+            draw(cx);
+            let trigger = cx.debug_bounds(case.trigger).unwrap();
+            let panel = cx.debug_bounds(case.panel).unwrap();
+            assert!(
+                panel.top() > trigger.bottom(),
+                "{} must return below after resize",
+                case.trigger
+            );
+            press(cx, "escape");
+            assert!(cx.debug_bounds(case.panel).is_none());
+        }
+    }
+}
+
+#[test]
+fn flipped_select_and_color_picker_animate_toward_the_trigger_on_exit() {
+    for case in [
+        SelectCase {
+            fixture: VisualFixture::SettingsSubtitles,
+            trigger: "settings-subtitle-font-select",
+            panel: "settings-subtitle-font-options",
+        },
+        SelectCase {
+            fixture: VisualFixture::SettingsSubtitles,
+            trigger: "settings-subtitle-font-color",
+            panel: "settings-subtitle-font-color-picker",
+        },
+    ] {
+        let mut app = TestAppContext::single();
+        let (_, cx) = select_window(&mut app, &case, ColorTheme::Light, ScalePreset::Percent100);
+        let trigger = cx.debug_bounds(case.trigger).unwrap();
+        cx.simulate_resize(size(px(1800.0), trigger.bottom() + px(40.0)));
+        draw(cx);
+        cx.update(|_, cx| cx.set_reduce_motion(false));
+        click(cx, case.trigger);
+        let entering = cx.debug_bounds(case.panel).unwrap();
+        std::thread::sleep(crate::app::motion::SURFACE_MOTION_DURATION);
+        draw(cx);
+        let settled = cx.debug_bounds(case.panel).unwrap();
+        let trigger = cx.debug_bounds(case.trigger).unwrap();
+        assert!(settled.bottom() < trigger.top());
+        assert!(
+            entering.top() > settled.top(),
+            "{} must enter upward",
+            case.trigger
+        );
+        press(cx, "escape");
+        std::thread::sleep(crate::app::motion::SURFACE_MOTION_DURATION / 2);
+        draw(cx);
+        let exiting = cx.debug_bounds(case.panel).unwrap();
+        assert!(
+            exiting.top() > settled.top(),
+            "{} must exit downward",
+            case.trigger
+        );
+        std::thread::sleep(crate::app::motion::SURFACE_MOTION_DURATION);
+        draw(cx);
+        assert!(cx.debug_bounds(case.panel).is_none());
+    }
+}

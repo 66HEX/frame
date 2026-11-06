@@ -15,7 +15,6 @@ pub(in crate::app) const FRAME_COLOR_PICKER_HUE_HANDLE_WIDTH: f32 = 6.0;
 pub(in crate::app) const FRAME_COLOR_PICKER_HUE_VISUAL_HEIGHT: f32 = super::MIN_POINTER_TARGET;
 
 pub(in crate::app) fn frame_color_picker_panel(
-    top: f32,
     progress: f32,
     sv_square: impl IntoElement,
     hue_slider: impl IntoElement,
@@ -23,13 +22,8 @@ pub(in crate::app) fn frame_color_picker_panel(
     palette: &'static theme::ThemePalette,
 ) -> gpui::Div {
     div()
-        .absolute()
-        .top(theme::ui_rem(top))
-        .left_0()
-        .right_0()
-        .flex()
-        .flex_col()
-        .gap(theme::ui_rem(theme::metrics::GROUP_GAP))
+        .w_full()
+        .max_h(relative(1.0))
         .popover_surface(palette)
         .opacity(progress)
         .p(theme::ui_rem(theme::metrics::POPOVER_PADDING))
@@ -37,9 +31,15 @@ pub(in crate::app) fn frame_color_picker_panel(
         .on_mouse_down(MouseButton::Left, move |_, _window, cx| {
             cx.stop_propagation();
         })
-        .child(sv_square)
-        .child(hue_slider)
-        .child(input)
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .gap(theme::ui_rem(theme::metrics::GROUP_GAP))
+                .child(sv_square)
+                .child(hue_slider)
+                .child(input),
+        )
 }
 
 pub(in crate::app) fn frame_color_picker_sv_canvas(
