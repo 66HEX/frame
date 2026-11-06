@@ -55,3 +55,25 @@ CARGO_INCREMENTAL=0 cargo test --locked -p gpui-ce --lib
 To audyt nawigacji klawiaturą. Nie obejmuje odsłuchu VoiceOver, natywnego działania
 na Windows/Linux ani pobierania i instalowania aktualizacji. Stany konwersji
 sprawdzano na kontrolowanych danych bez uruchamiania eksportu plików użytkownika.
+
+## Inspector po przebudowie — 2026-11-06
+
+Nawigacja ma trzy stałe zakładki: Metadata, Output i Presets. Testy dawnych
+zakładek Video, Audio, Images, filtrów i napisów otwierają odpowiadające im
+sekcje Output. Stan początkowy aplikacji pozostawia wszystkie sekcje zamknięte.
+
+Nowe testy obejmują Tab i Shift+Tab między zakładką, nagłówkami Collapsible
+i ich zawartością, zamykanie i ponowne otwieranie sekcji, Custom resolution,
+automatyczną aktywację Tabs, selekcję i powrót fokusu w nowych selectach oraz
+ich animacje wejścia i wyjścia. Test przechodzenia przez 17 widoków zachowuje
+kontrolę obu kierunków przy skalach 100/200%.
+
+W osobnym natywnym oknie macOS sprawdzono General, zmianę Processing mode,
+wybór kontenera, powrót Shift+Tab do zakładek, Presets, Video/Custom resolution,
+ponowne rozwijanie i wejście do Width oraz Subtitles/Burn-in. Panel nie dodaje
+własnego przystanku. Kliknięcie nagłówka przejmuje fokus przed odmontowaniem
+jego zawartości.
+
+`cargo xtask ci`: 1003 zaliczone, 50 dotychczasowych testów ignored; formatowanie,
+Clippy i pozostałe kontrole repozytorium przeszły. Referencyjna galeria React
+z Collapsible przechodzi `npm run build`.
