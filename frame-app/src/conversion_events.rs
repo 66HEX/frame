@@ -11,6 +11,7 @@ pub const LOG_STICKY_BOTTOM_THRESHOLD_PX: f64 = 25.0;
 pub struct ActiveLogFile {
     pub id: String,
     pub name: String,
+    pub original_format: String,
     pub status: FileStatus,
     pub line_count: usize,
 }
@@ -83,6 +84,7 @@ impl ConversionEventState {
             .map(|file| ActiveLogFile {
                 id: file.id.clone(),
                 name: file.name.clone(),
+                original_format: file.original_format.clone(),
                 status: file.status,
                 line_count: self.logs_for(&file.id).len(),
             })
@@ -365,10 +367,32 @@ mod tests {
             [ActiveLogFile {
                 id: "task-1".to_string(),
                 name: "source.mp4".to_string(),
+                original_format: "mp4".to_string(),
                 status: FileStatus::Idle,
                 line_count: 1,
             }]
         );
+    }
+
+    #[test]
+    fn active_log_files_keep_source_format_when_output_container_differs() {
+        let mut queue = FileQueue::new();
+        let mut file = FileItem::from_path("task-1", "/tmp/source.mp4", 1024);
+        file.config.container = "mp3".to_string();
+        file.output_name = "extracted-audio".to_string();
+        queue.add_file(file);
+        let mut state = ConversionEventState::new();
+        state.apply_conversion_event(&mut queue, ConversionEvent::log("task-1", "line"));
+        state.apply_conversion_event(
+            &mut queue,
+            ConversionEvent::completed("task-1", "/tmp/extracted-audio.mp3"),
+        );
+
+        let active_files = state.active_log_files(&queue);
+        assert_eq!(active_files.len(), 1);
+        assert_eq!(active_files[0].name, "source.mp4");
+        assert_eq!(active_files[0].original_format, "mp4");
+        assert_eq!(active_files[0].status, FileStatus::Completed);
     }
 
     #[test]

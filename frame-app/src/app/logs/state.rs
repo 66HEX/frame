@@ -12,6 +12,8 @@ pub(in crate::app) const LOG_SCROLL_BUTTON_SIZE: f32 = 24.0;
 
 pub(in crate::app) const LOG_SCROLL_ICON_SIZE: f32 = 16.0;
 
+pub(in crate::app) const LOG_TAB_ICON_SIZE: f32 = 16.0;
+
 pub(in crate::app) const LOG_COPY_FEEDBACK_DURATION: Duration = Duration::from_millis(1_200);
 
 #[derive(Clone, Debug, Eq, PartialEq)]

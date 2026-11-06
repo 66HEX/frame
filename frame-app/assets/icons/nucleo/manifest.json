@@ -4,6 +4,7 @@
   "style": "outline",
   "grid": 18,
   "source_archive": "nucleo_ui_svg_v1.9.0.zip",
+  "source_archive_sha256": "332166b787195f04e5b9792fd4afc8f22fcaba51d73512f57c40240dba7093b1",
   "source_url": "https://nucleoapp.com/",
   "normalization": "Black fill and stroke colors replaced with currentColor; original geometry, stroke width and opacity preserved.",
   "icons": [
@@ -23,6 +24,7 @@
     "outline/files/18px_file-arrow-in.svg",
     "outline/files/18px_file-download.svg",
     "outline/files/18px_file-image.svg",
+    "outline/files/18px_file.svg",
     "outline/photography-video/18px_film.svg",
     "outline/photography-video/18px_filters.svg",
     "outline/sound-music/18px_media-pause.svg",

@@ -1,5 +1,6 @@
 //! File extension filters for native source and subtitle pickers.
 
+use crate::settings::SourceKind;
 use std::path::{Path, PathBuf};
 
 pub const VIDEO_FILE_EXTENSIONS: &[&str] = &[
@@ -17,6 +18,22 @@ pub const SOURCE_FILE_EXTENSIONS: &[&str] = &[
 pub const BURN_SUBTITLE_FILE_EXTENSIONS: &[&str] = &["srt", "ass", "vtt"];
 pub const SELECTABLE_SUBTITLE_FILE_EXTENSIONS: &[&str] = &["srt", "ass", "vtt", "sup"];
 pub const PGS_SUBTITLE_FILE_EXTENSIONS: &[&str] = &["sup"];
+
+#[must_use]
+pub fn source_kind_for_extension(extension: &str) -> Option<SourceKind> {
+    [
+        (VIDEO_FILE_EXTENSIONS, SourceKind::Video),
+        (AUDIO_FILE_EXTENSIONS, SourceKind::Audio),
+        (IMAGE_FILE_EXTENSIONS, SourceKind::Image),
+    ]
+    .into_iter()
+    .find_map(|(extensions, kind)| {
+        extensions
+            .iter()
+            .any(|candidate| extension.eq_ignore_ascii_case(candidate))
+            .then_some(kind)
+    })
+}
 
 #[must_use]
 pub fn is_supported_source_path(path: &Path) -> bool {
@@ -125,6 +142,33 @@ fn path_has_extension(path: &Path, allowed_extensions: &[&str]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn source_kind_for_extension_classifies_all_supported_formats_case_insensitively() {
+        for (extensions, expected) in [
+            (VIDEO_FILE_EXTENSIONS, SourceKind::Video),
+            (AUDIO_FILE_EXTENSIONS, SourceKind::Audio),
+            (IMAGE_FILE_EXTENSIONS, SourceKind::Image),
+        ] {
+            for extension in extensions {
+                for spelling in [extension.to_string(), extension.to_ascii_uppercase()] {
+                    assert_eq!(
+                        source_kind_for_extension(&spelling),
+                        Some(expected),
+                        "{spelling}"
+                    );
+                }
+            }
+        }
+        assert_eq!(source_kind_for_extension("gIf"), Some(SourceKind::Video));
+    }
+
+    #[test]
+    fn source_kind_for_extension_leaves_unknown_formats_unclassified() {
+        for extension in ["", "unknown", "zip", "srt", ".mp4", "clip.mp4"] {
+            assert_eq!(source_kind_for_extension(extension), None, "{extension}");
+        }
+    }
 
     #[test]
     fn is_supported_source_path_accepts_original_media_extensions() {

@@ -7,15 +7,17 @@ use crate::app::components::{
 use crate::app::components::{FrameStyle, frame_panel_header, frame_tabs_list};
 use crate::app::logs::state::{
     LOG_LINE_HEIGHT, LOG_LINE_NUMBER_WIDTH, LOG_SCROLL_BUTTON_OFFSET, LOG_SCROLL_BUTTON_PADDING,
-    LOG_SCROLL_BUTTON_SIZE, LOG_SCROLL_ICON_SIZE,
+    LOG_SCROLL_BUTTON_SIZE, LOG_SCROLL_ICON_SIZE, LOG_TAB_ICON_SIZE,
 };
 use crate::app::primitives::{
     FrameSurface, button_mouse_down, color, element_id, panel_bottom_separator,
 };
 use crate::app::root::FrameRoot;
 use crate::conversion_events::{ActiveLogFile, ConversionEventState, LogLine};
+use crate::file_filters::source_kind_for_extension;
 use crate::file_queue::FileQueue;
 use crate::numeric::usize_to_f32;
+use crate::settings::SourceKind;
 use crate::{assets, theme};
 use gpui::prelude::{FluentBuilder, ParentElement, Styled};
 use gpui::{
@@ -180,6 +182,9 @@ pub(in crate::app) fn log_tab_button(
         .px(theme::ui_rem(6.0))
         .tab_surface(selected, palette)
         .flex_none()
+        .flex()
+        .items_center()
+        .gap(theme::ui_rem(theme::metrics::TAB_ICON_GAP))
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .hover_style(move |style| {
@@ -212,11 +217,26 @@ pub(in crate::app) fn log_tab_button(
                 cx.stop_propagation();
             }),
         )
+        .child(
+            gpui::svg()
+                .path(log_file_icon(&file.original_format))
+                .size(theme::ui_rem(LOG_TAB_ICON_SIZE))
+                .flex_none(),
+        )
         .child(file.name.clone());
 
     button.on_mouse_down(gpui::MouseButton::Left, |_, window, cx| {
         button_mouse_down(true, window, cx);
     })
+}
+
+fn log_file_icon(extension: &str) -> &'static str {
+    match source_kind_for_extension(extension) {
+        Some(SourceKind::Video) => assets::ICON_FILE_VIDEO,
+        Some(SourceKind::Audio) => assets::ICON_MUSIC,
+        Some(SourceKind::Image) => assets::ICON_FILE_IMAGE,
+        None => assets::ICON_FILE,
+    }
 }
 
 #[expect(

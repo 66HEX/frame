@@ -17,6 +17,7 @@ pub const MENU_ITEM_HEIGHT: f32 = CONTROL_HEIGHT;
 pub const TABS_HEIGHT: f32 = 8.0 * SPACING;
 pub const TABS_PADDING: f32 = 3.0;
 pub const TAB_HEIGHT: f32 = TABS_HEIGHT - 2.0 * TABS_PADDING - 1.0;
+pub const TAB_ICON_GAP: f32 = 6.0;
 pub const CHECKBOX_SIZE: f32 = 4.0 * SPACING;
 pub const CHECKBOX_RADIUS: f32 = 4.0;
 pub const SLIDER_THUMB: f32 = 3.0 * SPACING;

@@ -21,6 +21,7 @@ pub const ICON_COPY: &str = "icons/copy.svg";
 pub const ICON_UNFOLD_MORE: &str = "icons/unfold-more.svg";
 pub const ICON_CLOSE: &str = "icons/close.svg";
 pub const ICON_DOWNLOAD_02: &str = "icons/download-02.svg";
+pub const ICON_FILE: &str = "icons/file.svg";
 pub const ICON_FILE_UP: &str = "icons/file-up.svg";
 pub const ICON_FILE_DOWN: &str = "icons/file-down.svg";
 pub const ICON_FILE_IMPORT: &str = "icons/file-import.svg";
@@ -64,6 +65,7 @@ const COPY_SVG: &str = include_str!("../../assets/icons/nucleo/18px_copy.svg");
 const UNFOLD_MORE_SVG: &str = include_str!("../../assets/icons/nucleo/18px_chevron-expand-y.svg");
 const CLOSE_SVG: &str = include_str!("../../assets/icons/nucleo/18px_xmark.svg");
 const DOWNLOAD_02_SVG: &str = include_str!("../../assets/icons/nucleo/18px_download.svg");
+const FILE_SVG: &str = include_str!("../../assets/icons/nucleo/18px_file.svg");
 const FILE_UP_SVG: &str = include_str!("../../assets/icons/nucleo/18px_file-arrow-in.svg");
 const FILE_DOWN_SVG: &str = include_str!("../../assets/icons/nucleo/18px_file-download.svg");
 const FILE_IMPORT_SVG: &str = include_str!("../../assets/icons/nucleo/18px_file-arrow-in.svg");
@@ -113,6 +115,7 @@ impl AssetSource for FrameAssets {
             ICON_UNFOLD_MORE => Cow::Borrowed(UNFOLD_MORE_SVG.as_bytes()),
             ICON_CLOSE => Cow::Borrowed(CLOSE_SVG.as_bytes()),
             ICON_DOWNLOAD_02 => Cow::Borrowed(DOWNLOAD_02_SVG.as_bytes()),
+            ICON_FILE => Cow::Borrowed(FILE_SVG.as_bytes()),
             ICON_FILE_UP => Cow::Borrowed(FILE_UP_SVG.as_bytes()),
             ICON_FILE_DOWN => Cow::Borrowed(FILE_DOWN_SVG.as_bytes()),
             ICON_FILE_IMPORT => Cow::Borrowed(FILE_IMPORT_SVG.as_bytes()),
@@ -172,6 +175,7 @@ impl AssetSource for FrameAssets {
                 SharedString::from("copy.svg"),
                 SharedString::from("crop.svg"),
                 SharedString::from("download-02.svg"),
+                SharedString::from("file.svg"),
                 SharedString::from("file-down.svg"),
                 SharedString::from("file-image.svg"),
                 SharedString::from("file-import.svg"),

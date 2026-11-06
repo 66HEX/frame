@@ -132,7 +132,7 @@ pub(in crate::app) fn frame_tab_trigger(
         .flex()
         .items_center()
         .justify_center()
-        .gap(theme::ui_rem(6.0))
+        .gap(theme::ui_rem(theme::metrics::TAB_ICON_GAP))
         .px(theme::ui_rem(6.0))
         .rounded(theme::ui_rem(theme::RADIUS_MD))
         .tab_surface(selected, palette)

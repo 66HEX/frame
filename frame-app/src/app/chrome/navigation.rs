@@ -121,7 +121,7 @@ pub(in crate::app) fn titlebar_segment(
         })
         .flex()
         .items_center()
-        .gap(theme::ui_rem(6.0))
+        .gap(theme::ui_rem(theme::metrics::TAB_ICON_GAP))
         .rounded(theme::ui_rem(theme::RADIUS_MD))
         .group(segment_id)
         .px(theme::ui_rem(6.0))

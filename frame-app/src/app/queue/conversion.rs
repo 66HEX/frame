@@ -3,7 +3,7 @@ use crate::conversion_events::all_conversions_settled;
 use crate::conversion_runner::{
     conversion_task_from_file, disambiguate_output_paths, run_conversion_batch_with_control,
 };
-use crate::file_filters::{AUDIO_FILE_EXTENSIONS, IMAGE_FILE_EXTENSIONS};
+use crate::file_filters::source_kind_for_extension;
 use crate::file_queue::{FileItem, FileStatus};
 use crate::notifications::conversion_finished_notification_for_task_ids;
 use crate::settings::{SourceKind, SourceMetadata, normalize_output_config};
@@ -299,17 +299,6 @@ fn conversion_metadata_for_file(
 }
 
 fn source_kind_from_file_extension(file: &FileItem) -> Option<SourceKind> {
-    if extension_matches(&file.original_format, IMAGE_FILE_EXTENSIONS) {
-        Some(SourceKind::Image)
-    } else if extension_matches(&file.original_format, AUDIO_FILE_EXTENSIONS) {
-        Some(SourceKind::Audio)
-    } else {
-        None
-    }
-}
-
-fn extension_matches(extension: &str, candidates: &[&str]) -> bool {
-    candidates
-        .iter()
-        .any(|candidate| extension.eq_ignore_ascii_case(candidate))
+    // Preserve the conversion fallback: only audio and images need inferred metadata.
+    source_kind_for_extension(&file.original_format).filter(|kind| *kind != SourceKind::Video)
 }
