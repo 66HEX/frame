@@ -71,7 +71,10 @@ impl FrameRoot {
             }
             Some(VisualFixture::PreviewCropCustom) => {
                 self.apply_preview_crop_fixture();
-                self.settings_ui.active_tab = SettingsTab::Video;
+                self.settings_ui.active_tab = SettingsTab::Output;
+                self.settings_ui
+                    .expanded_output_sections
+                    .insert(crate::settings::OutputSection::Video);
                 self.preview_ui.crop_options.popover = None;
                 self.preview_ui.crop_options.custom = true;
                 self.set_crop_custom_mode(false);
@@ -139,15 +142,15 @@ impl FrameRoot {
         self.active_view = ActiveView::Workspace;
         self.file_queue = FileQueue::new();
         self.source_metadata = SourceMetadataStore::default();
-        self.settings_ui.active_tab = SettingsTab::Source;
+        self.settings_ui.active_tab = SettingsTab::Metadata;
     }
     pub(super) fn apply_workspace_audio_fixture(&mut self) {
         self.seed_audio_source_fixture();
-        self.settings_ui.active_tab = SettingsTab::Source;
+        self.settings_ui.active_tab = SettingsTab::Metadata;
     }
     pub(super) fn apply_workspace_image_fixture(&mut self) {
         self.seed_image_source_fixture();
-        self.settings_ui.active_tab = SettingsTab::Source;
+        self.settings_ui.active_tab = SettingsTab::Metadata;
     }
     pub(super) fn apply_workspace_large_queue_fixture(&mut self) {
         const FILE_COUNT: usize = 500;
@@ -224,10 +227,13 @@ impl FrameRoot {
     }
     pub(super) fn apply_settings_source_fixture(&mut self) {
         self.apply_preview_ready_fixture();
-        self.settings_ui.active_tab = SettingsTab::Source;
+        self.settings_ui.active_tab = SettingsTab::Metadata;
     }
     pub(super) fn apply_settings_output_fixture(&mut self) {
         self.apply_preview_ready_fixture();
+        self.settings_ui
+            .expanded_output_sections
+            .insert(crate::settings::OutputSection::General);
         self.settings_ui.active_tab = SettingsTab::Output;
         self.file_queue
             .update_selected_output_name("source_render_review.mov");
@@ -237,7 +243,10 @@ impl FrameRoot {
     }
     pub(super) fn apply_settings_video_fixture(&mut self) {
         self.apply_preview_ready_fixture();
-        self.settings_ui.active_tab = SettingsTab::Video;
+        self.settings_ui.active_tab = SettingsTab::Output;
+        self.settings_ui
+            .expanded_output_sections
+            .insert(crate::settings::OutputSection::Video);
         if let Some(file) = self.file_queue.selected_file_mut() {
             file.config.resolution = "custom".to_string();
             file.config.custom_width = Some("1920".to_string());
@@ -248,7 +257,10 @@ impl FrameRoot {
     }
     pub(super) fn apply_settings_video_filters_fixture(&mut self) {
         self.apply_preview_ready_fixture();
-        self.settings_ui.active_tab = SettingsTab::VideoFilters;
+        self.settings_ui.active_tab = SettingsTab::Output;
+        self.settings_ui
+            .expanded_output_sections
+            .insert(crate::settings::OutputSection::VideoFilters);
         if let Some(file) = self.file_queue.selected_file_mut() {
             file.config.video_filters.color.brightness.enabled = true;
             file.config.video_filters.color.brightness.value = 18;
@@ -269,7 +281,10 @@ impl FrameRoot {
     }
     pub(super) fn apply_settings_audio_fixture(&mut self) {
         self.seed_audio_source_fixture();
-        self.settings_ui.active_tab = SettingsTab::Audio;
+        self.settings_ui.active_tab = SettingsTab::Output;
+        self.settings_ui
+            .expanded_output_sections
+            .insert(crate::settings::OutputSection::Audio);
         if let Some(file) = self.file_queue.selected_file_mut() {
             file.config.container = "mp3".to_string();
             file.config.audio_codec = "mp3".to_string();
@@ -283,7 +298,10 @@ impl FrameRoot {
     }
     pub(super) fn apply_settings_audio_filters_fixture(&mut self) {
         self.seed_audio_source_fixture();
-        self.settings_ui.active_tab = SettingsTab::AudioFilters;
+        self.settings_ui.active_tab = SettingsTab::Output;
+        self.settings_ui
+            .expanded_output_sections
+            .insert(crate::settings::OutputSection::AudioFilters);
         if let Some(file) = self.file_queue.selected_file_mut() {
             file.config.audio_volume = 132;
             file.config.audio_normalize = true;
@@ -315,11 +333,17 @@ impl FrameRoot {
             file.config.custom_width = Some("2048".to_string());
             file.config.custom_height = Some("1080".to_string());
         }
-        self.settings_ui.active_tab = SettingsTab::Images;
+        self.settings_ui.active_tab = SettingsTab::Output;
+        self.settings_ui
+            .expanded_output_sections
+            .insert(crate::settings::OutputSection::Images);
     }
     pub(super) fn apply_settings_metadata_fixture(&mut self) {
         self.apply_preview_ready_fixture();
-        self.settings_ui.active_tab = SettingsTab::Metadata;
+        self.settings_ui.active_tab = SettingsTab::Output;
+        self.settings_ui
+            .expanded_output_sections
+            .insert(crate::settings::OutputSection::Metadata);
         self.source_metadata.mark_ready(
             "fixture-preview".to_string(),
             SourceMetadata {
@@ -351,7 +375,10 @@ impl FrameRoot {
     }
     pub(super) fn apply_settings_subtitles_fixture(&mut self) {
         self.apply_preview_ready_fixture();
-        self.settings_ui.active_tab = SettingsTab::Subtitles;
+        self.settings_ui.active_tab = SettingsTab::Output;
+        self.settings_ui
+            .expanded_output_sections
+            .insert(crate::settings::OutputSection::Subtitles);
         self.subtitle_font_families = vec![
             "Arial".to_string(),
             "Helvetica Neue".to_string(),

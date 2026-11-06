@@ -9,9 +9,7 @@ use crate::preview::{
     preview_control_availability,
 };
 use crate::preview_engine::{PreviewCommand, PreviewEngineError};
-use crate::settings::{
-    ConversionConfig, SettingsTab, SourceMetadata, apply_trim_times, resolve_active_settings_tab,
-};
+use crate::settings::{ConversionConfig, SourceMetadata, apply_trim_times};
 use gpui::prelude::*;
 use gpui::{Bounds, Context, Pixels, Point};
 
@@ -375,18 +373,6 @@ impl FrameRoot {
         });
 
         !availability.trim_disabled && self.preview_ui.playback.duration() > 0.0
-    }
-
-    pub(in crate::app) fn resolve_selected_settings_tab(
-        &mut self,
-        metadata: Option<&SourceMetadata>,
-    ) {
-        let next_tab = self
-            .selected_config()
-            .map_or(SettingsTab::Source, |config| {
-                resolve_active_settings_tab(self.settings_ui.active_tab, config, metadata)
-            });
-        self.settings_ui.active_tab = next_tab;
     }
 }
 

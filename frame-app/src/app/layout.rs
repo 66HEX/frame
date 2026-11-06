@@ -75,9 +75,7 @@ pub const PANEL_HEADER_HEIGHT: f32 = TITLEBAR_HEIGHT;
 
 pub const FILE_ROW_HEIGHT: f32 = 40.0;
 
-pub const SETTINGS_PANEL_PADDING: f32 = 16.0;
-
-pub const SETTINGS_TAB_BUTTON_SIZE: f32 = 24.0;
+pub const SETTINGS_PANEL_PADDING: f32 = theme::metrics::CARD_PADDING;
 
 pub const SETTINGS_TAB_ICON_SIZE: f32 = 16.0;
 

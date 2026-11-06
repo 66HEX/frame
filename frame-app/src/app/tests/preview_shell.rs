@@ -49,13 +49,16 @@ fn settings_state<'a>(
     metadata: Option<&'a SourceMetadata>,
     status: MetadataStatus,
 ) -> SettingsRenderState<'a> {
+    static CLOSED: std::collections::BTreeSet<crate::settings::OutputSection> =
+        std::collections::BTreeSet::new();
     let subtitle_font_select_scroll_handle = Box::leak(Box::new(ScrollHandle::new()));
     let subtitle_font_size_select_scroll_handle = Box::leak(Box::new(ScrollHandle::new()));
 
     SettingsRenderState {
         crop_editing: false,
         palette: theme::palette(crate::appearance::ColorTheme::Dark),
-        active_tab: SettingsTab::Source,
+        active_tab: SettingsTab::Metadata,
+        expanded_output_sections: &CLOSED,
         tooltip_visible_id: None,
         config,
         metadata,

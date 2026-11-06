@@ -173,7 +173,7 @@ fn settings_source_fixture_opens_source_tab_with_ready_metadata() {
     let metadata = root
         .selected_source_metadata()
         .expect("source fixture should seed ready metadata");
-    assert_eq!(root.settings_ui.active_tab, SettingsTab::Source);
+    assert_eq!(root.settings_ui.active_tab, SettingsTab::Metadata);
     assert_eq!(
         source_info_sections(&metadata)
             .iter()
@@ -207,7 +207,12 @@ fn settings_audio_fixture_opens_audio_tab_with_tracks_and_controls() {
 
     root.apply_visual_fixture(Some(VisualFixture::SettingsAudio));
 
-    assert_eq!(root.settings_ui.active_tab, SettingsTab::Audio);
+    assert_eq!(root.settings_ui.active_tab, SettingsTab::Output);
+    assert!(
+        root.settings_ui
+            .expanded_output_sections
+            .contains(&crate::settings::OutputSection::Audio)
+    );
     assert_eq!(
         root.selected_source_metadata()
             .map(|metadata| metadata.audio_tracks.len()),
@@ -231,7 +236,12 @@ fn settings_audio_filters_fixture_opens_audio_filters_tab_with_enabled_filters()
         .file_queue
         .selected_file()
         .expect("audio filters fixture should select a file");
-    assert_eq!(root.settings_ui.active_tab, SettingsTab::AudioFilters);
+    assert_eq!(root.settings_ui.active_tab, SettingsTab::Output);
+    assert!(
+        root.settings_ui
+            .expanded_output_sections
+            .contains(&crate::settings::OutputSection::AudioFilters)
+    );
     assert!(selected.config.audio_normalize);
     assert_eq!(selected.config.audio_volume, 132);
     assert!(selected.config.audio_filters.compressor_enabled);
@@ -247,7 +257,7 @@ fn settings_metadata_fixture_opens_metadata_tab_with_source_tags() {
 
     root.apply_visual_fixture(Some(VisualFixture::SettingsMetadata));
 
-    assert_eq!(root.settings_ui.active_tab, SettingsTab::Metadata);
+    assert_eq!(root.settings_ui.active_tab, SettingsTab::Output);
     assert_eq!(
         root.selected_source_metadata()
             .and_then(|metadata| metadata.tags)
@@ -262,7 +272,12 @@ fn settings_video_fixture_opens_video_tab() {
 
     root.apply_visual_fixture(Some(VisualFixture::SettingsVideo));
 
-    assert_eq!(root.settings_ui.active_tab, SettingsTab::Video);
+    assert_eq!(root.settings_ui.active_tab, SettingsTab::Output);
+    assert!(
+        root.settings_ui
+            .expanded_output_sections
+            .contains(&crate::settings::OutputSection::Video)
+    );
     assert_eq!(
         root.file_queue
             .selected_file()
@@ -281,7 +296,12 @@ fn settings_video_filters_fixture_opens_video_filters_tab_with_enabled_filters()
         .file_queue
         .selected_file()
         .expect("video filters fixture should select a file");
-    assert_eq!(root.settings_ui.active_tab, SettingsTab::VideoFilters);
+    assert_eq!(root.settings_ui.active_tab, SettingsTab::Output);
+    assert!(
+        root.settings_ui
+            .expanded_output_sections
+            .contains(&crate::settings::OutputSection::VideoFilters)
+    );
     assert!(selected.config.video_filters.color.brightness.enabled);
     assert!(selected.config.video_filters.color.contrast.enabled);
     assert!(selected.config.video_filters.temperature.enabled);
@@ -299,7 +319,12 @@ fn settings_images_fixture_opens_images_tab_for_image_source() {
 
     root.apply_visual_fixture(Some(VisualFixture::SettingsImages));
 
-    assert_eq!(root.settings_ui.active_tab, SettingsTab::Images);
+    assert_eq!(root.settings_ui.active_tab, SettingsTab::Output);
+    assert!(
+        root.settings_ui
+            .expanded_output_sections
+            .contains(&crate::settings::OutputSection::Images)
+    );
     assert_eq!(
         root.selected_source_metadata()
             .map(|metadata| metadata.source_kind()),
@@ -313,7 +338,12 @@ fn settings_subtitles_fixture_opens_subtitles_tab_with_tracks() {
 
     root.apply_visual_fixture(Some(VisualFixture::SettingsSubtitles));
 
-    assert_eq!(root.settings_ui.active_tab, SettingsTab::Subtitles);
+    assert_eq!(root.settings_ui.active_tab, SettingsTab::Output);
+    assert!(
+        root.settings_ui
+            .expanded_output_sections
+            .contains(&crate::settings::OutputSection::Subtitles)
+    );
     assert_eq!(
         root.selected_source_metadata()
             .map(|metadata| metadata.subtitle_tracks.len()),
@@ -327,7 +357,12 @@ fn settings_subtitles_popover_fixture_opens_font_color_picker() {
 
     root.apply_visual_fixture(Some(VisualFixture::SettingsSubtitlesPopover));
 
-    assert_eq!(root.settings_ui.active_tab, SettingsTab::Subtitles);
+    assert_eq!(root.settings_ui.active_tab, SettingsTab::Output);
+    assert!(
+        root.settings_ui
+            .expanded_output_sections
+            .contains(&crate::settings::OutputSection::Subtitles)
+    );
     assert_eq!(
         root.subtitle_ui.popover,
         Some(SettingsSubtitlePopover::FontColor)

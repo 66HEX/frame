@@ -249,26 +249,6 @@ impl FrameTooltip {
     }
 }
 
-pub(in crate::app) fn frame_tooltip(
-    id: impl Into<String>,
-    label: impl Into<String>,
-    is_visible: bool,
-    child: impl IntoElement,
-    palette: &'static theme::ThemePalette,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
-) -> gpui::Stateful<gpui::Div> {
-    let id = id.into();
-    let anchor = div().id(format!("tooltip-{id}-anchor")).child(child);
-    FrameTooltip {
-        id,
-        label: label.into(),
-        hovered: is_visible,
-        placement: TooltipPlacement::Above,
-    }
-    .render(anchor, is_visible, None, palette, window, cx)
-}
-
 impl FrameRoot {
     fn change_tooltip_hover(
         &mut self,

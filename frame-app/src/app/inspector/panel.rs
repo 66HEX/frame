@@ -1,6 +1,5 @@
-use crate::app::accessibility::{TabFocusGroup, tab_focus_base, tab_focus_ring};
-use crate::app::components::frame_tooltip;
-use crate::app::components::{FrameStyle, frame_section};
+use crate::app::accessibility::TabFocusGroup;
+use crate::app::components::{frame_collapsible, frame_section, frame_tab_trigger};
 use crate::app::inspector::audio::settings_audio_tab;
 use crate::app::inspector::images::settings_images_tab;
 use crate::app::inspector::metadata::settings_metadata_tab;
@@ -13,13 +12,12 @@ use crate::app::inspector::{
     SettingsSubtitlesTabState, settings_audio_filters_tab, settings_subtitles_tab,
     settings_video_filters_tab, settings_video_tab,
 };
-use crate::app::layout::{
-    PANEL_HEADER_HEIGHT, SETTINGS_PANEL_PADDING, SETTINGS_TAB_BUTTON_SIZE, SETTINGS_TAB_ICON_SIZE,
-};
+use crate::app::layout::{PANEL_HEADER_HEIGHT, SETTINGS_PANEL_PADDING, SETTINGS_TAB_ICON_SIZE};
 use crate::app::primitives::{FrameSurface, button_mouse_down, color, panel_bottom_separator};
 use crate::app::root::FrameRoot;
 use crate::settings::{
-    SettingsTab, SourceKind, resolve_active_settings_tab, source_kind_for, visible_settings_tabs,
+    ALL_SETTINGS_TABS, OutputSection, SettingsTab, SourceKind, source_kind_for,
+    visible_output_sections,
 };
 use crate::theme;
 use gpui::prelude::{FluentBuilder, ParentElement, Styled};
@@ -33,9 +31,8 @@ pub(in crate::app) fn settings_panel(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let palette = settings.palette;
-    let active_tab =
-        resolve_active_settings_tab(settings.active_tab, settings.config, settings.metadata);
-    let visible_tabs = visible_settings_tabs(settings.config, settings.metadata);
+    let active_tab = settings.active_tab;
+    let visible_tabs = ALL_SETTINGS_TABS;
     let focuses = TabFocusGroup::render(
         "settings-tabs-focus",
         active_tab.id().into(),
@@ -56,7 +53,8 @@ pub(in crate::app) fn settings_panel(
     let mut tab_rail = crate::app::components::frame_tabs_list(palette)
         .id("settings-tab-list")
         .role(gpui::Role::TabList)
-        .aria_label("Settings sections")
+        .aria_label("Inspector")
+        .w_full()
         .flex()
         .items_center()
         .justify_start();
@@ -65,7 +63,6 @@ pub(in crate::app) fn settings_panel(
             *tab,
             &focuses,
             &visible_tabs,
-            settings.tooltip_visible_id,
             palette,
             window,
             cx,
@@ -107,7 +104,9 @@ pub(in crate::app) fn settings_panel(
                 .flex_col()
                 .overflow_y_scroll()
                 .track_scroll(&scroll)
-                .p(theme::ui_rem(SETTINGS_PANEL_PADDING))
+                .when(active_tab != SettingsTab::Output, |body| {
+                    body.p(theme::ui_rem(SETTINGS_PANEL_PADDING))
+                })
                 .child(settings_tab_content(active_tab, settings, window, cx)),
         )
 }
@@ -116,10 +115,9 @@ pub(in crate::app) fn settings_tab_button(
     tab: SettingsTab,
     focuses: &TabFocusGroup,
     visible_tabs: &[SettingsTab],
-    tooltip_visible_id: Option<&str>,
     palette: &'static theme::ThemePalette,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
+    _window: &mut Window,
+    cx: &Context<FrameRoot>,
 ) -> impl IntoElement {
     let selected = focuses.selected(tab.id());
     let focus = focuses.handle(tab.id());
@@ -131,79 +129,48 @@ pub(in crate::app) fn settings_tab_button(
     let tab_id = format!("settings-tab-{}", tab.id());
     let keyboard_tabs = visible_tabs.to_vec();
 
-    let button = div()
-        .id(tab_id.clone())
-        .debug_selector({
-            let id = tab_id.clone();
-            move || id
-        })
-        .role(gpui::Role::Tab)
-        .aria_label(tab.label())
-        .aria_selected(selected)
-        .track_focus(&focus)
-        .tab_stop(selected)
-        .map(|element| tab_focus_base(element, palette))
-        .focus_visible_style(move |style| tab_focus_ring(style, palette))
-        .transitions(|t| {
-            t.ring(crate::app::motion::interaction_motion())
-                .outline_color(crate::app::motion::interaction_motion())
-                .bg(crate::app::motion::interaction_motion())
-                .text_color(crate::app::motion::interaction_motion())
-                .border_color(crate::app::motion::interaction_motion())
-        })
-        .group(tab_id)
-        .w(theme::ui_rem(SETTINGS_TAB_BUTTON_SIZE))
-        .h(theme::ui_rem(theme::metrics::TAB_HEIGHT))
-        .flex()
-        .items_center()
-        .justify_center()
-        .rounded(theme::ui_rem(theme::RADIUS_MD))
-        .tab_surface(selected, palette)
-        .hover_style(move |style| {
-            style
-                .cursor_default()
-                .text_color(color(palette.text_primary))
-        })
-        .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
-            click_focus.focus(window, cx);
-            root.settings_ui.active_tab = tab;
+    let button = frame_tab_trigger(
+        tab_id,
+        tab.label().to_owned(),
+        selected,
+        true,
+        &focus,
+        palette,
+    )
+    .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
+        click_focus.focus(window, cx);
+        root.settings_ui.active_tab = tab;
+        root.subtitle_ui.popover = None;
+        root.subtitle_ui.rendered_popover = None;
+        cx.stop_propagation();
+        cx.notify();
+    }))
+    .on_key_down(
+        cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+            let Some(next_tab) =
+                settings_tab_for_key(tab, &keyboard_tabs, event.keystroke.key.as_str())
+            else {
+                return;
+            };
+            if let Some((_, focus)) = keyboard_focuses.iter().find(|(tab, _)| *tab == next_tab) {
+                focus.focus(window, cx);
+            }
+            root.settings_ui.active_tab = next_tab;
+            root.subtitle_ui.popover = None;
+            root.subtitle_ui.rendered_popover = None;
             cx.stop_propagation();
             cx.notify();
-        }))
-        .on_key_down(
-            cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
-                let Some(next_tab) =
-                    settings_tab_for_key(tab, &keyboard_tabs, event.keystroke.key.as_str())
-                else {
-                    return;
-                };
-                if let Some((_, focus)) = keyboard_focuses.iter().find(|(tab, _)| *tab == next_tab)
-                {
-                    focus.focus(window, cx);
-                }
-                root.settings_ui.active_tab = next_tab;
-                cx.stop_propagation();
-                cx.notify();
-            }),
-        )
-        .child(
-            gpui::svg()
-                .path(settings_tab_icon(tab))
-                .size(theme::ui_rem(SETTINGS_TAB_ICON_SIZE)),
-        );
-    let button = button.on_mouse_down(gpui::MouseButton::Left, |_, window, cx| {
-        button_mouse_down(true, window, cx);
-    });
-
-    frame_tooltip(
-        tab.id(),
-        tab.label(),
-        tooltip_visible_id == Some(tab.id()),
-        button,
-        palette,
-        window,
-        cx,
+        }),
     )
+    .child(
+        gpui::svg()
+            .path(settings_tab_icon(tab))
+            .size(theme::ui_rem(SETTINGS_TAB_ICON_SIZE)),
+    )
+    .child(tab.label());
+    button.on_mouse_down(gpui::MouseButton::Left, |_, window, cx| {
+        button_mouse_down(true, window, cx);
+    })
 }
 
 fn settings_tab_for_key(
@@ -225,10 +192,6 @@ fn settings_tab_for_key(
     }
 }
 
-#[expect(
-    clippy::too_many_lines,
-    reason = "Settings tab dispatch is intentionally explicit for routing clarity."
-)]
 pub(in crate::app) fn settings_tab_content(
     tab: SettingsTab,
     settings: &SettingsRenderState<'_>,
@@ -242,13 +205,69 @@ pub(in crate::app) fn settings_tab_content(
         .text_color(color(palette.text_muted));
 
     match tab {
-        SettingsTab::Source => content.child(settings_source_tab(
+        SettingsTab::Metadata => content.child(settings_source_tab(
             settings.metadata,
             settings.metadata_status,
             settings.metadata_error,
             palette,
         )),
-        SettingsTab::Output => content.child(settings_output_tab(
+
+        SettingsTab::Output => {
+            let mut sections = div().flex().flex_col().w_full();
+            for section in visible_output_sections(settings.config, settings.metadata) {
+                let open = settings.expanded_output_sections.contains(&section);
+                // Do not construct controls for closed sections: no hidden focus stops.
+                let body = open.then(|| settings_output_section(section, settings, window, cx));
+                sections = sections.child(frame_collapsible(
+                    format!("output-section-{}", section.id()),
+                    section.label(),
+                    open,
+                    body,
+                    move |root, _, _| {
+                        if !root.settings_ui.expanded_output_sections.remove(&section) {
+                            root.settings_ui.expanded_output_sections.insert(section);
+                        }
+                        root.subtitle_ui.popover = None;
+                        root.subtitle_ui.rendered_popover = None;
+                    },
+                    palette,
+                    window,
+                    cx,
+                ));
+            }
+            content.gap_0().child(sections)
+        }
+        SettingsTab::Presets => content.child(settings_presets_tab(
+            SettingsPresetsTabState {
+                config: settings.config,
+                metadata: settings.metadata,
+                settings_disabled: settings.settings_disabled,
+                preset_name: settings.preset_name,
+                preset_name_focus: settings.preset_name_focus,
+                presets: settings.presets,
+                notice: settings.preset_notice,
+                palette,
+            },
+            window,
+            cx,
+        )),
+    }
+}
+
+#[expect(
+    clippy::too_many_lines,
+    reason = "Settings tab dispatch is intentionally explicit for routing clarity."
+)]
+fn settings_output_section(
+    section: OutputSection,
+    settings: &SettingsRenderState<'_>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    let palette = settings.palette;
+    let content = crate::app::components::frame_field_group();
+    match section {
+        OutputSection::General => content.child(settings_output_tab(
             settings.config,
             settings.metadata,
             settings.settings_disabled,
@@ -258,7 +277,7 @@ pub(in crate::app) fn settings_tab_content(
             window,
             cx,
         )),
-        SettingsTab::Video => content.child(settings_video_tab(
+        OutputSection::Video => content.child(settings_video_tab(
             settings.config,
             settings.settings_disabled,
             settings.available_encoders,
@@ -273,7 +292,7 @@ pub(in crate::app) fn settings_tab_content(
             window,
             cx,
         )),
-        SettingsTab::VideoFilters => content.child(settings_video_filters_tab(
+        OutputSection::VideoFilters => content.child(settings_video_filters_tab(
             settings.config,
             settings.settings_disabled,
             source_kind_for(settings.metadata) == SourceKind::Image,
@@ -282,7 +301,7 @@ pub(in crate::app) fn settings_tab_content(
             window,
             cx,
         )),
-        SettingsTab::Images => content.child(settings_images_tab(
+        OutputSection::Images => content.child(settings_images_tab(
             settings.config,
             settings.settings_disabled,
             settings.crop_editing,
@@ -292,7 +311,7 @@ pub(in crate::app) fn settings_tab_content(
             window,
             cx,
         )),
-        SettingsTab::Audio => content.child(settings_audio_tab(
+        OutputSection::Audio => content.child(settings_audio_tab(
             settings.config,
             settings.metadata,
             settings.settings_disabled,
@@ -302,7 +321,7 @@ pub(in crate::app) fn settings_tab_content(
             window,
             cx,
         )),
-        SettingsTab::AudioFilters => content.child(settings_audio_filters_tab(
+        OutputSection::AudioFilters => content.child(settings_audio_filters_tab(
             settings.config,
             settings.settings_disabled,
             settings.available_filters,
@@ -310,7 +329,7 @@ pub(in crate::app) fn settings_tab_content(
             window,
             cx,
         )),
-        SettingsTab::Subtitles => content.child(settings_subtitles_tab(
+        OutputSection::Subtitles => content.child(settings_subtitles_tab(
             SettingsSubtitlesTabState {
                 config: settings.config,
                 metadata: settings.metadata,
@@ -336,26 +355,12 @@ pub(in crate::app) fn settings_tab_content(
             window,
             cx,
         )),
-        SettingsTab::Metadata => content.child(settings_metadata_tab(
+        OutputSection::Metadata => content.child(settings_metadata_tab(
             settings.config,
             settings.metadata,
             settings.settings_disabled,
             settings.metadata_focuses,
             palette,
-            window,
-            cx,
-        )),
-        SettingsTab::Presets => content.child(settings_presets_tab(
-            SettingsPresetsTabState {
-                config: settings.config,
-                metadata: settings.metadata,
-                settings_disabled: settings.settings_disabled,
-                preset_name: settings.preset_name,
-                preset_name_focus: settings.preset_name_focus,
-                presets: settings.presets,
-                notice: settings.preset_notice,
-                palette,
-            },
             window,
             cx,
         )),
@@ -373,15 +378,19 @@ pub(in crate::app) fn settings_section(
 mod tests {
     use super::*;
 
-    const TABS: &[SettingsTab] = &[SettingsTab::Source, SettingsTab::Output, SettingsTab::Video];
+    const TABS: &[SettingsTab] = &[
+        SettingsTab::Metadata,
+        SettingsTab::Output,
+        SettingsTab::Presets,
+    ];
 
     #[test]
     fn settings_tab_for_key_handles_the_navigation_matrix() {
         let cases = [
-            (SettingsTab::Source, "left", Some(SettingsTab::Video)),
-            (SettingsTab::Video, "right", Some(SettingsTab::Source)),
-            (SettingsTab::Output, "home", Some(SettingsTab::Source)),
-            (SettingsTab::Output, "end", Some(SettingsTab::Video)),
+            (SettingsTab::Metadata, "left", Some(SettingsTab::Presets)),
+            (SettingsTab::Presets, "right", Some(SettingsTab::Metadata)),
+            (SettingsTab::Output, "home", Some(SettingsTab::Metadata)),
+            (SettingsTab::Output, "end", Some(SettingsTab::Presets)),
             (SettingsTab::Output, "space", None),
         ];
 

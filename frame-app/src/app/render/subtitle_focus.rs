@@ -58,7 +58,16 @@ impl FrameRoot {
             subtitle_outline_color_focus,
         } = input;
         let subtitles_copy_mode = selected_config_snapshot.processing_mode == ProcessingMode::Copy;
-        let subtitles_tab_active = self.settings_ui.active_tab == SettingsTab::Subtitles;
+        let subtitles_tab_active = self.settings_ui.active_tab == SettingsTab::Output
+            && self
+                .settings_ui
+                .expanded_output_sections
+                .contains(&crate::settings::OutputSection::Subtitles)
+            && crate::settings::visible_output_sections(
+                selected_config_snapshot,
+                self.selected_source_metadata().as_ref(),
+            )
+            .contains(&crate::settings::OutputSection::Subtitles);
         let subtitles_enabled =
             subtitles_tab_active && !self.file_queue.selected_file_locked() && !subtitles_copy_mode;
         let external_subtitles_enabled =

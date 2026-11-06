@@ -118,7 +118,7 @@ pub(in crate::app) fn settings_processing_mode_grid(
                 if root.update_selected_config(|config| {
                     apply_processing_mode(config, metadata.as_ref(), mode)
                 }) {
-                    root.resolve_selected_settings_tab(metadata.as_ref());
+                    root.sync_inspector_availability(metadata.as_ref());
                     cx.notify();
                 }
             })),
@@ -164,7 +164,7 @@ pub(in crate::app) fn settings_container_grid(
                         | normalize_output_config(config, metadata.as_ref())
                 });
                 if changed {
-                    root.resolve_selected_settings_tab(metadata.as_ref());
+                    root.sync_inspector_availability(metadata.as_ref());
                     cx.notify();
                 }
             })),

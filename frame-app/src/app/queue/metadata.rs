@@ -60,7 +60,7 @@ impl FrameRoot {
                         root.source_metadata.mark_ready(file_id.clone(), metadata);
                         if root.file_queue.selected_file_id() == Some(file_id.as_str()) {
                             let selected_metadata = root.selected_source_metadata();
-                            root.resolve_selected_settings_tab(selected_metadata.as_ref());
+                            root.sync_inspector_availability(selected_metadata.as_ref());
                         }
                     }
                     Err(error) => {

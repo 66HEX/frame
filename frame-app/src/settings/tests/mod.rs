@@ -1,9 +1,5 @@
 use super::*;
 
-fn tab_ids(tabs: Vec<SettingsTab>) -> Vec<&'static str> {
-    tabs.into_iter().map(SettingsTab::id).collect()
-}
-
 mod source_metadata;
 
 mod output_name;
@@ -32,7 +28,7 @@ mod source_info_formatting;
 
 mod source_info_sections;
 
-mod visible_settings_tabs;
+mod visible_output_sections;
 
 mod av1_native_presets;
 

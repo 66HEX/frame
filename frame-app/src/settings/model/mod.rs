@@ -66,4 +66,4 @@ pub use subtitles::{
     ExternalSubtitleTrack, SUBTITLE_FONT_SIZES, SUBTITLE_POSITIONS, SubtitleFontOption,
     SubtitleFontSizeOption, SubtitlePosition, SubtitlePositionOption, SubtitleTrackOption,
 };
-pub use tabs::{ALL_SETTINGS_TABS, SettingsTab};
+pub use tabs::{ALL_OUTPUT_SECTIONS, ALL_SETTINGS_TABS, OutputSection, SettingsTab};

@@ -123,20 +123,20 @@ fn inspector_tab_backgrounds_fade_without_darkening_even_when_reversed() {
                 root.appearance.color_theme = theme;
                 cx.notify();
             });
-            click(cx, "settings-tab-source");
+            click(cx, "settings-tab-metadata");
             cx.update(|_, cx| cx.set_reduce_motion(false));
-            click(cx, "settings-tab-video-filters");
+            click(cx, "settings-tab-presets");
             let mut saw_intermediate_fill = false;
             for frame in 0..=30 {
                 // Reverse an unfinished pointer transition, then switch by keyboard.
                 if frame == 4 {
-                    click(cx, "settings-tab-source");
+                    click(cx, "settings-tab-metadata");
                 } else if frame == 8 {
                     press(cx, "right");
                 }
                 for id in [
-                    "settings-tab-source",
-                    "settings-tab-video-filters",
+                    "settings-tab-metadata",
+                    "settings-tab-presets",
                     "settings-tab-output",
                 ] {
                     let bounds = cx.debug_bounds(id).unwrap();
@@ -200,17 +200,19 @@ fn tab_rails_move_focus_with_each_arrow_and_offer_one_tab_stop() {
         assert_eq!(focus(cx), selected);
 
         click(cx, "titlebar-workspace");
-        click(cx, "settings-tab-source");
+        click(cx, "settings-tab-metadata");
         let source = focus(cx);
         for (key, expected) in [
             ("right", SettingsTab::Output),
-            ("right", SettingsTab::Video),
-            ("right", SettingsTab::VideoFilters),
-            ("left", SettingsTab::Video),
-            ("end", SettingsTab::Presets),
-            ("right", SettingsTab::Source),
+            ("right", SettingsTab::Presets),
+            ("right", SettingsTab::Metadata),
             ("left", SettingsTab::Presets),
-            ("home", SettingsTab::Source),
+            ("home", SettingsTab::Metadata),
+            ("right", SettingsTab::Output),
+            ("end", SettingsTab::Presets),
+            ("right", SettingsTab::Metadata),
+            ("left", SettingsTab::Presets),
+            ("home", SettingsTab::Metadata),
         ] {
             let previous = focus(cx);
             press(cx, key);
@@ -219,7 +221,7 @@ fn tab_rails_move_focus_with_each_arrow_and_offer_one_tab_stop() {
                 expected
             );
             assert_ne!(focus(cx), previous, "focus did not move for {key}");
-            assert_eq!(focus(cx) == source, expected == SettingsTab::Source);
+            assert_eq!(focus(cx) == source, expected == SettingsTab::Metadata);
         }
         press(cx, "tab");
         assert_ne!(focus(cx), source);
@@ -236,9 +238,8 @@ fn inspector_tab_enters_controls_directly_and_shift_tab_returns_to_the_selected_
         cx.update(|window, _| window.set_a11y_forced(true));
         draw(cx);
         for (id, expected) in [
-            ("settings-tab-source", None),
-            ("settings-tab-output", Some("Re-encode")),
-            ("settings-tab-video", Some("Custom")),
+            ("settings-tab-metadata", None),
+            ("settings-tab-output", Some("General")),
             ("settings-tab-presets", Some("Preset name")),
         ] {
             click(cx, id);
@@ -267,15 +268,15 @@ fn inspector_tab_enters_controls_directly_and_shift_tab_returns_to_the_selected_
 }
 
 #[test]
-fn removing_the_focused_settings_tab_focuses_the_fallback_tab() {
+fn output_navigation_survives_changes_to_section_availability() {
     let mut app = TestAppContext::single();
     let (root, cx) = test_window(
         &mut app,
         VisualFixture::SettingsVideo,
         ScalePreset::Percent100,
     );
-    click(cx, "settings-tab-video");
-    let video = focus(cx);
+    click(cx, "settings-tab-output");
+    let output = focus(cx);
     root.update(cx, |root, cx| {
         root.update_selected_config(|config| {
             config.processing_mode = ProcessingMode::Copy;
@@ -288,11 +289,12 @@ fn removing_the_focused_settings_tab_focuses_the_fallback_tab() {
         root.read_with(cx, |root, _| root.settings_ui.active_tab),
         SettingsTab::Output
     );
-    assert_ne!(focus(cx), video);
+    assert_eq!(focus(cx), output);
+    assert!(cx.debug_bounds("output-section-video-trigger").is_none());
     press(cx, "left");
     assert_eq!(
         root.read_with(cx, |root, _| root.settings_ui.active_tab),
-        SettingsTab::Source
+        SettingsTab::Metadata
     );
 }
 

@@ -4,7 +4,7 @@ use crate::app::inspector::subtitles::state::{
     SettingsSubtitleMode, SettingsSubtitlePopover,
 };
 use crate::settings::{
-    ConversionConfig, PresetDefinition, PresetNotice, SettingsTab, SourceMetadata,
+    ConversionConfig, OutputSection, PresetDefinition, PresetNotice, SettingsTab, SourceMetadata,
 };
 use crate::source_metadata::MetadataStatus;
 use crate::theme;
@@ -16,6 +16,7 @@ pub(in crate::app) struct SettingsUiState {
     pub(in crate::app) is_open: bool,
     pub(in crate::app) is_present: bool,
     pub(in crate::app) active_tab: SettingsTab,
+    pub(in crate::app) expanded_output_sections: std::collections::BTreeSet<OutputSection>,
     pub(in crate::app) max_concurrency_draft: String,
     pub(in crate::app) max_concurrency_error: Option<String>,
     pub(in crate::app) output_directory_error: Option<String>,
@@ -35,7 +36,8 @@ impl Default for SettingsUiState {
         Self {
             is_open: false,
             is_present: false,
-            active_tab: SettingsTab::Source,
+            active_tab: SettingsTab::Metadata,
+            expanded_output_sections: std::collections::BTreeSet::new(),
             max_concurrency_draft: DEFAULT_MAX_CONCURRENCY.to_string(),
             max_concurrency_error: None,
             output_directory_error: None,
@@ -57,6 +59,7 @@ pub(in crate::app) struct SettingsRenderState<'a> {
     pub(in crate::app) palette: &'static theme::ThemePalette,
     pub(in crate::app) active_tab: SettingsTab,
     pub(in crate::app) tooltip_visible_id: Option<&'a str>,
+    pub(in crate::app) expanded_output_sections: &'a std::collections::BTreeSet<OutputSection>,
     pub(in crate::app) config: &'a ConversionConfig,
     pub(in crate::app) crop_editing: bool,
     pub(in crate::app) metadata: Option<&'a SourceMetadata>,
@@ -113,4 +116,41 @@ pub(in crate::app) struct SettingsMetadataInputFocuses<'a> {
     pub(in crate::app) comment: Option<&'a FocusHandle>,
     pub(in crate::app) service_name: Option<&'a FocusHandle>,
     pub(in crate::app) service_provider: Option<&'a FocusHandle>,
+}
+
+impl crate::app::root::FrameRoot {
+    pub(in crate::app) fn sync_inspector_availability(
+        &mut self,
+        metadata: Option<&SourceMetadata>,
+    ) {
+        if self.selected_config().is_none() {
+            self.settings_ui.active_tab = SettingsTab::Metadata;
+        }
+        let external_tracks = self
+            .selected_config()
+            .map_or(0, |config| config.external_subtitle_tracks.len());
+        self.subtitle_ui.external_track_index = if external_tracks == 0 {
+            None
+        } else {
+            Some(
+                self.subtitle_ui
+                    .external_track_index
+                    .unwrap_or(0)
+                    .min(external_tracks - 1),
+            )
+        };
+        let subtitles_visible = self.settings_ui.active_tab == SettingsTab::Output
+            && self
+                .settings_ui
+                .expanded_output_sections
+                .contains(&OutputSection::Subtitles)
+            && self.selected_config().is_some_and(|config| {
+                crate::settings::visible_output_sections(config, metadata)
+                    .contains(&OutputSection::Subtitles)
+            });
+        if !subtitles_visible {
+            self.subtitle_ui.popover = None;
+            self.subtitle_ui.rendered_popover = None;
+        }
+    }
 }

@@ -67,7 +67,7 @@ impl Render for FrameRoot {
         let source_metadata_entry = self.selected_source_metadata_entry();
         let source_metadata = source_metadata_entry.metadata.clone();
         self.normalize_selected_config(source_metadata.as_ref());
-        self.resolve_selected_settings_tab(source_metadata.as_ref());
+        self.sync_inspector_availability(source_metadata.as_ref());
         self.conversion_events
             .ensure_selected_log_file(&self.file_queue);
         self.update_log_scroll_target();
@@ -234,6 +234,7 @@ impl Render for FrameRoot {
                     palette,
                     active_tab: self.settings_ui.active_tab,
                     tooltip_visible_id: self.tooltip_ui.visible_id.as_deref(),
+                    expanded_output_sections: &self.settings_ui.expanded_output_sections,
                     config: crop_settings_preview
                         .as_ref()
                         .unwrap_or(&selected_config_snapshot),

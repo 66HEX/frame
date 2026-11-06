@@ -37,3 +37,8 @@ pub(in crate::app) use choice_group::FrameChoiceFocus;
 
 mod surface_motion;
 pub(in crate::app) use surface_motion::{SurfaceOrigin, frame_surface_motion};
+
+mod collapsible;
+pub(in crate::app) use collapsible::frame_collapsible;
+mod option_tabs;
+pub(in crate::app) use option_tabs::frame_tab_trigger;

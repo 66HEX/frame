@@ -33,14 +33,12 @@ pub(in crate::app) fn settings_audio_filters_tab(
         .flex()
         .flex_col()
         .gap_3()
-        .child(
-            settings_section("Audio Filters", palette).child(settings_audio_filters_reset_all(
-                controls_disabled,
-                palette,
-                window,
-                cx,
-            )),
-        )
+        .child(settings_audio_filters_reset_all(
+            controls_disabled,
+            palette,
+            window,
+            cx,
+        ))
         .child(
             settings_section("Level", palette)
                 .child(settings_audio_filter_range_field(
