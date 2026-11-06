@@ -15,7 +15,6 @@ pub(super) struct PositionedTooltip {
     pub placement: TooltipPlacement,
     pub scale: f32,
     pub progress: f32,
-    pub open: bool,
 }
 
 type PointerMoveListener = dyn Fn(&gpui::MouseMoveEvent, &mut Window, &mut App);
@@ -186,7 +185,7 @@ impl Element for PositionedTooltip {
             window.viewport_size(),
             self.placement,
             self.scale,
-            if self.open { self.progress } else { 1.0 },
+            self.progress,
         );
         self.content_bounds
             .set(Bounds::new(placement.content, bounds.size));

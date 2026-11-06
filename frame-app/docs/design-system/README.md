@@ -20,7 +20,7 @@ Porównanie ze źródłami CLI i `getComputedStyle` działającej galerii, 2026-
 | --- | --- | --- |
 | Select / Popover / color picker | 100 ms, CSS `ease` = cubic-bezier(.25,.1,.25,1) | opacity, skala .95–1; wejście od strony triggera o 8 px, wyjście w jego kierunku; strona i środek skalowania zależą od dostępnego miejsca |
 | Dialog | 100 ms, CSS `ease` | opacity i skala .95–1, środek panelu |
-| Tooltip | wejście natychmiastowe; wyjście 150 ms, CSS `ease` | domyślny delay=0 daje Radix `instant-open` bez animacji wejścia; wyjście opacity i skala 1–.95 |
+| Tooltip | wejście natychmiastowe; wyjście 150 ms, CSS `ease` | domyślny delay=0 daje Radix `instant-open` bez animacji wejścia; wyjście opacity, skala 1–.95 i przesunięcie w stronę triggera |
 | Sheet | 200 ms, cubic-bezier(.4,0,.2,1) | opacity i przesunięcie o 10% szerokości w obie strony |
 | Overlay Dialog/Sheet | 100 ms, CSS `ease` | opacity; blur 4 px jest stały |
 | Slider | 150 ms, cubic-bezier(.4,0,.2,1) | ring 0–2 px, kolor ring/30, hover/focus-visible/active; kursor domyślny |

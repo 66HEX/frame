@@ -240,7 +240,6 @@ impl FrameTooltip {
                             placement: self.placement,
                             scale,
                             progress,
-                            open: visible,
                         })
                         .priority(TOOLTIP_DEFERRED_PRIORITY),
                     )
