@@ -54,7 +54,7 @@ const FRAME_ICON_SVG: &str = include_str!("../../assets/icons/frame.svg");
 const FRAME_FONT_REGULAR_BYTES: &[u8] = include_bytes!("../../assets/fonts/Inter-Regular.ttf");
 const FRAME_FONT_MEDIUM_BYTES: &[u8] = include_bytes!("../../assets/fonts/Inter-Medium.ttf");
 
-// Nucleo UI 1.9.0, Outline, native 18px grid and 1.5px strokes.
+// Nucleo UI 1.9.0, Fill Duo (glyph-duo), native 18px grid with layered opacity.
 // SVG colors inherit the theme; source mapping and copyright notice live with the assets.
 const ARROW_DOWN_SVG: &str = include_str!("../../assets/icons/nucleo/18px_arrow-down.svg");
 const LAYOUT_LIST_SVG: &str = include_str!("../../assets/icons/nucleo/18px_grid-layout-rows.svg");

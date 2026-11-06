@@ -2,7 +2,7 @@
 
 Wygenerowano z kodu przez `python3 script/inventory-ui.py`. Zestawienie obejmuje konstruktory elementów i każde miejsce ich użycia poza testami. Listy plików, kodeków, presetów, fontów i ścieżek są dynamiczne; nie mają stałej liczby instancji.
 
-Rodzaje pól tekstowych: 24; konstruktory UI: 287; miejsca użycia: 833; jawne identyfikatory lub ich wzorce: 41. Pełny indeks z numerami linii jest w [inventory.json](inventory.json).
+Rodzaje pól tekstowych: 24; konstruktory UI: 285; miejsca użycia: 829; jawne identyfikatory lub ich wzorce: 41. Pełny indeks z numerami linii jest w [inventory.json](inventory.json).
 
 ## Pola tekstowe
 
@@ -58,8 +58,6 @@ Dodatkowo: pozycja odtwarzania, początek i koniec przycięcia, przezroczystoś�
 | `apply_accessible_slider_with_focus` | [accessibility.rs](../../src/app/accessibility.rs#L652) | 1 |
 | `apply_accessible_text_input` | [accessibility.rs](../../src/app/accessibility.rs#L681) | 1 |
 | `titlebar_navigation` | [chrome/navigation.rs](../../src/app/chrome/navigation.rs#L14) | 2 |
-| `titlebar_stats` | [chrome/navigation.rs](../../src/app/chrome/navigation.rs#L51) | 2 |
-| `titlebar_stat` | [chrome/navigation.rs](../../src/app/chrome/navigation.rs#L72) | 2 |
 | `titlebar_segment` | [chrome/navigation.rs](../../src/app/chrome/navigation.rs#L89) | 2 |
 | `current` | [chrome/titlebar.rs](../../src/app/chrome/titlebar.rs#L28) | 2 |
 | `titlebar_for_platform` | [chrome/titlebar.rs](../../src/app/chrome/titlebar.rs#L48) | 1 |

@@ -1,6 +1,6 @@
 # Graphite we Frame
 
-Frame używa motywu Graphite inspirowanego powierzchniami Sebastiano Guerriero: neutralnej, lekko chłodnej grafitowej palety, warstwowych cieni z highlightem i zagłębionych pól. Układ, odstępy, typografia, wymiary kontrolek i obsługa pozostają oparte na natywnym adapterze shadcn/ui Mira. Źródłem są pliki wygenerowane przez CLI `shadcn@4.23.0`, preset `b1D0eCA4`, baza Radix, kolor Neutral i Inter. Aplikacja używa ikon Nucleo UI 1.9.0, outline 18 px / stroke 1.5. To świadome odstępstwo od ikon oryginalnego presetu. Oryginały CLI znajdują się w [reference](reference).
+Frame używa motywu Graphite inspirowanego powierzchniami Sebastiano Guerriero: neutralnej, lekko chłodnej grafitowej palety, warstwowych cieni z highlightem i zagłębionych pól. Układ, odstępy, typografia, wymiary kontrolek i obsługa pozostają oparte na natywnym adapterze shadcn/ui Mira. Źródłem są pliki wygenerowane przez CLI `shadcn@4.23.0`, preset `b1D0eCA4`, baza Radix, kolor Neutral i Inter. Aplikacja używa ikon Nucleo UI 1.9.0, Fill Duo (`glyph-duo`) na siatce 18 px. Wypełnienia dziedziczą kolor motywu, a warstwy zachowują oryginalną przezroczystość. To świadome odstępstwo od ikon oryginalnego presetu. Oryginały CLI znajdują się w [reference](reference).
 
 Repozytorium React znajduje się obok Frame: `../frame-shadcn-mira`. Zawiera działającą galerię light/dark i komponenty zainstalowane przez CLI. Nie jest zależnością wykonawczą aplikacji Rust.
 

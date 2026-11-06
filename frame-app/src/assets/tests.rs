@@ -102,7 +102,7 @@ mod frame_assets {
     }
 
     #[test]
-    fn ui_icon_assets_render_with_nucleo_outline_style() {
+    fn ui_icon_assets_render_with_nucleo_fill_duo_style() {
         let renderer = gpui::SvgRenderer::new(std::sync::Arc::new(FrameAssets.into()));
 
         for icon in [
@@ -155,16 +155,12 @@ mod frame_assets {
                 "{icon} should use the Nucleo UI 18px grid"
             );
             assert!(
-                svg.contains(r#"fill="none""#),
-                "{icon} should use stroke rendering"
+                svg.contains(r#"fill="currentColor""#),
+                "{icon} should inherit GPUI text_color through filled paths"
             );
             assert!(
-                svg.contains(r#"stroke="currentColor""#),
-                "{icon} should inherit GPUI text_color"
-            );
-            assert!(
-                svg.contains(r#"stroke-width="1.5""#),
-                "{icon} should use the Mira stroke weight"
+                !svg.contains(r#"stroke=""#),
+                "{icon} should use Fill Duo geometry, not Outline strokes"
             );
             assert!(
                 !svg.contains(r##"="#000""##) && !svg.contains(r#"="black""#),
@@ -184,6 +180,24 @@ mod frame_assets {
                 );
             }
         }
+    }
+
+    #[test]
+    fn duotone_icon_raster_preserves_the_secondary_layer_opacity() {
+        let renderer = gpui::SvgRenderer::new(std::sync::Arc::new(FrameAssets.into()));
+        let svg = FrameAssets.load(ICON_LAYOUT_LIST).unwrap().unwrap();
+        let image = renderer.render_single_frame(svg.as_ref(), 1.0).unwrap();
+        let pixels = image.as_bytes(0).unwrap();
+        // GPUI supersamples SVGs; sample row interiors using the raster size.
+        let width = usize::try_from(image.size(0).width.0).unwrap();
+        let height = usize::try_from(image.size(0).height.0).unwrap();
+        let primary = pixels[(5 * height / 18 * width + width / 2) * 4 + 3];
+        let secondary = pixels[(13 * height / 18 * width + width / 2) * 4 + 3];
+        assert_eq!(primary, 255);
+        assert!(
+            (101..=103).contains(&secondary),
+            "the 40% secondary layer must survive SVG rasterization: {secondary}"
+        );
     }
 
     #[test]

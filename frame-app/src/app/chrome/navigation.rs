@@ -1,8 +1,8 @@
 use crate::app::accessibility::{TabFocusGroup, tab_focus_base, tab_focus_ring};
 use crate::app::components::{FrameStyle, FrameTabIndicator, frame_tabs_list};
 use crate::app::layout::{TITLEBAR_ICON_SIZE, TITLEBAR_NAV_BUTTON_HEIGHT};
-use crate::app::model::{ActiveView, FrameAppState, format_total_size};
-use crate::app::primitives::{button_mouse_down, color, icon_svg};
+use crate::app::model::ActiveView;
+use crate::app::primitives::{button_mouse_down, color};
 use crate::app::root::FrameRoot;
 use crate::{assets, theme};
 use gpui::prelude::{FluentBuilder, Styled};
@@ -48,44 +48,6 @@ pub(in crate::app) fn titlebar_navigation(
             &indicator,
             cx,
         ))
-}
-
-pub(in crate::app) fn titlebar_stats(
-    state: FrameAppState,
-    palette: &'static theme::ThemePalette,
-) -> gpui::Div {
-    div()
-        .flex()
-        .items_center()
-        .gap_4()
-        .text_color(color(palette.text_muted))
-        .child(titlebar_stat(
-            assets::ICON_HARD_DRIVE,
-            format!("Storage {}", format_total_size(state.total_size_bytes)),
-            palette,
-        ))
-        .child(titlebar_stat(
-            assets::ICON_FILE_VIDEO,
-            format!("Items {}", state.file_count),
-            palette,
-        ))
-}
-
-pub(in crate::app) fn titlebar_stat(
-    icon: &'static str,
-    label: String,
-    palette: &'static theme::ThemePalette,
-) -> gpui::Div {
-    div()
-        .flex()
-        .items_center()
-        .gap_2()
-        .child(icon_svg(
-            icon,
-            TITLEBAR_ICON_SIZE,
-            color(palette.text_muted),
-        ))
-        .child(theme::ui_text_owned(label))
 }
 
 pub(in crate::app) fn titlebar_segment(

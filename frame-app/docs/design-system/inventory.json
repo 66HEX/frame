@@ -243,16 +243,6 @@
       "line": 14
     },
     {
-      "name": "titlebar_stats",
-      "path": "frame-app/src/app/chrome/navigation.rs",
-      "line": 51
-    },
-    {
-      "name": "titlebar_stat",
-      "path": "frame-app/src/app/chrome/navigation.rs",
-      "line": 72
-    },
-    {
       "name": "titlebar_segment",
       "path": "frame-app/src/app/chrome/navigation.rs",
       "line": 89
@@ -3315,16 +3305,6 @@
       "line": 40
     },
     {
-      "builder": "titlebar_stat",
-      "path": "frame-app/src/app/chrome/navigation.rs",
-      "line": 60
-    },
-    {
-      "builder": "titlebar_stat",
-      "path": "frame-app/src/app/chrome/navigation.rs",
-      "line": 65
-    },
-    {
       "builder": "icon_svg",
       "path": "frame-app/src/app/chrome/navigation.rs",
       "line": 81
@@ -3395,11 +3375,6 @@
       "line": 90
     },
     {
-      "builder": "titlebar_stats",
-      "path": "frame-app/src/app/chrome/titlebar.rs",
-      "line": 91
-    },
-    {
       "builder": "titlebar_add_source_button",
       "path": "frame-app/src/app/chrome/titlebar.rs",
       "line": 102
@@ -3463,11 +3438,6 @@
       "builder": "platform_titlebar_divider",
       "path": "frame-app/src/app/chrome/titlebar.rs",
       "line": 228
-    },
-    {
-      "builder": "titlebar_stats",
-      "path": "frame-app/src/app/chrome/titlebar.rs",
-      "line": 229
     },
     {
       "builder": "titlebar_add_source_button",

@@ -1,4 +1,4 @@
-use crate::app::chrome::navigation::{titlebar_navigation, titlebar_stats};
+use crate::app::chrome::navigation::titlebar_navigation;
 use crate::app::chrome::window_controls::{
     linux_window_controls, macos_native_window_controls_placeholder, windows_window_controls,
 };
@@ -88,8 +88,6 @@ pub(in crate::app) fn macos_titlebar(
                     this.child(frame_logo(palette))
                         .child(titlebar_divider(palette))
                         .child(titlebar_navigation(state.active_view, palette, window, cx))
-                        .child(titlebar_divider(palette))
-                        .child(titlebar_stats(state, palette))
                 }),
         )
         .child(
@@ -226,8 +224,6 @@ pub(in crate::app) fn platform_titlebar_content(
                             this.child(platform_frame_logo(palette))
                                 .child(platform_titlebar_divider(palette))
                                 .child(titlebar_navigation(state.active_view, palette, window, cx))
-                                .child(platform_titlebar_divider(palette))
-                                .child(titlebar_stats(state, palette))
                         }),
                 )
                 .child(
