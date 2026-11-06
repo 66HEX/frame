@@ -25,5 +25,8 @@
   },
   "referenceGalleryTypeFix": "spinner.tsx: omit SVG size/strokeWidth string union, then accept numeric size/strokeWidth required by HugeiconsIcon. No visual or behavior changes.",
   "addCollapsible": "npx shadcn@4.23.0 add collapsible --yes",
-  "collapsibleAdded": "2026-11-06"
+  "collapsibleAdded": "2026-11-06",
+  "addDrawer": "npx shadcn@4.23.0 add drawer --yes",
+  "drawerAdded": "2026-11-06",
+  "drawerNativeVariant": "Right-side floating drawer with 8 px edge inset, card background and card foreground; the archived CLI component remains unmodified."
 }
