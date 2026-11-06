@@ -564,6 +564,15 @@ pub(in crate::app) fn apply_accessible_select_trigger_with_focus(
     }
 }
 
+fn select_option_highlight(
+    style: StyleRefinement,
+    palette: &theme::ThemePalette,
+) -> StyleRefinement {
+    style
+        .bg(color(palette.token("accent")))
+        .text_color(color(palette.token("accent-foreground")))
+}
+
 pub(in crate::app) fn apply_accessible_select_option(
     element: gpui::Stateful<gpui::Div>,
     label: impl Into<SharedString>,
@@ -579,11 +588,7 @@ pub(in crate::app) fn apply_accessible_select_option(
         element
             .focusable()
             .tab_stop(true)
-            .focus_style(move |style| {
-                style
-                    .bg(color(palette.fill_selected))
-                    .text_color(color(palette.text_primary))
-            })
+            .focus_style(move |style| select_option_highlight(style, palette))
     } else {
         element.disabled(true).tab_stop(false).aria_disabled(true)
     }
@@ -603,11 +608,9 @@ pub(in crate::app) fn apply_accessible_select_option_with_focus(
         .aria_selected(selected)
         .track_focus(focus);
     if enabled {
-        element.tab_stop(true).focus_style(move |style| {
-            style
-                .bg(color(palette.fill_selected))
-                .text_color(color(palette.text_primary))
-        })
+        element
+            .tab_stop(true)
+            .focus_style(move |style| select_option_highlight(style, palette))
     } else {
         element.disabled(true).tab_stop(false).aria_disabled(true)
     }

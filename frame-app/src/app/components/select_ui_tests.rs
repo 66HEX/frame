@@ -113,6 +113,106 @@ fn select_window<'a>(
     (root, cx)
 }
 
+fn theme_option_id(theme: ColorTheme) -> &'static str {
+    match theme {
+        ColorTheme::Dark => "app-settings-theme-option-dark",
+        ColorTheme::Light => "app-settings-theme-option-light",
+    }
+}
+
+fn theme_option_fill(cx: &mut VisualTestContext, theme: ColorTheme) -> gpui::Rgba {
+    let id = theme_option_id(theme);
+    let bounds = cx
+        .debug_bounds(id)
+        .unwrap_or_else(|| panic!("missing {id}"));
+    cx.update(|window, _| {
+        let bounds = bounds.scale(window.scale_factor());
+        window
+            .painted_quads()
+            .into_iter()
+            .filter(|quad| quad.bounds == bounds)
+            .map(|quad| {
+                gpui::hsla_to_rgba(
+                    quad.background
+                        .as_solid()
+                        .expect("select option fill is solid"),
+                )
+            })
+            .max_by(|a, b| a.alpha.total_cmp(&b.alpha))
+            .unwrap_or(gpui::Rgba::new(0.0, 0.0, 0.0, 0.0))
+    })
+}
+
+fn assert_theme_option_highlight(
+    cx: &mut VisualTestContext,
+    theme: ColorTheme,
+    focused: ColorTheme,
+    step: &str,
+) {
+    let fills = ColorTheme::ALL.map(|option| (option, theme_option_fill(cx, option)));
+    assert_eq!(
+        fills.iter().filter(|(_, fill)| fill.alpha > 0.001).count(),
+        1,
+        "{theme:?}, {step}: only the focused option should be highlighted: {fills:?}"
+    );
+    let expected = crate::theme::palette(theme).token("accent");
+    let (_, actual) = fills.iter().find(|(option, _)| *option == focused).unwrap();
+    for (painted, token) in [
+        (actual.red, expected.red),
+        (actual.green, expected.green),
+        (actual.blue, expected.blue),
+        (actual.alpha, expected.alpha),
+    ] {
+        assert!(
+            (painted - token).abs() < 0.001,
+            "{theme:?}, {step}: focused {focused:?} must keep the accent fill; expected {expected:?}, painted {actual:?}"
+        );
+    }
+}
+
+#[test]
+fn select_highlight_stays_consistent_between_open_pointer_and_keyboard_focus() {
+    let case = &SELECTS[0];
+    for theme in ColorTheme::ALL {
+        for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+            let mut app = TestAppContext::single();
+            let (_, cx) = select_window(&mut app, case, theme, scale);
+            click(cx, case.trigger);
+            assert_theme_option_highlight(cx, theme, theme, "just opened");
+
+            let selected = cx.debug_bounds(theme_option_id(theme)).unwrap();
+            cx.simulate_mouse_move(selected.center(), None, Modifiers::default());
+            draw(cx);
+            assert_theme_option_highlight(cx, theme, theme, "pointer over selected option");
+
+            let other = match theme {
+                ColorTheme::Dark => ColorTheme::Light,
+                ColorTheme::Light => ColorTheme::Dark,
+            };
+            let other_bounds = cx.debug_bounds(theme_option_id(other)).unwrap();
+            cx.simulate_mouse_move(other_bounds.center(), None, Modifiers::default());
+            draw(cx);
+            assert_theme_option_highlight(cx, theme, other, "pointer over other option");
+
+            // Leave the pointer over the old option while the keyboard moves focus.
+            // A competing hover fill would keep that row highlighted as well.
+            press(
+                cx,
+                if theme == ColorTheme::Dark {
+                    "up"
+                } else {
+                    "down"
+                },
+            );
+            assert_theme_option_highlight(cx, theme, theme, "keyboard with stationary pointer");
+            assert_eq!(
+                cx.update(|window, _| window.mouse_position()),
+                other_bounds.center()
+            );
+        }
+    }
+}
+
 #[test]
 fn every_select_opens_navigates_closes_and_reopens_in_both_themes_and_scales() {
     for theme in [ColorTheme::Dark, ColorTheme::Light] {

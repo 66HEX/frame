@@ -299,14 +299,9 @@ fn frame_select_option_inner(
         .font_weight(theme::TEXT_WEIGHT_REGULAR)
         .text_color(color(text_color))
         .opacity(if enabled { 1.0 } else { 0.5 })
-        .when(enabled, |this| {
-            this.hover_style(|style| {
-                style
-                    .bg(color(palette.fill_subtle))
-                    .text_color(color(palette.text_primary))
-                    .cursor_default()
-            })
-        })
+        // Pointer movement focuses the row, matching Radix SelectItem. A separate
+        // hover fill would override focus and persist after keyboard navigation.
+        .when(enabled, gpui::Styled::cursor_default)
         .when(!enabled, gpui::Styled::cursor_not_allowed)
         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
             cx.stop_propagation();
@@ -314,11 +309,12 @@ fn frame_select_option_inner(
         })
         .child(div().min_w_0().truncate().child(display_label))
         .when(selected, |this| {
-            this.child(icon_svg(
-                assets::ICON_CHECK,
-                14.0,
-                color(palette.text_primary),
-            ))
+            this.child(
+                gpui::svg()
+                    .path(assets::ICON_CHECK)
+                    .w(theme::ui_rem(14.0))
+                    .h(theme::ui_rem(14.0)),
+            )
         });
 
     if let Some(focus) = focus {

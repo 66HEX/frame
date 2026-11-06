@@ -134,6 +134,8 @@ Kompaktowe listy opcji, ścieżek i presetów używają `frame_list_group` z ods
 
 Selecty mają wspólny kod dla kliknięć, Enter/Space, strzałek bez zawijania listy, Home/End, Escape i wyszukiwania prefiksowego z timeoutem 1 s. Powtórzenie tej samej litery przechodzi do kolejnego dopasowania. Otwarty select blokuje Tab, a zamknięcie przywraca fokus triggera. Używana kompozycja odpowiada `SelectContent position="popper"` z limitem wysokości 192 px; domyślny Radix `item-aligned` jest odrębnym wariantem układu.
 
+Podświetlenie opcji Select ma jedno źródło: fokus używa pary `accent` / `accent-foreground`, a checkmark dziedziczy kolor tekstu. Ruch kursora przenosi fokus na opcję, tak jak w Radix; osobny kolor hover nie nadpisuje tego stanu. Dzięki temu kolory `secondary` i `accent` mogą się różnić, a użycie strzałek przy nieruchomym kursorze pozostawia tylko jedną podświetloną opcję.
+
 Scrollbar selecta jest absolutną nakładką: lista zachowuje padding 4 px z każdej strony, bez dodatkowej kolumny na scrollbar. Thumb jest przycinany do zaokrąglonego obrysu popovera również w skrajnych pozycjach przewijania.
 
 Selecty i color pickery używają wspólnego `FloatingPopover`. Komponent mierzy trigger i zawartość przed pierwszym malowaniem, otwiera popup nad triggerem, jeśli pod nim brakuje miejsca, oraz ogranicza wysokość do większej dostępnej przestrzeni, gdy nie mieści się po żadnej stronie. Zawartość pozostaje przewijalna. Pozycja uwzględnia szerokość okna, zmianę jego rozmiaru i skalę UI. Odstęp od triggera wynosi 4 px; margines kolizji Select wynosi 10 px, a Popover 0 px. Zgodnie z wymaganiem Frame animacja zamykania również przesuwa popup ku triggerowi; to rozszerzenie klas wyjścia zapisanych w referencji CLI.
