@@ -49,7 +49,6 @@ impl gpui::Render for MotionView {
                     "Preview control",
                     matches!(control, Control::PreviewToggle).then_some(selected),
                     !root.is_processing,
-                    root.tooltip_ui.visible_id.as_deref(),
                     TooltipPlacement::Above,
                     palette,
                     window,

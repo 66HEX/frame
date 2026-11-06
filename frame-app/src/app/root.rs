@@ -1,6 +1,5 @@
 use crate::app::accessibility::FrameFocusRegistry;
 use crate::app::chrome::state::TitlebarDragState;
-use crate::app::components::tooltip_state::TooltipUiState;
 use crate::app::input::FrameTextInputUiState;
 use crate::app::inspector::state::SettingsUiState;
 use crate::app::inspector::subtitles::state::SubtitleUiState;
@@ -44,7 +43,6 @@ pub struct FrameRoot {
     pub(in crate::app) log_copy_feedback_epoch: usize,
     pub(in crate::app) is_processing: bool,
     pub(in crate::app) settings_ui: SettingsUiState,
-    pub(in crate::app) tooltip_ui: TooltipUiState,
     pub(in crate::app) drag_drop_ui: DragDropUiState,
     pub(in crate::app) max_concurrency: usize,
     pub(in crate::app) default_output_directory: Option<std::path::PathBuf>,
@@ -171,7 +169,6 @@ impl FrameRoot {
             log_copy_feedback_epoch: 0,
             is_processing: false,
             settings_ui,
-            tooltip_ui: TooltipUiState::default(),
             drag_drop_ui: DragDropUiState::default(),
             max_concurrency,
             default_output_directory: persisted_settings.default_output_directory,

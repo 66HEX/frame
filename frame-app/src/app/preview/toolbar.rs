@@ -62,7 +62,6 @@ pub(in crate::app) fn preview_toolbar(
                 "Rotate preview",
                 None,
                 transform_enabled,
-                state.tooltip_visible_id.as_deref(),
                 TooltipPlacement::Right,
                 palette,
                 window,
@@ -81,7 +80,6 @@ pub(in crate::app) fn preview_toolbar(
                 "Flip horizontally",
                 Some(state.crop.flip_horizontal),
                 transform_enabled,
-                state.tooltip_visible_id.as_deref(),
                 TooltipPlacement::Right,
                 palette,
                 window,
@@ -100,7 +98,6 @@ pub(in crate::app) fn preview_toolbar(
                 "Flip vertically",
                 Some(state.crop.flip_vertical),
                 transform_enabled,
-                state.tooltip_visible_id.as_deref(),
                 TooltipPlacement::Right,
                 palette,
                 window,
@@ -120,7 +117,6 @@ pub(in crate::app) fn preview_toolbar(
                 Some(state.crop.crop_mode || state.crop.applied_crop.is_some()),
                 crop_enabled,
                 focuses.crop,
-                state.tooltip_visible_id.as_deref(),
                 TooltipPlacement::Right,
                 palette,
                 window,
@@ -140,7 +136,6 @@ pub(in crate::app) fn preview_toolbar(
                 Some(state.overlay.overlay_mode || state.overlay.has_overlay),
                 overlay_enabled,
                 focuses.overlay,
-                state.tooltip_visible_id.as_deref(),
                 TooltipPlacement::Right,
                 palette,
                 window,
@@ -178,7 +173,6 @@ pub(in crate::app) fn preview_zoom_toolbar(
                 "Zoom out",
                 None,
                 enabled,
-                state.tooltip_visible_id.as_deref(),
                 TooltipPlacement::Above,
                 palette,
                 window,
@@ -197,7 +191,6 @@ pub(in crate::app) fn preview_zoom_toolbar(
                 "Zoom in",
                 None,
                 enabled,
-                state.tooltip_visible_id.as_deref(),
                 TooltipPlacement::Above,
                 palette,
                 window,
@@ -231,7 +224,6 @@ pub(in crate::app) fn preview_tool_button(
     label: impl Into<String>,
     selected: Option<bool>,
     enabled: bool,
-    tooltip_visible_id: Option<&str>,
     tooltip_placement: TooltipPlacement,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
@@ -244,7 +236,6 @@ pub(in crate::app) fn preview_tool_button(
         selected,
         enabled,
         None,
-        tooltip_visible_id,
         tooltip_placement,
         palette,
         window,
@@ -263,7 +254,6 @@ pub(in crate::app) fn preview_tool_button_with_focus(
     selected: Option<bool>,
     enabled: bool,
     focus: &FocusHandle,
-    tooltip_visible_id: Option<&str>,
     tooltip_placement: TooltipPlacement,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
@@ -276,7 +266,6 @@ pub(in crate::app) fn preview_tool_button_with_focus(
         selected,
         enabled,
         Some(focus),
-        tooltip_visible_id,
         tooltip_placement,
         palette,
         window,
@@ -295,7 +284,6 @@ fn preview_tool_button_inner(
     selected: Option<bool>,
     enabled: bool,
     focus: Option<&FocusHandle>,
-    tooltip_visible_id: Option<&str>,
     tooltip_placement: TooltipPlacement,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
@@ -332,11 +320,7 @@ fn preview_tool_button_inner(
     } else {
         button
     };
-    FrameTooltip {
-        hovered: tooltip_visible_id == Some(button_id.as_str()),
-        id: button_id,
-        label,
-        placement: tooltip_placement,
-    }
-    .for_control(button, focus, enabled, palette, window, cx)
+    FrameTooltip::new(button_id, label)
+        .placement(tooltip_placement)
+        .for_control(button, focus, enabled, palette, window, cx)
 }

@@ -233,7 +233,6 @@ impl Render for FrameRoot {
                 let settings = SettingsRenderState {
                     palette,
                     active_tab: self.settings_ui.active_tab,
-                    tooltip_visible_id: self.tooltip_ui.visible_id.as_deref(),
                     expanded_output_sections: &self.settings_ui.expanded_output_sections,
                     config: crop_settings_preview
                         .as_ref()

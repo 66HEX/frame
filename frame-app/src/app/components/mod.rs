@@ -18,6 +18,8 @@ mod color_picker;
 #[cfg(test)]
 mod control_motion_tests;
 mod hit_target;
+#[cfg(test)]
+mod icon_button_tooltip_tests;
 mod list_item;
 mod scrollbar;
 mod select;

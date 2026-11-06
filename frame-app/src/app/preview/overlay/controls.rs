@@ -1,5 +1,5 @@
-use crate::app::components::FrameStyle;
 use crate::app::components::{FrameIconButtonSize, FrameIconButtonVariant, frame_icon_button};
+use crate::app::components::{FrameStyle, FrameTooltip};
 use crate::app::layout::{PREVIEW_TOOLBAR_BUTTON_SIZE, PREVIEW_TOOLBAR_ICON_SIZE};
 use crate::app::preview::overlay::opacity::preview_overlay_opacity_slider;
 use crate::app::preview::panel::{PreviewEditToolbarFocus, PreviewShellState};
@@ -232,9 +232,6 @@ pub(super) fn preview_overlay_icon_button_inner(
         color(button_colors(variant, false, enabled, palette).foreground),
     ));
 
-    if let Some(focus) = focus {
-        button.track_focus(focus)
-    } else {
-        button
-    }
+    FrameTooltip::new(format!("preview-overlay-{id}"), label)
+        .for_control(button, focus, enabled, palette, window, cx)
 }

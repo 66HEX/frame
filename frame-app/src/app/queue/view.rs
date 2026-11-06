@@ -505,11 +505,11 @@ fn row_primary_action_button(
             label,
             true,
             RowActionTone::Normal,
+            Some(&focus),
             palette,
             window,
             cx,
         )
-        .track_focus(&focus)
         .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
             cx.stop_propagation();
             let changed = match action {
@@ -559,11 +559,11 @@ fn row_secondary_action_button(
             label,
             true,
             RowActionTone::Destructive,
+            Some(&focus),
             palette,
             window,
             cx,
         )
-        .track_focus(&focus)
         .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
             cx.stop_propagation();
             let changed = match action {
@@ -616,6 +616,7 @@ pub(in crate::app) fn row_action_button(
     label: &'static str,
     enabled: bool,
     tone: RowActionTone,
+    focus: Option<&gpui::FocusHandle>,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
@@ -636,6 +637,7 @@ pub(in crate::app) fn row_action_button(
             button: FILE_LIST_ACTION_BUTTON_SIZE,
             icon: FILE_LIST_ACTION_ICON_SIZE,
         },
+        focus,
         palette,
         window,
         cx,

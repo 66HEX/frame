@@ -21,6 +21,11 @@ impl gpui::Render for TooltipTestView {
             window.set_rem_size(px(
                 crate::appearance::BASE_REM_PX * root.appearance.ui_scale.factor()
             ));
+            if edge_placement.is_some() {
+                tooltip_ui_state(window, cx).update(cx, |state, _| {
+                    state.visible_id = Some("preview-tool-rotate".into());
+                });
+            }
             let enabled = !root.is_processing;
             let palette = crate::theme::palette(crate::appearance::ColorTheme::Dark);
             let mut controls = if edge_placement.is_some() {
@@ -79,7 +84,6 @@ impl gpui::Render for TooltipTestView {
                         None
                     },
                     enabled,
-                    root.tooltip_ui.visible_id.as_deref(),
                     edge_placement.unwrap_or(placement),
                     palette,
                     window,
@@ -158,7 +162,6 @@ fn tooltip_flips_at_window_edges_and_keeps_the_bubble_inside_the_viewport() {
                     let mut root = FrameRoot::new();
                     root.apply_visual_fixture(Some(VisualFixture::PreviewReady));
                     root.appearance.ui_scale = scale;
-                    root.tooltip_ui.visible_id = Some("preview-tool-rotate".into());
                     root
                 });
                 let subscription = cx.observe(&root, |_, _, cx| cx.notify());
@@ -323,7 +326,7 @@ fn tooltip_switching_from_hover_to_keyboard_does_not_leave_two_bubbles() {
 #[test]
 fn tooltip_hover_delay_cancels_early_passes_and_clicks_but_keeps_warm_switching() {
     let mut app = TestAppContext::single();
-    let (root, cx) = preview_window(&mut app);
+    let (_, cx) = preview_window(&mut app);
     draw(cx);
     let rotate = cx.debug_bounds("preview-tool-rotate").unwrap();
     cx.simulate_mouse_move(rotate.center(), None, Modifiers::default());
@@ -367,7 +370,8 @@ fn tooltip_hover_delay_cancels_early_passes_and_clicks_but_keeps_warm_switching(
     );
     // A tooltip that remains open is still warm after the last-close deadline.
     // Move backwards through paint order to exercise enter-before-leave callbacks.
-    root.update(cx, |root, _| root.tooltip_ui.warm_until = None);
+    cx.executor()
+        .advance_clock(TOOLTIP_HYSTERESIS_WINDOW + Duration::from_millis(1));
     cx.simulate_mouse_move(rotate.center(), None, Modifiers::default());
     draw(cx);
     assert!(cx.debug_bounds("tooltip-preview-tool-rotate").is_some());
@@ -479,7 +483,6 @@ fn tooltip_stays_hidden_if_its_control_is_disabled_during_the_hover_delay() {
     cx.executor().advance_clock(TOOLTIP_HOVER_DELAY);
     draw(cx);
     assert!(cx.debug_bounds("tooltip-preview-tool-rotate").is_none());
-    assert!(root.read_with(cx, |root, _| root.tooltip_ui.visible_id.is_none()));
     root.update(cx, |root, cx| {
         root.is_processing = false;
         cx.notify();

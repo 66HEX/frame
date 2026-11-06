@@ -56,7 +56,6 @@ impl Default for SettingsUiState {
 pub(in crate::app) struct SettingsRenderState<'a> {
     pub(in crate::app) palette: &'static theme::ThemePalette,
     pub(in crate::app) active_tab: SettingsTab,
-    pub(in crate::app) tooltip_visible_id: Option<&'a str>,
     pub(in crate::app) expanded_output_sections: &'a std::collections::BTreeSet<OutputSection>,
     pub(in crate::app) config: &'a ConversionConfig,
     pub(in crate::app) crop_editing: bool,

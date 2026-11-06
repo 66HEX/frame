@@ -5,8 +5,8 @@ use crate::app::root::FrameRoot;
 use crate::theme;
 use gpui::prelude::{FluentBuilder, ParentElement, Styled};
 use gpui::{
-    Context, Entity, FocusHandle, InteractiveElement, IntoElement, StatefulInteractiveElement,
-    Subscription, Window, deferred, div,
+    App, AppContext, Context, Entity, FocusHandle, InteractiveElement, IntoElement,
+    StatefulInteractiveElement, Subscription, Window, deferred, div,
 };
 use std::{
     cell::Cell,
@@ -27,8 +27,8 @@ pub(in crate::app) enum TooltipPlacement {
 pub(in crate::app) struct FrameTooltip {
     pub(in crate::app) id: String,
     pub(in crate::app) label: String,
-    pub(in crate::app) hovered: bool,
     pub(in crate::app) placement: TooltipPlacement,
+    dismiss_on_click: bool,
 }
 
 struct TooltipFocusState {
@@ -55,7 +55,46 @@ impl TooltipFocusState {
     }
 }
 
+// Every icon button uses one window-local hover lifecycle, including delay and
+// warm switching. Callers do not have to route preview-specific state through UI.
+fn tooltip_ui_state(window: &mut Window, cx: &mut App) -> Entity<TooltipUiState> {
+    // An unscoped, typed element-state slot keeps virtualized rows and deferred
+    // overlays on the same lifecycle as controls built in the root render pass.
+    let view = window.current_view();
+    window.with_element_state(
+        &gpui::GlobalElementId::default(),
+        |state: Option<Entity<TooltipUiState>>, _| {
+            let state = state.unwrap_or_else(|| {
+                let state = cx.new(|_| TooltipUiState::default());
+                cx.observe(&state, move |_, cx| cx.notify(view)).detach();
+                state
+            });
+            (state.clone(), state)
+        },
+    )
+}
+
 impl FrameTooltip {
+    pub(in crate::app) fn new(id: impl Into<String>, label: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            placement: TooltipPlacement::Above,
+            dismiss_on_click: true,
+        }
+    }
+
+    /// Confirmation controls can update their label while the tooltip stays open.
+    pub(in crate::app) const fn keep_open_on_click(mut self) -> Self {
+        self.dismiss_on_click = false;
+        self
+    }
+
+    pub(in crate::app) const fn placement(mut self, placement: TooltipPlacement) -> Self {
+        self.placement = placement;
+        self
+    }
+
     pub(in crate::app) fn for_control(
         self,
         button: gpui::Stateful<gpui::Div>,
@@ -65,9 +104,9 @@ impl FrameTooltip {
         window: &mut Window,
         cx: &mut Context<FrameRoot>,
     ) -> gpui::Stateful<gpui::Div> {
+        let hover_state = tooltip_ui_state(window, cx);
         if !enabled {
-            let id = self.id.clone();
-            cx.defer_in(window, move |root, _, cx| root.end_tooltip_hover(&id, cx));
+            hover_state.update(cx, |state, cx| state.end_tooltip_hover(&self.id, cx));
         }
         let focus_state =
             window.use_keyed_state(format!("tooltip-{}-focus", self.id), cx, |window, cx| {
@@ -80,11 +119,11 @@ impl FrameTooltip {
             && if window.last_input_was_keyboard() {
                 state.focus.is_focused(window)
             } else {
-                self.hovered
+                hover_state.read(cx).visible_id.as_deref() == Some(self.id.as_str())
             };
         let focus = state.focus.clone().tab_stop(enabled);
         let button = button.track_focus(&focus).tab_stop(enabled);
-        self.render(button, visible, Some(focus_state), palette, window, cx)
+        self.render(button, visible, focus_state, palette, window, cx)
     }
 
     #[expect(
@@ -95,14 +134,17 @@ impl FrameTooltip {
         self,
         anchor: gpui::Stateful<gpui::Div>,
         visible: bool,
-        focus_state: Option<Entity<TooltipFocusState>>,
+        focus_state: Entity<TooltipFocusState>,
         palette: &'static theme::ThemePalette,
         window: &mut Window,
         cx: &mut Context<FrameRoot>,
     ) -> gpui::Stateful<gpui::Div> {
+        let hover_state = tooltip_ui_state(window, cx);
         let hover_id = self.id.clone();
         let dismiss_id = self.id.clone();
         let hover_focus_state = focus_state.clone();
+        let hover_owner: gpui::AnyWeakEntity = focus_state.downgrade().into();
+        let content_owner = hover_owner.clone();
         let motion = window
             .use_keyed_transition(
                 format!("tooltip-{}-motion", self.id),
@@ -125,72 +167,77 @@ impl FrameTooltip {
         let down_id = self.id.clone();
         let click_id = self.id.clone();
         let click_focus = focus_state.clone();
-        let on_pointer_move = Rc::new(cx.listener(
-            move |root, event: &gpui::MouseMoveEvent, _, cx| {
-                if root.tooltip_ui.visible_id.as_deref() == Some(&pointer_id)
-                    && root
-                        .tooltip_ui
-                        .grace_area
-                        .as_ref()
-                        .is_some_and(|area| !area.contains(event.position))
-                {
-                    root.end_tooltip_hover(&pointer_id, cx);
-                }
+        let dismiss_on_click = self.dismiss_on_click;
+        let pointer_state = hover_state.clone();
+        let on_pointer_move = Rc::new(
+            move |event: &gpui::MouseMoveEvent, _: &mut Window, cx: &mut App| {
+                pointer_state.update(cx, |state, cx| {
+                    if state.visible_id.as_deref() == Some(&pointer_id)
+                        && state
+                            .grace_area
+                            .as_ref()
+                            .is_some_and(|area| !area.contains(event.position))
+                    {
+                        state.end_tooltip_hover(&pointer_id, cx);
+                    }
+                });
             },
-        ));
+        );
+        let down_state = hover_state.clone();
+        let click_state = hover_state.clone();
+        let dismiss_state = hover_state.clone();
+        let content_state = hover_state.clone();
         let scale = window.rem_size().as_f32() / crate::appearance::BASE_REM_PX;
 
         anchor
             .debug_selector(|| self.id.clone())
             .relative()
             .on_prepaint(move |info, _, _| measured_anchor.set(info.bounds))
-            .on_hover(cx.listener(move |root, hovered: &bool, window, cx| {
-                if let Some(state) = &hover_focus_state {
-                    state.update(cx, |state, cx| {
-                        state.dismissed = false;
-                        cx.notify();
-                    });
+            .on_hover(move |hovered: &bool, window, cx| {
+                hover_focus_state.update(cx, |state, cx| {
+                    state.dismissed = false;
+                    cx.notify();
+                });
+                hover_state.update(cx, |state, cx| {
+                    if !*hovered && !visible {
+                        state.end_tooltip_hover(&hover_id, cx);
+                    } else {
+                        state.change_tooltip_hover(
+                            &hover_id,
+                            *hovered,
+                            (hover_anchor.get(), hover_content.get()),
+                            window.mouse_position(),
+                            &hover_owner,
+                            cx,
+                        );
+                    }
+                });
+            })
+            .on_mouse_down(gpui::MouseButton::Left, move |_, _, cx| {
+                if dismiss_on_click {
+                    down_state.update(cx, |state, cx| state.end_tooltip_hover(&down_id, cx));
                 }
-                if !*hovered && !visible {
-                    root.end_tooltip_hover(&hover_id, cx);
-                } else {
-                    root.change_tooltip_hover(
-                        &hover_id,
-                        *hovered,
-                        (hover_anchor.get(), hover_content.get()),
-                        window.mouse_position(),
-                        cx,
-                    );
+            })
+            .on_click(move |_, _, cx| {
+                if !dismiss_on_click {
+                    return;
                 }
-            }))
-            .on_mouse_down(
-                gpui::MouseButton::Left,
-                cx.listener(move |root, _, _, cx| {
-                    root.end_tooltip_hover(&down_id, cx);
-                }),
-            )
-            .on_click(cx.listener(move |root, _, _, cx| {
-                if let Some(state) = &click_focus {
-                    state.update(cx, |state, cx| {
+                click_focus.update(cx, |state, cx| {
+                    state.dismissed = true;
+                    cx.notify();
+                });
+                click_state.update(cx, |state, cx| state.end_tooltip_hover(&click_id, cx));
+            })
+            .on_key_down(move |event: &gpui::KeyDownEvent, _, cx| {
+                if event.keystroke.key == "escape" && visible {
+                    focus_state.update(cx, |state, cx| {
                         state.dismissed = true;
                         cx.notify();
                     });
+                    dismiss_state.update(cx, |state, cx| state.end_tooltip_hover(&dismiss_id, cx));
+                    // Help is nonmodal: preserve Escape handling in the owning
+                    // editor, popover or drawer after dismissing its tooltip.
                 }
-                root.end_tooltip_hover(&click_id, cx);
-            }))
-            .when_some(focus_state, |this, state| {
-                this.on_key_down(cx.listener(
-                    move |root, event: &gpui::KeyDownEvent, _window, cx| {
-                        if event.keystroke.key == "escape" && visible {
-                            state.update(cx, |state, cx| {
-                                state.dismissed = true;
-                                cx.notify();
-                            });
-                            root.end_tooltip_hover(&dismiss_id, cx);
-                            cx.stop_propagation();
-                        }
-                    },
-                ))
             })
             .when(
                 visible || !crate::app::motion::motion_is_hidden(progress),
@@ -198,15 +245,18 @@ impl FrameTooltip {
                     let bubble = div()
                         .id(format!("tooltip-{}", self.id))
                         .debug_selector(|| format!("tooltip-{}", self.id))
-                        .on_hover(cx.listener(move |root, hovered: &bool, window, cx| {
-                            root.change_tooltip_hover(
-                                &content_id,
-                                *hovered,
-                                (content_hover.get(), content_anchor.get()),
-                                window.mouse_position(),
-                                cx,
-                            );
-                        }))
+                        .on_hover(move |hovered: &bool, window, cx| {
+                            content_state.update(cx, |state, cx| {
+                                state.change_tooltip_hover(
+                                    &content_id,
+                                    *hovered,
+                                    (content_hover.get(), content_anchor.get()),
+                                    window.mouse_position(),
+                                    &content_owner,
+                                    cx,
+                                );
+                            });
+                        })
                         .flex()
                         .child(
                             div()
@@ -249,26 +299,27 @@ impl FrameTooltip {
     }
 }
 
-impl FrameRoot {
+impl TooltipUiState {
     fn change_tooltip_hover(
         &mut self,
         id: &str,
         hovered: bool,
         bounds: (gpui::Bounds<gpui::Pixels>, gpui::Bounds<gpui::Pixels>),
         pointer: gpui::Point<gpui::Pixels>,
+        owner: &gpui::AnyWeakEntity,
         cx: &mut Context<Self>,
     ) {
         if hovered {
-            self.tooltip_ui.grace_area = None;
-            self.begin_tooltip_hover(id.to_owned(), cx);
-        } else if self.tooltip_ui.visible_id.as_deref() == Some(id) {
+            self.grace_area = None;
+            self.begin_tooltip_hover(id.to_owned(), owner, cx);
+        } else if self.visible_id.as_deref() == Some(id) {
             if bounds.1.contains(&pointer) {
-                self.tooltip_ui.grace_area = None;
+                self.grace_area = None;
                 return;
             }
             let area = super::tooltip_grace::TooltipGraceArea::new(pointer, bounds.0, bounds.1);
             if area.contains(pointer) {
-                self.tooltip_ui.grace_area = Some(area);
+                self.grace_area = Some(area);
             } else {
                 self.end_tooltip_hover(id, cx);
             }
@@ -277,14 +328,29 @@ impl FrameRoot {
         }
     }
 
-    fn begin_tooltip_hover(&mut self, id: String, cx: &mut Context<Self>) {
+    fn begin_tooltip_hover(
+        &mut self,
+        id: String,
+        owner: &gpui::AnyWeakEntity,
+        cx: &mut Context<Self>,
+    ) {
         let now = Instant::now();
-        let show_without_delay =
-            self.tooltip_ui.visible_id.is_some() || self.tooltip_ui.is_warm(now);
-        let epoch = self.tooltip_ui.begin_hover(id.clone());
+        // Virtualized or changing queue actions may disappear without a leave
+        // event. Their stale state must not keep unrelated tooltips warm.
+        if self
+            .hover_owner
+            .as_ref()
+            .is_some_and(|owner| !owner.is_upgradable())
+        {
+            self.end_hover(now);
+            self.warm_until = None;
+        }
+        let show_without_delay = self.visible_id.is_some() || self.is_warm(now);
+        let epoch = self.begin_hover(id.clone());
+        self.hover_owner = Some(owner.clone());
 
         if show_without_delay {
-            self.tooltip_ui.visible_id = Some(id);
+            self.visible_id = Some(id);
             cx.notify();
             return;
         }
@@ -292,11 +358,15 @@ impl FrameRoot {
         cx.spawn(async move |this, cx| {
             cx.background_executor().timer(TOOLTIP_HOVER_DELAY).await;
             if let Some(this) = this.upgrade() {
-                this.update(cx, |root, cx| {
-                    if root.tooltip_ui.hover_epoch == epoch
-                        && root.tooltip_ui.hovered_id.as_deref() == Some(id.as_str())
+                this.update(cx, |state, cx| {
+                    if state.hover_epoch == epoch
+                        && state.hovered_id.as_deref() == Some(id.as_str())
+                        && state
+                            .hover_owner
+                            .as_ref()
+                            .is_some_and(gpui::AnyWeakEntity::is_upgradable)
                     {
-                        root.tooltip_ui.visible_id = Some(id);
+                        state.visible_id = Some(id);
                         cx.notify();
                     }
                 });
@@ -306,11 +376,11 @@ impl FrameRoot {
     }
 
     fn end_tooltip_hover(&mut self, id: &str, cx: &mut Context<Self>) {
-        if self.tooltip_ui.hovered_id.as_deref() != Some(id) {
+        if self.hovered_id.as_deref() != Some(id) {
             return;
         }
 
-        self.tooltip_ui.end_hover(Instant::now());
+        self.end_hover(Instant::now());
         cx.notify();
     }
 }
@@ -333,6 +403,7 @@ impl TooltipUiState {
         self.hover_epoch = self.hover_epoch.wrapping_add(1);
         self.hovered_id = None;
         self.visible_id = None;
+        self.hover_owner = None;
         self.warm_until = was_visible
             .then(|| now.checked_add(TOOLTIP_HYSTERESIS_WINDOW))
             .flatten();

@@ -36,7 +36,6 @@ fn preview_canvas_layout_ready_requires_measured_viewport() {
 #[test]
 fn preview_waiting_for_visual_render_only_hides_visual_media_without_frame() {
     let mut state = PreviewShellState {
-        tooltip_visible_id: None,
         palette: theme::palette(crate::appearance::ColorTheme::Dark),
         selected_file_name: Some("sample.mov".to_string()),
         metadata_status: PreviewMetadataStatus::Ready,

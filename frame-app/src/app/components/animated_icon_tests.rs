@@ -95,6 +95,7 @@ impl gpui::Render for IconTestView {
                             button: 24.0,
                             icon: 14.0,
                         },
+                        None,
                         palette,
                         window,
                         cx,

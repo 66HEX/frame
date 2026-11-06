@@ -1,4 +1,4 @@
-use super::frame_animated_icon;
+use super::{FrameTooltip, frame_animated_icon};
 use crate::app::accessibility::apply_accessible_button;
 #[cfg(test)]
 use crate::app::accessibility::apply_accessible_toggle_button;
@@ -338,6 +338,7 @@ pub(in crate::app) fn frame_icon_button(
         variant,
         enabled,
         size,
+        None,
         palette,
         window,
         cx,
@@ -356,18 +357,19 @@ pub(in crate::app) fn frame_icon_button_with_motion_key(
     variant: FrameIconButtonVariant,
     enabled: bool,
     size: FrameIconButtonSize,
+    focus: Option<&FocusHandle>,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let content = frame_animated_icon(motion_key, Some(icon), size.icon, None, window, cx);
     frame_icon_button_inner(
-        id.into(),
+        FrameTooltip::new(id, label),
         content,
-        &label.into(),
         variant,
         enabled,
         size,
+        focus,
         palette,
         window,
         cx,
@@ -403,12 +405,12 @@ pub(in crate::app) fn frame_icon_swap_button(
         cx,
     );
     frame_icon_button_inner(
-        id,
+        FrameTooltip::new(id, label).keep_open_on_click(),
         content,
-        &label.into(),
         variant,
         enabled,
         size,
+        None,
         palette,
         window,
         cx,
@@ -420,12 +422,12 @@ pub(in crate::app) fn frame_icon_swap_button(
     reason = "The shared implementation preserves the existing explicit icon button contract."
 )]
 fn frame_icon_button_inner(
-    id: String,
+    tooltip: FrameTooltip,
     content: gpui::Div,
-    label: &str,
     variant: FrameIconButtonVariant,
     enabled: bool,
     size: FrameIconButtonSize,
+    focus: Option<&FocusHandle>,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
@@ -434,9 +436,9 @@ fn frame_icon_button_inner(
         FrameIconButtonVariant::Ghost => ButtonVariant::Ghost,
         FrameIconButtonVariant::DestructiveGhost => ButtonVariant::Destructive,
     };
-    frame_button_base(
-        id,
-        label,
+    let button = frame_button_base(
+        tooltip.id.clone(),
+        &tooltip.label,
         variant,
         false,
         enabled,
@@ -448,5 +450,6 @@ fn frame_icon_button_inner(
     .w(theme::ui_rem(size.button))
     .h(theme::ui_rem(size.button))
     .p_0()
-    .child(content)
+    .child(content);
+    tooltip.for_control(button, focus, enabled, palette, window, cx)
 }

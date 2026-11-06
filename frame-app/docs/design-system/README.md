@@ -76,6 +76,8 @@ Przejście białego tła do przezroczystości wygasza biel bez szarego błysku.
 Test inspectora sprawdza malowane tła co 8 ms, zmianę tabów myszą i klawiaturą
 oraz odwrócenie przejścia w trakcie animacji, w obu motywach i skalach UI.
 
+Tooltipy opisują akcje ikonowe; oczywiste przyciski zamknięcia okna, dialogu i ustawień oraz kontrolki z widocznym tekstem pozostają bez dodatkowej podpowiedzi. Każdy przycisk zachowuje dostępną nazwę. `FrameTooltip` współdzieli zwłokę i stan hover w obrębie okna, także między wirtualizowanymi wierszami. Zniknięcie kontrolki unieważnia jej oczekującą podpowiedź. Escape zamyka tooltip i pozostawia działanie skrótu właścicielowi. Kopiowanie logów utrzymuje tooltip po kliknięciu, aby pokazać zmianę „Copy logs” na „Logs copied”.
+
 ## Inwentaryzacja
 
 [INVENTORY.md](INVENTORY.md) zawiera wszystkie 24 rodzaje pól tekstowych, konstruktory UI, ich miejsca użycia i jawne identyfikatory. [inventory.json](inventory.json) zawiera ten sam indeks do dalszej analizy. Polecenie `python3 script/inventory-ui.py` aktualizuje oba pliki.
@@ -95,7 +97,7 @@ oraz odwrócenie przejścia w trakcie animacji, w obu motywach i skalach UI.
 | Card | Preview, kolejka, inspektor, logi, welcome | `FrameSurface::card_surface`; card, radius-lg, shadow-sm |
 | Badge | Wartości suwaków i kompaktowe wskaźniki wartości | `frame_badge`, wariant secondary, 20 px, tekst 10 px |
 | Separator | Podziały nagłówków i toolbarów | Jeden piksel tokenu border, bez tłoczeń i dodatkowego highlightu |
-| Tooltip | Przyciski narzędziowe, playback, zoom | `tooltip.rs`; delay 400 ms, popover/foreground, radius-md, strzałka, keyboard focus/Escape, kolizje z brzegiem okna i hoverable content |
+| Tooltip | Akcje ikonowe logów, kolejki, presetów, filtrów, Settings i narzędzi podglądu | `tooltip.rs`; delay 400 ms, popover/foreground, radius-md, strzałka, keyboard focus/Escape, kolizje z brzegiem okna i hoverable content |
 | Popover | Selecty, color pickery, narzędzia crop/overlay | `popover_surface`, `frame_toolbar`; popover, shadow-md z krawędzią i highlightem |
 | Dialog / AlertDialog | Dostępna aktualizacja, pobieranie i potwierdzenia instalacji | `updates/dialog.rs`; wspólna powierzchnia dialogu i kontrolki |
 | Drawer | Ustawienia aplikacji | `preferences/view.rs`; prawa strona, odstęp 8 px od góry, prawego i dolnego brzegu, 384 px maks., 75% wąskiego okna, radius-xl 18 px, card/card-foreground, shadow-lg, backdrop black/80 + blur4 |

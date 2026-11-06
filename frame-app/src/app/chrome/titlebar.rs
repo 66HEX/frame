@@ -2,6 +2,7 @@ use crate::app::chrome::navigation::{titlebar_navigation, titlebar_stats};
 use crate::app::chrome::window_controls::{
     linux_window_controls, macos_native_window_controls_placeholder, windows_window_controls,
 };
+use crate::app::components::FrameTooltip;
 use crate::app::layout::{
     LEFT_COLUMN_SPAN, RIGHT_COLUMN_SPAN, TITLEBAR_DIVIDER_HEIGHT, TITLEBAR_HEIGHT,
     TITLEBAR_LOGO_SIZE, TITLEBAR_PLATFORM_DIVIDER_HEIGHT, TITLEBAR_TOP_PADDING, WORKSPACE_COLUMNS,
@@ -255,7 +256,7 @@ pub(in crate::app) fn titlebar_settings_button(
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
     let focus = crate::app::accessibility::titlebar_settings_focus(window, cx);
-    action_button(
+    let button = action_button(
         "titlebar-settings",
         assets::ICON_SETTINGS,
         None,
@@ -266,15 +267,17 @@ pub(in crate::app) fn titlebar_settings_button(
         window,
         cx,
     )
-    .track_focus(&focus)
-    .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
-        if root.settings_ui.is_open {
-            root.close_app_settings();
-        } else {
-            root.open_app_settings();
-        }
-        cx.notify();
-    }))
+    .track_focus(&focus);
+    FrameTooltip::new("titlebar-settings", "Settings")
+        .for_control(button, Some(&focus), true, palette, window, cx)
+        .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+            if root.settings_ui.is_open {
+                root.close_app_settings();
+            } else {
+                root.open_app_settings();
+            }
+            cx.notify();
+        }))
 }
 
 pub(in crate::app) fn titlebar_add_source_button(

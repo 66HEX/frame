@@ -59,7 +59,6 @@ fn settings_state<'a>(
         palette: theme::palette(crate::appearance::ColorTheme::Dark),
         active_tab: SettingsTab::Metadata,
         expanded_output_sections: &CLOSED,
-        tooltip_visible_id: None,
         config,
         metadata,
         metadata_status: status,
