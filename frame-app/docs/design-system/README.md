@@ -142,6 +142,8 @@ Kompaktowe listy opcji, ścieżek i presetów używają `frame_list_group` z ods
 
 W Presets lista zaczyna się bezpośrednio pod wierszem zapisu i zachowuje tę pozycję po każdej akcji. Panel nie dodaje nad listą komunikatów o zastosowaniu, zapisie, usunięciu ani błędach. Status `Applied` znajduje się na odpowiednim elemencie i używa tokenu `success`.
 
+Pasek tabów w Logs dopasowuje szerokość do zawartości. Przy braku miejsca kurczy się do dostępnej szerokości i przewija poziomo; przycisk kopiowania pozostaje przy prawym brzegu nagłówka. Pusty stan pokazuje komunikat bez tła i cienia listy tabów.
+
 Selecty mają wspólny kod dla kliknięć, Enter/Space, strzałek bez zawijania listy, Home/End, Escape i wyszukiwania prefiksowego z timeoutem 1 s. Powtórzenie tej samej litery przechodzi do kolejnego dopasowania. Otwarty select blokuje Tab, a zamknięcie przywraca fokus triggera. Używana kompozycja odpowiada `SelectContent position="popper"` z limitem wysokości 192 px; domyślny Radix `item-aligned` jest odrębnym wariantem układu.
 
 Podświetlenie opcji Select ma jedno źródło: fokus używa pary `accent` / `accent-foreground`, a checkmark dziedziczy kolor tekstu. Ruch kursora przenosi fokus na opcję, tak jak w Radix; osobny kolor hover nie nadpisuje tego stanu. Dzięki temu kolory `secondary` i `accent` mogą się różnić, a użycie strzałek przy nieruchomym kursorze pozostawia tylko jedną podświetloną opcję.

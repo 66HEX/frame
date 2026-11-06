@@ -370,28 +370,58 @@ fn overlay_toolbar_does_not_trap_focus_away_from_resize_handles() {
 fn logs_reveal_distant_tabs_and_keep_the_output_focus_ring_inside_its_clip() {
     let mut app = TestAppContext::single();
     let (root, cx) = test_window(&mut app, VisualFixture::LogsActive, ScalePreset::Percent100);
-    root.update(cx, |root, cx| {
-        for index in 0..30 {
-            let id = format!("keyboard-log-{index:02}");
-            root.file_queue
-                .add_file(crate::file_queue::FileItem::from_path(
-                    &id,
-                    format!("/tmp/long_conversion_filename_{index:02}.mov"),
-                    1000,
-                ));
-            root.file_queue
-                .update_status(&id, crate::file_queue::FileStatus::Converting, 50);
-            root.conversion_events.apply_conversion_event(
-                &mut root.file_queue,
-                frame_core::events::ConversionEvent::log(&id, "Progress"),
-            );
-        }
-        cx.notify();
-    });
     let viewport = size(px(1200.0), px(800.0));
     cx.simulate_resize(viewport);
     cx.update(|window, _| window.set_a11y_forced(true));
     draw(cx);
+    let single_tab = log_tab_widths(cx);
+    assert_eq!(single_tab.len(), 1);
+    let single_strip = cx.debug_bounds("logs-tab-list").unwrap();
+    let edge_padding = f64::from(single_strip.size.width.as_f32()) - single_tab[0];
+    assert!(
+        edge_padding >= 0.0 && edge_padding < single_tab[0],
+        "one tab should determine the strip width, not fill the header: {single_strip:?}"
+    );
+    let copy_right = cx.debug_bounds("logs-copy").unwrap().right();
+    for count in [3, 30] {
+        root.update(cx, |root, cx| {
+            for index in root.file_queue.files().len()..count {
+                let id = format!("keyboard-log-{index:02}");
+                root.file_queue
+                    .add_file(crate::file_queue::FileItem::from_path(
+                        &id,
+                        format!("/tmp/long_conversion_filename_{index:02}.mov"),
+                        1000,
+                    ));
+                root.file_queue
+                    .update_status(&id, crate::file_queue::FileStatus::Converting, 50);
+                root.conversion_events.apply_conversion_event(
+                    &mut root.file_queue,
+                    frame_core::events::ConversionEvent::log(&id, "Progress"),
+                );
+            }
+            cx.notify();
+        });
+        draw(cx);
+        let widths = log_tab_widths(cx);
+        assert_eq!(widths.len(), count);
+        let content_width: f64 = widths.iter().sum();
+        let strip = cx.debug_bounds("logs-tab-list").unwrap();
+        let copy = cx.debug_bounds("logs-copy").unwrap();
+        assert_eq!(copy.right(), copy_right, "Copy must keep its right anchor");
+        assert!(strip.right() < copy.left(), "tabs must not overlap Copy");
+        if count == 3 {
+            assert!(
+                (f64::from(strip.size.width.as_f32()) - content_width - edge_padding).abs() < 0.5,
+                "a short strip should fit the sum of tab widths: {strip:?}, tabs={widths:?}"
+            );
+        } else {
+            assert!(
+                content_width > f64::from(strip.size.width.as_f32()),
+                "many tabs must overflow inside a constrained strip"
+            );
+        }
+    }
     for _ in 0..10 {
         press(cx, "tab");
         if focused_node(cx)["element_id"]
@@ -404,6 +434,16 @@ fn logs_reveal_distant_tabs_and_keep_the_output_focus_ring_inside_its_clip() {
     }
     press(cx, "end");
     assert_visible_focus(cx, viewport);
+    let strip = cx.debug_bounds("logs-tab-list").unwrap();
+    let focused = focused_node(cx);
+    assert_eq!(focused["aria"]["label"], "long_conversion_filename_29.mov");
+    let left = focused["bounds"]["x"].as_f64().unwrap();
+    let right = left + focused["bounds"]["width"].as_f64().unwrap();
+    assert!(
+        left >= f64::from(strip.left().as_f32()) - 0.01
+            && right <= f64::from(strip.right().as_f32()) + 0.01,
+        "End must reveal the final tab inside its scrolling strip: {focused}"
+    );
     press(cx, "home");
     assert_visible_focus(cx, viewport);
     press(cx, "tab"); // Copy
@@ -425,6 +465,25 @@ fn logs_reveal_distant_tabs_and_keep_the_output_focus_ring_inside_its_clip() {
             ring.bounds
         );
     });
+}
+
+fn log_tab_widths(cx: &mut VisualTestContext) -> Vec<f64> {
+    cx.update(|window, _| {
+        let tree: serde_json::Value =
+            serde_json::from_str(&window.debug_a11y_tree_json().unwrap()).unwrap();
+        tree["nodes"]
+            .as_object()
+            .unwrap()
+            .values()
+            .filter(|node| {
+                node["aria"]["role"] == "Tab"
+                    && node["element_id"]
+                        .as_str()
+                        .is_some_and(|id| id.contains("logs-tab-"))
+            })
+            .map(|node| node["bounds"]["width"].as_f64().unwrap())
+            .collect()
+    })
 }
 
 #[test]

@@ -87,10 +87,14 @@ pub(in crate::app) fn logs_tab_strip(
         cx,
     );
     let mut tabs = frame_tabs_list(palette)
+        .when(active_files.is_empty(), |this| {
+            this.bg(color(palette.transparent)).shadow(Vec::new())
+        })
         .id("logs-tab-list")
+        .debug_selector(|| "logs-tab-list".to_string())
         .role(gpui::Role::TabList)
         .aria_label("Log files")
-        .flex_1()
+        .flex_initial()
         .min_w_0()
         .flex()
         .items_center()
@@ -122,6 +126,7 @@ pub(in crate::app) fn logs_tab_strip(
     }
 
     let header = frame_panel_header()
+        .justify_between()
         .child(tabs)
         .when_some(selected_id, |this, selected_id| {
             this.child(logs_copy_button(
