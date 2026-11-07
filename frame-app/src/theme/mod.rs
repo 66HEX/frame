@@ -77,6 +77,7 @@ pub struct ThemePalette {
     pub input_hover: RgbaToken,
     pub secondary_hover: RgbaToken,
     pub secondary_foreground: RgbaToken,
+    pub accent_hover: RgbaToken,
     pub accent_foreground: RgbaToken,
     /// Transient option focus, independent of persistent tab selection.
     pub select_highlight: RgbaToken,
@@ -144,6 +145,7 @@ impl ThemePalette {
             input_hover: get("muted"),
             secondary_hover: get("secondary-hover"),
             secondary_foreground: get("secondary-foreground"),
+            accent_hover: get("accent-hover"),
             accent_foreground: get("accent-foreground"),
             // Standard shadcn themes keep their accent mapping; Graphite can
             // define a separate option highlight without recoloring active tabs.

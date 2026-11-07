@@ -204,15 +204,17 @@ fn colors(variables: &Variables) -> Result<Value, String> {
             return Err(format!("--{name}: unsupported color {value:?}"));
         }
     }
-    let secondary = parse_color(&resolve("secondary", variables, &mut Vec::new())?)?;
     let foreground = parse_color(&resolve("foreground", variables, &mut Vec::new())?)?;
-    values.insert(
-        "secondary-hover".into(),
-        json!({
-            "css": "color-mix(in oklch,var(--secondary),var(--foreground) 5%)",
-            "srgb": rgba(mix_oklch(secondary, foreground, 0.05)),
-        }),
-    );
+    for name in ["secondary", "accent"] {
+        let base = parse_color(&resolve(name, variables, &mut Vec::new())?)?;
+        values.insert(
+            format!("{name}-hover"),
+            json!({
+                "css": format!("color-mix(in oklch,var(--{name}),var(--foreground) 5%)"),
+                "srgb": rgba(mix_oklch(base, foreground, 0.05)),
+            }),
+        );
+    }
     Ok(json!(values))
 }
 

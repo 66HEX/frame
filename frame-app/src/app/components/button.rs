@@ -217,7 +217,10 @@ fn frame_control_base(
     let raised = selected
         || matches!(
             variant,
-            ButtonVariant::Primary | ButtonVariant::Secondary | ButtonVariant::Outline
+            ButtonVariant::Primary
+                | ButtonVariant::Secondary
+                | ButtonVariant::Accent
+                | ButtonVariant::Outline
         );
     let background = if colors.background.alpha == 0.0 {
         colors.hover_background.with_alpha(0.0)

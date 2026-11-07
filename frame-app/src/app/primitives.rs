@@ -14,6 +14,7 @@ use gpui::{App, BoxShadow, Context, IntoElement, Rgba, Window, div, point, px, s
 pub(super) enum ButtonVariant {
     Primary,
     Secondary,
+    Accent,
     Outline,
     Ghost,
     Destructive,
@@ -52,6 +53,11 @@ pub(super) const fn button_colors(
                 palette.fill_subtle,
                 palette.secondary_hover,
                 palette.secondary_foreground,
+            ),
+            ButtonVariant::Accent => (
+                palette.fill_selected,
+                palette.accent_hover,
+                palette.accent_foreground,
             ),
             ButtonVariant::Outline => (
                 palette.fill_subtle,
@@ -223,6 +229,7 @@ mod tests {
             for variant in [
                 ButtonVariant::Primary,
                 ButtonVariant::Secondary,
+                ButtonVariant::Accent,
                 ButtonVariant::Outline,
                 ButtonVariant::Ghost,
                 ButtonVariant::Destructive,

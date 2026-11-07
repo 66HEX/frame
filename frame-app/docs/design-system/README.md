@@ -156,6 +156,8 @@ Selecty mają wspólny kod dla kliknięć, Enter/Space, strzałek bez zawijania 
 
 Podświetlenie opcji Select ma jedno źródło: fokus używa `select-highlight` i `accent-foreground`, a checkmark dziedziczy kolor tekstu. W Graphite jasny `select-highlight` wskazuje na `muted`, tak samo jak hover toolbara; ciemny wskazuje na `accent`. Motywy bez opcjonalnego `select-highlight` korzystają z `accent`, zgodnie z shadcn. Aktywne taby nadal używają `accent`. Ruch kursora przenosi fokus na opcję, tak jak w Radix; osobny kolor hover nie nadpisuje tego stanu, więc strzałki przy nieruchomym kursorze pozostawiają tylko jedną podświetloną opcję.
 
+Przyciski Settings i Add source w titlebarze używają wariantu `Accent`: tła `accent`, tekstu i ikon `accent-foreground` oraz hover wyliczanego jako domieszka 5% `foreground` do `accent`. W jasnym motywie mają białe tło; cienie, fokus i stan wciśnięcia pochodzą ze wspólnego komponentu przycisku.
+
 Scrollbar selecta jest absolutną nakładką: lista zachowuje padding 4 px z każdej strony, bez dodatkowej kolumny na scrollbar. Thumb jest przycinany do zaokrąglonego obrysu popovera również w skrajnych pozycjach przewijania.
 
 Selecty i color pickery używają wspólnego `FloatingPopover`. Komponent mierzy trigger i zawartość przed pierwszym malowaniem, otwiera popup nad triggerem, jeśli pod nim brakuje miejsca, oraz ogranicza wysokość do większej dostępnej przestrzeni, gdy nie mieści się po żadnej stronie. Zawartość pozostaje przewijalna. Pozycja uwzględnia szerokość okna, zmianę jego rozmiaru i skalę UI. Odstęp od triggera wynosi 4 px; margines kolizji Select wynosi 10 px, a Popover 0 px. Zgodnie z wymaganiem Frame animacja zamykania również przesuwa popup ku triggerowi; to rozszerzenie klas wyjścia zapisanych w referencji CLI.
