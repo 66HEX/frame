@@ -1,0 +1,10 @@
+
+running 1 test
+test app::preview::actions::media_commands::tests::benchmark_real_ffmpeg_seek_backlog ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 898 filtered out; finished in 13.10s
+
+seek backlog trial 1: FIFO=3736.75 ms/20 decodes; coalesced=379.01 ms/2 decodes; final timestamp=11428571 us; pixels identical
+seek backlog trial 2: FIFO=3725.46 ms/20 decodes; coalesced=376.15 ms/2 decodes; final timestamp=11428571 us; pixels identical
+seek backlog trial 3: FIFO=3806.27 ms/20 decodes; coalesced=381.99 ms/2 decodes; final timestamp=11428571 us; pixels identical
+seek backlog median of 3: FIFO=3736.75 ms; coalesced=379.01 ms; speedup=9.86x (headless blocked-worker burst, excludes startup and GPUI event timing)

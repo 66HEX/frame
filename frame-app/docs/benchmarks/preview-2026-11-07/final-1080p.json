@@ -1,0 +1,713 @@
+{
+  "schema_version": 1,
+  "ffmpeg": {
+    "executable": "/opt/homebrew/bin/ffmpeg",
+    "version": "ffmpeg version 8.1 Copyright (c) 2000-2026 the FFmpeg developers"
+  },
+  "host": {
+    "os": "macos",
+    "arch": "aarch64"
+  },
+  "config": {
+    "path": "/private/tmp/frame-preview-perf/h264-1080p.mp4",
+    "source_width": 1920,
+    "source_height": 1080,
+    "duration_seconds": 12.0,
+    "max_width": 1280,
+    "max_height": 720,
+    "fps": 30,
+    "audio_track": null,
+    "iterations": 5,
+    "warmup_iterations": 1,
+    "playback_seconds": 1.0,
+    "poll_interval_ms": 2
+  },
+  "summary": {
+    "filter_brightness_10": {
+      "count": 5,
+      "min": 53.080375,
+      "p50": 53.186459,
+      "p95": 54.643083000000004,
+      "max": 54.643083000000004,
+      "samples": [
+        53.080375,
+        53.161083,
+        53.186459,
+        54.643083000000004,
+        53.263541999999994
+      ]
+    },
+    "filter_brightness_20": {
+      "count": 5,
+      "min": 52.942583,
+      "p50": 53.558625,
+      "p95": 53.654708,
+      "max": 53.654708,
+      "samples": [
+        53.610917,
+        52.942583,
+        53.149208,
+        53.654708,
+        53.558625
+      ]
+    },
+    "pause": {
+      "count": 5,
+      "min": 3.100708,
+      "p50": 3.903792,
+      "p95": 5.209083,
+      "max": 5.209083,
+      "samples": [
+        3.903792,
+        3.887083,
+        5.209083,
+        4.631209,
+        3.100708
+      ]
+    },
+    "play_first_frame": {
+      "count": 5,
+      "min": 38.785042,
+      "p50": 39.029166,
+      "p95": 39.528,
+      "max": 39.528,
+      "samples": [
+        38.833916,
+        38.785042,
+        39.337041000000006,
+        39.029166,
+        39.528
+      ]
+    },
+    "seek_fast_20pct": {
+      "count": 5,
+      "min": 96.813417,
+      "p50": 97.03862500000001,
+      "p95": 99.244666,
+      "max": 99.244666,
+      "samples": [
+        97.03862500000001,
+        99.244666,
+        96.818875,
+        97.8065,
+        96.813417
+      ]
+    },
+    "seek_fast_40pct": {
+      "count": 5,
+      "min": 60.406833,
+      "p50": 61.200291,
+      "p95": 61.621459,
+      "max": 61.621459,
+      "samples": [
+        61.621459,
+        61.3355,
+        60.406833,
+        60.779834,
+        61.200291
+      ]
+    },
+    "seek_fast_70pct": {
+      "count": 5,
+      "min": 52.049291999999994,
+      "p50": 52.418958,
+      "p95": 52.997292,
+      "max": 52.997292,
+      "samples": [
+        52.988084,
+        52.130416,
+        52.418958,
+        52.997292,
+        52.049291999999994
+      ]
+    },
+    "seek_precise_20pct": {
+      "count": 5,
+      "min": 66.910917,
+      "p50": 68.575958,
+      "p95": 69.11025,
+      "max": 69.11025,
+      "samples": [
+        68.575958,
+        68.9545,
+        66.910917,
+        69.11025,
+        67.580417
+      ]
+    },
+    "seek_precise_40pct": {
+      "count": 5,
+      "min": 52.147667,
+      "p50": 52.395542000000006,
+      "p95": 52.771459,
+      "max": 52.771459,
+      "samples": [
+        52.147667,
+        52.395542000000006,
+        52.205959,
+        52.771459,
+        52.565041
+      ]
+    },
+    "seek_precise_70pct": {
+      "count": 5,
+      "min": 47.625875,
+      "p50": 48.470875,
+      "p95": 48.913334000000006,
+      "max": 48.913334000000006,
+      "samples": [
+        48.909124999999996,
+        48.913334000000006,
+        48.470875,
+        48.173625,
+        47.625875
+      ]
+    },
+    "startup_first_frame": {
+      "count": 5,
+      "min": 42.718292,
+      "p50": 43.615459,
+      "p95": 43.838916999999995,
+      "max": 43.838916999999995,
+      "samples": [
+        43.312292,
+        43.838916999999995,
+        43.733624999999996,
+        43.615459,
+        42.718292
+      ]
+    },
+    "stop": {
+      "count": 5,
+      "min": 0.007458,
+      "p50": 0.007916,
+      "p95": 0.01025,
+      "max": 0.01025,
+      "samples": [
+        0.007458,
+        0.007916,
+        0.01025,
+        0.009290999999999999,
+        0.007458
+      ]
+    }
+  },
+  "iterations": [
+    {
+      "timings_ms": {
+        "filter_brightness_10": 53.080375,
+        "filter_brightness_20": 53.610917,
+        "pause": 3.903792,
+        "play_first_frame": 38.833916,
+        "seek_fast_20pct": 97.03862500000001,
+        "seek_fast_40pct": 61.621459,
+        "seek_fast_70pct": 52.988084,
+        "seek_precise_20pct": 68.575958,
+        "seek_precise_40pct": 52.147667,
+        "seek_precise_70pct": 48.909124999999996,
+        "startup_first_frame": 43.312292,
+        "stop": 0.007458
+      },
+      "playback": {
+        "observed_intervals_ms": {
+          "count": 29,
+          "min": 30.17175,
+          "p50": 33.272125,
+          "p95": 35.408125,
+          "max": 36.200916,
+          "samples": [
+            35.408125,
+            33.201875,
+            32.144583,
+            34.651709000000004,
+            33.327042,
+            31.731500000000004,
+            34.884834000000005,
+            33.196666,
+            33.465542,
+            32.615625,
+            34.136041999999996,
+            33.176375,
+            32.235167000000004,
+            34.570167,
+            32.542959,
+            34.114167,
+            33.29475,
+            33.188291,
+            35.207041000000004,
+            32.265334,
+            32.611166,
+            36.200916,
+            30.17175,
+            33.272125,
+            32.772583000000004,
+            35.33825,
+            31.036791,
+            34.62825,
+            33.462292
+          ]
+        },
+        "elapsed_ms": 1000.8812920000001,
+        "frames_read": 31,
+        "frames_published": 31,
+        "frames_dropped": 0,
+        "video_process_spawns": 1,
+        "render_conversion_total_us": 92,
+        "render_image_bytes": 114278400,
+        "first_video_frame_read_ms": 38,
+        "first_video_frame_published_ms": 38,
+        "first_render_image_ms": 38,
+        "session_video_process_spawns": 12,
+        "audio_process_spawns": 0,
+        "audio_output_callbacks": 0,
+        "audio_output_underruns": 0,
+        "first_audio_pcm_ms": null,
+        "first_audio_callback_ms": null
+      },
+      "seek_and_play": {
+        "target_seconds": 2.4000000000000004,
+        "order": [
+          "atomic",
+          "separate"
+        ],
+        "reset": "Pause then precise seek to zero, outside each measurement; audio prewarm costs excluded symmetrically",
+        "first_frame_timestamp_and_bgra_equal": true,
+        "samples": {
+          "atomic": {
+            "elapsed_ms": 64.130791,
+            "video_process_spawns": 1,
+            "audio_process_spawns": 0,
+            "first_frame_timestamp_us": 2400000,
+            "first_frame_bytes": 3686400,
+            "playing": true,
+            "repeated_play_ms": 0.000542,
+            "repeated_play_extra_process_spawns": 0
+          },
+          "separate": {
+            "elapsed_ms": 132.89925,
+            "video_process_spawns": 2,
+            "audio_process_spawns": 0,
+            "first_frame_timestamp_us": 2400000,
+            "first_frame_bytes": 3686400,
+            "playing": true,
+            "repeated_play_ms": 0.000167,
+            "repeated_play_extra_process_spawns": 0
+          }
+        }
+      }
+    },
+    {
+      "timings_ms": {
+        "filter_brightness_10": 53.161083,
+        "filter_brightness_20": 52.942583,
+        "pause": 3.887083,
+        "play_first_frame": 38.785042,
+        "seek_fast_20pct": 99.244666,
+        "seek_fast_40pct": 61.3355,
+        "seek_fast_70pct": 52.130416,
+        "seek_precise_20pct": 68.9545,
+        "seek_precise_40pct": 52.395542000000006,
+        "seek_precise_70pct": 48.913334000000006,
+        "startup_first_frame": 43.838916999999995,
+        "stop": 0.007916
+      },
+      "playback": {
+        "observed_intervals_ms": {
+          "count": 29,
+          "min": 28.715917,
+          "p50": 33.171791,
+          "p95": 36.308,
+          "max": 37.084084000000004,
+          "samples": [
+            35.449792,
+            33.170291,
+            33.171791,
+            33.191832999999995,
+            33.060582999999994,
+            34.926916000000006,
+            31.868124999999996,
+            33.21625,
+            34.102292,
+            32.618916999999996,
+            31.633875,
+            37.084084000000004,
+            31.997541999999996,
+            32.660583,
+            36.308,
+            28.715917,
+            36.28375,
+            31.188208,
+            34.602417,
+            33.144541,
+            33.225709,
+            34.548625,
+            31.295541000000004,
+            35.344417,
+            33.221708,
+            32.570916999999994,
+            35.845791,
+            32.813165999999995,
+            29.976167
+          ]
+        },
+        "elapsed_ms": 1001.4823749999999,
+        "frames_read": 31,
+        "frames_published": 31,
+        "frames_dropped": 0,
+        "video_process_spawns": 1,
+        "render_conversion_total_us": 111,
+        "render_image_bytes": 114278400,
+        "first_video_frame_read_ms": 38,
+        "first_video_frame_published_ms": 38,
+        "first_render_image_ms": 38,
+        "session_video_process_spawns": 12,
+        "audio_process_spawns": 0,
+        "audio_output_callbacks": 0,
+        "audio_output_underruns": 0,
+        "first_audio_pcm_ms": null,
+        "first_audio_callback_ms": null
+      },
+      "seek_and_play": {
+        "target_seconds": 2.4000000000000004,
+        "order": [
+          "separate",
+          "atomic"
+        ],
+        "reset": "Pause then precise seek to zero, outside each measurement; audio prewarm costs excluded symmetrically",
+        "first_frame_timestamp_and_bgra_equal": true,
+        "samples": {
+          "atomic": {
+            "elapsed_ms": 64.08274999999999,
+            "video_process_spawns": 1,
+            "audio_process_spawns": 0,
+            "first_frame_timestamp_us": 2400000,
+            "first_frame_bytes": 3686400,
+            "playing": true,
+            "repeated_play_ms": 0.0005,
+            "repeated_play_extra_process_spawns": 0
+          },
+          "separate": {
+            "elapsed_ms": 132.41345800000002,
+            "video_process_spawns": 2,
+            "audio_process_spawns": 0,
+            "first_frame_timestamp_us": 2400000,
+            "first_frame_bytes": 3686400,
+            "playing": true,
+            "repeated_play_ms": 0.000375,
+            "repeated_play_extra_process_spawns": 0
+          }
+        }
+      }
+    },
+    {
+      "timings_ms": {
+        "filter_brightness_10": 53.186459,
+        "filter_brightness_20": 53.149208,
+        "pause": 5.209083,
+        "play_first_frame": 39.337041000000006,
+        "seek_fast_20pct": 96.818875,
+        "seek_fast_40pct": 60.406833,
+        "seek_fast_70pct": 52.418958,
+        "seek_precise_20pct": 66.910917,
+        "seek_precise_40pct": 52.205959,
+        "seek_precise_70pct": 48.470875,
+        "startup_first_frame": 43.733624999999996,
+        "stop": 0.01025
+      },
+      "playback": {
+        "observed_intervals_ms": {
+          "count": 29,
+          "min": 30.172667,
+          "p50": 33.196667,
+          "p95": 36.745458,
+          "max": 37.015541999999996,
+          "samples": [
+            34.943542,
+            33.347750000000005,
+            33.208541000000004,
+            34.203625,
+            32.528332999999996,
+            32.532667000000004,
+            35.050167,
+            32.45225,
+            33.21875,
+            33.196667,
+            34.300458,
+            33.193084,
+            32.768667,
+            35.547792,
+            30.178917,
+            32.936708,
+            34.667416,
+            33.220125,
+            33.193374999999996,
+            33.207333999999996,
+            33.191041999999996,
+            32.156625,
+            37.015541999999996,
+            30.172667,
+            36.745458,
+            30.224625000000003,
+            35.590708,
+            33.145292,
+            32.8985
+          ]
+        },
+        "elapsed_ms": 1002.8472079999999,
+        "frames_read": 31,
+        "frames_published": 31,
+        "frames_dropped": 0,
+        "video_process_spawns": 1,
+        "render_conversion_total_us": 75,
+        "render_image_bytes": 114278400,
+        "first_video_frame_read_ms": 39,
+        "first_video_frame_published_ms": 39,
+        "first_render_image_ms": 39,
+        "session_video_process_spawns": 12,
+        "audio_process_spawns": 0,
+        "audio_output_callbacks": 0,
+        "audio_output_underruns": 0,
+        "first_audio_pcm_ms": null,
+        "first_audio_callback_ms": null
+      },
+      "seek_and_play": {
+        "target_seconds": 2.4000000000000004,
+        "order": [
+          "atomic",
+          "separate"
+        ],
+        "reset": "Pause then precise seek to zero, outside each measurement; audio prewarm costs excluded symmetrically",
+        "first_frame_timestamp_and_bgra_equal": true,
+        "samples": {
+          "atomic": {
+            "elapsed_ms": 64.677833,
+            "video_process_spawns": 1,
+            "audio_process_spawns": 0,
+            "first_frame_timestamp_us": 2400000,
+            "first_frame_bytes": 3686400,
+            "playing": true,
+            "repeated_play_ms": 0.00041600000000000003,
+            "repeated_play_extra_process_spawns": 0
+          },
+          "separate": {
+            "elapsed_ms": 132.48862499999998,
+            "video_process_spawns": 2,
+            "audio_process_spawns": 0,
+            "first_frame_timestamp_us": 2400000,
+            "first_frame_bytes": 3686400,
+            "playing": true,
+            "repeated_play_ms": 0.000292,
+            "repeated_play_extra_process_spawns": 0
+          }
+        }
+      }
+    },
+    {
+      "timings_ms": {
+        "filter_brightness_10": 54.643083000000004,
+        "filter_brightness_20": 53.654708,
+        "pause": 4.631209,
+        "play_first_frame": 39.029166,
+        "seek_fast_20pct": 97.8065,
+        "seek_fast_40pct": 60.779834,
+        "seek_fast_70pct": 52.997292,
+        "seek_precise_20pct": 69.11025,
+        "seek_precise_40pct": 52.771459,
+        "seek_precise_70pct": 48.173625,
+        "startup_first_frame": 43.615459,
+        "stop": 0.009290999999999999
+      },
+      "playback": {
+        "observed_intervals_ms": {
+          "count": 29,
+          "min": 30.31675,
+          "p50": 33.412667,
+          "p95": 36.016875,
+          "max": 36.213667,
+          "samples": [
+            35.713959,
+            33.240417,
+            30.397000000000002,
+            35.066541,
+            33.412667,
+            35.319416,
+            31.315958,
+            33.9475,
+            33.883292000000004,
+            32.180665999999995,
+            34.370917,
+            34.565458,
+            31.0835,
+            33.280916,
+            35.394458,
+            31.206917,
+            33.28575,
+            31.773207999999997,
+            36.213667,
+            30.31675,
+            34.210334,
+            36.016875,
+            31.599000000000004,
+            33.312374999999996,
+            33.184416,
+            34.249209,
+            32.502458999999995,
+            33.440375,
+            34.935042
+          ]
+        },
+        "elapsed_ms": 1002.9047499999999,
+        "frames_read": 31,
+        "frames_published": 31,
+        "frames_dropped": 0,
+        "video_process_spawns": 1,
+        "render_conversion_total_us": 95,
+        "render_image_bytes": 114278400,
+        "first_video_frame_read_ms": 38,
+        "first_video_frame_published_ms": 39,
+        "first_render_image_ms": 39,
+        "session_video_process_spawns": 12,
+        "audio_process_spawns": 0,
+        "audio_output_callbacks": 0,
+        "audio_output_underruns": 0,
+        "first_audio_pcm_ms": null,
+        "first_audio_callback_ms": null
+      },
+      "seek_and_play": {
+        "target_seconds": 2.4000000000000004,
+        "order": [
+          "separate",
+          "atomic"
+        ],
+        "reset": "Pause then precise seek to zero, outside each measurement; audio prewarm costs excluded symmetrically",
+        "first_frame_timestamp_and_bgra_equal": true,
+        "samples": {
+          "atomic": {
+            "elapsed_ms": 66.265167,
+            "video_process_spawns": 1,
+            "audio_process_spawns": 0,
+            "first_frame_timestamp_us": 2400000,
+            "first_frame_bytes": 3686400,
+            "playing": true,
+            "repeated_play_ms": 0.000292,
+            "repeated_play_extra_process_spawns": 0
+          },
+          "separate": {
+            "elapsed_ms": 131.372958,
+            "video_process_spawns": 2,
+            "audio_process_spawns": 0,
+            "first_frame_timestamp_us": 2400000,
+            "first_frame_bytes": 3686400,
+            "playing": true,
+            "repeated_play_ms": 0.00029099999999999997,
+            "repeated_play_extra_process_spawns": 0
+          }
+        }
+      }
+    },
+    {
+      "timings_ms": {
+        "filter_brightness_10": 53.263541999999994,
+        "filter_brightness_20": 53.558625,
+        "pause": 3.100708,
+        "play_first_frame": 39.528,
+        "seek_fast_20pct": 96.813417,
+        "seek_fast_40pct": 61.200291,
+        "seek_fast_70pct": 52.049291999999994,
+        "seek_precise_20pct": 67.580417,
+        "seek_precise_40pct": 52.565041,
+        "seek_precise_70pct": 47.625875,
+        "startup_first_frame": 42.718292,
+        "stop": 0.007458
+      },
+      "playback": {
+        "observed_intervals_ms": {
+          "count": 29,
+          "min": 29.882042000000002,
+          "p50": 33.217834,
+          "p95": 35.830209,
+          "max": 36.468875,
+          "samples": [
+            34.473459,
+            33.191958,
+            35.829125000000005,
+            30.180625,
+            33.25425,
+            32.576458,
+            34.237792000000006,
+            33.217834,
+            33.6335,
+            33.2135,
+            33.193917000000006,
+            33.259792000000004,
+            33.475333000000006,
+            35.830209,
+            33.229875,
+            32.394791,
+            33.192291999999995,
+            32.672417,
+            35.642458000000005,
+            32.507124999999995,
+            34.46475,
+            31.692791999999997,
+            35.16520800000001,
+            29.882042000000002,
+            35.350583,
+            31.307334,
+            33.21425,
+            36.468875,
+            30.318459
+          ]
+        },
+        "elapsed_ms": 1001.9624590000001,
+        "frames_read": 31,
+        "frames_published": 31,
+        "frames_dropped": 0,
+        "video_process_spawns": 1,
+        "render_conversion_total_us": 85,
+        "render_image_bytes": 114278400,
+        "first_video_frame_read_ms": 39,
+        "first_video_frame_published_ms": 39,
+        "first_render_image_ms": 39,
+        "session_video_process_spawns": 12,
+        "audio_process_spawns": 0,
+        "audio_output_callbacks": 0,
+        "audio_output_underruns": 0,
+        "first_audio_pcm_ms": null,
+        "first_audio_callback_ms": null
+      },
+      "seek_and_play": {
+        "target_seconds": 2.4000000000000004,
+        "order": [
+          "atomic",
+          "separate"
+        ],
+        "reset": "Pause then precise seek to zero, outside each measurement; audio prewarm costs excluded symmetrically",
+        "first_frame_timestamp_and_bgra_equal": true,
+        "samples": {
+          "atomic": {
+            "elapsed_ms": 64.289916,
+            "video_process_spawns": 1,
+            "audio_process_spawns": 0,
+            "first_frame_timestamp_us": 2400000,
+            "first_frame_bytes": 3686400,
+            "playing": true,
+            "repeated_play_ms": 0.000417,
+            "repeated_play_extra_process_spawns": 0
+          },
+          "separate": {
+            "elapsed_ms": 134.686333,
+            "video_process_spawns": 2,
+            "audio_process_spawns": 0,
+            "first_frame_timestamp_us": 2400000,
+            "first_frame_bytes": 3686400,
+            "playing": true,
+            "repeated_play_ms": 0.000542,
+            "repeated_play_extra_process_spawns": 0
+          }
+        }
+      }
+    }
+  ],
+  "scope": "Headless engine wall time; frames are acknowledged by a 2 ms polling consumer. No GPUI window or GPU upload is measured. Optional audio runs through the real device with volume muted."
+}
