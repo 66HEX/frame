@@ -244,6 +244,14 @@ impl Render for FrameRoot {
                 );
                 let crop_settings_preview = self.crop_settings_preview();
                 let settings = SettingsRenderState {
+                    apply_all: if self.settings_ui.active_tab
+                        == crate::settings::SettingsTab::Output
+                        && self.file_queue.files().len() > 1
+                    {
+                        self.apply_all_availability()
+                    } else {
+                        crate::app::inspector::apply_all::ApplyAllAvailability::Hidden
+                    },
                     palette,
                     active_tab: self.settings_ui.active_tab,
                     expanded_output_sections: &self.settings_ui.expanded_output_sections,

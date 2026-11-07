@@ -220,6 +220,14 @@ pub(in crate::app) fn settings_tab_content(
 
         SettingsTab::Output => {
             let mut sections = div().flex().flex_col().w_full();
+            if settings.apply_all != super::apply_all::ApplyAllAvailability::Hidden {
+                sections = sections.child(super::apply_all::apply_all_control(
+                    settings.apply_all,
+                    palette,
+                    window,
+                    cx,
+                ));
+            }
             for section in visible_output_sections(settings.config, settings.metadata) {
                 let open = settings.expanded_output_sections.contains(&section);
                 // Do not construct controls for closed sections: no hidden focus stops.

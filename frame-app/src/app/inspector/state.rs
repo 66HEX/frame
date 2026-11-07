@@ -54,6 +54,7 @@ impl Default for SettingsUiState {
 
 #[derive(Clone, Copy)]
 pub(in crate::app) struct SettingsRenderState<'a> {
+    pub(in crate::app) apply_all: super::apply_all::ApplyAllAvailability,
     pub(in crate::app) palette: &'static theme::ThemePalette,
     pub(in crate::app) active_tab: SettingsTab,
     pub(in crate::app) expanded_output_sections: &'a std::collections::BTreeSet<OutputSection>,

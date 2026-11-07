@@ -55,6 +55,7 @@ fn settings_state<'a>(
     let subtitle_font_size_select_scroll_handle = Box::leak(Box::new(ScrollHandle::new()));
 
     SettingsRenderState {
+        apply_all: crate::app::inspector::apply_all::ApplyAllAvailability::Hidden,
         crop_editing: false,
         palette: theme::palette(crate::appearance::ColorTheme::Dark),
         active_tab: SettingsTab::Metadata,

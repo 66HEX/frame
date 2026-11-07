@@ -50,6 +50,21 @@ impl SourceMetadataStore {
             .and_then(|entry| entry.metadata.as_ref())
     }
 
+    #[must_use]
+    pub fn status_for(&self, id: &str) -> MetadataStatus {
+        self.entries
+            .get(id)
+            .map_or(MetadataStatus::Idle, |entry| entry.status)
+    }
+
+    #[must_use]
+    pub fn ready_metadata_for(&self, id: &str) -> Option<&SourceMetadata> {
+        self.entries
+            .get(id)
+            .filter(|entry| entry.status == MetadataStatus::Ready)
+            .and_then(|entry| entry.metadata.as_ref())
+    }
+
     pub fn mark_loading(&mut self, id: impl Into<String>) {
         self.entries.insert(
             id.into(),
@@ -321,6 +336,27 @@ mod tests {
             let entry = store.entry_for("file-1");
             assert_eq!(entry.status, MetadataStatus::Loading);
             assert_eq!(entry.error, None);
+        }
+
+        #[test]
+        fn borrowed_ready_metadata_requires_ready_status_and_present_metadata() {
+            let mut store = SourceMetadataStore::default();
+            assert_eq!(store.status_for("file"), MetadataStatus::Idle);
+            assert!(store.ready_metadata_for("file").is_none());
+            store.mark_loading("file");
+            assert_eq!(store.status_for("file"), MetadataStatus::Loading);
+            assert!(store.ready_metadata_for("file").is_none());
+            store.mark_ready("file", SourceMetadata::default());
+            assert!(std::ptr::eq(
+                store.metadata_for("file").unwrap(),
+                store.ready_metadata_for("file").unwrap()
+            ));
+            store.entries.get_mut("file").unwrap().metadata = None;
+            assert_eq!(store.status_for("file"), MetadataStatus::Ready);
+            assert!(store.ready_metadata_for("file").is_none());
+            store.mark_error("file", "failed");
+            assert_eq!(store.status_for("file"), MetadataStatus::Error);
+            assert!(store.ready_metadata_for("file").is_none());
         }
 
         #[test]
