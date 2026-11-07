@@ -14,6 +14,7 @@ fn default_config_matches_original_audio_defaults() {
     assert_eq!(config.audio_bitrate, "128");
     assert_eq!(config.audio_bitrate_mode, "bitrate");
     assert_eq!(config.audio_quality, "4");
+    assert!(config.opus_vbr);
     assert_eq!(config.audio_channels, "original");
     assert_eq!(config.audio_volume, 100);
     assert!(!config.audio_normalize);
@@ -175,4 +176,37 @@ fn apply_audio_normalize_rejects_stream_copy_mode() {
     assert!(!apply_audio_normalize(&mut config, true));
 
     assert!(!config.audio_normalize);
+}
+
+#[test]
+fn opus_vbr_is_independent_of_quality_mode_and_rejects_copy_or_other_codecs() {
+    let mut config = ConversionConfig {
+        container: "opus".to_string(),
+        audio_codec: "libopus".to_string(),
+        ..ConversionConfig::default()
+    };
+    assert!(!audio_codec_supports_vbr("libopus"));
+    assert_eq!(audio_quality_range("libopus"), None);
+    assert!(!apply_audio_bitrate_mode(&mut config, "vbr"));
+    assert!(apply_opus_vbr(&mut config, false));
+    assert!(!apply_opus_vbr(&mut config, false));
+    normalize_output_config(&mut config, None);
+    assert!(!config.opus_vbr);
+    assert_eq!(config.audio_bitrate, "128");
+    assert!(apply_processing_mode(
+        &mut config,
+        None,
+        ProcessingMode::Copy
+    ));
+    assert!(!apply_opus_vbr(&mut config, true));
+    assert!(apply_processing_mode(
+        &mut config,
+        None,
+        ProcessingMode::Reencode
+    ));
+    assert!(apply_output_container(&mut config, "mkv"));
+    assert!(apply_audio_codec(&mut config, "aac"));
+    assert!(!apply_opus_vbr(&mut config, true));
+    assert!(apply_audio_codec(&mut config, "libopus"));
+    assert!(!config.opus_vbr);
 }

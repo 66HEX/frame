@@ -211,6 +211,12 @@ mod tests {
                 "{}",
                 filter.label
             );
+            assert_eq!(
+                filter.extensions.contains(&"opus"),
+                matches!(filter.label, "Media Files" | "Audio"),
+                "{}",
+                filter.label
+            );
         }
     }
 

@@ -43,7 +43,8 @@ fn visible_output_containers_for_video_exclude_image_formats() {
     assert_eq!(
         visible_output_containers(None),
         vec![
-            "mp4", "mkv", "webm", "mov", "m2t", "mts", "m2ts", "gif", "mp3", "m4a", "wav", "flac"
+            "mp4", "mkv", "webm", "mov", "m2t", "mts", "m2ts", "gif", "mp3", "m4a", "wav", "flac",
+            "opus"
         ]
     );
 }
@@ -242,4 +243,32 @@ fn stream_copy_without_metadata_keeps_non_image_containers_selectable() {
     assert!(is_container_compatible_for_stream_copy(
         &config, None, "mp4"
     ));
+}
+
+#[test]
+fn opus_output_normalizes_flac_source_and_only_copies_opus() {
+    let metadata = audio_metadata("flac");
+    let mut config = ConversionConfig {
+        container: "flac".to_string(),
+        audio_codec: "flac".to_string(),
+        opus_vbr: false,
+        selected_audio_tracks: vec![0],
+        ..ConversionConfig::default()
+    };
+    assert!(visible_output_containers(Some(&metadata)).contains(&"opus".to_string()));
+    assert!(apply_output_container(&mut config, "opus"));
+    normalize_output_config(&mut config, Some(&metadata));
+    assert_eq!(config.container, "opus");
+    assert_eq!(config.audio_codec, "libopus");
+    assert_eq!(config.audio_bitrate_mode, "bitrate");
+    assert!(!config.opus_vbr);
+    assert!(!normalize_output_config(&mut config, Some(&metadata)));
+    config.processing_mode = ProcessingMode::Copy;
+    for (codec, compatible) in [("opus", true), ("flac", false), ("aac", false)] {
+        assert_eq!(
+            is_container_compatible_for_stream_copy(&config, Some(&audio_metadata(codec)), "opus"),
+            compatible,
+            "{codec}"
+        );
+    }
 }

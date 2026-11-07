@@ -82,6 +82,18 @@ pub fn apply_audio_bitrate_mode(config: &mut ConversionConfig, mode: &str) -> bo
     true
 }
 
+pub fn apply_opus_vbr(config: &mut ConversionConfig, enabled: bool) -> bool {
+    if config.processing_mode == ProcessingMode::Copy
+        || config.audio_codec != "libopus"
+        || config.opus_vbr == enabled
+    {
+        return false;
+    }
+
+    config.opus_vbr = enabled;
+    true
+}
+
 pub fn apply_audio_quality(config: &mut ConversionConfig, quality: &str) -> bool {
     if config.processing_mode == ProcessingMode::Copy {
         return false;

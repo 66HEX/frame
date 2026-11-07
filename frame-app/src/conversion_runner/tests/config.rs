@@ -12,6 +12,7 @@ fn core_config_from_gpui_preserves_active_conversion_fields() {
         audio_codec: "aac".to_string(),
         audio_bitrate: "192".to_string(),
         audio_bitrate_mode: "bitrate".to_string(),
+        opus_vbr: true,
         audio_quality: "4".to_string(),
         audio_channels: "stereo".to_string(),
         audio_volume: 125,
@@ -233,4 +234,27 @@ fn core_config_from_gpui_preserves_active_conversion_fields() {
     assert_eq!(core.metadata.mode, frame_core::types::MetadataMode::Replace);
     assert_eq!(core.metadata.title.as_deref(), Some("Render Title"));
     assert_eq!(core.metadata.artist.as_deref(), Some("Frame"));
+}
+
+#[test]
+fn opus_vbr_legacy_default_and_explicit_values_survive_app_core_mapping() {
+    let legacy = serde_json::json!({"container": "webm", "audioCodec": "libopus"});
+    let config: GpuiConversionConfig = serde_json::from_value(legacy).unwrap();
+    assert!(config.opus_vbr);
+    assert!(core_config_from_gpui(&config).opus_vbr);
+    for opus_vbr in [false, true] {
+        let config = GpuiConversionConfig {
+            opus_vbr,
+            ..config.clone()
+        };
+        let encoded = serde_json::to_value(&config).unwrap();
+        assert_eq!(encoded["opusVbr"], opus_vbr);
+        let restored: GpuiConversionConfig = serde_json::from_value(encoded).unwrap();
+        assert_eq!(restored, config);
+        let core = core_config_from_gpui(&restored);
+        assert_eq!(core.opus_vbr, opus_vbr);
+        let core_json = serde_json::to_value(core).unwrap();
+        let core: frame_core::types::ConversionConfig = serde_json::from_value(core_json).unwrap();
+        assert_eq!(core.opus_vbr, opus_vbr);
+    }
 }

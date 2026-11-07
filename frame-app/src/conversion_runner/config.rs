@@ -49,6 +49,7 @@ pub fn core_config_from_gpui(config: &GpuiConversionConfig) -> CoreConversionCon
         audio_codec: config.audio_codec.clone(),
         audio_bitrate: non_empty_or(&config.audio_bitrate, DEFAULT_AUDIO_BITRATE),
         audio_bitrate_mode: non_empty_or(&config.audio_bitrate_mode, DEFAULT_AUDIO_BITRATE_MODE),
+        opus_vbr: config.opus_vbr,
         audio_quality: non_empty_or(&config.audio_quality, DEFAULT_AUDIO_QUALITY),
         audio_channels: non_empty_or(&config.audio_channels, DEFAULT_AUDIO_CHANNELS),
         audio_volume: f64::from(config.audio_volume.min(200)),

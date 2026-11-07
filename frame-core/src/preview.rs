@@ -525,6 +525,7 @@ mod tests {
             audio_codec: "aac".to_string(),
             audio_bitrate: "192".to_string(),
             audio_bitrate_mode: "bitrate".to_string(),
+            opus_vbr: true,
             audio_quality: "4".to_string(),
             audio_channels: "original".to_string(),
             audio_volume: 100.0,

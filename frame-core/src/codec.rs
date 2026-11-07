@@ -181,6 +181,11 @@ pub fn add_audio_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
         }
     }
 
+    if config.audio_codec == "libopus" {
+        args.push("-vbr".to_string());
+        args.push(if config.opus_vbr { "on" } else { "off" }.to_string());
+    }
+
     match config.audio_channels.as_str() {
         "stereo" => {
             args.push("-ac".to_string());

@@ -1,4 +1,6 @@
-use crate::app::components::{FrameOption, frame_option_field, frame_select_field};
+use crate::app::components::{
+    FrameOption, frame_boolean_field, frame_option_field, frame_select_field,
+};
 use crate::app::components::{
     frame_slider, frame_slider_fraction_from_bounds, frame_slider_handle,
 };
@@ -12,9 +14,9 @@ use crate::app::primitives::color;
 use crate::app::root::FrameRoot;
 use crate::settings::{
     ConversionConfig, ProcessingMode, SourceMetadata, apply_audio_bitrate_mode,
-    apply_audio_channels, apply_audio_codec, apply_audio_quality, audio_channel_options,
-    audio_codec_options, audio_codec_supports_vbr, audio_quality_range, audio_track_options,
-    mp2_original_channels_are_unsupported, toggle_audio_track_selection,
+    apply_audio_channels, apply_audio_codec, apply_audio_quality, apply_opus_vbr,
+    audio_channel_options, audio_codec_options, audio_codec_supports_vbr, audio_quality_range,
+    audio_track_options, mp2_original_channels_are_unsupported, toggle_audio_track_selection,
 };
 use crate::theme;
 use frame_core::capabilities::AvailableEncoders;
@@ -231,6 +233,26 @@ fn settings_audio_encoding_controls(
         ));
     }
 
+    if config.audio_codec == "libopus" {
+        controls = controls.child(settings_field("Variable bitrate", palette).child(
+            frame_boolean_field(
+                "audio-opus-vbr",
+                "Variable bitrate",
+                config.opus_vbr,
+                !controls_disabled,
+                ["No", "Yes"],
+                |root, value, _window, cx| {
+                    if root.update_selected_config(|config| apply_opus_vbr(config, value)) {
+                        cx.notify();
+                    }
+                },
+                palette,
+                window,
+                cx,
+            ),
+        ));
+    }
+
     controls
 }
 
@@ -282,7 +304,7 @@ fn settings_audio_bitrate_field(
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
     crate::app::components::frame_field()
-        .child(settings_field_label("Bitrate (KB/s)", palette))
+        .child(settings_field_label("Bitrate (kbps)", palette))
         .child(frame_text_input(
             FrameTextInputSpec {
                 id: "settings-audio-bitrate-field",

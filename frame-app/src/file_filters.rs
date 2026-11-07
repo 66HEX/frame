@@ -6,13 +6,13 @@ use std::path::{Path, PathBuf};
 pub const VIDEO_FILE_EXTENSIONS: &[&str] = &[
     "mp4", "mov", "mkv", "avi", "webm", "ts", "mts", "m2t", "m2ts", "gif",
 ];
-pub const AUDIO_FILE_EXTENSIONS: &[&str] = &["mp3", "m4a", "wav", "flac"];
+pub const AUDIO_FILE_EXTENSIONS: &[&str] = &["mp3", "m4a", "wav", "flac", "opus"];
 pub const IMAGE_FILE_EXTENSIONS: &[&str] = &[
     "png", "jpg", "jpeg", "webp", "bmp", "tif", "tiff", "avif", "heic", "heif",
 ];
 pub const SOURCE_FILE_EXTENSIONS: &[&str] = &[
     "mp4", "mov", "mkv", "avi", "webm", "ts", "mts", "m2t", "m2ts", "gif", "mp3", "m4a", "wav",
-    "flac", "png", "jpg", "jpeg", "webp", "bmp", "tif", "tiff", "avif", "heic", "heif",
+    "flac", "opus", "png", "jpg", "jpeg", "webp", "bmp", "tif", "tiff", "avif", "heic", "heif",
 ];
 
 pub const BURN_SUBTITLE_FILE_EXTENSIONS: &[&str] = &["srt", "ass", "vtt"];

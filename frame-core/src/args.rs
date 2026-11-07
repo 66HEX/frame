@@ -1368,6 +1368,7 @@ mod tests {
             audio_codec: "aac".to_string(),
             audio_bitrate: "128".to_string(),
             audio_bitrate_mode: "bitrate".to_string(),
+            opus_vbr: true,
             audio_quality: "4".to_string(),
             audio_channels: "original".to_string(),
             audio_volume: 100.0,
@@ -1743,6 +1744,118 @@ mod tests {
             .expect("arguments should build");
 
         assert!(args_contains_pair(&args, "-compression_algo", "deflate"));
+    }
+
+    #[test]
+    fn opus_output_keeps_target_bitrate_in_both_vbr_modes() {
+        let input = temporary_input_file_with_extension("opus-input", "flac");
+        for bitrate in ["64", "128"] {
+            for opus_vbr in [false, true] {
+                let mut config = sample_config("opus", "libx264");
+                config.audio_codec = "libopus".to_string();
+                config.audio_bitrate = bitrate.to_string();
+                config.opus_vbr = opus_vbr;
+                config.selected_audio_tracks = vec![1];
+                validate_task_input(&input.to_string_lossy(), &config).unwrap();
+                let mut probe = sample_probe();
+                probe.media_kind = "audio".to_string();
+                probe.video_codec = None;
+                probe.audio_tracks[0].codec = "flac".to_string();
+                let args = build_ffmpeg_args("input.flac", "output.opus", &config, &probe).unwrap();
+                assert!(args_contains_pair(&args, "-c:a", "libopus"));
+                assert!(args_contains_pair(&args, "-b:a", &format!("{bitrate}k")));
+                assert!(args_contains_pair(
+                    &args,
+                    "-vbr",
+                    if opus_vbr { "on" } else { "off" }
+                ));
+                assert!(args_contains_pair(&args, "-map", "0:1"));
+                assert!(args.iter().any(|arg| arg == "-vn"));
+                for absent in ["-q:a", "-ar", "-c:v", "-c", "-c:s"] {
+                    assert!(!args.iter().any(|arg| arg == absent), "{absent}: {args:?}");
+                }
+            }
+        }
+        fs::remove_file(input).unwrap();
+    }
+
+    #[test]
+    fn legacy_opus_video_configs_keep_vbr_on() {
+        for (container, video_codec) in [("webm", "vp9"), ("mp4", "libx264")] {
+            let mut config = sample_config(container, video_codec);
+            config.audio_codec = "libopus".to_string();
+            config.selected_audio_tracks = vec![1];
+            let mut legacy = serde_json::to_value(config).unwrap();
+            legacy.as_object_mut().unwrap().remove("opusVbr");
+            let config = serde_json::from_value(legacy).unwrap();
+            let args = build_ffmpeg_args(
+                "input.mov",
+                &format!("output.{container}"),
+                &config,
+                &sample_probe(),
+            )
+            .unwrap();
+            assert!(args_contains_pair(&args, "-b:a", "128k"));
+            assert!(args_contains_pair(&args, "-vbr", "on"));
+            assert!(!args.iter().any(|arg| arg == "-q:a"));
+        }
+    }
+
+    #[test]
+    fn opus_stream_copy_requires_opus_source_and_omits_encoder_options() {
+        let mut config = sample_config("opus", "libx264");
+        config.processing_mode = "copy".to_string();
+        config.audio_codec = "libopus".to_string();
+        config.selected_audio_tracks = vec![1];
+        for opus_vbr in [false, true] {
+            config.opus_vbr = opus_vbr;
+            for codec in ["opus", "flac", "aac"] {
+                let mut probe = sample_probe();
+                probe.audio_tracks[0].codec = codec.to_string();
+                let result = build_ffmpeg_args("input.mkv", "output.opus", &config, &probe);
+                if codec != "opus" {
+                    assert!(result.is_err(), "{codec} must not copy into Ogg Opus");
+                    continue;
+                }
+                let args = result.unwrap();
+                assert!(args_contains_pair(&args, "-c", "copy"));
+                for absent in ["-b:a", "-vbr", "-q:a", "-ar", "-c:a"] {
+                    assert!(!args.iter().any(|arg| arg == absent), "{absent}: {args:?}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn opus_vbr_does_not_change_other_audio_encoder_arguments() {
+        for (codec, mode, expected) in [
+            ("aac", "bitrate", vec!["-c:a", "aac", "-b:a", "128k"]),
+            ("mp3", "bitrate", vec!["-c:a", "mp3", "-b:a", "128k"]),
+            ("mp3", "vbr", vec!["-c:a", "mp3", "-q:a", "4"]),
+            (
+                "libfdk_aac",
+                "bitrate",
+                vec!["-c:a", "libfdk_aac", "-b:a", "128k"],
+            ),
+            ("libfdk_aac", "vbr", vec!["-c:a", "libfdk_aac", "-vbr", "4"]),
+            ("flac", "bitrate", vec!["-c:a", "flac"]),
+            ("pcm_s16le", "bitrate", vec!["-c:a", "pcm_s16le"]),
+            (
+                "mp2",
+                "bitrate",
+                vec!["-c:a", "mp2", "-b:a", "128k", "-ar", "48000"],
+            ),
+        ] {
+            for opus_vbr in [false, true] {
+                let mut config = sample_config("mkv", "libx264");
+                config.audio_codec = codec.to_string();
+                config.audio_bitrate_mode = mode.to_string();
+                config.opus_vbr = opus_vbr;
+                let mut args = Vec::new();
+                add_audio_codec_args(&mut args, &config);
+                assert_eq!(args, expected, "{codec}, {mode}, opus_vbr={opus_vbr}");
+            }
+        }
     }
 
     #[test]

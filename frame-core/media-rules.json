@@ -16,9 +16,10 @@
 		"mp3",
 		"m4a",
 		"wav",
-		"flac"
+		"flac",
+		"opus"
 	],
-	"audioOnlyContainers": ["mp3", "m4a", "wav", "flac", "aac"],
+	"audioOnlyContainers": ["mp3", "m4a", "wav", "flac", "opus", "aac"],
 	"videoOnlyContainers": ["gif"],
 	"imageContainers": ["png", "jpg", "webp", "bmp", "tiff"],
 	"containerVideoCodecCompatibility": {
@@ -132,6 +133,7 @@
 		"m2ts": ["mpeg2video", "h264", "vc1", "hevc"]
 	},
 	"containerAudioCodecCompatibility": {
+		"opus": ["libopus"],
 		"mp3": ["mp3"],
 		"wav": ["pcm_s16le"],
 		"flac": ["flac"],
@@ -150,6 +152,7 @@
 		"tiff": []
 	},
 	"containerAudioStreamCodecCompatibility": {
+		"opus": ["opus"],
 		"mp3": ["mp3"],
 		"wav": [
 			"pcm_s16le",
@@ -186,6 +189,7 @@
 		"m2ts": ["hdmv_pgs_subtitle", "hdmv_text_subtitle"]
 	},
 	"defaultAudioCodec": {
+		"opus": "libopus",
 		"mp3": "mp3",
 		"wav": "pcm_s16le",
 		"flac": "flac",

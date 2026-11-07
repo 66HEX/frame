@@ -70,6 +70,8 @@ fn allocate_file_imports_skips_unsupported_source_extensions() {
         PathBuf::from("/tmp/no-extension"),
         PathBuf::from("/tmp/lower.ts"),
         PathBuf::from("/tmp/two.PNG"),
+        PathBuf::from("/tmp/export.opus"),
+        PathBuf::from("/tmp/export.OPUS"),
     ]);
 
     assert_eq!(
@@ -80,6 +82,8 @@ fn allocate_file_imports_skips_unsupported_source_extensions() {
             ("file-3".to_string(), PathBuf::from("/tmp/mixed.tS")),
             ("file-4".to_string(), PathBuf::from("/tmp/lower.ts")),
             ("file-5".to_string(), PathBuf::from("/tmp/two.PNG")),
+            ("file-6".to_string(), PathBuf::from("/tmp/export.opus")),
+            ("file-7".to_string(), PathBuf::from("/tmp/export.OPUS")),
         ]
     );
 }

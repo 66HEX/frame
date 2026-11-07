@@ -623,3 +623,112 @@ fn flipped_select_and_color_picker_animate_toward_the_trigger_on_exit() {
         assert!(cx.debug_bounds(case.panel).is_none());
     }
 }
+
+fn assert_opus_controls(cx: &mut VisualTestContext, opus_vbr: bool, disabled: bool) {
+    assert!(cx.debug_bounds("settings-audio-quality-slider").is_none());
+    assert!(cx.debug_bounds("audio-bitrate-mode-select").is_none());
+    cx.update(|window, _| {
+        let tree = window.a11y_tree().expect("rendered accessibility tree");
+        let (id, bitrate) = tree
+            .nodes
+            .iter()
+            .find(|(_, node)| {
+                node.role() == gpui::Role::TextInput && node.label() == Some("Audio bitrate")
+            })
+            .expect("visible bitrate input");
+        assert!(window.a11y_node_bounds(*id).is_some());
+        assert_eq!(bitrate.is_disabled(), disabled);
+        assert_eq!(bitrate.value(), Some("128"));
+        assert!(
+            !tree
+                .nodes
+                .iter()
+                .any(|(_, node)| node.label() == Some("Audio quality"))
+        );
+        let group = tree
+            .nodes
+            .iter()
+            .map(|(_, node)| node)
+            .find(|node| {
+                node.role() == gpui::Role::TabList && node.label() == Some("Variable bitrate")
+            })
+            .expect("Variable bitrate tab group");
+        for (label, selected) in [("No", !opus_vbr), ("Yes", opus_vbr)] {
+            let node = tree
+                .nodes
+                .iter()
+                .find(|(id, node)| group.children().contains(id) && node.label() == Some(label))
+                .map(|(_, node)| node)
+                .expect("named boolean choice");
+            assert_eq!(node.role(), gpui::Role::Tab);
+            assert_eq!(node.is_selected(), Some(selected));
+            assert_eq!(node.is_disabled(), disabled);
+        }
+    });
+}
+
+#[test]
+fn opus_bitrate_and_vbr_controls_support_keyboard_and_copy_in_both_themes_and_scales() {
+    for theme in ColorTheme::ALL {
+        for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+            let mut app = TestAppContext::single();
+            let (root, cx) = select_window(&mut app, &OUTPUT_SELECTS[3], theme, scale);
+            root.update(cx, |root, cx| {
+                let config = &mut root.file_queue.selected_file_mut().unwrap().config;
+                config.container = "opus".to_string();
+                config.audio_codec = "libopus".to_string();
+                config.audio_bitrate_mode = "bitrate".to_string();
+                config.opus_vbr = true;
+                cx.notify();
+            });
+            cx.update(|window, _| window.set_a11y_forced(true));
+            draw(cx);
+            assert_opus_controls(cx, true, false);
+            click(cx, "audio-opus-vbr-false");
+            assert!(!root.read_with(cx, |root, _| root.selected_config().unwrap().opus_vbr));
+            assert_opus_controls(cx, false, false);
+            press(cx, "right");
+            assert!(root.read_with(cx, |root, _| root.selected_config().unwrap().opus_vbr));
+            assert_opus_controls(cx, true, false);
+            press(cx, "left");
+            assert!(!root.read_with(cx, |root, _| root.selected_config().unwrap().opus_vbr));
+            assert_opus_controls(cx, false, false);
+            root.update(cx, |root, cx| {
+                root.file_queue
+                    .selected_file_mut()
+                    .unwrap()
+                    .config
+                    .processing_mode = crate::settings::ProcessingMode::Copy;
+                cx.notify();
+            });
+            draw(cx);
+            assert_opus_controls(cx, false, true);
+            click(cx, "audio-opus-vbr-true");
+            press(cx, "right");
+            assert!(!root.read_with(cx, |root, _| root.selected_config().unwrap().opus_vbr));
+            let bitrate_bounds = cx.update(|window, _| {
+                let (id, _) = window
+                    .a11y_tree()
+                    .unwrap()
+                    .nodes
+                    .iter()
+                    .find(|(_, node)| {
+                        node.role() == gpui::Role::TextInput
+                            && node.label() == Some("Audio bitrate")
+                    })
+                    .unwrap();
+                window.a11y_node_bounds(*id).unwrap()
+            });
+            cx.simulate_click(bitrate_bounds.center(), Modifiers::default());
+            press(cx, "9");
+            assert_eq!(
+                root.read_with(cx, |root, _| root
+                    .selected_config()
+                    .unwrap()
+                    .audio_bitrate
+                    .clone()),
+                "128"
+            );
+        }
+    }
+}

@@ -376,6 +376,7 @@ mod tests {
                 "m4a".to_string(),
                 "wav".to_string(),
                 "flac".to_string(),
+                "opus".to_string(),
             ]
         );
     }
@@ -427,6 +428,21 @@ mod tests {
     #[test]
     fn mov_accepts_any_audio_codec_like_shared_rules() {
         assert!(is_audio_codec_allowed("mov", "flac"));
+    }
+
+    #[test]
+    fn opus_container_only_accepts_opus_audio() {
+        assert!(is_audio_only_container("OPUS"));
+        assert!(container_supports_audio("opus"));
+        assert!(!container_supports_subtitles("opus"));
+        assert_eq!(default_audio_codec_for_container("opus"), "libopus");
+        assert!(is_audio_codec_allowed("opus", "libopus"));
+        assert!(is_audio_stream_codec_allowed("opus", "opus"));
+        for codec in ["flac", "aac", "vorbis"] {
+            assert!(!is_audio_codec_allowed("opus", codec));
+            assert!(!is_audio_stream_codec_allowed("opus", codec));
+        }
+        assert!(!all_containers().iter().any(|container| container == "ogg"));
     }
 
     #[test]

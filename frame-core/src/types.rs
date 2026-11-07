@@ -315,6 +315,8 @@ pub struct ConversionConfig {
     pub audio_bitrate: String,
     #[serde(default = "default_audio_bitrate_mode")]
     pub audio_bitrate_mode: String,
+    #[serde(default = "default_opus_vbr")]
+    pub opus_vbr: bool,
     #[serde(default = "default_audio_quality")]
     pub audio_quality: String,
     pub audio_channels: String,
@@ -422,6 +424,10 @@ const fn default_audio_volume() -> f64 {
 
 fn default_audio_bitrate_mode() -> String {
     "bitrate".to_string()
+}
+
+const fn default_opus_vbr() -> bool {
+    true
 }
 
 fn default_audio_quality() -> String {
@@ -690,6 +696,7 @@ mod tests {
 
         assert_eq!(config.processing_mode, "reencode");
         assert_eq!(config.audio_bitrate_mode, "bitrate");
+        assert!(config.opus_vbr);
         assert_eq!(config.audio_quality, "4");
         assert!((config.audio_volume - 100.0).abs() < f64::EPSILON);
         assert_eq!(config.quality, 50);
@@ -720,12 +727,27 @@ mod tests {
 
         assert_eq!(serialized["processingMode"], "reencode");
         assert_eq!(serialized["audioBitrateMode"], "bitrate");
+        assert_eq!(serialized["opusVbr"], true);
         assert_eq!(serialized["imageJpegQuality"], 85);
         assert_eq!(serialized["imageWebpPreset"], "default");
         assert_eq!(serialized["imagePngPrediction"], "paeth");
         assert_eq!(serialized["metadata"]["mode"], "preserve");
         assert_eq!(serialized["externalSubtitleTracks"], json!([]));
         assert!(serialized.get("processing_mode").is_none());
+    }
+
+    #[test]
+    fn opus_vbr_explicit_values_roundtrip() {
+        for opus_vbr in [false, true] {
+            let mut json = minimal_config_json();
+            json["opusVbr"] = json!(opus_vbr);
+            let config: ConversionConfig = serde_json::from_value(json).unwrap();
+            assert_eq!(config.opus_vbr, opus_vbr);
+            let encoded = serde_json::to_value(config).unwrap();
+            assert_eq!(encoded["opusVbr"], opus_vbr);
+            let restored: ConversionConfig = serde_json::from_value(encoded).unwrap();
+            assert_eq!(restored.opus_vbr, opus_vbr);
+        }
     }
 
     #[test]

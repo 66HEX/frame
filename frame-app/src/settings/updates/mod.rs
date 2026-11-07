@@ -12,8 +12,8 @@ mod video;
 
 pub use audio::{
     apply_audio_bitrate, apply_audio_bitrate_mode, apply_audio_channels, apply_audio_codec,
-    apply_audio_normalize, apply_audio_quality, apply_audio_volume, audio_codec_supports_vbr,
-    audio_quality_range, toggle_audio_track_selection,
+    apply_audio_normalize, apply_audio_quality, apply_audio_volume, apply_opus_vbr,
+    audio_codec_supports_vbr, audio_quality_range, toggle_audio_track_selection,
 };
 pub use images::{
     apply_image_jpeg_huffman, apply_image_jpeg_quality, apply_image_png_compression,
