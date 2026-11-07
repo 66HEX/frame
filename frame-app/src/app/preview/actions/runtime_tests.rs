@@ -1,6 +1,173 @@
 use super::*;
 use crate::app::*;
+use crate::preview::PlaybackMediaCommand;
 use gpui::{AppContext, TestAppContext};
+use std::time::{Duration, Instant};
+
+#[test]
+fn paused_preview_stops_polling_after_presenting_the_final_frame() {
+    let mut app = TestAppContext::single();
+    let root = app.new(|_| FrameRoot::new());
+    root.update(&mut app, |root, cx| {
+        root.apply_visual_fixture(Some(VisualFixture::PreviewReady));
+        let metadata = root.selected_source_metadata_entry();
+        let request = root.selected_preview_runtime_request(&metadata).unwrap();
+        let session = Arc::new(PreviewSession::new_for_test(request.config));
+        let frame = crate::preview_engine::rendered_frame_from_bgra_payload(1, 1, 4, 0, vec![0; 4])
+            .unwrap();
+        let _ = session.frame_store().publish(frame);
+        root.preview_ui.session = Some(session);
+        root.schedule_preview_frame_tick(cx);
+    });
+    app.run_until_parked();
+    let mut wakeups = 0;
+    for _ in 0..600 {
+        if !app.dispatcher.advance_clock_to_next_timer() {
+            break;
+        }
+        app.run_until_parked();
+        wakeups += 1;
+    }
+    eprintln!("paused preview timer wakeups over 600 potential ticks: {wakeups}");
+    assert_eq!(
+        wakeups, 1,
+        "an idle frame must not keep a 16 ms timer alive"
+    );
+    root.read_with(&app, |root, _| {
+        assert_eq!(root.preview_ui.render_generation, 1);
+        assert!(!root.preview_ui.frame_tick_active);
+    });
+}
+
+#[test]
+fn paused_preview_wakes_for_seek_and_play_then_stops_after_pause() {
+    let mut app = TestAppContext::single();
+    let root = app.new(|_| FrameRoot::new());
+    root.update(&mut app, |root, cx| {
+        root.apply_visual_fixture(Some(VisualFixture::PreviewReady));
+        let metadata = root.selected_source_metadata_entry();
+        let request = root.selected_preview_runtime_request(&metadata).unwrap();
+        root.preview_ui.session = Some(Arc::new(PreviewSession::new_for_test(request.config)));
+        root.schedule_preview_frame_tick(cx);
+    });
+    app.run_until_parked();
+    assert!(app.dispatcher.advance_clock_to_next_timer());
+    app.run_until_parked();
+    assert!(!app.dispatcher.advance_clock_to_next_timer());
+
+    root.update(&mut app, |root, cx| {
+        let frame =
+            crate::preview_engine::rendered_frame_from_bgra_payload(1, 1, 4, 1_000, vec![0; 4])
+                .unwrap();
+        let _ = root
+            .preview_ui
+            .session
+            .as_ref()
+            .unwrap()
+            .frame_store()
+            .publish(frame);
+        root.apply_preview_media_command(PlaybackMediaCommand::seek(1.0), true, Some(cx));
+    });
+    app.run_until_parked();
+    assert!(app.dispatcher.advance_clock_to_next_timer());
+    app.run_until_parked();
+    root.read_with(&app, |root, _| {
+        assert_eq!(root.preview_ui.render_generation, 1);
+        assert!(!root.preview_ui.frame_tick_active);
+    });
+    assert!(!app.dispatcher.advance_clock_to_next_timer());
+
+    root.update(&mut app, |root, cx| {
+        root.apply_preview_media_command(PlaybackMediaCommand::play(), true, Some(cx));
+    });
+    app.run_until_parked();
+    for _ in 0..3 {
+        assert!(app.dispatcher.advance_clock_to_next_timer());
+        app.run_until_parked();
+        root.read_with(&app, |root, _| assert!(root.preview_ui.frame_tick_active));
+    }
+
+    root.update(&mut app, |root, cx| {
+        root.apply_preview_media_command(PlaybackMediaCommand::pause(), true, Some(cx));
+    });
+    app.run_until_parked();
+    assert!(app.dispatcher.advance_clock_to_next_timer());
+    app.run_until_parked();
+    root.read_with(&app, |root, _| assert!(!root.preview_ui.frame_tick_active));
+    assert!(!app.dispatcher.advance_clock_to_next_timer());
+}
+
+#[test]
+fn preview_timer_keeps_debounces_alive_and_stops_after_their_deadlines() {
+    let mut app = TestAppContext::single();
+    let root = app.new(|_| FrameRoot::new());
+    root.update(&mut app, |root, cx| {
+        root.preview_ui.preview_dimensions_debounce_until =
+            Some(Instant::now() + Duration::from_mins(1));
+        root.preview_ui.filter_preview_debounce_until =
+            Some(Instant::now() + Duration::from_mins(1));
+        root.schedule_preview_frame_tick(cx);
+    });
+    app.run_until_parked();
+    assert!(app.dispatcher.advance_clock_to_next_timer());
+    app.run_until_parked();
+    root.read_with(&app, |root, _| assert!(root.preview_ui.frame_tick_active));
+
+    root.update(&mut app, |root, _| {
+        let expired = Some(
+            Instant::now()
+                .checked_sub(Duration::from_secs(1))
+                .expect("test deadline fits the monotonic clock"),
+        );
+        root.preview_ui.preview_dimensions_debounce_until = expired;
+        root.preview_ui.filter_preview_debounce_until = expired;
+    });
+    assert!(app.dispatcher.advance_clock_to_next_timer());
+    app.run_until_parked();
+    root.read_with(&app, |root, _| {
+        assert!(root.preview_ui.preview_dimensions_debounce_until.is_none());
+        assert!(root.preview_ui.filter_preview_debounce_until.is_none());
+        assert!(!root.preview_ui.frame_tick_active);
+    });
+    assert!(!app.dispatcher.advance_clock_to_next_timer());
+}
+
+#[test]
+#[expect(
+    clippy::float_cmp,
+    reason = "The completed animation must snap exactly to its deterministic target."
+)]
+fn preview_timer_keeps_canvas_animation_alive_and_settles_before_stopping() {
+    let mut app = TestAppContext::single();
+    let root = app.new(|_| FrameRoot::new());
+    root.update(&mut app, |root, cx| {
+        root.preview_ui.canvas.target_zoom = 2.0;
+        root.schedule_preview_frame_tick(cx);
+    });
+    app.run_until_parked();
+    assert!(app.dispatcher.advance_clock_to_next_timer());
+    app.run_until_parked();
+    root.read_with(&app, |root, _| {
+        assert!(root.preview_ui.canvas.current_zoom > 1.0);
+        assert!(root.preview_ui.canvas.current_zoom < 2.0);
+        assert!(root.preview_ui.frame_tick_active);
+    });
+    root.update(&mut app, |root, _| {
+        root.preview_ui.canvas.last_animation_tick = Some(
+            Instant::now()
+                .checked_sub(Duration::from_secs(10))
+                .expect("test animation timestamp fits the monotonic clock"),
+        );
+    });
+    assert!(app.dispatcher.advance_clock_to_next_timer());
+    app.run_until_parked();
+    root.read_with(&app, |root, _| {
+        assert_eq!(root.preview_ui.canvas.current_zoom, 2.0);
+        assert!(root.preview_ui.canvas.last_animation_tick.is_none());
+        assert!(!root.preview_ui.frame_tick_active);
+    });
+    assert!(!app.dispatcher.advance_clock_to_next_timer());
+}
 
 #[test]
 fn stale_preview_completion_cannot_replace_a_new_request_for_the_same_key() {

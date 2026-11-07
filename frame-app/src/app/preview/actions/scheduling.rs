@@ -67,36 +67,38 @@ impl FrameRoot {
                     .await;
                 let keep_ticking = this
                     .update(cx, |root, cx| {
-                        let canvas_changed = if cx.reduce_motion() {
+                        let mut canvas_changed = if cx.reduce_motion() {
                             root.settle_preview_canvas_animation()
                         } else {
                             root.tick_preview_canvas_animation()
                         };
                         let preview_dimensions_ready = root.tick_preview_dimensions_debounce();
                         let filter_preview_ready = root.tick_filter_preview_debounce();
-                        if root.preview_ui.session.is_none() {
-                            if canvas_changed || preview_dimensions_ready || filter_preview_ready {
-                                cx.notify();
-                                return true;
-                            }
-                            if root.preview_dimensions_debounce_pending()
-                                || root.filter_preview_debounce_pending()
-                            {
-                                return true;
-                            }
-                            root.preview_ui.frame_tick_active = false;
-                            return false;
+                        let frame_changed = root.refresh_preview_render_image(cx);
+                        let playing = root.preview_ui.session.is_some()
+                            && root.preview_ui.playback.is_playing();
+                        let canvas_animating = root.preview_canvas_transform_animating();
+                        if !canvas_animating {
+                            canvas_changed |= root.settle_preview_canvas_animation();
                         }
+                        // Paused operations publish their final frame before
+                        // completion wakes this timer. Static previews need no
+                        // polling between commands, animations or debounces.
+                        let keep_ticking = playing
+                            || canvas_animating
+                            || root.preview_dimensions_debounce_pending()
+                            || root.filter_preview_debounce_pending();
+                        root.preview_ui.frame_tick_active = keep_ticking;
 
-                        if root.refresh_preview_render_image(cx)
-                            || root.preview_ui.playback.is_playing()
+                        if frame_changed
+                            || playing
                             || canvas_changed
                             || preview_dimensions_ready
                             || filter_preview_ready
                         {
                             cx.notify();
                         }
-                        true
+                        keep_ticking
                     })
                     .unwrap_or(false);
 
