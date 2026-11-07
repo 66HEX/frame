@@ -1,14 +1,17 @@
 use crate::numeric::usize_to_f32;
 use crate::theme;
 use gpui::{
-    App, Bounds, Element, ElementId, GlobalElementId, IntoElement, LayoutId, Pixels, Position,
-    Rgba, Style, Window, point, px, relative, size,
+    App, Background, BackgroundKind, Bounds, Element, ElementId, GlobalElementId, IntoElement,
+    LayoutId, Pixels, Position, Style, Window, linear_gradient, point, px, relative, size,
 };
+use std::cell::Cell;
+use std::rc::Rc;
 
 /// Paint-only foreground for rounded media cutouts.
 /// No hitbox, so pan, zoom and crop interactions pass through to the content.
 pub(super) struct PreviewViewportFrame {
-    pub(super) color: Rgba,
+    pub(super) fill: Background,
+    pub(super) card_bounds: Rc<Cell<Bounds<Pixels>>>,
 }
 
 impl IntoElement for PreviewViewportFrame {
@@ -72,7 +75,31 @@ impl Element for PreviewViewportFrame {
         // the rounded corners; the viewport paints its focus ring above this mask.
         let radius = theme::ui_rem(theme::RADIUS_MD).to_pixels(window.rem_size());
         if let Some(path) = preview_viewport_rounded_clip_path(bounds, radius) {
-            window.paint_path(path, self.color);
+            let paint_bounds = path.bounds.intersect(&window.content_mask().bounds);
+            if paint_bounds.is_empty() {
+                return;
+            }
+            let card_bounds = self.card_bounds.get();
+            let card_bounds = Bounds::from_corners(
+                window.pixel_snap_point(card_bounds.origin),
+                window.pixel_snap_point(card_bounds.bottom_right()),
+            );
+            let mut fill = self.fill;
+            if let BackgroundKind::LinearGradient { angle, mut stops } = fill.kind() {
+                // Surface lighting runs vertically over the entire card. GPUI
+                // shades paths relative to their clipped bounds, so align the
+                // same stops to the card instead of restarting at the viewport.
+                for stop in &mut stops {
+                    stop.percentage = (stop.percentage.mul_add(
+                        card_bounds.size.height.as_f32(),
+                        card_bounds.origin.y.as_f32(),
+                    ) - paint_bounds.origin.y.as_f32())
+                        / paint_bounds.size.height.as_f32();
+                }
+                fill = linear_gradient(angle, stops[0], stops[1])
+                    .color_space(fill.interpolation_space());
+            }
+            window.paint_path(path, fill);
         }
     }
 }

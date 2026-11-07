@@ -26,14 +26,17 @@ use crate::preview::{MetadataStatus as PreviewMetadataStatus, PreviewMediaKind};
 use crate::{assets, theme};
 use gpui::prelude::*;
 use gpui::{
-    Context, DragMoveEvent, MouseUpEvent, PinchEvent, RenderImage, ScrollWheelEvent, Window, div,
-    px, relative,
+    Bounds, Context, DragMoveEvent, MouseUpEvent, PinchEvent, Pixels, RenderImage,
+    ScrollWheelEvent, Window, div, px, relative,
 };
+use std::cell::Cell;
+use std::rc::Rc;
 use std::sync::Arc;
 
 pub(in crate::app) fn preview_viewport(
     state: &PreviewShellState,
     focuses: PreviewViewportFocuses<'_>,
+    card_bounds: Rc<Cell<Bounds<Pixels>>>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -82,7 +85,8 @@ pub(in crate::app) fn preview_viewport(
         .child(preview_viewport_content(state, cx))
         // Fixed to the viewport, above media/crop layers and below floating controls.
         .child(PreviewViewportFrame {
-            color: color(palette.surface),
+            fill: theme::shadows::surface_fill(palette.surface, palette),
+            card_bounds,
         });
 
     if pan_enabled {

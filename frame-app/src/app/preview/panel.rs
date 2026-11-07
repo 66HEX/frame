@@ -2,7 +2,7 @@ use crate::app::inspector::state::SettingsRenderState;
 use crate::app::layout::PREVIEW_PANEL_PADDING;
 use crate::app::preview::state::{CropSelect, PreviewOverlayImageDimensions};
 use crate::app::preview::{preview_timeline, preview_viewport};
-use crate::app::primitives::{FrameSurface, color};
+use crate::app::primitives::FrameSurface;
 use crate::app::root::FrameRoot;
 use crate::file_queue::{FileItem, FileQueue};
 use crate::numeric::{f64_to_u32, u32_to_f32};
@@ -17,6 +17,8 @@ use crate::source_metadata::MetadataStatus;
 use crate::theme;
 use gpui::prelude::*;
 use gpui::{Context, FocusHandle, RenderImage, ScrollHandle, Window, div};
+use std::cell::Cell;
+use std::rc::Rc;
 use std::sync::Arc;
 
 #[expect(
@@ -203,8 +205,10 @@ pub(in crate::app) fn preview_panel(
     props: PreviewPanelProps<'_>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
-) -> gpui::Div {
+) -> gpui::Stateful<gpui::Div> {
     let palette = settings.palette;
+    let card_bounds = Rc::new(Cell::new(gpui::Bounds::default()));
+    let measured_card_bounds = Rc::clone(&card_bounds);
     let state = preview_shell_state(PreviewShellStateInput {
         selected_file: file_queue.selected_file(),
         settings,
@@ -222,10 +226,16 @@ pub(in crate::app) fn preview_panel(
         .flex_col()
         .overflow_hidden()
         .card_surface(palette)
-        // The media corner mask uses this same solid surface color.
-        .bg(color(palette.surface))
+        .id("preview-panel")
+        .on_prepaint(move |info, _, _| measured_card_bounds.set(info.bounds))
         .p(theme::ui_rem(PREVIEW_PANEL_PADDING))
-        .child(preview_viewport(&state, props.viewport_focuses, window, cx))
+        .child(preview_viewport(
+            &state,
+            props.viewport_focuses,
+            card_bounds,
+            window,
+            cx,
+        ))
         .child(preview_timeline(&state, props.timecode_focuses, window, cx))
 }
 
