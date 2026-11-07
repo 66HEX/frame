@@ -5,6 +5,172 @@ use gpui::{AppContext, TestAppContext};
 use std::time::{Duration, Instant};
 
 #[test]
+fn failed_preview_request_does_not_restart_on_unchanged_renders() {
+    let mut app = TestAppContext::single();
+    let root = app.new(|_| FrameRoot::new());
+    root.update(&mut app, |root, cx| {
+        root.apply_visual_fixture(Some(VisualFixture::PreviewReady));
+        let metadata = root.selected_source_metadata_entry();
+        let request = root.selected_preview_runtime_request(&metadata).unwrap();
+        root.preview_ui.pending_runtime_key = Some(request.key.clone());
+        let generation = root.preview_ui.runtime_request_generation;
+        let result = Err(PreviewEngineError::Ffmpeg("missing source".into()));
+        assert!(root.finish_preview_runtime_request(generation, &request.key, &result, cx));
+
+        for _ in 0..120 {
+            let request = root.selected_preview_runtime_request(&metadata).unwrap();
+            root.sync_preview_runtime_for_selection(Some(request), cx);
+        }
+        assert_eq!(root.preview_ui.runtime_request_generation, generation);
+        assert!(root.preview_ui.pending_runtime_key.is_none());
+        assert!(
+            root.preview_ui
+                .runtime_error
+                .as_deref()
+                .unwrap()
+                .contains("missing source")
+        );
+    });
+}
+
+#[test]
+fn changed_preview_request_can_retry_after_failure_and_success_clears_the_error() {
+    let mut app = TestAppContext::single();
+    let root = app.new(|_| FrameRoot::new());
+    root.update(&mut app, |root, cx| {
+        root.apply_visual_fixture(Some(VisualFixture::PreviewReady));
+        let metadata = root.selected_source_metadata_entry();
+        let failed = root.selected_preview_runtime_request(&metadata).unwrap();
+        root.preview_ui.pending_runtime_key = Some(failed.key.clone());
+        let generation = root.preview_ui.runtime_request_generation;
+        let result = Err(PreviewEngineError::Ffmpeg("invalid filter".into()));
+        assert!(root.finish_preview_runtime_request(generation, &failed.key, &result, cx));
+
+        let mut changed = root.selected_preview_runtime_request(&metadata).unwrap();
+        changed.key.visual_hash = changed.key.visual_hash.wrapping_add(1);
+        let key = changed.key.clone();
+        let session = Arc::new(PreviewSession::new_for_test(changed.config.clone()));
+        root.sync_preview_runtime_for_selection(Some(changed), cx);
+        assert_ne!(root.preview_ui.runtime_request_generation, generation);
+        assert_eq!(root.preview_ui.pending_runtime_key.as_ref(), Some(&key));
+        assert!(root.preview_ui.failed_runtime_key.is_none());
+
+        let generation = root.preview_ui.runtime_request_generation;
+        assert!(root.finish_preview_runtime_request(generation, &key, &Ok(session), cx));
+        assert!(root.preview_ui.runtime_error.is_none());
+        assert!(root.preview_ui.failed_runtime_key.is_none());
+        assert_eq!(root.preview_ui.runtime_key, Some(key));
+    });
+}
+
+#[test]
+fn successful_commands_and_frames_do_not_hide_a_failed_rebuild() {
+    let mut app = TestAppContext::single();
+    let root = app.new(|_| FrameRoot::new());
+    let (failed_key, error) = root.update(&mut app, |root, cx| {
+        root.apply_visual_fixture(Some(VisualFixture::PreviewReady));
+        let metadata = root.selected_source_metadata_entry();
+        let current = root.selected_preview_runtime_request(&metadata).unwrap();
+        let session = Arc::new(PreviewSession::new_for_test(current.config));
+        let frame = crate::preview_engine::rendered_frame_from_bgra_payload(1, 1, 4, 0, vec![0; 4])
+            .unwrap();
+        let _ = session.frame_store().publish(frame);
+        root.preview_ui.session = Some(session);
+        root.preview_ui.runtime_key = Some(current.key.clone());
+
+        let mut failed_key = current.key;
+        failed_key.visual_hash = failed_key.visual_hash.wrapping_add(1);
+        root.preview_ui.pending_runtime_key = Some(failed_key.clone());
+        let generation = root.preview_ui.runtime_request_generation;
+        let result = Err(PreviewEngineError::Ffmpeg("invalid filter".into()));
+        assert!(root.finish_preview_runtime_request(generation, &failed_key, &result, cx));
+        (failed_key, root.preview_runtime_error().unwrap())
+    });
+
+    // Commands still operate on the previous session. Their success and a
+    // late frame from that session do not mean the new config was applied.
+    for command in [
+        PlaybackMediaCommand::seek(1.0),
+        PlaybackMediaCommand::play(),
+        PlaybackMediaCommand::pause(),
+    ] {
+        root.update(&mut app, |root, cx| {
+            root.apply_preview_media_command(command, true, Some(cx));
+        });
+        app.run_until_parked();
+        assert!(app.dispatcher.advance_clock_to_next_timer());
+        app.run_until_parked();
+        root.read_with(&app, |root, _| {
+            assert_eq!(
+                root.preview_ui.failed_runtime_key.as_ref(),
+                Some(&failed_key)
+            );
+            assert_eq!(root.preview_ui.runtime_error.as_ref(), Some(&error));
+            assert!(root.preview_ui.render_image.is_some());
+        });
+    }
+
+    root.update(&mut app, |root, cx| {
+        assert!(root.queue_trim_preview_seek(3.0, Some(cx)));
+    });
+    app.run_until_parked();
+    for _ in 0..4 {
+        if !app.dispatcher.advance_clock_to_next_timer() {
+            break;
+        }
+        app.run_until_parked();
+    }
+
+    root.update(&mut app, |root, _| {
+        root.apply_preview_media_command(PlaybackMediaCommand::seek(2.0), true, None);
+        assert_eq!(
+            root.preview_ui.failed_runtime_key.as_ref(),
+            Some(&failed_key)
+        );
+        assert_eq!(root.preview_ui.runtime_error.as_ref(), Some(&error));
+    });
+    assert!(!app.dispatcher.advance_clock_to_next_timer());
+}
+
+#[test]
+fn deselecting_a_failed_source_allows_the_same_source_to_retry() {
+    let mut app = TestAppContext::single();
+    let root = app.new(|_| FrameRoot::new());
+    root.update(&mut app, |root, cx| {
+        root.apply_visual_fixture(Some(VisualFixture::PreviewReady));
+        let metadata = root.selected_source_metadata_entry();
+        let request = root.selected_preview_runtime_request(&metadata).unwrap();
+        root.preview_ui.pending_runtime_key = Some(request.key.clone());
+        let generation = root.preview_ui.runtime_request_generation;
+        let result = Err(PreviewEngineError::Ffmpeg("unavailable source".into()));
+        assert!(root.finish_preview_runtime_request(generation, &request.key, &result, cx));
+
+        root.sync_preview_runtime_for_selection(None, cx);
+        assert!(root.preview_ui.failed_runtime_key.is_none());
+        assert!(root.preview_ui.runtime_error.is_none());
+        let request = root.selected_preview_runtime_request(&metadata).unwrap();
+        let key = request.key.clone();
+        root.sync_preview_runtime_for_selection(Some(request), cx);
+        assert_eq!(root.preview_ui.pending_runtime_key, Some(key));
+    });
+}
+
+#[test]
+fn inactive_preview_renders_do_not_schedule_redundant_teardown() {
+    let mut app = TestAppContext::single();
+    let root = app.new(|_| FrameRoot::new());
+    root.update(&mut app, |root, cx| {
+        for _ in 0..120 {
+            root.sync_preview_runtime_for_selection(None, cx);
+        }
+        assert_eq!(root.preview_ui.runtime_request_generation, 0);
+        assert_eq!(root.preview_ui.media_command_generation, 0);
+    });
+    app.run_until_parked();
+    assert!(!app.dispatcher.advance_clock_to_next_timer());
+}
+
+#[test]
 fn paused_preview_stops_polling_after_presenting_the_final_frame() {
     let mut app = TestAppContext::single();
     let root = app.new(|_| FrameRoot::new());

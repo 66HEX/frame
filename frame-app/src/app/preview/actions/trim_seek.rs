@@ -152,7 +152,9 @@ impl FrameRoot {
 
         match result {
             Ok(()) => {
-                self.preview_ui.runtime_error = None;
+                if self.preview_ui.failed_runtime_key.is_none() {
+                    self.preview_ui.runtime_error = None;
+                }
                 self.schedule_preview_frame_tick(cx);
             }
             Err(error) => {

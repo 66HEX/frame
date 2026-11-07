@@ -318,7 +318,9 @@ impl FrameRoot {
                         }
                         match result {
                             Ok(()) => {
-                                root.preview_ui.runtime_error = None;
+                                if root.preview_ui.failed_runtime_key.is_none() {
+                                    root.preview_ui.runtime_error = None;
+                                }
                                 root.schedule_preview_frame_tick(cx);
                             }
                             Err(error) => {
@@ -337,7 +339,9 @@ impl FrameRoot {
                         return false;
                     }
                 }
-                self.preview_ui.runtime_error = None;
+                if self.preview_ui.failed_runtime_key.is_none() {
+                    self.preview_ui.runtime_error = None;
+                }
             }
         }
 

@@ -30,7 +30,15 @@ impl FrameRoot {
         cx: &mut Context<Self>,
     ) {
         let Some(request) = request else {
-            self.clear_preview_runtime_for_selection(cx);
+            if self.preview_ui.session.is_some()
+                || self.preview_ui.runtime_key.is_some()
+                || self.preview_ui.pending_runtime_key.is_some()
+                || self.preview_ui.failed_runtime_key.is_some()
+                || self.preview_ui.render_image.is_some()
+                || self.preview_ui.runtime_error.is_some()
+            {
+                self.clear_preview_runtime_for_selection(cx);
+            }
             self.preview_ui.render_presentation = PreviewRenderPresentation::default();
             self.preview_ui.rendered_presentation = PreviewRenderPresentation::default();
             return;
@@ -38,6 +46,16 @@ impl FrameRoot {
 
         let presentation_changed = self.preview_ui.render_presentation != request.presentation;
         self.preview_ui.render_presentation = request.presentation;
+
+        // A failed start/rebuild notifies the UI too. Re-rendering that error
+        // must not launch the same FFmpeg request again; a changed request or
+        // explicit teardown (including source reselection) permits a retry.
+        if self.preview_ui.failed_runtime_key.as_ref() == Some(&request.key) {
+            return;
+        }
+        if self.preview_ui.failed_runtime_key.take().is_some() {
+            self.preview_ui.runtime_error = None;
+        }
 
         let next_key = Some(request.key.clone());
         if self.preview_ui.runtime_key == next_key
@@ -129,6 +147,7 @@ impl FrameRoot {
         self.preview_ui.pending_runtime_key = None;
         match result {
             Ok(session) => {
+                self.preview_ui.failed_runtime_key = None;
                 self.preview_ui.runtime_key = Some(key.clone());
                 self.preview_ui.session = Some(Arc::clone(session));
                 self.preview_ui.runtime_error = None;
@@ -136,6 +155,7 @@ impl FrameRoot {
                 self.schedule_preview_frame_tick(cx);
             }
             Err(error) => {
+                self.preview_ui.failed_runtime_key = Some(key.clone());
                 self.preview_ui.runtime_error = Some(error.to_string());
             }
         }
@@ -163,6 +183,7 @@ impl FrameRoot {
         self.preview_ui.preview_dimensions_debounce_until = None;
         self.preview_ui.runtime_key = None;
         self.preview_ui.pending_runtime_key = None;
+        self.preview_ui.failed_runtime_key = None;
         self.preview_ui.runtime_request_generation =
             self.preview_ui.runtime_request_generation.wrapping_add(1);
         self.preview_ui.media_command_generation =
@@ -211,7 +232,9 @@ impl FrameRoot {
         session.mark_frame_presented(latest.generation);
         self.preview_ui.render_generation = latest.generation;
         self.preview_ui.rendered_presentation = self.preview_ui.render_presentation;
-        self.preview_ui.runtime_error = None;
+        if self.preview_ui.failed_runtime_key.is_none() {
+            self.preview_ui.runtime_error = None;
+        }
         self.apply_preview_canvas_auto_fit();
         true
     }
