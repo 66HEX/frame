@@ -124,7 +124,7 @@ pub fn normalize_output_config(
     if mp2_original_channels_are_unsupported(config, metadata) {
         config.audio_channels = "stereo".to_string();
     }
-    normalize_video_config(config, metadata);
+    normalize_video_config_values(config, metadata);
 
     before != *config
 }
@@ -151,6 +151,12 @@ pub fn normalize_video_config(
     metadata: Option<&SourceMetadata>,
 ) -> bool {
     let before = config.clone();
+    normalize_video_config_values(config, metadata);
+
+    before != *config
+}
+
+fn normalize_video_config_values(config: &mut ConversionConfig, metadata: Option<&SourceMetadata>) {
     let source_kind = source_kind_for(metadata);
     let is_audio_container = is_audio_only_container(&config.container);
     let is_gif_output = is_gif_container(&config.container);
@@ -221,8 +227,6 @@ pub fn normalize_video_config(
     if !GIF_DITHER_OPTIONS.contains(&config.gif_dither.as_str()) {
         config.gif_dither = DEFAULT_GIF_DITHER.to_string();
     }
-
-    before != *config
 }
 
 pub(super) fn normalize_audio_encoding_settings(config: &mut ConversionConfig) {

@@ -92,7 +92,7 @@ fn normalize_video_config_for_gif_forces_original_gif_contract() {
         ..ConversionConfig::default()
     };
 
-    assert!(normalize_video_config(&mut config, None));
+    assert_normalizes_once(normalize_video_config, &mut config, None);
 
     assert_eq!(config.video_codec, "gif");
     assert_eq!(config.pixel_format, "auto");
@@ -110,7 +110,7 @@ fn normalize_video_config_resets_visual_filters_in_copy_mode() {
         ..ConversionConfig::default()
     };
 
-    assert!(normalize_video_config(&mut config, None));
+    assert_normalizes_once(normalize_video_config, &mut config, None);
 
     assert_eq!(config.resolution, "original");
     assert_eq!(config.fps, "original");

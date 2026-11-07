@@ -28,7 +28,8 @@ fn normalize_output_config_resets_audio_filter_controls_in_copy_mode() {
         ..ConversionConfig::default()
     };
 
-    normalize_output_config(&mut config, None);
+    assert!(!normalize_video_config(&mut config, None));
+    assert_normalizes_once(normalize_output_config, &mut config, None);
 
     assert_eq!(config.audio_bitrate_mode, "bitrate");
     assert_eq!(config.audio_volume, 100);
@@ -90,7 +91,7 @@ fn normalize_output_config_forces_audio_sources_to_audio_container() {
     };
     let mut config = ConversionConfig::default();
 
-    normalize_output_config(&mut config, Some(&metadata));
+    assert_normalizes_once(normalize_output_config, &mut config, Some(&metadata));
 
     assert_eq!(config.container, "mp3");
 }
@@ -103,7 +104,7 @@ fn normalize_output_config_forces_image_sources_to_image_container() {
     };
     let mut config = ConversionConfig::default();
 
-    normalize_output_config(&mut config, Some(&metadata));
+    assert_normalizes_once(normalize_output_config, &mut config, Some(&metadata));
 
     assert_eq!(config.container, "png");
     assert_eq!(config.video_codec, "png");
@@ -195,9 +196,27 @@ fn normalize_output_config_reencodes_gif_outputs() {
         ..ConversionConfig::default()
     };
 
-    normalize_output_config(&mut config, None);
+    assert_normalizes_once(normalize_output_config, &mut config, None);
 
     assert_eq!(config.processing_mode, ProcessingMode::Reencode);
+}
+
+#[test]
+fn normalize_output_config_reports_video_only_changes() {
+    let metadata = SourceMetadata {
+        media_kind: Some(SourceKind::Video),
+        ..SourceMetadata::default()
+    };
+    for metadata in [None, Some(&metadata)] {
+        let mut config = ConversionConfig {
+            pixel_format: "invalid".to_string(),
+            ..ConversionConfig::default()
+        };
+        let mut expected = config.clone();
+        assert_normalizes_once(normalize_video_config, &mut expected, metadata);
+        assert_normalizes_once(normalize_output_config, &mut config, metadata);
+        assert_eq!(config, expected);
+    }
 }
 
 #[test]

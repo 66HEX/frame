@@ -373,7 +373,8 @@ fn normalize_output_config_removes_pgs_selection_for_mp4() {
         ..SourceMetadata::default()
     };
 
-    assert!(normalize_output_config(&mut config, Some(&metadata)));
+    assert!(!normalize_video_config(&mut config, Some(&metadata)));
+    assert_normalizes_once(normalize_output_config, &mut config, Some(&metadata));
     assert!(config.selected_subtitle_tracks.is_empty());
 }
 

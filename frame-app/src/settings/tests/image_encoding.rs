@@ -56,7 +56,7 @@ fn normalize_video_config_repairs_invalid_image_encoding_values() {
         ..ConversionConfig::default()
     };
 
-    assert!(normalize_video_config(&mut config, None));
+    assert_normalizes_once(normalize_video_config, &mut config, None);
 
     assert_eq!(config.image_jpeg_quality, 1);
     assert_eq!(config.image_jpeg_huffman, "optimal");
