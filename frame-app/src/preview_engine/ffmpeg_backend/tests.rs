@@ -154,14 +154,14 @@ fn playback_stream_state_waits_until_generation_is_started() {
     let generation = lock_playback(&playback).prepare_generation(2.5);
 
     assert_eq!(
-        playback_stream_state(&playback, generation),
+        playback_stream_state(&lock_playback(&playback), generation),
         PlaybackStreamState::Waiting
     );
 
     lock_playback(&playback).start_generation(generation, 2.5);
 
     assert_eq!(
-        playback_stream_state(&playback, generation),
+        playback_stream_state(&lock_playback(&playback), generation),
         PlaybackStreamState::Ready
     );
 }
@@ -214,9 +214,11 @@ fn wait_for_playback_start_returns_stale_when_stop_is_requested() {
         ended: false,
     }));
     let stop_requested = AtomicBool::new(true);
+    let start =
+        super::clock::AudioPlaybackStart::new(playback, Arc::new(std::sync::Condvar::new()));
 
     assert_eq!(
-        wait_for_playback_start(&playback, &stop_requested, 1),
+        wait_for_playback_start(&start, &stop_requested, 1),
         PlaybackStreamState::Stale
     );
 }

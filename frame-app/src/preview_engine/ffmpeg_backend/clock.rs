@@ -6,7 +6,7 @@ use crate::preview_engine::types::{
 };
 use frame_core::utils::parse_time;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -37,6 +37,41 @@ pub(super) enum PlaybackStreamState {
     Ready,
     Waiting,
     Stale,
+}
+
+/// One audio child's prestart wait, sharing the playback clock's notification.
+/// Every wake predicate is changed while holding `playback`, so checking the
+/// predicate and entering the condition-variable wait cannot lose a wakeup.
+#[derive(Debug)]
+pub(super) struct AudioPlaybackStart {
+    playback: Arc<Mutex<PreviewPlaybackClock>>,
+    changed: Arc<Condvar>,
+    #[cfg(test)]
+    pub(super) wait_count: std::sync::atomic::AtomicUsize,
+}
+
+impl AudioPlaybackStart {
+    pub(super) const fn new(
+        playback: Arc<Mutex<PreviewPlaybackClock>>,
+        changed: Arc<Condvar>,
+    ) -> Self {
+        Self {
+            playback,
+            changed,
+            #[cfg(test)]
+            wait_count: std::sync::atomic::AtomicUsize::new(0),
+        }
+    }
+
+    pub(super) fn request_stop(&self, stop_requested: &AtomicBool) {
+        let _playback = lock_playback(&self.playback);
+        stop_requested.store(true, Ordering::SeqCst);
+        self.changed.notify_all();
+    }
+
+    pub(super) fn mark_ended(&self, generation: u64) {
+        mark_playback_ended(&self.playback, &self.changed, generation);
+    }
 }
 
 impl RunningPreviewProcess {
@@ -75,6 +110,7 @@ impl RunningPreviewProcess {
             let mut playback = lock_playback(&self.playback);
             playback.prepare_generation(seconds)
         };
+        self.playback_changed.notify_all();
         self.metrics.begin_generation(generation);
         generation
     }
@@ -84,12 +120,14 @@ impl RunningPreviewProcess {
             let mut playback = lock_playback(&self.playback);
             playback.prepare_generation(seconds)
         };
+        self.playback_changed.notify_all();
         self.metrics.begin_generation_at(generation, started_at);
         generation
     }
 
     pub(super) fn start_playback_generation(&self, generation: u64, seconds: f64) {
         lock_playback(&self.playback).start_generation(generation, seconds);
+        self.playback_changed.notify_all();
     }
 
     pub(super) fn park_playback_generation(&self, generation: u64, seconds: f64) {
@@ -134,11 +172,10 @@ pub(super) fn clock_generation_matches(
     lock_playback(playback).generation_matches(generation)
 }
 
-pub(super) fn playback_stream_state(
-    playback: &Arc<Mutex<PreviewPlaybackClock>>,
+pub(super) const fn playback_stream_state(
+    playback: &PreviewPlaybackClock,
     generation: u64,
 ) -> PlaybackStreamState {
-    let playback = lock_playback(playback);
     if !playback.generation_matches(generation) || playback.ended {
         return PlaybackStreamState::Stale;
     }
@@ -146,6 +183,20 @@ pub(super) fn playback_stream_state(
         PlaybackStreamState::Ready
     } else {
         PlaybackStreamState::Waiting
+    }
+}
+
+pub(super) fn mark_playback_ended(
+    playback: &Mutex<PreviewPlaybackClock>,
+    changed: &Condvar,
+    generation: u64,
+) {
+    let mut playback = lock_playback(playback);
+    if playback.generation_matches(generation) {
+        playback.playing = false;
+        playback.ended = true;
+        drop(playback);
+        changed.notify_all();
     }
 }
 
@@ -170,19 +221,26 @@ pub(super) fn frame_presentation_state(
 }
 
 pub(super) fn wait_for_playback_start(
-    playback: &Arc<Mutex<PreviewPlaybackClock>>,
+    start: &AudioPlaybackStart,
     stop_requested: &AtomicBool,
     generation: u64,
 ) -> PlaybackStreamState {
+    let mut playback = lock_playback(&start.playback);
     loop {
         if stop_requested.load(Ordering::SeqCst) {
             return PlaybackStreamState::Stale;
         }
-        match playback_stream_state(playback, generation) {
+        match playback_stream_state(&playback, generation) {
             PlaybackStreamState::Ready => return PlaybackStreamState::Ready,
             PlaybackStreamState::Stale => return PlaybackStreamState::Stale,
-            PlaybackStreamState::Waiting => thread::sleep(VIDEO_START_WAIT_INTERVAL),
+            PlaybackStreamState::Waiting => {}
         }
+        #[cfg(test)]
+        start.wait_count.fetch_add(1, Ordering::SeqCst);
+        playback = start
+            .changed
+            .wait(playback)
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
     }
 }
 

@@ -2,7 +2,7 @@ use crate::numeric::u64_to_f64;
 use crate::preview_engine::error::PreviewEngineError;
 use crate::preview_engine::ffmpeg_backend::audio_stream::{AudioStartStatus, PendingAudioStart};
 use crate::preview_engine::ffmpeg_backend::clock::{
-    PlaybackStreamState, PreviewPlaybackClock, lock_playback, seconds_to_us,
+    PlaybackStreamState, PreviewPlaybackClock, mark_playback_ended, seconds_to_us,
     update_last_frame_seconds, wait_for_frame_presentation_time,
 };
 use crate::preview_engine::ffmpeg_backend::decode::{
@@ -20,7 +20,7 @@ use gpui::ImageId;
 use std::io::{ErrorKind, Read};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Instant;
@@ -36,6 +36,7 @@ pub(super) struct SpawnedVideoStream {
 pub(super) struct VideoStdoutWorkerConfig {
     pub(super) frame_store: LatestFrameStore,
     pub(super) playback: Arc<Mutex<PreviewPlaybackClock>>,
+    pub(super) playback_changed: Arc<Condvar>,
     pub(super) metrics: PreviewRuntimeMetricsStore,
     pub(super) stop_requested: Arc<AtomicBool>,
     pub(super) render_image_id: ImageId,
@@ -142,6 +143,7 @@ impl RunningPreviewProcess {
             VideoStdoutWorkerConfig {
                 frame_store: self.frame_store.clone(),
                 playback: Arc::clone(&self.playback),
+                playback_changed: Arc::clone(&self.playback_changed),
                 metrics: self.metrics.clone(),
                 stop_requested: Arc::clone(&stream.stop_requested),
                 render_image_id: self.render_image_id,
@@ -156,6 +158,7 @@ impl RunningPreviewProcess {
                     stdout_worker: None,
                     stderr_worker: Some(stream.stderr_worker),
                     stop_requested: Some(stream.stop_requested),
+                    audio_start: None,
                 };
                 let _ = stop_process_handles(handles);
                 let _ = self.stop_audio_process();
@@ -169,6 +172,7 @@ impl RunningPreviewProcess {
             stdout_worker: Some(stdout_worker),
             stderr_worker: Some(stream.stderr_worker),
             stop_requested: Some(stream.stop_requested),
+            audio_start: None,
         };
         drop(state);
 
@@ -275,6 +279,7 @@ pub(super) fn stop_spawned_video_stream(
         stdout_worker: None,
         stderr_worker: Some(stream.stderr_worker),
         stop_requested: Some(stream.stop_requested),
+        audio_start: None,
     })
 }
 
@@ -288,6 +293,7 @@ pub(super) fn spawn_stdout_worker(
             let VideoStdoutWorkerConfig {
                 frame_store,
                 playback,
+                playback_changed,
                 metrics,
                 stop_requested,
                 render_image_id,
@@ -374,11 +380,7 @@ pub(super) fn spawn_stdout_worker(
             }
 
             if !stop_requested.load(Ordering::SeqCst) {
-                let mut playback = lock_playback(&playback);
-                if playback.generation_matches(spec.generation) {
-                    playback.playing = false;
-                    playback.ended = true;
-                }
+                mark_playback_ended(&playback, &playback_changed, spec.generation);
             }
         })
         .map_err(|err| PreviewEngineError::Ffmpeg(format!("failed to spawn stdout worker: {err}")))

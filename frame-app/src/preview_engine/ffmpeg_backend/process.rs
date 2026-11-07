@@ -3,7 +3,8 @@ use crate::preview_engine::ffmpeg_backend::audio_stream::{
     AudioStartStatus, PendingAudioStart, lock_pending_audio_start,
 };
 use crate::preview_engine::ffmpeg_backend::clock::{
-    PreviewPlaybackClock, clamp_seek_seconds, initial_start_seconds, lock_playback,
+    AudioPlaybackStart, PreviewPlaybackClock, clamp_seek_seconds, initial_start_seconds,
+    lock_playback,
 };
 use crate::preview_engine::ffmpeg_backend::decode::{
     RenderImageIdentity, decode_single_preview_frame,
@@ -17,7 +18,7 @@ use std::collections::VecDeque;
 use std::io::{BufRead, BufReader, Read};
 use std::process::Child;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Instant;
@@ -33,6 +34,7 @@ pub struct RunningPreviewProcess {
     pub(super) audio_process: Mutex<RunningProcessState>,
     pub(super) pending_audio_start: Mutex<Option<PendingAudioStart>>,
     pub(super) playback: Arc<Mutex<PreviewPlaybackClock>>,
+    pub(super) playback_changed: Arc<Condvar>,
     pub(super) render_image_id: ImageId,
     pub(super) render_image_version: Arc<AtomicU64>,
     pub(super) stderr: Arc<Mutex<VecDeque<String>>>,
@@ -44,6 +46,7 @@ pub(super) struct RunningProcessState {
     pub(super) stdout_worker: Option<JoinHandle<()>>,
     pub(super) stderr_worker: Option<JoinHandle<()>>,
     pub(super) stop_requested: Option<Arc<AtomicBool>>,
+    pub(super) audio_start: Option<Arc<AudioPlaybackStart>>,
 }
 
 pub(super) struct ProcessHandles {
@@ -51,6 +54,7 @@ pub(super) struct ProcessHandles {
     pub(super) stdout_worker: Option<JoinHandle<()>>,
     pub(super) stderr_worker: Option<JoinHandle<()>>,
     pub(super) stop_requested: Option<Arc<AtomicBool>>,
+    pub(super) audio_start: Option<Arc<AudioPlaybackStart>>,
 }
 
 impl RunningPreviewProcess {
@@ -219,6 +223,7 @@ impl RunningPreviewProcess {
                 playing: false,
                 ended: false,
             })),
+            playback_changed: Arc::new(Condvar::new()),
             render_image_id: RenderImage::new_image_id(),
             render_image_version: Arc::new(AtomicU64::new(1)),
             stderr: Arc::new(Mutex::new(VecDeque::with_capacity(STDERR_RING_LINES))),
@@ -240,9 +245,9 @@ impl RunningPreviewProcess {
     }
 
     pub(super) fn stop_running_processes(&self) -> Result<(), PreviewEngineError> {
-        self.stop_video_process()?;
-        self.stop_audio_process()?;
-        Ok(())
+        let video = self.stop_video_process();
+        let audio = self.stop_audio_process();
+        video.and(audio)
     }
 
     pub(super) fn stop_video_process(&self) -> Result<(), PreviewEngineError> {
@@ -280,9 +285,22 @@ impl RunningPreviewProcess {
             return false;
         };
 
+        // A finished audio child can leave a live worker with prewarmed or
+        // buffered PCM. Keep its handles and Ready message until the consumer
+        // exits; joining now could block forever before Play starts the clock.
+        if state.audio_start.is_some()
+            && state
+                .stdout_worker
+                .as_ref()
+                .is_some_and(|worker| !worker.is_finished())
+        {
+            return false;
+        }
+
         state.child = None;
         let stdout_worker = state.stdout_worker.take();
         let stderr_worker = state.stderr_worker.take();
+        state.audio_start = None;
         state.stop_requested = None;
         drop(state);
 
@@ -292,6 +310,8 @@ impl RunningPreviewProcess {
             let mut playback = lock_playback(&self.playback);
             playback.playing = false;
             playback.ended = true;
+            drop(playback);
+            self.playback_changed.notify_all();
         }
         true
     }
@@ -299,7 +319,11 @@ impl RunningPreviewProcess {
 
 pub(super) fn stop_process_handles(handles: ProcessHandles) -> Result<(), PreviewEngineError> {
     if let Some(stop_requested) = &handles.stop_requested {
-        stop_requested.store(true, Ordering::SeqCst);
+        if let Some(start) = &handles.audio_start {
+            start.request_stop(stop_requested);
+        } else {
+            stop_requested.store(true, Ordering::SeqCst);
+        }
     }
     if let Some(mut child) = handles.child {
         if child.try_wait().map_err(PreviewEngineError::Io)?.is_none() {
@@ -319,6 +343,7 @@ pub(super) fn take_process_handles(process: &Mutex<RunningProcessState>) -> Proc
         stdout_worker: state.stdout_worker.take(),
         stderr_worker: state.stderr_worker.take(),
         stop_requested: state.stop_requested.take(),
+        audio_start: state.audio_start.take(),
     }
 }
 

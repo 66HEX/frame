@@ -3,12 +3,13 @@ use crate::preview_engine::ffmpeg_backend::audio_output::{
     AudioOutputSpec, AudioPreviewOutput, push_audio_sample_bytes,
 };
 use crate::preview_engine::ffmpeg_backend::clock::{
-    PlaybackStreamState, PreviewPlaybackClock, clock_generation_matches, lock_playback,
+    AudioPlaybackStart, PlaybackStreamState, PreviewPlaybackClock, clock_generation_matches,
     wait_for_playback_start,
 };
 use crate::preview_engine::ffmpeg_backend::plan::preview_audio_plan;
 use crate::preview_engine::ffmpeg_backend::process::{
-    RunningPreviewProcess, RunningProcessState, lock_process, push_stderr_line, spawn_stderr_worker,
+    ProcessHandles, RunningPreviewProcess, RunningProcessState, lock_process, push_stderr_line,
+    spawn_stderr_worker, stop_process_handles,
 };
 use crate::preview_engine::metrics::PreviewRuntimeMetricsStore;
 use crate::preview_engine::types::PreviewSessionConfig;
@@ -32,6 +33,7 @@ pub(super) struct AudioStdoutWorkerConfig {
     pub(super) playback: Arc<Mutex<PreviewPlaybackClock>>,
     pub(super) metrics: PreviewRuntimeMetricsStore,
     pub(super) stop_requested: Arc<AtomicBool>,
+    pub(super) audio_start: Arc<AudioPlaybackStart>,
     pub(super) mark_ended_on_eof: bool,
     pub(super) generation: u64,
     pub(super) prebuffer_samples: usize,
@@ -148,6 +150,10 @@ impl RunningPreviewProcess {
             PreviewEngineError::Ffmpeg("ffmpeg audio stderr was not captured".to_string())
         })?;
         let stop_requested = Arc::new(AtomicBool::new(false));
+        let audio_start = Arc::new(AudioPlaybackStart::new(
+            Arc::clone(&self.playback),
+            Arc::clone(&self.playback_changed),
+        ));
         let (ready_tx, ready_rx) = mpsc::channel();
         let stdout_worker = spawn_audio_stdout_worker(
             stdout,
@@ -156,17 +162,30 @@ impl RunningPreviewProcess {
                 playback: Arc::clone(&self.playback),
                 metrics: self.metrics.clone(),
                 stop_requested: Arc::clone(&stop_requested),
+                audio_start: Arc::clone(&audio_start),
                 mark_ended_on_eof,
                 generation,
                 prebuffer_samples: audio_prebuffer_samples(output_spec),
                 ready_tx,
             },
         )?;
-        let stderr_worker = spawn_stderr_worker(
+        let stderr_worker = match spawn_stderr_worker(
             stderr,
             Arc::clone(&self.stderr),
             Arc::clone(&stop_requested),
-        )?;
+        ) {
+            Ok(worker) => worker,
+            Err(error) => {
+                let _ = stop_process_handles(ProcessHandles {
+                    child: Some(child),
+                    stdout_worker: Some(stdout_worker),
+                    stderr_worker: None,
+                    stop_requested: Some(stop_requested),
+                    audio_start: Some(audio_start),
+                });
+                return Err(error);
+            }
+        };
 
         let mut state = lock_process(&self.audio_process);
         *state = RunningProcessState {
@@ -174,6 +193,7 @@ impl RunningPreviewProcess {
             stdout_worker: Some(stdout_worker),
             stderr_worker: Some(stderr_worker),
             stop_requested: Some(stop_requested),
+            audio_start: Some(audio_start),
         };
         drop(state);
         Ok(PendingAudioStart::Waiting {
@@ -263,10 +283,6 @@ pub(super) fn wait_for_audio_start(
         .unwrap_or(AudioStartStatus::TimedOut)
 }
 
-#[expect(
-    clippy::too_many_lines,
-    reason = "Audio stdout worker coordinates PCM buffering, prebuffer readiness, and CPAL start state."
-)]
 pub(super) fn spawn_audio_stdout_worker(
     mut stdout: impl Read + Send + 'static,
     config: AudioStdoutWorkerConfig,
@@ -325,7 +341,7 @@ pub(super) fn spawn_audio_stdout_worker(
                             }
                             if ready_sent && !output_started {
                                 match wait_for_playback_start(
-                                    &config.playback,
+                                    &config.audio_start,
                                     &config.stop_requested,
                                     config.generation,
                                 ) {
@@ -368,11 +384,7 @@ pub(super) fn spawn_audio_stdout_worker(
                 let _ = config.ready_tx.send(AudioStartStatus::TimedOut);
             }
             if config.mark_ended_on_eof && !config.stop_requested.load(Ordering::SeqCst) {
-                let mut playback = lock_playback(&config.playback);
-                if playback.generation_matches(config.generation) {
-                    playback.playing = false;
-                    playback.ended = true;
-                }
+                config.audio_start.mark_ended(config.generation);
             }
         })
         .map_err(|err| {

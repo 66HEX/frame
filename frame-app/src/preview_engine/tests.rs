@@ -479,6 +479,116 @@ fn ffmpeg_preview_session_collects_audio_video_metrics_for_sync_fixture() {
     );
 }
 
+#[test]
+#[ignore = "requires FFmpeg plus a default audio output device; run with --ignored"]
+fn ffmpeg_audio_prewarm_wakes_through_preview_session_lifecycle() {
+    let path = temp_preview_av_sync_video("audio-prewarm-lifecycle");
+    let mut config = real_av_preview_config(path.clone());
+    config.conversion_config.audio_volume = 0.0;
+    let (stage_tx, stage_rx) = std::sync::mpsc::channel();
+    let worker = thread::spawn(move || {
+        let session = PreviewSession::start(config.clone()).expect("session");
+        assert_audio_stays_paused(&session);
+        stage_tx.send("initial prewarm").unwrap();
+
+        session.command(PreviewCommand::Play).expect("play");
+        assert_audio_callbacks_resume(&session);
+        stage_tx.send("play").unwrap();
+
+        session.command(PreviewCommand::Pause).expect("pause");
+        assert_audio_stays_paused(&session);
+        stage_tx.send("pause").unwrap();
+
+        session
+            .command(PreviewCommand::Play)
+            .expect("resume prewarm");
+        assert_audio_callbacks_resume(&session);
+        stage_tx.send("resume").unwrap();
+
+        session
+            .command(PreviewCommand::Pause)
+            .expect("pause before seek");
+        session
+            .command(PreviewCommand::SeekPrecise(0.3))
+            .expect("paused seek");
+        assert_audio_stays_paused(&session);
+        stage_tx.send("paused seek").unwrap();
+
+        session
+            .command(PreviewCommand::SeekAndPlay {
+                seconds: 0.5,
+                precise: true,
+            })
+            .expect("seek and play");
+        assert_audio_callbacks_resume(&session);
+        stage_tx.send("seek and play").unwrap();
+
+        session
+            .command(PreviewCommand::Pause)
+            .expect("pause before rebuild");
+        config.conversion_config.flip_horizontal = true;
+        session.reconfigure(config).expect("paused rebuild");
+        assert_audio_stays_paused(&session);
+        stage_tx.send("paused rebuild").unwrap();
+
+        session
+            .command(PreviewCommand::Play)
+            .expect("play rebuilt prewarm");
+        assert_audio_callbacks_resume(&session);
+        session
+            .command(PreviewCommand::Pause)
+            .expect("pause before stop");
+        assert_audio_stays_paused(&session);
+        session.stop().expect("stop parked prewarm");
+        stage_tx.send("stop").unwrap();
+    });
+    for expected in [
+        "initial prewarm",
+        "play",
+        "pause",
+        "resume",
+        "paused seek",
+        "seek and play",
+        "paused rebuild",
+        "stop",
+    ] {
+        assert_eq!(
+            stage_rx
+                .recv_timeout(Duration::from_secs(8))
+                .unwrap_or_else(|error| panic!("audio lifecycle watchdog at {expected}: {error}")),
+            expected
+        );
+    }
+    worker.join().expect("audio lifecycle worker");
+    let _ = std::fs::remove_file(path);
+}
+
+fn assert_audio_stays_paused(session: &PreviewSession) {
+    let before = session.snapshot();
+    assert!(!before.playback.playing);
+    thread::sleep(Duration::from_millis(100));
+    let after = session.snapshot();
+    assert!(!after.playback.playing);
+    assert_eq!(
+        before.runtime_metrics.audio_output_callbacks, after.runtime_metrics.audio_output_callbacks,
+        "parked audio must not start its output stream",
+    );
+}
+
+fn assert_audio_callbacks_resume(session: &PreviewSession) {
+    let before = session.snapshot().runtime_metrics.audio_output_callbacks;
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        let snapshot = session.snapshot();
+        assert!(snapshot.playback.playing, "audio should still be playing");
+        if snapshot.runtime_metrics.audio_output_callbacks > before {
+            return;
+        }
+        assert!(Instant::now() < deadline, "audio callbacks did not resume");
+        thread::sleep(Duration::from_millis(5));
+    }
+}
+
 fn real_video_preview_config(path: PathBuf) -> PreviewSessionConfig {
     PreviewSessionConfig {
         file_id: "video-real".to_string(),

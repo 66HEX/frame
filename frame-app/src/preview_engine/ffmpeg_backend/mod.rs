@@ -41,4 +41,6 @@ mod process;
 mod video_stream;
 
 #[cfg(test)]
+mod playback_start_tests;
+#[cfg(test)]
 mod tests;
