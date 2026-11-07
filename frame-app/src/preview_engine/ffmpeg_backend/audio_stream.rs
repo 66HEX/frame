@@ -4,8 +4,9 @@ use crate::preview_engine::ffmpeg_backend::audio_exit::{
     AUDIO_EXIT_TIMEOUT, AudioExitOutcome, AudioProcessExit,
 };
 use crate::preview_engine::ffmpeg_backend::audio_output::{
-    AudioOutputSpec, AudioPreviewOutput, lock_audio_buffer, push_audio_sample_bytes,
+    AudioOutputSpec, AudioPreviewOutput, decode_audio_sample_bytes, lock_audio_buffer,
 };
+use crate::preview_engine::ffmpeg_backend::audio_queue::AudioQueueOutcome;
 use crate::preview_engine::ffmpeg_backend::clock::{
     AudioPlaybackStart, PlaybackStreamState, PreviewPlaybackClock, clock_generation_matches,
     wait_for_playback_start,
@@ -382,12 +383,20 @@ pub(super) fn spawn_audio_stdout_worker(
             };
             let mut read_buffer = [0_u8; AUDIO_READ_BUFFER_BYTES];
             let mut pending = Vec::new();
+            let mut samples = Vec::with_capacity(AUDIO_READ_BUFFER_BYTES / 4);
+            let prebuffer = output.as_ref().map_or(0, |output| {
+                let buffer = lock_audio_buffer(&output.context.buffer);
+                let channels = usize::from(buffer.spec.channels.max(1));
+                config
+                    .prebuffer_samples
+                    .min((buffer.capacity / channels) * channels)
+            });
             let mut queued_for_prebuffer = 0_usize;
             let mut ready_sent = output.is_none();
             let mut output_started = output.is_none();
             let mut pipe_exhausted = false;
 
-            loop {
+            'read: loop {
                 if config.stop_requested.load(Ordering::SeqCst) {
                     break;
                 }
@@ -407,6 +416,9 @@ pub(super) fn spawn_audio_stdout_worker(
                         break;
                     }
                     Ok(bytes_read) => {
+                        config
+                            .metrics
+                            .record_audio_pcm_chunk(config.generation, bytes_read);
                         pending.extend_from_slice(&read_buffer[..bytes_read]);
                         let frame_bytes = output.as_ref().map_or(4, |output| output.frame_bytes);
                         let complete_len = pending.len() - (pending.len() % frame_bytes);
@@ -415,41 +427,42 @@ pub(super) fn spawn_audio_stdout_worker(
                         }
 
                         if let Some(output) = &output {
-                            let samples = push_audio_sample_bytes(
-                                &output.context.buffer,
-                                &pending[..complete_len],
-                            );
-                            config.metrics.record_audio_pcm_chunk(
-                                config.generation,
-                                complete_len,
-                                samples,
-                            );
-                            queued_for_prebuffer = queued_for_prebuffer.saturating_add(samples);
-                            if !ready_sent && queued_for_prebuffer >= config.prebuffer_samples {
-                                let _ = config.ready_tx.send(AudioWorkerStatus::Ready);
-                                ready_sent = true;
-                            }
-                            if ready_sent && !output_started {
-                                match wait_for_playback_start(
-                                    &config.audio_start,
-                                    &config.stop_requested,
-                                    config.generation,
-                                ) {
-                                    PlaybackStreamState::Ready => match output.play() {
-                                        Ok(()) => {}
-                                        Err(_) => break,
-                                    },
-                                    PlaybackStreamState::Stale => break,
-                                    PlaybackStreamState::Waiting => {}
+                            decode_audio_sample_bytes(&pending[..complete_len], &mut samples);
+                            let mut admitted = 0;
+                            while admitted < samples.len() {
+                                let AudioQueueOutcome::Admitted(count) = output
+                                    .context
+                                    .admit_samples(&samples[admitted..], &config.stop_requested)
+                                else {
+                                    break 'read;
+                                };
+                                admitted += count;
+                                config
+                                    .metrics
+                                    .record_audio_samples_queued(config.generation, count);
+                                queued_for_prebuffer = queued_for_prebuffer.saturating_add(count);
+                                if !ready_sent && queued_for_prebuffer >= prebuffer {
+                                    let _ = config.ready_tx.send(AudioWorkerStatus::Ready);
+                                    ready_sent = true;
                                 }
-                                output_started = true;
+                                // Start after a partial admission, before waiting
+                                // for space for the rest of an oversized chunk.
+                                if ready_sent && !output_started {
+                                    match wait_for_playback_start(
+                                        &config.audio_start,
+                                        &config.stop_requested,
+                                        config.generation,
+                                    ) {
+                                        PlaybackStreamState::Ready => match output.play() {
+                                            Ok(()) => {}
+                                            Err(_) => break 'read,
+                                        },
+                                        PlaybackStreamState::Stale => break 'read,
+                                        PlaybackStreamState::Waiting => {}
+                                    }
+                                    output_started = true;
+                                }
                             }
-                        } else {
-                            config.metrics.record_audio_pcm_chunk(
-                                config.generation,
-                                complete_len,
-                                complete_len / 4,
-                            );
                         }
                         pending.drain(..complete_len);
                     }

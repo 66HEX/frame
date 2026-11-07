@@ -1,5 +1,6 @@
 use crate::preview_engine::error::PreviewEngineError;
 use crate::preview_engine::ffmpeg_backend::audio_drain::{AudioDrainOutcome, AudioDrainState};
+use crate::preview_engine::ffmpeg_backend::audio_queue::{AudioQueueOutcome, AudioQueuePoll};
 use crate::preview_engine::ffmpeg_backend::clock::{
     AudioPlaybackStart, PreviewPlaybackClock, clock_generation_matches, lock_playback,
 };
@@ -30,6 +31,7 @@ pub(super) struct AudioSampleBuffer {
     pub(super) capacity: usize,
     pub(super) spec: AudioOutputSpec,
     pub(super) drain: AudioDrainState,
+    pub(super) producer_waiting: bool,
 }
 
 #[derive(Clone)]
@@ -124,7 +126,7 @@ pub(super) fn fill_audio_output<T: Copy>(
         sample_rate,
     );
     let underrun = real_samples < data.len() && !buffer.drain.pipe_exhausted;
-    let notify = buffer.drain.pipe_exhausted && real_frames > 0;
+    let notify = (buffer.drain.pipe_exhausted || buffer.producer_waiting) && real_frames > 0;
     let failed = buffer.drain.failed();
     drop(buffer);
     if clock_generation_matches(&context.playback, context.generation) {
@@ -139,26 +141,59 @@ pub(super) fn fill_audio_output<T: Copy>(
     }
 }
 
+#[cfg(test)]
 pub(super) fn push_audio_sample_bytes(
     buffer: &Arc<Mutex<AudioSampleBuffer>>,
     bytes: &[u8],
 ) -> usize {
-    let mut buffer = lock_audio_buffer(buffer);
-    let frame_bytes = usize::from(buffer.spec.channels.max(1)) * 4;
-    let complete_len = bytes.len() - bytes.len() % frame_bytes;
-    let was_empty = buffer.samples.is_empty();
-    for bytes in bytes[..complete_len].chunks_exact(4) {
-        let sample = f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
-        if buffer.samples.len() >= buffer.capacity {
-            let _ = buffer.samples.pop_front();
+    let mut samples = Vec::new();
+    decode_audio_sample_bytes(bytes, &mut samples);
+    lock_audio_buffer(buffer).append_samples(&samples, Instant::now())
+}
+
+pub(super) fn decode_audio_sample_bytes(bytes: &[u8], samples: &mut Vec<f32>) {
+    samples.clear();
+    samples.extend(bytes.chunks_exact(4).map(|bytes| {
+        f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]).clamp(-1.0, 1.0)
+    }));
+}
+
+impl AudioSampleBuffer {
+    fn append_samples(&mut self, samples: &[f32], now: Instant) -> usize {
+        let channels = usize::from(self.spec.channels.max(1));
+        let available = self.capacity.saturating_sub(self.samples.len());
+        let count = (samples.len().min(available) / channels) * channels;
+        let was_empty = self.samples.is_empty();
+        self.samples.extend(&samples[..count]);
+        if was_empty && count > 0 {
+            self.drain.queue_became_nonempty(now);
         }
-        buffer.samples.push_back(sample.clamp(-1.0, 1.0));
+        count
     }
-    if was_empty && !buffer.samples.is_empty() {
-        buffer.drain.queue_became_nonempty(Instant::now());
+
+    pub(super) fn admit_samples(&mut self, samples: &[f32], now: Instant) -> AudioQueuePoll {
+        self.producer_waiting = false;
+        if self.drain.failed() {
+            return AudioQueuePoll::Failed;
+        }
+        if self.capacity < usize::from(self.spec.channels.max(1)) {
+            self.drain
+                .fail("audio buffer cannot hold a complete PCM frame".into());
+            return AudioQueuePoll::Failed;
+        }
+        let count = self.append_samples(samples, now);
+        if count > 0 {
+            return AudioQueuePoll::Admitted(count);
+        }
+        let deadline = self.drain.producer_deadline(now);
+        if deadline.is_some_and(|deadline| now >= deadline) {
+            self.drain
+                .fail("audio output made no progress for 2 seconds while buffering".into());
+            return AudioQueuePoll::Failed;
+        }
+        self.producer_waiting = true;
+        AudioQueuePoll::Pending(deadline)
     }
-    drop(buffer);
-    complete_len / 4
 }
 
 pub(super) fn audio_output_is_playing(
@@ -198,6 +233,19 @@ pub(super) fn lock_audio_buffer(
 }
 
 impl AudioCallbackContext {
+    pub(super) fn admit_samples(&self, samples: &[f32], stop: &AtomicBool) -> AudioQueueOutcome {
+        let outcome = self
+            .start
+            .wait_for_audio_capacity(stop, self.generation, |now| {
+                lock_audio_buffer(&self.buffer).admit_samples(samples, now)
+            });
+        lock_audio_buffer(&self.buffer).producer_waiting = false;
+        if outcome == AudioQueueOutcome::Failed {
+            self.report_failure();
+        }
+        outcome
+    }
+
     pub(super) fn fail(&self, message: String) {
         lock_audio_buffer(&self.buffer).drain.fail(message);
         self.report_failure();
@@ -296,6 +344,7 @@ impl AudioPreviewOutput {
                 channels: config.channels,
             },
             drain: AudioDrainState::default(),
+            producer_waiting: false,
         }));
         let context = AudioCallbackContext {
             buffer,

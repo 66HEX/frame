@@ -289,6 +289,7 @@ fn push_audio_sample_bytes_clamps_samples_and_returns_count() {
             channels: 1,
         },
         drain: AudioDrainState::default(),
+        producer_waiting: false,
     }));
     let samples = [
         2.0_f32.to_le_bytes(),
@@ -319,6 +320,7 @@ fn fill_audio_output_f32_mutes_when_playback_is_paused() {
             channels: 1,
         },
         drain: AudioDrainState::default(),
+        producer_waiting: false,
     }));
     let metrics = PreviewRuntimeMetricsStore::new();
     metrics.begin_generation(1);
@@ -359,6 +361,7 @@ fn fill_audio_output_f32_drains_samples_when_playback_is_playing() {
             channels: 1,
         },
         drain: AudioDrainState::default(),
+        producer_waiting: false,
     }));
     let metrics = PreviewRuntimeMetricsStore::new();
     metrics.begin_generation(1);

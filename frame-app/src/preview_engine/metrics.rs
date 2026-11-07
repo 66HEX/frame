@@ -164,7 +164,7 @@ impl PreviewRuntimeMetricsStore {
         );
     }
 
-    pub(super) fn record_audio_pcm_chunk(&self, generation: u64, bytes: usize, samples: usize) {
+    pub(super) fn record_audio_pcm_chunk(&self, generation: u64, bytes: usize) {
         let mut state = lock_metrics(&self.inner);
         if state.metrics.playback_generation != generation {
             return;
@@ -174,14 +174,20 @@ impl PreviewRuntimeMetricsStore {
             .metrics
             .audio_pcm_bytes_read
             .saturating_add(u64::try_from(bytes).unwrap_or(u64::MAX));
-        state.metrics.audio_samples_queued = state
-            .metrics
-            .audio_samples_queued
-            .saturating_add(u64::try_from(samples).unwrap_or(u64::MAX));
         set_first_elapsed_ms(
             state.generation_started_at,
             &mut state.metrics.first_audio_pcm_ms,
         );
+    }
+
+    pub(super) fn record_audio_samples_queued(&self, generation: u64, samples: usize) {
+        let mut state = lock_metrics(&self.inner);
+        if state.metrics.playback_generation == generation {
+            state.metrics.audio_samples_queued = state
+                .metrics
+                .audio_samples_queued
+                .saturating_add(u64::try_from(samples).unwrap_or(u64::MAX));
+        }
     }
 
     pub(super) fn record_audio_output_callback(

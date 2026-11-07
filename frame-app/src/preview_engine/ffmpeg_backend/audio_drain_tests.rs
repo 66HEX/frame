@@ -37,6 +37,7 @@ fn new_context(samples: &[f32]) -> AudioCallbackContext {
                 channels: 2,
             },
             drain: AudioDrainState::default(),
+            producer_waiting: false,
         })),
         metrics,
         start: Arc::new(AudioPlaybackStart::new(

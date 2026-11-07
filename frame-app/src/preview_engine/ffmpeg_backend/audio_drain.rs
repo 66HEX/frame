@@ -97,6 +97,14 @@ impl AudioDrainState {
         AudioDrainPoll::Drained
     }
 
+    pub(super) fn producer_deadline(&mut self, now: Instant) -> Option<Instant> {
+        self.started.then(|| {
+            *self
+                .progress_deadline
+                .get_or_insert(now + AUDIO_DRAIN_NO_PROGRESS_TIMEOUT)
+        })
+    }
+
     pub(super) fn fail(&mut self, message: String) {
         if self.failure.is_none() {
             self.failure = Some(message);

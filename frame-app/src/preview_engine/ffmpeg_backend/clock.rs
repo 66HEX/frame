@@ -1,6 +1,7 @@
 use crate::numeric::f64_to_u64;
 use crate::preview_engine::error::PreviewEngineError;
 use crate::preview_engine::ffmpeg_backend::audio_drain::{AudioDrainOutcome, AudioDrainPoll};
+use crate::preview_engine::ffmpeg_backend::audio_queue::{AudioQueueOutcome, AudioQueuePoll};
 use crate::preview_engine::ffmpeg_backend::process::RunningPreviewProcess;
 use crate::preview_engine::types::{
     PreviewPlaybackSnapshot, PreviewRenderedFrame, PreviewSessionConfig,
@@ -127,6 +128,45 @@ impl AudioPlaybackStart {
                     playback = guard;
                 }
             }
+        }
+    }
+
+    /// The admission callback runs with the clock held, then takes the PCM
+    /// buffer. Stop/generation changes cannot race a successful admission.
+    pub(super) fn wait_for_audio_capacity(
+        &self,
+        stop_requested: &AtomicBool,
+        generation: u64,
+        mut poll: impl FnMut(Instant) -> AudioQueuePoll,
+    ) -> AudioQueueOutcome {
+        let mut playback = lock_playback(&self.playback);
+        loop {
+            if stop_requested.load(Ordering::SeqCst)
+                || !playback.generation_matches(generation)
+                || playback.ended
+            {
+                return AudioQueueOutcome::Cancelled;
+            }
+            if playback.failed || self.output_failed.load(Ordering::SeqCst) {
+                return AudioQueueOutcome::Failed;
+            }
+            let deadline = match poll(Instant::now()) {
+                AudioQueuePoll::Admitted(samples) => return AudioQueueOutcome::Admitted(samples),
+                AudioQueuePoll::Failed => return AudioQueueOutcome::Failed,
+                AudioQueuePoll::Pending(deadline) => deadline,
+            };
+            #[cfg(test)]
+            self.wait_count.fetch_add(1, Ordering::SeqCst);
+            playback = if let Some(deadline) = deadline {
+                self.changed
+                    .wait_timeout(playback, deadline.saturating_duration_since(Instant::now()))
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .0
+            } else {
+                self.changed
+                    .wait(playback)
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+            };
         }
     }
 }
