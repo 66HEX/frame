@@ -156,6 +156,7 @@ impl RunningPreviewProcess {
                     seconds,
                     precise,
                     self.next_render_image_identity(),
+                    &self.metrics,
                 )?;
                 let dimensions = frame.frame.dimensions();
                 self.stop_running_processes()?;

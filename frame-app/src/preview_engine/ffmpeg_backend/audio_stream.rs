@@ -130,7 +130,6 @@ impl RunningPreviewProcess {
         self.stop_audio_process()?;
         let output_spec = AudioOutputSpec::default_output()?;
         let plan = preview_audio_plan(config, seconds, true, precise, output_spec)?;
-        self.metrics.record_audio_process_spawn();
         let mut child = Command::new(&self.executable)
             .args(&plan.args)
             .stdin(Stdio::null())
@@ -140,6 +139,7 @@ impl RunningPreviewProcess {
             .map_err(|err| {
                 PreviewEngineError::Ffmpeg(format!("failed to start audio preview: {err}"))
             })?;
+        self.metrics.record_audio_process_spawn();
 
         let stdout = child.stdout.take().ok_or_else(|| {
             PreviewEngineError::Ffmpeg("ffmpeg audio stdout was not captured".to_string())

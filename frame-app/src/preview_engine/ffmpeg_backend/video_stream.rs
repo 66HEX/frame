@@ -215,7 +215,6 @@ impl RunningPreviewProcess {
         precise: bool,
     ) -> Result<SpawnedVideoStream, PreviewEngineError> {
         let plan = preview_plan(config, seconds, true, precise)?;
-        self.metrics.record_video_process_spawn();
         let spawned_at = Instant::now();
         let mut child = Command::new(&self.executable)
             .args(&plan.args)
@@ -224,6 +223,7 @@ impl RunningPreviewProcess {
             .stderr(Stdio::piped())
             .spawn()
             .map_err(|err| PreviewEngineError::Ffmpeg(format!("failed to start: {err}")))?;
+        self.metrics.record_video_process_spawn();
 
         let stdout = child.stdout.take().ok_or_else(|| {
             PreviewEngineError::Ffmpeg("ffmpeg stdout was not captured".to_string())

@@ -2,6 +2,7 @@ use crate::preview_engine::error::PreviewEngineError;
 use crate::preview_engine::ffmpeg_backend::clock::seconds_to_us;
 use crate::preview_engine::ffmpeg_backend::plan::{insert_frame_limit, preview_plan};
 use crate::preview_engine::ffmpeg_backend::process::{RunningPreviewProcess, stderr_detail};
+use crate::preview_engine::metrics::PreviewRuntimeMetricsStore;
 use crate::preview_engine::renderer::rendered_frame_from_bgra_payload_with_image_id;
 use crate::preview_engine::types::{PreviewDimensions, PreviewRenderedFrame, PreviewSessionConfig};
 use gpui::ImageId;
@@ -46,6 +47,7 @@ impl RunningPreviewProcess {
             seconds,
             precise,
             self.next_render_image_identity(),
+            &self.metrics,
         )?;
         let dimensions = frame.frame.dimensions();
         let generation = self.prepare_playback_generation_at(seconds, started_at);
@@ -64,16 +66,23 @@ pub(super) fn decode_single_preview_frame(
     seconds: f64,
     precise: bool,
     image_identity: RenderImageIdentity,
+    metrics: &PreviewRuntimeMetricsStore,
 ) -> Result<DecodedPreviewFrame, PreviewEngineError> {
     let plan = preview_plan(config, seconds, false, precise)?;
     let mut args = plan.args.clone();
     insert_frame_limit(&mut args, 1);
     let read_started = Instant::now();
-    let output = Command::new(executable)
+    let child = Command::new(executable)
         .args(&args)
         .stdin(Stdio::null())
-        .output()
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .map_err(|err| PreviewEngineError::Ffmpeg(format!("failed to render frame: {err}")))?;
+    metrics.record_video_process_spawn();
+    let output = child.wait_with_output().map_err(|err| {
+        PreviewEngineError::Ffmpeg(format!("failed to read rendered frame: {err}"))
+    })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
