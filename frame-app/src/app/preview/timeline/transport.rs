@@ -134,7 +134,6 @@ pub(in crate::app) fn preview_transport(
                 cx.notify();
             }),
         )
-        .mr(theme::ui_rem(44.0))
         .flex_shrink_0()
         .when(visible, |capsule| {
             capsule.on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
