@@ -279,6 +279,50 @@ impl RunningPreviewProcess {
         video.and(audio)
     }
 
+    /// Failure and detachment share the generation lock so a stale attempt
+    /// cannot remove a replacement's registered processes or pending prewarm.
+    /// Candidate handles belong exclusively to this attempt, even when stale.
+    #[expect(
+        clippy::significant_drop_tightening,
+        reason = "The playback guard must serialize generation changes with pending/state detachment."
+    )]
+    pub(super) fn fail_video_start(
+        &self,
+        generation: u64,
+        error: PreviewEngineError,
+        candidate: Option<ProcessHandles>,
+    ) -> PreviewEngineError {
+        let registered = {
+            let mut playback = lock_playback(&self.playback);
+            if playback.generation_matches(generation) {
+                playback.fail_generation(generation);
+                *lock_pending_audio_start(&self.pending_audio_start) = None;
+                let video = lock_process(&self.process).take_handles();
+                let mut audio = lock_process(&self.audio_process);
+                let update = audio.record_audio_exit();
+                let audio_handles = audio.take_handles();
+                drop(audio);
+                Some((video, audio_handles, update))
+            } else {
+                None
+            }
+        };
+        if let Some((video, audio, update)) = registered {
+            // Wake parked consumers and make read-only snapshots show failure
+            // before any child wait or worker join can block this caller.
+            self.playback_changed.notify_all();
+            if let Some((exit, update)) = update {
+                exit.publish(update);
+            }
+            let _ = stop_process_handles(video);
+            let _ = stop_process_handles(audio);
+        }
+        if let Some(candidate) = candidate {
+            let _ = stop_process_handles(candidate);
+        }
+        error
+    }
+
     pub(super) fn stop_video_process(&self) -> Result<(), PreviewEngineError> {
         let handles = take_process_handles(&self.process);
         stop_process_handles(handles)

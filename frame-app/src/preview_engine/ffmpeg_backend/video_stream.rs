@@ -11,7 +11,7 @@ use crate::preview_engine::ffmpeg_backend::decode::{
 use crate::preview_engine::ffmpeg_backend::plan::preview_plan;
 use crate::preview_engine::ffmpeg_backend::process::{
     ProcessHandles, RunningPreviewProcess, RunningProcessState, lock_process, push_stderr_line,
-    spawn_stderr_worker, stop_process_handles,
+    spawn_stderr_worker,
 };
 use crate::preview_engine::frame_store::LatestFrameStore;
 use crate::preview_engine::metrics::PreviewRuntimeMetricsStore;
@@ -70,10 +70,6 @@ impl RunningPreviewProcess {
         Ok(())
     }
 
-    #[expect(
-        clippy::too_many_lines,
-        reason = "Video startup coordinates FFmpeg spawn, audio prewarm, first-frame readiness, and worker handoff in one transaction."
-    )]
     pub(super) fn start_video_streaming_with_config(
         &self,
         config: &PreviewSessionConfig,
@@ -86,13 +82,7 @@ impl RunningPreviewProcess {
             Some,
         );
 
-        let mut stream = match self.spawn_video_stream(config, seconds, precise) {
-            Ok(stream) => stream,
-            Err(error) => {
-                let _ = self.stop_audio_process();
-                return Err(error);
-            }
-        };
+        let mut stream = self.spawn_video_stream(config, seconds, precise, generation)?;
 
         let first_frame = match read_stream_frame(
             &mut stream.stdout,
@@ -102,9 +92,7 @@ impl RunningPreviewProcess {
         ) {
             Ok(frame) => frame,
             Err(error) => {
-                let _ = stop_spawned_video_stream(stream);
-                let _ = self.stop_audio_process();
-                return Err(error);
+                return Err(self.fail_video_start(generation, error, Some(stream.into_handles())));
             }
         };
         let first_frame_read_elapsed = stream
@@ -129,9 +117,7 @@ impl RunningPreviewProcess {
 
         let stop_result = self.stop_video_process();
         if let Err(error) = stop_result {
-            let _ = stop_spawned_video_stream(stream);
-            let _ = self.stop_audio_process();
-            return Err(error);
+            return Err(self.fail_video_start(generation, error, Some(stream.into_handles())));
         }
 
         let dimensions = PreviewDimensions {
@@ -164,9 +150,7 @@ impl RunningPreviewProcess {
                     audio_start: None,
                     audio_exit: None,
                 };
-                let _ = stop_process_handles(handles);
-                let _ = self.stop_audio_process();
-                return Err(error);
+                return Err(self.fail_video_start(generation, error, Some(handles)));
             }
         };
 
@@ -222,8 +206,10 @@ impl RunningPreviewProcess {
         config: &PreviewSessionConfig,
         seconds: f64,
         precise: bool,
+        generation: u64,
     ) -> Result<SpawnedVideoStream, PreviewEngineError> {
-        let plan = preview_plan(config, seconds, true, precise)?;
+        let plan = preview_plan(config, seconds, true, precise)
+            .map_err(|error| self.fail_video_start(generation, error, None))?;
         let spawned_at = Instant::now();
         let mut child = Command::new(&self.executable)
             .args(&plan.args)
@@ -231,16 +217,32 @@ impl RunningPreviewProcess {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .map_err(|err| PreviewEngineError::Ffmpeg(format!("failed to start: {err}")))?;
+            .map_err(|err| {
+                self.fail_video_start(
+                    generation,
+                    PreviewEngineError::Ffmpeg(format!("failed to start: {err}")),
+                    None,
+                )
+            })?;
         self.metrics.record_video_process_spawn();
 
-        let stdout = child.stdout.take().ok_or_else(|| {
-            PreviewEngineError::Ffmpeg("ffmpeg stdout was not captured".to_string())
-        })?;
-        let stderr = child.stderr.take().ok_or_else(|| {
-            PreviewEngineError::Ffmpeg("ffmpeg stderr was not captured".to_string())
-        })?;
         let stop_requested = Arc::new(AtomicBool::new(false));
+        let stdout = child.stdout.take();
+        let stderr = child.stderr.take();
+        let (Some(stdout), Some(stderr)) = (stdout, stderr) else {
+            return Err(self.fail_video_start(
+                generation,
+                PreviewEngineError::Ffmpeg("ffmpeg output pipes were not captured".to_string()),
+                Some(ProcessHandles {
+                    child: Some(child),
+                    stdout_worker: None,
+                    stderr_worker: None,
+                    stop_requested: Some(stop_requested),
+                    audio_start: None,
+                    audio_exit: None,
+                }),
+            ));
+        };
         let stderr_worker = match spawn_stderr_worker(
             stderr,
             Arc::clone(&self.stderr),
@@ -248,12 +250,18 @@ impl RunningPreviewProcess {
         ) {
             Ok(worker) => worker,
             Err(error) => {
-                stop_requested.store(true, Ordering::SeqCst);
-                if child.try_wait().map_err(PreviewEngineError::Io)?.is_none() {
-                    child.kill().map_err(PreviewEngineError::Io)?;
-                }
-                let _ = child.wait();
-                return Err(error);
+                return Err(self.fail_video_start(
+                    generation,
+                    error,
+                    Some(ProcessHandles {
+                        child: Some(child),
+                        stdout_worker: None,
+                        stderr_worker: None,
+                        stop_requested: Some(stop_requested),
+                        audio_start: None,
+                        audio_exit: None,
+                    }),
+                ));
             }
         };
 
@@ -276,17 +284,17 @@ impl RunningPreviewProcess {
     }
 }
 
-pub(super) fn stop_spawned_video_stream(
-    stream: SpawnedVideoStream,
-) -> Result<(), PreviewEngineError> {
-    stop_process_handles(ProcessHandles {
-        child: Some(stream.child),
-        stdout_worker: None,
-        stderr_worker: Some(stream.stderr_worker),
-        stop_requested: Some(stream.stop_requested),
-        audio_start: None,
-        audio_exit: None,
-    })
+impl SpawnedVideoStream {
+    fn into_handles(self) -> ProcessHandles {
+        ProcessHandles {
+            child: Some(self.child),
+            stdout_worker: None,
+            stderr_worker: Some(self.stderr_worker),
+            stop_requested: Some(self.stop_requested),
+            audio_start: None,
+            audio_exit: None,
+        }
+    }
 }
 
 pub(super) fn spawn_stdout_worker(

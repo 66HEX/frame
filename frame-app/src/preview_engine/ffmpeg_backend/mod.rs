@@ -52,3 +52,5 @@ mod audio_queue_tests;
 mod playback_start_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(all(test, unix))]
+mod video_failure_tests;
