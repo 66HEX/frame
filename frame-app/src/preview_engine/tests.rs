@@ -217,8 +217,15 @@ fn test_preview_session_command_is_noop_without_pipeline() {
     session
         .command(PreviewCommand::SeekFast(2.0))
         .expect("command");
+    session
+        .command(PreviewCommand::SeekAndPlay {
+            seconds: 2.0,
+            precise: true,
+        })
+        .expect("stopped session must not restart for queued playback");
 
     assert_eq!(session.snapshot().playback.duration_seconds, 12.5);
+    assert!(!session.snapshot().playback.playing);
 }
 
 #[test]
@@ -289,6 +296,108 @@ fn ffmpeg_preview_session_can_play_pause_and_seek() {
 
 #[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn ffmpeg_seek_and_play_matches_precise_frame_with_one_process_spawn() {
+    let path = temp_preview_video("atomic-seek-play");
+    let config = real_video_preview_config(path.clone());
+    let baseline = PreviewSession::start(config.clone()).expect("baseline session");
+    let baseline_spawns = baseline.snapshot().runtime_metrics.video_process_spawns;
+    baseline
+        .command(PreviewCommand::SeekPrecise(1.0))
+        .expect("paused precise seek");
+    let expected_frame = baseline.latest_frame().expect("precise frame").frame;
+    baseline
+        .command(PreviewCommand::Play)
+        .expect("baseline play");
+    let baseline_spawn_delta =
+        baseline.snapshot().runtime_metrics.video_process_spawns - baseline_spawns;
+    baseline.stop().expect("stop baseline");
+
+    let atomic = PreviewSession::start(config).expect("atomic session");
+    let atomic_spawns = atomic.snapshot().runtime_metrics.video_process_spawns;
+    atomic
+        .command(PreviewCommand::SeekAndPlay {
+            seconds: 1.0,
+            precise: true,
+        })
+        .expect("atomic precise seek and play");
+    // The first frame remains unpresented, so backpressure keeps it available
+    // for exact comparison even if the decoder has read subsequent frames.
+    let actual_frame = atomic.latest_frame().expect("atomic frame").frame;
+    let snapshot = atomic.snapshot();
+    atomic.stop().expect("stop atomic");
+    let _ = std::fs::remove_file(&path);
+
+    assert_eq!(baseline_spawn_delta, 2);
+    assert_eq!(
+        snapshot.runtime_metrics.video_process_spawns - atomic_spawns,
+        1
+    );
+    assert!(snapshot.playback.playing);
+    assert_eq!(actual_frame.timestamp_us, 1_000_000);
+    assert_eq!(actual_frame.timestamp_us, expected_frame.timestamp_us);
+    assert_eq!(actual_frame.dimensions(), expected_frame.dimensions());
+    assert_eq!(
+        actual_frame.render_image().as_bytes(0),
+        expected_frame.render_image().as_bytes(0)
+    );
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn ffmpeg_play_is_idempotent_and_restarts_after_eof() {
+    let path = temp_preview_video("idempotent-play-eof");
+    let mut config = real_video_preview_config(path.clone());
+    config.conversion_config.start_time = Some("00:00:00.250".into());
+    let session = PreviewSession::start(config).expect("session");
+    session.command(PreviewCommand::Play).expect("play");
+    let playing_spawns = session.snapshot().runtime_metrics.video_process_spawns;
+    let first_generation = session.latest_frame().expect("playing frame").generation;
+    for _ in 0..10 {
+        session
+            .command(PreviewCommand::Play)
+            .expect("repeated play");
+    }
+    assert_eq!(
+        session.snapshot().runtime_metrics.video_process_spawns,
+        playing_spawns
+    );
+    assert_eq!(session.latest_frame().unwrap().generation, first_generation);
+
+    session
+        .command(PreviewCommand::SeekAndPlay {
+            seconds: 1.8,
+            precise: true,
+        })
+        .expect("play near EOF");
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let ended = loop {
+        let playback = session.snapshot().playback;
+        if !playback.playing || Instant::now() >= deadline {
+            break playback;
+        }
+        thread::sleep(Duration::from_millis(10));
+    };
+    let ended_spawns = session.snapshot().runtime_metrics.video_process_spawns;
+    session
+        .command(PreviewCommand::Play)
+        .expect("replay after EOF");
+    let replay = session.snapshot();
+    let replay_frame = session.latest_frame().expect("replay frame").frame;
+    session.stop().expect("stop");
+    let _ = std::fs::remove_file(&path);
+
+    assert!(!ended.playing, "preview must reach EOF before replay");
+    assert_eq!(ended.position_seconds, ended.duration_seconds);
+    assert!(replay.playback.playing);
+    assert_eq!(
+        replay.runtime_metrics.video_process_spawns,
+        ended_spawns + 1
+    );
+    assert_eq!(replay_frame.timestamp_us, 250_000);
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 fn ffmpeg_preview_session_reconfigure_preserves_playback_position() {
     let path = temp_preview_video("reconfigure");
     let config = real_video_preview_config(path.clone());
@@ -338,7 +447,8 @@ fn ffmpeg_preview_session_reports_eof_through_read_only_snapshots() {
 #[ignore = "requires FFmpeg plus a default audio output device; run with --ignored"]
 fn ffmpeg_preview_session_collects_audio_video_metrics_for_sync_fixture() {
     let path = temp_preview_av_sync_video("av-sync");
-    let config = real_av_preview_config(path.clone());
+    let mut config = real_av_preview_config(path.clone());
+    config.conversion_config.audio_volume = 0.0;
 
     let session = PreviewSession::start(config).expect("session");
     session.command(PreviewCommand::Play).expect("play");

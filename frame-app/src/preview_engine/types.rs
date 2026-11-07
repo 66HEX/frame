@@ -282,6 +282,11 @@ pub enum PreviewCommand {
     Pause,
     SeekFast(f64),
     SeekPrecise(f64),
+    /// Starts playback at the target without decoding an intermediate paused frame.
+    SeekAndPlay {
+        seconds: f64,
+        precise: bool,
+    },
 }
 
 #[must_use]

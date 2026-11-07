@@ -382,18 +382,22 @@ pub(super) fn preview_commands_from_playback(
     command: PlaybackMediaCommand,
     precise_seek: bool,
 ) -> Vec<PreviewCommand> {
-    let mut commands = Vec::with_capacity(3);
+    let mut commands = Vec::with_capacity(2);
     if command.pause {
         commands.push(PreviewCommand::Pause);
     }
     if let Some(seconds) = command.seek_to {
-        commands.push(if precise_seek {
+        commands.push(if command.play {
+            PreviewCommand::SeekAndPlay {
+                seconds,
+                precise: precise_seek,
+            }
+        } else if precise_seek {
             PreviewCommand::SeekPrecise(seconds)
         } else {
             PreviewCommand::SeekFast(seconds)
         });
-    }
-    if command.play {
+    } else if command.play {
         commands.push(PreviewCommand::Play);
     }
     commands

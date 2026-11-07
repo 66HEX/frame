@@ -79,6 +79,9 @@ impl RunningPreviewProcess {
     pub fn resume(&self) -> Result<(), PreviewEngineError> {
         let seconds = {
             let playback = lock_playback(&self.playback);
+            if playback.playing && !playback.ended {
+                return Ok(());
+            }
             if playback.ended {
                 initial_start_seconds(&self.config)
             } else {
@@ -407,4 +410,44 @@ pub(super) fn lock_stderr(lines: &Mutex<VecDeque<String>>) -> MutexGuard<'_, Vec
     lines
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resume_keeps_a_playing_generation_without_starting_another_process() {
+        let config = PreviewSessionConfig {
+            file_id: "already-playing".into(),
+            path: "/missing/preview.mp4".into(),
+            source_kind: PreviewSourceKind::Video,
+            source_width: Some(160),
+            source_height: Some(90),
+            selected_audio_track: None,
+            duration_seconds: 2.0,
+            max_width: 320,
+            max_height: 180,
+            fps: 30,
+            conversion_config: crate::conversion_runner::core_config_from_gpui(
+                &crate::settings::ConversionConfig::default(),
+            ),
+        };
+        let process = RunningPreviewProcess::new(
+            config,
+            LatestFrameStore::new(),
+            PreviewRuntimeMetricsStore::new(),
+            "/missing/ffmpeg".into(),
+        );
+        {
+            let mut playback = lock_playback(&process.playback);
+            playback.generation = 7;
+            playback.playing = true;
+        }
+
+        process.resume().expect("Play must not spawn FFmpeg again");
+
+        assert_eq!(lock_playback(&process.playback).generation, 7);
+        assert_eq!(process.metrics.snapshot().video_process_spawns, 0);
+    }
 }

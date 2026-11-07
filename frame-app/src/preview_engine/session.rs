@@ -141,6 +141,10 @@ impl PreviewSession {
                 pipeline.seek(seconds, !was_playing, true)?;
                 None
             }
+            PreviewCommand::SeekAndPlay { seconds, precise } => {
+                pipeline.seek(seconds, false, precise)?;
+                Some(true)
+            }
         };
 
         if let Some(playing) = next_playing {
