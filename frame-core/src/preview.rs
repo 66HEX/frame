@@ -99,7 +99,7 @@ pub fn build_ffmpeg_preview_args(
     if options.start_seconds > 0.0 {
         args.push("-ss".to_string());
         args.push(format_seconds(options.start_seconds));
-        if !options.precise_seek {
+        if !options.precise_seek && options.end_seconds.is_none() {
             args.push("-noaccurate_seek".to_string());
         }
     }
@@ -170,7 +170,7 @@ pub fn build_ffmpeg_preview_audio_args(
     if options.start_seconds > 0.0 {
         args.push("-ss".to_string());
         args.push(format_seconds(options.start_seconds));
-        if !options.precise_seek {
+        if !options.precise_seek && options.end_seconds.is_none() {
             args.push("-noaccurate_seek".to_string());
         }
     }
@@ -600,6 +600,75 @@ mod tests {
             realtime: true,
             precise_seek: true,
             selected_track: 0,
+        }
+    }
+
+    #[test]
+    fn bounded_video_seek_uses_accurate_decoding_without_changing_other_arguments() {
+        for start_seconds in [0.0, 7.2] {
+            for end_seconds in [None, Some(10.0)] {
+                for precise_seek in [false, true] {
+                    let options = PreviewFfmpegOptions {
+                        start_seconds,
+                        end_seconds,
+                        precise_seek,
+                        ..default_options()
+                    };
+                    let plan = build_ffmpeg_preview_args("input.mp4", &default_config(), &options)
+                        .unwrap();
+                    assert_eq!(
+                        plan.args.iter().any(|arg| arg == "-noaccurate_seek"),
+                        start_seconds > 0.0 && end_seconds.is_none() && !precise_seek
+                    );
+                    let precise = build_ffmpeg_preview_args(
+                        "input.mp4",
+                        &default_config(),
+                        &PreviewFfmpegOptions {
+                            precise_seek: true,
+                            ..options
+                        },
+                    )
+                    .unwrap();
+                    let mut args = plan.args;
+                    args.retain(|arg| arg != "-noaccurate_seek");
+                    assert_eq!(args, precise.args);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn bounded_audio_seek_uses_accurate_decoding_without_changing_other_arguments() {
+        for start_seconds in [0.0, 7.2] {
+            for end_seconds in [None, Some(10.0)] {
+                for precise_seek in [false, true] {
+                    let options = PreviewAudioFfmpegOptions {
+                        start_seconds,
+                        end_seconds,
+                        precise_seek,
+                        ..default_audio_options()
+                    };
+                    let plan =
+                        build_ffmpeg_preview_audio_args("input.mp4", &default_config(), &options)
+                            .unwrap();
+                    assert_eq!(
+                        plan.args.iter().any(|arg| arg == "-noaccurate_seek"),
+                        start_seconds > 0.0 && end_seconds.is_none() && !precise_seek
+                    );
+                    let precise = build_ffmpeg_preview_audio_args(
+                        "input.mp4",
+                        &default_config(),
+                        &PreviewAudioFfmpegOptions {
+                            precise_seek: true,
+                            ..options
+                        },
+                    )
+                    .unwrap();
+                    let mut args = plan.args;
+                    args.retain(|arg| arg != "-noaccurate_seek");
+                    assert_eq!(args, precise.args);
+                }
+            }
         }
     }
 

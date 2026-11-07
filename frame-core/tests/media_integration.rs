@@ -10,7 +10,10 @@ use std::{
 
 use frame_core::{
     args::{build_ffmpeg_args, validate_task_input},
-    preview::{PreviewFfmpegOptions, build_ffmpeg_preview_args},
+    preview::{
+        PreviewAudioFfmpegOptions, PreviewFfmpegOptions, build_ffmpeg_preview_args,
+        build_ffmpeg_preview_audio_args,
+    },
     probe::{ffprobe_json_args, parse_ffprobe_stdout},
     types::{
         ConversionConfig, CropConfig, ExternalSubtitleTrack, MetadataConfig, MetadataMode,
@@ -1420,6 +1423,101 @@ fn subtitle_burn_should_encode_video_when_srt_is_present() -> TestResult {
 
 #[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn bounded_fast_preview_should_match_complete_source_frames_and_chirp_samples() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("bounded_fast_preview")?;
+    let input = sandbox.path("long_gop_chirp.mov");
+    generate_long_gop_chirp_source(&tools, &input)?;
+    let config = video_config("mp4", "libx264", "aac");
+    let video_options = PreviewFfmpegOptions {
+        start_seconds: 0.0,
+        end_seconds: None,
+        source_width: Some(160),
+        source_height: Some(90),
+        max_width: 160,
+        max_height: 90,
+        fps: 30,
+        realtime: false,
+        precise_seek: true,
+        source_is_image: false,
+    };
+    let audio_options = PreviewAudioFfmpegOptions {
+        start_seconds: 0.0,
+        end_seconds: None,
+        sample_rate: 48_000,
+        channels: 2,
+        realtime: false,
+        precise_seek: true,
+        selected_track: 1,
+    };
+    let video_source_plan = build_ffmpeg_preview_args(&path_arg(&input), &config, &video_options)
+        .map_err(|error| error.to_string())?;
+    let audio_source_plan =
+        build_ffmpeg_preview_audio_args(&path_arg(&input), &config, &audio_options)
+            .map_err(|error| error.to_string())?;
+    let source_frames = run_tool_output(&tools.ffmpeg, &video_source_plan.args)?;
+    let source_samples = run_tool_output(&tools.ffmpeg, &audio_source_plan.args)?;
+    let frame_bytes = video_source_plan.frame_bytes;
+    let video_end = 300 * frame_bytes;
+    let audio_end = 10 * 48_000 * 2 * 4;
+    assert!(source_frames.len() >= video_end);
+    assert!(source_samples.len() >= audio_end);
+    for start_ms in [4_800_u32, 7_200, 8_000, 9_700] {
+        let start_seconds = f64::from(start_ms) / 1_000.0;
+        let video_start = usize::try_from(start_ms * 30 / 1_000).unwrap() * frame_bytes;
+        let audio_start = usize::try_from(start_ms * 48).unwrap() * 2 * 4;
+        for precise_seek in [false, true] {
+            let video = build_ffmpeg_preview_args(
+                &path_arg(&input),
+                &config,
+                &PreviewFfmpegOptions {
+                    start_seconds,
+                    end_seconds: Some(10.0),
+                    precise_seek,
+                    ..video_options.clone()
+                },
+            )
+            .map_err(|error| error.to_string())?;
+            let frames = run_tool_output(&tools.ffmpeg, &video.args)?;
+            assert_eq!(
+                frames.len(),
+                video_end - video_start,
+                "video tail at {start_seconds}, precise={precise_seek}"
+            );
+            assert!(
+                frames == source_frames[video_start..video_end],
+                "wrong video interval at {start_seconds}, precise={precise_seek}"
+            );
+            let audio = build_ffmpeg_preview_audio_args(
+                &path_arg(&input),
+                &config,
+                &PreviewAudioFfmpegOptions {
+                    start_seconds,
+                    end_seconds: Some(10.0),
+                    precise_seek,
+                    ..audio_options.clone()
+                },
+            )
+            .map_err(|error| error.to_string())?;
+            let samples = run_tool_output(&tools.ffmpeg, &audio.args)?;
+            assert_eq!(
+                samples.len(),
+                audio_end - audio_start,
+                "audio tail at {start_seconds}, precise={precise_seek}"
+            );
+            // The chirp changes frequency continuously, so a keyframe-aligned
+            // prefix with the right duration cannot satisfy this source oracle.
+            assert!(
+                samples == source_samples[audio_start..audio_end],
+                "wrong audio interval at {start_seconds}, precise={precise_seek}"
+            );
+        }
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 fn preview_subtitle_burn_should_use_source_time_after_seek() -> TestResult {
     let tools = Toolchain::discover()?;
     let sandbox = Sandbox::new("preview_subtitle_seek")?;
@@ -1659,6 +1757,41 @@ fn base_config(container: &str, video_codec: &str) -> ConversionConfig {
         gif_dither: "sierra2_4a".to_string(),
         gif_loop: 0,
     }
+}
+
+fn generate_long_gop_chirp_source(tools: &Toolchain, output: &Path) -> TestResult {
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=160x90:rate=30:duration=12",
+            "-f",
+            "lavfi",
+            "-i",
+            "aevalsrc=0.2*sin(2*PI*(300*t+17*t*t)):s=48000:d=12",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-g",
+            "120",
+            "-keyint_min",
+            "120",
+            "-sc_threshold",
+            "0",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "pcm_f32le",
+            "-y",
+            &path_arg(output),
+        ]),
+    )
 }
 
 fn generate_h264_aac_source(
