@@ -1,11 +1,11 @@
 use crate::app::inspector::panel::settings_section;
 use crate::app::inspector::shared::settings_value_row;
-use crate::app::primitives::{color, horizontal_separator_shadows};
+use crate::app::primitives::color;
 use crate::settings::{SourceInfoSection, SourceMetadata, source_info_sections};
 use crate::source_metadata::MetadataStatus;
 use crate::theme;
 use gpui::prelude::{ParentElement, Styled};
-use gpui::{InteractiveElement, IntoElement, StatefulInteractiveElement, div, px};
+use gpui::{InteractiveElement, IntoElement, StatefulInteractiveElement, div};
 
 pub(in crate::app) fn settings_source_tab(
     metadata: Option<&SourceMetadata>,
@@ -114,11 +114,4 @@ pub(in crate::app) fn settings_track_header(
         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
         .text_color(color(palette.text_muted))
         .child(theme::ui_text_owned(label))
-        .child(
-            div()
-                .h(px(1.0))
-                .flex_1()
-                .bg(color(palette.canvas))
-                .shadow(horizontal_separator_shadows(palette)),
-        )
 }

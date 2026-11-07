@@ -1,7 +1,7 @@
 use crate::app::root::FrameRoot;
 use crate::theme;
 use gpui::prelude::{ParentElement, Styled};
-use gpui::{App, BoxShadow, Context, IntoElement, Rgba, Window, div, point, px, svg};
+use gpui::{App, Context, IntoElement, Rgba, Window, div, px, svg};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[cfg_attr(
@@ -202,16 +202,6 @@ impl FrameSurface for gpui::Div {
             .bg(theme::shadows::surface_fill(palette.surface, palette))
             .shadow(theme::shadows::ShadowLevel::Sm.shadows())
     }
-}
-
-pub(super) fn horizontal_separator_shadows(palette: &theme::ThemePalette) -> Vec<BoxShadow> {
-    vec![BoxShadow {
-        color: color(palette.border_subtle).into(),
-        offset: point(px(0.0), px(1.0)),
-        blur_radius: px(0.0),
-        spread_radius: px(0.0),
-        inset: false,
-    }]
 }
 
 pub(super) const fn color(token: theme::RgbaToken) -> Rgba {
