@@ -10,7 +10,6 @@ pub(in crate::app) struct PreviewTimecodeFieldSpec<'a> {
     pub(super) label: &'static str,
     pub(super) value: String,
     pub(super) enabled: bool,
-    pub(super) width: f32,
     pub(super) kind: Option<FrameTextInputKind>,
     pub(super) focus: Option<&'a FocusHandle>,
 }
@@ -25,28 +24,30 @@ pub(in crate::app) fn preview_timecode_field(
         label,
         value,
         enabled,
-        width,
         kind,
         focus,
     } = spec;
     let field = if let (Some(kind), Some(focus)) = (kind, focus) {
+        let id = match kind {
+            FrameTextInputKind::PreviewStartTime => "preview-start-time",
+            FrameTextInputKind::PreviewEndTime => "preview-end-time",
+            _ => "preview-timecode",
+        };
         frame_text_input(
             FrameTextInputSpec {
-                id: match kind {
-                    FrameTextInputKind::PreviewStartTime => "preview-start-time",
-                    FrameTextInputKind::PreviewEndTime => "preview-end-time",
-                    _ => "preview-timecode",
-                },
+                id,
                 value: &value,
                 placeholder: "--:--:--.---",
                 disabled: !enabled,
-                focus: Some(focus),
+                // Disabled exit frames must not keep GPUI's automatic mouse focus.
+                focus: enabled.then_some(focus),
                 kind,
             },
             palette,
             window,
             cx,
         )
+        .debug_selector(move || id.to_owned())
         .font_features(assets::frame_tabular_number_font_features())
         .into_any_element()
     } else {
@@ -63,12 +64,13 @@ pub(in crate::app) fn preview_timecode_field(
     };
 
     crate::app::components::frame_field()
-        .w(theme::ui_rem(width))
-        .flex_shrink_0()
+        .min_w_0()
+        .flex_1()
+        .gap(theme::ui_rem(4.0))
         .child(preview_timeline_label(label, palette))
         .child(
             div()
-                .w(theme::ui_rem(width))
+                .w_full()
                 .h(theme::ui_rem(PREVIEW_TIMELINE_CONTROL_HEIGHT))
                 .child(field),
         )

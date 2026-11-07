@@ -1,7 +1,9 @@
 use crate::app::inspector::state::SettingsRenderState;
 use crate::app::layout::PREVIEW_PANEL_PADDING;
-use crate::app::preview::state::{CropSelect, PreviewOverlayImageDimensions};
-use crate::app::preview::{preview_timeline, preview_viewport};
+use crate::app::preview::preview_viewport;
+use crate::app::preview::state::{
+    CropSelect, PreviewOverlayImageDimensions, PreviewTransportState,
+};
 use crate::app::primitives::FrameSurface;
 use crate::app::root::FrameRoot;
 use crate::file_queue::{FileItem, FileQueue};
@@ -138,6 +140,7 @@ pub(in crate::app) struct PreviewPanelProps<'a> {
     pub(in crate::app) overlay: PreviewOverlayRenderState,
     pub(in crate::app) viewport_focuses: PreviewViewportFocuses<'a>,
     pub(in crate::app) timecode_focuses: PreviewTimecodeInputFocuses<'a>,
+    pub(in crate::app) transport: PreviewTransportState,
     pub(in crate::app) playback: PreviewPlaybackState,
     pub(in crate::app) presentation: PreviewRenderPresentation,
     pub(in crate::app) render_image: Option<Arc<RenderImage>>,
@@ -227,16 +230,18 @@ pub(in crate::app) fn preview_panel(
         .overflow_hidden()
         .card_surface(palette)
         .id("preview-panel")
+        .debug_selector(|| "preview-panel".to_owned())
         .on_prepaint(move |info, _, _| measured_card_bounds.set(info.bounds))
         .p(theme::ui_rem(PREVIEW_PANEL_PADDING))
         .child(preview_viewport(
             &state,
             props.viewport_focuses,
+            props.timecode_focuses,
+            props.transport,
             card_bounds,
             window,
             cx,
         ))
-        .child(preview_timeline(&state, props.timecode_focuses, window, cx))
 }
 
 pub(in crate::app) fn preview_shell_state(input: PreviewShellStateInput<'_>) -> PreviewShellState {

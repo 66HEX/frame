@@ -6,8 +6,10 @@ use crate::app::preview::crop_overlay::{
     PreviewCropDrag, preview_crop_aspect_bar, preview_crop_overlay,
 };
 use crate::app::preview::panel::{
-    PreviewCanvasRenderState, PreviewMediaRenderState, PreviewShellState, PreviewViewportFocuses,
+    PreviewCanvasRenderState, PreviewMediaRenderState, PreviewShellState,
+    PreviewTimecodeInputFocuses, PreviewViewportFocuses,
 };
+use crate::app::preview::state::PreviewTransportState;
 use crate::app::preview::toolbar::{preview_toolbar, preview_zoom_toolbar};
 use crate::app::preview::viewport::bounds::{
     PreviewCanvasBoundsProbe, PreviewCanvasPanDrag, normalized_point_from_bounds,
@@ -36,12 +38,18 @@ use std::sync::Arc;
 pub(in crate::app) fn preview_viewport(
     state: &PreviewShellState,
     focuses: PreviewViewportFocuses<'_>,
+    timecode_inputs: PreviewTimecodeInputFocuses<'_>,
+    transport: PreviewTransportState,
     card_bounds: Rc<Cell<Bounds<Pixels>>>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let palette = state.palette;
     let pan_enabled = preview_canvas_pan_enabled(state);
+    let transport_enabled = !state.availability.trim_disabled
+        && state.duration_seconds > 0.0
+        && !state.crop.crop_mode
+        && !state.overlay.overlay_mode;
     let mut viewport = div()
         .id("preview-viewport")
         .debug_selector(|| "preview-viewport".to_string())
@@ -62,59 +70,32 @@ pub(in crate::app) fn preview_viewport(
                 .border_color(crate::app::motion::interaction_motion())
         })
         .track_focus(focuses.viewport)
-        .tab_stop(pan_enabled)
-        .on_key_down(cx.listener(|root, event: &gpui::KeyDownEvent, window, cx| {
-            if event.keystroke.key != "escape" {
-                return;
-            }
-            let tool = if root.preview_ui.crop_mode {
-                root.toggle_selected_crop_mode();
-                Some("preview-tool-crop")
-            } else if root.preview_ui.overlay.overlay_mode() {
-                root.set_selected_overlay_mode(false);
-                Some("preview-tool-overlay")
-            } else {
-                None
-            };
-            if let Some(tool) = tool {
-                root.focus_registered_control(tool, window, cx);
-                cx.stop_propagation();
+        .tab_stop(pan_enabled || transport_enabled)
+        .role(gpui::Role::Pane)
+        .aria_label("Preview canvas")
+        .aria_description(if transport_enabled {
+            "Space plays or pauses. Tab reveals playback and trim controls. Arrow keys pan the zoomed preview."
+        } else {
+            "Use arrow keys to pan the zoomed preview."
+        })
+        .focus_visible_style(move |style| {
+            focus_ring_above_content(focus_visible_ring(style, palette))
+        })
+        .on_hover(cx.listener(|root, hovered: &bool, _window, cx| {
+            if root.preview_ui.transport.hovered != *hovered {
+                root.preview_ui.transport.hovered = *hovered;
                 cx.notify();
             }
         }))
+        .map(|viewport| {
+            preview_viewport_keyboard(viewport, focuses.viewport, pan_enabled, transport_enabled, cx)
+        })
         .child(preview_viewport_content(state, cx))
         // Fixed to the viewport, above media/crop layers and below floating controls.
         .child(PreviewViewportFrame {
             fill: theme::shadows::surface_fill(palette.surface, palette),
             card_bounds,
         });
-
-    if pan_enabled {
-        let viewport_focus = focuses.viewport.clone();
-        viewport = viewport
-            .role(gpui::Role::Pane)
-            .aria_label("Preview canvas")
-            .aria_description("Use arrow keys to pan the zoomed preview.")
-            .focus_visible_style(move |style| {
-                focus_ring_above_content(focus_visible_ring(style, palette))
-            })
-            .cursor_grab()
-            .on_key_down(
-                cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
-                    if !viewport_focus.is_focused(window) {
-                        return;
-                    }
-                    if root
-                        .adjust_preview_canvas_pan_from_keyboard(event.keystroke.key.as_str(), cx)
-                    {
-                        cx.notify();
-                    }
-                    if preview_canvas_keyboard_pan_delta(event.keystroke.key.as_str()).is_some() {
-                        cx.stop_propagation();
-                    }
-                }),
-            );
-    }
 
     if state.crop.crop_mode && state.crop.draft_crop.is_some() {
         viewport = viewport.child(preview_crop_aspect_bar(
@@ -133,12 +114,73 @@ pub(in crate::app) fn preview_viewport(
     }
 
     if preview_visual_controls_visible(state) {
-        viewport = viewport
-            .child(preview_toolbar(state, focuses.tools, window, cx))
-            .child(preview_zoom_toolbar(state, window, cx));
+        let ui_scale = f64::from(window.rem_size().as_f32() / crate::appearance::BASE_REM_PX);
+        let compact_trim = transport.open
+            && (state.canvas.viewport_width < 440.0 * ui_scale
+                || state.canvas.viewport_height < 360.0 * ui_scale);
+        if !compact_trim {
+            viewport = viewport.child(preview_toolbar(state, focuses.tools, window, cx));
+        }
+        viewport = viewport.child(preview_zoom_toolbar(state, window, cx));
+    }
+
+    if let Some(transport) = crate::app::preview::preview_transport(
+        state,
+        timecode_inputs,
+        focuses.viewport,
+        transport,
+        window,
+        cx,
+    ) {
+        viewport = viewport.child(transport);
     }
 
     viewport
+}
+
+fn preview_viewport_keyboard(
+    viewport: gpui::Stateful<gpui::Div>,
+    focus: &gpui::FocusHandle,
+    pan_enabled: bool,
+    transport_enabled: bool,
+    cx: &Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    let focus = focus.clone();
+    viewport
+        .when(pan_enabled, gpui::Styled::cursor_grab)
+        .on_key_down(
+            cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+                let key = event.keystroke.key.as_str();
+                if key == "escape" {
+                    let tool = if root.preview_ui.crop_mode {
+                        root.toggle_selected_crop_mode();
+                        Some("preview-tool-crop")
+                    } else if root.preview_ui.overlay.overlay_mode() {
+                        root.set_selected_overlay_mode(false);
+                        Some("preview-tool-overlay")
+                    } else {
+                        None
+                    };
+                    if let Some(tool) = tool {
+                        root.focus_registered_control(tool, window, cx);
+                        cx.stop_propagation();
+                        cx.notify();
+                    }
+                } else if focus.is_focused(window) {
+                    if transport_enabled && key == "space" {
+                        if root.toggle_preview_playback_with_context(cx) {
+                            cx.notify();
+                        }
+                        cx.stop_propagation();
+                    } else if pan_enabled && preview_canvas_keyboard_pan_delta(key).is_some() {
+                        if root.adjust_preview_canvas_pan_from_keyboard(key, cx) {
+                            cx.notify();
+                        }
+                        cx.stop_propagation();
+                    }
+                }
+            }),
+        )
 }
 
 #[expect(

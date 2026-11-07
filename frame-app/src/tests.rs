@@ -167,6 +167,8 @@ mod visual_fixture_env {
             ("preview-crop-custom", VisualFixture::PreviewCropCustom),
             ("settings-video-av1", VisualFixture::SettingsVideoAv1),
             ("preview-ready", VisualFixture::PreviewReady),
+            ("preview-transport", VisualFixture::PreviewTransport),
+            ("preview-trim", VisualFixture::PreviewTrim),
             ("settings-audio", VisualFixture::SettingsAudio),
             (
                 "settings-audio-filters",

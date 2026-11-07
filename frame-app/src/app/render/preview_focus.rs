@@ -63,9 +63,14 @@ impl FrameRoot {
             && preview_visual_controls_enabled
             && !preview_crop.crop_mode
             && !preview_overlay.overlay_mode;
+        let preview_transport_enabled = !preview_availability.trim_disabled
+            && self.preview_ui.playback.duration() > 0.0
+            && !preview_crop.crop_mode
+            && !preview_overlay.overlay_mode;
+        let preview_viewport_enabled = preview_viewport_pan_enabled || preview_transport_enabled;
         let preview_viewport_focus = self.ensure_focus(
             FrameFocusKey::Control("preview-viewport".to_string()),
-            preview_viewport_pan_enabled,
+            preview_viewport_enabled,
             cx,
         );
         let preview_crop_tool_focus = self.ensure_focus(
@@ -166,7 +171,7 @@ impl FrameRoot {
                 app_root_focus.focus(window, cx);
             }
         }
-        if !preview_viewport_pan_enabled && preview_viewport_focus.is_focused(window) {
+        if !preview_viewport_enabled && preview_viewport_focus.is_focused(window) {
             app_root_focus.focus(window, cx);
         }
         // Editing toolbars are non-modal. Focus their first control only when

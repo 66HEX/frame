@@ -63,8 +63,18 @@ mod keyboard_tests;
 #[path = "accessibility/preview_motion_tests.rs"]
 mod preview_motion_tests;
 
+#[path = "accessibility/preview_transport_tests.rs"]
+mod preview_transport_tests;
+
 #[path = "accessibility/settings_drawer_tests.rs"]
 mod settings_drawer_tests;
+
+fn open_preview_trim(cx: &mut VisualTestContext) {
+    let viewport = cx.debug_bounds("preview-viewport").unwrap();
+    cx.simulate_mouse_move(viewport.center(), None, Modifiers::default());
+    draw(cx);
+    click(cx, "preview-trim-trigger");
+}
 
 #[test]
 fn preview_canvas_focus_ring_paints_above_the_clipped_content() {
@@ -592,6 +602,7 @@ fn timeline_seek_and_trim_targets_follow_the_inset_value_range() {
     for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
         let mut app = TestAppContext::single();
         let (root, cx) = test_window(&mut app, VisualFixture::PreviewReady, scale);
+        open_preview_trim(cx);
         let bounds = cx.debug_bounds("preview-timeline-track").unwrap();
         let inset = px(theme::metrics::SLIDER_THUMB / 2.0 * scale.factor());
         let inner = root.read_with(cx, |root, _| root.preview_ui.timeline_track_bounds.unwrap());
@@ -708,6 +719,7 @@ fn trim_targets_stay_separate_and_do_not_cover_play() {
     for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
         let mut app = TestAppContext::single();
         let (root, cx) = test_window(&mut app, VisualFixture::PreviewReady, scale);
+        open_preview_trim(cx);
         for (start, end) in [(0.0, 90.4), (45.0, 45.1), (0.0, 0.1), (90.3, 90.4)] {
             root.update(cx, |root, cx| {
                 root.update_selected_config(|config| {
@@ -736,6 +748,7 @@ fn trim_handle_padding_changes_start_without_moving_end() {
         VisualFixture::PreviewReady,
         ScalePreset::Percent100,
     );
+    open_preview_trim(cx);
     let bounds = cx.debug_bounds("preview-timeline-start-handle").unwrap();
     let end = root.read_with(cx, |root, _| root.preview_ui.playback.end_value());
     let from = point(bounds.right() - px(1.0), bounds.center().y);

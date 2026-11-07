@@ -219,9 +219,28 @@ fn every_view_has_named_visible_tab_stops_and_reversible_traversal() {
                     "missing {name} in {fixture:?}: {names:?}"
                 );
             }
-            for expected in seen.iter().rev() {
+            // Playback controls appear while focus is inside Preview, then unmount
+            // when focus leaves. Their reveal/traversal has a dedicated test; compare
+            // the stable controls here, in both directions through that region.
+            let contextual = ["Play preview", "Pause preview", "Trim preview"];
+            for (expected, name) in seen.iter().zip(&names).rev() {
+                if contextual.contains(&name.as_str()) {
+                    continue;
+                }
                 press(cx, "shift-tab");
-                assert_eq!(&focus(cx), expected, "reverse traversal: {fixture:?}");
+                for _ in 0..2 {
+                    let current = assert_visible_focus(cx, viewport);
+                    if !contextual.contains(&current.as_str()) {
+                        break;
+                    }
+                    press(cx, "shift-tab");
+                }
+                assert_eq!(
+                    &focus(cx),
+                    expected,
+                    "reverse traversal: {fixture:?}, expected {name}, actual {}",
+                    focused_node(cx)["aria"]["label"]
+                );
                 assert_visible_focus(cx, viewport);
             }
         }
@@ -296,6 +315,8 @@ fn virtual_queue_keyboard_selection_reaches_offscreen_files_without_toggling_the
     }
     assert_eq!(focused_node(cx)["aria"]["label"], "File queue");
     let selection_before = root.read_with(cx, |root, _| root.file_queue.batch_selection_state());
+    let initial_runtime_key =
+        root.read_with(cx, |root, _| root.preview_ui.pending_runtime_key.clone());
     press(cx, "end");
     root.read_with(cx, |root, _| {
         assert_eq!(
@@ -308,6 +329,10 @@ fn virtual_queue_keyboard_selection_reaches_offscreen_files_without_toggling_the
         .debug_bounds("file-list-row-fixture-queue-499")
         .expect("last row must be rendered");
     assert!(row.top() >= px(592.0) && row.bottom() <= px(784.0));
+    // Returning to the ready fixture must not start FFmpeg for its dummy /tmp path.
+    root.update(cx, |root, _| {
+        root.preview_ui.pending_runtime_key = initial_runtime_key;
+    });
     press(cx, "home");
     root.read_with(cx, |root, _| {
         assert_eq!(

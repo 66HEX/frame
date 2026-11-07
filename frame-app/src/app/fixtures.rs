@@ -89,6 +89,18 @@ impl FrameRoot {
             }
             Some(VisualFixture::PreviewCrop) => self.apply_preview_crop_fixture(),
             Some(VisualFixture::PreviewReady) => self.apply_preview_ready_fixture(),
+            Some(VisualFixture::PreviewTransport | VisualFixture::PreviewTrim) => {
+                self.apply_preview_ready_fixture();
+                self.preview_ui.playback_file_id = Some("fixture-preview".into());
+                self.preview_ui.playback = crate::app::preview::preview_playback_state(
+                    crate::preview::PreviewMediaKind::Video,
+                    90.4,
+                    None,
+                    None,
+                );
+                self.preview_ui.transport.hovered = true;
+                self.preview_ui.transport.open = fixture == Some(VisualFixture::PreviewTrim);
+            }
             Some(VisualFixture::SettingsAudio) => self.apply_settings_audio_fixture(),
             Some(VisualFixture::SettingsAudioFilters) => {
                 self.apply_settings_audio_filters_fixture();

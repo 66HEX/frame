@@ -108,6 +108,8 @@ Tooltipy opisują akcje ikonowe; oczywiste przyciski zamknięcia okna, dialogu i
 
 Crop, pan/zoom, overlay resize, HSV canvas, miniatury, timecode i strumień logów są komponentami domenowymi. Shadcn nie dostarcza odpowiadających im edytorów mediów. Ich obudowy i kontrolki korzystają ze wspólnych tokenów i primitives; logika przetwarzania mediów pozostaje we Frame.
 
+Preview wypełnia kartę bez dolnego rzędu kontrolek. Dla audio i wideo najechanie lub fokus w podglądzie ujawnia kapsułę odtwarzania; kliknięcie czasu otwiera nad nią panel trimu z osią i dokładnymi polami Start/End. Otwarcie panelu nie zmienia rozmiaru podglądu. Przy małej dostępnej powierzchni panel tymczasowo zastępuje lewy toolbar, a zoom pozostaje dostępny. Crop i Overlay przejmują tę strefę i chowają sterowanie czasem. Spacja na podglądzie przełącza odtwarzanie, Tab prowadzi do kontrolek, a Escape zamyka panel i przywraca fokus na jego przycisk; w edytowanym polu pierwsze Escape anuluje zmianę.
+
 ## Tokeny i geometria
 
 Każdy token kolorystyczny CSS light/dark jest dostępny pod oryginalną nazwą przez `ThemePalette::token`. Adapter konwertuje OKLCH do zmiennoprzecinkowego sRGB. Nie zaokrągla do 8-bitowego hex. Alfa `border` i `input` zostaje zachowana; modyfikatory typu `input/30` mnożą alfę koloru. Secondary hover jest obliczony w OKLCH, zgodnie z `color-mix` źródła.

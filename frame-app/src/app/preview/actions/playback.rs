@@ -36,6 +36,8 @@ impl FrameRoot {
         let duration_seconds = preview_duration_seconds(metadata);
 
         if self.preview_ui.playback_file_id.as_deref() != selected_file_id {
+            self.preview_ui.transport.open = false;
+            self.preview_ui.timeline_track_bounds = None;
             self.preview_ui.trim_preview_seek.reset();
             self.preview_ui.playback_file_id = selected_file_id.map(str::to_string);
             self.preview_ui.playback = preview_playback_state(

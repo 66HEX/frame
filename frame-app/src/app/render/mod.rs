@@ -102,6 +102,14 @@ impl Render for FrameRoot {
         let preview_crop =
             self.preview_crop_render_state(source_metadata.as_ref(), &selected_config_snapshot);
         let preview_overlay = self.preview_overlay_render_state();
+        if preview_crop.crop_mode
+            || preview_overlay.overlay_mode
+            || self.active_view == ActiveView::Logs
+        {
+            self.end_preview_timeline_drag_with_context(cx);
+            self.preview_ui.transport.open = false;
+            self.preview_ui.timeline_track_bounds = None;
+        }
         let preview_canvas = self.preview_canvas_render_state();
         let preview_playback = self.preview_playback_state();
         let preview_presentation = self.preview_ui.render_presentation;
@@ -118,6 +126,11 @@ impl Render for FrameRoot {
             processing_mode: selected_config_snapshot.processing_mode,
             container: Some(selected_config_snapshot.container.as_str()),
         });
+        if preview_availability.trim_disabled || preview_playback.duration() <= 0.0 {
+            self.end_preview_timeline_drag_with_context(cx);
+            self.preview_ui.transport.open = false;
+            self.preview_ui.timeline_track_bounds = None;
+        }
         let PreviewFocusHandles {
             preview_viewport_focus,
             preview_crop_tool_focus,
@@ -360,6 +373,7 @@ impl Render for FrameRoot {
                             start_value: &preview_start_time_value,
                             end_value: &preview_end_time_value,
                         },
+                        transport: self.preview_ui.transport,
                         playback: preview_playback,
                         presentation: preview_presentation,
                         render_image: preview_render_image,

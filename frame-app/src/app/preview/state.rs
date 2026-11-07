@@ -96,6 +96,12 @@ impl Default for CropOptionsUiState {
     }
 }
 
+#[derive(Clone, Copy, Default)]
+pub(in crate::app) struct PreviewTransportState {
+    pub(in crate::app) hovered: bool,
+    pub(in crate::app) open: bool,
+}
+
 pub(in crate::app) struct PreviewUiState {
     pub(in crate::app) canvas_file_id: Option<String>,
     pub(in crate::app) canvas: PreviewCanvasState,
@@ -114,6 +120,7 @@ pub(in crate::app) struct PreviewUiState {
     pub(in crate::app) overlay_image_dimensions: Option<PreviewOverlayImageDimensions>,
     pub(in crate::app) overlay_opacity_slider_bounds: Option<Bounds<Pixels>>,
     pub(in crate::app) timeline_track_bounds: Option<Bounds<Pixels>>,
+    pub(in crate::app) transport: PreviewTransportState,
     pub(in crate::app) playback_file_id: Option<String>,
     pub(in crate::app) playback: PreviewPlaybackState,
     pub(in crate::app) active_preview_dimensions: Option<PreviewRuntimeDimensions>,
@@ -153,6 +160,7 @@ impl Default for PreviewUiState {
             overlay_image_dimensions: None,
             overlay_opacity_slider_bounds: None,
             timeline_track_bounds: None,
+            transport: PreviewTransportState::default(),
             playback_file_id: None,
             playback: PreviewPlaybackState::new(false),
             active_preview_dimensions: None,
