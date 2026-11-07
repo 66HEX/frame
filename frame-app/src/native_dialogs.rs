@@ -204,6 +204,14 @@ mod tests {
                 },
             ]
         );
+        for filter in SOURCE_FILE_DIALOG_SPEC.filters {
+            assert_eq!(
+                filter.extensions.contains(&"ts"),
+                matches!(filter.label, "Media Files" | "Videos"),
+                "{}",
+                filter.label
+            );
+        }
     }
 
     #[test]

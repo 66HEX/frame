@@ -64,6 +64,11 @@ fn allocate_file_imports_skips_unsupported_source_extensions() {
     let imports = root.allocate_file_imports(vec![
         PathBuf::from("/tmp/one.mp4"),
         PathBuf::from("/tmp/readme.txt"),
+        PathBuf::from("/tmp/transport.TS"),
+        PathBuf::from("/tmp/archive.zip"),
+        PathBuf::from("/tmp/mixed.tS"),
+        PathBuf::from("/tmp/no-extension"),
+        PathBuf::from("/tmp/lower.ts"),
         PathBuf::from("/tmp/two.PNG"),
     ]);
 
@@ -71,7 +76,10 @@ fn allocate_file_imports_skips_unsupported_source_extensions() {
         imports,
         [
             ("file-1".to_string(), PathBuf::from("/tmp/one.mp4")),
-            ("file-2".to_string(), PathBuf::from("/tmp/two.PNG")),
+            ("file-2".to_string(), PathBuf::from("/tmp/transport.TS")),
+            ("file-3".to_string(), PathBuf::from("/tmp/mixed.tS")),
+            ("file-4".to_string(), PathBuf::from("/tmp/lower.ts")),
+            ("file-5".to_string(), PathBuf::from("/tmp/two.PNG")),
         ]
     );
 }
@@ -79,7 +87,11 @@ fn allocate_file_imports_skips_unsupported_source_extensions() {
 #[test]
 fn allocate_file_imports_does_not_advance_ids_for_unsupported_sources() {
     let mut root = FrameRoot::new();
-    root.allocate_file_imports(vec![PathBuf::from("/tmp/readme.txt")]);
+    root.allocate_file_imports(vec![
+        PathBuf::from("/tmp/readme.txt"),
+        PathBuf::from("/tmp/archive.zip"),
+        PathBuf::from("/tmp/no-extension"),
+    ]);
 
     let imports = root.allocate_file_imports(vec![PathBuf::from("/tmp/clip.mov")]);
 
