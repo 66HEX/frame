@@ -1,6 +1,6 @@
 //! GPUI-side reducers for backend conversion events.
 
-use crate::file_queue::{FileQueue, FileStatus};
+use crate::file_queue::{FileItem, FileQueue, FileStatus};
 use frame_core::events::ConversionEvent;
 use std::collections::BTreeMap;
 use std::ops::Range;
@@ -80,7 +80,7 @@ impl ConversionEventState {
         queue
             .files()
             .iter()
-            .filter(|file| self.logs.contains_key(&file.id) || file.status != FileStatus::Idle)
+            .filter(|file| self.log_file_is_active(file))
             .map(|file| ActiveLogFile {
                 id: file.id.clone(),
                 name: file.name.clone(),
@@ -92,30 +92,43 @@ impl ConversionEventState {
     }
 
     pub fn select_log_file(&mut self, queue: &FileQueue, id: &str) -> bool {
-        if self
-            .active_log_files(queue)
+        if !queue
+            .files()
             .iter()
-            .any(|file| file.id == id)
+            .any(|file| file.id == id && self.log_file_is_active(file))
         {
-            self.selected_log_file_id = Some(id.to_string());
-            true
-        } else {
-            false
+            return false;
         }
+        if self.selected_log_file_id.as_deref() != Some(id) {
+            self.selected_log_file_id = Some(id.to_string());
+        }
+        true
     }
 
     pub fn ensure_selected_log_file(&mut self, queue: &FileQueue) -> Option<&str> {
-        let active_files = self.active_log_files(queue);
         let selected_is_active = self
             .selected_log_file_id
             .as_deref()
-            .is_some_and(|selected| active_files.iter().any(|file| file.id == selected));
+            .is_some_and(|selected| {
+                queue
+                    .files()
+                    .iter()
+                    .any(|file| file.id == selected && self.log_file_is_active(file))
+            });
 
         if !selected_is_active {
-            self.selected_log_file_id = active_files.first().map(|file| file.id.clone());
+            self.selected_log_file_id = queue
+                .files()
+                .iter()
+                .find(|file| self.log_file_is_active(file))
+                .map(|file| file.id.clone());
         }
 
         self.selected_log_file_id()
+    }
+
+    fn log_file_is_active(&self, file: &FileItem) -> bool {
+        self.logs.contains_key(&file.id) || file.status != FileStatus::Idle
     }
 
     pub fn apply_conversion_event(&mut self, queue: &mut FileQueue, event: ConversionEvent) {
@@ -419,6 +432,134 @@ mod tests {
         state.ensure_selected_log_file(&queue);
 
         assert_eq!(state.selected_log_file_id(), Some("second"));
+    }
+
+    #[test]
+    fn borrowed_selection_matches_active_rows_for_all_statuses_and_empty_logs() {
+        let mut queue = FileQueue::new();
+        for (id, status) in [
+            ("idle", FileStatus::Idle),
+            ("empty", FileStatus::Idle),
+            ("logged", FileStatus::Idle),
+            ("queued", FileStatus::Queued),
+            ("converting", FileStatus::Converting),
+            ("paused", FileStatus::Paused),
+            ("cancelling", FileStatus::Cancelling),
+            ("completed", FileStatus::Completed),
+            ("error", FileStatus::Error),
+        ] {
+            let mut file = FileItem::from_path(id, "/tmp/source.mp4", 1);
+            file.status = status;
+            queue.add_file(file);
+        }
+        let mut state = ConversionEventState::new();
+        state.logs.insert("empty".into(), Vec::new());
+        state.logs.insert("logged".into(), vec!["line".into()]);
+        state.logs.insert("orphan".into(), vec!["old line".into()]);
+        let active = state.active_log_files(&queue);
+        assert_eq!(
+            active
+                .iter()
+                .map(|file| file.id.as_str())
+                .collect::<Vec<_>>(),
+            [
+                "empty",
+                "logged",
+                "queued",
+                "converting",
+                "paused",
+                "cancelling",
+                "completed",
+                "error"
+            ]
+        );
+        for selected in [
+            None,
+            Some("idle"),
+            Some("empty"),
+            Some("paused"),
+            Some("orphan"),
+            Some("missing"),
+        ] {
+            let mut actual = state.clone();
+            actual.selected_log_file_id = selected.map(str::to_owned);
+            let expected = selected
+                .filter(|id| active.iter().any(|file| file.id == *id))
+                .or_else(|| active.first().map(|file| file.id.as_str()));
+            assert_eq!(actual.ensure_selected_log_file(&queue), expected);
+            for requested in [
+                "idle",
+                "empty",
+                "logged",
+                "queued",
+                "converting",
+                "paused",
+                "cancelling",
+                "completed",
+                "error",
+                "orphan",
+                "missing",
+            ] {
+                let before = actual.selected_log_file_id.clone();
+                let valid = active.iter().any(|file| file.id == requested);
+                assert_eq!(actual.select_log_file(&queue, requested), valid);
+                assert_eq!(
+                    actual.selected_log_file_id(),
+                    if valid {
+                        Some(requested)
+                    } else {
+                        before.as_deref()
+                    }
+                );
+            }
+            assert_eq!(actual.active_log_files(&queue), active);
+        }
+    }
+
+    #[test]
+    fn duplicate_ids_use_any_active_row_and_removal_uses_first_active_queue_order() {
+        let mut queue = FileQueue::new();
+        for (id, status) in [
+            ("duplicate", FileStatus::Idle),
+            ("other", FileStatus::Queued),
+            ("duplicate", FileStatus::Paused),
+        ] {
+            let mut file = FileItem::from_path(id, "/tmp/source.mp4", 1);
+            file.status = status;
+            queue.add_file(file);
+        }
+        let mut state = ConversionEventState::new();
+        assert!(state.select_log_file(&queue, "duplicate"));
+        assert_eq!(state.ensure_selected_log_file(&queue), Some("duplicate"));
+        queue.files_mut()[2].status = FileStatus::Idle;
+        assert_eq!(state.ensure_selected_log_file(&queue), Some("other"));
+        state.logs.insert("duplicate".into(), Vec::new());
+        state.selected_log_file_id = None;
+        assert_eq!(state.ensure_selected_log_file(&queue), Some("duplicate"));
+        assert!(queue.remove_file("duplicate").is_some());
+        assert_eq!(state.ensure_selected_log_file(&queue), Some("duplicate"));
+        assert!(queue.remove_file("duplicate").is_some());
+        assert!(!state.select_log_file(&queue, "duplicate"));
+        assert_eq!(state.ensure_selected_log_file(&queue), Some("other"));
+        assert!(queue.remove_file("other").is_some());
+        assert_eq!(state.ensure_selected_log_file(&queue), None);
+    }
+
+    #[test]
+    fn valid_same_id_and_invalid_selection_keep_the_owned_selection_string() {
+        let queue = queue_with_file(FileStatus::Queued);
+        let mut state = ConversionEventState::new();
+        assert_eq!(state.ensure_selected_log_file(&queue), Some("task-1"));
+        let pointer = state.selected_log_file_id.as_ref().unwrap().as_ptr();
+        for _ in 0..3 {
+            assert_eq!(state.ensure_selected_log_file(&queue), Some("task-1"));
+            assert!(state.select_log_file(&queue, "task-1"));
+            assert!(!state.select_log_file(&queue, "missing"));
+            assert_eq!(
+                state.selected_log_file_id.as_ref().unwrap().as_ptr(),
+                pointer
+            );
+        }
     }
 
     #[test]
