@@ -8,9 +8,8 @@ use crate::preview::{
     PreviewControlInput, PreviewMediaKind, PreviewPlaybackState, TimelineDragTarget,
     preview_control_availability,
 };
-use crate::preview_engine::{PreviewCommand, PreviewEngineError};
+use crate::preview_engine::PreviewCommand;
 use crate::settings::{ConversionConfig, SourceMetadata, apply_trim_times};
-use gpui::prelude::*;
 use gpui::{Bounds, Context, Pixels, Point};
 
 impl FrameRoot {
@@ -83,6 +82,7 @@ impl FrameRoot {
     pub(in crate::app) const fn preview_media_snapshot_sync_blocked(&self) -> bool {
         self.preview_ui.playback.dragging().is_some()
             || self.preview_ui.trim_preview_seek.is_active()
+            || self.preview_ui.media_commands.is_active()
     }
 
     pub(in crate::app) fn apply_preview_timeline_drag(
@@ -218,6 +218,11 @@ impl FrameRoot {
             .dragging()
             .is_some_and(|target| target != TimelineDragTarget::Scrub);
         let end = self.preview_ui.playback.end_drag();
+        if !was_trim_drag {
+            // Discard delayed drag targets before the final precise seek. Any
+            // trim command already executing shares the FIFO and finishes first.
+            self.cancel_trim_preview_seek();
+        }
         let mut changed = self.apply_preview_media_command(end.command, true, cx);
         if let Some(trim) = end.trim {
             changed |= self.update_selected_config(|config| {
@@ -296,44 +301,11 @@ impl FrameRoot {
             return self.apply_preview_command_to_local_state(command);
         };
 
-        let commands = preview_commands_from_playback(command, precise_seek);
-        if !commands.is_empty() {
+        if command != PlaybackMediaCommand::none() {
             if let Some(cx) = cx {
-                self.preview_ui.media_command_generation =
-                    self.preview_ui.media_command_generation.saturating_add(1);
-                let command_generation = self.preview_ui.media_command_generation;
-                cx.spawn(async move |this, cx| {
-                    let result = cx
-                        .background_spawn(async move {
-                            for command in commands {
-                                session.command(command)?;
-                            }
-                            Ok::<(), PreviewEngineError>(())
-                        })
-                        .await;
-
-                    this.update(cx, move |root, cx| {
-                        if root.preview_ui.media_command_generation != command_generation {
-                            return;
-                        }
-                        match result {
-                            Ok(()) => {
-                                if root.preview_ui.failed_runtime_key.is_none() {
-                                    root.preview_ui.runtime_error = None;
-                                }
-                                root.schedule_preview_frame_tick(cx);
-                            }
-                            Err(error) => {
-                                root.preview_ui.runtime_error = Some(error.to_string());
-                            }
-                        }
-                        cx.notify();
-                    })
-                    .ok();
-                })
-                .detach();
+                self.queue_preview_media_command(command, precise_seek, cx);
             } else {
-                for command in commands {
+                for command in preview_commands_from_playback(command, precise_seek) {
                     if let Err(error) = session.command(command) {
                         self.preview_ui.runtime_error = Some(error.to_string());
                         return false;

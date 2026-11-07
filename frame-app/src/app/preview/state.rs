@@ -1,3 +1,4 @@
+use super::actions::PreviewMediaCommandQueue;
 use crate::preview::{
     CropRect, DragHandle, Point as PreviewPoint, PreviewOverlayState, PreviewPlaybackState,
 };
@@ -135,6 +136,7 @@ pub(in crate::app) struct PreviewUiState {
     pub(in crate::app) session: Option<Arc<PreviewSession>>,
     pub(in crate::app) trim_preview_seek: TrimPreviewSeekState,
     pub(in crate::app) media_command_generation: u64,
+    pub(in crate::app) media_commands: PreviewMediaCommandQueue,
     pub(in crate::app) render_generation: u64,
     pub(in crate::app) render_image: Option<Arc<RenderImage>>,
     pub(in crate::app) runtime_error: Option<String>,
@@ -176,6 +178,7 @@ impl Default for PreviewUiState {
             session: None,
             trim_preview_seek: TrimPreviewSeekState::default(),
             media_command_generation: 0,
+            media_commands: PreviewMediaCommandQueue::default(),
             render_generation: 0,
             render_image: None,
             runtime_error: None,

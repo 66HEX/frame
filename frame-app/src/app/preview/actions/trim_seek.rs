@@ -2,10 +2,8 @@ use crate::app::preview::panel::preview_source_media_kind;
 use crate::app::preview::state::{TRIM_PREVIEW_SEEK_INTERVAL, TrimPreviewSeekRequest};
 use crate::app::root::FrameRoot;
 use crate::preview::SourceMediaKind;
-use crate::preview_engine::{PreviewCommand, PreviewEngineError};
+use crate::preview_engine::PreviewEngineError;
 use gpui::Context;
-use gpui::prelude::*;
-use std::sync::Arc;
 
 impl FrameRoot {
     pub(super) fn trim_preview_seek_available(&self) -> bool {
@@ -50,79 +48,35 @@ impl FrameRoot {
     }
 
     pub(super) fn start_trim_preview_seek_worker(&mut self, cx: &Context<Self>) {
-        if self.preview_ui.trim_preview_seek.worker_active {
+        if self.preview_ui.trim_preview_seek.worker_active || self.preview_ui.session.is_none() {
             return;
         }
-        let Some(session) = self.preview_ui.session.clone() else {
+        self.preview_ui.trim_preview_seek.worker_active = true;
+        self.queue_next_trim_preview_seek(self.preview_ui.trim_preview_seek.generation, cx);
+    }
+
+    fn queue_next_trim_preview_seek(&mut self, generation: u64, cx: &Context<Self>) {
+        if self.preview_ui.trim_preview_seek.generation != generation {
+            return;
+        }
+        let Some(request) = self.take_next_trim_preview_seek(generation) else {
+            self.preview_ui.trim_preview_seek.worker_active = false;
             return;
         };
+        // Use the same decoder worker as transport commands. A delayed trim
+        // task can no longer acquire the session mutex after a final Seek/Play.
+        self.queue_trim_media_command(request, generation, cx);
+    }
 
-        self.preview_ui.trim_preview_seek.worker_active = true;
-        let generation = self.preview_ui.trim_preview_seek.generation;
+    pub(super) fn schedule_next_trim_preview_seek(generation: u64, cx: &Context<Self>) {
         cx.spawn(async move |this, cx| {
-            loop {
-                let request = this
-                    .update(cx, |root, _cx| root.take_next_trim_preview_seek(generation))
-                    .ok()
-                    .flatten();
-                let Some(request) = request else {
-                    let should_continue = this
-                        .update(cx, move |root, _cx| {
-                            if root.preview_ui.trim_preview_seek.generation != generation {
-                                return false;
-                            }
-                            if root.preview_ui.trim_preview_seek.pending_seconds.is_some() {
-                                return true;
-                            }
-                            root.preview_ui.trim_preview_seek.worker_active = false;
-                            false
-                        })
-                        .unwrap_or(false);
-                    if should_continue {
-                        continue;
-                    }
-                    break;
-                };
-
-                let generation_matches = this
-                    .update(cx, move |root, _cx| {
-                        root.preview_ui.trim_preview_seek.generation == generation
-                    })
-                    .unwrap_or(false);
-                if !generation_matches {
-                    break;
-                }
-
-                let result = cx
-                    .background_spawn({
-                        let session = Arc::clone(&session);
-                        async move {
-                            if request.pause_first {
-                                session.command(PreviewCommand::Pause)?;
-                            }
-                            session.command(PreviewCommand::SeekPrecise(request.seconds))
-                        }
-                    })
-                    .await;
-
-                let should_stop = this
-                    .update(cx, move |root, cx| {
-                        root.finish_trim_preview_seek_request(
-                            generation,
-                            request.seconds,
-                            result,
-                            cx,
-                        )
-                    })
-                    .unwrap_or(true);
-                if should_stop {
-                    break;
-                }
-
-                cx.background_executor()
-                    .timer(TRIM_PREVIEW_SEEK_INTERVAL)
-                    .await;
-            }
+            cx.background_executor()
+                .timer(TRIM_PREVIEW_SEEK_INTERVAL)
+                .await;
+            this.update(cx, |root, cx| {
+                root.queue_next_trim_preview_seek(generation, cx);
+            })
+            .ok();
         })
         .detach();
     }

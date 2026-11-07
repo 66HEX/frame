@@ -188,6 +188,7 @@ impl FrameRoot {
             self.preview_ui.runtime_request_generation.wrapping_add(1);
         self.preview_ui.media_command_generation =
             self.preview_ui.media_command_generation.wrapping_add(1);
+        self.preview_ui.media_commands.reset();
         self.preview_ui.trim_preview_seek.reset();
         self.preview_ui.render_generation = 0;
         self.preview_ui.runtime_error = None;
