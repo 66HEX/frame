@@ -156,7 +156,11 @@ pub(super) fn settings_audio_filters_reset_all(
     frame_text_button(
         "settings-audio-filters-reset-all",
         "Reset audio filters",
-        ButtonVariant::Secondary,
+        if palette.is_light() {
+            ButtonVariant::Accent
+        } else {
+            ButtonVariant::Secondary
+        },
         false,
         !disabled,
         palette,

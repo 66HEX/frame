@@ -5,6 +5,7 @@ use super::{
     frame_select_options_list, frame_select_popover, frame_select_scrollbar,
     frame_select_target_index, frame_select_trigger_with_focus,
 };
+use crate::app::primitives::ButtonVariant;
 use crate::app::root::FrameRoot;
 use crate::theme;
 use gpui::prelude::*;
@@ -35,6 +36,7 @@ pub(in crate::app) struct FrameSelectProps<'a> {
     pub open: bool,
     pub rendered: bool,
     pub progress: f32,
+    pub trigger_variant: ButtonVariant,
     pub trigger_focus: Option<&'a FocusHandle>,
     pub panel_focus: Option<&'a FocusHandle>,
     pub scroll: &'a ScrollHandle,
@@ -122,6 +124,7 @@ pub(in crate::app) fn frame_select_control(
         open,
         rendered,
         progress,
+        trigger_variant,
         trigger_focus,
         panel_focus,
         scroll,
@@ -180,6 +183,7 @@ pub(in crate::app) fn frame_select_control(
         id,
         label,
         display,
+        trigger_variant,
         enabled,
         open,
         &trigger_focus,

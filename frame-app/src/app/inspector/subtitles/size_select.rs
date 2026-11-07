@@ -3,6 +3,7 @@ use crate::app::components::{
 };
 use crate::app::inspector::subtitles::popover::subtitle_popover_progress;
 use crate::app::inspector::subtitles::view::SettingsSubtitleFontSizeSelectState;
+use crate::app::primitives::ButtonVariant;
 use crate::app::root::FrameRoot;
 use crate::settings::{apply_subtitle_font_size, subtitle_font_size_options};
 use gpui::{Context, ParentElement, Window};
@@ -59,6 +60,11 @@ pub(super) fn settings_subtitle_font_size_select(
                 open,
                 rendered: state.rendered_popover == Some(popover),
                 progress,
+                trigger_variant: if state.palette.is_light() {
+                    ButtonVariant::Accent
+                } else {
+                    ButtonVariant::Outline
+                },
                 trigger_focus: state.focuses.trigger,
                 panel_focus: state.focuses.panel,
                 scroll: state.scroll_handle,

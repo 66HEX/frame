@@ -20,7 +20,7 @@ use crate::app::inspector::subtitles::state::{
     SettingsSubtitleColorTarget, SettingsSubtitleHsv, SettingsSubtitlePopover,
 };
 use crate::app::inspector::subtitles::view::SettingsSubtitleColorFieldSpec;
-use crate::app::primitives::color;
+use crate::app::primitives::{ButtonVariant, color};
 use crate::app::root::FrameRoot;
 use crate::theme;
 use gpui::prelude::*;
@@ -140,11 +140,17 @@ pub(super) fn settings_subtitle_color_field(
     let click_value = value.clone();
     let key_value = value.clone();
     let trigger_content = frame_color_select_value(&value, palette);
+    let trigger_variant = if palette.is_light() {
+        ButtonVariant::Accent
+    } else {
+        ButtonVariant::Outline
+    };
     let trigger = if let Some(focus) = popover_focuses.trigger {
         frame_select_trigger_content_with_focus(
             id,
             label,
             trigger_content,
+            trigger_variant,
             enabled,
             active_popover == Some(popover),
             focus,
@@ -157,6 +163,7 @@ pub(super) fn settings_subtitle_color_field(
             id,
             label,
             trigger_content,
+            trigger_variant,
             enabled,
             active_popover == Some(popover),
             palette,

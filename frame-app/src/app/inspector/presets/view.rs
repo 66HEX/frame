@@ -94,7 +94,11 @@ fn settings_save_preset_button(
     frame_text_button(
         "settings-save-preset",
         "Save",
-        ButtonVariant::Secondary,
+        if palette.is_light() {
+            ButtonVariant::Accent
+        } else {
+            ButtonVariant::Secondary
+        },
         false,
         enabled,
         palette,

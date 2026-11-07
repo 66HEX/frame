@@ -31,6 +31,7 @@ pub(in crate::app) fn frame_select_trigger_with_focus(
     id: impl Into<String>,
     label: impl Into<String>,
     display: &str,
+    variant: ButtonVariant,
     enabled: bool,
     expanded: bool,
     focus: &FocusHandle,
@@ -47,6 +48,7 @@ pub(in crate::app) fn frame_select_trigger_with_focus(
             .truncate()
             .text_color(color(palette.text_primary))
             .child(theme::ui_text(display)),
+        variant,
         enabled,
         expanded,
         Some(focus),
@@ -64,6 +66,7 @@ pub(in crate::app) fn frame_select_trigger_content(
     id: impl Into<String>,
     label: impl Into<String>,
     content: impl IntoElement,
+    variant: ButtonVariant,
     enabled: bool,
     expanded: bool,
     palette: &'static theme::ThemePalette,
@@ -71,7 +74,7 @@ pub(in crate::app) fn frame_select_trigger_content(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     frame_select_trigger_content_inner(
-        id, label, content, enabled, expanded, None, palette, window, cx,
+        id, label, content, variant, enabled, expanded, None, palette, window, cx,
     )
 }
 
@@ -83,6 +86,7 @@ pub(in crate::app) fn frame_select_trigger_content_with_focus(
     id: impl Into<String>,
     label: impl Into<String>,
     content: impl IntoElement,
+    variant: ButtonVariant,
     enabled: bool,
     expanded: bool,
     focus: &FocusHandle,
@@ -94,6 +98,7 @@ pub(in crate::app) fn frame_select_trigger_content_with_focus(
         id,
         label,
         content,
+        variant,
         enabled,
         expanded,
         Some(focus),
@@ -111,6 +116,7 @@ fn frame_select_trigger_content_inner(
     id: impl Into<String>,
     label: impl Into<String>,
     content: impl IntoElement,
+    variant: ButtonVariant,
     enabled: bool,
     expanded: bool,
     focus: Option<&FocusHandle>,
@@ -120,9 +126,7 @@ fn frame_select_trigger_content_inner(
 ) -> gpui::Stateful<gpui::Div> {
     let id = id.into();
     let label = label.into();
-    let mut colors = button_colors(ButtonVariant::Outline, false, enabled, palette);
-    colors.background = palette.fill_subtle;
-    colors.hover_background = palette.secondary_hover;
+    let colors = button_colors(variant, false, enabled, palette);
     let trigger = div()
         .id(id.clone())
         .debug_selector(|| id.clone())

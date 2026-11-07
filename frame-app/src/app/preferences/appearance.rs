@@ -6,7 +6,7 @@ use crate::app::inspector::{settings_field_label, settings_hint_text, settings_s
 use crate::app::motion::{motion_is_hidden, surface_motion};
 use crate::app::preferences::state::AppearancePopover;
 use crate::app::preferences::view::AppSettingsSelectFocuses;
-use crate::app::primitives::color;
+use crate::app::primitives::{ButtonVariant, color};
 use crate::app::root::FrameRoot;
 use crate::appearance::{AppearanceSettings, ColorTheme, ScalePreset};
 use crate::theme;
@@ -196,6 +196,7 @@ pub(in crate::app) fn app_settings_appearance_select<T: AppSettingsAppearanceVal
                 open: popover_state.is_open(),
                 rendered: popover_state.is_rendered(),
                 progress,
+                trigger_variant: ButtonVariant::Outline,
                 trigger_focus: Some(focuses.trigger),
                 panel_focus: Some(focuses.panel),
                 scroll: scroll_handle,

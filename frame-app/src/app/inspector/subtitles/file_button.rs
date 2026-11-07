@@ -24,7 +24,11 @@ pub(super) fn settings_subtitle_file_button(
     frame_text_button_inner(
         id,
         label,
-        ButtonVariant::Outline,
+        if palette.is_light() {
+            ButtonVariant::Accent
+        } else {
+            ButtonVariant::Outline
+        },
         false,
         enabled,
         focus,

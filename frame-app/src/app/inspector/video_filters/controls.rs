@@ -193,7 +193,11 @@ pub(super) fn settings_video_filters_reset_all(
     frame_text_button(
         "settings-video-filters-reset-all",
         "Reset video filters",
-        ButtonVariant::Secondary,
+        if palette.is_light() {
+            ButtonVariant::Accent
+        } else {
+            ButtonVariant::Secondary
+        },
         false,
         !disabled,
         palette,

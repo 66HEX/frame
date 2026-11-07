@@ -1,7 +1,7 @@
 //! A select with local disclosure state and controlled application values.
 //! Every settings field uses the same trigger, menu, typeahead and motion.
 use super::{FrameSelectItem, FrameSelectProps, frame_select_control};
-use crate::app::{motion, root::FrameRoot};
+use crate::app::{motion, primitives::ButtonVariant, root::FrameRoot};
 use crate::theme;
 use gpui::{Context, FocusHandle, ScrollHandle, Window};
 use std::rc::Rc;
@@ -116,6 +116,11 @@ pub(in crate::app) fn frame_select_field(
             open,
             rendered: open || !motion::motion_is_hidden(progress),
             progress,
+            trigger_variant: if palette.is_light() {
+                ButtonVariant::Accent
+            } else {
+                ButtonVariant::Outline
+            },
             trigger_focus: Some(&focus),
             panel_focus: None,
             scroll: &scroll,

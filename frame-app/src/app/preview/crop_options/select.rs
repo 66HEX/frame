@@ -4,6 +4,7 @@ use crate::app::preview::panel::{
     PreviewCropOptionsProps, PreviewEditToolbarFocus, PreviewShellState,
 };
 use crate::app::preview::state::CropSelect;
+use crate::app::primitives::ButtonVariant;
 use crate::app::root::FrameRoot;
 use crate::preview::ASPECT_OPTIONS;
 use crate::theme;
@@ -97,6 +98,7 @@ pub(super) fn crop_select(
                 open,
                 rendered: open || !motion_is_hidden(progress),
                 progress,
+                trigger_variant: ButtonVariant::Outline,
                 trigger_focus: Some(focus),
                 panel_focus: None,
                 scroll: props.scroll,
