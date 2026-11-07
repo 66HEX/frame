@@ -1,5 +1,8 @@
 use crate::preview_engine::error::PreviewEngineError;
 use crate::preview_engine::ffmpeg_backend::audio_drain::AudioDrainOutcome;
+use crate::preview_engine::ffmpeg_backend::audio_exit::{
+    AUDIO_EXIT_TIMEOUT, AudioExitOutcome, AudioProcessExit,
+};
 use crate::preview_engine::ffmpeg_backend::audio_output::{
     AudioOutputSpec, AudioPreviewOutput, lock_audio_buffer, push_audio_sample_bytes,
 };
@@ -10,7 +13,7 @@ use crate::preview_engine::ffmpeg_backend::clock::{
 use crate::preview_engine::ffmpeg_backend::plan::preview_audio_plan;
 use crate::preview_engine::ffmpeg_backend::process::{
     ProcessHandles, RunningPreviewProcess, RunningProcessState, lock_process, push_stderr_line,
-    spawn_stderr_worker, stop_process_handles,
+    spawn_stderr_worker_with_completion, stop_process_handles,
 };
 use crate::preview_engine::metrics::PreviewRuntimeMetricsStore;
 use crate::preview_engine::types::PreviewSessionConfig;
@@ -38,7 +41,15 @@ pub(super) struct AudioStdoutWorkerConfig {
     pub(super) mark_ended_on_eof: bool,
     pub(super) generation: u64,
     pub(super) prebuffer_samples: usize,
-    pub(super) ready_tx: mpsc::Sender<AudioStartStatus>,
+    pub(super) ready_tx: mpsc::Sender<AudioWorkerStatus>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum AudioWorkerStatus {
+    Ready,
+    ReadyAtEof,
+    OutputDisabled,
+    Failed,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -46,12 +57,14 @@ pub(super) enum AudioStartStatus {
     Ready,
     OutputDisabled,
     TimedOut,
+    Failed,
 }
 
 pub(super) enum PendingAudioStart {
     Waiting {
         generation: u64,
-        ready_rx: mpsc::Receiver<AudioStartStatus>,
+        ready_rx: mpsc::Receiver<AudioWorkerStatus>,
+        exit: Arc<AudioProcessExit>,
     },
     OutputDisabled,
 }
@@ -155,8 +168,12 @@ impl RunningPreviewProcess {
             Arc::clone(&self.playback),
             Arc::clone(&self.playback_changed),
         ));
+        let exit = Arc::new(AudioProcessExit::new(
+            Arc::clone(&stop_requested),
+            Arc::clone(&self.stderr),
+        ));
         let (ready_tx, ready_rx) = mpsc::channel();
-        let stdout_worker = spawn_audio_stdout_worker(
+        let stdout_worker = match spawn_audio_stdout_worker(
             stdout,
             AudioStdoutWorkerConfig {
                 stderr_lines: Arc::clone(&self.stderr),
@@ -169,11 +186,32 @@ impl RunningPreviewProcess {
                 prebuffer_samples: audio_prebuffer_samples(output_spec),
                 ready_tx,
             },
-        )?;
-        let stderr_worker = match spawn_stderr_worker(
+        ) {
+            Ok(worker) => worker,
+            Err(error) => {
+                let _ = stop_process_handles(ProcessHandles {
+                    child: Some(child),
+                    stdout_worker: None,
+                    stderr_worker: None,
+                    stop_requested: Some(stop_requested),
+                    audio_start: Some(audio_start),
+                    audio_exit: Some(exit),
+                });
+                return Err(error);
+            }
+        };
+        // EOF can precede installation of the handles. The observer must not
+        // interpret that interval as cancellation or inspect a previous child.
+        let (registered_tx, registered_rx) = mpsc::channel();
+        let observer_exit = Arc::clone(&exit);
+        let observer_process = Arc::clone(&self.audio_process);
+        let stderr_worker = match spawn_stderr_worker_with_completion(
             stderr,
             Arc::clone(&self.stderr),
             Arc::clone(&stop_requested),
+            move || {
+                observer_exit.observe_after_registration(&observer_process, &registered_rx);
+            },
         ) {
             Ok(worker) => worker,
             Err(error) => {
@@ -183,6 +221,7 @@ impl RunningPreviewProcess {
                     stderr_worker: None,
                     stop_requested: Some(stop_requested),
                     audio_start: Some(audio_start),
+                    audio_exit: Some(exit),
                 });
                 return Err(error);
             }
@@ -195,27 +234,63 @@ impl RunningPreviewProcess {
             stderr_worker: Some(stderr_worker),
             stop_requested: Some(stop_requested),
             audio_start: Some(audio_start),
+            audio_exit: Some(Arc::clone(&exit)),
         };
         drop(state);
+        let _ = registered_tx.send(());
         Ok(PendingAudioStart::Waiting {
             generation,
             ready_rx,
+            exit,
         })
     }
 
     pub(super) fn finish_audio_start(&self, pending: PendingAudioStart) -> AudioStartStatus {
-        let PendingAudioStart::Waiting { ready_rx, .. } = pending else {
+        let PendingAudioStart::Waiting {
+            generation,
+            ready_rx,
+            exit,
+        } = pending
+        else {
             return AudioStartStatus::OutputDisabled;
         };
-        let status = wait_for_audio_start(&ready_rx);
-        if status != AudioStartStatus::TimedOut {
+        let status = match ready_rx.recv_timeout(AUDIO_START_READY_TIMEOUT) {
+            Ok(AudioWorkerStatus::Ready) => AudioStartStatus::Ready,
+            Ok(AudioWorkerStatus::ReadyAtEof) => {
+                match exit.wait_for_exit(&self.audio_process, AUDIO_EXIT_TIMEOUT) {
+                    AudioExitOutcome::Exited(status) if status.success() => AudioStartStatus::Ready,
+                    _ => AudioStartStatus::Failed,
+                }
+            }
+            Ok(AudioWorkerStatus::OutputDisabled) => AudioStartStatus::OutputDisabled,
+            Ok(AudioWorkerStatus::Failed) | Err(mpsc::RecvTimeoutError::Disconnected) => {
+                AudioStartStatus::Failed
+            }
+            Err(mpsc::RecvTimeoutError::Timeout) => AudioStartStatus::TimedOut,
+        };
+        if matches!(
+            status,
+            AudioStartStatus::Ready | AudioStartStatus::OutputDisabled
+        ) {
             return status;
         }
         push_stderr_line(
             &self.stderr,
-            "audio preview start readiness timed out".to_string(),
+            if status == AudioStartStatus::TimedOut {
+                "audio preview start readiness timed out"
+            } else {
+                "audio preview start failed"
+            }
+            .to_string(),
         );
-        let _ = self.stop_audio_process();
+        // A cancelled, older proof must never stop the replacement child.
+        let handles = self.take_audio_handles_for_exit(&exit);
+        if let Some(handles) = handles {
+            if let Some(start) = &handles.audio_start {
+                start.mark_output_failed((!self.has_visual_stream()).then_some(generation));
+            }
+            let _ = stop_process_handles(handles);
+        }
         status
     }
 
@@ -276,14 +351,6 @@ pub(super) fn audio_prebuffer_samples(output: AudioOutputSpec) -> usize {
     samples_per_second.saturating_mul(usize::try_from(AUDIO_PREBUFFER_MS).unwrap_or(30)) / 1_000
 }
 
-pub(super) fn wait_for_audio_start(
-    receiver: &mpsc::Receiver<AudioStartStatus>,
-) -> AudioStartStatus {
-    receiver
-        .recv_timeout(AUDIO_START_READY_TIMEOUT)
-        .unwrap_or(AudioStartStatus::TimedOut)
-}
-
 #[expect(
     clippy::too_many_lines,
     reason = "PCM reading coordinates readiness, cancellable playback start, and output drain in one worker."
@@ -309,7 +376,7 @@ pub(super) fn spawn_audio_stdout_worker(
                         &config.stderr_lines,
                         format!("audio preview output disabled: {error}"),
                     );
-                    let _ = config.ready_tx.send(AudioStartStatus::OutputDisabled);
+                    let _ = config.ready_tx.send(AudioWorkerStatus::OutputDisabled);
                     None
                 }
             };
@@ -359,7 +426,7 @@ pub(super) fn spawn_audio_stdout_worker(
                             );
                             queued_for_prebuffer = queued_for_prebuffer.saturating_add(samples);
                             if !ready_sent && queued_for_prebuffer >= config.prebuffer_samples {
-                                let _ = config.ready_tx.send(AudioStartStatus::Ready);
+                                let _ = config.ready_tx.send(AudioWorkerStatus::Ready);
                                 ready_sent = true;
                             }
                             if ready_sent && !output_started {
@@ -403,8 +470,35 @@ pub(super) fn spawn_audio_stdout_worker(
                 }
             }
 
+            if pipe_exhausted
+                && (!pending.is_empty() || queued_for_prebuffer == 0)
+                && let Some(output) = &output
+            {
+                let message = if pending.is_empty() {
+                    "audio preview ended without a complete PCM frame"
+                } else {
+                    "audio preview ended with an incomplete PCM frame"
+                };
+                output.context.fail(message.into());
+                pipe_exhausted = false;
+            }
             if !ready_sent {
-                let _ = config.ready_tx.send(AudioStartStatus::TimedOut);
+                if pipe_exhausted && let Some(output) = &output {
+                    let _ = config.ready_tx.send(AudioWorkerStatus::ReadyAtEof);
+                    // The caller verifies decoder success before starting the
+                    // clock. Until then the complete short clip stays parked.
+                    if wait_for_playback_start(
+                        &config.audio_start,
+                        &config.stop_requested,
+                        config.generation,
+                    ) == PlaybackStreamState::Ready
+                        && output.play().is_ok()
+                    {
+                        output_started = true;
+                    }
+                } else {
+                    let _ = config.ready_tx.send(AudioWorkerStatus::Failed);
+                }
             }
             let drained = pipe_exhausted
                 && output_started

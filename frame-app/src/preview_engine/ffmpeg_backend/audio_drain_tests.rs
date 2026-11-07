@@ -477,7 +477,7 @@ impl Read for FailingReader {
 #[ignore = "requires a default audio output device; run with --ignored"]
 fn audio_stdout_read_errors_fail_after_ready_without_publishing_eof() {
     use super::audio_stream::{
-        AudioStartStatus, AudioStdoutWorkerConfig, audio_prebuffer_samples,
+        AudioStdoutWorkerConfig, AudioWorkerStatus, audio_prebuffer_samples,
         spawn_audio_stdout_worker,
     };
 
@@ -525,7 +525,7 @@ fn audio_stdout_read_errors_fail_after_ready_without_publishing_eof() {
                 ready_rx
                     .recv_timeout(Duration::from_secs(3))
                     .expect("ready watchdog"),
-                AudioStartStatus::Ready
+                AudioWorkerStatus::Ready
             );
             lock_playback(&context.playback).start_generation(1, 0.0);
             context.start.notify_output_changed();

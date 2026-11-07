@@ -1,4 +1,5 @@
 use crate::preview_engine::error::PreviewEngineError;
+use crate::preview_engine::ffmpeg_backend::audio_exit::AudioProcessExit;
 use crate::preview_engine::ffmpeg_backend::audio_stream::{
     AudioStartStatus, PendingAudioStart, lock_pending_audio_start,
 };
@@ -31,7 +32,7 @@ pub struct RunningPreviewProcess {
     pub(super) metrics: PreviewRuntimeMetricsStore,
     pub(super) executable: String,
     pub(super) process: Mutex<RunningProcessState>,
-    pub(super) audio_process: Mutex<RunningProcessState>,
+    pub(super) audio_process: Arc<Mutex<RunningProcessState>>,
     pub(super) pending_audio_start: Mutex<Option<PendingAudioStart>>,
     pub(super) playback: Arc<Mutex<PreviewPlaybackClock>>,
     pub(super) playback_changed: Arc<Condvar>,
@@ -47,6 +48,7 @@ pub(super) struct RunningProcessState {
     pub(super) stderr_worker: Option<JoinHandle<()>>,
     pub(super) stop_requested: Option<Arc<AtomicBool>>,
     pub(super) audio_start: Option<Arc<AudioPlaybackStart>>,
+    pub(super) audio_exit: Option<Arc<AudioProcessExit>>,
 }
 
 pub(super) struct ProcessHandles {
@@ -55,6 +57,7 @@ pub(super) struct ProcessHandles {
     pub(super) stderr_worker: Option<JoinHandle<()>>,
     pub(super) stop_requested: Option<Arc<AtomicBool>>,
     pub(super) audio_start: Option<Arc<AudioPlaybackStart>>,
+    pub(super) audio_exit: Option<Arc<AudioProcessExit>>,
 }
 
 impl RunningPreviewProcess {
@@ -206,10 +209,13 @@ impl RunningPreviewProcess {
             let generation = self.prepare_playback_generation(seconds);
             if playing {
                 let status = self.start_audio_streaming(seconds, precise, true, generation)?;
-                if status == AudioStartStatus::TimedOut {
-                    return Err(PreviewEngineError::Audio(
-                        "audio preview start readiness timed out".to_string(),
-                    ));
+                if matches!(
+                    status,
+                    AudioStartStatus::TimedOut | AudioStartStatus::Failed
+                ) {
+                    return Err(PreviewEngineError::Audio(format!(
+                        "audio preview start failed: {status:?}"
+                    )));
                 }
                 self.start_playback_generation(generation, seconds);
             } else {
@@ -235,7 +241,7 @@ impl RunningPreviewProcess {
             metrics,
             executable,
             process: Mutex::new(RunningProcessState::default()),
-            audio_process: Mutex::new(RunningProcessState::default()),
+            audio_process: Arc::new(Mutex::new(RunningProcessState::default())),
             pending_audio_start: Mutex::new(None),
             playback: Arc::new(Mutex::new(PreviewPlaybackClock {
                 generation: 0,
@@ -284,6 +290,27 @@ impl RunningPreviewProcess {
         stop_process_handles(handles)
     }
 
+    pub(super) fn take_audio_handles_for_exit(
+        &self,
+        exit: &Arc<AudioProcessExit>,
+    ) -> Option<ProcessHandles> {
+        let mut state = lock_process(&self.audio_process);
+        if !state
+            .audio_exit
+            .as_ref()
+            .is_some_and(|current| Arc::ptr_eq(current, exit))
+        {
+            return None;
+        }
+        let update = state.record_audio_exit();
+        let handles = state.take_handles();
+        drop(state);
+        if let Some((exit, update)) = update {
+            exit.publish(update);
+        }
+        Some(handles)
+    }
+
     pub(super) fn reap_finished_processes(&self) {
         let video_finished = self.reap_finished_process(&self.process, true);
         if video_finished {
@@ -304,9 +331,13 @@ impl RunningPreviewProcess {
         let Some(child) = state.child.as_mut() else {
             return false;
         };
-        let Ok(Some(_status)) = child.try_wait() else {
+        let Ok(Some(status)) = child.try_wait() else {
             return false;
         };
+        let exit_update = state
+            .audio_exit
+            .as_ref()
+            .map(|exit| (Arc::clone(exit), exit.record_exit(status)));
 
         // A finished audio child can leave a live worker with prewarmed or
         // buffered PCM. Keep its handles and Ready message until the consumer
@@ -317,6 +348,10 @@ impl RunningPreviewProcess {
                 .as_ref()
                 .is_some_and(|worker| !worker.is_finished())
         {
+            drop(state);
+            if let Some((exit, update)) = exit_update {
+                exit.publish(update);
+            }
             return false;
         }
 
@@ -324,8 +359,13 @@ impl RunningPreviewProcess {
         let stdout_worker = state.stdout_worker.take();
         let stderr_worker = state.stderr_worker.take();
         state.audio_start = None;
+        state.audio_exit = None;
         state.stop_requested = None;
         drop(state);
+
+        if let Some((exit, update)) = exit_update {
+            exit.publish(update);
+        }
 
         join_worker(stdout_worker);
         join_worker(stderr_worker);
@@ -343,6 +383,18 @@ impl RunningPreviewProcess {
 }
 
 pub(super) fn stop_process_handles(handles: ProcessHandles) -> Result<(), PreviewEngineError> {
+    // Classify a child that already exited before requesting intentional stop.
+    // A kill performed below must never become a decoder-failure diagnostic.
+    let mut child = handles.child;
+    let already_exited = child
+        .as_mut()
+        .and_then(|child| child.try_wait().ok())
+        .flatten();
+    if let Some(status) = already_exited
+        && let Some(exit) = &handles.audio_exit
+    {
+        exit.publish(exit.record_exit(status));
+    }
     if let Some(stop_requested) = &handles.stop_requested {
         if let Some(start) = &handles.audio_start {
             start.request_stop(stop_requested);
@@ -350,25 +402,52 @@ pub(super) fn stop_process_handles(handles: ProcessHandles) -> Result<(), Previe
             stop_requested.store(true, Ordering::SeqCst);
         }
     }
-    if let Some(mut child) = handles.child {
-        if child.try_wait().map_err(PreviewEngineError::Io)?.is_none() {
-            child.kill().map_err(PreviewEngineError::Io)?;
+    if let Some(exit) = &handles.audio_exit {
+        exit.cancel();
+    }
+    let mut result = Ok(());
+    if let Some(mut child) = child {
+        if already_exited.is_none()
+            && let Err(error) = child.kill()
+        {
+            result = Err(PreviewEngineError::Io(error));
         }
         let _ = child.wait();
     }
     join_worker(handles.stdout_worker);
     join_worker(handles.stderr_worker);
-    Ok(())
+    result
 }
 
 pub(super) fn take_process_handles(process: &Mutex<RunningProcessState>) -> ProcessHandles {
     let mut state = lock_process(process);
-    ProcessHandles {
-        child: state.child.take(),
-        stdout_worker: state.stdout_worker.take(),
-        stderr_worker: state.stderr_worker.take(),
-        stop_requested: state.stop_requested.take(),
-        audio_start: state.audio_start.take(),
+    let update = state.record_audio_exit();
+    let handles = state.take_handles();
+    drop(state);
+    if let Some((exit, update)) = update {
+        exit.publish(update);
+    }
+    handles
+}
+
+impl RunningProcessState {
+    fn record_audio_exit(
+        &mut self,
+    ) -> Option<(Arc<AudioProcessExit>, super::audio_exit::AudioExitUpdate)> {
+        let exit = self.audio_exit.as_ref()?;
+        let status = self.child.as_mut()?.try_wait().ok()??;
+        Some((Arc::clone(exit), exit.record_exit(status)))
+    }
+
+    pub(super) const fn take_handles(&mut self) -> ProcessHandles {
+        ProcessHandles {
+            child: self.child.take(),
+            stdout_worker: self.stdout_worker.take(),
+            stderr_worker: self.stderr_worker.take(),
+            stop_requested: self.stop_requested.take(),
+            audio_start: self.audio_start.take(),
+            audio_exit: self.audio_exit.take(),
+        }
     }
 }
 
@@ -408,6 +487,15 @@ pub(super) fn spawn_stderr_worker(
     lines: Arc<Mutex<VecDeque<String>>>,
     stop_requested: Arc<AtomicBool>,
 ) -> Result<JoinHandle<()>, PreviewEngineError> {
+    spawn_stderr_worker_with_completion(stderr, lines, stop_requested, || {})
+}
+
+pub(super) fn spawn_stderr_worker_with_completion(
+    stderr: impl Read + Send + 'static,
+    lines: Arc<Mutex<VecDeque<String>>>,
+    stop_requested: Arc<AtomicBool>,
+    on_complete: impl FnOnce() + Send + 'static,
+) -> Result<JoinHandle<()>, PreviewEngineError> {
     thread::Builder::new()
         .name("frame-preview-ffmpeg-stderr".to_string())
         .spawn(move || {
@@ -421,6 +509,7 @@ pub(super) fn spawn_stderr_worker(
                 };
                 push_stderr_line(&lines, line);
             }
+            on_complete();
         })
         .map_err(|err| PreviewEngineError::Ffmpeg(format!("failed to spawn stderr worker: {err}")))
 }

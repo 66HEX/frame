@@ -1,5 +1,7 @@
 #[cfg(unix)]
-use super::audio_stream::{AudioStartStatus, PendingAudioStart, lock_pending_audio_start};
+use super::audio_stream::{
+    AudioStartStatus, AudioWorkerStatus, PendingAudioStart, lock_pending_audio_start,
+};
 use super::clock::{
     AudioPlaybackStart, PlaybackStreamState, lock_playback, wait_for_playback_start,
 };
@@ -200,10 +202,14 @@ fn reaping_exited_child_preserves_parked_audio_until_play() {
     waiter.install(&process);
     lock_process(&process.audio_process).child = Some(exited_child());
     let (ready_tx, ready_rx) = mpsc::channel();
-    ready_tx.send(AudioStartStatus::Ready).unwrap();
+    ready_tx.send(AudioWorkerStatus::Ready).unwrap();
     *lock_pending_audio_start(&process.pending_audio_start) = Some(PendingAudioStart::Waiting {
         generation: 0,
         ready_rx,
+        exit: Arc::new(super::audio_exit::AudioProcessExit::new(
+            Arc::clone(&waiter.stop),
+            Arc::clone(&process.stderr),
+        )),
     });
     let (done_tx, done) = mpsc::channel();
     let reaper_process = Arc::clone(&process);

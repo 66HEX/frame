@@ -111,17 +111,19 @@ fn ffmpeg_audio_drain_preserves_all_samples_for_normal_short_sources() {
 
 #[test]
 #[ignore = "requires FFmpeg and a default audio output device; run with --ignored"]
-fn ffmpeg_audio_below_prebuffer_retains_existing_readiness_failure() {
+fn ffmpeg_audio_below_prebuffer_plays_every_complete_sample() {
     for milliseconds in [10, 20] {
         let path = audio_fixture(milliseconds);
         let config = audio_config(path.clone(), milliseconds);
         with_watchdog(move || {
             let session = PreviewSession::start(config).expect("short audio session");
-            let error = session
+            session
                 .command(PreviewCommand::Play)
-                .expect_err("short readiness remains separate");
-            assert!(error.to_string().contains("readiness timed out"));
-            assert_eq!(session.snapshot().runtime_metrics.audio_samples_consumed, 0);
+                .expect("short audio Play");
+            wait_for_end(&session);
+            let metrics = session.snapshot().runtime_metrics;
+            assert!(metrics.audio_samples_queued > 0);
+            assert_eq!(metrics.audio_samples_consumed, metrics.audio_samples_queued);
             session.stop().expect("stop short audio");
         });
         let _ = std::fs::remove_file(path);

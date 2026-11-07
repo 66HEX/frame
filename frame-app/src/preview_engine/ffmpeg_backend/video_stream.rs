@@ -54,10 +54,13 @@ impl RunningPreviewProcess {
             self.stop_running_processes()?;
             let generation = self.prepare_playback_generation(seconds);
             let status = self.start_audio_streaming(seconds, precise, true, generation)?;
-            if status == AudioStartStatus::TimedOut {
-                return Err(PreviewEngineError::Audio(
-                    "audio preview start readiness timed out".to_string(),
-                ));
+            if matches!(
+                status,
+                AudioStartStatus::TimedOut | AudioStartStatus::Failed
+            ) {
+                return Err(PreviewEngineError::Audio(format!(
+                    "audio preview start failed: {status:?}"
+                )));
             }
             self.start_playback_generation(generation, seconds);
             return Ok(());
@@ -115,10 +118,10 @@ impl RunningPreviewProcess {
         if let Some(pending_audio) = pending_audio {
             match self.finish_audio_start(pending_audio) {
                 AudioStartStatus::Ready | AudioStartStatus::OutputDisabled => {}
-                AudioStartStatus::TimedOut => {
+                AudioStartStatus::TimedOut | AudioStartStatus::Failed => {
                     push_stderr_line(
                         &self.stderr,
-                        "audio preview disabled: start readiness timed out".to_string(),
+                        "audio preview disabled: start failed".to_string(),
                     );
                 }
             }
@@ -159,6 +162,7 @@ impl RunningPreviewProcess {
                     stderr_worker: Some(stream.stderr_worker),
                     stop_requested: Some(stream.stop_requested),
                     audio_start: None,
+                    audio_exit: None,
                 };
                 let _ = stop_process_handles(handles);
                 let _ = self.stop_audio_process();
@@ -173,6 +177,7 @@ impl RunningPreviewProcess {
             stderr_worker: Some(stream.stderr_worker),
             stop_requested: Some(stream.stop_requested),
             audio_start: None,
+            audio_exit: None,
         };
         drop(state);
 
@@ -280,6 +285,7 @@ pub(super) fn stop_spawned_video_stream(
         stderr_worker: Some(stream.stderr_worker),
         stop_requested: Some(stream.stop_requested),
         audio_start: None,
+        audio_exit: None,
     })
 }
 

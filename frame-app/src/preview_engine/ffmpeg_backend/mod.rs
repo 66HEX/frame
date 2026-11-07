@@ -32,6 +32,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 mod audio_drain;
+mod audio_exit;
 mod audio_output;
 mod audio_stream;
 mod clock;
@@ -42,6 +43,8 @@ mod video_stream;
 
 #[cfg(test)]
 mod audio_drain_tests;
+#[cfg(all(test, unix))]
+mod audio_exit_tests;
 #[cfg(test)]
 mod playback_start_tests;
 #[cfg(test)]
