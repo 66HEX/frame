@@ -82,11 +82,14 @@ impl PreviewSession {
     pub fn reconfigure(&self, config: PreviewSessionConfig) -> Result<(), PreviewEngineError> {
         config.validate()?;
         let mut pipeline_guard = lock(&self.pipeline);
-        let playing = *lock(&self.playing);
         let Some(pipeline) = pipeline_guard.as_mut() else {
             // A queued reconfiguration must not reopen a session already stopped.
             return Ok(());
         };
+        if pipeline.failed() {
+            *lock(&self.playing) = false;
+        }
+        let playing = *lock(&self.playing);
         let seconds = pipeline.position();
         let dimensions = pipeline.reconfigure(config.clone(), seconds, playing, true)?;
         self.store_reconfigured_state(config, dimensions);
@@ -122,6 +125,9 @@ impl PreviewSession {
         let Some(pipeline) = pipeline_guard.as_ref() else {
             return Ok(());
         };
+        if pipeline.failed() {
+            *lock(&self.playing) = false;
+        }
         let next_playing = match command {
             PreviewCommand::Play => {
                 pipeline.resume()?;
@@ -297,5 +303,47 @@ mod tests {
         assert!(lock(&session.pipeline).is_none());
         assert!(!lock(&session.config).conversion_config.flip_horizontal);
         assert!(!session.snapshot().playback.playing);
+    }
+
+    #[test]
+    fn failed_audio_seeks_and_reconfigures_stay_paused_until_an_explicit_retry() {
+        let mut config = test_config();
+        config.source_kind = PreviewSourceKind::Audio;
+        config.source_width = None;
+        config.source_height = None;
+        // No selected track is a supported silent audio session: these public
+        // commands exercise the real pipeline without a device or FFmpeg.
+        let session = PreviewSession::start(config.clone()).expect("audio session");
+        for seek in [
+            PreviewCommand::SeekFast(0.5),
+            PreviewCommand::SeekPrecise(0.75),
+        ] {
+            session.command(PreviewCommand::Play).unwrap();
+            lock(&session.pipeline)
+                .as_ref()
+                .unwrap()
+                .fail_audio_output_for_test();
+            assert!(!session.snapshot().playback.playing);
+            session.command(seek).unwrap();
+            assert!(
+                !session.snapshot().playback.playing,
+                "ordinary seek must remain paused after failure"
+            );
+        }
+        session.command(PreviewCommand::Play).unwrap();
+        lock(&session.pipeline)
+            .as_ref()
+            .unwrap()
+            .fail_audio_output_for_test();
+        session.reconfigure(config).unwrap();
+        assert!(!session.snapshot().playback.playing);
+        session
+            .command(PreviewCommand::SeekAndPlay {
+                seconds: 0.2,
+                precise: true,
+            })
+            .unwrap();
+        assert!(session.snapshot().playback.playing);
+        session.stop().unwrap();
     }
 }

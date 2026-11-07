@@ -1,6 +1,7 @@
 use crate::preview_engine::error::PreviewEngineError;
+use crate::preview_engine::ffmpeg_backend::audio_drain::AudioDrainOutcome;
 use crate::preview_engine::ffmpeg_backend::audio_output::{
-    AudioOutputSpec, AudioPreviewOutput, push_audio_sample_bytes,
+    AudioOutputSpec, AudioPreviewOutput, lock_audio_buffer, push_audio_sample_bytes,
 };
 use crate::preview_engine::ffmpeg_backend::clock::{
     AudioPlaybackStart, PlaybackStreamState, PreviewPlaybackClock, clock_generation_matches,
@@ -283,6 +284,10 @@ pub(super) fn wait_for_audio_start(
         .unwrap_or(AudioStartStatus::TimedOut)
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "PCM reading coordinates readiness, cancellable playback start, and output drain in one worker."
+)]
 pub(super) fn spawn_audio_stdout_worker(
     mut stdout: impl Read + Send + 'static,
     config: AudioStdoutWorkerConfig,
@@ -290,24 +295,30 @@ pub(super) fn spawn_audio_stdout_worker(
     thread::Builder::new()
         .name("frame-preview-ffmpeg-audio-stdout".to_string())
         .spawn(move || {
-            let output =
-                match AudioPreviewOutput::new(&config.metrics, &config.playback, config.generation)
-                {
-                    Ok(output) => Some(output),
-                    Err(error) => {
-                        push_stderr_line(
-                            &config.stderr_lines,
-                            format!("audio preview output disabled: {error}"),
-                        );
-                        let _ = config.ready_tx.send(AudioStartStatus::OutputDisabled);
-                        None
-                    }
-                };
+            let output = match AudioPreviewOutput::new(
+                &config.metrics,
+                &config.playback,
+                &config.audio_start,
+                &config.stderr_lines,
+                config.mark_ended_on_eof,
+                config.generation,
+            ) {
+                Ok(output) => Some(output),
+                Err(error) => {
+                    push_stderr_line(
+                        &config.stderr_lines,
+                        format!("audio preview output disabled: {error}"),
+                    );
+                    let _ = config.ready_tx.send(AudioStartStatus::OutputDisabled);
+                    None
+                }
+            };
             let mut read_buffer = [0_u8; AUDIO_READ_BUFFER_BYTES];
             let mut pending = Vec::new();
             let mut queued_for_prebuffer = 0_usize;
             let mut ready_sent = output.is_none();
             let mut output_started = output.is_none();
+            let mut pipe_exhausted = false;
 
             loop {
                 if config.stop_requested.load(Ordering::SeqCst) {
@@ -316,19 +327,31 @@ pub(super) fn spawn_audio_stdout_worker(
                 if !clock_generation_matches(&config.playback, config.generation) {
                     break;
                 }
+                if output
+                    .as_ref()
+                    .is_some_and(|output| lock_audio_buffer(&output.context.buffer).drain.failed())
+                {
+                    break;
+                }
 
                 match stdout.read(&mut read_buffer) {
-                    Ok(0) => break,
+                    Ok(0) => {
+                        pipe_exhausted = true;
+                        break;
+                    }
                     Ok(bytes_read) => {
                         pending.extend_from_slice(&read_buffer[..bytes_read]);
-                        let complete_len = pending.len() - (pending.len() % 4);
+                        let frame_bytes = output.as_ref().map_or(4, |output| output.frame_bytes);
+                        let complete_len = pending.len() - (pending.len() % frame_bytes);
                         if complete_len == 0 {
                             continue;
                         }
 
                         if let Some(output) = &output {
-                            let samples =
-                                push_audio_sample_bytes(&output.buffer, &pending[..complete_len]);
+                            let samples = push_audio_sample_bytes(
+                                &output.context.buffer,
+                                &pending[..complete_len],
+                            );
                             config.metrics.record_audio_pcm_chunk(
                                 config.generation,
                                 complete_len,
@@ -347,12 +370,7 @@ pub(super) fn spawn_audio_stdout_worker(
                                 ) {
                                     PlaybackStreamState::Ready => match output.play() {
                                         Ok(()) => {}
-                                        Err(error) => {
-                                            push_stderr_line(
-                                                &config.stderr_lines,
-                                                format!("audio preview output disabled: {error}"),
-                                            );
-                                        }
+                                        Err(_) => break,
                                     },
                                     PlaybackStreamState::Stale => break,
                                     PlaybackStreamState::Waiting => {}
@@ -368,22 +386,36 @@ pub(super) fn spawn_audio_stdout_worker(
                         }
                         pending.drain(..complete_len);
                     }
-                    Err(error)
-                        if matches!(
-                            error.kind(),
-                            ErrorKind::UnexpectedEof | ErrorKind::BrokenPipe
-                        ) =>
-                    {
+                    // Retry interrupted reads without consuming or discarding PCM.
+                    Err(error) if error.kind() == ErrorKind::Interrupted => {}
+                    Err(error) => {
+                        let message = format!("audio preview read failed: {error}");
+                        if let Some(output) = &output {
+                            output.context.fail(message);
+                        } else {
+                            push_stderr_line(&config.stderr_lines, message);
+                            config.audio_start.mark_output_failed(
+                                config.mark_ended_on_eof.then_some(config.generation),
+                            );
+                        }
                         break;
                     }
-                    Err(_) => break,
                 }
             }
 
             if !ready_sent {
                 let _ = config.ready_tx.send(AudioStartStatus::TimedOut);
             }
-            if config.mark_ended_on_eof && !config.stop_requested.load(Ordering::SeqCst) {
+            let drained = pipe_exhausted
+                && output_started
+                && output.as_ref().is_none_or(|output| {
+                    output
+                        .context
+                        .drain_after_pipe_exhausted(&config.stop_requested)
+                        == AudioDrainOutcome::Drained
+                });
+            if config.mark_ended_on_eof && drained && !config.stop_requested.load(Ordering::SeqCst)
+            {
                 config.audio_start.mark_ended(config.generation);
             }
         })

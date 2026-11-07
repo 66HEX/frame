@@ -1,9 +1,31 @@
+use super::audio_drain::AudioDrainState;
+use super::audio_output::{AudioCallbackContext, AudioCallbackTiming, fill_audio_output};
 use super::*;
+
+fn callback_context(
+    buffer: Arc<Mutex<AudioSampleBuffer>>,
+    metrics: PreviewRuntimeMetricsStore,
+    playback: Arc<Mutex<PreviewPlaybackClock>>,
+    generation: u64,
+) -> AudioCallbackContext {
+    AudioCallbackContext {
+        buffer,
+        metrics,
+        start: Arc::new(super::clock::AudioPlaybackStart::new(
+            Arc::clone(&playback),
+            Arc::new(std::sync::Condvar::new()),
+        )),
+        playback,
+        generation,
+        stderr: Arc::new(Mutex::new(VecDeque::new())),
+        failure_ends_playback: true,
+    }
+}
 use crate::conversion_runner::core_config_from_gpui;
 use crate::settings::ConversionConfig;
 use std::path::PathBuf;
 
-fn preview_config() -> PreviewSessionConfig {
+pub(super) fn preview_config() -> PreviewSessionConfig {
     PreviewSessionConfig {
         file_id: "video-1".to_string(),
         path: PathBuf::from("/tmp/video.mp4"),
@@ -95,6 +117,7 @@ fn preview_playback_clock_prepares_distinct_generations() {
         started_at: Instant::now(),
         playing: true,
         ended: true,
+        failed: false,
     };
 
     let generation = clock.prepare_generation(2.5);
@@ -118,6 +141,7 @@ fn playback_reader_tracks_pause_play_and_eof_without_process_access() {
                 .unwrap(),
             playing: false,
             ended: false,
+            failed: false,
         })),
     };
     let paused = reader.snapshot(12.5, false);
@@ -150,6 +174,7 @@ fn playback_stream_state_waits_until_generation_is_started() {
         started_at: Instant::now(),
         playing: true,
         ended: false,
+        failed: false,
     }));
     let generation = lock_playback(&playback).prepare_generation(2.5);
 
@@ -175,6 +200,7 @@ fn frame_presentation_state_waits_for_future_video_timestamp() {
         started_at: Instant::now(),
         playing: true,
         ended: false,
+        failed: false,
     }));
 
     assert_eq!(
@@ -195,6 +221,7 @@ fn frame_presentation_state_allows_due_video_timestamp() {
         started_at,
         playing: true,
         ended: false,
+        failed: false,
     }));
 
     assert_eq!(
@@ -212,6 +239,7 @@ fn wait_for_playback_start_returns_stale_when_stop_is_requested() {
         started_at: Instant::now(),
         playing: false,
         ended: false,
+        failed: false,
     }));
     let stop_requested = AtomicBool::new(true);
     let start =
@@ -232,6 +260,7 @@ fn update_last_frame_seconds_rejects_stale_generations() {
         started_at: Instant::now(),
         playing: true,
         ended: false,
+        failed: false,
     }));
 
     let updated = update_last_frame_seconds(&playback, 1, 4.0);
@@ -255,6 +284,11 @@ fn push_audio_sample_bytes_clamps_samples_and_returns_count() {
     let buffer = Arc::new(Mutex::new(AudioSampleBuffer {
         samples: VecDeque::new(),
         capacity: 4,
+        spec: AudioOutputSpec {
+            sample_rate: 48_000,
+            channels: 1,
+        },
+        drain: AudioDrainState::default(),
     }));
     let samples = [
         2.0_f32.to_le_bytes(),
@@ -280,6 +314,11 @@ fn fill_audio_output_f32_mutes_when_playback_is_paused() {
     let buffer = Arc::new(Mutex::new(AudioSampleBuffer {
         samples: VecDeque::from([0.5, -0.5]),
         capacity: 4,
+        spec: AudioOutputSpec {
+            sample_rate: 48_000,
+            channels: 1,
+        },
+        drain: AudioDrainState::default(),
     }));
     let metrics = PreviewRuntimeMetricsStore::new();
     metrics.begin_generation(1);
@@ -290,10 +329,20 @@ fn fill_audio_output_f32_mutes_when_playback_is_paused() {
         started_at: Instant::now(),
         playing: false,
         ended: false,
+        failed: false,
     }));
     let mut data = [1.0_f32, 1.0];
 
-    fill_audio_output_f32(&mut data, &buffer, &metrics, &playback, 1);
+    let context = callback_context(Arc::clone(&buffer), metrics.clone(), playback, 1);
+    fill_audio_output(
+        &mut data,
+        &context,
+        AudioCallbackTiming {
+            entered_at: Instant::now(),
+            playback_delay: Duration::ZERO,
+        },
+        std::convert::identity,
+    );
 
     assert!(data.iter().all(|sample| sample.abs() <= f32::EPSILON));
     assert_eq!(lock_audio_buffer(&buffer).samples.len(), 2);
@@ -305,6 +354,11 @@ fn fill_audio_output_f32_drains_samples_when_playback_is_playing() {
     let buffer = Arc::new(Mutex::new(AudioSampleBuffer {
         samples: VecDeque::from([0.25]),
         capacity: 4,
+        spec: AudioOutputSpec {
+            sample_rate: 48_000,
+            channels: 1,
+        },
+        drain: AudioDrainState::default(),
     }));
     let metrics = PreviewRuntimeMetricsStore::new();
     metrics.begin_generation(1);
@@ -315,10 +369,20 @@ fn fill_audio_output_f32_drains_samples_when_playback_is_playing() {
         started_at: Instant::now(),
         playing: true,
         ended: false,
+        failed: false,
     }));
     let mut data = [0.0_f32, 0.0];
 
-    fill_audio_output_f32(&mut data, &buffer, &metrics, &playback, 1);
+    let context = callback_context(Arc::clone(&buffer), metrics.clone(), playback, 1);
+    fill_audio_output(
+        &mut data,
+        &context,
+        AudioCallbackTiming {
+            entered_at: Instant::now(),
+            playback_delay: Duration::ZERO,
+        },
+        std::convert::identity,
+    );
 
     assert!((data[0] - 0.25).abs() <= f32::EPSILON);
     assert!(data[1].abs() <= f32::EPSILON);

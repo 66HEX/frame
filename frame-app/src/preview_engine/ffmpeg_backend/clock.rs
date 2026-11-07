@@ -1,5 +1,6 @@
 use crate::numeric::f64_to_u64;
 use crate::preview_engine::error::PreviewEngineError;
+use crate::preview_engine::ffmpeg_backend::audio_drain::{AudioDrainOutcome, AudioDrainPoll};
 use crate::preview_engine::ffmpeg_backend::process::RunningPreviewProcess;
 use crate::preview_engine::types::{
     PreviewPlaybackSnapshot, PreviewRenderedFrame, PreviewSessionConfig,
@@ -24,6 +25,7 @@ pub(super) struct PreviewPlaybackClock {
     pub(super) started_at: Instant,
     pub(super) playing: bool,
     pub(super) ended: bool,
+    pub(super) failed: bool,
 }
 
 /// Read-only clock access for UI snapshots. It never owns or reaps `FFmpeg` processes.
@@ -46,6 +48,7 @@ pub(super) enum PlaybackStreamState {
 pub(super) struct AudioPlaybackStart {
     playback: Arc<Mutex<PreviewPlaybackClock>>,
     changed: Arc<Condvar>,
+    output_failed: AtomicBool,
     #[cfg(test)]
     pub(super) wait_count: std::sync::atomic::AtomicUsize,
 }
@@ -58,6 +61,7 @@ impl AudioPlaybackStart {
         Self {
             playback,
             changed,
+            output_failed: AtomicBool::new(false),
             #[cfg(test)]
             wait_count: std::sync::atomic::AtomicUsize::new(0),
         }
@@ -71,6 +75,59 @@ impl AudioPlaybackStart {
 
     pub(super) fn mark_ended(&self, generation: u64) {
         mark_playback_ended(&self.playback, &self.changed, generation);
+    }
+
+    /// Buffer changes are published before this lock is acquired. Drain waits
+    /// hold the clock while inspecting the buffer, so this cannot lose a wake.
+    pub(super) fn notify_output_changed(&self) {
+        let _playback = lock_playback(&self.playback);
+        self.changed.notify_all();
+    }
+
+    pub(super) fn mark_output_failed(&self, end_generation: Option<u64>) {
+        let mut playback = lock_playback(&self.playback);
+        if let Some(generation) = end_generation {
+            playback.fail_generation(generation);
+        }
+        self.output_failed.store(true, Ordering::SeqCst);
+        drop(playback);
+        self.changed.notify_all();
+    }
+
+    pub(super) fn wait_for_audio_drain(
+        &self,
+        stop_requested: &AtomicBool,
+        generation: u64,
+        mut poll: impl FnMut(Instant) -> AudioDrainPoll,
+    ) -> AudioDrainOutcome {
+        let mut playback = lock_playback(&self.playback);
+        loop {
+            if stop_requested.load(Ordering::SeqCst)
+                || !playback.generation_matches(generation)
+                || playback.ended
+            {
+                return AudioDrainOutcome::Cancelled;
+            }
+            if self.output_failed.load(Ordering::SeqCst) {
+                return AudioDrainOutcome::Failed;
+            }
+            if !playback.playing {
+                return AudioDrainOutcome::Cancelled;
+            }
+            match poll(Instant::now()) {
+                AudioDrainPoll::Drained => return AudioDrainOutcome::Drained,
+                AudioDrainPoll::Failed => return AudioDrainOutcome::Failed,
+                AudioDrainPoll::Pending(deadline) => {
+                    #[cfg(test)]
+                    self.wait_count.fetch_add(1, Ordering::SeqCst);
+                    let (guard, _) = self
+                        .changed
+                        .wait_timeout(playback, deadline.saturating_duration_since(Instant::now()))
+                        .unwrap_or_else(std::sync::PoisonError::into_inner);
+                    playback = guard;
+                }
+            }
+        }
     }
 }
 
@@ -105,6 +162,10 @@ impl RunningPreviewProcess {
         lock_playback(&self.playback).ended
     }
 
+    pub(in crate::preview_engine) fn failed(&self) -> bool {
+        lock_playback(&self.playback).failed
+    }
+
     pub(super) fn prepare_playback_generation(&self, seconds: f64) -> u64 {
         let generation = {
             let mut playback = lock_playback(&self.playback);
@@ -136,7 +197,7 @@ impl RunningPreviewProcess {
 
     pub(super) fn parked_generation_at(&self, seconds: f64) -> Option<u64> {
         let playback = lock_playback(&self.playback);
-        if playback.playing || playback.ended {
+        if playback.playing || playback.ended || playback.failed {
             return None;
         }
         if (playback.last_frame_seconds - seconds).abs() > SEEK_END_EPSILON {
@@ -176,7 +237,7 @@ pub(super) const fn playback_stream_state(
     playback: &PreviewPlaybackClock,
     generation: u64,
 ) -> PlaybackStreamState {
-    if !playback.generation_matches(generation) || playback.ended {
+    if !playback.generation_matches(generation) || playback.ended || playback.failed {
         return PlaybackStreamState::Stale;
     }
     if playback.playing {
@@ -192,7 +253,7 @@ pub(super) fn mark_playback_ended(
     generation: u64,
 ) {
     let mut playback = lock_playback(playback);
-    if playback.generation_matches(generation) {
+    if playback.generation_matches(generation) && !playback.failed {
         playback.playing = false;
         playback.ended = true;
         drop(playback);
@@ -206,7 +267,7 @@ pub(super) fn frame_presentation_state(
     timestamp_seconds: f64,
 ) -> PlaybackStreamState {
     let playback = lock_playback(playback);
-    if !playback.generation_matches(generation) || playback.ended {
+    if !playback.generation_matches(generation) || playback.ended || playback.failed {
         return PlaybackStreamState::Stale;
     }
     if !playback.playing {
@@ -227,7 +288,7 @@ pub(super) fn wait_for_playback_start(
 ) -> PlaybackStreamState {
     let mut playback = lock_playback(&start.playback);
     loop {
-        if stop_requested.load(Ordering::SeqCst) {
+        if stop_requested.load(Ordering::SeqCst) || start.output_failed.load(Ordering::SeqCst) {
             return PlaybackStreamState::Stale;
         }
         match playback_stream_state(&playback, generation) {
@@ -268,7 +329,7 @@ pub(super) fn update_last_frame_seconds(
     timestamp_seconds: f64,
 ) -> bool {
     let mut playback = lock_playback(playback);
-    if !playback.generation_matches(generation) {
+    if !playback.generation_matches(generation) || playback.failed {
         return false;
     }
     playback.last_frame_seconds = timestamp_seconds;
@@ -333,7 +394,7 @@ impl PreviewPlaybackReader {
             position_seconds,
             duration_seconds,
             // Rebuilding briefly parks the clock while retaining playback intent.
-            playing: playing && !clock.ended,
+            playing: playing && !clock.ended && !clock.failed,
         }
     }
 }
@@ -346,11 +407,12 @@ impl PreviewPlaybackClock {
         self.started_at = Instant::now();
         self.playing = false;
         self.ended = false;
+        self.failed = false;
         self.generation
     }
 
     pub(super) fn start_generation(&mut self, generation: u64, seconds: f64) {
-        if self.generation != generation {
+        if self.generation != generation || self.failed {
             return;
         }
         self.base_seconds = seconds;
@@ -361,7 +423,7 @@ impl PreviewPlaybackClock {
     }
 
     pub(super) fn park_generation(&mut self, generation: u64, seconds: f64) {
-        if self.generation != generation {
+        if self.generation != generation || self.failed {
             return;
         }
         self.base_seconds = seconds;
@@ -373,5 +435,17 @@ impl PreviewPlaybackClock {
 
     pub(super) const fn generation_matches(&self, generation: u64) -> bool {
         self.generation == generation
+    }
+
+    pub(super) fn fail_generation(&mut self, generation: u64) {
+        if !self.generation_matches(generation) || self.failed || self.ended {
+            return;
+        }
+        if self.playing {
+            self.last_frame_seconds = (self.base_seconds + self.started_at.elapsed().as_secs_f64())
+                .max(self.last_frame_seconds);
+        }
+        self.playing = false;
+        self.failed = true;
     }
 }

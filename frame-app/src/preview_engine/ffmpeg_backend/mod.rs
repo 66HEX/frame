@@ -2,8 +2,7 @@
 
 #[cfg(test)]
 use crate::preview_engine::ffmpeg_backend::audio_output::{
-    AudioOutputSpec, AudioSampleBuffer, fill_audio_output_f32, lock_audio_buffer,
-    push_audio_sample_bytes,
+    AudioOutputSpec, AudioSampleBuffer, lock_audio_buffer, push_audio_sample_bytes,
 };
 #[cfg(test)]
 use crate::preview_engine::ffmpeg_backend::audio_stream::audio_prebuffer_samples;
@@ -32,6 +31,7 @@ use std::sync::{Arc, Mutex};
 #[cfg(test)]
 use std::time::{Duration, Instant};
 
+mod audio_drain;
 mod audio_output;
 mod audio_stream;
 mod clock;
@@ -40,6 +40,8 @@ mod plan;
 mod process;
 mod video_stream;
 
+#[cfg(test)]
+mod audio_drain_tests;
 #[cfg(test)]
 mod playback_start_tests;
 #[cfg(test)]

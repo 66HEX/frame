@@ -1,5 +1,7 @@
 //! Native preview session primitives for the GPUI app.
 
+#[cfg(test)]
+mod audio_drain_tests;
 mod error;
 mod ffmpeg_backend;
 mod frame_store;

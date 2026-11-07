@@ -4,7 +4,7 @@ use crate::preview_engine::ffmpeg_backend::audio_stream::{
 };
 use crate::preview_engine::ffmpeg_backend::clock::{
     AudioPlaybackStart, PreviewPlaybackClock, clamp_seek_seconds, initial_start_seconds,
-    lock_playback,
+    lock_playback, parsed_time,
 };
 use crate::preview_engine::ffmpeg_backend::decode::{
     RenderImageIdentity, decode_single_preview_frame,
@@ -58,6 +58,16 @@ pub(super) struct ProcessHandles {
 }
 
 impl RunningPreviewProcess {
+    #[cfg(test)]
+    pub(in crate::preview_engine) fn fail_audio_output_for_test(&self) {
+        let generation = lock_playback(&self.playback).generation;
+        AudioPlaybackStart::new(
+            Arc::clone(&self.playback),
+            Arc::clone(&self.playback_changed),
+        )
+        .mark_output_failed(Some(generation));
+    }
+
     /// Pauses preview playback by terminating the active `FFmpeg` process.
     ///
     /// # Errors
@@ -83,10 +93,22 @@ impl RunningPreviewProcess {
     pub fn resume(&self) -> Result<(), PreviewEngineError> {
         let seconds = {
             let playback = lock_playback(&self.playback);
-            if playback.playing && !playback.ended {
+            if playback.playing && !playback.ended && !playback.failed {
                 return Ok(());
             }
-            if playback.ended {
+            if playback.failed {
+                let duration = self.duration();
+                let end = parsed_time(self.config.conversion_config.end_time.as_deref())
+                    .filter(|end| *end > 0.0)
+                    .map_or(duration, |end| {
+                        if duration > 0.0 {
+                            end.min(duration)
+                        } else {
+                            end
+                        }
+                    });
+                clamp_seek_seconds(playback.last_frame_seconds, end)?
+            } else if playback.ended {
                 initial_start_seconds(&self.config)
             } else {
                 playback.last_frame_seconds
@@ -222,6 +244,7 @@ impl RunningPreviewProcess {
                 started_at: Instant::now(),
                 playing: false,
                 ended: false,
+                failed: false,
             })),
             playback_changed: Arc::new(Condvar::new()),
             render_image_id: RenderImage::new_image_id(),
@@ -308,8 +331,10 @@ impl RunningPreviewProcess {
         join_worker(stderr_worker);
         if mark_ended {
             let mut playback = lock_playback(&self.playback);
-            playback.playing = false;
-            playback.ended = true;
+            if !playback.failed {
+                playback.playing = false;
+                playback.ended = true;
+            }
             drop(playback);
             self.playback_changed.notify_all();
         }
@@ -474,5 +499,72 @@ mod tests {
 
         assert_eq!(lock_playback(&process.playback).generation, 7);
         assert_eq!(process.metrics.snapshot().video_process_spawns, 0);
+    }
+
+    #[test]
+    fn failed_audio_retry_clamps_to_source_or_trim_end_and_uses_a_new_generation() {
+        for (trim_end, expected_seconds) in [(None, 12.499), (Some("00:00:04.000"), 3.999)] {
+            let mut config = super::super::tests::preview_config();
+            config.source_kind = PreviewSourceKind::Audio;
+            config.source_width = None;
+            config.source_height = None;
+            config.conversion_config.end_time = trim_end.map(str::to_owned);
+            let process = RunningPreviewProcess::new(
+                config,
+                LatestFrameStore::new(),
+                PreviewRuntimeMetricsStore::new(),
+                "/missing/ffmpeg".into(),
+            );
+            {
+                let mut clock = lock_playback(&process.playback);
+                clock.last_frame_seconds = 50.0;
+                clock.fail_generation(0);
+            }
+            assert!(process.parked_generation_at(50.0).is_none());
+            assert!(
+                (process
+                    .playback_reader()
+                    .snapshot(12.5, true)
+                    .position_seconds
+                    - 50.0)
+                    .abs()
+                    < f64::EPSILON
+            );
+            process
+                .resume()
+                .expect("silent audio retry uses the real generation lifecycle");
+            let clock = lock_playback(&process.playback);
+            assert_eq!(clock.generation, 1);
+            assert!(!clock.failed);
+            assert!(clock.playing);
+            assert!((clock.base_seconds - expected_seconds).abs() < f64::EPSILON);
+            drop(clock);
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn reaping_an_audio_failure_does_not_turn_it_into_natural_eof() {
+        let mut config = super::super::tests::preview_config();
+        config.source_kind = PreviewSourceKind::Audio;
+        let process = RunningPreviewProcess::new(
+            config,
+            LatestFrameStore::new(),
+            PreviewRuntimeMetricsStore::new(),
+            "/missing/ffmpeg".into(),
+        );
+        process.fail_audio_output_for_test();
+        let mut child = std::process::Command::new("sh")
+            .args(["-c", "exit 0"])
+            .spawn()
+            .unwrap();
+        child.wait().unwrap();
+        lock_process(&process.audio_process).child = Some(child);
+        assert!(process.reap_finished_process(&process.audio_process, true));
+        let playback = process.playback_reader().snapshot(12.5, true);
+        assert!(!playback.playing);
+        assert!(playback.position_seconds.abs() < f64::EPSILON);
+        assert!(process.failed());
+        assert!(!process.ended());
     }
 }
