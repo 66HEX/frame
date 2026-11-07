@@ -1,6 +1,8 @@
 use super::crop::clamp;
 
 const PLAYBACK_END_EPSILON_SECONDS: f64 = 0.05;
+const TRIM_HANDLE_MINIMUM_SPAN_SECONDS: f64 = 1.0;
+const TIMECODE_PRECISION_SECONDS: f64 = 0.001;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TimelineDragTarget {
@@ -112,6 +114,7 @@ pub struct PreviewPlaybackState {
     start_value: f64,
     end_value: f64,
     dragging: Option<TimelineDragTarget>,
+    drag_minimum_span_seconds: f64,
     was_playing_before_drag: bool,
     previous_initial_start: Option<String>,
     previous_initial_end: Option<String>,
@@ -129,6 +132,7 @@ impl PreviewPlaybackState {
             start_value: 0.0,
             end_value: 0.0,
             dragging: None,
+            drag_minimum_span_seconds: TRIM_HANDLE_MINIMUM_SPAN_SECONDS,
             was_playing_before_drag: false,
             previous_initial_start: None,
             previous_initial_end: None,
@@ -308,11 +312,26 @@ impl PreviewPlaybackState {
     }
 
     pub const fn begin_handle_drag(&mut self, target: TimelineDragTarget) -> bool {
-        if self.is_image {
+        if self.is_image || self.duration <= 0.0 {
             return false;
         }
 
         self.dragging = Some(target);
+        // Preserve precisely entered subsecond ranges and short sources. Keep
+        // this limit fixed until release, including when the range is widened.
+        // Timecode round trips can put a one-second span just below 1.0 in
+        // floating point; only treat differences visible at our precision as
+        // intentional subsecond trims.
+        self.drag_minimum_span_seconds = if self.end_value - self.start_value
+            + TIMECODE_PRECISION_SECONDS / 2.0
+            >= TRIM_HANDLE_MINIMUM_SPAN_SECONDS
+        {
+            TRIM_HANDLE_MINIMUM_SPAN_SECONDS
+        } else if self.duration >= TIMECODE_PRECISION_SECONDS {
+            TIMECODE_PRECISION_SECONDS
+        } else {
+            self.duration
+        };
         self.was_playing_before_drag = self.is_playing;
         true
     }
@@ -375,7 +394,9 @@ impl PreviewPlaybackState {
                 }
             }
             TimelineDragTarget::Start => {
-                self.start_value = time.min(self.end_value - 1.0);
+                let latest_start =
+                    (self.end_value - self.drag_minimum_span_seconds).clamp(0.0, self.duration);
+                self.start_value = time.clamp(0.0, latest_start);
                 TimelineDragUpdate {
                     command: PlaybackMediaCommand::none(),
                     trim: self.commit_trim_values(),
@@ -383,7 +404,9 @@ impl PreviewPlaybackState {
                 }
             }
             TimelineDragTarget::End => {
-                self.end_value = time.max(self.start_value + 1.0);
+                let earliest_end =
+                    (self.start_value + self.drag_minimum_span_seconds).clamp(0.0, self.duration);
+                self.end_value = time.clamp(earliest_end, self.duration);
                 TimelineDragUpdate {
                     command: PlaybackMediaCommand::none(),
                     trim: self.commit_trim_values(),
@@ -416,6 +439,7 @@ impl PreviewPlaybackState {
         };
 
         self.dragging = None;
+        self.drag_minimum_span_seconds = TRIM_HANDLE_MINIMUM_SPAN_SECONDS;
         self.was_playing_before_drag = false;
 
         TimelineDragEnd { command, trim }

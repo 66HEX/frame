@@ -214,6 +214,106 @@ fn drag_end_handle_uses_one_second_gap_after_start_without_moving_playhead() {
 }
 
 #[test]
+fn repeated_trim_drags_keep_one_second_gap_after_timecode_round_trip() {
+    let mut playback = playback_with_media(90.4);
+    playback.sync_initial_values(Some("00:00:00.400"), None);
+    for target in [
+        TimelineDragTarget::End,
+        TimelineDragTarget::Start,
+        TimelineDragTarget::End,
+        TimelineDragTarget::Start,
+    ] {
+        assert!(playback.begin_handle_drag(target));
+        let percent = if target == TimelineDragTarget::Start {
+            1.0
+        } else {
+            0.0
+        };
+        let _ = playback.drag_to_percent(percent);
+        assert_close(playback.start_value(), 0.4);
+        assert_close(playback.end_value(), 1.4);
+
+        let trim = playback.end_drag().trim.unwrap();
+        playback.sync_initial_values(trim.start_time.as_deref(), trim.end_time.as_deref());
+    }
+}
+
+#[test]
+fn subsecond_source_trim_handles_remain_inside_the_source() {
+    let mut playback = playback_with_media(0.5);
+    assert!(playback.begin_handle_drag(TimelineDragTarget::Start));
+    let update = playback.drag_to_percent(1.0);
+    assert_close(playback.start_value(), 0.499);
+    assert_close(playback.end_value(), 0.5);
+    assert_close(update.preview_seek_to.unwrap(), 0.499);
+    let _ = playback.end_drag();
+
+    assert!(playback.begin_handle_drag(TimelineDragTarget::End));
+    let update = playback.drag_to_percent(0.0);
+    assert_close(playback.end_value(), 0.5);
+    assert_close(update.preview_seek_to.unwrap(), 0.5);
+    let _ = playback.end_drag();
+
+    let mut playback = playback_with_media(0.5);
+    assert!(playback.begin_handle_drag(TimelineDragTarget::End));
+    let _ = playback.drag_to_percent(0.0);
+    assert_close(playback.end_value(), 0.001);
+    let _ = playback.end_drag();
+    assert!(playback.begin_handle_drag(TimelineDragTarget::Start));
+    let _ = playback.drag_to_percent(1.0);
+    assert_close(playback.start_value(), 0.0);
+    assert_close(playback.end_value(), 0.001);
+}
+
+#[test]
+fn precise_subsecond_trim_stays_editable_near_both_source_edges() {
+    for (start, end) in [
+        ("00:00:00.100", "00:00:00.250"),
+        ("00:00:00.100", "00:00:01.099"),
+        ("00:01:59.750", "00:01:59.900"),
+    ] {
+        let mut playback = playback_with_media(120.0);
+        playback.sync_initial_values(Some(start), Some(end));
+        let initial_start = playback.start_value();
+        let initial_end = playback.end_value();
+        assert!(playback.begin_handle_drag(TimelineDragTarget::Start));
+        let _ = playback.drag_to_percent(initial_start / playback.duration());
+        assert_close(playback.start_value(), initial_start);
+        assert_close(playback.end_value(), initial_end);
+        let _ = playback.end_drag();
+
+        assert!(playback.begin_handle_drag(TimelineDragTarget::End));
+        let _ = playback.drag_to_percent(initial_end / playback.duration());
+        assert_close(playback.start_value(), initial_start);
+        assert_close(playback.end_value(), initial_end);
+    }
+}
+
+#[test]
+fn widening_a_subsecond_trim_does_not_change_its_minimum_span_mid_drag() {
+    let mut playback = playback_with_media(120.0);
+    playback.sync_initial_values(Some("00:00:10.000"), Some("00:00:10.250"));
+    assert!(playback.begin_handle_drag(TimelineDragTarget::Start));
+    let _ = playback.drag_to_percent(8.0 / 120.0);
+    assert_close(playback.start_value(), 8.0);
+    let _ = playback.drag_to_percent(10.0 / 120.0);
+    assert_close(playback.start_value(), 10.0);
+    assert_close(playback.end_value(), 10.25);
+}
+
+#[test]
+fn sources_shorter_than_timecode_precision_cannot_trim_outside_the_source() {
+    let mut playback = playback_with_media(0.000_5);
+    assert!(playback.begin_handle_drag(TimelineDragTarget::Start));
+    let _ = playback.drag_to_percent(1.0);
+    assert_close(playback.start_value(), 0.0);
+    let _ = playback.end_drag();
+    assert!(playback.begin_handle_drag(TimelineDragTarget::End));
+    let _ = playback.drag_to_percent(0.0);
+    assert_close(playback.end_value(), 0.000_5);
+}
+
+#[test]
 fn drag_start_handle_started_while_playing_preserves_playhead() {
     let mut playback = playback_with_media(120.0);
     playback.sync_media(MediaSnapshot {

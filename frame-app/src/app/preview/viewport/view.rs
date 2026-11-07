@@ -116,7 +116,8 @@ pub(in crate::app) fn preview_viewport(
     if preview_visual_controls_visible(state) {
         let ui_scale = f64::from(window.rem_size().as_f32() / crate::appearance::BASE_REM_PX);
         let compact_trim = transport.open
-            && (state.canvas.viewport_width < 440.0 * ui_scale
+            && (state.canvas.viewport_width
+                < f64::from(crate::app::layout::PREVIEW_TRIM_PANEL_WIDTH + 120.0) * ui_scale
                 || state.canvas.viewport_height < 360.0 * ui_scale);
         if !compact_trim {
             viewport = viewport.child(preview_toolbar(state, focuses.tools, window, cx));

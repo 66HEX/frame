@@ -604,7 +604,7 @@ fn timeline_seek_and_trim_targets_follow_the_inset_value_range() {
         let (root, cx) = test_window(&mut app, VisualFixture::PreviewReady, scale);
         open_preview_trim(cx);
         let bounds = cx.debug_bounds("preview-timeline-track").unwrap();
-        let inset = px(theme::metrics::SLIDER_THUMB / 2.0 * scale.factor());
+        let inset = px(crate::app::layout::PREVIEW_TIMELINE_INSET * scale.factor());
         let inner = root.read_with(cx, |root, _| root.preview_ui.timeline_track_bounds.unwrap());
         assert!((inner.left() - bounds.left() - inset).abs() < px(0.01));
         assert!((bounds.right() - inner.right() - inset).abs() < px(0.01));
@@ -613,7 +613,12 @@ fn timeline_seek_and_trim_targets_follow_the_inset_value_range() {
             ("preview-timeline-end-handle", inner.right()),
         ] {
             let handle = cx.debug_bounds(id).unwrap();
-            assert!((handle.center().x - endpoint).abs() < px(0.01));
+            let edge = if id == "preview-timeline-start-handle" {
+                handle.right()
+            } else {
+                handle.left()
+            };
+            assert!((edge - endpoint).abs() < px(0.01));
         }
         for fraction in [0.25, 0.75] {
             cx.simulate_click(

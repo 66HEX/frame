@@ -1,8 +1,8 @@
 use crate::app::accessibility::apply_accessible_slider;
-use crate::app::components::{frame_range_track, frame_slider_fraction_from_bounds};
+use crate::app::components::{FrameTooltip, surface_scale};
 use crate::app::layout::{
     PREVIEW_PLAYHEAD_HEIGHT, PREVIEW_TIMELINE_CONTROL_HEIGHT, PREVIEW_TIMELINE_HANDLE_WIDTH,
-    PREVIEW_TRACK_HEIGHT,
+    PREVIEW_TIMELINE_INSET, PREVIEW_TRACK_HEIGHT,
 };
 use crate::app::preview::panel::PreviewShellState;
 use crate::app::preview::timeline::view::preview_trim_enabled;
@@ -15,12 +15,29 @@ use gpui::prelude::*;
 use gpui::{
     App, Bounds, Context, DragMoveEvent, Element, ElementId, Entity, GlobalElementId, IntoElement,
     LayoutId, MouseButton, MouseDownEvent, MouseUpEvent, Pixels, Position, Render, Style, Window,
-    canvas, div, px, relative, size,
+    div, px, relative, size,
 };
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+use std::{cell::Cell, rc::Rc};
+
+const TRIM_GRIP_WIDTH: f32 = 6.0;
+const TRIM_GRIP_HEIGHT: f32 = 18.0;
+const TIMELINE_BAND_TOP: f32 = 12.0;
+const TRIM_GRIP_TOP: f32 = 5.0;
+
+#[derive(Clone, Debug)]
 pub(super) struct PreviewTimelineDrag {
     pub(super) target: TimelineDragTarget,
+    grab_offset: Rc<Cell<Pixels>>,
+}
+
+impl PreviewTimelineDrag {
+    fn new(target: TimelineDragTarget) -> Self {
+        Self {
+            target,
+            grab_offset: Rc::new(Cell::new(px(0.0))),
+        }
+    }
 }
 
 pub(in crate::app) struct PreviewTimelineDragPreview;
@@ -33,6 +50,8 @@ impl Render for PreviewTimelineDragPreview {
 
 pub(super) struct PreviewTimelineTrackBoundsProbe {
     pub(super) owner: Entity<FrameRoot>,
+    surface_bounds: Rc<Cell<Bounds<Pixels>>>,
+    scale: f32,
 }
 
 impl IntoElement for PreviewTimelineTrackBoundsProbe {
@@ -82,6 +101,11 @@ impl Element for PreviewTimelineTrackBoundsProbe {
         _window: &mut Window,
         cx: &mut App,
     ) -> Self::PrepaintState {
+        let origin = self.surface_bounds.get().center();
+        let bounds = Bounds::new(
+            origin + (bounds.origin - origin) * self.scale,
+            bounds.size.map(|dimension| dimension * self.scale),
+        );
         self.owner.update(cx, |root, _cx| {
             root.set_preview_timeline_track_bounds(bounds);
         });
@@ -106,17 +130,15 @@ impl Element for PreviewTimelineTrackBoundsProbe {
 )]
 pub(in crate::app) fn preview_timeline_track(
     state: &PreviewShellState,
+    surface_bounds: Rc<Cell<Bounds<Pixels>>>,
+    progress: f32,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
-    let measured_width = window.use_keyed_state("timeline-hit-width", cx, |_, _| 0.0_f32);
-    let track_width = *measured_width.read(cx);
     let palette = state.palette;
     let enabled = preview_trim_enabled(state);
     let duration = state.playback.duration();
     let current_time = state.playback.current_time();
-    let track_top = centered_offset(PREVIEW_TIMELINE_CONTROL_HEIGHT, PREVIEW_TRACK_HEIGHT);
-    let playhead_top = centered_offset(PREVIEW_TIMELINE_CONTROL_HEIGHT, PREVIEW_PLAYHEAD_HEIGHT);
     let start_fraction = timeline_fraction_from_percent(
         state
             .playback
@@ -132,9 +154,8 @@ pub(in crate::app) fn preview_timeline_track(
             .playback
             .to_timeline_percent(state.playback.current_time()),
     );
-    let start_target = timeline_hit_target(start_fraction, end_fraction, track_width, false);
-    let end_target = timeline_hit_target(start_fraction, end_fraction, track_width, true);
 
+    let scrub_owner = cx.entity();
     let track = div()
         .id("preview-timeline-track")
         .debug_selector(|| "preview-timeline-track".to_string())
@@ -143,7 +164,7 @@ pub(in crate::app) fn preview_timeline_track(
         .w_full()
         .rounded(theme::ui_rem(theme::RADIUS_MD))
         .opacity(if enabled { 1.0 } else { 0.5 })
-        .when(enabled, gpui::Styled::cursor_default)
+        .when(enabled, gpui::Styled::cursor_pointer)
         .on_mouse_down(
             MouseButton::Left,
             cx.listener(|root, event: &MouseDownEvent, _window, cx| {
@@ -154,26 +175,49 @@ pub(in crate::app) fn preview_timeline_track(
         )
         .when(enabled, |this| {
             this.on_drag(
-                PreviewTimelineDrag {
-                    target: TimelineDragTarget::Scrub,
+                PreviewTimelineDrag::new(TimelineDragTarget::Scrub),
+                move |_drag, _cursor_offset, window, cx| {
+                    let position = window.mouse_position();
+                    scrub_owner.update(cx, |root, cx| {
+                        if let Some(bounds) = root.preview_ui.timeline_track_bounds {
+                            let percent = timeline_slider_percent_from_bounds(position, bounds);
+                            if root.apply_preview_timeline_drag_with_context(
+                                TimelineDragTarget::Scrub,
+                                percent,
+                                cx,
+                            ) {
+                                cx.notify();
+                            }
+                        }
+                    });
+                    cx.new(|_| PreviewTimelineDragPreview)
                 },
-                |_drag, _position, _window, cx| cx.new(|_| PreviewTimelineDragPreview),
             )
         })
         .on_drag_move(cx.listener(
-            |root, event: &DragMoveEvent<PreviewTimelineDrag>, window, cx| {
-                let drag = *event.drag(cx);
-                let percent = frame_slider_fraction_from_bounds(
-                    event.event.position,
-                    event.bounds,
-                    window.rem_size(),
-                );
+            |root, event: &DragMoveEvent<PreviewTimelineDrag>, _window, cx| {
+                let drag = event.drag(cx).clone();
+                let Some(bounds) = root.preview_ui.timeline_track_bounds else {
+                    return;
+                };
+                let mut position = event.event.position;
+                position.x += drag.grab_offset.get();
+                let percent = timeline_slider_percent_from_bounds(position, bounds);
                 if root.apply_preview_timeline_drag_with_context(drag.target, percent, cx) {
                     cx.notify();
                 }
             },
         ))
-        .capture_any_mouse_up(cx.listener(|root, _event: &MouseUpEvent, _window, cx| {
+        .capture_any_mouse_up(cx.listener(|root, event: &MouseUpEvent, _window, cx| {
+            let drag = cx
+                .active_drag()
+                .and_then(|drag| drag.value.downcast_ref::<PreviewTimelineDrag>().cloned());
+            if let (Some(drag), Some(bounds)) = (drag, root.preview_ui.timeline_track_bounds) {
+                let mut position = event.position;
+                position.x += drag.grab_offset.get();
+                let percent = timeline_slider_percent_from_bounds(position, bounds);
+                root.apply_preview_timeline_drag_with_context(drag.target, percent, cx);
+            }
             if root.end_preview_timeline_drag_with_context(cx) {
                 cx.notify();
             }
@@ -229,78 +273,144 @@ pub(in crate::app) fn preview_timeline_track(
             cx.stop_propagation();
         }),
     )
-    .child(
-        frame_range_track(start_fraction, end_fraction, palette)
-            .absolute()
-            .left_0()
-            .right_0()
-            .top(theme::ui_rem(track_top)),
-    )
-    // Position measurements, playhead, and trim targets share the inset value range.
+    // Rail, selection, playhead and endpoints share the exact same value range.
     .child(
         div()
             .absolute()
             .top_0()
             .bottom_0()
-            .left(theme::ui_rem(theme::RANGE_TRACK_INSET))
-            .right(theme::ui_rem(theme::RANGE_TRACK_INSET))
-            .child(PreviewTimelineTrackBoundsProbe { owner: cx.entity() })
-            .child(
-                canvas(
-                    move |bounds, window, cx| {
-                        let scale = window.rem_size().as_f32() / crate::appearance::BASE_REM_PX;
-                        measured_width.update(cx, |width, cx| {
-                            let next = bounds.size.width.as_f32() / scale;
-                            if (*width - next).abs() > 0.01 {
-                                *width = next;
-                                cx.notify();
-                            }
-                        });
-                    },
-                    |_, (), _, _| {},
-                )
-                .absolute()
-                .size_full(),
-            )
+            .left(theme::ui_rem(PREVIEW_TIMELINE_INSET))
+            .right(theme::ui_rem(PREVIEW_TIMELINE_INSET))
+            .child(timeline_band(start_fraction, end_fraction, palette))
+            .child(PreviewTimelineTrackBoundsProbe {
+                owner: cx.entity(),
+                surface_bounds,
+                scale: surface_scale(progress),
+            })
             .child(
                 div()
+                    .id("preview-timeline-playhead")
+                    .debug_selector(|| "preview-timeline-playhead".to_owned())
                     .absolute()
                     .left(relative(playhead_fraction))
-                    .ml(px(-0.5))
-                    .top(theme::ui_rem(playhead_top))
+                    .ml(theme::ui_rem(-1.0))
+                    .top(theme::ui_rem(3.0))
                     .h(theme::ui_rem(PREVIEW_PLAYHEAD_HEIGHT))
-                    .w(px(1.0))
-                    .bg(color(palette.text_primary)),
+                    .w(theme::ui_rem(2.0))
+                    .rounded_full()
+                    .bg(color(palette.text_primary))
+                    .shadow(theme::shadows::ShadowLevel::Xs.shadows())
+                    .child(
+                        div()
+                            .absolute()
+                            .top_0()
+                            .left(theme::ui_rem(-1.5))
+                            .w(theme::ui_rem(5.0))
+                            .h(theme::ui_rem(3.0))
+                            .rounded(theme::ui_rem(2.0))
+                            .bg(color(palette.text_primary)),
+                    ),
             )
             .child(preview_timeline_handle(
                 TimelineDragTarget::Start,
-                start_target,
+                start_fraction,
+                state.playback.dragging() == Some(TimelineDragTarget::Start),
                 enabled,
                 state.playback.start_value(),
                 duration,
                 palette,
+                window,
                 cx,
             ))
             .child(preview_timeline_handle(
                 TimelineDragTarget::End,
-                end_target,
+                end_fraction,
+                state.playback.dragging() == Some(TimelineDragTarget::End),
                 enabled,
                 state.playback.end_value(),
                 duration,
                 palette,
+                window,
                 cx,
             )),
     )
 }
 
+fn timeline_band(start: f32, end: f32, palette: &'static theme::ThemePalette) -> gpui::Div {
+    div()
+        .absolute()
+        .top(theme::ui_rem(TIMELINE_BAND_TOP))
+        .h(theme::ui_rem(PREVIEW_TRACK_HEIGHT))
+        .w_full()
+        .rounded(theme::ui_rem(3.0))
+        .bg(color(palette.input_background))
+        .shadow(theme::shadows::recessed(palette))
+        .child(
+            div()
+                .id("preview-timeline-selection")
+                .debug_selector(|| "preview-timeline-selection".to_owned())
+                .absolute()
+                .top_0()
+                .bottom_0()
+                .left(relative(start))
+                .right(relative(1.0 - end))
+                .rounded_full()
+                .bg(color(palette.text_muted)),
+        )
+}
+
+fn timeline_grip(
+    target: TimelineDragTarget,
+    group: &'static str,
+    dragging: bool,
+    palette: &'static theme::ThemePalette,
+) -> gpui::Stateful<gpui::Div> {
+    let start = target == TimelineDragTarget::Start;
+    let id = if start {
+        "preview-timeline-start-grip"
+    } else {
+        "preview-timeline-end-grip"
+    };
+    // The solid cap extends out of the kept range. Even a very short selection
+    // retains two distinct grips, while the inner edges mark exact trim times.
+    div()
+        .id(id)
+        .debug_selector(move || id.to_owned())
+        .absolute()
+        .top(theme::ui_rem(TRIM_GRIP_TOP))
+        .left(theme::ui_rem(if start {
+            PREVIEW_TIMELINE_HANDLE_WIDTH - TRIM_GRIP_WIDTH
+        } else {
+            0.0
+        }))
+        .w(theme::ui_rem(TRIM_GRIP_WIDTH))
+        .h(theme::ui_rem(TRIM_GRIP_HEIGHT))
+        .rounded(theme::ui_rem(3.0))
+        .bg(color(palette.text_muted))
+        .shadow(theme::shadows::ShadowLevel::Xxs.shadows())
+        .group_hover_style(group, |style| style.bg(color(palette.text_primary)))
+        .when(dragging, |grip| {
+            grip.bg(color(palette.text_primary))
+                .ring(px(2.0))
+                .ring_color(color(palette.focus_ring.with_opacity(0.6)))
+        })
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    clippy::too_many_lines,
+    reason = "Endpoint rendering keeps shared geometry, pointer gestures and accessible actions together."
+)]
 pub(in crate::app) fn preview_timeline_handle(
     target: TimelineDragTarget,
-    hit_target: (f32, f32),
+    fraction: f32,
+    dragging: bool,
     enabled: bool,
     value: f64,
     duration: f64,
     palette: &'static theme::ThemePalette,
-    cx: &Context<FrameRoot>,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let (handle_id, label) = match target {
         TimelineDragTarget::Start => ("preview-timeline-start-handle", "Trim start"),
@@ -308,25 +418,65 @@ pub(in crate::app) fn preview_timeline_handle(
         TimelineDragTarget::Scrub => ("preview-timeline-scrub-handle", "Preview position"),
     };
 
+    // Mouse focus can rerender between press and the drag threshold. Retain the
+    // original grab point across those frames, not only within a rendered Div.
+    let drag_key = match target {
+        TimelineDragTarget::Start => "preview-start-grab",
+        TimelineDragTarget::End => "preview-end-grab",
+        TimelineDragTarget::Scrub => "preview-scrub-grab",
+    };
+    let drag = window
+        .use_keyed_state(drag_key, cx, |_, _| PreviewTimelineDrag::new(target))
+        .read(cx)
+        .clone();
+    let grab_offset = drag.grab_offset.clone();
+    let drag_owner = cx.entity();
     let handle = div()
         .id(handle_id)
         .debug_selector(move || handle_id.to_string())
+        .group(handle_id)
         .absolute()
         .top_0()
-        .left(theme::ui_rem(hit_target.0))
+        // Keep the hit target and cap anchored to the current layout, including
+        // the very first frame and a resize. No previous measurement is needed.
+        .left(relative(fraction))
+        .ml(theme::ui_rem(if target == TimelineDragTarget::Start {
+            -PREVIEW_TIMELINE_HANDLE_WIDTH
+        } else {
+            0.0
+        }))
         .h(theme::ui_rem(PREVIEW_TIMELINE_CONTROL_HEIGHT))
-        .w(theme::ui_rem(hit_target.1))
+        .w(theme::ui_rem(PREVIEW_TIMELINE_HANDLE_WIDTH))
         .rounded(theme::ui_rem(theme::RADIUS_MD))
-        .on_mouse_down(MouseButton::Left, |_event, _window, cx| {
-            cx.stop_propagation();
-        })
-        .when(enabled, gpui::Styled::cursor_default);
+        .on_mouse_down(
+            MouseButton::Left,
+            cx.listener(move |root, event: &MouseDownEvent, _window, cx| {
+                if let Some(bounds) = root.preview_ui.timeline_track_bounds {
+                    grab_offset
+                        .set(bounds.left() + bounds.size.width * fraction - event.position.x);
+                }
+                cx.stop_propagation();
+            }),
+        )
+        .when(enabled, gpui::Styled::cursor_ew_resize)
+        .child(timeline_grip(target, handle_id, dragging, palette));
 
     let handle = if enabled {
-        handle.on_drag(
-            PreviewTimelineDrag { target },
-            |_drag, _position, _window, cx| cx.new(|_| PreviewTimelineDragPreview),
-        )
+        handle.on_drag(drag, move |drag, _cursor_offset, window, cx| {
+            // Apply the threshold-crossing move in the same screen coordinates
+            // as subsequent moves and release, avoiding layout pixel rounding.
+            let mut position = window.mouse_position();
+            position.x += drag.grab_offset.get();
+            drag_owner.update(cx, |root, cx| {
+                if let Some(bounds) = root.preview_ui.timeline_track_bounds {
+                    let percent = timeline_slider_percent_from_bounds(position, bounds);
+                    if root.apply_preview_timeline_drag_with_context(target, percent, cx) {
+                        cx.notify();
+                    }
+                }
+            });
+            cx.new(|_| PreviewTimelineDragPreview)
+        })
     } else {
         handle
     };
@@ -334,7 +484,7 @@ pub(in crate::app) fn preview_timeline_handle(
     let owner = cx.entity();
     let decrement_owner = owner.clone();
 
-    apply_accessible_slider(
+    let handle = apply_accessible_slider(
         handle,
         label,
         enabled,
@@ -372,24 +522,13 @@ pub(in crate::app) fn preview_timeline_handle(
             }
             cx.stop_propagation();
         }),
-    )
+    );
+    FrameTooltip::new(handle_id, format!("Drag to set {}", label.to_lowercase()))
+        .for_control(handle, None, enabled, palette, window, cx)
+        .absolute()
 }
 
-// Split nearby endpoints at their midpoint, moving extra hit space outwards.
-// Limit overhang to half a target so adjacent time fields and Play stay usable.
-pub(super) fn timeline_hit_target(start: f32, end: f32, width: f32, is_end: bool) -> (f32, f32) {
-    let target = PREVIEW_TIMELINE_HANDLE_WIDTH;
-    let midpoint = start.midpoint(end) * width;
-    let (left, right) = if is_end {
-        let left = end.mul_add(width, -(target / 2.0)).max(midpoint);
-        (left, (left + target).min(width + target / 2.0))
-    } else {
-        let right = start.mul_add(width, target / 2.0).min(midpoint);
-        ((right - target).max(-target / 2.0), right)
-    };
-    (left, (right - left).max(0.0))
-}
-
+#[cfg(test)]
 pub(in crate::app) fn centered_offset(container: f32, child: f32) -> f32 {
     ((container - child) / 2.0).max(0.0)
 }

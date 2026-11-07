@@ -4,7 +4,7 @@ use crate::app::components::{
     FrameStyle, FrameTooltip, SurfaceOrigin, frame_button_base, frame_surface_motion, frame_toolbar,
 };
 use crate::app::input::FrameTextInputKind;
-use crate::app::layout::PREVIEW_TOOLBAR_OFFSET;
+use crate::app::layout::{PREVIEW_TOOLBAR_OFFSET, PREVIEW_TRIM_PANEL_WIDTH};
 use crate::app::motion::{motion_is_hidden, surface_motion};
 use crate::app::preview::panel::{PreviewShellState, PreviewTimecodeInputFocuses};
 use crate::app::preview::state::PreviewTransportState;
@@ -248,25 +248,31 @@ fn trim_trigger(
     ));
     let trigger = trigger_focus.clone();
     let panel = panel_focus.clone();
-    FrameTooltip::new("preview-trim-trigger", "Trim and playback")
-        .for_control(
-            button,
-            Some(trigger_focus),
-            enabled,
-            state.palette,
-            window,
-            cx,
-        )
-        .on_click(cx.listener(move |root, _, window, cx| {
-            if root.preview_ui.transport.open {
-                close_trim(root, &trigger, window, cx);
-            } else {
-                root.preview_ui.transport.open = true;
-                let panel = panel.clone();
-                cx.defer_in(window, move |_, window, cx| panel.focus(window, cx));
-                cx.notify();
-            }
-        }))
+    FrameTooltip::new(
+        "preview-trim-trigger",
+        format!(
+            "Trim and playback · Duration {}",
+            preview_timeline_labels(state).duration
+        ),
+    )
+    .for_control(
+        button,
+        Some(trigger_focus),
+        enabled,
+        state.palette,
+        window,
+        cx,
+    )
+    .on_click(cx.listener(move |root, _, window, cx| {
+        if root.preview_ui.transport.open {
+            close_trim(root, &trigger, window, cx);
+        } else {
+            root.preview_ui.transport.open = true;
+            let panel = panel.clone();
+            cx.defer_in(window, move |_, window, cx| panel.focus(window, cx));
+            cx.notify();
+        }
+    }))
 }
 
 #[expect(
@@ -284,6 +290,7 @@ fn trim_panel(
     cx: &mut Context<FrameRoot>,
 ) -> AnyElement {
     let palette = state.palette;
+    let track_surface_bounds = bounds.clone();
     let panel = div()
         .id("preview-trim-panel")
         .debug_selector(|| "preview-trim-panel".to_owned())
@@ -292,7 +299,7 @@ fn trim_panel(
         .aria_label("Trim preview")
         .when(enabled, |panel| panel.track_focus(focus).tab_stop(false))
         .w_full()
-        .max_w(theme::ui_rem(320.0))
+        .max_w(theme::ui_rem(PREVIEW_TRIM_PANEL_WIDTH))
         .min_w_0()
         .p(theme::ui_rem(8.0))
         .flex()
@@ -305,11 +312,17 @@ fn trim_panel(
                 .occlude()
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
         })
-        .child(preview_timeline_track(state, window, cx))
+        .child(preview_timeline_track(
+            state,
+            track_surface_bounds,
+            progress,
+            window,
+            cx,
+        ))
         .child(
             div()
                 .flex()
-                .gap(theme::ui_rem(12.0))
+                .gap(theme::ui_rem(8.0))
                 .child(preview_timecode_field(
                     PreviewTimecodeFieldSpec {
                         label: "Start",
@@ -334,24 +347,10 @@ fn trim_panel(
                     window,
                     cx,
                 )),
-        )
-        .child(
-            div()
-                .flex()
-                .items_center()
-                .justify_between()
-                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-                .text_color(color(palette.text_muted))
-                .child("Duration")
-                .child(
-                    div()
-                        .font_features(assets::frame_tabular_number_font_features())
-                        .child(preview_timeline_labels(state).duration),
-                ),
         );
     div()
         .w_full()
-        .max_w(theme::ui_rem(320.0))
+        .max_w(theme::ui_rem(PREVIEW_TRIM_PANEL_WIDTH))
         .child(frame_surface_motion(panel, progress, SurfaceOrigin::Center))
         .into_any_element()
 }

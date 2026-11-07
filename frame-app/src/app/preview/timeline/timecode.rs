@@ -1,5 +1,5 @@
 use crate::app::input::{FrameTextInputKind, FrameTextInputSpec, frame_text_input};
-use crate::app::layout::PREVIEW_TIMELINE_CONTROL_HEIGHT;
+use crate::app::layout::SETTINGS_CONTROL_HEIGHT;
 use crate::app::primitives::color;
 use crate::app::root::FrameRoot;
 use crate::{assets, theme};
@@ -53,7 +53,7 @@ pub(in crate::app) fn preview_timecode_field(
     } else {
         div()
             .w_full()
-            .h(theme::ui_rem(PREVIEW_TIMELINE_CONTROL_HEIGHT))
+            .h(theme::ui_rem(SETTINGS_CONTROL_HEIGHT))
             .flex()
             .items_center()
             .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
@@ -63,27 +63,24 @@ pub(in crate::app) fn preview_timecode_field(
             .into_any_element()
     };
 
-    crate::app::components::frame_field()
+    div()
         .min_w_0()
         .flex_1()
+        .flex()
+        .items_center()
         .gap(theme::ui_rem(4.0))
-        .child(preview_timeline_label(label, palette))
         .child(
             div()
-                .w_full()
-                .h(theme::ui_rem(PREVIEW_TIMELINE_CONTROL_HEIGHT))
+                .flex_shrink_0()
+                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
+                .text_color(color(palette.text_muted))
+                .child(label),
+        )
+        .child(
+            div()
+                .min_w_0()
+                .flex_1()
+                .h(theme::ui_rem(SETTINGS_CONTROL_HEIGHT))
                 .child(field),
         )
-}
-
-pub(in crate::app) fn preview_timeline_label(
-    label: &'static str,
-    palette: &'static theme::ThemePalette,
-) -> gpui::Div {
-    div()
-        .h(theme::ui_rem(12.0))
-        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-        .text_color(color(palette.text_muted))
-        .child(theme::ui_text(label))
 }
