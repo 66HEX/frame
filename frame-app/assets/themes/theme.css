@@ -18,6 +18,7 @@
     --muted-foreground: #64646c;
     --accent: #ffffff;
     --accent-foreground: #252528;
+    --select-highlight: var(--muted);
     --destructive: #b83842;
     --success: #28734f;
     --border: #03030212;
@@ -54,6 +55,7 @@
     --muted-foreground: #a5a5ad;
     --accent: #36363b;
     --accent-foreground: #f3f3f5;
+    --select-highlight: var(--accent);
     --destructive: #ed8588;
     --success: #83c89b;
     --border: #ffffff0a;

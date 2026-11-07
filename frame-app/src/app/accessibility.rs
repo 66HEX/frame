@@ -569,8 +569,8 @@ fn select_option_highlight(
     palette: &theme::ThemePalette,
 ) -> StyleRefinement {
     style
-        .bg(color(palette.token("accent")))
-        .text_color(color(palette.token("accent-foreground")))
+        .bg(color(palette.select_highlight))
+        .text_color(color(palette.accent_foreground))
 }
 
 pub(in crate::app) fn apply_accessible_select_option(

@@ -77,6 +77,9 @@ pub struct ThemePalette {
     pub input_hover: RgbaToken,
     pub secondary_hover: RgbaToken,
     pub secondary_foreground: RgbaToken,
+    pub accent_foreground: RgbaToken,
+    /// Transient option focus, independent of persistent tab selection.
+    pub select_highlight: RgbaToken,
     pub ghost_hover: RgbaToken,
     pub surface_ring: RgbaToken,
     pub slider_thumb: RgbaToken,
@@ -141,6 +144,14 @@ impl ThemePalette {
             input_hover: get("muted"),
             secondary_hover: get("secondary-hover"),
             secondary_foreground: get("secondary-foreground"),
+            accent_foreground: get("accent-foreground"),
+            // Standard shadcn themes keep their accent mapping; Graphite can
+            // define a separate option highlight without recoloring active tabs.
+            select_highlight: if mira::colors(color_theme).contains_key("select-highlight") {
+                get("select-highlight")
+            } else {
+                get("accent")
+            },
             // A light overlay stays visible over the top-lit dark card. Mixing
             // muted/50 into that surface can match the card and hide open rows.
             ghost_hover: if light {

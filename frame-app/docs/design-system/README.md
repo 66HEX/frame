@@ -154,7 +154,7 @@ Pasek tabów w Logs dopasowuje szerokość do zawartości. Przy braku miejsca ku
 
 Selecty mają wspólny kod dla kliknięć, Enter/Space, strzałek bez zawijania listy, Home/End, Escape i wyszukiwania prefiksowego z timeoutem 1 s. Powtórzenie tej samej litery przechodzi do kolejnego dopasowania. Otwarty select blokuje Tab, a zamknięcie przywraca fokus triggera. Używana kompozycja odpowiada `SelectContent position="popper"` z limitem wysokości 192 px; domyślny Radix `item-aligned` jest odrębnym wariantem układu.
 
-Podświetlenie opcji Select ma jedno źródło: fokus używa pary `accent` / `accent-foreground`, a checkmark dziedziczy kolor tekstu. Ruch kursora przenosi fokus na opcję, tak jak w Radix; osobny kolor hover nie nadpisuje tego stanu. Dzięki temu kolory `secondary` i `accent` mogą się różnić, a użycie strzałek przy nieruchomym kursorze pozostawia tylko jedną podświetloną opcję.
+Podświetlenie opcji Select ma jedno źródło: fokus używa `select-highlight` i `accent-foreground`, a checkmark dziedziczy kolor tekstu. W Graphite jasny `select-highlight` wskazuje na `muted`, tak samo jak hover toolbara; ciemny wskazuje na `accent`. Motywy bez opcjonalnego `select-highlight` korzystają z `accent`, zgodnie z shadcn. Aktywne taby nadal używają `accent`. Ruch kursora przenosi fokus na opcję, tak jak w Radix; osobny kolor hover nie nadpisuje tego stanu, więc strzałki przy nieruchomym kursorze pozostawiają tylko jedną podświetloną opcję.
 
 Scrollbar selecta jest absolutną nakładką: lista zachowuje padding 4 px z każdej strony, bez dodatkowej kolumny na scrollbar. Thumb jest przycinany do zaokrąglonego obrysu popovera również w skrajnych pozycjach przewijania.
 

@@ -155,7 +155,11 @@ fn assert_theme_option_highlight(
         1,
         "{theme:?}, {step}: only the focused option should be highlighted: {fills:?}"
     );
-    let expected = crate::theme::palette(theme).token("accent");
+    let palette = crate::theme::palette(theme);
+    let expected = match theme {
+        ColorTheme::Light => palette.ghost_hover,
+        ColorTheme::Dark => palette.token("accent"),
+    };
     let (_, actual) = fills.iter().find(|(option, _)| *option == focused).unwrap();
     for (painted, token) in [
         (actual.red, expected.red),
@@ -165,7 +169,7 @@ fn assert_theme_option_highlight(
     ] {
         assert!(
             (painted - token).abs() < 0.001,
-            "{theme:?}, {step}: focused {focused:?} must keep the accent fill; expected {expected:?}, painted {actual:?}"
+            "{theme:?}, {step}: focused {focused:?} must keep the theme highlight; expected {expected:?}, painted {actual:?}"
         );
     }
 }
