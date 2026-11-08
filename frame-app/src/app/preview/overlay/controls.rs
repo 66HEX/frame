@@ -7,15 +7,10 @@ use crate::app::preview::preview_visual_controls_enabled;
 use crate::app::preview::toolbar::preview_toolbar_vertical_separator;
 use crate::app::primitives::{ButtonVariant, button_colors, color, icon_svg};
 use crate::app::root::FrameRoot;
-use crate::preview::OverlaySizeDirection;
 use crate::{assets, theme};
 use gpui::prelude::*;
 use gpui::{ClickEvent, Context, FocusHandle, Window, div};
 
-#[expect(
-    clippy::too_many_lines,
-    reason = "Overlay controls are a compact declarative toolbar whose layout is clearer when kept together."
-)]
 pub(in crate::app) fn preview_overlay_controls(
     state: &PreviewShellState,
     focuses: PreviewEditToolbarFocus<'_>,
@@ -28,7 +23,6 @@ pub(in crate::app) fn preview_overlay_controls(
         return None;
     }
     let enabled = preview_visual_controls_enabled(state);
-    let media = state.media;
 
     let bar = div()
         .id("preview-overlay-toolbar")
@@ -57,40 +51,6 @@ pub(in crate::app) fn preview_overlay_controls(
             })),
         )
         .child(preview_toolbar_vertical_separator(palette))
-        .child(
-            preview_overlay_icon_button(
-                "decrease",
-                assets::ICON_MINUS,
-                "Decrease overlay size",
-                ButtonVariant::Ghost,
-                enabled,
-                palette,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
-                if root.nudge_selected_overlay_size(OverlaySizeDirection::Decrease, media) {
-                    cx.notify();
-                }
-            })),
-        )
-        .child(
-            preview_overlay_icon_button(
-                "increase",
-                assets::ICON_PLUS,
-                "Increase overlay size",
-                ButtonVariant::Ghost,
-                enabled,
-                palette,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
-                if root.nudge_selected_overlay_size(OverlaySizeDirection::Increase, media) {
-                    cx.notify();
-                }
-            })),
-        )
         .child(preview_overlay_opacity_slider(
             overlay.opacity,
             enabled,
@@ -151,23 +111,6 @@ pub(in crate::app) fn preview_overlay_controls(
             .justify_center()
             .child(bar),
     )
-}
-
-#[expect(
-    clippy::too_many_arguments,
-    reason = "Overlay buttons keep semantics, state, palette, and render context explicit."
-)]
-pub(super) fn preview_overlay_icon_button(
-    id: &'static str,
-    icon: &'static str,
-    label: &'static str,
-    variant: ButtonVariant,
-    enabled: bool,
-    palette: &'static theme::ThemePalette,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
-) -> gpui::Stateful<gpui::Div> {
-    preview_overlay_icon_button_inner(id, icon, label, variant, enabled, None, palette, window, cx)
 }
 
 #[expect(

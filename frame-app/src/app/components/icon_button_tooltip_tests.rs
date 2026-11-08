@@ -560,16 +560,14 @@ fn overlay_toolbar_icon_actions_expose_tooltips_in_the_real_preview() {
         cx.notify();
     });
     draw(cx);
+    for id in ["preview-overlay-decrease", "preview-overlay-increase"] {
+        assert!(cx.debug_bounds(id).is_none(), "{id} should not be rendered");
+    }
+    for id in ["preview-zoom-out", "preview-zoom-in"] {
+        assert!(cx.debug_bounds(id).is_some(), "{id} must remain available");
+    }
     for (id, tooltip_id) in [
         ("preview-overlay-replace", "tooltip-preview-overlay-replace"),
-        (
-            "preview-overlay-decrease",
-            "tooltip-preview-overlay-decrease",
-        ),
-        (
-            "preview-overlay-increase",
-            "tooltip-preview-overlay-increase",
-        ),
         ("preview-overlay-remove", "tooltip-preview-overlay-remove"),
         ("preview-overlay-done", "tooltip-preview-overlay-done"),
     ] {
