@@ -1145,6 +1145,160 @@ fn subtitle_stream_should_transcode_to_mov_text_in_mp4() -> TestResult {
 
 #[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn audio_parameters_should_follow_each_selected_source_track() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("audio_track_parameters")?;
+    let input = sandbox.path("mixed.mkv");
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=64x48:rate=10:duration=1",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:sample_rate=8000:duration=1",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=880:sample_rate=48000:duration=1",
+            "-map",
+            "0:v",
+            "-map",
+            "1:a",
+            "-map",
+            "2:a",
+            "-c:v",
+            "libx264",
+            "-c:a",
+            "mp3",
+            "-ar:a:0",
+            "8000",
+            "-ar:a:1",
+            "48000",
+            "-ac:a:1",
+            "2",
+            &path_arg(&input),
+        ]),
+    )?;
+    let metadata = probe_media(&tools, &input)?;
+    assert_eq!(
+        metadata.audio_tracks[0].sample_rate.as_deref(),
+        Some("8000")
+    );
+    assert_eq!(
+        metadata.audio_tracks[1].sample_rate.as_deref(),
+        Some("48000")
+    );
+    let mut config = video_config("mp4", "libx264", "mp3");
+    config.selected_audio_tracks = metadata
+        .audio_tracks
+        .iter()
+        .rev()
+        .map(|track| track.index)
+        .collect();
+    let output = sandbox.path("mp3.mp4");
+    convert(&tools, &input, &output, &config)?;
+    let output_metadata = probe_media(&tools, &output)?;
+    assert_eq!(
+        output_metadata
+            .audio_tracks
+            .iter()
+            .map(|track| track.sample_rate.as_deref())
+            .collect::<Vec<_>>(),
+        [Some("48000"), Some("16000")]
+    );
+    config.processing_mode = "copy".to_string();
+    assert!(
+        build_ffmpeg_args(&path_arg(&input), "copy.mp4", &config, &metadata)
+            .unwrap_err()
+            .to_string()
+            .contains("16 kHz")
+    );
+    config.processing_mode = "reencode".to_string();
+    config.container = "mkv".to_string();
+    config.audio_codec = "libopus".to_string();
+    config.audio_bitrate = "320".to_string();
+    assert!(
+        build_ffmpeg_args(&path_arg(&input), "opus.mkv", &config, &metadata)
+            .unwrap_err()
+            .to_string()
+            .contains("256")
+    );
+    config.audio_channels = "stereo".to_string();
+    let output = sandbox.path("opus-stereo.mkv");
+    convert(&tools, &input, &output, &config)?;
+    let encoded = probe_media(&tools, &output)?;
+    assert_eq!(encoded.audio_tracks.len(), 2);
+    assert!(
+        encoded
+            .audio_tracks
+            .iter()
+            .all(|track| track.channels == "2" && track.codec == "opus")
+    );
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn stereo_width_should_require_an_explicit_surround_downmix() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("stereo_width_channel_guard")?;
+    let input = sandbox.path("surround.mkv");
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=64x48:rate=10:duration=1",
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=channel_layout=5.1:sample_rate=48000:d=1",
+            "-c:v",
+            "libx264",
+            "-c:a",
+            "flac",
+            &path_arg(&input),
+        ]),
+    )?;
+    let metadata = probe_media(&tools, &input)?;
+    assert_eq!(metadata.audio_tracks[0].channels, "6");
+    assert_eq!(
+        metadata.audio_tracks[0].channel_layout.as_deref(),
+        Some("5.1")
+    );
+    let mut config = video_config("mkv", "libx264", "flac");
+    config.selected_audio_tracks = vec![metadata.audio_tracks[0].index];
+    config.audio_filters.stereo_width.enabled = true;
+    config.audio_filters.stereo_width.value = 150;
+    assert!(
+        build_ffmpeg_args(&path_arg(&input), "rejected.mkv", &config, &metadata)
+            .unwrap_err()
+            .to_string()
+            .contains("Stereo width")
+    );
+    config.audio_channels = "stereo".to_string();
+    let output = sandbox.path("stereo.mkv");
+    convert(&tools, &input, &output, &config)?;
+    assert_eq!(probe_media(&tools, &output)?.audio_tracks[0].channels, "2");
+    config.audio_channels = "original".to_string();
+    config.audio_filters.stereo_width.value = 100;
+    let output = sandbox.path("surround-preserved.mkv");
+    convert(&tools, &input, &output, &config)?;
+    assert_eq!(probe_media(&tools, &output)?.audio_tracks[0].channels, "6");
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 fn stream_copy_should_keep_audio_decodable_with_muxer_specific_options() -> TestResult {
     let tools = Toolchain::discover()?;
     let sandbox = Sandbox::new("mov_audio_copy_tags")?;
@@ -1153,6 +1307,7 @@ fn stream_copy_should_keep_audio_decodable_with_muxer_specific_options() -> Test
         ("g726", "g726", "adpcm_g726", "avi", 8000, "mov"),
         ("latm", "aac", "aac_latm", "mpegts", 48000, "mov"),
         ("dfpwm", "dfpwm", "dfpwm", "nut", 48000, "mkv"),
+        ("g723", "g723_1", "g723_1", "nut", 8000, "mov"),
     ] {
         if !encoder_available(&tools, encoder)? {
             eprintln!("skipping {label} fixture: encoder is unavailable");

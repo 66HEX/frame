@@ -7,8 +7,9 @@ use crate::app::inspector::audio_filters::range::{
 };
 use crate::app::inspector::audio_filters::spec::audio_filter_spec;
 use crate::app::inspector::panel::settings_field;
+use crate::app::inspector::shared::settings_hint_text;
 use crate::app::root::FrameRoot;
-use crate::settings::{ConversionConfig, ProcessingMode};
+use crate::settings::{ConversionConfig, ProcessingMode, SourceMetadata, stereo_width_available};
 use crate::theme;
 use frame_core::capabilities::AvailableFilters;
 use gpui::prelude::*;
@@ -20,6 +21,7 @@ use gpui::{Context, Window, div};
 )]
 pub(in crate::app) fn settings_audio_filters_tab(
     config: &ConversionConfig,
+    metadata: Option<&SourceMetadata>,
     settings_disabled: bool,
     available_filters: &AvailableFilters,
     palette: &'static theme::ThemePalette,
@@ -28,6 +30,25 @@ pub(in crate::app) fn settings_audio_filters_tab(
 ) -> gpui::Div {
     let filters = config.audio_filters;
     let controls_disabled = settings_disabled || config.processing_mode == ProcessingMode::Copy;
+    let width_available = stereo_width_available(config, metadata);
+    let mut stereo = settings_field("Stereo", palette).child(settings_audio_filter_range_field(
+        audio_filter_spec(
+            AudioFilterRangeTarget::StereoWidth,
+            filters.stereo_width.enabled,
+            i32::try_from(filters.stereo_width.value).unwrap_or(100),
+            available_filters,
+        ),
+        controls_disabled || !width_available,
+        palette,
+        window,
+        cx,
+    ));
+    if !width_available {
+        stereo = stereo.child(settings_hint_text(
+            "Stereo width needs stereo audio. Select stereo tracks or choose Stereo in Channels.",
+            palette,
+        ));
+    }
 
     div()
         .flex()
@@ -161,18 +182,5 @@ pub(in crate::app) fn settings_audio_filters_tab(
                     cx,
                 )),
         )
-        .child(
-            settings_field("Stereo", palette).child(settings_audio_filter_range_field(
-                audio_filter_spec(
-                    AudioFilterRangeTarget::StereoWidth,
-                    filters.stereo_width.enabled,
-                    i32::try_from(filters.stereo_width.value).unwrap_or(100),
-                    available_filters,
-                ),
-                controls_disabled,
-                palette,
-                window,
-                cx,
-            )),
-        )
+        .child(stereo)
 }

@@ -11,7 +11,7 @@ use crate::settings::model::{
 use crate::settings::options::{
     first_allowed_video_codec, first_allowed_video_pixel_format, first_allowed_video_preset,
     is_hardware_video_codec, is_nvenc_video_codec, is_video_preset_allowed,
-    is_videotoolbox_video_codec, mp2_original_channels_are_unsupported,
+    is_videotoolbox_video_codec, mp2_original_channels_are_unsupported, stereo_width_available,
 };
 use crate::settings::rules::{
     container_supports_audio, container_supports_subtitles, default_audio_codec_for_container,
@@ -115,8 +115,17 @@ pub fn normalize_output_config(
         config.audio_codec = default_audio_codec_for_container(&config.container).to_string();
     }
     normalize_audio_encoding_settings(config);
-    if mp2_original_channels_are_unsupported(config, metadata) {
+    if config.audio_channels == "original"
+        && mp2_original_channels_are_unsupported(config, metadata)
+    {
         config.audio_channels = "stereo".to_string();
+    }
+    if config.audio_filters.stereo_width.value != 100
+        && metadata.is_some()
+        && !config.selected_audio_tracks.is_empty()
+        && !stereo_width_available(config, metadata)
+    {
+        config.audio_filters.stereo_width.enabled = false;
     }
     normalize_video_config_values(config, metadata);
 

@@ -1,6 +1,6 @@
 use crate::settings::model::{
     AUDIO_CHANNEL_DEFINITIONS, AUDIO_CODEC_DEFINITIONS, AudioQualityRange, ConversionConfig,
-    DEFAULT_AUDIO_QUALITY, MAX_AUDIO_VOLUME, ProcessingMode,
+    DEFAULT_AUDIO_QUALITY, MAX_AUDIO_VOLUME, OPTIONAL_AUDIO_CODEC_DEFINITIONS, ProcessingMode,
 };
 use crate::settings::rules::{container_supports_audio, is_audio_codec_allowed_for_container};
 use crate::settings::updates::normalize::normalize_audio_encoding_settings;
@@ -11,6 +11,9 @@ pub fn toggle_audio_track_selection(config: &mut ConversionConfig, index: u32) -
             .selected_audio_tracks
             .retain(|selected_index| *selected_index != index);
     } else {
+        if frame_core::audio_rules::audio_track_limit(&config.container) == Some(1) {
+            config.selected_audio_tracks.clear();
+        }
         config.selected_audio_tracks.push(index);
     }
 
@@ -175,7 +178,13 @@ pub(super) fn normalized_audio_quality(codec: &str, quality: &str) -> String {
 pub(super) fn is_known_audio_codec(codec: &str) -> bool {
     AUDIO_CODEC_DEFINITIONS
         .iter()
-        .any(|definition| definition.codec == codec)
+        .map(|definition| definition.codec)
+        .chain(
+            OPTIONAL_AUDIO_CODEC_DEFINITIONS
+                .iter()
+                .map(|definition| definition.codec),
+        )
+        .any(|known_codec| known_codec == codec)
 }
 
 pub(super) fn is_known_audio_channels(channels: &str) -> bool {

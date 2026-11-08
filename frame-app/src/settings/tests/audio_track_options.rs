@@ -90,3 +90,34 @@ fn toggle_audio_track_selection_removes_selected_track() {
 
     assert_eq!(config.selected_audio_tracks, vec![2]);
 }
+
+#[test]
+fn single_track_outputs_replace_selection_only_after_an_explicit_click() {
+    for container in ["mp3", "wav", "flac"] {
+        let mut config = ConversionConfig {
+            container: container.to_string(),
+            selected_audio_tracks: vec![1, 2],
+            ..ConversionConfig::default()
+        };
+        normalize_output_config(&mut config, Some(&metadata_with_tracks()));
+        assert_eq!(config.selected_audio_tracks, [1, 2]);
+        assert!(
+            audio_settings_error(&config, Some(&metadata_with_tracks()))
+                .unwrap()
+                .contains("one audio track")
+        );
+        toggle_audio_track_selection(&mut config, 3);
+        assert_eq!(config.selected_audio_tracks, [3]);
+        toggle_audio_track_selection(&mut config, 3);
+        assert!(config.selected_audio_tracks.is_empty());
+    }
+    for container in ["mkv", "m4a"] {
+        let mut config = ConversionConfig {
+            container: container.to_string(),
+            selected_audio_tracks: vec![1],
+            ..ConversionConfig::default()
+        };
+        toggle_audio_track_selection(&mut config, 2);
+        assert_eq!(config.selected_audio_tracks, [1, 2]);
+    }
+}

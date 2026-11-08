@@ -5,6 +5,10 @@ use crate::settings::model::{
 };
 use crate::settings::rules::is_audio_codec_allowed_for_container;
 use crate::settings::source_info::{audio_track_bitrate, audio_track_detail, display_source_value};
+use frame_core::audio_rules::{
+    audio_stream_copy_error, audio_track_count_error, effective_audio_channels,
+    opus_channels_error, opus_encoding_error, stereo_width_supports_channels,
+};
 use frame_core::capabilities::AvailableEncoders;
 
 #[must_use]
@@ -49,13 +53,109 @@ pub fn audio_channel_options(
     disabled: bool,
 ) -> [AudioChannelOption; 3] {
     let disabled = disabled || config.processing_mode == ProcessingMode::Copy;
-    let original_is_unsupported = mp2_original_channels_are_unsupported(config, metadata);
+    let original_is_unsupported = mp2_original_channels_are_unsupported(config, metadata)
+        || (config.audio_codec == "libopus"
+            && metadata.is_some_and(|metadata| {
+                metadata
+                    .audio_tracks
+                    .iter()
+                    .filter(|track| config.selected_audio_tracks.contains(&track.index))
+                    .any(|track| {
+                        opus_channels_error(
+                            track
+                                .channels
+                                .as_deref()
+                                .and_then(|value| value.parse().ok()),
+                            track.channel_layout.as_deref(),
+                        )
+                        .is_some()
+                    })
+            }));
 
     AUDIO_CHANNEL_DEFINITIONS.map(|definition| AudioChannelOption {
         id: definition.id,
         label: definition.label,
         is_selected: config.audio_channels.eq_ignore_ascii_case(definition.id),
         is_disabled: disabled || (definition.id == "original" && original_is_unsupported),
+    })
+}
+
+#[must_use]
+pub fn audio_settings_error(
+    config: &ConversionConfig,
+    metadata: Option<&SourceMetadata>,
+) -> Option<String> {
+    if !frame_core::media_rules::container_supports_audio(&config.container) {
+        return None;
+    }
+    if let Some(reason) =
+        audio_track_count_error(&config.container, config.selected_audio_tracks.len())
+    {
+        return Some(reason);
+    }
+    for track in metadata?
+        .audio_tracks
+        .iter()
+        .filter(|track| config.selected_audio_tracks.contains(&track.index))
+    {
+        let reason = if config.processing_mode == ProcessingMode::Copy {
+            audio_stream_copy_error(
+                &config.container,
+                &track.codec,
+                track.sample_rate.as_deref(),
+            )
+            .map(str::to_string)
+        } else if config.audio_codec == "libopus" {
+            let channels = effective_audio_channels(
+                &config.audio_channels,
+                track
+                    .channels
+                    .as_deref()
+                    .and_then(|value| value.parse().ok()),
+            );
+            let layout = if config.audio_channels == "original" {
+                track.channel_layout.as_deref()
+            } else {
+                None
+            };
+            opus_encoding_error(&config.audio_bitrate, channels, layout)
+        } else {
+            None
+        };
+        if let Some(reason) = reason {
+            return Some(format!("Track #{}: {reason}", track.index));
+        }
+    }
+    None
+}
+
+#[must_use]
+pub fn stereo_width_available(
+    config: &ConversionConfig,
+    metadata: Option<&SourceMetadata>,
+) -> bool {
+    if config.selected_audio_tracks.is_empty() {
+        return false;
+    }
+    if config.audio_channels == "stereo" {
+        return true;
+    }
+    metadata.is_some_and(|metadata| {
+        config.selected_audio_tracks.iter().all(|index| {
+            metadata
+                .audio_tracks
+                .iter()
+                .find(|track| track.index == *index)
+                .is_some_and(|track| {
+                    stereo_width_supports_channels(
+                        &config.audio_channels,
+                        track
+                            .channels
+                            .as_deref()
+                            .and_then(|value| value.parse().ok()),
+                    )
+                })
+        })
     })
 }
 

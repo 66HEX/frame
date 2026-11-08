@@ -81,6 +81,7 @@ fn preview_runtime_key_tracks_visual_config_but_ignores_encoder_quality() {
                 index: 1,
                 codec: "aac".to_string(),
                 channels: Some("2".to_string()),
+                channel_layout: Some("stereo".to_string()),
                 language: None,
                 label: None,
                 bitrate_kbps: None,

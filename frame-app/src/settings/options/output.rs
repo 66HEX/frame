@@ -1,12 +1,13 @@
 use crate::settings::model::{
-    ConversionConfig, OutputContainerOption, OutputModeOption, ProcessingMode, SourceKind,
-    SourceMetadata,
+    AudioTrack, ConversionConfig, OutputContainerOption, OutputModeOption, ProcessingMode,
+    SourceKind, SourceMetadata,
 };
 use crate::settings::rules::{
-    is_audio_only_container, is_audio_stream_codec_allowed_for_container, is_gif_container,
-    is_image_container, is_subtitle_codec_allowed_for_container,
-    is_video_stream_codec_allowed_for_container, source_kind_for,
+    is_audio_only_container, is_gif_container, is_image_container,
+    is_subtitle_codec_allowed_for_container, is_video_stream_codec_allowed_for_container,
+    source_kind_for,
 };
+use frame_core::audio_rules::{audio_stream_copy_error, audio_track_count_error};
 use frame_core::media_rules;
 
 #[must_use]
@@ -80,12 +81,18 @@ pub fn is_container_compatible_for_stream_copy(
         return true;
     };
 
-    let selected_audio_codecs = selected_audio_codecs(config, metadata);
+    let selected_audio = selected_audio_tracks(config, metadata);
+    if selected_audio.len() != config.selected_audio_tracks.len()
+        || audio_track_count_error(container, selected_audio.len()).is_some()
+    {
+        return false;
+    }
     if is_audio_only_container(container) {
-        return !selected_audio_codecs.is_empty()
-            && selected_audio_codecs
-                .iter()
-                .all(|codec| is_audio_stream_codec_allowed_for_container(container, codec));
+        return !selected_audio.is_empty()
+            && selected_audio.iter().all(|track| {
+                audio_stream_copy_error(container, &track.codec, track.sample_rate.as_deref())
+                    .is_none()
+            });
     }
 
     let Some(video_codec) = metadata.video_codec.as_deref() else {
@@ -95,9 +102,9 @@ pub fn is_container_compatible_for_stream_copy(
         return false;
     }
 
-    let audio_codecs_allowed = selected_audio_codecs
-        .iter()
-        .all(|codec| is_audio_stream_codec_allowed_for_container(container, codec));
+    let audio_codecs_allowed = selected_audio.iter().all(|track| {
+        audio_stream_copy_error(container, &track.codec, track.sample_rate.as_deref()).is_none()
+    });
     let subtitle_codecs_allowed = selected_subtitle_codecs(config, metadata)
         .iter()
         .all(|codec| is_subtitle_codec_allowed_for_container(container, codec));
@@ -137,21 +144,34 @@ pub(super) fn output_container_disabled_reason(
         return Some("Audio container unavailable for image sources");
     }
     if !is_container_compatible_for_stream_copy(config, metadata, container) {
+        if audio_track_count_error(container, config.selected_audio_tracks.len()).is_some() {
+            return Some("Select one audio track for this format");
+        }
+        if metadata.is_some_and(|metadata| {
+            selected_audio_tracks(config, metadata).iter().any(|track| {
+                frame_core::audio_rules::mp3_requires_mp4_resampling(
+                    container,
+                    &track.codec,
+                    track.sample_rate.as_deref(),
+                )
+            })
+        }) {
+            return Some("MP4 needs MP3 audio at 16 kHz or higher");
+        }
         return Some("Incompatible container");
     }
 
     None
 }
 
-pub(super) fn selected_audio_codecs<'a>(
+pub(super) fn selected_audio_tracks<'a>(
     config: &ConversionConfig,
     metadata: &'a SourceMetadata,
-) -> Vec<&'a str> {
+) -> Vec<&'a AudioTrack> {
     metadata
         .audio_tracks
         .iter()
         .filter(|track| config.selected_audio_tracks.contains(&track.index))
-        .map(|track| track.codec.as_str())
         .collect()
 }
 

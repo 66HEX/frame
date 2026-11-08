@@ -336,6 +336,7 @@ fn settings_output_section(
         )),
         OutputSection::AudioFilters => content.child(settings_audio_filters_tab(
             settings.config,
+            settings.metadata,
             settings.settings_disabled,
             settings.available_filters,
             palette,

@@ -124,6 +124,7 @@ pub fn source_metadata_from_probe(probe: ProbeMetadata) -> SourceMetadata {
                 index: track.index,
                 codec: track.codec,
                 channels: Some(track.channels),
+                channel_layout: track.channel_layout,
                 language: track.language,
                 label: track.label,
                 bitrate_kbps: track.bitrate_kbps,
@@ -265,6 +266,7 @@ mod tests {
                     index: 1,
                     codec: "aac".to_string(),
                     channels: "2".to_string(),
+                    channel_layout: Some("stereo".to_string()),
                     language: Some("eng".to_string()),
                     label: Some("Main".to_string()),
                     bitrate_kbps: Some(192.0),
@@ -275,6 +277,10 @@ mod tests {
 
             assert_eq!(metadata.audio_tracks[0].label.as_deref(), Some("Main"));
             assert_eq!(metadata.audio_tracks[0].channels.as_deref(), Some("2"));
+            assert_eq!(
+                metadata.audio_tracks[0].channel_layout.as_deref(),
+                Some("stereo")
+            );
         }
 
         #[test]

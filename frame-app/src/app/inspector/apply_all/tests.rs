@@ -667,3 +667,62 @@ fn memo_does_not_cache_target_qualification_or_cross_audio_video_or_containers()
         assert_eq!(policy.audio_verdicts.entries, [("h264", false)]);
     }
 }
+
+#[test]
+fn copy_audio_rate_validation_is_not_cached_by_codec() {
+    let donor = ConversionConfig {
+        container: "mp4".into(),
+        processing_mode: ProcessingMode::Copy,
+        ..ConversionConfig::default()
+    };
+    let preset = create_custom_preset(String::new(), "copy", &donor);
+    let target = ConversionConfig {
+        selected_audio_tracks: vec![3],
+        ..ConversionConfig::default()
+    };
+    for rates in [[8000, 48000], [48000, 8000]] {
+        let sources: Vec<_> = rates
+            .into_iter()
+            .map(|rate| {
+                let mut source = metadata(SourceKind::Video, "h264", "mp3");
+                for track in &mut source.audio_tracks {
+                    track.sample_rate = Some(rate.to_string());
+                }
+                source
+            })
+            .collect();
+        let mut policy = CandidatePolicy::new(&donor);
+        for (source, rate) in sources.iter().zip(rates) {
+            assert!(policy.may_apply(&target, source));
+            assert_eq!(
+                candidate_for(&preset, &target, source).is_some(),
+                rate >= 16000
+            );
+        }
+    }
+}
+
+#[test]
+fn apply_all_reencode_rechecks_opus_bitrate_for_each_target() {
+    let donor = ConversionConfig {
+        container: "mkv".into(),
+        audio_codec: "libopus".into(),
+        audio_bitrate: "320".into(),
+        ..ConversionConfig::default()
+    };
+    let preset = create_custom_preset(String::new(), "Opus", &donor);
+    let target = ConversionConfig {
+        selected_audio_tracks: vec![3],
+        ..ConversionConfig::default()
+    };
+    for channels in [1, 2] {
+        let mut source = metadata(SourceKind::Video, "h264", "flac");
+        for track in &mut source.audio_tracks {
+            track.channels = Some(channels.to_string());
+        }
+        assert_eq!(
+            candidate_for(&preset, &target, &source).is_some(),
+            channels == 2
+        );
+    }
+}

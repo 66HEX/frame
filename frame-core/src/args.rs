@@ -1,5 +1,9 @@
 use std::{collections::HashSet, path::Path};
 
+use crate::audio_rules::{
+    audio_stream_copy_error, audio_track_count_error, effective_audio_channels,
+    mp3_requires_mp4_resampling, opus_encoding_error, stereo_width_supports_channels,
+};
 use crate::codec::{
     add_audio_codec_args, add_fps_args, add_video_codec_args, audio_codec_supports_vbr,
     subtitle_output_codec,
@@ -15,9 +19,9 @@ use crate::filters::{
 use crate::media_filters::validate_media_filters;
 use crate::media_rules::{
     SubtitleStreamAction as SubtitleAction, all_containers, container_supports_audio,
-    container_supports_subtitles, is_audio_codec_allowed, is_audio_stream_codec_allowed,
-    is_image_container, is_video_codec_allowed, is_video_only_container,
-    is_video_pixel_format_allowed, is_video_stream_codec_allowed,
+    container_supports_subtitles, is_audio_codec_allowed, is_image_container,
+    is_video_codec_allowed, is_video_only_container, is_video_pixel_format_allowed,
+    is_video_stream_codec_allowed,
 };
 use crate::types::{
     AudioTrack, ConversionConfig, ExternalSubtitleTrack, MetadataConfig, MetadataMode,
@@ -53,6 +57,63 @@ fn collect_selected_audio_tracks<'a>(
                 })
         })
         .collect()
+}
+
+fn validate_audio_track_count(config: &ConversionConfig) -> Result<(), ConversionError> {
+    if let Some(reason) =
+        audio_track_count_error(&config.container, config.selected_audio_tracks.len())
+    {
+        return Err(ConversionError::InvalidInput(reason));
+    }
+    Ok(())
+}
+
+fn validate_audio_encoding_tracks(
+    config: &ConversionConfig,
+    probe: &ProbeMetadata,
+) -> Result<(), ConversionError> {
+    validate_audio_track_count(config)?;
+    if is_copy_mode(config) || !container_supports_audio(&config.container) {
+        return Ok(());
+    }
+    for track in collect_selected_audio_tracks(config, probe)? {
+        let source_channels = track.channels.parse::<u16>().ok();
+        if config.audio_codec == "libopus" {
+            let channels = effective_audio_channels(&config.audio_channels, source_channels);
+            let layout = (config.audio_channels == "original")
+                .then_some(track.channel_layout.as_deref())
+                .flatten();
+            if let Some(reason) = opus_encoding_error(&config.audio_bitrate, channels, layout) {
+                return Err(ConversionError::InvalidInput(format!(
+                    "Audio track #{}: {reason}",
+                    track.index
+                )));
+            }
+        }
+        let width = config.audio_filters.stereo_width;
+        if width.enabled
+            && width.value != 100
+            && !stereo_width_supports_channels(&config.audio_channels, source_channels)
+        {
+            return Err(ConversionError::InvalidInput(format!(
+                "Stereo width needs two channels in every selected audio track. Track #{} is not stereo; choose Stereo in Channels or turn off Stereo width.",
+                track.index
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_audio_copy_track(container: &str, track: &AudioTrack) -> Result<(), ConversionError> {
+    if let Some(reason) =
+        audio_stream_copy_error(container, &track.codec, track.sample_rate.as_deref())
+    {
+        return Err(ConversionError::InvalidInput(format!(
+            "Audio codec '{}' from source track #{} is incompatible with container '{}': {reason}",
+            track.codec, track.index, container
+        )));
+    }
+    Ok(())
 }
 
 fn collect_selected_subtitle_tracks<'a>(
@@ -364,6 +425,7 @@ pub fn validate_stream_copy_compatibility(
     if !is_copy_mode(config) {
         return Ok(());
     }
+    validate_audio_track_count(config)?;
 
     let is_audio_only = is_audio_only_container(&config.container);
 
@@ -375,12 +437,7 @@ pub fn validate_stream_copy_compatibility(
             ));
         }
         for track in selected_audio {
-            if !is_audio_stream_codec_allowed(&config.container, &track.codec) {
-                return Err(ConversionError::InvalidInput(format!(
-                    "Audio codec '{}' from source track #{} is incompatible with container '{}'",
-                    track.codec, track.index, config.container
-                )));
-            }
+            validate_audio_copy_track(&config.container, track)?;
         }
         return Ok(());
     }
@@ -399,12 +456,7 @@ pub fn validate_stream_copy_compatibility(
 
     if container_supports_audio(&config.container) {
         for track in collect_selected_audio_tracks(config, probe)? {
-            if !is_audio_stream_codec_allowed(&config.container, &track.codec) {
-                return Err(ConversionError::InvalidInput(format!(
-                    "Audio codec '{}' from source track #{} is incompatible with container '{}'",
-                    track.codec, track.index, config.container
-                )));
-            }
+            validate_audio_copy_track(&config.container, track)?;
         }
     }
 
@@ -438,6 +490,7 @@ pub fn build_ffmpeg_args(
     config: &ConversionConfig,
     probe: &ProbeMetadata,
 ) -> Result<Vec<String>, ConversionError> {
+    validate_audio_encoding_tracks(config, probe)?;
     let mut args = Vec::new();
 
     // Hardware decode acceleration (must be before -i)
@@ -510,6 +563,11 @@ pub fn build_ffmpeg_args(
             let audio_tracks = collect_selected_audio_tracks(config, probe)?;
             add_track_maps(&mut args, &audio_tracks, |track| track.index);
             for (output_index, track) in audio_tracks.iter().enumerate() {
+                if config.container.eq_ignore_ascii_case("mov") && track.codec == "g723_1" {
+                    // G.723.1 has 240 samples per packet. Demuxed streams can
+                    // lose this value, causing MOV's edit list to omit the tail.
+                    args.extend([format!("-frame_size:a:{output_index}"), "240".to_string()]);
+                }
                 if config.container.eq_ignore_ascii_case("mkv") && track.codec == "dfpwm" {
                     // Demuxers can omit the keyframe flag for DFPWM packets;
                     // otherwise stream copy silently emits an empty track.
@@ -667,6 +725,18 @@ pub fn build_ffmpeg_args(
     }
 
     if !is_video_only && !is_image_output && !config.selected_audio_tracks.is_empty() {
+        for (output_index, track) in collect_selected_audio_tracks(config, probe)?
+            .iter()
+            .enumerate()
+        {
+            if mp3_requires_mp4_resampling(
+                &config.container,
+                &config.audio_codec,
+                track.sample_rate.as_deref(),
+            ) {
+                args.extend([format!("-ar:a:{output_index}"), "16000".to_string()]);
+            }
+        }
         let audio_filters = build_audio_filters(config);
         if !audio_filters.is_empty() {
             args.push("-af".to_string());
@@ -886,6 +956,7 @@ pub fn validate_task_input(
             "Input path is not a file: {file_path}"
         )));
     }
+    validate_audio_track_count(config)?;
 
     let start_time = config
         .start_time
@@ -1048,9 +1119,9 @@ pub fn validate_task_input(
                             config.audio_bitrate
                         ))
                     })?;
-                    if bitrate <= 0.0 {
+                    if !bitrate.is_finite() || bitrate <= 0.0 {
                         return Err(ConversionError::InvalidInput(
-                            "Audio bitrate must be positive".to_string(),
+                            "Audio bitrate must be a finite, positive number".to_string(),
                         ));
                     }
                 }
@@ -1079,6 +1150,17 @@ pub fn validate_task_input(
                     "Invalid audio bitrate mode: {other}"
                 )));
             }
+        }
+        if config.audio_codec == "libopus"
+            && !config.selected_audio_tracks.is_empty()
+            && matches!(config.audio_channels.as_str(), "mono" | "stereo")
+            && let Some(reason) = opus_encoding_error(
+                &config.audio_bitrate,
+                effective_audio_channels(&config.audio_channels, None),
+                None,
+            )
+        {
+            return Err(ConversionError::InvalidInput(reason));
         }
         if config.audio_codec == "mp2"
             && !matches!(
@@ -1450,6 +1532,154 @@ mod tests {
         config.processing_mode = "reencode".to_string();
         let args = build_ffmpeg_args("source.nut", "output.mkv", &config, &probe).unwrap();
         assert!(!args.iter().any(|arg| arg.starts_with("-copyinkf")));
+    }
+
+    #[test]
+    fn g723_mov_copy_restores_frame_size_only_for_the_selected_output_stream() {
+        let mut config = sample_config("mov", "libx264");
+        config.processing_mode = "copy".to_string();
+        config.selected_audio_tracks = vec![2, 1];
+        let mut probe = sample_probe();
+        probe.audio_tracks.push(AudioTrack {
+            index: 2,
+            codec: "g723_1".to_string(),
+            channels: "1".to_string(),
+            ..AudioTrack::default()
+        });
+        let args = build_ffmpeg_args("input.nut", "output.mov", &config, &probe).unwrap();
+        assert!(args_contains_pair(&args, "-frame_size:a:0", "240"));
+        assert!(!args.iter().any(|arg| arg == "-frame_size:a:1"));
+        for (container, mode) in [("mkv", "copy"), ("mov", "reencode")] {
+            config.container = container.to_string();
+            config.processing_mode = mode.to_string();
+            let args = build_ffmpeg_args("input.nut", "output.video", &config, &probe).unwrap();
+            assert!(!args.iter().any(|arg| arg.starts_with("-frame_size")));
+        }
+    }
+
+    #[test]
+    fn single_track_audio_outputs_reject_saved_multiple_selections_in_both_modes() {
+        let input = temporary_input_file_with_extension("single-track-limit", "mkv");
+        for container in ["mp3", "wav", "flac"] {
+            for mode in ["copy", "reencode"] {
+                let mut config = sample_config(container, "libx264");
+                config.processing_mode = mode.to_string();
+                config.selected_audio_tracks = vec![1, 2];
+                assert!(
+                    validate_task_input(&input.to_string_lossy(), &config)
+                        .unwrap_err()
+                        .to_string()
+                        .contains("one audio track")
+                );
+                assert!(
+                    build_ffmpeg_args("input.mkv", "output.audio", &config, &sample_probe())
+                        .unwrap_err()
+                        .to_string()
+                        .contains("one audio track")
+                );
+            }
+        }
+        fs::remove_file(input).unwrap();
+    }
+
+    #[test]
+    fn mp3_mp4_resamples_only_selected_low_rate_streams() {
+        let mut config = sample_config("mp4", "libx264");
+        config.audio_codec = "mp3".to_string();
+        config.selected_audio_tracks = vec![2, 1];
+        let mut probe = sample_probe();
+        probe.audio_tracks[0].codec = "mp3".to_string();
+        probe.audio_tracks[0].sample_rate = Some("8000".to_string());
+        probe.audio_tracks.push(AudioTrack {
+            index: 2,
+            codec: "mp3".to_string(),
+            channels: "2".to_string(),
+            sample_rate: Some("48000".to_string()),
+            ..AudioTrack::default()
+        });
+        let args = build_ffmpeg_args("input.mkv", "output.mp4", &config, &probe).unwrap();
+        assert!(args_contains_pair(&args, "-ar:a:1", "16000"));
+        assert!(!args.iter().any(|arg| arg == "-ar:a:0" || arg == "-ar"));
+        config.processing_mode = "copy".to_string();
+        assert!(
+            build_ffmpeg_args("input.mkv", "output.mp4", &config, &probe)
+                .unwrap_err()
+                .to_string()
+                .contains("16 kHz")
+        );
+        config.selected_audio_tracks = vec![2];
+        assert!(build_ffmpeg_args("input.mkv", "output.mp4", &config, &probe).is_ok());
+        config.processing_mode = "reencode".to_string();
+        config.selected_audio_tracks = vec![1];
+        for container in ["mov", "mkv", "mp3"] {
+            config.container = container.to_string();
+            let args = build_ffmpeg_args("input.mkv", "output.audio", &config, &probe).unwrap();
+            assert!(!args.iter().any(|arg| arg.starts_with("-ar")));
+        }
+    }
+
+    #[test]
+    fn opus_checks_every_selected_track_and_explicit_channel_override() {
+        let mut config = sample_config("mkv", "libx264");
+        config.audio_codec = "libopus".to_string();
+        config.audio_bitrate = "320".to_string();
+        let mut probe = sample_probe();
+        probe.audio_tracks.push(AudioTrack {
+            index: 2,
+            codec: "flac".to_string(),
+            channels: "1".to_string(),
+            ..AudioTrack::default()
+        });
+        for selected in [vec![1, 2], vec![2, 1]] {
+            config.selected_audio_tracks = selected;
+            for (mode, allowed) in [("original", false), ("stereo", true), ("mono", false)] {
+                config.audio_channels = mode.to_string();
+                assert_eq!(
+                    build_ffmpeg_args("input.mkv", "output.mkv", &config, &probe).is_ok(),
+                    allowed,
+                    "{mode}"
+                );
+            }
+        }
+        config.audio_channels = "original".to_string();
+        config.audio_bitrate = "128".to_string();
+        config.selected_audio_tracks = vec![2];
+        probe.audio_tracks[1].channels = "6".to_string();
+        probe.audio_tracks[1].channel_layout = Some("5.1(side)".to_string());
+        assert!(
+            build_ffmpeg_args("input.mkv", "output.mkv", &config, &probe)
+                .unwrap_err()
+                .to_string()
+                .contains("channel layout")
+        );
+        probe.audio_tracks[1].channel_layout = Some("5.1".to_string());
+        assert!(build_ffmpeg_args("input.mkv", "output.mkv", &config, &probe).is_ok());
+    }
+
+    #[test]
+    fn stereo_width_never_implicitly_downmixes_original_audio() {
+        let mut config = sample_config("mkv", "libx264");
+        config.audio_codec = "flac".to_string();
+        config.selected_audio_tracks = vec![1];
+        config.audio_filters.stereo_width.enabled = true;
+        config.audio_filters.stereo_width.value = 150;
+        let mut probe = sample_probe();
+        probe.audio_tracks[0].channels = "6".to_string();
+        assert!(
+            build_ffmpeg_args("input.mkv", "output.mkv", &config, &probe)
+                .unwrap_err()
+                .to_string()
+                .contains("Stereo width")
+        );
+        config.audio_channels = "stereo".to_string();
+        assert!(build_ffmpeg_args("input.mkv", "output.mkv", &config, &probe).is_ok());
+        config.audio_channels = "original".to_string();
+        config.audio_filters.stereo_width.value = 100;
+        assert!(build_ffmpeg_args("input.mkv", "output.mkv", &config, &probe).is_ok());
+        config.audio_filters.stereo_width.value = 150;
+        config.selected_audio_tracks.clear();
+        let args = build_ffmpeg_args("input.mkv", "output.mkv", &config, &probe).unwrap();
+        assert!(!args.iter().any(|arg| arg == "-af"));
     }
 
     #[test]

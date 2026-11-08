@@ -21,7 +21,7 @@ pub(in crate::app) fn settings_value_badge(
 }
 
 pub(in crate::app) fn settings_hint_text(
-    text: &'static str,
+    text: &str,
     palette: &'static theme::ThemePalette,
 ) -> gpui::Div {
     frame_description(theme::ui_text(text), palette)

@@ -9,8 +9,8 @@ mod subtitles;
 mod video;
 
 pub use audio::{
-    audio_channel_options, audio_codec_options, audio_track_options,
-    mp2_original_channels_are_unsupported,
+    audio_channel_options, audio_codec_options, audio_settings_error, audio_track_options,
+    mp2_original_channels_are_unsupported, stereo_width_available,
 };
 pub use images::{
     image_jpeg_huffman_options, image_png_prediction_options, image_tiff_compression_options,

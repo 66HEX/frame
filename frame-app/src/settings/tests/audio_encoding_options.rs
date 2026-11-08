@@ -1,4 +1,124 @@
 use super::*;
+use frame_core::capabilities::AvailableEncoders;
+
+#[test]
+fn mp2_normalization_preserves_explicit_mono_for_surround_sources() {
+    let metadata = SourceMetadata {
+        media_kind: Some(SourceKind::Video),
+        audio_tracks: vec![AudioTrack {
+            index: 1,
+            channels: Some("6".to_string()),
+            ..AudioTrack::default()
+        }],
+        ..SourceMetadata::default()
+    };
+    for (channels, expected) in [("original", "stereo"), ("mono", "mono")] {
+        let mut config = ConversionConfig {
+            container: "m2t".to_string(),
+            audio_codec: "mp2".to_string(),
+            audio_channels: channels.to_string(),
+            selected_audio_tracks: vec![1],
+            ..ConversionConfig::default()
+        };
+        normalize_output_config(&mut config, Some(&metadata));
+        assert_eq!(config.audio_channels, expected);
+    }
+}
+
+#[test]
+fn opus_ui_validates_each_selected_source_and_preserves_invalid_bitrate() {
+    let metadata = SourceMetadata {
+        media_kind: Some(SourceKind::Video),
+        audio_tracks: vec![
+            AudioTrack {
+                index: 1,
+                channels: Some("2".to_string()),
+                ..AudioTrack::default()
+            },
+            AudioTrack {
+                index: 2,
+                channels: Some("1".to_string()),
+                ..AudioTrack::default()
+            },
+        ],
+        ..SourceMetadata::default()
+    };
+    let mut config = ConversionConfig {
+        container: "mkv".to_string(),
+        audio_codec: "libopus".to_string(),
+        audio_bitrate: "320".to_string(),
+        selected_audio_tracks: vec![1, 2],
+        ..ConversionConfig::default()
+    };
+    for tracks in [vec![1, 2], vec![2, 1]] {
+        config.selected_audio_tracks = tracks;
+        normalize_output_config(&mut config, Some(&metadata));
+        assert_eq!(config.audio_bitrate, "320");
+        assert!(
+            audio_settings_error(&config, Some(&metadata))
+                .unwrap()
+                .contains("256")
+        );
+    }
+    config.audio_channels = "stereo".to_string();
+    assert_eq!(audio_settings_error(&config, Some(&metadata)), None);
+    config.selected_audio_tracks.clear();
+    config.audio_channels = "mono".to_string();
+    assert_eq!(audio_settings_error(&config, Some(&metadata)), None);
+}
+
+#[test]
+fn stereo_width_deactivation_keeps_the_draft_value() {
+    let metadata = SourceMetadata {
+        media_kind: Some(SourceKind::Video),
+        audio_tracks: vec![AudioTrack {
+            index: 1,
+            channels: Some("6".to_string()),
+            ..AudioTrack::default()
+        }],
+        ..SourceMetadata::default()
+    };
+    let mut config = ConversionConfig {
+        container: "mkv".to_string(),
+        audio_codec: "flac".to_string(),
+        selected_audio_tracks: vec![1],
+        ..ConversionConfig::default()
+    };
+    config.audio_filters.stereo_width.enabled = true;
+    config.audio_filters.stereo_width.value = 150;
+    assert!(!stereo_width_available(&config, Some(&metadata)));
+    normalize_output_config(&mut config, Some(&metadata));
+    assert!(!config.audio_filters.stereo_width.enabled);
+    assert_eq!(config.audio_filters.stereo_width.value, 150);
+    config.audio_channels = "stereo".to_string();
+    assert!(stereo_width_available(&config, Some(&metadata)));
+    config.audio_channels = "original".to_string();
+    config.audio_filters.stereo_width.enabled = true;
+    config.audio_filters.stereo_width.value = 100;
+    normalize_output_config(&mut config, Some(&metadata));
+    assert!(config.audio_filters.stereo_width.enabled);
+}
+
+#[test]
+fn available_fdk_aac_can_be_selected_and_keep_its_vbr_quality() {
+    let available = AvailableEncoders {
+        libfdk_aac: true,
+        ..AvailableEncoders::default()
+    };
+    let mut config = ConversionConfig::default();
+    assert!(
+        audio_codec_options(&config, &available, false)
+            .iter()
+            .any(|option| option.codec == "libfdk_aac" && !option.is_disabled)
+    );
+    assert!(apply_audio_codec(&mut config, "libfdk_aac"));
+    assert!(apply_audio_bitrate_mode(&mut config, "vbr"));
+    apply_audio_quality(&mut config, "5");
+    normalize_output_config(&mut config, None);
+    assert_eq!(config.audio_codec, "libfdk_aac");
+    assert_eq!(config.audio_bitrate_mode, "vbr");
+    assert_eq!(config.audio_quality, "5");
+}
 
 fn channel_option<'a>(options: &'a [AudioChannelOption], id: &str) -> &'a AudioChannelOption {
     options

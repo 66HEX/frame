@@ -7,7 +7,7 @@ use crate::app::root::FrameRoot;
 use crate::file_queue::FileItem;
 use crate::settings::{
     ConversionConfig, PresetDefinition, ProcessingMode, SourceKind, SourceMetadata, apply_preset,
-    container_supports_audio, create_custom_preset, is_audio_only_container,
+    audio_settings_error, container_supports_audio, create_custom_preset, is_audio_only_container,
     is_audio_stream_codec_allowed_for_container, is_container_compatible_for_stream_copy,
     is_gif_container, is_image_container, is_video_stream_codec_allowed_for_container,
     preset_is_compatible, source_kind_for,
@@ -186,6 +186,7 @@ fn candidate_for(
             .any(|track| track.index == *index)
     });
     (indices_exist
+        && audio_settings_error(&candidate, Some(metadata)).is_none()
         && is_container_compatible_for_stream_copy(
             &candidate,
             Some(metadata),

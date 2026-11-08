@@ -47,6 +47,7 @@ pub struct AudioTrack {
     pub index: u32,
     pub codec: String,
     pub channels: Option<String>,
+    pub channel_layout: Option<String>,
     pub language: Option<String>,
     pub label: Option<String>,
     pub bitrate_kbps: Option<f64>,

@@ -1,5 +1,33 @@
 use super::*;
 
+#[test]
+fn mp4_copy_option_explains_the_mp3_sample_rate_requirement() {
+    let mut metadata = video_metadata();
+    metadata.audio_tracks[0].codec = "mp3".to_string();
+    metadata.audio_tracks[0].sample_rate = Some("8000".to_string());
+    let config = ConversionConfig {
+        processing_mode: ProcessingMode::Copy,
+        selected_audio_tracks: vec![metadata.audio_tracks[0].index],
+        ..ConversionConfig::default()
+    };
+    let options = output_container_options(&config, Some(&metadata), false);
+    let mp4 = options
+        .iter()
+        .find(|option| option.container == "mp4")
+        .unwrap();
+    assert!(mp4.is_disabled);
+    assert_eq!(
+        mp4.disabled_reason,
+        Some("MP4 needs MP3 audio at 16 kHz or higher")
+    );
+    metadata.audio_tracks[0].sample_rate = Some("16000".to_string());
+    assert!(is_container_compatible_for_stream_copy(
+        &config,
+        Some(&metadata),
+        "mp4"
+    ));
+}
+
 fn audio_metadata(codec: &str) -> SourceMetadata {
     SourceMetadata {
         media_kind: Some(SourceKind::Audio),

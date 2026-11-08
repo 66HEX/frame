@@ -224,6 +224,8 @@ pub struct AudioTrack {
     pub index: u32,
     pub codec: String,
     pub channels: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub channel_layout: Option<String>,
     pub language: Option<String>,
     pub label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -599,7 +601,6 @@ pub struct FfprobeStream {
     pub channels: Option<i32>,
     pub bit_rate: Option<String>,
     pub avg_frame_rate: Option<String>,
-    #[allow(dead_code)]
     pub channel_layout: Option<String>,
     pub tags: Option<FfprobeTags>,
     pub pix_fmt: Option<String>,

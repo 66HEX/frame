@@ -148,6 +148,7 @@ fn metadata_from_ffprobe(
             channels: stream
                 .channels
                 .map_or_else(|| "?".to_string(), |c| c.to_string()),
+            channel_layout: stream.channel_layout.clone(),
             label,
             language,
             bitrate_kbps: track_bitrate,
@@ -390,6 +391,7 @@ mod tests {
                         "codec_type": "audio",
                         "codec_name": "aac",
                         "channels": 2,
+                        "channel_layout": "stereo",
                         "bit_rate": "192000",
                         "sample_rate": "48000",
                         "tags": { "language": "eng", "title": "Main" }
@@ -416,6 +418,10 @@ mod tests {
         assert_eq!(metadata.resolution.as_deref(), Some("1920x1080"));
         assert_eq!(metadata.audio_codec.as_deref(), Some("aac"));
         assert_eq!(metadata.audio_tracks[0].label.as_deref(), Some("Main"));
+        assert_eq!(
+            metadata.audio_tracks[0].channel_layout.as_deref(),
+            Some("stereo")
+        );
         assert_eq!(
             metadata.subtitle_tracks[0].label.as_deref(),
             Some("Captions")
