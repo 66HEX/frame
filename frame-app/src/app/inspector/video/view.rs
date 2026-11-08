@@ -21,12 +21,15 @@ use gpui::{Context, Window};
 
 #[expect(
     clippy::too_many_lines,
+    clippy::too_many_arguments,
     reason = "The declarative video tab keeps its conditional sections in the same order as the UI."
 )]
 pub(in crate::app) fn settings_video_tab(
     config: &ConversionConfig,
     settings_disabled: bool,
     available_encoders: &AvailableEncoders,
+    hardware_capabilities: &crate::capabilities::HardwareCapabilities,
+    capabilities_loading: bool,
     focuses: SettingsVideoInputFocuses<'_>,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
@@ -87,15 +90,17 @@ pub(in crate::app) fn settings_video_tab(
             .child(controls);
     }
 
-    let controls = content
-        .child(settings_video_encoder_section(
-            config,
-            settings_disabled,
-            available_encoders,
-            palette,
-            window,
-            cx,
-        ))
+    let encoder = settings_video_encoder_section(
+        config,
+        settings_disabled,
+        available_encoders,
+        hardware_capabilities,
+        capabilities_loading,
+        palette,
+        window,
+        cx,
+    );
+    let controls = crate::app::inspector::panel::settings_fields_grid()
         .child(settings_video_pixel_format_section(
             config,
             settings_disabled,
@@ -118,6 +123,8 @@ pub(in crate::app) fn settings_video_tab(
         );
     crate::app::components::frame_field_group()
         .child(resolution)
+        .child(content)
+        .child(encoder)
         .child(controls)
         .when(config.video_codec != "prores", |this| {
             this.child(settings_video_quality_section(

@@ -339,7 +339,9 @@ impl FrameRoot {
 
             let rollback_store = store.clone();
             let helper_result = cx
-                .background_spawn(async move { client.spawn_helper(&plan_path) })
+                .background_spawn(async move {
+                    client.spawn_helper_with_launcher(&plan_path, crate::process_launch::spawn)
+                })
                 .await;
 
             match helper_result {

@@ -42,37 +42,38 @@ impl Drop for ConversionRunnerSandbox {
 }
 
 pub(super) fn generate_runner_source(output: &Path) {
-    let status = Command::new(crate::runtime_binaries::ffmpeg_executable())
-        .args([
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-f",
-            "lavfi",
-            "-i",
-            "testsrc2=size=64x48:rate=12:duration=0.5",
-            "-f",
-            "lavfi",
-            "-i",
-            "sine=frequency=440:sample_rate=48000:duration=0.5",
-            "-shortest",
-            "-c:v",
-            "libx264",
-            "-preset",
-            "ultrafast",
-            "-crf",
-            "28",
-            "-pix_fmt",
-            "yuv420p",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "96k",
-            "-y",
-        ])
-        .arg(output)
-        .status()
-        .expect("ffmpeg should start to generate runner fixture");
+    let status = crate::process_launch::status(
+        Command::new(crate::runtime_binaries::ffmpeg_executable())
+            .args([
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "testsrc2=size=64x48:rate=12:duration=0.5",
+                "-f",
+                "lavfi",
+                "-i",
+                "sine=frequency=440:sample_rate=48000:duration=0.5",
+                "-shortest",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "ultrafast",
+                "-crf",
+                "28",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "96k",
+                "-y",
+            ])
+            .arg(output),
+    )
+    .expect("ffmpeg should start to generate runner fixture");
 
     assert!(
         status.success(),
@@ -81,24 +82,25 @@ pub(super) fn generate_runner_source(output: &Path) {
 }
 
 pub(super) fn generate_runner_image_source(output: &Path) {
-    let status = Command::new(crate::runtime_binaries::ffmpeg_executable())
-        .args([
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-f",
-            "lavfi",
-            "-i",
-            "testsrc2=size=64x48:rate=1",
-            "-frames:v",
-            "1",
-            "-update",
-            "1",
-            "-y",
-        ])
-        .arg(output)
-        .status()
-        .expect("ffmpeg should start to generate image fixture");
+    let status = crate::process_launch::status(
+        Command::new(crate::runtime_binaries::ffmpeg_executable())
+            .args([
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "testsrc2=size=64x48:rate=1",
+                "-frames:v",
+                "1",
+                "-update",
+                "1",
+                "-y",
+            ])
+            .arg(output),
+    )
+    .expect("ffmpeg should start to generate image fixture");
 
     assert!(
         status.success(),

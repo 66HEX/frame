@@ -134,6 +134,26 @@ pub fn apply_video_codec(config: &mut ConversionConfig, codec: &str) -> bool {
     changed | normalize_video_config(config, None)
 }
 
+pub fn apply_video_encoder_choice(
+    config: &mut ConversionConfig,
+    codec: &str,
+    allow_software_fallback: bool,
+) -> bool {
+    let codec = codec.to_ascii_lowercase();
+    if !is_known_video_codec(&codec)
+        || !is_video_codec_allowed_for_container(&config.container, &codec)
+        || (allow_software_fallback && !is_videotoolbox_video_codec(&codec))
+    {
+        return false;
+    }
+    let changed = apply_video_codec(config, &codec);
+    if is_videotoolbox_video_codec(&codec) {
+        changed | apply_videotoolbox_allow_sw(config, allow_software_fallback)
+    } else {
+        changed
+    }
+}
+
 pub fn apply_pixel_format(config: &mut ConversionConfig, pixel_format: &str) -> bool {
     let pixel_format = pixel_format.to_ascii_lowercase();
     if !is_known_pixel_format(&pixel_format)

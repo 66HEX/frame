@@ -294,6 +294,8 @@ fn settings_output_section(
             settings.config,
             settings.settings_disabled,
             settings.available_encoders,
+            settings.hardware_capabilities,
+            settings.runtime_capabilities_loading,
             SettingsVideoInputFocuses {
                 resolution_locked: settings.crop_editing,
                 width: settings.video_width_focus,

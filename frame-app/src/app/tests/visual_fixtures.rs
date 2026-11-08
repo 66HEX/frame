@@ -142,6 +142,27 @@ fn workspace_empty_fixture_clears_workspace_state() {
 }
 
 #[test]
+fn hardware_fixture_keeps_an_unavailable_selection_and_an_explicit_working_fallback() {
+    use crate::capabilities::{HardwareEncoder, HardwareProbePolicy};
+    let mut root = FrameRoot::new();
+    root.apply_visual_fixture(Some(VisualFixture::SettingsVideoHardware));
+    assert_eq!(root.selected_config().unwrap().video_codec, "h264_nvenc");
+    for (encoder, fallback, available) in [
+        (HardwareEncoder::H264Nvenc, false, false),
+        (HardwareEncoder::H264Videotoolbox, false, false),
+        (HardwareEncoder::H264Videotoolbox, true, true),
+    ] {
+        assert_eq!(
+            root.hardware_capabilities
+                .report(HardwareProbePolicy::new(encoder, fallback))
+                .unwrap()
+                .available(),
+            available
+        );
+    }
+}
+
+#[test]
 fn workspace_audio_fixture_seeds_selected_audio_source() {
     let mut root = FrameRoot::new();
 

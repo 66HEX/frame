@@ -12,7 +12,11 @@ use crate::app::queue::state::DragDropUiState;
 use crate::app::updates::state::UpdateUiState;
 use crate::app_persistence::{AppPersistence, AppSettings};
 use crate::appearance::AppearanceSettings;
-use crate::capabilities::{detect_available_encoders, detect_available_filters};
+use crate::capabilities::{
+    HardwareCapabilities, detect_available_encoders_with_executable,
+    detect_available_filters_with_executable, detect_hardware_capabilities,
+    invalidate_hardware_cache,
+};
 use crate::conversion_events::ConversionEventState;
 use crate::conversion_runner::ConversionProcessController;
 use crate::file_queue::FileQueue;
@@ -27,6 +31,10 @@ use frame_updater::UpdateChannel;
 use gpui::prelude::*;
 use gpui::{Context, UniformListScrollHandle};
 
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "Processing, log following, capability loading and update preferences are independent UI states."
+)]
 pub struct FrameRoot {
     pub(in crate::app) active_view: ActiveView,
     pub(in crate::app) appearance: AppearanceSettings,
@@ -51,6 +59,9 @@ pub struct FrameRoot {
     pub(in crate::app) conversion_processes: ConversionProcessController,
     pub(in crate::app) available_encoders: AvailableEncoders,
     pub(in crate::app) available_filters: AvailableFilters,
+    pub(in crate::app) hardware_capabilities: HardwareCapabilities,
+    pub(in crate::app) runtime_capabilities_loading: bool,
+    runtime_capability_generation: u64,
     pub(in crate::app) active_conversion_task_ids: Vec<String>,
     pub(in crate::app) notifier: AppNotifier,
     pub(in crate::app) subtitle_font_families: Vec<String>,
@@ -82,29 +93,94 @@ impl FrameRoot {
     }
 
     pub fn load_runtime_capabilities(&mut self, cx: &mut Context<Self>) {
+        let generation = self.begin_runtime_capability_load();
+        let executable = crate::runtime_binaries::ffmpeg_executable();
+        let listing_executable = executable.clone();
+        cx.notify();
         cx.spawn(async move |this, cx| {
             let detected = cx
-                .background_spawn(async {
-                    (detect_available_encoders(), detect_available_filters())
+                .background_spawn(async move {
+                    (
+                        detect_available_encoders_with_executable(&listing_executable),
+                        detect_available_filters_with_executable(&listing_executable),
+                    )
                 })
                 .await;
 
-            this.update(cx, |root, cx| {
-                match detected.0 {
-                    Ok(encoders) => root.available_encoders = encoders,
-                    Err(error) => {
-                        eprintln!("Failed to detect FFmpeg encoder capabilities: {error}");
+            let compiled = this
+                .update(cx, |root, cx| {
+                    if root.runtime_capability_generation != generation {
+                        return None;
                     }
+                    let mut compiled = None;
+                    match detected.0 {
+                        Ok(encoders) => {
+                            root.hardware_capabilities.inventory =
+                                crate::capabilities::EncoderInventory::Complete;
+                            root.available_encoders = encoders.clone();
+                            compiled = Some(encoders);
+                        }
+                        Err(error) => {
+                            root.hardware_capabilities.inventory =
+                                crate::capabilities::EncoderInventory::Failed;
+                            eprintln!("Failed to detect FFmpeg encoder capabilities: {error}");
+                        }
+                    }
+                    match detected.1 {
+                        Ok(filters) => root.available_filters = filters,
+                        Err(error) => {
+                            eprintln!("Failed to detect FFmpeg filter capabilities: {error}");
+                        }
+                    }
+                    if compiled.is_none() {
+                        root.runtime_capabilities_loading = false;
+                    }
+                    cx.notify();
+                    compiled
+                })
+                .ok()
+                .flatten();
+            let Some(compiled) = compiled else {
+                return;
+            };
+            let hardware = cx
+                .background_spawn(
+                    async move { detect_hardware_capabilities(&executable, &compiled) },
+                )
+                .await;
+            this.update(cx, |root, cx| {
+                if root.finish_runtime_capability_load(generation, hardware) {
+                    cx.notify();
                 }
-                match detected.1 {
-                    Ok(filters) => root.available_filters = filters,
-                    Err(error) => eprintln!("Failed to detect FFmpeg filter capabilities: {error}"),
-                }
-                cx.notify();
             })
             .ok();
         })
         .detach();
+    }
+
+    fn begin_runtime_capability_load(&mut self) -> u64 {
+        self.runtime_capability_generation = self.runtime_capability_generation.wrapping_add(1);
+        self.runtime_capabilities_loading = true;
+        self.hardware_capabilities = HardwareCapabilities::default();
+        self.runtime_capability_generation
+    }
+
+    fn finish_runtime_capability_load(
+        &mut self,
+        generation: u64,
+        hardware: HardwareCapabilities,
+    ) -> bool {
+        if self.runtime_capability_generation != generation {
+            return false;
+        }
+        self.hardware_capabilities = hardware;
+        self.runtime_capabilities_loading = false;
+        true
+    }
+
+    pub(in crate::app) fn rescan_runtime_capabilities(&mut self, cx: &mut Context<Self>) {
+        invalidate_hardware_cache();
+        self.load_runtime_capabilities(cx);
     }
 
     #[cfg(test)]
@@ -177,6 +253,9 @@ impl FrameRoot {
             conversion_processes,
             available_encoders: AvailableEncoders::default(),
             available_filters: AvailableFilters::default(),
+            hardware_capabilities: HardwareCapabilities::default(),
+            runtime_capabilities_loading: false,
+            runtime_capability_generation: 0,
             active_conversion_task_ids: Vec::new(),
             notifier,
             subtitle_font_families: frame_core::fonts::list_system_font_families(),
@@ -280,4 +359,39 @@ fn next_custom_preset_sequence(presets: &[PresetDefinition]) -> u64 {
         })
         .max()
         .unwrap_or(0)
+}
+
+#[cfg(test)]
+mod capability_generation_tests {
+    use super::*;
+    use crate::capabilities::{
+        EncoderInventory, HardwareEncoder, HardwareProbePolicy, HardwareProbeReport, HardwareStatus,
+    };
+
+    #[test]
+    fn rescanning_clears_previous_readiness_and_ignores_old_async_completion() {
+        let mut root = FrameRoot::new();
+        let report = HardwareCapabilities {
+            inventory: EncoderInventory::Complete,
+            reports: vec![HardwareProbeReport {
+                policy: HardwareProbePolicy::new(HardwareEncoder::H264Videotoolbox, false),
+                status: HardwareStatus::Available,
+                reason: None,
+                diagnostics: String::new(),
+                checked_at: std::time::SystemTime::UNIX_EPOCH,
+            }],
+        };
+        let first = root.begin_runtime_capability_load();
+        assert!(root.finish_runtime_capability_load(first, report.clone()));
+        let second = root.begin_runtime_capability_load();
+        let third = root.begin_runtime_capability_load();
+        assert!(root.hardware_capabilities.reports.is_empty());
+        assert!(root.runtime_capabilities_loading);
+        assert!(!root.finish_runtime_capability_load(second, report.clone()));
+        assert!(root.hardware_capabilities.reports.is_empty());
+        assert!(root.runtime_capabilities_loading);
+        assert!(root.finish_runtime_capability_load(third, report));
+        assert_eq!(root.hardware_capabilities.reports.len(), 1);
+        assert!(!root.runtime_capabilities_loading);
+    }
 }

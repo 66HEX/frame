@@ -89,6 +89,9 @@ impl FrameRoot {
             }
             Some(VisualFixture::SettingsVideoProres) => self.apply_settings_video_prores_fixture(),
             Some(VisualFixture::SettingsVideoVp9) => self.apply_settings_video_vp9_fixture(),
+            Some(VisualFixture::SettingsVideoHardware) => {
+                self.apply_settings_video_hardware_fixture();
+            }
             Some(VisualFixture::PreviewCrop) => self.apply_preview_crop_fixture(),
             Some(VisualFixture::PreviewReady) => self.apply_preview_ready_fixture(),
             Some(VisualFixture::PreviewTransport | VisualFixture::PreviewTrim) => {
@@ -290,6 +293,42 @@ impl FrameRoot {
             file.config.preset = "3".into();
             file.config.pixel_format = "yuv420p".into();
             file.config.crf = 0;
+        }
+    }
+
+    fn apply_settings_video_hardware_fixture(&mut self) {
+        use crate::capabilities::{
+            EncoderInventory, HardwareCapabilities, HardwareEncoder, HardwareProbePolicy,
+            HardwareProbeReport, HardwareReason, HardwareStatus,
+        };
+        self.apply_settings_video_fixture();
+        self.available_encoders.h264_nvenc = true;
+        self.available_encoders.h264_videotoolbox = true;
+        self.runtime_capabilities_loading = false;
+        self.hardware_capabilities = HardwareCapabilities {
+            inventory: EncoderInventory::Complete,
+            reports: [
+                (HardwareEncoder::H264Nvenc, false, false),
+                (HardwareEncoder::H264Videotoolbox, false, false),
+                (HardwareEncoder::H264Videotoolbox, true, true),
+            ]
+            .map(|(encoder, allow_software, available)| HardwareProbeReport {
+                policy: HardwareProbePolicy::new(encoder, allow_software),
+                status: if available {
+                    HardwareStatus::Available
+                } else {
+                    HardwareStatus::Unavailable
+                },
+                reason: (!available).then_some(HardwareReason::InitializationFailed),
+                diagnostics: String::new(),
+                checked_at: std::time::SystemTime::UNIX_EPOCH,
+            })
+            .into(),
+        };
+        if let Some(file) = self.file_queue.selected_file_mut() {
+            file.config.video_codec = "h264_nvenc".into();
+            file.config.hw_decode = true;
+            file.config.nvenc_spatial_aq = true;
         }
     }
 

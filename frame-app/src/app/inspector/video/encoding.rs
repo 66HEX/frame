@@ -1,13 +1,17 @@
 use crate::app::components::frame_checkbox_row;
-use crate::app::components::{FrameOption, frame_option_field, frame_select_field};
+use crate::app::components::{
+    FrameOption, frame_field, frame_option_field, frame_select_field, frame_text_button,
+};
 use crate::app::input::{FrameTextInputKind, FrameTextInputSpec, frame_text_input};
 use crate::app::inspector::panel::settings_field;
 use crate::app::inspector::shared::settings_field_label;
 use crate::app::inspector::video::quality::{SettingsVideoRangeTarget, settings_video_range_field};
+use crate::app::primitives::ButtonVariant;
 use crate::app::root::FrameRoot;
+use crate::capabilities::{HardwareCapabilities, HardwareEncoder};
 use crate::settings::{
     ConversionConfig, apply_hw_decode, apply_nvenc_spatial_aq, apply_nvenc_temporal_aq,
-    apply_pixel_format, apply_video_bitrate_mode, apply_video_codec, apply_video_preset,
+    apply_pixel_format, apply_video_bitrate_mode, apply_video_encoder_choice, apply_video_preset,
     apply_videotoolbox_allow_sw, is_hardware_video_codec, video_codec_options,
     video_pixel_format_options, video_preset_options,
 };
@@ -16,22 +20,55 @@ use frame_core::capabilities::AvailableEncoders;
 use gpui::prelude::*;
 use gpui::{ClickEvent, Context, FocusHandle, Window, div};
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "The encoder section renders configuration, compiled/runtime availability and the shared GPUI context together."
+)]
 pub(super) fn settings_video_encoder_section(
     config: &ConversionConfig,
     settings_disabled: bool,
     available_encoders: &AvailableEncoders,
+    hardware_capabilities: &HardwareCapabilities,
+    capabilities_loading: bool,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let mut list = Vec::new();
-    for option in video_codec_options(config, available_encoders, settings_disabled) {
+    for option in video_codec_options(
+        config,
+        available_encoders,
+        hardware_capabilities,
+        settings_disabled,
+    ) {
         let codec = option.codec;
+        let fallback = option.allow_software_fallback;
+        let videotoolbox =
+            HardwareEncoder::from_name(codec).is_some_and(HardwareEncoder::videotoolbox);
         let enabled = !option.is_disabled;
+        let reason = if capabilities_loading && HardwareEncoder::from_name(codec).is_some() {
+            Some("Checking…")
+        } else {
+            option.disabled_reason.map(compact_encoder_reason)
+        };
+        let caption = if videotoolbox {
+            reason.unwrap_or("").to_string()
+        } else {
+            reason.unwrap_or(option.label).to_string()
+        };
         list.push(FrameOption::with_caption(
-            format!("video-codec-{codec}"),
-            codec,
-            option.disabled_reason.unwrap_or(option.label).to_string(),
+            format!(
+                "video-codec-{codec}{}",
+                if fallback { "-software-fallback" } else { "" }
+            ),
+            if fallback {
+                format!("{codec} (software fallback)")
+            } else if videotoolbox {
+                format!("{codec} (hardware only)")
+            } else {
+                codec.to_string()
+            },
+            caption,
             option.is_selected,
             enabled,
             move |root, _window, cx| {
@@ -39,7 +76,9 @@ pub(super) fn settings_video_encoder_section(
                 if !enabled {
                     return;
                 }
-                if root.update_selected_config(|config| apply_video_codec(config, codec)) {
+                if root.update_selected_config(|config| {
+                    apply_video_encoder_choice(config, codec, fallback)
+                }) {
                     cx.notify();
                 }
             },
@@ -54,7 +93,55 @@ pub(super) fn settings_video_encoder_section(
         cx,
     );
 
-    settings_field("Video encoder", palette).child(list)
+    let rescan_enabled = !settings_disabled && !capabilities_loading;
+    let rescan = frame_text_button(
+        "video-encoder-rescan",
+        if capabilities_loading {
+            "Checking…"
+        } else {
+            "Check again"
+        },
+        ButtonVariant::Ghost,
+        false,
+        rescan_enabled,
+        palette,
+        window,
+        cx,
+    )
+    .w(theme::ui_rem(104.0))
+    .flex_shrink_0()
+    .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        if rescan_enabled {
+            root.rescan_runtime_capabilities(cx);
+        }
+    }));
+    frame_field()
+        .min_w_0()
+        .child(
+            div()
+                .flex()
+                .items_center()
+                .justify_between()
+                .gap_2()
+                .child(settings_field_label("Video encoder", palette))
+                .child(rescan),
+        )
+        .child(list)
+}
+
+fn compact_encoder_reason(reason: &'static str) -> &'static str {
+    match reason {
+        "Encoder availability not checked" => "Not checked",
+        "Encoder could not start" => "Could not start",
+        "Encoder check timed out" => "Check timed out",
+        "Encoder check cancelled" => "Check cancelled",
+        "Encoder check could not start" => "Check could not start",
+        "Encoder check did not finish" => "Check incomplete",
+        "Previous encoder check is still stopping" => "Previous check stopping",
+        "Encoder list could not be read" => "Encoder list unavailable",
+        "Encoder is not included in this FFmpeg" => "Not included in FFmpeg",
+        _ => reason,
+    }
 }
 
 pub(super) fn settings_video_pixel_format_section(

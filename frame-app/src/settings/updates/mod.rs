@@ -38,5 +38,5 @@ pub use video::{
     apply_gif_dither, apply_gif_loop, apply_hw_decode, apply_nvenc_spatial_aq,
     apply_nvenc_temporal_aq, apply_pixel_format, apply_quality, apply_resolution,
     apply_scaling_algorithm, apply_video_bitrate, apply_video_bitrate_mode, apply_video_codec,
-    apply_video_preset, apply_videotoolbox_allow_sw,
+    apply_video_encoder_choice, apply_video_preset, apply_videotoolbox_allow_sw,
 };

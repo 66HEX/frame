@@ -263,22 +263,23 @@ fn stalled_process_is_reaped_on_timeout_and_cancellation() {
 }
 
 fn generate_fixture(filter: &str, output: &Path) {
-    let result = Command::new(crate::runtime_binaries::ffmpeg_executable())
-        .args([
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-nostdin",
-            "-f",
-            "lavfi",
-            "-i",
-            filter,
-            "-c:v",
-            "ffv1",
-        ])
-        .arg(output)
-        .output()
-        .expect("run fixture FFmpeg");
+    let result = crate::process_launch::output(
+        Command::new(crate::runtime_binaries::ffmpeg_executable())
+            .args([
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-nostdin",
+                "-f",
+                "lavfi",
+                "-i",
+                filter,
+                "-c:v",
+                "ffv1",
+            ])
+            .arg(output),
+    )
+    .expect("run fixture FFmpeg");
     assert!(
         result.status.success(),
         "{}",
@@ -370,32 +371,33 @@ fn real_ffmpeg_uses_display_orientation_and_the_selected_video_stream() {
     let source = TemporaryFile::new("mp4");
     let rotated = TemporaryFile::new("mp4");
     let executable = crate::runtime_binaries::ffmpeg_executable();
-    let output = Command::new(&executable)
-        .args([
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-nostdin",
-            "-f",
-            "lavfi",
-            "-i",
-            "color=white:size=360x240:rate=10:duration=6",
-            "-f",
-            "lavfi",
-            "-i",
-            "color=white:size=320x180:rate=10:duration=6,pad=360:240:20:30:black",
-            "-map",
-            "0:v",
-            "-map",
-            "1:v",
-            "-c:v",
-            "libx264",
-            "-crf",
-            "0",
-        ])
-        .arg(source.path())
-        .output()
-        .unwrap();
+    let output = crate::process_launch::output(
+        Command::new(&executable)
+            .args([
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-nostdin",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=white:size=360x240:rate=10:duration=6",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=white:size=320x180:rate=10:duration=6,pad=360:240:20:30:black",
+                "-map",
+                "0:v",
+                "-map",
+                "1:v",
+                "-c:v",
+                "libx264",
+                "-crf",
+                "0",
+            ])
+            .arg(source.path()),
+    )
+    .unwrap();
     assert!(
         output.status.success(),
         "{}",
@@ -417,21 +419,22 @@ fn real_ffmpeg_uses_display_orientation_and_the_selected_video_stream() {
         })
     );
 
-    let output = Command::new(executable)
-        .args([
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-nostdin",
-            "-display_rotation",
-            "90",
-            "-i",
-        ])
-        .arg(source.path())
-        .args(["-map", "0:1", "-c", "copy"])
-        .arg(rotated.path())
-        .output()
-        .unwrap();
+    let output = crate::process_launch::output(
+        Command::new(executable)
+            .args([
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-nostdin",
+                "-display_rotation",
+                "90",
+                "-i",
+            ])
+            .arg(source.path())
+            .args(["-map", "0:1", "-c", "copy"])
+            .arg(rotated.path()),
+    )
+    .unwrap();
     assert!(
         output.status.success(),
         "{}",

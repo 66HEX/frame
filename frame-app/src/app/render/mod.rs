@@ -333,6 +333,8 @@ impl Render for FrameRoot {
                     subtitle_fonts: &self.subtitle_font_families,
                     available_encoders: &self.available_encoders,
                     available_filters: &self.available_filters,
+                    hardware_capabilities: &self.hardware_capabilities,
+                    runtime_capabilities_loading: self.runtime_capabilities_loading,
                 };
                 content.child(workspace_view(
                     &self.file_queue,

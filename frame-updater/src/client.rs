@@ -2,7 +2,7 @@ use std::{
     fs::{self, File},
     io::{self, Read, Write},
     path::{Path, PathBuf},
-    process::Command,
+    process::{Child, Command},
     time::Duration,
 };
 
@@ -289,17 +289,28 @@ impl UpdateClient {
     /// Returns an error if the helper cannot be staged or if spawning the
     /// helper process fails.
     pub fn spawn_helper(&self, plan_path: &Path) -> Result<(), UpdateError> {
+        self.spawn_helper_with_launcher(plan_path, Command::spawn)
+    }
+
+    /// Stages the helper before handing its prepared command to the launcher.
+    ///
+    /// The callback can coordinate process creation without locking file copying.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if staging or the supplied launcher fails.
+    pub fn spawn_helper_with_launcher(
+        &self,
+        plan_path: &Path,
+        launch: impl FnOnce(&mut Command) -> io::Result<Child>,
+    ) -> Result<(), UpdateError> {
         let helper_path = staged_helper_path(
             &self.config.install_context.helper_path,
             &self.config.cache_dir,
         )?;
-        Command::new(&helper_path)
-            .arg("--plan")
-            .arg(plan_path)
-            .spawn()
-            .map_err(|error| {
-                UpdateError::HelperSpawnFailed(format!("{}: {error}", helper_path.display()))
-            })?;
+        launch(Command::new(&helper_path).arg("--plan").arg(plan_path)).map_err(|error| {
+            UpdateError::HelperSpawnFailed(format!("{}: {error}", helper_path.display()))
+        })?;
 
         Ok(())
     }
@@ -633,6 +644,38 @@ mod tests {
             cache_dir,
         })
         .expect("test client should be created")
+    }
+
+    #[test]
+    fn helper_launcher_runs_after_staging_with_the_prepared_arguments() {
+        let directory = tempfile::tempdir().unwrap();
+        let client = test_client(directory.path().to_path_buf());
+        fs::write(
+            &client.config.install_context.helper_path,
+            b"helper fixture",
+        )
+        .unwrap();
+        let plan = directory.path().join("plan with spaces.json");
+        let mut invoked = false;
+        let result = client.spawn_helper_with_launcher(&plan, |command| {
+            invoked = true;
+            let staged = directory.path().join("helper/frame-update-helper");
+            assert_eq!(command.get_program(), staged.as_os_str());
+            assert_eq!(fs::read(&staged).unwrap(), b"helper fixture");
+            assert_eq!(
+                command.get_args().collect::<Vec<_>>(),
+                [std::ffi::OsStr::new("--plan"), plan.as_os_str()]
+            );
+            Err(io::Error::other("injected launcher failure"))
+        });
+        assert!(invoked);
+        assert!(matches!(result, Err(UpdateError::HelperSpawnFailed(_))));
+        fs::remove_file(&client.config.install_context.helper_path).unwrap();
+        assert!(
+            client
+                .spawn_helper_with_launcher(&plan, |_| panic!("staging must finish before launch"))
+                .is_err()
+        );
     }
 
     fn test_update(url: String, body: &[u8], size_bytes: u64) -> UpdateInfo {

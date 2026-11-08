@@ -147,15 +147,16 @@ impl RunningPreviewProcess {
         self.stop_audio_process()?;
         let output_spec = AudioOutputSpec::default_output()?;
         let plan = preview_audio_plan(config, seconds, true, precise, output_spec)?;
-        let mut child = Command::new(&self.executable)
-            .args(&plan.args)
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|err| {
-                PreviewEngineError::Ffmpeg(format!("failed to start audio preview: {err}"))
-            })?;
+        let mut child = crate::process_launch::spawn(
+            Command::new(&self.executable)
+                .args(&plan.args)
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped()),
+        )
+        .map_err(|err| {
+            PreviewEngineError::Ffmpeg(format!("failed to start audio preview: {err}"))
+        })?;
         self.metrics.record_audio_process_spawn();
 
         let stdout = child.stdout.take().ok_or_else(|| {

@@ -14,22 +14,23 @@ fn audio_fixture(milliseconds: u32) -> PathBuf {
         "sine=frequency=440:sample_rate=48000:duration={}",
         f64::from(milliseconds) / 1_000.0
     );
-    let status = Command::new(crate::runtime_binaries::ffmpeg_executable())
-        .args([
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-y",
-            "-f",
-            "lavfi",
-            "-i",
-            &source,
-            "-c:a",
-            "pcm_f32le",
-        ])
-        .arg(&path)
-        .status()
-        .expect("generate audio fixture");
+    let status = crate::process_launch::status(
+        Command::new(crate::runtime_binaries::ffmpeg_executable())
+            .args([
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                &source,
+                "-c:a",
+                "pcm_f32le",
+            ])
+            .arg(&path),
+    )
+    .expect("generate audio fixture");
     assert!(status.success());
     path
 }
@@ -137,28 +138,29 @@ fn ffmpeg_audio_drain_does_not_end_a_longer_video() {
         "frame-audio-drain-short-track-{}.mkv",
         std::process::id()
     ));
-    let status = Command::new(crate::runtime_binaries::ffmpeg_executable())
-        .args([
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-y",
-            "-f",
-            "lavfi",
-            "-i",
-            "color=c=black:s=160x90:r=30:d=1",
-            "-f",
-            "lavfi",
-            "-i",
-            "sine=frequency=440:sample_rate=48000:duration=0.1",
-            "-c:v",
-            "libx264",
-            "-c:a",
-            "pcm_f32le",
-        ])
-        .arg(&path)
-        .status()
-        .expect("generate shorter audio track");
+    let status = crate::process_launch::status(
+        Command::new(crate::runtime_binaries::ffmpeg_executable())
+            .args([
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=c=black:s=160x90:r=30:d=1",
+                "-f",
+                "lavfi",
+                "-i",
+                "sine=frequency=440:sample_rate=48000:duration=0.1",
+                "-c:v",
+                "libx264",
+                "-c:a",
+                "pcm_f32le",
+            ])
+            .arg(&path),
+    )
+    .expect("generate shorter audio track");
     assert!(status.success());
     let mut config = audio_config(path.clone(), 1_000);
     config.source_kind = PreviewSourceKind::Video;

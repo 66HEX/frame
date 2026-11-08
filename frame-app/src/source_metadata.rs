@@ -172,10 +172,9 @@ pub fn probe_source_metadata_with_executable(
     file_path: &str,
     executable: &str,
 ) -> Result<SourceMetadata, ConversionError> {
-    let output = Command::new(executable)
-        .args(ffprobe_json_args(file_path))
-        .output()
-        .map_err(ConversionError::Io)?;
+    let output =
+        crate::process_launch::output(Command::new(executable).args(ffprobe_json_args(file_path)))
+            .map_err(ConversionError::Io)?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

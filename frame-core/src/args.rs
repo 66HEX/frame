@@ -33,6 +33,24 @@ fn is_copy_mode(config: &ConversionConfig) -> bool {
     config.processing_mode == "copy"
 }
 
+/// Returns the configured video encoder only when this task actually uses it.
+#[must_use]
+pub fn effective_video_encoder<'a>(
+    config: &'a ConversionConfig,
+    probe: &ProbeMetadata,
+) -> Option<&'a str> {
+    if is_copy_mode(config)
+        || is_audio_only_container(&config.container)
+        || is_image_container(&config.container)
+        || config.container.eq_ignore_ascii_case("gif")
+        || (probe.video_stream_index.is_none() && probe.video_codec.is_none())
+    {
+        None
+    } else {
+        Some(&config.video_codec)
+    }
+}
+
 fn has_custom_pixel_format(config: &ConversionConfig) -> bool {
     let pixel_format = config.pixel_format.trim();
     !pixel_format.is_empty() && pixel_format != "auto"
@@ -508,8 +526,10 @@ pub fn build_ffmpeg_args(
     let mut args = Vec::new();
 
     // Hardware decode acceleration (must be before -i)
-    if config.hw_decode {
-        args.extend(get_hwaccel_args(&config.video_codec));
+    if config.hw_decode
+        && let Some(encoder) = effective_video_encoder(config, probe)
+    {
+        args.extend(get_hwaccel_args(encoder));
     }
 
     if let Some(start) = &config.start_time
@@ -1519,6 +1539,35 @@ mod tests {
             }],
             ..ProbeMetadata::default()
         }
+    }
+
+    #[test]
+    fn hardware_decoding_only_applies_to_an_effective_hardware_video_encoder() {
+        let probe = sample_probe();
+        let mut config = sample_config("mp4", "h264_nvenc");
+        config.hw_decode = true;
+        config.selected_audio_tracks = vec![1];
+        let args = build_ffmpeg_args("input.mp4", "output.mp4", &config, &probe).unwrap();
+        assert!(args_contains_pair(&args, "-hwaccel", "cuda"));
+        assert!(!args.iter().any(|arg| arg == "-hwaccel_output_format"));
+        for container in ["m4a", "png", "gif"] {
+            config.container = container.into();
+            let args = build_ffmpeg_args("input.mp4", "output", &config, &probe).unwrap();
+            assert!(!args.iter().any(|arg| arg == "-hwaccel"), "{container}");
+            assert_eq!(effective_video_encoder(&config, &probe), None);
+        }
+        config.container = "mp4".into();
+        config.processing_mode = "copy".into();
+        let args = build_ffmpeg_args("input.mp4", "output.mp4", &config, &probe).unwrap();
+        assert!(!args.iter().any(|arg| arg == "-hwaccel"));
+        config.processing_mode = "reencode".into();
+        let audio_probe = ProbeMetadata {
+            video_codec: None,
+            ..probe
+        };
+        assert_eq!(effective_video_encoder(&config, &audio_probe), None);
+        let args = build_ffmpeg_args("input.m4a", "output.mp4", &config, &audio_probe).unwrap();
+        assert!(!args.iter().any(|arg| arg == "-hwaccel"));
     }
 
     #[test]

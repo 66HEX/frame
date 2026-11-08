@@ -38,6 +38,7 @@ fn video_codec_options_hide_unavailable_hardware_encoders() {
     let options = video_codec_options(
         &ConversionConfig::default(),
         &AvailableEncoders::default(),
+        &crate::capabilities::HardwareCapabilities::default(),
         false,
     );
 
@@ -52,7 +53,12 @@ fn video_codec_options_show_available_hardware_encoders() {
         ..AvailableEncoders::default()
     };
 
-    let options = video_codec_options(&ConversionConfig::default(), &encoders, false);
+    let options = video_codec_options(
+        &ConversionConfig::default(),
+        &encoders,
+        &crate::capabilities::HardwareCapabilities::default(),
+        false,
+    );
 
     assert!(codec_option(&options, "h264_videotoolbox").is_some());
 }
@@ -167,4 +173,106 @@ fn prores_normalization_preserves_unused_quality_drafts() {
     assert_eq!(config.video_bitrate, "unused value");
     assert_eq!(config.preset, "unused preset");
     assert_eq!(config.crf, 17);
+}
+
+#[test]
+fn videotoolbox_software_fallback_is_reachable_from_a_software_encoder() {
+    use crate::capabilities::{
+        EncoderInventory, HardwareCapabilities, HardwareEncoder, HardwareProbePolicy,
+        HardwareProbeReport, HardwareReason, HardwareStatus,
+    };
+    let encoder = HardwareEncoder::H264Videotoolbox;
+    let encoders = AvailableEncoders {
+        h264_videotoolbox: true,
+        ..AvailableEncoders::default()
+    };
+    let report = |allow, status, reason| HardwareProbeReport {
+        policy: HardwareProbePolicy::new(encoder, allow),
+        status,
+        reason,
+        diagnostics: String::new(),
+        checked_at: std::time::SystemTime::UNIX_EPOCH,
+    };
+    let hardware = HardwareCapabilities {
+        inventory: EncoderInventory::Complete,
+        reports: vec![
+            report(
+                false,
+                HardwareStatus::Unavailable,
+                Some(HardwareReason::InitializationFailed),
+            ),
+            report(true, HardwareStatus::Available, None),
+        ],
+    };
+    let mut config = ConversionConfig::default();
+    let options = video_codec_options(&config, &encoders, &hardware, false);
+    let strict = options
+        .iter()
+        .find(|option| option.codec == encoder.name() && !option.allow_software_fallback)
+        .unwrap();
+    let relaxed = options
+        .iter()
+        .find(|option| option.codec == encoder.name() && option.allow_software_fallback)
+        .unwrap();
+    assert!(strict.is_disabled);
+    assert!(!relaxed.is_disabled);
+    assert!(apply_video_encoder_choice(
+        &mut config,
+        relaxed.codec,
+        relaxed.allow_software_fallback
+    ));
+    assert_eq!(config.video_codec, encoder.name());
+    assert!(config.videotoolbox_allow_sw);
+    let options = video_codec_options(&config, &encoders, &hardware, false);
+    assert!(options.iter().any(|option| option.codec == encoder.name()
+        && option.allow_software_fallback
+        && option.is_selected));
+    assert!(apply_videotoolbox_allow_sw(&mut config, false));
+    assert!(
+        video_codec_options(&config, &encoders, &hardware, false)
+            .iter()
+            .any(|option| option.codec == encoder.name()
+                && !option.allow_software_fallback
+                && option.is_selected
+                && option.is_disabled)
+    );
+}
+
+#[test]
+fn unavailable_selected_hardware_preserves_the_draft_and_distinguishes_inventory_failure() {
+    use crate::capabilities::{EncoderInventory, HardwareCapabilities};
+    let config = ConversionConfig {
+        video_codec: "h264_nvenc".into(),
+        preset: "slow".into(),
+        hw_decode: true,
+        nvenc_spatial_aq: true,
+        ..ConversionConfig::default()
+    };
+    let before = config.clone();
+    for (inventory, reason) in [
+        (
+            EncoderInventory::Unknown,
+            "Encoder availability not checked",
+        ),
+        (EncoderInventory::Failed, "Encoder list could not be read"),
+        (
+            EncoderInventory::Complete,
+            "Encoder is not included in this FFmpeg",
+        ),
+    ] {
+        let options = video_codec_options(
+            &config,
+            &AvailableEncoders::default(),
+            &HardwareCapabilities {
+                inventory,
+                reports: Vec::new(),
+            },
+            false,
+        );
+        let selected = options.iter().find(|option| option.is_selected).unwrap();
+        assert_eq!(selected.codec, "h264_nvenc");
+        assert!(selected.is_disabled);
+        assert_eq!(selected.disabled_reason, Some(reason));
+    }
+    assert_eq!(config, before);
 }

@@ -92,6 +92,8 @@ pub(in crate::app) struct SettingsRenderState<'a> {
     pub(in crate::app) subtitle_fonts: &'a [String],
     pub(in crate::app) available_encoders: &'a AvailableEncoders,
     pub(in crate::app) available_filters: &'a AvailableFilters,
+    pub(in crate::app) hardware_capabilities: &'a crate::capabilities::HardwareCapabilities,
+    pub(in crate::app) runtime_capabilities_loading: bool,
 }
 
 #[derive(Clone, Copy)]

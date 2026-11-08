@@ -47,8 +47,7 @@ pub(super) fn analyze_window(
         command.creation_flags(0x0800_0000);
     }
     let mut child = ChildGuard(
-        command
-            .spawn()
+        crate::process_launch::spawn(&mut command)
             .map_err(|error| AutoCropError::Unavailable(error.to_string()))?,
     );
     let stderr = child

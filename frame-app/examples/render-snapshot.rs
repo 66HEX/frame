@@ -1,6 +1,7 @@
 //! Captures a settled native fixture without advancing asynchronous media work.
 //! Set `FRAME_GPUI_VISUAL_FIXTURE`, `FRAME_VISUAL_THEME` and `FRAME_GPUI_UI_SCALE`.
 //! Set `FRAME_VISUAL_DRAG_DROP=1` to capture the native file-drop target over any fixture.
+//! Set `FRAME_VISUAL_CLICK_LABEL` to click a control by its accessibility label.
 //! Pass the destination PNG path as the first argument.
 //! Build with `--features gpui_platform/test-support` for native GPU readback.
 
@@ -10,8 +11,8 @@ use frame_app::{
     visual_fixture_from_env_value,
 };
 use gpui::{
-    AppContext, Bounds, ExternalPaths, FileDropEvent, MouseMoveEvent, PlatformInput, point, px,
-    size,
+    AppContext, Bounds, ExternalPaths, FileDropEvent, MouseButton, MouseDownEvent, MouseMoveEvent,
+    MouseUpEvent, PlatformInput, point, px, size,
 };
 
 fn main() {
@@ -39,6 +40,8 @@ fn main() {
                 .expect("open fixture window");
             cx.defer(move |cx| {
                 cx.update_window(handle.into(), |_, window, cx| {
+                    let click_label = std::env::var("FRAME_VISUAL_CLICK_LABEL").ok();
+                    window.set_a11y_forced(click_label.is_some());
                     // Keep physical pointer position from changing group-hover styles.
                     window.dispatch_event(
                         PlatformInput::MouseMove(MouseMoveEvent {
@@ -64,6 +67,13 @@ fn main() {
                         window.refresh();
                         window.draw(cx).clear(cx);
                     }
+                    if let Some(label) = click_label {
+                        click_label_control(window, cx, &label);
+                        for _ in 0..3 {
+                            window.refresh();
+                            window.draw(cx).clear(cx);
+                        }
+                    }
                     window
                         .render_to_image()
                         .expect("render fixture")
@@ -74,4 +84,38 @@ fn main() {
                 cx.quit();
             });
         });
+}
+
+fn click_label_control(window: &mut gpui::Window, cx: &mut gpui::App, label: &str) {
+    let node = window
+        .a11y_tree()
+        .and_then(|tree| {
+            tree.nodes
+                .iter()
+                .find(|(_, node)| node.label() == Some(label))
+                .map(|(id, _)| *id)
+        })
+        .expect("click label must identify a rendered accessibility node");
+    let position = window
+        .a11y_node_bounds(node)
+        .expect("click target must have bounds")
+        .center();
+    window.dispatch_event(
+        PlatformInput::MouseDown(MouseDownEvent {
+            button: MouseButton::Left,
+            position,
+            click_count: 1,
+            ..Default::default()
+        }),
+        cx,
+    );
+    window.dispatch_event(
+        PlatformInput::MouseUp(MouseUpEvent {
+            button: MouseButton::Left,
+            position,
+            click_count: 1,
+            ..Default::default()
+        }),
+        cx,
+    );
 }

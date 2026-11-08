@@ -48,6 +48,11 @@ FRAME_VISUAL_THEME=dark \
 target/debug/examples/render-snapshot /tmp/frame-settings-video.png
 ```
 
+Set `FRAME_VISUAL_CLICK_LABEL="Video encoder"` with
+`FRAME_GPUI_VISUAL_FIXTURE=settings-video-hardware` to capture the open encoder
+menu. The example clicks the rendered accessibility node with native pointer
+events before the final draw.
+
 For exact comparisons, capture both builds on the same machine, display scale,
 font environment and graphics backend. Compare the PNG bytes or SHA-256 hashes.
 The example deliberately fixes hover position: a physical pointer over the file
@@ -135,6 +140,7 @@ Frame's application code retains its normal debug settings.
 | `settings-video-av1` | SVT-AV1 selected with preset 4 and 10-bit pixels | Native preset numbers, encoding speed guidance, and the explicit 10-bit pixel format selection. |
 | `settings-video-prores` | ProRes MOV with 10-bit 4:2:2 pixels | Encoder and pixel format controls, with unused quality and speed controls hidden. |
 | `settings-video-vp9` | VP9 WebM with speed 3 and CRF 0 | Native speeds 0–5 and the Best quality endpoint. |
+| `settings-video-hardware` | Unavailable selected NVENC; unavailable strict VideoToolbox and available software fallback | Preserved selection, explicit hardware policy captions and the fixed-width Check again action. Open Video encoder to inspect both policies. |
 | `settings-audio` | Audio settings tab with an audio source and tracks | Audio codec controls, VBR quality, channel selection, volume and normalize controls, track selection rows, and audio-only source treatment. |
 | `settings-images` | Image settings tab with a selected PNG source | Image output controls, custom image dimensions, image-source metadata, and non-video settings visibility. |
 | `settings-metadata` | Metadata tab with source tags and output metadata drafts | Source metadata presentation, editable metadata fields, long value wrapping, and tag/value alignment. |

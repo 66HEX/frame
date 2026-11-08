@@ -1,3 +1,4 @@
+use crate::capabilities::{HardwareCapabilities, HardwareEncoder, HardwareProbePolicy};
 use crate::settings::model::{
     ConversionConfig, FPS_OPTIONS, GIF_COLOR_OPTIONS, GIF_DITHER_OPTIONS, GIF_FPS_OPTIONS,
     RESOLUTION_OPTIONS, SCALING_ALGORITHM_OPTIONS, VIDEO_CODEC_DEFINITIONS,
@@ -43,26 +44,58 @@ pub const fn gif_dither_options() -> &'static [&'static str] {
 pub fn video_codec_options(
     config: &ConversionConfig,
     available_encoders: &AvailableEncoders,
+    hardware: &HardwareCapabilities,
     disabled: bool,
 ) -> Vec<VideoCodecOption> {
-    VIDEO_CODEC_DEFINITIONS
-        .iter()
-        .filter(|definition| {
-            definition.capability.is_none_or(|capability| {
-                video_codec_capability_available(available_encoders, capability)
-            })
-        })
-        .map(|definition| {
+    let mut options = Vec::new();
+    for definition in &VIDEO_CODEC_DEFINITIONS {
+        let encoder = HardwareEncoder::from_name(definition.codec);
+        let selected = config.video_codec.eq_ignore_ascii_case(definition.codec);
+        let compiled = definition.capability.is_none_or(|capability| {
+            video_codec_capability_available(available_encoders, capability)
+        });
+        if !(compiled || selected && encoder.is_some()) {
+            continue;
+        }
+        let modes: &[bool] = if encoder.is_some_and(HardwareEncoder::videotoolbox) {
+            &[false, true]
+        } else {
+            &[false]
+        };
+        for &allow_software_fallback in modes {
             let allowed = is_video_codec_allowed_for_container(&config.container, definition.codec);
-            VideoCodecOption {
+            let hardware_reason = encoder.and_then(|encoder| match hardware.inventory {
+                crate::capabilities::EncoderInventory::Failed => {
+                    Some("Encoder list could not be read")
+                }
+                crate::capabilities::EncoderInventory::Unknown => {
+                    Some("Encoder availability not checked")
+                }
+                crate::capabilities::EncoderInventory::Complete
+                    if !encoder.compiled(available_encoders) =>
+                {
+                    Some("Encoder is not included in this FFmpeg")
+                }
+                crate::capabilities::EncoderInventory::Complete => hardware
+                    .disabled_reason(HardwareProbePolicy::new(encoder, allow_software_fallback)),
+            });
+            let policy_selected = !encoder.is_some_and(HardwareEncoder::videotoolbox)
+                || config.videotoolbox_allow_sw == allow_software_fallback;
+            options.push(VideoCodecOption {
                 codec: definition.codec,
                 label: definition.label,
-                is_selected: allowed && config.video_codec.eq_ignore_ascii_case(definition.codec),
-                is_disabled: disabled || !allowed,
-                disabled_reason: (!allowed).then_some("Incompatible container"),
-            }
-        })
-        .collect()
+                is_selected: allowed && selected && policy_selected,
+                is_disabled: disabled || !allowed || hardware_reason.is_some(),
+                disabled_reason: if allowed {
+                    hardware_reason
+                } else {
+                    Some("Incompatible container")
+                },
+                allow_software_fallback,
+            });
+        }
+    }
+    options
 }
 
 #[must_use]

@@ -87,6 +87,108 @@ fn press(cx: &mut VisualTestContext, key: &str) {
     draw(cx);
 }
 
+#[test]
+fn encoder_select_applies_explicit_software_fallback_with_pointer_and_keyboard() {
+    use crate::capabilities::{
+        EncoderInventory, HardwareCapabilities, HardwareEncoder, HardwareProbePolicy,
+        HardwareProbeReport, HardwareReason, HardwareStatus,
+    };
+    for (keyboard, viewport) in [
+        (false, size(px(1200.0), px(800.0))),
+        (true, size(px(1200.0), px(800.0))),
+        (false, size(px(1800.0), px(1800.0))),
+        (true, size(px(1800.0), px(1800.0))),
+    ] {
+        let mut app = TestAppContext::single();
+        let case = &OUTPUT_SELECTS[1];
+        let (root, cx) = select_window(&mut app, case, ColorTheme::Dark, ScalePreset::Percent100);
+        cx.simulate_resize(viewport);
+        root.update(cx, |root, cx| {
+            root.available_encoders.h264_videotoolbox = true;
+            root.runtime_capabilities_loading = false;
+            root.hardware_capabilities = HardwareCapabilities {
+                inventory: EncoderInventory::Complete,
+                reports: [false, true]
+                    .map(|allow| HardwareProbeReport {
+                        policy: HardwareProbePolicy::new(HardwareEncoder::H264Videotoolbox, allow),
+                        status: if allow {
+                            HardwareStatus::Available
+                        } else {
+                            HardwareStatus::Unavailable
+                        },
+                        reason: (!allow).then_some(HardwareReason::InitializationFailed),
+                        diagnostics: String::new(),
+                        checked_at: std::time::SystemTime::UNIX_EPOCH,
+                    })
+                    .into(),
+            };
+            root.update_selected_config(|config| {
+                config.video_codec = "libx264".into();
+                config.videotoolbox_allow_sw = false;
+                true
+            });
+            cx.notify();
+        });
+        draw(cx);
+        let before = cx.debug_bounds(case.trigger).unwrap();
+        let rescan = cx.debug_bounds("video-encoder-rescan").unwrap();
+        let pixels = cx.debug_bounds("video-pixel-format-select").unwrap();
+        assert!(
+            pixels.top() > before.bottom(),
+            "pixel format belongs below the complete encoder row"
+        );
+        assert!(before.size.width > pixels.size.width);
+        assert!(
+            rescan.left() >= before.left() && rescan.right() <= before.right(),
+            "rescan stays within the encoder row"
+        );
+        root.update(cx, |root, cx| {
+            root.runtime_capabilities_loading = true;
+            cx.notify();
+        });
+        draw(cx);
+        assert_eq!(cx.debug_bounds(case.trigger).unwrap(), before);
+        assert_eq!(cx.debug_bounds("video-encoder-rescan").unwrap(), rescan);
+        root.update(cx, |root, cx| {
+            root.runtime_capabilities_loading = false;
+            cx.notify();
+        });
+        draw(cx);
+        click(cx, case.trigger);
+        if keyboard {
+            // Typeahead skips the disabled strict variant and focuses the
+            // explicitly allowed fallback; Enter invokes the real GPUI callback.
+            press(cx, "h");
+            press(cx, "enter");
+        } else {
+            let panel = cx.debug_bounds(case.panel).unwrap();
+            cx.simulate_event(gpui::ScrollWheelEvent {
+                position: panel.center(),
+                delta: gpui::ScrollDelta::Pixels(gpui::point(px(0.0), px(-1000.0))),
+                ..Default::default()
+            });
+            draw(cx);
+            let row = cx
+                .debug_bounds("video-codec-h264_videotoolbox-software-fallback")
+                .unwrap();
+            assert!(
+                panel.contains(&row.center()),
+                "fallback must be scrolled into view before the pointer click"
+            );
+            click(cx, "video-codec-h264_videotoolbox-software-fallback");
+        }
+        root.read_with(cx, |root, _| {
+            let config = root.selected_config().unwrap();
+            assert_eq!(
+                config.video_codec, "h264_videotoolbox",
+                "keyboard={keyboard}"
+            );
+            assert!(config.videotoolbox_allow_sw, "keyboard={keyboard}");
+        });
+        assert!(cx.debug_bounds(case.panel).is_none());
+    }
+}
+
 fn select_window<'a>(
     app: &'a mut TestAppContext,
     case: &SelectCase,

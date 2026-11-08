@@ -105,6 +105,15 @@ fn settings_state<'a>(
         subtitle_fonts: &[],
         available_encoders: empty_encoders(),
         available_filters: empty_filters(),
+        hardware_capabilities: {
+            static HARDWARE: crate::capabilities::HardwareCapabilities =
+                crate::capabilities::HardwareCapabilities {
+                    reports: Vec::new(),
+                    inventory: crate::capabilities::EncoderInventory::Unknown,
+                };
+            &HARDWARE
+        },
+        runtime_capabilities_loading: false,
     }
 }
 

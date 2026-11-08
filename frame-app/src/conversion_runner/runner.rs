@@ -1,7 +1,10 @@
 use super::controller::ConversionProcessController;
 use super::output_paths::disambiguate_output_paths;
+use crate::capabilities::{HardwareEncoder, HardwareProbePolicy, probe_hardware_encoder};
 use crate::runtime_binaries::{ffmpeg_executable, ffprobe_executable};
-use frame_core::args::{build_ffmpeg_args, build_output_path, validate_task_input};
+use frame_core::args::{
+    build_ffmpeg_args, build_output_path, effective_video_encoder, validate_task_input,
+};
 use frame_core::error::ConversionError;
 use frame_core::events::ConversionEvent;
 use frame_core::probe::{ffprobe_json_args, parse_ffprobe_stdout};
@@ -122,18 +125,46 @@ fn run_prepared_conversion_task_with_control(
     let args = build_ffmpeg_args(&task.file_path, &output_path, &task.config, &probe)?;
     let executable = ffmpeg_executable();
 
+    if let Some(encoder) =
+        effective_video_encoder(&task.config, &probe).and_then(HardwareEncoder::from_name)
+    {
+        let policy = HardwareProbePolicy::new(encoder, task.config.videotoolbox_allow_sw);
+        let report =
+            probe_hardware_encoder(&executable, policy, || controller.is_cancelled(&task.id));
+        if controller.take_cancelled(&task.id)? {
+            emit_cancelled_task(&task.id, emit);
+            return Ok(());
+        }
+        if !report.available() {
+            if !report.diagnostics.is_empty() {
+                emit(ConversionEvent::log(
+                    task.id.clone(),
+                    format!("[ERROR] Encoder check: {}", report.diagnostics),
+                ));
+            }
+            return Err(ConversionError::InvalidInput(format!(
+                "Cannot use {}: {}. Check encoder availability again or choose another encoder.",
+                encoder.name(),
+                report
+                    .reason
+                    .map_or("encoder is unavailable", |reason| reason.caption())
+            )));
+        }
+    }
+
     emit(ConversionEvent::log(
         task.id.clone(),
         format!("[INFO] Running {executable} {}", args.join(" ")),
     ));
 
-    let mut child = Command::new(&executable)
-        .args(&args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(ConversionError::Io)?;
+    let mut child = crate::process_launch::spawn(
+        Command::new(&executable)
+            .args(&args)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped()),
+    )
+    .map_err(ConversionError::Io)?;
 
     let started_cancelled = controller.register_started_process(&task.id, child.id())?;
     if started_cancelled {
@@ -213,10 +244,10 @@ fn emit_cancelled_task(id: &str, emit: &mut impl FnMut(ConversionEvent)) {
 }
 
 fn probe_media_file(file_path: &str) -> Result<ProbeMetadata, ConversionError> {
-    let output = Command::new(ffprobe_executable())
-        .args(ffprobe_json_args(file_path))
-        .output()
-        .map_err(ConversionError::Io)?;
+    let output = crate::process_launch::output(
+        Command::new(ffprobe_executable()).args(ffprobe_json_args(file_path)),
+    )
+    .map_err(ConversionError::Io)?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

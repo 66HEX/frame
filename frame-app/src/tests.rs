@@ -168,6 +168,10 @@ mod visual_fixture_env {
             ("settings-video-av1", VisualFixture::SettingsVideoAv1),
             ("settings-video-prores", VisualFixture::SettingsVideoProres),
             ("settings-video-vp9", VisualFixture::SettingsVideoVp9),
+            (
+                "settings-video-hardware",
+                VisualFixture::SettingsVideoHardware,
+            ),
             ("preview-ready", VisualFixture::PreviewReady),
             ("preview-transport", VisualFixture::PreviewTransport),
             ("preview-trim", VisualFixture::PreviewTrim),

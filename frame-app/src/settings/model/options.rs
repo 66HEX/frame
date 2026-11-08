@@ -41,6 +41,7 @@ pub struct VideoCodecOption {
     pub is_selected: bool,
     pub is_disabled: bool,
     pub disabled_reason: Option<&'static str>,
+    pub allow_software_fallback: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

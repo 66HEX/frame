@@ -72,13 +72,14 @@ pub(super) fn decode_single_preview_frame(
     let mut args = plan.args.clone();
     insert_frame_limit(&mut args, 1);
     let read_started = Instant::now();
-    let child = Command::new(executable)
-        .args(&args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|err| PreviewEngineError::Ffmpeg(format!("failed to render frame: {err}")))?;
+    let child = crate::process_launch::spawn(
+        Command::new(executable)
+            .args(&args)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped()),
+    )
+    .map_err(|err| PreviewEngineError::Ffmpeg(format!("failed to render frame: {err}")))?;
     metrics.record_video_process_spawn();
     let output = child.wait_with_output().map_err(|err| {
         PreviewEngineError::Ffmpeg(format!("failed to read rendered frame: {err}"))

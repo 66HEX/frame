@@ -71,12 +71,13 @@ fn install_video(process: &RunningPreviewProcess, handles: ProcessHandles) {
 }
 
 fn child_alive(pid: u32) -> bool {
-    Command::new("kill")
-        .args(["-0", &pid.to_string()])
-        .stderr(Stdio::null())
-        .status()
-        .unwrap()
-        .success()
+    crate::process_launch::status(
+        Command::new("kill")
+            .args(["-0", &pid.to_string()])
+            .stderr(Stdio::null()),
+    )
+    .unwrap()
+    .success()
 }
 
 #[test]
@@ -304,22 +305,23 @@ fn fail_reconfigure(session: &PreviewSession, valid: &PreviewSessionConfig) {
 #[ignore = "requires FFmpeg and a default audio output device; run with --ignored"]
 fn real_video_failure_preserves_frame_pauses_ordinary_commands_and_allows_explicit_retry() {
     let path = std::env::temp_dir().join(format!("frame-video-failure-{}.mp4", std::process::id()));
-    let status = Command::new(crate::runtime_binaries::ffmpeg_executable())
-        .args([
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-y",
-            "-f",
-            "lavfi",
-            "-i",
-            "testsrc2=size=160x90:rate=30:duration=3",
-            "-c:v",
-            "libx264",
-        ])
-        .arg(&path)
-        .status()
-        .unwrap();
+    let status = crate::process_launch::status(
+        Command::new(crate::runtime_binaries::ffmpeg_executable())
+            .args([
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "testsrc2=size=160x90:rate=30:duration=3",
+                "-c:v",
+                "libx264",
+            ])
+            .arg(&path),
+    )
+    .unwrap();
     assert!(status.success());
     let mut valid = config();
     valid.path = path.clone();

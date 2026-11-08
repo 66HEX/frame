@@ -631,8 +631,8 @@ fn real_av_preview_config(path: PathBuf) -> PreviewSessionConfig {
 fn temp_preview_video(label: &str) -> PathBuf {
     let mut path = std::env::temp_dir();
     path.push(format!("frame-preview-{label}-{}.mp4", std::process::id()));
-    let status = Command::new(crate::runtime_binaries::ffmpeg_executable())
-        .args([
+    let status = crate::process_launch::status(
+        Command::new(crate::runtime_binaries::ffmpeg_executable()).args([
             "-hide_banner",
             "-loglevel",
             "error",
@@ -644,9 +644,9 @@ fn temp_preview_video(label: &str) -> PathBuf {
             "-pix_fmt",
             "yuv420p",
             path.to_string_lossy().as_ref(),
-        ])
-        .status()
-        .expect("spawn ffmpeg");
+        ]),
+    )
+    .expect("spawn ffmpeg");
     assert!(
         status.success(),
         "ffmpeg fixture generation failed: {status}"
@@ -657,8 +657,8 @@ fn temp_preview_video(label: &str) -> PathBuf {
 fn temp_preview_av_sync_video(label: &str) -> PathBuf {
     let mut path = std::env::temp_dir();
     path.push(format!("frame-preview-{label}-{}.mp4", std::process::id()));
-    let status = Command::new(crate::runtime_binaries::ffmpeg_executable())
-        .args([
+    let status = crate::process_launch::status(
+        Command::new(crate::runtime_binaries::ffmpeg_executable()).args([
             "-hide_banner",
             "-loglevel",
             "error",
@@ -681,9 +681,9 @@ fn temp_preview_av_sync_video(label: &str) -> PathBuf {
             "aac",
             "-shortest",
             path.to_string_lossy().as_ref(),
-        ])
-        .status()
-        .expect("spawn ffmpeg");
+        ]),
+    )
+    .expect("spawn ffmpeg");
     assert!(
         status.success(),
         "ffmpeg av fixture generation failed: {status}"

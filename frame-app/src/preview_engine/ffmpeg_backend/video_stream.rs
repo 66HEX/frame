@@ -211,19 +211,20 @@ impl RunningPreviewProcess {
         let plan = preview_plan(config, seconds, true, precise)
             .map_err(|error| self.fail_video_start(generation, error, None))?;
         let spawned_at = Instant::now();
-        let mut child = Command::new(&self.executable)
-            .args(&plan.args)
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|err| {
-                self.fail_video_start(
-                    generation,
-                    PreviewEngineError::Ffmpeg(format!("failed to start: {err}")),
-                    None,
-                )
-            })?;
+        let mut child = crate::process_launch::spawn(
+            Command::new(&self.executable)
+                .args(&plan.args)
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped()),
+        )
+        .map_err(|err| {
+            self.fail_video_start(
+                generation,
+                PreviewEngineError::Ffmpeg(format!("failed to start: {err}")),
+                None,
+            )
+        })?;
         self.metrics.record_video_process_spawn();
 
         let stop_requested = Arc::new(AtomicBool::new(false));
