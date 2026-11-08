@@ -82,7 +82,7 @@ pub fn apply_fps(config: &mut ConversionConfig, fps: &str) -> bool {
 }
 
 pub fn apply_gif_colors(config: &mut ConversionConfig, colors: u16) -> bool {
-    let colors = colors.clamp(2, MAX_GIF_COLORS);
+    let colors = colors.clamp(frame_core::types::MIN_GIF_COLORS, MAX_GIF_COLORS);
     if config.gif_colors == colors {
         return false;
     }

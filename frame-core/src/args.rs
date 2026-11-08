@@ -13,8 +13,8 @@ use crate::container::{
 };
 use crate::error::ConversionError;
 use crate::filters::{
-    build_audio_filters, build_encode_overlay_filter_complex, build_encode_video_filters,
-    build_overlay_filter_complex, build_video_filters, has_overlay,
+    VisualFilterContext, VisualFilterProfile, build_audio_filters,
+    build_visual_filter_chain_with_context, build_visual_filter_complex_with_context, has_overlay,
 };
 use crate::media_filters::validate_media_filters;
 use crate::media_rules::{
@@ -24,8 +24,8 @@ use crate::media_rules::{
     is_video_stream_codec_allowed,
 };
 use crate::types::{
-    AudioTrack, ConversionConfig, ExternalSubtitleTrack, MetadataConfig, MetadataMode,
-    ProbeMetadata, SubtitleTrack, VOLUME_EPSILON,
+    AudioTrack, ConversionConfig, ExternalSubtitleTrack, MIN_GIF_COLORS, MetadataConfig,
+    MetadataMode, ProbeMetadata, SubtitleTrack, VOLUME_EPSILON,
 };
 use crate::utils::{format_ffmpeg_seconds, get_hwaccel_args, is_audio_only_container, parse_time};
 
@@ -504,6 +504,7 @@ pub fn build_ffmpeg_args(
     probe: &ProbeMetadata,
 ) -> Result<Vec<String>, ConversionError> {
     validate_audio_encoding_tracks(config, probe)?;
+    let filter_context = VisualFilterContext::new(probe.width, probe.height);
     let mut args = Vec::new();
 
     // Hardware decode acceleration (must be before -i)
@@ -644,7 +645,7 @@ pub fn build_ffmpeg_args(
         add_audio_codec_args(&mut args, config);
     } else if is_video_only && is_gif_output {
         args.push("-filter_complex".to_string());
-        args.push(build_gif_filter_complex(config));
+        args.push(build_gif_filter_complex(config, filter_context));
 
         args.push("-map".to_string());
         args.push("[gif_out]".to_string());
@@ -666,9 +667,17 @@ pub fn build_ffmpeg_args(
 
         if use_overlay {
             args.push("-filter_complex".to_string());
-            args.push(build_overlay_filter_complex(config));
+            args.push(build_visual_filter_complex_with_context(
+                config,
+                VisualFilterProfile::ExportImage,
+                filter_context,
+            ));
         } else {
-            let video_filters = build_video_filters(config, true);
+            let video_filters = build_visual_filter_chain_with_context(
+                config,
+                VisualFilterProfile::ExportImage,
+                filter_context,
+            );
             if !video_filters.is_empty() {
                 args.push("-vf".to_string());
                 args.push(video_filters.join(","));
@@ -694,9 +703,17 @@ pub fn build_ffmpeg_args(
 
         if use_overlay {
             args.push("-filter_complex".to_string());
-            args.push(build_encode_overlay_filter_complex(config));
+            args.push(build_visual_filter_complex_with_context(
+                config,
+                VisualFilterProfile::ExportVideo,
+                filter_context,
+            ));
         } else {
-            let video_filters = build_encode_video_filters(config, true);
+            let video_filters = build_visual_filter_chain_with_context(
+                config,
+                VisualFilterProfile::ExportVideo,
+                filter_context,
+            );
             if !video_filters.is_empty() {
                 args.push("-vf".to_string());
                 args.push(video_filters.join(","));
@@ -844,8 +861,15 @@ fn normalize_gif_dither(dither: &str) -> &'static str {
     }
 }
 
-fn build_gif_filter_complex(config: &ConversionConfig) -> String {
-    let mut filters = build_video_filters(config, true);
+fn build_gif_filter_complex(
+    config: &ConversionConfig,
+    filter_context: VisualFilterContext,
+) -> String {
+    let mut filters = build_visual_filter_chain_with_context(
+        config,
+        VisualFilterProfile::ExportImage,
+        filter_context,
+    );
     if config.fps != "original" {
         filters.push(format!("fps={}", config.fps));
     }
@@ -856,7 +880,7 @@ fn build_gif_filter_complex(config: &ConversionConfig) -> String {
         format!("{},split[gif_src][gif_palette_src]", filters.join(","))
     };
 
-    let colors = config.gif_colors.clamp(2, 256);
+    let colors = config.gif_colors.clamp(MIN_GIF_COLORS, 256);
     let dither = normalize_gif_dither(&config.gif_dither);
 
     format!(
@@ -1311,9 +1335,9 @@ pub fn validate_task_input(
     }
 
     if is_video_only && config.container.eq_ignore_ascii_case("gif") {
-        if !(2..=256).contains(&config.gif_colors) {
+        if !(MIN_GIF_COLORS..=256).contains(&config.gif_colors) {
             return Err(ConversionError::InvalidInput(format!(
-                "GIF palette size must be between 2 and 256 colors: {}",
+                "GIF palette size must be between {MIN_GIF_COLORS} and 256 colors: {}",
                 config.gif_colors
             )));
         }
@@ -1823,6 +1847,20 @@ mod tests {
     }
 
     #[test]
+    fn gif_palette_requires_space_for_opaque_and_transparent_colors() {
+        let input = temporary_input_file_with_extension("gif-palette-input", "png");
+        let mut config = sample_config("gif", "gif");
+        config.gif_colors = 2;
+        assert!(validate_task_input(&input.to_string_lossy(), &config).is_err());
+        config.gif_colors = MIN_GIF_COLORS;
+        assert!(validate_task_input(&input.to_string_lossy(), &config).is_ok());
+        let graph = build_gif_filter_complex(&config, VisualFilterContext::default());
+        assert!(graph.contains("palettegen=max_colors=3"));
+        assert!(!graph.contains("reserve_transparent=0"));
+        fs::remove_file(input).unwrap();
+    }
+
+    #[test]
     fn nonfinite_trim_times_are_rejected_before_starting_ffmpeg() {
         let input = temporary_input_file_with_extension("nonfinite-trim-input", "mp4");
         for mode in ["copy", "reencode"] {
@@ -1932,14 +1970,16 @@ mod tests {
     }
 
     #[test]
-    fn build_ffmpeg_args_adds_even_dimensions_guard_for_default_video_reencode() {
+    fn build_ffmpeg_args_skips_padding_for_known_even_video_raster() {
         let config = sample_config("mp4", "libx264");
-
-        let args = build_ffmpeg_args("input.mov", "output.mp4", &config, &sample_probe())
-            .expect("arguments should build");
-
-        let vf_index = args.iter().position(|arg| arg == "-vf").unwrap();
-        assert_eq!(args[vf_index + 1], EVEN_DIMENSIONS_FILTER);
+        let probe = ProbeMetadata {
+            width: Some(1920),
+            height: Some(1080),
+            ..sample_probe()
+        };
+        let args = build_ffmpeg_args("input.mov", "output.mp4", &config, &probe)
+            .expect("known even source should need no visual filter");
+        assert!(!args.iter().any(|arg| arg == "-vf"));
     }
 
     #[test]

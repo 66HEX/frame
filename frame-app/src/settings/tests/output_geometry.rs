@@ -20,19 +20,22 @@ fn output_size_follows_rotation_crop_scaling_and_padding() {
     core.resolution = "custom".into();
     core.custom_width = Some("641".into());
     core.custom_height = Some("481".into());
-    assert_eq!(output_dimensions(&core, 1920, 1080, Some("yuv420p")), None);
+    assert_eq!(
+        output_dimensions(&core, 1920, 1080, Some("yuv420p")),
+        Some((642, 482))
+    );
     core.container = "png".into();
     assert_eq!(
         output_dimensions(&core, 1920, 1080, Some("yuv420p")),
         Some((641, 481))
     );
     core.custom_width = Some(String::new());
-    assert_eq!(output_dimensions(&core, 1920, 1080, None), None);
+    assert_eq!(output_dimensions(&core, 1920, 1080, Some("yuv420p")), None);
     core.processing_mode = "copy".into();
     assert_eq!(
-        output_dimensions(&core, 1920, 1080, None),
+        output_dimensions(&core, 1920, 1080, Some("yuv420p")),
         Some((1920, 1080))
     );
     core.container = "mp3".into();
-    assert_eq!(output_dimensions(&core, 1920, 1080, None), None);
+    assert_eq!(output_dimensions(&core, 1920, 1080, Some("yuv420p")), None);
 }

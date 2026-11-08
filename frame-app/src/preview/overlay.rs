@@ -123,7 +123,7 @@ impl PreviewOverlayState {
         }
 
         self.committed_overlay = initial_overlay
-            .filter(|overlay| overlay.enabled && !overlay.path.is_empty())
+            .filter(|overlay| !overlay.path.is_empty())
             .map(normalize_overlay);
         self.draft_overlay = None;
 
@@ -163,7 +163,7 @@ impl PreviewOverlayState {
             self.drag_origin = None;
         } else {
             self.overlay_mode = true;
-            self.draft_overlay = self.committed_overlay.clone();
+            self.draft_overlay = self.committed_overlay.as_ref().map(editable_overlay);
         }
         OverlayModeChange {
             changed: true,
@@ -184,7 +184,7 @@ impl PreviewOverlayState {
         if next_mode {
             self.overlay_mode = true;
             if self.draft_overlay.is_none() {
-                self.draft_overlay = self.committed_overlay.clone();
+                self.draft_overlay = self.committed_overlay.as_ref().map(editable_overlay);
             }
         } else {
             self.overlay_mode = false;
@@ -211,6 +211,18 @@ impl PreviewOverlayState {
         self.overlay_mode = false;
         self.drag_origin = None;
         Some(next_overlay)
+    }
+
+    pub fn suspend_overlay_edit(&mut self) -> Option<PreviewOverlay> {
+        if !self.overlay_mode {
+            return None;
+        }
+        let mut overlay = self.draft_overlay.take()?;
+        overlay.enabled = false;
+        self.committed_overlay = Some(overlay.clone());
+        self.overlay_mode = false;
+        self.drag_origin = None;
+        Some(overlay)
     }
 
     pub fn begin_overlay_drag(
@@ -441,6 +453,14 @@ pub fn create_default_overlay(path: impl Into<String>) -> PreviewOverlay {
         width,
         opacity: 1.0,
         anchor: "custom".to_string(),
+    }
+}
+
+#[must_use]
+fn editable_overlay(overlay: &PreviewOverlay) -> PreviewOverlay {
+    PreviewOverlay {
+        enabled: true,
+        ..overlay.clone()
     }
 }
 

@@ -1,14 +1,13 @@
 use crate::{
+    dimensions::{OutputRasterPolicy, output_dimensions, output_raster_policy},
     error::ConversionError,
     filters::{
-        PREVIEW_OUTPUT_LABEL, VisualFilterBase, VisualFilterProfile, build_audio_filters,
-        build_visual_filter_complex, has_overlay,
+        PREVIEW_OUTPUT_LABEL, VisualFilterBase, VisualFilterContext, VisualFilterProfile,
+        build_audio_filters, build_visual_filter_complex_with_context, has_overlay,
     },
     types::ConversionConfig,
     utils::format_ffmpeg_seconds as format_seconds,
 };
-
-const MIN_PREVIEW_DIMENSION: u32 = 16;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PreviewFfmpegOptions {
@@ -74,12 +73,12 @@ pub fn build_ffmpeg_preview_args(
     let fps = effective_preview_fps(config, options.fps);
     let geometry = preview_geometry(config, options)?;
     let frame_bytes = frame_bytes(geometry.preview_width, geometry.preview_height)?;
-    let base = if options.source_is_image {
-        VisualFilterBase::Image
-    } else {
-        VisualFilterBase::Video
+    let base = match output_raster_policy(&config.container, config.processing_mode == "copy") {
+        OutputRasterPolicy::Source => VisualFilterBase::Source,
+        OutputRasterPolicy::Exact => VisualFilterBase::Image,
+        OutputRasterPolicy::Even => VisualFilterBase::Video,
     };
-    let graph = build_visual_filter_complex(
+    let graph = build_visual_filter_complex_with_context(
         config,
         VisualFilterProfile::PreviewLowRes {
             base,
@@ -88,6 +87,7 @@ pub fn build_ffmpeg_preview_args(
             fps,
             source_time_seconds: options.start_seconds,
         },
+        VisualFilterContext::new(options.source_width, options.source_height),
     );
 
     let mut args = vec![
@@ -111,7 +111,8 @@ pub fn build_ffmpeg_preview_args(
     args.push("-i".to_string());
     args.push(input.to_string());
 
-    if has_overlay(config)
+    if base != VisualFilterBase::Source
+        && has_overlay(config)
         && let Some(overlay) = &config.overlay
     {
         args.push("-i".to_string());
@@ -299,6 +300,9 @@ fn audio_preview_duration(options: &PreviewAudioFfmpegOptions) -> Option<f64> {
 }
 
 fn effective_preview_fps(config: &ConversionConfig, preview_fps: u32) -> u32 {
+    if config.processing_mode == "copy" {
+        return preview_fps;
+    }
     config
         .fps
         .parse::<u32>()
@@ -311,11 +315,7 @@ fn preview_geometry(
     config: &ConversionConfig,
     options: &PreviewFfmpegOptions,
 ) -> Result<PreviewGeometry, ConversionError> {
-    let mut export = export_dimensions(config, options)?;
-    if !options.source_is_image {
-        export.width = ceil_even_dimension(export.width);
-        export.height = ceil_even_dimension(export.height);
-    }
+    let export = export_dimensions(config, options)?;
 
     let preview = fit_dimensions(
         export.width,
@@ -354,28 +354,20 @@ fn export_dimensions(
         })?,
     };
 
-    let mut dimensions = Dimensions {
-        width: source_width,
-        height: source_height,
-    };
-
-    if matches!(config.rotation.as_str(), "90" | "270") {
-        dimensions = Dimensions {
-            width: dimensions.height,
-            height: dimensions.width,
-        };
-    }
-
-    if let Some(crop) = &config.crop
-        && crop.enabled
+    if output_raster_policy(&config.container, config.processing_mode == "copy")
+        == OutputRasterPolicy::Source
     {
-        dimensions = Dimensions {
-            width: rounded_dimension(crop.width, 1.0),
-            height: rounded_dimension(crop.height, 1.0),
-        };
+        return Ok(Dimensions {
+            width: source_width,
+            height: source_height,
+        });
     }
 
-    Ok(apply_resolution_dimensions(config, dimensions))
+    let (width, height) =
+        output_dimensions(config, source_width, source_height, None).ok_or_else(|| {
+            ConversionError::InvalidInput("Preview output dimensions are invalid".to_string())
+        })?;
+    Ok(Dimensions { width, height })
 }
 
 fn source_dimensions_from_custom_resolution(config: &ConversionConfig) -> Option<(u32, u32)> {
@@ -385,43 +377,6 @@ fn source_dimensions_from_custom_resolution(config: &ConversionConfig) -> Option
     let width = parse_dimension(config.custom_width.as_deref())?;
     let height = parse_dimension(config.custom_height.as_deref())?;
     Some((width, height))
-}
-
-fn apply_resolution_dimensions(config: &ConversionConfig, dimensions: Dimensions) -> Dimensions {
-    if config.resolution == "original" {
-        return dimensions;
-    }
-
-    if config.resolution == "custom" {
-        let width = parse_dimension(config.custom_width.as_deref());
-        let height = parse_dimension(config.custom_height.as_deref());
-        return match (width, height) {
-            (Some(width), Some(height)) => Dimensions { width, height },
-            (Some(width), None) => Dimensions {
-                width,
-                height: scaled_dimension(dimensions.height, width, dimensions.width, false),
-            },
-            (None, Some(height)) => Dimensions {
-                width: scaled_dimension(dimensions.width, height, dimensions.height, true),
-                height,
-            },
-            (None, None) => dimensions,
-        };
-    }
-
-    let Some(target_height) = (match config.resolution.as_str() {
-        "1080p" => Some(1080),
-        "720p" => Some(720),
-        "480p" => Some(480),
-        _ => None,
-    }) else {
-        return dimensions;
-    };
-
-    Dimensions {
-        width: scaled_dimension(dimensions.width, target_height, dimensions.height, true),
-        height: target_height,
-    }
 }
 
 fn fit_dimensions(
@@ -435,24 +390,8 @@ fn fit_dimensions(
     let scale = width_scale.min(height_scale).min(1.0);
 
     Dimensions {
-        width: floor_even_dimension(round_to_u32(f64::from(source_width) * scale)),
-        height: floor_even_dimension(round_to_u32(f64::from(source_height) * scale)),
-    }
-}
-
-fn scaled_dimension(
-    source_dimension: u32,
-    target_dimension: u32,
-    source_reference: u32,
-    even: bool,
-) -> u32 {
-    let raw =
-        f64::from(source_dimension) * f64::from(target_dimension) / f64::from(source_reference);
-    let rounded = round_to_u32(raw);
-    if even {
-        floor_even_dimension(rounded)
-    } else {
-        rounded.max(1)
+        width: round_to_u32(f64::from(source_width) * scale),
+        height: round_to_u32(f64::from(source_height) * scale),
     }
 }
 
@@ -462,11 +401,6 @@ fn parse_dimension(value: Option<&str>) -> Option<u32> {
         .filter(|value| !value.is_empty() && *value != "-1")
         .and_then(|value| value.parse::<u32>().ok())
         .filter(|value| *value > 0)
-}
-
-fn rounded_dimension(value: f64, min_value: f64) -> u32 {
-    let rounded = value.max(min_value).round();
-    round_to_u32(rounded)
 }
 
 fn round_to_u32(value: f64) -> u32 {
@@ -480,19 +414,6 @@ fn round_to_u32(value: f64) -> u32 {
     )]
     let converted = value.round().min(f64::from(u32::MAX)) as u32;
     converted.max(1)
-}
-
-fn ceil_even_dimension(value: u32) -> u32 {
-    value.max(2).next_multiple_of(2)
-}
-
-fn floor_even_dimension(value: u32) -> u32 {
-    let value = value.max(MIN_PREVIEW_DIMENSION);
-    if value.is_multiple_of(2) {
-        value
-    } else {
-        value - 1
-    }
 }
 
 fn frame_bytes(width: u32, height: u32) -> Result<usize, ConversionError> {
@@ -787,12 +708,13 @@ mod tests {
         let plan = build_ffmpeg_preview_args("input.mp4", &config, &default_options())
             .expect("preview args");
 
-        assert_eq!(plan.width, 404);
+        assert_eq!(plan.width, 405);
         assert_eq!(plan.height, 720);
         assert!(plan.args.iter().any(|arg| {
-            arg.contains("crop=300:600:10:20,scale=1080:1920:force_original_aspect_ratio=decrease")
-                && arg.contains("scale=404:720")
-                && !arg.contains("pad=404:720")
+            arg.contains("crop=300:600:10:20:exact=1")
+                && arg.contains("scale=1080:1920:force_original_aspect_ratio=decrease")
+                && arg.contains("scale=405:720")
+                && !arg.contains("pad=405:720")
         }));
     }
 
@@ -804,9 +726,9 @@ mod tests {
         let plan = build_ffmpeg_preview_args("input.mp4", &config, &default_options())
             .expect("preview args");
 
-        assert_eq!(plan.width, 404);
+        assert_eq!(plan.width, 405);
         assert_eq!(plan.height, 720);
-        assert_eq!(plan.frame_bytes, 404 * 720 * 4);
+        assert_eq!(plan.frame_bytes, 405 * 720 * 4);
     }
 
     #[test]
@@ -820,7 +742,7 @@ mod tests {
 
         assert_eq!(
             (plan.width, plan.height, plan.frame_bytes),
-            (404, 720, 404 * 720 * 4)
+            (405, 720, 405 * 720 * 4)
         );
     }
 
@@ -878,12 +800,83 @@ mod tests {
     }
 
     #[test]
-    fn build_ffmpeg_preview_args_keeps_video_base_for_gif_output() {
+    fn preview_geometry_matches_odd_output_and_exact_crop_dimensions() {
+        let mut options = default_options();
+        options.source_width = Some(320);
+        options.source_height = Some(180);
+        for (container, fixed, height_only) in [
+            ("mp4", (128, 130), (230, 130)),
+            ("gif", (127, 129), (229, 129)),
+            ("png", (127, 129), (229, 129)),
+        ] {
+            let mut config = default_config();
+            config.container = container.to_string();
+            config.resolution = "custom".to_string();
+            config.custom_width = Some("127".to_string());
+            config.custom_height = Some("129".to_string());
+            let plan = build_ffmpeg_preview_args("input.mp4", &config, &options).unwrap();
+            assert_eq!((plan.width, plan.height), fixed, "{container}");
+            config.custom_width = Some("-1".to_string());
+            let plan = build_ffmpeg_preview_args("input.mp4", &config, &options).unwrap();
+            assert_eq!((plan.width, plan.height), height_only, "{container}");
+        }
+
+        let mut config = default_config();
+        config.container = "png".to_string();
+        config.crop = Some(CropConfig {
+            enabled: true,
+            x: 0.0,
+            y: 0.0,
+            width: 127.0,
+            height: 129.0,
+            source_width: None,
+            source_height: None,
+            aspect_ratio: None,
+        });
+        let plan = build_ffmpeg_preview_args("input.media", &config, &options).unwrap();
+        assert_eq!((plan.width, plan.height), (127, 129));
+        assert_eq!(plan.frame_bytes, 127 * 129 * 4);
+    }
+
+    #[test]
+    fn copy_preview_ignores_dormant_export_transforms_and_overlay() {
+        let mut config = default_config();
+        config.processing_mode = "copy".to_string();
+        config.rotation = "90".to_string();
+        config.resolution = "custom".to_string();
+        config.custom_width = Some("127".to_string());
+        config.custom_height = Some("129".to_string());
+        config.fps = "8".to_string();
+        config.subtitle_burn_path = Some("/tmp/dormant.srt".to_string());
+        config.overlay = Some(OverlayConfig {
+            enabled: true,
+            path: "/tmp/dormant.png".to_string(),
+            x: 0.5,
+            y: 0.5,
+            width: 0.2,
+            opacity: 1.0,
+            anchor: "center".to_string(),
+        });
+        let plan = build_ffmpeg_preview_args("input.mp4", &config, &default_options()).unwrap();
+        assert_eq!((plan.width, plan.height, plan.fps), (1280, 720, 30));
+        assert_eq!(plan.args.iter().filter(|arg| *arg == "-i").count(), 1);
+        let graph = plan
+            .args
+            .windows(2)
+            .find(|pair| pair[0] == "-filter_complex")
+            .unwrap();
+        for inactive in ["transpose", "overlay", "subtitles", "127", "pad="] {
+            assert!(!graph[1].contains(inactive), "{inactive}");
+        }
+    }
+
+    #[test]
+    fn build_ffmpeg_preview_args_keeps_exact_raster_for_gif_output() {
         let mut config = default_config();
         config.container = "gif".to_string();
         let plan = build_ffmpeg_preview_args("input.mp4", &config, &default_options())
             .expect("preview args");
 
-        assert!(plan.args.iter().any(|arg| arg.contains("ceil(iw/2)*2")));
+        assert!(!plan.args.iter().any(|arg| arg.contains("ceil(iw/2)*2")));
     }
 }

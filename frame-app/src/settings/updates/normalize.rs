@@ -181,6 +181,12 @@ fn normalize_video_config_values(config: &mut ConversionConfig, metadata: Option
         reset_subtitle_settings(config);
     }
 
+    if (is_audio_container || is_gif_output || config.processing_mode == ProcessingMode::Copy)
+        && let Some(overlay) = config.overlay.as_mut()
+    {
+        overlay.enabled = false;
+    }
+
     if is_audio_container {
         config.pixel_format = DEFAULT_PIXEL_FORMAT.to_string();
         config.selected_subtitle_tracks.clear();
@@ -231,7 +237,9 @@ fn normalize_video_config_values(config: &mut ConversionConfig, metadata: Option
 
     normalize_image_encoding_settings(config);
 
-    config.gif_colors = config.gif_colors.clamp(2, MAX_GIF_COLORS);
+    config.gif_colors = config
+        .gif_colors
+        .clamp(frame_core::types::MIN_GIF_COLORS, MAX_GIF_COLORS);
     if !GIF_DITHER_OPTIONS.contains(&config.gif_dither.as_str()) {
         config.gif_dither = DEFAULT_GIF_DITHER.to_string();
     }

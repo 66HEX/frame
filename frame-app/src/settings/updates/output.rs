@@ -33,7 +33,7 @@ pub fn apply_processing_mode(
 }
 
 pub fn apply_output_container(config: &mut ConversionConfig, container: &str) -> bool {
-    let changed = !config.container.eq_ignore_ascii_case(container);
+    let mut changed = !config.container.eq_ignore_ascii_case(container);
     config.container = container.to_ascii_lowercase();
 
     if config.processing_mode != ProcessingMode::Copy
@@ -41,13 +41,11 @@ pub fn apply_output_container(config: &mut ConversionConfig, container: &str) ->
         && !is_audio_codec_allowed_for_container(&config.container, &config.audio_codec)
     {
         config.audio_codec = default_audio_codec_for_container(&config.container).to_string();
-        normalize_audio_encoding_settings(config);
-        return true;
+        changed = true;
     }
 
     normalize_audio_encoding_settings(config);
-    normalize_video_config(config, None);
-    changed
+    changed | normalize_video_config(config, None)
 }
 
 pub fn apply_trim_times(

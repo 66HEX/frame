@@ -10,6 +10,7 @@ use std::{
 
 use frame_core::{
     args::{build_ffmpeg_args, validate_task_input},
+    filters::{VisualFilterContext, VisualFilterProfile, build_visual_filter_chain_with_context},
     preview::{
         PreviewAudioFfmpegOptions, PreviewFfmpegOptions, build_ffmpeg_preview_args,
         build_ffmpeg_preview_audio_args,
@@ -844,6 +845,533 @@ fn gif_output_should_write_palette_gif_video() -> TestResult {
 
     let metadata = probe_media(&tools, &output)?;
     assert_eq!(metadata.video_codec.as_deref(), Some("gif"));
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+#[expect(
+    clippy::too_many_lines,
+    reason = "The export and preview matrix shares setup and assertions across container and geometry combinations."
+)]
+fn odd_custom_and_crop_dimensions_should_match_export_and_preview() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("odd_export_preview_geometry")?;
+    let input = sandbox.path("source.mp4");
+    generate_h264_aac_source(&tools, &input, 0.25, 320, 180)?;
+    let subsampled = sandbox.path("source-422-10bit.mkv");
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-i",
+            &path_arg(&input),
+            "-an",
+            "-c:v",
+            "ffv1",
+            "-pix_fmt",
+            "yuv422p10le",
+            "-y",
+            &path_arg(&subsampled),
+        ]),
+    )?;
+    for (container, codec) in [("mp4", "libx264"), ("png", "png"), ("gif", "gif")] {
+        for operation in ["fixed", "height", "crop", "rotate"] {
+            let mut config = video_config(container, codec, "aac");
+            let case_input = if operation == "rotate" {
+                &subsampled
+            } else {
+                &input
+            };
+            let expected = match operation {
+                "crop" | "rotate" => {
+                    if operation == "rotate" {
+                        config.rotation = "90".to_string();
+                        if container == "mp4" {
+                            config.pixel_format = "yuv420p".to_string();
+                        }
+                    }
+                    config.crop = Some(CropConfig {
+                        enabled: true,
+                        x: 3.0,
+                        y: 3.0,
+                        width: 127.0,
+                        height: 129.0,
+                        source_width: None,
+                        source_height: None,
+                        aspect_ratio: None,
+                    });
+                    if container == "mp4" {
+                        (128, 130)
+                    } else {
+                        (127, 129)
+                    }
+                }
+                _ => {
+                    config.resolution = "custom".to_string();
+                    config.custom_width =
+                        Some(if operation == "fixed" { "127" } else { "-1" }.to_string());
+                    config.custom_height = Some("129".to_string());
+                    match (container, operation) {
+                        ("mp4", "fixed") => (128, 130),
+                        ("mp4", _) => (230, 130),
+                        (_, "fixed") => (127, 129),
+                        _ => (229, 129),
+                    }
+                }
+            };
+            let output = sandbox.path(&format!("{operation}.{container}"));
+            convert(&tools, case_input, &output, &config)?;
+            let actual = probe_media(&tools, &output)?;
+            assert_eq!(
+                actual.width.zip(actual.height),
+                Some(expected),
+                "{container}/{operation}"
+            );
+            assert_eq!(
+                frame_core::dimensions::output_dimensions(&config, 320, 180, None,),
+                Some(expected)
+            );
+            let plan = build_ffmpeg_preview_args(
+                &path_arg(case_input),
+                &config,
+                &PreviewFfmpegOptions {
+                    start_seconds: 0.0,
+                    end_seconds: None,
+                    source_width: Some(320),
+                    source_height: Some(180),
+                    max_width: 320,
+                    max_height: 180,
+                    fps: 12,
+                    realtime: false,
+                    precise_seek: true,
+                    source_is_image: false,
+                },
+            )
+            .map_err(|error| error.to_string())?;
+            assert_eq!(
+                (plan.width, plan.height),
+                expected,
+                "preview {container}/{operation}"
+            );
+            let mut preview_args = plan.args;
+            let output_index = preview_args.len() - 1;
+            preview_args.splice(
+                output_index..output_index,
+                ["-frames:v".to_string(), "1".to_string()],
+            );
+            let pixels = run_tool_output(&tools.ffmpeg, &preview_args)?;
+            assert_eq!(
+                pixels.len(),
+                plan.frame_bytes,
+                "preview {container}/{operation}"
+            );
+        }
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+#[expect(
+    clippy::too_many_lines,
+    reason = "The plane oracle covers crop and both custom padding boundaries without lossy encode comparisons."
+)]
+fn exact_padding_should_preserve_subsampled_edges_depth_and_frame_count() -> TestResult {
+    let tools = Toolchain::discover()?;
+    for (pixel_format, sub_y) in [("yuv420p10le", 2_usize), ("yuv422p16le", 1)] {
+        let source = format!(
+            "nullsrc=s=320x178:r=4:d=1,format={pixel_format},geq=lum='X*7+Y*11+N*13':cb='X*3+Y*5':cr='X*11+Y*7'"
+        );
+        for (operation, target, inner, offset) in [
+            (
+                "crop",
+                (128_usize, 130_usize),
+                (127_usize, 129_usize),
+                (0_usize, 0_usize),
+            ),
+            ("crop-even", (128, 130), (128, 129), (0, 0)),
+            ("crop-edge", (128, 130), (127, 129), (0, 0)),
+            ("custom", (128, 130), (127, 71), (0, 29)),
+            ("even", (128, 128), (128, 71), (0, 28)),
+        ] {
+            let mut config = video_config("mp4", "libx264", "aac");
+            let reference = if operation.starts_with("crop") {
+                config.crop = Some(CropConfig {
+                    enabled: true,
+                    x: if operation == "crop-edge" { 400.0 } else { 3.0 },
+                    y: 5.0,
+                    width: f64::from(u32::try_from(inner.0).unwrap()),
+                    height: 129.0,
+                    source_width: None,
+                    source_height: None,
+                    aspect_ratio: None,
+                });
+                "null".to_string()
+            } else {
+                config.resolution = "custom".to_string();
+                config.custom_width =
+                    Some(if operation == "custom" { "127" } else { "128" }.to_string());
+                config.custom_height =
+                    Some(if operation == "custom" { "129" } else { "128" }.to_string());
+                config.scaling_algorithm = "nearest".to_string();
+                format!("scale={}:{}:flags=neighbor", inner.0, inner.1)
+            };
+            let graph = build_visual_filter_chain_with_context(
+                &config,
+                VisualFilterProfile::ExportVideo,
+                VisualFilterContext::new(Some(320), Some(178)),
+            )
+            .join(",");
+            let reference_pixels = render_raw_filter(&tools, &source, &reference, pixel_format)?;
+            let expected = if operation.starts_with("crop") {
+                // A second FFmpeg crop would share the misaligned-byte bug.
+                // Slice independently from the original Y/U/V sample planes.
+                crop_yuv16_frames(
+                    &reference_pixels,
+                    (320, 178),
+                    (
+                        if operation == "crop-edge" { 193 } else { 3 },
+                        5,
+                        inner.0,
+                        inner.1,
+                    ),
+                    sub_y,
+                )?
+            } else {
+                reference_pixels
+            };
+            let actual = render_raw_filter(&tools, &source, &graph, pixel_format)?;
+            let expected_planes = [
+                (inner.0, inner.1),
+                (inner.0.div_ceil(2), inner.1.div_ceil(sub_y)),
+                (inner.0.div_ceil(2), inner.1.div_ceil(sub_y)),
+            ];
+            let actual_planes = [
+                (target.0, target.1),
+                (target.0.div_ceil(2), target.1.div_ceil(sub_y)),
+                (target.0.div_ceil(2), target.1.div_ceil(sub_y)),
+            ];
+            let expected_frame: usize = expected_planes.iter().map(|(w, h)| w * h * 2).sum();
+            let actual_frame: usize = actual_planes.iter().map(|(w, h)| w * h * 2).sum();
+            assert_eq!(expected.len(), 4 * expected_frame);
+            assert_eq!(actual.len(), 4 * actual_frame);
+            let levels: std::collections::HashSet<_> = expected[..inner.0 * inner.1 * 2]
+                .chunks_exact(2)
+                .map(|sample| u16::from_le_bytes([sample[0], sample[1]]))
+                .collect();
+            assert!(levels.len() > 256, "source must exercise high bit depth");
+            for frame in 0..4 {
+                let mut expected_plane = frame * expected_frame;
+                let mut actual_plane = frame * actual_frame;
+                for (plane, (&(w, h), &(aw, ah))) in
+                    expected_planes.iter().zip(&actual_planes).enumerate()
+                {
+                    let (x, y) = if plane == 0 {
+                        offset
+                    } else {
+                        (offset.0.div_ceil(2), offset.1.div_ceil(sub_y))
+                    };
+                    for row in 0..h {
+                        let e = expected_plane + row * w * 2;
+                        let a = actual_plane + ((row + y) * aw + x) * 2;
+                        assert_bytes_match(
+                            &actual[a..a + w * 2],
+                            &expected[e..e + w * 2],
+                            &format!(
+                                "{pixel_format}/{operation}/frame{frame}/plane{plane}/row{row}"
+                            ),
+                        )?;
+                    }
+                    expected_plane += w * h * 2;
+                    actual_plane += aw * ah * 2;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn exact_padding_should_preserve_tiny_rgba_pixels_and_alpha() -> TestResult {
+    let tools = Toolchain::discover()?;
+    for (pixel_format, bytes_per_pixel) in [("rgba", 4_usize), ("rgba64le", 8)] {
+        let source =
+            format!("testsrc=s=7x7:r=4:d=1,format={pixel_format},colorchannelmixer=aa=0.37");
+        for (width, height) in [(1_u16, 1_u16), (1, 3), (3, 3)] {
+            let mut config = video_config("mp4", "libx264", "aac");
+            config.crop = Some(CropConfig {
+                enabled: true,
+                x: 1.0,
+                y: 1.0,
+                width: f64::from(width),
+                height: f64::from(height),
+                source_width: None,
+                source_height: None,
+                aspect_ratio: None,
+            });
+            let graph = build_visual_filter_chain_with_context(
+                &config,
+                VisualFilterProfile::ExportVideo,
+                VisualFilterContext::new(Some(7), Some(7)),
+            )
+            .join(",");
+            let expected = render_raw_filter(
+                &tools,
+                &source,
+                &format!("crop={width}:{height}:1:1:exact=1"),
+                pixel_format,
+            )?;
+            let actual = render_raw_filter(&tools, &source, &graph, pixel_format)?;
+            let (width, height) = (usize::from(width), usize::from(height));
+            let (out_width, out_height) = (width + width % 2, height + height % 2);
+            let expected_frame = width * height * bytes_per_pixel;
+            let actual_frame = out_width * out_height * bytes_per_pixel;
+            assert_eq!(expected.len(), 4 * expected_frame);
+            assert_eq!(actual.len(), 4 * actual_frame);
+            for frame in 0..4 {
+                for row in 0..height {
+                    let e = frame * expected_frame + row * width * bytes_per_pixel;
+                    let a = frame * actual_frame + row * out_width * bytes_per_pixel;
+                    assert_bytes_match(
+                        &actual[a..a + width * bytes_per_pixel],
+                        &expected[e..e + width * bytes_per_pixel],
+                        "tiny RGBA including alpha",
+                    )?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn exact_padding_should_preserve_frame_properties_and_timestamps() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let mut config = video_config("mkv", "libx264", "aac");
+    config.crop = Some(CropConfig {
+        enabled: true,
+        x: 3.0,
+        y: 5.0,
+        width: 127.0,
+        height: 129.0,
+        source_width: None,
+        source_height: None,
+        aspect_ratio: None,
+    });
+    let graph = build_visual_filter_chain_with_context(
+        &config,
+        VisualFilterProfile::ExportVideo,
+        VisualFilterContext::new(Some(160), Some(144)),
+    )
+    .join(",");
+    // Inspect graph output before an encoder/muxer can normalize timestamps or
+    // color range. These properties must survive the internal xstack branch.
+    let graph = format!(
+        "setsar=3/2,setparams=range=full:color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,setpts=PTS+5/TB,{graph},showinfo"
+    );
+    let output = Command::new(&tools.ffmpeg)
+        .args([
+            "-v",
+            "info",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=s=160x144:r=4:d=4.25,format=yuv420p10le",
+            "-vf",
+            &graph,
+            "-fps_mode",
+            "passthrough",
+            "-f",
+            "null",
+            "-",
+        ])
+        .output()
+        .map_err(|error| error.to_string())?;
+    let log = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success(),
+        "frame property probe failed: {log}"
+    );
+    let frames: Vec<_> = log
+        .lines()
+        .filter(|line| line.contains("showinfo") && line.contains(" pts_time:"))
+        .collect();
+    let properties: Vec<_> = log
+        .lines()
+        .filter(|line| line.contains("showinfo") && line.contains("color_range:"))
+        .collect();
+    assert_eq!(frames.len(), 17);
+    assert_eq!(properties.len(), 17);
+    for (index, frame) in frames.iter().enumerate() {
+        assert!(
+            frame.contains("fmt:yuv420p10le")
+                && frame.contains("sar:3/2")
+                && frame.contains("s:128x130"),
+            "{frame}"
+        );
+        let timestamp = frame
+            .split("pts_time:")
+            .nth(1)
+            .and_then(|value| value.split_whitespace().next())
+            .ok_or("missing frame timestamp")?
+            .parse::<f64>()
+            .map_err(|error| error.to_string())?;
+        let expected = 5.0 + f64::from(u32::try_from(index).unwrap()) / 4.0;
+        assert!((timestamp - expected).abs() < 0.000_001);
+    }
+    for properties in properties {
+        assert!(
+            properties.contains("color_range:pc")
+                && properties.contains("color_primaries:bt2020")
+                && properties.contains("color_trc:smpte2084")
+                && properties.contains("color_space:bt2020nc"),
+            "{properties}"
+        );
+    }
+    Ok(())
+}
+
+fn crop_yuv16_frames(
+    pixels: &[u8],
+    source: (usize, usize),
+    crop: (usize, usize, usize, usize),
+    sub_y: usize,
+) -> TestResult<Vec<u8>> {
+    let (x, y, width, height) = crop;
+    let planes = [
+        (source.0, source.1, x, y, width, height),
+        (
+            source.0.div_ceil(2),
+            source.1.div_ceil(sub_y),
+            x / 2,
+            y / sub_y,
+            width.div_ceil(2),
+            height.div_ceil(sub_y),
+        ),
+        (
+            source.0.div_ceil(2),
+            source.1.div_ceil(sub_y),
+            x / 2,
+            y / sub_y,
+            width.div_ceil(2),
+            height.div_ceil(sub_y),
+        ),
+    ];
+    let frame_bytes: usize = planes.iter().map(|(w, h, ..)| w * h * 2).sum();
+    assert_eq!(pixels.len() % frame_bytes, 0);
+    let mut result = Vec::new();
+    for frame in pixels.chunks_exact(frame_bytes) {
+        let mut plane_offset = 0;
+        for &(sw, sh, x, y, w, h) in &planes {
+            for row in y..y + h {
+                let start = plane_offset + (row * sw + x) * 2;
+                result.extend_from_slice(
+                    frame
+                        .get(start..start + w * 2)
+                        .ok_or("source plane rectangle exceeds frame")?,
+                );
+            }
+            plane_offset += sw * sh * 2;
+        }
+    }
+    Ok(result)
+}
+
+fn render_raw_filter(
+    tools: &Toolchain,
+    source: &str,
+    graph: &str,
+    pixel_format: &str,
+) -> TestResult<Vec<u8>> {
+    run_tool_output(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            source,
+            "-vf",
+            graph,
+            "-pix_fmt",
+            pixel_format,
+            "-fps_mode",
+            "passthrough",
+            "-f",
+            "rawvideo",
+            "pipe:1",
+        ]),
+    )
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn minimum_gif_palette_should_preserve_transparency_for_every_dither() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("minimum_gif_alpha")?;
+    let raw = sandbox.path("source.rgba");
+    let input = sandbox.path("source.png");
+    let pixels: Vec<u8> = (0..256)
+        .flat_map(|pixel| {
+            if pixel % 16 < 8 {
+                [0, 0, 0, 0]
+            } else {
+                [255, 0, 0, 255]
+            }
+        })
+        .collect();
+    fs::write(&raw, &pixels).map_err(|error| error.to_string())?;
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgba",
+            "-s",
+            "16x16",
+            "-i",
+            &path_arg(&raw),
+            "-frames:v",
+            "1",
+            "-y",
+            &path_arg(&input),
+        ]),
+    )?;
+    for dither in ["none", "bayer", "floyd_steinberg", "sierra2_4a"] {
+        let mut config = image_config("gif", "gif");
+        config.gif_colors = frame_core::types::MIN_GIF_COLORS;
+        config.gif_dither = dither.to_string();
+        let output = sandbox.path(&format!("{dither}.gif"));
+        convert(&tools, &input, &output, &config)?;
+        let decoded = run_tool_output(
+            &tools.ffmpeg,
+            &args(&[
+                "-v",
+                "error",
+                "-i",
+                &path_arg(&output),
+                "-frames:v",
+                "1",
+                "-pix_fmt",
+                "rgba",
+                "-f",
+                "rawvideo",
+                "pipe:1",
+            ]),
+        )?;
+        assert_eq!(decoded.len(), pixels.len());
+        let alpha: Vec<u8> = decoded.chunks_exact(4).map(|pixel| pixel[3]).collect();
+        let expected: Vec<u8> = pixels.chunks_exact(4).map(|pixel| pixel[3]).collect();
+        assert_bytes_match(&alpha, &expected, dither)?;
+    }
     Ok(())
 }
 
@@ -2969,7 +3497,6 @@ fn output_geometry_matches_real_crop_rotate_and_scale_exports() -> TestResult {
     let sandbox = Sandbox::new("output_geometry")?;
     let input = sandbox.path("source.mp4");
     generate_h264_aac_source(&tools, &input, 0.1, 640, 360)?;
-    let source = probe_media(&tools, &input)?;
     for (index, rotation, crop, resolution, custom_width, custom_height) in [
         (0, "0", Some((480.0, 360.0)), "original", None, None),
         (1, "90", Some((240.0, 320.0)), "original", None, None),
@@ -3001,12 +3528,7 @@ fn output_geometry_matches_real_crop_rotate_and_scale_exports() -> TestResult {
             source_height: Some(360.0),
             aspect_ratio: None,
         });
-        let expected = frame_core::dimensions::output_dimensions(
-            &config,
-            640,
-            360,
-            source.pixel_format.as_deref(),
-        );
+        let expected = frame_core::dimensions::output_dimensions(&config, 640, 360, None);
         let output = sandbox.path(&format!("geometry-{index}.mp4"));
         convert(&tools, &input, &output, &config)?;
         let actual = probe_media(&tools, &output)?;

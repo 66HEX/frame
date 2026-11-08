@@ -49,7 +49,7 @@ fn normalize_overlay_clamps_position_size_and_opacity() {
 }
 
 #[test]
-fn sync_initial_overlay_discards_disabled_or_empty_overlay() {
+fn disabled_overlay_can_be_edited_cancelled_and_explicitly_reenabled() {
     let mut state = PreviewOverlayState::new();
     state.sync_initial_overlay(Some(&PreviewOverlay {
         enabled: true,
@@ -71,8 +71,29 @@ fn sync_initial_overlay_discards_disabled_or_empty_overlay() {
         anchor: "custom".to_string(),
     }));
 
-    assert_eq!(state.overlay(), None);
+    let disabled = state.overlay().unwrap().clone();
+    assert!(!disabled.enabled);
+    assert!(state.has_overlay());
     assert!(!state.overlay_mode());
+    assert_eq!(state.render_overlay(), None);
+
+    assert!(state.toggle_overlay_mode(false).changed);
+    assert!(state.render_overlay().unwrap().enabled);
+    assert!(!state.committed_overlay().unwrap().enabled);
+    assert!(state.toggle_overlay_mode(false).changed);
+    assert_eq!(state.overlay(), Some(&disabled));
+
+    assert!(state.set_overlay_mode(true, false).changed);
+    let applied = state.apply_overlay_edit().unwrap().unwrap();
+    assert!(applied.enabled);
+    assert_eq!(applied.path, disabled.path);
+    assert_close(applied.width, disabled.width);
+
+    state.sync_initial_overlay(Some(&PreviewOverlay {
+        path: String::new(),
+        ..disabled
+    }));
+    assert_eq!(state.overlay(), None);
 }
 
 #[test]

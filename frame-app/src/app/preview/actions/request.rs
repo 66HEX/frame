@@ -12,8 +12,8 @@ use crate::preview_engine::{
     PreviewRenderPresentation, PreviewSessionConfig, PreviewSourceKind as EnginePreviewSourceKind,
 };
 use crate::settings::{
-    AudioFiltersConfig, ConversionConfig, CropSettings, FilterValue, OverlaySettings, SourceKind,
-    SourceMetadata, VideoFiltersConfig,
+    AudioFiltersConfig, ConversionConfig, CropSettings, FilterValue, OverlaySettings,
+    ProcessingMode, SourceKind, SourceMetadata, VideoFiltersConfig,
 };
 use crate::source_metadata::{MetadataStatus, SourceMetadataEntry};
 use gpui::{Bounds, Pixels};
@@ -132,6 +132,11 @@ pub(super) fn quantized_preview_dimension(value: f64) -> u32 {
 
 pub(super) fn preview_visual_hash(config: &ConversionConfig) -> u64 {
     let mut state = DefaultHasher::new();
+    frame_core::dimensions::output_raster_policy(
+        &config.container,
+        config.processing_mode == ProcessingMode::Copy,
+    )
+    .hash(&mut state);
     config.rotation.hash(&mut state);
     config.flip_horizontal.hash(&mut state);
     config.flip_vertical.hash(&mut state);

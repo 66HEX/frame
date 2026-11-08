@@ -301,8 +301,8 @@ pub fn fit_dimensions(
     let scale = width_scale.min(height_scale).min(1.0);
 
     PreviewDimensions {
-        width: even_dimension(rounded_f64_to_u32(f64::from(source_width) * scale)),
-        height: even_dimension(rounded_f64_to_u32(f64::from(source_height) * scale)),
+        width: rounded_f64_to_u32(f64::from(source_width) * scale).max(1),
+        height: rounded_f64_to_u32(f64::from(source_height) * scale).max(1),
     }
 }
 

@@ -479,7 +479,7 @@ fn crop_resolution_preview_commits_on_apply_and_preserves_settings_on_cancel() {
 }
 
 #[test]
-fn custom_crop_resolution_uses_encoder_dimensions_before_and_after_apply() {
+fn custom_crop_resolution_preserves_selected_pixels_before_encoder_padding() {
     let mut root = video_root("90");
     root.source_metadata.mark_ready(
         "video",
@@ -496,13 +496,35 @@ fn custom_crop_resolution_uses_encoder_dimensions_before_and_after_apply() {
     root.write_text_input_value(FrameTextInputKind::CropWidth, "481");
     root.write_text_input_value(FrameTextInputKind::CropHeight, "359");
     let preview = root.crop_settings_preview().unwrap();
-    assert_eq!(preview.custom_width.as_deref(), Some("480"));
-    assert_eq!(preview.custom_height.as_deref(), Some("358"));
+    assert_eq!(preview.custom_width.as_deref(), Some("481"));
+    assert_eq!(preview.custom_height.as_deref(), Some("359"));
+    assert_eq!(
+        preview.crop.as_ref().map(|crop| (crop.width, crop.height)),
+        Some((481, 359))
+    );
+    assert_eq!(
+        frame_core::dimensions::output_dimensions(
+            &crate::conversion_runner::core_config_from_gpui(&preview),
+            1920,
+            1080,
+            Some("yuv420p"),
+        ),
+        Some((482, 360))
+    );
     assert!(root.apply_selected_crop());
     let config = root.selected_config().unwrap();
     assert_eq!(config.custom_width, preview.custom_width);
     assert_eq!(config.custom_height, preview.custom_height);
     assert_eq!(config.crop, preview.crop);
+    assert_eq!(
+        frame_core::dimensions::output_dimensions(
+            &crate::conversion_runner::core_config_from_gpui(config),
+            1920,
+            1080,
+            Some("yuv420p"),
+        ),
+        Some((482, 360))
+    );
 }
 
 #[test]

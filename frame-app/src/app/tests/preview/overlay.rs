@@ -1,6 +1,77 @@
 use super::*;
 
 #[test]
+fn unsupported_output_suspends_an_open_overlay_editor_and_keeps_its_draft() {
+    for target in ["gif", "mp3", "copy"] {
+        let mut root = root_with_overlay();
+        root.preview_ui.overlay_file_id = Some("video".to_string());
+        assert!(root.set_selected_overlay_opacity(0.4));
+        assert!(root.apply_preview_overlay_drag(
+            OverlayDragHandle::Move,
+            OverlayDragPoint {
+                x: 0.5,
+                y: 0.5,
+                width: Some(0.2),
+                height: Some(0.2),
+            }
+        ));
+        assert!(root.apply_preview_overlay_drag(
+            OverlayDragHandle::Move,
+            OverlayDragPoint {
+                x: 0.6,
+                y: 0.55,
+                width: Some(0.2),
+                height: Some(0.2),
+            }
+        ));
+        let draft = root.preview_ui.overlay.overlay().unwrap().clone();
+        root.update_selected_config(|config| {
+            if target == "copy" {
+                crate::settings::apply_processing_mode(
+                    config,
+                    None,
+                    crate::settings::ProcessingMode::Copy,
+                )
+            } else {
+                crate::settings::apply_output_container(config, target)
+            }
+        });
+        assert!(!root.preview_ui.overlay.overlay_mode());
+        assert!(!root.preview_ui.overlay.is_dragging());
+        assert_eq!(root.preview_ui.overlay.render_overlay(), None);
+        assert!(!root.set_selected_overlay_mode(true));
+        assert!(!root.set_selected_overlay_mode(false));
+        let stored = root.selected_config().unwrap().overlay.as_ref().unwrap();
+        assert!(!stored.enabled);
+        assert_eq!(stored.path, draft.path);
+        assert!((stored.x - draft.x).abs() < 0.000_001);
+        assert!((stored.y - draft.y).abs() < 0.000_001);
+        assert!((stored.opacity - draft.opacity).abs() < 0.000_001);
+
+        root.update_selected_config(|config| {
+            crate::settings::apply_output_container(config, "mp4");
+            crate::settings::apply_processing_mode(
+                config,
+                None,
+                crate::settings::ProcessingMode::Reencode,
+            );
+            true
+        });
+        assert!(root.set_selected_overlay_mode(true));
+        assert!(root.preview_ui.overlay.render_overlay().unwrap().enabled);
+        assert!(root.set_selected_overlay_mode(false));
+        assert!(
+            root.selected_config()
+                .unwrap()
+                .overlay
+                .as_ref()
+                .unwrap()
+                .enabled
+        );
+    }
+}
+
+#[test]
 fn apply_preview_overlay_drag_updates_draft_until_done_persists_position() {
     let mut root = root_with_overlay();
 

@@ -179,12 +179,14 @@ impl FrameRoot {
         config.resolution = "original".to_string();
         config.custom_width = None;
         config.custom_height = None;
-        let (width, height) = frame_core::dimensions::output_dimensions(
-            &crate::conversion_runner::core_config_from_gpui(&config),
-            metadata.width?,
-            metadata.height?,
-            metadata.pixel_format.as_deref(),
-        )?;
+        // Match the selected pixels. Encoder padding is applied after scaling;
+        // using its larger raster here would enlarge the cropped content.
+        let (width, height) = if let Some(crop) = &config.crop {
+            (crop.width, crop.height)
+        } else {
+            let dimensions = crop_base_dimensions(Some(&metadata), &config.rotation)?;
+            (dimensions.width, dimensions.height)
+        };
         config.resolution = "custom".to_string();
         config.custom_width = Some(width.to_string());
         config.custom_height = Some(height.to_string());

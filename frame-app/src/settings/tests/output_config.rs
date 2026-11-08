@@ -1,6 +1,82 @@
 use super::*;
 
 #[test]
+fn output_transitions_disable_overlay_without_losing_its_draft() {
+    let overlay = OverlaySettings {
+        enabled: true,
+        path: "/tmp/logo.png".to_string(),
+        x: 0.4,
+        y: 0.6,
+        width: 0.25,
+        opacity: 0.75,
+        anchor: "custom".to_string(),
+    };
+    for container in ["gif", "mp3", "wav"] {
+        let mut config = ConversionConfig {
+            overlay: Some(overlay.clone()),
+            ..ConversionConfig::default()
+        };
+        assert!(apply_output_container(&mut config, container));
+        let disabled = config.overlay.as_ref().unwrap();
+        assert_eq!(
+            disabled,
+            &OverlaySettings {
+                enabled: false,
+                ..overlay.clone()
+            }
+        );
+        normalize_output_config(&mut config, None);
+        assert!(!config.overlay.as_ref().unwrap().enabled);
+        apply_output_container(&mut config, "mp4");
+        assert_eq!(config.overlay.as_ref().unwrap().path, overlay.path);
+        assert!(!config.overlay.as_ref().unwrap().enabled);
+    }
+    let mut config = ConversionConfig {
+        overlay: Some(overlay.clone()),
+        ..ConversionConfig::default()
+    };
+    assert!(apply_processing_mode(
+        &mut config,
+        None,
+        ProcessingMode::Copy
+    ));
+    assert!(!config.overlay.as_ref().unwrap().enabled);
+    assert!(apply_processing_mode(
+        &mut config,
+        None,
+        ProcessingMode::Reencode
+    ));
+    assert_eq!(
+        config.overlay,
+        Some(OverlaySettings {
+            enabled: false,
+            ..overlay
+        })
+    );
+}
+
+#[test]
+fn gif_palette_minimum_reserves_a_transparent_entry() {
+    let mut config = ConversionConfig {
+        container: "gif".to_string(),
+        gif_colors: 2,
+        ..ConversionConfig::default()
+    };
+    normalize_output_config(&mut config, None);
+    assert_eq!(config.gif_colors, 3);
+    assert!(!apply_gif_colors(&mut config, 2));
+    assert_eq!(
+        crate::conversion_runner::core_config_from_gpui(&config).gif_colors,
+        3
+    );
+    config.gif_colors = 2;
+    assert_eq!(
+        crate::conversion_runner::core_config_from_gpui(&config).gif_colors,
+        3
+    );
+}
+
+#[test]
 fn default_config_has_no_trim_times() {
     let config = ConversionConfig::default();
 

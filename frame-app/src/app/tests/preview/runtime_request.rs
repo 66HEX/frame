@@ -1,6 +1,46 @@
 use super::*;
 
 #[test]
+fn preview_request_tracks_output_raster_policy_without_encoder_quality() {
+    let mut root = FrameRoot::new();
+    root.file_queue
+        .add_file(FileItem::from_path("video", "/tmp/one.mp4", 1));
+    root.source_metadata.mark_ready(
+        "video".to_string(),
+        SourceMetadata {
+            media_kind: Some(SourceKind::Video),
+            width: Some(320),
+            height: Some(180),
+            pixel_format: Some("yuv420p".to_string()),
+            ..SourceMetadata::default()
+        },
+    );
+    let entry = root.source_metadata.entry_for("video");
+    let request = root.selected_preview_runtime_request(&entry).unwrap();
+    root.update_selected_config(|config| {
+        config.video_bitrate = "9000".to_string();
+        true
+    });
+    let bitrate_only = root.selected_preview_runtime_request(&entry).unwrap();
+    assert_eq!(request.key.visual_hash, bitrate_only.key.visual_hash);
+    for container in ["gif", "png", "mp4"] {
+        root.update_selected_config(|config| {
+            crate::settings::apply_output_container(config, container)
+        });
+        let changed = root.selected_preview_runtime_request(&entry).unwrap();
+        assert_eq!(
+            changed.key.visual_hash == request.key.visual_hash,
+            container == "mp4"
+        );
+    }
+    root.update_selected_config(|config| {
+        crate::settings::apply_processing_mode(config, None, crate::settings::ProcessingMode::Copy)
+    });
+    let copy = root.selected_preview_runtime_request(&entry).unwrap();
+    assert_ne!(copy.key.visual_hash, request.key.visual_hash);
+}
+
+#[test]
 fn preview_runtime_request_is_silent_without_explicit_audio_selection() {
     let mut root = FrameRoot::new();
     root.file_queue

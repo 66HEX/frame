@@ -105,7 +105,9 @@ pub fn core_config_from_gpui(config: &GpuiConversionConfig) -> CoreConversionCon
         image_png_compression: config.image_png_compression.min(9),
         image_png_prediction: config.image_png_prediction.clone(),
         image_tiff_compression: config.image_tiff_compression.clone(),
-        gif_colors: config.gif_colors.clamp(2, DEFAULT_GIF_COLORS),
+        gif_colors: config
+            .gif_colors
+            .clamp(frame_core::types::MIN_GIF_COLORS, DEFAULT_GIF_COLORS),
         gif_dither: non_empty_or(&config.gif_dither, DEFAULT_GIF_DITHER),
         gif_loop: config.gif_loop,
     }

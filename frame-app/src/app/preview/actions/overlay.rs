@@ -13,12 +13,57 @@ use crate::preview::{
     PreviewOverlay, PreviewOverlayState, preview_control_availability,
 };
 use crate::preview_engine::MIN_PREVIEW_DIMENSION;
-use crate::settings::{ConversionConfig, OverlaySettings};
+use crate::settings::{
+    ConversionConfig, OverlaySettings, ProcessingMode, is_audio_only_container, is_gif_container,
+};
 use gpui::prelude::*;
 use gpui::{Bounds, Context, Pixels, Point, Window};
 use std::path::PathBuf;
 
 impl FrameRoot {
+    pub(in crate::app) fn suspend_unsupported_preview_overlay(&mut self) -> bool {
+        let Some(file) = self.file_queue.selected_file_mut() else {
+            return false;
+        };
+        if file.config.processing_mode != ProcessingMode::Copy
+            && !is_audio_only_container(&file.config.container)
+            && !is_gif_container(&file.config.container)
+        {
+            return false;
+        }
+        let same_file = self
+            .preview_ui
+            .overlay_file_id
+            .as_deref()
+            .is_none_or(|id| id == file.id.as_str());
+        let saved_draft =
+            if same_file && let Some(draft) = self.preview_ui.overlay.suspend_overlay_edit() {
+                file.config.overlay = Some(overlay_settings_from_preview(&draft));
+                true
+            } else {
+                false
+            };
+        let disabled = if let Some(overlay) = file.config.overlay.as_mut()
+            && overlay.enabled
+        {
+            overlay.enabled = false;
+            true
+        } else {
+            false
+        };
+        if same_file {
+            let overlay = file
+                .config
+                .overlay
+                .as_ref()
+                .map(preview_overlay_from_settings);
+            self.preview_ui
+                .overlay
+                .sync_initial_overlay(overlay.as_ref());
+        }
+        saved_draft || disabled
+    }
+
     pub(in crate::app) fn sync_preview_overlay_for_selection(
         &mut self,
         selected_file_id: Option<&str>,
@@ -129,6 +174,9 @@ impl FrameRoot {
     }
 
     pub(in crate::app) fn set_selected_overlay_mode(&mut self, value: bool) -> bool {
+        if value && !self.selected_preview_overlay_controls_enabled() {
+            return false;
+        }
         if !value {
             let was_editing = self.preview_ui.overlay.overlay_mode();
             let Some(next_overlay) = self.preview_ui.overlay.apply_overlay_edit() else {

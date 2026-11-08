@@ -19,7 +19,7 @@ fn rendered_test_frame(timestamp_us: u64, bytes: Vec<u8>) -> PreviewRenderedFram
 }
 
 #[test]
-fn fit_dimensions_preserves_aspect_and_even_dimensions() {
+fn fit_dimensions_preserves_aspect_without_rounding_odd_rasters() {
     let dimensions = fit_dimensions(1920, 1080, 1280, 720);
 
     assert_eq!(
@@ -27,6 +27,13 @@ fn fit_dimensions_preserves_aspect_and_even_dimensions() {
         PreviewDimensions {
             width: 1280,
             height: 720
+        }
+    );
+    assert_eq!(
+        fit_dimensions(127, 129, 1280, 720),
+        PreviewDimensions {
+            width: 127,
+            height: 129
         }
     );
 }

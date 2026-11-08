@@ -1,4 +1,5 @@
 use crate::{
+    dimensions::{FilterGeometry, filter_geometry, rotated_source_dimensions},
     media_filters::{
         build_audio_effect_filters, build_video_post_scale_filters, build_video_pre_scale_filters,
     },
@@ -11,8 +12,24 @@ pub const EVEN_DIMENSIONS_FILTER: &str = "pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0";
 pub const PREVIEW_OUTPUT_LABEL: &str = "preview_v";
 pub const VIDEO_OUTPUT_LABEL: &str = "vout";
 
+/// Source geometry used to preserve exact pixels when padding subsampled frames.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct VisualFilterContext {
+    pub source_dimensions: Option<(u32, u32)>,
+}
+
+impl VisualFilterContext {
+    #[must_use]
+    pub fn new(width: Option<u32>, height: Option<u32>) -> Self {
+        Self {
+            source_dimensions: width.zip(height).filter(|&(w, h)| w > 0 && h > 0),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum VisualFilterBase {
+    Source,
     Video,
     Image,
 }
@@ -55,9 +72,17 @@ fn rounded_i32(value: f64, min_value: f64) -> i32 {
     converted
 }
 
+/// Builds filters without source metadata. For exact custom padding, use
+/// [`build_visual_filter_chain_with_context`]; unknown geometry retains the
+/// legacy dynamic padding expression.
 #[must_use]
 pub fn build_video_filters(config: &ConversionConfig, include_scale: bool) -> Vec<String> {
-    build_video_filters_at_time(config, include_scale, export_subtitle_time(config))
+    build_video_filters_at_time(
+        config,
+        include_scale,
+        export_subtitle_time(config),
+        VisualFilterContext::default(),
+    )
 }
 
 fn export_subtitle_time(config: &ConversionConfig) -> f64 {
@@ -72,6 +97,7 @@ fn build_video_filters_at_time(
     config: &ConversionConfig,
     include_scale: bool,
     source_time_seconds: f64,
+    context: VisualFilterContext,
 ) -> Vec<String> {
     let mut filters = Vec::new();
     let is_image = is_image_container(&config.container);
@@ -97,7 +123,15 @@ fn build_video_filters_at_time(
         let crop_height = rounded_i32(crop.height, 1.0);
         let crop_x = rounded_i32(crop.x, 0.0);
         let crop_y = rounded_i32(crop.y, 0.0);
-        filters.push(format!("crop={crop_width}:{crop_height}:{crop_x}:{crop_y}"));
+        let source_width = rotated_source_dimensions(config, context.source_dimensions)
+            .map(|dimensions| dimensions.0);
+        filters.push(exact_crop_filter(
+            crop_width,
+            crop_height,
+            crop_x,
+            crop_y,
+            source_width,
+        ));
     }
 
     filters.extend(build_video_pre_scale_filters(
@@ -106,7 +140,7 @@ fn build_video_filters_at_time(
     ));
 
     if include_scale && (config.resolution != "original" || config.resolution == "custom") {
-        filters.push(build_resolution_scale_filter(config));
+        filters.push(build_resolution_scale_filter(config, context));
     }
 
     filters.extend(build_video_post_scale_filters(&config.video_filters));
@@ -171,6 +205,23 @@ fn build_video_filters_at_time(
     filters
 }
 
+// FFmpeg 8.1.2 crop computes chroma byte offsets before dividing by hsub.
+// An unaligned x therefore splits 16-bit samples. Keep exact luma/alpha from
+// the requested crop and copy only chroma from a safely aligned second crop.
+fn exact_crop_filter(width: i32, height: i32, x: i32, y: i32, source_width: Option<u32>) -> String {
+    let crop = format!("crop={width}:{height}:{x}:{y}:exact=1");
+    let effective_x =
+        source_width.map(|source| i64::from(x).min((i64::from(source) - i64::from(width)).max(0)));
+    if x == 0 || effective_x.is_some_and(|value| value % 4 == 0) {
+        return crop;
+    }
+    // Clamp before aligning: crop may clamp an out-of-bounds requested x to an
+    // unaligned iw-ow, even if the requested position itself was aligned.
+    format!(
+        "split[frame_crop_exact_src][frame_crop_chroma_src];[frame_crop_exact_src]{crop}[frame_crop_exact];[frame_crop_chroma_src]crop={width}:{height}:'floor(min({x},iw-ow)/hsub)*hsub':{y}:exact=1[frame_crop_chroma];[frame_crop_exact][frame_crop_chroma]blend=all_mode=normal:c1_opacity=0:c2_opacity=0"
+    )
+}
+
 // Filter options pass through two parsers: the filtergraph, then AVOption.
 // Escape each layer separately; Command passes these arguments without a shell.
 fn escape_filter_option_value(value: &str) -> String {
@@ -188,7 +239,10 @@ fn escape_filter_option_value(value: &str) -> String {
     escape(&option, &['\\', '\'', '[', ']', ',', ';'])
 }
 
-fn build_resolution_scale_filter(config: &ConversionConfig) -> String {
+fn build_resolution_scale_filter(
+    config: &ConversionConfig,
+    context: VisualFilterContext,
+) -> String {
     let algorithm = match config.scaling_algorithm.as_str() {
         "lanczos" => ":flags=lanczos",
         "bilinear" => ":flags=bilinear",
@@ -200,7 +254,12 @@ fn build_resolution_scale_filter(config: &ConversionConfig) -> String {
     if config.resolution == "custom" {
         let width = config.custom_width.as_deref().unwrap_or("-1");
         let height = config.custom_height.as_deref().unwrap_or("-1");
-        return custom_resolution_scale_filter(width, height, algorithm);
+        return custom_resolution_scale_filter(
+            width,
+            height,
+            algorithm,
+            filter_geometry(config, context.source_dimensions, true),
+        );
     }
 
     match config.resolution.as_str() {
@@ -211,10 +270,34 @@ fn build_resolution_scale_filter(config: &ConversionConfig) -> String {
     }
 }
 
-fn custom_resolution_scale_filter(width: &str, height: &str, algorithm: &str) -> String {
+fn custom_resolution_scale_filter(
+    width: &str,
+    height: &str,
+    algorithm: &str,
+    geometry: Option<FilterGeometry>,
+) -> String {
     if width != "-1" && height != "-1" {
+        let scale =
+            format!("scale={width}:{height}:force_original_aspect_ratio=decrease{algorithm}");
+        if let Some(geometry) = geometry {
+            if geometry.scaled == geometry.canvas {
+                return scale;
+            }
+            let (w, h) = geometry.canvas;
+            let x = (w - geometry.scaled.0) / 2;
+            let y = (h - geometry.scaled.1) / 2;
+            // pad rounds dimensions and placement to chroma boundaries. Keep
+            // its simple path only when every boundary is aligned, including
+            // the inner aspect-fit raster and the requested center offset.
+            if [w, h, geometry.scaled.0, geometry.scaled.1, x, y]
+                .iter()
+                .any(|value| value % 4 != 0)
+            {
+                return format!("{scale},{}", exact_padding_filter(w, h, x, y, "custom"));
+            }
+        }
         format!(
-            "scale={width}:{height}:force_original_aspect_ratio=decrease{algorithm},pad={width}:{height}:(ow-iw)/2:(oh-ih)/2"
+            "scale={width}:{height}:force_original_aspect_ratio=decrease{algorithm},pad=ceil({width}/hsub)*hsub:ceil({height}/vsub)*vsub:(ow-iw)/2:(oh-ih)/2,crop={width}:{height}:0:0:exact=1"
         )
     } else if width == "-1" && height == "-1" {
         "scale=-1:-1".to_string()
@@ -223,18 +306,50 @@ fn custom_resolution_scale_filter(width: &str, height: &str, algorithm: &str) ->
     }
 }
 
+// xstack copies the entire raster, including the final subsampled row/column.
+// A separate pad branch donates frame properties that xstack does not preserve.
+// blend at zero top opacity copies bottom pixels while retaining top properties.
+fn exact_padding_filter(width: u32, height: u32, x: u32, y: u32, stage: &str) -> String {
+    let p = format!("frame_pad_{stage}");
+    let dummy_x = u64::from(width) + 4;
+    let dummy_y = u64::from(height) + 4;
+    format!(
+        "split=3[{p}_main][{p}_dummy][{p}_props];[{p}_dummy]scale=4:4:flags=neighbor[{p}_corner];[{p}_main][{p}_corner]xstack=inputs=2:layout={x}_{y}|{dummy_x}_{dummy_y}:fill=black,crop={width}:{height}:0:0:exact=1[{p}_pixels];[{p}_props]pad=ceil({width}/4)*4:ceil({height}/4)*4:0:0,crop={width}:{height}:0:0:exact=1[{p}_meta];[{p}_meta][{p}_pixels]blend=all_mode=normal:all_opacity=0"
+    )
+}
+
 #[must_use]
 pub fn build_encode_video_filters(config: &ConversionConfig, include_scale: bool) -> Vec<String> {
-    build_encode_video_filters_at_time(config, include_scale, export_subtitle_time(config))
+    build_encode_video_filters_at_time(
+        config,
+        include_scale,
+        export_subtitle_time(config),
+        VisualFilterContext::default(),
+    )
 }
 
 fn build_encode_video_filters_at_time(
     config: &ConversionConfig,
     include_scale: bool,
     source_time_seconds: f64,
+    context: VisualFilterContext,
 ) -> Vec<String> {
-    let mut filters = build_video_filters_at_time(config, include_scale, source_time_seconds);
-    filters.push(EVEN_DIMENSIONS_FILTER.to_string());
+    let mut filters =
+        build_video_filters_at_time(config, include_scale, source_time_seconds, context);
+    let geometry = filter_geometry(config, context.source_dimensions, include_scale);
+    if let Some(geometry) = geometry
+        && (geometry.canvas.0 % 2 != 0 || geometry.canvas.1 % 2 != 0)
+        && let (Some(width), Some(height)) = (
+            geometry.canvas.0.checked_add(geometry.canvas.0 % 2),
+            geometry.canvas.1.checked_add(geometry.canvas.1 % 2),
+        )
+    {
+        filters.push(exact_padding_filter(width, height, 0, 0, "even"));
+    } else if geometry.is_none() {
+        // Metadata-free callers retain the legacy dynamic guard. Known even
+        // rasters need no pad, which also avoids rounding four-pixel chroma.
+        filters.push(EVEN_DIMENSIONS_FILTER.to_string());
+    }
     filters
 }
 
@@ -243,9 +358,23 @@ pub fn build_visual_filter_chain(
     config: &ConversionConfig,
     profile: VisualFilterProfile,
 ) -> Vec<String> {
+    build_visual_filter_chain_with_context(config, profile, VisualFilterContext::default())
+}
+
+/// Builds visual filters using source geometry for exact aspect-fit padding.
+#[must_use]
+pub fn build_visual_filter_chain_with_context(
+    config: &ConversionConfig,
+    profile: VisualFilterProfile,
+    context: VisualFilterContext,
+) -> Vec<String> {
     match profile {
-        VisualFilterProfile::ExportVideo => build_encode_video_filters(config, true),
-        VisualFilterProfile::ExportImage => build_video_filters(config, true),
+        VisualFilterProfile::ExportVideo => {
+            build_encode_video_filters_at_time(config, true, export_subtitle_time(config), context)
+        }
+        VisualFilterProfile::ExportImage => {
+            build_video_filters_at_time(config, true, export_subtitle_time(config), context)
+        }
         VisualFilterProfile::PreviewLowRes {
             base,
             width,
@@ -254,11 +383,12 @@ pub fn build_visual_filter_chain(
             source_time_seconds,
         } => {
             let mut filters = match base {
+                VisualFilterBase::Source => Vec::new(),
                 VisualFilterBase::Video => {
-                    build_encode_video_filters_at_time(config, true, source_time_seconds)
+                    build_encode_video_filters_at_time(config, true, source_time_seconds, context)
                 }
                 VisualFilterBase::Image => {
-                    build_video_filters_at_time(config, true, source_time_seconds)
+                    build_video_filters_at_time(config, true, source_time_seconds, context)
                 }
             };
             filters.extend(preview_low_res_filters(width, height, fps));
@@ -272,11 +402,21 @@ pub fn build_visual_filter_complex(
     config: &ConversionConfig,
     profile: VisualFilterProfile,
 ) -> String {
+    build_visual_filter_complex_with_context(config, profile, VisualFilterContext::default())
+}
+
+/// Builds a visual graph with the same exact padding geometry as export.
+#[must_use]
+pub fn build_visual_filter_complex_with_context(
+    config: &ConversionConfig,
+    profile: VisualFilterProfile,
+    context: VisualFilterContext,
+) -> String {
     match profile {
         VisualFilterProfile::ExportVideo | VisualFilterProfile::ExportImage => {
             build_export_filter_complex(
                 config,
-                &build_visual_filter_chain(config, profile),
+                &build_visual_filter_chain_with_context(config, profile, context),
                 VIDEO_OUTPUT_LABEL,
             )
         }
@@ -286,7 +426,15 @@ pub fn build_visual_filter_complex(
             height,
             fps,
             source_time_seconds,
-        } => build_preview_filter_complex(config, base, width, height, fps, source_time_seconds),
+        } => build_preview_filter_complex(
+            config,
+            base,
+            width,
+            height,
+            fps,
+            source_time_seconds,
+            context,
+        ),
     }
 }
 
@@ -349,17 +497,21 @@ fn build_preview_filter_complex(
     height: u32,
     fps: u32,
     source_time_seconds: f64,
+    context: VisualFilterContext,
 ) -> String {
     let base_filters = match base {
+        VisualFilterBase::Source => Vec::new(),
         VisualFilterBase::Video => {
-            build_encode_video_filters_at_time(config, true, source_time_seconds)
+            build_encode_video_filters_at_time(config, true, source_time_seconds, context)
         }
-        VisualFilterBase::Image => build_video_filters_at_time(config, true, source_time_seconds),
+        VisualFilterBase::Image => {
+            build_video_filters_at_time(config, true, source_time_seconds, context)
+        }
     };
     let preview_filters = preview_low_res_filters(width, height, fps);
     let preview_chain = preview_filters.join(",");
 
-    if has_overlay(config) {
+    if base != VisualFilterBase::Source && has_overlay(config) {
         let graph =
             build_overlay_filter_complex_with_filters(config, &base_filters, "preview_export");
         format!("{graph};[preview_export]{preview_chain}[{PREVIEW_OUTPUT_LABEL}]")
@@ -521,7 +673,9 @@ mod tests {
             aspect_ratio: None,
         });
         let filters = build_video_filters(&config, true);
-        assert_eq!(filters, vec!["crop=100:200:10:20"]);
+        assert_eq!(filters.len(), 1);
+        assert!(filters[0].contains("crop=100:200:10:20:exact=1"));
+        assert!(filters[0].contains("floor(min(10,iw-ow)/hsub)*hsub"));
     }
 
     #[test]
@@ -540,7 +694,70 @@ mod tests {
 
         let filters = build_encode_video_filters(&config, true);
 
-        assert_eq!(filters, vec!["crop=101:201:10:20", EVEN_DIMENSIONS_FILTER]);
+        assert_eq!(filters.len(), 2);
+        assert!(filters[0].contains("crop=101:201:10:20:exact=1"));
+        assert!(filters[1].contains("crop=102:202:0:0:exact=1"));
+        assert!(filters[1].ends_with("blend=all_mode=normal:all_opacity=0"));
+    }
+
+    #[test]
+    fn exact_crop_repair_uses_effective_clamped_origin() {
+        assert_eq!(
+            exact_crop_filter(128, 100, 4, 5, Some(320)),
+            "crop=128:100:4:5:exact=1"
+        );
+        let graph = exact_crop_filter(127, 100, 400, 5, Some(320));
+        assert!(graph.contains("crop=127:100:400:5:exact=1"));
+        assert!(graph.contains("floor(min(400,iw-ow)/hsub)*hsub"));
+        assert!(graph.ends_with("blend=all_mode=normal:c1_opacity=0:c2_opacity=0"));
+        assert!(exact_crop_filter(127, 100, 4, 5, None).contains("blend="));
+        assert_eq!(
+            exact_crop_filter(127, 100, 0, 5, None),
+            "crop=127:100:0:5:exact=1"
+        );
+    }
+
+    #[test]
+    fn known_geometry_preserves_centering_without_changing_even_identity() {
+        let mut config = default_config();
+        let context = VisualFilterContext::new(Some(320), Some(178));
+        assert!(
+            build_visual_filter_chain_with_context(
+                &config,
+                VisualFilterProfile::ExportVideo,
+                context,
+            )
+            .is_empty()
+        );
+        config.resolution = "custom".to_string();
+        config.custom_width = Some("128".to_string());
+        config.custom_height = Some("128".to_string());
+        let graph = build_visual_filter_chain_with_context(
+            &config,
+            VisualFilterProfile::ExportVideo,
+            context,
+        )
+        .join(",");
+        assert!(graph.contains("layout=0_28|132_132"));
+        assert!(graph.contains("crop=128:128:0:0:exact=1"));
+        assert_eq!(graph.matches("blend=").count(), 1);
+
+        config.custom_width = Some("127".to_string());
+        config.custom_height = Some("129".to_string());
+        let graph = build_visual_filter_chain_with_context(
+            &config,
+            VisualFilterProfile::ExportVideo,
+            context,
+        )
+        .join(",");
+        assert!(graph.contains("layout=0_29|131_133"));
+        assert!(graph.contains("frame_pad_custom_main"));
+        assert!(graph.contains("frame_pad_even_main"));
+
+        // Legacy callers without source metadata cannot infer aspect-fit size.
+        let legacy = build_video_filters(&config, true).join(",");
+        assert!(!legacy.contains("xstack"));
+        assert!(legacy.contains("pad=ceil(127/hsub)"));
     }
 
     #[test]

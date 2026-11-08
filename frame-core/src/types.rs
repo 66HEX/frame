@@ -476,6 +476,8 @@ fn default_image_tiff_compression() -> String {
     "packbits".to_string()
 }
 
+pub const MIN_GIF_COLORS: u16 = 3;
+
 const fn default_gif_colors() -> u16 {
     256
 }

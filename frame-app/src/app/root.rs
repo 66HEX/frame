@@ -220,9 +220,11 @@ impl FrameRoot {
         if self.update_installation_in_progress() {
             return false;
         }
-        self.file_queue
+        let changed = self
+            .file_queue
             .selected_file_mut()
-            .is_some_and(|file| update(&mut file.config))
+            .is_some_and(|file| update(&mut file.config));
+        changed | self.suspend_unsupported_preview_overlay()
     }
     pub(super) fn normalize_selected_config(&mut self, metadata: Option<&SourceMetadata>) -> bool {
         self.update_selected_config(|config| normalize_output_config(config, metadata))
