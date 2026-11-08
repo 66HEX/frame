@@ -180,11 +180,7 @@ impl FrameRoot {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> bool {
-        if self.file_queue.files().is_empty() {
-            self.focus_registered_control("welcome-open-file", window, cx)
-        } else {
-            self.focus_registered_control("titlebar-settings", window, cx)
-        }
+        self.focus_registered_control("titlebar-settings", window, cx)
     }
 
     pub(in crate::app) fn restore_focus_after_update_dialog_close(

@@ -47,7 +47,7 @@ fn removing_queue_rows_restores_visible_focus_including_the_last_row() {
     press(cx, "enter");
     assert_eq!(focused_node(cx)["aria"]["label"], "Open file");
     press(cx, "shift-tab");
-    assert_eq!(focused_node(cx)["aria"]["label"], "Open folder");
+    assert_eq!(focused_node(cx)["aria"]["label"], "Settings");
     press(cx, "tab");
     assert_eq!(focused_node(cx)["aria"]["label"], "Open file");
 }
@@ -249,23 +249,21 @@ fn every_view_has_named_visible_tab_stops_and_reversible_traversal() {
 
 #[test]
 fn settings_escape_returns_to_its_trigger_and_preserves_tab_order() {
-    let mut app = TestAppContext::single();
-    let (_, cx) = test_window(
-        &mut app,
-        VisualFixture::SettingsVideo,
-        ScalePreset::Percent100,
-    );
-    click(cx, "titlebar-settings");
-    press(cx, "escape");
-    let trigger = focus(cx);
-    press(cx, "tab");
-    press(cx, "shift-tab");
-    assert_eq!(focus(cx), trigger);
-    press(cx, "enter");
-    assert!(
-        cx.debug_bounds("app-settings-close").is_some(),
-        "Enter must reopen settings"
-    );
+    for fixture in [VisualFixture::SettingsVideo, VisualFixture::WorkspaceEmpty] {
+        let mut app = TestAppContext::single();
+        let (_, cx) = test_window(&mut app, fixture, ScalePreset::Percent100);
+        click(cx, "titlebar-settings");
+        press(cx, "escape");
+        let trigger = focus(cx);
+        press(cx, "tab");
+        press(cx, "shift-tab");
+        assert_eq!(focus(cx), trigger);
+        press(cx, "enter");
+        assert!(
+            cx.debug_bounds("app-settings-close").is_some(),
+            "Enter must reopen settings"
+        );
+    }
 }
 
 #[test]

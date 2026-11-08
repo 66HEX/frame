@@ -4,9 +4,10 @@ use crate::app::chrome::window_controls::{
 };
 use crate::app::components::FrameTooltip;
 use crate::app::layout::{
-    LEFT_COLUMN_SPAN, RIGHT_COLUMN_SPAN, TITLEBAR_DIVIDER_HEIGHT, TITLEBAR_HEIGHT,
-    TITLEBAR_LOGO_SIZE, TITLEBAR_PLATFORM_DIVIDER_HEIGHT, TITLEBAR_TOP_PADDING, WORKSPACE_COLUMNS,
-    WORKSPACE_GAP,
+    CONTENT_PADDING, LEFT_COLUMN_SPAN, RIGHT_COLUMN_SPAN, TITLEBAR_DIVIDER_HEIGHT, TITLEBAR_HEIGHT,
+    TITLEBAR_LINUX_WINDOW_BUTTON_SIZE, TITLEBAR_LINUX_WINDOW_CONTROLS_GAP,
+    TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X, TITLEBAR_LOGO_SIZE, TITLEBAR_PLATFORM_DIVIDER_HEIGHT,
+    TITLEBAR_TOP_PADDING, TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH, WORKSPACE_COLUMNS, WORKSPACE_GAP,
 };
 use crate::app::model::{FrameAppState, StartAvailability};
 use crate::app::primitives::{ButtonVariant, action_button, color, vertical_separator};
@@ -96,9 +97,9 @@ pub(in crate::app) fn macos_titlebar(
                 .items_center()
                 .mt_2()
                 .gap_2()
+                .child(titlebar_settings_button(palette, window, cx))
                 .when(show_workspace_controls, |this| {
-                    this.child(titlebar_settings_button(palette, window, cx))
-                        .child(titlebar_add_source_button(palette, window, cx))
+                    this.child(titlebar_add_source_button(palette, window, cx))
                         .child(titlebar_start_button(state, palette, window, cx))
                 }),
         )
@@ -116,7 +117,13 @@ pub(in crate::app) fn windows_titlebar(
         .w_full()
         .flex_none()
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-        .child(platform_titlebar_content(state, palette, window, cx))
+        .child(platform_titlebar_content(
+            FrameTitlebarPlatform::Windows,
+            state,
+            palette,
+            window,
+            cx,
+        ))
         .child(windows_window_controls(palette, window, cx))
 }
 
@@ -132,7 +139,13 @@ pub(in crate::app) fn linux_titlebar(
         .w_full()
         .flex_none()
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-        .child(platform_titlebar_content(state, palette, window, cx))
+        .child(platform_titlebar_content(
+            FrameTitlebarPlatform::Linux,
+            state,
+            palette,
+            window,
+            cx,
+        ))
         .child(linux_window_controls(palette, window, cx))
 }
 
@@ -193,12 +206,33 @@ pub(super) fn titlebar_drag_surface(
 }
 
 pub(in crate::app) fn platform_titlebar_content(
+    platform: FrameTitlebarPlatform,
     state: FrameAppState,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let show_workspace_controls = titlebar_shows_workspace_controls(state);
+
+    if !show_workspace_controls {
+        let window_controls_width = match platform {
+            FrameTitlebarPlatform::Windows => 3.0 * TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH,
+            FrameTitlebarPlatform::Linux => 3.0f32.mul_add(
+                TITLEBAR_LINUX_WINDOW_BUTTON_SIZE,
+                2.0 * (TITLEBAR_LINUX_WINDOW_CONTROLS_GAP
+                    + TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X),
+            ),
+            FrameTitlebarPlatform::Macos => 0.0,
+        };
+        return div()
+            .absolute()
+            .inset_0()
+            .flex()
+            .items_center()
+            .justify_end()
+            .pr(theme::ui_rem(window_controls_width + CONTENT_PADDING))
+            .child(titlebar_settings_button(palette, window, cx));
+    }
 
     div()
         .absolute()
