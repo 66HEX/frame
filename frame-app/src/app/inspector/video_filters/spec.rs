@@ -97,7 +97,7 @@ pub(super) const fn video_filter_available(
         VideoFilterRangeTarget::Brightness
         | VideoFilterRangeTarget::Contrast
         | VideoFilterRangeTarget::Saturation
-        | VideoFilterRangeTarget::Gamma => available_filters.eq,
+        | VideoFilterRangeTarget::Gamma => available_filters.lutyuv,
         VideoFilterRangeTarget::Hue => available_filters.hue,
         VideoFilterRangeTarget::Temperature => available_filters.colortemperature,
         VideoFilterRangeTarget::Sharpen => available_filters.unsharp,

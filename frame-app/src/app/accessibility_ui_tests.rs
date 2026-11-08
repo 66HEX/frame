@@ -21,7 +21,7 @@ fn test_window(
         let mut root = FrameRoot::new();
         root.apply_visual_fixture(Some(fixture));
         root.appearance.ui_scale = scale;
-        root.available_filters.eq = true;
+        root.available_filters.lutyuv = true;
         root.preview_ui.render_image = Some(Arc::new(RenderImage::new(smallvec::smallvec![
             image::Frame::new(image::RgbaImage::new(400, 225))
         ])));

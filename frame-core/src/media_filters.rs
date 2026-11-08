@@ -61,8 +61,8 @@ pub fn has_active_audio_filters(config: &ConversionConfig) -> bool {
 pub fn build_video_pre_scale_filters(config: &VideoFiltersConfig, is_image: bool) -> Vec<String> {
     let mut filters = Vec::new();
 
-    if let Some(eq) = build_eq_filter(config) {
-        filters.push(eq);
+    if let Some(lut) = build_color_lut_filter(config) {
+        filters.push(lut);
     }
     if config.hue.enabled {
         filters.push(format!("hue=h={}", config.hue.value));
@@ -258,36 +258,57 @@ pub fn validate_media_filters(config: &ConversionConfig) -> Result<(), Conversio
     validate_audio_filters(&config.audio_filters)
 }
 
-fn build_eq_filter(config: &VideoFiltersConfig) -> Option<String> {
+fn build_color_lut_filter(config: &VideoFiltersConfig) -> Option<String> {
+    // maxval can be the limited-range white level. Recover the format's full
+    // code-value maximum without narrowing 10/12/16-bit planes to eight bits.
+    const MAXIMUM: &str = "st(0,pow(2,ceil(log(maxval+1)/log(2)))-1)";
     let color = config.color;
-    let mut parts = Vec::new();
+    let brightness = if color.brightness.enabled {
+        color.brightness.value
+    } else {
+        0
+    };
+    let contrast = if color.contrast.enabled {
+        color.contrast.value
+    } else {
+        100
+    };
+    let gamma = if color.gamma.enabled {
+        color.gamma.value
+    } else {
+        100
+    };
+    let saturation = if color.saturation.enabled {
+        color.saturation.value
+    } else {
+        100
+    };
+    if (brightness, contrast, gamma, saturation) == (0, 100, 100, 100) {
+        // Even an identity LUT can negotiate an RGB/YUV conversion. Bypass the
+        // entire filter when the effective controls leave the image unchanged.
+        return None;
+    }
 
-    if color.brightness.enabled {
-        parts.push(format!(
-            "brightness={}",
-            format_filter_float(f64::from(color.brightness.value) / 100.0)
-        ));
-    }
-    if color.contrast.enabled {
-        parts.push(format!(
-            "contrast={}",
-            format_filter_float(f64::from(color.contrast.value) / 100.0)
-        ));
-    }
-    if color.saturation.enabled {
-        parts.push(format!(
-            "saturation={}",
-            format_filter_float(f64::from(color.saturation.value) / 100.0)
-        ));
-    }
-    if color.gamma.enabled {
-        parts.push(format!(
-            "gamma={}",
-            format_filter_float(f64::from(color.gamma.value) / 100.0)
-        ));
-    }
-
-    (!parts.is_empty()).then(|| format!("eq={}", parts.join(":")))
+    let y = if (brightness, contrast, gamma) == (0, 100, 100) {
+        "val".to_string()
+    } else {
+        let b = format_filter_float(f64::from(brightness) / 100.0);
+        let c = format_filter_float(f64::from(contrast) / 100.0);
+        let linear = format!("val*{c}+ld(0)*({b}+0.5*(1-{c}))");
+        if gamma == 100 {
+            format!("{MAXIMUM};clip(round({linear}),0,ld(0))")
+        } else {
+            let g = format_filter_float(f64::from(gamma) / 100.0);
+            format!("{MAXIMUM};clip(round(ld(0)*pow(clip(({linear})/ld(0),0,1),1/{g})),0,ld(0))")
+        }
+    };
+    let chroma = if saturation == 100 {
+        "val".to_string()
+    } else {
+        let s = format_filter_float(f64::from(saturation) / 100.0);
+        format!("{MAXIMUM};clip(round((val-(ld(0)+1)/2)*{s}+(ld(0)+1)/2),0,ld(0))")
+    };
+    Some(format!("lutyuv=y='{y}':u='{chroma}':v='{chroma}':a=val"))
 }
 
 fn build_denoise_filter(strength: FilterStrength, is_image: bool) -> String {
@@ -427,10 +448,60 @@ mod tests {
             ..VideoFiltersConfig::default()
         };
 
-        assert_eq!(
-            build_video_pre_scale_filters(&config, false),
-            vec!["eq=brightness=0.100:contrast=1.150:saturation=0.900:gamma=1.050"]
-        );
+        let filters = build_video_pre_scale_filters(&config, false);
+        assert_eq!(filters.len(), 1);
+        assert!(filters[0].starts_with("lutyuv=y="));
+        assert!(filters[0].contains("val*1.150+ld(0)*(0.100+0.5*(1-1.150))"));
+        assert!(filters[0].contains("1/1.050"));
+        assert!(filters[0].contains("(val-(ld(0)+1)/2)*0.900"));
+        assert!(filters[0].ends_with(":a=val"));
+    }
+
+    #[test]
+    fn neutral_color_controls_and_disabled_drafts_do_not_build_a_filter() {
+        let mut config = VideoFiltersConfig::default();
+        config.color.brightness.enabled = true;
+        config.color.contrast.enabled = true;
+        config.color.gamma.enabled = true;
+        config.color.saturation.enabled = true;
+        assert!(build_video_pre_scale_filters(&config, false).is_empty());
+        config.color.brightness = FilterValue {
+            enabled: false,
+            value: 90,
+        };
+        config.color.contrast = FilterValue {
+            enabled: false,
+            value: 250,
+        };
+        config.color.gamma = FilterValue {
+            enabled: false,
+            value: 10,
+        };
+        config.color.saturation = FilterValue {
+            enabled: false,
+            value: 0,
+        };
+        assert!(build_video_pre_scale_filters(&config, true).is_empty());
+    }
+
+    #[test]
+    fn linear_luma_and_saturation_leave_other_planes_untouched() {
+        let mut config = VideoFiltersConfig::default();
+        config.color.brightness = FilterValue {
+            enabled: true,
+            value: 10,
+        };
+        let filter = build_video_pre_scale_filters(&config, false).join(",");
+        assert!(filter.contains("clip(round(val*1.000+ld(0)*(0.100+0.5*(1-1.000))),0,ld(0))"));
+        assert!(!filter.contains("pow(clip("));
+        assert!(filter.ends_with(":u='val':v='val':a=val"));
+        config.color.brightness.enabled = false;
+        config.color.saturation = FilterValue {
+            enabled: true,
+            value: 120,
+        };
+        let filter = build_video_pre_scale_filters(&config, false).join(",");
+        assert!(filter.starts_with("lutyuv=y='val':"));
     }
 
     #[test]

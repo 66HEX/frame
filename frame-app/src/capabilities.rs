@@ -126,12 +126,12 @@ mod tests {
 
     #[test]
     fn available_filters_from_output_parses_successful_ffmpeg_stdout() {
-        let stdout = b"Filters:\n TSC eq V->V Adjust brightness\n ... deesser A->A De-ess\n";
+        let stdout = b"Filters:\n TSC lutyuv V->V Adjust brightness\n ... deesser A->A De-ess\n";
 
         let actual = available_filters_from_output(true, stdout, b"")
             .expect("successful ffmpeg filter output should parse");
 
-        assert!(actual.eq);
+        assert!(actual.lutyuv);
         assert!(actual.deesser);
     }
 

@@ -850,6 +850,214 @@ fn gif_output_should_write_palette_gif_video() -> TestResult {
 
 #[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+#[expect(
+    clippy::too_many_lines,
+    clippy::suboptimal_flops,
+    clippy::manual_midpoint,
+    reason = "The numerical oracle keeps the documented operation order while checking every plane, range tag, and control combination at both high bit depths."
+)]
+fn color_lut_should_preserve_high_depth_and_match_plane_values() -> TestResult {
+    use frame_core::types::FilterValue;
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("color_lut_depth")?;
+    for bits in [10_u32, 16] {
+        let maximum = (1_u32 << bits) - 1;
+        let samples: Vec<u16> = (0..6144_u32)
+            .map(|index| u16::try_from((index * 13) % (maximum + 1)).unwrap())
+            .collect();
+        let raw = sandbox.path(&format!("gradient-{bits}.raw"));
+        fs::write(
+            &raw,
+            samples
+                .iter()
+                .flat_map(|sample| sample.to_le_bytes())
+                .collect::<Vec<_>>(),
+        )
+        .map_err(|error| error.to_string())?;
+        for range in ["limited", "full"] {
+            for gamma_enabled in [false, true] {
+                let mut config = video_config("mkv", "libx264", "aac");
+                config.video_filters.color.brightness = FilterValue {
+                    enabled: true,
+                    value: 10,
+                };
+                config.video_filters.color.contrast = FilterValue {
+                    enabled: true,
+                    value: 120,
+                };
+                config.video_filters.color.gamma = FilterValue {
+                    enabled: gamma_enabled,
+                    value: 130,
+                };
+                config.video_filters.color.saturation = FilterValue {
+                    enabled: gamma_enabled,
+                    value: 120,
+                };
+                let graph = build_visual_filter_chain_with_context(
+                    &config,
+                    VisualFilterProfile::ExportVideo,
+                    VisualFilterContext::new(Some(128), Some(32)),
+                )
+                .join(",");
+                let graph = format!("setparams=range={range},{graph}");
+                let pixel_format = format!("yuv420p{bits}le");
+                let output = run_tool_output(
+                    &tools.ffmpeg,
+                    &args(&[
+                        "-v",
+                        "error",
+                        "-f",
+                        "rawvideo",
+                        "-pixel_format",
+                        &pixel_format,
+                        "-video_size",
+                        "128x32",
+                        "-i",
+                        &path_arg(&raw),
+                        "-vf",
+                        &graph,
+                        "-frames:v",
+                        "1",
+                        "-pix_fmt",
+                        &pixel_format,
+                        "-f",
+                        "rawvideo",
+                        "-",
+                    ]),
+                )?;
+                assert_eq!(output.len(), samples.len() * 2);
+                let values: Vec<u16> = output
+                    .chunks_exact(2)
+                    .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
+                    .collect();
+                let max = f64::from(maximum);
+                let mut levels = std::collections::HashSet::new();
+                for (index, (&source, &actual)) in samples.iter().zip(&values).enumerate() {
+                    let source = f64::from(source);
+                    let expected = if index < 4096 {
+                        levels.insert(actual);
+                        let linear = source * 1.2 + max * (0.1 + 0.5 * (1.0 - 1.2));
+                        if gamma_enabled {
+                            max * (linear / max).clamp(0.0, 1.0).powf(1.0 / 1.3)
+                        } else {
+                            linear
+                        }
+                    } else if gamma_enabled {
+                        (source - (max + 1.0) / 2.0) * 1.2 + (max + 1.0) / 2.0
+                    } else {
+                        source
+                    }
+                    .round()
+                    .clamp(0.0, max);
+                    assert!(u32::from(actual) <= maximum);
+                    assert!(
+                        (f64::from(actual) - expected).abs() <= 1.0,
+                        "{bits}-bit/{range}/gamma{gamma_enabled}/sample{index}: {actual} vs {expected}"
+                    );
+                    if index >= 4096 && !gamma_enabled {
+                        assert_eq!(actual, samples[index], "untouched chroma must be exact");
+                    }
+                }
+                assert!(
+                    levels.len() > 256,
+                    "color control narrowed {bits}-bit luma to eight bits"
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn color_lut_should_preserve_neutral_rgba16_and_active_png_alpha() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("color_lut_rgba16")?;
+    let raw = sandbox.path("source.rgba64");
+    let input = sandbox.path("source.png");
+    let pixels: Vec<u8> = (0..2048_u32)
+        .flat_map(|pixel| {
+            [pixel * 3, pixel * 7, pixel * 11, pixel * 13]
+                .into_iter()
+                .flat_map(|value| u16::try_from(value % 65_536).unwrap().to_le_bytes())
+        })
+        .collect();
+    fs::write(&raw, &pixels).map_err(|error| error.to_string())?;
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-f",
+            "rawvideo",
+            "-pixel_format",
+            "rgba64le",
+            "-video_size",
+            "64x32",
+            "-i",
+            &path_arg(&raw),
+            "-frames:v",
+            "1",
+            &path_arg(&input),
+        ]),
+    )?;
+    for active in [false, true] {
+        let mut config = image_config("png", "png");
+        config.video_filters.color.brightness.enabled = true;
+        config.video_filters.color.contrast.enabled = true;
+        config.video_filters.color.gamma.enabled = true;
+        config.video_filters.color.saturation.enabled = true;
+        if active {
+            config.video_filters.color.brightness.value = 10;
+            config.video_filters.color.saturation.value = 120;
+        }
+        let output = sandbox.path(&format!("active-{active}.png"));
+        convert(&tools, &input, &output, &config)?;
+        let metadata = probe_media(&tools, &output)?;
+        assert!(
+            metadata
+                .pixel_format
+                .as_deref()
+                .is_some_and(|format| format.starts_with("rgba64"))
+        );
+        let decoded = run_tool_output(
+            &tools.ffmpeg,
+            &args(&[
+                "-v",
+                "error",
+                "-i",
+                &path_arg(&output),
+                "-frames:v",
+                "1",
+                "-pix_fmt",
+                "rgba64le",
+                "-f",
+                "rawvideo",
+                "-",
+            ]),
+        )?;
+        assert_eq!(decoded.len(), pixels.len());
+        if active {
+            assert!(
+                decoded != pixels,
+                "active color controls must change the image"
+            );
+            for (index, (actual, expected)) in decoded
+                .chunks_exact(8)
+                .zip(pixels.chunks_exact(8))
+                .enumerate()
+            {
+                assert_eq!(&actual[6..8], &expected[6..8], "alpha sample{index}");
+            }
+        } else {
+            assert_bytes_match(&decoded, &pixels, "enabled neutral RGBA16 controls")?;
+        }
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 fn prores_should_ignore_unused_quality_drafts_and_choose_profile_from_pixels() -> TestResult {
     let tools = Toolchain::discover()?;
     let sandbox = Sandbox::new("prores_controls")?;

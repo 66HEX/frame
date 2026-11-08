@@ -385,7 +385,7 @@ fn fixture_window(
         if fixture == VisualFixture::SettingsPresets {
             root.presets.retain(|preset| preset.id == "custom-review");
         }
-        root.available_filters.eq = true;
+        root.available_filters.lutyuv = true;
         root.preview_ui.render_image = Some(Arc::new(RenderImage::new(smallvec::smallvec![
             image::Frame::new(image::RgbaImage::new(400, 225))
         ])));

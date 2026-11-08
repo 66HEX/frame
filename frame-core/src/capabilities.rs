@@ -28,7 +28,7 @@ pub struct AvailableEncoders {
     reason = "filter availability is represented as explicit frontend feature flags"
 )]
 pub struct AvailableFilters {
-    pub eq: bool,
+    pub lutyuv: bool,
     pub hue: bool,
     pub colortemperature: bool,
     pub unsharp: bool,
@@ -84,7 +84,7 @@ pub fn parse_available_filters(ffmpeg_filters_stdout: impl AsRef<str>) -> Availa
     let stdout = ffmpeg_filters_stdout.as_ref();
 
     AvailableFilters {
-        eq: filter_list_contains(stdout, "eq"),
+        lutyuv: filter_list_contains(stdout, "lutyuv"),
         hue: filter_list_contains(stdout, "hue"),
         colortemperature: filter_list_contains(stdout, "colortemperature"),
         unsharp: filter_list_contains(stdout, "unsharp"),
@@ -120,6 +120,12 @@ fn filter_list_contains(stdout: &str, name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn legacy_eq_does_not_enable_depth_preserving_color_controls() {
+        let actual = parse_available_filters(" TSC eq V->V Adjust colors\n");
+        assert!(!actual.lutyuv);
+    }
 
     #[test]
     fn ffmpeg_encoder_list_args_match_sidecar_contract() {
@@ -185,7 +191,7 @@ Encoders:
     fn parse_available_filters_detects_ffmpeg_filter_rows() {
         let stdout = "\
 Filters:
- TSC eq                V->V       Adjust brightness, contrast, gamma, and saturation.
+ TSC lutyuv                V->V       Adjust brightness, contrast, gamma, and saturation.
  T.C hue               V->V       Adjust the hue and saturation.
  ... colortemperature  V->V       Adjust color temperature.
  ... unsharp           V->V       Sharpen or blur the input video.
@@ -212,7 +218,7 @@ Filters:
         assert_eq!(
             actual,
             AvailableFilters {
-                eq: true,
+                lutyuv: true,
                 hue: true,
                 colortemperature: true,
                 unsharp: true,
@@ -240,7 +246,7 @@ Filters:
     fn parse_available_filters_rejects_substring_matches() {
         let stdout = "\
 Filters:
- ... not_eq             V->V should not match
+ ... not_lutyuv             V->V should not match
  ... deesser_extra      A->A should not match
 ";
 

@@ -20,7 +20,7 @@ fn empty_encoders() -> &'static AvailableEncoders {
 
 fn empty_filters() -> &'static AvailableFilters {
     static FILTERS: AvailableFilters = AvailableFilters {
-        eq: false,
+        lutyuv: false,
         hue: false,
         colortemperature: false,
         unsharp: false,

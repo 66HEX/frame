@@ -168,7 +168,7 @@ fn every_view_has_named_visible_tab_stops_and_reversible_traversal() {
             root.update(cx, |root, cx| {
                 root.available_filters = frame_core::capabilities::parse_available_filters(
                     [
-                        "eq",
+                        "lutyuv",
                         "hue",
                         "colortemperature",
                         "unsharp",
