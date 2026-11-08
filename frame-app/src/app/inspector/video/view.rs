@@ -104,7 +104,8 @@ pub(in crate::app) fn settings_video_tab(
             cx,
         ))
         .when(
-            !is_videotoolbox_video_codec(&config.video_codec) && config.video_codec != "mpeg2video",
+            !is_videotoolbox_video_codec(&config.video_codec)
+                && !matches!(config.video_codec.as_str(), "mpeg2video" | "prores"),
             |this| {
                 this.child(settings_video_preset_section(
                     config,
@@ -118,14 +119,16 @@ pub(in crate::app) fn settings_video_tab(
     crate::app::components::frame_field_group()
         .child(resolution)
         .child(controls)
-        .child(settings_video_quality_section(
-            config,
-            settings_disabled,
-            focuses.bitrate,
-            palette,
-            window,
-            cx,
-        ))
+        .when(config.video_codec != "prores", |this| {
+            this.child(settings_video_quality_section(
+                config,
+                settings_disabled,
+                focuses.bitrate,
+                palette,
+                window,
+                cx,
+            ))
+        })
         .when(is_nvenc_video_codec(&config.video_codec), |this| {
             this.child(settings_video_nvenc_section(
                 config,

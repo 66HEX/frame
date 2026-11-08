@@ -850,6 +850,111 @@ fn gif_output_should_write_palette_gif_video() -> TestResult {
 
 #[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn prores_should_ignore_unused_quality_drafts_and_choose_profile_from_pixels() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("prores_controls")?;
+    let input = sandbox.path("source.mp4");
+    generate_h264_aac_source(&tools, &input, 0.25, 64, 48)?;
+    for (pixel_format, expected_profile) in [("yuv422p10le", "Standard"), ("yuv444p10le", "4444")] {
+        let mut config = video_config("mov", "prores", "aac");
+        config.pixel_format = pixel_format.to_string();
+        config.video_bitrate_mode = "bitrate".to_string();
+        config.video_bitrate = "unused draft".to_string();
+        config.preset = "unused draft".to_string();
+        let output = sandbox.path(&format!("{pixel_format}.mov"));
+        validate_task_input(&path_arg(&input), &config).map_err(|error| error.to_string())?;
+        let probe = probe_media(&tools, &input)?;
+        let command = build_ffmpeg_args(&path_arg(&input), &path_arg(&output), &config, &probe)
+            .map_err(|error| error.to_string())?;
+        let result = Command::new(&tools.ffmpeg)
+            .args(&command)
+            .output()
+            .map_err(|error| error.to_string())?;
+        let log = String::from_utf8_lossy(&result.stderr);
+        assert!(result.status.success(), "ProRes encode failed: {log}");
+        assert!(
+            !log.contains("has not been used") && !log.contains("not used for any stream"),
+            "{log}"
+        );
+        let raw = run_tool_output(
+            &tools.ffprobe,
+            &args(&[
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=codec_name,profile,pix_fmt",
+                "-of",
+                "json",
+                &path_arg(&output),
+            ]),
+        )?;
+        let metadata: serde_json::Value =
+            serde_json::from_slice(&raw).map_err(|error| error.to_string())?;
+        assert_eq!(metadata["streams"][0]["codec_name"], "prores");
+        assert_eq!(metadata["streams"][0]["profile"], expected_profile);
+        let pixels = read_rgb_frame(&tools, &output)?;
+        assert_eq!((pixels.width, pixels.height), (64, 48));
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn vp9_speed_should_change_encoded_packets() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("vp9_native_speed")?;
+    let input = sandbox.path("source.mkv");
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=s=320x180:r=24:d=1",
+            "-c:v",
+            "ffv1",
+            &path_arg(&input),
+        ]),
+    )?;
+    let mut hashes = Vec::new();
+    for speed in ["0", "5"] {
+        let mut config = video_config("webm", "vp9", "libopus");
+        config.preset = speed.to_string();
+        config.crf = 30;
+        let output = sandbox.path(&format!("speed-{speed}.webm"));
+        convert(&tools, &input, &output, &config)?;
+        let hash = run_tool_output(
+            &tools.ffmpeg,
+            &args(&[
+                "-v",
+                "error",
+                "-i",
+                &path_arg(&output),
+                "-map",
+                "0:v:0",
+                "-c:v",
+                "copy",
+                "-f",
+                "hash",
+                "-",
+            ]),
+        )?;
+        assert!(hash.starts_with(b"SHA256="));
+        hashes.push(hash);
+    }
+    assert_ne!(
+        hashes[0], hashes[1],
+        "native speed must affect encoded video packets"
+    );
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 #[expect(
     clippy::too_many_lines,
     reason = "The export and preview matrix shares setup and assertions across container and geometry combinations."

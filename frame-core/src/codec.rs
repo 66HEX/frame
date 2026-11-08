@@ -1,6 +1,7 @@
 use crate::types::ConversionConfig;
 use crate::utils::{
     is_nvenc_codec, is_svt_av1_codec, is_videotoolbox_codec, map_nvenc_preset, map_svt_av1_preset,
+    map_vp9_speed,
 };
 
 pub fn add_video_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
@@ -24,6 +25,10 @@ pub fn add_video_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
         || config.container.eq_ignore_ascii_case("mov"))
     {
         args.extend(["-tag:v".to_string(), "hvc1".to_string()]);
+    }
+
+    if config.video_codec == "prores" {
+        return;
     }
 
     if config.video_codec == "mpeg2video" {
@@ -58,7 +63,14 @@ pub fn add_video_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
         args.push(config.crf.to_string());
     }
 
-    if !is_videotoolbox {
+    if config.video_codec == "vp9" {
+        args.extend([
+            "-deadline".to_string(),
+            "good".to_string(),
+            "-cpu-used".to_string(),
+            map_vp9_speed(&config.preset),
+        ]);
+    } else if !is_videotoolbox {
         args.push("-preset".to_string());
         let preset_value = if is_nvenc {
             map_nvenc_preset(&config.preset)
@@ -72,11 +84,11 @@ pub fn add_video_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
 
     if is_nvenc {
         if config.nvenc_spatial_aq {
-            args.push("-spatial_aq".to_string());
+            args.push("-spatial-aq".to_string());
             args.push("1".to_string());
         }
         if config.nvenc_temporal_aq {
-            args.push("-temporal_aq".to_string());
+            args.push("-temporal-aq".to_string());
             args.push("1".to_string());
         }
     }

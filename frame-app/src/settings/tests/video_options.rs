@@ -126,3 +126,45 @@ fn apply_gif_loop_strips_non_digits_and_clamps_to_ffmpeg_range() {
 
     assert_eq!(config.gif_loop, 65_535);
 }
+
+#[test]
+fn vp9_speed_options_are_native_and_legacy_default_is_migrated_once() {
+    let mut config = ConversionConfig {
+        container: "webm".to_string(),
+        video_codec: "vp9".to_string(),
+        ..ConversionConfig::default()
+    };
+    assert_normalizes_once(normalize_video_config, &mut config, None);
+    assert_eq!(config.preset, "1");
+    let options = video_preset_options(&config, false);
+    assert_eq!(options.len(), 6);
+    assert_eq!(
+        options.iter().filter(|option| option.is_selected).count(),
+        1
+    );
+    for option in options {
+        assert!(!option.is_disabled);
+        assert!(is_video_preset_allowed("vp9", option.preset));
+        apply_video_preset(&mut config, option.preset);
+        assert_eq!(config.preset, option.preset);
+    }
+    assert!(!apply_video_preset(&mut config, "6"));
+    assert!(!apply_video_preset(&mut config, "fast"));
+}
+
+#[test]
+fn prores_normalization_preserves_unused_quality_drafts() {
+    let mut config = ConversionConfig {
+        container: "mov".to_string(),
+        video_codec: "prores".to_string(),
+        video_bitrate_mode: "bitrate".to_string(),
+        video_bitrate: "unused value".to_string(),
+        preset: "unused preset".to_string(),
+        crf: 17,
+        ..ConversionConfig::default()
+    };
+    normalize_video_config(&mut config, None);
+    assert_eq!(config.video_bitrate, "unused value");
+    assert_eq!(config.preset, "unused preset");
+    assert_eq!(config.crf, 17);
+}

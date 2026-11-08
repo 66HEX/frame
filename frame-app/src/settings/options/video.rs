@@ -109,8 +109,35 @@ pub(super) const SVT_AV1_PRESETS: [(&str, &str); 14] = [
     ("13", "Preset 13"),
 ];
 
+pub(super) const VP9_SPEEDS: [(&str, &str); 6] = [
+    ("0", "Speed 0"),
+    ("1", "Speed 1"),
+    ("2", "Speed 2"),
+    ("3", "Speed 3"),
+    ("4", "Speed 4"),
+    ("5", "Speed 5"),
+];
+
 #[must_use]
 pub fn video_preset_options(config: &ConversionConfig, disabled: bool) -> Vec<VideoPresetOption> {
+    if config.video_codec == "vp9" {
+        let selected = frame_core::utils::map_vp9_speed(&config.preset);
+        return VP9_SPEEDS
+            .iter()
+            .map(|&(preset, label)| VideoPresetOption {
+                preset,
+                label,
+                caption: match preset {
+                    "0" => "Slowest encode, highest compression",
+                    "5" => "Fastest encode, lowest compression",
+                    "1" => "Default encoding speed",
+                    _ => "Lower numbers favor compression; higher numbers favor speed",
+                },
+                is_selected: selected == preset,
+                is_disabled: disabled,
+            })
+            .collect();
+    }
     if config.video_codec == "libsvtav1" {
         let selected = frame_core::utils::map_svt_av1_preset(&config.preset);
         return SVT_AV1_PRESETS
@@ -179,6 +206,9 @@ pub fn is_hardware_video_codec(codec: &str) -> bool {
 
 #[must_use]
 pub fn is_video_preset_allowed(codec: &str, preset: &str) -> bool {
+    if codec == "vp9" {
+        return VP9_SPEEDS.iter().any(|(value, _)| *value == preset);
+    }
     if codec == "libsvtav1" && SVT_AV1_PRESETS.iter().any(|(value, _)| *value == preset) {
         return true;
     }
@@ -194,6 +224,9 @@ pub fn is_video_preset_allowed(codec: &str, preset: &str) -> bool {
 
 #[must_use]
 pub fn first_allowed_video_preset(codec: &str) -> &'static str {
+    if codec == "vp9" {
+        return "1";
+    }
     VIDEO_PRESETS
         .iter()
         .copied()

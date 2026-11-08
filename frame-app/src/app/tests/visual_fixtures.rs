@@ -107,6 +107,26 @@ fn av1_fixture_selects_preset_four_and_ten_bit_pixels() {
 }
 
 #[test]
+fn codec_fixtures_seed_prores_and_native_vp9_controls() {
+    let mut root = FrameRoot::new();
+    root.apply_visual_fixture(Some(VisualFixture::SettingsVideoProres));
+    let config = root.selected_config().unwrap();
+    assert_eq!(config.container, "mov");
+    assert_eq!(config.video_codec, "prores");
+    assert_eq!(config.pixel_format, "yuv422p10le");
+    assert_eq!(config.video_bitrate_mode, "bitrate");
+    assert_eq!(config.preset, "slow");
+
+    root.apply_visual_fixture(Some(VisualFixture::SettingsVideoVp9));
+    let config = root.selected_config().unwrap();
+    assert_eq!(config.container, "webm");
+    assert_eq!(config.video_codec, "vp9");
+    assert_eq!(config.audio_codec, "libopus");
+    assert_eq!(config.preset, "3");
+    assert_eq!(config.crf, 0);
+}
+
+#[test]
 fn workspace_empty_fixture_clears_workspace_state() {
     let mut root = FrameRoot::new();
     root.apply_visual_fixture(Some(VisualFixture::PreviewReady));

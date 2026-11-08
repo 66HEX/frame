@@ -92,6 +92,26 @@ fn queue_action_focus_survives_conversion_status_changes() {
     }
 }
 
+#[test]
+fn codec_fixtures_render_only_effective_quality_and_speed_controls() {
+    for fixture in [
+        VisualFixture::SettingsVideoProres,
+        VisualFixture::SettingsVideoVp9,
+    ] {
+        let mut app = TestAppContext::single();
+        let (_, cx) = test_window(&mut app, fixture, ScalePreset::Percent100);
+        draw(cx);
+        assert!(cx.debug_bounds("video-encoder-select").is_some());
+        let prores = fixture == VisualFixture::SettingsVideoProres;
+        assert_eq!(cx.debug_bounds("video-preset-select").is_none(), prores);
+        assert_eq!(
+            cx.debug_bounds("settings-video-crf-slider").is_none(),
+            prores
+        );
+        assert!(cx.debug_bounds("settings-video-bitrate-field").is_none());
+    }
+}
+
 fn assert_visible_focus(cx: &mut VisualTestContext, viewport: gpui::Size<Pixels>) -> String {
     let node = focused_node(cx);
     let label = node["aria"]["label"]
@@ -140,6 +160,8 @@ fn every_view_has_named_visible_tab_stops_and_reversible_traversal() {
             VisualFixture::WorkspaceEmpty,
             VisualFixture::SettingsSource,
             VisualFixture::SettingsVideoAv1,
+            VisualFixture::SettingsVideoProres,
+            VisualFixture::SettingsVideoVp9,
         ] {
             let mut app = TestAppContext::single();
             let (root, cx) = test_window(&mut app, fixture, scale);

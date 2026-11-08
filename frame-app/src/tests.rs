@@ -166,6 +166,8 @@ mod visual_fixture_env {
             ("preview-crop-options", VisualFixture::PreviewCropOptions),
             ("preview-crop-custom", VisualFixture::PreviewCropCustom),
             ("settings-video-av1", VisualFixture::SettingsVideoAv1),
+            ("settings-video-prores", VisualFixture::SettingsVideoProres),
+            ("settings-video-vp9", VisualFixture::SettingsVideoVp9),
             ("preview-ready", VisualFixture::PreviewReady),
             ("preview-transport", VisualFixture::PreviewTransport),
             ("preview-trim", VisualFixture::PreviewTrim),

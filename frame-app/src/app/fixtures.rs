@@ -87,6 +87,8 @@ impl FrameRoot {
                     file.config.pixel_format = "yuv420p10le".into();
                 }
             }
+            Some(VisualFixture::SettingsVideoProres) => self.apply_settings_video_prores_fixture(),
+            Some(VisualFixture::SettingsVideoVp9) => self.apply_settings_video_vp9_fixture(),
             Some(VisualFixture::PreviewCrop) => self.apply_preview_crop_fixture(),
             Some(VisualFixture::PreviewReady) => self.apply_preview_ready_fixture(),
             Some(VisualFixture::PreviewTransport | VisualFixture::PreviewTrim) => {
@@ -267,6 +269,30 @@ impl FrameRoot {
             file.config.crf = 18;
         }
     }
+    fn apply_settings_video_prores_fixture(&mut self) {
+        self.apply_settings_video_fixture();
+        if let Some(file) = self.file_queue.selected_file_mut() {
+            file.config.container = "mov".into();
+            file.config.video_codec = "prores".into();
+            file.config.pixel_format = "yuv422p10le".into();
+            file.config.preset = "slow".into();
+            file.config.video_bitrate_mode = "bitrate".into();
+            file.config.video_bitrate = "7500".into();
+        }
+    }
+
+    fn apply_settings_video_vp9_fixture(&mut self) {
+        self.apply_settings_video_fixture();
+        if let Some(file) = self.file_queue.selected_file_mut() {
+            file.config.container = "webm".into();
+            file.config.video_codec = "vp9".into();
+            file.config.audio_codec = "libopus".into();
+            file.config.preset = "3".into();
+            file.config.pixel_format = "yuv420p".into();
+            file.config.crf = 0;
+        }
+    }
+
     pub(super) fn apply_settings_video_filters_fixture(&mut self) {
         self.apply_preview_ready_fixture();
         self.settings_ui.active_tab = SettingsTab::Output;

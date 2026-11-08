@@ -187,7 +187,7 @@ pub(super) fn settings_video_quality_section(
             if is_hardware {
                 "Low quality"
             } else {
-                "Lossless"
+                "Best quality"
             },
             if is_hardware {
                 "Best quality"

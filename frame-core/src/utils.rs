@@ -92,6 +92,20 @@ pub fn map_svt_av1_preset(preset: &str) -> String {
     }
 }
 
+/// Maps saved speed labels to libvpx's effective good-quality speed range.
+#[must_use]
+pub fn map_vp9_speed(preset: &str) -> String {
+    match preset {
+        "0" | "1" | "2" | "3" | "4" | "5" => preset.to_string(),
+        "ultrafast" | "superfast" => "5".to_string(),
+        "veryfast" | "faster" => "4".to_string(),
+        "fast" => "3".to_string(),
+        "slow" | "slower" | "veryslow" => "0".to_string(),
+        // libvpx's previous actual default was 1; -preset was ignored.
+        _ => "1".to_string(),
+    }
+}
+
 #[must_use]
 pub(crate) fn format_ffmpeg_seconds(seconds: f64) -> String {
     let mut formatted = format!("{seconds:.6}");
@@ -173,6 +187,23 @@ mod tests {
             assert_eq!(format_ffmpeg_seconds(seconds), expected);
         }
         assert_eq!(parse_time("00:00:01.234567"), Some(1.234_567));
+    }
+
+    #[test]
+    fn vp9_speed_migrates_legacy_labels_and_keeps_native_values() {
+        for speed in ["0", "1", "2", "3", "4", "5"] {
+            assert_eq!(map_vp9_speed(speed), speed);
+        }
+        for (preset, speed) in [
+            ("medium", "1"),
+            ("fast", "3"),
+            ("faster", "4"),
+            ("ultrafast", "5"),
+            ("slow", "0"),
+            ("unknown", "1"),
+        ] {
+            assert_eq!(map_vp9_speed(preset), speed);
+        }
     }
 
     #[test]

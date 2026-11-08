@@ -133,6 +133,8 @@ Frame's application code retains its normal debug settings.
 | `settings-output` | Output settings tab with a custom output name | Output filename field, container selection state, output tab layout, and long-name alignment. |
 | `settings-video` | Video settings tab with custom resolution and CRF mode | Video codec controls, custom width and height inputs, CRF controls, bitrate mode layout, and dense control grouping. |
 | `settings-video-av1` | SVT-AV1 selected with preset 4 and 10-bit pixels | Native preset numbers, encoding speed guidance, and the explicit 10-bit pixel format selection. |
+| `settings-video-prores` | ProRes MOV with 10-bit 4:2:2 pixels | Encoder and pixel format controls, with unused quality and speed controls hidden. |
+| `settings-video-vp9` | VP9 WebM with speed 3 and CRF 0 | Native speeds 0–5 and the Best quality endpoint. |
 | `settings-audio` | Audio settings tab with an audio source and tracks | Audio codec controls, VBR quality, channel selection, volume and normalize controls, track selection rows, and audio-only source treatment. |
 | `settings-images` | Image settings tab with a selected PNG source | Image output controls, custom image dimensions, image-source metadata, and non-video settings visibility. |
 | `settings-metadata` | Metadata tab with source tags and output metadata drafts | Source metadata presentation, editable metadata fields, long value wrapping, and tag/value alignment. |

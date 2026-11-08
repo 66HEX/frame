@@ -217,7 +217,11 @@ fn normalize_video_config_values(config: &mut ConversionConfig, metadata: Option
             first_allowed_video_pixel_format(&config.container, &config.video_codec).to_string();
     }
 
-    if !is_video_preset_allowed(&config.video_codec, &config.preset) {
+    if config.video_codec == "vp9" {
+        config.preset = frame_core::utils::map_vp9_speed(&config.preset);
+    } else if config.video_codec != "prores"
+        && !is_video_preset_allowed(&config.video_codec, &config.preset)
+    {
         config.preset = first_allowed_video_preset(&config.video_codec).to_string();
     }
     if config.video_codec == "mpeg2video" {

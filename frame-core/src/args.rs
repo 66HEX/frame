@@ -1107,9 +1107,11 @@ pub fn validate_task_input(
     }
 
     if !is_copy_mode
-        && config.video_bitrate_mode == "bitrate"
         && !is_audio_only_container(&config.container)
         && !is_video_only_container(&config.container)
+        && !is_image_container(&config.container)
+        && config.video_codec != "prores"
+        && (config.video_codec == "mpeg2video" || config.video_bitrate_mode == "bitrate")
     {
         let bitrate = config.video_bitrate.parse::<f64>().map_err(|_| {
             ConversionError::InvalidInput(format!(
@@ -1117,9 +1119,9 @@ pub fn validate_task_input(
                 config.video_bitrate
             ))
         })?;
-        if bitrate <= 0.0 {
+        if !bitrate.is_finite() || bitrate <= 0.0 {
             return Err(ConversionError::InvalidInput(
-                "Video bitrate must be positive".to_string(),
+                "Video bitrate must be a finite, positive number".to_string(),
             ));
         }
     }
@@ -1517,6 +1519,83 @@ mod tests {
             }],
             ..ProbeMetadata::default()
         }
+    }
+
+    #[test]
+    fn video_encoder_controls_use_codec_specific_ffmpeg_options() {
+        let mut config = sample_config("mov", "prores");
+        for mode in ["crf", "bitrate"] {
+            config.video_bitrate_mode = mode.to_string();
+            config.video_bitrate = "unused".to_string();
+            config.preset = "unused".to_string();
+            let args =
+                build_ffmpeg_args("input.mov", "output.mov", &config, &sample_probe()).unwrap();
+            assert!(args_contains_pair(&args, "-c:v", "prores"));
+            for unused in ["-crf", "-b:v", "-preset"] {
+                assert!(!args.iter().any(|arg| arg == unused));
+            }
+        }
+        config = sample_config("webm", "vp9");
+        config.audio_codec = "libopus".to_string();
+        for speed in ["0", "1", "2", "3", "4", "5", "medium"] {
+            config.preset = speed.to_string();
+            let args =
+                build_ffmpeg_args("input.mov", "output.webm", &config, &sample_probe()).unwrap();
+            assert!(args_contains_pair(&args, "-deadline", "good"));
+            assert!(args_contains_pair(
+                &args,
+                "-cpu-used",
+                if speed == "medium" { "1" } else { speed }
+            ));
+            assert!(!args.iter().any(|arg| arg == "-preset"));
+        }
+        for codec in ["h264_nvenc", "hevc_nvenc", "av1_nvenc"] {
+            config = sample_config("mp4", codec);
+            config.nvenc_spatial_aq = true;
+            config.nvenc_temporal_aq = true;
+            let args =
+                build_ffmpeg_args("input.mov", "output.mp4", &config, &sample_probe()).unwrap();
+            assert!(args_contains_pair(&args, "-spatial-aq", "1"));
+            assert!(args_contains_pair(&args, "-temporal-aq", "1"));
+            assert!(
+                !args
+                    .iter()
+                    .any(|arg| matches!(arg.as_str(), "-spatial_aq" | "-temporal_aq"))
+            );
+        }
+    }
+
+    #[test]
+    fn video_bitrate_validation_checks_only_effective_bitrate_controls() {
+        let input = temporary_input_file("effective-video-bitrate");
+        for (container, codec, mode, used) in [
+            ("mp4", "libx264", "bitrate", true),
+            ("mkv", "mpeg2video", "crf", true),
+            ("mov", "prores", "bitrate", false),
+            ("png", "png", "bitrate", false),
+            ("gif", "gif", "bitrate", false),
+        ] {
+            let mut config = sample_config(container, codec);
+            config.video_bitrate_mode = mode.to_string();
+            // MPEG-2 is offered in transport containers, where MP2 is valid.
+            if codec == "mpeg2video" {
+                config.container = "m2t".to_string();
+                config.audio_codec = "mp2".to_string();
+            }
+            for value in ["NaN", "inf", "0", "invalid"] {
+                config.video_bitrate = value.to_string();
+                let result = validate_task_input(&input.to_string_lossy(), &config);
+                assert_eq!(
+                    result.is_err(),
+                    used,
+                    "{container}/{codec}/{value}: {result:?}"
+                );
+                if used {
+                    assert!(result.unwrap_err().to_string().contains("bitrate"));
+                }
+            }
+        }
+        let _ = fs::remove_file(input);
     }
 
     #[test]
