@@ -93,6 +93,17 @@ pub fn map_svt_av1_preset(preset: &str) -> String {
 }
 
 #[must_use]
+pub(crate) fn format_ffmpeg_seconds(seconds: f64) -> String {
+    let mut formatted = format!("{seconds:.6}");
+    if let Some(decimal) = formatted.find('.') {
+        while formatted.len() > decimal + 4 && formatted.ends_with('0') {
+            formatted.pop();
+        }
+    }
+    formatted
+}
+
+#[must_use]
 pub fn parse_time(time_str: &str) -> Option<f64> {
     let parts: Vec<&str> = time_str.split(':').collect();
     match parts.len() {
@@ -150,6 +161,19 @@ pub fn sanitize_external_tool_path(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn subtitle_clock_and_input_seek_keep_microsecond_precision() {
+        for (seconds, expected) in [
+            (1.0, "1.000"),
+            (1.234, "1.234"),
+            (1.234_567, "1.234567"),
+            (1.2345, "1.2345"),
+        ] {
+            assert_eq!(format_ffmpeg_seconds(seconds), expected);
+        }
+        assert_eq!(parse_time("00:00:01.234567"), Some(1.234_567));
+    }
 
     #[test]
     fn map_svt_av1_preset_keeps_native_numeric_values() {

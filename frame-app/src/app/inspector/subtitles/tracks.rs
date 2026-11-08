@@ -11,8 +11,9 @@ use crate::app::inspector::subtitles::view::SettingsSubtitlesTabState;
 use crate::app::layout::SETTINGS_CONTROL_HEIGHT;
 use crate::app::root::FrameRoot;
 use crate::settings::{
-    ConversionConfig, apply_external_subtitle_default, apply_external_subtitle_forced,
-    remove_external_subtitle_track, toggle_subtitle_track_selection,
+    ConversionConfig, MetadataMode, apply_external_subtitle_default,
+    apply_external_subtitle_forced, remove_external_subtitle_track,
+    toggle_subtitle_track_selection,
 };
 use crate::{assets, theme};
 use gpui::prelude::*;
@@ -273,6 +274,12 @@ pub(super) fn settings_external_subtitle_editor(
         .gap_3()
         .pt(theme::ui_rem(4.0))
         .child(fields);
+    if visibility.has_any() && config.metadata.mode != MetadataMode::Preserve {
+        editor = editor.child(settings_hint_text(
+            "Language and title are saved here but exported only when Metadata is set to Preserve.",
+            palette,
+        ));
+    }
     if visibility.descriptive {
         let mut flags = div().grid().grid_cols(2).gap_2();
         for (id, label, selected, apply) in [

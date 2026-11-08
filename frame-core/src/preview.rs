@@ -5,6 +5,7 @@ use crate::{
         build_visual_filter_complex, has_overlay,
     },
     types::ConversionConfig,
+    utils::format_ffmpeg_seconds as format_seconds,
 };
 
 const MIN_PREVIEW_DIMENSION: u32 = 16;
@@ -506,10 +507,6 @@ fn frame_bytes(width: u32, height: u32) -> Result<usize, ConversionError> {
     })
 }
 
-fn format_seconds(seconds: f64) -> String {
-    format!("{seconds:.3}")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -722,11 +719,9 @@ mod tests {
         let plan = build_ffmpeg_preview_args("input.mp4", &config, &default_options())
             .expect("preview args");
 
-        assert!(
-            plan.args
-                .iter()
-                .any(|arg| arg.contains("subtitles='C\\:/Media/John\\'s \\[cut\\]\\,final.srt'"))
-        );
+        assert!(plan.args.iter().any(|arg| {
+            arg.contains(r"subtitles=filename=C\\:\\\\Media\\\\John\\\'s\\\ \[cut\]\,final.srt")
+        }));
     }
 
     #[test]
@@ -739,8 +734,24 @@ mod tests {
         let plan = build_ffmpeg_preview_args("input.mp4", &config, &options).expect("preview args");
 
         assert!(plan.args.iter().any(|arg| {
-            arg.contains("setpts=PTS+10.000/TB,subtitles='/tmp/sub.srt',setpts=PTS-10.000/TB")
+            arg.contains(
+                "setpts=PTS+10.000/TB,subtitles=filename=/tmp/sub.srt,setpts=PTS-10.000/TB",
+            )
         }));
+    }
+
+    #[test]
+    fn preview_subtitle_clock_matches_submillisecond_input_seek() {
+        let mut config = default_config();
+        config.subtitle_burn_path = Some("/tmp/sub.srt".to_string());
+        config.start_time = Some("0.750".to_string());
+        let mut options = default_options();
+        options.start_seconds = 1.234_567;
+        let plan = build_ffmpeg_preview_args("input.mp4", &config, &options).unwrap();
+        assert!(plan.args.windows(2).any(|pair| pair == ["-ss", "1.234567"]));
+        assert!(plan.args.iter().any(|arg| arg.contains(
+            "setpts=PTS+1.234567/TB,subtitles=filename=/tmp/sub.srt,setpts=PTS-1.234567/TB"
+        )));
     }
 
     #[test]

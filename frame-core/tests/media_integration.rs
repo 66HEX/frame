@@ -1754,6 +1754,99 @@ fn metadata_replace_should_write_requested_title() -> TestResult {
 
 #[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn metadata_cleaning_should_remove_embedded_and_external_subtitle_text() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("subtitle_metadata_cleaning")?;
+    let base = sandbox.path("base.mp4");
+    let input = sandbox.path("private.mp4");
+    let subtitle = sandbox.path("captions.srt");
+    write_srt(&subtitle)?;
+    generate_subtitled_source(&tools, &base, &subtitle)?;
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-i",
+            &path_arg(&base),
+            "-map",
+            "0",
+            "-c",
+            "copy",
+            "-metadata",
+            "title=PRIVATE_GLOBAL",
+            "-metadata:s:s:0",
+            "language=eng",
+            "-metadata:s:s:0",
+            "title=PRIVATE_SOURCE",
+            "-metadata:s:s:0",
+            "handler_name=PRIVATE_SOURCE",
+            &path_arg(&input),
+        ]),
+    )?;
+    assert_eq!(
+        probe_media(&tools, &input)?.subtitle_tracks[0]
+            .label
+            .as_deref(),
+        Some("PRIVATE_SOURCE")
+    );
+    for container in ["mp4", "mkv"] {
+        for mode in ["copy", "reencode"] {
+            for (label, metadata_mode) in [
+                ("clean", MetadataMode::Clean),
+                ("replace", MetadataMode::Replace),
+            ] {
+                let mut config = video_config(container, "libx264", "aac");
+                config.processing_mode = mode.to_string();
+                config.selected_subtitle_tracks = vec![2];
+                config.metadata.mode = metadata_mode;
+                config.metadata.title = Some("PUBLIC_REPLACEMENT".to_string());
+                config.external_subtitle_tracks = vec![ExternalSubtitleTrack {
+                    path: path_arg(&subtitle),
+                    language: Some("pol".to_string()),
+                    title: Some("PRIVATE_EXTERNAL".to_string()),
+                    is_default: true,
+                    is_forced: true,
+                }];
+                let output = sandbox.path(&format!("{label}-{mode}.{container}"));
+                convert(&tools, &input, &output, &config)?;
+                let data = run_tool_output(
+                    &tools.ffprobe,
+                    &args(&[
+                        "-v",
+                        "error",
+                        "-show_entries",
+                        "format_tags:stream_tags:stream_disposition=default,forced",
+                        "-of",
+                        "json",
+                        &path_arg(&output),
+                    ]),
+                )?;
+                let text = String::from_utf8_lossy(&data);
+                assert!(
+                    !text.contains("PRIVATE"),
+                    "{label}/{mode}/{container}: {text}"
+                );
+                assert_eq!(text.contains("PUBLIC_REPLACEMENT"), label == "replace");
+                let metadata = probe_media(&tools, &output)?;
+                assert_eq!(metadata.subtitle_tracks.len(), 2);
+                assert!(
+                    metadata
+                        .subtitle_tracks
+                        .iter()
+                        .all(|track| !matches!(track.language.as_deref(), Some("eng" | "pol")))
+                );
+                let json: serde_json::Value =
+                    serde_json::from_slice(&data).map_err(|error| error.to_string())?;
+                assert_eq!(json["streams"][2]["disposition"]["forced"], 1);
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 fn audio_normalize_and_mono_wav_should_emit_mono_pcm() -> TestResult {
     let tools = Toolchain::discover()?;
     let sandbox = Sandbox::new("audio_normalize_mono")?;
@@ -1800,6 +1893,151 @@ fn subtitle_burn_should_encode_video_when_srt_is_present() -> TestResult {
 
     let metadata = probe_media(&tools, &output)?;
     assert_eq!(metadata.video_codec.as_deref(), Some("h264"));
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn trimmed_subtitle_burn_with_overlay_should_match_full_render_frames() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("trimmed_subtitle_burn")?;
+    let input = sandbox.path("source.mp4");
+    let subtitle = sandbox.path("captions.srt");
+    let overlay = sandbox.path("black.ppm");
+    // Keep the source RGB so this clock regression does not depend on the
+    // overlay graph's YUV-to-RGB conversion rounding after an input seek.
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=black:size=320x180:rate=12:duration=2,format=rgb24",
+            "-c:v",
+            "libx264rgb",
+            "-crf",
+            "0",
+            "-preset",
+            "ultrafast",
+            "-y",
+            &path_arg(&input),
+        ]),
+    )?;
+    write_delayed_srt(&subtitle)?;
+    write_solid_ppm(&overlay, 16, 16, Rgb::BLACK)?;
+    let mut config = video_config("mp4", "libx264", "aac");
+    config.crf = 0;
+    config.subtitle_burn_path = Some(path_arg(&subtitle));
+    config.subtitle_font_size = Some("24".to_string());
+    config.overlay = Some(OverlayConfig {
+        enabled: true,
+        path: path_arg(&overlay),
+        x: 0.05,
+        y: 0.05,
+        width: 0.05,
+        opacity: 1.0,
+        anchor: "center".to_string(),
+    });
+    let reference = sandbox.path("reference.mp4");
+    convert(&tools, &input, &reference, &config)?;
+    config.start_time = Some("1.000".to_string());
+    config.end_time = Some("1.500".to_string());
+    let trimmed = sandbox.path("trimmed.mp4");
+    convert(&tools, &input, &trimmed, &config)?;
+    let decode = |path: &Path, start: &str| {
+        run_tool_output(
+            &tools.ffmpeg,
+            &args(&[
+                "-v",
+                "error",
+                "-ss",
+                start,
+                "-i",
+                &path_arg(path),
+                "-t",
+                "0.5",
+                "-an",
+                "-pix_fmt",
+                "rgb24",
+                "-f",
+                "rawvideo",
+                "pipe:1",
+            ]),
+        )
+    };
+    let expected = decode(&reference, "1")?;
+    assert_eq!(expected.len(), 6 * 320 * 180 * 3);
+    assert!(expected.iter().any(|value| *value > 35));
+    assert_bytes_match(
+        &decode(&trimmed, "0")?,
+        &expected,
+        "trimmed subtitle render",
+    )?;
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn subtitle_filenames_should_render_identically_in_simple_and_overlay_graphs() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("subtitle_filename_escaping")?;
+    let input = sandbox.path("source.mp4");
+    let overlay = sandbox.path("black.ppm");
+    generate_black_h264_source(&tools, &input, 0.25, 320, 180)?;
+    write_solid_ppm(&overlay, 16, 16, Rgb::BLACK)?;
+    let names = [
+        "simple.srt",
+        "John's.srt",
+        #[cfg(unix)]
+        r"slash\name.srt",
+        #[cfg(unix)]
+        "colon:name.srt",
+        "[title].srt",
+        "comma,name.srt",
+        "semi;name.srt",
+        "łąka 日本語.srt",
+        #[cfg(unix)]
+        "tab\tname.srt",
+        #[cfg(unix)]
+        "line\nname.srt",
+        #[cfg(unix)]
+        r"mix'\:[x],;.srt",
+    ];
+    for with_overlay in [false, true] {
+        let mut reference: Option<Vec<u8>> = None;
+        for (index, name) in names.iter().enumerate() {
+            let subtitle = sandbox.path(name);
+            write_srt(&subtitle)?;
+            let mut config = video_config("mp4", "libx264", "aac");
+            config.crf = 0;
+            config.subtitle_burn_path = Some(path_arg(&subtitle));
+            config.subtitle_font_name = Some("DejaVu Sans".to_string());
+            config.subtitle_font_size = Some("24".to_string());
+            config.subtitle_position = Some("middle".to_string());
+            if with_overlay {
+                config.overlay = Some(OverlayConfig {
+                    enabled: true,
+                    path: path_arg(&overlay),
+                    x: 0.05,
+                    y: 0.05,
+                    width: 0.05,
+                    opacity: 1.0,
+                    anchor: "center".to_string(),
+                });
+            }
+            let output = sandbox.path(&format!("render-{with_overlay}-{index}.mp4"));
+            convert(&tools, &input, &output, &config)?;
+            let pixels = read_rgb_frame(&tools, &output)?.pixels;
+            assert!(pixels.iter().any(|value| *value > 35));
+            if let Some(expected) = &reference {
+                assert_bytes_match(&pixels, expected, name)?;
+            } else {
+                reference = Some(pixels);
+            }
+        }
+    }
     Ok(())
 }
 
@@ -1917,6 +2155,7 @@ fn preview_subtitle_burn_should_use_source_time_after_seek() -> TestResult {
     config.subtitle_font_color = Some("#ffffff".to_string());
     config.subtitle_outline_color = Some("#000000".to_string());
     config.subtitle_position = Some("middle".to_string());
+    config.start_time = Some("0.750".to_string());
 
     let visible_pixels_at = |start_seconds: f64| -> TestResult<usize> {
         let plan = build_ffmpeg_preview_args(
@@ -1929,7 +2168,7 @@ fn preview_subtitle_burn_should_use_source_time_after_seek() -> TestResult {
                 source_height: Some(360),
                 max_width: 640,
                 max_height: 360,
-                fps: 1,
+                fps: 12,
                 realtime: false,
                 precise_seek: true,
                 source_is_image: false,
@@ -1958,7 +2197,7 @@ fn preview_subtitle_burn_should_use_source_time_after_seek() -> TestResult {
         before_subtitle, 0,
         "subtitle appeared before its source timestamp"
     );
-    let visible_pixels = visible_pixels_at(1.0)?;
+    let visible_pixels = visible_pixels_at(1.5)?;
     if visible_pixels < 50 {
         return Err(format!(
             "seeked preview did not render delayed subtitle; visible pixel count was {visible_pixels}"
@@ -2546,6 +2785,27 @@ fn count_visible_bgra_pixels(bytes: &[u8]) -> usize {
         .chunks_exact(4)
         .filter(|pixel| pixel[0] > 35 || pixel[1] > 35 || pixel[2] > 35)
         .count()
+}
+
+fn assert_bytes_match(actual: &[u8], expected: &[u8], label: &str) -> TestResult {
+    if actual.len() != expected.len() {
+        return Err(format!(
+            "{label}: byte length {}, expected {}",
+            actual.len(),
+            expected.len()
+        ));
+    }
+    if let Some((offset, (actual, expected))) = actual
+        .iter()
+        .zip(expected)
+        .enumerate()
+        .find(|(_, (actual, expected))| actual != expected)
+    {
+        return Err(format!(
+            "{label}: first differing byte at {offset}: {actual}, expected {expected}"
+        ));
+    }
+    Ok(())
 }
 
 fn assert_color_near(actual: Rgb, expected: Rgb, tolerance: u8, label: &str) -> TestResult {

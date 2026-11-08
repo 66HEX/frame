@@ -4,6 +4,7 @@ use crate::{
     },
     media_rules::is_image_container,
     types::ConversionConfig,
+    utils::{format_ffmpeg_seconds, parse_time},
 };
 
 pub const EVEN_DIMENSIONS_FILTER: &str = "pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0";
@@ -56,6 +57,22 @@ fn rounded_i32(value: f64, min_value: f64) -> i32 {
 
 #[must_use]
 pub fn build_video_filters(config: &ConversionConfig, include_scale: bool) -> Vec<String> {
+    build_video_filters_at_time(config, include_scale, export_subtitle_time(config))
+}
+
+fn export_subtitle_time(config: &ConversionConfig) -> f64 {
+    config
+        .start_time
+        .as_deref()
+        .and_then(parse_time)
+        .unwrap_or(0.0)
+}
+
+fn build_video_filters_at_time(
+    config: &ConversionConfig,
+    include_scale: bool,
+    source_time_seconds: f64,
+) -> Vec<String> {
     let mut filters = Vec::new();
     let is_image = is_image_container(&config.container);
 
@@ -97,13 +114,7 @@ pub fn build_video_filters(config: &ConversionConfig, include_scale: bool) -> Ve
     if let Some(burn_path) = &config.subtitle_burn_path
         && !burn_path.is_empty()
     {
-        let escaped_path = burn_path
-            .replace('\\', "/")
-            .replace(':', "\\:")
-            .replace('\'', "\\'")
-            .replace('[', "\\[")
-            .replace(']', "\\]")
-            .replace(',', "\\,");
+        let escaped_path = escape_filter_option_value(burn_path);
 
         let mut style_parts: Vec<String> = Vec::new();
 
@@ -147,14 +158,34 @@ pub fn build_video_filters(config: &ConversionConfig, include_scale: bool) -> Ve
         }
 
         if style_parts.is_empty() {
-            filters.push(format!("subtitles='{escaped_path}'"));
+            filters.push(format!("subtitles=filename={escaped_path}"));
         } else {
-            let style = style_parts.join(",");
-            filters.push(format!("subtitles='{escaped_path}':force_style='{style}'"));
+            let style = escape_filter_option_value(&style_parts.join(","));
+            filters.push(format!(
+                "subtitles=filename={escaped_path}:force_style={style}"
+            ));
         }
     }
 
+    apply_subtitle_timebase(&mut filters, source_time_seconds);
     filters
+}
+
+// Filter options pass through two parsers: the filtergraph, then AVOption.
+// Escape each layer separately; Command passes these arguments without a shell.
+fn escape_filter_option_value(value: &str) -> String {
+    let escape = |value: &str, separators: &[char]| {
+        let mut escaped = String::with_capacity(value.len());
+        for character in value.chars() {
+            if character.is_whitespace() || separators.contains(&character) {
+                escaped.push('\\');
+            }
+            escaped.push(character);
+        }
+        escaped
+    };
+    let option = escape(value, &['\\', '\'', ':']);
+    escape(&option, &['\\', '\'', '[', ']', ',', ';'])
 }
 
 fn build_resolution_scale_filter(config: &ConversionConfig) -> String {
@@ -194,7 +225,15 @@ fn custom_resolution_scale_filter(width: &str, height: &str, algorithm: &str) ->
 
 #[must_use]
 pub fn build_encode_video_filters(config: &ConversionConfig, include_scale: bool) -> Vec<String> {
-    let mut filters = build_video_filters(config, include_scale);
+    build_encode_video_filters_at_time(config, include_scale, export_subtitle_time(config))
+}
+
+fn build_encode_video_filters_at_time(
+    config: &ConversionConfig,
+    include_scale: bool,
+    source_time_seconds: f64,
+) -> Vec<String> {
+    let mut filters = build_video_filters_at_time(config, include_scale, source_time_seconds);
     filters.push(EVEN_DIMENSIONS_FILTER.to_string());
     filters
 }
@@ -215,10 +254,13 @@ pub fn build_visual_filter_chain(
             source_time_seconds,
         } => {
             let mut filters = match base {
-                VisualFilterBase::Video => build_encode_video_filters(config, true),
-                VisualFilterBase::Image => build_video_filters(config, true),
+                VisualFilterBase::Video => {
+                    build_encode_video_filters_at_time(config, true, source_time_seconds)
+                }
+                VisualFilterBase::Image => {
+                    build_video_filters_at_time(config, true, source_time_seconds)
+                }
             };
-            apply_preview_subtitle_timebase(&mut filters, source_time_seconds);
             filters.extend(preview_low_res_filters(width, height, fps));
             filters
         }
@@ -308,11 +350,12 @@ fn build_preview_filter_complex(
     fps: u32,
     source_time_seconds: f64,
 ) -> String {
-    let mut base_filters = match base {
-        VisualFilterBase::Video => build_encode_video_filters(config, true),
-        VisualFilterBase::Image => build_video_filters(config, true),
+    let base_filters = match base {
+        VisualFilterBase::Video => {
+            build_encode_video_filters_at_time(config, true, source_time_seconds)
+        }
+        VisualFilterBase::Image => build_video_filters_at_time(config, true, source_time_seconds),
     };
-    apply_preview_subtitle_timebase(&mut base_filters, source_time_seconds);
     let preview_filters = preview_low_res_filters(width, height, fps);
     let preview_chain = preview_filters.join(",");
 
@@ -327,7 +370,7 @@ fn build_preview_filter_complex(
     }
 }
 
-fn apply_preview_subtitle_timebase(filters: &mut Vec<String>, source_time_seconds: f64) {
+fn apply_subtitle_timebase(filters: &mut Vec<String>, source_time_seconds: f64) {
     if !source_time_seconds.is_finite() || source_time_seconds <= 0.0 {
         return;
     }
@@ -339,7 +382,7 @@ fn apply_preview_subtitle_timebase(filters: &mut Vec<String>, source_time_second
         return;
     };
 
-    let offset = format_preview_seconds(source_time_seconds);
+    let offset = format_ffmpeg_seconds(source_time_seconds);
     filters.insert(subtitle_index, format!("setpts=PTS+{offset}/TB"));
     filters.insert(subtitle_index + 2, format!("setpts=PTS-{offset}/TB"));
 }
@@ -359,10 +402,6 @@ fn preview_low_res_filters(width: u32, height: u32, fps: u32) -> Vec<String> {
         "setsar=1".to_string(),
         "format=bgra".to_string(),
     ]
-}
-
-fn format_preview_seconds(seconds: f64) -> String {
-    format!("{seconds:.3}")
 }
 
 #[must_use]
@@ -570,7 +609,7 @@ mod tests {
             filters,
             vec![
                 "setpts=PTS+10.000/TB",
-                "subtitles='/tmp/sub.srt'",
+                "subtitles=filename=/tmp/sub.srt",
                 "setpts=PTS-10.000/TB",
                 EVEN_DIMENSIONS_FILTER,
                 "fps=24",
@@ -652,8 +691,41 @@ mod tests {
 
         assert_eq!(
             filters,
-            vec!["subtitles='C\\:/Media/John\\'s \\[cut\\]\\,final.srt'"]
+            vec![r"subtitles=filename=C\\:\\\\Media\\\\John\\\'s\\\ \[cut\]\,final.srt"]
         );
+    }
+
+    #[test]
+    fn subtitle_clock_uses_export_trim_or_preview_seek_without_double_offset() {
+        let mut config = default_config();
+        config.subtitle_burn_path = Some("/tmp/sub.srt".to_string());
+        config.start_time = Some("00:00:02.500".to_string());
+        for profile in [
+            VisualFilterProfile::ExportVideo,
+            VisualFilterProfile::ExportImage,
+        ] {
+            let filters = build_visual_filter_chain(&config, profile).join(",");
+            assert!(filters.contains(
+                "setpts=PTS+2.500/TB,subtitles=filename=/tmp/sub.srt,setpts=PTS-2.500/TB"
+            ));
+        }
+        for base in [VisualFilterBase::Video, VisualFilterBase::Image] {
+            let profile = VisualFilterProfile::PreviewLowRes {
+                base,
+                width: 64,
+                height: 48,
+                fps: 10,
+                source_time_seconds: 3.0,
+            };
+            let filters = build_visual_filter_chain(&config, profile).join(",");
+            assert!(filters.contains(
+                "setpts=PTS+3.000/TB,subtitles=filename=/tmp/sub.srt,setpts=PTS-3.000/TB"
+            ));
+            assert!(!filters.contains("2.500/TB"));
+            let graph = build_visual_filter_complex(&config, profile);
+            assert!(graph.contains("setpts=PTS+3.000/TB"));
+            assert!(!graph.contains("2.500/TB"));
+        }
     }
 
     #[test]
@@ -666,7 +738,7 @@ mod tests {
 
         assert_eq!(
             filters,
-            vec!["subtitles='/tmp/sub.srt':force_style='Alignment=6'"]
+            vec!["subtitles=filename=/tmp/sub.srt:force_style=Alignment=6"]
         );
     }
 
@@ -680,7 +752,7 @@ mod tests {
 
         assert_eq!(
             filters,
-            vec!["subtitles='/tmp/sub.srt':force_style='Alignment=10'"]
+            vec!["subtitles=filename=/tmp/sub.srt:force_style=Alignment=10"]
         );
     }
 
@@ -694,7 +766,7 @@ mod tests {
 
         assert_eq!(
             filters,
-            vec!["subtitles='/tmp/sub.srt':force_style='Fontsize=28'"]
+            vec!["subtitles=filename=/tmp/sub.srt:force_style=Fontsize=28"]
         );
     }
 }

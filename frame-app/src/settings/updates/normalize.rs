@@ -6,7 +6,8 @@ use crate::settings::model::{
     DEFAULT_RESOLUTION, DEFAULT_VIDEO_BITRATE_MODE, GIF_DITHER_OPTIONS, IMAGE_JPEG_HUFFMAN_OPTIONS,
     IMAGE_PNG_PREDICTION_OPTIONS, IMAGE_TIFF_COMPRESSION_OPTIONS, IMAGE_WEBP_PRESET_OPTIONS,
     MAX_AUDIO_VOLUME, MAX_GIF_COLORS, MAX_IMAGE_JPEG_QUALITY, MAX_IMAGE_PNG_COMPRESSION,
-    MAX_IMAGE_WEBP_COMPRESSION, MAX_IMAGE_WEBP_QUALITY, ProcessingMode, SourceKind, SourceMetadata,
+    MAX_IMAGE_WEBP_COMPRESSION, MAX_IMAGE_WEBP_QUALITY, MetadataMode, ProcessingMode, SourceKind,
+    SourceMetadata,
 };
 use crate::settings::options::{
     first_allowed_video_codec, first_allowed_video_pixel_format, first_allowed_video_preset,
@@ -86,15 +87,19 @@ pub fn normalize_output_config(
         match frame_core::container::transport_stream_profile(&config.container) {
             Some(frame_core::container::TransportStreamProfile::M2ts192) => {
                 for track in &mut config.external_subtitle_tracks {
-                    track.language = None;
-                    track.title = None;
+                    if config.metadata.mode == MetadataMode::Preserve {
+                        track.language = None;
+                        track.title = None;
+                    }
                     track.is_default = false;
                     track.is_forced = false;
                 }
             }
             Some(frame_core::container::TransportStreamProfile::MpegTs188) => {
                 for track in &mut config.external_subtitle_tracks {
-                    track.title = None;
+                    if config.metadata.mode == MetadataMode::Preserve {
+                        track.title = None;
+                    }
                     track.is_default = false;
                     track.is_forced = false;
                 }

@@ -445,3 +445,44 @@ fn normalization_preserves_native_and_transcodable_subtitle_selections() {
         assert!(options[0].disabled_reason.is_none(), "{container}/{codec}");
     }
 }
+
+#[test]
+fn metadata_cleaning_keeps_external_text_drafts_including_transport_outputs() {
+    for container in ["mp4", "mkv", "m2t", "m2ts"] {
+        for mode in [MetadataMode::Clean, MetadataMode::Replace] {
+            let mut config = ConversionConfig {
+                container: container.to_string(),
+                ..ConversionConfig::default()
+            };
+            config.metadata.mode = mode;
+            config.external_subtitle_tracks = vec![ExternalSubtitleTrack {
+                path: if matches!(container, "m2t" | "m2ts") {
+                    "/tmp/sub.sup"
+                } else {
+                    "/tmp/sub.srt"
+                }
+                .to_string(),
+                language: Some("eng".to_string()),
+                title: Some("Saved title".to_string()),
+                ..ExternalSubtitleTrack::default()
+            }];
+            normalize_output_config(&mut config, None);
+            assert_eq!(
+                config.external_subtitle_tracks[0].language.as_deref(),
+                Some("eng")
+            );
+            assert_eq!(
+                config.external_subtitle_tracks[0].title.as_deref(),
+                Some("Saved title")
+            );
+            if matches!(container, "mp4" | "mkv") {
+                config.metadata.mode = MetadataMode::Preserve;
+                normalize_output_config(&mut config, None);
+                assert_eq!(
+                    config.external_subtitle_tracks[0].title.as_deref(),
+                    Some("Saved title")
+                );
+            }
+        }
+    }
+}

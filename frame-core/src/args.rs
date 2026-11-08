@@ -27,7 +27,7 @@ use crate::types::{
     AudioTrack, ConversionConfig, ExternalSubtitleTrack, MetadataConfig, MetadataMode,
     ProbeMetadata, SubtitleTrack, VOLUME_EPSILON,
 };
-use crate::utils::{get_hwaccel_args, is_audio_only_container, parse_time};
+use crate::utils::{format_ffmpeg_seconds, get_hwaccel_args, is_audio_only_container, parse_time};
 
 fn is_copy_mode(config: &ConversionConfig) -> bool {
     config.processing_mode == "copy"
@@ -203,9 +203,10 @@ fn validate_external_subtitle_tracks(config: &ConversionConfig) -> Result<(), Co
         }
 
         for (field, value) in [("language", &track.language), ("title", &track.title)] {
-            if value
-                .as_deref()
-                .is_some_and(|value| value.chars().any(char::is_control))
+            if config.metadata.mode == MetadataMode::Preserve
+                && value
+                    .as_deref()
+                    .is_some_and(|value| value.chars().any(char::is_control))
             {
                 return Err(ConversionError::InvalidInput(format!(
                     "External subtitle {field} contains control characters: {path}"
@@ -260,6 +261,7 @@ fn external_subtitle_action(
 fn add_subtitle_output_actions(
     args: &mut Vec<String>,
     container: &str,
+    preserve_text_metadata: bool,
     embedded: &[&SubtitleTrack],
     external: &[ExternalSubtitleTrack],
 ) -> Result<(), ConversionError> {
@@ -271,7 +273,8 @@ fn add_subtitle_output_actions(
             ))
         })?;
         add_subtitle_action_arg(args, output_index, action);
-        if transport_stream_profile(container) != Some(TransportStreamProfile::M2ts192)
+        if preserve_text_metadata
+            && transport_stream_profile(container) != Some(TransportStreamProfile::M2ts192)
             && let Some(language) = track
                 .language
                 .as_deref()
@@ -281,7 +284,8 @@ fn add_subtitle_output_actions(
             args.push(format!("-metadata:s:s:{output_index}"));
             args.push(format!("language={language}"));
         }
-        if !is_transport_stream_container(container)
+        if preserve_text_metadata
+            && !is_transport_stream_container(container)
             && let Some(label) = track
                 .label
                 .as_deref()
@@ -363,7 +367,13 @@ fn add_external_subtitle_output_args(
             args.push(format!("-c:s:{output_index}"));
             args.push(codec.to_string());
         }
-        add_external_subtitle_metadata(args, track, output_index, &config.container);
+        add_external_subtitle_metadata(
+            args,
+            track,
+            output_index,
+            &config.container,
+            config.metadata.mode == MetadataMode::Preserve,
+        );
     }
 }
 
@@ -372,19 +382,22 @@ fn add_external_subtitle_metadata(
     track: &ExternalSubtitleTrack,
     output_index: usize,
     container: &str,
+    preserve_text_metadata: bool,
 ) {
     let transport_profile = transport_stream_profile(container);
-    if let Some(language) = track
-        .language
-        .as_deref()
-        .map(str::trim)
-        .filter(|v| !v.is_empty())
+    if preserve_text_metadata
+        && let Some(language) = track
+            .language
+            .as_deref()
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
         && transport_profile != Some(TransportStreamProfile::M2ts192)
     {
         args.push(format!("-metadata:s:s:{output_index}"));
         args.push(format!("language={language}"));
     }
-    if transport_profile.is_none()
+    if preserve_text_metadata
+        && transport_profile.is_none()
         && let Some(title) = track
             .title
             .as_deref()
@@ -531,7 +544,7 @@ pub fn build_ffmpeg_args(
                 let duration = end_t - start_t;
                 if duration > 0.0 {
                     args.push("-t".to_string());
-                    args.push(format!("{duration:.3}"));
+                    args.push(format_ffmpeg_seconds(duration));
                 }
             }
         } else {
@@ -594,6 +607,7 @@ pub fn build_ffmpeg_args(
             add_subtitle_output_actions(
                 &mut args,
                 &config.container,
+                config.metadata.mode == MetadataMode::Preserve,
                 &subtitle_tracks,
                 &config.external_subtitle_tracks,
             )?;
@@ -717,6 +731,7 @@ pub fn build_ffmpeg_args(
             add_subtitle_output_actions(
                 &mut args,
                 &config.container,
+                config.metadata.mode == MetadataMode::Preserve,
                 &subtitle_tracks,
                 &config.external_subtitle_tracks,
             )?;
@@ -997,8 +1012,10 @@ pub fn validate_task_input(
             ))
         })?;
         if let Some(profile) = transport_stream_profile(&config.container) {
-            let has_language = non_empty(track.language.as_deref()).is_some();
-            let has_title = non_empty(track.title.as_deref()).is_some();
+            let preserve_text_metadata = config.metadata.mode == MetadataMode::Preserve;
+            let has_language =
+                preserve_text_metadata && non_empty(track.language.as_deref()).is_some();
+            let has_title = preserve_text_metadata && non_empty(track.title.as_deref()).is_some();
             let unsupported_metadata = match profile {
                 TransportStreamProfile::MpegTs188 => {
                     has_title || track.is_default || track.is_forced
@@ -1018,7 +1035,7 @@ pub fn validate_task_input(
     let is_copy_mode = processing_mode == "copy";
 
     if let Some(start) = start_time
-        && parse_time(start).is_none()
+        && parse_time(start).is_none_or(|seconds| !seconds.is_finite())
     {
         return Err(ConversionError::InvalidInput(format!(
             "Invalid start time: {start}"
@@ -1026,7 +1043,7 @@ pub fn validate_task_input(
     }
 
     if let Some(end) = end_time
-        && parse_time(end).is_none()
+        && parse_time(end).is_none_or(|seconds| !seconds.is_finite())
     {
         return Err(ConversionError::InvalidInput(format!(
             "Invalid end time: {end}"
@@ -1724,6 +1741,130 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn clean_and_replace_omit_subtitle_text_tags_but_keep_playback_flags() {
+        for mode in ["copy", "reencode"] {
+            for metadata_mode in [
+                MetadataMode::Preserve,
+                MetadataMode::Clean,
+                MetadataMode::Replace,
+            ] {
+                let preserve = metadata_mode == MetadataMode::Preserve;
+                let mut config = sample_config("mov", "libx264");
+                config.processing_mode = mode.to_string();
+                config.metadata.mode = metadata_mode;
+                config.selected_subtitle_tracks = vec![2];
+                config.external_subtitle_tracks = vec![ExternalSubtitleTrack {
+                    path: "/tmp/external.srt".to_string(),
+                    language: Some("pol".to_string()),
+                    title: Some("Private external title".to_string()),
+                    is_default: true,
+                    is_forced: true,
+                }];
+                let mut probe = sample_probe();
+                probe.subtitle_tracks = vec![SubtitleTrack {
+                    index: 2,
+                    codec: "subrip".to_string(),
+                    language: Some("eng".to_string()),
+                    label: Some("Private source title".to_string()),
+                }];
+                let args = build_ffmpeg_args("source.mkv", "output.mov", &config, &probe).unwrap();
+                for tag in [
+                    "language=eng",
+                    "language=pol",
+                    "title=Private source title",
+                    "title=Private external title",
+                    "handler_name=Private external title",
+                ] {
+                    assert_eq!(args.iter().any(|arg| arg == tag), preserve, "{mode}: {tag}");
+                }
+                assert!(args_contains_pair(
+                    &args,
+                    "-disposition:s:1",
+                    "default+forced"
+                ));
+            }
+        }
+    }
+
+    #[test]
+    fn burn_clock_is_shared_by_image_gif_and_overlay_graphs() {
+        for (container, codec, overlay) in [
+            ("png", "png", false),
+            ("gif", "gif", false),
+            ("mp4", "libx264", true),
+        ] {
+            let mut config = sample_config(container, codec);
+            config.subtitle_burn_path = Some("/tmp/sub.srt".to_string());
+            config.start_time = Some("1.234567".to_string());
+            config.end_time = Some("2.345678".to_string());
+            if overlay {
+                config.overlay = Some(crate::types::OverlayConfig {
+                    enabled: true,
+                    path: "/tmp/overlay.png".to_string(),
+                    x: 0.5,
+                    y: 0.5,
+                    width: 0.25,
+                    opacity: 1.0,
+                    anchor: "center".to_string(),
+                });
+            }
+            // These builders share burn construction even where the product's
+            // current UI does not expose subtitles for image/GIF outputs.
+            let args =
+                build_ffmpeg_args("input.mp4", "output.media", &config, &sample_probe()).unwrap();
+            assert!(args.iter().any(|arg| arg.contains(
+                "setpts=PTS+1.234567/TB,subtitles=filename=/tmp/sub.srt,setpts=PTS-1.234567/TB"
+            )));
+            assert!(args_contains_pair(&args, "-t", "1.111111"));
+        }
+    }
+
+    #[test]
+    fn nonfinite_trim_times_are_rejected_before_starting_ffmpeg() {
+        let input = temporary_input_file_with_extension("nonfinite-trim-input", "mp4");
+        for mode in ["copy", "reencode"] {
+            for value in ["NaN", "inf", "-inf", "1e309", "00:00:NaN"] {
+                let mut config = sample_config("mp4", "libx264");
+                config.processing_mode = mode.to_string();
+                config.start_time = Some(value.to_string());
+                let error = validate_task_input(&input.to_string_lossy(), &config).unwrap_err();
+                assert!(error.to_string().contains("Invalid start time"));
+                config.start_time = None;
+                config.end_time = Some(value.to_string());
+                let error = validate_task_input(&input.to_string_lossy(), &config).unwrap_err();
+                assert!(error.to_string().contains("Invalid end time"));
+            }
+        }
+        fs::remove_file(input).unwrap();
+    }
+
+    #[test]
+    fn ignored_transport_subtitle_text_tags_do_not_block_clean_or_replace() {
+        let input = temporary_input_file_with_extension("transport-metadata-input", "mkv");
+        let subtitle = temporary_input_file_with_extension("transport-metadata-sidecar", "sup");
+        for container in ["m2t", "m2ts"] {
+            let mut config = sample_config(container, "libx264");
+            config.audio_codec = "ac3".to_string();
+            config.external_subtitle_tracks = vec![ExternalSubtitleTrack {
+                path: subtitle.to_string_lossy().into_owned(),
+                language: Some("eng".to_string()),
+                title: Some("Private title".to_string()),
+                ..ExternalSubtitleTrack::default()
+            }];
+            assert!(validate_task_input(&input.to_string_lossy(), &config).is_err());
+            for metadata_mode in [MetadataMode::Clean, MetadataMode::Replace] {
+                config.metadata.mode = metadata_mode;
+                assert!(validate_task_input(&input.to_string_lossy(), &config).is_ok());
+                config.external_subtitle_tracks[0].is_forced = true;
+                assert!(validate_task_input(&input.to_string_lossy(), &config).is_err());
+                config.external_subtitle_tracks[0].is_forced = false;
+            }
+        }
+        fs::remove_file(input).unwrap();
+        fs::remove_file(subtitle).unwrap();
     }
 
     #[test]
