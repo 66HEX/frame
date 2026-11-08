@@ -2,7 +2,7 @@ use crate::app::components::frame_checkbox_row;
 use crate::app::components::{FrameOption, frame_option_field, frame_select_field};
 use crate::app::input::{FrameTextInputKind, FrameTextInputSpec, frame_text_input};
 use crate::app::inspector::panel::settings_field;
-use crate::app::inspector::shared::{settings_field_label, settings_hint_text};
+use crate::app::inspector::shared::settings_field_label;
 use crate::app::inspector::video::quality::{SettingsVideoRangeTarget, settings_video_range_field};
 use crate::app::root::FrameRoot;
 use crate::settings::{
@@ -94,15 +94,7 @@ pub(super) fn settings_video_pixel_format_section(
         cx,
     );
 
-    settings_field("Pixel format", palette).child(list).when(
-        config.video_codec == "libsvtav1",
-        |section| {
-            section.child(settings_hint_text(
-                "For 10-bit AV1, choose YUV 4:2:0 (10-bit). Auto uses the encoder default.",
-                palette,
-            ))
-        },
-    )
+    settings_field("Pixel format", palette).child(list)
 }
 
 pub(super) fn settings_video_preset_section(
