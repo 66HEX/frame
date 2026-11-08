@@ -145,12 +145,20 @@ pub(in crate::app) fn file_list_header(
         .child(panel_bottom_separator(palette))
 }
 
+struct QueueNavigationState {
+    focus: gpui::FocusHandle,
+    was_focused: bool,
+    pointer_entry: bool,
+}
+
 fn queue_navigation_state(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
-) -> gpui::Entity<(gpui::FocusHandle, bool)> {
-    window.use_keyed_state("file-list-navigation", cx, |_, cx| {
-        (cx.focus_handle().tab_stop(true), false)
+) -> gpui::Entity<QueueNavigationState> {
+    window.use_keyed_state("file-list-navigation", cx, |_, cx| QueueNavigationState {
+        focus: cx.focus_handle().tab_stop(true),
+        was_focused: false,
+        pointer_entry: false,
     })
 }
 
@@ -172,13 +180,14 @@ pub(in crate::app) fn file_list_body(
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
     let navigation = queue_navigation_state(window, cx);
-    let (focus, entered) = navigation.update(cx, |(focus, was_focused), _| {
-        let focused = focus.is_focused(window);
-        let entered = focused && !*was_focused;
-        *was_focused = focused;
-        (focus.clone(), entered)
+    let (focus, reveal_selected) = navigation.update(cx, |state, _| {
+        let focused = state.focus.is_focused(window);
+        let entered = focused && !state.was_focused;
+        let pointer_entry = std::mem::take(&mut state.pointer_entry);
+        state.was_focused = focused;
+        (state.focus.clone(), entered && !pointer_entry)
     });
-    if entered
+    if reveal_selected
         && let Some(index) = queue
             .files()
             .iter()
@@ -202,6 +211,20 @@ pub(in crate::app) fn file_list_body(
             "Use Up and Down to select a file; Space toggles its conversion selection.",
         )
         .track_focus(&focus)
+        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
+            // Child controls run first in GPUI's bubble phase. Its automatic
+            // container focus runs after this handler; own that transfer so a
+            // render before MouseUp cannot scroll away the pending click.
+            if !window.default_prevented() {
+                navigation.update(cx, |state, cx| {
+                    if !state.focus.is_focused(window) {
+                        state.focus.focus(window, cx);
+                        state.pointer_entry = true;
+                        window.prevent_default();
+                    }
+                });
+            }
+        })
         .on_key_down(
             cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
                 let files = root.file_queue.files();

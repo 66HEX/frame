@@ -60,6 +60,9 @@ fn focus(cx: &mut VisualTestContext) -> FocusHandle {
 #[path = "accessibility/keyboard_tests.rs"]
 mod keyboard_tests;
 
+#[path = "accessibility/queue_pointer_tests.rs"]
+mod queue_pointer_tests;
+
 #[path = "accessibility/preview_motion_tests.rs"]
 mod preview_motion_tests;
 
