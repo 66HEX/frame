@@ -4,3 +4,6 @@ pub(super) mod import;
 pub(super) mod metadata;
 pub(super) mod state;
 pub(super) mod view;
+
+#[cfg(test)]
+mod drop_overlay_tests;

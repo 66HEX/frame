@@ -1,5 +1,6 @@
 //! Captures a settled native fixture without advancing asynchronous media work.
 //! Set `FRAME_GPUI_VISUAL_FIXTURE`, `FRAME_VISUAL_THEME` and `FRAME_GPUI_UI_SCALE`.
+//! Set `FRAME_VISUAL_DRAG_DROP=1` to capture the native file-drop target over any fixture.
 //! Pass the destination PNG path as the first argument.
 //! Build with `--features gpui_platform/test-support` for native GPU readback.
 
@@ -8,7 +9,10 @@ use frame_app::{
     assets::{self, FrameAssets},
     visual_fixture_from_env_value,
 };
-use gpui::{AppContext, Bounds, MouseMoveEvent, PlatformInput, point, px, size};
+use gpui::{
+    AppContext, Bounds, ExternalPaths, FileDropEvent, MouseMoveEvent, PlatformInput, point, px,
+    size,
+};
 
 fn main() {
     let output = std::env::args()
@@ -43,6 +47,18 @@ fn main() {
                         }),
                         cx,
                     );
+                    if std::env::var("FRAME_VISUAL_DRAG_DROP").as_deref() == Ok("1") {
+                        window.draw(cx).clear(cx);
+                        window.dispatch_event(
+                            PlatformInput::FileDrop(FileDropEvent::Entered {
+                                position: point(px(600.0), px(400.0)),
+                                paths: ExternalPaths(
+                                    std::iter::once("/tmp/visual-drop.mp4".into()).collect(),
+                                ),
+                            }),
+                            cx,
+                        );
+                    }
                     // Resolve layout and focus synchronously, without advancing timers.
                     for _ in 0..3 {
                         window.refresh();
