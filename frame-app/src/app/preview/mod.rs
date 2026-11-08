@@ -11,6 +11,7 @@ pub(super) use timeline::*;
 pub(super) use toolbar::*;
 pub(super) use viewport::*;
 
+pub(in crate::app) mod auto_crop;
 mod crop;
 mod crop_options;
 mod crop_overlay;

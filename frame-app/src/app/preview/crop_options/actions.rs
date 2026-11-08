@@ -126,6 +126,7 @@ impl FrameRoot {
         let Some((rect, aspect)) = self.custom_crop_selection() else {
             return false;
         };
+        self.cancel_selected_auto_crop();
         self.preview_ui.draft_crop = Some(rect);
         self.preview_ui.crop_aspect = aspect;
         self.preview_ui.crop_options.popover = None;
@@ -138,6 +139,7 @@ impl FrameRoot {
         if !self.preview_ui.crop_options.custom {
             return;
         }
+        self.cancel_selected_auto_crop();
         // Both fields share the pre-edit rectangle so intermediate values cannot
         // progressively shrink the selection while typing a new ratio.
         if let Some((rect, aspect)) = self.custom_crop_selection() {

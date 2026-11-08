@@ -21,6 +21,7 @@ impl FrameRoot {
         selected_config: &ConversionConfig,
     ) {
         if self.preview_ui.crop_file_id.as_deref() != selected_file_id {
+            self.cancel_selected_auto_crop();
             self.preview_ui.crop_file_id = selected_file_id.map(str::to_string);
             self.preview_ui.crop_mode = false;
             self.preview_ui.crop_options.popover = None;
@@ -30,6 +31,7 @@ impl FrameRoot {
         }
 
         if !self.preview_ui.crop_mode {
+            self.cancel_selected_auto_crop();
             self.preview_ui.crop_aspect = selected_config
                 .crop
                 .as_ref()
@@ -38,6 +40,7 @@ impl FrameRoot {
             self.preview_ui.draft_crop = None;
             self.preview_ui.crop_drag = None;
         }
+        self.sync_auto_crop_for_selection();
     }
 
     pub(in crate::app) fn preview_crop_render_state(
@@ -46,6 +49,7 @@ impl FrameRoot {
         config: &ConversionConfig,
     ) -> PreviewCropRenderState {
         PreviewCropRenderState {
+            auto_crop: self.auto_crop_render_state(),
             crop_mode: self.preview_ui.crop_mode,
             draft_crop: self.preview_ui.draft_crop,
             applied_crop: crop_rect_from_settings(config.crop.as_ref(), config),
@@ -78,6 +82,8 @@ impl FrameRoot {
             .and_then(|crop| crop.aspect_ratio.clone())
             .unwrap_or_else(|| "free".to_string());
 
+        self.cancel_selected_auto_crop();
+
         if self.preview_ui.crop_mode {
             self.preview_ui.crop_mode = false;
             self.preview_ui.crop_options.popover = None;
@@ -103,6 +109,7 @@ impl FrameRoot {
         if !self.preview_ui.crop_mode || !is_known_crop_aspect(aspect_id) {
             return false;
         }
+        let cancelled = self.cancel_selected_auto_crop();
 
         let metadata = self.selected_source_metadata();
         let Some(config) = self.selected_config() else {
@@ -148,7 +155,8 @@ impl FrameRoot {
             ));
         }
 
-        previous_aspect != self.preview_ui.crop_aspect
+        cancelled
+            || previous_aspect != self.preview_ui.crop_aspect
             || previous_rect != self.preview_ui.draft_crop
     }
 
@@ -156,6 +164,7 @@ impl FrameRoot {
         if !self.preview_ui.crop_mode {
             return false;
         }
+        let cancelled = self.cancel_selected_auto_crop();
         let was_custom = self.preview_ui.crop_options.custom;
         self.preview_ui.crop_options.custom = false;
         self.preview_ui.crop_options.custom_dirty = false;
@@ -170,13 +179,17 @@ impl FrameRoot {
             default_crop_rect()
         });
         self.preview_ui.crop_aspect = "free".to_string();
-        was_custom
+        cancelled
+            || was_custom
             || previous_rect != self.preview_ui.draft_crop
             || previous_aspect != self.preview_ui.crop_aspect
     }
 
     pub(in crate::app) fn apply_selected_crop(&mut self) -> bool {
-        if !self.preview_ui.crop_mode {
+        if !self.preview_ui.crop_mode
+            || self.file_queue.selected_file_locked()
+            || self.update_installation_in_progress()
+        {
             return false;
         }
         if self.preview_ui.crop_options.custom
@@ -209,6 +222,7 @@ impl FrameRoot {
                 metadata.as_ref(),
             )
         };
+        self.cancel_selected_auto_crop();
         let cleared_crop = next_crop.is_none();
         let crop_preview = self.crop_settings_preview();
 
@@ -236,6 +250,7 @@ impl FrameRoot {
     }
 
     pub(in crate::app) fn rotate_selected_preview(&mut self) -> bool {
+        self.cancel_selected_auto_crop();
         let metadata = self.selected_source_metadata();
         let Some(config) = self.selected_config() else {
             return false;
@@ -276,6 +291,7 @@ impl FrameRoot {
     }
 
     pub(in crate::app) fn toggle_selected_flip(&mut self, axis: FlipAxis) -> bool {
+        self.cancel_selected_auto_crop();
         let metadata = self.selected_source_metadata();
         let Some(config) = self.selected_config() else {
             return false;
@@ -333,9 +349,10 @@ impl FrameRoot {
         if !self.preview_ui.crop_mode {
             return false;
         }
+        let cancelled = self.cancel_selected_auto_crop();
         self.finish_crop_custom_edit();
         let Some(current_rect) = self.preview_ui.draft_crop else {
-            return false;
+            return cancelled;
         };
 
         let metadata = self.selected_source_metadata();
@@ -394,7 +411,7 @@ impl FrameRoot {
         };
         let changed = self.preview_ui.draft_crop != Some(next_rect);
         self.preview_ui.draft_crop = Some(next_rect);
-        changed
+        changed || cancelled
     }
 
     pub(in crate::app) const fn end_preview_crop_drag(&mut self) -> bool {
@@ -418,6 +435,7 @@ impl FrameRoot {
         let Some(delta) = preview_crop_keyboard_delta(handle, key, large_step) else {
             return false;
         };
+        let cancelled = self.cancel_selected_auto_crop();
         self.finish_crop_custom_edit();
 
         let metadata = self.selected_source_metadata();
@@ -462,7 +480,7 @@ impl FrameRoot {
         };
         let changed = self.preview_ui.draft_crop != Some(next_rect);
         self.preview_ui.draft_crop = Some(next_rect);
-        changed
+        changed || cancelled
     }
 }
 

@@ -26,7 +26,13 @@ pub(in crate::app) fn preview_crop_custom_fields(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let mut fields = div().flex().flex_wrap().items_center().gap_2();
+    let mut fields = div()
+        .flex()
+        .flex_wrap()
+        .min_w_0()
+        .max_w_full()
+        .items_center()
+        .gap_2();
     for (label, id, kind, value, focus) in [
         (
             "W",

@@ -89,7 +89,15 @@ impl Element for FileDropLifecycleProbe {
 
 impl FrameRoot {
     pub(in crate::app) fn select_workspace_file(&mut self, id: &str) -> bool {
-        !self.update_installation_in_progress() && self.file_queue.select_existing_file(id)
+        if self.update_installation_in_progress() {
+            return false;
+        }
+        let previous = self.file_queue.selected_file_id().map(str::to_string);
+        let changed = self.file_queue.select_existing_file(id);
+        if changed && previous.as_deref() != Some(id) {
+            self.cancel_selected_auto_crop();
+        }
+        changed
     }
 
     pub(in crate::app) fn toggle_file_batch_selection(&mut self, id: &str) -> Option<bool> {

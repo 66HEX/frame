@@ -27,6 +27,7 @@
     "glyph-duo/files/18px_file.svg",
     "glyph-duo/photography-video/18px_film.svg",
     "glyph-duo/photography-video/18px_filters.svg",
+    "glyph-duo/photography-video/18px_square-dashed-sparkle.svg",
     "glyph-duo/sound-music/18px_media-pause.svg",
     "glyph-duo/sound-music/18px_media-play.svg",
     "glyph-duo/sound-music/18px_media-stop.svg",
@@ -42,6 +43,7 @@
     "glyph-duo/ui-layout/18px_plus.svg",
     "glyph-duo/ui-layout/18px_sliders-3-vertical.svg",
     "glyph-duo/ui-layout/18px_trash.svg",
+    "glyph-duo/ui-layout/18px_triangle-warning.svg",
     "glyph-duo/ui-layout/18px_xmark.svg"
   ],
   "style_label": "Fill Duo"

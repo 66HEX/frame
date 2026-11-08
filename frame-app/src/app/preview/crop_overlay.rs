@@ -1,12 +1,19 @@
 use crate::app::accessibility::apply_accessible_button;
-use crate::app::components::FrameStyle;
 use crate::app::components::frame_handle_hit_region;
+use crate::app::components::{FrameStyle, FrameTooltip, TooltipPlacement};
+use crate::app::layout::{
+    PREVIEW_TOOLBAR_BUTTON_SIZE, PREVIEW_TOOLBAR_ICON_SIZE, PREVIEW_TOOLBAR_OFFSET,
+};
+use crate::app::preview::auto_crop::{AutoCropRenderState, AutoCropStatus};
 use crate::app::preview::crop::default_crop_rect;
 use crate::app::preview::panel::{
     PreviewCropOptionsProps, PreviewCropRenderState, PreviewEditToolbarFocus, PreviewShellState,
 };
 use crate::app::preview::state::CROP_HANDLE_SIZE;
-use crate::app::preview::toolbar::preview_toolbar_vertical_separator;
+use crate::app::preview::toolbar::{
+    preview_tool_button, preview_toolbar_vertical_separator, preview_toolbar_width,
+    preview_zoom_toolbar_width,
+};
 use crate::app::preview::{
     PreviewTimelineDragPreview, preview_crop_custom_fields, preview_crop_options,
     preview_handle_color, preview_selection_line_color,
@@ -15,7 +22,7 @@ use crate::app::primitives::{ButtonVariant, color};
 use crate::app::root::FrameRoot;
 use crate::numeric::unit_f64_to_f32;
 use crate::preview::{CropRect, DragHandle, PreviewRotation, clamp_rect, transform_crop_rect};
-use crate::theme;
+use crate::{assets, theme};
 use gpui::prelude::*;
 use gpui::{ClickEvent, Context, FocusHandle, Window, div, hsla, px, relative};
 
@@ -375,37 +382,46 @@ pub(in crate::app) fn preview_crop_aspect_bar(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let palette = state.palette;
-    let mut bar = div()
-        .relative()
-        .id("preview-crop-toolbar")
-        .track_focus(focuses.panel)
-        .tab_stop(false)
+    let mut controls = div()
         .flex()
+        .flex_shrink_0()
         .flex_wrap()
+        .min_w_0()
         .max_w_full()
         .items_center()
-        .gap_2()
-        .popover_surface(palette)
-        .p(theme::ui_rem(4.0))
-        .shadow(theme::shadows::FLOATING.shadows());
+        .gap_1();
 
-    bar = bar.child(preview_crop_options(state, focuses, options, window, cx));
+    controls = controls.child(preview_crop_options(state, focuses, options, window, cx));
     if options.custom {
-        bar = bar.child(preview_crop_custom_fields(
+        controls = controls.child(preview_crop_custom_fields(
             state, focuses, options, window, cx,
         ));
     }
 
-    let bar = bar
+    let controls = controls
         .child(preview_toolbar_vertical_separator(palette))
+        .when(
+            state.crop.auto_crop.available
+                || state.crop.auto_crop.status == AutoCropStatus::Analyzing,
+            |this| this.child(auto_crop_button(&state.crop.auto_crop, palette, window, cx)),
+        )
         .child(
-            compact_text_button("Reset", false, true, palette, window, cx).on_click(cx.listener(
-                |root, _: &ClickEvent, _window, cx| {
-                    if root.reset_preview_crop_selection() {
-                        cx.notify();
-                    }
-                },
-            )),
+            preview_tool_button(
+                "preview-crop-action-reset",
+                assets::ICON_REFRESH,
+                "Reset",
+                None,
+                true,
+                TooltipPlacement::Above,
+                palette,
+                window,
+                cx,
+            )
+            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+                if root.reset_preview_crop_selection() {
+                    cx.notify();
+                }
+            })),
         )
         .child(
             compact_text_button_variant_inner(
@@ -429,42 +445,135 @@ pub(in crate::app) fn preview_crop_aspect_bar(
 
     div()
         .absolute()
+        .top(theme::ui_rem(16.0))
         .bottom(theme::ui_rem(16.0))
         .left_0()
         .right_0()
-        .px(theme::ui_rem(16.0))
+        // Reserve the transform and zoom toolbars' hit regions, even when wrapping.
+        .pl(theme::ui_rem(
+            PREVIEW_TOOLBAR_OFFSET + preview_toolbar_width() + 8.0,
+        ))
+        .pr(theme::ui_rem(
+            PREVIEW_TOOLBAR_OFFSET + preview_zoom_toolbar_width() + 8.0,
+        ))
         .flex()
+        .items_end()
         .justify_center()
-        .child(bar)
+        .child(
+            div()
+                .relative()
+                .id("preview-crop-toolbar")
+                .debug_selector(|| "preview-crop-toolbar".into())
+                .track_focus(focuses.panel)
+                .tab_stop(false)
+                .flex()
+                .flex_col()
+                .min_w_0()
+                .min_h_0()
+                .max_w_full()
+                .max_h_full()
+                .popover_surface(palette)
+                .p(theme::ui_rem(4.0))
+                .shadow(theme::shadows::FLOATING.shadows())
+                .child(
+                    div()
+                        .id("preview-crop-toolbar-controls")
+                        .debug_selector(|| "preview-crop-toolbar-controls".into())
+                        .min_h_0()
+                        .overflow_y_scroll()
+                        .child(controls),
+                )
+                .child(auto_crop_status(&state.crop.auto_crop.status)),
+        )
 }
 
-pub(in crate::app) fn compact_text_button(
-    label: &'static str,
-    selected: bool,
-    enabled: bool,
+fn auto_crop_button(
+    state: &AutoCropRenderState,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    let variant = if selected {
-        ButtonVariant::Secondary
+    let analyzing = state.status == AutoCropStatus::Analyzing;
+    let label = if analyzing {
+        "Cancel analysis"
     } else {
-        ButtonVariant::Ghost
+        "Auto crop"
     };
-
-    compact_text_button_variant(label, variant, selected, enabled, palette, window, cx)
+    let message = auto_crop_status_text(&state.status);
+    let icon = match state.status {
+        AutoCropStatus::Idle => assets::ICON_AUTO_CROP,
+        AutoCropStatus::Analyzing => assets::ICON_SQUARE,
+        AutoCropStatus::Ready | AutoCropStatus::NoBars => assets::ICON_CHECK,
+        AutoCropStatus::Error(_) => assets::ICON_WARNING,
+    };
+    let icon_color =
+        matches!(state.status, AutoCropStatus::Error(_)).then(|| color(palette.danger));
+    let button = crate::app::components::frame_button_base(
+        "preview-crop-auto",
+        label,
+        ButtonVariant::Ghost,
+        analyzing,
+        true,
+        theme::metrics::ControlSize::Default,
+        palette,
+        window,
+        cx,
+    )
+    .w(theme::ui_rem(PREVIEW_TOOLBAR_BUTTON_SIZE))
+    .px_0()
+    .aria_description(message)
+    .child(crate::app::components::frame_animated_icon(
+        "preview-crop-auto",
+        Some(icon),
+        PREVIEW_TOOLBAR_ICON_SIZE,
+        icon_color,
+        window,
+        cx,
+    ));
+    let tooltip = if message.is_empty() {
+        label.to_string()
+    } else {
+        format!("{label} · {message}")
+    };
+    FrameTooltip::new("preview-crop-auto", tooltip)
+        .placement(TooltipPlacement::Above)
+        .keep_open_on_click()
+        .for_control(button, None, true, palette, window, cx)
+        .debug_selector(|| "preview-crop-auto".into())
+        .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+            if analyzing {
+                if root.cancel_selected_auto_crop() {
+                    cx.notify();
+                }
+            } else {
+                root.start_selected_auto_crop(cx);
+            }
+        }))
 }
 
-pub(in crate::app) fn compact_text_button_variant(
-    label: &'static str,
-    variant: ButtonVariant,
-    selected: bool,
-    enabled: bool,
-    palette: &'static theme::ThemePalette,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
-) -> gpui::Stateful<gpui::Div> {
-    compact_text_button_variant_inner(label, variant, selected, enabled, None, palette, window, cx)
+const fn auto_crop_status_text(status: &AutoCropStatus) -> &str {
+    match status {
+        AutoCropStatus::Idle => "",
+        AutoCropStatus::Analyzing => "Analyzing video…",
+        AutoCropStatus::Ready => "Adjust the crop if needed, then Apply.",
+        AutoCropStatus::NoBars => "No black bars detected.",
+        AutoCropStatus::Error(message) => message.as_str(),
+    }
+}
+
+fn auto_crop_status(status: &AutoCropStatus) -> gpui::Stateful<gpui::Div> {
+    // Keep a live region for assistive technology without changing toolbar geometry.
+    div()
+        .id("preview-crop-auto-status")
+        .debug_selector(|| "preview-crop-auto-status".into())
+        .absolute()
+        .top_0()
+        .left_0()
+        .size(px(1.0))
+        .role(gpui::Role::Status)
+        .aria_live(gpui::accesskit::Live::Polite)
+        .aria_live_atomic(true)
+        .aria_label(auto_crop_status_text(status).to_owned())
 }
 
 #[expect(

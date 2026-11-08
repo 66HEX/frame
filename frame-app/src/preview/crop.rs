@@ -237,14 +237,15 @@ pub fn transform_crop_rect(
     let center_x = rect.x + rect.width / 2.0 - 0.5;
     let center_y = rect.y + rect.height / 2.0 - 0.5;
 
+    // Match the FFmpeg pipeline: source-axis flips precede rotation.
     let (center_x, center_y, width, height) = if inverse {
-        let (center_x, center_y) = flip_center(center_x, center_y, flip_horizontal, flip_vertical);
-        inverse_rotate_center(center_x, center_y, rect.width, rect.height, rotation)
-    } else {
         let (center_x, center_y, width, height) =
-            rotate_center(center_x, center_y, rect.width, rect.height, rotation);
+            inverse_rotate_center(center_x, center_y, rect.width, rect.height, rotation);
         let (center_x, center_y) = flip_center(center_x, center_y, flip_horizontal, flip_vertical);
         (center_x, center_y, width, height)
+    } else {
+        let (center_x, center_y) = flip_center(center_x, center_y, flip_horizontal, flip_vertical);
+        rotate_center(center_x, center_y, rect.width, rect.height, rotation)
     };
 
     CropRect {

@@ -56,6 +56,149 @@ fn video_root(rotation: &str) -> FrameRoot {
 }
 
 #[test]
+fn auto_crop_is_visible_and_keyboard_reachable_only_for_video() {
+    use crate::appearance::ScalePreset;
+
+    for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+        for custom in [false, true] {
+            let mut app = TestAppContext::single();
+            let (root, cx) = crop_window(&mut app);
+            root.update(cx, |root, cx| {
+                root.appearance.ui_scale = scale;
+                if custom {
+                    root.preview_ui.crop_options.custom = true;
+                    root.set_crop_custom_mode(false);
+                }
+                cx.notify();
+            });
+            cx.simulate_resize(size(px(1200.0), px(800.0)));
+            cx.update(|window, _| window.set_a11y_forced(true));
+            draw(cx);
+            assert_crop_toolbar_geometry(cx, scale, custom);
+            let mut reached_auto_crop = false;
+            for _ in 0..80 {
+                press_crop_key(cx, "tab");
+                if focused_crop_label(cx) == "Auto crop" {
+                    reached_auto_crop = true;
+                    break;
+                }
+            }
+            assert!(reached_auto_crop, "Auto crop must be a named tab stop");
+            assert_crop_control_visible(cx, "preview-crop-auto");
+            press_crop_key(cx, "tab");
+            assert_eq!(focused_crop_label(cx), "Reset");
+            assert_crop_control_visible(cx, "preview-crop-action-reset");
+            press_crop_key(cx, "tab");
+            assert_eq!(focused_crop_label(cx), "Apply");
+            assert_crop_control_visible(cx, "preview-crop-action-apply");
+            let mut reached_ratio = false;
+            for _ in 0..8 {
+                press_crop_key(cx, "shift-tab");
+                if focused_crop_label(cx) == "Crop aspect ratio" {
+                    reached_ratio = true;
+                    break;
+                }
+            }
+            assert!(reached_ratio, "the aspect ratio must remain reachable");
+            assert_crop_control_visible(cx, "preview-crop-ratio");
+
+            root.update(cx, |root, cx| {
+                let id = root.file_queue.selected_file_id().unwrap().to_owned();
+                let mut metadata = root.selected_source_metadata().unwrap();
+                metadata.media_kind = Some(SourceKind::Image);
+                root.source_metadata.mark_ready(id, metadata);
+                cx.notify();
+            });
+            draw(cx);
+            assert!(
+                cx.debug_bounds("preview-crop-auto").is_none(),
+                "image cropping must not offer video analysis"
+            );
+        }
+    }
+}
+
+fn assert_crop_toolbar_geometry(
+    cx: &mut VisualTestContext,
+    scale: crate::appearance::ScalePreset,
+    custom: bool,
+) {
+    let viewport = cx.debug_bounds("preview-viewport").unwrap();
+    let toolbar = cx.debug_bounds("preview-crop-toolbar").unwrap();
+    assert!(
+        toolbar.left() >= viewport.left()
+            && toolbar.right() <= viewport.right()
+            && toolbar.top() > viewport.top()
+            && toolbar.bottom() < viewport.bottom(),
+        "the crop toolbar must fit inside the preview at {scale:?}, custom={custom}: {toolbar:?} in {viewport:?}"
+    );
+    for id in [
+        "preview-crop-ratio",
+        "preview-crop-auto",
+        "preview-crop-action-reset",
+        "preview-crop-action-apply",
+    ] {
+        let bounds = cx.debug_bounds(id).unwrap();
+        assert!(
+            bounds.left() >= viewport.left() && bounds.right() <= viewport.right(),
+            "{id} must remain inside the preview at {scale:?}, custom={custom}: {bounds:?} in {viewport:?}"
+        );
+        for tool in [
+            "preview-tool-rotate",
+            "preview-tool-flip-horizontal",
+            "preview-tool-flip-vertical",
+            "preview-tool-crop",
+            "preview-tool-overlay",
+            "preview-zoom-out",
+            "preview-zoom-in",
+        ] {
+            let tool_bounds = cx.debug_bounds(tool).unwrap();
+            assert!(
+                bounds.intersect(&tool_bounds).is_empty(),
+                "{id} overlaps {tool} at {scale:?}, custom={custom}: {bounds:?} / {tool_bounds:?}"
+            );
+        }
+    }
+}
+
+fn assert_crop_control_visible(cx: &mut VisualTestContext, id: &'static str) {
+    let toolbar = cx.debug_bounds("preview-crop-toolbar-controls").unwrap();
+    let bounds = cx.debug_bounds(id).unwrap();
+    assert!(
+        bounds.left() >= toolbar.left()
+            && bounds.right() <= toolbar.right()
+            && bounds.top() >= toolbar.top()
+            && bounds.bottom() <= toolbar.bottom(),
+        "focused {id} must be revealed inside the toolbar: {bounds:?} in {toolbar:?}"
+    );
+}
+
+fn press_crop_key(cx: &mut VisualTestContext, key: &str) {
+    cx.simulate_keystrokes(key);
+    cx.simulate_event(gpui::KeyUpEvent {
+        keystroke: gpui::Keystroke::parse(key).unwrap(),
+    });
+    draw(cx);
+    // GPUI reveals keyboard focus in scroll containers on the following frame.
+    cx.update(|window, cx| {
+        window.simulate_next_frame(cx);
+        window.draw(cx).clear(cx);
+    });
+}
+
+fn focused_crop_label(cx: &mut VisualTestContext) -> String {
+    cx.update(|window, _| {
+        let tree: serde_json::Value =
+            serde_json::from_str(&window.debug_a11y_tree_json().unwrap()).unwrap();
+        tree["gpui_focus"]
+            .as_str()
+            .and_then(|id| tree["nodes"][id]["aria"]["label"].as_str())
+            .unwrap_or_default()
+            .to_owned()
+    })
+}
+
+#[test]
 fn loaded_preview_keeps_timeline_and_queue_inside_window() {
     let mut app = TestAppContext::single();
     let (root, cx) = crop_window(&mut app);

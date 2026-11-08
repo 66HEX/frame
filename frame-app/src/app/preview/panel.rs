@@ -1,5 +1,6 @@
 use crate::app::inspector::state::SettingsRenderState;
 use crate::app::layout::PREVIEW_PANEL_PADDING;
+use crate::app::preview::auto_crop::AutoCropRenderState;
 use crate::app::preview::preview_viewport;
 use crate::app::preview::state::{
     CropSelect, PreviewOverlayImageDimensions, PreviewTransportState,
@@ -34,6 +35,7 @@ pub(in crate::app) struct PreviewCropRenderState {
     pub(in crate::app) applied_crop: Option<CropRect>,
     pub(in crate::app) crop_aspect: String,
     pub(in crate::app) has_crop_dimensions: bool,
+    pub(in crate::app) auto_crop: AutoCropRenderState,
     pub(in crate::app) rotation: String,
     pub(in crate::app) flip_horizontal: bool,
     pub(in crate::app) flip_vertical: bool,

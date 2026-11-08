@@ -203,6 +203,9 @@ impl FrameRoot {
             return false;
         }
 
+        if self.file_queue.selected_file_id() == Some(id) {
+            self.cancel_selected_auto_crop();
+        }
         let removed = self.file_queue.remove_file(id).is_some();
         if removed {
             self.source_metadata.remove(id);

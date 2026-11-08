@@ -115,6 +115,7 @@ fn crop_state() -> PreviewCropRenderState {
         applied_crop: None,
         crop_aspect: "free".to_string(),
         has_crop_dimensions: false,
+        auto_crop: crate::app::preview::auto_crop::AutoCropRenderState::default(),
         rotation: "0".to_string(),
         flip_horizontal: false,
         flip_vertical: false,

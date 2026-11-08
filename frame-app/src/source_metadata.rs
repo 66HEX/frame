@@ -110,6 +110,7 @@ pub fn source_metadata_from_probe(probe: ProbeMetadata) -> SourceMetadata {
         duration: probe.duration,
         bitrate: probe.bitrate,
         video_codec: probe.video_codec,
+        video_stream_index: probe.video_stream_index,
         audio_codec: probe.audio_codec,
         resolution: probe.resolution,
         frame_rate: probe.frame_rate,
@@ -225,6 +226,7 @@ mod tests {
                 media_kind: "video".to_string(),
                 duration: Some("10.000000".to_string()),
                 video_codec: Some("h264".to_string()),
+                video_stream_index: Some(3),
                 resolution: Some("1920x1080".to_string()),
                 frame_rate: Some(29.97),
                 width: Some(1920),
@@ -235,6 +237,7 @@ mod tests {
 
             assert_eq!(metadata.media_kind, Some(SourceKind::Video));
             assert_eq!(metadata.video_codec.as_deref(), Some("h264"));
+            assert_eq!(metadata.video_stream_index, Some(3));
             assert_eq!(metadata.resolution.as_deref(), Some("1920x1080"));
         }
 

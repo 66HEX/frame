@@ -46,6 +46,8 @@ pub const ICON_REFRESH: &str = "icons/refresh.svg";
 pub const ICON_FLIP_HORIZONTAL: &str = "icons/flip-horizontal.svg";
 pub const ICON_FLIP_VERTICAL: &str = "icons/flip-vertical.svg";
 pub const ICON_CROP: &str = "icons/crop.svg";
+pub const ICON_AUTO_CROP: &str = "icons/auto-crop.svg";
+pub const ICON_WARNING: &str = "icons/warning.svg";
 pub const ICON_SPINNER: &str = "icons/spinner.svg";
 pub const ICON_SQUARE: &str = "icons/square.svg";
 pub const ICON_TRASH: &str = "icons/trash.svg";
@@ -92,6 +94,9 @@ const FLIP_HORIZONTAL_SVG: &str =
     include_str!("../../assets/icons/nucleo/18px_flip-horizontal.svg");
 const FLIP_VERTICAL_SVG: &str = include_str!("../../assets/icons/nucleo/18px_flip-vertical.svg");
 const CROP_SVG: &str = include_str!("../../assets/icons/nucleo/18px_crop.svg");
+const AUTO_CROP_SVG: &str =
+    include_str!("../../assets/icons/nucleo/18px_square-dashed-sparkle.svg");
+const WARNING_SVG: &str = include_str!("../../assets/icons/nucleo/18px_triangle-warning.svg");
 const SPINNER_SVG: &str = include_str!("../../assets/icons/nucleo/18px_loader.svg");
 const SQUARE_SVG: &str = include_str!("../../assets/icons/nucleo/18px_media-stop.svg");
 const TRASH_SVG: &str = include_str!("../../assets/icons/nucleo/18px_trash.svg");
@@ -140,6 +145,8 @@ impl AssetSource for FrameAssets {
             ICON_FLIP_HORIZONTAL => Cow::Borrowed(FLIP_HORIZONTAL_SVG.as_bytes()),
             ICON_FLIP_VERTICAL => Cow::Borrowed(FLIP_VERTICAL_SVG.as_bytes()),
             ICON_CROP => Cow::Borrowed(CROP_SVG.as_bytes()),
+            ICON_AUTO_CROP => Cow::Borrowed(AUTO_CROP_SVG.as_bytes()),
+            ICON_WARNING => Cow::Borrowed(WARNING_SVG.as_bytes()),
             ICON_SPINNER => Cow::Borrowed(SPINNER_SVG.as_bytes()),
             ICON_SQUARE => Cow::Borrowed(SQUARE_SVG.as_bytes()),
             ICON_TRASH => Cow::Borrowed(TRASH_SVG.as_bytes()),
@@ -168,6 +175,7 @@ impl AssetSource for FrameAssets {
             ],
             "icons" => vec![
                 SharedString::from("arrow-down.svg"),
+                SharedString::from("auto-crop.svg"),
                 SharedString::from("bookmark.svg"),
                 SharedString::from("captions.svg"),
                 SharedString::from("check.svg"),
@@ -205,6 +213,7 @@ impl AssetSource for FrameAssets {
                 SharedString::from("trash.svg"),
                 SharedString::from("unfold-more.svg"),
                 SharedString::from("video-filters.svg"),
+                SharedString::from("warning.svg"),
             ],
             _ => Vec::new(),
         };

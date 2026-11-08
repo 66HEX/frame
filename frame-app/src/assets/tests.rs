@@ -49,6 +49,7 @@ mod frame_assets {
 
         for icon_name in [
             "arrow-down.svg",
+            "auto-crop.svg",
             "bookmark.svg",
             "captions.svg",
             "check.svg",
@@ -85,6 +86,7 @@ mod frame_assets {
             "trash.svg",
             "unfold-more.svg",
             "video-filters.svg",
+            "warning.svg",
         ] {
             assert!(
                 listed.iter().any(|name| name.as_ref() == icon_name),
@@ -140,6 +142,8 @@ mod frame_assets {
             ICON_FLIP_HORIZONTAL,
             ICON_FLIP_VERTICAL,
             ICON_CROP,
+            ICON_AUTO_CROP,
+            ICON_WARNING,
             ICON_SPINNER,
             ICON_SQUARE,
             ICON_TRASH,

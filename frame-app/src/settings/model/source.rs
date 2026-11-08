@@ -92,6 +92,7 @@ pub struct SourceMetadata {
     pub duration: Option<String>,
     pub bitrate: Option<String>,
     pub video_codec: Option<String>,
+    pub video_stream_index: Option<u32>,
     pub audio_codec: Option<String>,
     pub resolution: Option<String>,
     pub frame_rate: Option<f64>,

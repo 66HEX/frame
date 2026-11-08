@@ -112,6 +112,7 @@ impl FrameRoot {
                 else {
                     return;
                 };
+                root.cancel_selected_auto_crop();
                 root.preview_ui.crop_mode = false;
                 root.preview_ui.draft_crop = None;
                 root.preview_ui.crop_drag = None;
@@ -287,11 +288,9 @@ impl FrameRoot {
         overlay_ratio * media_ratio
     }
 
-    pub(super) const fn apply_preview_overlay_mode_change(
-        &mut self,
-        change: OverlayModeChange,
-    ) -> bool {
+    pub(super) fn apply_preview_overlay_mode_change(&mut self, change: OverlayModeChange) -> bool {
         if change.should_deactivate_crop {
+            self.cancel_selected_auto_crop();
             self.preview_ui.crop_mode = false;
             self.preview_ui.crop_options.popover = None;
             self.preview_ui.draft_crop = None;

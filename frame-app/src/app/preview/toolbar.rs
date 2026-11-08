@@ -28,6 +28,14 @@ pub(in crate::app) const fn preview_toolbar_height() -> f32 {
         + (PREVIEW_TOOLBAR_GAP * PREVIEW_TOOLBAR_GAP_COUNT)
 }
 
+pub(in crate::app) const fn preview_toolbar_width() -> f32 {
+    PREVIEW_TOOLBAR_PADDING * 2.0 + PREVIEW_TOOLBAR_BUTTON_SIZE
+}
+
+pub(in crate::app) const fn preview_zoom_toolbar_width() -> f32 {
+    PREVIEW_TOOLBAR_PADDING * 2.0 + PREVIEW_TOOLBAR_BUTTON_SIZE * 2.0 + 8.0
+}
+
 pub(in crate::app) const fn preview_toolbar_center_margin() -> f32 {
     -(preview_toolbar_height() / 2.0)
 }
