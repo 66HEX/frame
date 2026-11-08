@@ -2,7 +2,7 @@
 
 use crate::app::components::frame_text_button;
 use crate::app::inspector::shared::settings_hint_text;
-use crate::app::primitives::ButtonVariant;
+use crate::app::primitives::{ButtonVariant, color};
 use crate::app::root::FrameRoot;
 use crate::file_queue::FileItem;
 use crate::settings::{
@@ -363,6 +363,8 @@ pub(super) fn apply_all_control(
     let enabled = reason.is_none();
     div()
         .p_4()
+        .border_b_1()
+        .border_color(color(palette.border_subtle))
         .flex()
         .flex_col()
         .gap_2()
