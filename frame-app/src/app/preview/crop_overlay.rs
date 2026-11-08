@@ -16,7 +16,7 @@ use crate::app::preview::toolbar::{
 };
 use crate::app::preview::{
     PreviewTimelineDragPreview, preview_crop_custom_fields, preview_crop_options,
-    preview_handle_color, preview_selection_line_color,
+    preview_resize_handle, preview_selection_line_color,
 };
 use crate::app::primitives::{ButtonVariant, color};
 use crate::app::root::FrameRoot;
@@ -248,14 +248,7 @@ pub(in crate::app) fn preview_crop_handle(
             .flex()
             .items_center()
             .justify_center()
-            .child(
-                div()
-                    .flex_shrink_0()
-                    .w(theme::ui_rem(CROP_HANDLE_SIZE))
-                    .h(theme::ui_rem(CROP_HANDLE_SIZE))
-                    .rounded_full()
-                    .bg(color(preview_handle_color(palette))),
-            ),
+            .child(preview_resize_handle(CROP_HANDLE_SIZE, palette)),
         handle,
     )
     .on_drag(

@@ -1,9 +1,11 @@
+use crate::app::primitives::color;
 use crate::appearance::ColorTheme;
 use crate::theme;
 pub(super) use crop::*;
 pub(super) use crop_options::*;
 #[cfg(test)]
 pub(super) use crop_overlay::*;
+use gpui::prelude::Styled;
 pub(super) use overlay::*;
 pub(super) use panel::*;
 pub(super) use timeline::*;
@@ -27,6 +29,17 @@ fn preview_handle_color(palette: &theme::ThemePalette) -> theme::RgbaToken {
     } else {
         palette.text_primary
     }
+}
+
+fn preview_resize_handle(size: f32, palette: &theme::ThemePalette) -> gpui::Div {
+    // Media can be bright in either theme, so every handle keeps a dark rim.
+    gpui::div()
+        .flex_shrink_0()
+        .size(theme::ui_rem(size))
+        .rounded_full()
+        .bg(color(preview_handle_color(palette)))
+        .border_1()
+        .border_color(color(theme::palette(ColorTheme::Light).text_primary))
 }
 
 const fn preview_selection_line_color() -> gpui::Hsla {

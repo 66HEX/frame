@@ -3,10 +3,9 @@ use crate::app::components::frame_handle_hit_region;
 use crate::app::preview::panel::{PreviewMediaRenderState, PreviewShellState};
 use crate::app::preview::state::PreviewOverlayImageDimensions;
 use crate::app::preview::{
-    PreviewTimelineDragPreview, normalized_point_from_bounds, preview_handle_color,
+    PreviewTimelineDragPreview, normalized_point_from_bounds, preview_resize_handle,
     preview_selection_line_color,
 };
-use crate::app::primitives::color;
 use crate::app::root::FrameRoot;
 use crate::numeric::unit_f64_to_f32;
 use crate::preview::{
@@ -234,14 +233,7 @@ pub(super) fn preview_overlay_handle(
             .flex()
             .items_center()
             .justify_center()
-            .child(
-                div()
-                    .flex_shrink_0()
-                    .w(theme::ui_rem(OVERLAY_HANDLE_SIZE))
-                    .h(theme::ui_rem(OVERLAY_HANDLE_SIZE))
-                    .rounded_full()
-                    .bg(color(preview_handle_color(palette))),
-            ),
+            .child(preview_resize_handle(OVERLAY_HANDLE_SIZE, palette)),
         handle,
     )
     .on_drag(
