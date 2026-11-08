@@ -20,6 +20,17 @@ fn keeps_transparent_titlebar_with_native_controls_in_frame_slot() {
             px(TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_Y),
         ))
     );
+    let position = titlebar.traffic_light_position.unwrap();
+    for coordinate in [position.x.as_f32(), position.y.as_f32()] {
+        assert!(coordinate.is_finite());
+        for backing_scale in [1.0, 2.0] {
+            let physical = coordinate * backing_scale;
+            assert!(
+                physical.is_finite() && physical.fract().abs() < f32::EPSILON,
+                "native mask edge must align to a pixel: {coordinate} points at {backing_scale}x"
+            );
+        }
+    }
 }
 
 #[test]

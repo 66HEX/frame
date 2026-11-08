@@ -16,7 +16,8 @@ pub const TITLEBAR_TOP_PADDING: f32 = 8.0;
 
 pub const TITLEBAR_TRAFFIC_LIGHT_SIZE: f32 = 24.0;
 
-pub const TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_INSET: f32 = 4.8;
+// Whole-point offsets align native sheet mask edges at 1x and 2x backing scales.
+pub const TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_INSET: f32 = 5.0;
 
 pub const TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_X: f32 =
     CONTENT_PADDING + TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_INSET;
