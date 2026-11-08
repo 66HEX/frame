@@ -664,9 +664,6 @@ fn memo_does_not_cache_target_qualification_or_cross_audio_video_or_containers()
             );
         }
         assert_eq!(policy.video_verdicts.entries, [("h264", true)]);
-        assert_eq!(
-            policy.audio_verdicts.entries,
-            [("h264", container == "mkv")]
-        );
+        assert_eq!(policy.audio_verdicts.entries, [("h264", false)]);
     }
 }

@@ -219,7 +219,7 @@ fn stream_copy_video_target_rejects_incompatible_subtitles() {
 }
 
 #[test]
-fn stream_copy_video_target_accepts_mkv_wildcard_rules() {
+fn stream_copy_video_target_accepts_supported_mkv_streams() {
     let config = ConversionConfig {
         processing_mode: ProcessingMode::Copy,
         selected_subtitle_tracks: vec![2],

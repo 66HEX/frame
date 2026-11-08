@@ -16,9 +16,8 @@ use crate::settings::options::{
 use crate::settings::rules::{
     container_supports_audio, container_supports_subtitles, default_audio_codec_for_container,
     is_audio_codec_allowed_for_container, is_audio_only_container, is_gif_container,
-    is_image_container, is_subtitle_codec_allowed_for_container,
-    is_video_codec_allowed_for_container, is_video_pixel_format_allowed_for_container,
-    source_kind_for,
+    is_image_container, is_video_codec_allowed_for_container,
+    is_video_pixel_format_allowed_for_container, source_kind_for,
 };
 use crate::settings::updates::audio::{
     audio_codec_supports_vbr, is_known_audio_channels, normalized_audio_quality,
@@ -102,14 +101,9 @@ pub fn normalize_output_config(
             }
             None => {}
         }
-        if let Some(metadata) = metadata {
-            config.selected_subtitle_tracks.retain(|selected_index| {
-                metadata.subtitle_tracks.iter().any(|track| {
-                    track.index == *selected_index
-                        && is_subtitle_codec_allowed_for_container(&config.container, &track.codec)
-                })
-            });
-        }
+        // Keep explicit selections so a saved or queued configuration cannot
+        // silently drop a track after its output compatibility changes. The UI
+        // permits deselecting incompatible tracks and core explains the error.
     } else {
         reset_subtitle_settings(config);
     }

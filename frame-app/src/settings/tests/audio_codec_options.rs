@@ -33,7 +33,7 @@ fn marks_flac_incompatible_for_mp4() {
 }
 
 #[test]
-fn keeps_mov_flac_codec_enabled() {
+fn disables_mov_flac_codec() {
     let config = ConversionConfig {
         container: "mov".to_string(),
         ..ConversionConfig::default()
@@ -41,7 +41,7 @@ fn keeps_mov_flac_codec_enabled() {
 
     let options = audio_codec_options(&config, &encoders(), false);
 
-    assert!(!codec_option(&options, "flac").is_disabled);
+    assert!(codec_option(&options, "flac").is_disabled);
 }
 
 #[test]
@@ -70,7 +70,7 @@ fn hides_libfdk_aac_when_encoder_is_unavailable() {
 #[test]
 fn apply_audio_codec_updates_allowed_codec() {
     let mut config = ConversionConfig {
-        container: "mov".to_string(),
+        container: "mkv".to_string(),
         ..ConversionConfig::default()
     };
 

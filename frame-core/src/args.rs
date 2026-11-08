@@ -14,9 +14,10 @@ use crate::filters::{
 };
 use crate::media_filters::validate_media_filters;
 use crate::media_rules::{
-    all_containers, container_supports_audio, container_supports_subtitles, is_audio_codec_allowed,
-    is_audio_stream_codec_allowed, is_image_container, is_video_codec_allowed,
-    is_video_only_container, is_video_pixel_format_allowed, is_video_stream_codec_allowed,
+    SubtitleStreamAction as SubtitleAction, all_containers, container_supports_audio,
+    container_supports_subtitles, is_audio_codec_allowed, is_audio_stream_codec_allowed,
+    is_image_container, is_video_codec_allowed, is_video_only_container,
+    is_video_pixel_format_allowed, is_video_stream_codec_allowed,
 };
 use crate::types::{
     AudioTrack, ConversionConfig, ExternalSubtitleTrack, MetadataConfig, MetadataMode,
@@ -92,32 +93,6 @@ fn collect_reencode_subtitle_tracks<'a>(
     Ok(tracks)
 }
 
-fn is_text_subtitle_codec(codec: &str) -> bool {
-    matches!(
-        codec.trim().to_ascii_lowercase().as_str(),
-        "text"
-            | "ssa"
-            | "mov_text"
-            | "srt"
-            | "microdvd"
-            | "eia_608"
-            | "jacosub"
-            | "sami"
-            | "realtext"
-            | "stl"
-            | "subviewer1"
-            | "subviewer"
-            | "subrip"
-            | "webvtt"
-            | "mpl2"
-            | "vplayer"
-            | "pjs"
-            | "ass"
-            | "hdmv_text_subtitle"
-            | "ttml"
-    )
-}
-
 fn validate_external_subtitle_tracks(config: &ConversionConfig) -> Result<(), ConversionError> {
     let mut paths = HashSet::new();
     let mut default_count = 0;
@@ -188,42 +163,10 @@ fn validate_external_subtitle_tracks(config: &ConversionConfig) -> Result<(), Co
     Ok(())
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum SubtitleAction {
-    Copy,
-    Encode(&'static str),
-}
-
 fn embedded_subtitle_action(container: &str, codec: &str) -> Result<SubtitleAction, &'static str> {
-    let codec = codec.trim().to_ascii_lowercase();
-    if crate::media_rules::is_subtitle_codec_allowed(container, &codec) {
-        return Ok(SubtitleAction::Copy);
-    }
-    if let Some(profile) = transport_stream_profile(container) {
-        return match profile {
-            TransportStreamProfile::MpegTs188 => match codec.as_str() {
-                "dvb_subtitle" | "dvb_teletext" | "arib_caption" => Ok(SubtitleAction::Copy),
-                "hdmv_pgs_subtitle" | "dvd_subtitle" => Ok(SubtitleAction::Encode("dvbsub")),
-                _ => Err(
-                    "M2T accepts DVB/teletext/ARIB subtitles; bitmap PGS/DVDSub can be converted to DVB",
-                ),
-            },
-            TransportStreamProfile::M2ts192 => match codec.as_str() {
-                "hdmv_pgs_subtitle" | "hdmv_text_subtitle" => Ok(SubtitleAction::Copy),
-                _ => Err("MTS/M2TS accepts existing PGS or HDMV text subtitle streams"),
-            },
-        };
-    }
-
-    if container.eq_ignore_ascii_case("mkv") {
-        return Ok(SubtitleAction::Copy);
-    }
-    if is_text_subtitle_codec(&codec)
-        && let Some(output_codec) = subtitle_output_codec(container)
-    {
-        return Ok(SubtitleAction::Encode(output_codec));
-    }
-    Err("subtitle codec cannot be represented by the selected container")
+    crate::media_rules::subtitle_stream_action(container, codec).ok_or(
+        "subtitle codec cannot be copied or decoded for the selected container; choose another output or leave this track unselected",
+    )
 }
 
 fn external_subtitle_action(
@@ -566,6 +509,18 @@ pub fn build_ffmpeg_args(
         if container_supports_audio(&config.container) {
             let audio_tracks = collect_selected_audio_tracks(config, probe)?;
             add_track_maps(&mut args, &audio_tracks, |track| track.index);
+            for (output_index, track) in audio_tracks.iter().enumerate() {
+                if config.container.eq_ignore_ascii_case("mkv") && track.codec == "dfpwm" {
+                    // Demuxers can omit the keyframe flag for DFPWM packets;
+                    // otherwise stream copy silently emits an empty track.
+                    args.push(format!("-copyinkf:a:{output_index}"));
+                }
+                if let Some(tag) =
+                    crate::media_rules::audio_stream_copy_tag(&config.container, &track.codec)
+                {
+                    args.extend([format!("-tag:a:{output_index}"), tag.to_string()]);
+                }
+            }
             if audio_tracks.is_empty() {
                 args.push("-an".to_string());
             }
@@ -590,6 +545,13 @@ pub fn build_ffmpeg_args(
             args.push("copy".to_string());
         }
         args.push("-dn".to_string());
+        if config.container.eq_ignore_ascii_case("mkv")
+            && probe.video_codec.as_deref() == Some("rawvideo")
+        {
+            // Matroska needs its VFW representation for untagged raw RGB.
+            // This option also preserves the already supported tagged YUV path.
+            args.extend(["-allow_raw_vfw".to_string(), "1".to_string()]);
+        }
         add_container_output_args(&mut args, &config.container);
         args.push("-n".to_string());
         args.push(output.to_string());
@@ -1431,6 +1393,106 @@ mod tests {
                 ..AudioTrack::default()
             }],
             ..ProbeMetadata::default()
+        }
+    }
+
+    #[test]
+    fn raw_vfw_is_enabled_only_for_matroska_raw_video_copy() {
+        for (container, mode, source_codec, expected) in [
+            ("mkv", "copy", "rawvideo", true),
+            ("mov", "copy", "rawvideo", false),
+            ("mkv", "reencode", "rawvideo", false),
+            ("mkv", "copy", "h264", false),
+        ] {
+            let mut config = sample_config(container, "libx264");
+            config.processing_mode = mode.to_string();
+            let mut probe = sample_probe();
+            probe.video_codec = Some(source_codec.to_string());
+            let args = build_ffmpeg_args(
+                "source.avi",
+                &format!("output.{container}"),
+                &config,
+                &probe,
+            )
+            .unwrap();
+            assert_eq!(args_contains_pair(&args, "-allow_raw_vfw", "1"), expected);
+        }
+    }
+
+    #[test]
+    fn vorbis_copy_uses_the_mov_audio_tag_for_each_output_track() {
+        let mut config = sample_config("mov", "libx264");
+        config.processing_mode = "copy".to_string();
+        config.selected_audio_tracks = vec![2, 1];
+        let mut probe = sample_probe();
+        probe.audio_tracks.push(AudioTrack {
+            index: 2,
+            codec: "vorbis".to_string(),
+            ..AudioTrack::default()
+        });
+        let args = build_ffmpeg_args("source.nut", "output.mov", &config, &probe).unwrap();
+        assert!(args_contains_pair(&args, "-tag:a:0", "0x6f56736d"));
+        assert!(!args.iter().any(|arg| arg == "-tag:a:1"));
+        config.container = "mkv".to_string();
+        let args = build_ffmpeg_args("source.nut", "output.mkv", &config, &probe).unwrap();
+        assert!(!args.iter().any(|arg| arg.starts_with("-tag:a:")));
+    }
+
+    #[test]
+    fn dfpwm_matroska_copy_preserves_packets_without_keyframe_flags() {
+        let mut config = sample_config("mkv", "libx264");
+        config.processing_mode = "copy".to_string();
+        config.selected_audio_tracks = vec![1];
+        let mut probe = sample_probe();
+        probe.audio_tracks[0].codec = "dfpwm".to_string();
+        let args = build_ffmpeg_args("source.nut", "output.mkv", &config, &probe).unwrap();
+        assert!(args.iter().any(|arg| arg == "-copyinkf:a:0"));
+        config.processing_mode = "reencode".to_string();
+        let args = build_ffmpeg_args("source.nut", "output.mkv", &config, &probe).unwrap();
+        assert!(!args.iter().any(|arg| arg.starts_with("-copyinkf")));
+    }
+
+    #[test]
+    fn subtitle_copy_and_conversion_decisions_match_in_both_processing_modes() {
+        for mode in ["copy", "reencode"] {
+            for (container, codec, expected) in [
+                ("mkv", "mov_text", Some("srt")),
+                ("mov", "subrip", Some("mov_text")),
+                ("mp4", "ttml", Some("copy")),
+                ("mov", "ttml", Some("copy")),
+                ("webm", "ttml", None),
+                ("mkv", "ttml", None),
+            ] {
+                let mut config = sample_config(
+                    container,
+                    if container == "webm" {
+                        "vp9"
+                    } else {
+                        "libx264"
+                    },
+                );
+                config.processing_mode = mode.to_string();
+                config.selected_subtitle_tracks = vec![2];
+                let mut probe = sample_probe();
+                probe.video_codec =
+                    Some(if container == "webm" { "vp9" } else { "h264" }.to_string());
+                probe.subtitle_tracks = vec![SubtitleTrack {
+                    index: 2,
+                    codec: codec.to_string(),
+                    ..SubtitleTrack::default()
+                }];
+                let result = build_ffmpeg_args(
+                    "source.mkv",
+                    &format!("output.{container}"),
+                    &config,
+                    &probe,
+                );
+                if let Some(expected) = expected {
+                    assert!(args_contains_pair(&result.unwrap(), "-c:s:0", expected));
+                } else {
+                    assert!(result.unwrap_err().to_string().contains("ttml"));
+                }
+            }
         }
     }
 

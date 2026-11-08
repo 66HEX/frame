@@ -357,7 +357,7 @@ fn normalize_output_config_clears_subtitle_settings_for_audio_container() {
 }
 
 #[test]
-fn normalize_output_config_removes_pgs_selection_for_mp4() {
+fn normalization_keeps_invalid_selection_visible_for_explicit_removal() {
     let mut config = ConversionConfig {
         container: "mp4".to_string(),
         selected_subtitle_tracks: vec![2],
@@ -374,7 +374,18 @@ fn normalize_output_config_removes_pgs_selection_for_mp4() {
     };
 
     assert!(!normalize_video_config(&mut config, Some(&metadata)));
-    assert_normalizes_once(normalize_output_config, &mut config, Some(&metadata));
+    normalize_output_config(&mut config, Some(&metadata));
+    assert_eq!(config.selected_subtitle_tracks, [2]);
+    let options = subtitle_track_options(
+        &config,
+        Some(&metadata),
+        false,
+        &frame_core::capabilities::AvailableEncoders::default(),
+    );
+    assert!(options[0].is_selected);
+    assert!(!options[0].is_disabled);
+    assert!(options[0].disabled_reason.is_some());
+    toggle_subtitle_track_selection(&mut config, 2);
     assert!(config.selected_subtitle_tracks.is_empty());
 }
 
@@ -398,4 +409,39 @@ fn normalize_output_config_keeps_text_subtitle_selection_for_mp4() {
     normalize_output_config(&mut config, Some(&metadata));
 
     assert_eq!(config.selected_subtitle_tracks, [2]);
+}
+
+#[test]
+fn normalization_preserves_native_and_transcodable_subtitle_selections() {
+    for (container, codec) in [
+        ("mkv", "mov_text"),
+        ("mov", "subrip"),
+        ("mp4", "ttml"),
+        ("mov", "ttml"),
+    ] {
+        let mut config = ConversionConfig {
+            container: container.to_string(),
+            selected_subtitle_tracks: vec![2],
+            ..ConversionConfig::default()
+        };
+        let metadata = SourceMetadata {
+            media_kind: Some(SourceKind::Video),
+            subtitle_tracks: vec![SubtitleTrack {
+                index: 2,
+                codec: codec.to_string(),
+                ..SubtitleTrack::default()
+            }],
+            ..SourceMetadata::default()
+        };
+        normalize_output_config(&mut config, Some(&metadata));
+        assert_eq!(config.selected_subtitle_tracks, [2]);
+        let options = subtitle_track_options(
+            &config,
+            Some(&metadata),
+            false,
+            &frame_core::capabilities::AvailableEncoders::default(),
+        );
+        assert!(!options[0].is_disabled, "{container}/{codec}");
+        assert!(options[0].disabled_reason.is_none(), "{container}/{codec}");
+    }
 }

@@ -39,6 +39,7 @@ pub fn subtitle_track_options(
                     } else {
                         None
                     };
+                    let is_selected = config.selected_subtitle_tracks.contains(&track.index);
                     SubtitleTrackOption {
                         index: track.index,
                         index_label: format!("#{}", track.index),
@@ -47,8 +48,9 @@ pub fn subtitle_track_options(
                             track.language.as_deref(),
                             track.label.as_deref(),
                         ),
-                        is_selected: config.selected_subtitle_tracks.contains(&track.index),
-                        is_disabled: disabled || !compatible || requires_unavailable_dvbsub,
+                        is_selected,
+                        is_disabled: disabled
+                            || (!is_selected && (!compatible || requires_unavailable_dvbsub)),
                         disabled_reason: reason,
                     }
                 })

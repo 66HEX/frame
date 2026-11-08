@@ -1145,6 +1145,233 @@ fn subtitle_stream_should_transcode_to_mov_text_in_mp4() -> TestResult {
 
 #[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn stream_copy_should_keep_audio_decodable_with_muxer_specific_options() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("mov_audio_copy_tags")?;
+    for (label, encoder, expected_codec, muxer, sample_rate, container) in [
+        ("vorbis", "libvorbis", "vorbis", "nut", 48000, "mov"),
+        ("g726", "g726", "adpcm_g726", "avi", 8000, "mov"),
+        ("latm", "aac", "aac_latm", "mpegts", 48000, "mov"),
+        ("dfpwm", "dfpwm", "dfpwm", "nut", 48000, "mkv"),
+    ] {
+        if !encoder_available(&tools, encoder)? {
+            eprintln!("skipping {label} fixture: encoder is unavailable");
+            continue;
+        }
+        let input = sandbox.path(&format!(
+            "source-{label}.{}",
+            if muxer == "mpegts" { "m2t" } else { muxer }
+        ));
+        let output = sandbox.path(&format!("copied-{label}.{container}"));
+        let mut fixture_args = args(&[
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=64x48:rate=10:duration=1",
+            "-f",
+            "lavfi",
+            "-i",
+            &format!("sine=frequency=440:sample_rate={sample_rate}:duration=1"),
+            "-c:v",
+            "libx264",
+            "-c:a",
+            encoder,
+        ]);
+        if muxer == "mpegts" {
+            fixture_args.extend(args(&["-mpegts_flags", "latm"]));
+        }
+        fixture_args.extend(args(&["-f", muxer, &path_arg(&input)]));
+        run_tool(&tools.ffmpeg, &fixture_args)?;
+        let metadata = probe_media(&tools, &input)?;
+        assert_eq!(metadata.audio_tracks[0].codec, expected_codec);
+        let mut config = video_config(container, "libx264", "aac");
+        config.processing_mode = "copy".to_string();
+        config.selected_audio_tracks = vec![metadata.audio_tracks[0].index];
+        convert(&tools, &input, &output, &config)?;
+        assert_eq!(
+            probe_media(&tools, &output)?.audio_tracks[0].codec,
+            expected_codec
+        );
+        let decode = |path: &Path| {
+            run_tool_output(
+                &tools.ffmpeg,
+                &args(&[
+                    "-v",
+                    "error",
+                    "-i",
+                    &path_arg(path),
+                    "-map",
+                    "0:a:0",
+                    "-c:a",
+                    "pcm_s16le",
+                    "-f",
+                    "s16le",
+                    "pipe:1",
+                ]),
+            )
+        };
+        let source_audio = decode(&input)?;
+        assert!(!source_audio.is_empty());
+        let output_audio = decode(&output)?;
+        if label == "vorbis" {
+            // R1: MOV's edit list can omit Vorbis's final packet when its
+            // source duration is zero. This test covers codec identification
+            // and the first 0.9 seconds, not a lossless-duration guarantee.
+            let checked_bytes = 43200 * 2;
+            assert!(source_audio.len() >= checked_bytes);
+            assert!(output_audio.len() >= checked_bytes);
+            assert_eq!(source_audio[..checked_bytes], output_audio[..checked_bytes]);
+        } else {
+            assert_eq!(source_audio, output_audio, "{label} audio samples changed");
+        }
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn embedded_subtitles_should_transcode_between_mov_and_matroska_in_both_modes() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("embedded_subtitle_muxer_compatibility")?;
+    let input = sandbox.path("source.mp4");
+    let subtitle = sandbox.path("subtitle.srt");
+    write_srt(&subtitle)?;
+    generate_subtitled_source(&tools, &input, &subtitle)?;
+
+    for mode in ["reencode", "copy"] {
+        let matroska = sandbox.path(&format!("subtitles-{mode}.mkv"));
+        let mov = sandbox.path(&format!("subtitles-{mode}.mov"));
+        let mut config = video_config("mkv", "libx264", "aac");
+        config.processing_mode = mode.to_string();
+        config.selected_subtitle_tracks = vec![2];
+        convert(&tools, &input, &matroska, &config)?;
+        let metadata = probe_media(&tools, &matroska)?;
+        assert_eq!(metadata.subtitle_tracks[0].codec, "subrip");
+
+        config.container = "mov".to_string();
+        config.selected_subtitle_tracks = vec![metadata.subtitle_tracks[0].index];
+        convert(&tools, &matroska, &mov, &config)?;
+        let metadata = probe_media(&tools, &mov)?;
+        assert_eq!(metadata.subtitle_tracks[0].codec, "mov_text");
+        let text = run_tool_output(
+            &tools.ffmpeg,
+            &args(&[
+                "-v",
+                "error",
+                "-i",
+                &path_arg(&mov),
+                "-map",
+                "0:s:0",
+                "-f",
+                "srt",
+                "pipe:1",
+            ]),
+        )?;
+        assert!(String::from_utf8_lossy(&text).contains("Frame subtitle integration"));
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn ttml_should_be_copied_without_a_decoder_only_to_supported_containers() -> TestResult {
+    let tools = Toolchain::discover()?;
+    if !encoder_available(&tools, "ttml")? {
+        eprintln!("skipping TTML fixture: encoder is unavailable");
+        return Ok(());
+    }
+    let sandbox = Sandbox::new("ttml_native_copy")?;
+    let source = sandbox.path("source.mp4");
+    let input = sandbox.path("ttml.mp4");
+    let subtitle = sandbox.path("subtitle.srt");
+    write_srt(&subtitle)?;
+    generate_subtitled_source(&tools, &source, &subtitle)?;
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-i",
+            &path_arg(&source),
+            "-map",
+            "0",
+            "-c",
+            "copy",
+            "-c:s",
+            "ttml",
+            &path_arg(&input),
+        ]),
+    )?;
+    let metadata = probe_media(&tools, &input)?;
+    assert_eq!(metadata.subtitle_tracks[0].codec, "ttml");
+    for mode in ["reencode", "copy"] {
+        for container in ["mp4", "mov", "mkv", "webm"] {
+            let output = sandbox.path(&format!("ttml-{mode}.{container}"));
+            let mut config = video_config(container, "libx264", "aac");
+            config.processing_mode = mode.to_string();
+            config.selected_subtitle_tracks = vec![metadata.subtitle_tracks[0].index];
+            if matches!(container, "mp4" | "mov") {
+                convert(&tools, &input, &output, &config)?;
+                assert_eq!(
+                    probe_media(&tools, &output)?.subtitle_tracks[0].codec,
+                    "ttml"
+                );
+            } else {
+                // Isolate the subtitle decision from video-copy compatibility.
+                assert!(!frame_core::media_rules::is_subtitle_stream_supported(
+                    container, "ttml"
+                ));
+                assert!(
+                    build_ffmpeg_args(&path_arg(&input), &path_arg(&output), &config, &metadata)
+                        .is_err()
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn raw_rgb_copy_to_matroska_should_preserve_decoded_pixels() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("raw_rgb_matroska")?;
+    let input = sandbox.path("source.avi");
+    let output = sandbox.path("copied.mkv");
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=64x48:rate=1:duration=1",
+            "-c:v",
+            "rawvideo",
+            "-pix_fmt",
+            "bgr24",
+            &path_arg(&input),
+        ]),
+    )?;
+    let mut config = video_config("mkv", "libx264", "aac");
+    config.processing_mode = "copy".to_string();
+    convert(&tools, &input, &output, &config)?;
+    assert_eq!(
+        probe_media(&tools, &output)?.video_codec.as_deref(),
+        Some("rawvideo")
+    );
+    assert_eq!(
+        read_rgb_frame(&tools, &input)?.pixels,
+        read_rgb_frame(&tools, &output)?.pixels
+    );
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 fn external_selectable_subtitle_should_survive_stream_copy_with_metadata() -> TestResult {
     let tools = Toolchain::discover()?;
     let sandbox = Sandbox::new("external_selectable_subtitle")?;
