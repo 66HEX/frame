@@ -210,7 +210,11 @@ pub(in crate::app) fn update_action_row(
                     frame_text_button_with_focus(
                         "app-settings-update-download",
                         "Download",
-                        ButtonVariant::Primary,
+                        if palette.is_light() {
+                            ButtonVariant::Accent
+                        } else {
+                            ButtonVariant::Primary
+                        },
                         false,
                         true,
                         focuses.download,
@@ -230,7 +234,11 @@ pub(in crate::app) fn update_action_row(
                     frame_text_button_with_focus(
                         "app-settings-update-skip",
                         "Skip",
-                        ButtonVariant::Secondary,
+                        if palette.is_light() {
+                            ButtonVariant::Accent
+                        } else {
+                            ButtonVariant::Secondary
+                        },
                         false,
                         true,
                         focuses.skip,
@@ -253,7 +261,11 @@ pub(in crate::app) fn update_action_row(
                 frame_text_button_with_focus(
                     "app-settings-update-install",
                     "Install and restart",
-                    ButtonVariant::Primary,
+                    if palette.is_light() {
+                        ButtonVariant::Accent
+                    } else {
+                        ButtonVariant::Primary
+                    },
                     false,
                     update_install_ready,
                     focuses.install,
@@ -288,7 +300,11 @@ pub(in crate::app) fn update_check_now_button(
     frame_text_button_with_focus(
         "app-settings-update-check-now",
         "Check now",
-        ButtonVariant::Secondary,
+        if palette.is_light() {
+            ButtonVariant::Accent
+        } else {
+            ButtonVariant::Secondary
+        },
         false,
         !busy,
         focus,

@@ -328,7 +328,11 @@ pub(in crate::app) fn app_settings_output_directory_section(
             frame_text_button_with_focus(
                 "app-settings-output-directory",
                 button_label,
-                ButtonVariant::Secondary,
+                if palette.is_light() {
+                    ButtonVariant::Accent
+                } else {
+                    ButtonVariant::Secondary
+                },
                 false,
                 true,
                 focus,
@@ -448,7 +452,11 @@ pub(in crate::app) fn app_settings_apply_button(
     frame_text_button(
         "app-settings-max-concurrency-apply",
         "Apply",
-        ButtonVariant::Secondary,
+        if palette.is_light() {
+            ButtonVariant::Accent
+        } else {
+            ButtonVariant::Secondary
+        },
         false,
         enabled,
         palette,

@@ -196,7 +196,11 @@ pub(in crate::app) fn app_settings_appearance_select<T: AppSettingsAppearanceVal
                 open: popover_state.is_open(),
                 rendered: popover_state.is_rendered(),
                 progress,
-                trigger_variant: ButtonVariant::Outline,
+                trigger_variant: if palette.is_light() {
+                    ButtonVariant::Accent
+                } else {
+                    ButtonVariant::Outline
+                },
                 trigger_focus: Some(focuses.trigger),
                 panel_focus: Some(focuses.panel),
                 scroll: scroll_handle,
