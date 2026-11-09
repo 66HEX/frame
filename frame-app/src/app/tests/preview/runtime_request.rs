@@ -148,6 +148,7 @@ fn preview_runtime_key_tracks_visual_config_but_ignores_encoder_quality() {
             audio_tracks: vec![crate::settings::AudioTrack {
                 index: 1,
                 codec: "aac".to_string(),
+                codec_tag: None,
                 channels: Some("2".to_string()),
                 channel_layout: Some("stereo".to_string()),
                 language: None,

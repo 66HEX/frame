@@ -223,6 +223,8 @@ impl Default for AudioFiltersConfig {
 pub struct AudioTrack {
     pub index: u32,
     pub codec: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub codec_tag: Option<u32>,
     pub channels: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub channel_layout: Option<String>,
@@ -260,6 +262,8 @@ pub struct ExternalSubtitleTrack {
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ProbeMetadata {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_format: Option<String>,
     #[serde(default = "default_media_kind")]
     pub media_kind: String,
     pub duration: Option<String>,
@@ -598,6 +602,7 @@ pub struct FfprobeStream {
     pub index: u32,
     pub codec_type: String,
     pub codec_name: Option<String>,
+    pub codec_tag: Option<String>,
     pub width: Option<i32>,
     pub height: Option<i32>,
     pub channels: Option<i32>,
@@ -782,6 +787,24 @@ mod tests {
         .unwrap();
 
         assert_eq!(metadata.media_kind, "video");
+    }
+
+    #[test]
+    fn optional_copy_source_facts_round_trip_without_breaking_old_metadata() {
+        let old = json!({
+            "audioTracks": [{"index":1,"codec":"adpcm_swf","channels":"1"}],
+            "subtitleTracks": []
+        });
+        let mut metadata: ProbeMetadata = serde_json::from_value(old).unwrap();
+        assert!(metadata.source_format.is_none());
+        assert!(metadata.audio_tracks[0].codec_tag.is_none());
+        metadata.source_format = Some("mov,mp4,m4a,3gp,3g2,mj2".into());
+        metadata.audio_tracks[0].codec_tag = Some(0x4653_736d);
+        let value = serde_json::to_value(&metadata).unwrap();
+        assert_eq!(value["audioTracks"][0]["codecTag"], 0x4653_736d_u32);
+        let restored: ProbeMetadata = serde_json::from_value(value).unwrap();
+        assert_eq!(restored.source_format, metadata.source_format);
+        assert_eq!(restored.audio_tracks[0].codec_tag, Some(0x4653_736d));
     }
 
     #[test]

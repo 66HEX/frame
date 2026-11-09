@@ -46,6 +46,7 @@ impl SourceKind {
 pub struct AudioTrack {
     pub index: u32,
     pub codec: String,
+    pub codec_tag: Option<u32>,
     pub channels: Option<String>,
     pub channel_layout: Option<String>,
     pub language: Option<String>,
@@ -89,6 +90,7 @@ impl SourceTags {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct SourceMetadata {
+    pub source_format: Option<String>,
     pub media_kind: Option<SourceKind>,
     pub duration: Option<String>,
     pub bitrate: Option<String>,

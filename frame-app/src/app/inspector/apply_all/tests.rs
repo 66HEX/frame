@@ -726,3 +726,40 @@ fn apply_all_reencode_rechecks_opus_bitrate_for_each_target() {
         );
     }
 }
+
+#[test]
+fn copy_adpcm_source_verdict_is_not_cached_by_codec() {
+    let donor = ConversionConfig {
+        container: "mkv".into(),
+        processing_mode: ProcessingMode::Copy,
+        ..ConversionConfig::default()
+    };
+    let preset = create_custom_preset(String::new(), "copy", &donor);
+    let target = ConversionConfig {
+        selected_audio_tracks: vec![3],
+        ..ConversionConfig::default()
+    };
+    for tags in [[0x4653_736d, 0x5346], [0x5346, 0x4653_736d]] {
+        let sources: Vec<_> = tags
+            .into_iter()
+            .map(|tag| {
+                let mut source = metadata(SourceKind::Video, "h264", "adpcm_swf");
+                source.source_format = Some("mov,mp4,m4a,3gp,3g2,mj2".into());
+                for track in &mut source.audio_tracks {
+                    track.channels = Some("1".into());
+                    track.codec_tag = Some(tag);
+                }
+                source
+            })
+            .collect();
+        let mut policy = CandidatePolicy::new(&donor);
+        for (source, tag) in sources.iter().zip(tags) {
+            assert!(policy.may_apply(&target, source));
+            assert_eq!(
+                candidate_for(&preset, &target, source).is_some(),
+                tag == 0x5346
+            );
+        }
+        assert_eq!(policy.audio_verdicts.entries, [("adpcm_swf", true)]);
+    }
+}

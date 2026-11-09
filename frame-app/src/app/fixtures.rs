@@ -564,6 +564,7 @@ impl FrameRoot {
                     crate::settings::AudioTrack {
                         index: 0,
                         codec: "pcm_s16le".to_string(),
+                        codec_tag: None,
                         channels: Some("2".to_string()),
                         channel_layout: Some("stereo".to_string()),
                         language: Some("eng".to_string()),
@@ -574,6 +575,7 @@ impl FrameRoot {
                     crate::settings::AudioTrack {
                         index: 1,
                         codec: "aac".to_string(),
+                        codec_tag: None,
                         channels: Some("2".to_string()),
                         channel_layout: Some("stereo".to_string()),
                         language: Some("eng".to_string()),

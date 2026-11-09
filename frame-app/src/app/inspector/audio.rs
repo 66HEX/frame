@@ -549,7 +549,10 @@ pub(in crate::app) fn settings_audio_track_button(
     crate::app::inspector::shared::settings_track_choice(
         format!("audio-track-{index}"),
         format!("{} · {}", option.index_label, option.codec),
-        format!("{} · {}", option.detail, option.bitrate),
+        option.copy_error.map_or_else(
+            || format!("{} · {}", option.detail, option.bitrate),
+            str::to_string,
+        ),
         option.is_selected,
         !option.is_disabled,
         move |root, _, cx| {

@@ -1,8 +1,9 @@
 use std::{collections::HashSet, path::Path};
 
 use crate::audio_rules::{
-    audio_stream_copy_error, audio_track_count_error, effective_audio_channels,
-    mp3_requires_mp4_resampling, opus_encoding_error, stereo_width_supports_channels,
+    AudioStreamCopySource, audio_stream_copy_error_with_source, audio_track_count_error,
+    effective_audio_channels, mp3_requires_mp4_resampling, opus_encoding_error,
+    stereo_width_supports_channels,
 };
 use crate::codec::{
     add_audio_codec_args, add_fps_args, add_video_codec_args, audio_codec_supports_vbr,
@@ -122,13 +123,24 @@ fn validate_audio_encoding_tracks(
     Ok(())
 }
 
-fn validate_audio_copy_track(container: &str, track: &AudioTrack) -> Result<(), ConversionError> {
-    if let Some(reason) =
-        audio_stream_copy_error(container, &track.codec, track.sample_rate.as_deref())
-    {
+fn validate_audio_copy_track(
+    container: &str,
+    probe: &ProbeMetadata,
+    track: &AudioTrack,
+) -> Result<(), ConversionError> {
+    if let Some(reason) = audio_stream_copy_error_with_source(
+        container,
+        &track.codec,
+        track.sample_rate.as_deref(),
+        AudioStreamCopySource {
+            format: probe.source_format.as_deref(),
+            channels: track.channels.parse().ok(),
+            codec_tag: track.codec_tag,
+        },
+    ) {
         return Err(ConversionError::InvalidInput(format!(
-            "Audio codec '{}' from source track #{} is incompatible with container '{}': {reason}",
-            track.codec, track.index, container
+            "Source audio track #{} ('{}') cannot be copied to '{}': {reason}",
+            track.index, track.codec, container
         )));
     }
     Ok(())
@@ -468,7 +480,7 @@ pub fn validate_stream_copy_compatibility(
             ));
         }
         for track in selected_audio {
-            validate_audio_copy_track(&config.container, track)?;
+            validate_audio_copy_track(&config.container, probe, track)?;
         }
         return Ok(());
     }
@@ -487,7 +499,7 @@ pub fn validate_stream_copy_compatibility(
 
     if container_supports_audio(&config.container) {
         for track in collect_selected_audio_tracks(config, probe)? {
-            validate_audio_copy_track(&config.container, track)?;
+            validate_audio_copy_track(&config.container, probe, track)?;
         }
     }
 
@@ -1541,6 +1553,42 @@ mod tests {
                 ..AudioTrack::default()
             }],
             ..ProbeMetadata::default()
+        }
+    }
+
+    #[test]
+    fn copy_preflight_checks_only_selected_source_dependent_audio_tracks() {
+        let mut probe = sample_probe();
+        probe.source_format = Some("mov,mp4,m4a,3gp,3g2,mj2".into());
+        probe.audio_tracks.push(AudioTrack {
+            index: 3,
+            codec: "adpcm_swf".into(),
+            codec_tag: Some(0x4653_736d),
+            channels: "1".into(),
+            ..AudioTrack::default()
+        });
+        let mut config = sample_config("mkv", "libx264");
+        config.processing_mode = "copy".into();
+        for selected in [vec![3], vec![1, 3], vec![3, 1]] {
+            config.selected_audio_tracks = selected.clone();
+            let error = build_ffmpeg_args("misleading.wav", "output.mkv", &config, &probe)
+                .unwrap_err()
+                .to_string();
+            assert!(error.contains("track #3"), "{error}");
+            assert!(error.contains("Choose Re-encode"), "{error}");
+            assert_eq!(config.selected_audio_tracks, selected);
+        }
+        for selected in [vec![], vec![1]] {
+            config.selected_audio_tracks = selected;
+            assert!(build_ffmpeg_args("input.mov", "output.mkv", &config, &probe).is_ok());
+        }
+        config.selected_audio_tracks = vec![3];
+        config.processing_mode = "reencode".into();
+        assert!(build_ffmpeg_args("input.mov", "output.mkv", &config, &probe).is_ok());
+        config.processing_mode = "copy".into();
+        for tag in [None, Some(0x5346)] {
+            probe.audio_tracks[1].codec_tag = tag;
+            assert!(build_ffmpeg_args("input.mov", "output.mkv", &config, &probe).is_ok());
         }
     }
 

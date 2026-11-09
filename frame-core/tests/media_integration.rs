@@ -24,6 +24,8 @@ use frame_core::{
 
 type TestResult<T = ()> = Result<T, String>;
 
+#[path = "media_integration/adpcm.rs"]
+mod adpcm;
 #[path = "media_integration/tiff.rs"]
 mod tiff;
 

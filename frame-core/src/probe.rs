@@ -57,6 +57,7 @@ fn metadata_from_ffprobe(
     });
 
     let mut metadata = ProbeMetadata {
+        source_format: source_format_name.clone(),
         duration: probe_data.format.duration,
         bitrate: probe_data.format.bit_rate,
         ..ProbeMetadata::default()
@@ -145,6 +146,7 @@ fn metadata_from_ffprobe(
         metadata.audio_tracks.push(AudioTrack {
             index: stream.index,
             codec: codec.to_string(),
+            codec_tag: stream.codec_tag.as_deref().and_then(parse_codec_tag),
             channels: stream
                 .channels
                 .map_or_else(|| "?".to_string(), |c| c.to_string()),
@@ -219,6 +221,18 @@ fn metadata_from_ffprobe(
     }
 
     Ok(metadata)
+}
+
+// ffprobe prints codec tags as unsigned hexadecimal values. A missing or malformed
+// tag is unknown, never evidence of a particular container's sample-entry path.
+fn parse_codec_tag(value: &str) -> Option<u32> {
+    let digits = value
+        .strip_prefix("0x")
+        .or_else(|| value.strip_prefix("0X"))?;
+    if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return None;
+    }
+    u32::from_str_radix(digits, 16).ok()
 }
 
 fn select_program(probe: &FfprobeOutput) -> Result<Option<&FfprobeProgram>, ConversionError> {
@@ -328,6 +342,37 @@ fn format_name_indicates_image(format_name: Option<&str>) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn probe_preserves_source_format_and_parses_only_unsigned_hex_codec_tags() {
+        for (tag, expected) in [
+            (serde_json::Value::Null, None),
+            (serde_json::json!("0x4653736d"), Some(0x4653_736d)),
+            (serde_json::json!("0X00005346"), Some(0x5346)),
+            (serde_json::json!("0xffffffff"), Some(u32::MAX)),
+            (serde_json::json!("0x100000000"), None),
+            (serde_json::json!("0x-1"), None),
+            (serde_json::json!("0x+1"), None),
+            (serde_json::json!("0x"), None),
+            (serde_json::json!("msSF"), None),
+            (serde_json::json!("4653736d"), None),
+        ] {
+            let json = serde_json::json!({
+                "streams": [{"index": 3, "codec_type": "audio", "codec_name": "adpcm_swf", "channels": 1, "codec_tag": tag}],
+                "format": {"format_name": "mov,mp4,m4a,3gp,3g2,mj2"}
+            });
+            // The filename must not substitute for the demuxer's actual format.
+            let metadata = parse_ffprobe_stdout("misleading.wav", json.to_string()).unwrap();
+            assert_eq!(
+                metadata.source_format.as_deref(),
+                Some("mov,mp4,m4a,3gp,3g2,mj2")
+            );
+            assert_eq!(metadata.audio_tracks[0].codec_tag, expected, "{tag}");
+        }
+        let metadata = parse_ffprobe_stdout("unknown.mov", r#"{"streams":[{"index":0,"codec_type":"audio","codec_name":"adpcm_swf"}],"format":{}}"#).unwrap();
+        assert!(metadata.source_format.is_none());
+        assert!(metadata.audio_tracks[0].codec_tag.is_none());
+    }
 
     #[test]
     fn ffprobe_json_args_match_probe_contract() {

@@ -1,3 +1,4 @@
+use super::audio::audio_copy_error_for_track;
 use crate::settings::model::{
     AudioTrack, ConversionConfig, OutputContainerOption, OutputModeOption, ProcessingMode,
     SourceKind, SourceMetadata,
@@ -7,7 +8,7 @@ use crate::settings::rules::{
     is_subtitle_codec_allowed_for_container, is_video_stream_codec_allowed_for_container,
     source_kind_for,
 };
-use frame_core::audio_rules::{audio_stream_copy_error, audio_track_count_error};
+use frame_core::audio_rules::audio_track_count_error;
 use frame_core::media_rules;
 
 #[must_use]
@@ -89,10 +90,9 @@ pub fn is_container_compatible_for_stream_copy(
     }
     if is_audio_only_container(container) {
         return !selected_audio.is_empty()
-            && selected_audio.iter().all(|track| {
-                audio_stream_copy_error(container, &track.codec, track.sample_rate.as_deref())
-                    .is_none()
-            });
+            && selected_audio
+                .iter()
+                .all(|track| audio_copy_error_for_track(container, metadata, track).is_none());
     }
 
     let Some(video_codec) = metadata.video_codec.as_deref() else {
@@ -102,9 +102,9 @@ pub fn is_container_compatible_for_stream_copy(
         return false;
     }
 
-    let audio_codecs_allowed = selected_audio.iter().all(|track| {
-        audio_stream_copy_error(container, &track.codec, track.sample_rate.as_deref()).is_none()
-    });
+    let audio_codecs_allowed = selected_audio
+        .iter()
+        .all(|track| audio_copy_error_for_track(container, metadata, track).is_none());
     let subtitle_codecs_allowed = selected_subtitle_codecs(config, metadata)
         .iter()
         .all(|codec| is_subtitle_codec_allowed_for_container(container, codec));
@@ -157,6 +157,13 @@ pub(super) fn output_container_disabled_reason(
             })
         }) {
             return Some("MP4 needs MP3 audio at 16 kHz or higher");
+        }
+        if let Some(reason) = metadata.and_then(|metadata| {
+            selected_audio_tracks(config, metadata)
+                .iter()
+                .find_map(|track| audio_copy_error_for_track(container, metadata, track))
+        }) {
+            return Some(reason);
         }
         return Some("Incompatible container");
     }

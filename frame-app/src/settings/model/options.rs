@@ -81,6 +81,7 @@ pub struct AudioQualityRange {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AudioTrackOption {
+    pub copy_error: Option<&'static str>,
     pub index: u32,
     pub index_label: String,
     pub codec: String,

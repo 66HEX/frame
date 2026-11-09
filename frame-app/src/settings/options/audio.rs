@@ -1,13 +1,14 @@
 use crate::settings::model::{
     AUDIO_CHANNEL_DEFINITIONS, AUDIO_CODEC_DEFINITIONS, AudioChannelOption, AudioCodecOption,
-    AudioTrackOption, ConversionConfig, OPTIONAL_AUDIO_CODEC_DEFINITIONS, ProcessingMode,
-    SourceMetadata,
+    AudioTrack, AudioTrackOption, ConversionConfig, OPTIONAL_AUDIO_CODEC_DEFINITIONS,
+    ProcessingMode, SourceMetadata,
 };
 use crate::settings::rules::is_audio_codec_allowed_for_container;
 use crate::settings::source_info::{audio_track_bitrate, audio_track_detail, display_source_value};
 use frame_core::audio_rules::{
-    audio_stream_copy_error, audio_track_count_error, effective_audio_channels,
-    opus_channels_error, opus_encoding_error, stereo_width_supports_channels,
+    AudioStreamCopySource, audio_stream_copy_error_with_source, audio_track_count_error,
+    effective_audio_channels, opus_channels_error, opus_encoding_error,
+    stereo_width_supports_channels,
 };
 use frame_core::capabilities::AvailableEncoders;
 
@@ -93,18 +94,14 @@ pub fn audio_settings_error(
     {
         return Some(reason);
     }
-    for track in metadata?
+    let metadata = metadata?;
+    for track in metadata
         .audio_tracks
         .iter()
         .filter(|track| config.selected_audio_tracks.contains(&track.index))
     {
         let reason = if config.processing_mode == ProcessingMode::Copy {
-            audio_stream_copy_error(
-                &config.container,
-                &track.codec,
-                track.sample_rate.as_deref(),
-            )
-            .map(str::to_string)
+            audio_copy_error_for_track(&config.container, metadata, track).map(str::to_string)
         } else if config.audio_codec == "libopus" {
             let channels = effective_audio_channels(
                 &config.audio_channels,
@@ -127,6 +124,26 @@ pub fn audio_settings_error(
         }
     }
     None
+}
+
+pub(super) fn audio_copy_error_for_track(
+    container: &str,
+    metadata: &SourceMetadata,
+    track: &AudioTrack,
+) -> Option<&'static str> {
+    audio_stream_copy_error_with_source(
+        container,
+        &track.codec,
+        track.sample_rate.as_deref(),
+        AudioStreamCopySource {
+            format: metadata.source_format.as_deref(),
+            channels: track
+                .channels
+                .as_deref()
+                .and_then(|value| value.parse().ok()),
+            codec_tag: track.codec_tag,
+        },
+    )
 }
 
 #[must_use]
@@ -193,6 +210,10 @@ pub fn audio_track_options(
                     index_label: format!("#{}", track.index),
                     codec: display_source_value(Some(&track.codec)),
                     detail: audio_track_detail(track),
+                    copy_error: (config.processing_mode == ProcessingMode::Copy
+                        && config.selected_audio_tracks.contains(&track.index))
+                    .then(|| audio_copy_error_for_track(&config.container, metadata, track))
+                    .flatten(),
                     bitrate: audio_track_bitrate(track),
                     is_selected: config.selected_audio_tracks.contains(&track.index),
                     is_disabled: disabled,

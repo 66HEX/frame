@@ -33,6 +33,52 @@ pub fn audio_stream_copy_error(
     }
 }
 
+/// Actual demuxer and selected-track facts from the existing source probe.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct AudioStreamCopySource<'a> {
+    pub format: Option<&'a str>,
+    pub channels: Option<u16>,
+    pub codec_tag: Option<u32>,
+}
+
+/// Checks codec/rate support plus the known source-specific ADPCM copy failures.
+///
+/// `FFmpeg` does not expose audio block alignment in its probe JSON. These narrow
+/// rules identify tested demuxer paths that lose it; unknown facts stay allowed.
+/// A MOV `wfex` sample entry has a WAVE tag and must not be treated as `msSF`.
+#[must_use]
+pub fn audio_stream_copy_error_with_source(
+    container: &str,
+    codec: &str,
+    sample_rate: Option<&str>,
+    source: AudioStreamCopySource<'_>,
+) -> Option<&'static str> {
+    if let Some(reason) = audio_stream_copy_error(container, codec, sample_rate) {
+        return Some(reason);
+    }
+    if !container.eq_ignore_ascii_case("mkv") {
+        return None;
+    }
+    let has_format = |expected: &str| {
+        source.format.is_some_and(|format| {
+            format
+                .split(',')
+                .any(|name| name.trim().eq_ignore_ascii_case(expected))
+        })
+    };
+    let missing_ms_alignment = codec.eq_ignore_ascii_case("adpcm_ms") && has_format("nut");
+    let missing_swf_alignment = codec.eq_ignore_ascii_case("adpcm_swf")
+        && source.channels == Some(1)
+        && (has_format("nut")
+            || has_format("flv")
+            || (source.codec_tag == Some(0x4653_736d)
+                && ["mov", "mp4", "m4a", "3gp", "3g2", "mj2"]
+                    .into_iter()
+                    .any(has_format)));
+    (missing_ms_alignment || missing_swf_alignment)
+        .then_some("This audio track cannot be copied to MKV. Choose Re-encode.")
+}
+
 #[must_use]
 pub fn mp3_requires_mp4_resampling(
     container: &str,
@@ -125,6 +171,49 @@ mod tests {
         for rate in ["16000", "22050", "44100", "48000"] {
             assert_eq!(audio_stream_copy_error("mp4", "mp3", Some(rate)), None);
         }
+    }
+
+    #[test]
+    fn adpcm_copy_guard_uses_exact_source_facts_without_rejecting_working_paths() {
+        let check = |container, codec, format, channels, codec_tag| {
+            audio_stream_copy_error_with_source(
+                container,
+                codec,
+                None,
+                AudioStreamCopySource {
+                    format,
+                    channels,
+                    codec_tag,
+                },
+            )
+        };
+        for format in ["nut", "NUT", "other,nut"] {
+            for channels in [None, Some(1), Some(2)] {
+                assert!(check("mkv", "adpcm_ms", Some(format), channels, None).is_some());
+            }
+        }
+        for format in ["nut", "flv", "mov,mp4,m4a,3gp,3g2,mj2", " MOV "] {
+            assert!(check("MKV", "ADPCM_SWF", Some(format), Some(1), Some(0x4653_736d)).is_some());
+            assert!(check("mkv", "adpcm_swf", Some(format), Some(2), Some(0x4653_736d)).is_none());
+            assert!(check("mkv", "adpcm_swf", Some(format), None, Some(0x4653_736d)).is_none());
+        }
+        for format in [
+            None,
+            Some("wav"),
+            Some("avi"),
+            Some("matroska,webm"),
+            Some("notnut"),
+            Some("movish"),
+        ] {
+            for codec in ["adpcm_ms", "adpcm_swf"] {
+                assert!(check("mkv", codec, format, Some(1), Some(0x4653_736d)).is_none());
+            }
+        }
+        for tag in [None, Some(0x5346), Some(0), Some(u32::MAX)] {
+            assert!(check("mkv", "adpcm_swf", Some("mov"), Some(1), tag).is_none());
+        }
+        assert!(check("mov", "adpcm_swf", Some("flv"), Some(1), None).is_none());
+        assert!(check("mkv", "adpcm_yamaha", Some("nut"), Some(1), None).is_none());
     }
 
     #[test]

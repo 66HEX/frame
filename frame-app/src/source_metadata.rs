@@ -106,6 +106,7 @@ impl SourceMetadataStore {
 #[must_use]
 pub fn source_metadata_from_probe(probe: ProbeMetadata) -> SourceMetadata {
     SourceMetadata {
+        source_format: probe.source_format,
         media_kind: source_kind_from_probe(&probe.media_kind),
         duration: probe.duration,
         bitrate: probe.bitrate,
@@ -123,6 +124,7 @@ pub fn source_metadata_from_probe(probe: ProbeMetadata) -> SourceMetadata {
             .map(|track| AudioTrack {
                 index: track.index,
                 codec: track.codec,
+                codec_tag: track.codec_tag,
                 channels: Some(track.channels),
                 channel_layout: track.channel_layout,
                 language: track.language,
@@ -261,9 +263,11 @@ mod tests {
         fn maps_audio_tracks() {
             let metadata = source_metadata_from_probe(ProbeMetadata {
                 media_kind: "audio".to_string(),
+                source_format: Some("mov,mp4,m4a,3gp,3g2,mj2".into()),
                 audio_tracks: vec![ProbeAudioTrack {
                     index: 1,
                     codec: "aac".to_string(),
+                    codec_tag: Some(0x6134_706d),
                     channels: "2".to_string(),
                     channel_layout: Some("stereo".to_string()),
                     language: Some("eng".to_string()),
@@ -274,6 +278,11 @@ mod tests {
                 ..ProbeMetadata::default()
             });
 
+            assert_eq!(
+                metadata.source_format.as_deref(),
+                Some("mov,mp4,m4a,3gp,3g2,mj2")
+            );
+            assert_eq!(metadata.audio_tracks[0].codec_tag, Some(0x6134_706d));
             assert_eq!(metadata.audio_tracks[0].label.as_deref(), Some("Main"));
             assert_eq!(metadata.audio_tracks[0].channels.as_deref(), Some("2"));
             assert_eq!(
