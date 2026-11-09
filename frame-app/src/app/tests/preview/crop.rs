@@ -250,3 +250,41 @@ fn apply_preview_crop_drag_moves_visual_rect_after_side_rotation() {
     assert!((after.x - before.x - 0.10).abs() < 0.000_001);
     assert!((after.y - before.y).abs() < 0.000_001);
 }
+
+#[test]
+fn pending_crop_source_keeps_draft_but_hides_and_blocks_old_frame_handles() {
+    let mut root = FrameRoot::new();
+    seed_ready_video(&mut root, "crop-pending", "/tmp/crop.mkv");
+    let entry = root.selected_source_metadata_entry();
+    let accepted = root.selected_preview_runtime_request(&entry).unwrap();
+    root.preview_ui.render_image = root_with_preview_canvas_media(128, 128)
+        .preview_ui
+        .render_image;
+    root.preview_ui.rendered_runtime_key = Some(accepted.key);
+    root.preview_ui.crop_mode = true;
+    root.preview_ui.draft_crop = Some(CropRect {
+        x: 0.1,
+        y: 0.1,
+        width: 0.5,
+        height: 0.5,
+    });
+    let draft = root.preview_ui.draft_crop;
+    let editing = root.selected_preview_runtime_request(&entry).unwrap();
+    root.preview_ui.desired_runtime_key = Some(editing.key.clone());
+    root.preview_ui.pending_runtime_key = Some(editing.key.clone());
+    let render =
+        root.preview_crop_render_state(entry.metadata.as_ref(), root.selected_config().unwrap());
+    assert!(render.crop_mode);
+    assert_eq!(render.draft_crop, draft);
+    assert!(!render.frame_ready);
+    assert!(!root.apply_preview_crop_drag(DragHandle::Move, PreviewPoint { x: 0.3, y: 0.3 }));
+    assert!(!root.adjust_preview_crop_from_keyboard_with_step(DragHandle::Move, "right", false));
+    assert_eq!(root.preview_ui.draft_crop, draft);
+    root.preview_ui.pending_runtime_key = None;
+    // Completion without a matching frame still does not make old pixels editable.
+    root.preview_ui.runtime_key = Some(editing.key.clone());
+    assert!(!root.preview_edit_frame_ready());
+    root.preview_ui.rendered_runtime_key = Some(editing.key);
+    assert!(root.preview_edit_frame_ready());
+    assert!(root.adjust_preview_crop_from_keyboard_with_step(DragHandle::Move, "right", false));
+}

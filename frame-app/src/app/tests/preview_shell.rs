@@ -44,7 +44,7 @@ fn empty_filters() -> &'static AvailableFilters {
     &FILTERS
 }
 
-fn settings_state<'a>(
+pub(super) fn settings_state<'a>(
     config: &'a ConversionConfig,
     metadata: Option<&'a SourceMetadata>,
     status: MetadataStatus,
@@ -119,6 +119,8 @@ fn settings_state<'a>(
 
 fn crop_state() -> PreviewCropRenderState {
     PreviewCropRenderState {
+        request_epoch: 0,
+        frame_ready: true,
         crop_mode: false,
         draft_crop: None,
         applied_crop: None,

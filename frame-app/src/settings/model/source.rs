@@ -90,6 +90,7 @@ impl SourceTags {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct SourceMetadata {
+    pub sample_aspect_ratio: Option<frame_core::aspect::SampleAspectRatio>,
     pub source_timing: Option<frame_core::source_timing::SourceTiming>,
     pub source_format: Option<String>,
     pub media_kind: Option<SourceKind>,

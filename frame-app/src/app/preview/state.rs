@@ -104,6 +104,8 @@ pub(in crate::app) struct PreviewTransportState {
 }
 
 pub(in crate::app) struct PreviewUiState {
+    // Only deterministic visual fixtures seed this; real sessions always own frames.
+    pub(in crate::app) static_fixture_file_id: Option<String>,
     pub(in crate::app) canvas_file_id: Option<String>,
     pub(in crate::app) canvas: PreviewCanvasState,
     pub(in crate::app) canvas_pan_drag: Option<PreviewCanvasPanDragState>,
@@ -132,7 +134,9 @@ pub(in crate::app) struct PreviewUiState {
     pub(in crate::app) pending_runtime_key: Option<PreviewRuntimeKey>,
     pub(in crate::app) failed_runtime_key: Option<PreviewRuntimeKey>,
     pub(in crate::app) runtime_request_generation: u64,
-    pub(in crate::app) render_presentation: PreviewRenderPresentation,
+    pub(in crate::app) accepted_request_token: u64,
+    pub(in crate::app) desired_runtime_key: Option<PreviewRuntimeKey>,
+    pub(in crate::app) rendered_runtime_key: Option<PreviewRuntimeKey>,
     pub(in crate::app) rendered_presentation: PreviewRenderPresentation,
     pub(in crate::app) session: Option<Arc<PreviewSession>>,
     pub(in crate::app) trim_preview_seek: TrimPreviewSeekState,
@@ -147,6 +151,7 @@ pub(in crate::app) struct PreviewUiState {
 impl Default for PreviewUiState {
     fn default() -> Self {
         Self {
+            static_fixture_file_id: None,
             canvas_file_id: None,
             canvas: PreviewCanvasState::default(),
             canvas_pan_drag: None,
@@ -175,7 +180,9 @@ impl Default for PreviewUiState {
             pending_runtime_key: None,
             failed_runtime_key: None,
             runtime_request_generation: 0,
-            render_presentation: PreviewRenderPresentation::default(),
+            accepted_request_token: 0,
+            desired_runtime_key: None,
+            rendered_runtime_key: None,
             rendered_presentation: PreviewRenderPresentation::default(),
             session: None,
             trim_preview_seek: TrimPreviewSeekState::default(),
@@ -368,6 +375,8 @@ pub(in crate::app) struct PreviewRuntimeKey {
     pub(in crate::app) preview_dimensions: PreviewRuntimeDimensions,
     pub(in crate::app) visual_hash: u64,
     pub(in crate::app) audio_hash: u64,
+    pub(in crate::app) edit_crop: bool,
+    pub(in crate::app) edit_overlay: bool,
 }
 
 impl PreviewRuntimeKey {
@@ -391,5 +400,4 @@ pub(in crate::app) struct PreviewRuntimeDimensions {
 pub(in crate::app) struct PreviewRuntimeRequest {
     pub(in crate::app) key: PreviewRuntimeKey,
     pub(in crate::app) config: PreviewSessionConfig,
-    pub(in crate::app) presentation: PreviewRenderPresentation,
 }

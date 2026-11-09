@@ -29,7 +29,7 @@ impl FrameRoot {
         request: Option<PreviewRuntimeRequest>,
         cx: &mut Context<Self>,
     ) {
-        let Some(request) = request else {
+        let Some(mut request) = request else {
             if self.preview_ui.session.is_some()
                 || self.preview_ui.runtime_key.is_some()
                 || self.preview_ui.pending_runtime_key.is_some()
@@ -39,13 +39,22 @@ impl FrameRoot {
             {
                 self.clear_preview_runtime_for_selection(cx);
             }
-            self.preview_ui.render_presentation = PreviewRenderPresentation::default();
             self.preview_ui.rendered_presentation = PreviewRenderPresentation::default();
             return;
         };
 
-        let presentation_changed = self.preview_ui.render_presentation != request.presentation;
-        self.preview_ui.render_presentation = request.presentation;
+        if let Some(fixture_file_id) = &self.preview_ui.static_fixture_file_id {
+            if fixture_file_id == &request.key.file_id && self.preview_ui.render_image.is_some() {
+                self.preview_ui.desired_runtime_key = Some(request.key.clone());
+                self.preview_ui.rendered_runtime_key = Some(request.key.clone());
+                self.preview_ui.runtime_key = Some(request.key);
+                self.preview_ui.accepted_request_token = 0;
+                self.apply_preview_canvas_auto_fit();
+                return;
+            }
+            self.clear_preview_runtime_for_selection(cx);
+        }
+        self.preview_ui.desired_runtime_key = Some(request.key.clone());
 
         // A failed start/rebuild notifies the UI too. Re-rendering that error
         // must not launch the same FFmpeg request again; a changed request or
@@ -61,11 +70,6 @@ impl FrameRoot {
         if self.preview_ui.runtime_key == next_key
             || self.preview_ui.pending_runtime_key == next_key
         {
-            if presentation_changed {
-                self.preview_ui.rendered_presentation = request.presentation;
-                self.apply_preview_canvas_auto_fit();
-                cx.notify();
-            }
             return;
         }
 
@@ -95,9 +99,13 @@ impl FrameRoot {
         }
 
         let key = request.key.clone();
+        self.preview_ui.desired_runtime_key = Some(key.clone());
         self.preview_ui.runtime_request_generation =
             self.preview_ui.runtime_request_generation.wrapping_add(1);
         let generation = self.preview_ui.runtime_request_generation;
+        request.config.request_token = generation;
+        self.end_preview_crop_drag();
+        self.end_preview_overlay_drag();
         self.preview_ui.pending_runtime_key = Some(key.clone());
         cx.spawn(async move |this, cx| {
             let config = request.config;
@@ -149,6 +157,7 @@ impl FrameRoot {
             Ok(session) => {
                 self.preview_ui.failed_runtime_key = None;
                 self.preview_ui.runtime_key = Some(key.clone());
+                self.preview_ui.accepted_request_token = generation;
                 self.preview_ui.session = Some(Arc::clone(session));
                 self.preview_ui.runtime_error = None;
                 self.refresh_preview_render_image(cx);
@@ -161,6 +170,27 @@ impl FrameRoot {
         }
         cx.notify();
         true
+    }
+
+    pub(in crate::app) fn accept_preview_drag_epoch(&mut self, epoch: u64) -> bool {
+        if epoch == self.preview_ui.runtime_request_generation && self.preview_edit_frame_ready() {
+            return true;
+        }
+        self.end_preview_crop_drag();
+        self.end_preview_overlay_drag();
+        false
+    }
+
+    pub(in crate::app) fn preview_edit_frame_ready(&self) -> bool {
+        self.preview_ui
+            .desired_runtime_key
+            .as_ref()
+            .is_none_or(|desired| {
+                self.preview_ui.rendered_runtime_key.as_ref() == Some(desired)
+                    && self.preview_ui.render_image.is_some()
+                    && desired.edit_crop == self.preview_ui.crop_mode
+                    && desired.edit_overlay == self.preview_ui.overlay.overlay_mode()
+            })
     }
 
     pub(in crate::app) fn preview_render_image(&self) -> Option<Arc<RenderImage>> {
@@ -179,9 +209,16 @@ impl FrameRoot {
         if let Some(image) = self.preview_ui.render_image.take() {
             cx.drop_image(image, None);
         }
+        self.preview_ui.static_fixture_file_id = None;
+        self.end_preview_crop_drag();
+        self.end_preview_overlay_drag();
         self.preview_ui.active_preview_dimensions = None;
         self.preview_ui.preview_dimensions_debounce_until = None;
         self.preview_ui.runtime_key = None;
+        self.preview_ui.desired_runtime_key = None;
+        self.preview_ui.rendered_runtime_key = None;
+        self.preview_ui.accepted_request_token = 0;
+        self.preview_ui.rendered_presentation = PreviewRenderPresentation::default();
         self.preview_ui.pending_runtime_key = None;
         self.preview_ui.failed_runtime_key = None;
         self.preview_ui.runtime_request_generation =
@@ -209,13 +246,18 @@ impl FrameRoot {
     }
 
     pub(super) fn refresh_preview_render_image(&mut self, cx: &mut Context<Self>) -> bool {
+        if self.preview_ui.pending_runtime_key.is_some() {
+            return false;
+        }
         let Some(session) = &self.preview_ui.session else {
             return false;
         };
         let Some(latest) = session.latest_frame() else {
             return false;
         };
-        if latest.generation == self.preview_ui.render_generation {
+        if latest.frame.request_token != self.preview_ui.accepted_request_token
+            || latest.generation == self.preview_ui.render_generation
+        {
             return false;
         }
 
@@ -232,7 +274,8 @@ impl FrameRoot {
         }
         session.mark_frame_presented(latest.generation);
         self.preview_ui.render_generation = latest.generation;
-        self.preview_ui.rendered_presentation = self.preview_ui.render_presentation;
+        self.preview_ui.rendered_presentation = latest.frame.presentation;
+        self.preview_ui.rendered_runtime_key = self.preview_ui.runtime_key.clone();
         if self.preview_ui.failed_runtime_key.is_none() {
             self.preview_ui.runtime_error = None;
         }

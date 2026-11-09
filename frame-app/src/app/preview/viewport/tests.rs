@@ -51,6 +51,8 @@ fn preview_waiting_for_visual_render_only_hides_visual_media_without_frame() {
         duration_seconds: 1.0,
         canvas: PreviewCanvasRenderState::default(),
         crop: PreviewCropRenderState {
+            request_epoch: 0,
+            frame_ready: true,
             crop_mode: false,
             draft_crop: None,
             applied_crop: None,
@@ -62,6 +64,8 @@ fn preview_waiting_for_visual_render_only_hides_visual_media_without_frame() {
             flip_vertical: false,
         },
         overlay: PreviewOverlayRenderState {
+            request_epoch: 0,
+            frame_ready: true,
             overlay_mode: false,
             has_overlay: false,
             overlay: None,

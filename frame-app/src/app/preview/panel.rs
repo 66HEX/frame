@@ -8,7 +8,7 @@ use crate::app::preview::state::{
 use crate::app::primitives::FrameSurface;
 use crate::app::root::FrameRoot;
 use crate::file_queue::{FileItem, FileQueue};
-use crate::numeric::{f64_to_u32, u32_to_f32};
+use crate::numeric::{f64_to_f32, f64_to_u32};
 use crate::preview::{
     CropRect, MediaSnapshot, MetadataStatus as PreviewMetadataStatus, PreviewControlAvailability,
     PreviewControlInput, PreviewMediaKind, PreviewOverlay, PreviewPlaybackState, SourceMediaKind,
@@ -30,6 +30,8 @@ use std::sync::Arc;
 )]
 #[derive(Clone, Debug, PartialEq)]
 pub(in crate::app) struct PreviewCropRenderState {
+    pub(in crate::app) request_epoch: u64,
+    pub(in crate::app) frame_ready: bool,
     pub(in crate::app) crop_mode: bool,
     pub(in crate::app) draft_crop: Option<CropRect>,
     pub(in crate::app) applied_crop: Option<CropRect>,
@@ -83,17 +85,39 @@ impl Default for PreviewCanvasRenderState {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::app) struct PreviewMediaRenderState {
+    pub(in crate::app) pixel_aspect_ratio: frame_core::aspect::DisplayRatio,
+    pub(in crate::app) output_raster_aspect_ratio: Option<frame_core::aspect::DisplayRatio>,
     pub(in crate::app) width: u32,
     pub(in crate::app) height: u32,
 }
 
 impl PreviewMediaRenderState {
-    pub(in crate::app) fn aspect_ratio(self) -> f32 {
-        if self.height == 0 {
-            return 1.0;
-        }
+    pub(in crate::app) fn raster_aspect_ratio(self) -> f64 {
+        self.output_raster_aspect_ratio.map_or_else(
+            || {
+                if self.height == 0 {
+                    1.0
+                } else {
+                    f64::from(self.width) / f64::from(self.height)
+                }
+            },
+            frame_core::aspect::DisplayRatio::as_f64,
+        )
+    }
 
-        u32_to_f32(self.width) / u32_to_f32(self.height)
+    pub(in crate::app) fn display_dimensions(self) -> (f64, f64) {
+        (
+            f64::from(self.width) * self.pixel_aspect_ratio.as_f64(),
+            f64::from(self.height),
+        )
+    }
+    pub(in crate::app) fn aspect_ratio(self) -> f32 {
+        let (width, height) = self.display_dimensions();
+        if height == 0.0 {
+            1.0
+        } else {
+            f64_to_f32(width / height)
+        }
     }
 }
 
@@ -109,6 +133,8 @@ pub(in crate::app) struct PreviewPresentedFrame {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(in crate::app) struct PreviewOverlayRenderState {
+    pub(in crate::app) request_epoch: u64,
+    pub(in crate::app) frame_ready: bool,
     pub(in crate::app) overlay_mode: bool,
     pub(in crate::app) has_overlay: bool,
     pub(in crate::app) overlay: Option<PreviewOverlay>,
@@ -120,6 +146,8 @@ impl PreviewOverlayRenderState {
     #[must_use]
     pub(in crate::app) const fn empty() -> Self {
         Self {
+            request_epoch: 0,
+            frame_ready: true,
             overlay_mode: false,
             has_overlay: false,
             overlay: None,
@@ -293,7 +321,27 @@ pub(in crate::app) fn preview_media_render_state(
     presentation: PreviewRenderPresentation,
 ) -> Option<PreviewMediaRenderState> {
     let frame = preview_presented_frame(render_image?, presentation)?;
+    let output_raster_aspect_ratio = presentation.output_raster_aspect_ratio.and_then(|ratio| {
+        let oriented = if presentation.transform.has_side_rotation() {
+            ratio.inverted()
+        } else {
+            ratio
+        };
+        // The optional legacy native crop exposes a fraction of the prepared
+        // texture. Apply that same visible fraction to O, without changing the
+        // texture coordinates or repeating FFmpeg's already-applied crop.
+        oriented.multiplied_by(
+            u128::from(frame.visible_width) * u128::from(frame.full_height),
+            u128::from(frame.visible_height) * u128::from(frame.full_width),
+        )
+    });
     Some(PreviewMediaRenderState {
+        output_raster_aspect_ratio,
+        pixel_aspect_ratio: if presentation.transform.has_side_rotation() {
+            presentation.pixel_aspect_ratio.inverted()
+        } else {
+            presentation.pixel_aspect_ratio
+        },
         width: frame.visible_width,
         height: frame.visible_height,
     })

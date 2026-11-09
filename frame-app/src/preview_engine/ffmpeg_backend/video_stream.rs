@@ -272,6 +272,12 @@ impl RunningPreviewProcess {
             stderr_worker,
             stop_requested,
             spec: FrameStreamSpec {
+                presentation: crate::preview_engine::PreviewRenderPresentation {
+                    pixel_aspect_ratio: plan.pixel_aspect_ratio,
+                    output_raster_aspect_ratio: plan.output_raster_aspect_ratio,
+                    ..Default::default()
+                },
+                request_token: config.request_token,
                 width: plan.width,
                 height: plan.height,
                 fps: plan.fps,
@@ -377,7 +383,11 @@ pub(super) fn spawn_stdout_worker(
                                 frame.frame.byte_len,
                                 frame.render_elapsed,
                             );
-                            let _ = frame_store.publish(frame.frame);
+                            let _ = frame_store.publish(
+                                frame
+                                    .frame
+                                    .with_presentation(spec.presentation, spec.request_token),
+                            );
                             metrics.record_video_frame_published(spec.generation);
                         }
                         frame_index = frame_index.saturating_add(1);

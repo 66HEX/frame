@@ -1,6 +1,7 @@
 //! Shared backend services for the Frame GPUI migration.
 
 pub mod args;
+pub mod aspect;
 pub mod audio_rules;
 pub mod capabilities;
 pub mod codec;

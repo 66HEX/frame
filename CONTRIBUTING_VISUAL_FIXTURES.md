@@ -131,6 +131,8 @@ Frame's application code retains its normal debug settings.
 | `app-settings-ui-open` | App settings with UI scale open at 200% | Scaled geometry and typography, scrollable sheet body, popover placement, and titlebar coexistence. |
 | `logs-active` | Logs tab with an active FFmpeg conversion | Log tab navigation, active file state, plain FFmpeg log rendering, progress line wrapping, monospaced text rendering, and scroll density. |
 | `preview-ready` | Workspace with a selected ready video source | Preview panel shell, selected video metadata, timeline controls, toolbar visibility, empty frame handling, and source video state. |
+| `preview-anamorphic-crop` | Real 320×180 grid with 2:1 sample aspect | A 128×128 raster crop displays twice as wide as it is tall; handles remain aligned with the visible frame. |
+| `preview-anamorphic-overlay` | Same anamorphic grid with a square logo | An 80×80 raster overlay displays at 160×80; the image fills its selection bounds. Both anamorphic fixtures seed a frame with request token zero and bypass asynchronous decoding only for their selected fixture file. |
 | `preview-crop` | Preview panel with crop mode enabled | Crop aspect bar, crop overlay geometry, crop handles, preview toolbar coexistence, and canvas framing while editing crop bounds. |
 | `preview-crop-options` | Crop aspect ratio selector open | Standard select options, selected state, keyboard navigation, scrolling, and popover placement at different UI scales. |
 | `preview-crop-custom` | Custom crop fields with the Video tab visible | Ratio/pixel mode switching, width and height fields, validation, and live resolution synchronization. |

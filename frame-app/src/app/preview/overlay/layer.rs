@@ -7,7 +7,7 @@ use crate::app::preview::{
     preview_selection_line_color,
 };
 use crate::app::root::FrameRoot;
-use crate::numeric::unit_f64_to_f32;
+use crate::numeric::{f64_to_f32, unit_f64_to_f32};
 use crate::preview::{
     MAX_OVERLAY_WIDTH, MIN_OVERLAY_WIDTH, OverlayDragHandle, OverlayDragPoint,
     OverlaySizeDirection, PreviewOverlay,
@@ -21,6 +21,7 @@ pub(super) const OVERLAY_HANDLE_SIZE: f32 = 10.0;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(in crate::app) struct PreviewOverlayDrag {
+    pub(in crate::app) request_epoch: u64,
     pub(in crate::app) handle: OverlayDragHandle,
     pub(in crate::app) width: f64,
     pub(in crate::app) height: f64,
@@ -36,14 +37,19 @@ pub(in crate::app) fn preview_overlay_layer(
 ) -> Option<gpui::Stateful<gpui::Div>> {
     let palette = state.palette;
     let overlay = state.overlay.overlay.as_ref()?;
-    if !overlay.enabled || overlay.path.is_empty() {
+    if !state.overlay.frame_ready || !overlay.enabled || overlay.path.is_empty() {
         return None;
     }
 
     let (width, height) = preview_overlay_render_size(state, overlay);
+    let image_aspect_ratio = f64_to_f32(width / height)
+        * state
+            .media
+            .map_or(1.0, PreviewMediaRenderState::aspect_ratio);
     let left = (overlay.x - width / 2.0).clamp(0.0, 1.0);
     let top = (overlay.y - height / 2.0).clamp(0.0, 1.0);
     let drag = PreviewOverlayDrag {
+        request_epoch: state.overlay.request_epoch,
         handle: OverlayDragHandle::Move,
         width,
         height,
@@ -71,8 +77,14 @@ pub(in crate::app) fn preview_overlay_layer(
                 .opacity(unit_f64_to_f32(overlay.opacity))
                 .child(
                     img(PathBuf::from(overlay.path.clone()))
+                        .debug_selector(|| "preview-overlay-image".into())
+                        .absolute()
+                        .inset_0()
                         .size_full()
-                        .object_fit(ObjectFit::Contain),
+                        // GPUI otherwise supplies the asset's intrinsic ratio
+                        // during layout, before ObjectFit controls painting.
+                        .aspect_ratio(image_aspect_ratio)
+                        .object_fit(ObjectFit::Fill),
                 ),
         )
         .when(state.overlay.overlay_mode, |this| {
@@ -133,6 +145,7 @@ pub(in crate::app) fn preview_overlay_layer(
                 width,
                 height,
                 state.media,
+                state.overlay.request_epoch,
                 palette,
                 cx,
             ))
@@ -143,6 +156,7 @@ pub(in crate::app) fn preview_overlay_layer(
                 width,
                 height,
                 state.media,
+                state.overlay.request_epoch,
                 palette,
                 cx,
             ))
@@ -153,6 +167,7 @@ pub(in crate::app) fn preview_overlay_layer(
                 width,
                 height,
                 state.media,
+                state.overlay.request_epoch,
                 palette,
                 cx,
             ))
@@ -163,6 +178,7 @@ pub(in crate::app) fn preview_overlay_layer(
                 width,
                 height,
                 state.media,
+                state.overlay.request_epoch,
                 palette,
                 cx,
             ));
@@ -194,18 +210,19 @@ pub(super) fn preview_overlay_render_size(
     (width, height.clamp(MIN_OVERLAY_WIDTH, 1.0))
 }
 
+#[cfg(test)]
+pub(in crate::app) fn preview_overlay_test_render_size(state: &PreviewShellState) -> (f64, f64) {
+    preview_overlay_render_size(state, state.overlay.overlay.as_ref().unwrap())
+}
+
 pub(super) fn preview_overlay_height_ratio(state: &PreviewShellState) -> f64 {
     let overlay_ratio = state
         .overlay
         .image_dimensions
         .map_or(1.0, PreviewOverlayImageDimensions::height_over_width);
-    let media_ratio = state.media.map_or(1.0, |media| {
-        if media.height == 0 {
-            1.0
-        } else {
-            f64::from(media.width) / f64::from(media.height)
-        }
-    });
+    let media_ratio = state
+        .media
+        .map_or(1.0, PreviewMediaRenderState::raster_aspect_ratio);
     overlay_ratio * media_ratio
 }
 
@@ -220,6 +237,7 @@ pub(super) fn preview_overlay_handle(
     width: f64,
     height: f64,
     media: Option<PreviewMediaRenderState>,
+    request_epoch: u64,
     palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
@@ -238,6 +256,7 @@ pub(super) fn preview_overlay_handle(
     )
     .on_drag(
         PreviewOverlayDrag {
+            request_epoch,
             handle,
             width,
             height,

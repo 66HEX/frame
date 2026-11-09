@@ -12,7 +12,7 @@ pub(super) fn root_with_preview_canvas_media(width: u32, height: u32) -> FrameRo
     let frame =
         PreviewFrame::bgra(width, height, row_bytes, 0, vec![0; data_len]).expect("preview frame");
     root.preview_ui.render_image = Some(render_image_from_frame(&frame).expect("render image"));
-    root.preview_ui.render_presentation = PreviewRenderPresentation::default();
+    root.preview_ui.rendered_presentation = PreviewRenderPresentation::default();
     root.preview_ui.canvas_bounds = Some(preview_test_bounds(1000.0, 500.0));
     root.preview_ui.canvas.auto_fit_pending = false;
     root
@@ -40,6 +40,8 @@ pub(super) fn test_video_preview_session(file_id: &str) -> std::sync::Arc<Previe
         source_width: Some(1920),
         source_height: Some(1080),
         source_is_palette: false,
+        source_sample_aspect_ratio: None,
+        request_token: 0,
         source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
         selected_audio_track: None,
         duration_seconds: 90.0,

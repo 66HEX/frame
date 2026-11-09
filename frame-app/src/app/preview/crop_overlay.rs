@@ -34,9 +34,14 @@ pub(in crate::app) enum FlipAxis {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) struct PreviewCropDrag {
+    pub(super) request_epoch: u64,
     pub(super) handle: DragHandle,
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "The crop mask, guides and eight anchored handles are composed together with one captured request epoch."
+)]
 pub(in crate::app) fn preview_crop_overlay(
     state: &PreviewShellState,
     cx: &Context<FrameRoot>,
@@ -57,7 +62,15 @@ pub(in crate::app) fn preview_crop_overlay(
         .child(crop_mask_rect(0.0, y, x.clamp(0.0, 1.0), height))
         .child(crop_mask_rect(right, y, (1.0 - right).max(0.0), height))
         .child(crop_mask_rect(0.0, bottom, 1.0, (1.0 - bottom).max(0.0)))
-        .child(crop_outline_rect(x, y, width, height, palette, cx))
+        .child(crop_outline_rect(
+            x,
+            y,
+            width,
+            height,
+            state.crop.request_epoch,
+            palette,
+            cx,
+        ))
         .child(crop_vertical_guide_line(x + width / 3.0, y, height))
         .child(crop_vertical_guide_line(x + (width * 2.0) / 3.0, y, height))
         .child(crop_horizontal_guide_line(x, y + height / 3.0, width))
@@ -71,6 +84,7 @@ pub(in crate::app) fn preview_crop_overlay(
             x,
             y,
             (width / 2.0, height / 2.0),
+            state.crop.request_epoch,
             palette,
             cx,
         ))
@@ -79,6 +93,7 @@ pub(in crate::app) fn preview_crop_overlay(
             x + width / 2.0,
             y,
             (width / 2.0, height / 2.0),
+            state.crop.request_epoch,
             palette,
             cx,
         ))
@@ -87,6 +102,7 @@ pub(in crate::app) fn preview_crop_overlay(
             right,
             y,
             (width / 2.0, height / 2.0),
+            state.crop.request_epoch,
             palette,
             cx,
         ))
@@ -95,6 +111,7 @@ pub(in crate::app) fn preview_crop_overlay(
             right,
             y + height / 2.0,
             (width / 2.0, height / 2.0),
+            state.crop.request_epoch,
             palette,
             cx,
         ))
@@ -103,6 +120,7 @@ pub(in crate::app) fn preview_crop_overlay(
             right,
             bottom,
             (width / 2.0, height / 2.0),
+            state.crop.request_epoch,
             palette,
             cx,
         ))
@@ -111,6 +129,7 @@ pub(in crate::app) fn preview_crop_overlay(
             x + width / 2.0,
             bottom,
             (width / 2.0, height / 2.0),
+            state.crop.request_epoch,
             palette,
             cx,
         ))
@@ -119,6 +138,7 @@ pub(in crate::app) fn preview_crop_overlay(
             x,
             bottom,
             (width / 2.0, height / 2.0),
+            state.crop.request_epoch,
             palette,
             cx,
         ))
@@ -127,6 +147,7 @@ pub(in crate::app) fn preview_crop_overlay(
             x,
             y + height / 2.0,
             (width / 2.0, height / 2.0),
+            state.crop.request_epoch,
             palette,
             cx,
         ))
@@ -159,6 +180,7 @@ pub(in crate::app) fn crop_outline_rect(
     top: f32,
     width: f32,
     height: f32,
+    request_epoch: u64,
     palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -175,6 +197,7 @@ pub(in crate::app) fn crop_outline_rect(
         .cursor_grab()
         .on_drag(
             PreviewCropDrag {
+                request_epoch,
                 handle: DragHandle::Move,
             },
             |_drag, _position, _window, cx| cx.new(|_| PreviewTimelineDragPreview),
@@ -238,6 +261,7 @@ pub(in crate::app) fn preview_crop_handle(
     x: f32,
     y: f32,
     spacing: (f32, f32),
+    request_epoch: u64,
     palette: &'static theme::ThemePalette,
     cx: &Context<FrameRoot>,
 ) -> gpui::Div {
@@ -252,7 +276,10 @@ pub(in crate::app) fn preview_crop_handle(
         handle,
     )
     .on_drag(
-        PreviewCropDrag { handle },
+        PreviewCropDrag {
+            request_epoch,
+            handle,
+        },
         |_drag, _position, _window, cx| cx.new(|_| PreviewTimelineDragPreview),
     );
 

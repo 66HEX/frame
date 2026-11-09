@@ -26,6 +26,7 @@ pub(in crate::app) fn preview_overlay_controls(
 
     let bar = div()
         .id("preview-overlay-toolbar")
+        .debug_selector(|| "preview-overlay-toolbar".into())
         .track_focus(focuses.panel)
         .tab_stop(false)
         .flex()

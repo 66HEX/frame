@@ -51,6 +51,7 @@ pub fn output_dimensions(
 /// Geometry at the scale and padding boundaries of the visual filter graph.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct FilterGeometry {
+    pub pre_scale: (u32, u32),
     pub scaled: (u32, u32),
     pub canvas: (u32, u32),
 }
@@ -69,8 +70,10 @@ pub(crate) fn filter_geometry(
         }));
     }
     let (mut width, mut height) = dimensions?;
+    let pre_scale = (width, height);
     if !include_scale {
         return Some(FilterGeometry {
+            pre_scale,
             scaled: (width, height),
             canvas: (width, height),
         });
@@ -108,6 +111,7 @@ pub(crate) fn filter_geometry(
                         h.min(scaled_dimension(height, w, width, 1)?),
                     );
                     return Some(FilterGeometry {
+                        pre_scale,
                         scaled,
                         canvas: (w, h),
                     });
@@ -126,6 +130,7 @@ pub(crate) fn filter_geometry(
         _ => {}
     }
     Some(FilterGeometry {
+        pre_scale,
         scaled: (width, height),
         canvas: (width, height),
     })
@@ -161,4 +166,32 @@ fn scaled_dimension(value: u32, target: u32, reference: u32, multiple: u32) -> O
     u32::try_from(rounded.max(1) * u64::from(multiple))
         .ok()
         .filter(|value| *value > 0)
+}
+
+/// Physical output aspect, following the same rounded geometry as export.
+#[must_use]
+pub fn output_display_aspect_ratio(
+    config: &ConversionConfig,
+    source_width: u32,
+    source_height: u32,
+    source_sar: Option<crate::aspect::SampleAspectRatio>,
+) -> Option<crate::aspect::DisplayRatio> {
+    use crate::aspect::DisplayRatio;
+    let (width, height) = output_dimensions(config, source_width, source_height, None)?;
+    let mut aspect = DisplayRatio::new(u128::from(width), u128::from(height))?;
+    if let Some(mut sar) = source_sar {
+        if config.processing_mode != "copy" {
+            let geometry = filter_geometry(config, Some((source_width, source_height)), true)?;
+            if matches!(config.rotation.as_str(), "90" | "270") {
+                sar = sar.inverted();
+            }
+            aspect = aspect.multiplied_by(
+                u128::from(geometry.pre_scale.0) * u128::from(geometry.scaled.1),
+                u128::from(geometry.pre_scale.1) * u128::from(geometry.scaled.0),
+            )?;
+        }
+        aspect =
+            aspect.multiplied_by(u128::from(sar.numerator()), u128::from(sar.denominator()))?;
+    }
+    Some(aspect)
 }

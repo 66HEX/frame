@@ -21,6 +21,8 @@ fn config() -> PreviewSessionConfig {
         source_width: Some(160),
         source_height: Some(90),
         source_is_palette: false,
+        source_sample_aspect_ratio: None,
+        request_token: 0,
         source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
         selected_audio_track: None,
         duration_seconds: 3.0,

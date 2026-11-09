@@ -112,7 +112,7 @@ impl Render for FrameRoot {
         }
         let preview_canvas = self.preview_canvas_render_state();
         let preview_playback = self.preview_playback_state();
-        let preview_presentation = self.preview_ui.render_presentation;
+        let preview_presentation = self.preview_ui.rendered_presentation;
         let preview_render_image = self.preview_render_image();
         let preview_runtime_error = self.preview_runtime_error();
         let preview_availability = preview_control_availability(PreviewControlInput {

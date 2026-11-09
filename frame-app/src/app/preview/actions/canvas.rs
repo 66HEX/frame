@@ -1,4 +1,4 @@
-use crate::app::preview::panel::{PreviewCanvasRenderState, preview_presented_frame};
+use crate::app::preview::panel::{PreviewCanvasRenderState, preview_media_render_state};
 use crate::app::preview::state::{
     PREVIEW_CANVAS_INITIAL_CONTAIN_SCALE, PREVIEW_CANVAS_LERP_FACTOR, PREVIEW_CANVAS_MAX_PAN,
     PREVIEW_CANVAS_MAX_ZOOM, PREVIEW_CANVAS_MIN_ZOOM, PREVIEW_CANVAS_PAN_SNAP_EPSILON,
@@ -261,13 +261,11 @@ impl FrameRoot {
     }
 
     pub(super) fn preview_canvas_media_dimensions(&self) -> Option<(f64, f64)> {
-        let frame = preview_presented_frame(
-            self.preview_ui.render_image.as_ref()?,
-            self.preview_ui.render_presentation,
+        let media = preview_media_render_state(
+            self.preview_ui.render_image.as_ref(),
+            self.preview_ui.rendered_presentation,
         )?;
-        let width = f64::from(frame.visible_width);
-        let height = f64::from(frame.visible_height);
-        (width > 0.0 && height > 0.0).then_some((width, height))
+        Some(media.display_dimensions())
     }
 
     pub(super) fn apply_preview_canvas_auto_fit(&mut self) -> bool {

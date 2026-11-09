@@ -29,3 +29,9 @@ mod trim_seek;
 
 #[cfg(test)]
 mod runtime_tests;
+
+#[cfg(test)]
+mod presentation_tests;
+
+#[cfg(test)]
+mod gesture_tests;

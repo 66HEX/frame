@@ -9,7 +9,7 @@ use crate::file_queue::FileItem;
 use crate::numeric::rounded_f64_to_u64;
 use crate::preview_engine::{
     DEFAULT_PREVIEW_FPS, DEFAULT_PREVIEW_MAX_HEIGHT, DEFAULT_PREVIEW_MAX_WIDTH,
-    PreviewRenderPresentation, PreviewSessionConfig, PreviewSourceKind as EnginePreviewSourceKind,
+    PreviewSessionConfig, PreviewSourceKind as EnginePreviewSourceKind,
 };
 use crate::settings::{
     AudioFiltersConfig, ConversionConfig, CropSettings, FilterValue, OverlaySettings,
@@ -60,8 +60,11 @@ pub(super) fn preview_runtime_request(
         video_index,
         video_index.as_slice(),
     );
-    let presentation = PreviewRenderPresentation::default();
     let selected_audio_track = preview_selected_audio_track(&preview_config, metadata);
+    let mut visual_identity = DefaultHasher::new();
+    preview_visual_hash(&preview_config, source_is_palette, source_clock)
+        .hash(&mut visual_identity);
+    metadata.sample_aspect_ratio.hash(&mut visual_identity);
     let key = PreviewRuntimeKey {
         file_id: selected_file.id.clone(),
         path: selected_file.path.clone(),
@@ -70,7 +73,9 @@ pub(super) fn preview_runtime_request(
         source_height,
         duration_millis: rounded_f64_to_u64(duration_seconds * 1000.0),
         preview_dimensions,
-        visual_hash: preview_visual_hash(&preview_config, source_is_palette, source_clock),
+        visual_hash: visual_identity.finish(),
+        edit_crop: !include_applied_crop,
+        edit_overlay: !include_committed_overlay,
         audio_hash: preview_audio_hash(&preview_config, selected_audio_track),
     };
     let config = PreviewSessionConfig {
@@ -80,6 +85,8 @@ pub(super) fn preview_runtime_request(
         source_width,
         source_height,
         source_is_palette,
+        source_sample_aspect_ratio: metadata.sample_aspect_ratio,
+        request_token: 0,
         source_clock,
         selected_audio_track,
         duration_seconds,
@@ -89,11 +96,7 @@ pub(super) fn preview_runtime_request(
         conversion_config: core_config,
     };
 
-    Some(PreviewRuntimeRequest {
-        key,
-        config,
-        presentation,
-    })
+    Some(PreviewRuntimeRequest { key, config })
 }
 
 pub(in crate::app) fn preview_runtime_dimensions(

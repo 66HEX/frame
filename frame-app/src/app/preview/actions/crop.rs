@@ -49,6 +49,8 @@ impl FrameRoot {
         config: &ConversionConfig,
     ) -> PreviewCropRenderState {
         PreviewCropRenderState {
+            request_epoch: self.preview_ui.runtime_request_generation,
+            frame_ready: self.preview_edit_frame_ready(),
             auto_crop: self.auto_crop_render_state(),
             crop_mode: self.preview_ui.crop_mode,
             draft_crop: self.preview_ui.draft_crop,
@@ -346,7 +348,7 @@ impl FrameRoot {
         handle: DragHandle,
         point: PreviewPoint,
     ) -> bool {
-        if !self.preview_ui.crop_mode {
+        if !self.preview_ui.crop_mode || !self.preview_edit_frame_ready() {
             return false;
         }
         let cancelled = self.cancel_selected_auto_crop();
@@ -426,7 +428,7 @@ impl FrameRoot {
         key: &str,
         large_step: bool,
     ) -> bool {
-        if !self.preview_ui.crop_mode {
+        if !self.preview_ui.crop_mode || !self.preview_edit_frame_ready() {
             return false;
         }
         let Some(current_rect) = self.preview_ui.draft_crop else {

@@ -88,6 +88,8 @@ impl FrameRoot {
 
     pub(in crate::app) fn preview_overlay_render_state(&self) -> PreviewOverlayRenderState {
         PreviewOverlayRenderState {
+            request_epoch: self.preview_ui.runtime_request_generation,
+            frame_ready: self.preview_edit_frame_ready(),
             overlay_mode: self.preview_ui.overlay.overlay_mode(),
             has_overlay: self.preview_ui.overlay.has_overlay(),
             overlay: self.preview_ui.overlay.render_overlay().cloned(),
@@ -211,6 +213,9 @@ impl FrameRoot {
         direction: OverlaySizeDirection,
         media: Option<PreviewMediaRenderState>,
     ) -> bool {
+        if !self.preview_edit_frame_ready() {
+            return false;
+        }
         let height_ratio = self.preview_overlay_height_ratio(media);
         let Some(overlay) = self.preview_ui.overlay.nudge_size(
             direction,
@@ -260,7 +265,7 @@ impl FrameRoot {
         handle: OverlayDragHandle,
         point: OverlayDragPoint,
     ) -> bool {
-        if !self.selected_preview_overlay_controls_enabled() {
+        if !self.selected_preview_overlay_controls_enabled() || !self.preview_edit_frame_ready() {
             return false;
         }
 
@@ -294,7 +299,7 @@ impl FrameRoot {
         media: Option<PreviewMediaRenderState>,
         large_step: bool,
     ) -> bool {
-        if !self.selected_preview_overlay_controls_enabled() {
+        if !self.selected_preview_overlay_controls_enabled() || !self.preview_edit_frame_ready() {
             return false;
         }
         let Some(delta) = preview_overlay_keyboard_delta(key, large_step) else {
@@ -326,13 +331,7 @@ impl FrameRoot {
             .preview_ui
             .overlay_image_dimensions
             .map_or(1.0, PreviewOverlayImageDimensions::height_over_width);
-        let media_ratio = media.map_or(1.0, |media| {
-            if media.height == 0 {
-                1.0
-            } else {
-                f64::from(media.width) / f64::from(media.height)
-            }
-        });
+        let media_ratio = media.map_or(1.0, PreviewMediaRenderState::raster_aspect_ratio);
         overlay_ratio * media_ratio
     }
 

@@ -1,12 +1,30 @@
 use super::*;
 use gpui::{Entity, Modifiers, TestAppContext, VisualTestContext};
 
+fn draw_stub_frame(window: &mut gpui::Window, cx: &mut gpui::App) {
+    // Input/layout fixtures supply a synthetic image instead of a decoder.
+    // Advance that stub's identity before each draw, including the draw after
+    // adaptive dimensions settle. Runtime ownership/races have separate tests.
+    if let Some(root) = window.root::<FrameRoot>().flatten() {
+        root.update(cx, |root, _| {
+            let entry = root.selected_source_metadata_entry();
+            if root.preview_ui.render_image.is_some()
+                && let Some(request) = root.selected_preview_runtime_request(&entry)
+            {
+                root.preview_ui.rendered_runtime_key = Some(request.key.clone());
+                root.preview_ui.pending_runtime_key = Some(request.key);
+            }
+        });
+    }
+    window.draw(cx).clear(cx);
+}
+
 fn draw(cx: &mut VisualTestContext) {
-    cx.update(|window, cx| window.draw(cx).clear(cx));
+    cx.update(draw_stub_frame);
     cx.run_until_parked();
     cx.update(|window, cx| {
         window.simulate_next_frame(cx);
-        window.draw(cx).clear(cx);
+        draw_stub_frame(window, cx);
     });
 }
 

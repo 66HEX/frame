@@ -98,6 +98,17 @@ fn metadata_from_ffprobe(
                 .as_ref()
                 .is_none_or(|indices| indices.contains(&stream.index))
     }) {
+        metadata.sample_aspect_ratio = video_stream
+            .sample_aspect_ratio
+            .as_deref()
+            .and_then(crate::aspect::SampleAspectRatio::parse)
+            .map(|ratio| {
+                if has_side_display_rotation(video_stream) {
+                    ratio.inverted()
+                } else {
+                    ratio
+                }
+            });
         metadata.video_stream_index = Some(video_stream.index);
         metadata.video_codec.clone_from(&video_stream.codec_name);
         metadata.pixel_format.clone_from(&video_stream.pix_fmt);
@@ -314,16 +325,19 @@ fn display_oriented_dimensions(
     height: i32,
     video_stream: &FfprobeStream,
 ) -> (i32, i32) {
-    if video_stream
-        .side_data_list
-        .iter()
-        .filter_map(|side_data| side_data.rotation)
-        .any(is_side_display_rotation)
-    {
+    if has_side_display_rotation(video_stream) {
         (height, width)
     } else {
         (width, height)
     }
+}
+
+fn has_side_display_rotation(stream: &FfprobeStream) -> bool {
+    stream
+        .side_data_list
+        .iter()
+        .filter_map(|data| data.rotation)
+        .any(is_side_display_rotation)
 }
 
 fn is_side_display_rotation(rotation: f64) -> bool {

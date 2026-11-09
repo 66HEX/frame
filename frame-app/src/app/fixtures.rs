@@ -1,3 +1,5 @@
+mod anamorphic;
+
 use crate::app::inspector;
 use crate::app::inspector::subtitles::state::{SettingsSubtitleMode, SettingsSubtitlePopover};
 use crate::app::model::{ActiveView, VisualFixture};
@@ -92,6 +94,8 @@ impl FrameRoot {
             Some(VisualFixture::SettingsVideoHardware) => {
                 self.apply_settings_video_hardware_fixture();
             }
+            Some(VisualFixture::PreviewAnamorphicCrop) => self.apply_anamorphic_fixture(false),
+            Some(VisualFixture::PreviewAnamorphicOverlay) => self.apply_anamorphic_fixture(true),
             Some(VisualFixture::PreviewCrop) => self.apply_preview_crop_fixture(),
             Some(VisualFixture::PreviewReady) => self.apply_preview_ready_fixture(),
             Some(VisualFixture::PreviewTransport | VisualFixture::PreviewTrim) => {

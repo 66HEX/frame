@@ -297,10 +297,6 @@ fn preview_runtime_key_tracks_visual_config_but_ignores_encoder_quality() {
         .expect("transformed request");
 
     assert_ne!(transformed_request.key, initial_request.key);
-    assert_eq!(
-        transformed_request.presentation,
-        PreviewRenderPresentation::default()
-    );
     assert_eq!(transformed_request.config.conversion_config.rotation, "90");
     assert!(transformed_request.config.conversion_config.flip_horizontal);
     assert!(
@@ -316,6 +312,8 @@ fn preview_runtime_key_tracks_visual_config_but_ignores_encoder_quality() {
 #[test]
 fn preview_runtime_key_reconfigures_only_same_source_identity() {
     let current = PreviewRuntimeKey {
+        edit_crop: false,
+        edit_overlay: false,
         file_id: "video".to_string(),
         path: "/tmp/one.mp4".to_string(),
         source_kind: EnginePreviewSourceKind::Video,
@@ -342,6 +340,8 @@ fn preview_runtime_key_reconfigures_only_same_source_identity() {
 #[test]
 fn preview_runtime_key_changes_when_adaptive_dimensions_change() {
     let current = PreviewRuntimeKey {
+        edit_crop: false,
+        edit_overlay: false,
         file_id: "video".to_string(),
         path: "/tmp/one.mp4".to_string(),
         source_kind: EnginePreviewSourceKind::Video,
@@ -427,4 +427,30 @@ fn preview_resolves_video_only_timing_and_hashes_only_an_effective_burn_clock() 
     entry.metadata.as_mut().unwrap().source_timing = None;
     let copy_unknown = root.selected_preview_runtime_request(&entry).unwrap();
     assert_eq!(copy.key.visual_hash, copy_unknown.key.visual_hash);
+}
+
+#[test]
+fn preview_key_retains_canonical_unknown_distinction_and_edit_intent() {
+    let mut root = FrameRoot::new();
+    seed_ready_video(&mut root, "ratio", "/tmp/ratio.mkv");
+    let mut entry = root.source_metadata.entry_for("ratio");
+    let unknown = root.selected_preview_runtime_request(&entry).unwrap();
+    entry.metadata.as_mut().unwrap().sample_aspect_ratio =
+        frame_core::aspect::SampleAspectRatio::new(1, 1);
+    let square = root.selected_preview_runtime_request(&entry).unwrap();
+    assert_ne!(unknown.key.visual_hash, square.key.visual_hash);
+    entry.metadata.as_mut().unwrap().sample_aspect_ratio =
+        frame_core::aspect::SampleAspectRatio::new(2, 2);
+    let reduced = root.selected_preview_runtime_request(&entry).unwrap();
+    assert_eq!(square.key, reduced.key);
+    assert_eq!(
+        square.config.source_sample_aspect_ratio,
+        entry.metadata.as_ref().unwrap().sample_aspect_ratio
+    );
+    root.preview_ui.crop_mode = true;
+    let editing = root.selected_preview_runtime_request(&entry).unwrap();
+    assert_ne!(editing.key, square.key);
+    assert!(editing.key.edit_crop);
+    assert!(editing.config.conversion_config.crop.is_none());
+    assert!(square.config.conversion_config.crop.is_none());
 }

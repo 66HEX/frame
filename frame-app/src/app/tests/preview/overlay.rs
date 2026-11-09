@@ -160,3 +160,51 @@ fn remove_selected_overlay_clears_selected_file_overlay_config() {
     );
     assert!(root.preview_ui.overlay.overlay().is_none());
 }
+
+#[test]
+fn pending_overlay_source_blocks_drag_arrows_and_size_shortcuts_until_matching_frame() {
+    let mut root = root_with_overlay();
+    let entry = root.selected_source_metadata_entry();
+    let editing = root.selected_preview_runtime_request(&entry).unwrap();
+    let mut accepted = editing.key.clone();
+    accepted.edit_overlay = false;
+    root.preview_ui.render_image = root_with_preview_canvas_media(128, 128)
+        .preview_ui
+        .render_image;
+    root.preview_ui.rendered_runtime_key = Some(accepted);
+    root.preview_ui.desired_runtime_key = Some(editing.key.clone());
+    root.preview_ui.pending_runtime_key = Some(editing.key.clone());
+    let draft = root.preview_ui.overlay.overlay().cloned();
+    assert_eq!(
+        root.preview_overlay_render_state().overlay.as_ref(),
+        draft.as_ref()
+    );
+    assert!(!root.preview_overlay_render_state().frame_ready);
+    assert!(!root.apply_preview_overlay_drag(
+        OverlayDragHandle::Move,
+        OverlayDragPoint {
+            x: 0.4,
+            y: 0.4,
+            width: None,
+            height: None
+        }
+    ));
+    assert!(!root.adjust_preview_overlay_from_keyboard_with_step(
+        OverlayDragHandle::Move,
+        "right",
+        None,
+        false
+    ));
+    for direction in [
+        crate::preview::OverlaySizeDirection::Increase,
+        crate::preview::OverlaySizeDirection::Decrease,
+    ] {
+        assert!(!root.nudge_selected_overlay_size(direction, None));
+    }
+    assert_eq!(root.preview_ui.overlay.overlay(), draft.as_ref());
+    root.preview_ui.pending_runtime_key = None;
+    root.preview_ui.runtime_key = Some(editing.key.clone());
+    assert!(!root.preview_edit_frame_ready());
+    root.preview_ui.rendered_runtime_key = Some(editing.key);
+    assert!(root.nudge_selected_overlay_size(crate::preview::OverlaySizeDirection::Increase, None));
+}

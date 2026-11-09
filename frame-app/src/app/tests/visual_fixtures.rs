@@ -425,3 +425,326 @@ fn settings_presets_fixture_opens_presets_tab_with_custom_draft() {
             .any(|preset| preset.id == "custom-review")
     );
 }
+
+#[test]
+fn anamorphic_fixtures_seed_real_pixels_and_an_explicit_file_scoped_static_frame() {
+    for (key, fixture) in [
+        (
+            "preview-anamorphic-crop",
+            VisualFixture::PreviewAnamorphicCrop,
+        ),
+        (
+            "preview-anamorphic-overlay",
+            VisualFixture::PreviewAnamorphicOverlay,
+        ),
+    ] {
+        assert_eq!(
+            crate::app::model::visual_fixture_from_env_value(Some(key)),
+            Some(fixture)
+        );
+        let mut root = FrameRoot::new();
+        root.apply_visual_fixture(Some(fixture));
+        assert_eq!(
+            root.preview_ui.static_fixture_file_id.as_deref(),
+            Some("fixture-preview")
+        );
+        assert_eq!(root.preview_ui.accepted_request_token, 0);
+        let image = root.preview_ui.render_image.as_ref().unwrap();
+        assert_eq!((image.size(0).width.0, image.size(0).height.0), (320, 180));
+        assert!(image.as_bytes(0).unwrap().iter().any(|byte| *byte != 0));
+        assert_eq!(
+            root.preview_ui
+                .rendered_presentation
+                .pixel_aspect_ratio
+                .exact_ratio(),
+            Some((2, 1))
+        );
+        assert_eq!(
+            root.selected_source_metadata().unwrap().sample_aspect_ratio,
+            frame_core::aspect::SampleAspectRatio::new(2, 1)
+        );
+        assert_eq!(
+            root.preview_ui.crop_mode,
+            fixture == VisualFixture::PreviewAnamorphicCrop
+        );
+        assert_eq!(
+            root.preview_ui.overlay.overlay_mode(),
+            fixture == VisualFixture::PreviewAnamorphicOverlay
+        );
+    }
+}
+
+#[test]
+fn native_anamorphic_fixture_bounds_keep_crop_and_overlay_in_raster_coordinates() {
+    use gpui::{TestAppContext, VisualTestContext};
+    fn draw(cx: &mut VisualTestContext) {
+        for _ in 0..3 {
+            cx.update(|window, cx| {
+                window.simulate_next_frame(cx);
+                window.draw(cx).clear(cx);
+            });
+        }
+    }
+    for (fixture, selection, width_fraction, height_fraction) in [
+        (
+            VisualFixture::PreviewAnamorphicCrop,
+            "preview-crop-move-handle",
+            128.0 / 320.0,
+            128.0 / 180.0,
+        ),
+        (
+            VisualFixture::PreviewAnamorphicOverlay,
+            "preview-overlay-layer",
+            80.0 / 320.0,
+            80.0 / 180.0,
+        ),
+    ] {
+        for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+            let mut app = TestAppContext::single();
+            if fixture == VisualFixture::PreviewAnamorphicOverlay {
+                preload_overlay_test_image(
+                    &app,
+                    std::path::Path::new(concat!(
+                        env!("CARGO_MANIFEST_DIR"),
+                        "/resources/app-icons/64x64.png"
+                    )),
+                    (64, 64),
+                );
+            }
+            let (root, cx) = app.add_window_view(|_, cx| {
+                crate::app::init_app(cx, "Anamorphic preview test");
+                cx.set_reduce_motion(true);
+                let mut root = FrameRoot::new();
+                root.apply_visual_fixture(Some(fixture));
+                root.appearance.ui_scale = scale;
+                root
+            });
+            cx.simulate_resize(size(px(1800.0), px(1200.0)));
+            draw(cx);
+            let stage = cx.debug_bounds("preview-media-stage").unwrap();
+            let selected = cx.debug_bounds(selection).unwrap();
+            let width = f64::from(stage.size.width.as_f32());
+            let height = f64::from(stage.size.height.as_f32());
+            assert!((width / height - 32.0 / 9.0).abs() < 0.001, "{stage:?}");
+            assert!(
+                width
+                    .mul_add(-width_fraction, f64::from(selected.size.width.as_f32()))
+                    .abs()
+                    < 1.0
+            );
+            assert!(
+                height
+                    .mul_add(-height_fraction, f64::from(selected.size.height.as_f32()))
+                    .abs()
+                    < 1.0
+            );
+            assert!(
+                (selected.size.width.as_f32() / selected.size.height.as_f32() - 2.0).abs() < 0.01
+            );
+            if fixture == VisualFixture::PreviewAnamorphicOverlay {
+                // Check the loaded image itself, not merely its clipping parent:
+                // an intrinsic square previously lost its entire lower half.
+                let image = cx.debug_bounds("preview-overlay-image").unwrap();
+                assert_eq!(image, selected);
+                let painted_images = cx.update(|window, _| window.rendered_primitive_counts().3);
+                assert!(painted_images >= 2, "preview and overlay must both paint");
+            }
+            root.read_with(cx, |root, _| {
+                assert!(root.preview_edit_frame_ready());
+                assert!(root.preview_ui.session.is_none());
+            });
+        }
+    }
+}
+
+fn preload_overlay_test_image(
+    app: &gpui::TestAppContext,
+    path: &std::path::Path,
+    expected: (i32, i32),
+) {
+    let resource = gpui::Resource::Path(path.into());
+    let image = app.update(|cx| cx.fetch_asset::<gpui::ImgResourceLoader>(&resource).0);
+    let image = app
+        .foreground_executor()
+        .block_test(image)
+        .expect("load overlay asset");
+    assert_eq!((image.size(0).width.0, image.size(0).height.0), expected);
+}
+
+fn rounded_overlay_test_root(path: &std::path::Path) -> FrameRoot {
+    use crate::preview_engine::{PreviewRenderPresentation, rendered_frame_from_bgra_payload};
+    use frame_core::aspect::SampleAspectRatio;
+    let mut root = FrameRoot::new();
+    root.apply_visual_fixture(Some(VisualFixture::PreviewAnamorphicOverlay));
+    let mut metadata = root.selected_source_metadata().unwrap();
+    metadata.width = Some(400);
+    metadata.height = Some(4);
+    metadata.sample_aspect_ratio = SampleAspectRatio::new(1, 1);
+    root.source_metadata.mark_ready("fixture-preview", metadata);
+    let mut overlay = root.preview_ui.overlay.overlay().unwrap().clone();
+    overlay.path = path.to_string_lossy().into_owned();
+    overlay.width = 0.05;
+    root.preview_ui.overlay = crate::preview::PreviewOverlayState::new();
+    root.preview_ui.overlay.sync_initial_overlay(Some(&overlay));
+    root.preview_ui.overlay.set_overlay_mode(true, false);
+    root.preview_ui.overlay_dimensions_key = Some(overlay.path.clone());
+    root.preview_ui.overlay_image_dimensions =
+        Some(crate::app::preview::state::PreviewOverlayImageDimensions {
+            width: 100,
+            height: 10,
+        });
+    let config = crate::conversion_runner::core_config_from_gpui(root.selected_config().unwrap());
+    let plan = frame_core::preview::build_ffmpeg_preview_args(
+        "source",
+        &config,
+        &frame_core::preview::PreviewFfmpegOptions {
+            start_seconds: 0.0,
+            end_seconds: None,
+            source_width: Some(400),
+            source_height: Some(4),
+            source_is_palette: false,
+            source_sample_aspect_ratio: SampleAspectRatio::new(1, 1),
+            source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
+            max_width: 240,
+            max_height: 240,
+            fps: 30,
+            realtime: false,
+            precise_seek: true,
+            source_is_image: false,
+        },
+    )
+    .unwrap();
+    assert_eq!((plan.width, plan.height), (240, 2));
+    let frame = rendered_frame_from_bgra_payload(
+        plan.width,
+        plan.height,
+        plan.width * 4,
+        0,
+        vec![0; plan.frame_bytes],
+    )
+    .unwrap()
+    .with_presentation(
+        PreviewRenderPresentation {
+            pixel_aspect_ratio: plan.pixel_aspect_ratio,
+            output_raster_aspect_ratio: plan.output_raster_aspect_ratio,
+            ..Default::default()
+        },
+        0,
+    );
+    root.preview_ui.render_image = Some(frame.render_image());
+    root.preview_ui.rendered_presentation = frame.presentation;
+    root
+}
+
+fn normalized_test_overlay_size(root: &FrameRoot) -> (f64, f64) {
+    let metadata = root.selected_source_metadata();
+    let config = root.selected_config().unwrap();
+    let settings =
+        super::preview_shell::settings_state(config, metadata.as_ref(), MetadataStatus::Ready);
+    let state = preview_shell_state(PreviewShellStateInput {
+        selected_file: root.file_queue.selected_file(),
+        settings: &settings,
+        crop: root.preview_crop_render_state(metadata.as_ref(), config),
+        overlay: root.preview_overlay_render_state(),
+        canvas: root.preview_canvas_render_state(),
+        playback: root.preview_playback_state(),
+        presentation: root.preview_ui.rendered_presentation,
+        render_image: root.preview_ui.render_image.clone(),
+        runtime_error: None,
+    });
+    preview_overlay_test_render_size(&state)
+}
+
+#[expect(
+    clippy::suboptimal_flops,
+    reason = "The native edge oracle preserves GPUI's separate f32 layout operations before midpoint snapping; fused arithmetic can change the selected pixel."
+)]
+fn snapped_overlay_bounds(stage: Bounds<Pixels>, device_scale: f32) -> Bounds<Pixels> {
+    // GPUI rounds absolute near/far edges in device pixels, with midpoint ties
+    // toward zero. Keep this independent oracle in exact normalized geometry.
+    let snap = |value: f32| px((value * device_scale - 0.5).ceil() / device_scale);
+    Bounds::from_corners(
+        point(
+            snap(stage.origin.x.as_f32() + stage.size.width.as_f32() * 0.475),
+            snap(stage.origin.y.as_f32() + stage.size.height.as_f32() * 0.25),
+        ),
+        point(
+            snap(stage.origin.x.as_f32() + stage.size.width.as_f32() * 0.525),
+            snap(stage.origin.y.as_f32() + stage.size.height.as_f32() * 0.75),
+        ),
+    )
+}
+
+#[test]
+fn rounded_preview_texture_keeps_output_overlay_geometry_in_native_layout_and_keyboard() {
+    use gpui::TestAppContext;
+    let path = std::env::temp_dir().join(format!(
+        "frame-r7-rounded-overlay-{}.png",
+        std::process::id()
+    ));
+    image::RgbaImage::from_pixel(100, 10, image::Rgba([255, 0, 0, 255]))
+        .save(&path)
+        .unwrap();
+    for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+        let mut app = TestAppContext::single();
+        preload_overlay_test_image(&app, &path, (100, 10));
+        let (root, cx) = app.add_window_view(|_, cx| {
+            crate::app::init_app(cx, "Rounded overlay test");
+            cx.set_reduce_motion(true);
+            let mut root = rounded_overlay_test_root(&path);
+            root.appearance.ui_scale = scale;
+            root
+        });
+        cx.simulate_resize(size(px(1800.0), px(1200.0)));
+        for _ in 0..3 {
+            cx.update(|window, cx| {
+                window.simulate_next_frame(cx);
+                window.draw(cx).clear(cx);
+            });
+        }
+        let stage = cx.debug_bounds("preview-media-stage").unwrap();
+        let selected = cx.debug_bounds("preview-overlay-layer").unwrap();
+        let image = cx.debug_bounds("preview-overlay-image").unwrap();
+        let normalized = root.read_with(cx, |root, _| normalized_test_overlay_size(root));
+        assert_eq!(normalized, (0.05, 0.5));
+        assert_eq!(normalized.0 / normalized.1 * 100.0, 10.0);
+        let device_scale = cx.update(|window, _| window.scale_factor());
+        let expected_bounds = snapped_overlay_bounds(stage, device_scale);
+        root.read_with(cx, |root, _| {
+            eprintln!(
+                "rounded-overlay scale={scale:?} stage={stage:?} selected={selected:?} image={image:?} draft={:?} presentation={:?}",
+                root.preview_ui.overlay.render_overlay(), root.preview_ui.rendered_presentation
+            );
+        });
+        assert_eq!(image, selected);
+        assert_eq!(
+            selected, expected_bounds,
+            "scale={scale:?}, device_scale={device_scale}"
+        );
+        root.update(cx, |root, _| {
+            let media = preview_media_render_state(
+                root.preview_ui.render_image.as_ref(),
+                root.preview_ui.rendered_presentation,
+            )
+            .unwrap();
+            assert_eq!((media.width, media.height), (240, 2));
+            assert_eq!(media.raster_aspect_ratio(), 100.0);
+            for _ in 0..8 {
+                root.adjust_preview_overlay_from_keyboard_with_step(
+                    crate::preview::OverlayDragHandle::Move,
+                    "down",
+                    Some(media),
+                    true,
+                );
+            }
+            assert!((root.preview_ui.overlay.overlay().unwrap().y - 0.75).abs() < 0.000_001);
+            assert!(root.nudge_selected_overlay_size(
+                crate::preview::OverlaySizeDirection::Increase,
+                Some(media)
+            ));
+            let overlay = root.preview_ui.overlay.overlay().unwrap();
+            assert!((overlay.y - (1.0 - overlay.width * 10.0 / 2.0)).abs() < 0.000_001);
+        });
+    }
+    std::fs::remove_file(path).unwrap();
+}

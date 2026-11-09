@@ -33,6 +33,8 @@ pub(super) fn preview_config() -> PreviewSessionConfig {
         source_width: Some(1920),
         source_height: Some(1080),
         source_is_palette: false,
+        source_sample_aspect_ratio: None,
+        request_token: 0,
         source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
         selected_audio_track: None,
         duration_seconds: 12.5,
@@ -495,4 +497,73 @@ fn clamp_seek_seconds_keeps_seek_inside_duration() {
     let seconds = clamp_seek_seconds(12.5, 12.5).expect("seconds");
 
     assert!((seconds - 12.499).abs() <= f64::EPSILON);
+}
+
+#[test]
+fn stream_frame_keeps_captured_plan_presentation_and_request_token() {
+    use super::decode::{FrameStreamSpec, RenderImageIdentity, read_stream_frame};
+    use crate::preview_engine::{PreviewRenderPresentation, rendered_frame_from_bgra_payload};
+    use frame_core::aspect::{DisplayRatio, SampleAspectRatio};
+    let mut config = preview_config();
+    config.source_sample_aspect_ratio = SampleAspectRatio::new(2, 1);
+    config.request_token = 41;
+    config.max_width = 16;
+    config.max_height = 9;
+    let plan = preview_plan(&config, 0.5, false, true).unwrap();
+    let presentation = PreviewRenderPresentation {
+        pixel_aspect_ratio: plan.pixel_aspect_ratio,
+        output_raster_aspect_ratio: plan.output_raster_aspect_ratio,
+        ..Default::default()
+    };
+    let spec = FrameStreamSpec {
+        presentation,
+        request_token: config.request_token,
+        width: plan.width,
+        height: plan.height,
+        fps: config.fps,
+        frame_bytes: plan.frame_bytes,
+        base_seconds: 0.5,
+        first_frame_index: 0,
+        generation: 9,
+        spawned_at: Instant::now(),
+    };
+    // A later request must not relabel bytes already owned by this stream.
+    config.request_token = 42;
+    config.source_sample_aspect_ratio = SampleAspectRatio::new(1, 2);
+    let replacement = preview_plan(&config, 0.5, false, true).unwrap();
+    assert_ne!(
+        replacement.pixel_aspect_ratio,
+        spec.presentation.pixel_aspect_ratio
+    );
+    let identity = rendered_frame_from_bgra_payload(1, 1, 4, 0, vec![0; 4])
+        .unwrap()
+        .render_image()
+        .id;
+    let payload = vec![123; spec.frame_bytes];
+    let decoded = read_stream_frame(
+        &mut std::io::Cursor::new(payload.clone()),
+        &spec,
+        0.5,
+        RenderImageIdentity {
+            image_id: identity,
+            content_version: 7,
+        },
+    )
+    .unwrap();
+    assert_eq!(decoded.frame.request_token, 41);
+    assert_eq!(decoded.frame.presentation, presentation);
+    assert_eq!(
+        decoded.frame.presentation.output_raster_aspect_ratio,
+        DisplayRatio::new(16, 9)
+    );
+    assert_eq!(
+        decoded.frame.presentation.pixel_aspect_ratio,
+        DisplayRatio::new(2, 1).unwrap()
+    );
+    assert_eq!(decoded.frame.timestamp_us, 500_000);
+    assert_eq!(decoded.frame.render_image().content_version(), 7);
+    assert_eq!(
+        decoded.frame.render_image().as_bytes(0),
+        Some(payload.as_slice())
+    );
 }

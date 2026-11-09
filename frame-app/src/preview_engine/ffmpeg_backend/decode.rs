@@ -12,6 +12,8 @@ use std::time::{Duration, Instant};
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct FrameStreamSpec {
+    pub(super) presentation: crate::preview_engine::PreviewRenderPresentation,
+    pub(super) request_token: u64,
     pub(super) width: u32,
     pub(super) height: u32,
     pub(super) fps: u32,
@@ -115,6 +117,17 @@ pub(super) fn decode_single_preview_frame(
         read_elapsed,
         image_identity,
     )
+    .map(|mut decoded| {
+        decoded.frame = decoded.frame.with_presentation(
+            crate::preview_engine::PreviewRenderPresentation {
+                pixel_aspect_ratio: plan.pixel_aspect_ratio,
+                output_raster_aspect_ratio: plan.output_raster_aspect_ratio,
+                ..Default::default()
+            },
+            config.request_token,
+        );
+        decoded
+    })
 }
 
 pub(super) fn read_stream_frame(
@@ -138,6 +151,12 @@ pub(super) fn read_stream_frame(
         read_elapsed,
         image_identity,
     )
+    .map(|mut decoded| {
+        decoded.frame = decoded
+            .frame
+            .with_presentation(spec.presentation, spec.request_token);
+        decoded
+    })
 }
 
 pub(super) fn rendered_preview_frame_from_payload(

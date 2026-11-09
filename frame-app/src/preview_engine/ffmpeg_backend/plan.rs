@@ -24,6 +24,7 @@ pub(super) fn preview_plan(
             source_width: config.source_width,
             source_height: config.source_height,
             source_is_palette: config.source_is_palette,
+            source_sample_aspect_ratio: config.source_sample_aspect_ratio,
             source_clock: config.source_clock,
             max_width: config.max_width,
             max_height: config.max_height,

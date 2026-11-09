@@ -338,18 +338,29 @@ pub(in crate::app) fn preview_media_stage(
     let canvas = state.canvas;
     let mut media_stage = div()
         .id("preview-media-stage")
-        .on_drag_move(cx.listener(
-            |root, event: &DragMoveEvent<PreviewCropDrag>, _window, cx| {
+        .debug_selector(|| "preview-media-stage".into())
+        .on_drag_move(
+            cx.listener(|root, event: &DragMoveEvent<PreviewCropDrag>, window, cx| {
                 let drag = *event.drag(cx);
+                if !root.accept_preview_drag_epoch(drag.request_epoch) {
+                    cx.stop_active_drag(window);
+                    cx.notify();
+                    return;
+                }
                 let point = normalized_point_from_bounds(event.event.position, event.bounds);
                 if root.apply_preview_crop_drag(drag.handle, point) {
                     cx.notify();
                 }
-            },
-        ))
+            }),
+        )
         .on_drag_move(cx.listener(
-            |root, event: &DragMoveEvent<PreviewOverlayDrag>, _window, cx| {
+            |root, event: &DragMoveEvent<PreviewOverlayDrag>, window, cx| {
                 let drag = *event.drag(cx);
+                if !root.accept_preview_drag_epoch(drag.request_epoch) {
+                    cx.stop_active_drag(window);
+                    cx.notify();
+                    return;
+                }
                 let point =
                     overlay_drag_point_from_bounds(event.event.position, event.bounds, drag);
                 if root.apply_preview_overlay_drag(drag.handle, point) {
@@ -369,8 +380,8 @@ pub(in crate::app) fn preview_media_stage(
     if let Some(metrics) = preview_canvas_layout_metrics(
         canvas.viewport_width,
         canvas.viewport_height,
-        f64::from(media.width),
-        f64::from(media.height),
+        media.display_dimensions().0,
+        media.display_dimensions().1,
         canvas.zoom,
         canvas.pan_x,
         canvas.pan_y,
@@ -394,7 +405,7 @@ pub(in crate::app) fn preview_media_stage(
         media_stage = media_stage.child(overlay);
     }
 
-    if state.crop.crop_mode && state.crop.draft_crop.is_some() {
+    if state.crop.frame_ready && state.crop.crop_mode && state.crop.draft_crop.is_some() {
         media_stage = media_stage.child(preview_crop_overlay(state, cx));
     }
 

@@ -47,6 +47,8 @@ fn session_config_rejects_unpaired_source_dimensions() {
         source_width: Some(1920),
         source_height: None,
         source_is_palette: false,
+        source_sample_aspect_ratio: None,
+        request_token: 0,
         source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
         selected_audio_track: None,
         duration_seconds: 10.0,
@@ -72,6 +74,8 @@ fn session_config_accepts_silent_audio_source_without_selected_track() {
         source_width: None,
         source_height: None,
         source_is_palette: false,
+        source_sample_aspect_ratio: None,
+        request_token: 0,
         source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
         selected_audio_track: None,
         duration_seconds: 10.0,
@@ -217,6 +221,8 @@ fn test_preview_session_command_is_noop_without_pipeline() {
         source_width: Some(1920),
         source_height: Some(1080),
         source_is_palette: false,
+        source_sample_aspect_ratio: None,
+        request_token: 0,
         source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
         selected_audio_track: None,
         duration_seconds: 12.5,
@@ -250,6 +256,8 @@ fn test_preview_session_snapshot_exposes_runtime_metrics() {
         source_width: Some(1920),
         source_height: Some(1080),
         source_is_palette: false,
+        source_sample_aspect_ratio: None,
+        request_token: 0,
         source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
         selected_audio_track: None,
         duration_seconds: 12.5,
@@ -612,6 +620,8 @@ fn real_video_preview_config(path: PathBuf) -> PreviewSessionConfig {
         source_width: Some(160),
         source_height: Some(90),
         source_is_palette: false,
+        source_sample_aspect_ratio: None,
+        request_token: 0,
         source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
         selected_audio_track: None,
         duration_seconds: 2.0,
@@ -630,6 +640,8 @@ fn real_av_preview_config(path: PathBuf) -> PreviewSessionConfig {
         source_width: Some(160),
         source_height: Some(90),
         source_is_palette: false,
+        source_sample_aspect_ratio: None,
+        request_token: 0,
         source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
         selected_audio_track: Some(1),
         duration_seconds: 2.0,
@@ -701,4 +713,60 @@ fn temp_preview_av_sync_video(label: &str) -> PathBuf {
         "ffmpeg av fixture generation failed: {status}"
     );
     path
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn ffmpeg_snapshot_stream_seek_and_reconfigure_keep_frame_owned_presentation() {
+    use frame_core::aspect::{DisplayRatio, SampleAspectRatio};
+    let path = temp_preview_video("presentation-ownership");
+    let mut config = real_video_preview_config(path.clone());
+    config.source_sample_aspect_ratio = SampleAspectRatio::new(2, 1);
+    config.request_token = 101;
+    let session = PreviewSession::start(config.clone()).expect("session");
+    let initial = session.latest_frame().unwrap().frame;
+    assert_eq!(initial.request_token, 101);
+    assert_eq!(
+        initial.presentation.pixel_aspect_ratio,
+        DisplayRatio::new(2, 1).unwrap()
+    );
+    assert_eq!(initial.presentation.transform, PreviewTransform::default());
+    assert_eq!(
+        initial.presentation.output_raster_aspect_ratio,
+        DisplayRatio::new(16, 9)
+    );
+    for command in [
+        PreviewCommand::SeekPrecise(0.5),
+        PreviewCommand::SeekAndPlay {
+            seconds: 0.5,
+            precise: true,
+        },
+    ] {
+        session.command(command).unwrap();
+        let frame = session.latest_frame().unwrap().frame;
+        assert_eq!(frame.request_token, 101);
+        assert_eq!(frame.presentation, initial.presentation);
+        assert_eq!(frame.render_image().id, initial.render_image().id);
+        assert!(frame.render_image().content_version() > initial.render_image().content_version());
+        session.command(PreviewCommand::Pause).unwrap();
+    }
+    config.request_token = 102;
+    config.conversion_config.rotation = "90".into();
+    session.reconfigure(config).unwrap();
+    let rotated = session.latest_frame().unwrap().frame;
+    assert_eq!(rotated.request_token, 102);
+    assert_eq!((rotated.width, rotated.height), (90, 160));
+    assert_eq!(
+        rotated.presentation.pixel_aspect_ratio,
+        DisplayRatio::new(1, 2).unwrap()
+    );
+    assert_eq!(rotated.presentation.transform, PreviewTransform::default());
+    assert_eq!(
+        rotated.presentation.output_raster_aspect_ratio,
+        DisplayRatio::new(9, 16)
+    );
+    assert_eq!(rotated.render_image().id, initial.render_image().id);
+    assert!(rotated.render_image().content_version() > initial.render_image().content_version());
+    session.stop().unwrap();
+    let _ = std::fs::remove_file(path);
 }

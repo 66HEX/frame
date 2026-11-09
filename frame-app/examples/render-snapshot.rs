@@ -31,59 +31,79 @@ fn main() {
             assets::load_frame_fonts(cx).expect("load fixture fonts");
             init_app(cx, "Frame visual snapshot");
             cx.set_reduce_motion(true);
-            let bounds = Bounds::centered(None, size(px(1200.0), px(800.0)), cx);
-            let mut options = frame_window_options(bounds);
-            options.show = false;
-            options.focus = false;
-            let handle = cx
-                .open_window(options, |_, cx| cx.new(|_| FrameRoot::new()))
-                .expect("open fixture window");
-            cx.defer(move |cx| {
-                cx.update_window(handle.into(), |_, window, cx| {
-                    let click_label = std::env::var("FRAME_VISUAL_CLICK_LABEL").ok();
-                    window.set_a11y_forced(click_label.is_some());
-                    // Keep physical pointer position from changing group-hover styles.
-                    window.dispatch_event(
-                        PlatformInput::MouseMove(MouseMoveEvent {
-                            position: point(px(-1000.0), px(-1000.0)),
-                            ..Default::default()
-                        }),
-                        cx,
-                    );
-                    if std::env::var("FRAME_VISUAL_DRAG_DROP").as_deref() == Ok("1") {
-                        window.draw(cx).clear(cx);
-                        window.dispatch_event(
-                            PlatformInput::FileDrop(FileDropEvent::Entered {
-                                position: point(px(600.0), px(400.0)),
-                                paths: ExternalPaths(
-                                    std::iter::once("/tmp/visual-drop.mp4".into()).collect(),
-                                ),
-                            }),
-                            cx,
-                        );
-                    }
-                    // Resolve layout and focus synchronously, without advancing timers.
-                    for _ in 0..3 {
-                        window.refresh();
-                        window.draw(cx).clear(cx);
-                    }
-                    if let Some(label) = click_label {
-                        click_label_control(window, cx, &label);
-                        for _ in 0..3 {
-                            window.refresh();
-                            window.draw(cx).clear(cx);
-                        }
-                    }
-                    window
-                        .render_to_image()
-                        .expect("render fixture")
-                        .save(&output)
-                        .expect("save PNG");
+            if fixture == "preview-anamorphic-overlay" {
+                let path = std::path::PathBuf::from(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/resources/app-icons/64x64.png"
+                ));
+                let resource = gpui::Resource::Path(path.into());
+                let (image, _) = cx.fetch_asset::<gpui::ImgResourceLoader>(&resource);
+                cx.spawn(async move |cx| {
+                    image
+                        .await
+                        .expect("load the anamorphic fixture logo before capture");
+                    cx.update(|cx| capture_fixture(output, cx));
                 })
-                .expect("draw fixture");
-                cx.quit();
-            });
+                .detach();
+            } else {
+                capture_fixture(output, cx);
+            }
         });
+}
+
+fn capture_fixture(output: String, cx: &mut gpui::App) {
+    let bounds = Bounds::centered(None, size(px(1200.0), px(800.0)), cx);
+    let mut options = frame_window_options(bounds);
+    options.show = false;
+    options.focus = false;
+    let handle = cx
+        .open_window(options, |_, cx| cx.new(|_| FrameRoot::new()))
+        .expect("open fixture window");
+    cx.defer(move |cx| {
+        cx.update_window(handle.into(), |_, window, cx| {
+            let click_label = std::env::var("FRAME_VISUAL_CLICK_LABEL").ok();
+            window.set_a11y_forced(click_label.is_some());
+            // Keep physical pointer position from changing group-hover styles.
+            window.dispatch_event(
+                PlatformInput::MouseMove(MouseMoveEvent {
+                    position: point(px(-1000.0), px(-1000.0)),
+                    ..Default::default()
+                }),
+                cx,
+            );
+            if std::env::var("FRAME_VISUAL_DRAG_DROP").as_deref() == Ok("1") {
+                window.draw(cx).clear(cx);
+                window.dispatch_event(
+                    PlatformInput::FileDrop(FileDropEvent::Entered {
+                        position: point(px(600.0), px(400.0)),
+                        paths: ExternalPaths(
+                            std::iter::once("/tmp/visual-drop.mp4".into()).collect(),
+                        ),
+                    }),
+                    cx,
+                );
+            }
+            // Resolve layout and focus synchronously, without advancing timers.
+            for _ in 0..3 {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            }
+            if let Some(label) = click_label {
+                click_label_control(window, cx, &label);
+                for _ in 0..3 {
+                    window.refresh();
+                    window.draw(cx).clear(cx);
+                }
+            }
+            window
+                .render_to_image()
+                .expect("render fixture")
+                .save(&output)
+                .expect("save PNG");
+        })
+        .expect("draw fixture");
+        cx.quit();
+    });
 }
 
 fn click_label_control(window: &mut gpui::Window, cx: &mut gpui::App, label: &str) {

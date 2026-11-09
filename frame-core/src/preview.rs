@@ -20,6 +20,7 @@ pub struct PreviewFfmpegOptions {
     pub source_width: Option<u32>,
     pub source_height: Option<u32>,
     pub source_is_palette: bool,
+    pub source_sample_aspect_ratio: Option<crate::aspect::SampleAspectRatio>,
     pub source_clock: crate::source_timing::ResolvedSourceClock,
     pub max_width: u32,
     pub max_height: u32,
@@ -42,6 +43,9 @@ pub struct PreviewAudioFfmpegOptions {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PreviewFfmpegPlan {
+    pub pixel_aspect_ratio: crate::aspect::DisplayRatio,
+    /// Raster aspect before preview downscaling; independent of texture rounding.
+    pub output_raster_aspect_ratio: Option<crate::aspect::DisplayRatio>,
     pub args: Vec<String>,
     pub width: u32,
     pub height: u32,
@@ -60,6 +64,15 @@ pub struct PreviewAudioFfmpegPlan {
 struct PreviewGeometry {
     preview_width: u32,
     preview_height: u32,
+}
+
+impl PreviewFfmpegPlan {
+    #[must_use]
+    pub fn display_aspect_ratio(&self) -> crate::aspect::DisplayRatio {
+        self.pixel_aspect_ratio
+            .multiplied_by(u128::from(self.width), u128::from(self.height))
+            .unwrap_or_default()
+    }
 }
 
 /// Builds an `FFmpeg` command plan that streams low-resolution BGRA preview
@@ -159,12 +172,43 @@ pub fn build_ffmpeg_preview_args(
     ]);
 
     Ok(PreviewFfmpegPlan {
+        pixel_aspect_ratio: preview_pixel_aspect_ratio(config, options, geometry),
+        output_raster_aspect_ratio: options
+            .source_width
+            .zip(options.source_height)
+            .and_then(|(w, h)| output_dimensions(config, w, h, None))
+            .and_then(|(w, h)| crate::aspect::DisplayRatio::new(u128::from(w), u128::from(h))),
         args,
         width: geometry.preview_width,
         height: geometry.preview_height,
         fps,
         frame_bytes,
     })
+}
+
+fn preview_pixel_aspect_ratio(
+    config: &ConversionConfig,
+    options: &PreviewFfmpegOptions,
+    geometry: PreviewGeometry,
+) -> crate::aspect::DisplayRatio {
+    options
+        .source_width
+        .zip(options.source_height)
+        .and_then(|(w, h)| {
+            crate::dimensions::output_display_aspect_ratio(
+                config,
+                w,
+                h,
+                options.source_sample_aspect_ratio,
+            )
+        })
+        .and_then(|aspect| {
+            aspect.multiplied_by(
+                u128::from(geometry.preview_height),
+                u128::from(geometry.preview_width),
+            )
+        })
+        .unwrap_or_default()
 }
 
 /// Builds an `FFmpeg` command plan that streams decoded preview audio as PCM
@@ -546,6 +590,86 @@ mod tests {
         assert!(build_ffmpeg_preview_args("source.mkv", &config, &options).is_ok());
     }
 
+    #[test]
+    fn display_aspect_follows_oriented_crop_scale_and_padding_without_changing_payload_plan() {
+        use crate::aspect::SampleAspectRatio;
+        let mut config = default_config();
+        let mut options = default_options();
+        options.source_width = Some(320);
+        options.source_height = Some(180);
+        options.max_width = 320;
+        options.max_height = 180;
+        let square = build_ffmpeg_preview_args("source", &config, &options).unwrap();
+        options.source_sample_aspect_ratio = SampleAspectRatio::new(2, 1);
+        let wide = build_ffmpeg_preview_args("source", &config, &options).unwrap();
+        assert_eq!(wide.args, square.args);
+        assert_eq!(wide.frame_bytes, square.frame_bytes);
+        assert_eq!(wide.display_aspect_ratio().exact_ratio(), Some((32, 9)));
+        config.resolution = "custom".into();
+        config.custom_width = Some("127".into());
+        config.custom_height = Some("129".into());
+        let custom = build_ffmpeg_preview_args("source", &config, &options).unwrap();
+        assert_eq!(
+            custom.display_aspect_ratio().exact_ratio(),
+            Some((145_408, 74_295))
+        );
+        config.processing_mode = "copy".into();
+        config.rotation = "90".into();
+        let copied = build_ffmpeg_preview_args("source", &config, &options).unwrap();
+        assert_eq!(copied.display_aspect_ratio().exact_ratio(), Some((32, 9)));
+        config.processing_mode = "reencode".into();
+        config.resolution = "original".into();
+        let rotated = build_ffmpeg_preview_args("source", &config, &options).unwrap();
+        assert_eq!(rotated.display_aspect_ratio().exact_ratio(), Some((9, 32)));
+    }
+
+    #[test]
+    fn output_raster_aspect_is_independent_of_rounded_preview_texture() {
+        use crate::aspect::{DisplayRatio, SampleAspectRatio};
+        let config = default_config();
+        let mut options = default_options();
+        options.source_width = Some(400);
+        options.source_height = Some(4);
+        options.source_sample_aspect_ratio = SampleAspectRatio::new(1, 1);
+        options.max_width = 240;
+        let small = build_ffmpeg_preview_args("source", &config, &options).unwrap();
+        assert_eq!((small.width, small.height), (240, 2));
+        assert_eq!(small.pixel_aspect_ratio, DisplayRatio::new(5, 6).unwrap());
+        assert_eq!(small.output_raster_aspect_ratio, DisplayRatio::new(100, 1));
+        options.max_width = 400;
+        let full = build_ffmpeg_preview_args("source", &config, &options).unwrap();
+        assert_eq!((full.width, full.height), (400, 4));
+        assert_eq!(full.pixel_aspect_ratio, DisplayRatio::ONE);
+        assert_eq!(
+            full.output_raster_aspect_ratio,
+            small.output_raster_aspect_ratio
+        );
+        assert_eq!(full.display_aspect_ratio(), small.display_aspect_ratio());
+    }
+
+    #[test]
+    fn explicit_square_pixels_and_unknown_sar_differ_after_rounded_scaling() {
+        use crate::aspect::SampleAspectRatio;
+        let mut config = default_config();
+        config.container = "png".into();
+        config.video_codec = "png".into();
+        config.resolution = "custom".into();
+        config.custom_width = Some("-1".into());
+        config.custom_height = Some("100".into());
+        let mut options = default_options();
+        options.source_width = Some(321);
+        options.source_height = Some(179);
+        let unknown = build_ffmpeg_preview_args("source", &config, &options).unwrap();
+        options.source_sample_aspect_ratio = SampleAspectRatio::new(1, 1);
+        let known = build_ffmpeg_preview_args("source", &config, &options).unwrap();
+        assert_eq!(unknown.args, known.args);
+        assert_eq!(
+            unknown.display_aspect_ratio().exact_ratio(),
+            Some((179, 100))
+        );
+        assert_eq!(known.display_aspect_ratio().exact_ratio(), Some((321, 179)));
+    }
+
     fn default_options() -> PreviewFfmpegOptions {
         PreviewFfmpegOptions {
             start_seconds: 12.345,
@@ -553,6 +677,7 @@ mod tests {
             source_width: Some(1920),
             source_height: Some(1080),
             source_is_palette: false,
+            source_sample_aspect_ratio: None,
             source_clock: crate::source_timing::ResolvedSourceClock::Unknown,
             max_width: 1280,
             max_height: 720,

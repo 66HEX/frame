@@ -262,6 +262,12 @@ pub struct ExternalSubtitleTrack {
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ProbeMetadata {
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::aspect::deserialize_optional_sample_aspect_ratio"
+    )]
+    pub sample_aspect_ratio: Option<crate::aspect::SampleAspectRatio>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_timing: Option<crate::source_timing::SourceTiming>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -601,6 +607,7 @@ pub struct FfprobeProgram {
 
 #[derive(Deserialize)]
 pub struct FfprobeStream {
+    pub sample_aspect_ratio: Option<String>,
     pub index: u32,
     pub codec_type: String,
     pub codec_name: Option<String>,
