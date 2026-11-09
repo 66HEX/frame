@@ -2,6 +2,61 @@ use super::*;
 use crate::settings::{CropSettings, OverlaySettings};
 
 #[test]
+fn preview_request_hash_tracks_only_effective_high_depth_overlay_policy() {
+    let mut root = FrameRoot::new();
+    seed_ready_video(&mut root, "overlay", "/tmp/dynamic.mov");
+    let entry = root.source_metadata.entry_for("overlay");
+    root.update_selected_config(|config| {
+        crate::settings::apply_output_container(config, "png");
+        config.overlay = Some(OverlaySettings {
+            enabled: true,
+            path: "/tmp/logo.png".into(),
+            x: 0.5,
+            y: 0.5,
+            width: 0.25,
+            opacity: 0.145,
+            anchor: "center".into(),
+        });
+        true
+    });
+    let ordinary = root.selected_preview_runtime_request(&entry).unwrap();
+    root.update_selected_config(|config| {
+        config.pixel_format = "rgba64be".into();
+        true
+    });
+    let precise = root.selected_preview_runtime_request(&entry).unwrap();
+    assert_ne!(ordinary.key.visual_hash, precise.key.visual_hash);
+    root.update_selected_config(|config| {
+        config.pixel_format = "rgb48be".into();
+        true
+    });
+    let same_policy = root.selected_preview_runtime_request(&entry).unwrap();
+    assert_eq!(precise.key.visual_hash, same_policy.key.visual_hash);
+    root.update_selected_config(|config| {
+        config.overlay.as_mut().unwrap().opacity = 0.0;
+        true
+    });
+    let zero = root.selected_preview_runtime_request(&entry).unwrap();
+    root.update_selected_config(|config| {
+        config.pixel_format = "auto".into();
+        true
+    });
+    let zero_auto = root.selected_preview_runtime_request(&entry).unwrap();
+    assert_eq!(zero.key.visual_hash, zero_auto.key.visual_hash);
+    root.update_selected_config(|config| {
+        config.overlay = None;
+        true
+    });
+    let absent = root.selected_preview_runtime_request(&entry).unwrap();
+    root.update_selected_config(|config| {
+        config.pixel_format = "rgba64be".into();
+        true
+    });
+    let absent_precise = root.selected_preview_runtime_request(&entry).unwrap();
+    assert_eq!(absent.key.visual_hash, absent_precise.key.visual_hash);
+}
+
+#[test]
 fn tiff_preview_propagates_palette_source_and_invalidates_only_effective_format_changes() {
     let mut root = FrameRoot::new();
     seed_ready_video(&mut root, "palette", "/tmp/dynamic.mov");

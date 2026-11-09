@@ -182,6 +182,17 @@ pub(super) fn preview_visual_hash(
         && config.container.eq_ignore_ascii_case("tiff");
     tiff_output.hash(&mut state);
     (tiff_output && source_is_palette).hash(&mut state);
+    let precise_overlay = config.processing_mode != ProcessingMode::Copy
+        && config.overlay.as_ref().is_some_and(|overlay| {
+            overlay.enabled
+                && !overlay.path.trim().is_empty()
+                && frame_core::filters::high_depth_image_overlay(
+                    &config.container,
+                    &config.pixel_format,
+                    overlay.opacity,
+                )
+        });
+    precise_overlay.hash(&mut state);
     config.rotation.hash(&mut state);
     config.flip_horizontal.hash(&mut state);
     config.flip_vertical.hash(&mut state);

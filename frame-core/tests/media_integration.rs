@@ -30,6 +30,8 @@ mod adpcm;
 mod audio_titles;
 #[path = "media_integration/gif_frames.rs"]
 mod gif_frames;
+#[path = "media_integration/overlay_depth.rs"]
+mod overlay_depth;
 #[path = "media_integration/subtitle_trim.rs"]
 mod subtitle_trim;
 #[path = "media_integration/tiff.rs"]

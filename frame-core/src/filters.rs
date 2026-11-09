@@ -8,6 +8,9 @@ use crate::{
     utils::format_ffmpeg_seconds,
 };
 
+mod overlay;
+pub use overlay::high_depth_image_overlay;
+
 pub const EVEN_DIMENSIONS_FILTER: &str = "pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0";
 pub const PREVIEW_OUTPUT_LABEL: &str = "preview_v";
 pub const VIDEO_OUTPUT_LABEL: &str = "vout";
@@ -557,11 +560,27 @@ fn build_overlay_filter_complex_with_filters(
         return labeled_filter_chain(filters, output_label);
     };
 
-    let base_chain = labeled_filter_chain(filters, "base");
     let x = overlay.x.clamp(0.0, 1.0);
     let y = overlay.y.clamp(0.0, 1.0);
     let width = overlay.width.clamp(0.03, 0.8);
     let opacity = overlay.opacity.clamp(0.0, 1.0);
+    let opacity_thousandths = overlay::opacity_thousandths(opacity);
+    if opacity_thousandths == Some(0) {
+        return labeled_filter_chain(filters, output_label);
+    }
+    let base_chain = labeled_filter_chain(filters, "base");
+    if high_depth_image_overlay(&config.container, &config.pixel_format, opacity)
+        && let Some(opacity_thousandths) = opacity_thousandths
+    {
+        return overlay::build_high_depth_overlay(
+            base_chain,
+            x,
+            y,
+            width,
+            opacity_thousandths,
+            output_label,
+        );
+    }
 
     format!(
         "{base_chain};[base]split[base_ref][base_out];[1:v:0]format=rgba,colorchannelmixer=aa={opacity:.3}[overlay_src];[overlay_src][base_ref]scale=w='min(rw*{width:.6},rh*iw/ih)':h=-1[overlay_scaled];[base_out][overlay_scaled]overlay=x='min(max(main_w*{x:.6}-overlay_w/2,0),main_w-overlay_w)':y='min(max(main_h*{y:.6}-overlay_h/2,0),main_h-overlay_h)':format=auto[{output_label}]"
@@ -930,6 +949,7 @@ mod tests {
         config.overlay = Some(OverlayConfig {
             enabled: true,
             path: "overlay.png".into(),
+            opacity: 1.0,
             ..OverlayConfig::default()
         });
         let context = VisualFilterContext {
@@ -994,6 +1014,99 @@ mod tests {
             )
         );
         assert!(filter.ends_with("[vout]"));
+    }
+
+    #[test]
+    fn high_depth_image_composition_is_shared_with_preview_and_scoped_to_explicit_formats() {
+        let mut config = default_config();
+        config.overlay = Some(OverlayConfig {
+            enabled: true,
+            path: "/tmp/logo.png".into(),
+            x: 0.5,
+            y: 0.5,
+            width: 0.25,
+            opacity: 0.145,
+            anchor: "center".into(),
+        });
+        for container in ["png", "tiff", "mp4", "gif", "webp"] {
+            config.container = container.into();
+            for pixel_format in ["auto", "rgba", "rgb48le", "rgb48be", "rgba64le", "rgba64be"] {
+                config.pixel_format = pixel_format.into();
+                let expected =
+                    matches!(container, "png" | "tiff") && !matches!(pixel_format, "auto" | "rgba");
+                let export = build_visual_filter_complex(&config, VisualFilterProfile::ExportImage);
+                let preview = build_visual_filter_complex(
+                    &config,
+                    VisualFilterProfile::PreviewLowRes {
+                        base: VisualFilterBase::Image,
+                        width: 8,
+                        height: 4,
+                        fps: 12,
+                        source_time_seconds: 0.0,
+                    },
+                );
+                for graph in [&export, &preview] {
+                    assert_eq!(
+                        graph.contains("[ov16_props]"),
+                        expected,
+                        "{container}/{pixel_format}"
+                    );
+                    if expected {
+                        assert!(graph.contains("[1:v:0]format=rgba64le,format=gbrap16le"));
+                        assert!(graph.contains("floor((lum(X,Y)*145+500)/1000)"));
+                        assert_eq!(graph.matches("max(1,min(rw,").count(), 4);
+                        assert!(graph.contains(
+                            "[ov16_props][ov16_pixels]blend=all_mode=normal:all_opacity=0"
+                        ));
+                    }
+                }
+                let source = build_visual_filter_complex(
+                    &config,
+                    VisualFilterProfile::PreviewLowRes {
+                        base: VisualFilterBase::Source,
+                        width: 8,
+                        height: 4,
+                        fps: 12,
+                        source_time_seconds: 0.0,
+                    },
+                );
+                assert!(!source.contains("ov16"));
+                assert!(!source.contains("[1:v:0]"));
+            }
+        }
+    }
+
+    #[test]
+    fn effective_zero_overlay_opacity_bypasses_composition_without_changing_the_draft() {
+        let mut config = default_config();
+        config.container = "png".into();
+        config.pixel_format = "rgba64be".into();
+        config.overlay = Some(OverlayConfig {
+            enabled: true,
+            path: "/tmp/logo.png".into(),
+            x: 0.5,
+            y: 0.5,
+            width: 0.25,
+            opacity: 0.0004,
+            anchor: "center".into(),
+        });
+        let expected = labeled_filter_chain(&["hflip".into()], "result");
+        assert_eq!(
+            build_overlay_filter_complex_with_filters(&config, &["hflip".into()], "result"),
+            expected
+        );
+        assert_eq!(
+            config.overlay.as_ref().unwrap().opacity.to_bits(),
+            0.0004_f64.to_bits()
+        );
+        for value in [0.0, 0.0004, 0.0005, 0.145, 0.3335, 1.0] {
+            let formatted = format!("{value:.3}");
+            let expected: u16 = formatted.replace('.', "").parse().unwrap();
+            assert_eq!(overlay::opacity_thousandths(value), Some(expected));
+        }
+        assert_eq!(overlay::opacity_thousandths(f64::NAN), None);
+        assert_eq!(overlay::opacity_thousandths(-0.0), Some(0));
+        assert!(high_depth_image_overlay("png", " rgb48le ", 1.0));
     }
 
     #[test]
