@@ -1,5 +1,6 @@
 //! Shared backend services for the Frame GPUI migration.
 
+pub mod alac_copy;
 pub mod args;
 pub mod aspect;
 pub mod audio_rules;

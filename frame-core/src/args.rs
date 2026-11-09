@@ -1,6 +1,9 @@
 use crate::trim::{OutputTrim, SubtitleTrimPlan};
 use std::{collections::HashSet, path::Path};
 
+mod alac;
+pub use alac::{AlacCopyObserver, CopyAudioOutput, build_alac_copy_observer};
+
 use crate::audio_rules::{
     AudioStreamCopySource, audio_stream_copy_error_with_source, audio_track_count_error,
     effective_audio_channels, mp3_requires_mp4_resampling, opus_encoding_error,
@@ -1612,6 +1615,7 @@ fn validate_image_encoding_settings(config: &ConversionConfig) -> Result<(), Con
 mod tests {
     use super::*;
 
+    mod alac_observer;
     mod audio_titles;
     use crate::filters::EVEN_DIMENSIONS_FILTER;
     use crate::types::OverlayConfig;
