@@ -2,8 +2,8 @@ use crate::{
     dimensions::{OutputRasterPolicy, output_dimensions, output_raster_policy},
     error::ConversionError,
     filters::{
-        FrameRateEofAction, PREVIEW_OUTPUT_LABEL, VisualFilterBase, VisualFilterContext,
-        VisualFilterProfile, build_audio_filters, build_visual_filter_complex_with_eof_action,
+        PREVIEW_OUTPUT_LABEL, PreviewFramePolicy, VisualFilterBase, VisualFilterContext,
+        VisualFilterProfile, build_audio_filters, build_visual_filter_complex_with_preview_policy,
         has_overlay,
     },
     types::ConversionConfig,
@@ -89,10 +89,13 @@ pub fn build_ffmpeg_preview_args(
     config: &ConversionConfig,
     options: &PreviewFfmpegOptions,
 ) -> Result<PreviewFfmpegPlan, ConversionError> {
-    build_preview_args_with_eof_action(input, config, options, FrameRateEofAction::Round, false)
+    build_preview_args_with_frame_policy(input, config, options, PreviewFramePolicy::Stream, false)
 }
 
-/// Builds a snapshot preview plan that retains the final frame at EOF.
+/// Builds a snapshot preview plan without the terminal playback FPS filter.
+///
+/// This releases the first processed frame before a format change can discard
+/// frames buffered by that filter. Export commands are unchanged.
 ///
 /// The snapshot caller must retain its one-frame output limit. Streaming callers
 /// use [`build_ffmpeg_preview_args`] and preserve ordinary FPS rounding.
@@ -104,7 +107,13 @@ pub fn build_ffmpeg_snapshot_preview_args(
     config: &ConversionConfig,
     options: &PreviewFfmpegOptions,
 ) -> Result<PreviewFfmpegPlan, ConversionError> {
-    build_preview_args_with_eof_action(input, config, options, FrameRateEofAction::Pass, false)
+    build_preview_args_with_frame_policy(
+        input,
+        config,
+        options,
+        PreviewFramePolicy::Snapshot,
+        false,
+    )
 }
 
 /// Builds the packet-bound preview protocol for a verified runtime and a
@@ -112,7 +121,7 @@ pub fn build_ffmpeg_snapshot_preview_args(
 ///
 /// The caller must establish runtime support before launching this plan.
 /// Source/Copy preview alone uses this policy; encoded preview retains the
-/// export's container/SAR semantics. Snapshot and streaming FPS rules are kept.
+/// export's container/SAR semantics. Only streaming applies preview FPS pacing.
 ///
 /// # Errors
 /// Returns an error for non-Copy configs or invalid preview options.
@@ -127,14 +136,14 @@ pub fn build_ffmpeg_framed_source_preview_args(
             "Native frame presentation requires Source/Copy preview".into(),
         ));
     }
-    build_preview_args_with_eof_action(
+    build_preview_args_with_frame_policy(
         input,
         config,
         options,
         if snapshot {
-            FrameRateEofAction::Pass
+            PreviewFramePolicy::Snapshot
         } else {
-            FrameRateEofAction::Round
+            PreviewFramePolicy::Stream
         },
         true,
     )
@@ -144,11 +153,11 @@ pub fn build_ffmpeg_framed_source_preview_args(
     clippy::too_many_lines,
     reason = "Keep preview validation, filter planning and FFmpeg argument assembly in one auditable sequence."
 )]
-fn build_preview_args_with_eof_action(
+fn build_preview_args_with_frame_policy(
     input: &str,
     config: &ConversionConfig,
     options: &PreviewFfmpegOptions,
-    eof_action: FrameRateEofAction,
+    frame_policy: PreviewFramePolicy,
     framed: bool,
 ) -> Result<PreviewFfmpegPlan, ConversionError> {
     validate_preview_options(input, options)?;
@@ -185,10 +194,10 @@ fn build_preview_args_with_eof_action(
             geometry.preview_width,
             geometry.preview_height,
             fps,
-            eof_action,
+            frame_policy,
         )
     } else {
-        build_visual_filter_complex_with_eof_action(
+        build_visual_filter_complex_with_preview_policy(
             config,
             VisualFilterProfile::PreviewLowRes {
                 base,
@@ -203,7 +212,7 @@ fn build_preview_args_with_eof_action(
                 preview_burn_clock,
                 ..VisualFilterContext::new(options.source_width, options.source_height)
             },
-            eof_action,
+            frame_policy,
         )
     };
 
@@ -952,6 +961,30 @@ mod tests {
 
         assert!(plan.args.iter().any(|arg| arg.contains("format=bgra")));
         assert_eq!(plan.frame_bytes, 1280 * 720 * 4);
+    }
+
+    #[test]
+    fn snapshot_keeps_temporal_effects_and_nominal_rate_without_playback_pacing() {
+        let mut config = default_config();
+        config.fps = "8".into();
+        config.video_filters.deinterlace = crate::types::DeinterlaceMode::On;
+        let options = default_options();
+        let mut stream = build_ffmpeg_preview_args("input.mp4", &config, &options).unwrap();
+        let snapshot = build_ffmpeg_snapshot_preview_args("input.mp4", &config, &options).unwrap();
+        let index = stream
+            .args
+            .iter()
+            .position(|arg| arg == "-filter_complex")
+            .unwrap()
+            + 1;
+        assert_eq!(stream.args[index].matches("fps=8").count(), 1);
+        assert!(!snapshot.args[index].contains("fps="));
+        assert_eq!(snapshot.fps, 8);
+        assert!(snapshot.args[index].contains("bwdif=mode=send_frame:parity=auto:deint=all"));
+        let terminal = ",fps=8,scale=";
+        assert_eq!(stream.args[index].matches(terminal).count(), 1);
+        stream.args[index] = stream.args[index].replace(terminal, ",scale=");
+        assert_eq!(snapshot, stream);
     }
 
     #[test]

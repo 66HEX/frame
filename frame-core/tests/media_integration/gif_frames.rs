@@ -177,7 +177,7 @@ fn gif_probe_should_preserve_normal_animation_and_one_frame_video_duration() -> 
 
 #[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
-fn snapshot_eof_pass_should_keep_one_frame_without_changing_the_stream_plan() -> TestResult {
+fn snapshot_without_pacing_should_keep_one_frame_without_changing_the_stream_plan() -> TestResult {
     let tools = Toolchain::discover()?;
     let sandbox = Sandbox::new("snapshot_eof_frame")?;
     let input = png_source(&tools, &sandbox)?;

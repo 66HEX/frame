@@ -225,7 +225,7 @@ fn explicit_rgb16_overlay_should_scale_constant_planes_exactly_at_tiny_aspect_li
 
 #[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
-fn selected_later_rgb16_frame_should_use_precise_overlay_in_export_and_snapshot() -> TestResult {
+fn selected_rgb16_frames_should_use_precise_overlay_in_export_and_snapshot() -> TestResult {
     let tools = Toolchain::discover()?;
     let sandbox = Sandbox::new("overlay_dynamic_rgb16")?;
     write_png(
@@ -324,5 +324,67 @@ fn selected_later_rgb16_frame_should_use_precise_overlay_in_export_and_snapshot(
         &decode(&tools, &output, "bgra")?,
         "dynamic snapshot/export pixels",
     )?;
+
+    check_first_dynamic_snapshot(&tools, &sandbox, &input, &overlay, logo[0], &options)
+}
+
+fn check_first_dynamic_snapshot(
+    tools: &Toolchain,
+    sandbox: &Sandbox,
+    input: &Path,
+    overlay: &Path,
+    logo: [u16; 4],
+    options: &PreviewFfmpegOptions,
+) -> TestResult {
+    let mut config = image_config("png", "png");
+    config.pixel_format = "rgba64be".into();
+    // Frame zero must reach the snapshot before the next decoded PNG changes
+    // pixel format. A terminal playback FPS filter buffers and loses it during
+    // reinitialization, even when its EOF policy is `pass`.
+    let first_options = PreviewFfmpegOptions {
+        start_seconds: 0.0,
+        ..options.clone()
+    };
+    let first = [7 * 257, 11 * 257, 19 * 257, 65_535];
+    let mut without_overlay = None;
+    for (name, opacity) in [("none", None), ("zero", Some(0.0)), ("active", Some(0.145))] {
+        config.overlay = opacity.map(|opacity| overlay_config(overlay, opacity, 0.25));
+        let mut expected = vec![first; 32];
+        if opacity == Some(0.145) {
+            for y in 1..3 {
+                for x in 3..5 {
+                    expected[y * 8 + x] = source_over(first, logo, 145);
+                }
+            }
+        }
+        let oracle = write_png(
+            tools,
+            sandbox,
+            &format!("first-oracle-{name}"),
+            (8, 4),
+            "rgba64le",
+            &rgba_bytes(&expected),
+        )?;
+        let plan = frame_core::preview::build_ffmpeg_snapshot_preview_args(
+            &path_arg(input),
+            &config,
+            &first_options,
+        )
+        .map_err(|error| error.to_string())?;
+        let mut command = plan.args;
+        let sink = command.len() - 1;
+        command.splice(sink..sink, ["-frames:v".into(), "1".into()]);
+        let pixels = run_tool_output(&tools.ffmpeg, &command)?;
+        assert_bytes_match(
+            &pixels,
+            &decode(tools, &oracle, "bgra")?,
+            &format!("first dynamic snapshot {name}"),
+        )?;
+        if name == "none" {
+            without_overlay = Some(pixels);
+        } else if name == "zero" {
+            assert_eq!(Some(pixels), without_overlay);
+        }
+    }
     Ok(())
 }

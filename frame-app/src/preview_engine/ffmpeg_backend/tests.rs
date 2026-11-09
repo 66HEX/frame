@@ -48,7 +48,7 @@ pub(super) fn preview_config() -> PreviewSessionConfig {
 }
 
 #[test]
-fn snapshot_eof_behavior_is_local_and_preserves_frame_presentation() {
+fn snapshot_pacing_is_local_and_preserves_frame_presentation() {
     let mut config = preview_config();
     config.source_sample_aspect_ratio = frame_core::aspect::SampleAspectRatio::new(2, 1);
     config.request_token = 79;
@@ -69,16 +69,17 @@ fn snapshot_eof_behavior_is_local_and_preserves_frame_presentation() {
                 ..frame_core::types::OverlayConfig::default()
             });
         }
-        let ordinary = preview_plan(&config, 0.75, false, true).unwrap();
-        let mut snapshot = super::plan::snapshot_preview_plan(&config, 0.75, true).unwrap();
+        let mut ordinary = preview_plan(&config, 0.75, false, true).unwrap();
+        let snapshot = super::plan::snapshot_preview_plan(&config, 0.75, true).unwrap();
         let graph = snapshot
             .args
             .iter()
             .position(|arg| arg == "-filter_complex")
             .unwrap()
             + 1;
-        assert_eq!(snapshot.args[graph].matches("eof_action=pass").count(), 1);
-        snapshot.args[graph] = snapshot.args[graph].replace("fps=30:eof_action=pass", "fps=30");
+        assert!(!snapshot.args[graph].contains("fps="));
+        assert_eq!(ordinary.args[graph].matches("fps=30,").count(), 1);
+        ordinary.args[graph] = ordinary.args[graph].replace("fps=30,", "");
         assert_eq!(snapshot, ordinary);
         let realtime = preview_plan(&config, 0.75, true, true).unwrap();
         assert!(

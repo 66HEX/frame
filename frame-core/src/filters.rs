@@ -63,6 +63,14 @@ impl FrameRateEofAction {
     }
 }
 
+/// Preview pacing applies only to continuous playback. A snapshot must release
+/// the first processed frame without waiting for a subsequent frame or EOF.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum PreviewFramePolicy {
+    Stream,
+    Snapshot,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum VisualFilterProfile {
     ExportVideo,
@@ -456,7 +464,7 @@ pub fn build_visual_filter_chain_with_context(
                 width,
                 height,
                 fps,
-                FrameRateEofAction::Round,
+                PreviewFramePolicy::Stream,
             ));
             filters
         }
@@ -478,14 +486,19 @@ pub fn build_visual_filter_complex_with_context(
     profile: VisualFilterProfile,
     context: VisualFilterContext,
 ) -> String {
-    build_visual_filter_complex_with_eof_action(config, profile, context, FrameRateEofAction::Round)
+    build_visual_filter_complex_with_preview_policy(
+        config,
+        profile,
+        context,
+        PreviewFramePolicy::Stream,
+    )
 }
 
-pub(crate) fn build_visual_filter_complex_with_eof_action(
+pub(crate) fn build_visual_filter_complex_with_preview_policy(
     config: &ConversionConfig,
     profile: VisualFilterProfile,
     context: VisualFilterContext,
-    eof_action: FrameRateEofAction,
+    frame_policy: PreviewFramePolicy,
 ) -> String {
     match profile {
         VisualFilterProfile::ExportVideo => build_export_filter_complex(
@@ -519,7 +532,7 @@ pub(crate) fn build_visual_filter_complex_with_eof_action(
             fps,
             source_time_seconds,
             context,
-            eof_action,
+            frame_policy,
         ),
     }
 }
@@ -601,7 +614,7 @@ fn build_export_filter_complex(
 
 #[expect(
     clippy::too_many_arguments,
-    reason = "Preview profile geometry, clock and terminal EOF policy are explicit independent inputs."
+    reason = "Preview profile geometry, clock and frame selection policy are explicit independent inputs."
 )]
 fn build_preview_filter_complex(
     config: &ConversionConfig,
@@ -611,7 +624,7 @@ fn build_preview_filter_complex(
     fps: u32,
     source_time_seconds: f64,
     context: VisualFilterContext,
-    eof_action: FrameRateEofAction,
+    frame_policy: PreviewFramePolicy,
 ) -> String {
     let source_time_seconds = SubtitleClock::NumericPreview(source_time_seconds);
     let base_filters = match base {
@@ -627,7 +640,7 @@ fn build_preview_filter_complex(
     if base == VisualFilterBase::Image {
         preview_filters.extend(image_output_format(config).map(str::to_owned));
     }
-    preview_filters.extend(preview_low_res_filters(width, height, fps, eof_action));
+    preview_filters.extend(preview_low_res_filters(width, height, fps, frame_policy));
     let preview_chain = preview_filters.join(",");
 
     if base != VisualFilterBase::Source && has_overlay(config) {
@@ -727,19 +740,19 @@ fn preview_low_res_filters(
     width: u32,
     height: u32,
     fps: u32,
-    eof_action: FrameRateEofAction,
+    frame_policy: PreviewFramePolicy,
 ) -> Vec<String> {
-    preview_transport_filters(width, height, fps, eof_action, false)
+    preview_transport_filters(width, height, fps, frame_policy, false)
 }
 
 pub(crate) fn build_framed_source_preview_graph(
     width: u32,
     height: u32,
     fps: u32,
-    eof_action: FrameRateEofAction,
+    frame_policy: PreviewFramePolicy,
 ) -> String {
     labeled_filter_chain(
-        &preview_transport_filters(width, height, fps, eof_action, true),
+        &preview_transport_filters(width, height, fps, frame_policy, true),
         PREVIEW_OUTPUT_LABEL,
     )
 }
@@ -748,7 +761,7 @@ fn preview_transport_filters(
     width: u32,
     height: u32,
     fps: u32,
-    eof_action: FrameRateEofAction,
+    frame_policy: PreviewFramePolicy,
     capture: bool,
 ) -> Vec<String> {
     let capture = if capture {
@@ -756,12 +769,16 @@ fn preview_transport_filters(
     } else {
         ""
     };
-    vec![
-        eof_action.filter(&fps.to_string()),
+    let mut filters = Vec::new();
+    if frame_policy == PreviewFramePolicy::Stream {
+        filters.push(format!("fps={fps}"));
+    }
+    filters.extend([
         format!("scale={width}:{height}{capture}"),
         "setsar=1".to_string(),
         "format=bgra".to_string(),
-    ]
+    ]);
+    filters
 }
 
 #[must_use]
