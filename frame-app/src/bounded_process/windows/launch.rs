@@ -34,6 +34,14 @@ pub(super) fn handle(value: &impl AsRawHandle) -> HANDLE {
     HANDLE(value.as_raw_handle())
 }
 
+#[cfg_attr(
+    not(test),
+    expect(
+        clippy::missing_const_for_fn,
+        clippy::unnecessary_wraps,
+        reason = "Test-only injected failures require runtime checks and a shared Result-returning call site."
+    )
+)]
 pub(super) fn fault(spec: &CommandSpec, point: &str) -> io::Result<()> {
     #[cfg(test)]
     if spec
