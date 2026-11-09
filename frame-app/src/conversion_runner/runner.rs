@@ -4,8 +4,8 @@ use super::output_paths::disambiguate_output_paths;
 use crate::capabilities::{HardwareEncoder, HardwareProbePolicy, probe_hardware_encoder};
 use crate::runtime_binaries::{ffmpeg_executable, ffprobe_executable};
 use frame_core::args::{
-    GifFramePolicy, build_ffmpeg_args, build_ffmpeg_args_with_gif_policy, build_output_path,
-    effective_video_encoder, validate_task_input,
+    GifFramePolicy, build_alac_copy_observer, build_ffmpeg_args, build_ffmpeg_args_with_gif_policy,
+    build_output_path, effective_video_encoder, validate_task_input,
 };
 use frame_core::error::ConversionError;
 use frame_core::events::ConversionEvent;
@@ -44,6 +44,8 @@ pub fn run_conversion_batch_with_control(
     controller: &ConversionProcessController,
     mut emit: impl FnMut(ConversionEvent),
 ) -> Result<(), ConversionError> {
+    controller
+        .begin_queued_attempts(&tasks.iter().map(|task| task.id.clone()).collect::<Vec<_>>())?;
     disambiguate_output_paths(&mut tasks);
     let mut pending = VecDeque::from(tasks);
     let mut running_count = 0_usize;
@@ -102,6 +104,7 @@ pub fn run_conversion_task_with_control(
     controller: &ConversionProcessController,
     emit: &mut impl FnMut(ConversionEvent),
 ) -> Result<(), ConversionError> {
+    controller.begin_attempt(&task.id)?;
     disambiguate_output_paths(std::slice::from_mut(&mut task));
     run_prepared_conversion_task_with_control(&task, controller, emit)
 }
@@ -111,6 +114,7 @@ fn run_prepared_conversion_task_with_control(
     controller: &ConversionProcessController,
     emit: &mut impl FnMut(ConversionEvent),
 ) -> Result<(), ConversionError> {
+    controller.begin_attempt(&task.id)?;
     if controller.take_cancelled(&task.id)? {
         emit_cancelled_task(&task.id, emit);
         return Ok(());
@@ -126,6 +130,30 @@ fn run_prepared_conversion_task_with_control(
     );
     let ordinary_args = build_ffmpeg_args(&task.file_path, &output_path, &task.config, &probe)?;
     let executable = ffmpeg_executable();
+    if let Some(observer) =
+        build_alac_copy_observer(&task.file_path, &output_path, &task.config, &probe)?
+    {
+        // This scoped branch is full Copy to MOV/MP4/M4A; GIF and hardware
+        // encoding checks are dormant, but selectable subtitle BSFs still apply.
+        if !super::subtitles::check_subtitle_trim_with_control(
+            &task.config,
+            &executable,
+            &task.id,
+            controller,
+            emit,
+        )? {
+            return Ok(());
+        }
+        return super::alac::run(
+            task,
+            &output_path,
+            &observer,
+            &executable,
+            &ffprobe_executable(),
+            controller,
+            emit,
+        );
+    }
     let Some(prepared) = prepare_gif_export(
         task,
         &output_path,
@@ -271,14 +299,27 @@ fn final_command(executable: &str, args: &[String], progress_path: &std::path::P
     command
 }
 
-fn run_final_child(
+pub(super) fn run_final_child(
     command: &mut Command,
     task: &ConversionTask,
     controller: &ConversionProcessController,
     emit: &mut impl FnMut(ConversionEvent),
     was_cancelled: &mut bool,
 ) -> Result<(), ConversionError> {
+    let mut started = false;
+    run_final_child_observed(command, task, controller, emit, was_cancelled, &mut started)
+}
+
+pub(super) fn run_final_child_observed(
+    command: &mut Command,
+    task: &ConversionTask,
+    controller: &ConversionProcessController,
+    emit: &mut impl FnMut(ConversionEvent),
+    was_cancelled: &mut bool,
+    started: &mut bool,
+) -> Result<(), ConversionError> {
     let mut child = crate::process_launch::spawn(command).map_err(ConversionError::Io)?;
+    *started = true;
     let started_cancelled = match controller.register_started_process(&task.id, child.id()) {
         Ok(cancelled) => cancelled,
         Err(error) => {

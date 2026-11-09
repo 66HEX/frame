@@ -1,5 +1,6 @@
 //! Native GPUI conversion runner backed by the shared Frame ffmpeg argument builder.
 
+mod alac;
 mod completion;
 mod config;
 mod controller;

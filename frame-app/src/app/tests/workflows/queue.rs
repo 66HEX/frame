@@ -46,6 +46,37 @@ fn queue_selected_conversion_tasks_marks_pending_file_as_queued() {
 }
 
 #[test]
+fn queued_retry_accepts_cancellation_before_its_background_worker_starts() {
+    let mut root = root_with_output_directory();
+    root.file_queue
+        .add_file(FileItem::from_path("first", "/tmp/one.m4a", 1));
+    // Seed only the controller's completed-publication policy. Real repaired
+    // exports and delayed batch retries have separate FFmpeg integration tests.
+    root.conversion_processes
+        .complete_publication_for_test("first")
+        .unwrap();
+    root.file_queue
+        .update_status("first", FileStatus::Completed, 100);
+    root.conversion_processes.cancel_task("first").unwrap();
+    assert!(!root.conversion_processes.is_cancelled("first"));
+
+    assert!(root.prepare_file_for_reconversion("first"));
+    let tasks = root.queue_selected_conversion_tasks();
+    assert_eq!(tasks.len(), 1);
+    assert!(root.cancel_conversion_task("first"));
+    assert!(root.conversion_processes.is_cancelled("first"));
+    assert_eq!(
+        root.file_queue.file_by_id("first").map(|file| file.status),
+        Some(FileStatus::Cancelling)
+    );
+    // Registration at the later batch entry must preserve that pending cancel.
+    root.conversion_processes
+        .begin_queued_attempts(&[tasks[0].id.clone()])
+        .unwrap();
+    assert!(root.conversion_processes.take_cancelled("first").unwrap());
+}
+
+#[test]
 fn queue_selected_conversion_tasks_assigns_and_exposes_unique_output_names() {
     let mut root = FrameRoot::new();
     root.default_output_directory = Some(test_settings_path().with_file_name("exports"));

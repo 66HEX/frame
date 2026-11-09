@@ -146,3 +146,44 @@ fn next_batch_launch_count_respects_live_concurrency_limit() {
     assert_eq!(next_batch_launch_count(5, 2, 2), 0);
     assert_eq!(next_batch_launch_count(1, 0, 4), 1);
 }
+
+#[test]
+fn public_batch_registers_a_delayed_same_id_retry_before_the_first_worker_finishes() {
+    let controller = ConversionProcessController::default();
+    controller.update_max_concurrency(1).unwrap();
+    controller.complete_publication_for_test("second").unwrap();
+    let tasks = ["first", "second"].map(|id| ConversionTask {
+        id: id.into(),
+        file_path: format!("/definitely/missing-{id}.mov"),
+        output_directory: "/tmp/frame-output".into(),
+        output_name: Some(id.into()),
+        config: core_config_from_gpui(&GpuiConversionConfig::default()),
+    });
+    let mut events = Vec::new();
+    run_conversion_batch_with_control(tasks.into(), &controller, |event| {
+        if matches!(&event, ConversionEvent::Error(payload) if payload.id == "first") {
+            // The second task is queued, not yet launched. Its previous terminal
+            // publication must no longer make this cancellation a no-op.
+            assert_eq!(controller.active_process_count().unwrap(), 0);
+            controller.cancel_task("second").unwrap();
+        }
+        events.push(event);
+    })
+    .unwrap();
+    assert!(
+        events
+            .iter()
+            .any(|event| matches!(event, ConversionEvent::Error(payload) if payload.id == "first"))
+    );
+    assert_eq!(events.iter().filter(|event| matches!(event, ConversionEvent::Cancelled(payload) if payload.id == "second")).count(), 1);
+    assert!(!events.iter().any(|event| matches!(
+        event,
+        ConversionEvent::Started(_) | ConversionEvent::Completed(_)
+    )));
+    assert!(
+        !events.iter().any(
+            |event| matches!(event, ConversionEvent::Error(payload) if payload.id == "second")
+        )
+    );
+    assert!(!controller.take_cancelled("second").unwrap());
+}

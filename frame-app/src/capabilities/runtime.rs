@@ -34,6 +34,27 @@ impl RuntimeIdentity {
     pub fn matches_paths(&self, paths: &[PathBuf]) -> bool {
         fingerprint(paths).as_ref() == Some(self)
     }
+
+    pub fn capture_open_file(path: &Path, file: &fs::File) -> Option<Self> {
+        let path = fs::canonicalize(path).ok()?;
+        let metadata = file.metadata().ok()?;
+        #[cfg(unix)]
+        let object = unix_identity(&metadata);
+        #[cfg(windows)]
+        let object = {
+            use std::os::windows::io::AsRawHandle;
+            windows_handle_identity(
+                windows::Win32::Foundation::HANDLE(file.as_raw_handle()),
+                &metadata,
+            )?
+        };
+        Some(Self(vec![FileIdentity {
+            path,
+            size: metadata.len(),
+            modified: metadata.modified().ok()?,
+            object,
+        }]))
+    }
 }
 
 impl Runtime {
@@ -99,15 +120,7 @@ fn fingerprint(paths: &[PathBuf]) -> Option<RuntimeIdentity> {
             let path = fs::canonicalize(path).ok()?;
             let metadata = fs::metadata(&path).ok()?;
             #[cfg(unix)]
-            let object = {
-                use std::os::unix::fs::MetadataExt;
-                (
-                    metadata.dev(),
-                    metadata.ino(),
-                    metadata.ctime(),
-                    metadata.ctime_nsec(),
-                )
-            };
+            let object = unix_identity(&metadata);
             #[cfg(windows)]
             let object = windows_identity(&path, &metadata)?;
             Some(FileIdentity {
@@ -119,6 +132,17 @@ fn fingerprint(paths: &[PathBuf]) -> Option<RuntimeIdentity> {
         })
         .collect::<Option<Vec<_>>>()?;
     Some(RuntimeIdentity(files))
+}
+
+#[cfg(unix)]
+fn unix_identity(metadata: &fs::Metadata) -> (u64, u64, i64, i64) {
+    use std::os::unix::fs::MetadataExt;
+    (
+        metadata.dev(),
+        metadata.ino(),
+        metadata.ctime(),
+        metadata.ctime_nsec(),
+    )
 }
 
 fn native_header(path: &Path) -> bool {
@@ -153,13 +177,11 @@ fn native_header(path: &Path) -> bool {
 #[cfg(windows)]
 fn windows_identity(path: &Path, metadata: &fs::Metadata) -> Option<(u64, [u8; 16], u64, i64)> {
     use std::os::windows::ffi::OsStrExt;
-    use std::os::windows::fs::MetadataExt;
     use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
     use windows::Win32::Foundation::HANDLE;
     use windows::Win32::Storage::FileSystem::{
-        CreateFileW, FILE_BASIC_INFO, FILE_FLAG_BACKUP_SEMANTICS, FILE_ID_INFO,
-        FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, FileBasicInfo,
-        FileIdInfo, GetFileInformationByHandleEx, OPEN_EXISTING,
+        CreateFileW, FILE_FLAG_BACKUP_SEMANTICS, FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE,
+        FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING,
     };
     use windows::core::PCWSTR;
     let path: Vec<_> = path.as_os_str().encode_wide().chain([0]).collect();
@@ -179,11 +201,23 @@ fn windows_identity(path: &Path, metadata: &fs::Metadata) -> Option<(u64, [u8; 1
     .ok()?;
     // SAFETY: ownership is transferred once from the successful native call.
     let owned = unsafe { OwnedHandle::from_raw_handle(raw.0) };
+    windows_handle_identity(HANDLE(owned.as_raw_handle()), metadata)
+}
+
+#[cfg(windows)]
+fn windows_handle_identity(
+    handle: windows::Win32::Foundation::HANDLE,
+    metadata: &fs::Metadata,
+) -> Option<(u64, [u8; 16], u64, i64)> {
+    use std::os::windows::fs::MetadataExt;
+    use windows::Win32::Storage::FileSystem::{
+        FILE_BASIC_INFO, FILE_ID_INFO, FileBasicInfo, FileIdInfo, GetFileInformationByHandleEx,
+    };
     let mut info = FILE_ID_INFO::default();
     // SAFETY: the live handle and destination match this information class.
     unsafe {
         GetFileInformationByHandleEx(
-            HANDLE(owned.as_raw_handle()),
+            handle,
             FileIdInfo,
             (&raw mut info).cast(),
             u32::try_from(size_of_val(&info)).ok()?,
@@ -195,7 +229,7 @@ fn windows_identity(path: &Path, metadata: &fs::Metadata) -> Option<(u64, [u8; 1
     // ChangeTime also detects in-place writes followed by restoring LastWriteTime.
     unsafe {
         GetFileInformationByHandleEx(
-            HANDLE(owned.as_raw_handle()),
+            handle,
             FileBasicInfo,
             (&raw mut basic).cast(),
             u32::try_from(size_of_val(&basic)).ok()?,

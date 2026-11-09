@@ -30,6 +30,27 @@ impl FrameRoot {
         };
         self.normalize_selected_actionable_conversion_configs();
 
+        let pending_ids = self
+            .file_queue
+            .files()
+            .iter()
+            .filter(|file| {
+                file.is_selected_for_conversion && file.status.is_actionable_for_conversion()
+            })
+            .map(|file| file.id.clone())
+            .collect::<Vec<_>>();
+        // A queued retry must accept cancellation before its background worker
+        // starts, even if the previous attempt already published its output.
+        if let Err(error) = self
+            .conversion_processes
+            .begin_queued_attempts(&pending_ids)
+        {
+            for id in pending_ids {
+                self.log_conversion_control_error(&id, "queue", &error);
+            }
+            return Vec::new();
+        }
+
         let mut tasks = self
             .file_queue
             .queue_selected_pending_conversions()

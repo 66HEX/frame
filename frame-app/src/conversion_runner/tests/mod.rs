@@ -15,6 +15,7 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 use support::*;
 
+mod alac;
 mod completion;
 mod config;
 mod controller;
