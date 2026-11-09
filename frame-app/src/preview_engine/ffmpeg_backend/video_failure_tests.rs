@@ -20,6 +20,7 @@ fn config() -> PreviewSessionConfig {
         source_kind: PreviewSourceKind::Video,
         source_width: Some(160),
         source_height: Some(90),
+        source_is_palette: false,
         selected_audio_track: None,
         duration_seconds: 3.0,
         max_width: 160,

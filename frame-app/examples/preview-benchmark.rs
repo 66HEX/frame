@@ -119,6 +119,7 @@ fn session_config(options: &Options) -> PreviewSessionConfig {
         source_kind: PreviewSourceKind::Video,
         source_width: Some(options.width),
         source_height: Some(options.height),
+        source_is_palette: false,
         selected_audio_track: options.audio_track,
         duration_seconds: options.duration,
         max_width: options.max_width,

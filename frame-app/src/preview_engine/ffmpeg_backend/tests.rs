@@ -32,6 +32,7 @@ pub(super) fn preview_config() -> PreviewSessionConfig {
         source_kind: PreviewSourceKind::Video,
         source_width: Some(1920),
         source_height: Some(1080),
+        source_is_palette: false,
         selected_audio_track: None,
         duration_seconds: 12.5,
         max_width: 1280,
@@ -39,6 +40,32 @@ pub(super) fn preview_config() -> PreviewSessionConfig {
         fps: 30,
         conversion_config: core_config_from_gpui(&ConversionConfig::default()),
     }
+}
+
+#[test]
+fn tiff_preview_plan_uses_the_session_palette_fact_before_visual_effects() {
+    let mut config = preview_config();
+    config.source_is_palette = true;
+    config.conversion_config.container = "tiff".into();
+    config.conversion_config.flip_horizontal = true;
+    let plan = super::preview_plan(&config, 0.0, false, true).unwrap();
+    let graph = plan
+        .args
+        .windows(2)
+        .find(|pair| pair[0] == "-filter_complex")
+        .unwrap();
+    assert!(graph[1].starts_with("[0:v:0]format=pix_fmts=rgba|rgba64le,hflip"));
+    assert!(graph[1].contains(
+        "format=pix_fmts=rgb24|rgb48le|rgba|rgba64le|gray|ya8|gray16le|ya16le|monob|monow"
+    ));
+    config.conversion_config.container = "png".into();
+    let plan = super::preview_plan(&config, 0.0, false, true).unwrap();
+    assert!(
+        !plan
+            .args
+            .iter()
+            .any(|arg| arg.contains("format=pix_fmts=rgba|rgba64le"))
+    );
 }
 
 #[test]

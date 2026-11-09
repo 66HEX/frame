@@ -522,7 +522,10 @@ pub fn build_ffmpeg_args(
     probe: &ProbeMetadata,
 ) -> Result<Vec<String>, ConversionError> {
     validate_audio_encoding_tracks(config, probe)?;
-    let filter_context = VisualFilterContext::new(probe.width, probe.height);
+    let filter_context = VisualFilterContext {
+        source_is_palette: probe.pixel_format.as_deref() == Some("pal8"),
+        ..VisualFilterContext::new(probe.width, probe.height)
+    };
     let mut args = Vec::new();
 
     // Hardware decode acceleration (must be before -i)
@@ -2344,7 +2347,7 @@ mod tests {
         let args = build_ffmpeg_args("input.mov", "output.tiff", &config, &sample_probe())
             .expect("arguments should build");
 
-        assert!(args_contains_pair(&args, "-compression_algo", "deflate"));
+        assert!(args_contains_pair(&args, "-compression_algo", "8"));
     }
 
     #[test]

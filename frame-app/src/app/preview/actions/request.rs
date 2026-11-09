@@ -36,6 +36,7 @@ pub(super) fn preview_runtime_request(
     let source_kind = engine_source_kind(metadata);
     let duration_seconds = preview_duration_seconds(Some(metadata));
     let (source_width, source_height) = valid_preview_dimensions(metadata.width, metadata.height);
+    let source_is_palette = metadata.pixel_format.as_deref() == Some("pal8");
     let mut preview_config = selected_file.config.clone();
     if !include_applied_crop {
         preview_config.crop = None;
@@ -57,7 +58,7 @@ pub(super) fn preview_runtime_request(
         source_height,
         duration_millis: rounded_f64_to_u64(duration_seconds * 1000.0),
         preview_dimensions,
-        visual_hash: preview_visual_hash(&preview_config),
+        visual_hash: preview_visual_hash(&preview_config, source_is_palette),
         audio_hash: preview_audio_hash(&preview_config, selected_audio_track),
     };
     let config = PreviewSessionConfig {
@@ -66,6 +67,7 @@ pub(super) fn preview_runtime_request(
         source_kind,
         source_width,
         source_height,
+        source_is_palette,
         selected_audio_track,
         duration_seconds,
         max_width: preview_dimensions.max_width,
@@ -130,13 +132,17 @@ pub(super) fn quantized_preview_dimension(value: f64) -> u32 {
     }
 }
 
-pub(super) fn preview_visual_hash(config: &ConversionConfig) -> u64 {
+pub(super) fn preview_visual_hash(config: &ConversionConfig, source_is_palette: bool) -> u64 {
     let mut state = DefaultHasher::new();
     frame_core::dimensions::output_raster_policy(
         &config.container,
         config.processing_mode == ProcessingMode::Copy,
     )
     .hash(&mut state);
+    let tiff_output = config.processing_mode != ProcessingMode::Copy
+        && config.container.eq_ignore_ascii_case("tiff");
+    tiff_output.hash(&mut state);
+    (tiff_output && source_is_palette).hash(&mut state);
     config.rotation.hash(&mut state);
     config.flip_horizontal.hash(&mut state);
     config.flip_vertical.hash(&mut state);

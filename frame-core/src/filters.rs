@@ -11,11 +11,15 @@ use crate::{
 pub const EVEN_DIMENSIONS_FILTER: &str = "pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0";
 pub const PREVIEW_OUTPUT_LABEL: &str = "preview_v";
 pub const VIDEO_OUTPUT_LABEL: &str = "vout";
+const TIFF_OUTPUT_FORMAT: &str =
+    "format=pix_fmts=rgb24|rgb48le|rgba|rgba64le|gray|ya8|gray16le|ya16le|monob|monow";
+const TIFF_PALETTE_INPUT_FORMAT: &str = "format=pix_fmts=rgba|rgba64le";
 
-/// Source geometry used to preserve exact pixels when padding subsampled frames.
+/// Source facts needed to preserve pixels through geometry and image conversion.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct VisualFilterContext {
     pub source_dimensions: Option<(u32, u32)>,
+    pub source_is_palette: bool,
 }
 
 impl VisualFilterContext {
@@ -23,6 +27,7 @@ impl VisualFilterContext {
     pub fn new(width: Option<u32>, height: Option<u32>) -> Self {
         Self {
             source_dimensions: width.zip(height).filter(|&(w, h)| w > 0 && h > 0),
+            source_is_palette: false,
         }
     }
 }
@@ -101,6 +106,12 @@ fn build_video_filters_at_time(
 ) -> Vec<String> {
     let mut filters = Vec::new();
     let is_image = is_image_container(&config.container);
+
+    if config.container.eq_ignore_ascii_case("tiff") && context.source_is_palette {
+        // Expand palette alpha before effects negotiate an opaque YUV format.
+        // Keep 16-bit eligible for streams whose later frames change format.
+        filters.push(TIFF_PALETTE_INPUT_FORMAT.to_string());
+    }
 
     if config.flip_horizontal {
         filters.push("hflip".to_string());
@@ -373,7 +384,10 @@ pub fn build_visual_filter_chain_with_context(
             build_encode_video_filters_at_time(config, true, export_subtitle_time(config), context)
         }
         VisualFilterProfile::ExportImage => {
-            build_video_filters_at_time(config, true, export_subtitle_time(config), context)
+            let mut filters =
+                build_video_filters_at_time(config, true, export_subtitle_time(config), context);
+            filters.extend(image_output_format(config).map(str::to_owned));
+            filters
         }
         VisualFilterProfile::PreviewLowRes {
             base,
@@ -388,7 +402,10 @@ pub fn build_visual_filter_chain_with_context(
                     build_encode_video_filters_at_time(config, true, source_time_seconds, context)
                 }
                 VisualFilterBase::Image => {
-                    build_video_filters_at_time(config, true, source_time_seconds, context)
+                    let mut filters =
+                        build_video_filters_at_time(config, true, source_time_seconds, context);
+                    filters.extend(image_output_format(config).map(str::to_owned));
+                    filters
                 }
             };
             filters.extend(preview_low_res_filters(width, height, fps));
@@ -413,11 +430,21 @@ pub fn build_visual_filter_complex_with_context(
     context: VisualFilterContext,
 ) -> String {
     match profile {
-        VisualFilterProfile::ExportVideo | VisualFilterProfile::ExportImage => {
-            build_export_filter_complex(
-                config,
-                &build_visual_filter_chain_with_context(config, profile, context),
-                VIDEO_OUTPUT_LABEL,
+        VisualFilterProfile::ExportVideo => build_export_filter_complex(
+            config,
+            &build_visual_filter_chain_with_context(config, profile, context),
+            VIDEO_OUTPUT_LABEL,
+        ),
+        VisualFilterProfile::ExportImage => {
+            let filters =
+                build_video_filters_at_time(config, true, export_subtitle_time(config), context);
+            image_output_format(config).map_or_else(
+                || build_export_filter_complex(config, &filters, VIDEO_OUTPUT_LABEL),
+                |format| {
+                    // The TIFF storage policy must apply after composition too.
+                    let graph = build_export_filter_complex(config, &filters, "image_composed");
+                    format!("{graph};[image_composed]{format}[{VIDEO_OUTPUT_LABEL}]")
+                },
             )
         }
         VisualFilterProfile::PreviewLowRes {
@@ -436,6 +463,13 @@ pub fn build_visual_filter_complex_with_context(
             context,
         ),
     }
+}
+
+fn image_output_format(config: &ConversionConfig) -> Option<&'static str> {
+    config
+        .container
+        .eq_ignore_ascii_case("tiff")
+        .then_some(TIFF_OUTPUT_FORMAT)
 }
 
 #[must_use]
@@ -508,7 +542,11 @@ fn build_preview_filter_complex(
             build_video_filters_at_time(config, true, source_time_seconds, context)
         }
     };
-    let preview_filters = preview_low_res_filters(width, height, fps);
+    let mut preview_filters = Vec::new();
+    if base == VisualFilterBase::Image {
+        preview_filters.extend(image_output_format(config).map(str::to_owned));
+    }
+    preview_filters.extend(preview_low_res_filters(width, height, fps));
     let preview_chain = preview_filters.join(",");
 
     if base != VisualFilterBase::Source && has_overlay(config) {
@@ -758,6 +796,50 @@ mod tests {
         let legacy = build_video_filters(&config, true).join(",");
         assert!(!legacy.contains("xstack"));
         assert!(legacy.contains("pad=ceil(127/hsub)"));
+    }
+
+    #[test]
+    fn tiff_palette_and_storage_formats_surround_effects_and_composition() {
+        let mut config = default_config();
+        config.container = "tiff".into();
+        config.flip_horizontal = true;
+        config.overlay = Some(OverlayConfig {
+            enabled: true,
+            path: "overlay.png".into(),
+            ..OverlayConfig::default()
+        });
+        let context = VisualFilterContext {
+            source_is_palette: true,
+            ..VisualFilterContext::new(Some(32), Some(24))
+        };
+        let chain = build_visual_filter_chain_with_context(
+            &config,
+            VisualFilterProfile::ExportImage,
+            context,
+        );
+        assert_eq!(
+            chain.first().map(String::as_str),
+            Some(TIFF_PALETTE_INPUT_FORMAT)
+        );
+        assert_eq!(chain.last().map(String::as_str), Some(TIFF_OUTPUT_FORMAT));
+        let graph = build_visual_filter_complex_with_context(
+            &config,
+            VisualFilterProfile::ExportImage,
+            context,
+        );
+        assert!(graph.starts_with(&format!("[0:v:0]{TIFF_PALETTE_INPUT_FORMAT},hflip")));
+        assert!(graph.ends_with(&format!(";[image_composed]{TIFF_OUTPUT_FORMAT}[vout]")));
+        assert!(graph.find("overlay=x=").unwrap() < graph.find(TIFF_OUTPUT_FORMAT).unwrap());
+        for container in ["png", "jpg", "webp", "gif", "mp4"] {
+            config.container = container.into();
+            let graph = build_visual_filter_complex_with_context(
+                &config,
+                VisualFilterProfile::ExportImage,
+                context,
+            );
+            assert!(!graph.contains(TIFF_PALETTE_INPUT_FORMAT), "{container}");
+            assert!(!graph.contains(TIFF_OUTPUT_FORMAT), "{container}");
+        }
     }
 
     #[test]

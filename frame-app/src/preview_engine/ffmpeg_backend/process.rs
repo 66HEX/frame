@@ -607,6 +607,7 @@ mod tests {
             source_kind: PreviewSourceKind::Video,
             source_width: Some(160),
             source_height: Some(90),
+            source_is_palette: false,
             selected_audio_track: None,
             duration_seconds: 2.0,
             max_width: 320,

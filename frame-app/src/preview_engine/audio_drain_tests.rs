@@ -46,6 +46,7 @@ fn audio_config(path: PathBuf, milliseconds: u32) -> PreviewSessionConfig {
         source_kind: PreviewSourceKind::Audio,
         source_width: None,
         source_height: None,
+        source_is_palette: false,
         selected_audio_track: Some(0),
         duration_seconds: f64::from(milliseconds) / 1_000.0,
         max_width: 320,

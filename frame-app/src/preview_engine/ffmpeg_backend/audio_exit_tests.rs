@@ -21,6 +21,7 @@ fn new_process() -> RunningPreviewProcess {
             source_kind: PreviewSourceKind::Audio,
             source_width: None,
             source_height: None,
+            source_is_palette: false,
             selected_audio_track: Some(0),
             duration_seconds: 1.0,
             max_width: 320,

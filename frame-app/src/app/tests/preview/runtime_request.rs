@@ -1,6 +1,34 @@
 use super::*;
 
 #[test]
+fn tiff_preview_propagates_palette_source_and_invalidates_only_effective_format_changes() {
+    let mut root = FrameRoot::new();
+    seed_ready_video(&mut root, "palette", "/tmp/dynamic.mov");
+    let mut entry = root.source_metadata.entry_for("palette");
+    entry.metadata.as_mut().unwrap().pixel_format = Some("pal8".into());
+    root.update_selected_config(|config| crate::settings::apply_output_container(config, "png"));
+    let png = root.selected_preview_runtime_request(&entry).unwrap();
+    assert!(png.config.source_is_palette);
+    root.update_selected_config(|config| crate::settings::apply_output_container(config, "tiff"));
+    let tiff = root.selected_preview_runtime_request(&entry).unwrap();
+    assert!(tiff.config.source_is_palette);
+    assert_ne!(png.key.visual_hash, tiff.key.visual_hash);
+    root.update_selected_config(|config| {
+        config.image_tiff_compression = "raw".into();
+        true
+    });
+    let raw = root.selected_preview_runtime_request(&entry).unwrap();
+    assert_eq!(raw.key.visual_hash, tiff.key.visual_hash);
+    entry.metadata.as_mut().unwrap().pixel_format = Some("rgba64le".into());
+    let true_color = root.selected_preview_runtime_request(&entry).unwrap();
+    assert!(!true_color.config.source_is_palette);
+    assert_ne!(true_color.key.visual_hash, tiff.key.visual_hash);
+    root.update_selected_config(|config| crate::settings::apply_output_container(config, "png"));
+    let png_true_color = root.selected_preview_runtime_request(&entry).unwrap();
+    assert_eq!(png.key.visual_hash, png_true_color.key.visual_hash);
+}
+
+#[test]
 fn preview_request_tracks_output_raster_policy_without_encoder_quality() {
     let mut root = FrameRoot::new();
     root.file_queue

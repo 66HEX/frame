@@ -125,7 +125,17 @@ fn add_still_image_codec_args(args: &mut Vec<String>, config: &ConversionConfig)
         }
         "tiff" => {
             args.push("-compression_algo".to_string());
-            args.push(normalize_tiff_compression(&config.image_tiff_compression).to_string());
+            let compression = normalize_tiff_compression(&config.image_tiff_compression);
+            // Adobe Deflate uses the same compression, with the interoperable
+            // TIFF tag 8 instead of the legacy tag 32946 named "deflate".
+            args.push(
+                if compression == "deflate" {
+                    "8"
+                } else {
+                    compression
+                }
+                .to_string(),
+            );
         }
         _ => {}
     }

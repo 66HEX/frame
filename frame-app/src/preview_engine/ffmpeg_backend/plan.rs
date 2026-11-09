@@ -23,6 +23,7 @@ pub(super) fn preview_plan(
             end_seconds,
             source_width: config.source_width,
             source_height: config.source_height,
+            source_is_palette: config.source_is_palette,
             max_width: config.max_width,
             max_height: config.max_height,
             fps: config.fps,

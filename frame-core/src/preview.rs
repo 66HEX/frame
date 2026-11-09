@@ -10,11 +10,16 @@ use crate::{
 };
 
 #[derive(Clone, Debug, PartialEq)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "Playback pacing, seek accuracy, source kind and palette storage are independent preview facts."
+)]
 pub struct PreviewFfmpegOptions {
     pub start_seconds: f64,
     pub end_seconds: Option<f64>,
     pub source_width: Option<u32>,
     pub source_height: Option<u32>,
+    pub source_is_palette: bool,
     pub max_width: u32,
     pub max_height: u32,
     pub fps: u32,
@@ -87,7 +92,10 @@ pub fn build_ffmpeg_preview_args(
             fps,
             source_time_seconds: options.start_seconds,
         },
-        VisualFilterContext::new(options.source_width, options.source_height),
+        VisualFilterContext {
+            source_is_palette: options.source_is_palette,
+            ..VisualFilterContext::new(options.source_width, options.source_height)
+        },
     );
 
     let mut args = vec![
@@ -501,6 +509,7 @@ mod tests {
             end_seconds: Some(15.0),
             source_width: Some(1920),
             source_height: Some(1080),
+            source_is_palette: false,
             max_width: 1280,
             max_height: 720,
             fps: 30,

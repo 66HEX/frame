@@ -176,6 +176,7 @@ pub struct PreviewSessionConfig {
     pub source_kind: PreviewSourceKind,
     pub source_width: Option<u32>,
     pub source_height: Option<u32>,
+    pub source_is_palette: bool,
     pub selected_audio_track: Option<u32>,
     pub duration_seconds: f64,
     pub max_width: u32,

@@ -24,6 +24,9 @@ use frame_core::{
 
 type TestResult<T = ()> = Result<T, String>;
 
+#[path = "media_integration/tiff.rs"]
+mod tiff;
+
 #[derive(Clone, Debug)]
 struct Toolchain {
     ffmpeg: PathBuf,
@@ -1254,6 +1257,7 @@ fn odd_custom_and_crop_dimensions_should_match_export_and_preview() -> TestResul
                     end_seconds: None,
                     source_width: Some(320),
                     source_height: Some(180),
+                    source_is_palette: false,
                     max_width: 320,
                     max_height: 180,
                     fps: 12,
@@ -2895,6 +2899,7 @@ fn bounded_fast_preview_should_match_complete_source_frames_and_chirp_samples() 
         end_seconds: None,
         source_width: Some(160),
         source_height: Some(90),
+        source_is_palette: false,
         max_width: 160,
         max_height: 90,
         fps: 30,
@@ -3007,6 +3012,7 @@ fn preview_subtitle_burn_should_use_source_time_after_seek() -> TestResult {
                 end_seconds: Some(start_seconds + 0.2),
                 source_width: Some(640),
                 source_height: Some(360),
+                source_is_palette: false,
                 max_width: 640,
                 max_height: 360,
                 fps: 12,
@@ -3084,6 +3090,7 @@ fn display_matrix_rotation_should_produce_portrait_preview_frame() -> TestResult
             end_seconds: Some(0.2),
             source_width: metadata.width,
             source_height: metadata.height,
+            source_is_palette: false,
             max_width: 160,
             max_height: 160,
             fps: 12,
