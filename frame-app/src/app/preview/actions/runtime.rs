@@ -6,6 +6,7 @@ use crate::source_metadata::SourceMetadataEntry;
 use gpui::prelude::*;
 use gpui::{Context, RenderImage};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 impl FrameRoot {
     pub(in crate::app) fn selected_preview_runtime_request(
@@ -107,6 +108,11 @@ impl FrameRoot {
         self.end_preview_crop_drag();
         self.end_preview_overlay_drag();
         self.preview_ui.pending_runtime_key = Some(key.clone());
+        let cancelled = session.as_ref().map_or_else(
+            || Arc::new(AtomicBool::new(false)),
+            |session| session.cancellation_token(),
+        );
+        self.preview_ui.pending_runtime_cancel = Some(Arc::clone(&cancelled));
         cx.spawn(async move |this, cx| {
             let config = request.config;
             let result = cx
@@ -115,7 +121,7 @@ impl FrameRoot {
                         session.reconfigure(config)?;
                         Ok(session)
                     } else {
-                        PreviewSession::start(config).map(Arc::new)
+                        PreviewSession::start_with_cancellation(config, cancelled).map(Arc::new)
                     }
                 })
                 .await;
@@ -153,6 +159,7 @@ impl FrameRoot {
         }
 
         self.preview_ui.pending_runtime_key = None;
+        self.preview_ui.pending_runtime_cancel = None;
         match result {
             Ok(session) => {
                 self.preview_ui.failed_runtime_key = None;
@@ -206,6 +213,12 @@ impl FrameRoot {
         cx: &mut Context<Self>,
     ) -> gpui::Task<Result<(), PreviewEngineError>> {
         let session = self.preview_ui.session.take();
+        if let Some(cancelled) = self.preview_ui.pending_runtime_cancel.take() {
+            cancelled.store(true, Ordering::Release);
+        }
+        if let Some(session) = &session {
+            session.cancellation_token().store(true, Ordering::Release);
+        }
         if let Some(image) = self.preview_ui.render_image.take() {
             cx.drop_image(image, None);
         }

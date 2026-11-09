@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "synthetic": true,
+  "files": [
+    {
+      "path": "static.nut",
+      "sha256": "628a6551a41952774fa81ced1f4fbda560265b8bc2c07b69561acd4a182da3ba",
+      "bytes": 330
+    },
+    {
+      "path": "static.fpv",
+      "sha256": "be622522dce6bdb9b997a8a628afedae69b1c9ce750a0a30b0a6e917e54a7f67",
+      "bytes": 224
+    },
+    {
+      "path": "dynamic.m2ts",
+      "sha256": "fb98b606610cf9a36226f4cf54fc65a907739c8415a02dfa8e8293374e9bdde2",
+      "bytes": 24576
+    },
+    {
+      "path": "dynamic.fpv",
+      "sha256": "73b1285d6daba8444acbeff1f73daf88f41e37230f080b602b2a6ea960790c34",
+      "bytes": 4032
+    }
+  ]
+}

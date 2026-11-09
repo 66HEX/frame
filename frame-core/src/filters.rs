@@ -729,9 +729,36 @@ fn preview_low_res_filters(
     fps: u32,
     eof_action: FrameRateEofAction,
 ) -> Vec<String> {
+    preview_transport_filters(width, height, fps, eof_action, false)
+}
+
+pub(crate) fn build_framed_source_preview_graph(
+    width: u32,
+    height: u32,
+    fps: u32,
+    eof_action: FrameRateEofAction,
+) -> String {
+    labeled_filter_chain(
+        &preview_transport_filters(width, height, fps, eof_action, true),
+        PREVIEW_OUTPUT_LABEL,
+    )
+}
+
+fn preview_transport_filters(
+    width: u32,
+    height: u32,
+    fps: u32,
+    eof_action: FrameRateEofAction,
+    capture: bool,
+) -> Vec<String> {
+    let capture = if capture {
+        ":frame_preview_capture=1"
+    } else {
+        ""
+    };
     vec![
         eof_action.filter(&fps.to_string()),
-        format!("scale={width}:{height}"),
+        format!("scale={width}:{height}{capture}"),
         "setsar=1".to_string(),
         "format=bgra".to_string(),
     ]

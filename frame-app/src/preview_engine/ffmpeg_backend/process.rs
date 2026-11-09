@@ -31,9 +31,10 @@ pub struct RunningPreviewProcess {
     pub(super) frame_store: LatestFrameStore,
     pub(super) metrics: PreviewRuntimeMetricsStore,
     pub(super) executable: String,
-    pub(super) process: Mutex<RunningProcessState>,
+    pub(super) cancelled: Arc<AtomicBool>,
+    pub(super) process: Arc<Mutex<RunningProcessState>>,
     pub(super) audio_process: Arc<Mutex<RunningProcessState>>,
-    pub(super) pending_audio_start: Mutex<Option<PendingAudioStart>>,
+    pub(super) pending_audio_start: Arc<Mutex<Option<PendingAudioStart>>>,
     pub(super) playback: Arc<Mutex<PreviewPlaybackClock>>,
     pub(super) playback_changed: Arc<Condvar>,
     pub(super) render_image_id: ImageId,
@@ -43,6 +44,7 @@ pub struct RunningPreviewProcess {
 
 #[derive(Debug, Default)]
 pub(super) struct RunningProcessState {
+    pub(super) framed_video: bool,
     pub(super) child: Option<Child>,
     pub(super) stdout_worker: Option<JoinHandle<()>>,
     pub(super) stderr_worker: Option<JoinHandle<()>>,
@@ -189,6 +191,7 @@ impl RunningPreviewProcess {
                     precise,
                     self.next_render_image_identity(),
                     &self.metrics,
+                    &self.cancelled,
                 )?;
                 let dimensions = frame.frame.dimensions();
                 self.stop_running_processes()?;
@@ -240,9 +243,10 @@ impl RunningPreviewProcess {
             frame_store,
             metrics,
             executable,
-            process: Mutex::new(RunningProcessState::default()),
+            cancelled: Arc::new(AtomicBool::new(false)),
+            process: Arc::new(Mutex::new(RunningProcessState::default())),
             audio_process: Arc::new(Mutex::new(RunningProcessState::default())),
-            pending_audio_start: Mutex::new(None),
+            pending_audio_start: Arc::new(Mutex::new(None)),
             playback: Arc::new(Mutex::new(PreviewPlaybackClock {
                 generation: 0,
                 base_seconds: start_seconds,
@@ -372,6 +376,17 @@ impl RunningPreviewProcess {
         mark_ended: bool,
     ) -> bool {
         let mut state = lock_process(process);
+        // The framed reader owns protocol completion and its child's exit.
+        // Reaping first would erase that exit proof or relabel a partial frame
+        // as normal EOF while the worker is still validating it.
+        if state.framed_video
+            && state
+                .stdout_worker
+                .as_ref()
+                .is_some_and(|worker| !worker.is_finished())
+        {
+            return false;
+        }
         let Some(child) = state.child.as_mut() else {
             return false;
         };
@@ -511,9 +526,11 @@ pub(in crate::preview_engine) fn start_ffmpeg_preview_process(
     config: &PreviewSessionConfig,
     frame_store: LatestFrameStore,
     metrics: PreviewRuntimeMetricsStore,
+    cancelled: Arc<AtomicBool>,
 ) -> Result<(RunningPreviewProcess, PreviewDimensions, f64), PreviewEngineError> {
     let executable = ffmpeg_executable();
-    let process = RunningPreviewProcess::new(config.clone(), frame_store, metrics, executable);
+    let mut process = RunningPreviewProcess::new(config.clone(), frame_store, metrics, executable);
+    process.cancelled = cancelled;
     let dimensions = if matches!(
         config.source_kind,
         PreviewSourceKind::Video | PreviewSourceKind::Image
@@ -608,6 +625,7 @@ mod tests {
             source_width: Some(160),
             source_height: Some(90),
             source_is_palette: false,
+            source_is_mpeg_ts: false,
             source_sample_aspect_ratio: None,
             request_token: 0,
             source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,

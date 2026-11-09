@@ -33,6 +33,7 @@ pub(super) fn preview_config() -> PreviewSessionConfig {
         source_width: Some(1920),
         source_height: Some(1080),
         source_is_palette: false,
+        source_is_mpeg_ts: false,
         source_sample_aspect_ratio: None,
         request_token: 0,
         source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
@@ -561,6 +562,7 @@ fn stream_frame_keeps_captured_plan_presentation_and_request_token() {
         ..Default::default()
     };
     let spec = FrameStreamSpec {
+        framed: false,
         presentation,
         request_token: config.request_token,
         width: plan.width,

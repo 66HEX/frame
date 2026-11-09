@@ -170,7 +170,8 @@ fn pending_overlay_source_blocks_drag_arrows_and_size_shortcuts_until_matching_f
     accepted.edit_overlay = false;
     root.preview_ui.render_image = root_with_preview_canvas_media(128, 128)
         .preview_ui
-        .render_image;
+        .render_image
+        .clone();
     root.preview_ui.rendered_runtime_key = Some(accepted);
     root.preview_ui.desired_runtime_key = Some(editing.key.clone());
     root.preview_ui.pending_runtime_key = Some(editing.key.clone());

@@ -259,7 +259,8 @@ fn pending_crop_source_keeps_draft_but_hides_and_blocks_old_frame_handles() {
     let accepted = root.selected_preview_runtime_request(&entry).unwrap();
     root.preview_ui.render_image = root_with_preview_canvas_media(128, 128)
         .preview_ui
-        .render_image;
+        .render_image
+        .clone();
     root.preview_ui.rendered_runtime_key = Some(accepted.key);
     root.preview_ui.crop_mode = true;
     root.preview_ui.draft_crop = Some(CropRect {

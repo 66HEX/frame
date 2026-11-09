@@ -13,7 +13,7 @@ pub(super) fn preview_plan(
     realtime: bool,
     precise: bool,
 ) -> Result<PreviewFfmpegPlan, PreviewEngineError> {
-    build_preview_plan(config, seconds, realtime, precise, false)
+    build_preview_plan(config, seconds, realtime, precise, false, Transport::Raw)
 }
 
 pub(super) fn snapshot_preview_plan(
@@ -21,7 +21,29 @@ pub(super) fn snapshot_preview_plan(
     seconds: f64,
     precise: bool,
 ) -> Result<PreviewFfmpegPlan, PreviewEngineError> {
-    build_preview_plan(config, seconds, false, precise, true)
+    build_preview_plan(config, seconds, false, precise, true, Transport::Raw)
+}
+
+pub(super) fn framed_preview_plan(
+    config: &PreviewSessionConfig,
+    seconds: f64,
+    precise: bool,
+    snapshot: bool,
+) -> Result<PreviewFfmpegPlan, PreviewEngineError> {
+    build_preview_plan(
+        config,
+        seconds,
+        !snapshot,
+        precise,
+        snapshot,
+        Transport::Framed,
+    )
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum Transport {
+    Raw,
+    Framed,
 }
 
 fn build_preview_plan(
@@ -30,6 +52,7 @@ fn build_preview_plan(
     realtime: bool,
     precise: bool,
     snapshot: bool,
+    transport: Transport,
 ) -> Result<PreviewFfmpegPlan, PreviewEngineError> {
     let end_seconds = parsed_time(config.conversion_config.end_time.as_deref())
         .filter(|end_seconds| *end_seconds > seconds);
@@ -38,26 +61,33 @@ fn build_preview_plan(
     } else {
         build_ffmpeg_preview_args
     };
-    builder(
-        config.path.to_string_lossy().as_ref(),
-        &config.conversion_config,
-        &PreviewFfmpegOptions {
-            start_seconds: seconds,
-            end_seconds,
-            source_width: config.source_width,
-            source_height: config.source_height,
-            source_is_palette: config.source_is_palette,
-            source_sample_aspect_ratio: config.source_sample_aspect_ratio,
-            source_clock: config.source_clock,
-            preview_burn_clock: config.preview_burn_clock,
-            max_width: config.max_width,
-            max_height: config.max_height,
-            fps: config.fps,
-            realtime,
-            precise_seek: precise,
-            source_is_image: config.source_kind == PreviewSourceKind::Image,
-        },
-    )
+    let options = PreviewFfmpegOptions {
+        start_seconds: seconds,
+        end_seconds,
+        source_width: config.source_width,
+        source_height: config.source_height,
+        source_is_palette: config.source_is_palette,
+        source_sample_aspect_ratio: config.source_sample_aspect_ratio,
+        source_clock: config.source_clock,
+        preview_burn_clock: config.preview_burn_clock,
+        max_width: config.max_width,
+        max_height: config.max_height,
+        fps: config.fps,
+        realtime,
+        precise_seek: precise,
+        source_is_image: config.source_kind == PreviewSourceKind::Image,
+    };
+    let path = config.path.to_string_lossy();
+    if transport == Transport::Framed {
+        frame_core::preview::build_ffmpeg_framed_source_preview_args(
+            &path,
+            &config.conversion_config,
+            &options,
+            snapshot,
+        )
+    } else {
+        builder(&path, &config.conversion_config, &options)
+    }
     .map_err(|err| PreviewEngineError::Ffmpeg(err.to_string()))
 }
 

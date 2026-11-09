@@ -21,6 +21,7 @@ fn config() -> PreviewSessionConfig {
         source_width: Some(160),
         source_height: Some(90),
         source_is_palette: false,
+        source_is_mpeg_ts: false,
         source_sample_aspect_ratio: None,
         request_token: 0,
         source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
@@ -66,6 +67,7 @@ fn sleeping_handles() -> ProcessHandles {
 
 fn install_video(process: &RunningPreviewProcess, handles: ProcessHandles) {
     *lock_process(&process.process) = RunningProcessState {
+        framed_video: false,
         child: handles.child,
         stdout_worker: handles.stdout_worker,
         stderr_worker: handles.stderr_worker,
@@ -105,6 +107,7 @@ fn video_failure_marks_and_notifies_before_blocking_cleanup() {
         let _ = woke_tx.send(wait_for_playback_start(&worker_start, &worker_stop, 0));
     });
     *lock_process(&process.audio_process) = RunningProcessState {
+        framed_video: false,
         stdout_worker: Some(audio_worker),
         audio_start: Some(start),
         stop_requested: Some(stop),
@@ -164,6 +167,7 @@ fn stale_video_failure_preserves_replacement_but_disposes_owned_candidate() {
         Arc::clone(&process.stderr),
     ));
     *lock_process(&process.audio_process) = RunningProcessState {
+        framed_video: false,
         child: audio.child,
         stop_requested: audio.stop_requested,
         audio_exit: Some(Arc::clone(&exit)),
@@ -269,6 +273,7 @@ fn video_failure_cancels_reused_audio_prewarm_generation() {
         exit,
     });
     *lock_process(&process.audio_process) = RunningProcessState {
+        framed_video: false,
         child: handles.child,
         stdout_worker: handles.stdout_worker,
         stderr_worker: handles.stderr_worker,

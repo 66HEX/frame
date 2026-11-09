@@ -8,10 +8,12 @@ use crate::preview_engine::types::{PreviewDimensions, PreviewRenderedFrame, Prev
 use gpui::ImageId;
 use std::io::Read;
 use std::process::{Command, Stdio};
+use std::sync::atomic::AtomicBool;
 use std::time::{Duration, Instant};
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct FrameStreamSpec {
+    pub(super) framed: bool,
     pub(super) presentation: crate::preview_engine::PreviewRenderPresentation,
     pub(super) request_token: u64,
     pub(super) width: u32,
@@ -50,6 +52,7 @@ impl RunningPreviewProcess {
             precise,
             self.next_render_image_identity(),
             &self.metrics,
+            &self.cancelled,
         )?;
         let dimensions = frame.frame.dimensions();
         let generation = self.prepare_playback_generation_at(seconds, started_at);
@@ -69,14 +72,59 @@ pub(super) fn decode_single_preview_frame(
     precise: bool,
     image_identity: RenderImageIdentity,
     metrics: &PreviewRuntimeMetricsStore,
+    cancelled: &AtomicBool,
 ) -> Result<DecodedPreviewFrame, PreviewEngineError> {
-    let plan = snapshot_preview_plan(config, seconds, precise)?;
+    let verified = super::framed::prepare(executable, config, cancelled)?;
+    let plan = if verified.is_some() {
+        super::plan::framed_preview_plan(config, seconds, precise, true)?
+    } else {
+        snapshot_preview_plan(config, seconds, precise)?
+    };
     let mut args = plan.args.clone();
     insert_frame_limit(&mut args, 1);
     let read_started = Instant::now();
+    let (payload, presentation) = if let Some(verified) = verified {
+        metrics.record_video_process_spawn();
+        let spec = frame_core::preview_transport::FramedBgraSpec::new(plan.width, plan.height)?;
+        verified.snapshot(&args, spec, cancelled)?
+    } else {
+        (
+            raw_snapshot(executable, &args, plan.frame_bytes, metrics)?,
+            crate::preview_engine::PreviewRenderPresentation {
+                pixel_aspect_ratio: plan.pixel_aspect_ratio,
+                output_raster_aspect_ratio: plan.output_raster_aspect_ratio,
+                ..Default::default()
+            },
+        )
+    };
+    let read_elapsed = read_started.elapsed();
+
+    rendered_preview_frame_from_payload(
+        plan.width,
+        plan.height,
+        plan.width.saturating_mul(4),
+        seconds_to_us(seconds),
+        payload,
+        read_elapsed,
+        image_identity,
+    )
+    .map(|mut decoded| {
+        decoded.frame = decoded
+            .frame
+            .with_presentation(presentation, config.request_token);
+        decoded
+    })
+}
+
+fn raw_snapshot(
+    executable: &str,
+    args: &[String],
+    frame_bytes: usize,
+    metrics: &PreviewRuntimeMetricsStore,
+) -> Result<Vec<u8>, PreviewEngineError> {
     let child = crate::process_launch::spawn(
         Command::new(executable)
-            .args(&args)
+            .args(args)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped()),
@@ -95,39 +143,18 @@ pub(super) fn decode_single_preview_frame(
             stderr_detail(&stderr)
         )));
     }
-    if output.stdout.len() < plan.frame_bytes {
+    if output.stdout.len() < frame_bytes {
         return Err(PreviewEngineError::Ffmpeg(format!(
             "single frame render returned {} bytes, expected {}{}",
             output.stdout.len(),
-            plan.frame_bytes,
+            frame_bytes,
             stderr_detail(&String::from_utf8_lossy(&output.stderr))
         )));
     }
 
     let mut payload = output.stdout;
-    payload.truncate(plan.frame_bytes);
-    let read_elapsed = read_started.elapsed();
-
-    rendered_preview_frame_from_payload(
-        plan.width,
-        plan.height,
-        plan.width.saturating_mul(4),
-        seconds_to_us(seconds),
-        payload,
-        read_elapsed,
-        image_identity,
-    )
-    .map(|mut decoded| {
-        decoded.frame = decoded.frame.with_presentation(
-            crate::preview_engine::PreviewRenderPresentation {
-                pixel_aspect_ratio: plan.pixel_aspect_ratio,
-                output_raster_aspect_ratio: plan.output_raster_aspect_ratio,
-                ..Default::default()
-            },
-            config.request_token,
-        );
-        decoded
-    })
+    payload.truncate(frame_bytes);
+    Ok(payload)
 }
 
 pub(super) fn read_stream_frame(
@@ -136,11 +163,12 @@ pub(super) fn read_stream_frame(
     timestamp_seconds: f64,
     image_identity: RenderImageIdentity,
 ) -> Result<DecodedPreviewFrame, PreviewEngineError> {
-    let mut payload = vec![0_u8; spec.frame_bytes];
     let read_started = Instant::now();
-    stdout.read_exact(&mut payload).map_err(|error| {
-        PreviewEngineError::Ffmpeg(format!("failed to read first preview frame: {error}"))
-    })?;
+    let (payload, presentation) = super::framed::read_payload(stdout, spec, spec.first_frame_index)
+        .map_err(|error| {
+            PreviewEngineError::Ffmpeg(format!("failed to read first preview frame: {error}"))
+        })?
+        .ok_or_else(|| PreviewEngineError::Ffmpeg("preview returned no first frame".into()))?;
     let read_elapsed = read_started.elapsed();
     rendered_preview_frame_from_payload(
         spec.width,
@@ -154,7 +182,7 @@ pub(super) fn read_stream_frame(
     .map(|mut decoded| {
         decoded.frame = decoded
             .frame
-            .with_presentation(spec.presentation, spec.request_token);
+            .with_presentation(presentation, spec.request_token);
         decoded
     })
 }

@@ -132,6 +132,7 @@ pub(in crate::app) struct PreviewUiState {
     pub(in crate::app) filter_preview_debounce_until: Option<Instant>,
     pub(in crate::app) runtime_key: Option<PreviewRuntimeKey>,
     pub(in crate::app) pending_runtime_key: Option<PreviewRuntimeKey>,
+    pub(in crate::app) pending_runtime_cancel: Option<Arc<std::sync::atomic::AtomicBool>>,
     pub(in crate::app) failed_runtime_key: Option<PreviewRuntimeKey>,
     pub(in crate::app) runtime_request_generation: u64,
     pub(in crate::app) accepted_request_token: u64,
@@ -178,6 +179,7 @@ impl Default for PreviewUiState {
             filter_preview_debounce_until: None,
             runtime_key: None,
             pending_runtime_key: None,
+            pending_runtime_cancel: None,
             failed_runtime_key: None,
             runtime_request_generation: 0,
             accepted_request_token: 0,
@@ -192,6 +194,18 @@ impl Default for PreviewUiState {
             render_image: None,
             runtime_error: None,
             frame_tick_active: false,
+        }
+    }
+}
+
+impl Drop for PreviewUiState {
+    fn drop(&mut self) {
+        use std::sync::atomic::Ordering;
+        if let Some(cancelled) = &self.pending_runtime_cancel {
+            cancelled.store(true, Ordering::Release);
+        }
+        if let Some(session) = &self.session {
+            session.cancellation_token().store(true, Ordering::Release);
         }
     }
 }

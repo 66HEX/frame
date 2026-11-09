@@ -212,6 +212,8 @@ pub struct PreviewSessionConfig {
     pub source_width: Option<u32>,
     pub source_height: Option<u32>,
     pub source_is_palette: bool,
+    /// Derived from probed demuxer format, never the filename extension.
+    pub source_is_mpeg_ts: bool,
     pub source_sample_aspect_ratio: Option<frame_core::aspect::SampleAspectRatio>,
     pub request_token: u64,
     pub source_clock: frame_core::source_timing::ResolvedSourceClock,

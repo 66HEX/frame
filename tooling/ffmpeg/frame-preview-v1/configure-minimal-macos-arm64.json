@@ -1,0 +1,21 @@
+[
+  "--cc=/usr/bin/clang",
+  "--disable-everything",
+  "--disable-autodetect",
+  "--disable-doc",
+  "--disable-network",
+  "--disable-debug",
+  "--disable-programs",
+  "--enable-ffmpeg",
+  "--enable-ffprobe",
+  "--enable-protocol=file,pipe",
+  "--enable-demuxer=mpegts,mov,matroska,nut,h264",
+  "--enable-decoder=h264,hevc,ffv1,rawvideo,png",
+  "--enable-parser=h264,hevc",
+  "--enable-encoder=rawvideo,wrapped_avframe",
+  "--enable-muxer=rawvideo,null",
+  "--enable-filter=buffer,buffersink,fps,scale,format,setsar,showinfo,trim,setpts,transpose,hflip,vflip",
+  "--enable-swscale",
+  "--enable-zlib",
+  "--enable-bsf=extract_extradata"
+]

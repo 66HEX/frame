@@ -132,6 +132,10 @@ impl RunningPreviewProcess {
         Ok(self.finish_audio_start(pending))
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "Keep child registration and every pipe-worker failure cleanup in one sequence."
+    )]
     pub(super) fn spawn_audio_streaming_with_config(
         &self,
         config: &PreviewSessionConfig,
@@ -231,6 +235,7 @@ impl RunningPreviewProcess {
 
         let mut state = lock_process(&self.audio_process);
         *state = RunningProcessState {
+            framed_video: false,
             child: Some(child),
             stdout_worker: Some(stdout_worker),
             stderr_worker: Some(stderr_worker),

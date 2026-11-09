@@ -89,7 +89,7 @@ pub fn build_ffmpeg_preview_args(
     config: &ConversionConfig,
     options: &PreviewFfmpegOptions,
 ) -> Result<PreviewFfmpegPlan, ConversionError> {
-    build_preview_args_with_eof_action(input, config, options, FrameRateEofAction::Round)
+    build_preview_args_with_eof_action(input, config, options, FrameRateEofAction::Round, false)
 }
 
 /// Builds a snapshot preview plan that retains the final frame at EOF.
@@ -104,7 +104,40 @@ pub fn build_ffmpeg_snapshot_preview_args(
     config: &ConversionConfig,
     options: &PreviewFfmpegOptions,
 ) -> Result<PreviewFfmpegPlan, ConversionError> {
-    build_preview_args_with_eof_action(input, config, options, FrameRateEofAction::Pass)
+    build_preview_args_with_eof_action(input, config, options, FrameRateEofAction::Pass, false)
+}
+
+/// Builds the packet-bound preview protocol for a verified runtime and a
+/// decoder-native SAR source (currently MPEG-TS in the application).
+///
+/// The caller must establish runtime support before launching this plan.
+/// Source/Copy preview alone uses this policy; encoded preview retains the
+/// export's container/SAR semantics. Snapshot and streaming FPS rules are kept.
+///
+/// # Errors
+/// Returns an error for non-Copy configs or invalid preview options.
+pub fn build_ffmpeg_framed_source_preview_args(
+    input: &str,
+    config: &ConversionConfig,
+    options: &PreviewFfmpegOptions,
+    snapshot: bool,
+) -> Result<PreviewFfmpegPlan, ConversionError> {
+    if config.processing_mode != "copy" {
+        return Err(ConversionError::InvalidInput(
+            "Native frame presentation requires Source/Copy preview".into(),
+        ));
+    }
+    build_preview_args_with_eof_action(
+        input,
+        config,
+        options,
+        if snapshot {
+            FrameRateEofAction::Pass
+        } else {
+            FrameRateEofAction::Round
+        },
+        true,
+    )
 }
 
 #[expect(
@@ -116,6 +149,7 @@ fn build_preview_args_with_eof_action(
     config: &ConversionConfig,
     options: &PreviewFfmpegOptions,
     eof_action: FrameRateEofAction,
+    framed: bool,
 ) -> Result<PreviewFfmpegPlan, ConversionError> {
     validate_preview_options(input, options)?;
 
@@ -146,23 +180,32 @@ fn build_preview_args_with_eof_action(
             seek.microseconds,
         )?;
     }
-    let graph = build_visual_filter_complex_with_eof_action(
-        config,
-        VisualFilterProfile::PreviewLowRes {
-            base,
-            width: geometry.preview_width,
-            height: geometry.preview_height,
+    let graph = if framed {
+        crate::filters::build_framed_source_preview_graph(
+            geometry.preview_width,
+            geometry.preview_height,
             fps,
-            source_time_seconds: options.start_seconds,
-        },
-        VisualFilterContext {
-            source_is_palette: options.source_is_palette,
-            source_clock: options.source_clock,
-            preview_burn_clock,
-            ..VisualFilterContext::new(options.source_width, options.source_height)
-        },
-        eof_action,
-    );
+            eof_action,
+        )
+    } else {
+        build_visual_filter_complex_with_eof_action(
+            config,
+            VisualFilterProfile::PreviewLowRes {
+                base,
+                width: geometry.preview_width,
+                height: geometry.preview_height,
+                fps,
+                source_time_seconds: options.start_seconds,
+            },
+            VisualFilterContext {
+                source_is_palette: options.source_is_palette,
+                source_clock: options.source_clock,
+                preview_burn_clock,
+                ..VisualFilterContext::new(options.source_width, options.source_height)
+            },
+            eof_action,
+        )
+    };
 
     let mut args = vec![
         "-hide_banner".to_string(),
@@ -181,6 +224,9 @@ fn build_preview_args_with_eof_action(
     if options.realtime {
         args.push("-readrate".to_string());
         args.push("1".to_string());
+    }
+    if framed {
+        args.push("-native_frame_sar:v:0".into());
     }
     args.push("-i".to_string());
     args.push(input.to_string());
@@ -208,10 +254,15 @@ fn build_preview_args_with_eof_action(
         "-dn".to_string(),
         "-pix_fmt".to_string(),
         "bgra".to_string(),
-        "-f".to_string(),
-        "rawvideo".to_string(),
-        "pipe:1".to_string(),
     ]);
+    if framed {
+        args.extend([
+            "-c:v".into(),
+            "rawvideo".into(),
+            "-frame_preview_framed".into(),
+        ]);
+    }
+    args.extend(["-f".into(), "rawvideo".into(), "pipe:1".into()]);
 
     Ok(PreviewFfmpegPlan {
         pixel_aspect_ratio: preview_pixel_aspect_ratio(config, options, geometry),

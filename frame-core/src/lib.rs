@@ -16,6 +16,7 @@ pub mod input_map;
 pub mod media_filters;
 pub mod media_rules;
 pub mod preview;
+pub mod preview_transport;
 pub mod probe;
 pub mod source_timing;
 pub mod trim;

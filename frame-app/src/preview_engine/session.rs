@@ -5,9 +5,11 @@ use super::{
     PreviewPlaybackSnapshot, PreviewSessionConfig, PreviewSessionSnapshot, PreviewSessionStatus,
     PreviewSourceKind, RunningPreviewProcess, start_ffmpeg_preview_process,
 };
-use std::sync::{Mutex, MutexGuard};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 pub struct PreviewSession {
+    cancelled: Arc<AtomicBool>,
     config: Mutex<PreviewSessionConfig>,
     dimensions: Mutex<PreviewDimensions>,
     duration_seconds: Mutex<f64>,
@@ -27,15 +29,37 @@ impl PreviewSession {
     /// Returns an error when the config is invalid or the `FFmpeg` preview
     /// process cannot render the initial frame.
     pub fn start(config: PreviewSessionConfig) -> Result<Self, PreviewEngineError> {
+        Self::start_with_cancellation(config, Arc::new(AtomicBool::new(false)))
+    }
+
+    /// Starts a session with a cancellation signal available before any child
+    /// starts or the session object is returned.
+    ///
+    /// # Errors
+    /// Returns the same errors as `start`, including a cancelled initial probe.
+    pub fn start_with_cancellation(
+        config: PreviewSessionConfig,
+        cancelled: Arc<AtomicBool>,
+    ) -> Result<Self, PreviewEngineError> {
         config.validate()?;
+        if cancelled.load(Ordering::Acquire) {
+            return Err(PreviewEngineError::Ffmpeg(
+                "preview request cancelled".into(),
+            ));
+        }
         let frame_store = LatestFrameStore::new();
         let metrics = PreviewRuntimeMetricsStore::new();
 
         match config.source_kind {
             PreviewSourceKind::Image | PreviewSourceKind::Video | PreviewSourceKind::Audio => {
-                let (pipeline, dimensions, duration_seconds) =
-                    start_ffmpeg_preview_process(&config, frame_store.clone(), metrics.clone())?;
+                let (pipeline, dimensions, duration_seconds) = start_ffmpeg_preview_process(
+                    &config,
+                    frame_store.clone(),
+                    metrics.clone(),
+                    Arc::clone(&cancelled),
+                )?;
                 Ok(Self {
+                    cancelled,
                     config: Mutex::new(config),
                     dimensions: Mutex::new(dimensions),
                     duration_seconds: Mutex::new(duration_seconds),
@@ -56,6 +80,7 @@ impl PreviewSession {
         let frame_store = LatestFrameStore::new();
         let metrics = PreviewRuntimeMetricsStore::new();
         Self {
+            cancelled: Arc::new(AtomicBool::new(false)),
             dimensions: Mutex::new(config.target_dimensions()),
             duration_seconds: Mutex::new(config.duration_seconds),
             config: Mutex::new(config),
@@ -86,6 +111,11 @@ impl PreviewSession {
             // A queued reconfiguration must not reopen a session already stopped.
             return Ok(());
         };
+        if self.cancelled.load(Ordering::Acquire) {
+            return Err(PreviewEngineError::Ffmpeg(
+                "preview request cancelled".into(),
+            ));
+        }
         if pipeline.failed() {
             *lock(&self.playing) = false;
         }
@@ -194,11 +224,16 @@ impl PreviewSession {
     ///
     /// Returns an error when the preview pipeline cannot stop a child process.
     pub fn stop(&self) -> Result<(), PreviewEngineError> {
+        self.cancelled.store(true, Ordering::Release);
         let pipeline = { lock(&self.pipeline).take() };
         *lock(&self.playback_reader) = None;
         let result = pipeline.map_or(Ok(()), |mut pipeline| pipeline.stop());
         *lock(&self.playing) = false;
         result
+    }
+
+    pub(crate) fn cancellation_token(&self) -> Arc<AtomicBool> {
+        Arc::clone(&self.cancelled)
     }
 
     fn store_reconfigured_state(
@@ -215,6 +250,7 @@ impl PreviewSession {
 
 impl Drop for PreviewSession {
     fn drop(&mut self) {
+        self.cancelled.store(true, Ordering::Release);
         let pipeline = { lock(&self.pipeline).take() };
         if let Some(mut pipeline) = pipeline {
             let _ = pipeline.stop();
@@ -244,6 +280,7 @@ mod tests {
             source_width: Some(160),
             source_height: Some(90),
             source_is_palette: false,
+            source_is_mpeg_ts: false,
             source_sample_aspect_ratio: None,
             request_token: 0,
             source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,

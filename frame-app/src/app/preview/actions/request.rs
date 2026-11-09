@@ -37,6 +37,10 @@ pub(super) fn preview_runtime_request(
     let duration_seconds = preview_duration_seconds(Some(metadata));
     let (source_width, source_height) = valid_preview_dimensions(metadata.width, metadata.height);
     let source_is_palette = metadata.pixel_format.as_deref() == Some("pal8");
+    let source_is_mpeg_ts = metadata
+        .source_format
+        .as_deref()
+        .is_some_and(|formats| formats.split(',').any(|format| format.trim() == "mpegts"));
     let mut preview_config = selected_file.config.clone();
     if !include_applied_crop {
         preview_config.crop = None;
@@ -83,6 +87,7 @@ pub(super) fn preview_runtime_request(
         clock.hash(&mut visual_identity);
     }
     metadata.sample_aspect_ratio.hash(&mut visual_identity);
+    source_is_mpeg_ts.hash(&mut visual_identity);
     let key = PreviewRuntimeKey {
         file_id: selected_file.id.clone(),
         path: selected_file.path.clone(),
@@ -103,6 +108,7 @@ pub(super) fn preview_runtime_request(
         source_width,
         source_height,
         source_is_palette,
+        source_is_mpeg_ts,
         source_sample_aspect_ratio: metadata.sample_aspect_ratio,
         request_token: 0,
         source_clock,
