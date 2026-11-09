@@ -26,6 +26,8 @@ type TestResult<T = ()> = Result<T, String>;
 
 #[path = "media_integration/adpcm.rs"]
 mod adpcm;
+#[path = "media_integration/audio_titles.rs"]
+mod audio_titles;
 #[path = "media_integration/gif_frames.rs"]
 mod gif_frames;
 #[path = "media_integration/subtitle_trim.rs"]

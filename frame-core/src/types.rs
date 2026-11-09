@@ -230,6 +230,9 @@ pub struct AudioTrack {
     pub channel_layout: Option<String>,
     pub language: Option<String>,
     pub label: Option<String>,
+    /// Genuine title/name metadata, without the display label's handler fallback.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata_title: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bitrate_kbps: Option<f64>,
     pub sample_rate: Option<String>,
@@ -818,6 +821,23 @@ mod tests {
         let restored: ProbeMetadata = serde_json::from_value(value).unwrap();
         assert_eq!(restored.source_format, metadata.source_format);
         assert_eq!(restored.audio_tracks[0].codec_tag, Some(0x4653_736d));
+    }
+
+    #[test]
+    fn audio_metadata_title_preserves_empty_and_does_not_infer_old_labels() {
+        let old = json!({"index":1,"codec":"aac","channels":"2","label":"SoundHandler"});
+        let mut track: AudioTrack = serde_json::from_value(old).unwrap();
+        assert!(track.metadata_title.is_none());
+        let absent = serde_json::to_value(&track).unwrap();
+        assert!(absent.get("metadataTitle").is_none());
+        for value in ["", " ", "Żółć = commentary"] {
+            track.metadata_title = Some(value.into());
+            let serialized = serde_json::to_value(&track).unwrap();
+            assert_eq!(serialized["metadataTitle"], value);
+            let restored: AudioTrack = serde_json::from_value(serialized).unwrap();
+            assert_eq!(restored.metadata_title.as_deref(), Some(value));
+            assert_eq!(restored.label.as_deref(), Some("SoundHandler"));
+        }
     }
 
     #[test]

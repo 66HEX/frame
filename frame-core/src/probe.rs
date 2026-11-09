@@ -161,6 +161,11 @@ fn metadata_from_ffprobe(
                 .map_or_else(|| "?".to_string(), |c| c.to_string()),
             channel_layout: stream.channel_layout.clone(),
             label,
+            metadata_title: stream
+                .tags
+                .as_ref()
+                .and_then(stream_title)
+                .map(str::to_string),
             language,
             bitrate_kbps: track_bitrate,
             sample_rate: stream.sample_rate.clone(),
@@ -230,11 +235,15 @@ fn metadata_from_ffprobe(
 }
 
 fn stream_label(tags: &FfprobeTags) -> Option<String> {
+    stream_title(tags)
+        .or(tags.handler_name.as_deref())
+        .map(str::to_string)
+}
+
+fn stream_title(tags: &FfprobeTags) -> Option<&str> {
     tags.title
-        .as_ref()
-        .or_else(|| tags.name.as_ref().filter(|name| !name.is_empty()))
-        .or(tags.handler_name.as_ref())
-        .cloned()
+        .as_deref()
+        .or_else(|| tags.name.as_deref().filter(|name| !name.is_empty()))
 }
 
 fn source_timing(probe: &FfprobeOutput) -> crate::source_timing::SourceTiming {
@@ -479,6 +488,89 @@ mod tests {
             let global = metadata.tags.unwrap();
             assert_eq!(global.title.as_deref(), Some("Global title"));
             assert_eq!(global.name.as_deref(), Some("Global name"));
+        }
+    }
+
+    #[test]
+    fn audio_metadata_titles_exclude_display_handler_fallback() {
+        use serde_json::json;
+        for (tags, title, label) in [
+            (json!(null), None, None),
+            (
+                json!({"handler_name":"HANDLER ONLY"}),
+                None,
+                Some("HANDLER ONLY"),
+            ),
+            (
+                json!({"title":"TITLE","name":"NAME","handler_name":"HANDLER"}),
+                Some("TITLE"),
+                Some("TITLE"),
+            ),
+            (
+                json!({"title":"","name":"NAME","handler_name":"HANDLER"}),
+                Some(""),
+                Some(""),
+            ),
+            (
+                json!({"name":"NAME","handler_name":"HANDLER"}),
+                Some("NAME"),
+                Some("NAME"),
+            ),
+            (
+                json!({"name":"","handler_name":"HANDLER"}),
+                None,
+                Some("HANDLER"),
+            ),
+            (
+                json!({"name":" ","handler_name":"HANDLER"}),
+                Some(" "),
+                Some(" "),
+            ),
+            (json!({"title":" ","name":"NAME"}), Some(" "), Some(" ")),
+            (
+                json!({"title":null,"name":"NAME"}),
+                Some("NAME"),
+                Some("NAME"),
+            ),
+            (json!({"handler_name":""}), None, Some("")),
+            (json!({"title":""}), Some(""), Some("")),
+            (
+                json!({"name":"Żółć = commentary / \"quoted\""}),
+                Some("Żółć = commentary / \"quoted\""),
+                Some("Żółć = commentary / \"quoted\""),
+            ),
+        ] {
+            let metadata = parse_ffprobe_stdout(
+                "source.mp4",
+                json!({
+                    "format":{"tags":{"title":"Global title","name":"Global name"}},
+                    "streams":[
+                        {"index":1,"codec_type":"audio","codec_name":"aac","tags":tags},
+                        {"index":2,"codec_type":"subtitle","codec_name":"mov_text","tags":tags}
+                    ]
+                })
+                .to_string(),
+            )
+            .unwrap();
+            assert_eq!(
+                metadata.audio_tracks[0].metadata_title.as_deref(),
+                title,
+                "{tags}"
+            );
+            assert_eq!(metadata.audio_tracks[0].label.as_deref(), label, "{tags}");
+            assert_eq!(
+                metadata.subtitle_tracks[0].label.as_deref(),
+                label,
+                "{tags}"
+            );
+            assert_eq!(
+                metadata.tags.as_ref().unwrap().title.as_deref(),
+                Some("Global title")
+            );
+            assert_eq!(
+                metadata.tags.as_ref().unwrap().name.as_deref(),
+                Some("Global name")
+            );
         }
     }
 

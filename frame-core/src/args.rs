@@ -340,6 +340,27 @@ fn add_subtitle_action_arg(args: &mut Vec<String>, output_index: usize, action: 
     );
 }
 
+fn add_audio_title_metadata(
+    args: &mut Vec<String>,
+    config: &ConversionConfig,
+    tracks: &[&AudioTrack],
+) {
+    if config.metadata.mode != MetadataMode::Preserve
+        || !(config.container.eq_ignore_ascii_case("mp4")
+            || config.container.eq_ignore_ascii_case("mov"))
+    {
+        return;
+    }
+    for (output_index, track) in tracks.iter().enumerate() {
+        if let Some(title) = &track.metadata_title {
+            args.extend([
+                format!("-metadata:s:a:{output_index}"),
+                format!("title={title}"),
+            ]);
+        }
+    }
+}
+
 fn add_track_maps<T>(args: &mut Vec<String>, tracks: &[&T], index: impl Fn(&T) -> u32) {
     for track in tracks {
         args.push("-map".to_string());
@@ -594,6 +615,7 @@ pub fn build_ffmpeg_args_with_gif_policy(
         if container_supports_audio(&config.container) {
             let audio_tracks = collect_selected_audio_tracks(config, probe)?;
             add_track_maps(&mut args, &audio_tracks, |track| track.index);
+            add_audio_title_metadata(&mut args, config, &audio_tracks);
             for (output_index, track) in audio_tracks.iter().enumerate() {
                 if config.container.eq_ignore_ascii_case("mov") && track.codec == "g723_1" {
                     // G.723.1 has 240 samples per packet. Demuxed streams can
@@ -791,6 +813,7 @@ pub fn build_ffmpeg_args_with_gif_policy(
 
         let audio_tracks = mapped_audio;
         add_track_maps(&mut args, &audio_tracks, |track| track.index);
+        add_audio_title_metadata(&mut args, config, &audio_tracks);
 
         if audio_tracks.is_empty() {
             args.push("-an".to_string());
@@ -1588,6 +1611,8 @@ fn validate_image_encoding_settings(config: &ConversionConfig) -> Result<(), Con
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    mod audio_titles;
     use crate::filters::EVEN_DIMENSIONS_FILTER;
     use crate::types::OverlayConfig;
     use std::{

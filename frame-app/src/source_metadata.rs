@@ -274,6 +274,7 @@ mod tests {
                     channel_layout: Some("stereo".to_string()),
                     language: Some("eng".to_string()),
                     label: Some("Main".to_string()),
+                    metadata_title: Some("Genuine source title".to_string()),
                     bitrate_kbps: Some(192.0),
                     sample_rate: Some("48000".to_string()),
                 }],
