@@ -9,6 +9,8 @@ pub const DEFAULT_PREVIEW_MAX_WIDTH: u32 = 1280;
 pub const DEFAULT_PREVIEW_MAX_HEIGHT: u32 = 720;
 pub const DEFAULT_PREVIEW_FPS: u32 = 30;
 pub const MIN_PREVIEW_DIMENSION: u32 = 16;
+/// Source pixels are independent of the minimum requested preview canvas.
+pub const MIN_PREVIEW_SOURCE_DIMENSION: u32 = 1;
 pub const MAX_PREVIEW_DIMENSION: u32 = 3840;
 pub const MIN_PREVIEW_FPS: u32 = 1;
 pub const MAX_PREVIEW_FPS: u32 = 60;
@@ -257,13 +259,13 @@ impl PreviewSessionConfig {
                 validate_range(
                     "source_width",
                     width,
-                    MIN_PREVIEW_DIMENSION,
+                    MIN_PREVIEW_SOURCE_DIMENSION,
                     MAX_PREVIEW_DIMENSION * 8,
                 )?;
                 validate_range(
                     "source_height",
                     height,
-                    MIN_PREVIEW_DIMENSION,
+                    MIN_PREVIEW_SOURCE_DIMENSION,
                     MAX_PREVIEW_DIMENSION * 8,
                 )?;
             }

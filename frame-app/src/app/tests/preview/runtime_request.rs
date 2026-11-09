@@ -1,4 +1,5 @@
 use super::*;
+use crate::settings::{CropSettings, OverlaySettings};
 
 #[test]
 fn tiff_preview_propagates_palette_source_and_invalidates_only_effective_format_changes() {
@@ -453,4 +454,125 @@ fn preview_key_retains_canonical_unknown_distinction_and_edit_intent() {
     assert!(editing.key.edit_crop);
     assert!(editing.config.conversion_config.crop.is_none());
     assert!(square.config.conversion_config.crop.is_none());
+}
+
+#[test]
+fn preview_request_retains_small_source_facts_without_sanitizing_upper_bounds() {
+    let mut root = FrameRoot::new();
+    seed_ready_video(&mut root, "tiny", "/tmp/tiny.mkv");
+    let saved = root.file_queue.selected_file().unwrap().config.clone();
+    let mut entry = root.source_metadata.entry_for("tiny");
+    for (width, height) in [
+        (Some(1), Some(1)),
+        (Some(400), Some(4)),
+        (Some(4), Some(400)),
+        (Some(15), Some(100)),
+        (Some(30_720), Some(1)),
+        (Some(30_721), Some(16)),
+        (Some(16), Some(u32::MAX)),
+        (Some(0), Some(100)),
+        (Some(100), Some(0)),
+        (Some(1), None),
+        (None, Some(1)),
+        (None, None),
+    ] {
+        let metadata = entry.metadata.as_mut().unwrap();
+        metadata.width = width;
+        metadata.height = height;
+        metadata.sample_aspect_ratio = frame_core::aspect::SampleAspectRatio::new(2, 1);
+        let request = root.selected_preview_runtime_request(&entry).unwrap();
+        let expected = if width.is_some_and(|w| w > 0) && height.is_some_and(|h| h > 0) {
+            (width, height)
+        } else {
+            (None, None)
+        };
+        assert_eq!(
+            (request.config.source_width, request.config.source_height),
+            expected
+        );
+        assert_eq!(
+            (request.key.source_width, request.key.source_height),
+            expected
+        );
+        assert_eq!(
+            request.config.source_sample_aspect_ratio,
+            frame_core::aspect::SampleAspectRatio::new(2, 1)
+        );
+        let oversized =
+            expected.0.is_some_and(|w| w > 30_720) || expected.1.is_some_and(|h| h > 30_720);
+        assert_eq!(
+            request.config.validate().is_err(),
+            oversized,
+            "{width:?}x{height:?}"
+        );
+        assert_eq!(root.file_queue.selected_file().unwrap().config, saved);
+    }
+}
+
+#[test]
+fn tiny_source_edit_requests_keep_full_source_facts_and_saved_geometry() {
+    let mut root = FrameRoot::new();
+    let mut file = FileItem::from_path("tiny-edit", "/tmp/tiny.mkv", 1);
+    file.config.crop = Some(CropSettings {
+        enabled: true,
+        x: 1,
+        y: 1,
+        width: 200,
+        height: 3,
+        ..CropSettings::default()
+    });
+    file.config.overlay = Some(OverlaySettings {
+        enabled: true,
+        path: "/tmp/logo.png".into(),
+        x: 0.5,
+        y: 0.5,
+        width: 0.05,
+        opacity: 1.0,
+        anchor: "center".into(),
+    });
+    let saved = file.config.clone();
+    root.file_queue.add_file(file);
+    root.source_metadata.mark_ready(
+        "tiny-edit",
+        SourceMetadata {
+            media_kind: Some(SourceKind::Video),
+            width: Some(400),
+            height: Some(4),
+            sample_aspect_ratio: frame_core::aspect::SampleAspectRatio::new(2, 1),
+            ..SourceMetadata::default()
+        },
+    );
+    let overlay = saved.overlay.as_ref().unwrap();
+    root.preview_ui
+        .overlay
+        .sync_initial_overlay(Some(&crate::preview::PreviewOverlay {
+            enabled: overlay.enabled,
+            path: overlay.path.clone(),
+            x: overlay.x,
+            y: overlay.y,
+            width: overlay.width,
+            opacity: overlay.opacity,
+            anchor: overlay.anchor.clone(),
+        }));
+    let entry = root.source_metadata.entry_for("tiny-edit");
+    for editing in [false, true] {
+        root.preview_ui.crop_mode = editing;
+        root.preview_ui.overlay.set_overlay_mode(editing, false);
+        let request = root.selected_preview_runtime_request(&entry).unwrap();
+        assert_eq!(
+            (request.config.source_width, request.config.source_height),
+            (Some(400), Some(4))
+        );
+        assert_eq!(
+            (request.key.source_width, request.key.source_height),
+            (Some(400), Some(4))
+        );
+        assert_eq!(
+            (request.key.edit_crop, request.key.edit_overlay),
+            (editing, editing)
+        );
+        assert_eq!(request.config.conversion_config.crop.is_none(), editing);
+        assert_eq!(request.config.conversion_config.overlay.is_none(), editing);
+        assert_eq!(root.file_queue.selected_file().unwrap().config, saved);
+    }
 }

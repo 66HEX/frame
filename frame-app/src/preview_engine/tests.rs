@@ -770,3 +770,6 @@ fn ffmpeg_snapshot_stream_seek_and_reconfigure_keep_frame_owned_presentation() {
     session.stop().unwrap();
     let _ = std::fs::remove_file(path);
 }
+
+#[path = "tests/small_sources.rs"]
+mod small_sources;

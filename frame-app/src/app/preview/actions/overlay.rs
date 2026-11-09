@@ -12,7 +12,7 @@ use crate::preview::{
     OverlayModeChange, OverlaySizeDirection, Point as PreviewPoint, PreviewControlInput,
     PreviewOverlay, PreviewOverlayState, preview_control_availability,
 };
-use crate::preview_engine::MIN_PREVIEW_DIMENSION;
+use crate::preview_engine::MIN_PREVIEW_SOURCE_DIMENSION;
 use crate::settings::{
     ConversionConfig, OverlaySettings, ProcessingMode, is_audio_only_container, is_gif_container,
 };
@@ -467,7 +467,7 @@ pub(super) const fn valid_preview_dimensions(
 ) -> (Option<u32>, Option<u32>) {
     match (width, height) {
         (Some(width), Some(height))
-            if width >= MIN_PREVIEW_DIMENSION && height >= MIN_PREVIEW_DIMENSION =>
+            if width >= MIN_PREVIEW_SOURCE_DIMENSION && height >= MIN_PREVIEW_SOURCE_DIMENSION =>
         {
             (Some(width), Some(height))
         }
