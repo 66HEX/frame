@@ -263,6 +263,8 @@ pub struct ExternalSubtitleTrack {
 #[serde(rename_all = "camelCase")]
 pub struct ProbeMetadata {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_timing: Option<crate::source_timing::SourceTiming>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_format: Option<String>,
     #[serde(default = "default_media_kind")]
     pub media_kind: String,
@@ -603,6 +605,8 @@ pub struct FfprobeStream {
     pub codec_type: String,
     pub codec_name: Option<String>,
     pub codec_tag: Option<String>,
+    pub time_base: Option<String>,
+    pub start_pts: Option<i64>,
     pub width: Option<i32>,
     pub height: Option<i32>,
     pub channels: Option<i32>,
@@ -629,6 +633,7 @@ pub struct FfprobeSideData {
 #[derive(Deserialize)]
 pub struct FfprobeFormat {
     pub format_name: Option<String>,
+    pub start_time: Option<String>,
     pub duration: Option<String>,
     pub bit_rate: Option<String>,
     pub tags: Option<FfprobeTags>,

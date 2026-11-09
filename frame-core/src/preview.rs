@@ -20,6 +20,7 @@ pub struct PreviewFfmpegOptions {
     pub source_width: Option<u32>,
     pub source_height: Option<u32>,
     pub source_is_palette: bool,
+    pub source_clock: crate::source_timing::ResolvedSourceClock,
     pub max_width: u32,
     pub max_height: u32,
     pub fps: u32,
@@ -83,6 +84,15 @@ pub fn build_ffmpeg_preview_args(
         OutputRasterPolicy::Exact => VisualFilterBase::Image,
         OutputRasterPolicy::Even => VisualFilterBase::Video,
     };
+    if base != VisualFilterBase::Source && crate::filters::has_subtitle_burn(config) {
+        let seek = crate::trim::RawFfmpegTime::parse(&format_seconds(options.start_seconds))
+            .ok_or_else(|| {
+                ConversionError::InvalidInput(
+                    "Preview start position is too large to align subtitles".into(),
+                )
+            })?;
+        crate::filters::validate_subtitle_clock(config, options.source_clock, seek.microseconds)?;
+    }
     let graph = build_visual_filter_complex_with_context(
         config,
         VisualFilterProfile::PreviewLowRes {
@@ -94,6 +104,7 @@ pub fn build_ffmpeg_preview_args(
         },
         VisualFilterContext {
             source_is_palette: options.source_is_palette,
+            source_clock: options.source_clock,
             ..VisualFilterContext::new(options.source_width, options.source_height)
         },
     );
@@ -503,6 +514,38 @@ mod tests {
         }
     }
 
+    #[test]
+    fn preview_uses_resolved_video_only_clock_and_validates_only_active_burn() {
+        use crate::source_timing::{ResolvedSourceClock, TimeBase};
+        let mut config = default_config();
+        config.subtitle_burn_path = Some("/tmp/sub.srt".into());
+        config.start_time = Some("9".into());
+        let mut options = default_options();
+        options.start_seconds = 0.123_456_789;
+        options.source_clock = ResolvedSourceClock::Known {
+            video_time_base: TimeBase::new(1, 1000).unwrap(),
+            origin_microseconds: 0,
+            minimum_start_microseconds: None,
+        };
+        let plan = build_ffmpeg_preview_args("source.mkv", &config, &options).unwrap();
+        assert!(plan.args.windows(2).any(|pair| pair == ["-ss", "0.123457"]));
+        assert!(
+            plan.args
+                .iter()
+                .any(|value| value.contains("setpts=PTS+(round(123/(1000*TB)))"))
+        );
+        options.source_clock = ResolvedSourceClock::Invalid;
+        assert!(build_ffmpeg_preview_args("source.mkv", &config, &options).is_err());
+        options.start_seconds = 0.0;
+        assert!(build_ffmpeg_preview_args("source.mkv", &config, &options).is_ok());
+        options.start_seconds = 0.5;
+        config.processing_mode = "copy".into();
+        assert!(build_ffmpeg_preview_args("source.mkv", &config, &options).is_ok());
+        config.processing_mode = "reencode".into();
+        config.subtitle_burn_path = None;
+        assert!(build_ffmpeg_preview_args("source.mkv", &config, &options).is_ok());
+    }
+
     fn default_options() -> PreviewFfmpegOptions {
         PreviewFfmpegOptions {
             start_seconds: 12.345,
@@ -510,6 +553,7 @@ mod tests {
             source_width: Some(1920),
             source_height: Some(1080),
             source_is_palette: false,
+            source_clock: crate::source_timing::ResolvedSourceClock::Unknown,
             max_width: 1280,
             max_height: 720,
             fps: 30,
@@ -665,7 +709,7 @@ mod tests {
 
         assert!(plan.args.iter().any(|arg| {
             arg.contains(
-                "setpts=PTS+10.000/TB,subtitles=filename=/tmp/sub.srt,setpts=PTS-10.000/TB",
+                "setpts=PTS+(round(10.000/TB)),subtitles=filename=/tmp/sub.srt,setpts=PTS-(round(10.000/TB))",
             )
         }));
     }
@@ -680,7 +724,7 @@ mod tests {
         let plan = build_ffmpeg_preview_args("input.mp4", &config, &options).unwrap();
         assert!(plan.args.windows(2).any(|pair| pair == ["-ss", "1.234567"]));
         assert!(plan.args.iter().any(|arg| arg.contains(
-            "setpts=PTS+1.234567/TB,subtitles=filename=/tmp/sub.srt,setpts=PTS-1.234567/TB"
+            "setpts=PTS+(round(1.234567/TB)),subtitles=filename=/tmp/sub.srt,setpts=PTS-(round(1.234567/TB))"
         )));
     }
 

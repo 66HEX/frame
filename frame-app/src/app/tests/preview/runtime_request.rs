@@ -364,3 +364,67 @@ fn preview_runtime_key_changes_when_adaptive_dimensions_change() {
     assert_ne!(current, next);
     assert!(current.can_reconfigure_to(&next));
 }
+
+#[test]
+fn preview_resolves_video_only_timing_and_hashes_only_an_effective_burn_clock() {
+    use frame_core::source_timing::{ResolvedSourceClock, TimeBase};
+    let mut root = FrameRoot::new();
+    seed_ready_video(&mut root, "clock", "/tmp/source.m2ts");
+    let mut entry = root.source_metadata.entry_for("clock");
+    let probe = frame_core::probe::parse_ffprobe_stdout("source.m2ts", serde_json::json!({
+        "format":{"format_name":"mpegts","start_time":"1.400000","duration":"10"},
+        "streams":[
+            {"index":4,"codec_type":"video","codec_name":"h264","width":320,"height":180,"time_base":"1/90000","start_pts":145_920},
+            {"index":7,"codec_type":"audio","codec_name":"aac","channels":2,"time_base":"1/90000","start_pts":126_000}
+        ]
+    }).to_string()).unwrap();
+    entry.metadata = Some(crate::source_metadata::source_metadata_from_probe(probe));
+    let video_only = ResolvedSourceClock::Known {
+        video_time_base: TimeBase::new(1, 90_000).unwrap(),
+        origin_microseconds: 1_400_000,
+        minimum_start_microseconds: Some(1_621_333),
+    };
+    root.update_selected_config(|config| {
+        config.selected_audio_tracks = vec![7];
+        true
+    });
+    let without_burn = root.selected_preview_runtime_request(&entry).unwrap();
+    assert_eq!(without_burn.config.source_clock, video_only);
+    entry
+        .metadata
+        .as_mut()
+        .unwrap()
+        .source_timing
+        .as_mut()
+        .unwrap()
+        .format_start_microseconds = Some(0);
+    let changed_unused = root.selected_preview_runtime_request(&entry).unwrap();
+    assert_eq!(without_burn.key.visual_hash, changed_unused.key.visual_hash);
+    root.update_selected_config(|config| {
+        config.subtitle_burn_path = Some("/tmp/sub.srt".into());
+        true
+    });
+    let burn_zero_origin = root.selected_preview_runtime_request(&entry).unwrap();
+    entry
+        .metadata
+        .as_mut()
+        .unwrap()
+        .source_timing
+        .as_mut()
+        .unwrap()
+        .format_start_microseconds = Some(1_400_000);
+    let burn_original = root.selected_preview_runtime_request(&entry).unwrap();
+    assert_ne!(
+        burn_zero_origin.key.visual_hash,
+        burn_original.key.visual_hash
+    );
+    assert_eq!(burn_original.config.source_clock, video_only);
+    root.update_selected_config(|config| {
+        config.processing_mode = crate::settings::ProcessingMode::Copy;
+        true
+    });
+    let copy = root.selected_preview_runtime_request(&entry).unwrap();
+    entry.metadata.as_mut().unwrap().source_timing = None;
+    let copy_unknown = root.selected_preview_runtime_request(&entry).unwrap();
+    assert_eq!(copy.key.visual_hash, copy_unknown.key.visual_hash);
+}

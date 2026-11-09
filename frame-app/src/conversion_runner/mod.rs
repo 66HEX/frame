@@ -22,5 +22,5 @@ use frame_core::types::{ConversionTask, DEFAULT_MAX_CONCURRENCY};
 pub use output_paths::*;
 pub use runner::*;
 #[cfg(test)]
-use runner::{ffmpeg_progress_from_line, next_batch_launch_count};
+use runner::{expected_duration_seconds, ffmpeg_progress_from_line, next_batch_launch_count};
 pub use subtitles::check_subtitle_trim_support;

@@ -11,6 +11,20 @@ fn parse_time_to_seconds_returns_zero_for_partial_timecodes() {
 }
 
 #[test]
+fn full_timecodes_apply_the_sign_to_the_entire_duration() {
+    for (time, expected) in [
+        ("-00:00:00.5", -0.5),
+        ("-01:00:01.5", -3601.5),
+        ("+01:00:01.5", 3601.5),
+    ] {
+        assert_close(super::super::parse_time_to_seconds(time), expected);
+    }
+    for partial in ["-1:30", ".5", "02:03", "--01:00:00"] {
+        assert_eq!(super::super::parse_time_to_seconds(partial), 0.0);
+    }
+}
+
+#[test]
 fn format_time_matches_trim_precision() {
     assert_eq!(super::super::format_time(3723.25), "01:02:03.250");
 }

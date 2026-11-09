@@ -5,7 +5,7 @@ use crate::{
     },
     media_rules::is_image_container,
     types::ConversionConfig,
-    utils::{format_ffmpeg_seconds, parse_time},
+    utils::format_ffmpeg_seconds,
 };
 
 pub const EVEN_DIMENSIONS_FILTER: &str = "pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0";
@@ -20,6 +20,7 @@ const TIFF_PALETTE_INPUT_FORMAT: &str = "format=pix_fmts=rgba|rgba64le";
 pub struct VisualFilterContext {
     pub source_dimensions: Option<(u32, u32)>,
     pub source_is_palette: bool,
+    pub source_clock: crate::source_timing::ResolvedSourceClock,
 }
 
 impl VisualFilterContext {
@@ -28,6 +29,7 @@ impl VisualFilterContext {
         Self {
             source_dimensions: width.zip(height).filter(|&(w, h)| w > 0 && h > 0),
             source_is_palette: false,
+            source_clock: crate::source_timing::ResolvedSourceClock::Unknown,
         }
     }
 }
@@ -77,9 +79,12 @@ fn rounded_i32(value: f64, min_value: f64) -> i32 {
     converted
 }
 
-/// Builds filters without source metadata. For exact custom padding, use
+/// Builds filters without source metadata.
+///
+/// For exact custom padding, use
 /// [`build_visual_filter_chain_with_context`]; unknown geometry retains the
-/// legacy dynamic padding expression.
+/// legacy dynamic padding expression. Without timestamp metadata, subtitle burn
+/// clocks use symmetric current-time-base rounding as a best effort.
 #[must_use]
 pub fn build_video_filters(config: &ConversionConfig, include_scale: bool) -> Vec<String> {
     build_video_filters_at_time(
@@ -90,18 +95,26 @@ pub fn build_video_filters(config: &ConversionConfig, include_scale: bool) -> Ve
     )
 }
 
-fn export_subtitle_time(config: &ConversionConfig) -> f64 {
-    config
-        .start_time
-        .as_deref()
-        .and_then(parse_time)
-        .unwrap_or(0.0)
+#[derive(Clone, Copy, Debug)]
+enum SubtitleClock {
+    SourceMicroseconds(i64),
+    NumericPreview(f64),
+}
+
+fn export_subtitle_time(config: &ConversionConfig) -> SubtitleClock {
+    SubtitleClock::SourceMicroseconds(
+        config
+            .start_time
+            .as_deref()
+            .and_then(crate::trim::RawFfmpegTime::parse)
+            .map_or(0, |time| time.microseconds),
+    )
 }
 
 fn build_video_filters_at_time(
     config: &ConversionConfig,
     include_scale: bool,
-    source_time_seconds: f64,
+    source_time_seconds: SubtitleClock,
     context: VisualFilterContext,
 ) -> Vec<String> {
     let mut filters = Vec::new();
@@ -212,7 +225,7 @@ fn build_video_filters_at_time(
         }
     }
 
-    apply_subtitle_timebase(&mut filters, source_time_seconds);
+    apply_subtitle_timebase(&mut filters, source_time_seconds, context.source_clock);
     filters
 }
 
@@ -342,7 +355,7 @@ pub fn build_encode_video_filters(config: &ConversionConfig, include_scale: bool
 fn build_encode_video_filters_at_time(
     config: &ConversionConfig,
     include_scale: bool,
-    source_time_seconds: f64,
+    source_time_seconds: SubtitleClock,
     context: VisualFilterContext,
 ) -> Vec<String> {
     let mut filters =
@@ -373,6 +386,9 @@ pub fn build_visual_filter_chain(
 }
 
 /// Builds visual filters using source geometry for exact aspect-fit padding.
+///
+/// Callers requiring timestamp error reporting should use the export/preview
+/// argument builders, which validate known clocks before constructing filters.
 #[must_use]
 pub fn build_visual_filter_chain_with_context(
     config: &ConversionConfig,
@@ -396,6 +412,7 @@ pub fn build_visual_filter_chain_with_context(
             fps,
             source_time_seconds,
         } => {
+            let source_time_seconds = SubtitleClock::NumericPreview(source_time_seconds);
             let mut filters = match base {
                 VisualFilterBase::Source => Vec::new(),
                 VisualFilterBase::Video => {
@@ -533,6 +550,7 @@ fn build_preview_filter_complex(
     source_time_seconds: f64,
     context: VisualFilterContext,
 ) -> String {
+    let source_time_seconds = SubtitleClock::NumericPreview(source_time_seconds);
     let base_filters = match base {
         VisualFilterBase::Source => Vec::new(),
         VisualFilterBase::Video => {
@@ -560,21 +578,57 @@ fn build_preview_filter_complex(
     }
 }
 
-fn apply_subtitle_timebase(filters: &mut Vec<String>, source_time_seconds: f64) {
-    if !source_time_seconds.is_finite() || source_time_seconds <= 0.0 {
-        return;
-    }
+pub(crate) fn has_subtitle_burn(config: &ConversionConfig) -> bool {
+    config
+        .subtitle_burn_path
+        .as_deref()
+        .is_some_and(|path| !path.is_empty())
+}
 
+pub(crate) fn validate_subtitle_clock(
+    config: &ConversionConfig,
+    source: crate::source_timing::ResolvedSourceClock,
+    seek_microseconds: i64,
+) -> Result<(), crate::error::ConversionError> {
+    let doubles = !is_image_container(&config.container)
+        && config.video_filters.deinterlace != crate::types::DeinterlaceMode::Off;
+    source.shift_expression_for_filter(seek_microseconds, doubles)?;
+    Ok(())
+}
+
+pub(crate) fn preview_seek_microseconds(seconds: f64) -> i64 {
+    crate::trim::RawFfmpegTime::parse(&format_ffmpeg_seconds(seconds))
+        .map_or(0, |time| time.microseconds)
+}
+
+fn apply_subtitle_timebase(
+    filters: &mut Vec<String>,
+    clock: SubtitleClock,
+    source: crate::source_timing::ResolvedSourceClock,
+) {
     let Some(subtitle_index) = filters
         .iter()
         .position(|filter| filter.starts_with("subtitles="))
     else {
         return;
     };
-
-    let offset = format_ffmpeg_seconds(source_time_seconds);
-    filters.insert(subtitle_index, format!("setpts=PTS+{offset}/TB"));
-    filters.insert(subtitle_index + 2, format!("setpts=PTS-{offset}/TB"));
+    let microseconds = match clock {
+        SubtitleClock::SourceMicroseconds(value) => value,
+        SubtitleClock::NumericPreview(seconds) => preview_seek_microseconds(seconds),
+    };
+    // Legacy Vec-returning builders cannot report invalid metadata. Production
+    // export/preview Result entry points validate the exact clock before calling
+    // these builders; metadata-free callers retain a symmetric best effort.
+    let expression = source.shift_expression(microseconds).unwrap_or_else(|_| {
+        crate::source_timing::ResolvedSourceClock::Unknown
+            .shift_expression(microseconds)
+            .unwrap_or_default()
+    });
+    let Some(expression) = expression else {
+        return;
+    };
+    filters.insert(subtitle_index, format!("setpts=PTS+({expression})"));
+    filters.insert(subtitle_index + 2, format!("setpts=PTS-({expression})"));
 }
 
 fn labeled_filter_chain(filters: &[String], output_label: &str) -> String {
@@ -810,6 +864,7 @@ mod tests {
         });
         let context = VisualFilterContext {
             source_is_palette: true,
+            source_clock: crate::source_timing::ResolvedSourceClock::Unknown,
             ..VisualFilterContext::new(Some(32), Some(24))
         };
         let chain = build_visual_filter_chain_with_context(
@@ -907,9 +962,9 @@ mod tests {
         assert_eq!(
             filters,
             vec![
-                "setpts=PTS+10.000/TB",
+                "setpts=PTS+(round(10.000/TB))",
                 "subtitles=filename=/tmp/sub.srt",
-                "setpts=PTS-10.000/TB",
+                "setpts=PTS-(round(10.000/TB))",
                 EVEN_DIMENSIONS_FILTER,
                 "fps=24",
                 "scale=640:360",
@@ -1005,7 +1060,7 @@ mod tests {
         ] {
             let filters = build_visual_filter_chain(&config, profile).join(",");
             assert!(filters.contains(
-                "setpts=PTS+2.500/TB,subtitles=filename=/tmp/sub.srt,setpts=PTS-2.500/TB"
+                "setpts=PTS+(round(2.500/TB)),subtitles=filename=/tmp/sub.srt,setpts=PTS-(round(2.500/TB))"
             ));
         }
         for base in [VisualFilterBase::Video, VisualFilterBase::Image] {
@@ -1018,13 +1073,53 @@ mod tests {
             };
             let filters = build_visual_filter_chain(&config, profile).join(",");
             assert!(filters.contains(
-                "setpts=PTS+3.000/TB,subtitles=filename=/tmp/sub.srt,setpts=PTS-3.000/TB"
+                "setpts=PTS+(round(3.000/TB)),subtitles=filename=/tmp/sub.srt,setpts=PTS-(round(3.000/TB))"
             ));
             assert!(!filters.contains("2.500/TB"));
             let graph = build_visual_filter_complex(&config, profile);
-            assert!(graph.contains("setpts=PTS+3.000/TB"));
+            assert!(graph.contains("setpts=PTS+(round(3.000/TB))"));
             assert!(!graph.contains("2.500/TB"));
         }
+    }
+
+    #[test]
+    fn export_subtitle_clock_uses_exact_signed_input_microseconds() {
+        let mut config = default_config();
+        config.subtitle_burn_path = Some("/tmp/sub.srt".into());
+        for (start, offset) in [
+            ("-.5", "-0.500"),
+            ("-00:00:00.5", "-0.500"),
+            ("-1:30", "-90.000"),
+            ("-.123456789", "-0.123456"),
+            (".123456789", "0.123456"),
+            ("9223372036854.775807", "9223372036854.775807"),
+        ] {
+            config.start_time = Some(start.into());
+            let filters = build_video_filters(&config, true).join(",");
+            assert!(
+                filters.contains(&format!(
+                    "setpts=PTS+(round({offset}/TB)),subtitles=filename=/tmp/sub.srt,setpts=PTS-(round({offset}/TB))"
+                )),
+                "{start}: {filters}"
+            );
+        }
+        config.start_time = Some("0.0000009".into());
+        assert_eq!(
+            build_video_filters(&config, true),
+            ["subtitles=filename=/tmp/sub.srt"]
+        );
+        let profile = VisualFilterProfile::PreviewLowRes {
+            base: VisualFilterBase::Video,
+            width: 64,
+            height: 48,
+            fps: 10,
+            source_time_seconds: 0.123_456_789,
+        };
+        assert!(
+            build_visual_filter_chain(&config, profile)
+                .join(",")
+                .contains("setpts=PTS+(round(0.123457/TB))")
+        );
     }
 
     #[test]

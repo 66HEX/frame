@@ -48,6 +48,18 @@ pub(super) fn preview_runtime_request(
         preview_config.overlay = None;
     }
     let core_config = core_config_from_gpui(&preview_config);
+    let video_index = metadata
+        .source_timing
+        .as_ref()
+        .and_then(|timing| timing.first_video_stream_index);
+    // The video child disables audio and subtitles; their preview processes
+    // have separate input clocks and must not affect this enabled stream set.
+    let source_clock = frame_core::source_timing::resolve_source_clock(
+        metadata.source_timing.as_ref(),
+        metadata.source_format.as_deref(),
+        video_index,
+        video_index.as_slice(),
+    );
     let presentation = PreviewRenderPresentation::default();
     let selected_audio_track = preview_selected_audio_track(&preview_config, metadata);
     let key = PreviewRuntimeKey {
@@ -58,7 +70,7 @@ pub(super) fn preview_runtime_request(
         source_height,
         duration_millis: rounded_f64_to_u64(duration_seconds * 1000.0),
         preview_dimensions,
-        visual_hash: preview_visual_hash(&preview_config, source_is_palette),
+        visual_hash: preview_visual_hash(&preview_config, source_is_palette, source_clock),
         audio_hash: preview_audio_hash(&preview_config, selected_audio_track),
     };
     let config = PreviewSessionConfig {
@@ -68,6 +80,7 @@ pub(super) fn preview_runtime_request(
         source_width,
         source_height,
         source_is_palette,
+        source_clock,
         selected_audio_track,
         duration_seconds,
         max_width: preview_dimensions.max_width,
@@ -132,7 +145,11 @@ pub(super) fn quantized_preview_dimension(value: f64) -> u32 {
     }
 }
 
-pub(super) fn preview_visual_hash(config: &ConversionConfig, source_is_palette: bool) -> u64 {
+pub(super) fn preview_visual_hash(
+    config: &ConversionConfig,
+    source_is_palette: bool,
+    source_clock: frame_core::source_timing::ResolvedSourceClock,
+) -> u64 {
     let mut state = DefaultHasher::new();
     frame_core::dimensions::output_raster_policy(
         &config.container,
@@ -153,6 +170,14 @@ pub(super) fn preview_visual_hash(config: &ConversionConfig, source_is_palette: 
     config.fps.hash(&mut state);
     hash_crop(config.crop.as_ref(), &mut state);
     config.subtitle_burn_path.hash(&mut state);
+    if config.processing_mode != ProcessingMode::Copy
+        && config
+            .subtitle_burn_path
+            .as_deref()
+            .is_some_and(|path| !path.is_empty())
+    {
+        source_clock.hash(&mut state);
+    }
     config.subtitle_font_name.hash(&mut state);
     config.subtitle_font_size.hash(&mut state);
     config.subtitle_font_color.hash(&mut state);

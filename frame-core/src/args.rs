@@ -533,8 +533,9 @@ pub fn build_ffmpeg_args(
     validate_audio_encoding_tracks(config, probe)?;
     let trim = OutputTrim::from_config(config)?;
     let subtitle_trim = SubtitleTrimPlan::for_window(config, &trim);
-    let filter_context = VisualFilterContext {
+    let mut filter_context = VisualFilterContext {
         source_is_palette: probe.pixel_format.as_deref() == Some("pal8"),
+        source_clock: crate::source_timing::ResolvedSourceClock::Unknown,
         ..VisualFilterContext::new(probe.width, probe.height)
     };
     let mut args = Vec::new();
@@ -643,6 +644,43 @@ pub fn build_ffmpeg_args(
         return Ok(args);
     }
 
+    // These exact lists feed both FFmpeg's -map options and the main-input
+    // timestamp clock. Separate overlay/sidecar inputs never enter this set.
+    let regular_video = !is_audio_only && !is_image_output && !is_gif_output;
+    let mapped_audio = if regular_video {
+        collect_selected_audio_tracks(config, probe)?
+    } else {
+        Vec::new()
+    };
+    let mapped_subtitles = if regular_video {
+        collect_reencode_subtitle_tracks(config, probe)?
+    } else {
+        Vec::new()
+    };
+    if !is_audio_only && crate::filters::has_subtitle_burn(config) {
+        let video_index = probe
+            .source_timing
+            .as_ref()
+            .and_then(|timing| timing.first_video_stream_index);
+        let enabled = video_index
+            .into_iter()
+            .chain(mapped_audio.iter().map(|track| track.index))
+            .chain(mapped_subtitles.iter().map(|track| track.index))
+            .collect::<Vec<_>>();
+        filter_context.source_clock = crate::source_timing::resolve_source_clock(
+            probe.source_timing.as_ref(),
+            probe.source_format.as_deref(),
+            video_index,
+            &enabled,
+        );
+        let seek = config
+            .start_time
+            .as_deref()
+            .and_then(crate::trim::RawFfmpegTime::parse)
+            .map_or(0, |time| time.microseconds);
+        crate::filters::validate_subtitle_clock(config, filter_context.source_clock, seek)?;
+    }
+
     if is_audio_only {
         args.push("-vn".to_string());
 
@@ -740,7 +778,7 @@ pub fn build_ffmpeg_args(
             "0:v:0".to_string()
         });
 
-        let audio_tracks = collect_selected_audio_tracks(config, probe)?;
+        let audio_tracks = mapped_audio;
         add_track_maps(&mut args, &audio_tracks, |track| track.index);
 
         if audio_tracks.is_empty() {
@@ -750,7 +788,7 @@ pub fn build_ffmpeg_args(
         }
 
         let mut subtitle_output_count = 0;
-        let subtitle_tracks = collect_reencode_subtitle_tracks(config, probe)?;
+        let subtitle_tracks = mapped_subtitles;
         if !subtitle_tracks.is_empty() {
             add_track_maps(&mut args, &subtitle_tracks, |track| track.index);
             subtitle_output_count = subtitle_tracks.len();
@@ -1428,6 +1466,65 @@ mod tests {
         time::{SystemTime, UNIX_EPOCH},
     };
 
+    #[test]
+    fn burn_clock_uses_the_same_main_input_tracks_as_export_maps() {
+        let payload = serde_json::json!({"format":{"format_name":"mpegts","start_time":"1.400000"},"streams":[
+            {"index":4,"codec_type":"video","codec_name":"h264","time_base":"1/90000","start_pts":145_920},
+            {"index":7,"codec_type":"audio","codec_name":"aac","channels":2,"time_base":"1/90000","start_pts":126_000},
+            {"index":9,"codec_type":"subtitle","codec_name":"hdmv_pgs_subtitle","time_base":"1/90000","start_pts":126_000}
+        ]});
+        let probe = crate::probe::parse_ffprobe_stdout("source.ts", payload.to_string()).unwrap();
+        for (audio, subtitles, shifted) in [
+            (vec![], vec![], false),
+            (vec![7], vec![], true),
+            (vec![], vec![9], true),
+            (vec![7], vec![9], true),
+        ] {
+            let mut config = sample_config("mkv", "libx264");
+            config.start_time = Some(".123456789".into());
+            config.subtitle_burn_path = Some("/tmp/burn.srt".into());
+            config.selected_audio_tracks = audio.clone();
+            config.selected_subtitle_tracks = subtitles.clone();
+            let argv = build_ffmpeg_args("source.ts", "out.mkv", &config, &probe).unwrap();
+            let graph = argv.windows(2).find(|pair| pair[0] == "-vf").unwrap();
+            assert_eq!(graph[1].contains("round(11111/(90000*TB))"), shifted);
+            for index in audio.iter().chain(&subtitles) {
+                assert!(
+                    argv.windows(2)
+                        .any(|pair| pair[0] == "-map" && pair[1] == format!("0:{index}"))
+                );
+            }
+            assert!(argv.windows(2).any(|pair| pair == ["-ss", "0.123456789"]));
+        }
+    }
+
+    #[test]
+    fn unused_clock_metadata_never_blocks_export_but_used_overflow_does() {
+        use crate::source_timing::{SourceStreamTiming, SourceTiming, TimeBase};
+        let mut probe = sample_probe();
+        probe.source_format = Some("matroska,webm".into());
+        probe.source_timing = Some(SourceTiming {
+            format_start_microseconds: Some(i64::MAX),
+            format_start_invalid: false,
+            first_video_stream_index: Some(0),
+            streams: vec![SourceStreamTiming {
+                index: 0,
+                time_base: TimeBase::new(1, 1_000_000),
+                start_pts: Some(0),
+            }],
+        });
+        let mut config = sample_config("mkv", "libx264");
+        config.start_time = Some("0.000001".into());
+        assert!(build_ffmpeg_args("source.mkv", "out.mkv", &config, &probe).is_ok());
+        config.subtitle_burn_path = Some("/tmp/burn.srt".into());
+        assert!(build_ffmpeg_args("source.mkv", "out.mkv", &config, &probe).is_err());
+        config.start_time = Some("0.0000009".into());
+        assert!(build_ffmpeg_args("source.mkv", "out.mkv", &config, &probe).is_ok());
+        config.start_time = Some("0.000001".into());
+        config.processing_mode = "copy".into();
+        assert!(build_ffmpeg_args("source.mkv", "out.mkv", &config, &probe).is_ok());
+    }
+
     fn sample_config(container: &str, video_codec: &str) -> ConversionConfig {
         ConversionConfig {
             processing_mode: "reencode".to_string(),
@@ -1967,7 +2064,7 @@ mod tests {
             let args =
                 build_ffmpeg_args("input.mp4", "output.media", &config, &sample_probe()).unwrap();
             assert!(args.iter().any(|arg| arg.contains(
-                "setpts=PTS+1.234567/TB,subtitles=filename=/tmp/sub.srt,setpts=PTS-1.234567/TB"
+                "setpts=PTS+(round(1.234567/TB)),subtitles=filename=/tmp/sub.srt,setpts=PTS-(round(1.234567/TB))"
             )));
             assert!(args_contains_pair(&args, "-t", "1.111111"));
         }
@@ -2007,7 +2104,7 @@ mod tests {
     }
 
     #[test]
-    fn effective_trim_duration_must_be_finite_even_when_each_endpoint_is_finite() {
+    fn finite_scientific_start_is_rejected_before_it_can_overflow_trim_duration() {
         let mut config = sample_config("mkv", "libx264");
         config.start_time = Some("-1e308".into());
         config.end_time = Some("1e308".into());
@@ -2015,7 +2112,7 @@ mod tests {
             build_ffmpeg_args("input.mkv", "out.mkv", &config, &sample_probe())
                 .unwrap_err()
                 .to_string()
-                .contains("Invalid trim duration")
+                .contains("Invalid start time")
         );
     }
 
@@ -2033,6 +2130,7 @@ mod tests {
             Some("  "),
             Some("0"),
             Some("00:00:00.000"),
+            Some("0.0000009"),
             Some("-1"),
         ] {
             config.start_time = start.map(str::to_string);
@@ -2080,6 +2178,60 @@ mod tests {
         });
         config.container = "gif".into();
         assert!(subtitle_trim_plan(&config).unwrap().is_none());
+    }
+
+    #[test]
+    fn raw_time_validation_is_role_aware_and_does_not_rewrite_saved_literals() {
+        let mut config = sample_config("mkv", "libx264");
+        for (start, literal, duration) in [
+            (" .123456789 ", "0.123456789", "1.376543"),
+            ("-.5", "-0.5", "2.000"),
+            ("+.5", "+0.5", "1.000"),
+            ("-00:00:00.5", "-00:00:00.5", "2.000"),
+            ("-1:30", "-1:30", "91.500"),
+        ] {
+            config.start_time = Some(start.into());
+            config.end_time = Some("1.5".into());
+            let args = build_ffmpeg_args("input.mkv", "out.mkv", &config, &sample_probe()).unwrap();
+            assert!(args_contains_pair(&args, "-ss", literal), "{start}");
+            assert!(args_contains_pair(&args, "-t", duration), "{start}");
+            assert_eq!(config.start_time.as_deref(), Some(start));
+        }
+        for (end, duration) in [
+            ("1e-3", "0.001"),
+            ("1:60", "120.000"),
+            ("001:2", "62.000"),
+            ("1.5:2", "92.000"),
+            ("+1:30", "90.000"),
+            ("1:-2", "58.000"),
+        ] {
+            config.start_time = Some("0".into());
+            config.end_time = Some(end.into());
+            let args = build_ffmpeg_args("input.mkv", "out.mkv", &config, &sample_probe()).unwrap();
+            assert!(args_contains_pair(&args, "-t", duration), "{end}");
+            config.start_time = None;
+            assert!(
+                build_ffmpeg_args("input.mkv", "out.mkv", &config, &sample_probe())
+                    .unwrap_err()
+                    .to_string()
+                    .contains("Invalid end time"),
+                "{end}"
+            );
+            config.start_time = Some(end.into());
+            config.end_time = None;
+            assert!(
+                build_ffmpeg_args("input.mkv", "out.mkv", &config, &sample_probe())
+                    .unwrap_err()
+                    .to_string()
+                    .contains("Invalid start time"),
+                "{end}"
+            );
+        }
+        config.start_time = None;
+        config.end_time = Some(".123456789".into());
+        let args = build_ffmpeg_args("input.mkv", "out.mkv", &config, &sample_probe()).unwrap();
+        assert!(args_contains_pair(&args, "-to", "0.123456789"));
+        assert_eq!(config.end_time.as_deref(), Some(".123456789"));
     }
 
     #[test]

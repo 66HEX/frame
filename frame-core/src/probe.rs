@@ -57,6 +57,7 @@ fn metadata_from_ffprobe(
     });
 
     let mut metadata = ProbeMetadata {
+        source_timing: Some(source_timing(&probe_data)),
         source_format: source_format_name.clone(),
         duration: probe_data.format.duration,
         bitrate: probe_data.format.bit_rate,
@@ -221,6 +222,33 @@ fn metadata_from_ffprobe(
     }
 
     Ok(metadata)
+}
+
+fn source_timing(probe: &FfprobeOutput) -> crate::source_timing::SourceTiming {
+    use crate::source_timing::{SourceStreamTiming, SourceTiming, TimeBase};
+    let raw_origin = probe.format.start_time.as_deref();
+    // ffprobe's N/A sentinel has the same meaning as an omitted start time.
+    let present_origin =
+        raw_origin.filter(|value| !matches!(*value, "N/A" | "-9223372036854.775808"));
+    let origin = present_origin.and_then(crate::trim::RawFfmpegTime::parse);
+    SourceTiming {
+        format_start_microseconds: origin.as_ref().map(|value| value.microseconds),
+        format_start_invalid: present_origin.is_some() && origin.is_none(),
+        first_video_stream_index: probe
+            .streams
+            .iter()
+            .find(|stream| stream.codec_type == "video")
+            .map(|stream| stream.index),
+        streams: probe
+            .streams
+            .iter()
+            .map(|stream| SourceStreamTiming {
+                index: stream.index,
+                time_base: stream.time_base.as_deref().and_then(TimeBase::parse),
+                start_pts: stream.start_pts.filter(|value| *value != i64::MIN),
+            })
+            .collect(),
+    }
 }
 
 // ffprobe prints codec tags as unsigned hexadecimal values. A missing or malformed

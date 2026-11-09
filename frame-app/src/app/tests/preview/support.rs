@@ -40,6 +40,7 @@ pub(super) fn test_video_preview_session(file_id: &str) -> std::sync::Arc<Previe
         source_width: Some(1920),
         source_height: Some(1080),
         source_is_palette: false,
+        source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
         selected_audio_track: None,
         duration_seconds: 90.0,
         max_width: DEFAULT_PREVIEW_MAX_WIDTH,

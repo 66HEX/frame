@@ -119,22 +119,32 @@ pub(crate) fn format_ffmpeg_seconds(seconds: f64) -> String {
 
 #[must_use]
 pub fn parse_time(time_str: &str) -> Option<f64> {
-    let parts: Vec<&str> = time_str.split(':').collect();
-    match parts.len() {
-        1 => parts[0].parse::<f64>().ok(),
+    if !time_str.contains(':') {
+        return time_str.parse::<f64>().ok();
+    }
+    // This arithmetic parser also accepts legacy computed END values. Raw
+    // FFmpeg arguments have their own stricter grammar in RawFfmpegTime.
+    let negative = time_str.starts_with('-');
+    let body = time_str.strip_prefix(['-', '+']).unwrap_or(time_str);
+    if body.starts_with(['-', '+']) {
+        return None;
+    }
+    let parts: Vec<&str> = body.split(':').collect();
+    let seconds = match parts.len() {
         2 => {
             let m: f64 = parts[0].parse().ok()?;
             let s: f64 = parts[1].trim().parse().ok()?;
-            Some(m.mul_add(60.0, s))
+            m.mul_add(60.0, s)
         }
         3 => {
             let h: f64 = parts[0].parse().ok()?;
             let m: f64 = parts[1].parse().ok()?;
             let s: f64 = parts[2].trim().parse().ok()?;
-            Some(h.mul_add(3600.0, m * 60.0) + s)
+            h.mul_add(3600.0, m * 60.0) + s
         }
-        _ => None,
-    }
+        _ => return None,
+    };
+    Some(if negative { -seconds } else { seconds })
 }
 
 #[must_use]
@@ -185,6 +195,25 @@ mod tests {
             assert_eq!(format_ffmpeg_seconds(seconds), expected);
         }
         assert_eq!(parse_time("00:00:01.234567"), Some(1.234_567));
+    }
+
+    #[test]
+    fn arithmetic_time_applies_one_global_sign_without_restricting_derived_end_values() {
+        for (input, expected) in [
+            ("-1:30", -90.0),
+            ("-00:00:00.5", -0.5),
+            ("-01:00:01.5", -3601.5),
+            ("1:60", 120.0),
+            ("001:2", 62.0),
+            ("1.5:2", 92.0),
+            ("+1:30", 90.0),
+            ("1:-2", 58.0),
+            ("1e-3", 0.001),
+            ("10000:00:00.5", 36_000_000.5),
+        ] {
+            assert_eq!(parse_time(input), Some(expected), "{input}");
+        }
+        assert_eq!(parse_time("--1:30"), None);
     }
 
     #[test]

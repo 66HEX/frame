@@ -341,7 +341,7 @@ fn handle_ffmpeg_line(
     }
 }
 
-fn expected_duration_seconds(config: &CoreConversionConfig) -> f64 {
+pub(super) fn expected_duration_seconds(config: &CoreConversionConfig) -> f64 {
     let start = config
         .start_time
         .as_deref()

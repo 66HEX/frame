@@ -307,6 +307,7 @@ fn tiff_palette_stream_seek_should_preserve_a_later_rgba16_frame_and_preview() -
         source_width: Some(8),
         source_height: Some(4),
         source_is_palette: true,
+        source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
         max_width: 8,
         max_height: 4,
         fps: 25,
@@ -322,6 +323,7 @@ fn tiff_palette_stream_seek_should_preserve_a_later_rgba16_frame_and_preview() -
         &PreviewFfmpegOptions {
             start_seconds: 0.0,
             source_is_palette: false,
+            source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
             ..options
         },
     )?;

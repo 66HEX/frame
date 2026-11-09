@@ -386,7 +386,12 @@ pub(super) fn parsed_time(value: Option<&str>) -> Option<f64> {
 }
 
 pub(super) fn initial_start_seconds(config: &PreviewSessionConfig) -> f64 {
-    parsed_time(config.conversion_config.start_time.as_deref()).unwrap_or(0.0)
+    config
+        .conversion_config
+        .start_time
+        .as_deref()
+        .and_then(frame_core::trim::RawFfmpegTime::parse)
+        .map_or(0.0, |time| time.seconds().max(0.0))
 }
 
 pub(super) fn clamp_seek_seconds(seconds: f64, duration: f64) -> Result<f64, PreviewEngineError> {

@@ -106,6 +106,7 @@ impl SourceMetadataStore {
 #[must_use]
 pub fn source_metadata_from_probe(probe: ProbeMetadata) -> SourceMetadata {
     SourceMetadata {
+        source_timing: probe.source_timing,
         source_format: probe.source_format,
         media_kind: source_kind_from_probe(&probe.media_kind),
         duration: probe.duration,

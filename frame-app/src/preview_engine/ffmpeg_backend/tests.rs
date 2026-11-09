@@ -33,6 +33,7 @@ pub(super) fn preview_config() -> PreviewSessionConfig {
         source_width: Some(1920),
         source_height: Some(1080),
         source_is_palette: false,
+        source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
         selected_audio_track: None,
         duration_seconds: 12.5,
         max_width: 1280,
@@ -40,6 +41,75 @@ pub(super) fn preview_config() -> PreviewSessionConfig {
         fps: 30,
         conversion_config: core_config_from_gpui(&ConversionConfig::default()),
     }
+}
+
+#[test]
+fn initial_preview_seek_uses_raw_microseconds_while_explicit_playhead_keeps_rounding() {
+    for (start, expected_seek) in [
+        ("00:00:00.123456789", Some("0.123456")),
+        (".123456789", Some("0.123456")),
+        ("0.999999999", Some("0.999999")),
+        ("-00:00:00.5", None),
+        ("-.5", None),
+        ("0.0000009", None),
+    ] {
+        let mut config = preview_config();
+        config.conversion_config.start_time = Some(start.into());
+        config.conversion_config.end_time = Some("1:60".into());
+        config.conversion_config.subtitle_burn_path = Some("/tmp/sub.srt".into());
+        let seconds = super::clock::initial_start_seconds(&config);
+        let plan = preview_plan(&config, seconds, false, true).unwrap();
+        assert_eq!(
+            plan.args
+                .windows(2)
+                .find(|pair| pair[0] == "-ss")
+                .map(|pair| pair[1].as_str()),
+            expected_seek,
+            "{start}"
+        );
+        assert_eq!(config.conversion_config.start_time.as_deref(), Some(start));
+        let graph = plan
+            .args
+            .windows(2)
+            .find(|pair| pair[0] == "-filter_complex")
+            .unwrap();
+        if let Some(seek) = expected_seek {
+            assert!(
+                graph[1].contains(&format!("setpts=PTS+(round({seek}/TB))")),
+                "{start}"
+            );
+        } else {
+            assert!(!graph[1].contains("setpts=PTS"), "{start}");
+        }
+        // END still follows the established arithmetic policy, not raw -ss grammar.
+        assert!(
+            super::clock::parsed_time(config.conversion_config.end_time.as_deref())
+                .is_some_and(|value| (value - 120.0).abs() < f64::EPSILON)
+        );
+        config.selected_audio_track = Some(1);
+        let audio = preview_audio_plan(
+            &config,
+            seconds,
+            false,
+            true,
+            AudioOutputSpec {
+                sample_rate: 48_000,
+                channels: 2,
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            audio
+                .args
+                .windows(2)
+                .find(|pair| pair[0] == "-ss")
+                .map(|pair| pair[1].as_str()),
+            expected_seek,
+            "audio: {start}"
+        );
+    }
+    let plan = preview_plan(&preview_config(), 0.123_456_789, false, true).unwrap();
+    assert!(plan.args.windows(2).any(|pair| pair == ["-ss", "0.123457"]));
 }
 
 #[test]

@@ -35,6 +35,82 @@ fn sync_from_media_clamps_trim_values_to_duration() {
 }
 
 #[test]
+fn initial_timeline_range_is_nonnegative_ordered_and_preserves_saved_timecodes() {
+    for media_first in [false, true] {
+        for (start, end, expected_start, expected_end) in [
+            ("00:00:02.000", "00:00:05.000", 2.0, 5.0),
+            ("-00:00:00.5", "00:00:05.000", 0.0, 5.0),
+            ("00:00:02.000", "-00:00:00.5", 2.0, 2.0),
+            ("00:00:NaN", "00:00:inf", 0.0, 0.0),
+        ] {
+            let config = crate::settings::ConversionConfig {
+                start_time: Some(start.into()),
+                end_time: Some(end.into()),
+                ..Default::default()
+            };
+            let mut playback = PreviewPlaybackState::new(false);
+            let snapshot = MediaSnapshot {
+                current_time: -0.5,
+                duration: 10.0,
+                paused: true,
+            };
+            if media_first {
+                playback.sync_media(snapshot);
+            }
+            playback.sync_initial_values(config.start_time.as_deref(), config.end_time.as_deref());
+            if !media_first {
+                assert_close(playback.start_value(), expected_start);
+                playback.sync_media(snapshot);
+            }
+            assert_close(playback.start_value(), expected_start);
+            assert_close(playback.end_value(), expected_end);
+            assert_close(playback.current_time(), 0.0);
+            let before = playback.clone();
+            playback.sync_initial_values(config.start_time.as_deref(), config.end_time.as_deref());
+            playback.sync_media(snapshot);
+            assert_eq!(playback, before);
+            assert_eq!(config.start_time.as_deref(), Some(start));
+            assert_eq!(config.end_time.as_deref(), Some(end));
+        }
+    }
+    let mut playback = PreviewPlaybackState::new(false);
+    playback.sync_media(MediaSnapshot {
+        current_time: f64::NAN,
+        duration: f64::INFINITY,
+        paused: true,
+    });
+    assert_close(playback.current_time(), 0.0);
+    assert_close(playback.duration(), 0.0);
+}
+
+#[test]
+fn initial_playhead_is_bounded_by_known_source_duration_not_the_trim_window() {
+    let mut playback = PreviewPlaybackState::new(false);
+    playback.sync_media(MediaSnapshot {
+        current_time: 11.0,
+        duration: 0.0,
+        paused: true,
+    });
+    assert_close(playback.current_time(), 11.0);
+    playback.sync_initial_values(Some("00:00:02.000"), Some("00:00:05.000"));
+    assert_close(playback.current_time(), 11.0);
+    playback.sync_media(MediaSnapshot {
+        current_time: 11.0,
+        duration: 10.0,
+        paused: true,
+    });
+    assert_close(playback.current_time(), 10.0);
+    playback.sync_media(MediaSnapshot {
+        current_time: 1.0,
+        duration: 10.0,
+        paused: true,
+    });
+    assert_close(playback.current_time(), 1.0);
+    assert_close(playback.start_value(), 2.0);
+    assert_close(playback.end_value(), 5.0);
+}
+
+#[test]
 fn clear_media_resets_timeline_state_like_detached_media_element() {
     let mut playback = playback_with_media(120.0);
     playback.sync_initial_values(Some("00:00:05.000"), Some("00:00:20.000"));

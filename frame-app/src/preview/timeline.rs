@@ -185,7 +185,7 @@ impl PreviewPlaybackState {
     pub fn sync_media(&mut self, snapshot: MediaSnapshot) {
         self.has_media = true;
         self.is_playing = !snapshot.paused;
-        self.current_time = finite_or_zero(snapshot.current_time);
+        self.current_time = finite_or_zero(snapshot.current_time).max(0.0);
         self.sync_from_media(snapshot);
     }
 
@@ -205,6 +205,7 @@ impl PreviewPlaybackState {
         } else if initial_end.is_none() && self.duration > 0.0 && self.end_value == 0.0 {
             self.end_value = self.duration;
         }
+        self.clamp_initial_range();
     }
 
     pub fn sync_from_media(&mut self, snapshot: MediaSnapshot) {
@@ -212,19 +213,30 @@ impl PreviewPlaybackState {
             return;
         }
 
-        self.duration = finite_or_zero(snapshot.duration);
-        self.current_time = finite_or_zero(snapshot.current_time);
+        self.duration = finite_or_zero(snapshot.duration).max(0.0);
+        self.current_time = finite_or_zero(snapshot.current_time).max(0.0);
         self.end_value = self
             .previous_initial_end
             .as_deref()
             .map_or(self.duration, parse_time_to_seconds);
 
-        if self.start_value > self.duration {
-            self.start_value = 0.0;
+        self.clamp_initial_range();
+    }
+
+    fn clamp_initial_range(&mut self) {
+        self.current_time = finite_or_zero(self.current_time).max(0.0);
+        self.start_value = finite_or_zero(self.start_value).max(0.0);
+        self.end_value = finite_or_zero(self.end_value).max(0.0);
+        // Before metadata arrives, duration zero must not discard a saved
+        // positive start. Keep the established reset for an out-of-range start.
+        if self.duration > 0.0 {
+            self.current_time = self.current_time.min(self.duration);
+            if self.start_value > self.duration {
+                self.start_value = 0.0;
+            }
+            self.end_value = self.end_value.min(self.duration);
         }
-        if self.end_value > self.duration {
-            self.end_value = self.duration;
-        }
+        self.end_value = self.end_value.max(self.start_value);
     }
 
     pub const fn handle_play(&mut self) {
@@ -461,7 +473,12 @@ impl PreviewPlaybackState {
 
 #[must_use]
 pub fn parse_time_to_seconds(time: &str) -> f64 {
-    let mut parts = time.split(':');
+    let negative = time.starts_with('-');
+    let body = time.strip_prefix(['-', '+']).unwrap_or(time);
+    if body.starts_with(['-', '+']) {
+        return 0.0;
+    }
+    let mut parts = body.split(':');
     let (Some(hours), Some(minutes), Some(seconds), None) =
         (parts.next(), parts.next(), parts.next(), parts.next())
     else {
@@ -478,7 +495,8 @@ pub fn parse_time_to_seconds(time: &str) -> f64 {
         return 0.0;
     };
 
-    hours.mul_add(3600.0, minutes * 60.0) + seconds
+    let seconds = hours.mul_add(3600.0, minutes * 60.0) + seconds;
+    if negative { -seconds } else { seconds }
 }
 
 #[must_use]

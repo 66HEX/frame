@@ -6,6 +6,54 @@ use crate::types::ConversionConfig;
 use crate::utils::{format_ffmpeg_seconds, parse_time};
 use std::path::Path;
 
+/// A request-local raw `FFmpeg` duration literal and its exact parsed offset.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RawFfmpegTime {
+    pub literal: String,
+    pub microseconds: i64,
+}
+
+impl RawFfmpegTime {
+    /// Validates a raw duration, adding only a missing plain-decimal leading zero.
+    #[must_use]
+    pub fn parse(value: &str) -> Option<Self> {
+        let value = value.trim();
+        let (sign, body) = value.strip_prefix('-').map_or_else(
+            || {
+                value
+                    .strip_prefix('+')
+                    .map_or(("", value), |body| ("+", body))
+            },
+            |body| ("-", body),
+        );
+        let literal = body
+            .strip_prefix('.')
+            .filter(|fraction| {
+                !fraction.is_empty() && fraction.bytes().all(|byte| byte.is_ascii_digit())
+            })
+            .map_or_else(
+                || value.to_string(),
+                |fraction| format!("{sign}0.{fraction}"),
+            );
+        let microseconds = raw_time_microseconds(&literal)?;
+        Some(Self {
+            literal,
+            microseconds,
+        })
+    }
+
+    /// Converts the already truncated offset for numeric preview APIs.
+    #[must_use]
+    pub const fn seconds(&self) -> f64 {
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "Numeric playback clocks use f64; raw literals and burn clocks retain the exact integer separately."
+        )]
+        let seconds = self.microseconds as f64 / 1_000_000.0;
+        seconds
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OutputTrim {
     input_start: Option<String>,
@@ -23,6 +71,13 @@ impl OutputTrim {
     pub fn from_config(config: &ConversionConfig) -> Result<Self, ConversionError> {
         let start = non_empty(config.start_time.as_deref());
         let end = non_empty(config.end_time.as_deref());
+        let raw_start = start
+            .map(|value| {
+                RawFfmpegTime::parse(value).ok_or_else(|| {
+                    ConversionError::InvalidInput(format!("Invalid start time: {value}"))
+                })
+            })
+            .transpose()?;
         let start_seconds = parse_optional_time(start, "start")?;
         let end_seconds = parse_optional_time(end, "end")?;
         if let (Some(start), Some(end)) = (start_seconds, end_seconds)
@@ -46,21 +101,23 @@ impl OutputTrim {
             (Some(raw), Some(_), None) => {
                 // Raw -to uses FFmpeg's lexical microsecond truncation. Keep the
                 // original argument; rounding it through f64 can add a frame.
-                let micros = raw_time_microseconds(raw).ok_or_else(|| {
+                let parsed = RawFfmpegTime::parse(raw).ok_or_else(|| {
                     ConversionError::InvalidInput(format!("Invalid end time: {raw}"))
                 })?;
                 (
-                    Some(("-to", raw.to_string())),
-                    Some(format_microseconds(micros)),
+                    Some(("-to", parsed.literal)),
+                    Some(format_microseconds(parsed.microseconds)),
                 )
             }
             _ => (None, None),
         };
         Ok(Self {
-            input_start: start.map(str::to_string),
+            starts_after_zero: raw_start
+                .as_ref()
+                .is_some_and(|start| start.microseconds > 0),
+            input_start: raw_start.map(|start| start.literal),
             output_limit,
             packet_limit,
-            starts_after_zero: start_seconds.is_some_and(|start| start > 0.0),
         })
     }
 
@@ -148,7 +205,7 @@ fn ascii_integer(value: &str) -> Option<u64> {
         .flatten()
 }
 
-fn format_microseconds(value: i64) -> String {
+pub(crate) fn format_microseconds(value: i64) -> String {
     let sign = if value < 0 { "-" } else { "" };
     let magnitude = value.unsigned_abs();
     format!(
@@ -246,6 +303,37 @@ fn subtitle_window_filter(length: Option<&str>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn raw_time_preserves_valid_literals_and_normalizes_only_plain_missing_zero() {
+        for (input, literal, microseconds) in [
+            (" .123456789 ", "0.123456789", 123_456),
+            ("-.123456789", "-0.123456789", -123_456),
+            ("+.5", "+0.5", 500_000),
+            ("0.999999999", "0.999999999", 999_999),
+            ("-00:00:00.5", "-00:00:00.5", -500_000),
+            ("-1:30", "-1:30", -90_000_000),
+            ("0.0000009", "0.0000009", 0),
+            ("9223372036854.775807", "9223372036854.775807", i64::MAX),
+        ] {
+            let parsed = RawFfmpegTime::parse(input).unwrap();
+            assert_eq!(parsed.literal, literal, "{input}");
+            assert_eq!(parsed.microseconds, microseconds, "{input}");
+        }
+        for input in [
+            ".",
+            "-.",
+            ".5e1",
+            ".5s",
+            "00:00:.5",
+            "+1:30",
+            "1:60",
+            "1e-3",
+            "9223372036854.775808",
+        ] {
+            assert_eq!(RawFfmpegTime::parse(input), None, "{input}");
+        }
+    }
 
     #[test]
     fn raw_time_uses_checked_integer_microseconds_and_truncates_fraction_digits() {
