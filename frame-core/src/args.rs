@@ -1603,6 +1603,51 @@ mod tests {
     };
 
     #[test]
+    fn parsed_track_name_uses_existing_preserve_policy_without_leaking_into_clean_or_replace() {
+        let probe = crate::probe::parse_ffprobe_stdout("source.mp4", serde_json::json!({
+            "format":{"tags":{"title":"Global title","name":"Global name"}},
+            "streams":[
+                {"index":0,"codec_type":"video","codec_name":"h264"},
+                {"index":4,"codec_type":"subtitle","codec_name":"mov_text","tags":{"name":"PRIVATE SUBTITLE","handler_name":"SubtitleHandler","language":"pol"}}
+            ]
+        }).to_string()).unwrap();
+        for mode in [
+            MetadataMode::Preserve,
+            MetadataMode::Clean,
+            MetadataMode::Replace,
+        ] {
+            let mut config = sample_config("mkv", "libx264");
+            config.selected_subtitle_tracks = vec![4];
+            config.metadata.mode = mode;
+            if config.metadata.mode == MetadataMode::Replace {
+                config.metadata.title = Some("Replacement title".into());
+            }
+            let args = build_ffmpeg_args("source.mp4", "out.mkv", &config, &probe).unwrap();
+            let tags = args
+                .windows(2)
+                .filter(|pair| pair[0] == "-metadata:s:s:0")
+                .map(|pair| pair[1].as_str())
+                .collect::<Vec<_>>();
+            if config.metadata.mode == MetadataMode::Preserve {
+                assert_eq!(tags, ["language=pol", "title=PRIVATE SUBTITLE"]);
+            } else {
+                assert!(tags.is_empty());
+                assert!(args.windows(2).any(|pair| pair == ["-map_metadata", "-1"]));
+            }
+            assert!(args.windows(2).any(|pair| pair == ["-map", "0:4"]));
+            assert!(
+                !args
+                    .iter()
+                    .any(|arg| arg.contains("SubtitleHandler") || arg.contains("Global name"))
+            );
+            assert_eq!(
+                args.iter().any(|arg| arg == "title=Replacement title"),
+                config.metadata.mode == MetadataMode::Replace
+            );
+        }
+    }
+
+    #[test]
     fn gif_probe_preserves_structural_geometry_trim_and_only_varies_terminal_fps() {
         let mut config = sample_config("gif", "gif");
         config.fps = "8".into();

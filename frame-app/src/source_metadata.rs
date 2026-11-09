@@ -313,6 +313,40 @@ mod tests {
         }
 
         #[test]
+        fn track_names_do_not_alias_global_title_or_leak_to_unnamed_streams() {
+            for global in [
+                serde_json::json!({"name":"Global name"}),
+                serde_json::json!({"title":"Global title","name":"Global name"}),
+                serde_json::json!({"title":"","name":"Global name"}),
+            ] {
+                let value = serde_json::json!({"format":{"tags":global},"streams":[
+                    {"index":1,"codec_type":"audio","codec_name":"aac","tags":{"name":"Main audio","language":"pol"}},
+                    {"index":2,"codec_type":"subtitle","codec_name":"mov_text","tags":{"name":"Captions","language":"eng"}},
+                    {"index":3,"codec_type":"subtitle","codec_name":"mov_text"}
+                ]});
+                let probe =
+                    frame_core::probe::parse_ffprobe_stdout("source.mp4", value.to_string())
+                        .unwrap();
+                let metadata = source_metadata_from_probe(probe);
+                assert_eq!(
+                    metadata.tags.as_ref().unwrap().title.as_deref(),
+                    global["title"].as_str()
+                );
+                assert_eq!(
+                    metadata.audio_tracks[0].label.as_deref(),
+                    Some("Main audio")
+                );
+                assert_eq!(metadata.audio_tracks[0].language.as_deref(), Some("pol"));
+                assert_eq!(
+                    metadata.subtitle_tracks[0].label.as_deref(),
+                    Some("Captions")
+                );
+                assert_eq!(metadata.subtitle_tracks[0].language.as_deref(), Some("eng"));
+                assert!(metadata.subtitle_tracks[1].label.is_none());
+            }
+        }
+
+        #[test]
         fn maps_format_tags_for_metadata_placeholders() {
             let metadata = source_metadata_from_probe(ProbeMetadata {
                 tags: Some(FfprobeTags {

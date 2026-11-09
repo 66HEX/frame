@@ -651,6 +651,7 @@ pub struct FfprobeFormat {
 pub struct FfprobeTags {
     #[serde(alias = "TITLE")]
     pub title: Option<String>,
+    pub name: Option<String>,
     #[serde(alias = "ARTIST")]
     pub artist: Option<String>,
     #[serde(alias = "ALBUM")]

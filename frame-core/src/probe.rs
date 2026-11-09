@@ -4,8 +4,8 @@ use std::path::Path;
 
 use crate::error::ConversionError;
 use crate::types::{
-    AudioTrack, FfprobeOutput, FfprobeProgram, FfprobeStream, ProbeMetadata, SubtitleTrack,
-    TransportStreamMetadata,
+    AudioTrack, FfprobeOutput, FfprobeProgram, FfprobeStream, FfprobeTags, ProbeMetadata,
+    SubtitleTrack, TransportStreamMetadata,
 };
 use crate::utils::{parse_frame_rate_string, parse_probe_bitrate};
 
@@ -148,10 +148,7 @@ fn metadata_from_ffprobe(
         let Some(codec) = recognized_codec_name(stream.codec_name.as_deref()) else {
             continue;
         };
-        let label = stream
-            .tags
-            .as_ref()
-            .and_then(|tags| tags.title.clone().or_else(|| tags.handler_name.clone()));
+        let label = stream.tags.as_ref().and_then(stream_label);
         let language = stream.tags.as_ref().and_then(|t| t.language.clone());
         let track_bitrate = parse_probe_bitrate(stream.bit_rate.as_deref());
 
@@ -179,10 +176,7 @@ fn metadata_from_ffprobe(
         let Some(codec) = recognized_codec_name(stream.codec_name.as_deref()) else {
             continue;
         };
-        let label = stream
-            .tags
-            .as_ref()
-            .and_then(|tags| tags.title.clone().or_else(|| tags.handler_name.clone()));
+        let label = stream.tags.as_ref().and_then(stream_label);
         let language = stream.tags.as_ref().and_then(|t| t.language.clone());
 
         metadata.subtitle_tracks.push(SubtitleTrack {
@@ -233,6 +227,14 @@ fn metadata_from_ffprobe(
     }
 
     Ok(metadata)
+}
+
+fn stream_label(tags: &FfprobeTags) -> Option<String> {
+    tags.title
+        .as_ref()
+        .or_else(|| tags.name.as_ref().filter(|name| !name.is_empty()))
+        .or(tags.handler_name.as_ref())
+        .cloned()
 }
 
 fn source_timing(probe: &FfprobeOutput) -> crate::source_timing::SourceTiming {
@@ -414,6 +416,70 @@ mod tests {
         let metadata = parse_ffprobe_stdout("unknown.mov", r#"{"streams":[{"index":0,"codec_type":"audio","codec_name":"adpcm_swf"}],"format":{}}"#).unwrap();
         assert!(metadata.source_format.is_none());
         assert!(metadata.audio_tracks[0].codec_tag.is_none());
+    }
+
+    #[test]
+    fn stream_labels_keep_title_precedence_and_use_canonical_track_name() {
+        use serde_json::json;
+        for (tags, expected) in [
+            (
+                json!({"title":"Title","name":"Name","handler_name":"Handler"}),
+                Some("Title"),
+            ),
+            (
+                json!({"title":"","name":"Name","handler_name":"Handler"}),
+                Some(""),
+            ),
+            (json!({"title":"  ","name":"Name"}), Some("  ")),
+            (
+                json!({"name":"Name","handler_name":"Handler"}),
+                Some("Name"),
+            ),
+            (json!({"name":"Name"}), Some("Name")),
+            (json!({"name":"","handler_name":"Handler"}), Some("Handler")),
+            (json!({"name":""}), None),
+            (json!({"name":"  ","handler_name":"Handler"}), Some("  ")),
+            (json!({"handler_name":"Handler"}), Some("Handler")),
+            (json!({"handler_name":""}), Some("")),
+            (
+                json!({"TITLE":"Legacy title","name":"Name"}),
+                Some("Legacy title"),
+            ),
+            (
+                json!({"NAME":"Not a new alias","handler_name":"Handler"}),
+                Some("Handler"),
+            ),
+            (json!({}), None),
+            (json!(null), None),
+        ] {
+            let value = json!({"format":{"tags":{"title":"Global title","name":"Global name"}},"streams":[
+                {"index":4,"codec_type":"audio","codec_name":"aac","channels":2,"tags":tags},
+                {"index":9,"codec_type":"subtitle","codec_name":"mov_text","tags":tags}
+            ]});
+            let metadata = parse_ffprobe_stdout("unrelated.extension", value.to_string()).unwrap();
+            assert_eq!(
+                metadata.audio_tracks[0].label.as_deref(),
+                expected,
+                "{tags}"
+            );
+            assert_eq!(
+                metadata.subtitle_tracks[0].label.as_deref(),
+                expected,
+                "{tags}"
+            );
+            assert_eq!(
+                (
+                    metadata.audio_tracks[0].index,
+                    metadata.subtitle_tracks[0].index
+                ),
+                (4, 9)
+            );
+            assert_eq!(metadata.audio_tracks[0].codec, "aac");
+            assert_eq!(metadata.subtitle_tracks[0].codec, "mov_text");
+            let global = metadata.tags.unwrap();
+            assert_eq!(global.title.as_deref(), Some("Global title"));
+            assert_eq!(global.name.as_deref(), Some("Global name"));
+        }
     }
 
     #[test]
