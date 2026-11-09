@@ -17,13 +17,23 @@ pub(super) struct FileIdentity {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub(super) struct RuntimeIdentity(Vec<FileIdentity>);
+pub struct RuntimeIdentity(Vec<FileIdentity>);
 
-pub(super) struct Runtime {
+pub struct Runtime {
     pub command: CommandSpec,
     pub identity: Option<RuntimeIdentity>,
     observed_identity: Option<RuntimeIdentity>,
     identity_paths: Vec<PathBuf>,
+}
+
+impl RuntimeIdentity {
+    pub fn capture_paths(paths: &[PathBuf]) -> Option<Self> {
+        fingerprint(paths)
+    }
+
+    pub fn matches_paths(&self, paths: &[PathBuf]) -> bool {
+        fingerprint(paths).as_ref() == Some(self)
+    }
 }
 
 impl Runtime {

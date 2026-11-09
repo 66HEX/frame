@@ -4,7 +4,7 @@ use crate::preview_engine::ffmpeg_backend::clock::parsed_time;
 use crate::preview_engine::types::{PreviewSessionConfig, PreviewSourceKind};
 use frame_core::preview::{
     PreviewAudioFfmpegOptions, PreviewFfmpegOptions, PreviewFfmpegPlan, build_ffmpeg_preview_args,
-    build_ffmpeg_preview_audio_args,
+    build_ffmpeg_preview_audio_args, build_ffmpeg_snapshot_preview_args,
 };
 
 pub(super) fn preview_plan(
@@ -13,9 +13,32 @@ pub(super) fn preview_plan(
     realtime: bool,
     precise: bool,
 ) -> Result<PreviewFfmpegPlan, PreviewEngineError> {
+    build_preview_plan(config, seconds, realtime, precise, false)
+}
+
+pub(super) fn snapshot_preview_plan(
+    config: &PreviewSessionConfig,
+    seconds: f64,
+    precise: bool,
+) -> Result<PreviewFfmpegPlan, PreviewEngineError> {
+    build_preview_plan(config, seconds, false, precise, true)
+}
+
+fn build_preview_plan(
+    config: &PreviewSessionConfig,
+    seconds: f64,
+    realtime: bool,
+    precise: bool,
+    snapshot: bool,
+) -> Result<PreviewFfmpegPlan, PreviewEngineError> {
     let end_seconds = parsed_time(config.conversion_config.end_time.as_deref())
         .filter(|end_seconds| *end_seconds > seconds);
-    build_ffmpeg_preview_args(
+    let builder = if snapshot {
+        build_ffmpeg_snapshot_preview_args
+    } else {
+        build_ffmpeg_preview_args
+    };
+    builder(
         config.path.to_string_lossy().as_ref(),
         &config.conversion_config,
         &PreviewFfmpegOptions {

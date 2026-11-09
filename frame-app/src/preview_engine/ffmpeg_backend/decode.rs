@@ -1,6 +1,6 @@
 use crate::preview_engine::error::PreviewEngineError;
 use crate::preview_engine::ffmpeg_backend::clock::seconds_to_us;
-use crate::preview_engine::ffmpeg_backend::plan::{insert_frame_limit, preview_plan};
+use crate::preview_engine::ffmpeg_backend::plan::{insert_frame_limit, snapshot_preview_plan};
 use crate::preview_engine::ffmpeg_backend::process::{RunningPreviewProcess, stderr_detail};
 use crate::preview_engine::metrics::PreviewRuntimeMetricsStore;
 use crate::preview_engine::renderer::rendered_frame_from_bgra_payload_with_image_id;
@@ -70,7 +70,7 @@ pub(super) fn decode_single_preview_frame(
     image_identity: RenderImageIdentity,
     metrics: &PreviewRuntimeMetricsStore,
 ) -> Result<DecodedPreviewFrame, PreviewEngineError> {
-    let plan = preview_plan(config, seconds, false, precise)?;
+    let plan = snapshot_preview_plan(config, seconds, precise)?;
     let mut args = plan.args.clone();
     insert_frame_limit(&mut args, 1);
     let read_started = Instant::now();

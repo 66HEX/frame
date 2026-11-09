@@ -2,6 +2,7 @@
 
 mod config;
 mod controller;
+mod gif;
 mod output_paths;
 mod process;
 mod runner;

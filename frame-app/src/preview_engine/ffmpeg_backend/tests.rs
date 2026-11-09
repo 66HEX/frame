@@ -46,6 +46,50 @@ pub(super) fn preview_config() -> PreviewSessionConfig {
 }
 
 #[test]
+fn snapshot_eof_behavior_is_local_and_preserves_frame_presentation() {
+    let mut config = preview_config();
+    config.source_sample_aspect_ratio = frame_core::aspect::SampleAspectRatio::new(2, 1);
+    config.request_token = 79;
+    config.conversion_config.crop = Some(frame_core::types::CropConfig {
+        enabled: true,
+        x: 3.0,
+        y: 5.0,
+        width: 127.0,
+        height: 129.0,
+        ..frame_core::types::CropConfig::default()
+    });
+    for with_overlay in [false, true] {
+        if with_overlay {
+            config.conversion_config.overlay = Some(frame_core::types::OverlayConfig {
+                enabled: true,
+                path: "/tmp/overlay.png".into(),
+                width: 0.1,
+                ..frame_core::types::OverlayConfig::default()
+            });
+        }
+        let ordinary = preview_plan(&config, 0.75, false, true).unwrap();
+        let mut snapshot = super::plan::snapshot_preview_plan(&config, 0.75, true).unwrap();
+        let graph = snapshot
+            .args
+            .iter()
+            .position(|arg| arg == "-filter_complex")
+            .unwrap()
+            + 1;
+        assert_eq!(snapshot.args[graph].matches("eof_action=pass").count(), 1);
+        snapshot.args[graph] = snapshot.args[graph].replace("fps=30:eof_action=pass", "fps=30");
+        assert_eq!(snapshot, ordinary);
+        let realtime = preview_plan(&config, 0.75, true, true).unwrap();
+        assert!(
+            !realtime
+                .args
+                .iter()
+                .any(|arg| arg.contains("eof_action=pass"))
+        );
+        assert_eq!(config.request_token, 79);
+    }
+}
+
+#[test]
 fn initial_preview_seek_uses_raw_microseconds_while_explicit_playhead_keeps_rounding() {
     for (start, expected_seek) in [
         ("00:00:00.123456789", Some("0.123456")),

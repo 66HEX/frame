@@ -1,7 +1,7 @@
 //! Runtime encoder capability detection for the native app.
 
 mod hardware;
-mod runtime;
+pub(crate) mod runtime;
 
 pub use hardware::{
     EncoderInventory, HardwareCapabilities, HardwareEncoder, HardwareProbePolicy,

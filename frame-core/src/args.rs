@@ -15,7 +15,7 @@ use crate::container::{
 };
 use crate::error::ConversionError;
 use crate::filters::{
-    VisualFilterContext, VisualFilterProfile, build_audio_filters,
+    FrameRateEofAction, VisualFilterContext, VisualFilterProfile, build_audio_filters,
     build_visual_filter_chain_with_context, build_visual_filter_complex_with_context, has_overlay,
 };
 use crate::media_filters::validate_media_filters;
@@ -514,10 +514,6 @@ pub fn validate_stream_copy_compatibility(
     Ok(())
 }
 
-#[expect(
-    clippy::too_many_lines,
-    reason = "FFmpeg command assembly stays in one place to keep ordering guarantees explicit"
-)]
 /// Builds probe-aware `FFmpeg` arguments for one conversion.
 ///
 /// # Errors
@@ -530,14 +526,36 @@ pub fn build_ffmpeg_args(
     config: &ConversionConfig,
     probe: &ProbeMetadata,
 ) -> Result<Vec<String>, ConversionError> {
+    build_ffmpeg_args_with_gif_policy(input, output, config, probe, GifFramePolicy::Ordinary)
+}
+
+/// A request-local GIF decision. It is never stored in conversion settings.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum GifFramePolicy {
+    #[default]
+    Ordinary,
+    ConfirmedMinimumFrame,
+}
+
+/// Builds export arguments with an independently verified minimum-frame policy.
+///
+/// # Errors
+/// Returns the same validation errors as [`build_ffmpeg_args`].
+#[expect(
+    clippy::too_many_lines,
+    reason = "FFmpeg command assembly stays in one place to keep ordering guarantees explicit"
+)]
+pub fn build_ffmpeg_args_with_gif_policy(
+    input: &str,
+    output: &str,
+    config: &ConversionConfig,
+    probe: &ProbeMetadata,
+    gif_policy: GifFramePolicy,
+) -> Result<Vec<String>, ConversionError> {
     validate_audio_encoding_tracks(config, probe)?;
     let trim = OutputTrim::from_config(config)?;
     let subtitle_trim = SubtitleTrimPlan::for_window(config, &trim);
-    let mut filter_context = VisualFilterContext {
-        source_is_palette: probe.pixel_format.as_deref() == Some("pal8"),
-        source_clock: crate::source_timing::ResolvedSourceClock::Unknown,
-        ..VisualFilterContext::new(probe.width, probe.height)
-    };
+    let mut filter_context = source_filter_context(probe);
     let mut args = Vec::new();
 
     // Hardware decode acceleration (must be before -i)
@@ -658,27 +676,13 @@ pub fn build_ffmpeg_args(
         Vec::new()
     };
     if !is_audio_only && crate::filters::has_subtitle_burn(config) {
-        let video_index = probe
-            .source_timing
-            .as_ref()
-            .and_then(|timing| timing.first_video_stream_index);
-        let enabled = video_index
-            .into_iter()
-            .chain(mapped_audio.iter().map(|track| track.index))
-            .chain(mapped_subtitles.iter().map(|track| track.index))
-            .collect::<Vec<_>>();
-        filter_context.source_clock = crate::source_timing::resolve_source_clock(
-            probe.source_timing.as_ref(),
-            probe.source_format.as_deref(),
-            video_index,
-            &enabled,
-        );
-        let seek = config
-            .start_time
-            .as_deref()
-            .and_then(crate::trim::RawFfmpegTime::parse)
-            .map_or(0, |time| time.microseconds);
-        crate::filters::validate_subtitle_clock(config, filter_context.source_clock, seek)?;
+        configure_subtitle_clock(
+            config,
+            probe,
+            &mut filter_context,
+            &mapped_audio,
+            &mapped_subtitles,
+        )?;
     }
 
     if is_audio_only {
@@ -695,7 +699,17 @@ pub fn build_ffmpeg_args(
         add_audio_codec_args(&mut args, config);
     } else if is_video_only && is_gif_output {
         args.push("-filter_complex".to_string());
-        args.push(build_gif_filter_complex(config, filter_context));
+        let recover = gif_policy == GifFramePolicy::ConfirmedMinimumFrame
+            && is_gif_minimum_frame_candidate(config);
+        args.push(build_gif_filter_complex_with_eof(
+            config,
+            filter_context,
+            if recover {
+                FrameRateEofAction::Pass
+            } else {
+                FrameRateEofAction::Round
+            },
+        ));
 
         args.push("-map".to_string());
         args.push("[gif_out]".to_string());
@@ -703,6 +717,9 @@ pub fn build_ffmpeg_args(
 
         args.push("-c:v".to_string());
         args.push("gif".to_string());
+        if recover {
+            args.extend(["-frames:v".to_string(), "1".to_string()]);
+        }
 
         args.push("-loop".to_string());
         args.push(config.gif_loop.to_string());
@@ -914,19 +931,138 @@ fn normalize_gif_dither(dither: &str) -> &'static str {
     }
 }
 
+fn source_filter_context(probe: &ProbeMetadata) -> VisualFilterContext {
+    VisualFilterContext {
+        source_is_palette: probe.pixel_format.as_deref() == Some("pal8"),
+        ..VisualFilterContext::new(probe.width, probe.height)
+    }
+}
+
+fn configure_subtitle_clock(
+    config: &ConversionConfig,
+    probe: &ProbeMetadata,
+    context: &mut VisualFilterContext,
+    audio: &[&AudioTrack],
+    subtitles: &[&SubtitleTrack],
+) -> Result<(), ConversionError> {
+    let video_index = probe
+        .source_timing
+        .as_ref()
+        .and_then(|timing| timing.first_video_stream_index);
+    let enabled = video_index
+        .into_iter()
+        .chain(audio.iter().map(|track| track.index))
+        .chain(subtitles.iter().map(|track| track.index))
+        .collect::<Vec<_>>();
+    context.source_clock = crate::source_timing::resolve_source_clock(
+        probe.source_timing.as_ref(),
+        probe.source_format.as_deref(),
+        video_index,
+        &enabled,
+    );
+    let seek = config
+        .start_time
+        .as_deref()
+        .and_then(crate::trim::RawFfmpegTime::parse)
+        .map_or(0, |time| time.microseconds);
+    crate::filters::validate_subtitle_clock(config, context.source_clock, seek)
+}
+
+/// Only explicit-rate GIF reencoding needs an optional minimum-frame check.
+#[must_use]
+pub fn is_gif_minimum_frame_candidate(config: &ConversionConfig) -> bool {
+    config.container.eq_ignore_ascii_case("gif")
+        && !is_copy_mode(config)
+        && config.fps != "original"
+}
+
+/// Builds the exact GIF visual prefix with a null output and one-frame limit.
+///
+/// This low-level helper does not expand application support for GIF subtitles
+/// or overlays. Valid tasks are validated before this optional preflight.
+///
+/// # Errors
+/// Returns an error for invalid trim or source-clock settings.
+pub fn build_gif_probe_args(
+    input: &str,
+    config: &ConversionConfig,
+    probe: &ProbeMetadata,
+    eof_action: FrameRateEofAction,
+) -> Result<Option<Vec<String>>, ConversionError> {
+    if !is_gif_minimum_frame_candidate(config) {
+        return Ok(None);
+    }
+    let trim = OutputTrim::from_config(config)?;
+    let mut context = source_filter_context(probe);
+    if crate::filters::has_subtitle_burn(config) {
+        configure_subtitle_clock(config, probe, &mut context, &[], &[])?;
+    }
+    let mut args = ["-nostdin", "-hide_banner", "-loglevel", "error", "-xerror"]
+        .map(str::to_owned)
+        .to_vec();
+    trim.append_input_args(&mut args);
+    args.extend(["-i".to_owned(), input.to_owned()]);
+    trim.append_output_args(&mut args);
+    let prefix = gif_visual_prefix(config, context, eof_action).join(",");
+    args.extend([
+        "-filter_complex".to_owned(),
+        format!("[0:v:0]{prefix}[probe_out]"),
+    ]);
+    args.extend(
+        [
+            "-map",
+            "[probe_out]",
+            "-an",
+            "-sn",
+            "-dn",
+            "-c:v",
+            "wrapped_avframe",
+            "-fps_mode",
+            "passthrough",
+            "-frames:v",
+            "1",
+            "-progress",
+            "pipe:1",
+            "-nostats",
+            "-f",
+            "null",
+            "-",
+        ]
+        .map(str::to_owned),
+    );
+    Ok(Some(args))
+}
+
+#[cfg(test)]
 fn build_gif_filter_complex(
     config: &ConversionConfig,
     filter_context: VisualFilterContext,
 ) -> String {
+    build_gif_filter_complex_with_eof(config, filter_context, FrameRateEofAction::Round)
+}
+
+fn gif_visual_prefix(
+    config: &ConversionConfig,
+    filter_context: VisualFilterContext,
+    eof_action: FrameRateEofAction,
+) -> Vec<String> {
     let mut filters = build_visual_filter_chain_with_context(
         config,
         VisualFilterProfile::ExportImage,
         filter_context,
     );
     if config.fps != "original" {
-        filters.push(format!("fps={}", config.fps));
+        filters.push(eof_action.filter(&config.fps));
     }
+    filters
+}
 
+fn build_gif_filter_complex_with_eof(
+    config: &ConversionConfig,
+    filter_context: VisualFilterContext,
+    eof_action: FrameRateEofAction,
+) -> String {
+    let filters = gif_visual_prefix(config, filter_context, eof_action);
     let chain = if filters.is_empty() {
         "split[gif_src][gif_palette_src]".to_string()
     } else {
@@ -1465,6 +1601,160 @@ mod tests {
         path::PathBuf,
         time::{SystemTime, UNIX_EPOCH},
     };
+
+    #[test]
+    fn gif_probe_preserves_structural_geometry_trim_and_only_varies_terminal_fps() {
+        let mut config = sample_config("gif", "gif");
+        config.fps = "8".into();
+        config.start_time = Some(".123456789".into());
+        config.end_time = Some("1.5".into());
+        config.crop = Some(crate::types::CropConfig {
+            enabled: true,
+            x: 3.0,
+            y: 5.0,
+            width: 127.0,
+            height: 129.0,
+            ..crate::types::CropConfig::default()
+        });
+        config.resolution = "custom".into();
+        config.custom_width = Some("131".into());
+        // Leave an odd inner raster and real padding; 131x133 would fit exactly.
+        config.custom_height = Some("139".into());
+        let mut probe = sample_probe();
+        probe.width = Some(320);
+        probe.height = Some(180);
+        let ordinary = build_ffmpeg_args("source.mkv", "out.gif", &config, &probe).unwrap();
+        let normal = build_gif_probe_args("source.mkv", &config, &probe, FrameRateEofAction::Round)
+            .unwrap()
+            .unwrap();
+        let pass = build_gif_probe_args("source.mkv", &config, &probe, FrameRateEofAction::Pass)
+            .unwrap()
+            .unwrap();
+        let value = |args: &[String], flag: &str| {
+            args.windows(2)
+                .find(|pair| pair[0] == flag)
+                .map(|pair| pair[1].clone())
+                .unwrap()
+        };
+        let graph = value(&normal, "-filter_complex");
+        let prefix = graph.strip_suffix("[probe_out]").unwrap();
+        assert!(prefix.contains("xstack="), "GIF prefix: {prefix}");
+        assert!(prefix.contains("blend="), "GIF prefix: {prefix}");
+        assert!(prefix.contains("split="), "GIF prefix: {prefix}");
+        assert!(prefix.ends_with(",fps=8"));
+        assert!(
+            value(&ordinary, "-filter_complex")
+                .starts_with(&format!("{prefix},split[gif_src][gif_palette_src]"))
+        );
+        assert_eq!(
+            value(&pass, "-filter_complex"),
+            format!("{prefix}:eof_action=pass[probe_out]")
+        );
+        assert!(!graph.contains("palette"));
+        for flag in ["-ss", "-i", "-t"] {
+            assert_eq!(value(&normal, flag), value(&ordinary, flag));
+        }
+        assert_eq!(value(&normal, "-ss"), "0.123456789");
+        assert_eq!(value(&normal, "-map"), "[probe_out]");
+        assert_eq!(value(&normal, "-c:v"), "wrapped_avframe");
+        assert_eq!(value(&normal, "-fps_mode"), "passthrough");
+        assert_eq!(value(&normal, "-progress"), "pipe:1");
+        assert_eq!(normal.last().unwrap(), "-");
+        assert!(!normal.contains(&"out.gif".to_string()));
+        assert!(normal.contains(&"-xerror".to_string()));
+        let recovery = build_ffmpeg_args_with_gif_policy(
+            "source.mkv",
+            "out.gif",
+            &config,
+            &probe,
+            GifFramePolicy::ConfirmedMinimumFrame,
+        )
+        .unwrap();
+        let mut restored = recovery;
+        let cap = restored.iter().position(|arg| arg == "-frames:v").unwrap();
+        assert_eq!(restored[cap + 1], "1");
+        restored.drain(cap..cap + 2);
+        assert!(!restored.contains(&"-frames:v".to_string()));
+        let index = restored
+            .iter()
+            .position(|arg| arg == "-filter_complex")
+            .unwrap()
+            + 1;
+        restored[index] = restored[index].replace("fps=8:eof_action=pass", "fps=8");
+        assert_eq!(restored, ordinary);
+    }
+
+    #[test]
+    fn gif_recovery_is_not_persisted_or_applied_to_unrelated_outputs() {
+        for (container, codec, fps) in [
+            ("gif", "gif", "original"),
+            ("mp4", "libx264", "8"),
+            ("png", "png", "8"),
+        ] {
+            let mut config = sample_config(container, codec);
+            config.fps = fps.into();
+            let ordinary = build_ffmpeg_args("source", "out", &config, &sample_probe()).unwrap();
+            assert!(
+                build_gif_probe_args("source", &config, &sample_probe(), FrameRateEofAction::Pass)
+                    .unwrap()
+                    .is_none()
+            );
+            assert_eq!(
+                build_ffmpeg_args_with_gif_policy(
+                    "source",
+                    "out",
+                    &config,
+                    &sample_probe(),
+                    GifFramePolicy::ConfirmedMinimumFrame
+                )
+                .unwrap(),
+                ordinary
+            );
+        }
+        let mut config = sample_config("gif", "gif");
+        config.fps = "8".into();
+        config.processing_mode = "copy".into();
+        assert!(!is_gif_minimum_frame_candidate(&config));
+    }
+
+    #[test]
+    fn raw_gif_helper_preserves_burn_clock_but_application_policy_still_rejects_it() {
+        let mut config = sample_config("gif", "gif");
+        config.fps = "8".into();
+        config.start_time = Some("-.123456789".into());
+        config.subtitle_burn_path = Some("/tmp/captions.srt".into());
+        assert!(validate_task_input("source.mkv", &config).is_err());
+        let probe = sample_probe();
+        let ordinary = build_ffmpeg_args("source.mkv", "out.gif", &config, &probe).unwrap();
+        let args = build_gif_probe_args("source.mkv", &config, &probe, FrameRateEofAction::Round)
+            .unwrap()
+            .unwrap();
+        let graph = &args[args
+            .iter()
+            .position(|arg| arg == "-filter_complex")
+            .unwrap()
+            + 1];
+        let prefix = graph.strip_suffix("[probe_out]").unwrap();
+        assert!(prefix.contains("subtitles="));
+        assert!(
+            prefix.contains("setpts=PTS+(round(-0.123456/TB))"),
+            "GIF prefix: {prefix}"
+        );
+        assert!(
+            prefix.contains("setpts=PTS-(round(-0.123456/TB))"),
+            "GIF prefix: {prefix}"
+        );
+        assert!(ordinary.iter().any(|arg| arg.starts_with(prefix)));
+        config.start_time = None;
+        config.end_time = Some("00:00:00.123456789".into());
+        let args = build_gif_probe_args("source", &config, &probe, FrameRateEofAction::Round)
+            .unwrap()
+            .unwrap();
+        assert!(
+            args.windows(2)
+                .any(|pair| pair == ["-to", "00:00:00.123456789"])
+        );
+    }
 
     #[test]
     fn burn_clock_uses_the_same_main_input_tracks_as_export_maps() {

@@ -2,8 +2,9 @@ use crate::{
     dimensions::{OutputRasterPolicy, output_dimensions, output_raster_policy},
     error::ConversionError,
     filters::{
-        PREVIEW_OUTPUT_LABEL, VisualFilterBase, VisualFilterContext, VisualFilterProfile,
-        build_audio_filters, build_visual_filter_complex_with_context, has_overlay,
+        FrameRateEofAction, PREVIEW_OUTPUT_LABEL, VisualFilterBase, VisualFilterContext,
+        VisualFilterProfile, build_audio_filters, build_visual_filter_complex_with_eof_action,
+        has_overlay,
     },
     types::ConversionConfig,
     utils::format_ffmpeg_seconds as format_seconds,
@@ -87,6 +88,30 @@ pub fn build_ffmpeg_preview_args(
     config: &ConversionConfig,
     options: &PreviewFfmpegOptions,
 ) -> Result<PreviewFfmpegPlan, ConversionError> {
+    build_preview_args_with_eof_action(input, config, options, FrameRateEofAction::Round)
+}
+
+/// Builds a snapshot preview plan that retains the final frame at EOF.
+///
+/// The snapshot caller must retain its one-frame output limit. Streaming callers
+/// use [`build_ffmpeg_preview_args`] and preserve ordinary FPS rounding.
+///
+/// # Errors
+/// Returns the same errors as [`build_ffmpeg_preview_args`].
+pub fn build_ffmpeg_snapshot_preview_args(
+    input: &str,
+    config: &ConversionConfig,
+    options: &PreviewFfmpegOptions,
+) -> Result<PreviewFfmpegPlan, ConversionError> {
+    build_preview_args_with_eof_action(input, config, options, FrameRateEofAction::Pass)
+}
+
+fn build_preview_args_with_eof_action(
+    input: &str,
+    config: &ConversionConfig,
+    options: &PreviewFfmpegOptions,
+    eof_action: FrameRateEofAction,
+) -> Result<PreviewFfmpegPlan, ConversionError> {
     validate_preview_options(input, options)?;
 
     let fps = effective_preview_fps(config, options.fps);
@@ -106,7 +131,7 @@ pub fn build_ffmpeg_preview_args(
             })?;
         crate::filters::validate_subtitle_clock(config, options.source_clock, seek.microseconds)?;
     }
-    let graph = build_visual_filter_complex_with_context(
+    let graph = build_visual_filter_complex_with_eof_action(
         config,
         VisualFilterProfile::PreviewLowRes {
             base,
@@ -120,6 +145,7 @@ pub fn build_ffmpeg_preview_args(
             source_clock: options.source_clock,
             ..VisualFilterContext::new(options.source_width, options.source_height)
         },
+        eof_action,
     );
 
     let mut args = vec![

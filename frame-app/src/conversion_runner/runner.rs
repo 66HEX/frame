@@ -3,7 +3,8 @@ use super::output_paths::disambiguate_output_paths;
 use crate::capabilities::{HardwareEncoder, HardwareProbePolicy, probe_hardware_encoder};
 use crate::runtime_binaries::{ffmpeg_executable, ffprobe_executable};
 use frame_core::args::{
-    build_ffmpeg_args, build_output_path, effective_video_encoder, validate_task_input,
+    GifFramePolicy, build_ffmpeg_args, build_ffmpeg_args_with_gif_policy, build_output_path,
+    effective_video_encoder, validate_task_input,
 };
 use frame_core::error::ConversionError;
 use frame_core::events::ConversionEvent;
@@ -122,8 +123,23 @@ fn run_prepared_conversion_task_with_control(
         &task.config.container,
         task.output_name.as_deref(),
     );
-    let args = build_ffmpeg_args(&task.file_path, &output_path, &task.config, &probe)?;
+    let ordinary_args = build_ffmpeg_args(&task.file_path, &output_path, &task.config, &probe)?;
     let executable = ffmpeg_executable();
+    let Some(PreparedGifExport {
+        mut args,
+        proof: recovery_proof,
+    }) = prepare_gif_export(
+        &task,
+        &output_path,
+        &probe,
+        &executable,
+        controller,
+        emit,
+        &ordinary_args,
+    )?
+    else {
+        return Ok(());
+    };
 
     if !super::subtitles::check_subtitle_trim_with_control(
         &task.config,
@@ -135,37 +151,34 @@ fn run_prepared_conversion_task_with_control(
         return Ok(());
     }
 
-    if let Some(encoder) =
-        effective_video_encoder(&task.config, &probe).and_then(HardwareEncoder::from_name)
-    {
-        let policy = HardwareProbePolicy::new(encoder, task.config.videotoolbox_allow_sw);
-        let report =
-            probe_hardware_encoder(&executable, policy, || controller.is_cancelled(&task.id));
-        if controller.take_cancelled(&task.id)? {
-            emit_cancelled_task(&task.id, emit);
-            return Ok(());
-        }
-        if !report.available() {
-            if !report.diagnostics.is_empty() {
-                emit(ConversionEvent::log(
-                    task.id.clone(),
-                    format!("[ERROR] Encoder check: {}", report.diagnostics),
-                ));
-            }
-            return Err(ConversionError::InvalidInput(format!(
-                "Cannot use {}: {}. Check encoder availability again or choose another encoder.",
-                encoder.name(),
-                report
-                    .reason
-                    .map_or("encoder is unavailable", |reason| reason.caption())
-            )));
-        }
+    if !check_hardware_encoder(&task, &probe, &executable, controller, emit)? {
+        return Ok(());
     }
 
     emit(ConversionEvent::log(
         task.id.clone(),
         format!("[INFO] Running {executable} {}", args.join(" ")),
     ));
+
+    // Recheck after diagnostics too: event handlers may take time or replace a
+    // source. Never reuse the truncating cap after an observed identity change.
+    if recovery_proof
+        .as_ref()
+        .is_some_and(|proof| !proof.unchanged())
+    {
+        args = ordinary_args;
+        emit(ConversionEvent::log(
+            task.id.clone(),
+            format!(
+                "[INFO] GIF proof changed before launch; using ordinary export: {executable} {}",
+                args.join(" ")
+            ),
+        ));
+    }
+    if controller.take_cancelled(&task.id)? {
+        emit_cancelled_task(&task.id, emit);
+        return Ok(());
+    }
 
     let mut child = crate::process_launch::spawn(
         Command::new(&executable)
@@ -210,6 +223,123 @@ fn run_prepared_conversion_task_with_control(
             "ffmpeg exited with status {status}"
         )))
     }
+}
+
+fn check_hardware_encoder(
+    task: &ConversionTask,
+    probe: &ProbeMetadata,
+    executable: &str,
+    controller: &ConversionProcessController,
+    emit: &mut impl FnMut(ConversionEvent),
+) -> Result<bool, ConversionError> {
+    if let Some(encoder) =
+        effective_video_encoder(&task.config, probe).and_then(HardwareEncoder::from_name)
+    {
+        let policy = HardwareProbePolicy::new(encoder, task.config.videotoolbox_allow_sw);
+        let report =
+            probe_hardware_encoder(executable, policy, || controller.is_cancelled(&task.id));
+        if controller.take_cancelled(&task.id)? {
+            emit_cancelled_task(&task.id, emit);
+            return Ok(false);
+        }
+        if !report.available() {
+            if !report.diagnostics.is_empty() {
+                emit(ConversionEvent::log(
+                    task.id.clone(),
+                    format!("[ERROR] Encoder check: {}", report.diagnostics),
+                ));
+            }
+            return Err(ConversionError::InvalidInput(format!(
+                "Cannot use {}: {}. Check encoder availability again or choose another encoder.",
+                encoder.name(),
+                report
+                    .reason
+                    .map_or("encoder is unavailable", |reason| reason.caption())
+            )));
+        }
+    }
+    Ok(true)
+}
+
+struct PreparedGifExport {
+    args: Vec<String>,
+    proof: Option<Box<super::gif::GifProof>>,
+}
+
+fn prepare_gif_export(
+    task: &ConversionTask,
+    output_path: &str,
+    probe: &ProbeMetadata,
+    executable: &str,
+    controller: &ConversionProcessController,
+    emit: &mut impl FnMut(ConversionEvent),
+    ordinary_args: &[String],
+) -> Result<Option<PreparedGifExport>, ConversionError> {
+    let check = super::gif::check_gif_minimum_frame(
+        &task.file_path,
+        &task.config,
+        probe,
+        executable,
+        || controller.is_cancelled(&task.id),
+    );
+    // The callback is non-consuming until the owned helper has returned.
+    if controller.take_cancelled(&task.id)?
+        || matches!(check.decision, super::gif::GifDecision::Cancelled)
+    {
+        emit_cancelled_task(&task.id, emit);
+        return Ok(None);
+    }
+    for diagnostic in check.diagnostics {
+        emit(ConversionEvent::log(
+            task.id.clone(),
+            format!("[INFO] {diagnostic}"),
+        ));
+    }
+    // Logging callbacks may cancel the task after the helper has settled.
+    if controller.take_cancelled(&task.id)? {
+        emit_cancelled_task(&task.id, emit);
+        return Ok(None);
+    }
+    let mut args = ordinary_args.to_vec();
+    let proof = match check.decision {
+        super::gif::GifDecision::Recover(proof) => {
+            match build_ffmpeg_args_with_gif_policy(
+                &task.file_path,
+                output_path,
+                &task.config,
+                probe,
+                GifFramePolicy::ConfirmedMinimumFrame,
+            ) {
+                Ok(recovery) => {
+                    args = recovery;
+                    Some(proof)
+                }
+                Err(error) => {
+                    emit(ConversionEvent::log(
+                        task.id.clone(),
+                        format!(
+                            "[INFO] Could not build GIF recovery: {error}; using ordinary export."
+                        ),
+                    ));
+                    None
+                }
+            }
+        }
+        super::gif::GifDecision::Empty => {
+            return Err(ConversionError::InvalidInput(
+                "No video frames were found in the selected interval. Adjust the trim range."
+                    .into(),
+            ));
+        }
+        super::gif::GifDecision::CleanupPending => {
+            return Err(ConversionError::Worker(
+                "The GIF frame check could not finish cleaning up. Try again before exporting."
+                    .into(),
+            ));
+        }
+        super::gif::GifDecision::Ordinary | super::gif::GifDecision::Cancelled => None,
+    };
+    Ok(Some(PreparedGifExport { args, proof }))
 }
 
 fn spawn_batch_worker(

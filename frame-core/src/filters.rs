@@ -41,6 +41,23 @@ pub enum VisualFilterBase {
     Image,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum FrameRateEofAction {
+    #[default]
+    Round,
+    Pass,
+}
+
+impl FrameRateEofAction {
+    #[must_use]
+    pub fn filter(self, rate: &str) -> String {
+        match self {
+            Self::Round => format!("fps={rate}"),
+            Self::Pass => format!("fps={rate}:eof_action=pass"),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum VisualFilterProfile {
     ExportVideo,
@@ -425,7 +442,12 @@ pub fn build_visual_filter_chain_with_context(
                     filters
                 }
             };
-            filters.extend(preview_low_res_filters(width, height, fps));
+            filters.extend(preview_low_res_filters(
+                width,
+                height,
+                fps,
+                FrameRateEofAction::Round,
+            ));
             filters
         }
     }
@@ -445,6 +467,15 @@ pub fn build_visual_filter_complex_with_context(
     config: &ConversionConfig,
     profile: VisualFilterProfile,
     context: VisualFilterContext,
+) -> String {
+    build_visual_filter_complex_with_eof_action(config, profile, context, FrameRateEofAction::Round)
+}
+
+pub(crate) fn build_visual_filter_complex_with_eof_action(
+    config: &ConversionConfig,
+    profile: VisualFilterProfile,
+    context: VisualFilterContext,
+    eof_action: FrameRateEofAction,
 ) -> String {
     match profile {
         VisualFilterProfile::ExportVideo => build_export_filter_complex(
@@ -478,6 +509,7 @@ pub fn build_visual_filter_complex_with_context(
             fps,
             source_time_seconds,
             context,
+            eof_action,
         ),
     }
 }
@@ -541,6 +573,10 @@ fn build_export_filter_complex(
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Preview profile geometry, clock and terminal EOF policy are explicit independent inputs."
+)]
 fn build_preview_filter_complex(
     config: &ConversionConfig,
     base: VisualFilterBase,
@@ -549,6 +585,7 @@ fn build_preview_filter_complex(
     fps: u32,
     source_time_seconds: f64,
     context: VisualFilterContext,
+    eof_action: FrameRateEofAction,
 ) -> String {
     let source_time_seconds = SubtitleClock::NumericPreview(source_time_seconds);
     let base_filters = match base {
@@ -564,7 +601,7 @@ fn build_preview_filter_complex(
     if base == VisualFilterBase::Image {
         preview_filters.extend(image_output_format(config).map(str::to_owned));
     }
-    preview_filters.extend(preview_low_res_filters(width, height, fps));
+    preview_filters.extend(preview_low_res_filters(width, height, fps, eof_action));
     let preview_chain = preview_filters.join(",");
 
     if base != VisualFilterBase::Source && has_overlay(config) {
@@ -639,9 +676,14 @@ fn labeled_filter_chain(filters: &[String], output_label: &str) -> String {
     }
 }
 
-fn preview_low_res_filters(width: u32, height: u32, fps: u32) -> Vec<String> {
+fn preview_low_res_filters(
+    width: u32,
+    height: u32,
+    fps: u32,
+    eof_action: FrameRateEofAction,
+) -> Vec<String> {
     vec![
-        format!("fps={fps}"),
+        eof_action.filter(&fps.to_string()),
         format!("scale={width}:{height}"),
         "setsar=1".to_string(),
         "format=bgra".to_string(),
