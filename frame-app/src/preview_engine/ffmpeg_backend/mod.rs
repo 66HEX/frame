@@ -51,10 +51,10 @@ mod audio_exit_tests;
 #[cfg(test)]
 mod audio_queue_tests;
 #[cfg(test)]
+mod framed_tests;
+#[cfg(test)]
 mod playback_start_tests;
 #[cfg(test)]
 mod tests;
-#[cfg(test)]
-mod framed_tests;
 #[cfg(all(test, unix))]
 mod video_failure_tests;
