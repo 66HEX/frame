@@ -19,9 +19,9 @@ use std::io;
 
 #[derive(Debug, thiserror::Error)]
 pub enum CapabilityDetectionError {
-    #[error("failed to run ffmpeg encoder detection: {0}")]
+    #[error("failed to run FFmpeg capability detection: {0}")]
     Io(#[from] io::Error),
-    #[error("ffmpeg encoder detection failed: {0}")]
+    #[error("FFmpeg capability detection failed: {0}")]
     Ffmpeg(String),
     #[error("ffmpeg capability check did not finish: {0}")]
     Incomplete(String),
@@ -47,7 +47,12 @@ pub fn detect_available_encoders() -> Result<AvailableEncoders, CapabilityDetect
 pub fn detect_available_encoders_with_executable(
     executable: &str,
 ) -> Result<AvailableEncoders, CapabilityDetectionError> {
-    let (stdout, stderr) = bounded_listing(executable, &ffmpeg_encoder_list_args(), "Encoders:")?;
+    let (stdout, stderr) = bounded_listing(
+        executable,
+        &ffmpeg_encoder_list_args(),
+        ListingKind::Encoders,
+        || false,
+    )?;
     available_encoders_from_output(true, &stdout, &stderr)
 }
 
@@ -71,14 +76,64 @@ pub fn detect_available_filters() -> Result<AvailableFilters, CapabilityDetectio
 pub fn detect_available_filters_with_executable(
     executable: &str,
 ) -> Result<AvailableFilters, CapabilityDetectionError> {
-    let (stdout, stderr) = bounded_listing(executable, &ffmpeg_filter_list_args(), "Filters:")?;
+    let (stdout, stderr) = bounded_listing(
+        executable,
+        &ffmpeg_filter_list_args(),
+        ListingKind::Filters,
+        || false,
+    )?;
     available_filters_from_output(true, &stdout, &stderr)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ListingKind {
+    Encoders,
+    Filters,
+    BitstreamFilters,
+}
+
+impl ListingKind {
+    const fn header(self) -> &'static str {
+        match self {
+            Self::Encoders => "Encoders:",
+            Self::Filters => "Filters:",
+            Self::BitstreamFilters => "Bitstream filters:",
+        }
+    }
+}
+
+/// Reads the current runtime's complete bitstream-filter inventory.
+///
+/// # Errors
+///
+/// Returns an error for a cancelled, failed, incomplete, or changed-runtime
+/// check. Such errors do not establish that a particular filter is missing.
+pub fn detect_available_bitstream_filters_with_executable(
+    executable: &str,
+    cancelled: impl Fn() -> bool,
+) -> Result<Vec<String>, CapabilityDetectionError> {
+    let (stdout, _) = bounded_listing(
+        executable,
+        &["-nostdin", "-hide_banner", "-loglevel", "error", "-bsfs"],
+        ListingKind::BitstreamFilters,
+        cancelled,
+    )?;
+    // The bounded listing already validated UTF-8 and every complete row.
+    Ok(String::from_utf8_lossy(&stdout)
+        .lines()
+        .skip_while(|line| line.trim() != ListingKind::BitstreamFilters.header())
+        .skip(1)
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(str::to_string)
+        .collect())
 }
 
 fn bounded_listing(
     executable: &str,
     args: &[&str],
-    header: &str,
+    kind: ListingKind,
+    cancelled: impl Fn() -> bool,
 ) -> Result<(Vec<u8>, Vec<u8>), CapabilityDetectionError> {
     let mut runtime = runtime::Runtime::resolve(executable)?;
     runtime.command.args = args.iter().map(std::ffi::OsString::from).collect();
@@ -89,7 +144,7 @@ fn bounded_listing(
             stdout_bytes: 256 * 1024,
             ..Limits::default()
         },
-        || false,
+        &cancelled,
     )
     .map_err(|error| {
         CapabilityDetectionError::Incomplete(format!(
@@ -97,6 +152,11 @@ fn bounded_listing(
             String::from_utf8_lossy(&error.stderr.bytes).trim()
         ))
     })?;
+    if cancelled() {
+        return Err(CapabilityDetectionError::Incomplete(
+            "check cancelled".into(),
+        ));
+    }
     if !output.success {
         return Err(CapabilityDetectionError::Ffmpeg(format!(
             "exit {:?}: {}",
@@ -112,7 +172,7 @@ fn bounded_listing(
     let text = std::str::from_utf8(&output.stdout.bytes).map_err(|_| {
         CapabilityDetectionError::Incomplete("capability table is not valid UTF-8".into())
     })?;
-    validate_listing_table(text, header)?;
+    validate_listing_table(text, kind)?;
     if !runtime.identity_unchanged() {
         return Err(CapabilityDetectionError::Incomplete(
             "FFmpeg changed during the check".into(),
@@ -121,16 +181,38 @@ fn bounded_listing(
     Ok((output.stdout.bytes, output.stderr.bytes))
 }
 
-fn validate_listing_table(text: &str, header: &str) -> Result<(), CapabilityDetectionError> {
+fn validate_listing_table(text: &str, kind: ListingKind) -> Result<(), CapabilityDetectionError> {
+    let header = kind.header();
     let mut found_header = false;
     let mut rows = 0;
     for raw in text.split_inclusive('\n') {
         let line = raw.trim();
         if line == header {
+            if found_header && kind == ListingKind::BitstreamFilters {
+                return Err(CapabilityDetectionError::Incomplete(
+                    "bitstream-filter table repeats its header".into(),
+                ));
+            }
             found_header = true;
             continue;
         }
-        if !found_header || line.is_empty() || line.bytes().all(|byte| byte == b'-') {
+        if !found_header || line.is_empty() {
+            continue;
+        }
+        if kind == ListingKind::BitstreamFilters {
+            if !raw.ends_with('\n')
+                || !line
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+            {
+                return Err(CapabilityDetectionError::Incomplete(
+                    "bitstream-filter table contains an incomplete row".into(),
+                ));
+            }
+            rows += 1;
+            continue;
+        }
+        if line.bytes().all(|byte| byte == b'-') {
             continue;
         }
         let fields: Vec<_> = line.split_ascii_whitespace().collect();
@@ -141,7 +223,7 @@ fn validate_listing_table(text: &str, header: &str) -> Result<(), CapabilityDete
         let valid_flags = flags
             .bytes()
             .all(|byte| byte.is_ascii_uppercase() || matches!(byte, b'.' | b'|'));
-        let valid = if header == "Encoders:" {
+        let valid = if kind == ListingKind::Encoders {
             valid_flags
                 && flags.len() == 6
                 && fields.len() >= 2
@@ -221,14 +303,14 @@ mod tests {
             "Encoders:\n V..... h264_nvenc NVIDIA",
             "Encoders:\n V..... h264_nvenc ",
         ] {
-            validate_listing_table(valid, "Encoders:").unwrap();
+            validate_listing_table(valid, ListingKind::Encoders).unwrap();
         }
         for valid in [
             "Filters:\n TS lutyuv V->V Color",
             "Filters:\n TSC lutyuv V->V\n",
             "Filters:\n .. color |->V ",
         ] {
-            validate_listing_table(valid, "Filters:").unwrap();
+            validate_listing_table(valid, ListingKind::Filters).unwrap();
         }
         for invalid in [
             "Encoders:\n V..... libx264 Encoder\n V....",
@@ -237,7 +319,7 @@ mod tests {
             "Encoders:\n",
         ] {
             assert!(
-                validate_listing_table(invalid, "Encoders:").is_err(),
+                validate_listing_table(invalid, ListingKind::Encoders).is_err(),
                 "{invalid}"
             );
         }
@@ -247,7 +329,33 @@ mod tests {
             "Filters:\n TSC valid V->V Filter\n TSC",
         ] {
             assert!(
-                validate_listing_table(invalid, "Filters:").is_err(),
+                validate_listing_table(invalid, ListingKind::Filters).is_err(),
+                "{invalid}"
+            );
+        }
+    }
+
+    #[test]
+    fn bitstream_listing_requires_exact_header_and_complete_single_token_rows() {
+        for valid in [
+            "Bitstream filters:\nnoise\nsetts\n",
+            "FFmpeg build banner\nBitstream filters:\r\n  noise\r\nsetts\r\n\n",
+            "Bitstream filters:\nother_123\n",
+        ] {
+            validate_listing_table(valid, ListingKind::BitstreamFilters).unwrap();
+        }
+        for invalid in [
+            "noise\nsetts\n",
+            "diagnostic: Bitstream filters:\nnoise\nsetts\n",
+            "Bitstream filters:\nnoise\nsetts",
+            "Bitstream filters:\nnoise setts\n",
+            "Bitstream filters:\nnoise\nBitstream filters:\nsetts\n",
+            "Bitstream filters:\nnoise\nsetts!\n",
+            "Bitstream filters:\n---\nnoise\nsetts\n",
+            "Bitstream filters:\n",
+        ] {
+            assert!(
+                validate_listing_table(invalid, ListingKind::BitstreamFilters).is_err(),
                 "{invalid}"
             );
         }
@@ -283,7 +391,7 @@ mod tests {
 
         assert_eq!(
             error.to_string(),
-            "ffmpeg encoder detection failed: ffmpeg missing codec table"
+            "FFmpeg capability detection failed: ffmpeg missing codec table"
         );
     }
 
@@ -294,7 +402,7 @@ mod tests {
 
         assert_eq!(
             error.to_string(),
-            "ffmpeg encoder detection failed: unknown ffmpeg encoder detection failure"
+            "FFmpeg capability detection failed: unknown ffmpeg encoder detection failure"
         );
     }
 }

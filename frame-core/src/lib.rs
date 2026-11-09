@@ -14,5 +14,6 @@ pub mod media_filters;
 pub mod media_rules;
 pub mod preview;
 pub mod probe;
+pub mod trim;
 pub mod types;
 pub mod utils;

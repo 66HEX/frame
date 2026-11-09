@@ -12,6 +12,12 @@ use std::time::{Duration, Instant};
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(all(test, unix))]
+pub fn serial_test_processes() -> std::sync::MutexGuard<'static, ()> {
+    tests::serial()
+}
+
 #[cfg(unix)]
 mod unix;
 #[cfg(windows)]

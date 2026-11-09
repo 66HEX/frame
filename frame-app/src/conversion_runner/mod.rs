@@ -5,6 +5,7 @@ mod controller;
 mod output_paths;
 mod process;
 mod runner;
+mod subtitles;
 #[cfg(test)]
 mod tests;
 
@@ -22,3 +23,4 @@ pub use output_paths::*;
 pub use runner::*;
 #[cfg(test)]
 use runner::{ffmpeg_progress_from_line, next_batch_launch_count};
+pub use subtitles::check_subtitle_trim_support;

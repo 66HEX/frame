@@ -1,3 +1,4 @@
+use crate::trim::{OutputTrim, SubtitleTrimPlan};
 use std::{collections::HashSet, path::Path};
 
 use crate::audio_rules::{
@@ -28,7 +29,7 @@ use crate::types::{
     AudioTrack, ConversionConfig, ExternalSubtitleTrack, MIN_GIF_COLORS, MetadataConfig,
     MetadataMode, ProbeMetadata, SubtitleTrack, VOLUME_EPSILON,
 };
-use crate::utils::{format_ffmpeg_seconds, get_hwaccel_args, is_audio_only_container, parse_time};
+use crate::utils::{get_hwaccel_args, is_audio_only_container};
 
 fn is_copy_mode(config: &ConversionConfig) -> bool {
     config.processing_mode == "copy"
@@ -356,17 +357,13 @@ fn add_track_maps<T>(args: &mut Vec<String>, tracks: &[&T], index: impl Fn(&T) -
     }
 }
 
-fn add_external_subtitle_inputs(args: &mut Vec<String>, config: &ConversionConfig) {
+fn add_external_subtitle_inputs(
+    args: &mut Vec<String>,
+    config: &ConversionConfig,
+    trim: &OutputTrim,
+) {
     for track in &config.external_subtitle_tracks {
-        if let Some(start) = config
-            .start_time
-            .as_deref()
-            .map(str::trim)
-            .filter(|start| !start.is_empty())
-        {
-            args.push("-ss".to_string());
-            args.push(start.to_string());
-        }
+        trim.append_input_args(args);
         args.push("-i".to_string());
         args.push(track.path.clone());
     }
@@ -534,6 +531,8 @@ pub fn build_ffmpeg_args(
     probe: &ProbeMetadata,
 ) -> Result<Vec<String>, ConversionError> {
     validate_audio_encoding_tracks(config, probe)?;
+    let trim = OutputTrim::from_config(config)?;
+    let subtitle_trim = SubtitleTrimPlan::for_window(config, &trim);
     let filter_context = VisualFilterContext {
         source_is_palette: probe.pixel_format.as_deref() == Some("pal8"),
         ..VisualFilterContext::new(probe.width, probe.height)
@@ -547,12 +546,7 @@ pub fn build_ffmpeg_args(
         args.extend(get_hwaccel_args(encoder));
     }
 
-    if let Some(start) = &config.start_time
-        && !start.is_empty()
-    {
-        args.push("-ss".to_string());
-        args.push(start.clone());
-    }
+    trim.append_input_args(&mut args);
 
     args.push("-i".to_string());
     args.push(input.to_string());
@@ -565,29 +559,9 @@ pub fn build_ffmpeg_args(
     }
 
     let first_external_subtitle_input = 1 + usize::from(has_overlay(config));
-    add_external_subtitle_inputs(&mut args, config);
+    add_external_subtitle_inputs(&mut args, config, &trim);
 
-    if let Some(end_str) = &config.end_time
-        && !end_str.is_empty()
-    {
-        if let Some(start_str) = &config.start_time {
-            if start_str.is_empty() {
-                args.push("-to".to_string());
-                args.push(end_str.clone());
-            } else if let (Some(start_t), Some(end_t)) =
-                (parse_time(start_str), parse_time(end_str))
-            {
-                let duration = end_t - start_t;
-                if duration > 0.0 {
-                    args.push("-t".to_string());
-                    args.push(format_ffmpeg_seconds(duration));
-                }
-            }
-        } else {
-            args.push("-to".to_string());
-            args.push(end_str.clone());
-        }
-    }
+    trim.append_output_args(&mut args);
 
     add_container_metadata_flags(&mut args, config, probe);
 
@@ -648,6 +622,9 @@ pub fn build_ffmpeg_args(
                 &config.external_subtitle_tracks,
             )?;
             add_external_subtitle_output_args(&mut args, config, subtitle_tracks.len(), false);
+            if let Some(plan) = &subtitle_trim {
+                plan.append_args(&mut args);
+            }
         } else {
             args.push("-c".to_string());
             args.push("copy".to_string());
@@ -788,6 +765,9 @@ pub fn build_ffmpeg_args(
                 &config.external_subtitle_tracks,
             )?;
             add_external_subtitle_output_args(&mut args, config, subtitle_output_count, false);
+            if let Some(plan) = &subtitle_trim {
+                plan.append_args(&mut args);
+            }
         }
     }
 
@@ -1032,16 +1012,6 @@ pub fn validate_task_input(
     }
     validate_audio_track_count(config)?;
 
-    let start_time = config
-        .start_time
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty());
-    let end_time = config
-        .end_time
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty());
     let processing_mode = config.processing_mode.trim();
 
     if processing_mode != "reencode" && processing_mode != "copy" {
@@ -1093,30 +1063,7 @@ pub fn validate_task_input(
     }
     let is_copy_mode = processing_mode == "copy";
 
-    if let Some(start) = start_time
-        && parse_time(start).is_none_or(|seconds| !seconds.is_finite())
-    {
-        return Err(ConversionError::InvalidInput(format!(
-            "Invalid start time: {start}"
-        )));
-    }
-
-    if let Some(end) = end_time
-        && parse_time(end).is_none_or(|seconds| !seconds.is_finite())
-    {
-        return Err(ConversionError::InvalidInput(format!(
-            "Invalid end time: {end}"
-        )));
-    }
-
-    if let (Some(start), Some(end)) = (start_time, end_time)
-        && let (Some(start_t), Some(end_t)) = (parse_time(start), parse_time(end))
-        && end_t <= start_t
-    {
-        return Err(ConversionError::InvalidInput(
-            "End time must be greater than start time".to_string(),
-        ));
-    }
+    OutputTrim::from_config(config)?;
 
     if !is_copy_mode && config.resolution == "custom" {
         let w_str = config.custom_width.as_deref().unwrap_or("-1");
@@ -1474,6 +1421,7 @@ fn validate_image_encoding_settings(config: &ConversionConfig) -> Result<(), Con
 mod tests {
     use super::*;
     use crate::filters::EVEN_DIMENSIONS_FILTER;
+    use crate::types::OverlayConfig;
     use std::{
         fs,
         path::PathBuf,
@@ -2056,6 +2004,200 @@ mod tests {
             }
         }
         fs::remove_file(input).unwrap();
+    }
+
+    #[test]
+    fn effective_trim_duration_must_be_finite_even_when_each_endpoint_is_finite() {
+        let mut config = sample_config("mkv", "libx264");
+        config.start_time = Some("-1e308".into());
+        config.end_time = Some("1e308".into());
+        assert!(
+            build_ffmpeg_args("input.mkv", "out.mkv", &config, &sample_probe())
+                .unwrap_err()
+                .to_string()
+                .contains("Invalid trim duration")
+        );
+    }
+
+    #[test]
+    fn subtitle_trim_plan_skips_nontext_and_noop_windows_and_shares_output_precision() {
+        use crate::trim::subtitle_trim_plan;
+        let mut config = sample_config("mkv", "libx264");
+        config.external_subtitle_tracks = vec![ExternalSubtitleTrack {
+            path: "/tmp/captions.SRT".into(),
+            ..ExternalSubtitleTrack::default()
+        }];
+        for start in [
+            None,
+            Some(""),
+            Some("  "),
+            Some("0"),
+            Some("00:00:00.000"),
+            Some("-1"),
+        ] {
+            config.start_time = start.map(str::to_string);
+            assert!(subtitle_trim_plan(&config).unwrap().is_none());
+        }
+        config.start_time = Some(" 00:00:08.250001 ".into());
+        let plan = subtitle_trim_plan(&config).unwrap().unwrap();
+        assert!(plan.bitstream_filter.contains("max(0,DURATION+min(PTS,0))"));
+        assert!(!plan.bitstream_filter.contains("/tb"));
+        for (start, end, option, length) in [
+            (None, " 00:00:01.234567 ", "-to", "1.234567"),
+            (Some(" "), "1.234567", "-to", "1.234567"),
+            (Some("00:00:08.250001"), "00:00:08.750004", "-t", "0.500003"),
+            (Some("0"), "1", "-t", "1.000"),
+        ] {
+            config.start_time = start.map(str::to_string);
+            config.end_time = Some(end.into());
+            let plan = subtitle_trim_plan(&config).unwrap().unwrap();
+            let args = build_ffmpeg_args("input.mkv", "out.mkv", &config, &sample_probe()).unwrap();
+            assert!(args_contains_pair(
+                &args,
+                option,
+                if option == "-to" { end.trim() } else { length }
+            ));
+            assert!(
+                plan.bitstream_filter
+                    .contains(&format!("gte(pts,{length}/tb)"))
+            );
+            assert!(
+                plan.bitstream_filter
+                    .contains(&format!("min(PTS+DURATION,{length}/TB)"))
+            );
+        }
+        for path in ["/tmp/bitmap.sup", "/tmp/captions.ttml"] {
+            config.external_subtitle_tracks[0].path = path.into();
+            assert!(subtitle_trim_plan(&config).unwrap().is_none());
+        }
+        config.external_subtitle_tracks.clear();
+        config.selected_subtitle_tracks = vec![7];
+        config.subtitle_burn_path = Some("/tmp/burn.srt".into());
+        assert!(subtitle_trim_plan(&config).unwrap().is_none());
+        config.external_subtitle_tracks.push(ExternalSubtitleTrack {
+            path: "/tmp/captions.srt".into(),
+            ..ExternalSubtitleTrack::default()
+        });
+        config.container = "gif".into();
+        assert!(subtitle_trim_plan(&config).unwrap().is_none());
+    }
+
+    #[test]
+    fn raw_end_only_time_keeps_ffmpeg_precision_while_generated_duration_keeps_existing_semantics()
+    {
+        let mut config = sample_config("mkv", "libx264");
+        config.external_subtitle_tracks = vec![ExternalSubtitleTrack {
+            path: "/tmp/captions.srt".into(),
+            ..ExternalSubtitleTrack::default()
+        }];
+        for start in [None, Some(""), Some("  ")] {
+            config.start_time = start.map(str::to_string);
+            for (end, length) in [
+                ("0.9999999", "0.999999"),
+                ("00:00:00.123456789", "0.123456"),
+                ("1.0000009", "1.000000"),
+                ("0.0000009", "0.000000"),
+            ] {
+                config.end_time = Some(end.into());
+                let args =
+                    build_ffmpeg_args("input.mkv", "out.mkv", &config, &sample_probe()).unwrap();
+                assert!(args_contains_pair(&args, "-to", end));
+                let plan = crate::trim::subtitle_trim_plan(&config).unwrap().unwrap();
+                assert!(
+                    plan.bitstream_filter
+                        .contains(&format!("gte(pts,{length}/tb)"))
+                );
+            }
+        }
+        config.end_time = Some("1e-3".into());
+        assert!(
+            build_ffmpeg_args("input.mkv", "out.mkv", &config, &sample_probe())
+                .unwrap_err()
+                .to_string()
+                .contains("Invalid end time")
+        );
+        config.start_time = Some("0".into());
+        let args = build_ffmpeg_args("input.mkv", "out.mkv", &config, &sample_probe()).unwrap();
+        assert!(args_contains_pair(&args, "-ss", "0"));
+        assert!(args_contains_pair(&args, "-t", "0.001"));
+        assert!(
+            crate::trim::subtitle_trim_plan(&config)
+                .unwrap()
+                .unwrap()
+                .bitstream_filter
+                .contains("gte(pts,0.001/tb)")
+        );
+    }
+
+    #[test]
+    fn subtitle_trim_plan_keeps_mixed_output_ordinals_actions_and_metadata_independent() {
+        let mut probe = sample_probe();
+        probe.subtitle_tracks = [(1, "subrip"), (2, "hdmv_pgs_subtitle"), (3, "ass")]
+            .map(|(index, codec)| SubtitleTrack {
+                index,
+                codec: codec.into(),
+                ..SubtitleTrack::default()
+            })
+            .to_vec();
+        for mode in ["copy", "reencode"] {
+            for metadata_mode in [
+                MetadataMode::Preserve,
+                MetadataMode::Clean,
+                MetadataMode::Replace,
+            ] {
+                let mut config = sample_config("mkv", "libx264");
+                config.processing_mode = mode.into();
+                config.start_time = Some("8".into());
+                config.end_time = Some("9".into());
+                config.selected_subtitle_tracks = vec![3, 2, 1];
+                config.metadata.mode = metadata_mode;
+                config.external_subtitle_tracks = ["srt", "sup", "ass", "vtt"]
+                    .map(|extension| ExternalSubtitleTrack {
+                        path: format!("/tmp/captions.{extension}"),
+                        is_forced: true,
+                        ..ExternalSubtitleTrack::default()
+                    })
+                    .to_vec();
+                if mode == "reencode" {
+                    config.overlay = Some(OverlayConfig {
+                        enabled: true,
+                        path: "/tmp/logo.png".into(),
+                        width: 0.25,
+                        opacity: 1.0,
+                        anchor: "center".into(),
+                        ..OverlayConfig::default()
+                    });
+                }
+                let args = build_ffmpeg_args("input.mkv", "out.mkv", &config, &probe).unwrap();
+                let ordinals: Vec<_> = args
+                    .iter()
+                    .filter(|arg| arg.starts_with("-bsf:"))
+                    .map(String::as_str)
+                    .collect();
+                assert_eq!(ordinals, ["-bsf:s:3", "-bsf:s:5", "-bsf:s:6"]);
+                // MKV preserves each native subtitle codec, including imported text.
+                for ordinal in 0..7 {
+                    assert!(args_contains_pair(
+                        &args,
+                        &format!("-c:s:{ordinal}"),
+                        "copy"
+                    ));
+                }
+                assert!(args_contains_pair(&args, "-map", "0:3"));
+                assert!(args_contains_pair(
+                    &args,
+                    "-map",
+                    if mode == "copy" { "1:s:0" } else { "2:s:0" }
+                ));
+                assert!(args_contains_pair(&args, "-disposition:s:3", "forced"));
+                let plan = crate::trim::subtitle_trim_plan(&config).unwrap().unwrap();
+                assert_eq!(plan.output_ordinals, [3, 5, 6]);
+                assert_eq!(plan.required_bitstream_filters(), ["noise", "setts"]);
+                let expected = "noise=amount=0:drop='if(gte(duration,0)*not(eq(pts,nopts))*gt(tb,0),gt(duration,0)*lte(pts+duration,0)+gte(pts,1.000/tb),0)',setts=pts='if(gte(DURATION,0)*not(eq(PTS,NOPTS))*gt(TB,0),max(PTS,0),PTS)':dts='if(gte(DURATION,0)*not(eq(PTS,NOPTS))*gt(TB,0)*not(eq(DTS,NOPTS)),max(DTS,0),DTS)':duration='if(gte(DURATION,0)*not(eq(PTS,NOPTS))*gt(TB,0)*gt(DURATION,0),max(0,min(PTS+DURATION,1.000/TB)-max(PTS,0)),DURATION)'";
+                assert_eq!(plan.bitstream_filter, expected);
+                assert!(args_contains_pair(&args, "-bsf:s:3", expected));
+            }
+        }
     }
 
     #[test]

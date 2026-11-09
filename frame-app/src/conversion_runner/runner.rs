@@ -125,6 +125,16 @@ fn run_prepared_conversion_task_with_control(
     let args = build_ffmpeg_args(&task.file_path, &output_path, &task.config, &probe)?;
     let executable = ffmpeg_executable();
 
+    if !super::subtitles::check_subtitle_trim_with_control(
+        &task.config,
+        &executable,
+        &task.id,
+        controller,
+        emit,
+    )? {
+        return Ok(());
+    }
+
     if let Some(encoder) =
         effective_video_encoder(&task.config, &probe).and_then(HardwareEncoder::from_name)
     {
@@ -235,7 +245,7 @@ pub(super) fn next_batch_launch_count(
     pending_count.min(available_slots)
 }
 
-fn emit_cancelled_task(id: &str, emit: &mut impl FnMut(ConversionEvent)) {
+pub(super) fn emit_cancelled_task(id: &str, emit: &mut impl FnMut(ConversionEvent)) {
     emit(ConversionEvent::log(
         id.to_string(),
         "[INFO] Task cancelled",
