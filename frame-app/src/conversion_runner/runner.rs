@@ -1,3 +1,4 @@
+use super::completion::CompletionFile;
 use super::controller::ConversionProcessController;
 use super::output_paths::disambiguate_output_paths;
 use crate::capabilities::{HardwareEncoder, HardwareProbePolicy, probe_hardware_encoder};
@@ -102,11 +103,11 @@ pub fn run_conversion_task_with_control(
     emit: &mut impl FnMut(ConversionEvent),
 ) -> Result<(), ConversionError> {
     disambiguate_output_paths(std::slice::from_mut(&mut task));
-    run_prepared_conversion_task_with_control(task, controller, emit)
+    run_prepared_conversion_task_with_control(&task, controller, emit)
 }
 
 fn run_prepared_conversion_task_with_control(
-    task: ConversionTask,
+    task: &ConversionTask,
     controller: &ConversionProcessController,
     emit: &mut impl FnMut(ConversionEvent),
 ) -> Result<(), ConversionError> {
@@ -125,11 +126,8 @@ fn run_prepared_conversion_task_with_control(
     );
     let ordinary_args = build_ffmpeg_args(&task.file_path, &output_path, &task.config, &probe)?;
     let executable = ffmpeg_executable();
-    let Some(PreparedGifExport {
-        mut args,
-        proof: recovery_proof,
-    }) = prepare_gif_export(
-        &task,
+    let Some(prepared) = prepare_gif_export(
+        task,
         &output_path,
         &probe,
         &executable,
@@ -151,78 +149,210 @@ fn run_prepared_conversion_task_with_control(
         return Ok(());
     }
 
-    if !check_hardware_encoder(&task, &probe, &executable, controller, emit)? {
+    if !check_hardware_encoder(task, &probe, &executable, controller, emit)? {
         return Ok(());
     }
 
-    emit(ConversionEvent::log(
-        task.id.clone(),
-        format!("[INFO] Running {executable} {}", args.join(" ")),
-    ));
+    run_final_conversion(
+        task,
+        &output_path,
+        &executable,
+        ordinary_args,
+        prepared,
+        controller,
+        emit,
+    )
+}
 
-    // Recheck after diagnostics too: event handlers may take time or replace a
-    // source. Never reuse the truncating cap after an observed identity change.
-    if recovery_proof
-        .as_ref()
-        .is_some_and(|proof| !proof.unchanged())
-    {
-        args = ordinary_args;
+struct FinalOutcome {
+    result: Result<(), ConversionError>,
+    was_cancelled: bool,
+    diagnostics: Vec<String>,
+}
+
+fn run_final_conversion(
+    task: &ConversionTask,
+    output_path: &str,
+    executable: &str,
+    ordinary_args: Vec<String>,
+    prepared: PreparedGifExport,
+    controller: &ConversionProcessController,
+    emit: &mut impl FnMut(ConversionEvent),
+) -> Result<(), ConversionError> {
+    let mut completion = match CompletionFile::create() {
+        Ok(owner) => owner,
+        Err(error) => {
+            return finish_final_conversion(
+                task,
+                output_path,
+                controller,
+                emit,
+                FinalOutcome {
+                    result: Err(ConversionError::Worker(format!(
+                        "Could not prepare the export completion check: {}",
+                        error.error
+                    ))),
+                    was_cancelled: false,
+                    diagnostics: error.diagnostics,
+                },
+            );
+        }
+    };
+    let PreparedGifExport {
+        mut args,
+        proof: recovery_proof,
+    } = prepared;
+    let mut was_cancelled = false;
+    let result = (|| {
         emit(ConversionEvent::log(
             task.id.clone(),
             format!(
-                "[INFO] GIF proof changed before launch; using ordinary export: {executable} {}",
+                "[INFO] Running {executable} -progress {} {}",
+                completion.path().display(),
                 args.join(" ")
             ),
         ));
-    }
-    if controller.take_cancelled(&task.id)? {
-        emit_cancelled_task(&task.id, emit);
-        return Ok(());
-    }
-
-    let mut child = crate::process_launch::spawn(
-        Command::new(&executable)
-            .args(&args)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::piped()),
+        // The log callback may replace source/runtime. Only the base media args
+        // change; the OS-path transport is attached to the final Command below.
+        if recovery_proof
+            .as_ref()
+            .is_some_and(|proof| !proof.unchanged())
+        {
+            args = ordinary_args;
+            emit(ConversionEvent::log(
+                task.id.clone(),
+                format!(
+                    "[INFO] GIF proof changed before launch; using ordinary export: {executable} -progress {} {}",
+                    completion.path().display(),
+                    args.join(" ")
+                ),
+            ));
+        }
+        was_cancelled = controller.take_cancelled(&task.id)?;
+        if was_cancelled {
+            return Ok(());
+        }
+        run_final_child(
+            &mut final_command(executable, &args, completion.path()),
+            task,
+            controller,
+            emit,
+            &mut was_cancelled,
+        )?;
+        completion.verify().map_err(|reason| {
+            ConversionError::Worker(format!(
+                "FFmpeg did not confirm that the export finished: {reason}. Check the conversion log."
+            ))
+        })
+    })();
+    let diagnostics = completion.cleanup();
+    finish_final_conversion(
+        task,
+        output_path,
+        controller,
+        emit,
+        FinalOutcome {
+            result,
+            was_cancelled,
+            diagnostics,
+        },
     )
-    .map_err(ConversionError::Io)?;
+}
 
-    let started_cancelled = controller.register_started_process(&task.id, child.id())?;
-    if started_cancelled {
-        let _ = child.wait();
-        let _ = controller.finish_task(&task.id);
-        emit_cancelled_task(&task.id, emit);
-        return Ok(());
-    }
+fn final_command(executable: &str, args: &[String], progress_path: &std::path::Path) -> Command {
+    let mut command = Command::new(executable);
+    command
+        .arg("-progress")
+        .arg(progress_path)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped());
+    command
+}
 
-    emit(ConversionEvent::started(task.id.clone()));
-    emit(ConversionEvent::progress(task.id.clone(), 0.0));
-
-    let mut stderr = child
-        .stderr
-        .take()
-        .ok_or_else(|| ConversionError::Worker("ffmpeg stderr was not captured".to_string()))?;
-    let stream_result = stream_ffmpeg_stderr(&mut stderr, &task, emit);
-
+fn run_final_child(
+    command: &mut Command,
+    task: &ConversionTask,
+    controller: &ConversionProcessController,
+    emit: &mut impl FnMut(ConversionEvent),
+    was_cancelled: &mut bool,
+) -> Result<(), ConversionError> {
+    let mut child = crate::process_launch::spawn(command).map_err(ConversionError::Io)?;
+    let started_cancelled = match controller.register_started_process(&task.id, child.id()) {
+        Ok(cancelled) => cancelled,
+        Err(error) => {
+            // Keep the file owner alive until this already-started child settles,
+            // even if process registration itself fails. Retain the primary error.
+            let _ = child.kill();
+            let _ = child.wait();
+            if let Ok(cancelled) = controller.finish_task(&task.id) {
+                *was_cancelled |= cancelled;
+            }
+            return Err(error);
+        }
+    };
+    *was_cancelled |= started_cancelled;
+    let stream_result = if started_cancelled {
+        Ok(())
+    } else {
+        emit(ConversionEvent::started(task.id.clone()));
+        emit(ConversionEvent::progress(task.id.clone(), 0.0));
+        child.stderr.take().map_or_else(
+            || {
+                Err(ConversionError::Worker(
+                    "ffmpeg stderr was not captured".to_string(),
+                ))
+            },
+            |mut stderr| stream_ffmpeg_stderr(&mut stderr, task, emit),
+        )
+    };
     let status = child.wait().map_err(ConversionError::Io);
-    let was_cancelled = controller.finish_task(&task.id)?;
-    if was_cancelled {
-        emit_cancelled_task(&task.id, emit);
-        return Ok(());
-    }
-
+    // Unregister before proof IO, cleanup or any further callback: the PID must
+    // not remain actionable after wait, even if subsequent verification fails.
+    let finished = controller.finish_task(&task.id);
+    *was_cancelled |= finished?;
     stream_result?;
     let status = status?;
     if status.success() {
-        emit(ConversionEvent::completed(task.id, output_path));
         Ok(())
     } else {
         Err(ConversionError::Worker(format!(
             "ffmpeg exited with status {status}"
         )))
     }
+}
+
+fn finish_final_conversion(
+    task: &ConversionTask,
+    output_path: &str,
+    controller: &ConversionProcessController,
+    emit: &mut impl FnMut(ConversionEvent),
+    outcome: FinalOutcome,
+) -> Result<(), ConversionError> {
+    for diagnostic in outcome.diagnostics {
+        emit(ConversionEvent::log(
+            task.id.clone(),
+            format!("[WARN] Completion cleanup: {diagnostic}"),
+        ));
+    }
+    if outcome.was_cancelled || controller.is_cancelled(&task.id) {
+        emit(ConversionEvent::log(
+            task.id.clone(),
+            "[INFO] Task cancelled",
+        ));
+    }
+    // Always consume again, including when finish_task already consumed a marker.
+    // Diagnostics can synchronously cancel. No callback follows this consume
+    // before the terminal event/result (emit_cancelled_task would add such a log).
+    let late_cancelled = controller.take_cancelled(&task.id)?;
+    if outcome.was_cancelled || late_cancelled {
+        emit(ConversionEvent::cancelled(task.id.clone()));
+        return Ok(());
+    }
+    outcome.result?;
+    emit(ConversionEvent::completed(task.id.clone(), output_path));
+    Ok(())
 }
 
 fn check_hardware_encoder(
@@ -350,7 +480,7 @@ fn spawn_batch_worker(
 ) {
     let task_id = task.id.clone();
     thread::spawn(move || {
-        let result = run_prepared_conversion_task_with_control(task, &controller, &mut |event| {
+        let result = run_prepared_conversion_task_with_control(&task, &controller, &mut |event| {
             let _ = event_tx.send(event);
         });
         let _ = done_tx.send((task_id, result));
@@ -507,3 +637,6 @@ pub(super) fn ffmpeg_progress_from_line(
 
     (duration > 0.0).then(|| (current_time / duration * 100.0).clamp(0.0, 100.0))
 }
+
+#[cfg(test)]
+mod completion_tests;
