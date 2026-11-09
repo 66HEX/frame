@@ -60,10 +60,28 @@ pub(super) fn preview_runtime_request(
         video_index,
         video_index.as_slice(),
     );
+    let preview_burn_clock = frame_core::source_timing::resolve_preview_burn_clock(
+        &core_config,
+        metadata.source_timing.as_ref(),
+        metadata.source_format.as_deref(),
+        &metadata
+            .audio_tracks
+            .iter()
+            .map(|track| track.index)
+            .collect::<Vec<_>>(),
+        &metadata
+            .subtitle_tracks
+            .iter()
+            .map(|track| (track.index, track.codec.as_str()))
+            .collect::<Vec<_>>(),
+    );
     let selected_audio_track = preview_selected_audio_track(&preview_config, metadata);
     let mut visual_identity = DefaultHasher::new();
     preview_visual_hash(&preview_config, source_is_palette, source_clock)
         .hash(&mut visual_identity);
+    if let Some(clock) = preview_burn_clock {
+        clock.hash(&mut visual_identity);
+    }
     metadata.sample_aspect_ratio.hash(&mut visual_identity);
     let key = PreviewRuntimeKey {
         file_id: selected_file.id.clone(),
@@ -88,6 +106,7 @@ pub(super) fn preview_runtime_request(
         source_sample_aspect_ratio: metadata.sample_aspect_ratio,
         request_token: 0,
         source_clock,
+        preview_burn_clock,
         selected_audio_track,
         duration_seconds,
         max_width: preview_dimensions.max_width,

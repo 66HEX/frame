@@ -309,6 +309,7 @@ fn tiff_palette_stream_seek_should_preserve_a_later_rgba16_frame_and_preview() -
         source_is_palette: true,
         source_sample_aspect_ratio: None,
         source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
+        preview_burn_clock: None,
         max_width: 8,
         max_height: 4,
         fps: 25,
@@ -326,6 +327,7 @@ fn tiff_palette_stream_seek_should_preserve_a_later_rgba16_frame_and_preview() -
             source_is_palette: false,
             source_sample_aspect_ratio: None,
             source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
+            preview_burn_clock: None,
             ..options
         },
     )?;

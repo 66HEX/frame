@@ -605,6 +605,7 @@ fn rounded_overlay_test_root(path: &std::path::Path) -> FrameRoot {
             source_is_palette: false,
             source_sample_aspect_ratio: SampleAspectRatio::new(1, 1),
             source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
+            preview_burn_clock: None,
             max_width: 240,
             max_height: 240,
             fps: 30,

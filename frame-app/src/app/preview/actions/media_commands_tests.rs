@@ -378,6 +378,7 @@ fn benchmark_real_ffmpeg_seek_backlog() {
         source_sample_aspect_ratio: None,
         request_token: 0,
         source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
+        preview_burn_clock: None,
         selected_audio_track: None,
         duration_seconds: benchmark_env("FRAME_PREVIEW_BENCH_DURATION", 12.0),
         max_width: 1280,

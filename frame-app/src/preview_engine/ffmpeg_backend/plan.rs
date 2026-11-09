@@ -49,6 +49,7 @@ fn build_preview_plan(
             source_is_palette: config.source_is_palette,
             source_sample_aspect_ratio: config.source_sample_aspect_ratio,
             source_clock: config.source_clock,
+            preview_burn_clock: config.preview_burn_clock,
             max_width: config.max_width,
             max_height: config.max_height,
             fps: config.fps,

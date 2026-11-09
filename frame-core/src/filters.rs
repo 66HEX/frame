@@ -21,6 +21,7 @@ pub struct VisualFilterContext {
     pub source_dimensions: Option<(u32, u32)>,
     pub source_is_palette: bool,
     pub source_clock: crate::source_timing::ResolvedSourceClock,
+    pub preview_burn_clock: Option<crate::source_timing::PreviewBurnClock>,
 }
 
 impl VisualFilterContext {
@@ -30,6 +31,7 @@ impl VisualFilterContext {
             source_dimensions: width.zip(height).filter(|&(w, h)| w > 0 && h > 0),
             source_is_palette: false,
             source_clock: crate::source_timing::ResolvedSourceClock::Unknown,
+            preview_burn_clock: None,
         }
     }
 }
@@ -242,7 +244,12 @@ fn build_video_filters_at_time(
         }
     }
 
-    apply_subtitle_timebase(&mut filters, source_time_seconds, context.source_clock);
+    apply_subtitle_timebase(
+        &mut filters,
+        source_time_seconds,
+        context.source_clock,
+        context.preview_burn_clock,
+    );
     filters
 }
 
@@ -633,6 +640,22 @@ pub(crate) fn validate_subtitle_clock(
     Ok(())
 }
 
+pub(crate) fn validate_preview_subtitle_clock(
+    config: &ConversionConfig,
+    source: crate::source_timing::ResolvedSourceClock,
+    preview: Option<crate::source_timing::PreviewBurnClock>,
+    seek_microseconds: i64,
+) -> Result<(), crate::error::ConversionError> {
+    if let Some(preview) = preview {
+        let doubles = !is_image_container(&config.container)
+            && config.video_filters.deinterlace != crate::types::DeinterlaceMode::Off;
+        preview.shift_expression_for_filter(seek_microseconds, doubles)?;
+        Ok(())
+    } else {
+        validate_subtitle_clock(config, source, seek_microseconds)
+    }
+}
+
 pub(crate) fn preview_seek_microseconds(seconds: f64) -> i64 {
     crate::trim::RawFfmpegTime::parse(&format_ffmpeg_seconds(seconds))
         .map_or(0, |time| time.microseconds)
@@ -642,6 +665,7 @@ fn apply_subtitle_timebase(
     filters: &mut Vec<String>,
     clock: SubtitleClock,
     source: crate::source_timing::ResolvedSourceClock,
+    preview: Option<crate::source_timing::PreviewBurnClock>,
 ) {
     let Some(subtitle_index) = filters
         .iter()
@@ -656,7 +680,11 @@ fn apply_subtitle_timebase(
     // Legacy Vec-returning builders cannot report invalid metadata. Production
     // export/preview Result entry points validate the exact clock before calling
     // these builders; metadata-free callers retain a symmetric best effort.
-    let expression = source.shift_expression(microseconds).unwrap_or_else(|_| {
+    let expression = match (clock, preview) {
+        (SubtitleClock::NumericPreview(_), Some(preview)) => preview.shift_expression(microseconds),
+        _ => source.shift_expression(microseconds),
+    }
+    .unwrap_or_else(|_| {
         crate::source_timing::ResolvedSourceClock::Unknown
             .shift_expression(microseconds)
             .unwrap_or_default()
@@ -907,6 +935,7 @@ mod tests {
         let context = VisualFilterContext {
             source_is_palette: true,
             source_clock: crate::source_timing::ResolvedSourceClock::Unknown,
+            preview_burn_clock: None,
             ..VisualFilterContext::new(Some(32), Some(24))
         };
         let chain = build_visual_filter_chain_with_context(

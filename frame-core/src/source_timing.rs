@@ -87,6 +87,124 @@ pub enum ResolvedSourceClock {
     Invalid,
 }
 
+/// A preview's visual clock and untrimmed export baseline, resolved from one source.
+/// Private fields prevent joining independently observed source generations.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct PreviewBurnClock {
+    visual: ResolvedSourceClock,
+    export: ResolvedSourceClock,
+}
+
+impl PreviewBurnClock {
+    #[must_use]
+    pub const fn visual_clock(self) -> ResolvedSourceClock {
+        self.visual
+    }
+
+    #[must_use]
+    pub const fn export_clock(self) -> ResolvedSourceClock {
+        self.export
+    }
+
+    /// Aligns the preview source frame with the configured untrimmed export.
+    ///
+    /// # Errors
+    /// Returns an error for used invalid arithmetic or an unrepresentable shift.
+    pub fn shift_expression(
+        self,
+        seek_microseconds: i64,
+    ) -> Result<Option<String>, ConversionError> {
+        self.shift_expression_for_filter(seek_microseconds, false)
+    }
+
+    pub(crate) fn shift_expression_for_filter(
+        self,
+        seek_microseconds: i64,
+        doubles_time_base: bool,
+    ) -> Result<Option<String>, ConversionError> {
+        if self.visual == ResolvedSourceClock::Invalid
+            || self.export == ResolvedSourceClock::Invalid
+        {
+            return Err(clock_overflow());
+        }
+        let (
+            ResolvedSourceClock::Known {
+                video_time_base,
+                origin_microseconds,
+                minimum_start_microseconds: visual_minimum,
+            },
+            ResolvedSourceClock::Known {
+                video_time_base: export_time_base,
+                origin_microseconds: export_origin,
+                minimum_start_microseconds: export_minimum,
+            },
+        ) = (self.visual, self.export)
+        else {
+            return self
+                .visual
+                .shift_expression_for_filter(seek_microseconds, doubles_time_base);
+        };
+        if video_time_base != export_time_base || origin_microseconds != export_origin {
+            return self
+                .visual
+                .shift_expression_for_filter(seek_microseconds, doubles_time_base);
+        }
+        let sought = origin_microseconds
+            .checked_add(seek_microseconds)
+            .filter(|value| *value != i64::MIN)
+            .ok_or_else(clock_overflow)?;
+        let visual_time = visual_minimum.map_or(sought, |minimum| sought.max(minimum));
+        let export_time =
+            export_minimum.map_or(export_origin, |minimum| export_origin.max(minimum));
+        let rescale = |time| {
+            rescale_near_inf(
+                time,
+                i128::from(video_time_base.denominator),
+                i128::from(video_time_base.numerator) * 1_000_000,
+            )
+            .ok_or_else(clock_overflow)
+        };
+        let ticks = rescale(visual_time)?
+            .checked_sub(rescale(export_time)?)
+            .ok_or_else(clock_overflow)?;
+        shift_expression_from_ticks(video_time_base, ticks, doubles_time_base)
+    }
+}
+
+/// Prepares both burn clocks from the same immutable timestamp and stream facts.
+/// Invalid selections retain the visual clock with an unknown export baseline.
+#[must_use]
+pub fn resolve_preview_burn_clock(
+    config: &crate::types::ConversionConfig,
+    timing: Option<&SourceTiming>,
+    format_name: Option<&str>,
+    available_audio: &[u32],
+    available_subtitles: &[(u32, &str)],
+) -> Option<PreviewBurnClock> {
+    if config.processing_mode == "copy"
+        || crate::utils::is_audio_only_container(&config.container)
+        || !crate::filters::has_subtitle_burn(config)
+    {
+        return None;
+    }
+    let video = timing.and_then(|timing| timing.first_video_stream_index);
+    let visual = resolve_source_clock(timing, format_name, video, video.as_slice());
+    let export = crate::input_map::resolve_reencode_main_input_map(
+        config,
+        available_audio,
+        available_subtitles,
+    )
+    .map_or(ResolvedSourceClock::Unknown, |mapped| {
+        let enabled = video
+            .into_iter()
+            .chain(mapped.audio)
+            .chain(mapped.subtitles)
+            .collect::<Vec<_>>();
+        resolve_source_clock(timing, format_name, video, &enabled)
+    });
+    Some(PreviewBurnClock { visual, export })
+}
+
 /// Resolves only streams enabled on the main input, excluding sidecar inputs.
 #[must_use]
 pub fn resolve_source_clock(
@@ -237,25 +355,36 @@ impl ResolvedSourceClock {
         if ticks == 0 {
             return Ok(None);
         }
-        // Leave one bit of headroom for setpts arithmetic: shifts near 2^53
-        // can erase even small incoming PTS. bwdif is the only current
-        // pre-subtitle filter that changes TB, so reserve another bit for it.
-        // This conservative bound does not replace the expression's actual TB.
-        let max_ticks = 1_u64 << if doubles_time_base { 51 } else { 52 };
-        if ticks.unsigned_abs() > max_ticks {
-            return Err(clock_overflow());
-        }
-        let numerator = i128::from(ticks) * i128::from(video_time_base.numerator);
-        let denominator = i128::from(video_time_base.denominator);
-        let divisor = gcd128(numerator.unsigned_abs(), denominator.unsigned_abs());
-        let divisor = i128::try_from(divisor).map_err(|_| clock_overflow())?;
-        let numerator = numerator / divisor;
-        let denominator = denominator / divisor;
-        if numerator.unsigned_abs() > (1_u128 << 53) {
-            return Err(clock_overflow());
-        }
-        Ok(Some(format!("round({numerator}/({denominator}*TB))")))
+        shift_expression_from_ticks(video_time_base, ticks, doubles_time_base)
     }
+}
+
+fn shift_expression_from_ticks(
+    video_time_base: TimeBase,
+    ticks: i64,
+    doubles_time_base: bool,
+) -> Result<Option<String>, ConversionError> {
+    if ticks == 0 {
+        return Ok(None);
+    }
+    // Leave one bit of headroom for setpts arithmetic: shifts near 2^53
+    // can erase even small incoming PTS. bwdif is the only current
+    // pre-subtitle filter that changes TB, so reserve another bit for it.
+    // This conservative bound does not replace the expression's actual TB.
+    let max_ticks = 1_u64 << if doubles_time_base { 51 } else { 52 };
+    if ticks.unsigned_abs() > max_ticks {
+        return Err(clock_overflow());
+    }
+    let numerator = i128::from(ticks) * i128::from(video_time_base.numerator);
+    let denominator = i128::from(video_time_base.denominator);
+    let divisor = gcd128(numerator.unsigned_abs(), denominator.unsigned_abs());
+    let divisor = i128::try_from(divisor).map_err(|_| clock_overflow())?;
+    let numerator = numerator / divisor;
+    let denominator = denominator / divisor;
+    if numerator.unsigned_abs() > (1_u128 << 53) {
+        return Err(clock_overflow());
+    }
+    Ok(Some(format!("round({numerator}/({denominator}*TB))")))
 }
 
 fn fallback_expression(microseconds: i64) -> String {
@@ -304,3 +433,7 @@ const fn gcd128(mut left: u128, mut right: u128) -> u128 {
 #[cfg(test)]
 #[path = "source_timing/tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "source_timing/preview_tests.rs"]
+mod preview_tests;

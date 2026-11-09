@@ -25,6 +25,7 @@ fn new_process() -> RunningPreviewProcess {
             source_sample_aspect_ratio: None,
             request_token: 0,
             source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
+            preview_burn_clock: None,
             selected_audio_track: Some(0),
             duration_seconds: 1.0,
             max_width: 320,

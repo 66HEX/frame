@@ -23,6 +23,7 @@ pub struct PreviewFfmpegOptions {
     pub source_is_palette: bool,
     pub source_sample_aspect_ratio: Option<crate::aspect::SampleAspectRatio>,
     pub source_clock: crate::source_timing::ResolvedSourceClock,
+    pub preview_burn_clock: Option<crate::source_timing::PreviewBurnClock>,
     pub max_width: u32,
     pub max_height: u32,
     pub fps: u32,
@@ -106,6 +107,10 @@ pub fn build_ffmpeg_snapshot_preview_args(
     build_preview_args_with_eof_action(input, config, options, FrameRateEofAction::Pass)
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "Keep preview validation, filter planning and FFmpeg argument assembly in one auditable sequence."
+)]
 fn build_preview_args_with_eof_action(
     input: &str,
     config: &ConversionConfig,
@@ -122,6 +127,11 @@ fn build_preview_args_with_eof_action(
         OutputRasterPolicy::Exact => VisualFilterBase::Image,
         OutputRasterPolicy::Even => VisualFilterBase::Video,
     };
+    let preview_burn_clock = options.preview_burn_clock.filter(|_| {
+        base != VisualFilterBase::Source
+            && !crate::utils::is_audio_only_container(&config.container)
+            && crate::filters::has_subtitle_burn(config)
+    });
     if base != VisualFilterBase::Source && crate::filters::has_subtitle_burn(config) {
         let seek = crate::trim::RawFfmpegTime::parse(&format_seconds(options.start_seconds))
             .ok_or_else(|| {
@@ -129,7 +139,12 @@ fn build_preview_args_with_eof_action(
                     "Preview start position is too large to align subtitles".into(),
                 )
             })?;
-        crate::filters::validate_subtitle_clock(config, options.source_clock, seek.microseconds)?;
+        crate::filters::validate_preview_subtitle_clock(
+            config,
+            options.source_clock,
+            preview_burn_clock,
+            seek.microseconds,
+        )?;
     }
     let graph = build_visual_filter_complex_with_eof_action(
         config,
@@ -143,6 +158,7 @@ fn build_preview_args_with_eof_action(
         VisualFilterContext {
             source_is_palette: options.source_is_palette,
             source_clock: options.source_clock,
+            preview_burn_clock,
             ..VisualFilterContext::new(options.source_width, options.source_height)
         },
         eof_action,
@@ -617,6 +633,79 @@ mod tests {
     }
 
     #[test]
+    fn paired_export_clock_changes_only_the_active_burn_wrapper_even_at_zero_seek() {
+        use crate::source_timing::{
+            SourceStreamTiming, SourceTiming, TimeBase, resolve_preview_burn_clock,
+        };
+        let mut config = default_config();
+        config.container = "mkv".into();
+        config.subtitle_burn_path = Some("/tmp/clock.srt".into());
+        config.selected_audio_tracks = vec![1];
+        let mut timing = SourceTiming {
+            format_start_microseconds: Some(1_400_000),
+            format_start_invalid: false,
+            first_video_stream_index: Some(0),
+            streams: [(0, 145_920), (1, 126_000)]
+                .map(|(index, start_pts)| SourceStreamTiming {
+                    index,
+                    time_base: TimeBase::new(1, 90_000),
+                    start_pts: Some(start_pts),
+                })
+                .into(),
+        };
+        let mut options = default_options();
+        options.start_seconds = 0.0;
+        let clock =
+            resolve_preview_burn_clock(&config, Some(&timing), Some("mpegts"), &[1], &[]).unwrap();
+        options.source_clock = clock.visual_clock();
+        let legacy = build_ffmpeg_preview_args("source.m2ts", &config, &options).unwrap();
+        options.preview_burn_clock = Some(clock);
+        let paired = build_ffmpeg_preview_args("source.m2ts", &config, &options).unwrap();
+        let normalized = paired
+            .args
+            .iter()
+            .map(|arg| {
+                arg.replace("setpts=PTS+(round(83/(375*TB))),", "")
+                    .replace(",setpts=PTS-(round(83/(375*TB)))", "")
+            })
+            .collect::<Vec<_>>();
+        assert_ne!(paired.args, legacy.args);
+        assert_eq!(normalized, legacy.args);
+        assert_eq!(
+            (
+                paired.width,
+                paired.height,
+                paired.pixel_aspect_ratio,
+                paired.output_raster_aspect_ratio
+            ),
+            (
+                legacy.width,
+                legacy.height,
+                legacy.pixel_aspect_ratio,
+                legacy.output_raster_aspect_ratio
+            )
+        );
+
+        timing.streams[1].start_pts = Some(i64::MAX);
+        timing.streams[1].time_base = TimeBase::new(1, 1);
+        options.preview_burn_clock =
+            resolve_preview_burn_clock(&config, Some(&timing), Some("mpegts"), &[1], &[]);
+        assert!(build_ffmpeg_preview_args("source.m2ts", &config, &options).is_err());
+        for dormant in ["no-burn", "copy", "audio"] {
+            let mut config = config.clone();
+            match dormant {
+                "no-burn" => config.subtitle_burn_path = None,
+                "copy" => config.processing_mode = "copy".into(),
+                _ => config.container = "wav".into(),
+            }
+            assert!(
+                build_ffmpeg_preview_args("source.m2ts", &config, &options).is_ok(),
+                "{dormant}"
+            );
+        }
+    }
+
+    #[test]
     fn display_aspect_follows_oriented_crop_scale_and_padding_without_changing_payload_plan() {
         use crate::aspect::SampleAspectRatio;
         let mut config = default_config();
@@ -705,6 +794,7 @@ mod tests {
             source_is_palette: false,
             source_sample_aspect_ratio: None,
             source_clock: crate::source_timing::ResolvedSourceClock::Unknown,
+            preview_burn_clock: None,
             max_width: 1280,
             max_height: 720,
             fps: 30,

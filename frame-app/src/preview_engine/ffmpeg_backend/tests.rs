@@ -36,6 +36,7 @@ pub(super) fn preview_config() -> PreviewSessionConfig {
         source_sample_aspect_ratio: None,
         request_token: 0,
         source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
+        preview_burn_clock: None,
         selected_audio_track: None,
         duration_seconds: 12.5,
         max_width: 1280,

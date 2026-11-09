@@ -191,6 +191,7 @@ fn snapshot_eof_pass_should_keep_one_frame_without_changing_the_stream_plan() ->
         source_is_palette: false,
         source_sample_aspect_ratio: None,
         source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
+        preview_burn_clock: None,
         max_width: 64,
         max_height: 48,
         fps: 8,

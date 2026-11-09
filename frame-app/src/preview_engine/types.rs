@@ -215,6 +215,7 @@ pub struct PreviewSessionConfig {
     pub source_sample_aspect_ratio: Option<frame_core::aspect::SampleAspectRatio>,
     pub request_token: u64,
     pub source_clock: frame_core::source_timing::ResolvedSourceClock,
+    pub preview_burn_clock: Option<frame_core::source_timing::PreviewBurnClock>,
     pub selected_audio_track: Option<u32>,
     pub duration_seconds: f64,
     pub max_width: u32,

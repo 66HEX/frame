@@ -123,6 +123,7 @@ fn session_config(options: &Options) -> PreviewSessionConfig {
         source_sample_aspect_ratio: None,
         request_token: 0,
         source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
+        preview_burn_clock: None,
         selected_audio_track: options.audio_track,
         duration_seconds: options.duration,
         max_width: options.max_width,

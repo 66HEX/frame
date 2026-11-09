@@ -4,6 +4,7 @@ use support::*;
 mod canvas;
 mod config;
 mod crop;
+mod cross_clock;
 mod overlay;
 mod presentation;
 mod runtime_dimensions;

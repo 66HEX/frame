@@ -18,6 +18,7 @@ use crate::filters::{
     FrameRateEofAction, VisualFilterContext, VisualFilterProfile, build_audio_filters,
     build_visual_filter_chain_with_context, build_visual_filter_complex_with_context, has_overlay,
 };
+use crate::input_map::{embedded_subtitle_action, resolve_reencode_main_input_map};
 use crate::media_filters::validate_media_filters;
 use crate::media_rules::{
     SubtitleStreamAction as SubtitleAction, all_containers, container_supports_audio,
@@ -62,8 +63,14 @@ fn collect_selected_audio_tracks<'a>(
     config: &ConversionConfig,
     probe: &'a ProbeMetadata,
 ) -> Result<Vec<&'a AudioTrack>, ConversionError> {
-    config
-        .selected_audio_tracks
+    collect_audio_tracks(&config.selected_audio_tracks, probe)
+}
+
+fn collect_audio_tracks<'a>(
+    indices: &[u32],
+    probe: &'a ProbeMetadata,
+) -> Result<Vec<&'a AudioTrack>, ConversionError> {
+    indices
         .iter()
         .map(|index| {
             probe
@@ -151,8 +158,14 @@ fn collect_selected_subtitle_tracks<'a>(
     config: &ConversionConfig,
     probe: &'a ProbeMetadata,
 ) -> Result<Vec<&'a SubtitleTrack>, ConversionError> {
-    config
-        .selected_subtitle_tracks
+    collect_subtitle_tracks(&config.selected_subtitle_tracks, probe)
+}
+
+fn collect_subtitle_tracks<'a>(
+    indices: &[u32],
+    probe: &'a ProbeMetadata,
+) -> Result<Vec<&'a SubtitleTrack>, ConversionError> {
+    indices
         .iter()
         .map(|index| {
             probe
@@ -166,23 +179,6 @@ fn collect_selected_subtitle_tracks<'a>(
                 })
         })
         .collect()
-}
-
-fn collect_reencode_subtitle_tracks<'a>(
-    config: &ConversionConfig,
-    probe: &'a ProbeMetadata,
-) -> Result<Vec<&'a SubtitleTrack>, ConversionError> {
-    let tracks = collect_selected_subtitle_tracks(config, probe)?;
-    for track in &tracks {
-        if let Err(reason) = embedded_subtitle_action(&config.container, &track.codec) {
-            return Err(ConversionError::InvalidInput(format!(
-                "Subtitle codec '{}' from source track #{} cannot be represented by '{}': {reason}",
-                track.codec, track.index, config.container,
-            )));
-        }
-    }
-
-    Ok(tracks)
 }
 
 fn validate_external_subtitle_tracks(config: &ConversionConfig) -> Result<(), ConversionError> {
@@ -254,12 +250,6 @@ fn validate_external_subtitle_tracks(config: &ConversionConfig) -> Result<(), Co
     }
 
     Ok(())
-}
-
-fn embedded_subtitle_action(container: &str, codec: &str) -> Result<SubtitleAction, &'static str> {
-    crate::media_rules::subtitle_stream_action(container, codec).ok_or(
-        "subtitle codec cannot be copied or decoded for the selected container; choose another output or leave this track unselected",
-    )
 }
 
 fn external_subtitle_action(
@@ -664,17 +654,21 @@ pub fn build_ffmpeg_args_with_gif_policy(
 
     // These exact lists feed both FFmpeg's -map options and the main-input
     // timestamp clock. Separate overlay/sidecar inputs never enter this set.
-    let regular_video = !is_audio_only && !is_image_output && !is_gif_output;
-    let mapped_audio = if regular_video {
-        collect_selected_audio_tracks(config, probe)?
-    } else {
-        Vec::new()
-    };
-    let mapped_subtitles = if regular_video {
-        collect_reencode_subtitle_tracks(config, probe)?
-    } else {
-        Vec::new()
-    };
+    let mapped = resolve_reencode_main_input_map(
+        config,
+        &probe
+            .audio_tracks
+            .iter()
+            .map(|track| track.index)
+            .collect::<Vec<_>>(),
+        &probe
+            .subtitle_tracks
+            .iter()
+            .map(|track| (track.index, track.codec.as_str()))
+            .collect::<Vec<_>>(),
+    )?;
+    let mapped_audio = collect_audio_tracks(&mapped.audio, probe)?;
+    let mapped_subtitles = collect_subtitle_tracks(&mapped.subtitles, probe)?;
     if !is_audio_only && crate::filters::has_subtitle_burn(config) {
         configure_subtitle_clock(
             config,

@@ -50,6 +50,7 @@ fn audio_config(path: PathBuf, milliseconds: u32) -> PreviewSessionConfig {
         source_sample_aspect_ratio: None,
         request_token: 0,
         source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
+        preview_burn_clock: None,
         selected_audio_track: Some(0),
         duration_seconds: f64::from(milliseconds) / 1_000.0,
         max_width: 320,
