@@ -2814,6 +2814,78 @@ mod tests {
     }
 
     #[test]
+    fn build_ffmpeg_args_copies_libx265_frames_after_visual_filters() {
+        let probe = ProbeMetadata {
+            width: Some(48),
+            height: Some(32),
+            ..sample_probe()
+        };
+        for (flip_vertical, expected_filter) in [(false, "copy"), (true, "vflip,copy")] {
+            let mut config = sample_config("mkv", "libx265");
+            config.flip_vertical = flip_vertical;
+            let args = build_ffmpeg_args("input.mp4", "output.mkv", &config, &probe)
+                .expect("libx265 arguments should build");
+
+            assert!(args_contains_pair(&args, "-vf", expected_filter));
+        }
+    }
+
+    #[test]
+    fn stream_copy_does_not_add_libx265_frame_copy() {
+        let mut config = sample_config("mkv", "libx265");
+        config.processing_mode = "copy".into();
+        let args = build_ffmpeg_args("input.mp4", "output.mkv", &config, &sample_probe())
+            .expect("stream-copy arguments should build");
+
+        assert!(args_contains_pair(&args, "-c", "copy"));
+        assert!(
+            !args
+                .iter()
+                .any(|arg| matches!(arg.as_str(), "-vf" | "-filter_complex"))
+        );
+    }
+
+    #[test]
+    fn build_ffmpeg_args_copies_libx265_frames_after_overlay_composition() {
+        let probe = ProbeMetadata {
+            width: Some(48),
+            height: Some(32),
+            ..sample_probe()
+        };
+        for opacity in [0.0, 1.0] {
+            let mut config = sample_config("mkv", "libx265");
+            config.flip_vertical = true;
+            config.overlay = Some(OverlayConfig {
+                enabled: true,
+                path: "/tmp/logo.png".into(),
+                width: 0.25,
+                opacity,
+                ..OverlayConfig::default()
+            });
+            let args = build_ffmpeg_args("input.mp4", "output.mkv", &config, &probe)
+                .expect("libx265 overlay arguments should build");
+            let graph = args
+                .windows(2)
+                .find(|pair| pair[0] == "-filter_complex")
+                .map(|pair| pair[1].as_str())
+                .expect("overlay should use a complex graph");
+
+            assert!(graph.ends_with(";[video_composed]copy[vout]"), "{graph}");
+            assert_eq!(graph.matches("copy").count(), 1, "{graph}");
+            if opacity > 0.0 {
+                assert!(graph.contains("overlay=x="), "{graph}");
+                assert!(graph.contains(":format=auto[video_composed]"), "{graph}");
+            } else {
+                assert_eq!(
+                    graph,
+                    "[0:v:0]vflip[video_composed];[video_composed]copy[vout]"
+                );
+            }
+            assert!(args_contains_pair(&args, "-map", "[vout]"));
+        }
+    }
+
+    #[test]
     fn build_ffmpeg_args_does_not_add_even_dimensions_guard_for_image_output() {
         let config = sample_config("png", "png");
 

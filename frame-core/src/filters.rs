@@ -379,12 +379,14 @@ fn exact_padding_filter(width: u32, height: u32, x: u32, y: u32, stage: &str) ->
 
 #[must_use]
 pub fn build_encode_video_filters(config: &ConversionConfig, include_scale: bool) -> Vec<String> {
-    build_encode_video_filters_at_time(
+    let mut filters = build_encode_video_filters_at_time(
         config,
         include_scale,
         export_subtitle_time(config),
         VisualFilterContext::default(),
-    )
+    );
+    filters.extend(video_output_filter(config).map(str::to_owned));
+    filters
 }
 
 fn build_encode_video_filters_at_time(
@@ -432,7 +434,14 @@ pub fn build_visual_filter_chain_with_context(
 ) -> Vec<String> {
     match profile {
         VisualFilterProfile::ExportVideo => {
-            build_encode_video_filters_at_time(config, true, export_subtitle_time(config), context)
+            let mut filters = build_encode_video_filters_at_time(
+                config,
+                true,
+                export_subtitle_time(config),
+                context,
+            );
+            filters.extend(video_output_filter(config).map(str::to_owned));
+            filters
         }
         VisualFilterProfile::ExportImage => {
             let mut filters =
@@ -501,11 +510,17 @@ pub(crate) fn build_visual_filter_complex_with_preview_policy(
     frame_policy: PreviewFramePolicy,
 ) -> String {
     match profile {
-        VisualFilterProfile::ExportVideo => build_export_filter_complex(
-            config,
-            &build_visual_filter_chain_with_context(config, profile, context),
-            VIDEO_OUTPUT_LABEL,
-        ),
+        VisualFilterProfile::ExportVideo => {
+            let filters = build_encode_video_filters_at_time(
+                config,
+                true,
+                export_subtitle_time(config),
+                context,
+            );
+            build_video_filter_complex_with_output_filter(config, |output_label| {
+                build_export_filter_complex(config, &filters, output_label)
+            })
+        }
         VisualFilterProfile::ExportImage => {
             let filters =
                 build_video_filters_at_time(config, true, export_subtitle_time(config), context);
@@ -537,6 +552,28 @@ pub(crate) fn build_visual_filter_complex_with_preview_policy(
     }
 }
 
+fn video_output_filter(config: &ConversionConfig) -> Option<&'static str> {
+    // FFmpeg 8.1.2 / x265 4.0 can crash on decoder-backed frames, including
+    // after vflip. Copy after composition provides a fresh buffer without
+    // changing pixels, geometry or timestamps.
+    config
+        .video_codec
+        .eq_ignore_ascii_case("libx265")
+        .then_some("copy")
+}
+
+fn build_video_filter_complex_with_output_filter(
+    config: &ConversionConfig,
+    compose: impl FnOnce(&str) -> String,
+) -> String {
+    if let Some(filter) = video_output_filter(config) {
+        let graph = compose("video_composed");
+        format!("{graph};[video_composed]{filter}[{VIDEO_OUTPUT_LABEL}]")
+    } else {
+        compose(VIDEO_OUTPUT_LABEL)
+    }
+}
+
 fn image_output_format(config: &ConversionConfig) -> Option<&'static str> {
     config
         .container
@@ -560,8 +597,15 @@ pub fn build_overlay_filter_complex(config: &ConversionConfig) -> String {
 
 #[must_use]
 pub fn build_encode_overlay_filter_complex(config: &ConversionConfig) -> String {
-    let filters = build_encode_video_filters(config, true);
-    build_overlay_filter_complex_with_filters(config, &filters, VIDEO_OUTPUT_LABEL)
+    let filters = build_encode_video_filters_at_time(
+        config,
+        true,
+        export_subtitle_time(config),
+        VisualFilterContext::default(),
+    );
+    build_video_filter_complex_with_output_filter(config, |output_label| {
+        build_overlay_filter_complex_with_filters(config, &filters, output_label)
+    })
 }
 
 fn build_overlay_filter_complex_with_filters(
@@ -865,6 +909,28 @@ mod tests {
         let config = default_config();
         let filters = build_encode_video_filters(&config, true);
         assert_eq!(filters, vec![EVEN_DIMENSIONS_FILTER]);
+    }
+
+    #[test]
+    fn metadata_free_encode_helpers_copy_libx265_frames_at_the_output() {
+        let mut config = default_config();
+        config.video_codec = "libx265".into();
+        config.flip_vertical = true;
+        assert_eq!(
+            build_encode_video_filters(&config, true),
+            ["vflip", EVEN_DIMENSIONS_FILTER, "copy"]
+        );
+
+        config.overlay = Some(OverlayConfig {
+            enabled: true,
+            path: "overlay.png".into(),
+            opacity: 1.0,
+            ..OverlayConfig::default()
+        });
+        let graph = build_encode_overlay_filter_complex(&config);
+        assert!(graph.contains(":format=auto[video_composed]"), "{graph}");
+        assert!(graph.ends_with(";[video_composed]copy[vout]"), "{graph}");
+        assert_eq!(graph.matches("copy").count(), 1, "{graph}");
     }
 
     #[test]
@@ -1200,6 +1266,42 @@ mod tests {
                 "format=bgra",
             ]
         );
+    }
+
+    #[test]
+    fn libx265_preview_does_not_copy_encoder_input_frames() {
+        let mut config = default_config();
+        config.video_codec = "libx265".into();
+        config.flip_vertical = true;
+        let context = VisualFilterContext::new(Some(48), Some(32));
+        let profile = VisualFilterProfile::PreviewLowRes {
+            base: VisualFilterBase::Video,
+            width: 640,
+            height: 360,
+            fps: 24,
+            source_time_seconds: 0.0,
+        };
+
+        assert_eq!(
+            build_visual_filter_chain_with_context(&config, profile, context),
+            [
+                "vflip",
+                "fps=24",
+                "scale=640:360",
+                "setsar=1",
+                "format=bgra"
+            ]
+        );
+
+        config.overlay = Some(OverlayConfig {
+            enabled: true,
+            path: "overlay.png".into(),
+            opacity: 1.0,
+            ..OverlayConfig::default()
+        });
+        let graph = build_visual_filter_complex_with_context(&config, profile, context);
+        assert!(graph.contains("overlay=x="), "{graph}");
+        assert!(!graph.contains("copy"), "{graph}");
     }
 
     #[test]

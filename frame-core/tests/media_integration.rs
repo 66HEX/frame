@@ -614,16 +614,20 @@ fn hevc_mkv_reencode_should_write_hevc_video() -> TestResult {
     let tools = Toolchain::discover()?;
     let sandbox = Sandbox::new("hevc_mkv_reencode")?;
     let input = sandbox.path("source.mp4");
-    let output = sandbox.path("output.mkv");
 
     generate_h264_aac_source(&tools, &input, 0.5, 48, 32)?;
-    let config = video_config("mkv", "libx265", "aac");
-    convert(&tools, &input, &output, &config)?;
+    for flip_vertical in [false, true] {
+        let output = sandbox.path(&format!("output-vflip-{flip_vertical}.mkv"));
+        let mut config = video_config("mkv", "libx265", "aac");
+        config.flip_vertical = flip_vertical;
+        convert(&tools, &input, &output, &config)?;
 
-    let metadata = probe_media(&tools, &output)?;
-    assert_eq!(metadata.video_codec.as_deref(), Some("hevc"));
-    assert_eq!(metadata.width, Some(48));
-    assert_eq!(metadata.height, Some(32));
+        let metadata = probe_media(&tools, &output)?;
+        assert_eq!(metadata.video_codec.as_deref(), Some("hevc"));
+        assert_eq!(metadata.width, Some(48));
+        assert_eq!(metadata.height, Some(32));
+        decode_media(&tools, &output)?;
+    }
     Ok(())
 }
 
