@@ -1,0 +1,316 @@
+{
+  "inspected_on": "2026-11-10",
+  "reference_url": "https://tailark.com/pages/quartz/libre",
+  "preview_url": "https://pro-pages.tailark.com/libre/landing-one",
+  "capture": {
+    "html_sha256": "d12fb8889fb89ee1c57012c8ef865cde47b3e587391ac03887b5f07260251319",
+    "html_bytes": 588335,
+    "javascript_assets": 19,
+    "stylesheet_assets": 2,
+    "assets": [
+      {
+        "url": "https://pro-pages.tailark.com/_next/static/immutable/chunks/074_dzl0zdxfa.css",
+        "bytes": 3713,
+        "sha256": "423f3899175ed784c04c5289a62139a35a983a976652558110b0dbd60c5a4271"
+      },
+      {
+        "url": "https://pro-pages.tailark.com/_next/static/immutable/chunks/2f502z13e-x43.css",
+        "bytes": 420173,
+        "sha256": "e2f98de612e71c3412278b0cdd4a026962b47ec460f7bbfe22bf3e1f28406fa5"
+      },
+      {
+        "url": "https://pro-pages.tailark.com/_next/static/immutable/chunks/14wg3l79xl7pa.js",
+        "bytes": 29140,
+        "sha256": "1923e0dd805daf9ec987d60bb1b3e68dc5cacd1d58377bdc365b8233bd7cf34f"
+      },
+      {
+        "url": "https://pro-pages.tailark.com/_next/static/immutable/chunks/2mw784wp98zpi.js",
+        "bytes": 229460,
+        "sha256": "b7993d00940afc1cd07c121d0fe213bc89c3dffb5d1edfd0c64a567a88c90cdf"
+      },
+      {
+        "url": "https://pro-pages.tailark.com/_next/static/immutable/chunks/25vdkorpm0d0j.js",
+        "bytes": 164677,
+        "sha256": "24adb20c9bba5cf3f79ab4d2d8c13d9b7de0cccc308a52659bca285cecceddfa"
+      },
+      {
+        "url": "https://pro-pages.tailark.com/_next/static/immutable/chunks/turbopack-1tuse3cztoq7m.js",
+        "bytes": 10918,
+        "sha256": "c202bd7505d38b78bf6fb1484d507832be35332305a9d89b490528fbc1005281"
+      },
+      {
+        "url": "https://pro-pages.tailark.com/_next/static/immutable/chunks/27tr2umk6gs1z.js",
+        "bytes": 14445,
+        "sha256": "8e44c0cfd2f540f31f22d900a9f2a51a449540cb02e4231ac43b84065c23abf8"
+      },
+      {
+        "url": "https://pro-pages.tailark.com/_next/static/immutable/chunks/1yci1uvnfhq-p.js",
+        "bytes": 20028,
+        "sha256": "300a9977f9c3252d03cd47ebb916c802a835a9289a9fdaed89aee9d3eda5fe98"
+      },
+      {
+        "url": "https://pro-pages.tailark.com/_next/static/immutable/chunks/3baa2_1e16s31.js",
+        "bytes": 27683,
+        "sha256": "6d0a50a0d730e4da75e8d73ac84626d8926ceb9c025e8b1824ab4b0a64eafb46"
+      },
+      {
+        "url": "https://pro-pages.tailark.com/_next/static/immutable/chunks/1eiejiszd03jd.js",
+        "bytes": 32683,
+        "sha256": "81e698c4b7dbc5659158fe20dab63c758993faca8dd114ee0486666fbfe141a7"
+      },
+      {
+        "url": "https://pro-pages.tailark.com/_next/static/immutable/chunks/1-3-a4et-ok05.js",
+        "bytes": 27449,
+        "sha256": "f7fdcf1c1f17bbe190646115519b7847d7005861dae07ab0bb0b49243a7535e7"
+      },
+      {
+        "url": "https://pro-pages.tailark.com/_next/static/immutable/chunks/0y0pz4ca0fd0t.js",
+        "bytes": 26919,
+        "sha256": "dc16a5fea43871d540014919f01b741206f83214c460cee344bc5b07ca2be226"
+      },
+      {
+        "url": "https://pro-pages.tailark.com/_next/static/immutable/chunks/0oz4k9hb-gneb.js",
+        "bytes": 41952,
+        "sha256": "64abacb26f9170debbc366106368908219113467b8cc5dbd459c7b5d249c8c60"
+      },
+      {
+        "url": "https://pro-pages.tailark.com/_next/static/immutable/chunks/15ehmvf9d74fu.js",
+        "bytes": 38709,
+        "sha256": "11fd643a32cba775bfdc10125bf599192bc682e5d154453e6e3aebfbf1655585"
+      },
+      {
+        "url": "https://pro-pages.tailark.com/_next/static/immutable/chunks/3183vuvthw4gh.js",
+        "bytes": 15154,
+        "sha256": "703e71081fd22caae537f28c0dbec0afaa6523485cecc158b2894c9c904ba676"
+      },
+      {
+        "url": "https://pro-pages.tailark.com/_next/static/immutable/chunks/0v77d0omqjkv2.js",
+        "bytes": 42796,
+        "sha256": "1745d028755a8858f5ce5a83025c91436cd02a72ba282d82f1a0e17f9f6c68ea"
+      },
+      {
+        "url": "https://pro-pages.tailark.com/_next/static/immutable/chunks/32fdgl2a3w54g.js",
+        "bytes": 196892,
+        "sha256": "329b0c4ff6370822795334608975f9237a75fbf1135e82e792397868fa577ecc"
+      },
+      {
+        "url": "https://pro-pages.tailark.com/_next/static/immutable/chunks/2zirqiw89en6k.js",
+        "bytes": 397571,
+        "sha256": "01628ea4b9b19e77ec1d4205d395047fd2fd1c9916ea8f4ceddca9e1d82d5dc3"
+      },
+      {
+        "url": "https://pro-pages.tailark.com/_next/static/immutable/chunks/2_6g6lmw09sgn.js",
+        "bytes": 123370,
+        "sha256": "55da37cff2832469ddbd4a57fc5592826e1791f87494b85f42b0c65b1e743170"
+      },
+      {
+        "url": "https://pro-pages.tailark.com/_next/static/immutable/chunks/0c0hxoamwjsbw.js",
+        "bytes": 112594,
+        "sha256": "0973c1d64c88adc8e3c950410cb58b288f72118d5965b78049438deb8f2f9683"
+      },
+      {
+        "url": "https://pro-pages.tailark.com/_next/static/immutable/chunks/0dwj1xyoi0011.js",
+        "bytes": 5611,
+        "sha256": "b53dc63954e17bbc08034beb39fc926d689441d4ea9f72b73b80aea11748263b"
+      }
+    ]
+  },
+  "rea": {
+    "repository": "https://github.com/morluto/rea",
+    "package": "rea-agents",
+    "version": "6.8.0",
+    "node_version": "24.22.2",
+    "command": "analyze-javascript-application",
+    "evidence_id": "ev_65e0ac84a00b071ae77ebf09878d1da5bc99789902c71701bfe62ef2a766e444",
+    "artifact_sha256": "875179cbf25738a531098c5673b0d8b67746a046ae10a2eebe1d8f430f9702eb",
+    "source_selection": {
+      "requested_paths": [
+        "0oz4k9hb-gneb.js",
+        "1eiejiszd03jd.js",
+        "15ehmvf9d74fu.js"
+      ],
+      "unselected_files": 17
+    },
+    "statistics": {
+      "findings": 128,
+      "invalid_utf8_files": 0,
+      "modules": 0,
+      "nested_asar_containers": 0,
+      "parse_failures": 0,
+      "parsed_javascript_files": 3,
+      "relevant_files": 20,
+      "skipped_javascript_files": 0,
+      "text_bytes_read": 113344,
+      "visited_ast_nodes": 29622
+    },
+    "application_graph": {
+      "nodes": 154,
+      "edges": 168,
+      "coverage": {
+        "limits": [
+          {
+            "name": "javascript_semantic_alias_selections",
+            "unit": "items",
+            "value": 512
+          }
+        ],
+        "omitted_count": null,
+        "status": "partial",
+        "truncated": false
+      }
+    },
+    "semantic_graph": {
+      "nodes": 600,
+      "relations": 12,
+      "coverage_status": "partial",
+      "truncated": true
+    },
+    "limits": {
+      "max_semantic_nodes": 600,
+      "max_semantic_nodes_per_file": 200,
+      "max_semantic_unknowns": 600,
+      "max_semantic_unknowns_per_file": 200,
+      "analysis_timeout_ms": 30000
+    },
+    "limitations": [
+      "Three selected UI chunks parsed without syntax failures; sixteen other JavaScript assets and the HTML file were inventoried but not analyzed.",
+      "Semantic node and unknown retention ceilings were reached; semantic and whole-application coverage are partial.",
+      "Static relationships do not prove runtime behavior or complete component recovery.",
+      "The largest UI/demo chunk 32fdgl2a3w54g.js timed out at 300000ms, then 30000ms with a reduced semantic budget. Partial Evidence from these attempts remains in the local evidence directory."
+    ],
+    "retained_evidence": "/tmp/frame-tailark-evidence/rea-ui-evidence.json",
+    "retained_summary": "/tmp/frame-tailark-evidence/rea-ui-summary.json",
+    "retained_evidence_sha256": "66b23b0f4032ecadc8f84e86f1c6a1b6b1b8179b6e623bc6515ead26ce5eba76"
+  },
+  "supplementary_observations": {
+    "method": "Public HTML class inspection and literal-marker extraction with Python, separate from REA results",
+    "layout": {
+      "hero_container": "max-w-6xl",
+      "section_container": "max-w-5xl",
+      "horizontal_padding_px": [
+        24,
+        48
+      ],
+      "section_padding_px": [
+        64,
+        96
+      ],
+      "hero_heading_px": [
+        48,
+        60
+      ],
+      "section_heading_px": [
+        36,
+        48
+      ],
+      "section_count": 7
+    },
+    "component_markers": [
+      {
+        "asset": "0oz4k9hb-gneb.js",
+        "dataSlots": [
+          "context-menu",
+          "context-menu-content",
+          "context-menu-group",
+          "context-menu-item",
+          "context-menu-separator",
+          "context-menu-trigger"
+        ],
+        "radixVariables": [
+          "--radix-context-menu-content-available-height",
+          "--radix-context-menu-content-available-width",
+          "--radix-context-menu-content-transform-origin",
+          "--radix-context-menu-trigger-height",
+          "--radix-context-menu-trigger-width",
+          "--radix-popper-anchor-height",
+          "--radix-popper-anchor-width",
+          "--radix-popper-available-height",
+          "--radix-popper-available-width",
+          "--radix-popper-transform-origin"
+        ],
+        "tailwindGridClassCount": 7,
+        "classNameCount": 84
+      },
+      {
+        "asset": "1eiejiszd03jd.js",
+        "dataSlots": [
+          "navigation-menu",
+          "navigation-menu-content",
+          "navigation-menu-item",
+          "navigation-menu-link",
+          "navigation-menu-list",
+          "navigation-menu-trigger",
+          "navigation-menu-viewport",
+          "navigation-menu-viewport-parent"
+        ],
+        "radixVariables": [
+          "--radix-navigation-menu-indicator-translate-x",
+          "--radix-navigation-menu-indicator-translate-y",
+          "--radix-navigation-menu-viewport-height",
+          "--radix-navigation-menu-viewport-width"
+        ],
+        "tailwindGridClassCount": 0,
+        "classNameCount": 20
+      },
+      {
+        "asset": "15ehmvf9d74fu.js",
+        "dataSlots": [
+          "accordion",
+          "accordion-content",
+          "accordion-item",
+          "accordion-trigger"
+        ],
+        "radixVariables": [
+          "--radix-accordion-content-height",
+          "--radix-accordion-content-width",
+          "--radix-collapsible-content-height",
+          "--radix-collapsible-content-width"
+        ],
+        "tailwindGridClassCount": 0,
+        "classNameCount": 9
+      },
+      {
+        "asset": "32fdgl2a3w54g.js",
+        "dataSlots": [],
+        "radixVariables": [],
+        "tailwindGridClassCount": 13,
+        "classNameCount": 284
+      }
+    ],
+    "interpretation": "Radix variable names and data-slot conventions support a shadcn-style component fingerprint. This does not identify an exact dependency version."
+  },
+  "frame_sources": {
+    "colors": "frame/frame-app/assets/themes/theme.css",
+    "shadows": "frame/frame-app/docs/ui-shadows/scale.css",
+    "geometry": "frame/frame-app/docs/design-system/README.md",
+    "fonts": "frame/frame-app/assets/fonts/Inter-{Regular,Medium}.ttf"
+  },
+  "native_screenshots": {
+    "frame_commit": "5be3a7c4ad6fcd8bfb229f53908c368468f25aa5",
+    "method": "Native GPUI Window::render_to_image on unchanged FrameRoot with the actual alpine-lake.jpg imported through the application drop handler. Preview settled; Output, General and Images controls opened; no browser mockup, macOS screen overlay or cursor.",
+    "temporary_helper": "/tmp/frame-render-website-capture.rs",
+    "source_media": "static/media/alpine-lake.jpg",
+    "source_dimensions": [
+      1600,
+      1067
+    ],
+    "captures": [
+      {
+        "file": "static/media/frame-dark.png",
+        "width": 2400,
+        "height": 1600,
+        "bytes": 3661031,
+        "sha256": "da37cac47f7a71ebbffaaff83eee133ef4494b2473c249b692541cd93630885e",
+        "theme": "dark"
+      },
+      {
+        "file": "static/media/frame-light.png",
+        "width": 2400,
+        "height": 1600,
+        "bytes": 3533977,
+        "sha256": "92de9900a835d6346946a634be2bcff58705719d84d561e3c27b6ce362d21e2c",
+        "theme": "light"
+      }
+    ]
+  }
+}

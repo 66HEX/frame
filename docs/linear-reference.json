@@ -1,0 +1,576 @@
+{
+  "schema_version": 1,
+  "target": "https://linear.app/",
+  "generated_at_utc": "2026-11-10T19:43:23.946153+00:00",
+  "evidence_directory": "frame-linear-evidence",
+  "scope": "Public homepage layout and interaction reconstruction for a Frame landing-page adaptation; documentation is frozen and was not edited.",
+  "capture": {
+    "manifest": "capture-manifest.json",
+    "html_sha256": "e206ecb77a8ff4a50ad885b37e984b9e237f0d069c446a143619d5ba2abcb151",
+    "external_css_files": 46,
+    "inline_style_blocks": "captured in inline-styles.css",
+    "javascript_files_downloaded": 5,
+    "html_declared_javascript_urls": 260,
+    "css_rule_inventory_count": 3600,
+    "css_imports_found": 0,
+    "download_errors": []
+  },
+  "sections": [
+    {
+      "order": 1,
+      "role": "Fixed navigation",
+      "structure": "Brand at leading edge; primary links, account actions and responsive menu. Transparent initially, background/border strengthen when scrolled.",
+      "sources": [
+        "capture/CX5ehBfa.css",
+        "capture/CZy5xRP-.css"
+      ]
+    },
+    {
+      "order": 2,
+      "role": "Hero",
+      "structure": "Left-aligned large headline, short muted description and one understated announcement/action; substantial empty space above; large app presentation below.",
+      "sources": [
+        "capture/DeL57MwE.js",
+        "capture/BlGFcVAC.css",
+        "inline-styles.css"
+      ]
+    },
+    {
+      "order": 3,
+      "role": "Customer proof",
+      "structure": "Concise trust caption plus customer marks, followed by an oversized product-positioning statement.",
+      "sources": [
+        "capture/index.html",
+        "capture/DeL57MwE.js"
+      ]
+    },
+    {
+      "order": 4,
+      "role": "Three value illustrations",
+      "structure": "Three equal open columns divided by fine vertical lines on desktop; figure labels above, illustration occupying most height, short title and paragraph below. Horizontal cards on narrower screens.",
+      "sources": [
+        "capture/BlGFcVAC.css",
+        "capture/DeL57MwE.js"
+      ]
+    },
+    {
+      "order": 5,
+      "role": "Four product chapters",
+      "structure": "Intake/integrations; planning/monitoring; AI/automations; build/review/shipping. Each reuses the same two-column title/copy header, broad app illustration and compact feature links.",
+      "sources": [
+        "capture/vfNSRYu7.css",
+        "capture/DeL57MwE.js",
+        "capture/index.html"
+      ]
+    },
+    {
+      "order": 6,
+      "role": "Supporting proof and updates",
+      "structure": "Changelog plus customer quotes/proof area. Not an additional grid of generic feature cards. Some customer presentation is hidden below laptop breakpoint.",
+      "sources": [
+        "capture/index.html",
+        "capture/DeL57MwE.js"
+      ]
+    },
+    {
+      "order": 7,
+      "role": "Closing CTA",
+      "structure": "Centered short headline with a restrained action row and generous isolation.",
+      "sources": [
+        "capture/CDNJI-Em.css",
+        "capture/index.html"
+      ]
+    },
+    {
+      "order": 8,
+      "role": "Footer",
+      "structure": "Fine top separator and structured link columns, collapsing from six to four to two; status, legal and theme utilities.",
+      "sources": [
+        "capture/DEeMOhYy.css",
+        "capture/Du1RuT2M.css"
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "layout.container",
+      "observation": "Homepage max width is 1344px plus two outer gutters. Outer gutter 46px normally,10px at<=1280,28px at<=1024,16px at<=640. Inner inset32px normally and8px at<=1024. The combination yields the observed40px desktop headline edge after a-2px optical adjustment, and23px mobile edge after-1px.",
+      "evidence_type": "static CSS corroborated by root measurements",
+      "sources": [
+        "capture/N0NSUQdS.css",
+        "capture/CWXL7otR.css",
+        "capture/2AMbo6gs.css",
+        "root-browser-observations.json"
+      ]
+    },
+    {
+      "id": "layout.chapters",
+      "observation": "Chapter padding 128px vertically; title/copy grid 1fr 1fr;96px gap below header. At<=1024 header becomes one column with 64px below; description adds32px top margin. At<=640 chapter root reverses flex direction, illustration first; header has40px top/48px bottom and description margin 24px.",
+      "evidence_type": "static CSS corroborated by root measurements",
+      "sources": [
+        "capture/vfNSRYu7.css",
+        "root-browser-observations.json"
+      ]
+    },
+    {
+      "id": "layout.values",
+      "observation": "Value columns are 468px high normally,360px at<=1280, separated by translucent vertical lines. Narrow-screen carousel cards are 328x440px, radius 8px, padding 0 24px 28px. Illustrations get flexible remaining height; text stays near the bottom.",
+      "evidence_type": "static CSS plus inert JSX",
+      "sources": [
+        "capture/BlGFcVAC.css",
+        "capture/DeL57MwE.js"
+      ]
+    },
+    {
+      "id": "type.scale",
+      "observation": "Inter Variable; weight tokens 400/510/590/680. Display tracking -.022em. Desktop hero 64/64; product titles 48/48. Body regular 15/24 and large 17/27.2. Mobile headline 38/41.8 and chapter title 24/31.92 are root runtime measurements, not inferred solely from SSR classes.",
+      "evidence_type": "static token CSS and root measurements",
+      "sources": [
+        "capture/N0NSUQdS.css",
+        "inline-styles.css",
+        "root-browser-observations.json"
+      ]
+    },
+    {
+      "id": "color.hierarchy",
+      "observation": "Dark background #08090a, primary text #f7f8f8, secondary #d0d6e0, tertiary #8a8f98, quaternary #62666d; solid separator #23252a and translucent strong edge #ffffff14. Full-width sections usually share the same base background.",
+      "evidence_type": "static CSS",
+      "sources": [
+        "capture/N0NSUQdS.css"
+      ]
+    },
+    {
+      "id": "interaction.features",
+      "observation": "Feature-plus buttons call setActivePanelId with slugified labels; pointer-enter/focus preloads panel content. GlobalSidePanel reads activePanelId, keeps prior panel during transition and clears active state on close. Root confirmed a Tech Specs dialog and Escape behavior.",
+      "evidence_type": "inert compiled JSX inspection plus root interaction",
+      "sources": [
+        "capture/DeL57MwE.js",
+        "root-browser-observations.json"
+      ]
+    },
+    {
+      "id": "interaction.motion",
+      "observation": "Hero line reveal declares a 0.4s initial delay plus 0.033s per line. Feature link hover brightness transition 0.16s; active scale .97. IntersectionObserver gates near-viewport loading/video playback in homepage code. These are declared behaviors; only parent supplied runtime interactions were executed.",
+      "evidence_type": "inert JavaScript/CSS",
+      "sources": [
+        "capture/DeL57MwE.js",
+        "capture/BlGFcVAC.css"
+      ]
+    },
+    {
+      "id": "layout.closing",
+      "observation": "Closing CTA is centered, gap 40px, margin-block 224px desktop/128px at<=768/96px at<=640. Footer top/bottom content padding 56px, titles separated from links 24px or16px narrow; links min-height 28px and 2px list gap.",
+      "evidence_type": "static CSS",
+      "sources": [
+        "capture/CDNJI-Em.css",
+        "capture/DEeMOhYy.css"
+      ]
+    }
+  ],
+  "root_browser_observations": {
+    "provider": "Parent agent /root, direct CUA observation of Linear; supplied through collaboration messages. This subagent did not open a browser.",
+    "desktop_1280": {
+      "body_background": "#08090a",
+      "hero_h1": {
+        "font_size_px": 64,
+        "line_height_px": 64,
+        "weight": 510,
+        "letter_spacing_px": -1.408,
+        "x_px": 40,
+        "y_px": 272
+      },
+      "section_h2": {
+        "font_size_px": 48,
+        "line_height_px": 48,
+        "weight": 510
+      },
+      "intro_statement": {
+        "font_size_px": 40,
+        "line_height_px": 44
+      },
+      "header_height_px": 72
+    },
+    "mobile_375": {
+      "hero_h1": {
+        "font_size_px": 38,
+        "line_height_px": 41.8,
+        "weight": 510,
+        "x_px": 23,
+        "y_px": 196
+      },
+      "section_h2": {
+        "font_size_px": 24,
+        "line_height_px": 31.92
+      },
+      "header_height_px": 64,
+      "behaviors": [
+        "Hero app presentation remains oversized and horizontally clipped",
+        "Value cards scroll horizontally",
+        "Product chapter illustration precedes heading and description"
+      ]
+    },
+    "interaction": {
+      "action": "Click Customer Requests plus control",
+      "observed": "A Tech Specs dialog with blueprint/table content opens; Escape closes it"
+    },
+    "limitations": [
+      "Only1280px desktop and375px mobile were directly measured by root in this investigation.",
+      "The screenshot was captured by parent; this subagent did not operate CUA."
+    ],
+    "screenshot": "screenshots/linear-desktop-full.jpg"
+  },
+  "rea": {
+    "version": "6.8.0",
+    "homepage_evidence_id": "ev_7acd8c2b89ab530e17eb0646b01eaeb0cac9c09900431fd05b03b4a00824b527",
+    "homepage_summary_id": "ev_dd626a60cda4d400fccfc96a1640526f92b06f1010efc719dfae71d7f3cd94f6",
+    "homepage_evidence_file": "rea-homepage-evidence.json",
+    "homepage_summary_file": "rea-homepage-summary.json",
+    "selected_source": {
+      "kind": "javascript",
+      "requested_url": "https://static.linear.app/web/_next/static/chunks/DeL57MwE.js",
+      "final_url": "https://static.linear.app/web/_next/static/chunks/DeL57MwE.js",
+      "path": "capture/DeL57MwE.js",
+      "bytes": 182540,
+      "sha256": "a74a40a37a6169dcf66ce383afb977d0e3520aba4017cdeeed307020cba54f76",
+      "status": 200,
+      "content_type": "text/javascript",
+      "selection": "Declared modulepreload in HTML; mapped from Hero/Benefits/Pillar or ClientHeader RSC module IDs through directly loaded CkHShNvM.js"
+    },
+    "statistics": {
+      "relevant_files": 6,
+      "nested_asar_containers": 0,
+      "text_bytes_read": 182540,
+      "invalid_utf8_files": 0,
+      "parsed_javascript_files": 1,
+      "skipped_javascript_files": 0,
+      "visited_ast_nodes": 38232,
+      "findings": 209,
+      "modules": 0,
+      "parse_failures": 0
+    },
+    "coverage": {
+      "static_sources": {
+        "sources": 5,
+        "unmeasured_sources": 0,
+        "syntax": {
+          "complete": 1,
+          "recovered": 0,
+          "failed": 0,
+          "not-examined": 4
+        },
+        "semantics": {
+          "unknown_sources": 1,
+          "unexamined_sources": 4
+        },
+        "examination": {
+          "complete": 0,
+          "limited": 1,
+          "not-examined": 4
+        },
+        "electron_applicability": {
+          "observed": 0,
+          "unknown": 5
+        }
+      },
+      "application": {
+        "status": "partial",
+        "truncated": false,
+        "omitted_count": null,
+        "limits": []
+      },
+      "semantic": {
+        "status": "partial",
+        "truncated": true,
+        "omitted_unknown_occurrences": [
+          {
+            "family": "boundary",
+            "reason": "incomplete-module",
+            "occurrences": 4
+          },
+          {
+            "family": "call-flow",
+            "reason": "dynamic-call",
+            "occurrences": 1823
+          },
+          {
+            "family": "call-flow",
+            "reason": "incomplete-module",
+            "occurrences": 4
+          },
+          {
+            "family": "child-process",
+            "reason": "incomplete-module",
+            "occurrences": 4
+          },
+          {
+            "family": "closure",
+            "reason": "incomplete-module",
+            "occurrences": 4
+          },
+          {
+            "family": "configuration",
+            "reason": "incomplete-module",
+            "occurrences": 4
+          },
+          {
+            "family": "data-flow",
+            "reason": "incomplete-module",
+            "occurrences": 4
+          },
+          {
+            "family": "event",
+            "reason": "incomplete-module",
+            "occurrences": 4
+          },
+          {
+            "family": "object-flow",
+            "reason": "ambiguous-target",
+            "occurrences": 1837
+          },
+          {
+            "family": "object-flow",
+            "reason": "dynamic-property",
+            "occurrences": 48
+          },
+          {
+            "family": "object-flow",
+            "reason": "incomplete-module",
+            "occurrences": 4
+          },
+          {
+            "family": "promise-ownership",
+            "reason": "incomplete-module",
+            "occurrences": 4
+          },
+          {
+            "family": "request",
+            "reason": "incomplete-module",
+            "occurrences": 4
+          },
+          {
+            "family": "resource-lifecycle",
+            "reason": "incomplete-module",
+            "occurrences": 4
+          },
+          {
+            "family": "timer",
+            "reason": "ambiguous-target",
+            "occurrences": 3
+          },
+          {
+            "family": "timer",
+            "reason": "incomplete-module",
+            "occurrences": 4
+          }
+        ],
+        "omitted_nodes": null,
+        "omitted_relations": null,
+        "limits": [
+          {
+            "name": "max_semantic_nodes",
+            "value": 1200,
+            "unit": "items"
+          },
+          {
+            "name": "max_semantic_nodes_per_file",
+            "value": 1200,
+            "unit": "items"
+          },
+          {
+            "name": "max_semantic_unknowns",
+            "value": 1200,
+            "unit": "items"
+          },
+          {
+            "name": "max_semantic_unknowns_per_file",
+            "value": 1200,
+            "unit": "items"
+          },
+          {
+            "name": "semantic_graph_file_node_ceiling",
+            "value": 1200,
+            "unit": "items"
+          },
+          {
+            "name": "semantic_graph_file_unknown_ceiling",
+            "value": 1200,
+            "unit": "items"
+          },
+          {
+            "name": "semantic_graph_node_ceiling",
+            "value": 1200,
+            "unit": "items"
+          },
+          {
+            "name": "semantic_graph_unknown_ceiling",
+            "value": 1200,
+            "unit": "items"
+          }
+        ],
+        "families": [
+          {
+            "family": "boundary",
+            "status": "partial",
+            "retained_relations": 0,
+            "omitted_relations": null,
+            "unknown_count": 0
+          },
+          {
+            "family": "call-flow",
+            "status": "partial",
+            "retained_relations": 0,
+            "omitted_relations": null,
+            "unknown_count": 0
+          },
+          {
+            "family": "child-process",
+            "status": "partial",
+            "retained_relations": 0,
+            "omitted_relations": null,
+            "unknown_count": 0
+          },
+          {
+            "family": "closure",
+            "status": "partial",
+            "retained_relations": 1906,
+            "omitted_relations": null,
+            "unknown_count": 0
+          },
+          {
+            "family": "configuration",
+            "status": "partial",
+            "retained_relations": 0,
+            "omitted_relations": null,
+            "unknown_count": 0
+          },
+          {
+            "family": "data-flow",
+            "status": "partial",
+            "retained_relations": 0,
+            "omitted_relations": null,
+            "unknown_count": 871
+          },
+          {
+            "family": "event",
+            "status": "partial",
+            "retained_relations": 0,
+            "omitted_relations": null,
+            "unknown_count": 0
+          },
+          {
+            "family": "object-flow",
+            "status": "partial",
+            "retained_relations": 0,
+            "omitted_relations": null,
+            "unknown_count": 329
+          },
+          {
+            "family": "promise-ownership",
+            "status": "partial",
+            "retained_relations": 0,
+            "omitted_relations": null,
+            "unknown_count": 0
+          },
+          {
+            "family": "request",
+            "status": "partial",
+            "retained_relations": 0,
+            "omitted_relations": null,
+            "unknown_count": 0
+          },
+          {
+            "family": "resource-lifecycle",
+            "status": "partial",
+            "retained_relations": 0,
+            "omitted_relations": null,
+            "unknown_count": 0
+          },
+          {
+            "family": "timer",
+            "status": "partial",
+            "retained_relations": 0,
+            "omitted_relations": null,
+            "unknown_count": 0
+          }
+        ]
+      },
+      "application_unknowns": 5,
+      "semantic_unknowns": 1200
+    },
+    "limits": {
+      "max_semantic_nodes": 1200,
+      "max_semantic_unknowns": 1200,
+      "max_heap_mb": 512,
+      "analysis_timeout_ms": 45000
+    },
+    "bootstrap_evidence_id": "ev_b14a3257cc28b4adc3fd913dfac04f8154c7a3e655d921f2a59a71c39ad36736",
+    "bootstrap_evidence_file": "rea-ui-evidence.json",
+    "limitations": [
+      "Boundary extraction covers unshadowed JSON/global coercions plus parse and validation method candidates.",
+      "Caller-selected source analysis leaves 5 inventoried files outside analysis scope. Inventory identity covers the complete artifact; relationships through unselected sources remain unknown.",
+      "Child-process extraction covers asynchronous node:child_process creation, literal argv/env/stdio options, exit/error listeners, and kill signals.",
+      "CommonJS and ESM binding relationships were recovered from inert syntax and resolved only within the inventoried artifact container.",
+      "Configuration extraction covers process.env, process.argv, node:fs reads, and direct logical defaults.",
+      "Event extraction covers EventEmitter-style literal registrations, removals, and dispatch candidates; dynamic names remain unknown.",
+      "Function fingerprints are static candidates; equal digests can remain ambiguous and do not prove behavioral equivalence.",
+      "Graph coverage is incomplete; unavailable facts remain explicit and must not be read as absence.",
+      "JavaScript and HTML were parsed as inert text; bundle bootstrap code was never executed.",
+      "Local data flow does not claim control-flow-sensitive reaching definitions or arbitrary dynamic property resolution.",
+      "Promise ownership covers explicit unshadowed Promise construction, static factories, aggregation, chaining, and await syntax only.",
+      "Request extraction covers fetch, WebSocket, node:http/node:https construction, direct option fields, and exact local response consumers.",
+      "Resource extraction covers built-in filesystem/network acquisition and exact local close/destroy/end handles.",
+      "Semantic node retention reached max_semantic_nodes is 1200 (default 100000; an integer from 1 to 1000000) and max_semantic_nodes_per_file is 1200 (default 20000; an integer from 1 to 1000000). Set max_semantic_nodes and max_semantic_nodes_per_file on the next analyze_javascript_application call (CLI: --max-semantic-nodes and --max-semantic-nodes-per-file). The change applies to that next analysis and does not restart the worker or the REA server. Raising them does not raise max_semantic_unknowns, max_heap_mb, transfer ceilings, or the parent result budget. Coverage reports the same effective values as semantic_graph_node_ceiling and semantic_graph_file_node_ceiling.",
+      "Semantic unknown retention reached max_semantic_unknowns is 1200 (default 100000; an integer from 1 to 1000000) and max_semantic_unknowns_per_file is 1200 (default 20000; an integer from 1 to 1000000). Set max_semantic_unknowns and max_semantic_unknowns_per_file on the next analyze_javascript_application call (CLI: --max-semantic-unknowns and --max-semantic-unknowns-per-file). The change applies to that next analysis and does not restart the worker or the REA server. Raising them does not raise max_semantic_nodes, max_heap_mb, transfer ceilings, or the parent result budget. Coverage reports the same effective values as semantic_graph_unknown_ceiling and semantic_graph_file_unknown_ceiling. Omission coverage counts examined emission occurrences by family and reason, including repeats; it does not count unexamined source frontiers or distinct discarded identities.",
+      "Static imports, entrypoints, workers, endpoints, and storage relationships do not prove runtime execution.",
+      "Static paths and relationships may remain unresolved when expressions are dynamic or obfuscated.",
+      "The semantic graph contains static syntax observations and conservative relationship candidates; it does not claim runtime execution.",
+      "Timer extraction covers global or node:timers scheduling and exact local-handle cancellation.",
+      "Webpack/Rspack factories were recovered from AST literals; REA did not invoke push handlers or bundle bootstrap code."
+    ]
+  },
+  "adaptation_recommendations": [
+    "Keep Frame tokens, Inter font and native screenshots; adopt the section hierarchy and calm spacing rather than copying Linear branding or app mockups.",
+    "Build a left-aligned hero followed by one wide real Frame view; avoid stacks of decorative nested cards.",
+    "Use three restrained value illustrations for video/audio/images, then substantial product chapters for queue/presets, output controls and local processing.",
+    "On phones place chapter media before copy, preserve readable screenshot content through deliberate clipping, and keep horizontal value panels accessible.",
+    "Use actual documentation links for feature details instead of duplicating Linear Tech Specs modals.",
+    "Use genuine platform downloads and Frame project proof; do not invent customer logos, usage statistics or AI features.",
+    "Limit application changes strictly to the landing page."
+  ],
+  "completion": {
+    "homepage_section_structure": "answered",
+    "all_initial_external_css": "captured and indexed",
+    "responsive_rules": "static breakpoints640/768/1024/1280 plus root runtime at375/1280",
+    "homepage_ui_javascript": "bounded static analysis completed; syntax parsed; semantic retention partial",
+    "whole_application_behavior": "not claimed",
+    "repo_changes": "none"
+  },
+  "unknowns": [
+    "Unselected modulepreload and later dynamically loaded JavaScript relationships remain unanalyzed.",
+    "No source maps or original source repository were obtained.",
+    "Only two viewport widths were runtime-measured by parent.",
+    "No authenticated application behavior, analytics flow, signup or network mutation was inspected.",
+    "REA complete-within-view means the summary page is exhausted, not that application semantics are complete."
+  ],
+  "implementation": {
+    "route": "src/routes/+page.svelte",
+    "scope": "landing only",
+    "reference_markdown": "docs/linear-reference.md",
+    "capture_manifest": "docs/landing-capture-manifest.json",
+    "viewport_widths_verified": [
+      320,
+      375,
+      768,
+      1024,
+      1280
+    ],
+    "docs_shared_theme_and_shell_changed": false,
+    "intentional_differences": [
+      "Frame Graphite palette and native control treatment",
+      "Mobile chapters retain text-first reading order",
+      "Mobile value figures stack",
+      "Existing documentation links replace Tech Specs modals",
+      "Dark marketing scope does not mutate saved theme"
+    ]
+  }
+}
