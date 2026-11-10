@@ -5,6 +5,20 @@ use std::{
 
 use crate::{Animated, App, Entity, EntityId, Motion, Progress, Window, lerp::Lerp};
 
+#[cfg(any(test, feature = "test-support"))]
+pub(crate) struct TransitionTestClock(pub(crate) Instant);
+
+#[cfg(any(test, feature = "test-support"))]
+impl crate::Global for TransitionTestClock {}
+
+fn transition_now(_cx: &App) -> Instant {
+    #[cfg(any(test, feature = "test-support"))]
+    if let Some(clock) = _cx.try_global::<TransitionTestClock>() {
+        return clock.0;
+    }
+    Instant::now()
+}
+
 #[derive(Clone)]
 struct TransitionCache<T> {
     value: Option<T>,
@@ -107,8 +121,9 @@ impl<T: Lerp + Clone + PartialEq + 'static> Transition<T> {
 
     fn sample(&self, cx: &mut App) -> Ref<'_, TransitionCache<T>> {
         if self.cache.borrow().value.is_none() {
+            let now = transition_now(cx);
             let mut state = self.state.as_mut(cx);
-            let sample = state.sample(Instant::now());
+            let sample = state.sample(now);
 
             *self.cache.borrow_mut() = TransitionCache {
                 value: Some(sample.value),
@@ -160,7 +175,7 @@ impl<T: Lerp + Clone + PartialEq + 'static> Transition<T> {
             return self.cache.borrow().progress.get();
         }
 
-        self.state.read(cx).progress_at(Instant::now()).get()
+        self.state.read(cx).progress_at(transition_now(cx)).get()
     }
 
     /// Updates the goal value for the transition.
@@ -185,10 +200,11 @@ impl<T: Lerp + Clone + PartialEq + 'static> Transition<T> {
         self.state.update(cx, |state, cx| {
             let mut value = state.value().clone();
             update(&mut value, cx);
+            let now = transition_now(cx);
             was_updated = if self.continuous {
-                state.set(value, &self.motion, Instant::now())
+                state.set(value, &self.motion, now)
             } else {
-                state.restart(value, &self.motion, Instant::now())
+                state.restart(value, &self.motion, now)
             };
         });
 

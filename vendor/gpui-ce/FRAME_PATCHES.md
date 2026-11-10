@@ -100,6 +100,13 @@ Source: [WebKit FontCascadeCoreText.cpp](https://github.com/WebKit/WebKit/blob/m
 
 ## Integration changes
 
+Frame's test platform exposes window hover changes separately from activation,
+matching the native Linux/Windows cursor contract. Legacy transitions also have
+an opt-in clock per test app, so intermediate animation frames can be asserted
+without wall-clock sleeps. Production transitions still use `Instant::now`;
+tests without an override retain that behavior. Frame's motion tests verify
+clock advancement and isolation between two apps sharing an executor.
+
 Upstream renamed Cargo packages to `gpui-ce` / `gpui_ce_*`, moved Apple's renderer
 to `gpui_apple`, introduced shared shader generation in `gpui_render`, and replaced
 the text backend with Parley. Frame explicitly enables both X11 and Wayland,

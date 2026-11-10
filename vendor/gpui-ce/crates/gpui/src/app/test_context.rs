@@ -345,6 +345,12 @@ impl TestAppContext {
         self.test_platform.cursor_style()
     }
 
+    /// Freezes legacy transition time for this test app until the next call.
+    /// This does not advance executor timers or affect other test apps.
+    pub fn set_transition_time(&mut self, now: std::time::Instant) {
+        self.update(|cx| cx.set_global(crate::transition::TransitionTestClock(now)));
+    }
+
     /// Simulates writing to the platform clipboard
     pub fn write_to_clipboard(&self, item: ClipboardItem) {
         self.test_platform.write_to_clipboard(item)
@@ -952,6 +958,13 @@ impl VisualTestContext {
     pub fn simulate_event<E: InputEvent>(&mut self, event: E) {
         self.test_window(self.window)
             .simulate_input(event.to_platform_input());
+        self.background_executor.run_until_parked();
+    }
+
+    /// Simulates the platform reporting that the pointer entered or left this window.
+    pub fn simulate_window_hover(&mut self, hovered: bool) {
+        self.test_window(self.window)
+            .simulate_hover_status_change(hovered);
         self.background_executor.run_until_parked();
     }
 

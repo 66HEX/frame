@@ -33,6 +33,7 @@ pub(crate) struct TestWindowState {
     pub(crate) should_close_handler: Option<Box<dyn FnMut() -> bool>>,
     hit_test_window_control_callback: Option<Box<dyn FnMut() -> Option<WindowControlArea>>>,
     input_callback: Option<Box<dyn FnMut(PlatformInput) -> DispatchEventResult>>,
+    hovered: bool,
     active_status_change_callback: Option<Box<dyn FnMut(bool)>>,
     hover_status_change_callback: Option<Box<dyn FnMut(bool)>>,
     resize_callback: Option<Box<dyn FnMut(Size<Pixels>, f32)>>,
@@ -98,6 +99,7 @@ impl TestWindow {
             should_close_handler: None,
             hit_test_window_control_callback: None,
             input_callback: None,
+            hovered: false,
             active_status_change_callback: None,
             hover_status_change_callback: None,
             resize_callback: None,
@@ -175,6 +177,17 @@ impl TestWindow {
         drop(lock);
         callback(active);
         self.0.lock().active_status_change_callback = Some(callback);
+    }
+
+    pub(crate) fn simulate_hover_status_change(&self, hovered: bool) {
+        let mut lock = self.0.lock();
+        lock.hovered = hovered;
+        let Some(mut callback) = lock.hover_status_change_callback.take() else {
+            return;
+        };
+        drop(lock);
+        callback(hovered);
+        self.0.lock().hover_status_change_callback = Some(callback);
     }
 
     pub fn simulate_appearance_change(&self, appearance: WindowAppearance) {
@@ -322,7 +335,7 @@ impl PlatformWindow for TestWindow {
     }
 
     fn is_hovered(&self) -> bool {
-        false
+        self.0.lock().hovered
     }
 
     fn background_appearance(&self) -> WindowBackgroundAppearance {

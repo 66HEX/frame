@@ -253,6 +253,41 @@ mod tests {
     }
 
     #[test]
+    fn controlled_transition_time_advances_independently_in_each_test_app() {
+        let now = std::time::Instant::now();
+        let mut first_app = TestAppContext::single();
+        let mut second_app = first_app.new_app();
+        first_app.set_transition_time(now);
+        second_app.set_transition_time(now + Duration::from_mins(1));
+        let (first, first_cx) = first_app.add_window_view(|_, _| MotionProbe::default());
+        let (second, second_cx) = second_app.add_window_view(|_, _| MotionProbe::default());
+        for (probe, cx) in [(&first, &mut *first_cx), (&second, &mut *second_cx)] {
+            cx.update(|window, cx| window.draw(cx).clear(cx));
+            probe.update(cx, |probe, cx| {
+                probe.open = true;
+                cx.notify();
+            });
+            cx.update(|window, cx| window.draw(cx).clear(cx));
+            assert_eq!(probe.read_with(cx, |probe, _| probe.surface), 0.0);
+        }
+
+        first_cx.set_transition_time(now + SURFACE_MOTION_DURATION / 2);
+        first_cx.update(|window, cx| window.draw(cx).clear(cx));
+        assert!(
+            (first.read_with(first_cx, |probe, _| probe.surface) - 0.802_403_4).abs() < 0.00001
+        );
+        second_cx.update(|window, cx| window.draw(cx).clear(cx));
+        assert_eq!(second.read_with(second_cx, |probe, _| probe.surface), 0.0);
+
+        first_cx.set_transition_time(now + SURFACE_MOTION_DURATION);
+        first_cx.update(|window, cx| window.draw(cx).clear(cx));
+        assert_eq!(first.read_with(first_cx, |probe, _| probe.surface), 1.0);
+        second_cx.set_transition_time(now + Duration::from_mins(1) + SURFACE_MOTION_DURATION);
+        second_cx.update(|window, cx| window.draw(cx).clear(cx));
+        assert_eq!(second.read_with(second_cx, |probe, _| probe.surface), 1.0);
+    }
+
+    #[test]
     fn reduced_motion_settles_surfaces_and_icons_without_a_tail() {
         let mut app = TestAppContext::single();
         let (probe, cx) = app.add_window_view(|_, cx| {

@@ -698,10 +698,13 @@ fn flipped_select_and_color_picker_animate_toward_the_trigger_on_exit() {
         let trigger = cx.debug_bounds(case.trigger).unwrap();
         cx.simulate_resize(size(px(1800.0), trigger.bottom() + px(40.0)));
         draw(cx);
+        let mut now = std::time::Instant::now();
+        cx.set_transition_time(now);
         cx.update(|_, cx| cx.set_reduce_motion(false));
         click(cx, case.trigger);
         let entering = cx.debug_bounds(case.panel).unwrap();
-        std::thread::sleep(crate::app::motion::SURFACE_MOTION_DURATION);
+        now += crate::app::motion::SURFACE_MOTION_DURATION;
+        cx.set_transition_time(now);
         draw(cx);
         let settled = cx.debug_bounds(case.panel).unwrap();
         let trigger = cx.debug_bounds(case.trigger).unwrap();
@@ -712,7 +715,8 @@ fn flipped_select_and_color_picker_animate_toward_the_trigger_on_exit() {
             case.trigger
         );
         press(cx, "escape");
-        std::thread::sleep(crate::app::motion::SURFACE_MOTION_DURATION / 2);
+        now += crate::app::motion::SURFACE_MOTION_DURATION / 2;
+        cx.set_transition_time(now);
         draw(cx);
         let exiting = cx.debug_bounds(case.panel).unwrap();
         assert!(
@@ -720,7 +724,8 @@ fn flipped_select_and_color_picker_animate_toward_the_trigger_on_exit() {
             "{} must exit downward",
             case.trigger
         );
-        std::thread::sleep(crate::app::motion::SURFACE_MOTION_DURATION);
+        now += crate::app::motion::SURFACE_MOTION_DURATION;
+        cx.set_transition_time(now);
         draw(cx);
         assert!(cx.debug_bounds(case.panel).is_none());
     }

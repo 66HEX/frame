@@ -50,6 +50,7 @@ fn test_window(
         root
     });
     cx.update(|window, _| window.activate());
+    cx.simulate_window_hover(true);
     cx.simulate_resize(size(px(2200.0), px(1800.0)));
     draw(cx);
     (root, cx)
