@@ -1,3 +1,12 @@
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
+
+# Prerendered endpoints have no extension, so Workers Assets needs an explicit MIME type.
+/og
+  Content-Type: image/png
+  Cache-Control: public, max-age=3600
+
+/docs/og/*
+  Content-Type: image/png
+  Cache-Control: public, max-age=3600
