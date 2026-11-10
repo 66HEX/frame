@@ -89,7 +89,7 @@ pub fn build_ffmpeg_preview_args(
     config: &ConversionConfig,
     options: &PreviewFfmpegOptions,
 ) -> Result<PreviewFfmpegPlan, ConversionError> {
-    build_preview_args_with_frame_policy(input, config, options, PreviewFramePolicy::Stream, false)
+    build_preview_args_with_frame_policy(input, config, options, PreviewFramePolicy::Stream)
 }
 
 /// Builds a snapshot preview plan without the terminal playback FPS filter.
@@ -107,58 +107,14 @@ pub fn build_ffmpeg_snapshot_preview_args(
     config: &ConversionConfig,
     options: &PreviewFfmpegOptions,
 ) -> Result<PreviewFfmpegPlan, ConversionError> {
-    build_preview_args_with_frame_policy(
-        input,
-        config,
-        options,
-        PreviewFramePolicy::Snapshot,
-        false,
-    )
+    build_preview_args_with_frame_policy(input, config, options, PreviewFramePolicy::Snapshot)
 }
 
-/// Builds the packet-bound preview protocol for a verified runtime and a
-/// decoder-native SAR source (currently MPEG-TS in the application).
-///
-/// The caller must establish runtime support before launching this plan.
-/// Source/Copy preview alone uses this policy; encoded preview retains the
-/// export's container/SAR semantics. Only streaming applies preview FPS pacing.
-///
-/// # Errors
-/// Returns an error for non-Copy configs or invalid preview options.
-pub fn build_ffmpeg_framed_source_preview_args(
-    input: &str,
-    config: &ConversionConfig,
-    options: &PreviewFfmpegOptions,
-    snapshot: bool,
-) -> Result<PreviewFfmpegPlan, ConversionError> {
-    if config.processing_mode != "copy" {
-        return Err(ConversionError::InvalidInput(
-            "Native frame presentation requires Source/Copy preview".into(),
-        ));
-    }
-    build_preview_args_with_frame_policy(
-        input,
-        config,
-        options,
-        if snapshot {
-            PreviewFramePolicy::Snapshot
-        } else {
-            PreviewFramePolicy::Stream
-        },
-        true,
-    )
-}
-
-#[expect(
-    clippy::too_many_lines,
-    reason = "Keep preview validation, filter planning and FFmpeg argument assembly in one auditable sequence."
-)]
 fn build_preview_args_with_frame_policy(
     input: &str,
     config: &ConversionConfig,
     options: &PreviewFfmpegOptions,
     frame_policy: PreviewFramePolicy,
-    framed: bool,
 ) -> Result<PreviewFfmpegPlan, ConversionError> {
     validate_preview_options(input, options)?;
 
@@ -189,32 +145,23 @@ fn build_preview_args_with_frame_policy(
             seek.microseconds,
         )?;
     }
-    let graph = if framed {
-        crate::filters::build_framed_source_preview_graph(
-            geometry.preview_width,
-            geometry.preview_height,
+    let graph = build_visual_filter_complex_with_preview_policy(
+        config,
+        VisualFilterProfile::PreviewLowRes {
+            base,
+            width: geometry.preview_width,
+            height: geometry.preview_height,
             fps,
-            frame_policy,
-        )
-    } else {
-        build_visual_filter_complex_with_preview_policy(
-            config,
-            VisualFilterProfile::PreviewLowRes {
-                base,
-                width: geometry.preview_width,
-                height: geometry.preview_height,
-                fps,
-                source_time_seconds: options.start_seconds,
-            },
-            VisualFilterContext {
-                source_is_palette: options.source_is_palette,
-                source_clock: options.source_clock,
-                preview_burn_clock,
-                ..VisualFilterContext::new(options.source_width, options.source_height)
-            },
-            frame_policy,
-        )
-    };
+            source_time_seconds: options.start_seconds,
+        },
+        VisualFilterContext {
+            source_is_palette: options.source_is_palette,
+            source_clock: options.source_clock,
+            preview_burn_clock,
+            ..VisualFilterContext::new(options.source_width, options.source_height)
+        },
+        frame_policy,
+    );
 
     let mut args = vec![
         "-hide_banner".to_string(),
@@ -233,9 +180,6 @@ fn build_preview_args_with_frame_policy(
     if options.realtime {
         args.push("-readrate".to_string());
         args.push("1".to_string());
-    }
-    if framed {
-        args.push("-native_frame_sar:v:0".into());
     }
     args.push("-i".to_string());
     args.push(input.to_string());
@@ -264,13 +208,6 @@ fn build_preview_args_with_frame_policy(
         "-pix_fmt".to_string(),
         "bgra".to_string(),
     ]);
-    if framed {
-        args.extend([
-            "-c:v".into(),
-            "rawvideo".into(),
-            "-frame_preview_framed".into(),
-        ]);
-    }
     args.extend(["-f".into(), "rawvideo".into(), "pipe:1".into()]);
 
     Ok(PreviewFfmpegPlan {

@@ -6,7 +6,7 @@ use crate::preview_engine::ffmpeg_backend::clock::{
     update_last_frame_seconds, wait_for_frame_presentation_time,
 };
 use crate::preview_engine::ffmpeg_backend::decode::{
-    FrameStreamSpec, RenderImageIdentity, rendered_preview_frame_from_payload,
+    FrameStreamSpec, RenderImageIdentity, read_stream_frame, rendered_preview_frame_from_payload,
 };
 use crate::preview_engine::ffmpeg_backend::plan::preview_plan;
 use crate::preview_engine::ffmpeg_backend::process::{
@@ -18,7 +18,7 @@ use crate::preview_engine::metrics::PreviewRuntimeMetricsStore;
 use crate::preview_engine::types::{PreviewDimensions, PreviewSessionConfig};
 use gpui::ImageId;
 use std::io::Read;
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, ChildStdout, Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
@@ -27,7 +27,7 @@ use std::time::{Duration, Instant};
 
 pub(super) struct SpawnedVideoStream {
     pub(super) child: Child,
-    pub(super) stdout: Box<dyn Read + Send>,
+    pub(super) stdout: ChildStdout,
     pub(super) stderr_worker: JoinHandle<()>,
     pub(super) stop_requested: Arc<AtomicBool>,
     pub(super) spec: FrameStreamSpec,
@@ -42,7 +42,6 @@ pub(super) struct VideoStdoutWorkerConfig {
     pub(super) render_image_id: ImageId,
     pub(super) render_image_version: Arc<AtomicU64>,
     pub(super) spec: FrameStreamSpec,
-    pub(super) framed_owner: Option<super::framed_stream::FramedStreamOwner>,
 }
 
 impl RunningPreviewProcess {
@@ -85,11 +84,11 @@ impl RunningPreviewProcess {
 
         let mut stream = self.spawn_video_stream(config, seconds, precise, generation)?;
 
-        let first_frame = match super::framed_stream::read_first_frame(
-            &mut stream,
+        let first_frame = match read_stream_frame(
+            &mut stream.stdout,
+            &stream.spec,
             seconds,
             self.next_render_image_identity(),
-            &self.cancelled,
         ) {
             Ok(frame) => frame,
             Err(error) => {
@@ -139,7 +138,6 @@ impl RunningPreviewProcess {
                 render_image_id: self.render_image_id,
                 render_image_version: Arc::clone(&self.render_image_version),
                 spec: stdout_spec,
-                framed_owner: stdout_spec.framed.then(|| self.framed_stream_owner()),
             },
         ) {
             Ok(worker) => worker,
@@ -158,7 +156,6 @@ impl RunningPreviewProcess {
 
         let mut state = lock_process(&self.process);
         *state = RunningProcessState {
-            framed_video: stdout_spec.framed,
             child: Some(stream.child),
             stdout_worker: Some(stdout_worker),
             stderr_worker: Some(stream.stderr_worker),
@@ -183,15 +180,6 @@ impl RunningPreviewProcess {
 
         self.start_playback_generation(generation, seconds);
         Ok(dimensions)
-    }
-
-    fn framed_stream_owner(&self) -> super::framed_stream::FramedStreamOwner {
-        super::framed_stream::FramedStreamOwner {
-            process: Arc::clone(&self.process),
-            audio: Arc::clone(&self.audio_process),
-            pending_audio: Arc::clone(&self.pending_audio_start),
-            stderr: Arc::clone(&self.stderr),
-        }
     }
 
     pub(super) fn prepare_video_start_generation(
@@ -220,26 +208,11 @@ impl RunningPreviewProcess {
         precise: bool,
         generation: u64,
     ) -> Result<SpawnedVideoStream, PreviewEngineError> {
-        let verified = super::framed::prepare(&self.executable, config, &self.cancelled)
+        let plan = preview_plan(config, seconds, true, precise)
             .map_err(|error| self.fail_video_start(generation, error, None))?;
-        let plan = if verified.is_some() {
-            super::plan::framed_preview_plan(config, seconds, precise, false)
-        } else {
-            preview_plan(config, seconds, true, precise)
-        }
-        .map_err(|error| self.fail_video_start(generation, error, None))?;
-        if let Some(verified) = &verified {
-            verified
-                .recheck(&self.cancelled)
-                .map_err(|error| self.fail_video_start(generation, error, None))?;
-        }
         let spawned_at = Instant::now();
-        let program = verified.as_ref().map_or_else(
-            || std::path::Path::new(&self.executable),
-            super::framed::VerifiedTransport::program,
-        );
         let mut child = crate::process_launch::spawn(
-            Command::new(program)
+            Command::new(&self.executable)
                 .args(&plan.args)
                 .stdin(Stdio::null())
                 .stdout(Stdio::piped())
@@ -295,11 +268,10 @@ impl RunningPreviewProcess {
 
         Ok(SpawnedVideoStream {
             child,
-            stdout: Box::new(stdout),
+            stdout,
             stderr_worker,
             stop_requested,
             spec: FrameStreamSpec {
-                framed: verified.is_some(),
                 presentation: crate::preview_engine::PreviewRenderPresentation {
                     pixel_aspect_ratio: plan.pixel_aspect_ratio,
                     output_raster_aspect_ratio: plan.output_raster_aspect_ratio,
@@ -333,13 +305,7 @@ impl SpawnedVideoStream {
 }
 
 impl VideoStdoutWorkerConfig {
-    fn publish_payload(
-        &self,
-        payload: Vec<u8>,
-        presentation: crate::preview_engine::PreviewRenderPresentation,
-        timestamp_seconds: f64,
-        read_elapsed: Duration,
-    ) {
+    fn publish_payload(&self, payload: Vec<u8>, timestamp_seconds: f64, read_elapsed: Duration) {
         let spec = self.spec;
         self.metrics
             .record_video_frame_read(spec.generation, spec.frame_bytes, read_elapsed);
@@ -372,21 +338,9 @@ impl VideoStdoutWorkerConfig {
             let _ = self.frame_store.publish(
                 frame
                     .frame
-                    .with_presentation(presentation, spec.request_token),
+                    .with_presentation(spec.presentation, spec.request_token),
             );
             self.metrics.record_video_frame_published(spec.generation);
-        }
-    }
-
-    fn finish_framed(&self, error: Option<String>) {
-        if let Some(owner) = &self.framed_owner {
-            owner.finish(
-                self.spec.generation,
-                &self.playback,
-                &self.playback_changed,
-                &self.stop_requested,
-                error,
-            );
         }
     }
 }
@@ -417,29 +371,14 @@ pub(super) fn spawn_stdout_worker(
                     PlaybackStreamState::Waiting => continue,
                 }
                 let read_started = Instant::now();
-                match super::framed::read_payload(&mut stdout, &spec, frame_index) {
-                    Ok(Some((payload, presentation))) => {
-                        config.publish_payload(
-                            payload,
-                            presentation,
-                            timestamp_seconds,
-                            read_started.elapsed(),
-                        );
-                        frame_index = frame_index.saturating_add(1);
-                    }
-                    Ok(None) => {
-                        config.finish_framed(None);
-                        break;
-                    }
-                    Err(error) => {
-                        if spec.framed {
-                            config.finish_framed(Some(error.to_string()));
-                        }
-                        break;
-                    }
+                let mut payload = vec![0; spec.frame_bytes];
+                if stdout.read_exact(&mut payload).is_err() {
+                    break;
                 }
+                config.publish_payload(payload, timestamp_seconds, read_started.elapsed());
+                frame_index = frame_index.saturating_add(1);
             }
-            if !spec.framed && !config.stop_requested.load(Ordering::SeqCst) {
+            if !config.stop_requested.load(Ordering::SeqCst) {
                 mark_playback_ended(&config.playback, &config.playback_changed, spec.generation);
             }
         })
