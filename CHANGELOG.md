@@ -9,35 +9,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Native Snapshot Capture:** Adds deterministic GPUI PNG capture for named fixtures, with fixed pointer position, settled motion and synchronous rendering.
-- **Crop Controls:** Adds an animated aspect ratio select with 4:3, 5:4, portrait variants, and custom ratio or pixel fields in the toolbar. Valid custom values update the preview immediately. Resolution follows the crop while editing and is saved as Custom on Apply; canceling preserves previous export settings. The Output tab shows estimated dimensions after crop, rotation, and scaling. Resolves [#167](https://github.com/66HEX/frame/issues/167).
-- **AV1 Encoding Settings:** Exposes SVT-AV1 presets 0–13 directly and clarifies the 10-bit pixel format choice, while preserving existing preset selections. Resolves [#200](https://github.com/66HEX/frame/issues/200).
-- **Preview Control Tooltips:** Adds tooltips to preview tools, zoom, and playback controls on pointer hover and keyboard focus. Escape dismisses the tooltip. Resolves [#176](https://github.com/66HEX/frame/issues/176).
+- **Auto Crop:** Detects black bars using up to five samples across the selected video range. The proposed crop can be adjusted in the preview before applying it. Resolves [#210](https://github.com/66HEX/frame/issues/210).
+- **Crop Controls:** Adds more aspect-ratio presets and custom ratio or pixel dimensions, with live preview and calculated output dimensions. Applying a crop updates the output resolution; canceling preserves the previous settings. Resolves [#167](https://github.com/66HEX/frame/issues/167).
+- **Opus Audio Files:** Adds `.opus` import and export, with variable or constant bitrate.
+- **Apply to All:** Applies the current output settings to compatible pending files without saving a preset, while retaining each file's own track selections and subtitle files where supported.
+- **AV1 Presets:** Exposes SVT-AV1 presets 0–13 directly and clarifies the existing 10-bit output option. Resolves [#200](https://github.com/66HEX/frame/issues/200).
+- **TS File Import:** Recognizes `.ts` files in the file chooser and folder imports, alongside the existing M2T, MTS and M2TS support.
+- **Keyboard Controls:** Adds file-queue navigation with arrow keys and Home/End, Space to toggle conversion selection, and type-to-search in select menus. Preview tooltips appear on hover and keyboard focus and can be dismissed with Escape. Resolves [#176](https://github.com/66HEX/frame/issues/176).
+- **Reduced Motion:** Follows system reduced-motion preferences on macOS, Windows and Linux desktops exposing the portal setting, including changes made while Frame is running. UI transitions and preview zoom/pan respect the preference; media playback is unchanged.
 
 ### Changed
 
-- **Test Organization:** Groups domain and UI regression suites by responsibility, with shared test helpers and adjacent persistence/session tests. Assertions, coverage and serialized formats are preserved.
-- **Application Structure:** Organizes native UI code by feature and settings/FFmpeg internals by responsibility, with explicit imports and stable public entry points. Separates root rendering, focus registration and overlay composition while preserving their order and behavior.
-- **UI Icons:** Replaces Hugeicons with bundled Nucleo UI outline icons that inherit theme colors, with rendering checks at supported sizes.
-- **Theme Colors:** Uses shadcn Mira Neutral tokens from editable CSS.
-- **GPUI Framework:** Updates the vendored GPUI-CE snapshot to `bc57747`, adapting Frame to the new text and rendering APIs while preserving GPU preview transforms, reusable video textures, keyboard focus and accessibility, toolbar drag handling, and rounded Linux window frames.
+- **Interface:** Refreshes both themes with Inter typography, Nucleo icons and consistent controls. The inspector now has Metadata, Output and Presets tabs, with collapsible sections for output settings.
+- **Empty and Drop Screens:** Centers the no-files screen around Open file and Open folder, and simplifies drag feedback to a full-window drop target.
+- **Preview Controls:** Moves playback and trimming into controls over the preview, simplifies crop and overlay toolbars, and improves resize-handle contrast. Sliders, scrollbars and editing handles have larger pointer targets.
 
 ### Fixed
 
-- **Keyboard Navigation:** Restores inspector group tab stops, reveals focused controls in long panels, and gives scroll areas visible focus. Removes crop/overlay toolbar traps, restores focus after dialogs and queue action changes, and supports keyboard file selection, release-note scrolling, and long log tab strips.
-- **Preview Responsiveness:** Separates playback snapshots from FFmpeg rebuild locks and stops old sessions in the background. Preset changes retain the last frame, skip intermediate rebuild requests, and reject stale results after a source change.
-- **Reduced Motion:** Follows the system motion preference on macOS, Windows, and Linux desktops exposing the portal setting, including changes made while Frame is running. UI transitions and preview zoom/pan settle immediately when motion is reduced; media playback remains unchanged.
-- **Tab Navigation:** Moves keyboard focus with the selected settings or main-view tab, keeps one Tab stop per tab rail, and restores focus to the fallback tab when the focused section becomes unavailable.
-- **Pointer Targets:** Enlarges slider, scrollbar, crop, overlay, and trim hit areas while retaining their visible sizes. Scrollbars have reserved space beside list content, and neighboring resize handles stay separate on small selections.
-- **UI Motion and Selects:** Shares a 120 ms enter/exit transition across dropdowns, color pickers, settings and dialogs, while keeping hover feedback at 75 ms. Selects retain keyboard focus after pointer activation, closing lists reject stale input, and reselecting the current subtitle font or size still closes the menu. Existing selections no longer animate on initial render.
-- **Development UI Performance:** Optimizes GPUI layout and text dependencies in development builds to reduce UI stalls with video loaded, including while paused. Frame's application code retains its debug settings.
-- **Toolbar Window Dragging:** Prevents toolbar buttons and tabs from dragging the window on macOS and Linux. Empty titlebar space stays draggable, and macOS retains its configured double-click action. Resolves [#175](https://github.com/66HEX/frame/issues/175).
-- **HEVC Quick Look Compatibility:** Fixes macOS Quick Look previews for HEVC videos encoded to MP4 or MOV with libx265, VideoToolbox, or NVENC by writing the `hvc1` tag. Resolves [#211](https://github.com/66HEX/frame/issues/211).
+- **Keyboard Focus and Menus:** Keeps focus with the selected tab, reveals focused controls in long panels, and restores focus after dialogs and queue changes. Dropdowns and color pickers stay within the window and retain keyboard access after pointer interaction. Source information and update release notes can be scrolled with the keyboard.
+- **Toolbar Window Dragging:** Prevents toolbar buttons and tabs from dragging the window on macOS and Linux. Empty titlebar space remains draggable, and macOS retains its configured double-click action. Resolves [#175](https://github.com/66HEX/frame/issues/175).
+- **Preview Responsiveness:** Keeps playback and scrubbing responsive while settings change and prevents outdated seek or source-change results from replacing the current preview. Paused previews no longer keep polling for frames.
+- **Wayland Integration:** Improves clipboard handling and displays the application icon on compositors supporting window icons.
+- **Output Geometry:** Makes crop, rotation and custom dimensions agree between preview and export, including odd-sized and very small sources. Crop positioning now matches combined flips and rotation, and Source/Copy preview ignores inactive encoding transforms.
+- **Anamorphic Preview:** Uses the source's sample aspect ratio to display the correct proportions and align crop and overlay controls with the image.
+- **Short Trim Ranges:** Preserves subsecond selections and keeps dragged trim handles within the source duration.
+- **Format Compatibility:** Rejects unsupported codec/container combinations and incompatible selected tracks before conversion. Corrects affected stream-copy outputs, including MOV codec tags and raw RGB video in Matroska.
+- **Audio Settings:** Enforces single-track output where required and checks channel layouts and bitrates for each selected track. Corrects low-sample-rate MP3 handling in MP4, prevents Stereo width from silently downmixing surround audio, and restores FDK AAC selection when available.
+- **Subtitle Timing and Conversion:** Keeps imported and burned-in subtitles aligned with trimmed media, clips imported cues to the exported range, and converts embedded text subtitles when the destination requires it. Subtitle filenames containing apostrophes or filter separators are handled correctly.
+- **Track Metadata:** Keeps subtitle language and title tags removed in Clean and Replace modes. Preserve mode retains genuine audio track titles in MP4/MOV, and source information recognizes those containers' track-name tags.
+- **Color Precision:** Preserves high bit depth during brightness, contrast, gamma and saturation adjustments. Neutral settings leave the source pixels unchanged.
+- **Image Output:** Preserves overlay precision when explicit 16-bit RGB/RGBA PNG or TIFF output is selected. TIFF exports use compatible pixel formats and compression while retaining transparency.
+- **Audio Preview:** Plays queued audio through its final samples instead of stopping at decoder EOF, including clips shorter than the playback prebuffer. Full queues no longer discard older samples.
+- **Audio Stream Copy:** Repairs verified ALAC tail truncation when copying to MOV, MP4 or M4A, and corrects affected G.723.1 MOV and DFPWM Matroska exports.
+- **Short GIFs and Snapshots:** Exports nonempty, very short GIF selections reliably and avoids dropping paused preview snapshots near the end of a clip.
+- **Encoder Controls:** Uses native VP9 speed values 0–5 and hides unsupported quality/speed controls for ProRes. Quality labels no longer describe CRF 0 as lossless for x265 or SVT-AV1.
+- **Hardware Encoders:** Checks whether an encoder can actually start, with failure reasons and a Check again action. VideoToolbox distinguishes hardware-only encoding from software fallback. Corrects NVENC adaptive-quantization options and hardware-decoding transfers needed by software filters.
+- **HEVC Quick Look Compatibility:** Writes the `hvc1` tag for HEVC videos encoded to MP4 or MOV with libx265, VideoToolbox or NVENC, fixing macOS Quick Look previews. Resolves [#211](https://github.com/66HEX/frame/issues/211).
+- **Discord Preset:** Uses the broadly compatible `yuv420p` pixel format.
+- **Mode Changes:** Suspends unsupported overlays when changing output modes while retaining their settings, and keeps incompatible subtitle selections available for explicit correction instead of silently removing them.
 
 ### Security
 
-- **Async Executor:** Updates `async-executor` to 1.14.1 to fix a use-after-free when a task wakes during executor shutdown, replacing the withdrawn 1.14.0 release.
-- **Dependency Updates:** Updates TLS certificate validation, root certificates, QUIC, Tokio, ZIP tooling, and the pinned Nix installer to address newly reported advisories.
+- **Executor Shutdown:** Updates `async-executor` to fix a use-after-free during task shutdown. [Upstream fix](https://github.com/smol-rs/async-executor/releases/tag/v1.14.1).
+- **TLS and I/O Dependencies:** Updates shipped dependencies with upstream TLS and asynchronous I/O safety fixes. [TLS advisory](https://rustsec.org/advisories/RUSTSEC-2026-0349.html), [I/O advisory](https://rustsec.org/advisories/RUSTSEC-2026-0386.html).
 
 ## [0.33.1] - 2026-08-27
 
