@@ -52,5 +52,5 @@
       "patchedSHA256": "de4ad08dff82e38efa88a5fc554cb89589930dbcf8031076171e6257f1927d24"
     }
   ],
-  "scope": "isolated feasibility build; no app integration or release-equivalent codec coverage"
+  "scope": "Pinned preview source patch and minimal protocol-test build; no release-equivalent codec coverage or automatic runtime installation"
 }

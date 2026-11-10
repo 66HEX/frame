@@ -25,6 +25,10 @@ external dependency, and does not promise bit-for-bit binary reproducibility.
 Full release builds need their own dependency locks and native platform tests.
 The existing downloaded release runtimes do not contain this patch.
 
+The [complete macOS ARM64 recipe](full-macos-arm64/README.md) builds the
+external dependencies in a private directory and targets macOS 12. Its source
+lock and verification requirements are separate from the minimal profile.
+
 ## Wire format
 
 `-frame_preview_framed` requires a single rawvideo BGRA output stream. Add
