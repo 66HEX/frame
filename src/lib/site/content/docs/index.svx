@@ -1,0 +1,60 @@
+---
+title: Frame documentation
+description: Convert video, audio, and images with a native interface for FFmpeg.
+order: 0
+sidebar:
+  label: Overview
+group:
+  label: Getting started
+view:
+  label: Documentation
+  icon: BookOpenIcon
+  order: 0
+---
+
+<script>
+  import DocsScreenshot from '$lib/features/docs/DocsScreenshot.svelte';
+</script>
+
+Frame is a native media converter for macOS, Windows, and Linux. Add your source files, choose an output format, adjust the settings you need, and run the queue. Media processing happens on your computer with FFmpeg.
+
+<DocsScreenshot
+  scene="workspace"
+  alt="Frame workspace with the file queue on the left, media preview in the center, and output inspector on the right."
+  caption="The queue, preview, and output settings share one workspace."
+/>
+
+## Start here
+
+If this is your first time using Frame, [install the app](/docs/installation) and follow [your first conversion](/docs/getting-started). The **Balanced MP4** preset is a useful starting point for everyday video.
+
+| I want to… | Read |
+| --- | --- |
+| Convert several files with the same settings | [Batch conversion](/docs/batch-conversion) |
+| Save a setup for later | [Presets](/docs/presets) |
+| Trim a clip or check a crop | [Preview and trim](/docs/preview) |
+| Choose a codec, quality, or resolution | [Video](/docs/video) |
+| Export audio or select tracks | [Audio](/docs/audio) |
+| Convert a still image or make a GIF | [Images and GIFs](/docs/images) |
+| Add subtitles to a video | [Subtitles](/docs/subtitles) |
+| Inspect or change file information | [Metadata](/docs/metadata) |
+
+## Find your way around
+
+The queue holds your source files. Select a row to inspect that file and change its conversion settings. The preview shows the selected source, while the inspector has three tabs:
+
+- **Metadata** shows information read from the source.
+- **Output** controls the container, encoding, filters, tracks, and output metadata.
+- **Presets** applies a saved configuration or saves your current settings.
+
+App **Settings** contains the default output folder, maximum concurrency, appearance, and update controls. Output settings belong to the selected file; they do not automatically change every item in the queue.
+
+## Formats and compatibility
+
+Frame supports common video, audio, and image formats. The output container determines which codecs and tracks are available. Hardware encoders also depend on your operating system and the encoders available in your FFmpeg build.
+
+A file extension does not describe everything inside a media file. For example, two MP4 files can use different video codecs, audio codecs, and pixel formats. Check the Metadata tab when a source behaves differently than expected.
+
+## Get help
+
+Use the documentation search to find a setting by name. If a conversion fails, start with [troubleshooting](/docs/troubleshooting), then report a reproducible problem on [GitHub](https://github.com/66HEX/frame/issues).

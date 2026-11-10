@@ -1,23 +1,22 @@
+# dependencies
 node_modules
+.pnpm-store
+package-lock.json
+yarn.lock
 
-# Output
-.output
-.vercel
-.netlify
+# build artifacts
+dist
+build
+.svelte-kit
+.turbo
 .wrangler
-/.svelte-kit
-/build
+*.tsbuildinfo
 
-# OS
-.DS_Store
-Thumbs.db
-
-# Env
+# environments
 .env
 .env.*
-!.env.example
-!.env.test
 
-# Vite
-vite.config.js.timestamp-*
-vite.config.ts.timestamp-*
+# misc
+.DS_Store
+*.log
+.vercel

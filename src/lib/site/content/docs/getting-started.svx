@@ -1,0 +1,53 @@
+---
+title: Your first conversion
+description: Turn a source video into an MP4 and find the finished file.
+order: 20
+---
+
+<script>
+  import DocsScreenshot from '$lib/features/docs/DocsScreenshot.svelte';
+</script>
+
+This walkthrough uses a video source and the Balanced MP4 preset. The same queue workflow applies to audio and images.
+
+## Add a source
+
+Drop a supported file into Frame, or choose **Add source** to open the file picker. Frame inspects the source and adds it to the queue.
+
+Select the file's row. Its preview and inspector now refer to that file. The **Metadata** tab shows the source details, including the streams Frame detected.
+
+## Choose an output
+
+Open **Presets** and select **Balanced MP4**. Then open **Output** to review the configuration.
+
+The **General** section contains the output format and output name. Other sections expose the settings relevant to that format and source: video or images, audio, subtitles, filters, and metadata.
+
+For your first conversion, keep the preset's encoding defaults. Once you have a working result, change one setting at a time and compare the output.
+
+<DocsScreenshot
+  scene="video-output"
+  alt="Frame with a video selected and the output inspector open to video encoding settings."
+  caption="Review the selected file’s output settings before starting a conversion."
+/>
+
+## Check the tracks
+
+If the source has audio or subtitle streams, check the tracks you want to export. Frame exports the selected source tracks. An unchecked track is not included just because it was present in the input.
+
+Choose subtitle handling deliberately: a selectable subtitle track and text burned into the picture produce different results. See [subtitles](/docs/subtitles).
+
+## Set the destination
+
+Choose an output folder. You can set a default output folder in app **Settings** for future work.
+
+If a destination is missing, the main action reads **Choose output** and opens the folder picker. Check the output name before starting, especially when exporting several versions of the same source.
+
+## Run the conversion
+
+Check the file in the queue and choose **Start**. The queue shows conversion status and progress while FFmpeg processes the file. Logs are available if you need details about the operation.
+
+When the conversion finishes, open the result from your output folder and check playback, audio, and subtitles in the player you intend to use.
+
+## Repeat with more files
+
+Add more sources to the queue and configure them individually, or use [presets](/docs/presets) to reuse settings across compatible files. [Batch conversion](/docs/batch-conversion) explains selection, shared settings, and concurrency.

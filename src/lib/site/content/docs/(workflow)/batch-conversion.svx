@@ -1,0 +1,61 @@
+---
+title: Batch conversion
+description: Select files, share compatible settings, and control how many conversions run at once.
+order: 10
+---
+
+<script>
+  import DocsScreenshot from '$lib/features/docs/DocsScreenshot.svelte';
+</script>
+
+Frame keeps each source in a queue with its own output configuration. Selecting a row chooses the file you are editing. Checking a file chooses whether it participates in the conversion run.
+
+## Build a queue
+
+Drop multiple supported files into Frame or add them through the file picker. Wait for source inspection to finish before choosing settings that depend on the detected streams.
+
+Select each row to review its output. Mixed video, audio, and image sources can need different formats or presets.
+
+<DocsScreenshot
+  scene="batch-queue"
+  alt="Frame file queue with several media sources available for batch conversion."
+  caption="Select a row to edit its settings; check files to include them in the run."
+/>
+
+## Reuse settings
+
+Choose a built-in or custom preset in the **Presets** tab. The **Apply preset to all files** action applies it to compatible files after confirmation. Incompatible sources are not valid targets for that preset.
+
+The Output inspector also has an action for applying output settings to other compatible files. Review the confirmation before applying a batch change. Track choices and source-specific properties still deserve a check when the sources differ.
+
+A useful workflow is to configure one representative file, convert it, inspect the result, and then reuse that configuration for the remaining files.
+
+## Choose what runs
+
+Check the queue entries you want to convert, set the output folder, and choose **Start**. The main action reflects what is missing:
+
+| Action | What to do |
+| --- | --- |
+| Add a source | Import a file. |
+| Select files | Check at least one queue entry. |
+| Choose output | Select a destination folder. |
+| Nothing pending | Add or prepare a file that needs conversion. |
+| Start | Run the selected pending conversions. |
+
+A completed file can be prepared for another run with **Convert again**.
+
+## Set concurrency
+
+App **Settings** includes **Max concurrency**, the limit on simultaneous conversion processes. A larger value runs more files at the same time, but those processes share your CPU, GPU, memory, and storage bandwidth.
+
+Start with a small value for high-resolution video. Increase it if your computer has spare capacity and your workload benefits. The best value depends on the codec and the size of the sources.
+
+<DocsScreenshot
+  scene="settings"
+  alt="Frame Settings dialog with application preferences and conversion controls."
+  caption="App Settings contains the default output folder and maximum concurrency."
+/>
+
+## Check the results
+
+Watch per-file status and progress. If one source fails, inspect its log and settings before repeating the entire queue. See [troubleshooting](/docs/troubleshooting) for common causes.

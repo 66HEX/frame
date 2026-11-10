@@ -1,5 +1,4 @@
-allowBuilds:
-  '@hugeicons/svelte': true
-  esbuild: true
-  sharp: true
-  workerd: true
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+  - workerd

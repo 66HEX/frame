@@ -10,4 +10,31 @@ declare global {
 	}
 }
 
+declare module '*.svx' {
+	import type { Component } from 'svelte';
+	export default class extends Component<Record<string, unknown>> {}
+}
+
+declare module '*.svg?raw' {
+	const content: string;
+	export default content;
+}
+
+declare module '*.svelte?raw' {
+	const content: string;
+	export default content;
+}
+
+declare module '*.ts?raw' {
+	const content: string;
+	export default content;
+}
+
+declare module '*.wgsl?raw' {
+	const content: string;
+	export default content;
+}
+
+declare module '@babel/standalone';
+
 export {};
