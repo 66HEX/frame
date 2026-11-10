@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
-dest = root / 'frame-app/docs/design-system'
+dest = root / 'docs/frame-app/design-system'
 paths = subprocess.check_output(['rg', '--files', 'frame-app/src/app'], cwd=root, text=True).splitlines()
 sources = {path: (root / path).read_text() for path in paths if path.endswith('.rs') and 'test' not in path}
 builders = []
@@ -45,10 +45,10 @@ for entry in enums:
 lines += ['', 'Dodatkowo: pozycja odtwarzania, początek i koniec przycięcia, przezroczystość nakładki, hue i saturation/value w pickerze kolorów.', '', '## Komponenty i miejsca użycia', '', '| Konstruktor | Źródło | Liczba wywołań |', '| --- | --- | --- |']
 for entry in report['builders']:
     short=entry['path'].removeprefix('frame-app/src/app/')
-    lines.append(f"| `{entry['name']}` | [{short}](../../src/app/{short}#L{entry['line']}) | {sum(site['builder']==entry['name'] for site in sites)} |")
+    lines.append(f"| `{entry['name']}` | [{short}](../../../frame-app/src/app/{short}#L{entry['line']}) | {sum(site['builder']==entry['name'] for site in sites)} |")
 lines += ['', '## Jawne identyfikatory elementów', '', 'Identyfikatory obejmują również kontenery, które mają znaczenie dla testów geometrii i dostępności. Pełne argumenty dynamicznych kontrolek są w podanych konstruktorach.', '', '| Identyfikator lub wzorzec | Źródło |', '| --- | --- |']
 for entry in ids:
     short=entry['path'].removeprefix('frame-app/src/app/')
-    lines.append(f"| `{entry['id_or_pattern']}` | [{short}](../../src/app/{short}#L{entry['line']}) |")
+    lines.append(f"| `{entry['id_or_pattern']}` | [{short}](../../../frame-app/src/app/{short}#L{entry['line']}) |")
 (dest/'INVENTORY.md').write_text('\n'.join(lines)+'\n')
 print(f'{len(inputs)} inputs; {len(builders)} builders; {len(sites)} call sites; {len(ids)} IDs')

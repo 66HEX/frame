@@ -216,7 +216,7 @@ mod tests {
 
     #[test]
     fn documented_css_matches_all_native_layers() {
-        let css = include_str!("../../docs/ui-shadows/scale.css");
+        let css = include_str!("fixtures/shadow-scale.css");
         for (level, name) in LEVELS
             .into_iter()
             .zip(["2xs", "xs", "sm", "md", "lg", "xl", "2xl"])

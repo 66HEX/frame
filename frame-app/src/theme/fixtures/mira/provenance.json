@@ -1,0 +1,11 @@
+{
+  "cli": "shadcn@4.23.0",
+  "style": "radix-mira",
+  "baseColor": "neutral",
+  "init": "npx shadcn@4.23.0 init --template vite --base radix --preset mira --name frame-shadcn-mira --no-monorepo --yes",
+  "colorConversion": "culori, floating-point sRGB; alpha preserved; secondary hover interpolated in OKLCH",
+  "presetCode": "b1D0eCA4",
+  "presetUrl": "https://ui.shadcn.com/create?preset=b1D0eCA4",
+  "date": "2026-11-05",
+  "license": "LICENSE.md"
+}

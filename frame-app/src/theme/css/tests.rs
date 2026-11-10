@@ -1,14 +1,12 @@
 use super::*;
 
-const MIRA: &str = include_str!("../../../docs/design-system/reference/theme.css");
+const MIRA: &str = include_str!("../fixtures/mira/theme.css");
 
 #[test]
 fn css_import_matches_the_original_cli_snapshot_without_quantizing_alpha() {
     let imported = import(MIRA).unwrap();
-    let original: Value = serde_json::from_str(include_str!(
-        "../../../docs/design-system/reference/mira-neutral.json"
-    ))
-    .unwrap();
+    let original: Value =
+        serde_json::from_str(include_str!("../fixtures/mira/mira-neutral.json")).unwrap();
     assert!((imported.radius - 10.0).abs() < f32::EPSILON);
     for mode in ["light", "dark"] {
         for (name, value) in original[mode].as_object().unwrap() {

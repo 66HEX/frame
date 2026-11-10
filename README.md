@@ -272,10 +272,6 @@ cargo xtask setup-ffmpeg
 
 ## Development Checks
 
-Graphite theme, Mira component geometry, and customization: [design system](frame-app/docs/design-system/README.md).
-
-UI elevation and component assignments: [shadow scale](frame-app/docs/ui-shadows/README.md).
-
 Run the main checks before submitting changes:
 
 ```bash
