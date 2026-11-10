@@ -1,0 +1,367 @@
+{
+  "collection": "Nucleo UI",
+  "version": "1.9.0",
+  "style": "outline",
+  "style_label": "Outline",
+  "grid": 18,
+  "source_archive": "nucleo_ui_svg_v1.9.0.zip",
+  "source_archive_sha256": "332166b787195f04e5b9792fd4afc8f22fcaba51d73512f57c40240dba7093b1",
+  "source_url": "https://nucleoapp.com/",
+  "normalization": "Only black fill and stroke colors are replaced with currentColor. Geometry, element order, transforms, stroke widths, line caps, line joins, fill rules, opacity, and data attributes are preserved. IconRoot supplies the original 18×18 viewBox and configurable display dimensions without adding global strokes.",
+  "native_frame_reference": "66HEX/frame:frame-app/assets/icons/nucleo/manifest.json",
+  "native_source_archive_sha256_matches": true,
+  "icons": [
+    {
+      "component": "ArrowLeftIcon.svelte",
+      "source": "outline/arrows/18px_arrow-left.svg",
+      "source_svg_sha256": "787ddb34fdd83c370d77239c42bccc4fe06841ff610be3d001152920e0e827c6",
+      "normalized_svg_sha256": "bfc5cac0dbdc11186c88514be3062ee21b93579e822bebcae0f66641b3f5dccc"
+    },
+    {
+      "component": "ArrowRightIcon.svelte",
+      "source": "outline/arrows/18px_arrow-right.svg",
+      "source_svg_sha256": "f6fae3759de7338ace9e2056a95ae2ded856778e2302275dbca4ff2631507528",
+      "normalized_svg_sha256": "b79ed82895035f80ec66b931df3d16166af1631bbad03858044118f0fbd7f549"
+    },
+    {
+      "component": "ArrowRotateClockwiseIcon.svelte",
+      "source": "outline/arrows/18px_arrow-rotate-clockwise.svg",
+      "source_svg_sha256": "1b7b622ddbd713de6eedbee1e653bc2a174e9ce3710a2dcca187590000a0294e",
+      "normalized_svg_sha256": "a155f8177d39e9cb5d6fb6add791aabff1880ec895071b3b2ff6d39cdd45f0ee"
+    },
+    {
+      "component": "ArrowTurnRightIcon.svelte",
+      "source": "outline/arrows/18px_arrow-turn-right-2.svg",
+      "source_svg_sha256": "a4dddb1ea8a42d60c846789f31e48d864778ecedd5984f4b8f8075ef9cb758f1",
+      "normalized_svg_sha256": "2fd39e2ba8824698b6f26b7ed8de5582ebc63eead1b95f31d81fc6a41b059c2e"
+    },
+    {
+      "component": "BookOpenIcon.svelte",
+      "source": "outline/school-education/18px_book-open.svg",
+      "source_svg_sha256": "6b2c27259d2846664969aeace96e60bd804ef40c7b10918b825bb90c5a09b8dc",
+      "normalized_svg_sha256": "0ebca97c52f5c8efceaa21f24576ef544b2706564bb45a36041767cc47463184"
+    },
+    {
+      "component": "CheckIcon.svelte",
+      "source": "outline/ui-layout/18px_check.svg",
+      "source_svg_sha256": "aec772ada908cc936b55535fd94177b94b9a8a68cd850070192a1af737aa1a00",
+      "normalized_svg_sha256": "570dd2224063583c040102fee848941cc740e137b82fe7fdd84efd9c69cef246"
+    },
+    {
+      "component": "ChevronDownIcon.svelte",
+      "source": "outline/arrows/18px_chevron-down.svg",
+      "source_svg_sha256": "99a1ada9119158bc7d7d2ac2b70300f35f79cd50848c3f755a5dd2020c193a71",
+      "normalized_svg_sha256": "be290284da883fa22e65ba46fac13229c0b651cd776040ac6c2a0700b9d0d297"
+    },
+    {
+      "component": "ChevronExpandYIcon.svelte",
+      "source": "outline/arrows/18px_chevron-expand-y.svg",
+      "source_svg_sha256": "c551943ae72c1d98125d71d5dd05bda0a884a8b224c63fdab7b0875f12da3c2c",
+      "normalized_svg_sha256": "bd9d31e850e4bf42a431111f0069d39a1e14402b9ad49af5817d4c06a8d4334e"
+    },
+    {
+      "component": "ChevronRightIcon.svelte",
+      "source": "outline/arrows/18px_chevron-right.svg",
+      "source_svg_sha256": "6dd46bebed8be25230a4c9a75751accf1ab8857804adcd6c0bcec5122c932e31",
+      "normalized_svg_sha256": "3531e59784fc58fa9d946edf5ca14976049b6107a39bb6ac96db5db15d52e2c2"
+    },
+    {
+      "component": "ChevronUpIcon.svelte",
+      "source": "outline/arrows/18px_chevron-up.svg",
+      "source_svg_sha256": "18fe0ba846fbd2e916143e0b519047df27abd983ee8e8caefaef4caaecfe12d5",
+      "normalized_svg_sha256": "319e608b10a5d7c374ddd8033a3de7e687e1c5e99321c0e9b687837e02702f8d"
+    },
+    {
+      "component": "CircleQuestionIcon.svelte",
+      "source": "outline/ui-layout/18px_circle-question.svg",
+      "source_svg_sha256": "ed42ce9d9714015ecdbb10d8037327fefaaa7e26f9ef3eee86044aa1ab61b4dd",
+      "normalized_svg_sha256": "a2c7a5bd5f0fe19ba3fa57531f61d2b9da52da60b62220d1e6d1b5b8367736fb"
+    },
+    {
+      "component": "CircleWarningIcon.svelte",
+      "source": "outline/ui-layout/18px_circle-warning.svg",
+      "source_svg_sha256": "7b74ed16bf3146117b7c541a3afc1b171ec681c996b91bf9cf10e01056fb653c",
+      "normalized_svg_sha256": "0d5411fd423b5e100ca2f232357a2df7b969f2d3417069e1152eabbe6fc48e88"
+    },
+    {
+      "component": "CodeIcon.svelte",
+      "source": "outline/design-development/18px_code.svg",
+      "source_svg_sha256": "4c2c195acdb141bd7c8fbe8a74a3a2852a3a7dcd75b6ed84c7d7361cf7f3aae0",
+      "normalized_svg_sha256": "e02b7a603bcf21775b05af4a6eb0405b23a67d5a9ff478c7f284f07400c85ee5"
+    },
+    {
+      "component": "CopyIcon.svelte",
+      "source": "outline/ui-layout/18px_copy.svg",
+      "source_svg_sha256": "f864f2edf2925f27734aa5cd5a1acb85bed57080fa11629d58e7a6455b5a5f06",
+      "normalized_svg_sha256": "119b376e6792702f5449547254089a93b657658c0fc0f85caa973142a8a8a8a3"
+    },
+    {
+      "component": "CpuIcon.svelte",
+      "source": "outline/technology-devices/18px_microchip.svg",
+      "source_svg_sha256": "241cf900c495f8508e1d55e980c737deced09ccee020f3cad945487002474d0a",
+      "normalized_svg_sha256": "1d6908a98df9132714f7ca5fd2f1650acc2740cccf21bda800fdb35220349204"
+    },
+    {
+      "component": "CubeAxisIcon.svelte",
+      "source": "outline/ar-vr/18px_cube-axis.svg",
+      "source_svg_sha256": "0750a2dd8b8c46e5d3465b7b08b7e016e1f3f98d99f24b175b41049afb0df8ed",
+      "normalized_svg_sha256": "0435997ba3e9032ea30050d76bb5c276730cc9d610123cbe24cacbaabe6f718b"
+    },
+    {
+      "component": "CubeIcon.svelte",
+      "source": "outline/ar-vr/18px_cube.svg",
+      "source_svg_sha256": "14c97d2cd2e32d90df18d1c08cc5ced84780d1d9a27598e27376c312b7fb5803",
+      "normalized_svg_sha256": "1d787328ad64d9eb2f8b91dfc235f2fc698bcc2bd8f5b30b2d9cde90b214fb47"
+    },
+    {
+      "component": "CubesIcon.svelte",
+      "source": "outline/ar-vr/18px_cubes.svg",
+      "source_svg_sha256": "1e6a07cce9f20cef66bc52938b0eae043204a9e3c118a4b0c6661970393449db",
+      "normalized_svg_sha256": "139d56c864fd8c2d76b953565bffd42f50590a4545075c607e185a24ae260e1a"
+    },
+    {
+      "component": "DatabaseIcon.svelte",
+      "source": "outline/design-development/18px_database.svg",
+      "source_svg_sha256": "9b67c3b831b4671e5010aa2036debfd45dfb8d24526fd6650c98c15166f33076",
+      "normalized_svg_sha256": "77532ec907b2d29a3d071c7255bef777b26dc7145f85cdda5024118deb9b9706"
+    },
+    {
+      "component": "DotsIcon.svelte",
+      "source": "outline/ui-layout/18px_dots.svg",
+      "source_svg_sha256": "a58081f789f3032468de1abed3a2017b0506661d93d732dde57422241478ddb9",
+      "normalized_svg_sha256": "28cc7d4aa46156e2fe62d24da0cdede8ba752a74490961229907b3faf9e45cea"
+    },
+    {
+      "component": "FileIcon.svelte",
+      "source": "outline/files/18px_file.svg",
+      "source_svg_sha256": "4d13f6c06a00ef560e5138ae4eb181146774b25a67358f73d072c061475c6992",
+      "normalized_svg_sha256": "7e4cc9df17b9dad4513d6283ac9303e423cca34eec78750c33fda1412042d306"
+    },
+    {
+      "component": "Grid2x2Icon.svelte",
+      "source": "outline/ui-layout/18px_grid-2x2.svg",
+      "source_svg_sha256": "6708d9478a536a79397017b0126bb2ea9809bda22d1e899e85484cf5e6d166ec",
+      "normalized_svg_sha256": "eefbb018b428e2f3c981d63670bde2ffde22f5d75683fab08ad4953fc7990423"
+    },
+    {
+      "component": "HashtagIcon.svelte",
+      "source": "outline/shopping/18px_hashtag.svg",
+      "source_svg_sha256": "2840fae7b721e2312aef8ae1b0eeb2ed7be292329c0046a077635095116913d3",
+      "normalized_svg_sha256": "d8425c08219d30d9c18785a14c2dd095c1e468eaf5f7809e55d010da68d7ab61"
+    },
+    {
+      "component": "LanguageBashIcon.svelte",
+      "source": "outline/design-development/18px_square-terminal.svg",
+      "source_svg_sha256": "d9a3378295b6866b17adb4e04164516dac865485a4a1ed503552a9476773436f",
+      "normalized_svg_sha256": "ec4ae8769037edae037a616ecc8f06893938ef3975c1b1f82873b073433a386d"
+    },
+    {
+      "component": "LayersIcon.svelte",
+      "source": "outline/design-development/18px_layers.svg",
+      "source_svg_sha256": "c547b25befe7a44918615976af9f30076690a9e26dc5cd0748d5011cbe2114c9",
+      "normalized_svg_sha256": "88667be357c36d0a87e006f5e2e74bb2641ad3177b67788502f1e11ae11c4329"
+    },
+    {
+      "component": "LinkIcon.svelte",
+      "source": "outline/editing/18px_link.svg",
+      "source_svg_sha256": "d4e0a3c6c34c4f5825e2c5f976c825d97d48f70856453d7ba0c46d0c4806fbc1",
+      "normalized_svg_sha256": "66ead2c4a85600a0d9d157ba9a7f451ffe019c819f86d60d1811933583a5fb63"
+    },
+    {
+      "component": "LoaderIcon.svelte",
+      "source": "outline/ui-layout/18px_loader.svg",
+      "source_svg_sha256": "ce5da7fc199499e192ffc66426b29cb9d46059cf8747513dc81f4c762fad61ce",
+      "normalized_svg_sha256": "9da9b45ca7c0ab7496e5de443ce94520235b36864bde20a699cba2cd3a02c81d"
+    },
+    {
+      "component": "MagnifierIcon.svelte",
+      "source": "outline/filtering-sorting/18px_magnifier.svg",
+      "source_svg_sha256": "db5933e054a8b5d65615e56beabceef4814f7f34a986df847815913c86c7eb01",
+      "normalized_svg_sha256": "643b9145736ad361913647bc90429c8b4c5ef853b8ec590d2e93152cbf4d53e2"
+    },
+    {
+      "component": "Menu2Icon.svelte",
+      "source": "outline/ui-layout/18px_menu-2.svg",
+      "source_svg_sha256": "8f4ac2a79b2cd7742a4e2835d99acca969cf7e0423af3b90781a54d06da98e5a",
+      "normalized_svg_sha256": "2a285c5d839b2c0fe7484752fea3795a99b77a6a3a154d687994be07e820d251"
+    },
+    {
+      "component": "MinusIcon.svelte",
+      "source": "outline/ui-layout/18px_minus.svg",
+      "source_svg_sha256": "ff6b3ad9dafa99c1811696376ed09f7af6da06b8fb68157dc791516e699d244f",
+      "normalized_svg_sha256": "902ba90068894a1f055221d586c652959ee432f832428d7f239c82ca2b7783fa"
+    },
+    {
+      "component": "SidebarLeftClosedIcon.svelte",
+      "source": "outline/ui-layout/18px_layout-left.svg",
+      "source_svg_sha256": "137cd2af8dcf7bab8f8d0904d4811353b5a117c80905e5f7a17d24fe3c67eacb",
+      "normalized_svg_sha256": "27d50805a2a6fa2b2df4dccbedc0a6f92a3d7113eb7b30274edbb34573f948cc"
+    },
+    {
+      "component": "SidebarLeftIcon.svelte",
+      "source": "outline/ui-layout/18px_sidebar-left.svg",
+      "source_svg_sha256": "16059e9621c4eaa438add82c8574a2e8a4d86014d3f44c6837f60d56a7a439b6",
+      "normalized_svg_sha256": "897b3cf83236b0ecfb4ec9e97f9d829883dc189820ccf07c7b92fea5925a4a07"
+    },
+    {
+      "component": "TableOfContentsIcon.svelte",
+      "source": "outline/ui-layout/18px_table-rows.svg",
+      "source_svg_sha256": "cea833f670f2c2f2c581ba4cfc58b14b12c5477aa1bb87128d05e4b088eed24f",
+      "normalized_svg_sha256": "0390f8f9595dc9ee338a6614614224b97d274a404e58811c96d3c03fe4541f0f"
+    },
+    {
+      "component": "TerminalIcon.svelte",
+      "source": "outline/design-development/18px_terminal.svg",
+      "source_svg_sha256": "58393118ae631bc440fa185f885d67895473a47c0b9d2cd9bee65a3e358f69da",
+      "normalized_svg_sha256": "370906e73f332173589da2090ea99eae9fd0afdc4688ef211af61fdeb6af2fbb"
+    },
+    {
+      "component": "ThemeIcon.svelte",
+      "source": "outline/photography-video/18px_dark-light.svg",
+      "source_svg_sha256": "f894c05858a2f0bd933e7aa5fb6a0f3f4a438d06994070fbac288d80d258a3bc",
+      "normalized_svg_sha256": "771114f7949bb92ac458002789106475629c8901a4ee838f04035bfbf1289cf6"
+    },
+    {
+      "component": "TouchClickIcon.svelte",
+      "source": "outline/design-development/18px_touch-click.svg",
+      "source_svg_sha256": "e84db099f559e02d9a578500f7ec0f58293da3c039d24d00082c902fc884878d",
+      "normalized_svg_sha256": "16be54d088068e532fc00cfbe241dd067f384aa57be68870b5a319a4b5e6cf32"
+    },
+    {
+      "component": "TriangleWarningIcon.svelte",
+      "source": "outline/ui-layout/18px_triangle-warning.svg",
+      "source_svg_sha256": "90b4de3a05dca6466549bf015aa1d6ea24c2e97b7691197caf79e7e45bf2d405",
+      "normalized_svg_sha256": "a6846ff631ee0e1a298e32e6a937de40a481e55f7b0e61139fcd74b98a1674ee"
+    },
+    {
+      "component": "WorkflowIcon.svelte",
+      "source": "outline/arrows/18px_workflow.svg",
+      "source_svg_sha256": "73cf03add692556c1e962327ad1788dca36aafb71ed15c9539751ad9b71ef6f7",
+      "normalized_svg_sha256": "f338591ba0c468849531b5efd2e795de86a9692706590911e45b0e3265ada43e"
+    },
+    {
+      "component": "XmarkIcon.svelte",
+      "source": "outline/ui-layout/18px_xmark.svg",
+      "source_svg_sha256": "d83361581afa2cd1df9605280a57bf0f8762890ffeb76cc81477d50e6944b292",
+      "normalized_svg_sha256": "332680472dc1569ccc01260e6ef431cb3fca9a9db55ab11b3f5afc6972937730"
+    }
+  ],
+  "preserved_exceptions": [
+    {
+      "component": "AnthropicIcon.svelte",
+      "source": "Source: Simple Icons (existing monochrome adaptation)\nOriginal name: Anthropic (anthropic.svg)\nhttps://github.com/simple-icons/simple-icons/blob/develop/icons/anthropic.svg",
+      "component_sha256": "26460f1181ecb32754af6a78f71dbc5712c05746caef0fc51e4e9e20868940b2"
+    },
+    {
+      "component": "BoltIcon.svelte",
+      "source": "Source: preserved Spektral Bolt.new logo; upstream asset attribution was not recorded\nOriginal name: BoltIcon\nhttps://github.com/kaltwrk/spektral/blob/e7a3551f/apps/web/src/lib/icons/BoltIcon.svelte",
+      "component_sha256": "db3189ad3abd737cc959c1f0e33e950f099006ee5d2ac93f919056ac1d5fafeb"
+    },
+    {
+      "component": "CursorIcon.svelte",
+      "source": "Source: Spektral's preserved Cursor artwork; upstream asset attribution was not recorded\nOriginal name: CursorIcon\nhttps://github.com/kaltwrk/spektral/blob/e7a3551f/apps/web/src/lib/icons/CursorIcon.svelte",
+      "component_sha256": "04b3c5432dd5b942a198169410482d00f05e307185de142774d27f9429974fd0"
+    },
+    {
+      "component": "FrameworkReactIcon.svelte",
+      "source": "Source: Hugeicons core-free-icons (existing adaptation with a filled center)\nOriginal name: ReactIcon\nhttps://www.npmjs.com/package/@hugeicons/core-free-icons",
+      "component_sha256": "f7304eaf15d43863c839ac6cd404919c806c2cf3429acdee3952aeea7af593af"
+    },
+    {
+      "component": "FrameworkSvelteIcon.svelte",
+      "source": "Source: Spektral's preserved Svelte artwork; upstream asset attribution was not recorded\nOriginal name: AppFrameworkSvelteIcon\nhttps://github.com/kaltwrk/spektral/blob/01498e0d/apps/web/src/lib/components/app-icons/AppFrameworkSvelteIcon.svelte",
+      "component_sha256": "9be40ec66ceee71ca837b97cea6daef102eefff3a1ef85122a79baba30077cce"
+    },
+    {
+      "component": "FrameworkVueIcon.svelte",
+      "source": "Source: Spektral's preserved Vue artwork; upstream asset attribution was not recorded\nOriginal name: AppFrameworkVueIcon\nhttps://github.com/kaltwrk/spektral/blob/01498e0d/apps/web/src/lib/components/app-icons/AppFrameworkVueIcon.svelte",
+      "component_sha256": "d53bddaeea9f3d1f0cd79366dbbcce9b720b8471a74146f8cd5d0766333d6def"
+    },
+    {
+      "component": "GitHubIcon.svelte",
+      "source": "Source: Nucleo Social Media Icons (existing logo)\nOriginal name: GitHub\nhttps://nucleoapp.com/social-media-icons",
+      "component_sha256": "3758022d86b38fa66d67bb05a4baa25aaa7d12683d6df2df469b815be7308531"
+    },
+    {
+      "component": "GrokIcon.svelte",
+      "source": "Source: Lobe Icons (existing monochrome adaptation)\nOriginal name: Grok.Mono (Grok/components/Mono.tsx)\nhttps://github.com/lobehub/lobe-icons/blob/master/src/Grok/components/Mono.tsx",
+      "component_sha256": "f09441b77d1073d63d530e27c4283a6b705358497595cb799fe56c905b0ccb3f"
+    },
+    {
+      "component": "LanguageCssIcon.svelte",
+      "source": "Source: Simple Icons (existing monochrome adaptation)\nOriginal name: CSS (css.svg)\nhttps://github.com/simple-icons/simple-icons/blob/develop/icons/css.svg",
+      "component_sha256": "7d883f7170d1de9a5ce8495cc41d3dc10125863bde6460f6f4e402783bb97add"
+    },
+    {
+      "component": "LanguageDotenvIcon.svelte",
+      "source": "Source: Simple Icons (existing monochrome adaptation)\nOriginal name: .ENV (dotenv.svg)\nhttps://github.com/simple-icons/simple-icons/blob/develop/icons/dotenv.svg",
+      "component_sha256": "c24cf733658f4aebe644e91242287371e4cfb6b48f0de7d1a168860f4d6b18be"
+    },
+    {
+      "component": "LanguageHtmlIcon.svelte",
+      "source": "Source: Simple Icons (existing monochrome adaptation)\nOriginal name: HTML5 (html5.svg)\nhttps://github.com/simple-icons/simple-icons/blob/develop/icons/html5.svg",
+      "component_sha256": "c64c90c8ac6400d85b472979ac50e8b24a5cd8643c74c46596d024203205e1d8"
+    },
+    {
+      "component": "LanguageJavaScriptIcon.svelte",
+      "source": "Source: Simple Icons (existing monochrome adaptation)\nOriginal name: JavaScript (javascript.svg)\nhttps://github.com/simple-icons/simple-icons/blob/develop/icons/javascript.svg",
+      "component_sha256": "45b9989f60a04fd0f4dbf97beac9453ab80795fe713f74783695837652ff94e2"
+    },
+    {
+      "component": "LanguageJsonIcon.svelte",
+      "source": "Source: Simple Icons (existing monochrome adaptation)\nOriginal name: JSON (json.svg)\nhttps://github.com/simple-icons/simple-icons/blob/develop/icons/json.svg",
+      "component_sha256": "6e346d345a6601361bd16441f7134e3ea36fe83ee8bba573b5057a240d8d4090"
+    },
+    {
+      "component": "LanguageMarkdownIcon.svelte",
+      "source": "Source: Simple Icons (existing monochrome adaptation)\nOriginal name: Markdown (markdown.svg)\nhttps://github.com/simple-icons/simple-icons/blob/develop/icons/markdown.svg",
+      "component_sha256": "8f93765b71b133c0cba07dd6b7d3dec1ab8e17a42aecfc4516ac12a783fd23bc"
+    },
+    {
+      "component": "LanguageTypeScriptIcon.svelte",
+      "source": "Source: Simple Icons (existing monochrome adaptation)\nOriginal name: TypeScript (typescript.svg)\nhttps://github.com/simple-icons/simple-icons/blob/develop/icons/typescript.svg",
+      "component_sha256": "e80f587da0aac5ea60431f125fcbc7575cac3a8b84a1a8d0f3b486887c3869f3"
+    },
+    {
+      "component": "LanguageWebGlIcon.svelte",
+      "source": "Source: Simple Icons (existing monochrome adaptation)\nOriginal name: WebGL (webgl.svg)\nhttps://github.com/simple-icons/simple-icons/blob/develop/icons/webgl.svg",
+      "component_sha256": "032c44ccdaec5e9c45f84e6a0cdda6e7d478fe6a17f174075429de9b365ac70d"
+    },
+    {
+      "component": "LanguageWebGpuIcon.svelte",
+      "source": "Source: Simple Icons (existing monochrome adaptation)\nOriginal name: WebGPU (webgpu.svg)\nhttps://github.com/simple-icons/simple-icons/blob/develop/icons/webgpu.svg",
+      "component_sha256": "e0edcad0b79d26ed62d51ec2d20d4c35d49ddff8b62da11add2fbc5cd00ce780"
+    },
+    {
+      "component": "LovableIcon.svelte",
+      "source": "Source: SVGL (existing monochrome silhouette)\nOriginal name: Lovable (lovable.svg)\nhttps://github.com/pheralb/svgl/blob/main/static/library/lovable.svg",
+      "component_sha256": "e6872760ba7ca8ebb350314fef6cd7473605933f97f924c88e1415cf232bb262"
+    },
+    {
+      "component": "MetaAIIcon.svelte",
+      "source": "Source: Spektral's preserved Meta AI artwork; upstream asset attribution was not recorded\nOriginal name: MetaAIIcon\nhttps://github.com/kaltwrk/spektral/blob/e7a3551f/apps/web/src/lib/icons/MetaAIIcon.svelte",
+      "component_sha256": "7e79178915db04a0bbb144cc8c214a3888c4513c208ae2df9ffb6a8157bbb142"
+    },
+    {
+      "component": "OpenAIIcon.svelte",
+      "source": "Source: Simple Icons (existing monochrome adaptation)\nOriginal name: OpenAI (openai.svg)\nhttps://github.com/simple-icons/simple-icons/blob/14.15.0/icons/openai.svg",
+      "component_sha256": "46f61864fb2690a41c4dc4dcf8cf9237b3857546c17068762a3eb3bf1969f52b"
+    },
+    {
+      "component": "PerplexityIcon.svelte",
+      "source": "Source: Lobe Icons (existing monochrome adaptation)\nOriginal name: Perplexity.Mono (Perplexity/components/Mono.tsx)\nhttps://github.com/lobehub/lobe-icons/blob/master/src/Perplexity/components/Mono.tsx",
+      "component_sha256": "f7ab75f726b3658c8cce0a8c612f2bfb2aca26140205d24e029169480b475c3a"
+    },
+    {
+      "component": "ZedIcon.svelte",
+      "source": "Source: Zed repository (existing monochrome logo)\nOriginal name: zed_logo.svg\nhttps://github.com/zed-industries/zed/blob/main/assets/images/zed_logo.svg",
+      "component_sha256": "93bdc4319d1767e003b83f2ac6c886265616c8fd5ab8864e66ce92c3470f3c17"
+    }
+  ],
+  "copyright_notice": {
+    "source": "nucleo-copyright-notice.html",
+    "file": "nucleo-copyright-notice.html",
+    "sha256": "2af27cde3f2a3f0abc72019934344f4b448a702513599de6d079428a9fce3560"
+  },
+  "native_reference_note": "The website uses the Outline style from the same user-supplied collection archive by explicit user preference. The native application and screenshots keep their existing icon artwork."
+}
