@@ -207,6 +207,7 @@ fn ambiguous_progress_and_process_failures_are_never_zero_proofs() {
 fn identity_change_after_either_phase_never_grants_a_cap() {
     for change_at in [0, 1] {
         let fixture = Fixture::new();
+        let initial_size = fs::metadata(&fixture.input).unwrap().len();
         let mut calls = 0;
         let result = fixture.check(
             &config(),
@@ -214,7 +215,9 @@ fn identity_change_after_either_phase_never_grants_a_cap() {
             &|| false,
             &mut |_, _, _| {
                 if calls == change_at {
-                    fs::write(&fixture.input, b"changed source").unwrap();
+                    // Same-size writes can share a filesystem timestamp tick.
+                    fs::write(&fixture.input, b"changed source after GIF probe").unwrap();
+                    assert_ne!(fs::metadata(&fixture.input).unwrap().len(), initial_size);
                 }
                 let frames = u64::from(calls != 0);
                 calls += 1;
