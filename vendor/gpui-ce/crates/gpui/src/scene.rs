@@ -16,6 +16,8 @@ use std::{
     slice,
 };
 
+mod scale;
+pub(crate) use scale::PaintScale;
 mod plan;
 pub use plan::*;
 mod abi;
@@ -64,6 +66,7 @@ pub struct Scene {
     primitive_bounds: BoundsTree<ScaledPixels>,
     layer_stack: Vec<Option<DrawOrder>>,
     filter_depth: usize,
+    paint_scales: Vec<PaintScale>,
     pub shadows: Vec<Shadow>,
     pub quads: Vec<Quad>,
     pub paths: Vec<Path<ScaledPixels>>,
@@ -86,6 +89,7 @@ impl Scene {
         self.primitive_bounds.clear();
         self.layer_stack.clear();
         self.filter_depth = 0;
+        self.paint_scales.clear();
         self.paths.clear();
         self.shadows.clear();
         self.quads.clear();
@@ -105,12 +109,29 @@ impl Scene {
         self.paint_operations.len()
     }
 
+    pub(crate) fn push_scale(&mut self, scale: PaintScale) {
+        self.paint_scales.push(scale);
+        self.paint_operations
+            .push(PaintOperation::StartScale(scale));
+    }
+
+    pub(crate) fn pop_scale(&mut self) {
+        self.paint_scales.pop();
+        self.paint_operations.push(PaintOperation::EndScale);
+    }
+
     pub fn push_layer(&mut self, bounds: Bounds<ScaledPixels>) {
+        let recorded_bounds = bounds;
+        let bounds = self
+            .paint_scales
+            .iter()
+            .rev()
+            .fold(bounds, |b, s| s.bounds(b));
         self.is_finished = false;
         let order = self.primitive_bounds.insert(bounds);
         self.layer_stack.push(Some(order));
         self.paint_operations
-            .push(PaintOperation::StartLayer(bounds));
+            .push(PaintOperation::StartLayer(recorded_bounds));
     }
 
     pub fn pop_layer(&mut self) {
@@ -153,6 +174,10 @@ impl Scene {
             });
         }
 
+        let recorded = (!self.paint_scales.is_empty()).then(|| primitive.clone());
+        for scale in self.paint_scales.iter().rev() {
+            scale.apply(&mut primitive);
+        }
         let clipped_bounds = primitive
             .bounds()
             .intersect(&primitive.content_mask().bounds);
@@ -236,7 +261,7 @@ impl Scene {
         }
 
         self.paint_operations
-            .push(PaintOperation::Primitive(primitive));
+            .push(PaintOperation::Primitive(recorded.unwrap_or(primitive)));
     }
 
     pub fn replay(&mut self, range: Range<usize>, prev_scene: &Scene) {
@@ -245,6 +270,8 @@ impl Scene {
                 PaintOperation::Primitive(primitive) => self.insert_primitive(primitive.clone()),
                 PaintOperation::StartLayer(bounds) => self.push_layer(*bounds),
                 PaintOperation::EndLayer => self.pop_layer(),
+                PaintOperation::StartScale(scale) => self.push_scale(*scale),
+                PaintOperation::EndScale => self.pop_scale(),
             }
         }
     }
@@ -382,6 +409,8 @@ pub(crate) enum PrimitiveKind {
 }
 
 pub(crate) enum PaintOperation {
+    StartScale(PaintScale),
+    EndScale,
     Primitive(Primitive),
     StartLayer(Bounds<ScaledPixels>),
     EndLayer,
@@ -1362,6 +1391,45 @@ mod tests {
     fn batches(scene: &mut Scene) -> Vec<PrimitiveBatch> {
         scene.finish();
         scene.batches().collect()
+    }
+
+    #[test]
+    fn subtree_scale_preserves_layout_geometry_and_replays_nested_scopes() {
+        let mut scene = Scene::default();
+        let scale = PaintScale {
+            origin: point(scaled(50.0), scaled(0.0)),
+            factor: 0.95,
+            outer_mask: full_bounds(),
+        };
+        scene.push_scale(scale);
+        scene.insert_primitive(quad());
+        scene.push_scale(scale);
+        scene.insert_primitive(polychrome_sprite(0));
+        scene.pop_scale();
+        scene.pop_scale();
+        scene.insert_primitive(quad());
+        assert_eq!(scene.quads[0].bounds.origin.x, scaled(2.5));
+        assert_eq!(scene.quads[0].bounds.size.width, scaled(95.0));
+        assert_eq!(scene.quads[0].content_mask, mask());
+        assert_eq!(scene.quads[1].bounds, full_bounds());
+        assert!((scene.polychrome_sprites[0].bounds.size.width.0 - 90.25).abs() < 0.001);
+        let mut replay = Scene::default();
+        replay.replay(0..scene.len(), &scene);
+        assert_eq!(replay.quads[0].bounds, scene.quads[0].bounds);
+        assert_eq!(
+            replay.polychrome_sprites[0].bounds,
+            scene.polychrome_sprites[0].bounds
+        );
+        assert!(replay.paint_scales.is_empty());
+        // Replay a cached child under a different live scale: no double-transform.
+        let mut cached = Scene::default();
+        cached.push_scale(PaintScale {
+            factor: 0.5,
+            ..scale
+        });
+        cached.replay(1..2, &scene);
+        cached.pop_scale();
+        assert_eq!(cached.quads[0].bounds.size.width, scaled(50.0));
     }
 
     #[test]

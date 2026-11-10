@@ -1,0 +1,86 @@
+use crate::app::input::{FrameTextInputKind, FrameTextInputSpec, frame_text_input};
+use crate::app::layout::SETTINGS_CONTROL_HEIGHT;
+use crate::app::primitives::color;
+use crate::app::root::FrameRoot;
+use crate::{assets, theme};
+use gpui::prelude::*;
+use gpui::{Context, FocusHandle, Window, div};
+
+pub(in crate::app) struct PreviewTimecodeFieldSpec<'a> {
+    pub(super) label: &'static str,
+    pub(super) value: String,
+    pub(super) enabled: bool,
+    pub(super) kind: Option<FrameTextInputKind>,
+    pub(super) focus: Option<&'a FocusHandle>,
+}
+
+pub(in crate::app) fn preview_timecode_field(
+    spec: PreviewTimecodeFieldSpec<'_>,
+    palette: &'static theme::ThemePalette,
+    window: &Window,
+    cx: &Context<FrameRoot>,
+) -> gpui::Div {
+    let PreviewTimecodeFieldSpec {
+        label,
+        value,
+        enabled,
+        kind,
+        focus,
+    } = spec;
+    let field = if let (Some(kind), Some(focus)) = (kind, focus) {
+        let id = match kind {
+            FrameTextInputKind::PreviewStartTime => "preview-start-time",
+            FrameTextInputKind::PreviewEndTime => "preview-end-time",
+            _ => "preview-timecode",
+        };
+        frame_text_input(
+            FrameTextInputSpec {
+                id,
+                value: &value,
+                placeholder: "--:--:--.---",
+                disabled: !enabled,
+                // Disabled exit frames must not keep GPUI's automatic mouse focus.
+                focus: enabled.then_some(focus),
+                kind,
+            },
+            palette,
+            window,
+            cx,
+        )
+        .debug_selector(move || id.to_owned())
+        .font_features(assets::frame_tabular_number_font_features())
+        .into_any_element()
+    } else {
+        div()
+            .w_full()
+            .h(theme::ui_rem(SETTINGS_CONTROL_HEIGHT))
+            .flex()
+            .items_center()
+            .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
+            .text_color(color(palette.text_primary))
+            .font_features(assets::frame_tabular_number_font_features())
+            .child(value)
+            .into_any_element()
+    };
+
+    div()
+        .min_w_0()
+        .flex_1()
+        .flex()
+        .items_center()
+        .gap(theme::ui_rem(4.0))
+        .child(
+            div()
+                .flex_shrink_0()
+                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
+                .text_color(color(palette.text_muted))
+                .child(label),
+        )
+        .child(
+            div()
+                .min_w_0()
+                .flex_1()
+                .h(theme::ui_rem(SETTINGS_CONTROL_HEIGHT))
+                .child(field),
+        )
+}

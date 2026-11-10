@@ -1,19 +1,17 @@
-use super::{
-    model::{
-        ALL_SETTINGS_TABS, ConversionConfig, ProcessingMode, SettingsTab, SourceKind,
-        SourceMetadata,
-    },
-    rules::{
-        container_supports_audio, container_supports_subtitles, is_audio_only_container,
-        source_kind_for,
-    },
+use crate::settings::model::{
+    ALL_OUTPUT_SECTIONS, ConversionConfig, OutputSection, ProcessingMode, SourceKind,
+    SourceMetadata,
+};
+use crate::settings::rules::{
+    container_supports_audio, container_supports_subtitles, is_audio_only_container,
+    source_kind_for,
 };
 
 #[must_use]
-pub fn visible_settings_tabs(
+pub fn visible_output_sections(
     config: &ConversionConfig,
     metadata: Option<&SourceMetadata>,
-) -> Vec<SettingsTab> {
+) -> Vec<OutputSection> {
     let source_kind = source_kind_for(metadata);
     let is_source_audio_only = source_kind == SourceKind::Audio;
     let is_source_image = source_kind == SourceKind::Image;
@@ -29,32 +27,16 @@ pub fn visible_settings_tabs(
     let supports_images_tab = is_source_image && !is_audio_container && !is_copy_mode;
     let supports_audio_filters_tab = supports_audio && !is_copy_mode;
 
-    ALL_SETTINGS_TABS
+    ALL_OUTPUT_SECTIONS
         .into_iter()
         .filter(|tab| match tab {
-            SettingsTab::Video => supports_video_tab,
-            SettingsTab::VideoFilters => supports_video_filters_tab,
-            SettingsTab::Images => supports_images_tab,
-            SettingsTab::Audio => supports_audio,
-            SettingsTab::AudioFilters => supports_audio_filters_tab,
-            SettingsTab::Subtitles => supports_subtitles,
-            SettingsTab::Source
-            | SettingsTab::Output
-            | SettingsTab::Metadata
-            | SettingsTab::Presets => true,
+            OutputSection::Video => supports_video_tab,
+            OutputSection::VideoFilters => supports_video_filters_tab,
+            OutputSection::Images => supports_images_tab,
+            OutputSection::Audio => supports_audio,
+            OutputSection::AudioFilters => supports_audio_filters_tab,
+            OutputSection::Subtitles => supports_subtitles,
+            OutputSection::General | OutputSection::Metadata => true,
         })
         .collect()
-}
-
-#[must_use]
-pub fn resolve_active_settings_tab(
-    active_tab: SettingsTab,
-    config: &ConversionConfig,
-    metadata: Option<&SourceMetadata>,
-) -> SettingsTab {
-    if visible_settings_tabs(config, metadata).contains(&active_tab) {
-        active_tab
-    } else {
-        SettingsTab::Output
-    }
 }

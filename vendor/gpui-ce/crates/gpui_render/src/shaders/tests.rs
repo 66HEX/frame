@@ -246,3 +246,116 @@ fn linear_gradients_preserve_native_dithering() {
 
     assert_ne!(first.w, second.w);
 }
+
+fn shadow_clip_fixture(inset: bool, blur: f32, smoothing: f32) -> shadow::Shadow {
+    use common::*;
+    use wgsl_rs::std::vec2f;
+    let element_bounds = Bounds {
+        origin: vec2f(20.0, 20.0),
+        size: vec2f(100.0, 60.0),
+    };
+    let corners = Corners {
+        top_left: 8.0,
+        top_right: 8.0,
+        bottom_right: 8.0,
+        bottom_left: 8.0,
+    };
+    let clear = Hsla {
+        h: 0.0,
+        s: 0.0,
+        l: 0.0,
+        a: 0.0,
+    };
+    shadow::Shadow {
+        order: 0,
+        blur_radius: blur,
+        bounds: if inset {
+            Bounds {
+                origin: vec2f(21.0, 21.0),
+                size: vec2f(98.0, 58.0),
+            }
+        } else {
+            Bounds {
+                origin: vec2f(19.0, 19.0),
+                size: vec2f(102.0, 62.0),
+            }
+        },
+        corner_radii: corners,
+        content_mask: ContentMask {
+            bounds: element_bounds,
+            fade_out: Edges {
+                top: 0.0,
+                right: 0.0,
+                bottom: 0.0,
+                left: 0.0,
+            },
+        },
+        color: Background {
+            tag: BackgroundTag::Solid,
+            color_space: ColorSpace::Srgb,
+            solid: clear,
+            gradient_angle_or_pattern_height: 0.0,
+            colors: [LinearColorStop {
+                color: clear,
+                percentage: 0.0,
+            }; 2],
+            padding: 0,
+        },
+        element_bounds,
+        element_corner_radii: corners,
+        inset: if inset {
+            ShaderBool::Enabled
+        } else {
+            ShaderBool::Disabled
+        },
+        corner_smoothing: smoothing,
+    }
+}
+
+#[test]
+fn outer_shadows_leave_transparent_interiors_clear_and_preserve_external_edges() {
+    use corner_smoothing::prepare_corners;
+    use wgsl_rs::std::vec2f;
+    for blur in [0.0, 0.5, 3.0, 42.5] {
+        for smoothing in [0.0, 0.6] {
+            let shadow = shadow_clip_fixture(false, blur, smoothing);
+            let coverage = |position| {
+                if smoothing == 0.0 {
+                    shadow::shadow_coverage(shadow, position)
+                } else {
+                    shadow::smoothed_shadow_coverage(
+                        shadow,
+                        position,
+                        prepare_corners(shadow.bounds.size, shadow.corner_radii, smoothing, false),
+                        prepare_corners(
+                            shadow.element_bounds.size,
+                            shadow.element_corner_radii,
+                            smoothing,
+                            false,
+                        ),
+                    )
+                }
+            };
+            assert_eq!(
+                coverage(vec2f(70.0, 50.0)),
+                0.0,
+                "blur={blur}, smoothing={smoothing}"
+            );
+            assert_eq!(coverage(vec2f(21.0, 50.0)), 0.0);
+            assert!(coverage(vec2f(19.5, 50.0)) > 0.0);
+            // The rounded corner is outside the element, despite being in its AABB.
+            if blur > 0.0 {
+                assert!(coverage(vec2f(20.5, 20.5)) > 0.0);
+            }
+        }
+    }
+}
+
+#[test]
+fn inset_shadow_clip_preserves_the_inner_edge() {
+    use wgsl_rs::std::vec2f;
+    let shadow = shadow_clip_fixture(true, 0.0, 0.0);
+    assert_eq!(shadow::shadow_coverage(shadow, vec2f(70.0, 50.0)), 0.0);
+    assert_eq!(shadow::shadow_coverage(shadow, vec2f(19.5, 50.0)), 0.0);
+    assert!(shadow::shadow_coverage(shadow, vec2f(20.5, 50.0)) > 0.0);
+}

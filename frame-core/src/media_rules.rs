@@ -1,4 +1,20 @@
 //! Media compatibility rules shared by the conversion core and GPUI frontend state.
+//!
+//! The MOV and Matroska stream-copy lists in `media-rules.json` follow `FFmpeg`
+//! n8.1.2: `libavformat/isom_tags.c`, `riff.c`, and `matroska.c`. MOV accepts its
+//! native tags plus BMP/WAVE fallback tags; Matroska accepts native codec IDs
+//! plus VFW, `QuickTime`, and ACM fallback tags. The lists exclude the codec-level
+//! restrictions in `movenc.c` (VP8/VP9/AV1 and FLAC/Opus/TrueHD in MOV).
+//! Blu-ray PCM is excluded: MOV may preserve its foreign tag and exit
+//! successfully, but the resulting stream cannot be decoded.
+//! ADPCM MS/IMA WAV are excluded from MOV copy: demuxed tracks lack the
+//! `frame_size` required by `mov_write_packet`, even when block alignment is set.
+//! WMA1/2 lose required block alignment in MOV, and 64-bit integer PCM is
+//! misidentified as 16-bit there; their apparently successful muxes are unusable.
+//! QTRLE loses its pixel depth and SMC its palette in Matroska `CodecPrivate`.
+//! `TrueHD` copied into 188-byte MPEG-TS is misidentified on demux; the M2TS path
+//! remains supported.
+//! Codec eligibility does not replace validation of track-specific parameters.
 
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
@@ -26,6 +42,8 @@ struct MediaRulesRaw {
     #[serde(default)]
     container_audio_stream_codec_compatibility: HashMap<String, Vec<String>>,
     #[serde(default)]
+    container_audio_stream_copy_tags: HashMap<String, HashMap<String, String>>,
+    #[serde(default)]
     container_subtitle_codec_compatibility: HashMap<String, Vec<String>>,
     #[serde(default)]
     default_audio_codec: HashMap<String, String>,
@@ -46,6 +64,7 @@ struct MediaRules {
     container_video_stream_codec_compatibility: HashMap<String, HashSet<String>>,
     container_audio_codec_compatibility: HashMap<String, HashSet<String>>,
     container_audio_stream_codec_compatibility: HashMap<String, HashSet<String>>,
+    container_audio_stream_copy_tags: HashMap<String, HashMap<String, String>>,
     container_subtitle_codec_compatibility: HashMap<String, HashSet<String>>,
     default_audio_codec: HashMap<String, String>,
     default_audio_codec_fallback: String,
@@ -78,6 +97,7 @@ impl From<MediaRulesRaw> for MediaRules {
             container_audio_stream_codec_compatibility: normalized_codec_map(
                 raw.container_audio_stream_codec_compatibility,
             ),
+            container_audio_stream_copy_tags: raw.container_audio_stream_copy_tags,
             container_subtitle_codec_compatibility: normalized_codec_map(
                 raw.container_subtitle_codec_compatibility,
             ),
@@ -229,6 +249,19 @@ pub fn is_audio_stream_codec_allowed(container: &str, codec: &str) -> bool {
     )
 }
 
+/// Returns a canonical tag to replace an incompatible input tag during copy.
+///
+/// These overrides are limited to verified, decodable copy combinations;
+/// PCM continues to use the muxer's bit-depth and byte-order-aware selection.
+#[must_use]
+pub fn audio_stream_copy_tag(container: &str, codec: &str) -> Option<&'static str> {
+    MEDIA_RULES
+        .container_audio_stream_copy_tags
+        .get(&media_rules_key(container))
+        .and_then(|tags| tags.get(&normalize(codec)))
+        .map(String::as_str)
+}
+
 #[must_use]
 pub fn is_subtitle_codec_allowed(container: &str, codec: &str) -> bool {
     codec_allowed(
@@ -239,24 +272,47 @@ pub fn is_subtitle_codec_allowed(container: &str, codec: &str) -> bool {
     )
 }
 
+/// How a selected subtitle stream can be represented in the output.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SubtitleStreamAction {
+    Copy,
+    Encode(&'static str),
+}
+
+/// Returns the same subtitle decision used by the UI and argument builder.
+///
+/// Text conversion is limited to codecs with decoders in the supported `FFmpeg`
+/// runtime. TTML and HDMV text may be copied where supported, but not decoded.
+#[must_use]
+pub fn subtitle_stream_action(container: &str, codec: &str) -> Option<SubtitleStreamAction> {
+    if is_subtitle_codec_allowed(container, codec) {
+        return Some(SubtitleStreamAction::Copy);
+    }
+    let codec = normalize(codec);
+    let container = media_rules_key(container);
+    if is_decodable_text_subtitle_codec(&codec) {
+        let encoder = match container.as_str() {
+            "mp4" | "mov" => "mov_text",
+            "mkv" => "srt",
+            "webm" => "webvtt",
+            _ => return None,
+        };
+        return Some(SubtitleStreamAction::Encode(encoder));
+    }
+    if container == "mpegts" && matches!(codec.as_str(), "hdmv_pgs_subtitle" | "dvd_subtitle") {
+        return Some(SubtitleStreamAction::Encode("dvbsub"));
+    }
+    None
+}
+
 /// Returns whether a subtitle stream can be copied or standards-compliantly
 /// transcoded for the selected output profile.
 #[must_use]
 pub fn is_subtitle_stream_supported(container: &str, codec: &str) -> bool {
-    if is_subtitle_codec_allowed(container, codec) {
-        return true;
-    }
-    let codec = normalize(codec);
-    if is_text_subtitle_codec(&codec) {
-        return matches!(media_rules_key(container).as_str(), "mp4" | "webm");
-    }
-    crate::container::transport_stream_profile(container).is_some_and(|profile| {
-        profile == crate::container::TransportStreamProfile::MpegTs188
-            && matches!(codec.as_str(), "hdmv_pgs_subtitle" | "dvd_subtitle")
-    })
+    subtitle_stream_action(container, codec).is_some()
 }
 
-fn is_text_subtitle_codec(codec: &str) -> bool {
+fn is_decodable_text_subtitle_codec(codec: &str) -> bool {
     matches!(
         codec,
         "text"
@@ -277,8 +333,6 @@ fn is_text_subtitle_codec(codec: &str) -> bool {
             | "vplayer"
             | "pjs"
             | "ass"
-            | "hdmv_text_subtitle"
-            | "ttml"
     )
 }
 
@@ -376,6 +430,7 @@ mod tests {
                 "m4a".to_string(),
                 "wav".to_string(),
                 "flac".to_string(),
+                "opus".to_string(),
             ]
         );
     }
@@ -425,8 +480,126 @@ mod tests {
     }
 
     #[test]
-    fn mov_accepts_any_audio_codec_like_shared_rules() {
-        assert!(is_audio_codec_allowed("mov", "flac"));
+    fn mov_and_mkv_distinguish_audio_encoding_from_copy() {
+        for codec in ["libopus", "flac", "pcm_bluray"] {
+            assert!(!is_audio_codec_allowed("mov", codec));
+        }
+        assert!(is_audio_codec_allowed("mkv", "flac"));
+        assert!(!is_audio_codec_allowed("mkv", "pcm_bluray"));
+        assert!(!is_audio_stream_codec_allowed("mov", "pcm_bluray"));
+        assert!(!is_audio_stream_codec_allowed("mkv", "pcm_bluray"));
+        assert!(!is_audio_stream_codec_allowed("mov", "truehd"));
+        assert!(!is_audio_stream_codec_allowed("mkv", "pcm_s8"));
+        for codec in ["wmav1", "wmav2", "pcm_s64le", "dfpwm"] {
+            assert!(!is_audio_stream_codec_allowed("mov", codec));
+            assert!(is_audio_stream_codec_allowed("mkv", codec));
+        }
+    }
+
+    #[test]
+    fn mov_copy_canonical_tags_do_not_override_pcm_selection() {
+        for (codec, tag) in [
+            ("aac_latm", "0x0216736d"),
+            ("adpcm_g726", "0x4500736d"),
+            ("g723_1", "0x4200736d"),
+            ("vorbis", "0x6f56736d"),
+        ] {
+            assert_eq!(audio_stream_copy_tag("mov", codec), Some(tag));
+            assert_eq!(audio_stream_copy_tag("mkv", codec), None);
+        }
+        assert_eq!(audio_stream_copy_tag("mov", "pcm_s24le"), None);
+    }
+
+    #[test]
+    fn stream_copy_lists_reject_unsupported_muxer_pairs() {
+        for codec in ["vp8", "vp9", "av1", "unknown"] {
+            assert!(!is_video_stream_codec_allowed("mov", codec));
+        }
+        assert!(is_video_stream_codec_allowed("mkv", "rawvideo"));
+        for codec in ["mp3", "eac3"] {
+            assert!(!is_audio_stream_codec_allowed("m4a", codec));
+        }
+        assert!(!is_audio_stream_codec_allowed("wav", "pcm_s8"));
+        assert!(is_audio_stream_codec_allowed("wav", "pcm_u8"));
+        for codec in ["qtrle", "smc"] {
+            assert!(!is_video_stream_codec_allowed("mkv", codec));
+            assert!(is_video_stream_codec_allowed("mov", codec));
+        }
+        assert!(!is_audio_stream_codec_allowed("m2t", "truehd"));
+        assert!(is_audio_stream_codec_allowed("m2ts", "truehd"));
+    }
+
+    #[test]
+    fn stream_copy_lists_preserve_muxer_fallback_codecs() {
+        for container in ["mov", "mkv"] {
+            for codec in ["h261", "h263", "flv1", "msmpeg4v2", "msmpeg4v3", "zlib"] {
+                assert!(
+                    is_video_stream_codec_allowed(container, codec),
+                    "{container}/{codec}"
+                );
+            }
+        }
+        assert!(is_audio_stream_codec_allowed("mov", "adpcm_ima_qt"));
+        assert!(!is_audio_stream_codec_allowed("mkv", "adpcm_ima_qt"));
+        for codec in ["adpcm_ima_wav", "adpcm_ms"] {
+            assert!(is_audio_stream_codec_allowed("mkv", codec));
+            assert!(!is_audio_stream_codec_allowed("mov", codec));
+        }
+    }
+
+    #[test]
+    fn subtitle_actions_distinguish_copy_transcode_and_missing_decoder() {
+        for (container, codec, expected) in [
+            ("mkv", "mov_text", Some(SubtitleStreamAction::Encode("srt"))),
+            (
+                "mov",
+                "subrip",
+                Some(SubtitleStreamAction::Encode("mov_text")),
+            ),
+            ("mov", "ass", Some(SubtitleStreamAction::Encode("mov_text"))),
+            ("mkv", "ass", Some(SubtitleStreamAction::Copy)),
+            ("mp4", "ttml", Some(SubtitleStreamAction::Copy)),
+            ("mov", "ttml", Some(SubtitleStreamAction::Copy)),
+            ("webm", "ttml", None),
+            ("mkv", "ttml", None),
+            ("mp4", "hdmv_text_subtitle", None),
+            (
+                "mkv",
+                "hdmv_text_subtitle",
+                Some(SubtitleStreamAction::Copy),
+            ),
+            ("mkv", "arib_caption", Some(SubtitleStreamAction::Copy)),
+            (
+                "m2ts",
+                "hdmv_text_subtitle",
+                Some(SubtitleStreamAction::Copy),
+            ),
+        ] {
+            assert_eq!(
+                subtitle_stream_action(container, codec),
+                expected,
+                "{container}/{codec}"
+            );
+            assert_eq!(
+                is_subtitle_stream_supported(container, codec),
+                expected.is_some()
+            );
+        }
+    }
+
+    #[test]
+    fn opus_container_only_accepts_opus_audio() {
+        assert!(is_audio_only_container("OPUS"));
+        assert!(container_supports_audio("opus"));
+        assert!(!container_supports_subtitles("opus"));
+        assert_eq!(default_audio_codec_for_container("opus"), "libopus");
+        assert!(is_audio_codec_allowed("opus", "libopus"));
+        assert!(is_audio_stream_codec_allowed("opus", "opus"));
+        for codec in ["flac", "aac", "vorbis"] {
+            assert!(!is_audio_codec_allowed("opus", codec));
+            assert!(!is_audio_stream_codec_allowed("opus", codec));
+        }
+        assert!(!all_containers().iter().any(|container| container == "ogg"));
     }
 
     #[test]

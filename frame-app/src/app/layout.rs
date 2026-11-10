@@ -1,0 +1,103 @@
+//! Fixed layout contracts shared by the application shell and UI components.
+
+use crate::theme;
+
+pub const WINDOW_MIN_WIDTH: f32 = 1200.0;
+
+pub const WINDOW_MIN_HEIGHT: f32 = 800.0;
+
+pub const LINUX_WINDOW_FRAME_INSET: f32 = 24.0;
+
+pub const CONTENT_PADDING: f32 = 16.0;
+
+pub const TITLEBAR_HEIGHT: f32 = 40.0;
+
+pub const TITLEBAR_TOP_PADDING: f32 = 8.0;
+
+pub const TITLEBAR_TRAFFIC_LIGHT_SIZE: f32 = 24.0;
+
+// Whole-point offsets align native sheet mask edges at 1x and 2x backing scales.
+pub const TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_INSET: f32 = 5.0;
+
+pub const TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_X: f32 =
+    CONTENT_PADDING + TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_INSET;
+
+pub const TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_Y: f32 =
+    TITLEBAR_HEIGHT - TITLEBAR_TRAFFIC_LIGHT_SIZE + TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_INSET;
+
+pub const TITLEBAR_MACOS_NATIVE_TRAFFIC_LIGHT_PLACEHOLDER_WIDTH: f32 =
+    TITLEBAR_TRAFFIC_LIGHT_SIZE * 3.0;
+
+pub const TITLEBAR_LOGO_SIZE: f32 = 20.0;
+
+pub const TITLEBAR_DIVIDER_HEIGHT: f32 = 24.0;
+
+pub const TITLEBAR_SEGMENT_HEIGHT: f32 = theme::metrics::TABS_HEIGHT;
+
+pub const TITLEBAR_BUTTON_HEIGHT: f32 = theme::metrics::CONTROL_HEIGHT;
+
+pub const TITLEBAR_ICON_BUTTON_SIZE: f32 = theme::metrics::CONTROL_HEIGHT;
+
+pub const TITLEBAR_NAV_BUTTON_HEIGHT: f32 = theme::metrics::TAB_HEIGHT;
+
+pub const TITLEBAR_ICON_SIZE: f32 = 14.0;
+
+pub const TITLEBAR_ACTION_ICON_SIZE: f32 = theme::metrics::CONTROL_ICON;
+
+pub const TITLEBAR_PLATFORM_DIVIDER_HEIGHT: f32 = 20.0;
+
+pub const TITLEBAR_WINDOWS_WINDOW_BUTTON_WIDTH: f32 = 46.0;
+
+pub const TITLEBAR_WINDOWS_WINDOW_ICON_SIZE: f32 = 18.0;
+
+pub const TITLEBAR_WINDOWS_WINDOW_MAX_ICON_SIZE: f32 = 14.0;
+
+pub const TITLEBAR_LINUX_WINDOW_BUTTON_SIZE: f32 = 28.0;
+
+pub const TITLEBAR_LINUX_WINDOW_CONTROLS_GAP: f32 = 2.0;
+
+pub const TITLEBAR_LINUX_WINDOW_CONTROLS_PADDING_X: f32 = 8.0;
+
+pub const WORKSPACE_COLUMNS: u16 = 12;
+
+pub const WORKSPACE_GAP: f32 = 16.0;
+
+pub const LEFT_COLUMN_SPAN: u16 = 8;
+
+pub const RIGHT_COLUMN_SPAN: u16 = 4;
+
+pub const LEFT_GRID_ROWS: u16 = 12;
+
+pub const PREVIEW_ROW_SPAN: u16 = 8;
+
+pub const FILE_LIST_ROW_SPAN: u16 = 4;
+
+pub const PANEL_HEADER_HEIGHT: f32 = TITLEBAR_HEIGHT;
+
+pub const FILE_ROW_HEIGHT: f32 = 40.0;
+
+pub const SETTINGS_PANEL_PADDING: f32 = theme::metrics::CARD_PADDING;
+
+pub const SETTINGS_TAB_ICON_SIZE: f32 = 16.0;
+
+pub const SETTINGS_CONTROL_HEIGHT: f32 = theme::metrics::CONTROL_HEIGHT;
+
+pub const PREVIEW_PANEL_PADDING: f32 = CONTENT_PADDING;
+
+pub const PREVIEW_TIMELINE_CONTROL_HEIGHT: f32 = 28.0;
+
+pub const PREVIEW_TIMELINE_HANDLE_WIDTH: f32 = 24.0;
+
+pub const PREVIEW_TIMELINE_INSET: f32 = PREVIEW_TIMELINE_HANDLE_WIDTH;
+
+pub const PREVIEW_TRIM_PANEL_WIDTH: f32 = 320.0;
+
+pub const PREVIEW_TOOLBAR_OFFSET: f32 = 16.0;
+
+pub const PREVIEW_TOOLBAR_BUTTON_SIZE: f32 = theme::metrics::CONTROL_HEIGHT;
+
+pub const PREVIEW_TOOLBAR_ICON_SIZE: f32 = theme::metrics::CONTROL_ICON;
+
+pub const PREVIEW_TRACK_HEIGHT: f32 = 4.0;
+
+pub const PREVIEW_PLAYHEAD_HEIGHT: f32 = 22.0;

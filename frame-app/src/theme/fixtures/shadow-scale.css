@@ -1,0 +1,62 @@
+/* Guerriero reference scale. First listed layer is on top in CSS. */
+:root {
+  --shadow-2xs:
+    0px 1px 0px 0px #03030213,
+    0px 0px 0px 1px #FFFFFF0D inset,
+    0px 1px 0px 0px #FFFFFF1F inset,
+    0px 0px 0px 1px #03030212;
+  --shadow-xs:
+    0px 1px 1px -0.5px #03030230,
+    0px 2px 2px -1px #0303020A,
+    0px 4px 4px -2px #03030205,
+    0px 8px 4px -3px #03030203,
+    0px 0px 0px 1px #03030212,
+    0px 1px 0px 0px #0303020A,
+    0px 0px 0px 1px #FFFFFF0D inset,
+    0px 1px 0px 0px #FFFFFF1F inset;
+  --shadow-sm:
+    0px 1px 2px -0.5px #03030230,
+    0px 3px 3px -1px #0303020A,
+    0px 6px 5px -2px #03030205,
+    0px 15px 6px -3px #03030203,
+    0px 0px 0px 1px #03030212,
+    0px 1px 0px 0px #0303020A,
+    0px 0px 0px 1px #FFFFFF0D inset,
+    0px 1px 0px 0px #FFFFFF1F inset;
+  --shadow-md:
+    0px 1px 3px 0px #0303020D,
+    0px 5px 5px -1px #0303020D,
+    0px 11px 6px -2px #03030208,
+    0px 19px 8px -3px #03030203,
+    0px 0px 0px 1px #FFFFFF0D inset,
+    0px 1px 0px 0px #FFFFFF1F inset,
+    0px 0px 0px 1px #03030212,
+    0px 1px 0px 0px #0303020A;
+  --shadow-lg:
+    0px 0px 0px 1px #FFFFFF0D inset,
+    0px 1px 0px 0px #FFFFFF1F inset,
+    0px 0px 0px 1px #0303021A,
+    0px 1px 0px 0px #0303021A,
+    0px 2px 5px -1px #0303020F,
+    0px 8px 12px -1px #0303020D,
+    0px 22px 16px -2px #0303020A,
+    0px 32px 18px -2px #03030203;
+  --shadow-xl:
+    0px 0px 0px 1px #FFFFFF0D inset,
+    0px 1px 0px 0px #FFFFFF1F inset,
+    0px 0px 0px 1px #0303021A,
+    0px 1px 0px 0px #0303021A,
+    0px 4px 8px -1px #0303020F,
+    0px 15px 15px -1px #0303020D,
+    0px 33px 20px -2px #0303020A,
+    0px 58px 23px -2px #03030203;
+  --shadow-2xl:
+    0px 13px 29px 0px #03030212,
+    0px 53px 53px 0px #0303020F,
+    0px 119px 71px 0px #03030208,
+    0px 211px 85px 0px #03030203,
+    0px 0px 0px 1px #0303021A,
+    0px 1px 0px 0px #0303021A,
+    0px 0px 0px 1px #FFFFFF0D inset,
+    0px 1px 0px 0px #FFFFFF1F inset;
+}

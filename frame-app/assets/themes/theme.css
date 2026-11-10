@@ -1,0 +1,77 @@
+/* Frame Graphite — Guerriero-inspired neutral charcoal surfaces.
+ * CSS owns color and radius; native shadows supply edges and highlights.
+ * Light mode keeps the same hierarchy in cool neutral grays.
+ */
+
+:root {
+    --background: #e9e9eb;
+    --foreground: #252528;
+    --card: #f6f6f7;
+    --card-foreground: #252528;
+    --popover: #fbfbfc;
+    --popover-foreground: #252528;
+    --primary: #29292d;
+    --primary-foreground: #f7f7f8;
+    --secondary: #e9e9ec;
+    --secondary-foreground: #323237;
+    --muted: #e1e1e5;
+    --muted-foreground: #64646c;
+    --accent: #ffffff;
+    --accent-foreground: #252528;
+    --select-highlight: var(--muted);
+    --destructive: #b83842;
+    --success: #28734f;
+    --border: #03030212;
+    --input: #0303021a;
+    --ring: #777782;
+    --chart-1: #757581;
+    --chart-2: #9797a1;
+    --chart-3: #666670;
+    --chart-4: #484850;
+    --chart-5: #303037;
+    --radius: 0.875rem;
+    --sidebar: #e2e2e6;
+    --sidebar-foreground: #252528;
+    --sidebar-primary: #29292d;
+    --sidebar-primary-foreground: #f7f7f8;
+    --sidebar-accent: #f6f6f7;
+    --sidebar-accent-foreground: #252528;
+    --sidebar-border: #03030212;
+    --sidebar-ring: #777782;
+}
+
+.dark {
+    --background: #111113;
+    --foreground: #ededf0;
+    --card: #1d1d20;
+    --card-foreground: #ededf0;
+    --popover: #262629;
+    --popover-foreground: #ededf0;
+    --primary: #e5e5e9;
+    --primary-foreground: #1c1c20;
+    --secondary: #2c2c30;
+    --secondary-foreground: #e5e5e9;
+    --muted: #242427;
+    --muted-foreground: #a5a5ad;
+    --accent: #36363b;
+    --accent-foreground: #f3f3f5;
+    --select-highlight: var(--accent);
+    --destructive: #ed8588;
+    --success: #83c89b;
+    --border: #ffffff0a;
+    --input: #ffffff14;
+    --ring: #aaaab5;
+    --chart-1: #d1d1d8;
+    --chart-2: #aaaab4;
+    --chart-3: #85858f;
+    --chart-4: #63636c;
+    --chart-5: #45454c;
+    --sidebar: #19191c;
+    --sidebar-foreground: #ededf0;
+    --sidebar-primary: #e5e5e9;
+    --sidebar-primary-foreground: #1c1c20;
+    --sidebar-accent: #2c2c30;
+    --sidebar-accent-foreground: #ededf0;
+    --sidebar-border: #ffffff0a;
+    --sidebar-ring: #aaaab5;
+}

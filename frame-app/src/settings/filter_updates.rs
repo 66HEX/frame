@@ -1,4 +1,4 @@
-use super::model::{
+use crate::settings::model::{
     AudioFiltersConfig, ConversionConfig, DeinterlaceMode, FilterStrength, FilterValue,
     VideoFiltersConfig,
 };
@@ -312,6 +312,7 @@ mod tests {
     fn reset_audio_filters_preserves_audio_bitrate_mode() {
         let mut config = ConversionConfig {
             audio_bitrate_mode: "vbr".to_string(),
+            opus_vbr: false,
             audio_normalize: true,
             audio_volume: 140,
             ..ConversionConfig::default()
@@ -320,6 +321,7 @@ mod tests {
         assert!(reset_audio_filters(&mut config));
 
         assert_eq!(config.audio_bitrate_mode, "vbr");
+        assert!(!config.opus_vbr);
     }
 
     #[test]

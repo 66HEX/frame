@@ -1,4 +1,6 @@
-use super::{ParentElement, Styled, div, relative, theme};
+use crate::theme;
+use gpui::prelude::{ParentElement, Styled};
+use gpui::{div, relative};
 
 pub(in crate::app) const MIN_POINTER_TARGET: f32 = 24.0;
 

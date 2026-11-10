@@ -36,18 +36,21 @@ ashpd = { version = "0.13.12", default-features = false, features = ["async-io",
 smol = "2.0"
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_Threading", "Win32_System_LibraryLoader", "Win32_UI_WindowsAndMessaging"] }
+windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_Threading", "Win32_System_SystemInformation", "Win32_System_JobObjects", "Win32_System_Pipes", "Win32_System_IO", "Win32_System_LibraryLoader", "Win32_UI_WindowsAndMessaging"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSAccessibility", "NSWorkspace", "NSButton", "NSControl", "NSResponder", "NSView", "NSWindow"] }
 raw-window-handle = "0.6"
 
 [dev-dependencies]
+csscolorparser = "0.9.0"
 gpui = { package = "gpui-ce", git = "https://github.com/gpui-ce/gpui-ce", rev = "bc577476a0eb55173ef985585cfb487f75ab1cab", features = ["test-support"] }
 
 [build-dependencies]
+csscolorparser = "0.9.0"
 embed-resource = "3.0.9"
 image = "0.25.10"
+serde_json = "1.0.150"
 
 [package.metadata.bundle]
 name = "Frame"

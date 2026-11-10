@@ -1,10 +1,34 @@
-use super::*;
+use crate::app::input::constants::{FRAME_TEXT_INPUT_CONTEXT, FRAME_TIMECODE_INPUT_CONTEXT};
+#[cfg(target_os = "linux")]
+use crate::app::layout::LINUX_WINDOW_FRAME_INSET;
+use crate::app::layout::{WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH};
+use crate::app::root::FrameRoot;
+use crate::app::{
+    DecreaseUiScale, IncreaseUiScale, Quit, ResetUiScale, TextInputBackspace, TextInputCancel,
+    TextInputCommit, TextInputCopy, TextInputCut, TextInputDelete, TextInputEnd, TextInputHome,
+    TextInputLeft, TextInputPaste, TextInputRight, TextInputSelectAll, TextInputSelectLeft,
+    TextInputSelectRight,
+};
+use crate::app_info::FRAME_APP_ID;
+#[cfg(target_os = "linux")]
+use crate::theme;
+use gpui::prelude::*;
+use gpui::{
+    App, Bounds, KeyBinding, Menu, MenuItem, Pixels, SharedString, TextRenderingMode,
+    TitlebarOptions, WindowBounds, WindowDecorations, WindowOptions, point, px, size,
+};
 
 pub fn init_app(cx: &mut App, name: impl Into<SharedString>) {
     #[cfg(not(test))]
     super::system_motion::observe(cx);
     cx.activate(true);
-    cx.set_text_rendering_mode(TextRenderingMode::PlatformDefault);
+    // Tailwind's `antialiased` is a macOS font-smoothing override. Apply it once
+    // for all text, including custom-painted inputs and deferred popovers.
+    cx.set_text_rendering_mode(if cfg!(target_os = "macos") {
+        TextRenderingMode::Antialiased
+    } else {
+        TextRenderingMode::PlatformDefault
+    });
     cx.on_action(|_: &Quit, cx| cx.quit());
     cx.bind_keys([
         KeyBinding::new("cmd-q", Quit, None),

@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 
+/docs/
 /target
 /.cache
 /frame-core/target

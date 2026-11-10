@@ -62,14 +62,14 @@ details, tier suggestions, and a launch checklist.
 
 - **Media Types:** Video, audio, and image sources.
 - **Supported Source Files:**
-  - **Video:** `mp4`, `mov`, `mkv`, `avi`, `webm`, `mts`, `m2t`, `m2ts`, `gif`
-  - **Audio:** `mp3`, `m4a`, `wav`, `flac`
+  - **Video:** `mp4`, `mov`, `mkv`, `avi`, `webm`, `ts`, `mts`, `m2t`, `m2ts`, `gif`
+  - **Audio:** `mp3`, `m4a`, `wav`, `flac`, `opus`
   - **Image:** `png`, `jpg`, `jpeg`, `webp`, `bmp`, `tif`, `tiff`, `avif`,
     `heic`, `heif`
 - **Supported Output Formats:**
   - **Video:** `mp4`, `mkv`, `webm`, `mov`, `m2t` (188-byte MPEG-TS), `mts`
     and `m2ts` (192-byte M2TS), `gif`
-  - **Audio:** `mp3`, `m4a`, `wav`, `flac`
+  - **Audio:** `mp3`, `m4a`, `wav`, `flac`, `opus`
   - **Image:** `png`, `jpg`, `webp`, `bmp`, `tiff`
 - **Video Encoders:**
   - `libx264` (H.264 / AVC)

@@ -16,9 +16,10 @@
 		"mp3",
 		"m4a",
 		"wav",
-		"flac"
+		"flac",
+		"opus"
 	],
-	"audioOnlyContainers": ["mp3", "m4a", "wav", "flac", "aac"],
+	"audioOnlyContainers": ["mp3", "m4a", "wav", "flac", "opus", "aac"],
 	"videoOnlyContainers": ["gif"],
 	"imageContainers": ["png", "jpg", "webp", "bmp", "tiff"],
 	"containerVideoCodecCompatibility": {
@@ -124,21 +125,22 @@
 	},
 	"containerVideoStreamCodecCompatibility": {
 		"mp4": ["h264", "hevc", "av1", "vp9", "mpeg4", "mjpeg"],
-		"mkv": ["*"],
-		"mov": ["*"],
+		"mkv": ["012v", "4xm", "8bps", "aasc", "agm", "aic", "amv", "apv", "arbc", "asv1", "asv2", "aura", "aura2", "av1", "avrn", "avrp", "avs2", "avs3", "avui", "cavs", "cdtoons", "cfhd", "cinepak", "clearvideo", "cljr", "cllc", "cscd", "cyuv", "dirac", "dnxhd", "dpx", "dvvideo", "dxtory", "dxv", "escape130", "evc", "exr", "ffv1", "ffvhuff", "fic", "flashsv", "flic", "flv1", "fmvc", "fraps", "frwu", "g2m", "gif", "h261", "h263", "h263i", "h263p", "h264", "hap", "hevc", "hq_hqa", "hqx", "huffyuv", "hymt", "imm4", "imm5", "indeo2", "indeo3", "indeo4", "indeo5", "jpeg2000", "jpegls", "kgv1", "kmvc", "lagarith", "lcevc", "lead", "ljpeg", "loco", "lscr", "m101", "magicyuv", "media100", "mimic", "mjpeg", "mjpegb", "mpeg1video", "mpeg2video", "mpeg4", "msa1", "mscc", "msmpeg4v1", "msmpeg4v2", "msmpeg4v3", "msrle", "mss1", "mss2", "msvideo1", "mszh", "mts2", "mv30", "mvdv", "mvha", "mwsc", "notchlc", "pixlet", "png", "prores", "prores_raw", "prosumer", "qdraw", "qpeg", "r10k", "r210", "rasc", "rawvideo", "rpza", "rscc", "rtv1", "rv10", "rv20", "rv30", "rv40", "rv60", "scpr", "screenpresso", "sgi", "sgirle", "sheervideo", "snow", "sp5x", "speedhq", "srgc", "svq1", "svq3", "targa", "targa_y216", "tdsc", "theora", "tiff", "truemotion1", "truemotion2", "truemotion2rt", "tscc", "tscc2", "ulti", "utvideo", "v210", "v308", "v408", "v410", "vble", "vc1", "vc1image", "vcr1", "vixl", "vmix", "vmnc", "vp3", "vp4", "vp5", "vp6", "vp6a", "vp6f", "vp7", "vp8", "vp9", "vqc", "vvc", "wcmv", "wmv1", "wmv2", "wmv3", "wmv3image", "wnv1", "xan_wc4", "y41p", "ylc", "yuv4", "zerocodec", "zlib", "zmbv"],
+		"mov": ["012v", "4xm", "8bps", "aasc", "agm", "aic", "amv", "apv", "arbc", "asv1", "asv2", "aura", "aura2", "avrn", "avrp", "avs2", "avs3", "avui", "cavs", "cdtoons", "cfhd", "cinepak", "clearvideo", "cljr", "cllc", "cscd", "cyuv", "dirac", "dnxhd", "dpx", "dvvideo", "dxtory", "dxv", "escape130", "evc", "exr", "ffv1", "ffvhuff", "fic", "flashsv", "flic", "flv1", "fmvc", "fraps", "frwu", "g2m", "gif", "h261", "h263", "h263i", "h263p", "h264", "hap", "hevc", "hq_hqa", "hqx", "huffyuv", "hymt", "imm4", "imm5", "indeo2", "indeo3", "indeo4", "indeo5", "jpeg2000", "jpegls", "kgv1", "kmvc", "lagarith", "lcevc", "lead", "ljpeg", "loco", "lscr", "m101", "magicyuv", "media100", "mimic", "mjpeg", "mjpegb", "mpeg1video", "mpeg2video", "mpeg4", "msa1", "mscc", "msmpeg4v1", "msmpeg4v2", "msmpeg4v3", "msrle", "mss1", "mss2", "msvideo1", "mszh", "mts2", "mv30", "mvdv", "mvha", "mwsc", "notchlc", "pixlet", "png", "prores", "prores_raw", "prosumer", "qdraw", "qpeg", "qtrle", "r10k", "r210", "rasc", "rawvideo", "rpza", "rscc", "rtv1", "rv40", "rv60", "scpr", "screenpresso", "sgi", "sgirle", "sheervideo", "smc", "snow", "sp5x", "speedhq", "srgc", "svq1", "svq3", "targa", "targa_y216", "tdsc", "theora", "tiff", "truemotion1", "truemotion2", "truemotion2rt", "tscc", "tscc2", "ulti", "utvideo", "v210", "v308", "v408", "v410", "vble", "vc1", "vc1image", "vcr1", "vixl", "vmix", "vmnc", "vp3", "vp4", "vp5", "vp6", "vp6a", "vp6f", "vp7", "vqc", "vvc", "wcmv", "wmv1", "wmv2", "wmv3", "wmv3image", "wnv1", "xan_wc4", "y41p", "ylc", "yuv4", "zerocodec", "zlib", "zmbv"],
 		"webm": ["vp8", "vp9", "av1"],
 		"gif": ["gif"],
 		"mpegts": ["mpeg1video", "mpeg2video", "mpeg4", "h264", "hevc", "vvc", "cavs", "avs2", "avs3", "dirac", "vc1"],
 		"m2ts": ["mpeg2video", "h264", "vc1", "hevc"]
 	},
 	"containerAudioCodecCompatibility": {
+		"opus": ["libopus"],
 		"mp3": ["mp3"],
 		"wav": ["pcm_s16le"],
 		"flac": ["flac"],
 		"m4a": ["aac", "libfdk_aac", "alac"],
 		"mp4": ["aac", "libfdk_aac", "ac3", "libopus", "mp3", "alac"],
-		"mov": ["*"],
-		"mkv": ["*"],
+		"mov": ["aac", "libfdk_aac", "ac3", "mp3", "alac", "pcm_s16le", "mp2"],
+		"mkv": ["aac", "libfdk_aac", "ac3", "libopus", "mp3", "alac", "flac", "pcm_s16le", "mp2"],
 		"webm": ["libopus", "vorbis"],
 		"mpegts": ["mp2", "aac", "libfdk_aac", "ac3", "mp3", "libopus"],
 		"m2ts": ["ac3", "pcm_bluray"],
@@ -150,6 +152,7 @@
 		"tiff": []
 	},
 	"containerAudioStreamCodecCompatibility": {
+		"opus": ["opus"],
 		"mp3": ["mp3"],
 		"wav": [
 			"pcm_s16le",
@@ -158,17 +161,16 @@
 			"pcm_f32le",
 			"pcm_f64le",
 			"pcm_u8",
-			"pcm_s8",
 			"pcm_alaw",
 			"pcm_mulaw"
 		],
 		"flac": ["flac"],
-		"m4a": ["aac", "alac", "ac3", "eac3", "mp3"],
+		"m4a": ["aac", "alac", "ac3"],
 		"mp4": ["aac", "ac3", "eac3", "opus", "mp3", "alac"],
-		"mov": ["*"],
-		"mkv": ["*"],
+		"mov": ["aac", "aac_latm", "ac3", "ac4", "acelp.kelvin", "adpcm_ct", "adpcm_g722", "adpcm_g726", "adpcm_ima_dk3", "adpcm_ima_dk4", "adpcm_ima_oki", "adpcm_ima_qt", "adpcm_ima_xbox", "adpcm_sanyo", "adpcm_swf", "adpcm_yamaha", "adpcm_zork", "alac", "amr_nb", "amr_wb", "atrac3", "avc", "dts", "dvaudio", "eac3", "evrc", "ftr", "g723_1", "g728", "g729", "gsm", "gsm_ms", "iac", "ilbc", "imc", "mace3", "mace6", "metasound", "misc4", "mp1", "mp2", "mp3", "mpegh_3d_audio", "msnsiren", "nellymoser", "pcm_alaw", "pcm_f32be", "pcm_f32le", "pcm_f64be", "pcm_f64le", "pcm_mulaw", "pcm_s16be", "pcm_s16le", "pcm_s24be", "pcm_s24le", "pcm_s32be", "pcm_s32le", "pcm_s8", "pcm_u8", "qcelp", "qdm2", "qdmc", "sipr", "smv", "sonic", "sonicls", "speex", "truespeech", "vorbis", "wmalossless", "wmapro", "wmavoice", "xan_dpcm", "xma1", "xma2"],
+		"mkv": ["aac", "aac_latm", "ac3", "acelp.kelvin", "adpcm_ct", "adpcm_g722", "adpcm_g726", "adpcm_ima_dk3", "adpcm_ima_dk4", "adpcm_ima_oki", "adpcm_ima_wav", "adpcm_ima_xbox", "adpcm_ms", "adpcm_sanyo", "adpcm_swf", "adpcm_yamaha", "adpcm_zork", "alac", "amr_nb", "amr_wb", "atrac1", "atrac3", "avc", "cook", "dfpwm", "dts", "dvaudio", "eac3", "flac", "ftr", "g723_1", "g728", "g729", "gsm_ms", "iac", "imc", "metasound", "misc4", "mlp", "mp1", "mp2", "mp3", "msnsiren", "opus", "pcm_alaw", "pcm_f32le", "pcm_f64le", "pcm_mulaw", "pcm_s16be", "pcm_s16le", "pcm_s24be", "pcm_s24le", "pcm_s32be", "pcm_s32le", "pcm_s64le", "pcm_u8", "qdm2", "qdmc", "ra_144", "ra_288", "sipr", "sonic", "sonicls", "speex", "truehd", "truespeech", "tta", "vorbis", "wavpack", "wmalossless", "wmapro", "wmav1", "wmav2", "wmavoice", "xan_dpcm", "xma1", "xma2"],
 		"webm": ["opus", "vorbis"],
-		"mpegts": ["mp2", "mp3", "aac", "aac_latm", "ac3", "eac3", "dts", "truehd", "opus"],
+		"mpegts": ["mp2", "mp3", "aac", "aac_latm", "ac3", "eac3", "dts", "opus"],
 		"m2ts": ["pcm_bluray", "ac3", "dts", "truehd", "eac3"],
 		"gif": [],
 		"png": [],
@@ -177,15 +179,24 @@
 		"bmp": [],
 		"tiff": []
 	},
+	"containerAudioStreamCopyTags": {
+		"mov": {
+			"aac_latm": "0x0216736d",
+			"adpcm_g726": "0x4500736d",
+			"g723_1": "0x4200736d",
+			"vorbis": "0x6f56736d"
+		}
+	},
 	"containerSubtitleCodecCompatibility": {
-		"mp4": ["mov_text"],
-		"mov": ["*"],
-		"mkv": ["*"],
+		"mp4": ["mov_text", "ttml"],
+		"mov": ["mov_text", "ttml", "eia_608"],
+		"mkv": ["arib_caption", "ass", "dvb_subtitle", "dvd_subtitle", "hdmv_pgs_subtitle", "hdmv_text_subtitle", "srt", "ssa", "subrip", "text", "webvtt"],
 		"webm": ["webvtt"],
 		"mpegts": ["dvb_subtitle", "dvb_teletext", "arib_caption"],
 		"m2ts": ["hdmv_pgs_subtitle", "hdmv_text_subtitle"]
 	},
 	"defaultAudioCodec": {
+		"opus": "libopus",
 		"mp3": "mp3",
 		"wav": "pcm_s16le",
 		"flac": "flac",

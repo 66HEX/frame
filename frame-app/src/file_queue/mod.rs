@@ -9,7 +9,6 @@ mod tests;
 
 #[cfg(test)]
 use crate::settings::ConversionConfig;
-
 pub use format::*;
 pub use item::*;
 pub use queue::*;

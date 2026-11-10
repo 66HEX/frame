@@ -9,7 +9,11 @@ const LEGAL_COPYRIGHT: &str = "Copyright 2026 Marek Jozwiak";
 const LINUX_APP_ICON: &str = "resources/app-icons/icon.png";
 const WINDOWS_APP_ICON: &str = "resources/app-icons/icon.ico";
 
+#[path = "src/theme/css.rs"]
+mod theme_css;
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    compile_theme()?;
     println!("cargo:rerun-if-env-changed=CARGO_CFG_TARGET_OS");
     println!("cargo:rerun-if-env-changed=CARGO_PKG_VERSION");
     println!("cargo:rerun-if-changed={LINUX_APP_ICON}");
@@ -21,6 +25,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => {}
     }
 
+    Ok(())
+}
+
+fn compile_theme() -> Result<(), Box<dyn std::error::Error>> {
+    const SOURCE: &str = "assets/themes/theme.css";
+    println!("cargo:rerun-if-changed={SOURCE}");
+    println!("cargo:rerun-if-changed=src/theme/css.rs");
+    let css = fs::read_to_string(SOURCE)?;
+    let theme = theme_css::import(&css).map_err(|message| format!("{SOURCE}: {message}"))?;
+    let output = PathBuf::from(env::var("OUT_DIR")?);
+    fs::write(
+        output.join("theme-colors.json"),
+        serde_json::to_string(&theme.colors)?,
+    )?;
+    fs::write(
+        output.join("theme-radius.rs"),
+        format!("pub const RADIUS_BASE: f32 = {:?};\n", theme.radius),
+    )?;
     Ok(())
 }
 

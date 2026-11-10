@@ -197,6 +197,7 @@ pub(crate) struct StyleTransitionState {
     border_color: Option<StyleTransitionPropertyState<Background>>,
     ring: RingStyleTransitionState,
     inset_ring: RingStyleTransitionState,
+    outline: RingStyleTransitionState,
     text: TextStyleTransitionState,
     opacity: Option<StyleTransitionPropertyState<f32>>,
 }
@@ -1095,6 +1096,40 @@ mod tests {
             style.ring.color,
             RingColor::Color(red().lerp(&blue(), 0.5).into())
         );
+    }
+
+    #[test]
+    fn outline_color_fades_without_changing_its_width_or_flashing() {
+        let start = Instant::now();
+        let duration = Duration::from_millis(150);
+        let transitions = StyleTransitions::new().outline_color(duration);
+        let context = StyleTransitionContext::new(None, px(16.0));
+        let mut state = StyleTransitionState::default();
+        let mut style = Style::default();
+        style.outline.width = px(1.0);
+        let visible = crate::hsla(0.0, 0.0, 0.45, 1.0);
+        let hidden = crate::hsla(0.0, 0.0, 0.45, 0.0);
+        style.outline.color = RingColor::Color(hidden.into());
+        transitions.apply(&mut style, &mut state, context, start, false);
+        for (offset, target, expected) in [
+            (0, visible, hidden),
+            (75, visible, hidden.lerp(&visible, 0.5)),
+            (150, visible, visible),
+            (150, hidden, visible),
+            (225, hidden, visible.lerp(&hidden, 0.5)),
+            (300, hidden, hidden),
+        ] {
+            style.outline.color = RingColor::Color(target.into());
+            transitions.apply(
+                &mut style,
+                &mut state,
+                context,
+                start + Duration::from_millis(offset),
+                false,
+            );
+            assert_eq!(style.outline.width, px(1.0));
+            assert_eq!(style.outline.color, RingColor::Color(expected.into()));
+        }
     }
 
     #[test]

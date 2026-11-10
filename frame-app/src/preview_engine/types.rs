@@ -1,16 +1,16 @@
-use std::{path::PathBuf, sync::Arc};
-
+use super::{PreviewEngineError, PreviewFrameStats, PreviewRuntimeMetrics};
+use crate::numeric::rounded_f64_to_u32;
 use frame_core::types::ConversionConfig as CoreConversionConfig;
 use gpui::RenderImage;
-
-use crate::numeric::rounded_f64_to_u32;
-
-use super::{PreviewEngineError, PreviewFrameStats, PreviewRuntimeMetrics};
+use std::path::PathBuf;
+use std::sync::Arc;
 
 pub const DEFAULT_PREVIEW_MAX_WIDTH: u32 = 1280;
 pub const DEFAULT_PREVIEW_MAX_HEIGHT: u32 = 720;
 pub const DEFAULT_PREVIEW_FPS: u32 = 30;
 pub const MIN_PREVIEW_DIMENSION: u32 = 16;
+/// Source pixels are independent of the minimum requested preview canvas.
+pub const MIN_PREVIEW_SOURCE_DIMENSION: u32 = 1;
 pub const MAX_PREVIEW_DIMENSION: u32 = 3840;
 pub const MIN_PREVIEW_FPS: u32 = 1;
 pub const MAX_PREVIEW_FPS: u32 = 60;
@@ -62,6 +62,11 @@ pub struct PreviewCrop {
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct PreviewRenderPresentation {
+    /// Pixel aspect of the prepared raster before this optional native transform.
+    pub pixel_aspect_ratio: frame_core::aspect::DisplayRatio,
+    /// Output raster aspect before low-resolution scaling and native transforms.
+    /// Legacy/manual frames without this metadata use their texture raster.
+    pub output_raster_aspect_ratio: Option<frame_core::aspect::DisplayRatio>,
     pub transform: PreviewTransform,
     pub crop: Option<PreviewCrop>,
     pub crop_source_width: Option<u32>,
@@ -80,6 +85,8 @@ pub struct PreviewFrame {
 
 #[derive(Clone, Debug)]
 pub struct PreviewRenderedFrame {
+    pub presentation: PreviewRenderPresentation,
+    pub request_token: u64,
     pub width: u32,
     pub height: u32,
     pub timestamp_us: u64,
@@ -89,7 +96,9 @@ pub struct PreviewRenderedFrame {
 
 impl PartialEq for PreviewRenderedFrame {
     fn eq(&self, other: &Self) -> bool {
-        self.width == other.width
+        self.presentation == other.presentation
+            && self.request_token == other.request_token
+            && self.width == other.width
             && self.height == other.height
             && self.timestamp_us == other.timestamp_us
             && self.byte_len == other.byte_len
@@ -110,12 +119,36 @@ impl PreviewRenderedFrame {
         render_image: Arc<RenderImage>,
     ) -> Self {
         Self {
+            presentation: PreviewRenderPresentation {
+                pixel_aspect_ratio: frame_core::aspect::DisplayRatio::ONE,
+                output_raster_aspect_ratio: None,
+                transform: PreviewTransform {
+                    rotation_degrees: 0,
+                    flip_horizontal: false,
+                    flip_vertical: false,
+                },
+                crop: None,
+                crop_source_width: None,
+                crop_source_height: None,
+            },
+            request_token: 0,
             width,
             height,
             timestamp_us,
             byte_len,
             render_image,
         }
+    }
+
+    #[must_use]
+    pub const fn with_presentation(
+        mut self,
+        presentation: PreviewRenderPresentation,
+        request_token: u64,
+    ) -> Self {
+        self.presentation = presentation;
+        self.request_token = request_token;
+        self
     }
 
     #[must_use]
@@ -178,6 +211,13 @@ pub struct PreviewSessionConfig {
     pub source_kind: PreviewSourceKind,
     pub source_width: Option<u32>,
     pub source_height: Option<u32>,
+    pub source_is_palette: bool,
+    /// Derived from probed demuxer format, never the filename extension.
+    pub source_is_mpeg_ts: bool,
+    pub source_sample_aspect_ratio: Option<frame_core::aspect::SampleAspectRatio>,
+    pub request_token: u64,
+    pub source_clock: frame_core::source_timing::ResolvedSourceClock,
+    pub preview_burn_clock: Option<frame_core::source_timing::PreviewBurnClock>,
     pub selected_audio_track: Option<u32>,
     pub duration_seconds: f64,
     pub max_width: u32,
@@ -222,13 +262,13 @@ impl PreviewSessionConfig {
                 validate_range(
                     "source_width",
                     width,
-                    MIN_PREVIEW_DIMENSION,
+                    MIN_PREVIEW_SOURCE_DIMENSION,
                     MAX_PREVIEW_DIMENSION * 8,
                 )?;
                 validate_range(
                     "source_height",
                     height,
-                    MIN_PREVIEW_DIMENSION,
+                    MIN_PREVIEW_SOURCE_DIMENSION,
                     MAX_PREVIEW_DIMENSION * 8,
                 )?;
             }
@@ -284,6 +324,11 @@ pub enum PreviewCommand {
     Pause,
     SeekFast(f64),
     SeekPrecise(f64),
+    /// Starts playback at the target without decoding an intermediate paused frame.
+    SeekAndPlay {
+        seconds: f64,
+        precise: bool,
+    },
 }
 
 #[must_use]
@@ -298,8 +343,8 @@ pub fn fit_dimensions(
     let scale = width_scale.min(height_scale).min(1.0);
 
     PreviewDimensions {
-        width: even_dimension(rounded_f64_to_u32(f64::from(source_width) * scale)),
-        height: even_dimension(rounded_f64_to_u32(f64::from(source_height) * scale)),
+        width: rounded_f64_to_u32(f64::from(source_width) * scale).max(1),
+        height: rounded_f64_to_u32(f64::from(source_height) * scale).max(1),
     }
 }
 

@@ -1,12 +1,18 @@
-use super::{
-    App, Context, FocusHandle, FrameRoot, StatefulInteractiveElement, Styled, Window, color, px,
-    theme,
+use crate::app::primitives::color;
+use crate::app::root::FrameRoot;
+use crate::theme;
+use gpui::prelude::Styled;
+use gpui::{
+    App, Context, FocusHandle, InteractiveElement, Orientation, Role, SharedString,
+    StatefulInteractiveElement, StyleRefinement, Toggled, Window, px,
 };
-use gpui::{InteractiveElement, Orientation, Role, SharedString, StyleRefinement, Toggled};
 use std::collections::HashMap;
 
-const FOCUS_RING_WIDTH: f32 = 3.0;
-const FOCUS_RING_ALPHA: f32 = 0.55;
+#[cfg(test)]
+#[path = "accessibility/focus_ring_tests.rs"]
+mod focus_ring_tests;
+
+const FOCUS_RING_WIDTH: f32 = theme::metrics::FOCUS_WIDTH;
 pub(in crate::app) const APP_ROOT_FOCUS_ID: &str = "app-root";
 
 /// One tab stop per rail; selection, pointer focus and arrow-key focus agree.
@@ -17,7 +23,7 @@ pub(in crate::app) struct TabFocusGroup {
 
 impl TabFocusGroup {
     pub(in crate::app) fn render(
-        id: &'static str,
+        id: impl Into<gpui::ElementId>,
         active: String,
         tabs: impl IntoIterator<Item = String>,
         window: &mut Window,
@@ -144,13 +150,37 @@ impl FrameRoot {
         true
     }
 
+    pub(in crate::app) fn register_shell_focus(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        // Keyed state is render-only. Keep the same handle in the registry so
+        // dialog event handlers can restore it without touching render state.
+        let handle = titlebar_settings_focus(window, cx);
+        self.focus_registry.handles.insert(
+            FrameFocusKey::Control("titlebar-settings".into()),
+            FrameFocusEntry {
+                handle,
+                last_seen_epoch: self.focus_registry.frame_epoch,
+            },
+        );
+        let handle = welcome_open_file_focus(window, cx);
+        self.focus_registry.handles.insert(
+            FrameFocusKey::Control("welcome-open-file".into()),
+            FrameFocusEntry {
+                handle,
+                last_seen_epoch: self.focus_registry.frame_epoch,
+            },
+        );
+    }
+
     pub(in crate::app) fn restore_focus_after_settings_close(
         &self,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> bool {
         self.focus_registered_control("titlebar-settings", window, cx)
-            || self.focus_registered_control(APP_ROOT_FOCUS_ID, window, cx)
     }
 
     pub(in crate::app) fn restore_focus_after_update_dialog_close(
@@ -163,9 +193,51 @@ impl FrameRoot {
         {
             return true;
         }
-        self.focus_registered_control("titlebar-settings", window, cx)
-            || self.focus_registered_control(APP_ROOT_FOCUS_ID, window, cx)
+        self.restore_focus_after_settings_close(window, cx)
     }
+}
+
+pub(in crate::app) fn titlebar_settings_focus(
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> FocusHandle {
+    window
+        .use_keyed_state("titlebar-settings-focus", cx, |_, cx| cx.focus_handle())
+        .read(cx)
+        .clone()
+        .tab_stop(true)
+}
+
+pub(in crate::app) fn welcome_open_file_focus(
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> FocusHandle {
+    window
+        .use_keyed_state("welcome-open-file-focus", cx, |_, cx| cx.focus_handle())
+        .read(cx)
+        .clone()
+        .tab_stop(true)
+}
+
+/// An absent CSS box shadow starts transparent, not at `currentColor`.
+/// GPUI interpolates `CurrentColor` -> `Color` discretely, which would paint the
+/// text color until the last frame while the ring is already growing.
+pub(in crate::app) fn focus_ring_base<T: Styled>(
+    mut element: T,
+    palette: &theme::ThemePalette,
+) -> T {
+    if element.style().ring.color.is_none() {
+        element = element.ring_color(color(palette.focus_ring.with_alpha(0.0)));
+    }
+    element
+}
+
+/// Keep the shared ring appearance, but paint it above custom media/corner masks.
+/// GPUI's outline uses the same geometry as its ring, with a foreground paint pass.
+pub(in crate::app) fn focus_ring_above_content<T: Styled>(mut element: T) -> T {
+    let style = element.style();
+    style.outline = std::mem::take(&mut style.ring);
+    element
 }
 
 pub(in crate::app) fn focus_visible_ring(
@@ -174,7 +246,34 @@ pub(in crate::app) fn focus_visible_ring(
 ) -> StyleRefinement {
     style
         .ring(px(FOCUS_RING_WIDTH))
-        .ring_color(color(palette.accent.with_alpha(FOCUS_RING_ALPHA)))
+        .ring_color(color(
+            palette.focus_ring.with_opacity(theme::metrics::FOCUS_ALPHA),
+        ))
+        .border_color(color(palette.focus_ring))
+}
+
+pub(in crate::app) fn composite_focus_ring(
+    style: StyleRefinement,
+    palette: &'static theme::ThemePalette,
+) -> StyleRefinement {
+    style
+        .ring(px(3.0))
+        .ring_color(color(palette.focus_ring.with_opacity(0.5)))
+        .border_color(color(palette.focus_ring))
+}
+
+/// Keep outline width at 1px; CSS outline-color transitions from transparent.
+pub(in crate::app) fn tab_focus_base<T: Styled>(element: T, palette: &theme::ThemePalette) -> T {
+    focus_ring_base(element, palette)
+        .outline(px(1.0))
+        .outline_color(color(palette.focus_ring.with_alpha(0.0)))
+}
+
+pub(in crate::app) fn tab_focus_ring(
+    style: StyleRefinement,
+    palette: &'static theme::ThemePalette,
+) -> StyleRefinement {
+    composite_focus_ring(style, palette).outline_color(color(palette.focus_ring))
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -257,40 +356,85 @@ pub(in crate::app) fn handle_modal_tab_navigation(
     true
 }
 
+/// Keyboard scrolling for focused read-only areas (inspectors, release notes).
+pub(in crate::app) fn handle_scroll_area_key(
+    event: &gpui::KeyDownEvent,
+    scroll: &gpui::ScrollHandle,
+    window: &mut Window,
+    cx: &mut App,
+) -> bool {
+    let mut offset = scroll.offset();
+    let page = scroll.bounds().size.height * 0.9;
+    match event.keystroke.key.as_str() {
+        "up" => offset.y += px(40.0),
+        "down" => offset.y -= px(40.0),
+        "pageup" => offset.y += page,
+        "pagedown" => offset.y -= page,
+        "home" => offset.y = px(0.0),
+        "end" => offset.y = -scroll.max_offset().y,
+        _ => return false,
+    }
+    scroll.set_offset(offset);
+    window.refresh();
+    cx.stop_propagation();
+    true
+}
+
+/// Move through the rendered stops inside a dialog, including dynamic actions.
+pub(in crate::app) fn handle_focus_scope_tab_navigation(
+    event: &gpui::KeyDownEvent,
+    scope: &FocusHandle,
+    window: &mut Window,
+    cx: &mut App,
+) -> bool {
+    let Some(navigation) = tab_navigation_for_key(
+        event.keystroke.key.as_str(),
+        event.keystroke.modifiers.shift,
+    ) else {
+        return false;
+    };
+    let mut first = None;
+    loop {
+        if navigation == TabNavigation::Previous {
+            window.focus_prev(cx);
+        } else {
+            window.focus_next(cx);
+        }
+        if scope.contains_focused(window, cx) {
+            break;
+        }
+        let candidate = window.focused(cx);
+        if candidate.is_none() || candidate == first {
+            scope.focus(window, cx);
+            break;
+        }
+        if first.is_none() {
+            first = candidate;
+        }
+    }
+    cx.stop_propagation();
+    true
+}
+
 pub(in crate::app) fn apply_accessible_button(
     element: gpui::Stateful<gpui::Div>,
     label: impl Into<SharedString>,
     enabled: bool,
     palette: &'static theme::ThemePalette,
 ) -> gpui::Stateful<gpui::Div> {
-    let element = element.role(Role::Button).aria_label(label);
+    let element = focus_ring_base(element, palette)
+        .role(Role::Button)
+        .aria_label(label)
+        // Drag handles share button semantics and focus feedback, but their
+        // geometry must follow pointer/keyboard input without interpolation.
+        .transitions(crate::app::motion::control_style_transitions);
     if enabled {
         element
             .focusable()
             .tab_stop(true)
             .focus_visible_style(move |style| focus_visible_ring(style, palette))
     } else {
-        element.tab_stop(false).aria_disabled(true)
-    }
-}
-
-pub(in crate::app) fn apply_accessible_button_with_focus(
-    element: gpui::Stateful<gpui::Div>,
-    label: impl Into<SharedString>,
-    enabled: bool,
-    focus: &FocusHandle,
-    palette: &'static theme::ThemePalette,
-) -> gpui::Stateful<gpui::Div> {
-    let element = element
-        .role(Role::Button)
-        .aria_label(label)
-        .track_focus(focus);
-    if enabled {
-        element
-            .tab_stop(true)
-            .focus_visible_style(move |style| focus_visible_ring(style, palette))
-    } else {
-        element.tab_stop(false).aria_disabled(true)
+        element.disabled(true).tab_stop(false).aria_disabled(true)
     }
 }
 
@@ -301,7 +445,9 @@ pub(in crate::app) fn apply_accessible_toggle_button(
     selected: bool,
     palette: &'static theme::ThemePalette,
 ) -> gpui::Stateful<gpui::Div> {
-    apply_accessible_button(element, label, enabled, palette).aria_toggled(Toggled::from(selected))
+    apply_accessible_button(element, label, enabled, palette)
+        .aria_toggled(Toggled::from(selected))
+        .focus_visible_style(move |style| composite_focus_ring(style, palette))
 }
 
 pub(in crate::app) fn apply_accessible_checkbox(
@@ -317,17 +463,18 @@ pub(in crate::app) fn apply_accessible_checkbox(
     } else {
         Toggled::from(checked)
     };
-    let element = element
+    let element = focus_ring_base(element, palette)
         .role(Role::CheckBox)
         .aria_label(label)
-        .aria_toggled(toggled);
+        .aria_toggled(toggled)
+        .transitions(|t| t.ring(crate::app::motion::interaction_motion()));
     if enabled {
         element
             .focusable()
             .tab_stop(true)
             .focus_visible_style(move |style| focus_visible_ring(style, palette))
     } else {
-        element.tab_stop(false).aria_disabled(true)
+        element.disabled(true).tab_stop(false).aria_disabled(true)
     }
 }
 
@@ -345,17 +492,18 @@ pub(in crate::app) fn apply_accessible_checkbox_with_focus(
     } else {
         Toggled::from(checked)
     };
-    let element = element
+    let element = focus_ring_base(element, palette)
         .role(Role::CheckBox)
         .aria_label(label)
         .aria_toggled(toggled)
-        .track_focus(focus);
+        .track_focus(focus)
+        .transitions(|t| t.ring(crate::app::motion::interaction_motion()));
     if enabled {
         element
             .tab_stop(true)
             .focus_visible_style(move |style| focus_visible_ring(style, palette))
     } else {
-        element.tab_stop(false).aria_disabled(true)
+        element.disabled(true).tab_stop(false).aria_disabled(true)
     }
 }
 
@@ -369,14 +517,19 @@ pub(in crate::app) fn apply_accessible_select_trigger(
     let element = element
         .role(Role::ComboBox)
         .aria_label(label)
-        .aria_expanded(expanded);
+        .aria_expanded(expanded)
+        .transitions(|t| {
+            t.border_color(crate::app::motion::interaction_motion())
+                .bg(crate::app::motion::interaction_motion())
+                .text_color(crate::app::motion::interaction_motion())
+        });
     if enabled {
         element
             .focusable()
             .tab_stop(true)
             .focus_visible_style(move |style| focus_visible_ring(style, palette))
     } else {
-        element.tab_stop(false).aria_disabled(true)
+        element.disabled(true).tab_stop(false).aria_disabled(true)
     }
 }
 
@@ -392,14 +545,28 @@ pub(in crate::app) fn apply_accessible_select_trigger_with_focus(
         .role(Role::ComboBox)
         .aria_label(label)
         .aria_expanded(expanded)
-        .track_focus(focus);
+        .track_focus(focus)
+        .transitions(|t| {
+            t.border_color(crate::app::motion::interaction_motion())
+                .bg(crate::app::motion::interaction_motion())
+                .text_color(crate::app::motion::interaction_motion())
+        });
     if enabled {
         element
             .tab_stop(true)
             .focus_visible_style(move |style| focus_visible_ring(style, palette))
     } else {
-        element.tab_stop(false).aria_disabled(true)
+        element.disabled(true).tab_stop(false).aria_disabled(true)
     }
+}
+
+fn select_option_highlight(
+    style: StyleRefinement,
+    palette: &theme::ThemePalette,
+) -> StyleRefinement {
+    style
+        .bg(color(palette.select_highlight))
+        .text_color(color(palette.accent_foreground))
 }
 
 pub(in crate::app) fn apply_accessible_select_option(
@@ -417,9 +584,9 @@ pub(in crate::app) fn apply_accessible_select_option(
         element
             .focusable()
             .tab_stop(true)
-            .focus_visible_style(move |style| focus_visible_ring(style, palette))
+            .focus_style(move |style| select_option_highlight(style, palette))
     } else {
-        element.tab_stop(false).aria_disabled(true)
+        element.disabled(true).tab_stop(false).aria_disabled(true)
     }
 }
 
@@ -439,9 +606,9 @@ pub(in crate::app) fn apply_accessible_select_option_with_focus(
     if enabled {
         element
             .tab_stop(true)
-            .focus_visible_style(move |style| focus_visible_ring(style, palette))
+            .focus_style(move |style| select_option_highlight(style, palette))
     } else {
-        element.tab_stop(false).aria_disabled(true)
+        element.disabled(true).tab_stop(false).aria_disabled(true)
     }
 }
 
@@ -473,7 +640,7 @@ pub(in crate::app) fn apply_accessible_slider(
             .tab_stop(true)
             .focus_visible_style(move |style| focus_visible_ring(style, palette))
     } else {
-        element.tab_stop(false).aria_disabled(true)
+        element.disabled(true).tab_stop(false).aria_disabled(true)
     }
 }
 
@@ -506,7 +673,7 @@ pub(in crate::app) fn apply_accessible_slider_with_focus(
             .tab_stop(true)
             .focus_visible_style(move |style| focus_visible_ring(style, palette))
     } else {
-        element.tab_stop(false).aria_disabled(true)
+        element.disabled(true).tab_stop(false).aria_disabled(true)
     }
 }
 
@@ -520,14 +687,19 @@ pub(in crate::app) fn apply_accessible_text_input(
     let element = element
         .role(Role::TextInput)
         .aria_label(label)
-        .aria_value(value.into());
+        .aria_value(value.into())
+        .transitions(|t| {
+            t.border_color(crate::app::motion::interaction_motion())
+                .bg(crate::app::motion::interaction_motion())
+                .text_color(crate::app::motion::interaction_motion())
+        });
     if enabled {
         element
             .focusable()
             .tab_stop(true)
             .focus_visible_style(move |style| focus_visible_ring(style, palette))
     } else {
-        element.tab_stop(false).aria_disabled(true)
+        element.disabled(true).tab_stop(false).aria_disabled(true)
     }
 }
 
@@ -544,7 +716,7 @@ mod tests {
         assert_eq!(
             style.ring.color,
             Some(gpui::RingColor::Color(
-                color(palette.accent.with_alpha(FOCUS_RING_ALPHA)).into()
+                color(palette.focus_ring.with_opacity(theme::metrics::FOCUS_ALPHA)).into()
             ))
         );
         assert!(style.box_shadow.is_none());

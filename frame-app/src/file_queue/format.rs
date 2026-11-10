@@ -1,6 +1,5 @@
-use std::path::Path;
-
 use crate::numeric::u64_to_f64;
+use std::path::Path;
 
 const FILE_SIZE_UNITS: [&str; 4] = ["B", "KB", "MB", "GB"];
 

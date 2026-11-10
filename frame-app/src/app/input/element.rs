@@ -1,4 +1,22 @@
-use super::{super::accessibility::apply_accessible_text_input, text::clamp_text_range, *};
+use crate::app::accessibility::apply_accessible_text_input;
+use crate::app::input::constants::{FRAME_TEXT_INPUT_CONTEXT, FRAME_TIMECODE_TEXT_INPUT_CONTEXT};
+use crate::app::input::runtime::{
+    FrameTextInputKind, FrameTextInputMetrics, clamp_text_input_scroll_x,
+    text_input_scroll_x_for_cursor,
+};
+use crate::app::input::text::clamp_text_range;
+use crate::app::input::text_line_x_for_index;
+use crate::app::layout::SETTINGS_CONTROL_HEIGHT;
+use crate::app::primitives::color;
+use crate::app::root::FrameRoot;
+use crate::theme;
+use gpui::prelude::*;
+use gpui::{
+    App, Bounds, Context, Element, ElementId, ElementInputHandler, Entity, FocusHandle,
+    GlobalElementId, IntoElement, LayoutId, MouseButton, MouseDownEvent, MouseMoveEvent,
+    MouseUpEvent, PaintQuad, Pixels, ShapedLine, SharedString, Style, TextRun, Window, div, point,
+    px, relative, size,
+};
 
 pub(super) struct FrameTextInputElement {
     owner: Entity<FrameRoot>,
@@ -150,7 +168,7 @@ impl Element for FrameTextInputElement {
                     text_top + px(metrics.caret_height),
                 ),
             ))
-            .background(color(self.palette.accent.with_alpha(0.30)))
+            .background(color(self.palette.text_selection))
         });
 
         FrameTextInputPrepaintState {
@@ -263,7 +281,7 @@ pub(in crate::app) fn frame_text_input(
     } else {
         value.to_string()
     };
-    let label_color = if disabled || is_placeholder {
+    let label_color = if is_placeholder {
         palette.text_muted
     } else {
         palette.text_primary
@@ -276,13 +294,15 @@ pub(in crate::app) fn frame_text_input(
         .flex()
         .items_center()
         .min_w_0()
-        .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .bg(color(palette.canvas))
-        .px(theme::ui_rem(10.0))
+        .rounded(theme::ui_rem(theme::RADIUS_MD))
+        .bg(color(palette.input_background))
+        .border_1()
+        .border_color(color(palette.transparent))
+        .shadow(theme::shadows::recessed(palette))
+        .px(theme::ui_rem(theme::metrics::CONTROL_PADDING_X))
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
         .text_color(color(label_color))
         .opacity(if disabled { 0.5 } else { 1.0 })
-        .shadow(input_highlight_shadows(palette))
         .key_context(if kind.is_preview_timecode() {
             FRAME_TIMECODE_TEXT_INPUT_CONTEXT
         } else {

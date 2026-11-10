@@ -1,9 +1,6 @@
-use std::{
-    sync::{Arc, Mutex, MutexGuard},
-    time::Instant,
-};
-
 use super::PreviewRenderedFrame;
+use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::Instant;
 
 #[derive(Clone, Debug, Default)]
 pub struct LatestFrameStore {

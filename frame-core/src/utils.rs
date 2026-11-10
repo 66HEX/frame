@@ -92,35 +92,68 @@ pub fn map_svt_av1_preset(preset: &str) -> String {
     }
 }
 
+/// Maps saved speed labels to libvpx's effective good-quality speed range.
+#[must_use]
+pub fn map_vp9_speed(preset: &str) -> String {
+    match preset {
+        "0" | "1" | "2" | "3" | "4" | "5" => preset.to_string(),
+        "ultrafast" | "superfast" => "5".to_string(),
+        "veryfast" | "faster" => "4".to_string(),
+        "fast" => "3".to_string(),
+        "slow" | "slower" | "veryslow" => "0".to_string(),
+        // libvpx's previous actual default was 1; -preset was ignored.
+        _ => "1".to_string(),
+    }
+}
+
+#[must_use]
+pub(crate) fn format_ffmpeg_seconds(seconds: f64) -> String {
+    let mut formatted = format!("{seconds:.6}");
+    if let Some(decimal) = formatted.find('.') {
+        while formatted.len() > decimal + 4 && formatted.ends_with('0') {
+            formatted.pop();
+        }
+    }
+    formatted
+}
+
 #[must_use]
 pub fn parse_time(time_str: &str) -> Option<f64> {
-    let parts: Vec<&str> = time_str.split(':').collect();
-    match parts.len() {
-        1 => parts[0].parse::<f64>().ok(),
+    if !time_str.contains(':') {
+        return time_str.parse::<f64>().ok();
+    }
+    // This arithmetic parser also accepts legacy computed END values. Raw
+    // FFmpeg arguments have their own stricter grammar in RawFfmpegTime.
+    let negative = time_str.starts_with('-');
+    let body = time_str.strip_prefix(['-', '+']).unwrap_or(time_str);
+    if body.starts_with(['-', '+']) {
+        return None;
+    }
+    let parts: Vec<&str> = body.split(':').collect();
+    let seconds = match parts.len() {
         2 => {
             let m: f64 = parts[0].parse().ok()?;
             let s: f64 = parts[1].trim().parse().ok()?;
-            Some(m.mul_add(60.0, s))
+            m.mul_add(60.0, s)
         }
         3 => {
             let h: f64 = parts[0].parse().ok()?;
             let m: f64 = parts[1].parse().ok()?;
             let s: f64 = parts[2].trim().parse().ok()?;
-            Some(h.mul_add(3600.0, m * 60.0) + s)
+            h.mul_add(3600.0, m * 60.0) + s
         }
-        _ => None,
-    }
+        _ => return None,
+    };
+    Some(if negative { -seconds } else { seconds })
 }
 
 #[must_use]
 pub fn get_hwaccel_args(video_codec: &str) -> Vec<String> {
     if is_nvenc_codec(video_codec) {
-        vec![
-            "-hwaccel".to_string(),
-            "cuda".to_string(),
-            "-hwaccel_output_format".to_string(),
-            "cuda".to_string(),
-        ]
+        // Without an explicit CUDA output format FFmpeg transfers decoded frames
+        // back to their native software format, retaining depth for CPU filters.
+        // See n8.1.2 ffmpeg_dec.c hwaccel_retrieve_data and ffmpeg_demux.c defaults.
+        vec!["-hwaccel".to_string(), "cuda".to_string()]
     } else if is_videotoolbox_codec(video_codec) {
         vec!["-hwaccel".to_string(), "videotoolbox".to_string()]
     } else {
@@ -150,6 +183,55 @@ pub fn sanitize_external_tool_path(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn subtitle_clock_and_input_seek_keep_microsecond_precision() {
+        for (seconds, expected) in [
+            (1.0, "1.000"),
+            (1.234, "1.234"),
+            (1.234_567, "1.234567"),
+            (1.2345, "1.2345"),
+        ] {
+            assert_eq!(format_ffmpeg_seconds(seconds), expected);
+        }
+        assert_eq!(parse_time("00:00:01.234567"), Some(1.234_567));
+    }
+
+    #[test]
+    fn arithmetic_time_applies_one_global_sign_without_restricting_derived_end_values() {
+        for (input, expected) in [
+            ("-1:30", -90.0),
+            ("-00:00:00.5", -0.5),
+            ("-01:00:01.5", -3601.5),
+            ("1:60", 120.0),
+            ("001:2", 62.0),
+            ("1.5:2", 92.0),
+            ("+1:30", 90.0),
+            ("1:-2", 58.0),
+            ("1e-3", 0.001),
+            ("10000:00:00.5", 36_000_000.5),
+        ] {
+            assert_eq!(parse_time(input), Some(expected), "{input}");
+        }
+        assert_eq!(parse_time("--1:30"), None);
+    }
+
+    #[test]
+    fn vp9_speed_migrates_legacy_labels_and_keeps_native_values() {
+        for speed in ["0", "1", "2", "3", "4", "5"] {
+            assert_eq!(map_vp9_speed(speed), speed);
+        }
+        for (preset, speed) in [
+            ("medium", "1"),
+            ("fast", "3"),
+            ("faster", "4"),
+            ("ultrafast", "5"),
+            ("slow", "0"),
+            ("unknown", "1"),
+        ] {
+            assert_eq!(map_vp9_speed(preset), speed);
+        }
+    }
 
     #[test]
     fn map_svt_av1_preset_keeps_native_numeric_values() {

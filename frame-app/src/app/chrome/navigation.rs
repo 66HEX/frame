@@ -1,0 +1,155 @@
+use crate::app::accessibility::{TabFocusGroup, tab_focus_base, tab_focus_ring};
+use crate::app::components::{FrameStyle, FrameTabIndicator, frame_tabs_list};
+use crate::app::layout::{TITLEBAR_ICON_SIZE, TITLEBAR_NAV_BUTTON_HEIGHT};
+use crate::app::model::ActiveView;
+use crate::app::primitives::{button_mouse_down, color};
+use crate::app::root::FrameRoot;
+use crate::{assets, theme};
+use gpui::prelude::{FluentBuilder, Styled};
+use gpui::{
+    ClickEvent, Context, InteractiveElement, ParentElement, StatefulInteractiveElement, Window, div,
+};
+
+pub(in crate::app) fn titlebar_navigation(
+    active_view: ActiveView,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    let focuses = TabFocusGroup::render(
+        "main-tabs-focus",
+        titlebar_tab_id(active_view).into(),
+        [ActiveView::Workspace, ActiveView::Logs].map(|view| titlebar_tab_id(view).into()),
+        window,
+        cx,
+    );
+    let indicator = FrameTabIndicator::new("titlebar-main-view-tabs", window, cx);
+    frame_tabs_list(palette)
+        .id("titlebar-main-view-tabs")
+        .debug_selector(|| "titlebar-main-view-tabs".to_owned())
+        .role(gpui::Role::TabList)
+        .aria_label("Main view")
+        .child(indicator.background(palette))
+        .child(titlebar_segment(
+            assets::ICON_LAYOUT_LIST,
+            "Workspace",
+            ActiveView::Workspace,
+            &focuses,
+            palette,
+            &indicator,
+            cx,
+        ))
+        .child(titlebar_segment(
+            assets::ICON_TERMINAL,
+            "Logs",
+            ActiveView::Logs,
+            &focuses,
+            palette,
+            &indicator,
+            cx,
+        ))
+}
+
+pub(in crate::app) fn titlebar_segment(
+    icon: &'static str,
+    label: &'static str,
+    view: ActiveView,
+    focuses: &TabFocusGroup,
+    palette: &'static theme::ThemePalette,
+    indicator: &FrameTabIndicator,
+    cx: &Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    let segment_id = titlebar_tab_id(view);
+    let selected = focuses.selected(segment_id);
+    let focus = focuses.handle(segment_id);
+    let click_focus = focus.clone();
+    let workspace_focus = focuses.handle("titlebar-workspace");
+    let logs_focus = focuses.handle("titlebar-logs");
+    let button = div()
+        .id(segment_id)
+        .debug_selector(|| segment_id.to_string())
+        .h(theme::ui_rem(TITLEBAR_NAV_BUTTON_HEIGHT))
+        .role(gpui::Role::Tab)
+        .aria_label(label)
+        .aria_selected(selected)
+        .track_focus(&focus)
+        .tab_stop(selected)
+        .map(|element| tab_focus_base(element, palette))
+        .focus_visible_style(move |style| tab_focus_ring(style, palette))
+        .transitions(|t| {
+            t.ring(crate::app::motion::interaction_motion())
+                .outline_color(crate::app::motion::interaction_motion())
+                .text_color(crate::app::motion::interaction_motion())
+                .border_color(crate::app::motion::interaction_motion())
+        })
+        .flex()
+        .items_center()
+        .gap(theme::ui_rem(theme::metrics::TAB_ICON_GAP))
+        .rounded(theme::ui_rem(theme::RADIUS_MD))
+        .group(segment_id)
+        .px(theme::ui_rem(6.0))
+        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
+        .tab_surface(selected, palette)
+        .hover_style(move |style| {
+            style
+                .cursor_default()
+                .text_color(color(palette.text_primary))
+        })
+        .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
+            click_focus.focus(window, cx);
+            if root.active_view != view {
+                root.active_view = view;
+                cx.notify();
+            }
+            cx.stop_propagation();
+        }))
+        .on_key_down(
+            cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+                let Some(next_view) = titlebar_view_for_key(view, event.keystroke.key.as_str())
+                else {
+                    return;
+                };
+                match next_view {
+                    ActiveView::Workspace => &workspace_focus,
+                    ActiveView::Logs => &logs_focus,
+                }
+                .focus(window, cx);
+                if root.active_view != next_view {
+                    root.active_view = next_view;
+                    cx.notify();
+                }
+                cx.stop_propagation();
+            }),
+        )
+        .child(
+            gpui::svg()
+                .path(icon)
+                .size(theme::ui_rem(TITLEBAR_ICON_SIZE)),
+        )
+        .child(theme::ui_text(label));
+
+    indicator
+        .track(button, selected.then(|| segment_id.to_owned()))
+        .on_mouse_down(gpui::MouseButton::Left, |_, window, cx| {
+            button_mouse_down(true, window, cx);
+        })
+}
+
+pub(super) const fn titlebar_tab_id(view: ActiveView) -> &'static str {
+    match view {
+        ActiveView::Workspace => "titlebar-workspace",
+        ActiveView::Logs => "titlebar-logs",
+    }
+}
+
+pub(super) fn titlebar_view_for_key(current: ActiveView, key: &str) -> Option<ActiveView> {
+    match key {
+        "left" | "right" => Some(match current {
+            ActiveView::Workspace => ActiveView::Logs,
+            ActiveView::Logs => ActiveView::Workspace,
+        }),
+        "home" => Some(ActiveView::Workspace),
+        "end" => Some(ActiveView::Logs),
+        _ => None,
+    }
+}

@@ -10,7 +10,11 @@ use std::{
 
 use frame_core::{
     args::{build_ffmpeg_args, validate_task_input},
-    preview::{PreviewFfmpegOptions, build_ffmpeg_preview_args},
+    filters::{VisualFilterContext, VisualFilterProfile, build_visual_filter_chain_with_context},
+    preview::{
+        PreviewAudioFfmpegOptions, PreviewFfmpegOptions, build_ffmpeg_preview_args,
+        build_ffmpeg_preview_audio_args,
+    },
     probe::{ffprobe_json_args, parse_ffprobe_stdout},
     types::{
         ConversionConfig, CropConfig, ExternalSubtitleTrack, MetadataConfig, MetadataMode,
@@ -19,6 +23,21 @@ use frame_core::{
 };
 
 type TestResult<T = ()> = Result<T, String>;
+
+#[path = "media_integration/adpcm.rs"]
+mod adpcm;
+#[path = "media_integration/audio_titles.rs"]
+mod audio_titles;
+#[path = "media_integration/gif_frames.rs"]
+mod gif_frames;
+#[path = "media_integration/overlay_depth.rs"]
+mod overlay_depth;
+#[path = "media_integration/subtitle_trim.rs"]
+mod subtitle_trim;
+#[path = "media_integration/tiff.rs"]
+mod tiff;
+#[path = "media_integration/time_grammar.rs"]
+mod time_grammar;
 
 #[derive(Clone, Debug)]
 struct Toolchain {
@@ -595,16 +614,20 @@ fn hevc_mkv_reencode_should_write_hevc_video() -> TestResult {
     let tools = Toolchain::discover()?;
     let sandbox = Sandbox::new("hevc_mkv_reencode")?;
     let input = sandbox.path("source.mp4");
-    let output = sandbox.path("output.mkv");
 
     generate_h264_aac_source(&tools, &input, 0.5, 48, 32)?;
-    let config = video_config("mkv", "libx265", "aac");
-    convert(&tools, &input, &output, &config)?;
+    for flip_vertical in [false, true] {
+        let output = sandbox.path(&format!("output-vflip-{flip_vertical}.mkv"));
+        let mut config = video_config("mkv", "libx265", "aac");
+        config.flip_vertical = flip_vertical;
+        convert(&tools, &input, &output, &config)?;
 
-    let metadata = probe_media(&tools, &output)?;
-    assert_eq!(metadata.video_codec.as_deref(), Some("hevc"));
-    assert_eq!(metadata.width, Some(48));
-    assert_eq!(metadata.height, Some(32));
+        let metadata = probe_media(&tools, &output)?;
+        assert_eq!(metadata.video_codec.as_deref(), Some("hevc"));
+        assert_eq!(metadata.width, Some(48));
+        assert_eq!(metadata.height, Some(32));
+        decode_media(&tools, &output)?;
+    }
     Ok(())
 }
 
@@ -841,6 +864,850 @@ fn gif_output_should_write_palette_gif_video() -> TestResult {
 
     let metadata = probe_media(&tools, &output)?;
     assert_eq!(metadata.video_codec.as_deref(), Some("gif"));
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+#[expect(
+    clippy::too_many_lines,
+    clippy::suboptimal_flops,
+    clippy::manual_midpoint,
+    reason = "The numerical oracle keeps the documented operation order while checking every plane, range tag, and control combination at both high bit depths."
+)]
+fn color_lut_should_preserve_high_depth_and_match_plane_values() -> TestResult {
+    use frame_core::types::FilterValue;
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("color_lut_depth")?;
+    for bits in [10_u32, 16] {
+        let maximum = (1_u32 << bits) - 1;
+        let samples: Vec<u16> = (0..6144_u32)
+            .map(|index| u16::try_from((index * 13) % (maximum + 1)).unwrap())
+            .collect();
+        let raw = sandbox.path(&format!("gradient-{bits}.raw"));
+        fs::write(
+            &raw,
+            samples
+                .iter()
+                .flat_map(|sample| sample.to_le_bytes())
+                .collect::<Vec<_>>(),
+        )
+        .map_err(|error| error.to_string())?;
+        for range in ["limited", "full"] {
+            for gamma_enabled in [false, true] {
+                let mut config = video_config("mkv", "libx264", "aac");
+                config.video_filters.color.brightness = FilterValue {
+                    enabled: true,
+                    value: 10,
+                };
+                config.video_filters.color.contrast = FilterValue {
+                    enabled: true,
+                    value: 120,
+                };
+                config.video_filters.color.gamma = FilterValue {
+                    enabled: gamma_enabled,
+                    value: 130,
+                };
+                config.video_filters.color.saturation = FilterValue {
+                    enabled: gamma_enabled,
+                    value: 120,
+                };
+                let graph = build_visual_filter_chain_with_context(
+                    &config,
+                    VisualFilterProfile::ExportVideo,
+                    VisualFilterContext::new(Some(128), Some(32)),
+                )
+                .join(",");
+                let graph = format!("setparams=range={range},{graph}");
+                let pixel_format = format!("yuv420p{bits}le");
+                let output = run_tool_output(
+                    &tools.ffmpeg,
+                    &args(&[
+                        "-v",
+                        "error",
+                        "-f",
+                        "rawvideo",
+                        "-pixel_format",
+                        &pixel_format,
+                        "-video_size",
+                        "128x32",
+                        "-i",
+                        &path_arg(&raw),
+                        "-vf",
+                        &graph,
+                        "-frames:v",
+                        "1",
+                        "-pix_fmt",
+                        &pixel_format,
+                        "-f",
+                        "rawvideo",
+                        "-",
+                    ]),
+                )?;
+                assert_eq!(output.len(), samples.len() * 2);
+                let values: Vec<u16> = output
+                    .chunks_exact(2)
+                    .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
+                    .collect();
+                let max = f64::from(maximum);
+                let mut levels = std::collections::HashSet::new();
+                for (index, (&source, &actual)) in samples.iter().zip(&values).enumerate() {
+                    let source = f64::from(source);
+                    let expected = if index < 4096 {
+                        levels.insert(actual);
+                        let linear = source * 1.2 + max * (0.1 + 0.5 * (1.0 - 1.2));
+                        if gamma_enabled {
+                            max * (linear / max).clamp(0.0, 1.0).powf(1.0 / 1.3)
+                        } else {
+                            linear
+                        }
+                    } else if gamma_enabled {
+                        (source - (max + 1.0) / 2.0) * 1.2 + (max + 1.0) / 2.0
+                    } else {
+                        source
+                    }
+                    .round()
+                    .clamp(0.0, max);
+                    assert!(u32::from(actual) <= maximum);
+                    assert!(
+                        (f64::from(actual) - expected).abs() <= 1.0,
+                        "{bits}-bit/{range}/gamma{gamma_enabled}/sample{index}: {actual} vs {expected}"
+                    );
+                    if index >= 4096 && !gamma_enabled {
+                        assert_eq!(actual, samples[index], "untouched chroma must be exact");
+                    }
+                }
+                assert!(
+                    levels.len() > 256,
+                    "color control narrowed {bits}-bit luma to eight bits"
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn color_lut_should_preserve_neutral_rgba16_and_active_png_alpha() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("color_lut_rgba16")?;
+    let raw = sandbox.path("source.rgba64");
+    let input = sandbox.path("source.png");
+    let pixels: Vec<u8> = (0..2048_u32)
+        .flat_map(|pixel| {
+            [pixel * 3, pixel * 7, pixel * 11, pixel * 13]
+                .into_iter()
+                .flat_map(|value| u16::try_from(value % 65_536).unwrap().to_le_bytes())
+        })
+        .collect();
+    fs::write(&raw, &pixels).map_err(|error| error.to_string())?;
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-f",
+            "rawvideo",
+            "-pixel_format",
+            "rgba64le",
+            "-video_size",
+            "64x32",
+            "-i",
+            &path_arg(&raw),
+            "-frames:v",
+            "1",
+            &path_arg(&input),
+        ]),
+    )?;
+    for active in [false, true] {
+        let mut config = image_config("png", "png");
+        config.video_filters.color.brightness.enabled = true;
+        config.video_filters.color.contrast.enabled = true;
+        config.video_filters.color.gamma.enabled = true;
+        config.video_filters.color.saturation.enabled = true;
+        if active {
+            config.video_filters.color.brightness.value = 10;
+            config.video_filters.color.saturation.value = 120;
+        }
+        let output = sandbox.path(&format!("active-{active}.png"));
+        convert(&tools, &input, &output, &config)?;
+        let metadata = probe_media(&tools, &output)?;
+        assert!(
+            metadata
+                .pixel_format
+                .as_deref()
+                .is_some_and(|format| format.starts_with("rgba64"))
+        );
+        let decoded = run_tool_output(
+            &tools.ffmpeg,
+            &args(&[
+                "-v",
+                "error",
+                "-i",
+                &path_arg(&output),
+                "-frames:v",
+                "1",
+                "-pix_fmt",
+                "rgba64le",
+                "-f",
+                "rawvideo",
+                "-",
+            ]),
+        )?;
+        assert_eq!(decoded.len(), pixels.len());
+        if active {
+            assert!(
+                decoded != pixels,
+                "active color controls must change the image"
+            );
+            for (index, (actual, expected)) in decoded
+                .chunks_exact(8)
+                .zip(pixels.chunks_exact(8))
+                .enumerate()
+            {
+                assert_eq!(&actual[6..8], &expected[6..8], "alpha sample{index}");
+            }
+        } else {
+            assert_bytes_match(&decoded, &pixels, "enabled neutral RGBA16 controls")?;
+        }
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn prores_should_ignore_unused_quality_drafts_and_choose_profile_from_pixels() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("prores_controls")?;
+    let input = sandbox.path("source.mp4");
+    generate_h264_aac_source(&tools, &input, 0.25, 64, 48)?;
+    for (pixel_format, expected_profile) in [("yuv422p10le", "Standard"), ("yuv444p10le", "4444")] {
+        let mut config = video_config("mov", "prores", "aac");
+        config.pixel_format = pixel_format.to_string();
+        config.video_bitrate_mode = "bitrate".to_string();
+        config.video_bitrate = "unused draft".to_string();
+        config.preset = "unused draft".to_string();
+        let output = sandbox.path(&format!("{pixel_format}.mov"));
+        validate_task_input(&path_arg(&input), &config).map_err(|error| error.to_string())?;
+        let probe = probe_media(&tools, &input)?;
+        let command = build_ffmpeg_args(&path_arg(&input), &path_arg(&output), &config, &probe)
+            .map_err(|error| error.to_string())?;
+        let result = Command::new(&tools.ffmpeg)
+            .args(&command)
+            .output()
+            .map_err(|error| error.to_string())?;
+        let log = String::from_utf8_lossy(&result.stderr);
+        assert!(result.status.success(), "ProRes encode failed: {log}");
+        assert!(
+            !log.contains("has not been used") && !log.contains("not used for any stream"),
+            "{log}"
+        );
+        let raw = run_tool_output(
+            &tools.ffprobe,
+            &args(&[
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=codec_name,profile,pix_fmt",
+                "-of",
+                "json",
+                &path_arg(&output),
+            ]),
+        )?;
+        let metadata: serde_json::Value =
+            serde_json::from_slice(&raw).map_err(|error| error.to_string())?;
+        assert_eq!(metadata["streams"][0]["codec_name"], "prores");
+        assert_eq!(metadata["streams"][0]["profile"], expected_profile);
+        let pixels = read_rgb_frame(&tools, &output)?;
+        assert_eq!((pixels.width, pixels.height), (64, 48));
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn vp9_speed_should_change_encoded_packets() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("vp9_native_speed")?;
+    let input = sandbox.path("source.mkv");
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=s=320x180:r=24:d=1",
+            "-c:v",
+            "ffv1",
+            &path_arg(&input),
+        ]),
+    )?;
+    let mut hashes = Vec::new();
+    for speed in ["0", "5"] {
+        let mut config = video_config("webm", "vp9", "libopus");
+        config.preset = speed.to_string();
+        config.crf = 30;
+        let output = sandbox.path(&format!("speed-{speed}.webm"));
+        convert(&tools, &input, &output, &config)?;
+        let hash = run_tool_output(
+            &tools.ffmpeg,
+            &args(&[
+                "-v",
+                "error",
+                "-i",
+                &path_arg(&output),
+                "-map",
+                "0:v:0",
+                "-c:v",
+                "copy",
+                "-f",
+                "hash",
+                "-",
+            ]),
+        )?;
+        assert!(hash.starts_with(b"SHA256="));
+        hashes.push(hash);
+    }
+    assert_ne!(
+        hashes[0], hashes[1],
+        "native speed must affect encoded video packets"
+    );
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+#[expect(
+    clippy::too_many_lines,
+    reason = "The export and preview matrix shares setup and assertions across container and geometry combinations."
+)]
+fn odd_custom_and_crop_dimensions_should_match_export_and_preview() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("odd_export_preview_geometry")?;
+    let input = sandbox.path("source.mp4");
+    generate_h264_aac_source(&tools, &input, 0.25, 320, 180)?;
+    let subsampled = sandbox.path("source-422-10bit.mkv");
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-i",
+            &path_arg(&input),
+            "-an",
+            "-c:v",
+            "ffv1",
+            "-pix_fmt",
+            "yuv422p10le",
+            "-y",
+            &path_arg(&subsampled),
+        ]),
+    )?;
+    for (container, codec) in [("mp4", "libx264"), ("png", "png"), ("gif", "gif")] {
+        for operation in ["fixed", "height", "crop", "rotate"] {
+            let mut config = video_config(container, codec, "aac");
+            let case_input = if operation == "rotate" {
+                &subsampled
+            } else {
+                &input
+            };
+            let expected = match operation {
+                "crop" | "rotate" => {
+                    if operation == "rotate" {
+                        config.rotation = "90".to_string();
+                        if container == "mp4" {
+                            config.pixel_format = "yuv420p".to_string();
+                        }
+                    }
+                    config.crop = Some(CropConfig {
+                        enabled: true,
+                        x: 3.0,
+                        y: 3.0,
+                        width: 127.0,
+                        height: 129.0,
+                        source_width: None,
+                        source_height: None,
+                        aspect_ratio: None,
+                    });
+                    if container == "mp4" {
+                        (128, 130)
+                    } else {
+                        (127, 129)
+                    }
+                }
+                _ => {
+                    config.resolution = "custom".to_string();
+                    config.custom_width =
+                        Some(if operation == "fixed" { "127" } else { "-1" }.to_string());
+                    config.custom_height = Some("129".to_string());
+                    match (container, operation) {
+                        ("mp4", "fixed") => (128, 130),
+                        ("mp4", _) => (230, 130),
+                        (_, "fixed") => (127, 129),
+                        _ => (229, 129),
+                    }
+                }
+            };
+            let output = sandbox.path(&format!("{operation}.{container}"));
+            convert(&tools, case_input, &output, &config)?;
+            let actual = probe_media(&tools, &output)?;
+            assert_eq!(
+                actual.width.zip(actual.height),
+                Some(expected),
+                "{container}/{operation}"
+            );
+            assert_eq!(
+                frame_core::dimensions::output_dimensions(&config, 320, 180, None,),
+                Some(expected)
+            );
+            let plan = build_ffmpeg_preview_args(
+                &path_arg(case_input),
+                &config,
+                &PreviewFfmpegOptions {
+                    start_seconds: 0.0,
+                    end_seconds: None,
+                    source_width: Some(320),
+                    source_height: Some(180),
+                    source_is_palette: false,
+                    source_sample_aspect_ratio: None,
+                    source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
+                    preview_burn_clock: None,
+                    max_width: 320,
+                    max_height: 180,
+                    fps: 12,
+                    realtime: false,
+                    precise_seek: true,
+                    source_is_image: false,
+                },
+            )
+            .map_err(|error| error.to_string())?;
+            assert_eq!(
+                (plan.width, plan.height),
+                expected,
+                "preview {container}/{operation}"
+            );
+            let mut preview_args = plan.args;
+            let output_index = preview_args.len() - 1;
+            preview_args.splice(
+                output_index..output_index,
+                ["-frames:v".to_string(), "1".to_string()],
+            );
+            let pixels = run_tool_output(&tools.ffmpeg, &preview_args)?;
+            assert_eq!(
+                pixels.len(),
+                plan.frame_bytes,
+                "preview {container}/{operation}"
+            );
+        }
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+#[expect(
+    clippy::too_many_lines,
+    reason = "The plane oracle covers crop and both custom padding boundaries without lossy encode comparisons."
+)]
+fn exact_padding_should_preserve_subsampled_edges_depth_and_frame_count() -> TestResult {
+    let tools = Toolchain::discover()?;
+    for (pixel_format, sub_y) in [("yuv420p10le", 2_usize), ("yuv422p16le", 1)] {
+        let source = format!(
+            "nullsrc=s=320x178:r=4:d=1,format={pixel_format},geq=lum='X*7+Y*11+N*13':cb='X*3+Y*5':cr='X*11+Y*7'"
+        );
+        for (operation, target, inner, offset) in [
+            (
+                "crop",
+                (128_usize, 130_usize),
+                (127_usize, 129_usize),
+                (0_usize, 0_usize),
+            ),
+            ("crop-even", (128, 130), (128, 129), (0, 0)),
+            ("crop-edge", (128, 130), (127, 129), (0, 0)),
+            ("custom", (128, 130), (127, 71), (0, 29)),
+            ("even", (128, 128), (128, 71), (0, 28)),
+        ] {
+            let mut config = video_config("mp4", "libx264", "aac");
+            let reference = if operation.starts_with("crop") {
+                config.crop = Some(CropConfig {
+                    enabled: true,
+                    x: if operation == "crop-edge" { 400.0 } else { 3.0 },
+                    y: 5.0,
+                    width: f64::from(u32::try_from(inner.0).unwrap()),
+                    height: 129.0,
+                    source_width: None,
+                    source_height: None,
+                    aspect_ratio: None,
+                });
+                "null".to_string()
+            } else {
+                config.resolution = "custom".to_string();
+                config.custom_width =
+                    Some(if operation == "custom" { "127" } else { "128" }.to_string());
+                config.custom_height =
+                    Some(if operation == "custom" { "129" } else { "128" }.to_string());
+                config.scaling_algorithm = "nearest".to_string();
+                format!("scale={}:{}:flags=neighbor", inner.0, inner.1)
+            };
+            let graph = build_visual_filter_chain_with_context(
+                &config,
+                VisualFilterProfile::ExportVideo,
+                VisualFilterContext::new(Some(320), Some(178)),
+            )
+            .join(",");
+            let reference_pixels = render_raw_filter(&tools, &source, &reference, pixel_format)?;
+            let expected = if operation.starts_with("crop") {
+                // A second FFmpeg crop would share the misaligned-byte bug.
+                // Slice independently from the original Y/U/V sample planes.
+                crop_yuv16_frames(
+                    &reference_pixels,
+                    (320, 178),
+                    (
+                        if operation == "crop-edge" { 193 } else { 3 },
+                        5,
+                        inner.0,
+                        inner.1,
+                    ),
+                    sub_y,
+                )?
+            } else {
+                reference_pixels
+            };
+            let actual = render_raw_filter(&tools, &source, &graph, pixel_format)?;
+            let expected_planes = [
+                (inner.0, inner.1),
+                (inner.0.div_ceil(2), inner.1.div_ceil(sub_y)),
+                (inner.0.div_ceil(2), inner.1.div_ceil(sub_y)),
+            ];
+            let actual_planes = [
+                (target.0, target.1),
+                (target.0.div_ceil(2), target.1.div_ceil(sub_y)),
+                (target.0.div_ceil(2), target.1.div_ceil(sub_y)),
+            ];
+            let expected_frame: usize = expected_planes.iter().map(|(w, h)| w * h * 2).sum();
+            let actual_frame: usize = actual_planes.iter().map(|(w, h)| w * h * 2).sum();
+            assert_eq!(expected.len(), 4 * expected_frame);
+            assert_eq!(actual.len(), 4 * actual_frame);
+            let levels: std::collections::HashSet<_> = expected[..inner.0 * inner.1 * 2]
+                .chunks_exact(2)
+                .map(|sample| u16::from_le_bytes([sample[0], sample[1]]))
+                .collect();
+            assert!(levels.len() > 256, "source must exercise high bit depth");
+            for frame in 0..4 {
+                let mut expected_plane = frame * expected_frame;
+                let mut actual_plane = frame * actual_frame;
+                for (plane, (&(w, h), &(aw, ah))) in
+                    expected_planes.iter().zip(&actual_planes).enumerate()
+                {
+                    let (x, y) = if plane == 0 {
+                        offset
+                    } else {
+                        (offset.0.div_ceil(2), offset.1.div_ceil(sub_y))
+                    };
+                    for row in 0..h {
+                        let e = expected_plane + row * w * 2;
+                        let a = actual_plane + ((row + y) * aw + x) * 2;
+                        assert_bytes_match(
+                            &actual[a..a + w * 2],
+                            &expected[e..e + w * 2],
+                            &format!(
+                                "{pixel_format}/{operation}/frame{frame}/plane{plane}/row{row}"
+                            ),
+                        )?;
+                    }
+                    expected_plane += w * h * 2;
+                    actual_plane += aw * ah * 2;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn exact_padding_should_preserve_tiny_rgba_pixels_and_alpha() -> TestResult {
+    let tools = Toolchain::discover()?;
+    for (pixel_format, bytes_per_pixel) in [("rgba", 4_usize), ("rgba64le", 8)] {
+        let source =
+            format!("testsrc=s=7x7:r=4:d=1,format={pixel_format},colorchannelmixer=aa=0.37");
+        for (width, height) in [(1_u16, 1_u16), (1, 3), (3, 3)] {
+            let mut config = video_config("mp4", "libx264", "aac");
+            config.crop = Some(CropConfig {
+                enabled: true,
+                x: 1.0,
+                y: 1.0,
+                width: f64::from(width),
+                height: f64::from(height),
+                source_width: None,
+                source_height: None,
+                aspect_ratio: None,
+            });
+            let graph = build_visual_filter_chain_with_context(
+                &config,
+                VisualFilterProfile::ExportVideo,
+                VisualFilterContext::new(Some(7), Some(7)),
+            )
+            .join(",");
+            let expected = render_raw_filter(
+                &tools,
+                &source,
+                &format!("crop={width}:{height}:1:1:exact=1"),
+                pixel_format,
+            )?;
+            let actual = render_raw_filter(&tools, &source, &graph, pixel_format)?;
+            let (width, height) = (usize::from(width), usize::from(height));
+            let (out_width, out_height) = (width + width % 2, height + height % 2);
+            let expected_frame = width * height * bytes_per_pixel;
+            let actual_frame = out_width * out_height * bytes_per_pixel;
+            assert_eq!(expected.len(), 4 * expected_frame);
+            assert_eq!(actual.len(), 4 * actual_frame);
+            for frame in 0..4 {
+                for row in 0..height {
+                    let e = frame * expected_frame + row * width * bytes_per_pixel;
+                    let a = frame * actual_frame + row * out_width * bytes_per_pixel;
+                    assert_bytes_match(
+                        &actual[a..a + width * bytes_per_pixel],
+                        &expected[e..e + width * bytes_per_pixel],
+                        "tiny RGBA including alpha",
+                    )?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn exact_padding_should_preserve_frame_properties_and_timestamps() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let mut config = video_config("mkv", "libx264", "aac");
+    config.crop = Some(CropConfig {
+        enabled: true,
+        x: 3.0,
+        y: 5.0,
+        width: 127.0,
+        height: 129.0,
+        source_width: None,
+        source_height: None,
+        aspect_ratio: None,
+    });
+    let graph = build_visual_filter_chain_with_context(
+        &config,
+        VisualFilterProfile::ExportVideo,
+        VisualFilterContext::new(Some(160), Some(144)),
+    )
+    .join(",");
+    // Inspect graph output before an encoder/muxer can normalize timestamps or
+    // color range. These properties must survive the internal xstack branch.
+    let graph = format!(
+        "setsar=3/2,setparams=range=full:color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc,setpts=PTS+5/TB,{graph},showinfo"
+    );
+    let output = Command::new(&tools.ffmpeg)
+        .args([
+            "-v",
+            "info",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=s=160x144:r=4:d=4.25,format=yuv420p10le",
+            "-vf",
+            &graph,
+            "-fps_mode",
+            "passthrough",
+            "-f",
+            "null",
+            "-",
+        ])
+        .output()
+        .map_err(|error| error.to_string())?;
+    let log = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success(),
+        "frame property probe failed: {log}"
+    );
+    let frames: Vec<_> = log
+        .lines()
+        .filter(|line| line.contains("showinfo") && line.contains(" pts_time:"))
+        .collect();
+    let properties: Vec<_> = log
+        .lines()
+        .filter(|line| line.contains("showinfo") && line.contains("color_range:"))
+        .collect();
+    assert_eq!(frames.len(), 17);
+    assert_eq!(properties.len(), 17);
+    for (index, frame) in frames.iter().enumerate() {
+        assert!(
+            frame.contains("fmt:yuv420p10le")
+                && frame.contains("sar:3/2")
+                && frame.contains("s:128x130"),
+            "{frame}"
+        );
+        let timestamp = frame
+            .split("pts_time:")
+            .nth(1)
+            .and_then(|value| value.split_whitespace().next())
+            .ok_or("missing frame timestamp")?
+            .parse::<f64>()
+            .map_err(|error| error.to_string())?;
+        let expected = 5.0 + f64::from(u32::try_from(index).unwrap()) / 4.0;
+        assert!((timestamp - expected).abs() < 0.000_001);
+    }
+    for properties in properties {
+        assert!(
+            properties.contains("color_range:pc")
+                && properties.contains("color_primaries:bt2020")
+                && properties.contains("color_trc:smpte2084")
+                && properties.contains("color_space:bt2020nc"),
+            "{properties}"
+        );
+    }
+    Ok(())
+}
+
+fn crop_yuv16_frames(
+    pixels: &[u8],
+    source: (usize, usize),
+    crop: (usize, usize, usize, usize),
+    sub_y: usize,
+) -> TestResult<Vec<u8>> {
+    let (x, y, width, height) = crop;
+    let planes = [
+        (source.0, source.1, x, y, width, height),
+        (
+            source.0.div_ceil(2),
+            source.1.div_ceil(sub_y),
+            x / 2,
+            y / sub_y,
+            width.div_ceil(2),
+            height.div_ceil(sub_y),
+        ),
+        (
+            source.0.div_ceil(2),
+            source.1.div_ceil(sub_y),
+            x / 2,
+            y / sub_y,
+            width.div_ceil(2),
+            height.div_ceil(sub_y),
+        ),
+    ];
+    let frame_bytes: usize = planes.iter().map(|(w, h, ..)| w * h * 2).sum();
+    assert_eq!(pixels.len() % frame_bytes, 0);
+    let mut result = Vec::new();
+    for frame in pixels.chunks_exact(frame_bytes) {
+        let mut plane_offset = 0;
+        for &(sw, sh, x, y, w, h) in &planes {
+            for row in y..y + h {
+                let start = plane_offset + (row * sw + x) * 2;
+                result.extend_from_slice(
+                    frame
+                        .get(start..start + w * 2)
+                        .ok_or("source plane rectangle exceeds frame")?,
+                );
+            }
+            plane_offset += sw * sh * 2;
+        }
+    }
+    Ok(result)
+}
+
+fn render_raw_filter(
+    tools: &Toolchain,
+    source: &str,
+    graph: &str,
+    pixel_format: &str,
+) -> TestResult<Vec<u8>> {
+    run_tool_output(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            source,
+            "-vf",
+            graph,
+            "-pix_fmt",
+            pixel_format,
+            "-fps_mode",
+            "passthrough",
+            "-f",
+            "rawvideo",
+            "pipe:1",
+        ]),
+    )
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn minimum_gif_palette_should_preserve_transparency_for_every_dither() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("minimum_gif_alpha")?;
+    let raw = sandbox.path("source.rgba");
+    let input = sandbox.path("source.png");
+    let pixels: Vec<u8> = (0..256)
+        .flat_map(|pixel| {
+            if pixel % 16 < 8 {
+                [0, 0, 0, 0]
+            } else {
+                [255, 0, 0, 255]
+            }
+        })
+        .collect();
+    fs::write(&raw, &pixels).map_err(|error| error.to_string())?;
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgba",
+            "-s",
+            "16x16",
+            "-i",
+            &path_arg(&raw),
+            "-frames:v",
+            "1",
+            "-y",
+            &path_arg(&input),
+        ]),
+    )?;
+    for dither in ["none", "bayer", "floyd_steinberg", "sierra2_4a"] {
+        let mut config = image_config("gif", "gif");
+        config.gif_colors = frame_core::types::MIN_GIF_COLORS;
+        config.gif_dither = dither.to_string();
+        let output = sandbox.path(&format!("{dither}.gif"));
+        convert(&tools, &input, &output, &config)?;
+        let decoded = run_tool_output(
+            &tools.ffmpeg,
+            &args(&[
+                "-v",
+                "error",
+                "-i",
+                &path_arg(&output),
+                "-frames:v",
+                "1",
+                "-pix_fmt",
+                "rgba",
+                "-f",
+                "rawvideo",
+                "pipe:1",
+            ]),
+        )?;
+        assert_eq!(decoded.len(), pixels.len());
+        let alpha: Vec<u8> = decoded.chunks_exact(4).map(|pixel| pixel[3]).collect();
+        let expected: Vec<u8> = pixels.chunks_exact(4).map(|pixel| pixel[3]).collect();
+        assert_bytes_match(&alpha, &expected, dither)?;
+    }
     Ok(())
 }
 
@@ -1142,6 +2009,388 @@ fn subtitle_stream_should_transcode_to_mov_text_in_mp4() -> TestResult {
 
 #[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn audio_parameters_should_follow_each_selected_source_track() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("audio_track_parameters")?;
+    let input = sandbox.path("mixed.mkv");
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=64x48:rate=10:duration=1",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:sample_rate=8000:duration=1",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=880:sample_rate=48000:duration=1",
+            "-map",
+            "0:v",
+            "-map",
+            "1:a",
+            "-map",
+            "2:a",
+            "-c:v",
+            "libx264",
+            "-c:a",
+            "mp3",
+            "-ar:a:0",
+            "8000",
+            "-ar:a:1",
+            "48000",
+            "-ac:a:1",
+            "2",
+            &path_arg(&input),
+        ]),
+    )?;
+    let metadata = probe_media(&tools, &input)?;
+    assert_eq!(
+        metadata.audio_tracks[0].sample_rate.as_deref(),
+        Some("8000")
+    );
+    assert_eq!(
+        metadata.audio_tracks[1].sample_rate.as_deref(),
+        Some("48000")
+    );
+    let mut config = video_config("mp4", "libx264", "mp3");
+    config.selected_audio_tracks = metadata
+        .audio_tracks
+        .iter()
+        .rev()
+        .map(|track| track.index)
+        .collect();
+    let output = sandbox.path("mp3.mp4");
+    convert(&tools, &input, &output, &config)?;
+    let output_metadata = probe_media(&tools, &output)?;
+    assert_eq!(
+        output_metadata
+            .audio_tracks
+            .iter()
+            .map(|track| track.sample_rate.as_deref())
+            .collect::<Vec<_>>(),
+        [Some("48000"), Some("16000")]
+    );
+    config.processing_mode = "copy".to_string();
+    assert!(
+        build_ffmpeg_args(&path_arg(&input), "copy.mp4", &config, &metadata)
+            .unwrap_err()
+            .to_string()
+            .contains("16 kHz")
+    );
+    config.processing_mode = "reencode".to_string();
+    config.container = "mkv".to_string();
+    config.audio_codec = "libopus".to_string();
+    config.audio_bitrate = "320".to_string();
+    assert!(
+        build_ffmpeg_args(&path_arg(&input), "opus.mkv", &config, &metadata)
+            .unwrap_err()
+            .to_string()
+            .contains("256")
+    );
+    config.audio_channels = "stereo".to_string();
+    let output = sandbox.path("opus-stereo.mkv");
+    convert(&tools, &input, &output, &config)?;
+    let encoded = probe_media(&tools, &output)?;
+    assert_eq!(encoded.audio_tracks.len(), 2);
+    assert!(
+        encoded
+            .audio_tracks
+            .iter()
+            .all(|track| track.channels == "2" && track.codec == "opus")
+    );
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn stereo_width_should_require_an_explicit_surround_downmix() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("stereo_width_channel_guard")?;
+    let input = sandbox.path("surround.mkv");
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=64x48:rate=10:duration=1",
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=channel_layout=5.1:sample_rate=48000:d=1",
+            "-c:v",
+            "libx264",
+            "-c:a",
+            "flac",
+            &path_arg(&input),
+        ]),
+    )?;
+    let metadata = probe_media(&tools, &input)?;
+    assert_eq!(metadata.audio_tracks[0].channels, "6");
+    assert_eq!(
+        metadata.audio_tracks[0].channel_layout.as_deref(),
+        Some("5.1")
+    );
+    let mut config = video_config("mkv", "libx264", "flac");
+    config.selected_audio_tracks = vec![metadata.audio_tracks[0].index];
+    config.audio_filters.stereo_width.enabled = true;
+    config.audio_filters.stereo_width.value = 150;
+    assert!(
+        build_ffmpeg_args(&path_arg(&input), "rejected.mkv", &config, &metadata)
+            .unwrap_err()
+            .to_string()
+            .contains("Stereo width")
+    );
+    config.audio_channels = "stereo".to_string();
+    let output = sandbox.path("stereo.mkv");
+    convert(&tools, &input, &output, &config)?;
+    assert_eq!(probe_media(&tools, &output)?.audio_tracks[0].channels, "2");
+    config.audio_channels = "original".to_string();
+    config.audio_filters.stereo_width.value = 100;
+    let output = sandbox.path("surround-preserved.mkv");
+    convert(&tools, &input, &output, &config)?;
+    assert_eq!(probe_media(&tools, &output)?.audio_tracks[0].channels, "6");
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn stream_copy_should_keep_audio_decodable_with_muxer_specific_options() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("mov_audio_copy_tags")?;
+    for (label, encoder, expected_codec, muxer, sample_rate, container) in [
+        ("vorbis", "libvorbis", "vorbis", "nut", 48000, "mov"),
+        ("g726", "g726", "adpcm_g726", "avi", 8000, "mov"),
+        ("latm", "aac", "aac_latm", "mpegts", 48000, "mov"),
+        ("dfpwm", "dfpwm", "dfpwm", "nut", 48000, "mkv"),
+        ("g723", "g723_1", "g723_1", "nut", 8000, "mov"),
+    ] {
+        if !encoder_available(&tools, encoder)? {
+            eprintln!("skipping {label} fixture: encoder is unavailable");
+            continue;
+        }
+        let input = sandbox.path(&format!(
+            "source-{label}.{}",
+            if muxer == "mpegts" { "m2t" } else { muxer }
+        ));
+        let output = sandbox.path(&format!("copied-{label}.{container}"));
+        let mut fixture_args = args(&[
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=64x48:rate=10:duration=1",
+            "-f",
+            "lavfi",
+            "-i",
+            &format!("sine=frequency=440:sample_rate={sample_rate}:duration=1"),
+            "-c:v",
+            "libx264",
+            "-c:a",
+            encoder,
+        ]);
+        if muxer == "mpegts" {
+            fixture_args.extend(args(&["-mpegts_flags", "latm"]));
+        }
+        fixture_args.extend(args(&["-f", muxer, &path_arg(&input)]));
+        run_tool(&tools.ffmpeg, &fixture_args)?;
+        let metadata = probe_media(&tools, &input)?;
+        assert_eq!(metadata.audio_tracks[0].codec, expected_codec);
+        let mut config = video_config(container, "libx264", "aac");
+        config.processing_mode = "copy".to_string();
+        config.selected_audio_tracks = vec![metadata.audio_tracks[0].index];
+        convert(&tools, &input, &output, &config)?;
+        assert_eq!(
+            probe_media(&tools, &output)?.audio_tracks[0].codec,
+            expected_codec
+        );
+        let decode = |path: &Path| {
+            run_tool_output(
+                &tools.ffmpeg,
+                &args(&[
+                    "-v",
+                    "error",
+                    "-i",
+                    &path_arg(path),
+                    "-map",
+                    "0:a:0",
+                    "-c:a",
+                    "pcm_s16le",
+                    "-f",
+                    "s16le",
+                    "pipe:1",
+                ]),
+            )
+        };
+        let source_audio = decode(&input)?;
+        assert!(!source_audio.is_empty());
+        let output_audio = decode(&output)?;
+        if label == "vorbis" {
+            // R1: MOV's edit list can omit Vorbis's final packet when its
+            // source duration is zero. This test covers codec identification
+            // and the first 0.9 seconds, not a lossless-duration guarantee.
+            let checked_bytes = 43200 * 2;
+            assert!(source_audio.len() >= checked_bytes);
+            assert!(output_audio.len() >= checked_bytes);
+            assert_eq!(source_audio[..checked_bytes], output_audio[..checked_bytes]);
+        } else {
+            assert_eq!(source_audio, output_audio, "{label} audio samples changed");
+        }
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn embedded_subtitles_should_transcode_between_mov_and_matroska_in_both_modes() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("embedded_subtitle_muxer_compatibility")?;
+    let input = sandbox.path("source.mp4");
+    let subtitle = sandbox.path("subtitle.srt");
+    write_srt(&subtitle)?;
+    generate_subtitled_source(&tools, &input, &subtitle)?;
+
+    for mode in ["reencode", "copy"] {
+        let matroska = sandbox.path(&format!("subtitles-{mode}.mkv"));
+        let mov = sandbox.path(&format!("subtitles-{mode}.mov"));
+        let mut config = video_config("mkv", "libx264", "aac");
+        config.processing_mode = mode.to_string();
+        config.selected_subtitle_tracks = vec![2];
+        convert(&tools, &input, &matroska, &config)?;
+        let metadata = probe_media(&tools, &matroska)?;
+        assert_eq!(metadata.subtitle_tracks[0].codec, "subrip");
+
+        config.container = "mov".to_string();
+        config.selected_subtitle_tracks = vec![metadata.subtitle_tracks[0].index];
+        convert(&tools, &matroska, &mov, &config)?;
+        let metadata = probe_media(&tools, &mov)?;
+        assert_eq!(metadata.subtitle_tracks[0].codec, "mov_text");
+        let text = run_tool_output(
+            &tools.ffmpeg,
+            &args(&[
+                "-v",
+                "error",
+                "-i",
+                &path_arg(&mov),
+                "-map",
+                "0:s:0",
+                "-f",
+                "srt",
+                "pipe:1",
+            ]),
+        )?;
+        assert!(String::from_utf8_lossy(&text).contains("Frame subtitle integration"));
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn ttml_should_be_copied_without_a_decoder_only_to_supported_containers() -> TestResult {
+    let tools = Toolchain::discover()?;
+    if !encoder_available(&tools, "ttml")? {
+        eprintln!("skipping TTML fixture: encoder is unavailable");
+        return Ok(());
+    }
+    let sandbox = Sandbox::new("ttml_native_copy")?;
+    let source = sandbox.path("source.mp4");
+    let input = sandbox.path("ttml.mp4");
+    let subtitle = sandbox.path("subtitle.srt");
+    write_srt(&subtitle)?;
+    generate_subtitled_source(&tools, &source, &subtitle)?;
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-i",
+            &path_arg(&source),
+            "-map",
+            "0",
+            "-c",
+            "copy",
+            "-c:s",
+            "ttml",
+            &path_arg(&input),
+        ]),
+    )?;
+    let metadata = probe_media(&tools, &input)?;
+    assert_eq!(metadata.subtitle_tracks[0].codec, "ttml");
+    for mode in ["reencode", "copy"] {
+        for container in ["mp4", "mov", "mkv", "webm"] {
+            let output = sandbox.path(&format!("ttml-{mode}.{container}"));
+            let mut config = video_config(container, "libx264", "aac");
+            config.processing_mode = mode.to_string();
+            config.selected_subtitle_tracks = vec![metadata.subtitle_tracks[0].index];
+            if matches!(container, "mp4" | "mov") {
+                convert(&tools, &input, &output, &config)?;
+                assert_eq!(
+                    probe_media(&tools, &output)?.subtitle_tracks[0].codec,
+                    "ttml"
+                );
+            } else {
+                // Isolate the subtitle decision from video-copy compatibility.
+                assert!(!frame_core::media_rules::is_subtitle_stream_supported(
+                    container, "ttml"
+                ));
+                assert!(
+                    build_ffmpeg_args(&path_arg(&input), &path_arg(&output), &config, &metadata)
+                        .is_err()
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn raw_rgb_copy_to_matroska_should_preserve_decoded_pixels() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("raw_rgb_matroska")?;
+    let input = sandbox.path("source.avi");
+    let output = sandbox.path("copied.mkv");
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=64x48:rate=1:duration=1",
+            "-c:v",
+            "rawvideo",
+            "-pix_fmt",
+            "bgr24",
+            &path_arg(&input),
+        ]),
+    )?;
+    let mut config = video_config("mkv", "libx264", "aac");
+    config.processing_mode = "copy".to_string();
+    convert(&tools, &input, &output, &config)?;
+    assert_eq!(
+        probe_media(&tools, &output)?.video_codec.as_deref(),
+        Some("rawvideo")
+    );
+    assert_eq!(
+        read_rgb_frame(&tools, &input)?.pixels,
+        read_rgb_frame(&tools, &output)?.pixels
+    );
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 fn external_selectable_subtitle_should_survive_stream_copy_with_metadata() -> TestResult {
     let tools = Toolchain::discover()?;
     let sandbox = Sandbox::new("external_selectable_subtitle")?;
@@ -1369,6 +2618,99 @@ fn metadata_replace_should_write_requested_title() -> TestResult {
 
 #[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn metadata_cleaning_should_remove_embedded_and_external_subtitle_text() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("subtitle_metadata_cleaning")?;
+    let base = sandbox.path("base.mp4");
+    let input = sandbox.path("private.mp4");
+    let subtitle = sandbox.path("captions.srt");
+    write_srt(&subtitle)?;
+    generate_subtitled_source(&tools, &base, &subtitle)?;
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-i",
+            &path_arg(&base),
+            "-map",
+            "0",
+            "-c",
+            "copy",
+            "-metadata",
+            "title=PRIVATE_GLOBAL",
+            "-metadata:s:s:0",
+            "language=eng",
+            "-metadata:s:s:0",
+            "title=PRIVATE_SOURCE",
+            "-metadata:s:s:0",
+            "handler_name=PRIVATE_SOURCE",
+            &path_arg(&input),
+        ]),
+    )?;
+    assert_eq!(
+        probe_media(&tools, &input)?.subtitle_tracks[0]
+            .label
+            .as_deref(),
+        Some("PRIVATE_SOURCE")
+    );
+    for container in ["mp4", "mkv"] {
+        for mode in ["copy", "reencode"] {
+            for (label, metadata_mode) in [
+                ("clean", MetadataMode::Clean),
+                ("replace", MetadataMode::Replace),
+            ] {
+                let mut config = video_config(container, "libx264", "aac");
+                config.processing_mode = mode.to_string();
+                config.selected_subtitle_tracks = vec![2];
+                config.metadata.mode = metadata_mode;
+                config.metadata.title = Some("PUBLIC_REPLACEMENT".to_string());
+                config.external_subtitle_tracks = vec![ExternalSubtitleTrack {
+                    path: path_arg(&subtitle),
+                    language: Some("pol".to_string()),
+                    title: Some("PRIVATE_EXTERNAL".to_string()),
+                    is_default: true,
+                    is_forced: true,
+                }];
+                let output = sandbox.path(&format!("{label}-{mode}.{container}"));
+                convert(&tools, &input, &output, &config)?;
+                let data = run_tool_output(
+                    &tools.ffprobe,
+                    &args(&[
+                        "-v",
+                        "error",
+                        "-show_entries",
+                        "format_tags:stream_tags:stream_disposition=default,forced",
+                        "-of",
+                        "json",
+                        &path_arg(&output),
+                    ]),
+                )?;
+                let text = String::from_utf8_lossy(&data);
+                assert!(
+                    !text.contains("PRIVATE"),
+                    "{label}/{mode}/{container}: {text}"
+                );
+                assert_eq!(text.contains("PUBLIC_REPLACEMENT"), label == "replace");
+                let metadata = probe_media(&tools, &output)?;
+                assert_eq!(metadata.subtitle_tracks.len(), 2);
+                assert!(
+                    metadata
+                        .subtitle_tracks
+                        .iter()
+                        .all(|track| !matches!(track.language.as_deref(), Some("eng" | "pol")))
+                );
+                let json: serde_json::Value =
+                    serde_json::from_slice(&data).map_err(|error| error.to_string())?;
+                assert_eq!(json["streams"][2]["disposition"]["forced"], 1);
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 fn audio_normalize_and_mono_wav_should_emit_mono_pcm() -> TestResult {
     let tools = Toolchain::discover()?;
     let sandbox = Sandbox::new("audio_normalize_mono")?;
@@ -1420,6 +2762,250 @@ fn subtitle_burn_should_encode_video_when_srt_is_present() -> TestResult {
 
 #[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn trimmed_subtitle_burn_with_overlay_should_match_full_render_frames() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("trimmed_subtitle_burn")?;
+    let input = sandbox.path("source.mp4");
+    let subtitle = sandbox.path("captions.srt");
+    let overlay = sandbox.path("black.ppm");
+    // Keep the source RGB so this clock regression does not depend on the
+    // overlay graph's YUV-to-RGB conversion rounding after an input seek.
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=black:size=320x180:rate=12:duration=2,format=rgb24",
+            "-c:v",
+            "libx264rgb",
+            "-crf",
+            "0",
+            "-preset",
+            "ultrafast",
+            "-y",
+            &path_arg(&input),
+        ]),
+    )?;
+    write_delayed_srt(&subtitle)?;
+    write_solid_ppm(&overlay, 16, 16, Rgb::BLACK)?;
+    let mut config = video_config("mp4", "libx264", "aac");
+    config.crf = 0;
+    config.subtitle_burn_path = Some(path_arg(&subtitle));
+    config.subtitle_font_size = Some("24".to_string());
+    config.overlay = Some(OverlayConfig {
+        enabled: true,
+        path: path_arg(&overlay),
+        x: 0.05,
+        y: 0.05,
+        width: 0.05,
+        opacity: 1.0,
+        anchor: "center".to_string(),
+    });
+    let reference = sandbox.path("reference.mp4");
+    convert(&tools, &input, &reference, &config)?;
+    config.start_time = Some("1.000".to_string());
+    config.end_time = Some("1.500".to_string());
+    let trimmed = sandbox.path("trimmed.mp4");
+    convert(&tools, &input, &trimmed, &config)?;
+    let decode = |path: &Path, start: &str| {
+        run_tool_output(
+            &tools.ffmpeg,
+            &args(&[
+                "-v",
+                "error",
+                "-ss",
+                start,
+                "-i",
+                &path_arg(path),
+                "-t",
+                "0.5",
+                "-an",
+                "-pix_fmt",
+                "rgb24",
+                "-f",
+                "rawvideo",
+                "pipe:1",
+            ]),
+        )
+    };
+    let expected = decode(&reference, "1")?;
+    assert_eq!(expected.len(), 6 * 320 * 180 * 3);
+    assert!(expected.iter().any(|value| *value > 35));
+    assert_bytes_match(
+        &decode(&trimmed, "0")?,
+        &expected,
+        "trimmed subtitle render",
+    )?;
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn subtitle_filenames_should_render_identically_in_simple_and_overlay_graphs() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("subtitle_filename_escaping")?;
+    let input = sandbox.path("source.mp4");
+    let overlay = sandbox.path("black.ppm");
+    generate_black_h264_source(&tools, &input, 0.25, 320, 180)?;
+    write_solid_ppm(&overlay, 16, 16, Rgb::BLACK)?;
+    let names = [
+        "simple.srt",
+        "John's.srt",
+        #[cfg(unix)]
+        r"slash\name.srt",
+        #[cfg(unix)]
+        "colon:name.srt",
+        "[title].srt",
+        "comma,name.srt",
+        "semi;name.srt",
+        "łąka 日本語.srt",
+        #[cfg(unix)]
+        "tab\tname.srt",
+        #[cfg(unix)]
+        "line\nname.srt",
+        #[cfg(unix)]
+        r"mix'\:[x],;.srt",
+    ];
+    for with_overlay in [false, true] {
+        let mut reference: Option<Vec<u8>> = None;
+        for (index, name) in names.iter().enumerate() {
+            let subtitle = sandbox.path(name);
+            write_srt(&subtitle)?;
+            let mut config = video_config("mp4", "libx264", "aac");
+            config.crf = 0;
+            config.subtitle_burn_path = Some(path_arg(&subtitle));
+            config.subtitle_font_name = Some("DejaVu Sans".to_string());
+            config.subtitle_font_size = Some("24".to_string());
+            config.subtitle_position = Some("middle".to_string());
+            if with_overlay {
+                config.overlay = Some(OverlayConfig {
+                    enabled: true,
+                    path: path_arg(&overlay),
+                    x: 0.05,
+                    y: 0.05,
+                    width: 0.05,
+                    opacity: 1.0,
+                    anchor: "center".to_string(),
+                });
+            }
+            let output = sandbox.path(&format!("render-{with_overlay}-{index}.mp4"));
+            convert(&tools, &input, &output, &config)?;
+            let pixels = read_rgb_frame(&tools, &output)?.pixels;
+            assert!(pixels.iter().any(|value| *value > 35));
+            if let Some(expected) = &reference {
+                assert_bytes_match(&pixels, expected, name)?;
+            } else {
+                reference = Some(pixels);
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn bounded_fast_preview_should_match_complete_source_frames_and_chirp_samples() -> TestResult {
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("bounded_fast_preview")?;
+    let input = sandbox.path("long_gop_chirp.mov");
+    generate_long_gop_chirp_source(&tools, &input)?;
+    let config = video_config("mp4", "libx264", "aac");
+    let video_options = PreviewFfmpegOptions {
+        start_seconds: 0.0,
+        end_seconds: None,
+        source_width: Some(160),
+        source_height: Some(90),
+        source_is_palette: false,
+        source_sample_aspect_ratio: None,
+        source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
+        preview_burn_clock: None,
+        max_width: 160,
+        max_height: 90,
+        fps: 30,
+        realtime: false,
+        precise_seek: true,
+        source_is_image: false,
+    };
+    let audio_options = PreviewAudioFfmpegOptions {
+        start_seconds: 0.0,
+        end_seconds: None,
+        sample_rate: 48_000,
+        channels: 2,
+        realtime: false,
+        precise_seek: true,
+        selected_track: 1,
+    };
+    let video_source_plan = build_ffmpeg_preview_args(&path_arg(&input), &config, &video_options)
+        .map_err(|error| error.to_string())?;
+    let audio_source_plan =
+        build_ffmpeg_preview_audio_args(&path_arg(&input), &config, &audio_options)
+            .map_err(|error| error.to_string())?;
+    let source_frames = run_tool_output(&tools.ffmpeg, &video_source_plan.args)?;
+    let source_samples = run_tool_output(&tools.ffmpeg, &audio_source_plan.args)?;
+    let frame_bytes = video_source_plan.frame_bytes;
+    let video_end = 300 * frame_bytes;
+    let audio_end = 10 * 48_000 * 2 * 4;
+    assert!(source_frames.len() >= video_end);
+    assert!(source_samples.len() >= audio_end);
+    for start_ms in [4_800_u32, 7_200, 8_000, 9_700] {
+        let start_seconds = f64::from(start_ms) / 1_000.0;
+        let video_start = usize::try_from(start_ms * 30 / 1_000).unwrap() * frame_bytes;
+        let audio_start = usize::try_from(start_ms * 48).unwrap() * 2 * 4;
+        for precise_seek in [false, true] {
+            let video = build_ffmpeg_preview_args(
+                &path_arg(&input),
+                &config,
+                &PreviewFfmpegOptions {
+                    start_seconds,
+                    end_seconds: Some(10.0),
+                    precise_seek,
+                    ..video_options.clone()
+                },
+            )
+            .map_err(|error| error.to_string())?;
+            let frames = run_tool_output(&tools.ffmpeg, &video.args)?;
+            assert_eq!(
+                frames.len(),
+                video_end - video_start,
+                "video tail at {start_seconds}, precise={precise_seek}"
+            );
+            assert!(
+                frames == source_frames[video_start..video_end],
+                "wrong video interval at {start_seconds}, precise={precise_seek}"
+            );
+            let audio = build_ffmpeg_preview_audio_args(
+                &path_arg(&input),
+                &config,
+                &PreviewAudioFfmpegOptions {
+                    start_seconds,
+                    end_seconds: Some(10.0),
+                    precise_seek,
+                    ..audio_options.clone()
+                },
+            )
+            .map_err(|error| error.to_string())?;
+            let samples = run_tool_output(&tools.ffmpeg, &audio.args)?;
+            assert_eq!(
+                samples.len(),
+                audio_end - audio_start,
+                "audio tail at {start_seconds}, precise={precise_seek}"
+            );
+            // The chirp changes frequency continuously, so a keyframe-aligned
+            // prefix with the right duration cannot satisfy this source oracle.
+            assert!(
+                samples == source_samples[audio_start..audio_end],
+                "wrong audio interval at {start_seconds}, precise={precise_seek}"
+            );
+        }
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 fn preview_subtitle_burn_should_use_source_time_after_seek() -> TestResult {
     let tools = Toolchain::discover()?;
     let sandbox = Sandbox::new("preview_subtitle_seek")?;
@@ -1437,6 +3023,7 @@ fn preview_subtitle_burn_should_use_source_time_after_seek() -> TestResult {
     config.subtitle_font_color = Some("#ffffff".to_string());
     config.subtitle_outline_color = Some("#000000".to_string());
     config.subtitle_position = Some("middle".to_string());
+    config.start_time = Some("0.750".to_string());
 
     let visible_pixels_at = |start_seconds: f64| -> TestResult<usize> {
         let plan = build_ffmpeg_preview_args(
@@ -1447,9 +3034,13 @@ fn preview_subtitle_burn_should_use_source_time_after_seek() -> TestResult {
                 end_seconds: Some(start_seconds + 0.2),
                 source_width: Some(640),
                 source_height: Some(360),
+                source_is_palette: false,
+                source_sample_aspect_ratio: None,
+                source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
+                preview_burn_clock: None,
                 max_width: 640,
                 max_height: 360,
-                fps: 1,
+                fps: 12,
                 realtime: false,
                 precise_seek: true,
                 source_is_image: false,
@@ -1478,7 +3069,7 @@ fn preview_subtitle_burn_should_use_source_time_after_seek() -> TestResult {
         before_subtitle, 0,
         "subtitle appeared before its source timestamp"
     );
-    let visible_pixels = visible_pixels_at(1.0)?;
+    let visible_pixels = visible_pixels_at(1.5)?;
     if visible_pixels < 50 {
         return Err(format!(
             "seeked preview did not render delayed subtitle; visible pixel count was {visible_pixels}"
@@ -1524,6 +3115,10 @@ fn display_matrix_rotation_should_produce_portrait_preview_frame() -> TestResult
             end_seconds: Some(0.2),
             source_width: metadata.width,
             source_height: metadata.height,
+            source_is_palette: false,
+            source_sample_aspect_ratio: None,
+            source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
+            preview_burn_clock: None,
             max_width: 160,
             max_height: 160,
             fps: 12,
@@ -1610,6 +3205,7 @@ fn base_config(container: &str, video_codec: &str) -> ConversionConfig {
         audio_codec: "aac".to_string(),
         audio_bitrate: "96".to_string(),
         audio_bitrate_mode: "bitrate".to_string(),
+        opus_vbr: true,
         audio_quality: "4".to_string(),
         audio_channels: "original".to_string(),
         audio_volume: 100.0,
@@ -1659,6 +3255,41 @@ fn base_config(container: &str, video_codec: &str) -> ConversionConfig {
         gif_dither: "sierra2_4a".to_string(),
         gif_loop: 0,
     }
+}
+
+fn generate_long_gop_chirp_source(tools: &Toolchain, output: &Path) -> TestResult {
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=160x90:rate=30:duration=12",
+            "-f",
+            "lavfi",
+            "-i",
+            "aevalsrc=0.2*sin(2*PI*(300*t+17*t*t)):s=48000:d=12",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-g",
+            "120",
+            "-keyint_min",
+            "120",
+            "-sc_threshold",
+            "0",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "pcm_f32le",
+            "-y",
+            &path_arg(output),
+        ]),
+    )
 }
 
 fn generate_h264_aac_source(
@@ -2032,6 +3663,27 @@ fn count_visible_bgra_pixels(bytes: &[u8]) -> usize {
         .count()
 }
 
+fn assert_bytes_match(actual: &[u8], expected: &[u8], label: &str) -> TestResult {
+    if actual.len() != expected.len() {
+        return Err(format!(
+            "{label}: byte length {}, expected {}",
+            actual.len(),
+            expected.len()
+        ));
+    }
+    if let Some((offset, (actual, expected))) = actual
+        .iter()
+        .zip(expected)
+        .enumerate()
+        .find(|(_, (actual, expected))| actual != expected)
+    {
+        return Err(format!(
+            "{label}: first differing byte at {offset}: {actual}, expected {expected}"
+        ));
+    }
+    Ok(())
+}
+
 fn assert_color_near(actual: Rgb, expected: Rgb, tolerance: u8, label: &str) -> TestResult {
     let tolerance = i16::from(tolerance);
     for (channel, actual, expected) in [
@@ -2193,7 +3845,6 @@ fn output_geometry_matches_real_crop_rotate_and_scale_exports() -> TestResult {
     let sandbox = Sandbox::new("output_geometry")?;
     let input = sandbox.path("source.mp4");
     generate_h264_aac_source(&tools, &input, 0.1, 640, 360)?;
-    let source = probe_media(&tools, &input)?;
     for (index, rotation, crop, resolution, custom_width, custom_height) in [
         (0, "0", Some((480.0, 360.0)), "original", None, None),
         (1, "90", Some((240.0, 320.0)), "original", None, None),
@@ -2225,12 +3876,7 @@ fn output_geometry_matches_real_crop_rotate_and_scale_exports() -> TestResult {
             source_height: Some(360.0),
             aspect_ratio: None,
         });
-        let expected = frame_core::dimensions::output_dimensions(
-            &config,
-            640,
-            360,
-            source.pixel_format.as_deref(),
-        );
+        let expected = frame_core::dimensions::output_dimensions(&config, 640, 360, None);
         let output = sandbox.path(&format!("geometry-{index}.mp4"));
         convert(&tools, &input, &output, &config)?;
         let actual = probe_media(&tools, &output)?;

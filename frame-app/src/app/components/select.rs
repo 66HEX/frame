@@ -1,52 +1,27 @@
-use super::{
-    App, ButtonVariant, Context, FluentBuilder, FrameRoot, InteractiveElement, IntoElement,
-    MouseButton, MouseMoveEvent, ParentElement, PlatformInput, SETTINGS_CONTROL_HEIGHT,
-    ScrollHandle, ScrollWheelEvent, StatefulInteractiveElement, Styled, Window,
-    animated_button_colors, apply_accessible_select_option,
-    apply_accessible_select_option_with_focus, apply_accessible_select_trigger,
-    apply_accessible_select_trigger_with_focus, apply_button_motion, assets, button_colors,
-    button_highlight_shadows, button_mouse_down, card_surface_shadows, color, div, icon_svg,
-    input_highlight_shadows, parse_hex, theme,
+use super::FrameStyle;
+use crate::app::accessibility::{
+    apply_accessible_select_option, apply_accessible_select_option_with_focus,
+    apply_accessible_select_trigger, apply_accessible_select_trigger_with_focus,
 };
-use crate::app::accessibility::handle_modal_tab_navigation;
+use crate::app::layout::SETTINGS_CONTROL_HEIGHT;
+use crate::app::primitives::{
+    ButtonVariant, button_colors, button_mouse_down, color, icon_svg, parse_hex,
+};
+use crate::app::root::FrameRoot;
 use crate::numeric::usize_to_f32;
-use gpui::FocusHandle;
+use crate::{assets, theme};
+use gpui::prelude::{FluentBuilder, ParentElement, Styled};
+use gpui::{
+    App, Context, FocusHandle, InteractiveElement, IntoElement, MouseButton, MouseMoveEvent,
+    PlatformInput, ScrollHandle, ScrollWheelEvent, StatefulInteractiveElement, Window, div,
+};
 
 pub(in crate::app) const FRAME_SELECT_MAX_HEIGHT: f32 = 192.0;
 pub(in crate::app) const FRAME_SELECT_CONTENT_PADDING: f32 = 4.0;
 pub(in crate::app) const FRAME_SELECT_OPTION_HEIGHT: f32 = 28.0;
 pub(in crate::app) const FRAME_COLOR_SWATCH_SIZE: f32 = 14.0;
-
-#[expect(
-    clippy::too_many_arguments,
-    reason = "Select triggers need explicit labels, state, palette, and GPUI render context."
-)]
-pub(in crate::app) fn frame_select_trigger(
-    id: impl Into<String>,
-    label: impl Into<String>,
-    display: &str,
-    enabled: bool,
-    expanded: bool,
-    palette: &'static theme::ThemePalette,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
-) -> gpui::Stateful<gpui::Div> {
-    frame_select_trigger_content(
-        id,
-        label,
-        div()
-            .flex_1()
-            .min_w_0()
-            .truncate()
-            .text_color(color(palette.text_primary))
-            .child(theme::ui_text(display)),
-        enabled,
-        expanded,
-        palette,
-        window,
-        cx,
-    )
-}
+// The pointer target overlays the options; it never reserves a layout gutter.
+const FRAME_SELECT_SCROLLBAR_WIDTH: f32 = 12.0;
 
 #[expect(
     clippy::too_many_arguments,
@@ -56,6 +31,7 @@ pub(in crate::app) fn frame_select_trigger_with_focus(
     id: impl Into<String>,
     label: impl Into<String>,
     display: &str,
+    variant: ButtonVariant,
     enabled: bool,
     expanded: bool,
     focus: &FocusHandle,
@@ -72,6 +48,7 @@ pub(in crate::app) fn frame_select_trigger_with_focus(
             .truncate()
             .text_color(color(palette.text_primary))
             .child(theme::ui_text(display)),
+        variant,
         enabled,
         expanded,
         Some(focus),
@@ -89,6 +66,7 @@ pub(in crate::app) fn frame_select_trigger_content(
     id: impl Into<String>,
     label: impl Into<String>,
     content: impl IntoElement,
+    variant: ButtonVariant,
     enabled: bool,
     expanded: bool,
     palette: &'static theme::ThemePalette,
@@ -96,7 +74,7 @@ pub(in crate::app) fn frame_select_trigger_content(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     frame_select_trigger_content_inner(
-        id, label, content, enabled, expanded, None, palette, window, cx,
+        id, label, content, variant, enabled, expanded, None, palette, window, cx,
     )
 }
 
@@ -108,6 +86,7 @@ pub(in crate::app) fn frame_select_trigger_content_with_focus(
     id: impl Into<String>,
     label: impl Into<String>,
     content: impl IntoElement,
+    variant: ButtonVariant,
     enabled: bool,
     expanded: bool,
     focus: &FocusHandle,
@@ -119,6 +98,7 @@ pub(in crate::app) fn frame_select_trigger_content_with_focus(
         id,
         label,
         content,
+        variant,
         enabled,
         expanded,
         Some(focus),
@@ -136,21 +116,17 @@ fn frame_select_trigger_content_inner(
     id: impl Into<String>,
     label: impl Into<String>,
     content: impl IntoElement,
+    variant: ButtonVariant,
     enabled: bool,
     expanded: bool,
     focus: Option<&FocusHandle>,
     palette: &'static theme::ThemePalette,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
+    _window: &mut Window,
+    _cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let id = id.into();
     let label = label.into();
-    let colors = button_colors(ButtonVariant::Secondary, false, enabled, palette);
-    let animated = animated_button_colors(id.clone(), colors, window, cx);
-    let background = animated.background;
-    let foreground = animated.foreground;
-    let motion = animated.motion;
-
+    let colors = button_colors(variant, false, enabled, palette);
     let trigger = div()
         .id(id.clone())
         .debug_selector(|| id.clone())
@@ -161,38 +137,36 @@ fn frame_select_trigger_content_inner(
         .items_center()
         .justify_between()
         .min_w_0()
-        .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .px(theme::ui_rem(10.0))
-        .bg(background)
+        .rounded(theme::ui_rem(theme::RADIUS_MD))
+        .px(theme::ui_rem(theme::metrics::CONTROL_PADDING_X))
+        .input_surface(palette)
+        .bg(color(colors.background))
+        .shadow(theme::shadows::ShadowLevel::Xs.shadows())
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-        .text_color(foreground)
+        .font_weight(theme::TEXT_WEIGHT_REGULAR)
+        .text_color(color(colors.foreground))
         .opacity(colors.opacity)
-        .shadow(button_highlight_shadows(palette))
         .when(enabled, |this| {
-            this.hover_style(gpui::Styled::cursor_pointer)
-                .active_style(move |style| style.bg(color(colors.active_background)))
+            this.cursor_default()
+                .hover_style(move |style| style.bg(color(colors.hover_background)))
         })
         .when(!enabled, gpui::Styled::cursor_not_allowed)
         .child(content)
-        .child(
-            div()
-                .flex_shrink_0()
-                .child(icon_svg(assets::ICON_UNFOLD_MORE, 12.0, foreground)),
-        );
+        .child(div().flex_shrink_0().child(icon_svg(
+            assets::ICON_UNFOLD_MORE,
+            14.0,
+            color(palette.text_muted),
+        )));
 
     let pointer_focus = focus.cloned();
-    let trigger = apply_button_motion(trigger, motion, enabled).on_mouse_down(
-        MouseButton::Left,
-        move |_, window, cx| {
-            // Button motion prevents GPUI's default mouse-down action. Explicitly
-            // focus this select so arrows after a pointer click address its menu.
-            if enabled && let Some(focus) = &pointer_focus {
-                focus.focus(window, cx);
-            }
-            cx.stop_propagation();
-        },
-    );
+    let trigger = trigger.on_mouse_down(MouseButton::Left, move |_, window, cx| {
+        button_mouse_down(enabled, window, cx);
+        // Explicit focus lets arrows address the menu after a pointer click.
+        if enabled && let Some(focus) = &pointer_focus {
+            focus.focus(window, cx);
+        }
+        cx.stop_propagation();
+    });
 
     if let Some(focus) = focus {
         apply_accessible_select_trigger_with_focus(
@@ -204,29 +178,26 @@ fn frame_select_trigger_content_inner(
 }
 
 pub(in crate::app) fn frame_select_popover(
-    id: &'static str,
-    top: f32,
+    id: &str,
     progress: f32,
     list: impl IntoElement,
     palette: &'static theme::ThemePalette,
 ) -> gpui::Stateful<gpui::Div> {
     div()
-        .absolute()
-        .id(id)
-        .debug_selector(|| id.to_string())
-        .top(theme::ui_rem(top))
-        .left_0()
-        .right_0()
-        .max_h(theme::ui_rem(FRAME_SELECT_MAX_HEIGHT))
-        .overflow_hidden()
-        .rounded(theme::ui_rem(theme::RADIUS_SM))
-        .bg(color(palette.surface_elevated))
-        .opacity(progress)
-        .shadow(if palette.is_light() {
-            card_surface_shadows(palette)
-        } else {
-            button_highlight_shadows(palette)
+        .relative()
+        .id(id.to_owned())
+        .debug_selector({
+            let id = id.to_owned();
+            move || id
         })
+        .w_full()
+        .max_h(gpui::relative(1.0))
+        .flex()
+        .flex_col()
+        .overflow_hidden()
+        .popover_surface(palette)
+        .opacity(progress)
+        .shadow(theme::shadows::FLOATING.shadows())
         .occlude()
         .on_mouse_down(MouseButton::Left, move |_, _window, cx| {
             cx.stop_propagation();
@@ -235,21 +206,34 @@ pub(in crate::app) fn frame_select_popover(
 }
 
 pub(in crate::app) fn frame_select_options_list(
-    id: &'static str,
+    id: &str,
     scroll_handle: &ScrollHandle,
-    scrollable: bool,
 ) -> gpui::Stateful<gpui::Div> {
     div()
-        .id(id)
+        .id(id.to_owned())
         .role(gpui::Role::ListBox)
+        .min_h_0()
         .max_h(theme::ui_rem(FRAME_SELECT_MAX_HEIGHT))
         .overflow_y_scroll()
         .track_scroll(scroll_handle)
         .p(theme::ui_rem(FRAME_SELECT_CONTENT_PADDING))
-        .when(scrollable, |list| {
-            list.pr(theme::ui_rem(super::FRAME_SCROLLBAR_WIDTH))
-        })
         .on_scroll_wheel(refresh_select_hover_after_scroll)
+}
+
+pub(in crate::app) fn frame_select_scrollbar(
+    id: impl Into<String>,
+    scroll_handle: ScrollHandle,
+    content_height: f32,
+    palette: &'static theme::ThemePalette,
+) -> gpui::Stateful<gpui::Div> {
+    super::scrollbar::frame_vertical_scrollbar_clipped(
+        id,
+        scroll_handle,
+        content_height,
+        theme::RADIUS_LG,
+        palette,
+    )
+    .w(theme::ui_rem(FRAME_SELECT_SCROLLBAR_WIDTH))
 }
 
 pub(in crate::app) fn frame_select_content_height(option_count: usize) -> f32 {
@@ -272,144 +256,13 @@ pub(in crate::app) fn frame_select_target_index(
         "home" => (0..len).find(|index| is_enabled(*index)),
         "end" => (0..len).rev().find(|index| is_enabled(*index)),
         "down" => {
-            let start = selected_index.unwrap_or(len - 1);
-            (1..=len)
-                .map(|offset| (start + offset) % len)
-                .find(|index| is_enabled(*index))
+            (selected_index.map_or(0, |index| index + 1)..len).find(|index| is_enabled(*index))
         }
-        "up" => {
-            let start = selected_index.unwrap_or(0);
-            (1..=len)
-                .map(|offset| (start + len - offset) % len)
-                .find(|index| is_enabled(*index))
-        }
+        "up" => (0..selected_index.unwrap_or(len))
+            .rev()
+            .find(|index| is_enabled(*index)),
         _ => None,
     }
-}
-
-pub(in crate::app) const fn frame_select_option_focus<'a>(
-    index: usize,
-    option_count: usize,
-    first_focus: Option<&'a FocusHandle>,
-    last_focus: Option<&'a FocusHandle>,
-) -> Option<&'a FocusHandle> {
-    if index == 0 {
-        first_focus
-    } else if index + 1 == option_count {
-        last_focus
-    } else {
-        None
-    }
-}
-
-pub(in crate::app) const fn frame_select_last_focus<'a>(
-    option_count: usize,
-    first_focus: Option<&'a FocusHandle>,
-    last_focus: Option<&'a FocusHandle>,
-) -> Option<&'a FocusHandle> {
-    if option_count <= 1 {
-        first_focus
-    } else {
-        last_focus
-    }
-}
-
-pub(in crate::app) fn focus_frame_select_initial_target(
-    key: &str,
-    option_count: usize,
-    first_focus: Option<&FocusHandle>,
-    last_focus: Option<&FocusHandle>,
-    scroll_handle: &ScrollHandle,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
-) {
-    if option_count == 0 {
-        return;
-    }
-    let target_index = if matches!(key, "up" | "end") {
-        option_count.saturating_sub(1)
-    } else {
-        0
-    };
-    scroll_handle.scroll_to_item(target_index);
-    let focus = if target_index == 0 {
-        first_focus
-    } else {
-        last_focus.or(first_focus)
-    };
-    if let Some(focus) = focus {
-        focus.focus(window, cx);
-    }
-}
-
-pub(in crate::app) fn apply_frame_select_popover_focus_trap(
-    popover: gpui::Stateful<gpui::Div>,
-    panel_focus: Option<&FocusHandle>,
-    first_focus: Option<&FocusHandle>,
-    last_focus: Option<&FocusHandle>,
-    cx: &Context<FrameRoot>,
-) -> gpui::Stateful<gpui::Div> {
-    let (Some(panel_focus), Some(first_focus), Some(last_focus)) =
-        (panel_focus, first_focus, last_focus)
-    else {
-        return popover;
-    };
-    let first_focus = first_focus.clone();
-    let last_focus = last_focus.clone();
-    popover
-        .track_focus(panel_focus)
-        .tab_stop(false)
-        .on_key_down(
-            cx.listener(move |_root, event: &gpui::KeyDownEvent, window, cx| {
-                handle_modal_tab_navigation(event, &first_focus, &last_focus, window, cx);
-            }),
-        )
-}
-
-#[derive(Clone, Copy)]
-pub(in crate::app) struct FrameSelectFocusTarget<'a> {
-    pub(in crate::app) current_index: usize,
-    pub(in crate::app) target_index: usize,
-    pub(in crate::app) first_focus: Option<&'a FocusHandle>,
-    pub(in crate::app) last_focus: Option<&'a FocusHandle>,
-    pub(in crate::app) scroll_handle: &'a ScrollHandle,
-}
-
-pub(in crate::app) fn focus_frame_select_target(
-    key: &str,
-    target: FrameSelectFocusTarget<'_>,
-    window: &mut Window,
-    cx: &mut Context<FrameRoot>,
-) {
-    target.scroll_handle.scroll_to_item(target.target_index);
-    let boundary_focus = match key {
-        "home" => target.first_focus,
-        "end" => target.last_focus,
-        "down" if target.target_index <= target.current_index => target.first_focus,
-        "up" if target.target_index >= target.current_index => target.last_focus,
-        "down" => {
-            window.focus_next(cx);
-            None
-        }
-        "up" => {
-            window.focus_prev(cx);
-            None
-        }
-        _ => None,
-    };
-    if let Some(focus) = boundary_focus {
-        focus.focus(window, cx);
-    }
-}
-
-pub(in crate::app) fn frame_select_option(
-    id: impl Into<String>,
-    label: impl Into<String>,
-    selected: bool,
-    enabled: bool,
-    palette: &'static theme::ThemePalette,
-) -> gpui::Stateful<gpui::Div> {
-    frame_select_option_inner(id, label, selected, enabled, None, palette)
 }
 
 pub(in crate::app) fn frame_select_option_with_focus(
@@ -434,11 +287,7 @@ fn frame_select_option_inner(
     let id = id.into();
     let label = label.into();
     let display_label = theme::ui_text_owned(label.clone());
-    let text_color = if selected {
-        palette.text_primary
-    } else {
-        palette.text_muted
-    };
+    let text_color = palette.text_primary;
 
     let option = div()
         .id(id.clone())
@@ -449,20 +298,15 @@ fn frame_select_option_inner(
         .items_center()
         .justify_between()
         .gap_2()
-        .rounded(theme::ui_rem(theme::RADIUS_XS))
-        .px(theme::ui_rem(12.0))
+        .rounded(theme::ui_rem(theme::RADIUS_MD))
+        .px(theme::ui_rem(8.0))
         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
+        .font_weight(theme::TEXT_WEIGHT_REGULAR)
         .text_color(color(text_color))
         .opacity(if enabled { 1.0 } else { 0.5 })
-        .when(enabled, |this| {
-            this.hover_style(|style| {
-                style
-                    .bg(color(palette.fill_subtle))
-                    .text_color(color(palette.text_primary))
-                    .cursor_pointer()
-            })
-        })
+        // Pointer movement focuses the row, matching Radix SelectItem. A separate
+        // hover fill would override focus and persist after keyboard navigation.
+        .when(enabled, gpui::Styled::cursor_default)
         .when(!enabled, gpui::Styled::cursor_not_allowed)
         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
             cx.stop_propagation();
@@ -470,11 +314,12 @@ fn frame_select_option_inner(
         })
         .child(div().min_w_0().truncate().child(display_label))
         .when(selected, |this| {
-            this.child(icon_svg(
-                assets::ICON_CHECK,
-                12.0,
-                color(palette.text_primary),
-            ))
+            this.child(
+                gpui::svg()
+                    .path(assets::ICON_CHECK)
+                    .w(theme::ui_rem(14.0))
+                    .h(theme::ui_rem(14.0)),
+            )
         });
 
     if let Some(focus) = focus {
@@ -494,7 +339,7 @@ pub(in crate::app) fn frame_color_select_value(
         .min_w_0()
         .items_center()
         .gap_2()
-        .child(frame_color_swatch(value, palette))
+        .child(frame_color_swatch(value))
         .child(
             div()
                 .flex_1()
@@ -506,17 +351,13 @@ pub(in crate::app) fn frame_color_select_value(
         )
 }
 
-pub(in crate::app) fn frame_color_swatch(
-    value: &str,
-    palette: &'static theme::ThemePalette,
-) -> gpui::Div {
+pub(in crate::app) fn frame_color_swatch(value: &str) -> gpui::Div {
     div()
         .w(theme::ui_rem(FRAME_COLOR_SWATCH_SIZE))
         .h(theme::ui_rem(FRAME_COLOR_SWATCH_SIZE))
         .flex_shrink_0()
         .rounded(theme::ui_rem(theme::RADIUS_XS))
         .bg(parse_hex(value))
-        .shadow(input_highlight_shadows(palette))
 }
 
 fn refresh_select_hover_after_scroll(
@@ -553,15 +394,15 @@ mod tests {
     #[test]
     fn frame_select_target_handles_the_keyboard_navigation_matrix() {
         let cases = [
-            (4, Some(3), "down", &[0][..], Some(1)),
+            (4, Some(3), "down", &[0][..], None),
             (4, Some(2), "home", &[0][..], Some(1)),
             (4, Some(2), "end", &[3][..], Some(2)),
             (0, None, "down", &[][..], None),
             (3, Some(1), "up", &[0, 1, 2][..], None),
             (3, Some(1), "home", &[0, 1, 2][..], None),
             (3, Some(1), "end", &[0, 1, 2][..], None),
-            (1, Some(0), "up", &[][..], Some(0)),
-            (1, Some(0), "down", &[][..], Some(0)),
+            (1, Some(0), "up", &[][..], None),
+            (1, Some(0), "down", &[][..], None),
             (1, Some(0), "home", &[][..], Some(0)),
             (1, Some(0), "end", &[][..], Some(0)),
             (3, Some(1), "escape", &[][..], None),

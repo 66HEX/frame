@@ -1,12 +1,12 @@
-use std::{
-    collections::{HashMap, HashSet},
-    sync::{Arc, Mutex, MutexGuard},
-};
-
-use frame_core::{error::ConversionError, types::DEFAULT_MAX_CONCURRENCY};
+use super::process::{pause_process, resume_process, terminate_process};
+use frame_core::error::ConversionError;
+use frame_core::types::DEFAULT_MAX_CONCURRENCY;
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex, MutexGuard};
 use sysinfo::{Pid, ProcessesToUpdate, System};
 
-use super::process::{pause_process, resume_process, terminate_process};
+mod publication;
+use publication::PublicationPhase;
 
 #[derive(Clone, Debug, Default)]
 pub struct ConversionProcessController {
@@ -17,6 +17,7 @@ pub struct ConversionProcessController {
 struct ConversionProcessState {
     active_processes: HashMap<String, ActiveConversionProcess>,
     cancelled_tasks: HashSet<String>,
+    publications: HashMap<String, PublicationPhase>,
     max_concurrency: usize,
 }
 
@@ -31,6 +32,7 @@ impl Default for ConversionProcessState {
         Self {
             active_processes: HashMap::new(),
             cancelled_tasks: HashSet::new(),
+            publications: HashMap::new(),
             max_concurrency: DEFAULT_MAX_CONCURRENCY,
         }
     }
@@ -137,6 +139,9 @@ impl ConversionProcessController {
     pub fn cancel_task(&self, id: &str) -> Result<(), ConversionError> {
         let process = {
             let mut state = self.lock_state()?;
+            if state.publications.contains_key(id) {
+                return Ok(());
+            }
             state.cancelled_tasks.insert(id.to_string());
             state.active_processes.get(id).copied()
         };

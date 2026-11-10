@@ -3223,6 +3223,10 @@ pub enum TextRenderingMode {
     Subpixel,
     /// Use grayscale text rendering.
     Grayscale,
+    /// Use grayscale antialiasing without CoreGraphics font-smoothing dilation.
+    /// This matches `-webkit-font-smoothing: antialiased` on macOS. Font weights,
+    /// fractional glyph positioning, and color glyphs are preserved.
+    Antialiased,
 }
 
 /// The options that can be configured for a file dialog prompt

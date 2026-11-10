@@ -4,8 +4,8 @@ use std::path::Path;
 
 use crate::error::ConversionError;
 use crate::types::{
-    AudioTrack, FfprobeOutput, FfprobeProgram, FfprobeStream, ProbeMetadata, SubtitleTrack,
-    TransportStreamMetadata,
+    AudioTrack, FfprobeOutput, FfprobeProgram, FfprobeStream, FfprobeTags, ProbeMetadata,
+    SubtitleTrack, TransportStreamMetadata,
 };
 use crate::utils::{parse_frame_rate_string, parse_probe_bitrate};
 
@@ -57,6 +57,8 @@ fn metadata_from_ffprobe(
     });
 
     let mut metadata = ProbeMetadata {
+        source_timing: Some(source_timing(&probe_data)),
+        source_format: source_format_name.clone(),
         duration: probe_data.format.duration,
         bitrate: probe_data.format.bit_rate,
         ..ProbeMetadata::default()
@@ -96,6 +98,17 @@ fn metadata_from_ffprobe(
                 .as_ref()
                 .is_none_or(|indices| indices.contains(&stream.index))
     }) {
+        metadata.sample_aspect_ratio = video_stream
+            .sample_aspect_ratio
+            .as_deref()
+            .and_then(crate::aspect::SampleAspectRatio::parse)
+            .map(|ratio| {
+                if has_side_display_rotation(video_stream) {
+                    ratio.inverted()
+                } else {
+                    ratio
+                }
+            });
         metadata.video_stream_index = Some(video_stream.index);
         metadata.video_codec.clone_from(&video_stream.codec_name);
         metadata.pixel_format.clone_from(&video_stream.pix_fmt);
@@ -135,20 +148,24 @@ fn metadata_from_ffprobe(
         let Some(codec) = recognized_codec_name(stream.codec_name.as_deref()) else {
             continue;
         };
-        let label = stream
-            .tags
-            .as_ref()
-            .and_then(|tags| tags.title.clone().or_else(|| tags.handler_name.clone()));
+        let label = stream.tags.as_ref().and_then(stream_label);
         let language = stream.tags.as_ref().and_then(|t| t.language.clone());
         let track_bitrate = parse_probe_bitrate(stream.bit_rate.as_deref());
 
         metadata.audio_tracks.push(AudioTrack {
             index: stream.index,
             codec: codec.to_string(),
+            codec_tag: stream.codec_tag.as_deref().and_then(parse_codec_tag),
             channels: stream
                 .channels
                 .map_or_else(|| "?".to_string(), |c| c.to_string()),
+            channel_layout: stream.channel_layout.clone(),
             label,
+            metadata_title: stream
+                .tags
+                .as_ref()
+                .and_then(stream_title)
+                .map(str::to_string),
             language,
             bitrate_kbps: track_bitrate,
             sample_rate: stream.sample_rate.clone(),
@@ -164,10 +181,7 @@ fn metadata_from_ffprobe(
         let Some(codec) = recognized_codec_name(stream.codec_name.as_deref()) else {
             continue;
         };
-        let label = stream
-            .tags
-            .as_ref()
-            .and_then(|tags| tags.title.clone().or_else(|| tags.handler_name.clone()));
+        let label = stream.tags.as_ref().and_then(stream_label);
         let language = stream.tags.as_ref().and_then(|t| t.language.clone());
 
         metadata.subtitle_tracks.push(SubtitleTrack {
@@ -218,6 +232,57 @@ fn metadata_from_ffprobe(
     }
 
     Ok(metadata)
+}
+
+fn stream_label(tags: &FfprobeTags) -> Option<String> {
+    stream_title(tags)
+        .or(tags.handler_name.as_deref())
+        .map(str::to_string)
+}
+
+fn stream_title(tags: &FfprobeTags) -> Option<&str> {
+    tags.title
+        .as_deref()
+        .or_else(|| tags.name.as_deref().filter(|name| !name.is_empty()))
+}
+
+fn source_timing(probe: &FfprobeOutput) -> crate::source_timing::SourceTiming {
+    use crate::source_timing::{SourceStreamTiming, SourceTiming, TimeBase};
+    let raw_origin = probe.format.start_time.as_deref();
+    // ffprobe's N/A sentinel has the same meaning as an omitted start time.
+    let present_origin =
+        raw_origin.filter(|value| !matches!(*value, "N/A" | "-9223372036854.775808"));
+    let origin = present_origin.and_then(crate::trim::RawFfmpegTime::parse);
+    SourceTiming {
+        format_start_microseconds: origin.as_ref().map(|value| value.microseconds),
+        format_start_invalid: present_origin.is_some() && origin.is_none(),
+        first_video_stream_index: probe
+            .streams
+            .iter()
+            .find(|stream| stream.codec_type == "video")
+            .map(|stream| stream.index),
+        streams: probe
+            .streams
+            .iter()
+            .map(|stream| SourceStreamTiming {
+                index: stream.index,
+                time_base: stream.time_base.as_deref().and_then(TimeBase::parse),
+                start_pts: stream.start_pts.filter(|value| *value != i64::MIN),
+            })
+            .collect(),
+    }
+}
+
+// ffprobe prints codec tags as unsigned hexadecimal values. A missing or malformed
+// tag is unknown, never evidence of a particular container's sample-entry path.
+fn parse_codec_tag(value: &str) -> Option<u32> {
+    let digits = value
+        .strip_prefix("0x")
+        .or_else(|| value.strip_prefix("0X"))?;
+    if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return None;
+    }
+    u32::from_str_radix(digits, 16).ok()
 }
 
 fn select_program(probe: &FfprobeOutput) -> Result<Option<&FfprobeProgram>, ConversionError> {
@@ -271,16 +336,19 @@ fn display_oriented_dimensions(
     height: i32,
     video_stream: &FfprobeStream,
 ) -> (i32, i32) {
-    if video_stream
-        .side_data_list
-        .iter()
-        .filter_map(|side_data| side_data.rotation)
-        .any(is_side_display_rotation)
-    {
+    if has_side_display_rotation(video_stream) {
         (height, width)
     } else {
         (width, height)
     }
+}
+
+fn has_side_display_rotation(stream: &FfprobeStream) -> bool {
+    stream
+        .side_data_list
+        .iter()
+        .filter_map(|data| data.rotation)
+        .any(is_side_display_rotation)
 }
 
 fn is_side_display_rotation(rotation: f64) -> bool {
@@ -327,6 +395,184 @@ fn format_name_indicates_image(format_name: Option<&str>) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn probe_preserves_source_format_and_parses_only_unsigned_hex_codec_tags() {
+        for (tag, expected) in [
+            (serde_json::Value::Null, None),
+            (serde_json::json!("0x4653736d"), Some(0x4653_736d)),
+            (serde_json::json!("0X00005346"), Some(0x5346)),
+            (serde_json::json!("0xffffffff"), Some(u32::MAX)),
+            (serde_json::json!("0x100000000"), None),
+            (serde_json::json!("0x-1"), None),
+            (serde_json::json!("0x+1"), None),
+            (serde_json::json!("0x"), None),
+            (serde_json::json!("msSF"), None),
+            (serde_json::json!("4653736d"), None),
+        ] {
+            let json = serde_json::json!({
+                "streams": [{"index": 3, "codec_type": "audio", "codec_name": "adpcm_swf", "channels": 1, "codec_tag": tag}],
+                "format": {"format_name": "mov,mp4,m4a,3gp,3g2,mj2"}
+            });
+            // The filename must not substitute for the demuxer's actual format.
+            let metadata = parse_ffprobe_stdout("misleading.wav", json.to_string()).unwrap();
+            assert_eq!(
+                metadata.source_format.as_deref(),
+                Some("mov,mp4,m4a,3gp,3g2,mj2")
+            );
+            assert_eq!(metadata.audio_tracks[0].codec_tag, expected, "{tag}");
+        }
+        let metadata = parse_ffprobe_stdout("unknown.mov", r#"{"streams":[{"index":0,"codec_type":"audio","codec_name":"adpcm_swf"}],"format":{}}"#).unwrap();
+        assert!(metadata.source_format.is_none());
+        assert!(metadata.audio_tracks[0].codec_tag.is_none());
+    }
+
+    #[test]
+    fn stream_labels_keep_title_precedence_and_use_canonical_track_name() {
+        use serde_json::json;
+        for (tags, expected) in [
+            (
+                json!({"title":"Title","name":"Name","handler_name":"Handler"}),
+                Some("Title"),
+            ),
+            (
+                json!({"title":"","name":"Name","handler_name":"Handler"}),
+                Some(""),
+            ),
+            (json!({"title":"  ","name":"Name"}), Some("  ")),
+            (
+                json!({"name":"Name","handler_name":"Handler"}),
+                Some("Name"),
+            ),
+            (json!({"name":"Name"}), Some("Name")),
+            (json!({"name":"","handler_name":"Handler"}), Some("Handler")),
+            (json!({"name":""}), None),
+            (json!({"name":"  ","handler_name":"Handler"}), Some("  ")),
+            (json!({"handler_name":"Handler"}), Some("Handler")),
+            (json!({"handler_name":""}), Some("")),
+            (
+                json!({"TITLE":"Legacy title","name":"Name"}),
+                Some("Legacy title"),
+            ),
+            (
+                json!({"NAME":"Not a new alias","handler_name":"Handler"}),
+                Some("Handler"),
+            ),
+            (json!({}), None),
+            (json!(null), None),
+        ] {
+            let value = json!({"format":{"tags":{"title":"Global title","name":"Global name"}},"streams":[
+                {"index":4,"codec_type":"audio","codec_name":"aac","channels":2,"tags":tags},
+                {"index":9,"codec_type":"subtitle","codec_name":"mov_text","tags":tags}
+            ]});
+            let metadata = parse_ffprobe_stdout("unrelated.extension", value.to_string()).unwrap();
+            assert_eq!(
+                metadata.audio_tracks[0].label.as_deref(),
+                expected,
+                "{tags}"
+            );
+            assert_eq!(
+                metadata.subtitle_tracks[0].label.as_deref(),
+                expected,
+                "{tags}"
+            );
+            assert_eq!(
+                (
+                    metadata.audio_tracks[0].index,
+                    metadata.subtitle_tracks[0].index
+                ),
+                (4, 9)
+            );
+            assert_eq!(metadata.audio_tracks[0].codec, "aac");
+            assert_eq!(metadata.subtitle_tracks[0].codec, "mov_text");
+            let global = metadata.tags.unwrap();
+            assert_eq!(global.title.as_deref(), Some("Global title"));
+            assert_eq!(global.name.as_deref(), Some("Global name"));
+        }
+    }
+
+    #[test]
+    fn audio_metadata_titles_exclude_display_handler_fallback() {
+        use serde_json::json;
+        for (tags, title, label) in [
+            (json!(null), None, None),
+            (
+                json!({"handler_name":"HANDLER ONLY"}),
+                None,
+                Some("HANDLER ONLY"),
+            ),
+            (
+                json!({"title":"TITLE","name":"NAME","handler_name":"HANDLER"}),
+                Some("TITLE"),
+                Some("TITLE"),
+            ),
+            (
+                json!({"title":"","name":"NAME","handler_name":"HANDLER"}),
+                Some(""),
+                Some(""),
+            ),
+            (
+                json!({"name":"NAME","handler_name":"HANDLER"}),
+                Some("NAME"),
+                Some("NAME"),
+            ),
+            (
+                json!({"name":"","handler_name":"HANDLER"}),
+                None,
+                Some("HANDLER"),
+            ),
+            (
+                json!({"name":" ","handler_name":"HANDLER"}),
+                Some(" "),
+                Some(" "),
+            ),
+            (json!({"title":" ","name":"NAME"}), Some(" "), Some(" ")),
+            (
+                json!({"title":null,"name":"NAME"}),
+                Some("NAME"),
+                Some("NAME"),
+            ),
+            (json!({"handler_name":""}), None, Some("")),
+            (json!({"title":""}), Some(""), Some("")),
+            (
+                json!({"name":"Żółć = commentary / \"quoted\""}),
+                Some("Żółć = commentary / \"quoted\""),
+                Some("Żółć = commentary / \"quoted\""),
+            ),
+        ] {
+            let metadata = parse_ffprobe_stdout(
+                "source.mp4",
+                json!({
+                    "format":{"tags":{"title":"Global title","name":"Global name"}},
+                    "streams":[
+                        {"index":1,"codec_type":"audio","codec_name":"aac","tags":tags},
+                        {"index":2,"codec_type":"subtitle","codec_name":"mov_text","tags":tags}
+                    ]
+                })
+                .to_string(),
+            )
+            .unwrap();
+            assert_eq!(
+                metadata.audio_tracks[0].metadata_title.as_deref(),
+                title,
+                "{tags}"
+            );
+            assert_eq!(metadata.audio_tracks[0].label.as_deref(), label, "{tags}");
+            assert_eq!(
+                metadata.subtitle_tracks[0].label.as_deref(),
+                label,
+                "{tags}"
+            );
+            assert_eq!(
+                metadata.tags.as_ref().unwrap().title.as_deref(),
+                Some("Global title")
+            );
+            assert_eq!(
+                metadata.tags.as_ref().unwrap().name.as_deref(),
+                Some("Global name")
+            );
+        }
+    }
 
     #[test]
     fn ffprobe_json_args_match_probe_contract() {
@@ -390,6 +636,7 @@ mod tests {
                         "codec_type": "audio",
                         "codec_name": "aac",
                         "channels": 2,
+                        "channel_layout": "stereo",
                         "bit_rate": "192000",
                         "sample_rate": "48000",
                         "tags": { "language": "eng", "title": "Main" }
@@ -416,6 +663,10 @@ mod tests {
         assert_eq!(metadata.resolution.as_deref(), Some("1920x1080"));
         assert_eq!(metadata.audio_codec.as_deref(), Some("aac"));
         assert_eq!(metadata.audio_tracks[0].label.as_deref(), Some("Main"));
+        assert_eq!(
+            metadata.audio_tracks[0].channel_layout.as_deref(),
+            Some("stereo")
+        );
         assert_eq!(
             metadata.subtitle_tracks[0].label.as_deref(),
             Some("Captions")

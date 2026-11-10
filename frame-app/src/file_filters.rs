@@ -1,22 +1,39 @@
 //! File extension filters for native source and subtitle pickers.
 
+use crate::settings::SourceKind;
 use std::path::{Path, PathBuf};
 
 pub const VIDEO_FILE_EXTENSIONS: &[&str] = &[
-    "mp4", "mov", "mkv", "avi", "webm", "mts", "m2t", "m2ts", "gif",
+    "mp4", "mov", "mkv", "avi", "webm", "ts", "mts", "m2t", "m2ts", "gif",
 ];
-pub const AUDIO_FILE_EXTENSIONS: &[&str] = &["mp3", "m4a", "wav", "flac"];
+pub const AUDIO_FILE_EXTENSIONS: &[&str] = &["mp3", "m4a", "wav", "flac", "opus"];
 pub const IMAGE_FILE_EXTENSIONS: &[&str] = &[
     "png", "jpg", "jpeg", "webp", "bmp", "tif", "tiff", "avif", "heic", "heif",
 ];
 pub const SOURCE_FILE_EXTENSIONS: &[&str] = &[
-    "mp4", "mov", "mkv", "avi", "webm", "mts", "m2t", "m2ts", "gif", "mp3", "m4a", "wav", "flac",
-    "png", "jpg", "jpeg", "webp", "bmp", "tif", "tiff", "avif", "heic", "heif",
+    "mp4", "mov", "mkv", "avi", "webm", "ts", "mts", "m2t", "m2ts", "gif", "mp3", "m4a", "wav",
+    "flac", "opus", "png", "jpg", "jpeg", "webp", "bmp", "tif", "tiff", "avif", "heic", "heif",
 ];
 
 pub const BURN_SUBTITLE_FILE_EXTENSIONS: &[&str] = &["srt", "ass", "vtt"];
 pub const SELECTABLE_SUBTITLE_FILE_EXTENSIONS: &[&str] = &["srt", "ass", "vtt", "sup"];
 pub const PGS_SUBTITLE_FILE_EXTENSIONS: &[&str] = &["sup"];
+
+#[must_use]
+pub fn source_kind_for_extension(extension: &str) -> Option<SourceKind> {
+    [
+        (VIDEO_FILE_EXTENSIONS, SourceKind::Video),
+        (AUDIO_FILE_EXTENSIONS, SourceKind::Audio),
+        (IMAGE_FILE_EXTENSIONS, SourceKind::Image),
+    ]
+    .into_iter()
+    .find_map(|(extensions, kind)| {
+        extensions
+            .iter()
+            .any(|candidate| extension.eq_ignore_ascii_case(candidate))
+            .then_some(kind)
+    })
+}
 
 #[must_use]
 pub fn is_supported_source_path(path: &Path) -> bool {
@@ -127,6 +144,33 @@ mod tests {
     use super::*;
 
     #[test]
+    fn source_kind_for_extension_classifies_all_supported_formats_case_insensitively() {
+        for (extensions, expected) in [
+            (VIDEO_FILE_EXTENSIONS, SourceKind::Video),
+            (AUDIO_FILE_EXTENSIONS, SourceKind::Audio),
+            (IMAGE_FILE_EXTENSIONS, SourceKind::Image),
+        ] {
+            for extension in extensions {
+                for spelling in [extension.to_string(), extension.to_ascii_uppercase()] {
+                    assert_eq!(
+                        source_kind_for_extension(&spelling),
+                        Some(expected),
+                        "{spelling}"
+                    );
+                }
+            }
+        }
+        assert_eq!(source_kind_for_extension("gIf"), Some(SourceKind::Video));
+    }
+
+    #[test]
+    fn source_kind_for_extension_leaves_unknown_formats_unclassified() {
+        for extension in ["", "unknown", "zip", "srt", ".mp4", "clip.mp4"] {
+            assert_eq!(source_kind_for_extension(extension), None, "{extension}");
+        }
+    }
+
+    #[test]
     fn is_supported_source_path_accepts_original_media_extensions() {
         assert!(is_supported_source_path(Path::new("/tmp/clip.MOV")));
         assert!(is_supported_source_path(Path::new("/tmp/still.heif")));
@@ -134,8 +178,14 @@ mod tests {
 
     #[test]
     fn transport_stream_extensions_are_supported_case_insensitively() {
-        for path in ["clip.m2t", "clip.MTS", "clip.M2TS"] {
-            assert!(is_supported_source_path(Path::new(path)), "{path}");
+        for extension in ["ts", "TS", "tS", "m2t", "MTS", "M2TS"] {
+            let path = format!("clip.{extension}");
+            assert!(is_supported_source_path(Path::new(&path)), "{path}");
+            assert_eq!(
+                source_kind_for_extension(extension),
+                Some(SourceKind::Video),
+                "{path}"
+            );
         }
     }
 
@@ -174,6 +224,7 @@ mod tests {
 
     #[test]
     fn is_supported_source_path_rejects_unknown_extensions() {
+        assert!(!is_supported_source_path(Path::new("/tmp/readme.txt")));
         assert!(!is_supported_source_path(Path::new("/tmp/archive.zip")));
         assert!(!is_supported_source_path(Path::new("/tmp/no-extension")));
     }
@@ -196,12 +247,19 @@ mod tests {
         let paths = filter_supported_source_paths(vec![
             PathBuf::from("/tmp/one.mp4"),
             PathBuf::from("/tmp/readme.txt"),
+            PathBuf::from("/tmp/transport.ts"),
+            PathBuf::from("/tmp/archive.zip"),
+            PathBuf::from("/tmp/no-extension"),
             PathBuf::from("/tmp/two.PNG"),
         ]);
 
         assert_eq!(
             paths,
-            [PathBuf::from("/tmp/one.mp4"), PathBuf::from("/tmp/two.PNG")]
+            [
+                PathBuf::from("/tmp/one.mp4"),
+                PathBuf::from("/tmp/transport.ts"),
+                PathBuf::from("/tmp/two.PNG")
+            ]
         );
     }
 
@@ -210,28 +268,62 @@ mod tests {
         let paths = discover_supported_source_paths(vec![
             PathBuf::from("/tmp/one.mp4"),
             PathBuf::from("/tmp/readme.txt"),
+            PathBuf::from("/tmp/transport.TS"),
+            PathBuf::from("/tmp/archive.zip"),
+            PathBuf::from("/tmp/no-extension"),
             PathBuf::from("/tmp/two.PNG"),
         ]);
 
         assert_eq!(
             paths,
-            [PathBuf::from("/tmp/one.mp4"), PathBuf::from("/tmp/two.PNG")]
+            [
+                PathBuf::from("/tmp/one.mp4"),
+                PathBuf::from("/tmp/transport.TS"),
+                PathBuf::from("/tmp/two.PNG")
+            ]
         );
     }
 
     #[test]
     fn discover_supported_source_paths_expands_directories_recursively() {
         let root = unique_test_dir("recursive-discovery");
-        let nested = root.join("nested");
+        let media = root.join("media");
+        let nested = media.join("nested");
         std::fs::create_dir_all(&nested).expect("test media directory should be created");
-        std::fs::write(root.join("clip.mp4"), b"").expect("test video should be written");
-        std::fs::write(root.join("notes.txt"), b"").expect("test text file should be written");
-        std::fs::write(nested.join("still.PNG"), b"").expect("test image should be written");
+        for path in [
+            root.join("direct.tS"),
+            root.join("after.flac"),
+            media.join("clip.mp4"),
+            media.join("transport.ts"),
+            media.join("notes.txt"),
+            nested.join("archive.zip"),
+            nested.join("no-extension"),
+            nested.join("still.PNG"),
+            nested.join("transport.TS"),
+        ] {
+            std::fs::write(path, b"").expect("test source file should be written");
+        }
 
-        let paths = discover_supported_source_paths(vec![root.clone()]);
+        let paths = discover_supported_source_paths(vec![
+            root.join("direct.tS"),
+            media.join("notes.txt"),
+            media.clone(),
+            nested.join("archive.zip"),
+            root.join("after.flac"),
+        ]);
 
         std::fs::remove_dir_all(&root).expect("test media directory should be removed");
-        assert_eq!(paths, [root.join("clip.mp4"), nested.join("still.PNG")]);
+        assert_eq!(
+            paths,
+            [
+                root.join("direct.tS"),
+                media.join("clip.mp4"),
+                nested.join("still.PNG"),
+                nested.join("transport.TS"),
+                media.join("transport.ts"),
+                root.join("after.flac"),
+            ]
+        );
     }
 
     #[test]

@@ -4523,6 +4523,65 @@ impl Window {
         });
     }
 
+    /// Paint a subtree at a uniform scale around a window-space origin, without
+    /// changing its layout. Nested scopes and cached paint replay retain the transform.
+    /// Call during paint; use `with_prepaint_scale` for the matching pointer geometry.
+    pub fn with_paint_scale<R>(
+        &mut self,
+        origin: Point<Pixels>,
+        factor: f32,
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        self.invalidator.debug_assert_paint();
+        assert!(factor.is_finite() && factor > 0.0);
+        if factor == 1.0 {
+            return f(self);
+        }
+        let scale = crate::scene::PaintScale {
+            origin: origin.scale(self.scale_factor()),
+            factor,
+            outer_mask: self.content_mask().bounds.scale(self.scale_factor()),
+        };
+        self.next_frame.scene.push_scale(scale);
+        let result = f(self);
+        self.next_frame.scene.pop_scale();
+        result
+    }
+
+    /// Match pointer hitboxes to a `with_paint_scale` subtree. Call during prepaint.
+    pub fn with_prepaint_scale<R>(
+        &mut self,
+        origin: Point<Pixels>,
+        factor: f32,
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        self.invalidator.debug_assert_prepaint();
+        assert!(factor.is_finite() && factor > 0.0);
+        if factor == 1.0 {
+            return f(self);
+        }
+        let start = self.next_frame.hitboxes.len();
+        let outer_mask = self.content_mask().bounds;
+        let result = f(self);
+        let transform = |b: Bounds<Pixels>| {
+            Bounds::new(
+                origin + (b.origin - origin) * factor,
+                b.size.map(|v| v * factor),
+            )
+        };
+        for hitbox in &mut self.next_frame.hitboxes[start..] {
+            hitbox.bounds = transform(hitbox.bounds);
+            if hitbox.content_mask.bounds != outer_mask {
+                hitbox.content_mask.bounds =
+                    transform(hitbox.content_mask.bounds).intersect(&outer_mask);
+            }
+            if let Some(fragments) = &mut hitbox.fragments {
+                *fragments = fragments.iter().copied().map(transform).collect();
+            }
+        }
+        result
+    }
+
     /// Creates a new painting layer for the specified bounds. A "layer" is a batch
     /// of geometry that are non-overlapping and have the same draw order. This is typically used
     /// for performance reasons.
@@ -4762,8 +4821,17 @@ impl Window {
     pub fn paint_quad(&mut self, quad: PaintQuad) {
         self.invalidator.debug_assert_paint();
 
-        let snapped_bounds = self.snap_bounds(quad.bounds);
-        let snapped_border_widths = self.snap_border_widths(quad.border_widths);
+        let pixel_snap = quad.pixel_snap;
+        let snapped_bounds = if pixel_snap {
+            self.snap_bounds(quad.bounds)
+        } else {
+            quad.bounds.scale(self.scale_factor())
+        };
+        let snapped_border_widths = if pixel_snap {
+            self.snap_border_widths(quad.border_widths)
+        } else {
+            quad.border_widths.scale(self.scale_factor())
+        };
         let quad = Quad {
             order: 0,
             bounds: snapped_bounds,
@@ -4779,7 +4847,9 @@ impl Window {
             padding: 0,
         };
 
-        if !quad.background.is_transparent() {
+        // Fractional strip boundaries would clip the same antialiased pixel in two
+        // separate draws, introducing seams. Keep animated outlines in one draw.
+        if !pixel_snap || !quad.background.is_transparent() {
             self.next_frame.scene.insert_primitive(quad);
             return;
         }
@@ -4937,9 +5007,13 @@ impl Window {
         } else {
             GlyphRenderMode::Grayscale
         };
-        let raster_style =
-            self.text_system()
-                .prepare_raster_style(font_id, glyph_id, color, requested_mode);
+        let raster_style = self.text_system().prepare_raster_style(
+            font_id,
+            glyph_id,
+            color,
+            requested_mode,
+            self.text_rendering_mode.get(),
+        );
         let params = RenderGlyphParams {
             font_id,
             glyph_id,
@@ -5077,6 +5151,7 @@ impl Window {
             glyph_id,
             color,
             GlyphRenderMode::Color,
+            self.text_rendering_mode.get(),
         );
         let params = RenderGlyphParams {
             font_id,
@@ -8077,6 +8152,8 @@ impl From<[u8; 20]> for ElementId {
 pub struct PaintQuad {
     /// The bounds of the quad within the window.
     pub bounds: Bounds<Pixels>,
+    /// Whether to snap bounds and border widths to device pixels. Disable for animated rings.
+    pub pixel_snap: bool,
     /// The radii of the quad's corners.
     #[setters(generate)]
     pub corner_radii: Corners<Pixels>,
@@ -8105,6 +8182,7 @@ impl PaintQuad {
     pub fn new(bounds: impl Into<Bounds<Pixels>>) -> Self {
         Self {
             bounds: bounds.into(),
+            pixel_snap: true,
             corner_radii: (0.).into(),
             corner_smoothing: 0.0,
             background: transparent_black().into(),
@@ -8114,6 +8192,12 @@ impl PaintQuad {
             border_dashed_length: crate::scene::DEFAULT_BORDER_DASHED_LENGTH,
             border_dashed_gap: crate::scene::DEFAULT_BORDER_DASHED_GAP,
         }
+    }
+
+    /// Controls device-pixel snapping. Fractional geometry is antialiased by the renderer.
+    pub fn pixel_snap(mut self, enabled: bool) -> Self {
+        self.pixel_snap = enabled;
+        self
     }
 
     /// Sets the corner smoothing, clamped to the range `0.0..=1.0`.
@@ -8180,6 +8264,10 @@ pub fn outline(
 
 #[cfg(test)]
 mod pointer_tests;
+
+#[cfg(test)]
+#[path = "window/svg_tests.rs"]
+mod svg_current_color_tests;
 
 #[cfg(test)]
 mod tests {

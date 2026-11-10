@@ -1,6 +1,8 @@
 use super::crop::clamp;
 
 const PLAYBACK_END_EPSILON_SECONDS: f64 = 0.05;
+const TRIM_HANDLE_MINIMUM_SPAN_SECONDS: f64 = 1.0;
+const TIMECODE_PRECISION_SECONDS: f64 = 0.001;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TimelineDragTarget {
@@ -112,6 +114,7 @@ pub struct PreviewPlaybackState {
     start_value: f64,
     end_value: f64,
     dragging: Option<TimelineDragTarget>,
+    drag_minimum_span_seconds: f64,
     was_playing_before_drag: bool,
     previous_initial_start: Option<String>,
     previous_initial_end: Option<String>,
@@ -129,6 +132,7 @@ impl PreviewPlaybackState {
             start_value: 0.0,
             end_value: 0.0,
             dragging: None,
+            drag_minimum_span_seconds: TRIM_HANDLE_MINIMUM_SPAN_SECONDS,
             was_playing_before_drag: false,
             previous_initial_start: None,
             previous_initial_end: None,
@@ -181,7 +185,7 @@ impl PreviewPlaybackState {
     pub fn sync_media(&mut self, snapshot: MediaSnapshot) {
         self.has_media = true;
         self.is_playing = !snapshot.paused;
-        self.current_time = finite_or_zero(snapshot.current_time);
+        self.current_time = finite_or_zero(snapshot.current_time).max(0.0);
         self.sync_from_media(snapshot);
     }
 
@@ -201,6 +205,7 @@ impl PreviewPlaybackState {
         } else if initial_end.is_none() && self.duration > 0.0 && self.end_value == 0.0 {
             self.end_value = self.duration;
         }
+        self.clamp_initial_range();
     }
 
     pub fn sync_from_media(&mut self, snapshot: MediaSnapshot) {
@@ -208,19 +213,30 @@ impl PreviewPlaybackState {
             return;
         }
 
-        self.duration = finite_or_zero(snapshot.duration);
-        self.current_time = finite_or_zero(snapshot.current_time);
+        self.duration = finite_or_zero(snapshot.duration).max(0.0);
+        self.current_time = finite_or_zero(snapshot.current_time).max(0.0);
         self.end_value = self
             .previous_initial_end
             .as_deref()
             .map_or(self.duration, parse_time_to_seconds);
 
-        if self.start_value > self.duration {
-            self.start_value = 0.0;
+        self.clamp_initial_range();
+    }
+
+    fn clamp_initial_range(&mut self) {
+        self.current_time = finite_or_zero(self.current_time).max(0.0);
+        self.start_value = finite_or_zero(self.start_value).max(0.0);
+        self.end_value = finite_or_zero(self.end_value).max(0.0);
+        // Before metadata arrives, duration zero must not discard a saved
+        // positive start. Keep the established reset for an out-of-range start.
+        if self.duration > 0.0 {
+            self.current_time = self.current_time.min(self.duration);
+            if self.start_value > self.duration {
+                self.start_value = 0.0;
+            }
+            self.end_value = self.end_value.min(self.duration);
         }
-        if self.end_value > self.duration {
-            self.end_value = self.duration;
-        }
+        self.end_value = self.end_value.max(self.start_value);
     }
 
     pub const fn handle_play(&mut self) {
@@ -308,11 +324,26 @@ impl PreviewPlaybackState {
     }
 
     pub const fn begin_handle_drag(&mut self, target: TimelineDragTarget) -> bool {
-        if self.is_image {
+        if self.is_image || self.duration <= 0.0 {
             return false;
         }
 
         self.dragging = Some(target);
+        // Preserve precisely entered subsecond ranges and short sources. Keep
+        // this limit fixed until release, including when the range is widened.
+        // Timecode round trips can put a one-second span just below 1.0 in
+        // floating point; only treat differences visible at our precision as
+        // intentional subsecond trims.
+        self.drag_minimum_span_seconds = if self.end_value - self.start_value
+            + TIMECODE_PRECISION_SECONDS / 2.0
+            >= TRIM_HANDLE_MINIMUM_SPAN_SECONDS
+        {
+            TRIM_HANDLE_MINIMUM_SPAN_SECONDS
+        } else if self.duration >= TIMECODE_PRECISION_SECONDS {
+            TIMECODE_PRECISION_SECONDS
+        } else {
+            self.duration
+        };
         self.was_playing_before_drag = self.is_playing;
         true
     }
@@ -375,7 +406,9 @@ impl PreviewPlaybackState {
                 }
             }
             TimelineDragTarget::Start => {
-                self.start_value = time.min(self.end_value - 1.0);
+                let latest_start =
+                    (self.end_value - self.drag_minimum_span_seconds).clamp(0.0, self.duration);
+                self.start_value = time.clamp(0.0, latest_start);
                 TimelineDragUpdate {
                     command: PlaybackMediaCommand::none(),
                     trim: self.commit_trim_values(),
@@ -383,7 +416,9 @@ impl PreviewPlaybackState {
                 }
             }
             TimelineDragTarget::End => {
-                self.end_value = time.max(self.start_value + 1.0);
+                let earliest_end =
+                    (self.start_value + self.drag_minimum_span_seconds).clamp(0.0, self.duration);
+                self.end_value = time.clamp(earliest_end, self.duration);
                 TimelineDragUpdate {
                     command: PlaybackMediaCommand::none(),
                     trim: self.commit_trim_values(),
@@ -416,6 +451,7 @@ impl PreviewPlaybackState {
         };
 
         self.dragging = None;
+        self.drag_minimum_span_seconds = TRIM_HANDLE_MINIMUM_SPAN_SECONDS;
         self.was_playing_before_drag = false;
 
         TimelineDragEnd { command, trim }
@@ -437,7 +473,12 @@ impl PreviewPlaybackState {
 
 #[must_use]
 pub fn parse_time_to_seconds(time: &str) -> f64 {
-    let mut parts = time.split(':');
+    let negative = time.starts_with('-');
+    let body = time.strip_prefix(['-', '+']).unwrap_or(time);
+    if body.starts_with(['-', '+']) {
+        return 0.0;
+    }
+    let mut parts = body.split(':');
     let (Some(hours), Some(minutes), Some(seconds), None) =
         (parts.next(), parts.next(), parts.next(), parts.next())
     else {
@@ -454,7 +495,8 @@ pub fn parse_time_to_seconds(time: &str) -> f64 {
         return 0.0;
     };
 
-    hours.mul_add(3600.0, minutes * 60.0) + seconds
+    let seconds = hours.mul_add(3600.0, minutes * 60.0) + seconds;
+    if negative { -seconds } else { seconds }
 }
 
 #[must_use]

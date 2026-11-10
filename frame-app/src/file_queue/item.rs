@@ -1,13 +1,11 @@
-use std::path::Path;
-
-use crate::settings::ConversionConfig;
-
-use super::{
-    format::{derive_output_name, file_name_from_path, file_size_bytes, original_format_from_name},
-    status::{
-        FileStateTone, FileStatus, RowActionAvailability, RowPrimaryAction, RowSecondaryAction,
-    },
+use super::format::{
+    derive_output_name, file_name_from_path, file_size_bytes, original_format_from_name,
 };
+use super::status::{
+    FileStateTone, FileStatus, RowActionAvailability, RowPrimaryAction, RowSecondaryAction,
+};
+use crate::settings::ConversionConfig;
+use std::path::Path;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FileItem {

@@ -35,7 +35,77 @@ interception, while retaining its existing `is_movable` policy. Once a blank-are
 press arms a drag, Frame handles the first pointer move even if a native event
 batch carries it beyond the titlebar. Buttons still cannot arm that gesture.
 
+## Subtree animation scale
+
+`Window::with_paint_scale` and `with_prepaint_scale` support Frame's Mira enter/exit zoom without reflowing text. Scene operations retain untransformed primitives and explicit scale scopes so cached replay and nested scopes do not double-transform. Quads, glyph/image sprites, paths, rings, shadows, filters and pointer hitboxes follow the same origin. Ancestor clipping remains in window coordinates. The scene regression test covers nested scaling, scope restoration and cached replay under a new scale. Frame's integration test exercises opening/closing all six selects and both color pickers with motion enabled.
+
+## SVG currentColor inheritance
+
+SVGs without an explicit local `text_color` now use `window.text_style().color`,
+including the parent's animated color. Upstream silently skipped those SVGs.
+This applies to bundled paths, raw data and external SVGs; explicit icon colors
+still take precedence. `svg_current_color_inherits_and_updates_while_explicit_colors_win`
+asserts actual painted sprites for direct/nested inheritance and color changes.
+
+## Fractional focus rings and outlines
+
+`RingStyle` opts out of quad pixel snapping. Bounds, border width and corner
+radii retain the same fractional spread, and animated rings are submitted as
+one quad to avoid seams between fractional clip strips. Ordinary borders retain
+pixel snapping. Quad vertices cover the half-pixel antialias fringe so fractional
+outer edges are not cut off by triangle rasterization. The transparent fill uses
+the ring RGB rather than black, avoiding a dark inner antialias fringe.
+
+`Style::outline` paints a concentric outside outline above the ring and content,
+with independent width/color transitions. Frame's tabs use a fixed 1px outline
+with animated color instead of approximating it with an unanimated box shadow.
+`gpui_ce_wgpu/tests/focus_rings.rs` exercises actual Style -> Window -> GPU pixels.
+
+## Alpha-aware color transitions
+
+`Rgba::lerp` interpolates premultiplied channels, then returns an unpremultiplied
+color for rendering. `Hsla`, background, border, text and ring transitions share
+this path. Previously a white-to-transparent tab background faded through gray,
+causing a dark flash in the light theme. Opaque endpoints retain their existing
+interpolation and authored endpoints remain exact. Tests cover transparent and
+partially transparent colors, zero alpha, and the CSS Color 4 example. Frame's
+inspector regression test exercises pointer/keyboard switching and mid-transition
+reversal in both themes at 100% and 200% scale.
+
+## Revealing keyboard focus
+
+Interactive divs request autoscroll once per new keyboard focus generation.
+Scrollable ancestors reveal the descendant with a small ring margin, then pass
+the adjusted target to outer scroll areas. Each subtree isolates its request so
+unrelated sibling panes do not move. Scroll offsets are applied on the next frame
+to keep layout, painting and hit testing in agreement. Pointer focus and manually
+scrolling away from an already focused control do not trigger repeated reveals.
+`elements/div/focus_scroll_tests.rs` covers nested areas, siblings, refocusing
+and pointer modality. Frame adds full forward/reverse traversal across its views.
+
+## macOS font smoothing
+
+`TextRenderingMode::Antialiased` requests grayscale coverage without CoreGraphics'
+luminance-dependent font-smoothing dilation. Frame selects this mode globally on
+macOS, matching Tailwind's `antialiased` (`-webkit-font-smoothing: antialiased` /
+`-moz-osx-font-smoothing: grayscale`). Windows and Linux retain PlatformDefault.
+WebKit uses `CGContextSetShouldSmoothFonts(false)` while keeping antialiasing on;
+the existing native rasterizer's Independent mask path uses the same settings.
+Glyph positioning, layout, authored font weights, SVGs and preblended color glyphs
+are unchanged. Normalization runs before the atlas lookup, so dilated and
+undilated masks cannot alias in the cache. The raster contract tests cover mask
+reuse across foreground colors and preserve color glyph RGB/alpha.
+
+Source: [WebKit FontCascadeCoreText.cpp](https://github.com/WebKit/WebKit/blob/main/Source/WebCore/platform/graphics/coretext/FontCascadeCoreText.cpp).
+
 ## Integration changes
+
+Frame's test platform exposes window hover changes separately from activation,
+matching the native Linux/Windows cursor contract. Legacy transitions also have
+an opt-in clock per test app, so intermediate animation frames can be asserted
+without wall-clock sleeps. Production transitions still use `Instant::now`;
+tests without an override retain that behavior. Frame's motion tests verify
+clock advancement and isolation between two apps sharing an executor.
 
 Upstream renamed Cargo packages to `gpui-ce` / `gpui_ce_*`, moved Apple's renderer
 to `gpui_apple`, introduced shared shader generation in `gpui_render`, and replaced
@@ -54,6 +124,15 @@ The pinned shader generator is
 Its crate manifests omit license metadata; `deny.toml` verifies the workspace's
 MIT license file by hash. Removed Git sources and obsolete advisory exceptions
 were removed from that configuration.
+
+### CSS shadow clipping (2026-11-03)
+
+The shared shadow shader clips outer shadows out of the element's rounded border
+box. This prevents multilayer shadows from darkening translucent control fills.
+Both ordinary and smoothed-corner paths use the element coverage; inset shadows
+keep their inner clipping. Tests cover clear interiors, outside edges, rounded
+corners, blur radii from 0 to 42.5, and preserved inset highlights. No shader ABI
+or platform-specific rendering code changes.
 
 ## Regression checks
 
@@ -79,6 +158,12 @@ On this Mac, upstream's WGPU test
 `quad_border_backgrounds_use_the_fill_coordinate_space` fails its two-level color
 tolerance: red is 228 instead of 225 at (10, 10). The identical failure was reproduced
 in the unmodified `bc57747` checkout. Its assertion is retained unchanged.
+
+The broader `headless_primitives::every_primitive_kind_renders` smoke test also
+expects outer-shadow color inside the shadow's element bounds. The retained CSS
+shadow clipping patch deliberately leaves that interior clear. The three shadow
+assertions fail identically with the pre-ring-fix quad shader (verified 2026-11-05);
+the other three primitive tests and both focus-ring pixel tests pass.
 
 Windows can be type-checked from macOS with
 `GPUI_RENDER_ALLOW_MISSING_DXBC=1 cargo check --locked -p frame-app --target x86_64-pc-windows-gnu`.

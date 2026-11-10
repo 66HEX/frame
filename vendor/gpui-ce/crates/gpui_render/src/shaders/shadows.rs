@@ -84,13 +84,17 @@ pub mod shadow {
             coverage = blurred_shadow_coverage(shadow, position);
         }
 
+        let element_coverage = antialiased_coverage(rounded_rectangle_signed_distance(
+            position,
+            shadow.element_bounds,
+            shadow.element_corner_radii,
+        ));
         if is_enabled(shadow.inset) {
-            coverage = (1.0 - coverage)
-                * antialiased_coverage(rounded_rectangle_signed_distance(
-                    position,
-                    shadow.element_bounds,
-                    shadow.element_corner_radii,
-                ));
+            coverage = (1.0 - coverage) * element_coverage;
+        } else {
+            // CSS outer shadows are clipped out of the border box, including when
+            // its fill is translucent. Otherwise every layer darkens the fill.
+            coverage *= 1.0 - element_coverage;
         }
         coverage
     }
@@ -148,15 +152,17 @@ pub mod shadow {
             coverage = blurred_shadow_coverage(shadow, position);
         }
 
+        let element_coverage = antialiased_coverage(prepared_corner_signed_distance(
+            position,
+            shadow.element_bounds,
+            shadow.element_corner_radii,
+            shadow.corner_smoothing,
+            prepared_element,
+        ));
         if is_enabled(shadow.inset) {
-            coverage = (1.0 - coverage)
-                * antialiased_coverage(prepared_corner_signed_distance(
-                    position,
-                    shadow.element_bounds,
-                    shadow.element_corner_radii,
-                    shadow.corner_smoothing,
-                    prepared_element,
-                ));
+            coverage = (1.0 - coverage) * element_coverage;
+        } else {
+            coverage *= 1.0 - element_coverage;
         }
 
         coverage

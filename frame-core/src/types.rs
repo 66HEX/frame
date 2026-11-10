@@ -223,9 +223,16 @@ impl Default for AudioFiltersConfig {
 pub struct AudioTrack {
     pub index: u32,
     pub codec: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub codec_tag: Option<u32>,
     pub channels: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub channel_layout: Option<String>,
     pub language: Option<String>,
     pub label: Option<String>,
+    /// Genuine title/name metadata, without the display label's handler fallback.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata_title: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bitrate_kbps: Option<f64>,
     pub sample_rate: Option<String>,
@@ -258,6 +265,16 @@ pub struct ExternalSubtitleTrack {
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ProbeMetadata {
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::aspect::deserialize_optional_sample_aspect_ratio"
+    )]
+    pub sample_aspect_ratio: Option<crate::aspect::SampleAspectRatio>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_timing: Option<crate::source_timing::SourceTiming>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_format: Option<String>,
     #[serde(default = "default_media_kind")]
     pub media_kind: String,
     pub duration: Option<String>,
@@ -315,6 +332,8 @@ pub struct ConversionConfig {
     pub audio_bitrate: String,
     #[serde(default = "default_audio_bitrate_mode")]
     pub audio_bitrate_mode: String,
+    #[serde(default = "default_opus_vbr")]
+    pub opus_vbr: bool,
     #[serde(default = "default_audio_quality")]
     pub audio_quality: String,
     pub audio_channels: String,
@@ -424,6 +443,10 @@ fn default_audio_bitrate_mode() -> String {
     "bitrate".to_string()
 }
 
+const fn default_opus_vbr() -> bool {
+    true
+}
+
 fn default_audio_quality() -> String {
     "4".to_string()
 }
@@ -467,6 +490,8 @@ fn default_image_png_prediction() -> String {
 fn default_image_tiff_compression() -> String {
     "packbits".to_string()
 }
+
+pub const MIN_GIF_COLORS: u16 = 3;
 
 const fn default_gif_colors() -> u16 {
     256
@@ -585,15 +610,18 @@ pub struct FfprobeProgram {
 
 #[derive(Deserialize)]
 pub struct FfprobeStream {
+    pub sample_aspect_ratio: Option<String>,
     pub index: u32,
     pub codec_type: String,
     pub codec_name: Option<String>,
+    pub codec_tag: Option<String>,
+    pub time_base: Option<String>,
+    pub start_pts: Option<i64>,
     pub width: Option<i32>,
     pub height: Option<i32>,
     pub channels: Option<i32>,
     pub bit_rate: Option<String>,
     pub avg_frame_rate: Option<String>,
-    #[allow(dead_code)]
     pub channel_layout: Option<String>,
     pub tags: Option<FfprobeTags>,
     pub pix_fmt: Option<String>,
@@ -615,6 +643,7 @@ pub struct FfprobeSideData {
 #[derive(Deserialize)]
 pub struct FfprobeFormat {
     pub format_name: Option<String>,
+    pub start_time: Option<String>,
     pub duration: Option<String>,
     pub bit_rate: Option<String>,
     pub tags: Option<FfprobeTags>,
@@ -625,6 +654,7 @@ pub struct FfprobeFormat {
 pub struct FfprobeTags {
     #[serde(alias = "TITLE")]
     pub title: Option<String>,
+    pub name: Option<String>,
     #[serde(alias = "ARTIST")]
     pub artist: Option<String>,
     #[serde(alias = "ALBUM")]
@@ -690,6 +720,7 @@ mod tests {
 
         assert_eq!(config.processing_mode, "reencode");
         assert_eq!(config.audio_bitrate_mode, "bitrate");
+        assert!(config.opus_vbr);
         assert_eq!(config.audio_quality, "4");
         assert!((config.audio_volume - 100.0).abs() < f64::EPSILON);
         assert_eq!(config.quality, 50);
@@ -720,12 +751,27 @@ mod tests {
 
         assert_eq!(serialized["processingMode"], "reencode");
         assert_eq!(serialized["audioBitrateMode"], "bitrate");
+        assert_eq!(serialized["opusVbr"], true);
         assert_eq!(serialized["imageJpegQuality"], 85);
         assert_eq!(serialized["imageWebpPreset"], "default");
         assert_eq!(serialized["imagePngPrediction"], "paeth");
         assert_eq!(serialized["metadata"]["mode"], "preserve");
         assert_eq!(serialized["externalSubtitleTracks"], json!([]));
         assert!(serialized.get("processing_mode").is_none());
+    }
+
+    #[test]
+    fn opus_vbr_explicit_values_roundtrip() {
+        for opus_vbr in [false, true] {
+            let mut json = minimal_config_json();
+            json["opusVbr"] = json!(opus_vbr);
+            let config: ConversionConfig = serde_json::from_value(json).unwrap();
+            assert_eq!(config.opus_vbr, opus_vbr);
+            let encoded = serde_json::to_value(config).unwrap();
+            assert_eq!(encoded["opusVbr"], opus_vbr);
+            let restored: ConversionConfig = serde_json::from_value(encoded).unwrap();
+            assert_eq!(restored.opus_vbr, opus_vbr);
+        }
     }
 
     #[test]
@@ -757,6 +803,41 @@ mod tests {
         .unwrap();
 
         assert_eq!(metadata.media_kind, "video");
+    }
+
+    #[test]
+    fn optional_copy_source_facts_round_trip_without_breaking_old_metadata() {
+        let old = json!({
+            "audioTracks": [{"index":1,"codec":"adpcm_swf","channels":"1"}],
+            "subtitleTracks": []
+        });
+        let mut metadata: ProbeMetadata = serde_json::from_value(old).unwrap();
+        assert!(metadata.source_format.is_none());
+        assert!(metadata.audio_tracks[0].codec_tag.is_none());
+        metadata.source_format = Some("mov,mp4,m4a,3gp,3g2,mj2".into());
+        metadata.audio_tracks[0].codec_tag = Some(0x4653_736d);
+        let value = serde_json::to_value(&metadata).unwrap();
+        assert_eq!(value["audioTracks"][0]["codecTag"], 0x4653_736d_u32);
+        let restored: ProbeMetadata = serde_json::from_value(value).unwrap();
+        assert_eq!(restored.source_format, metadata.source_format);
+        assert_eq!(restored.audio_tracks[0].codec_tag, Some(0x4653_736d));
+    }
+
+    #[test]
+    fn audio_metadata_title_preserves_empty_and_does_not_infer_old_labels() {
+        let old = json!({"index":1,"codec":"aac","channels":"2","label":"SoundHandler"});
+        let mut track: AudioTrack = serde_json::from_value(old).unwrap();
+        assert!(track.metadata_title.is_none());
+        let absent = serde_json::to_value(&track).unwrap();
+        assert!(absent.get("metadataTitle").is_none());
+        for value in ["", " ", "Żółć = commentary"] {
+            track.metadata_title = Some(value.into());
+            let serialized = serde_json::to_value(&track).unwrap();
+            assert_eq!(serialized["metadataTitle"], value);
+            let restored: AudioTrack = serde_json::from_value(serialized).unwrap();
+            assert_eq!(restored.metadata_title.as_deref(), Some(value));
+            assert_eq!(restored.label.as_deref(), Some("SoundHandler"));
+        }
     }
 
     #[test]

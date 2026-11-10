@@ -1,14 +1,68 @@
-use super::{App, Duration, ElementId, Lerp, Rgba, Window, color, ease_in_out, theme};
+use gpui::{App, ElementId, Window};
+use std::time::Duration;
 
-// Panels, selects and color pickers share one enter/exit timing. Hover and
-// selection feedback stays shorter because it happens on every interaction.
-pub(super) const SURFACE_MOTION_DURATION: Duration = Duration::from_millis(120);
-pub(super) const INTERACTION_MOTION_DURATION: Duration = Duration::from_millis(75);
+// Mira uses 100 ms enter/exit keyframes and 150 ms CSS transitions.
+pub(super) const SURFACE_MOTION_DURATION: Duration = Duration::from_millis(100);
+pub(super) const INTERACTION_MOTION_DURATION: Duration = Duration::from_millis(150);
 pub(super) const MOTION_DONE_EPSILON: f32 = 0.001;
 
-const SETTINGS_SHEET_SLIDE_DISTANCE: f32 = 24.0;
-const SETTINGS_SHEET_EDGE_INSET: f32 = 8.0;
-const POPOVER_SLIDE_DISTANCE: f32 = 4.0;
+const SETTINGS_DRAWER_SLIDE_DISTANCE: f32 = 384.0 * 0.1;
+pub(super) const SETTINGS_DRAWER_EDGE_INSET: f32 = 8.0;
+const POPOVER_SLIDE_DISTANCE: f32 = 8.0;
+
+/// CSS `ease`, the default timing function of tw-animate-css enter/exit keyframes.
+pub(super) fn css_ease(progress: f32) -> f32 {
+    cubic_bezier(progress, 0.25, 0.1, 0.25, 1.0)
+}
+
+/// Tailwind's default transition timing, also used by the settings drawer.
+pub(super) fn css_transition_ease(progress: f32) -> f32 {
+    cubic_bezier(progress, 0.4, 0.0, 0.2, 1.0)
+}
+
+fn cubic_bezier(progress: f32, x1: f32, y1: f32, x2: f32, y2: f32) -> f32 {
+    if progress <= 0.0 || progress >= 1.0 {
+        return progress.clamp(0.0, 1.0);
+    }
+    let sample = |t: f32, a: f32, b: f32| {
+        (t * t).mul_add(
+            t,
+            (3.0 * (1.0 - t).powi(2) * t).mul_add(a, 3.0 * (1.0 - t) * t * t * b),
+        )
+    };
+    let (mut low, mut high) = (0.0, 1.0);
+    for _ in 0..24 {
+        let t = f32::midpoint(low, high);
+        if sample(t, x1, x2) < progress {
+            low = t;
+        } else {
+            high = t;
+        }
+    }
+    sample(f32::midpoint(low, high), y1, y2)
+}
+
+pub(super) fn interaction_motion() -> gpui::Motion {
+    gpui::Motion::new(INTERACTION_MOTION_DURATION).with_easing(css_transition_ease)
+}
+
+/// A quick departure and soft landing for the shared tab surface, without bounce.
+pub(super) fn tab_indicator_ease(progress: f32) -> f32 {
+    cubic_bezier(progress, 0.2, 0.0, 0.0, 1.0)
+}
+
+pub(super) fn tab_indicator_motion() -> gpui::Motion {
+    gpui::Motion::new(Duration::from_millis(180)).with_easing(tab_indicator_ease)
+}
+
+pub(super) fn control_style_transitions(t: gpui::StyleTransitions) -> gpui::StyleTransitions {
+    let motion = interaction_motion();
+    t.ring(motion.clone())
+        .bg(motion.clone())
+        .text_color(motion.clone())
+        .border_color(motion.clone())
+        .opacity(motion)
+}
 
 pub(super) const fn motion_target(is_open: bool) -> f32 {
     if is_open { 1.0 } else { 0.0 }
@@ -31,28 +85,20 @@ fn motion_target_changed(current: f32, target: f32) -> bool {
     (current - target).abs() > f32::EPSILON
 }
 
-pub(super) fn retarget_hover_motion(
-    transition: &gpui::Transition<f32>,
-    is_hovered: bool,
-    cx: &mut App,
-) {
-    set_motion_target(transition, motion_target(is_hovered), cx);
-}
-
 pub(super) fn motion_is_hidden(progress: f32) -> bool {
     progress <= MOTION_DONE_EPSILON
 }
 
-pub(super) fn settings_sheet_slide_offset(progress: f32) -> f32 {
-    (1.0 - progress.clamp(0.0, 1.0)) * SETTINGS_SHEET_SLIDE_DISTANCE
+pub(super) fn settings_drawer_slide_offset(progress: f32) -> f32 {
+    (1.0 - progress.clamp(0.0, 1.0)) * SETTINGS_DRAWER_SLIDE_DISTANCE
 }
 
-pub(super) fn settings_sheet_right_inset(progress: f32) -> f32 {
-    SETTINGS_SHEET_EDGE_INSET - settings_sheet_slide_offset(progress)
+pub(super) fn settings_drawer_right_inset(progress: f32) -> f32 {
+    SETTINGS_DRAWER_EDGE_INSET - settings_drawer_slide_offset(progress)
 }
 
 pub(super) fn popover_slide_offset(progress: f32) -> f32 {
-    (1.0 - progress.clamp(0.0, 1.0)) * POPOVER_SLIDE_DISTANCE
+    -(1.0 - progress.clamp(0.0, 1.0)) * POPOVER_SLIDE_DISTANCE
 }
 
 pub(super) fn surface_motion(
@@ -63,7 +109,20 @@ pub(super) fn surface_motion(
 ) -> f32 {
     let transition = window
         .use_keyed_transition(key, cx, SURFACE_MOTION_DURATION, |_, _| 0.0_f32)
-        .with_easing(gpui::ease_out_quint());
+        .with_easing(css_ease);
+    set_motion_target(&transition, motion_target(is_open), cx);
+    *transition.evaluate(window, cx)
+}
+
+pub(super) fn drawer_motion(is_open: bool, window: &mut Window, cx: &mut App) -> f32 {
+    let transition = window
+        .use_keyed_transition(
+            "app-settings-drawer-motion",
+            cx,
+            Duration::from_millis(200),
+            |_, _| 0.0_f32,
+        )
+        .with_easing(css_transition_ease);
     set_motion_target(&transition, motion_target(is_open), cx);
     *transition.evaluate(window, cx)
 }
@@ -75,7 +134,7 @@ pub(super) fn hover_motion(
 ) -> gpui::Transition<f32> {
     let transition = window
         .use_keyed_transition(key, cx, INTERACTION_MOTION_DURATION, |_window, _cx| 0.0_f32)
-        .with_easing(ease_in_out);
+        .with_easing(css_transition_ease);
     if cx.reduce_motion() {
         let target = *transition.read_goal(cx);
         transition.jump_to(target, cx);
@@ -83,68 +142,20 @@ pub(super) fn hover_motion(
     transition
 }
 
-pub(super) fn selected_motion(
-    key: impl Into<ElementId>,
-    selected: bool,
-    window: &mut Window,
-    cx: &mut App,
-) -> f32 {
-    let transition = window
-        .use_keyed_transition(key, cx, INTERACTION_MOTION_DURATION, |_, _| {
-            motion_target(selected)
-        })
-        .with_easing(ease_in_out);
-    set_motion_target(&transition, motion_target(selected), cx);
-    *transition.evaluate(window, cx)
-}
-
 pub(super) fn contextual_icon_motion(
     key: impl Into<ElementId>,
     active: bool,
+    initially_active: bool,
     window: &mut Window,
     cx: &mut App,
 ) -> f32 {
     let transition = window
         .use_keyed_transition(key, cx, INTERACTION_MOTION_DURATION, |_, _| {
-            motion_target(active)
+            motion_target(initially_active)
         })
-        .with_easing(ease_in_out);
+        .with_easing(css_transition_ease);
     set_motion_target(&transition, motion_target(active), cx);
     *transition.evaluate(window, cx)
-}
-
-pub(super) fn mix_color(from: theme::RgbaToken, to: theme::RgbaToken, progress: f32) -> Rgba {
-    mix_rgba(color(from), color(to), progress)
-}
-
-pub(super) fn mix_rgba(from: Rgba, to: Rgba, progress: f32) -> Rgba {
-    let progress = progress.clamp(0.0, 1.0);
-    if progress <= 0.0 {
-        return from;
-    }
-    if progress >= 1.0 {
-        return to;
-    }
-
-    let alpha = from.alpha.lerp(&to.alpha, progress);
-    if alpha <= f32::EPSILON {
-        return Rgba::default();
-    }
-
-    let premultiplied = |from_channel: f32, to_channel: f32| {
-        (from_channel * from.alpha).lerp(&(to_channel * to.alpha), progress) / alpha
-    };
-
-    Rgba::new(
-        premultiplied(from.red, to.red),
-        premultiplied(from.green, to.green),
-        premultiplied(from.blue, to.blue),
-        alpha,
-    )
-}
-
-pub(super) fn mix_scalar(from: f32, to: f32, progress: f32) -> f32 {
-    from.lerp(&to, progress.clamp(0.0, 1.0))
 }
 
 #[cfg(test)]
@@ -154,7 +165,6 @@ pub(super) fn mix_scalar(from: f32, to: f32, progress: f32) -> f32 {
 )]
 mod tests {
     use super::*;
-    use crate::appearance::ColorTheme;
     use gpui::{Context, IntoElement, Render, TestAppContext, div};
 
     #[derive(Default)]
@@ -162,22 +172,38 @@ mod tests {
         open: bool,
         selected: bool,
         surface: f32,
-        selection: f32,
         icon: f32,
     }
 
     impl Render for MotionProbe {
         fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
             self.surface = surface_motion("panel", self.open, window, cx);
-            self.selection = selected_motion("selection", self.selected, window, cx);
-            self.icon = contextual_icon_motion("icon", self.selected, window, cx);
+            self.icon = contextual_icon_motion("icon", self.selected, self.selected, window, cx);
             div()
         }
     }
 
     #[test]
+    fn timing_curves_match_css_samples_and_do_not_overshoot() {
+        for (input, ease, transition) in [
+            (0.25, 0.408_510_6, 0.236_587_4),
+            (0.5, 0.802_403_4, 0.775_561_3),
+            (0.75, 0.960_459, 0.959_367_7),
+        ] {
+            assert!((css_ease(input) - ease).abs() < 0.00001);
+            assert!((css_transition_ease(input) - transition).abs() < 0.00001);
+        }
+        assert_eq!(css_ease(0.0), 0.0);
+        assert_eq!(css_ease(1.0), 1.0);
+        assert_eq!(css_transition_ease(0.0), 0.0);
+        assert_eq!(css_transition_ease(1.0), 1.0);
+    }
+
+    #[test]
     fn surface_motion_animates_both_directions_and_can_be_reopened() {
         let mut app = TestAppContext::single();
+        let mut now = std::time::Instant::now();
+        app.set_transition_time(now);
         let (probe, cx) = app.add_window_view(|_, _| MotionProbe::default());
         cx.update(|window, cx| window.draw(cx).clear(cx));
         assert_eq!(probe.read_with(cx, |probe, _| probe.surface), 0.0);
@@ -187,7 +213,8 @@ mod tests {
         });
         cx.update(|window, cx| window.draw(cx).clear(cx));
         assert!(probe.read_with(cx, |probe, _| probe.surface) < 1.0);
-        std::thread::sleep(SURFACE_MOTION_DURATION);
+        now += SURFACE_MOTION_DURATION;
+        cx.set_transition_time(now);
         cx.update(|window, cx| window.draw(cx).clear(cx));
         assert_eq!(probe.read_with(cx, |probe, _| probe.surface), 1.0);
 
@@ -196,7 +223,11 @@ mod tests {
             cx.notify();
         });
         cx.update(|window, cx| window.draw(cx).clear(cx));
+        now += SURFACE_MOTION_DURATION / 2;
+        cx.set_transition_time(now);
+        cx.update(|window, cx| window.draw(cx).clear(cx));
         assert!(probe.read_with(cx, |probe, _| probe.surface) > 0.0);
+        assert!(probe.read_with(cx, |probe, _| probe.surface) < 1.0);
         // Reverse an exit before completion: it must not restart at zero.
         probe.update(cx, |probe, cx| {
             probe.open = true;
@@ -204,7 +235,8 @@ mod tests {
         });
         cx.update(|window, cx| window.draw(cx).clear(cx));
         assert!(probe.read_with(cx, |probe, _| probe.surface) > 0.0);
-        std::thread::sleep(SURFACE_MOTION_DURATION);
+        now += SURFACE_MOTION_DURATION;
+        cx.set_transition_time(now);
         cx.update(|window, cx| window.draw(cx).clear(cx));
         assert_eq!(probe.read_with(cx, |probe, _| probe.surface), 1.0);
         probe.update(cx, |probe, cx| {
@@ -212,25 +244,60 @@ mod tests {
             cx.notify();
         });
         cx.update(|window, cx| window.draw(cx).clear(cx));
-        std::thread::sleep(SURFACE_MOTION_DURATION);
+        now += SURFACE_MOTION_DURATION;
+        cx.set_transition_time(now);
         cx.update(|window, cx| window.draw(cx).clear(cx));
         assert_eq!(probe.read_with(cx, |probe, _| probe.surface), 0.0);
     }
 
     #[test]
-    fn selected_controls_do_not_animate_their_initial_state() {
+    fn contextual_icons_do_not_animate_their_initial_state() {
         let mut app = TestAppContext::single();
         let (probe, cx) = app.add_window_view(|_, _| MotionProbe {
             selected: true,
             ..MotionProbe::default()
         });
         cx.update(|window, cx| window.draw(cx).clear(cx));
-        assert_eq!(probe.read_with(cx, |probe, _| probe.selection), 1.0);
         assert_eq!(probe.read_with(cx, |probe, _| probe.icon), 1.0);
     }
 
     #[test]
-    fn reduced_motion_settles_surfaces_and_selection_without_a_tail() {
+    fn controlled_transition_time_advances_independently_in_each_test_app() {
+        let now = std::time::Instant::now();
+        let mut first_app = TestAppContext::single();
+        let mut second_app = first_app.new_app();
+        first_app.set_transition_time(now);
+        second_app.set_transition_time(now + Duration::from_mins(1));
+        let (first, first_cx) = first_app.add_window_view(|_, _| MotionProbe::default());
+        let (second, second_cx) = second_app.add_window_view(|_, _| MotionProbe::default());
+        for (probe, cx) in [(&first, &mut *first_cx), (&second, &mut *second_cx)] {
+            cx.update(|window, cx| window.draw(cx).clear(cx));
+            probe.update(cx, |probe, cx| {
+                probe.open = true;
+                cx.notify();
+            });
+            cx.update(|window, cx| window.draw(cx).clear(cx));
+            assert_eq!(probe.read_with(cx, |probe, _| probe.surface), 0.0);
+        }
+
+        first_cx.set_transition_time(now + SURFACE_MOTION_DURATION / 2);
+        first_cx.update(|window, cx| window.draw(cx).clear(cx));
+        assert!(
+            (first.read_with(first_cx, |probe, _| probe.surface) - 0.802_403_4).abs() < 0.00001
+        );
+        second_cx.update(|window, cx| window.draw(cx).clear(cx));
+        assert_eq!(second.read_with(second_cx, |probe, _| probe.surface), 0.0);
+
+        first_cx.set_transition_time(now + SURFACE_MOTION_DURATION);
+        first_cx.update(|window, cx| window.draw(cx).clear(cx));
+        assert_eq!(first.read_with(first_cx, |probe, _| probe.surface), 1.0);
+        second_cx.set_transition_time(now + Duration::from_mins(1) + SURFACE_MOTION_DURATION);
+        second_cx.update(|window, cx| window.draw(cx).clear(cx));
+        assert_eq!(second.read_with(second_cx, |probe, _| probe.surface), 1.0);
+    }
+
+    #[test]
+    fn reduced_motion_settles_surfaces_and_icons_without_a_tail() {
         let mut app = TestAppContext::single();
         let (probe, cx) = app.add_window_view(|_, cx| {
             cx.set_reduce_motion(true);
@@ -245,22 +312,7 @@ mod tests {
             cx.update(|window, cx| window.draw(cx).clear(cx));
             let expected = motion_target(open);
             assert_eq!(probe.read_with(cx, |probe, _| probe.surface), expected);
-            assert_eq!(probe.read_with(cx, |probe, _| probe.selection), expected);
             assert_eq!(probe.read_with(cx, |probe, _| probe.icon), expected);
-        }
-    }
-
-    #[test]
-    fn color_motion_does_not_fade_through_transparent_black_in_either_theme() {
-        for color_theme in [ColorTheme::Light, ColorTheme::Dark] {
-            let palette = theme::palette(color_theme);
-            let midpoint = mix_color(palette.transparent, palette.fill_subtle, 0.5);
-
-            assert!((midpoint.red - palette.fill_subtle.red).abs() <= f32::EPSILON);
-            assert!((midpoint.green - palette.fill_subtle.green).abs() <= f32::EPSILON);
-            assert!((midpoint.blue - palette.fill_subtle.blue).abs() <= f32::EPSILON);
-            let expected_alpha = palette.fill_subtle.alpha * 0.5;
-            assert!((midpoint.alpha - expected_alpha).abs() <= f32::EPSILON);
         }
     }
 }

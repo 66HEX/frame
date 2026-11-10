@@ -1,20 +1,29 @@
 use crate::{
+    dimensions::{OutputRasterPolicy, output_dimensions, output_raster_policy},
     error::ConversionError,
     filters::{
-        PREVIEW_OUTPUT_LABEL, VisualFilterBase, VisualFilterProfile, build_audio_filters,
-        build_visual_filter_complex, has_overlay,
+        PREVIEW_OUTPUT_LABEL, PreviewFramePolicy, VisualFilterBase, VisualFilterContext,
+        VisualFilterProfile, build_audio_filters, build_visual_filter_complex_with_preview_policy,
+        has_overlay,
     },
     types::ConversionConfig,
+    utils::format_ffmpeg_seconds as format_seconds,
 };
 
-const MIN_PREVIEW_DIMENSION: u32 = 16;
-
 #[derive(Clone, Debug, PartialEq)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "Playback pacing, seek accuracy, source kind and palette storage are independent preview facts."
+)]
 pub struct PreviewFfmpegOptions {
     pub start_seconds: f64,
     pub end_seconds: Option<f64>,
     pub source_width: Option<u32>,
     pub source_height: Option<u32>,
+    pub source_is_palette: bool,
+    pub source_sample_aspect_ratio: Option<crate::aspect::SampleAspectRatio>,
+    pub source_clock: crate::source_timing::ResolvedSourceClock,
+    pub preview_burn_clock: Option<crate::source_timing::PreviewBurnClock>,
     pub max_width: u32,
     pub max_height: u32,
     pub fps: u32,
@@ -36,6 +45,9 @@ pub struct PreviewAudioFfmpegOptions {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PreviewFfmpegPlan {
+    pub pixel_aspect_ratio: crate::aspect::DisplayRatio,
+    /// Raster aspect before preview downscaling; independent of texture rounding.
+    pub output_raster_aspect_ratio: Option<crate::aspect::DisplayRatio>,
     pub args: Vec<String>,
     pub width: u32,
     pub height: u32,
@@ -56,6 +68,15 @@ struct PreviewGeometry {
     preview_height: u32,
 }
 
+impl PreviewFfmpegPlan {
+    #[must_use]
+    pub fn display_aspect_ratio(&self) -> crate::aspect::DisplayRatio {
+        self.pixel_aspect_ratio
+            .multiplied_by(u128::from(self.width), u128::from(self.height))
+            .unwrap_or_default()
+    }
+}
+
 /// Builds an `FFmpeg` command plan that streams low-resolution BGRA preview
 /// frames to stdout.
 ///
@@ -68,26 +89,132 @@ pub fn build_ffmpeg_preview_args(
     config: &ConversionConfig,
     options: &PreviewFfmpegOptions,
 ) -> Result<PreviewFfmpegPlan, ConversionError> {
+    build_preview_args_with_frame_policy(input, config, options, PreviewFramePolicy::Stream, false)
+}
+
+/// Builds a snapshot preview plan without the terminal playback FPS filter.
+///
+/// This releases the first processed frame before a format change can discard
+/// frames buffered by that filter. Export commands are unchanged.
+///
+/// The snapshot caller must retain its one-frame output limit. Streaming callers
+/// use [`build_ffmpeg_preview_args`] and preserve ordinary FPS rounding.
+///
+/// # Errors
+/// Returns the same errors as [`build_ffmpeg_preview_args`].
+pub fn build_ffmpeg_snapshot_preview_args(
+    input: &str,
+    config: &ConversionConfig,
+    options: &PreviewFfmpegOptions,
+) -> Result<PreviewFfmpegPlan, ConversionError> {
+    build_preview_args_with_frame_policy(
+        input,
+        config,
+        options,
+        PreviewFramePolicy::Snapshot,
+        false,
+    )
+}
+
+/// Builds the packet-bound preview protocol for a verified runtime and a
+/// decoder-native SAR source (currently MPEG-TS in the application).
+///
+/// The caller must establish runtime support before launching this plan.
+/// Source/Copy preview alone uses this policy; encoded preview retains the
+/// export's container/SAR semantics. Only streaming applies preview FPS pacing.
+///
+/// # Errors
+/// Returns an error for non-Copy configs or invalid preview options.
+pub fn build_ffmpeg_framed_source_preview_args(
+    input: &str,
+    config: &ConversionConfig,
+    options: &PreviewFfmpegOptions,
+    snapshot: bool,
+) -> Result<PreviewFfmpegPlan, ConversionError> {
+    if config.processing_mode != "copy" {
+        return Err(ConversionError::InvalidInput(
+            "Native frame presentation requires Source/Copy preview".into(),
+        ));
+    }
+    build_preview_args_with_frame_policy(
+        input,
+        config,
+        options,
+        if snapshot {
+            PreviewFramePolicy::Snapshot
+        } else {
+            PreviewFramePolicy::Stream
+        },
+        true,
+    )
+}
+
+#[expect(
+    clippy::too_many_lines,
+    reason = "Keep preview validation, filter planning and FFmpeg argument assembly in one auditable sequence."
+)]
+fn build_preview_args_with_frame_policy(
+    input: &str,
+    config: &ConversionConfig,
+    options: &PreviewFfmpegOptions,
+    frame_policy: PreviewFramePolicy,
+    framed: bool,
+) -> Result<PreviewFfmpegPlan, ConversionError> {
     validate_preview_options(input, options)?;
 
     let fps = effective_preview_fps(config, options.fps);
     let geometry = preview_geometry(config, options)?;
     let frame_bytes = frame_bytes(geometry.preview_width, geometry.preview_height)?;
-    let base = if options.source_is_image {
-        VisualFilterBase::Image
-    } else {
-        VisualFilterBase::Video
+    let base = match output_raster_policy(&config.container, config.processing_mode == "copy") {
+        OutputRasterPolicy::Source => VisualFilterBase::Source,
+        OutputRasterPolicy::Exact => VisualFilterBase::Image,
+        OutputRasterPolicy::Even => VisualFilterBase::Video,
     };
-    let graph = build_visual_filter_complex(
-        config,
-        VisualFilterProfile::PreviewLowRes {
-            base,
-            width: geometry.preview_width,
-            height: geometry.preview_height,
+    let preview_burn_clock = options.preview_burn_clock.filter(|_| {
+        base != VisualFilterBase::Source
+            && !crate::utils::is_audio_only_container(&config.container)
+            && crate::filters::has_subtitle_burn(config)
+    });
+    if base != VisualFilterBase::Source && crate::filters::has_subtitle_burn(config) {
+        let seek = crate::trim::RawFfmpegTime::parse(&format_seconds(options.start_seconds))
+            .ok_or_else(|| {
+                ConversionError::InvalidInput(
+                    "Preview start position is too large to align subtitles".into(),
+                )
+            })?;
+        crate::filters::validate_preview_subtitle_clock(
+            config,
+            options.source_clock,
+            preview_burn_clock,
+            seek.microseconds,
+        )?;
+    }
+    let graph = if framed {
+        crate::filters::build_framed_source_preview_graph(
+            geometry.preview_width,
+            geometry.preview_height,
             fps,
-            source_time_seconds: options.start_seconds,
-        },
-    );
+            frame_policy,
+        )
+    } else {
+        build_visual_filter_complex_with_preview_policy(
+            config,
+            VisualFilterProfile::PreviewLowRes {
+                base,
+                width: geometry.preview_width,
+                height: geometry.preview_height,
+                fps,
+                source_time_seconds: options.start_seconds,
+            },
+            VisualFilterContext {
+                source_is_palette: options.source_is_palette,
+                source_clock: options.source_clock,
+                preview_burn_clock,
+                ..VisualFilterContext::new(options.source_width, options.source_height)
+            },
+            frame_policy,
+        )
+    };
 
     let mut args = vec![
         "-hide_banner".to_string(),
@@ -99,7 +226,7 @@ pub fn build_ffmpeg_preview_args(
     if options.start_seconds > 0.0 {
         args.push("-ss".to_string());
         args.push(format_seconds(options.start_seconds));
-        if !options.precise_seek {
+        if !options.precise_seek && options.end_seconds.is_none() {
             args.push("-noaccurate_seek".to_string());
         }
     }
@@ -107,10 +234,14 @@ pub fn build_ffmpeg_preview_args(
         args.push("-readrate".to_string());
         args.push("1".to_string());
     }
+    if framed {
+        args.push("-native_frame_sar:v:0".into());
+    }
     args.push("-i".to_string());
     args.push(input.to_string());
 
-    if has_overlay(config)
+    if base != VisualFilterBase::Source
+        && has_overlay(config)
         && let Some(overlay) = &config.overlay
     {
         args.push("-i".to_string());
@@ -132,18 +263,54 @@ pub fn build_ffmpeg_preview_args(
         "-dn".to_string(),
         "-pix_fmt".to_string(),
         "bgra".to_string(),
-        "-f".to_string(),
-        "rawvideo".to_string(),
-        "pipe:1".to_string(),
     ]);
+    if framed {
+        args.extend([
+            "-c:v".into(),
+            "rawvideo".into(),
+            "-frame_preview_framed".into(),
+        ]);
+    }
+    args.extend(["-f".into(), "rawvideo".into(), "pipe:1".into()]);
 
     Ok(PreviewFfmpegPlan {
+        pixel_aspect_ratio: preview_pixel_aspect_ratio(config, options, geometry),
+        output_raster_aspect_ratio: options
+            .source_width
+            .zip(options.source_height)
+            .and_then(|(w, h)| output_dimensions(config, w, h, None))
+            .and_then(|(w, h)| crate::aspect::DisplayRatio::new(u128::from(w), u128::from(h))),
         args,
         width: geometry.preview_width,
         height: geometry.preview_height,
         fps,
         frame_bytes,
     })
+}
+
+fn preview_pixel_aspect_ratio(
+    config: &ConversionConfig,
+    options: &PreviewFfmpegOptions,
+    geometry: PreviewGeometry,
+) -> crate::aspect::DisplayRatio {
+    options
+        .source_width
+        .zip(options.source_height)
+        .and_then(|(w, h)| {
+            crate::dimensions::output_display_aspect_ratio(
+                config,
+                w,
+                h,
+                options.source_sample_aspect_ratio,
+            )
+        })
+        .and_then(|aspect| {
+            aspect.multiplied_by(
+                u128::from(geometry.preview_height),
+                u128::from(geometry.preview_width),
+            )
+        })
+        .unwrap_or_default()
 }
 
 /// Builds an `FFmpeg` command plan that streams decoded preview audio as PCM
@@ -170,7 +337,7 @@ pub fn build_ffmpeg_preview_audio_args(
     if options.start_seconds > 0.0 {
         args.push("-ss".to_string());
         args.push(format_seconds(options.start_seconds));
-        if !options.precise_seek {
+        if !options.precise_seek && options.end_seconds.is_none() {
             args.push("-noaccurate_seek".to_string());
         }
     }
@@ -298,6 +465,9 @@ fn audio_preview_duration(options: &PreviewAudioFfmpegOptions) -> Option<f64> {
 }
 
 fn effective_preview_fps(config: &ConversionConfig, preview_fps: u32) -> u32 {
+    if config.processing_mode == "copy" {
+        return preview_fps;
+    }
     config
         .fps
         .parse::<u32>()
@@ -310,11 +480,7 @@ fn preview_geometry(
     config: &ConversionConfig,
     options: &PreviewFfmpegOptions,
 ) -> Result<PreviewGeometry, ConversionError> {
-    let mut export = export_dimensions(config, options)?;
-    if !options.source_is_image {
-        export.width = ceil_even_dimension(export.width);
-        export.height = ceil_even_dimension(export.height);
-    }
+    let export = export_dimensions(config, options)?;
 
     let preview = fit_dimensions(
         export.width,
@@ -353,28 +519,20 @@ fn export_dimensions(
         })?,
     };
 
-    let mut dimensions = Dimensions {
-        width: source_width,
-        height: source_height,
-    };
-
-    if matches!(config.rotation.as_str(), "90" | "270") {
-        dimensions = Dimensions {
-            width: dimensions.height,
-            height: dimensions.width,
-        };
-    }
-
-    if let Some(crop) = &config.crop
-        && crop.enabled
+    if output_raster_policy(&config.container, config.processing_mode == "copy")
+        == OutputRasterPolicy::Source
     {
-        dimensions = Dimensions {
-            width: rounded_dimension(crop.width, 1.0),
-            height: rounded_dimension(crop.height, 1.0),
-        };
+        return Ok(Dimensions {
+            width: source_width,
+            height: source_height,
+        });
     }
 
-    Ok(apply_resolution_dimensions(config, dimensions))
+    let (width, height) =
+        output_dimensions(config, source_width, source_height, None).ok_or_else(|| {
+            ConversionError::InvalidInput("Preview output dimensions are invalid".to_string())
+        })?;
+    Ok(Dimensions { width, height })
 }
 
 fn source_dimensions_from_custom_resolution(config: &ConversionConfig) -> Option<(u32, u32)> {
@@ -384,43 +542,6 @@ fn source_dimensions_from_custom_resolution(config: &ConversionConfig) -> Option
     let width = parse_dimension(config.custom_width.as_deref())?;
     let height = parse_dimension(config.custom_height.as_deref())?;
     Some((width, height))
-}
-
-fn apply_resolution_dimensions(config: &ConversionConfig, dimensions: Dimensions) -> Dimensions {
-    if config.resolution == "original" {
-        return dimensions;
-    }
-
-    if config.resolution == "custom" {
-        let width = parse_dimension(config.custom_width.as_deref());
-        let height = parse_dimension(config.custom_height.as_deref());
-        return match (width, height) {
-            (Some(width), Some(height)) => Dimensions { width, height },
-            (Some(width), None) => Dimensions {
-                width,
-                height: scaled_dimension(dimensions.height, width, dimensions.width, false),
-            },
-            (None, Some(height)) => Dimensions {
-                width: scaled_dimension(dimensions.width, height, dimensions.height, true),
-                height,
-            },
-            (None, None) => dimensions,
-        };
-    }
-
-    let Some(target_height) = (match config.resolution.as_str() {
-        "1080p" => Some(1080),
-        "720p" => Some(720),
-        "480p" => Some(480),
-        _ => None,
-    }) else {
-        return dimensions;
-    };
-
-    Dimensions {
-        width: scaled_dimension(dimensions.width, target_height, dimensions.height, true),
-        height: target_height,
-    }
 }
 
 fn fit_dimensions(
@@ -434,24 +555,8 @@ fn fit_dimensions(
     let scale = width_scale.min(height_scale).min(1.0);
 
     Dimensions {
-        width: floor_even_dimension(round_to_u32(f64::from(source_width) * scale)),
-        height: floor_even_dimension(round_to_u32(f64::from(source_height) * scale)),
-    }
-}
-
-fn scaled_dimension(
-    source_dimension: u32,
-    target_dimension: u32,
-    source_reference: u32,
-    even: bool,
-) -> u32 {
-    let raw =
-        f64::from(source_dimension) * f64::from(target_dimension) / f64::from(source_reference);
-    let rounded = round_to_u32(raw);
-    if even {
-        floor_even_dimension(rounded)
-    } else {
-        rounded.max(1)
+        width: round_to_u32(f64::from(source_width) * scale),
+        height: round_to_u32(f64::from(source_height) * scale),
     }
 }
 
@@ -461,11 +566,6 @@ fn parse_dimension(value: Option<&str>) -> Option<u32> {
         .filter(|value| !value.is_empty() && *value != "-1")
         .and_then(|value| value.parse::<u32>().ok())
         .filter(|value| *value > 0)
-}
-
-fn rounded_dimension(value: f64, min_value: f64) -> u32 {
-    let rounded = value.max(min_value).round();
-    round_to_u32(rounded)
 }
 
 fn round_to_u32(value: f64) -> u32 {
@@ -481,19 +581,6 @@ fn round_to_u32(value: f64) -> u32 {
     converted.max(1)
 }
 
-fn ceil_even_dimension(value: u32) -> u32 {
-    value.max(2).next_multiple_of(2)
-}
-
-fn floor_even_dimension(value: u32) -> u32 {
-    let value = value.max(MIN_PREVIEW_DIMENSION);
-    if value.is_multiple_of(2) {
-        value
-    } else {
-        value - 1
-    }
-}
-
 fn frame_bytes(width: u32, height: u32) -> Result<usize, ConversionError> {
     let pixels = width.checked_mul(height).ok_or_else(|| {
         ConversionError::InvalidInput("Preview frame dimensions are too large".to_string())
@@ -504,10 +591,6 @@ fn frame_bytes(width: u32, height: u32) -> Result<usize, ConversionError> {
     usize::try_from(bytes).map_err(|_| {
         ConversionError::InvalidInput("Preview frame byte size is too large".to_string())
     })
-}
-
-fn format_seconds(seconds: f64) -> String {
-    format!("{seconds:.3}")
 }
 
 #[cfg(test)]
@@ -525,6 +608,7 @@ mod tests {
             audio_codec: "aac".to_string(),
             audio_bitrate: "192".to_string(),
             audio_bitrate_mode: "bitrate".to_string(),
+            opus_vbr: true,
             audio_quality: "4".to_string(),
             audio_channels: "original".to_string(),
             audio_volume: 100.0,
@@ -576,12 +660,201 @@ mod tests {
         }
     }
 
+    #[test]
+    fn preview_uses_resolved_video_only_clock_and_validates_only_active_burn() {
+        use crate::source_timing::{ResolvedSourceClock, TimeBase};
+        let mut config = default_config();
+        config.subtitle_burn_path = Some("/tmp/sub.srt".into());
+        config.start_time = Some("9".into());
+        let mut options = default_options();
+        options.start_seconds = 0.123_456_789;
+        options.source_clock = ResolvedSourceClock::Known {
+            video_time_base: TimeBase::new(1, 1000).unwrap(),
+            origin_microseconds: 0,
+            minimum_start_microseconds: None,
+        };
+        let plan = build_ffmpeg_preview_args("source.mkv", &config, &options).unwrap();
+        assert!(plan.args.windows(2).any(|pair| pair == ["-ss", "0.123457"]));
+        assert!(
+            plan.args
+                .iter()
+                .any(|value| value.contains("setpts=PTS+(round(123/(1000*TB)))"))
+        );
+        options.source_clock = ResolvedSourceClock::Invalid;
+        assert!(build_ffmpeg_preview_args("source.mkv", &config, &options).is_err());
+        options.start_seconds = 0.0;
+        assert!(build_ffmpeg_preview_args("source.mkv", &config, &options).is_ok());
+        options.start_seconds = 0.5;
+        config.processing_mode = "copy".into();
+        assert!(build_ffmpeg_preview_args("source.mkv", &config, &options).is_ok());
+        config.processing_mode = "reencode".into();
+        config.subtitle_burn_path = None;
+        assert!(build_ffmpeg_preview_args("source.mkv", &config, &options).is_ok());
+    }
+
+    #[test]
+    fn paired_export_clock_changes_only_the_active_burn_wrapper_even_at_zero_seek() {
+        use crate::source_timing::{
+            SourceStreamTiming, SourceTiming, TimeBase, resolve_preview_burn_clock,
+        };
+        let mut config = default_config();
+        config.container = "mkv".into();
+        config.subtitle_burn_path = Some("/tmp/clock.srt".into());
+        config.selected_audio_tracks = vec![1];
+        let mut timing = SourceTiming {
+            format_start_microseconds: Some(1_400_000),
+            format_start_invalid: false,
+            first_video_stream_index: Some(0),
+            streams: [(0, 145_920), (1, 126_000)]
+                .map(|(index, start_pts)| SourceStreamTiming {
+                    index,
+                    time_base: TimeBase::new(1, 90_000),
+                    start_pts: Some(start_pts),
+                })
+                .into(),
+        };
+        let mut options = default_options();
+        options.start_seconds = 0.0;
+        let clock =
+            resolve_preview_burn_clock(&config, Some(&timing), Some("mpegts"), &[1], &[]).unwrap();
+        options.source_clock = clock.visual_clock();
+        let legacy = build_ffmpeg_preview_args("source.m2ts", &config, &options).unwrap();
+        options.preview_burn_clock = Some(clock);
+        let paired = build_ffmpeg_preview_args("source.m2ts", &config, &options).unwrap();
+        let normalized = paired
+            .args
+            .iter()
+            .map(|arg| {
+                arg.replace("setpts=PTS+(round(83/(375*TB))),", "")
+                    .replace(",setpts=PTS-(round(83/(375*TB)))", "")
+            })
+            .collect::<Vec<_>>();
+        assert_ne!(paired.args, legacy.args);
+        assert_eq!(normalized, legacy.args);
+        assert_eq!(
+            (
+                paired.width,
+                paired.height,
+                paired.pixel_aspect_ratio,
+                paired.output_raster_aspect_ratio
+            ),
+            (
+                legacy.width,
+                legacy.height,
+                legacy.pixel_aspect_ratio,
+                legacy.output_raster_aspect_ratio
+            )
+        );
+
+        timing.streams[1].start_pts = Some(i64::MAX);
+        timing.streams[1].time_base = TimeBase::new(1, 1);
+        options.preview_burn_clock =
+            resolve_preview_burn_clock(&config, Some(&timing), Some("mpegts"), &[1], &[]);
+        assert!(build_ffmpeg_preview_args("source.m2ts", &config, &options).is_err());
+        for dormant in ["no-burn", "copy", "audio"] {
+            let mut config = config.clone();
+            match dormant {
+                "no-burn" => config.subtitle_burn_path = None,
+                "copy" => config.processing_mode = "copy".into(),
+                _ => config.container = "wav".into(),
+            }
+            assert!(
+                build_ffmpeg_preview_args("source.m2ts", &config, &options).is_ok(),
+                "{dormant}"
+            );
+        }
+    }
+
+    #[test]
+    fn display_aspect_follows_oriented_crop_scale_and_padding_without_changing_payload_plan() {
+        use crate::aspect::SampleAspectRatio;
+        let mut config = default_config();
+        let mut options = default_options();
+        options.source_width = Some(320);
+        options.source_height = Some(180);
+        options.max_width = 320;
+        options.max_height = 180;
+        let square = build_ffmpeg_preview_args("source", &config, &options).unwrap();
+        options.source_sample_aspect_ratio = SampleAspectRatio::new(2, 1);
+        let wide = build_ffmpeg_preview_args("source", &config, &options).unwrap();
+        assert_eq!(wide.args, square.args);
+        assert_eq!(wide.frame_bytes, square.frame_bytes);
+        assert_eq!(wide.display_aspect_ratio().exact_ratio(), Some((32, 9)));
+        config.resolution = "custom".into();
+        config.custom_width = Some("127".into());
+        config.custom_height = Some("129".into());
+        let custom = build_ffmpeg_preview_args("source", &config, &options).unwrap();
+        assert_eq!(
+            custom.display_aspect_ratio().exact_ratio(),
+            Some((145_408, 74_295))
+        );
+        config.processing_mode = "copy".into();
+        config.rotation = "90".into();
+        let copied = build_ffmpeg_preview_args("source", &config, &options).unwrap();
+        assert_eq!(copied.display_aspect_ratio().exact_ratio(), Some((32, 9)));
+        config.processing_mode = "reencode".into();
+        config.resolution = "original".into();
+        let rotated = build_ffmpeg_preview_args("source", &config, &options).unwrap();
+        assert_eq!(rotated.display_aspect_ratio().exact_ratio(), Some((9, 32)));
+    }
+
+    #[test]
+    fn output_raster_aspect_is_independent_of_rounded_preview_texture() {
+        use crate::aspect::{DisplayRatio, SampleAspectRatio};
+        let config = default_config();
+        let mut options = default_options();
+        options.source_width = Some(400);
+        options.source_height = Some(4);
+        options.source_sample_aspect_ratio = SampleAspectRatio::new(1, 1);
+        options.max_width = 240;
+        let small = build_ffmpeg_preview_args("source", &config, &options).unwrap();
+        assert_eq!((small.width, small.height), (240, 2));
+        assert_eq!(small.pixel_aspect_ratio, DisplayRatio::new(5, 6).unwrap());
+        assert_eq!(small.output_raster_aspect_ratio, DisplayRatio::new(100, 1));
+        options.max_width = 400;
+        let full = build_ffmpeg_preview_args("source", &config, &options).unwrap();
+        assert_eq!((full.width, full.height), (400, 4));
+        assert_eq!(full.pixel_aspect_ratio, DisplayRatio::ONE);
+        assert_eq!(
+            full.output_raster_aspect_ratio,
+            small.output_raster_aspect_ratio
+        );
+        assert_eq!(full.display_aspect_ratio(), small.display_aspect_ratio());
+    }
+
+    #[test]
+    fn explicit_square_pixels_and_unknown_sar_differ_after_rounded_scaling() {
+        use crate::aspect::SampleAspectRatio;
+        let mut config = default_config();
+        config.container = "png".into();
+        config.video_codec = "png".into();
+        config.resolution = "custom".into();
+        config.custom_width = Some("-1".into());
+        config.custom_height = Some("100".into());
+        let mut options = default_options();
+        options.source_width = Some(321);
+        options.source_height = Some(179);
+        let unknown = build_ffmpeg_preview_args("source", &config, &options).unwrap();
+        options.source_sample_aspect_ratio = SampleAspectRatio::new(1, 1);
+        let known = build_ffmpeg_preview_args("source", &config, &options).unwrap();
+        assert_eq!(unknown.args, known.args);
+        assert_eq!(
+            unknown.display_aspect_ratio().exact_ratio(),
+            Some((179, 100))
+        );
+        assert_eq!(known.display_aspect_ratio().exact_ratio(), Some((321, 179)));
+    }
+
     fn default_options() -> PreviewFfmpegOptions {
         PreviewFfmpegOptions {
             start_seconds: 12.345,
             end_seconds: Some(15.0),
             source_width: Some(1920),
             source_height: Some(1080),
+            source_is_palette: false,
+            source_sample_aspect_ratio: None,
+            source_clock: crate::source_timing::ResolvedSourceClock::Unknown,
+            preview_burn_clock: None,
             max_width: 1280,
             max_height: 720,
             fps: 30,
@@ -604,6 +877,75 @@ mod tests {
     }
 
     #[test]
+    fn bounded_video_seek_uses_accurate_decoding_without_changing_other_arguments() {
+        for start_seconds in [0.0, 7.2] {
+            for end_seconds in [None, Some(10.0)] {
+                for precise_seek in [false, true] {
+                    let options = PreviewFfmpegOptions {
+                        start_seconds,
+                        end_seconds,
+                        precise_seek,
+                        ..default_options()
+                    };
+                    let plan = build_ffmpeg_preview_args("input.mp4", &default_config(), &options)
+                        .unwrap();
+                    assert_eq!(
+                        plan.args.iter().any(|arg| arg == "-noaccurate_seek"),
+                        start_seconds > 0.0 && end_seconds.is_none() && !precise_seek
+                    );
+                    let precise = build_ffmpeg_preview_args(
+                        "input.mp4",
+                        &default_config(),
+                        &PreviewFfmpegOptions {
+                            precise_seek: true,
+                            ..options
+                        },
+                    )
+                    .unwrap();
+                    let mut args = plan.args;
+                    args.retain(|arg| arg != "-noaccurate_seek");
+                    assert_eq!(args, precise.args);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn bounded_audio_seek_uses_accurate_decoding_without_changing_other_arguments() {
+        for start_seconds in [0.0, 7.2] {
+            for end_seconds in [None, Some(10.0)] {
+                for precise_seek in [false, true] {
+                    let options = PreviewAudioFfmpegOptions {
+                        start_seconds,
+                        end_seconds,
+                        precise_seek,
+                        ..default_audio_options()
+                    };
+                    let plan =
+                        build_ffmpeg_preview_audio_args("input.mp4", &default_config(), &options)
+                            .unwrap();
+                    assert_eq!(
+                        plan.args.iter().any(|arg| arg == "-noaccurate_seek"),
+                        start_seconds > 0.0 && end_seconds.is_none() && !precise_seek
+                    );
+                    let precise = build_ffmpeg_preview_audio_args(
+                        "input.mp4",
+                        &default_config(),
+                        &PreviewAudioFfmpegOptions {
+                            precise_seek: true,
+                            ..options
+                        },
+                    )
+                    .unwrap();
+                    let mut args = plan.args;
+                    args.retain(|arg| arg != "-noaccurate_seek");
+                    assert_eq!(args, precise.args);
+                }
+            }
+        }
+    }
+
+    #[test]
     fn build_ffmpeg_preview_args_streams_raw_bgra_to_stdout() {
         let plan = build_ffmpeg_preview_args("input.mp4", &default_config(), &default_options())
             .expect("preview args");
@@ -619,6 +961,30 @@ mod tests {
 
         assert!(plan.args.iter().any(|arg| arg.contains("format=bgra")));
         assert_eq!(plan.frame_bytes, 1280 * 720 * 4);
+    }
+
+    #[test]
+    fn snapshot_keeps_temporal_effects_and_nominal_rate_without_playback_pacing() {
+        let mut config = default_config();
+        config.fps = "8".into();
+        config.video_filters.deinterlace = crate::types::DeinterlaceMode::On;
+        let options = default_options();
+        let mut stream = build_ffmpeg_preview_args("input.mp4", &config, &options).unwrap();
+        let snapshot = build_ffmpeg_snapshot_preview_args("input.mp4", &config, &options).unwrap();
+        let index = stream
+            .args
+            .iter()
+            .position(|arg| arg == "-filter_complex")
+            .unwrap()
+            + 1;
+        assert_eq!(stream.args[index].matches("fps=8").count(), 1);
+        assert!(!snapshot.args[index].contains("fps="));
+        assert_eq!(snapshot.fps, 8);
+        assert!(snapshot.args[index].contains("bwdif=mode=send_frame:parity=auto:deint=all"));
+        let terminal = ",fps=8,scale=";
+        assert_eq!(stream.args[index].matches(terminal).count(), 1);
+        stream.args[index] = stream.args[index].replace(terminal, ",scale=");
+        assert_eq!(snapshot, stream);
     }
 
     #[test]
@@ -652,11 +1018,9 @@ mod tests {
         let plan = build_ffmpeg_preview_args("input.mp4", &config, &default_options())
             .expect("preview args");
 
-        assert!(
-            plan.args
-                .iter()
-                .any(|arg| arg.contains("subtitles='C\\:/Media/John\\'s \\[cut\\]\\,final.srt'"))
-        );
+        assert!(plan.args.iter().any(|arg| {
+            arg.contains(r"subtitles=filename=C\\:\\\\Media\\\\John\\\'s\\\ \[cut\]\,final.srt")
+        }));
     }
 
     #[test]
@@ -669,8 +1033,24 @@ mod tests {
         let plan = build_ffmpeg_preview_args("input.mp4", &config, &options).expect("preview args");
 
         assert!(plan.args.iter().any(|arg| {
-            arg.contains("setpts=PTS+10.000/TB,subtitles='/tmp/sub.srt',setpts=PTS-10.000/TB")
+            arg.contains(
+                "setpts=PTS+(round(10.000/TB)),subtitles=filename=/tmp/sub.srt,setpts=PTS-(round(10.000/TB))",
+            )
         }));
+    }
+
+    #[test]
+    fn preview_subtitle_clock_matches_submillisecond_input_seek() {
+        let mut config = default_config();
+        config.subtitle_burn_path = Some("/tmp/sub.srt".to_string());
+        config.start_time = Some("0.750".to_string());
+        let mut options = default_options();
+        options.start_seconds = 1.234_567;
+        let plan = build_ffmpeg_preview_args("input.mp4", &config, &options).unwrap();
+        assert!(plan.args.windows(2).any(|pair| pair == ["-ss", "1.234567"]));
+        assert!(plan.args.iter().any(|arg| arg.contains(
+            "setpts=PTS+(round(1.234567/TB)),subtitles=filename=/tmp/sub.srt,setpts=PTS-(round(1.234567/TB))"
+        )));
     }
 
     #[test]
@@ -706,12 +1086,13 @@ mod tests {
         let plan = build_ffmpeg_preview_args("input.mp4", &config, &default_options())
             .expect("preview args");
 
-        assert_eq!(plan.width, 404);
+        assert_eq!(plan.width, 405);
         assert_eq!(plan.height, 720);
         assert!(plan.args.iter().any(|arg| {
-            arg.contains("crop=300:600:10:20,scale=1080:1920:force_original_aspect_ratio=decrease")
-                && arg.contains("scale=404:720")
-                && !arg.contains("pad=404:720")
+            arg.contains("crop=300:600:10:20:exact=1")
+                && arg.contains("scale=1080:1920:force_original_aspect_ratio=decrease")
+                && arg.contains("scale=405:720")
+                && !arg.contains("pad=405:720")
         }));
     }
 
@@ -723,9 +1104,9 @@ mod tests {
         let plan = build_ffmpeg_preview_args("input.mp4", &config, &default_options())
             .expect("preview args");
 
-        assert_eq!(plan.width, 404);
+        assert_eq!(plan.width, 405);
         assert_eq!(plan.height, 720);
-        assert_eq!(plan.frame_bytes, 404 * 720 * 4);
+        assert_eq!(plan.frame_bytes, 405 * 720 * 4);
     }
 
     #[test]
@@ -739,7 +1120,7 @@ mod tests {
 
         assert_eq!(
             (plan.width, plan.height, plan.frame_bytes),
-            (404, 720, 404 * 720 * 4)
+            (405, 720, 405 * 720 * 4)
         );
     }
 
@@ -797,12 +1178,83 @@ mod tests {
     }
 
     #[test]
-    fn build_ffmpeg_preview_args_keeps_video_base_for_gif_output() {
+    fn preview_geometry_matches_odd_output_and_exact_crop_dimensions() {
+        let mut options = default_options();
+        options.source_width = Some(320);
+        options.source_height = Some(180);
+        for (container, fixed, height_only) in [
+            ("mp4", (128, 130), (230, 130)),
+            ("gif", (127, 129), (229, 129)),
+            ("png", (127, 129), (229, 129)),
+        ] {
+            let mut config = default_config();
+            config.container = container.to_string();
+            config.resolution = "custom".to_string();
+            config.custom_width = Some("127".to_string());
+            config.custom_height = Some("129".to_string());
+            let plan = build_ffmpeg_preview_args("input.mp4", &config, &options).unwrap();
+            assert_eq!((plan.width, plan.height), fixed, "{container}");
+            config.custom_width = Some("-1".to_string());
+            let plan = build_ffmpeg_preview_args("input.mp4", &config, &options).unwrap();
+            assert_eq!((plan.width, plan.height), height_only, "{container}");
+        }
+
+        let mut config = default_config();
+        config.container = "png".to_string();
+        config.crop = Some(CropConfig {
+            enabled: true,
+            x: 0.0,
+            y: 0.0,
+            width: 127.0,
+            height: 129.0,
+            source_width: None,
+            source_height: None,
+            aspect_ratio: None,
+        });
+        let plan = build_ffmpeg_preview_args("input.media", &config, &options).unwrap();
+        assert_eq!((plan.width, plan.height), (127, 129));
+        assert_eq!(plan.frame_bytes, 127 * 129 * 4);
+    }
+
+    #[test]
+    fn copy_preview_ignores_dormant_export_transforms_and_overlay() {
+        let mut config = default_config();
+        config.processing_mode = "copy".to_string();
+        config.rotation = "90".to_string();
+        config.resolution = "custom".to_string();
+        config.custom_width = Some("127".to_string());
+        config.custom_height = Some("129".to_string());
+        config.fps = "8".to_string();
+        config.subtitle_burn_path = Some("/tmp/dormant.srt".to_string());
+        config.overlay = Some(OverlayConfig {
+            enabled: true,
+            path: "/tmp/dormant.png".to_string(),
+            x: 0.5,
+            y: 0.5,
+            width: 0.2,
+            opacity: 1.0,
+            anchor: "center".to_string(),
+        });
+        let plan = build_ffmpeg_preview_args("input.mp4", &config, &default_options()).unwrap();
+        assert_eq!((plan.width, plan.height, plan.fps), (1280, 720, 30));
+        assert_eq!(plan.args.iter().filter(|arg| *arg == "-i").count(), 1);
+        let graph = plan
+            .args
+            .windows(2)
+            .find(|pair| pair[0] == "-filter_complex")
+            .unwrap();
+        for inactive in ["transpose", "overlay", "subtitles", "127", "pad="] {
+            assert!(!graph[1].contains(inactive), "{inactive}");
+        }
+    }
+
+    #[test]
+    fn build_ffmpeg_preview_args_keeps_exact_raster_for_gif_output() {
         let mut config = default_config();
         config.container = "gif".to_string();
         let plan = build_ffmpeg_preview_args("input.mp4", &config, &default_options())
             .expect("preview args");
 
-        assert!(plan.args.iter().any(|arg| arg.contains("ceil(iw/2)*2")));
+        assert!(!plan.args.iter().any(|arg| arg.contains("ceil(iw/2)*2")));
     }
 }

@@ -1,9 +1,7 @@
 //! Runtime binary resolution for bundled conversion tools.
 
-use std::{
-    env,
-    path::{Path, PathBuf},
-};
+use std::env;
+use std::path::{Path, PathBuf};
 
 pub const BINARIES_RESOURCE_DIR: &str = "resources/binaries";
 pub const BUNDLED_BINARIES_DIR: &str = "binaries";
@@ -136,9 +134,8 @@ const fn target_triple() -> Option<&'static str> {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-
     use super::*;
+    use std::fs;
 
     #[test]
     fn runtime_binary_file_name_matches_setup_script_target_name() {

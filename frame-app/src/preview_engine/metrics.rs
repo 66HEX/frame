@@ -1,7 +1,5 @@
-use std::{
-    sync::{Arc, Mutex, MutexGuard, OnceLock},
-    time::{Duration, Instant},
-};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
+use std::time::{Duration, Instant};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PreviewRuntimeMetrics {
@@ -20,6 +18,7 @@ pub struct PreviewRuntimeMetrics {
     pub audio_pcm_chunks: u64,
     pub audio_pcm_bytes_read: u64,
     pub audio_samples_queued: u64,
+    pub audio_samples_consumed: u64,
     pub audio_output_callbacks: u64,
     pub audio_output_underruns: u64,
     pub first_video_frame_read_ms: Option<u64>,
@@ -165,7 +164,7 @@ impl PreviewRuntimeMetricsStore {
         );
     }
 
-    pub(super) fn record_audio_pcm_chunk(&self, generation: u64, bytes: usize, samples: usize) {
+    pub(super) fn record_audio_pcm_chunk(&self, generation: u64, bytes: usize) {
         let mut state = lock_metrics(&self.inner);
         if state.metrics.playback_generation != generation {
             return;
@@ -175,23 +174,38 @@ impl PreviewRuntimeMetricsStore {
             .metrics
             .audio_pcm_bytes_read
             .saturating_add(u64::try_from(bytes).unwrap_or(u64::MAX));
-        state.metrics.audio_samples_queued = state
-            .metrics
-            .audio_samples_queued
-            .saturating_add(u64::try_from(samples).unwrap_or(u64::MAX));
         set_first_elapsed_ms(
             state.generation_started_at,
             &mut state.metrics.first_audio_pcm_ms,
         );
     }
 
-    pub(super) fn record_audio_output_callback(&self, generation: u64, underrun: bool) {
+    pub(super) fn record_audio_samples_queued(&self, generation: u64, samples: usize) {
+        let mut state = lock_metrics(&self.inner);
+        if state.metrics.playback_generation == generation {
+            state.metrics.audio_samples_queued = state
+                .metrics
+                .audio_samples_queued
+                .saturating_add(u64::try_from(samples).unwrap_or(u64::MAX));
+        }
+    }
+
+    pub(super) fn record_audio_output_callback(
+        &self,
+        generation: u64,
+        underrun: bool,
+        samples: usize,
+    ) {
         let mut state = lock_metrics(&self.inner);
         if state.metrics.playback_generation != generation {
             return;
         }
         state.metrics.audio_output_callbacks =
             state.metrics.audio_output_callbacks.saturating_add(1);
+        state.metrics.audio_samples_consumed = state
+            .metrics
+            .audio_samples_consumed
+            .saturating_add(u64::try_from(samples).unwrap_or(u64::MAX));
         if underrun {
             state.metrics.audio_output_underruns =
                 state.metrics.audio_output_underruns.saturating_add(1);
@@ -220,7 +234,7 @@ pub(super) fn log_preview_runtime_metrics(label: &str, metrics: PreviewRuntimeMe
     }
 
     eprintln!(
-        "frame preview metrics [{label}]: generation={} video_spawns={} audio_spawns={} frames_read={} frame_bytes={} read_total_us={} frames_published={} frames_dropped={} render_conversions={} render_bytes={} render_total_us={} presented={} audio_chunks={} audio_bytes={} audio_samples={} audio_callbacks={} audio_underruns={} first_video_read_ms={:?} first_video_published_ms={:?} first_audio_pcm_ms={:?} first_audio_callback_ms={:?} first_render_ms={:?} first_presented_ms={:?}",
+        "frame preview metrics [{label}]: generation={} video_spawns={} audio_spawns={} frames_read={} frame_bytes={} read_total_us={} frames_published={} frames_dropped={} render_conversions={} render_bytes={} render_total_us={} presented={} audio_chunks={} audio_bytes={} audio_samples={} audio_consumed={} audio_callbacks={} audio_underruns={} first_video_read_ms={:?} first_video_published_ms={:?} first_audio_pcm_ms={:?} first_audio_callback_ms={:?} first_render_ms={:?} first_presented_ms={:?}",
         metrics.playback_generation,
         metrics.video_process_spawns,
         metrics.audio_process_spawns,
@@ -236,6 +250,7 @@ pub(super) fn log_preview_runtime_metrics(label: &str, metrics: PreviewRuntimeMe
         metrics.audio_pcm_chunks,
         metrics.audio_pcm_bytes_read,
         metrics.audio_samples_queued,
+        metrics.audio_samples_consumed,
         metrics.audio_output_callbacks,
         metrics.audio_output_underruns,
         metrics.first_video_frame_read_ms,

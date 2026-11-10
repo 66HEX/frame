@@ -1,29 +1,24 @@
-use frame_core::{
-    media_rules,
-    types::{
-        AudioFiltersConfig as CoreAudioFiltersConfig, ConversionConfig as CoreConversionConfig,
-        ConversionTask, CropConfig, DeinterlaceMode as CoreDeinterlaceMode,
-        FilterStrength as CoreFilterStrength, FilterValue as CoreFilterValue,
-        MetadataConfig as CoreMetadataConfig, MetadataMode as CoreMetadataMode, OverlayConfig,
-        VideoColorFiltersConfig as CoreVideoColorFiltersConfig,
-        VideoFiltersConfig as CoreVideoFiltersConfig,
-    },
+use crate::file_queue::FileItem;
+use crate::settings::{
+    AudioFiltersConfig as GpuiAudioFiltersConfig, ConversionConfig as GpuiConversionConfig,
+    CropSettings, DEFAULT_AUDIO_BITRATE, DEFAULT_AUDIO_BITRATE_MODE, DEFAULT_AUDIO_CHANNELS,
+    DEFAULT_AUDIO_QUALITY, DEFAULT_FPS, DEFAULT_GIF_COLORS, DEFAULT_GIF_DITHER,
+    DEFAULT_PIXEL_FORMAT, DEFAULT_PRESET, DEFAULT_RESOLUTION, DEFAULT_SCALING_ALGORITHM,
+    DEFAULT_VIDEO_BITRATE, DEFAULT_VIDEO_BITRATE_MODE, DEFAULT_VIDEO_CODEC,
+    DeinterlaceMode as GpuiDeinterlaceMode, FilterStrength as GpuiFilterStrength,
+    FilterValue as GpuiFilterValue, MetadataConfig as GpuiMetadataConfig,
+    MetadataMode as GpuiMetadataMode, OverlaySettings,
+    VideoColorFiltersConfig as GpuiVideoColorFiltersConfig,
+    VideoFiltersConfig as GpuiVideoFiltersConfig,
 };
-
-use crate::{
-    file_queue::FileItem,
-    settings::{
-        AudioFiltersConfig as GpuiAudioFiltersConfig, ConversionConfig as GpuiConversionConfig,
-        CropSettings, DEFAULT_AUDIO_BITRATE, DEFAULT_AUDIO_BITRATE_MODE, DEFAULT_AUDIO_CHANNELS,
-        DEFAULT_AUDIO_QUALITY, DEFAULT_FPS, DEFAULT_GIF_COLORS, DEFAULT_GIF_DITHER,
-        DEFAULT_PIXEL_FORMAT, DEFAULT_PRESET, DEFAULT_RESOLUTION, DEFAULT_SCALING_ALGORITHM,
-        DEFAULT_VIDEO_BITRATE, DEFAULT_VIDEO_BITRATE_MODE, DEFAULT_VIDEO_CODEC,
-        DeinterlaceMode as GpuiDeinterlaceMode, FilterStrength as GpuiFilterStrength,
-        FilterValue as GpuiFilterValue, MetadataConfig as GpuiMetadataConfig,
-        MetadataMode as GpuiMetadataMode, OverlaySettings,
-        VideoColorFiltersConfig as GpuiVideoColorFiltersConfig,
-        VideoFiltersConfig as GpuiVideoFiltersConfig,
-    },
+use frame_core::media_rules;
+use frame_core::types::{
+    AudioFiltersConfig as CoreAudioFiltersConfig, ConversionConfig as CoreConversionConfig,
+    ConversionTask, CropConfig, DeinterlaceMode as CoreDeinterlaceMode,
+    FilterStrength as CoreFilterStrength, FilterValue as CoreFilterValue,
+    MetadataConfig as CoreMetadataConfig, MetadataMode as CoreMetadataMode, OverlayConfig,
+    VideoColorFiltersConfig as CoreVideoColorFiltersConfig,
+    VideoFiltersConfig as CoreVideoFiltersConfig,
 };
 
 #[must_use]
@@ -54,6 +49,7 @@ pub fn core_config_from_gpui(config: &GpuiConversionConfig) -> CoreConversionCon
         audio_codec: config.audio_codec.clone(),
         audio_bitrate: non_empty_or(&config.audio_bitrate, DEFAULT_AUDIO_BITRATE),
         audio_bitrate_mode: non_empty_or(&config.audio_bitrate_mode, DEFAULT_AUDIO_BITRATE_MODE),
+        opus_vbr: config.opus_vbr,
         audio_quality: non_empty_or(&config.audio_quality, DEFAULT_AUDIO_QUALITY),
         audio_channels: non_empty_or(&config.audio_channels, DEFAULT_AUDIO_CHANNELS),
         audio_volume: f64::from(config.audio_volume.min(200)),
@@ -109,7 +105,9 @@ pub fn core_config_from_gpui(config: &GpuiConversionConfig) -> CoreConversionCon
         image_png_compression: config.image_png_compression.min(9),
         image_png_prediction: config.image_png_prediction.clone(),
         image_tiff_compression: config.image_tiff_compression.clone(),
-        gif_colors: config.gif_colors.clamp(2, DEFAULT_GIF_COLORS),
+        gif_colors: config
+            .gif_colors
+            .clamp(frame_core::types::MIN_GIF_COLORS, DEFAULT_GIF_COLORS),
         gif_dither: non_empty_or(&config.gif_dither, DEFAULT_GIF_DITHER),
         gif_loop: config.gif_loop,
     }

@@ -1,16 +1,14 @@
 use frame_core::error::ConversionError;
-
 #[cfg(windows)]
-use windows::{
-    Win32::{
-        Foundation::{CloseHandle, HANDLE},
-        System::{
-            LibraryLoader::{GetModuleHandleA, GetProcAddress},
-            Threading::{OpenProcess, PROCESS_SUSPEND_RESUME, PROCESS_TERMINATE, TerminateProcess},
-        },
-    },
-    core::s,
+use windows::Win32::Foundation::{CloseHandle, HANDLE};
+#[cfg(windows)]
+use windows::Win32::System::LibraryLoader::{GetModuleHandleA, GetProcAddress};
+#[cfg(windows)]
+use windows::Win32::System::Threading::{
+    OpenProcess, PROCESS_SUSPEND_RESUME, PROCESS_TERMINATE, TerminateProcess,
 };
+#[cfg(windows)]
+use windows::core::s;
 
 #[cfg(unix)]
 pub(super) fn pause_process(pid: u32) -> Result<(), ConversionError> {

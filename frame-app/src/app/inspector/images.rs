@@ -1,0 +1,585 @@
+use crate::app::components::{FrameOption, frame_option_field};
+use crate::app::components::{
+    frame_slider, frame_slider_fraction_from_bounds, frame_slider_handle,
+};
+use crate::app::inspector::panel::settings_field;
+use crate::app::inspector::shared::{
+    range_fraction, range_value_for_key, range_value_from_fraction, settings_field_label,
+    settings_hint_text, settings_value_badge,
+};
+use crate::app::inspector::{settings_video_resolution_section, settings_video_scaling_section};
+use crate::app::primitives::color;
+use crate::app::root::FrameRoot;
+use crate::settings::{
+    ConversionConfig, apply_image_jpeg_huffman, apply_image_jpeg_quality,
+    apply_image_png_compression, apply_image_png_prediction, apply_image_tiff_compression,
+    apply_image_webp_compression, apply_image_webp_lossless, apply_image_webp_preset,
+    apply_image_webp_quality, apply_pixel_format, image_jpeg_huffman_options,
+    image_png_prediction_options, image_tiff_compression_options, image_webp_preset_options,
+    video_pixel_format_options,
+};
+use crate::theme;
+use gpui::prelude::{FluentBuilder, ParentElement, Styled};
+use gpui::{
+    AppContext, Context, DragMoveEvent, FocusHandle, InteractiveElement, Render,
+    StatefulInteractiveElement, Window, div,
+};
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SettingsImageRangeTarget {
+    JpegQuality,
+    WebpQuality,
+    WebpCompression,
+    PngCompression,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct SettingsImageRangeDrag {
+    target: SettingsImageRangeTarget,
+    min: u32,
+    max: u32,
+}
+
+struct SettingsImageRangeDragPreview;
+
+impl Render for SettingsImageRangeDragPreview {
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl gpui::IntoElement {
+        div().w(theme::ui_rem(0.0)).h(theme::ui_rem(0.0))
+    }
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Image settings receive the crop editing lock alongside input focus and render context."
+)]
+pub(in crate::app) fn settings_images_tab(
+    config: &ConversionConfig,
+    settings_disabled: bool,
+    crop_editing: bool,
+    video_width_focus: Option<&FocusHandle>,
+    video_height_focus: Option<&FocusHandle>,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    crate::app::components::frame_field_group()
+        .child(settings_video_resolution_section(
+            config,
+            settings_disabled || crop_editing,
+            video_width_focus,
+            video_height_focus,
+            palette,
+            window,
+            cx,
+        ))
+        .child(
+            crate::app::inspector::panel::settings_fields_grid()
+                .child(settings_video_scaling_section(
+                    config,
+                    settings_disabled,
+                    palette,
+                    window,
+                    cx,
+                ))
+                .child(settings_images_pixel_format_section(
+                    config,
+                    settings_disabled,
+                    palette,
+                    window,
+                    cx,
+                )),
+        )
+        .child(settings_images_encoding_section(
+            config,
+            settings_disabled,
+            palette,
+            window,
+            cx,
+        ))
+}
+
+fn settings_images_pixel_format_section(
+    config: &ConversionConfig,
+    settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    let mut list = Vec::new();
+    for option in video_pixel_format_options(config) {
+        let pixel_format = option.id;
+        let enabled = !settings_disabled && !option.is_disabled;
+        list.push(FrameOption::with_caption(
+            format!("images-pixel-format-{pixel_format}"),
+            option.label,
+            option.caption,
+            option.is_selected,
+            enabled,
+            move |root, _window, cx| {
+                cx.stop_propagation();
+                if !enabled {
+                    return;
+                }
+                if root.update_selected_config(|config| apply_pixel_format(config, pixel_format)) {
+                    cx.notify();
+                }
+            },
+        ));
+    }
+    let list = frame_option_field(
+        "images-pixel-format-select",
+        "Pixel format",
+        list,
+        palette,
+        window,
+        cx,
+    );
+
+    settings_field("Pixel format", palette).child(list)
+}
+
+fn settings_images_encoding_section(
+    config: &ConversionConfig,
+    settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    match config.container.as_str() {
+        "jpg" => settings_image_jpeg_section(config, settings_disabled, palette, window, cx),
+        "webp" => settings_image_webp_section(config, settings_disabled, palette, window, cx),
+        "png" => settings_image_png_section(config, settings_disabled, palette, window, cx),
+        "tiff" => settings_image_tiff_section(config, settings_disabled, palette, window, cx),
+        "bmp" => settings_field("BMP encoding", palette)
+            .child(settings_hint_text("BMP output is uncompressed.", palette)),
+        _ => settings_field("Image encoding", palette).child(settings_hint_text(
+            "Select an image format to tune encoding.",
+            palette,
+        )),
+    }
+}
+
+fn settings_image_jpeg_section(
+    config: &ConversionConfig,
+    settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    settings_field("JPEG encoding", palette)
+        .child(settings_image_range_field(
+            "Quality",
+            format!("{}%", config.image_jpeg_quality),
+            config.image_jpeg_quality,
+            1,
+            100,
+            "Smallest",
+            "Best quality",
+            SettingsImageRangeTarget::JpegQuality,
+            settings_disabled,
+            palette,
+            window,
+            cx,
+        ))
+        .child(settings_image_option_list(
+            image_jpeg_huffman_options(config, settings_disabled),
+            "image-jpeg-huffman",
+            "JPEG Huffman coding",
+            palette,
+            window,
+            cx,
+            apply_image_jpeg_huffman,
+        ))
+}
+
+fn settings_image_webp_section(
+    config: &ConversionConfig,
+    settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    settings_field("WebP encoding", palette)
+        .child(settings_image_webp_mode_grid(
+            config,
+            settings_disabled,
+            palette,
+            window,
+            cx,
+        ))
+        .child(settings_image_range_field(
+            if config.image_webp_lossless {
+                "Effort"
+            } else {
+                "Quality"
+            },
+            format!("{}%", config.image_webp_quality),
+            config.image_webp_quality,
+            0,
+            100,
+            if config.image_webp_lossless {
+                "Fastest"
+            } else {
+                "Smallest"
+            },
+            if config.image_webp_lossless {
+                "Smallest"
+            } else {
+                "Best quality"
+            },
+            SettingsImageRangeTarget::WebpQuality,
+            settings_disabled,
+            palette,
+            window,
+            cx,
+        ))
+        .child(settings_image_range_field(
+            "Compression effort",
+            config.image_webp_compression.to_string(),
+            config.image_webp_compression,
+            0,
+            6,
+            "Fastest",
+            "Smallest",
+            SettingsImageRangeTarget::WebpCompression,
+            settings_disabled,
+            palette,
+            window,
+            cx,
+        ))
+        .child(settings_image_option_list(
+            image_webp_preset_options(config, settings_disabled),
+            "image-webp-preset",
+            "WebP preset",
+            palette,
+            window,
+            cx,
+            apply_image_webp_preset,
+        ))
+}
+
+fn settings_image_png_section(
+    config: &ConversionConfig,
+    settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    settings_field("PNG compression", palette)
+        .child(settings_image_range_field(
+            "Compression level",
+            config.image_png_compression.to_string(),
+            config.image_png_compression,
+            0,
+            9,
+            "Fastest",
+            "Smallest",
+            SettingsImageRangeTarget::PngCompression,
+            settings_disabled,
+            palette,
+            window,
+            cx,
+        ))
+        .child(settings_image_option_list(
+            image_png_prediction_options(config, settings_disabled),
+            "image-png-prediction",
+            "PNG prediction",
+            palette,
+            window,
+            cx,
+            apply_image_png_prediction,
+        ))
+}
+
+fn settings_image_tiff_section(
+    config: &ConversionConfig,
+    settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    settings_field("TIFF compression", palette).child(settings_image_option_list(
+        image_tiff_compression_options(config, settings_disabled),
+        "image-tiff-compression",
+        "TIFF compression",
+        palette,
+        window,
+        cx,
+        apply_image_tiff_compression,
+    ))
+}
+
+fn settings_image_webp_mode_grid(
+    config: &ConversionConfig,
+    disabled: bool,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    let mut grid = Vec::new();
+    for (lossless, label) in [(false, "Lossy"), (true, "Lossless")] {
+        grid.push(FrameOption::new(
+            format!("image-webp-mode-{label}"),
+            label,
+            config.image_webp_lossless == lossless,
+            !disabled,
+            move |root, _window, cx| {
+                cx.stop_propagation();
+                if disabled {
+                    return;
+                }
+                if root.update_selected_config(|config| apply_image_webp_lossless(config, lossless))
+                {
+                    cx.notify();
+                }
+            },
+        ));
+    }
+    frame_option_field(
+        "image-webp-mode-select",
+        "WebP compression mode",
+        grid,
+        palette,
+        window,
+        cx,
+    )
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "keeps slider construction close to the existing settings slider contract"
+)]
+fn settings_image_range_field(
+    label: &'static str,
+    value_label: String,
+    value: u32,
+    min: u32,
+    max: u32,
+    lower_label: &'static str,
+    upper_label: &'static str,
+    target: SettingsImageRangeTarget,
+    disabled: bool,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    div()
+        .flex()
+        .flex_col()
+        .gap_2()
+        .child(
+            div()
+                .flex()
+                .items_end()
+                .justify_between()
+                .child(settings_field_label(label, palette))
+                .child(settings_value_badge(value_label, palette)),
+        )
+        .child(settings_image_range_slider(
+            value, min, max, disabled, target, palette, window, cx,
+        ))
+        .child(
+            div()
+                .flex()
+                .justify_between()
+                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
+                .text_color(color(palette.text_muted))
+                .child(theme::ui_text(lower_label))
+                .child(theme::ui_text(upper_label)),
+        )
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Range controls require domain limits, target, state and rendering context."
+)]
+fn settings_image_range_slider(
+    value: u32,
+    min: u32,
+    max: u32,
+    disabled: bool,
+    target: SettingsImageRangeTarget,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    let fraction = range_fraction(value, min, max);
+    let drag = SettingsImageRangeDrag { target, min, max };
+    let owner = cx.entity();
+    let decrement_owner = owner.clone();
+
+    frame_slider(
+        settings_image_range_slider_id(target),
+        settings_image_range_slider_label(target),
+        fraction,
+        disabled,
+        palette,
+        window,
+        cx,
+    )
+    .on_a11y_action(gpui::AccessibleAction::Increment, move |_, _window, cx| {
+        if disabled {
+            return;
+        }
+        owner.update(cx, move |root, cx| {
+            if let Some(value) = range_value_for_key(value, min, max, "right")
+                && root.update_selected_config(|config| {
+                    apply_settings_image_range_value(config, target, value)
+                })
+            {
+                cx.notify();
+            }
+        });
+    })
+    .on_a11y_action(gpui::AccessibleAction::Decrement, move |_, _window, cx| {
+        if disabled {
+            return;
+        }
+        decrement_owner.update(cx, move |root, cx| {
+            if let Some(value) = range_value_for_key(value, min, max, "left")
+                && root.update_selected_config(|config| {
+                    apply_settings_image_range_value(config, target, value)
+                })
+            {
+                cx.notify();
+            }
+        });
+    })
+    .when(!disabled, |slider| {
+        slider.on_drag(drag, |_drag, _position, _window, cx| {
+            cx.new(|_| SettingsImageRangeDragPreview)
+        })
+    })
+    .on_drag_move(cx.listener(
+        |root, event: &DragMoveEvent<SettingsImageRangeDrag>, window, cx| {
+            let drag = *event.drag(cx);
+            let fraction = frame_slider_fraction_from_bounds(
+                event.event.position,
+                event.bounds,
+                window.rem_size(),
+            );
+            let value = range_value_from_fraction(fraction, drag.min, drag.max);
+            let changed = root.update_selected_config(|config| {
+                apply_settings_image_range_value(config, drag.target, value)
+            });
+            if changed {
+                cx.notify();
+            }
+        },
+    ))
+    .on_key_down(
+        cx.listener(move |root, event: &gpui::KeyDownEvent, _window, cx| {
+            let Some(value) = range_value_for_key(value, min, max, event.keystroke.key.as_str())
+            else {
+                return;
+            };
+            if root.update_selected_config(|config| {
+                apply_settings_image_range_value(config, target, value)
+            }) {
+                cx.notify();
+            }
+            cx.stop_propagation();
+        }),
+    )
+    .child(settings_image_range_handle(fraction, drag, !disabled))
+}
+
+fn apply_settings_image_range_value(
+    config: &mut ConversionConfig,
+    target: SettingsImageRangeTarget,
+    value: u32,
+) -> bool {
+    match target {
+        SettingsImageRangeTarget::JpegQuality => apply_image_jpeg_quality(config, value),
+        SettingsImageRangeTarget::WebpQuality => apply_image_webp_quality(config, value),
+        SettingsImageRangeTarget::WebpCompression => apply_image_webp_compression(config, value),
+        SettingsImageRangeTarget::PngCompression => apply_image_png_compression(config, value),
+    }
+}
+
+fn settings_image_range_handle(
+    fraction: f32,
+    drag: SettingsImageRangeDrag,
+    enabled: bool,
+) -> gpui::Stateful<gpui::Div> {
+    let handle = frame_slider_handle(
+        settings_image_range_handle_id(drag.target),
+        fraction,
+        enabled,
+    );
+
+    if enabled {
+        handle.on_drag(drag, |_drag, _position, _window, cx| {
+            cx.new(|_| SettingsImageRangeDragPreview)
+        })
+    } else {
+        handle
+    }
+}
+
+const fn settings_image_range_slider_id(target: SettingsImageRangeTarget) -> &'static str {
+    match target {
+        SettingsImageRangeTarget::JpegQuality => "settings-image-jpeg-quality-slider",
+        SettingsImageRangeTarget::WebpQuality => "settings-image-webp-quality-slider",
+        SettingsImageRangeTarget::WebpCompression => "settings-image-webp-compression-slider",
+        SettingsImageRangeTarget::PngCompression => "settings-image-png-compression-slider",
+    }
+}
+
+const fn settings_image_range_slider_label(target: SettingsImageRangeTarget) -> &'static str {
+    match target {
+        SettingsImageRangeTarget::JpegQuality => "JPEG quality",
+        SettingsImageRangeTarget::WebpQuality => "WebP quality",
+        SettingsImageRangeTarget::WebpCompression => "WebP compression",
+        SettingsImageRangeTarget::PngCompression => "PNG compression",
+    }
+}
+
+const fn settings_image_range_handle_id(target: SettingsImageRangeTarget) -> &'static str {
+    match target {
+        SettingsImageRangeTarget::JpegQuality => "settings-image-jpeg-quality-handle",
+        SettingsImageRangeTarget::WebpQuality => "settings-image-webp-quality-handle",
+        SettingsImageRangeTarget::WebpCompression => "settings-image-webp-compression-handle",
+        SettingsImageRangeTarget::PngCompression => "settings-image-png-compression-handle",
+    }
+}
+
+fn settings_image_option_list(
+    options: Vec<crate::settings::ImageEncodingOption>,
+    id_prefix: &'static str,
+    label: &'static str,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+    apply: fn(&mut ConversionConfig, &str) -> bool,
+) -> gpui::Div {
+    let mut list = Vec::new();
+    for option in options {
+        let id = option.id;
+        let enabled = !option.is_disabled;
+        list.push(FrameOption::with_caption(
+            format!("{id_prefix}-{id}"),
+            option.label,
+            option.caption,
+            option.is_selected,
+            enabled,
+            move |root, _window, cx| {
+                cx.stop_propagation();
+                if !enabled {
+                    return;
+                }
+                if root.update_selected_config(|config| apply(config, id)) {
+                    cx.notify();
+                }
+            },
+        ));
+    }
+    frame_option_field(
+        format!("{id_prefix}-select"),
+        label,
+        list,
+        palette,
+        window,
+        cx,
+    )
+}

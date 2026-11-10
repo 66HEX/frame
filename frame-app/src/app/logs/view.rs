@@ -1,0 +1,669 @@
+use crate::app::accessibility::{TabFocusGroup, tab_focus_base, tab_focus_ring};
+use crate::app::accessibility::{focus_ring_base, focus_visible_ring};
+use crate::app::components::{
+    FRAME_ICON_BUTTON_SM_SIZE, FRAME_ICON_SM_SIZE, FrameIconButtonSize, FrameIconButtonVariant,
+    frame_icon_button, frame_icon_swap_button, frame_vertical_uniform_scrollbar,
+};
+use crate::app::components::{FrameStyle, FrameTabIndicator, frame_panel_header, frame_tabs_list};
+use crate::app::logs::state::{
+    LOG_LINE_HEIGHT, LOG_LINE_NUMBER_WIDTH, LOG_SCROLL_BUTTON_OFFSET, LOG_SCROLL_BUTTON_PADDING,
+    LOG_SCROLL_BUTTON_SIZE, LOG_SCROLL_ICON_SIZE, LOG_TAB_ICON_SIZE,
+};
+use crate::app::primitives::{
+    FrameSurface, button_mouse_down, color, element_id, panel_bottom_separator,
+};
+use crate::app::root::FrameRoot;
+use crate::conversion_events::{ActiveLogFile, ConversionEventState, LogLine};
+use crate::file_filters::source_kind_for_extension;
+use crate::file_queue::FileQueue;
+use crate::numeric::usize_to_f32;
+use crate::settings::SourceKind;
+use crate::{assets, theme};
+use gpui::prelude::{FluentBuilder, ParentElement, Styled};
+use gpui::{
+    ClickEvent, Context, InteractiveElement, IntoElement, ScrollStrategy, ScrollWheelEvent,
+    StatefulInteractiveElement, UniformListScrollHandle, Window, div, uniform_list,
+};
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "The logs view explicitly receives its queue, scroll state, selection, palette, and render context."
+)]
+pub(in crate::app) fn logs_view(
+    queue: &FileQueue,
+    conversion_events: &ConversionEventState,
+    scroll_handle: &UniformListScrollHandle,
+    follow_tail: bool,
+    copied_log_file_id: Option<&str>,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    let active_files = conversion_events.active_log_files(queue);
+    let selected_id = conversion_events.selected_log_file_id();
+    let selected_line_count = selected_id.map_or(0, |id| conversion_events.logs_for(id).len());
+    let selected_logs_copied =
+        selected_id.is_some_and(|id| copied_log_file_id.is_some_and(|copied| copied == id));
+
+    div()
+        .size_full()
+        .flex()
+        .flex_col()
+        .overflow_hidden()
+        .card_surface(palette)
+        .child(logs_tab_strip(
+            &active_files,
+            selected_id,
+            selected_line_count,
+            selected_logs_copied,
+            palette,
+            window,
+            cx,
+        ))
+        .child(logs_body(
+            conversion_events,
+            selected_id,
+            !active_files.is_empty(),
+            scroll_handle,
+            follow_tail,
+            palette,
+            window,
+            cx,
+        ))
+}
+
+pub(in crate::app) fn logs_tab_strip(
+    active_files: &[ActiveLogFile],
+    selected_id: Option<&str>,
+    selected_line_count: usize,
+    selected_logs_copied: bool,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    let focuses = TabFocusGroup::render(
+        "logs-tabs-focus",
+        selected_id.unwrap_or_default().into(),
+        active_files.iter().map(|file| file.id.clone()),
+        window,
+        cx,
+    );
+    let indicator = FrameTabIndicator::new("logs-tab-list", window, cx);
+    let mut tabs = frame_tabs_list(palette)
+        .when(active_files.is_empty(), |this| {
+            this.bg(color(palette.transparent)).shadow(Vec::new())
+        })
+        .id("logs-tab-list")
+        .debug_selector(|| "logs-tab-list".to_string())
+        .role(gpui::Role::TabList)
+        .aria_label("Log files")
+        .flex_initial()
+        .min_w_0()
+        .flex()
+        .items_center()
+        .overflow_x_scroll()
+        .child(indicator.background(palette));
+
+    let tab_ids = active_files
+        .iter()
+        .map(|file| file.id.clone())
+        .collect::<Vec<_>>();
+    for file in active_files {
+        tabs = tabs.child(log_tab_button(
+            file,
+            selected_id.is_some_and(|id| id == file.id),
+            &tab_ids,
+            &focuses,
+            palette,
+            &indicator,
+            cx,
+        ));
+    }
+
+    if active_files.is_empty() {
+        tabs = tabs.child(
+            div()
+                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
+                .text_color(color(palette.text_muted))
+                .child(theme::ui_text("No active processes")),
+        );
+    }
+
+    let header = frame_panel_header()
+        .justify_between()
+        .child(tabs)
+        .when_some(selected_id, |this, selected_id| {
+            this.child(logs_copy_button(
+                selected_id,
+                selected_line_count > 0,
+                selected_logs_copied,
+                palette,
+                window,
+                cx,
+            ))
+        });
+
+    header.child(panel_bottom_separator(palette))
+}
+
+pub(in crate::app) fn log_tab_button(
+    file: &ActiveLogFile,
+    selected: bool,
+    active_file_ids: &[String],
+    focuses: &TabFocusGroup,
+    palette: &'static theme::ThemePalette,
+    indicator: &FrameTabIndicator,
+    cx: &Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    let focus = focuses.handle(&file.id);
+    let click_focus = focus.clone();
+    let keyboard_focuses: Vec<_> = active_file_ids
+        .iter()
+        .map(|id| (id.clone(), focuses.handle(id)))
+        .collect();
+    let file_id = file.id.clone();
+    let key_file_id = file.id.clone();
+    let keyboard_file_ids = active_file_ids.to_vec();
+    let selector = element_id("logs-tab", &file.id);
+    let button = div()
+        .id(element_id("logs-tab", &file.id))
+        .debug_selector(move || selector)
+        .role(gpui::Role::Tab)
+        .aria_label(file.name.clone())
+        .aria_selected(selected)
+        .track_focus(&focus)
+        .tab_stop(selected)
+        .map(|element| tab_focus_base(element, palette))
+        .focus_visible_style(move |style| tab_focus_ring(style, palette))
+        .transitions(|t| {
+            t.ring(crate::app::motion::interaction_motion())
+                .outline_color(crate::app::motion::interaction_motion())
+                .text_color(crate::app::motion::interaction_motion())
+                .border_color(crate::app::motion::interaction_motion())
+        })
+        .h(theme::ui_rem(theme::metrics::TAB_HEIGHT))
+        .px(theme::ui_rem(6.0))
+        .tab_surface(selected, palette)
+        .flex_none()
+        .flex()
+        .items_center()
+        .gap(theme::ui_rem(theme::metrics::TAB_ICON_GAP))
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
+        .font_weight(theme::TEXT_WEIGHT_MEDIUM)
+        .hover_style(move |style| {
+            style
+                .cursor_default()
+                .text_color(color(palette.text_primary))
+        })
+        .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
+            click_focus.focus(window, cx);
+            if root.select_log_file_for_logs_view(&file_id) {
+                cx.notify();
+            }
+            cx.stop_propagation();
+        }))
+        .on_key_down(
+            cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+                let Some(next_id) = log_tab_id_for_key(
+                    key_file_id.as_str(),
+                    &keyboard_file_ids,
+                    event.keystroke.key.as_str(),
+                ) else {
+                    return;
+                };
+                if let Some((_, focus)) = keyboard_focuses.iter().find(|(id, _)| id == next_id) {
+                    focus.focus(window, cx);
+                }
+                if root.select_log_file_for_logs_view(next_id) {
+                    cx.notify();
+                }
+                cx.stop_propagation();
+            }),
+        )
+        .child(
+            gpui::svg()
+                .path(log_file_icon(&file.original_format))
+                .size(theme::ui_rem(LOG_TAB_ICON_SIZE))
+                .flex_none(),
+        )
+        .child(file.name.clone());
+
+    indicator
+        .track(button, selected.then(|| file.id.clone()))
+        .on_mouse_down(gpui::MouseButton::Left, |_, window, cx| {
+            button_mouse_down(true, window, cx);
+        })
+}
+
+fn log_file_icon(extension: &str) -> &'static str {
+    match source_kind_for_extension(extension) {
+        Some(SourceKind::Video) => assets::ICON_FILE_VIDEO,
+        Some(SourceKind::Audio) => assets::ICON_MUSIC,
+        Some(SourceKind::Image) => assets::ICON_FILE_IMAGE,
+        None => assets::ICON_FILE,
+    }
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "The logs body explicitly receives filtering, scrolling, palette, and render context."
+)]
+pub(in crate::app) fn logs_body(
+    conversion_events: &ConversionEventState,
+    selected_id: Option<&str>,
+    has_active_files: bool,
+    scroll_handle: &UniformListScrollHandle,
+    follow_tail: bool,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> impl IntoElement {
+    let body = div()
+        .id("logs-body")
+        .p(gpui::px(theme::metrics::FOCUS_WIDTH))
+        .relative()
+        .flex_1()
+        .flex()
+        .flex_col()
+        .overflow_hidden();
+
+    if !has_active_files {
+        return body.child(logs_empty_state(
+            "Select a task to view console output",
+            palette,
+        ));
+    }
+
+    let Some(selected_id) = selected_id else {
+        return body.child(logs_empty_state(
+            "Select a task to view console output",
+            palette,
+        ));
+    };
+
+    let line_count = conversion_events.logs_for(selected_id).len();
+    if line_count == 0 {
+        return body.child(logs_empty_state(
+            "Process started, waiting for output...",
+            palette,
+        ));
+    }
+
+    let body = body.child(log_lines_list(
+        selected_id,
+        line_count,
+        scroll_handle,
+        palette,
+        cx,
+    ));
+    if follow_tail {
+        body
+    } else {
+        body.child(log_scroll_to_bottom_button(palette, window, cx))
+    }
+}
+
+pub(in crate::app) fn log_lines_list(
+    selected_id: &str,
+    line_count: usize,
+    scroll_handle: &UniformListScrollHandle,
+    palette: &'static theme::ThemePalette,
+    cx: &Context<FrameRoot>,
+) -> impl IntoElement {
+    let selected_id = selected_id.to_string();
+    let list_id = element_id("logs-line-list", &selected_id);
+    let key_scroll_handle = scroll_handle.clone();
+    let processor_selected_id = selected_id.clone();
+
+    let list = uniform_list(
+        list_id,
+        line_count,
+        cx.processor(move |root, range, _window, _cx| {
+            root.conversion_events
+                .log_line_window_for(&processor_selected_id, range)
+                .into_iter()
+                .map(|line| log_line_row(line, palette))
+                .collect()
+        }),
+    )
+    .track_scroll(scroll_handle)
+    .on_scroll_wheel(cx.listener(|_root, _event: &ScrollWheelEvent, window, cx| {
+        cx.defer_in(window, |root, _window, cx| {
+            if root.sync_logs_follow_tail_after_user_scroll() {
+                cx.notify();
+            }
+        });
+        cx.notify();
+    }))
+    .size_full()
+    .p(theme::ui_rem(2.0))
+    .pr(theme::ui_rem(crate::app::components::FRAME_SCROLLBAR_WIDTH))
+    .text_color(color(palette.text_primary))
+    .line_height(theme::ui_rem(LOG_LINE_HEIGHT));
+
+    div()
+        .relative()
+        .id(element_id("logs-scroll-area", &selected_id))
+        .debug_selector(|| "logs-output".to_string())
+        .role(gpui::Role::Log)
+        .aria_label("Conversion log output")
+        .focusable()
+        .tab_stop(true)
+        .map(|element| focus_ring_base(element, palette))
+        .focus_visible_style(move |style| focus_visible_ring(style, palette))
+        .size_full()
+        .on_key_down(
+            cx.listener(move |root, event: &gpui::KeyDownEvent, _window, cx| {
+                let Some(target) = log_scroll_target_for_key(
+                    root.logs_keyboard_scroll_top,
+                    line_count,
+                    event.keystroke.key.as_str(),
+                ) else {
+                    return;
+                };
+                key_scroll_handle.scroll_to_item_strict(target, ScrollStrategy::Top);
+                root.logs_keyboard_scroll_top = target;
+                root.logs_follow_tail = target + 1 >= line_count;
+                cx.stop_propagation();
+                cx.notify();
+            }),
+        )
+        .child(list)
+        .child(frame_vertical_uniform_scrollbar(
+            "logs-line-list-scrollbar",
+            scroll_handle,
+            usize_to_f32(line_count) * LOG_LINE_HEIGHT,
+            palette,
+        ))
+}
+
+fn log_tab_id_for_key<'a>(
+    current_id: &str,
+    active_file_ids: &'a [String],
+    key: &str,
+) -> Option<&'a str> {
+    let current_index = active_file_ids.iter().position(|id| id == current_id)?;
+    match key {
+        "left" => Some(if current_index == 0 {
+            active_file_ids.last()?.as_str()
+        } else {
+            active_file_ids[current_index - 1].as_str()
+        }),
+        "right" => Some(active_file_ids[(current_index + 1) % active_file_ids.len()].as_str()),
+        "home" => active_file_ids.first().map(String::as_str),
+        "end" => active_file_ids.last().map(String::as_str),
+        _ => None,
+    }
+}
+
+fn log_scroll_target_for_key(current_top: usize, line_count: usize, key: &str) -> Option<usize> {
+    if line_count == 0 {
+        return None;
+    }
+    match key {
+        "pageup" => Some(current_top.saturating_sub(10)),
+        "pagedown" => Some((current_top + 10).min(line_count - 1)),
+        "home" => Some(0),
+        "end" => Some(line_count - 1),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod keyboard_tests {
+
+    use crate::app::logs::view::{log_scroll_target_for_key, log_tab_id_for_key};
+
+    fn log_ids() -> Vec<String> {
+        vec![
+            "first".to_string(),
+            "second".to_string(),
+            "third".to_string(),
+        ]
+    }
+
+    #[test]
+    fn log_tab_id_for_key_wraps_at_both_ends() {
+        let ids = log_ids();
+
+        for (current, key, expected) in [
+            ("first", "left", Some("third")),
+            ("third", "right", Some("first")),
+        ] {
+            assert_eq!(
+                log_tab_id_for_key(current, &ids, key),
+                expected,
+                "tab navigation failed for current={current:?}, key={key:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn log_scroll_target_for_key_handles_the_navigation_matrix() {
+        for (key, expected) in [
+            ("pagedown", Some(13)),
+            ("pageup", Some(0)),
+            ("end", Some(29)),
+        ] {
+            assert_eq!(
+                log_scroll_target_for_key(3, 30, key),
+                expected,
+                "scroll navigation failed for key={key:?}"
+            );
+        }
+    }
+}
+
+pub(in crate::app) fn log_line_row(
+    line: LogLine,
+    palette: &'static theme::ThemePalette,
+) -> impl IntoElement {
+    let tone = log_line_tone(&line.text);
+    let row_group = format!("logs-line-{}", line.index);
+
+    div()
+        .id(row_group.clone())
+        .group(row_group.clone())
+        .min_h(theme::ui_rem(LOG_LINE_HEIGHT))
+        .w_full()
+        .flex()
+        .items_center()
+        .rounded(theme::ui_rem(theme::RADIUS_XS))
+        .overflow_hidden()
+        .px_1()
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
+        .line_height(theme::ui_rem(LOG_LINE_HEIGHT))
+        .hover_style(|style| style.bg(color(palette.fill_subtle)))
+        .child(
+            div()
+                .flex_none()
+                .w(theme::ui_rem(LOG_LINE_NUMBER_WIDTH))
+                .mr(theme::ui_rem(12.0))
+                .text_right()
+                .text_color(color(palette.text_muted))
+                .font_features(assets::frame_tabular_number_font_features())
+                .group_hover_style(row_group.clone(), |style| {
+                    style.text_color(color(palette.text_muted))
+                })
+                .child(line.index.to_string()),
+        )
+        .child(
+            div()
+                .flex_1()
+                .overflow_hidden()
+                .whitespace_nowrap()
+                .text_color(color(log_line_tone_color(tone, palette)))
+                .group_hover_style(row_group, move |style| {
+                    style.text_color(color(log_line_hover_tone_color(tone, palette)))
+                })
+                .child(line.text),
+        )
+}
+
+pub(in crate::app) fn log_scroll_to_bottom_button(
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> impl IntoElement {
+    div()
+        .absolute()
+        .right(theme::ui_rem(LOG_SCROLL_BUTTON_OFFSET))
+        .bottom(theme::ui_rem(LOG_SCROLL_BUTTON_OFFSET))
+        .rounded(theme::ui_rem(theme::RADIUS_MD + LOG_SCROLL_BUTTON_PADDING))
+        .bg(theme::shadows::surface_fill(
+            palette.surface_elevated,
+            palette,
+        ))
+        .p(theme::ui_rem(LOG_SCROLL_BUTTON_PADDING))
+        .shadow(theme::shadows::FLOATING.shadows())
+        .child(
+            frame_icon_button(
+                "logs-scroll-to-bottom",
+                assets::ICON_ARROW_DOWN,
+                "Scroll logs to bottom",
+                FrameIconButtonVariant::Ghost,
+                true,
+                FrameIconButtonSize {
+                    button: LOG_SCROLL_BUTTON_SIZE,
+                    icon: LOG_SCROLL_ICON_SIZE,
+                },
+                palette,
+                window,
+                cx,
+            )
+            .on_click(cx.listener(|root, _: &ClickEvent, _window, cx| {
+                cx.stop_propagation();
+                if root.scroll_selected_log_to_bottom() {
+                    cx.notify();
+                }
+            })),
+        )
+}
+
+pub(in crate::app) fn logs_copy_button(
+    file_id: &str,
+    enabled: bool,
+    copied: bool,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> impl IntoElement {
+    let file_id = file_id.to_string();
+    frame_icon_swap_button(
+        "logs-copy",
+        assets::ICON_COPY,
+        assets::ICON_CHECK,
+        copied,
+        color(palette.success),
+        if copied { "Logs copied" } else { "Copy logs" },
+        FrameIconButtonVariant::Ghost,
+        enabled,
+        FrameIconButtonSize {
+            button: FRAME_ICON_BUTTON_SM_SIZE,
+            icon: FRAME_ICON_SM_SIZE,
+        },
+        palette,
+        window,
+        cx,
+    )
+    .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
+        cx.stop_propagation();
+        if enabled && root.copy_log_lines_to_clipboard(&file_id, cx) {
+            cx.notify();
+        }
+    }))
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::app) enum LogLineTone {
+    Default,
+    Warning,
+    Error,
+}
+
+#[must_use]
+pub(in crate::app) fn log_line_tone(text: &str) -> LogLineTone {
+    let trimmed = text.trim_start();
+    let lower = trimmed.to_ascii_lowercase();
+
+    if lower.contains("[error]")
+        || lower.contains(" error")
+        || lower.starts_with("error")
+        || lower.contains("failed")
+        || lower.contains("invalid")
+        || lower.contains("panic")
+    {
+        return LogLineTone::Error;
+    }
+
+    if lower.contains("[warning]")
+        || lower.contains(" warning")
+        || lower.starts_with("warning")
+        || lower.contains("deprecated")
+    {
+        return LogLineTone::Warning;
+    }
+
+    LogLineTone::Default
+}
+
+#[must_use]
+pub(in crate::app) const fn log_line_tone_color(
+    tone: LogLineTone,
+    palette: &theme::ThemePalette,
+) -> theme::RgbaToken {
+    match tone {
+        LogLineTone::Default => palette.text_primary,
+        LogLineTone::Warning => palette.warning,
+        LogLineTone::Error => palette.danger,
+    }
+}
+
+#[must_use]
+pub(in crate::app) const fn log_line_hover_tone_color(
+    tone: LogLineTone,
+    palette: &theme::ThemePalette,
+) -> theme::RgbaToken {
+    match tone {
+        LogLineTone::Default => palette.text_primary,
+        LogLineTone::Warning => palette.warning,
+        LogLineTone::Error => palette.danger,
+    }
+}
+
+pub(in crate::app) fn logs_empty_state(
+    message: &'static str,
+    palette: &'static theme::ThemePalette,
+) -> gpui::Div {
+    div()
+        .size_full()
+        .flex()
+        .items_center()
+        .justify_center()
+        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
+        .text_color(color(palette.text_muted))
+        .child(theme::ui_text(message))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn log_line_tone_marks_frame_error_lines() {
+        assert_eq!(log_line_tone("[ERROR] ffmpeg failed"), LogLineTone::Error);
+    }
+
+    #[test]
+    fn log_line_tone_marks_ffmpeg_warnings() {
+        assert_eq!(
+            log_line_tone("  warning: deprecated pixel format"),
+            LogLineTone::Warning
+        );
+    }
+
+    #[test]
+    fn log_line_tone_keeps_ffmpeg_preamble_as_default_text() {
+        assert_eq!(log_line_tone("ffmpeg version 7.1"), LogLineTone::Default);
+    }
+}

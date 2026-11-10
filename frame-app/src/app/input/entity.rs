@@ -1,9 +1,11 @@
-use super::{
-    Bounds, Context, EntityInputHandler, FrameRoot, FrameTextInputMetrics, Pixels, Point, Range,
-    UTF16Selection, Window, point, px,
-    text::{clamp_text_offset, text_offset_to_utf16, text_range_from_utf16, text_range_to_utf16},
+use crate::app::input::runtime::FrameTextInputMetrics;
+use crate::app::input::text::{
+    clamp_text_offset, text_offset_to_utf16, text_range_from_utf16, text_range_to_utf16,
 };
-use super::{text_line_closest_index_for_x, text_line_x_for_index};
+use crate::app::input::{text_line_closest_index_for_x, text_line_x_for_index};
+use crate::app::root::FrameRoot;
+use gpui::{Bounds, Context, EntityInputHandler, Pixels, Point, UTF16Selection, Window, point, px};
+use std::ops::Range;
 
 impl EntityInputHandler for FrameRoot {
     fn text_for_range(

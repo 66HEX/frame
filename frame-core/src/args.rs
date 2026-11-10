@@ -1,5 +1,14 @@
+use crate::trim::{OutputTrim, SubtitleTrimPlan};
 use std::{collections::HashSet, path::Path};
 
+mod alac;
+pub use alac::{AlacCopyObserver, CopyAudioOutput, build_alac_copy_observer};
+
+use crate::audio_rules::{
+    AudioStreamCopySource, audio_stream_copy_error_with_source, audio_track_count_error,
+    effective_audio_channels, mp3_requires_mp4_resampling, opus_encoding_error,
+    stereo_width_supports_channels,
+};
 use crate::codec::{
     add_audio_codec_args, add_fps_args, add_video_codec_args, audio_codec_supports_vbr,
     subtitle_output_codec,
@@ -9,23 +18,43 @@ use crate::container::{
 };
 use crate::error::ConversionError;
 use crate::filters::{
-    build_audio_filters, build_encode_overlay_filter_complex, build_encode_video_filters,
-    build_overlay_filter_complex, build_video_filters, has_overlay,
+    FrameRateEofAction, VisualFilterContext, VisualFilterProfile, build_audio_filters,
+    build_visual_filter_chain_with_context, build_visual_filter_complex_with_context, has_overlay,
 };
+use crate::input_map::{embedded_subtitle_action, resolve_reencode_main_input_map};
 use crate::media_filters::validate_media_filters;
 use crate::media_rules::{
-    all_containers, container_supports_audio, container_supports_subtitles, is_audio_codec_allowed,
-    is_audio_stream_codec_allowed, is_image_container, is_video_codec_allowed,
-    is_video_only_container, is_video_pixel_format_allowed, is_video_stream_codec_allowed,
+    SubtitleStreamAction as SubtitleAction, all_containers, container_supports_audio,
+    container_supports_subtitles, is_audio_codec_allowed, is_image_container,
+    is_video_codec_allowed, is_video_only_container, is_video_pixel_format_allowed,
+    is_video_stream_codec_allowed,
 };
 use crate::types::{
-    AudioTrack, ConversionConfig, ExternalSubtitleTrack, MetadataConfig, MetadataMode,
-    ProbeMetadata, SubtitleTrack, VOLUME_EPSILON,
+    AudioTrack, ConversionConfig, ExternalSubtitleTrack, MIN_GIF_COLORS, MetadataConfig,
+    MetadataMode, ProbeMetadata, SubtitleTrack, VOLUME_EPSILON,
 };
-use crate::utils::{get_hwaccel_args, is_audio_only_container, parse_time};
+use crate::utils::{get_hwaccel_args, is_audio_only_container};
 
 fn is_copy_mode(config: &ConversionConfig) -> bool {
     config.processing_mode == "copy"
+}
+
+/// Returns the configured video encoder only when this task actually uses it.
+#[must_use]
+pub fn effective_video_encoder<'a>(
+    config: &'a ConversionConfig,
+    probe: &ProbeMetadata,
+) -> Option<&'a str> {
+    if is_copy_mode(config)
+        || is_audio_only_container(&config.container)
+        || is_image_container(&config.container)
+        || config.container.eq_ignore_ascii_case("gif")
+        || (probe.video_stream_index.is_none() && probe.video_codec.is_none())
+    {
+        None
+    } else {
+        Some(&config.video_codec)
+    }
 }
 
 fn has_custom_pixel_format(config: &ConversionConfig) -> bool {
@@ -37,8 +66,14 @@ fn collect_selected_audio_tracks<'a>(
     config: &ConversionConfig,
     probe: &'a ProbeMetadata,
 ) -> Result<Vec<&'a AudioTrack>, ConversionError> {
-    config
-        .selected_audio_tracks
+    collect_audio_tracks(&config.selected_audio_tracks, probe)
+}
+
+fn collect_audio_tracks<'a>(
+    indices: &[u32],
+    probe: &'a ProbeMetadata,
+) -> Result<Vec<&'a AudioTrack>, ConversionError> {
+    indices
         .iter()
         .map(|index| {
             probe
@@ -54,12 +89,86 @@ fn collect_selected_audio_tracks<'a>(
         .collect()
 }
 
+fn validate_audio_track_count(config: &ConversionConfig) -> Result<(), ConversionError> {
+    if let Some(reason) =
+        audio_track_count_error(&config.container, config.selected_audio_tracks.len())
+    {
+        return Err(ConversionError::InvalidInput(reason));
+    }
+    Ok(())
+}
+
+fn validate_audio_encoding_tracks(
+    config: &ConversionConfig,
+    probe: &ProbeMetadata,
+) -> Result<(), ConversionError> {
+    validate_audio_track_count(config)?;
+    if is_copy_mode(config) || !container_supports_audio(&config.container) {
+        return Ok(());
+    }
+    for track in collect_selected_audio_tracks(config, probe)? {
+        let source_channels = track.channels.parse::<u16>().ok();
+        if config.audio_codec == "libopus" {
+            let channels = effective_audio_channels(&config.audio_channels, source_channels);
+            let layout = (config.audio_channels == "original")
+                .then_some(track.channel_layout.as_deref())
+                .flatten();
+            if let Some(reason) = opus_encoding_error(&config.audio_bitrate, channels, layout) {
+                return Err(ConversionError::InvalidInput(format!(
+                    "Audio track #{}: {reason}",
+                    track.index
+                )));
+            }
+        }
+        let width = config.audio_filters.stereo_width;
+        if width.enabled
+            && width.value != 100
+            && !stereo_width_supports_channels(&config.audio_channels, source_channels)
+        {
+            return Err(ConversionError::InvalidInput(format!(
+                "Stereo width needs two channels in every selected audio track. Track #{} is not stereo; choose Stereo in Channels or turn off Stereo width.",
+                track.index
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_audio_copy_track(
+    container: &str,
+    probe: &ProbeMetadata,
+    track: &AudioTrack,
+) -> Result<(), ConversionError> {
+    if let Some(reason) = audio_stream_copy_error_with_source(
+        container,
+        &track.codec,
+        track.sample_rate.as_deref(),
+        AudioStreamCopySource {
+            format: probe.source_format.as_deref(),
+            channels: track.channels.parse().ok(),
+            codec_tag: track.codec_tag,
+        },
+    ) {
+        return Err(ConversionError::InvalidInput(format!(
+            "Source audio track #{} ('{}') cannot be copied to '{}': {reason}",
+            track.index, track.codec, container
+        )));
+    }
+    Ok(())
+}
+
 fn collect_selected_subtitle_tracks<'a>(
     config: &ConversionConfig,
     probe: &'a ProbeMetadata,
 ) -> Result<Vec<&'a SubtitleTrack>, ConversionError> {
-    config
-        .selected_subtitle_tracks
+    collect_subtitle_tracks(&config.selected_subtitle_tracks, probe)
+}
+
+fn collect_subtitle_tracks<'a>(
+    indices: &[u32],
+    probe: &'a ProbeMetadata,
+) -> Result<Vec<&'a SubtitleTrack>, ConversionError> {
+    indices
         .iter()
         .map(|index| {
             probe
@@ -73,49 +182,6 @@ fn collect_selected_subtitle_tracks<'a>(
                 })
         })
         .collect()
-}
-
-fn collect_reencode_subtitle_tracks<'a>(
-    config: &ConversionConfig,
-    probe: &'a ProbeMetadata,
-) -> Result<Vec<&'a SubtitleTrack>, ConversionError> {
-    let tracks = collect_selected_subtitle_tracks(config, probe)?;
-    for track in &tracks {
-        if let Err(reason) = embedded_subtitle_action(&config.container, &track.codec) {
-            return Err(ConversionError::InvalidInput(format!(
-                "Subtitle codec '{}' from source track #{} cannot be represented by '{}': {reason}",
-                track.codec, track.index, config.container,
-            )));
-        }
-    }
-
-    Ok(tracks)
-}
-
-fn is_text_subtitle_codec(codec: &str) -> bool {
-    matches!(
-        codec.trim().to_ascii_lowercase().as_str(),
-        "text"
-            | "ssa"
-            | "mov_text"
-            | "srt"
-            | "microdvd"
-            | "eia_608"
-            | "jacosub"
-            | "sami"
-            | "realtext"
-            | "stl"
-            | "subviewer1"
-            | "subviewer"
-            | "subrip"
-            | "webvtt"
-            | "mpl2"
-            | "vplayer"
-            | "pjs"
-            | "ass"
-            | "hdmv_text_subtitle"
-            | "ttml"
-    )
 }
 
 fn validate_external_subtitle_tracks(config: &ConversionConfig) -> Result<(), ConversionError> {
@@ -167,9 +233,10 @@ fn validate_external_subtitle_tracks(config: &ConversionConfig) -> Result<(), Co
         }
 
         for (field, value) in [("language", &track.language), ("title", &track.title)] {
-            if value
-                .as_deref()
-                .is_some_and(|value| value.chars().any(char::is_control))
+            if config.metadata.mode == MetadataMode::Preserve
+                && value
+                    .as_deref()
+                    .is_some_and(|value| value.chars().any(char::is_control))
             {
                 return Err(ConversionError::InvalidInput(format!(
                     "External subtitle {field} contains control characters: {path}"
@@ -186,44 +253,6 @@ fn validate_external_subtitle_tracks(config: &ConversionConfig) -> Result<(), Co
     }
 
     Ok(())
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum SubtitleAction {
-    Copy,
-    Encode(&'static str),
-}
-
-fn embedded_subtitle_action(container: &str, codec: &str) -> Result<SubtitleAction, &'static str> {
-    let codec = codec.trim().to_ascii_lowercase();
-    if crate::media_rules::is_subtitle_codec_allowed(container, &codec) {
-        return Ok(SubtitleAction::Copy);
-    }
-    if let Some(profile) = transport_stream_profile(container) {
-        return match profile {
-            TransportStreamProfile::MpegTs188 => match codec.as_str() {
-                "dvb_subtitle" | "dvb_teletext" | "arib_caption" => Ok(SubtitleAction::Copy),
-                "hdmv_pgs_subtitle" | "dvd_subtitle" => Ok(SubtitleAction::Encode("dvbsub")),
-                _ => Err(
-                    "M2T accepts DVB/teletext/ARIB subtitles; bitmap PGS/DVDSub can be converted to DVB",
-                ),
-            },
-            TransportStreamProfile::M2ts192 => match codec.as_str() {
-                "hdmv_pgs_subtitle" | "hdmv_text_subtitle" => Ok(SubtitleAction::Copy),
-                _ => Err("MTS/M2TS accepts existing PGS or HDMV text subtitle streams"),
-            },
-        };
-    }
-
-    if container.eq_ignore_ascii_case("mkv") {
-        return Ok(SubtitleAction::Copy);
-    }
-    if is_text_subtitle_codec(&codec)
-        && let Some(output_codec) = subtitle_output_codec(container)
-    {
-        return Ok(SubtitleAction::Encode(output_codec));
-    }
-    Err("subtitle codec cannot be represented by the selected container")
 }
 
 fn external_subtitle_action(
@@ -256,6 +285,7 @@ fn external_subtitle_action(
 fn add_subtitle_output_actions(
     args: &mut Vec<String>,
     container: &str,
+    preserve_text_metadata: bool,
     embedded: &[&SubtitleTrack],
     external: &[ExternalSubtitleTrack],
 ) -> Result<(), ConversionError> {
@@ -267,7 +297,8 @@ fn add_subtitle_output_actions(
             ))
         })?;
         add_subtitle_action_arg(args, output_index, action);
-        if transport_stream_profile(container) != Some(TransportStreamProfile::M2ts192)
+        if preserve_text_metadata
+            && transport_stream_profile(container) != Some(TransportStreamProfile::M2ts192)
             && let Some(language) = track
                 .language
                 .as_deref()
@@ -277,7 +308,8 @@ fn add_subtitle_output_actions(
             args.push(format!("-metadata:s:s:{output_index}"));
             args.push(format!("language={language}"));
         }
-        if !is_transport_stream_container(container)
+        if preserve_text_metadata
+            && !is_transport_stream_container(container)
             && let Some(label) = track
                 .label
                 .as_deref()
@@ -311,6 +343,27 @@ fn add_subtitle_action_arg(args: &mut Vec<String>, output_index: usize, action: 
     );
 }
 
+fn add_audio_title_metadata(
+    args: &mut Vec<String>,
+    config: &ConversionConfig,
+    tracks: &[&AudioTrack],
+) {
+    if config.metadata.mode != MetadataMode::Preserve
+        || !(config.container.eq_ignore_ascii_case("mp4")
+            || config.container.eq_ignore_ascii_case("mov"))
+    {
+        return;
+    }
+    for (output_index, track) in tracks.iter().enumerate() {
+        if let Some(title) = &track.metadata_title {
+            args.extend([
+                format!("-metadata:s:a:{output_index}"),
+                format!("title={title}"),
+            ]);
+        }
+    }
+}
+
 fn add_track_maps<T>(args: &mut Vec<String>, tracks: &[&T], index: impl Fn(&T) -> u32) {
     for track in tracks {
         args.push("-map".to_string());
@@ -318,17 +371,13 @@ fn add_track_maps<T>(args: &mut Vec<String>, tracks: &[&T], index: impl Fn(&T) -
     }
 }
 
-fn add_external_subtitle_inputs(args: &mut Vec<String>, config: &ConversionConfig) {
+fn add_external_subtitle_inputs(
+    args: &mut Vec<String>,
+    config: &ConversionConfig,
+    trim: &OutputTrim,
+) {
     for track in &config.external_subtitle_tracks {
-        if let Some(start) = config
-            .start_time
-            .as_deref()
-            .map(str::trim)
-            .filter(|start| !start.is_empty())
-        {
-            args.push("-ss".to_string());
-            args.push(start.to_string());
-        }
+        trim.append_input_args(args);
         args.push("-i".to_string());
         args.push(track.path.clone());
     }
@@ -359,7 +408,13 @@ fn add_external_subtitle_output_args(
             args.push(format!("-c:s:{output_index}"));
             args.push(codec.to_string());
         }
-        add_external_subtitle_metadata(args, track, output_index, &config.container);
+        add_external_subtitle_metadata(
+            args,
+            track,
+            output_index,
+            &config.container,
+            config.metadata.mode == MetadataMode::Preserve,
+        );
     }
 }
 
@@ -368,19 +423,22 @@ fn add_external_subtitle_metadata(
     track: &ExternalSubtitleTrack,
     output_index: usize,
     container: &str,
+    preserve_text_metadata: bool,
 ) {
     let transport_profile = transport_stream_profile(container);
-    if let Some(language) = track
-        .language
-        .as_deref()
-        .map(str::trim)
-        .filter(|v| !v.is_empty())
+    if preserve_text_metadata
+        && let Some(language) = track
+            .language
+            .as_deref()
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
         && transport_profile != Some(TransportStreamProfile::M2ts192)
     {
         args.push(format!("-metadata:s:s:{output_index}"));
         args.push(format!("language={language}"));
     }
-    if transport_profile.is_none()
+    if preserve_text_metadata
+        && transport_profile.is_none()
         && let Some(title) = track
             .title
             .as_deref()
@@ -421,6 +479,7 @@ pub fn validate_stream_copy_compatibility(
     if !is_copy_mode(config) {
         return Ok(());
     }
+    validate_audio_track_count(config)?;
 
     let is_audio_only = is_audio_only_container(&config.container);
 
@@ -432,12 +491,7 @@ pub fn validate_stream_copy_compatibility(
             ));
         }
         for track in selected_audio {
-            if !is_audio_stream_codec_allowed(&config.container, &track.codec) {
-                return Err(ConversionError::InvalidInput(format!(
-                    "Audio codec '{}' from source track #{} is incompatible with container '{}'",
-                    track.codec, track.index, config.container
-                )));
-            }
+            validate_audio_copy_track(&config.container, probe, track)?;
         }
         return Ok(());
     }
@@ -456,12 +510,7 @@ pub fn validate_stream_copy_compatibility(
 
     if container_supports_audio(&config.container) {
         for track in collect_selected_audio_tracks(config, probe)? {
-            if !is_audio_stream_codec_allowed(&config.container, &track.codec) {
-                return Err(ConversionError::InvalidInput(format!(
-                    "Audio codec '{}' from source track #{} is incompatible with container '{}'",
-                    track.codec, track.index, config.container
-                )));
-            }
+            validate_audio_copy_track(&config.container, probe, track)?;
         }
     }
 
@@ -479,10 +528,6 @@ pub fn validate_stream_copy_compatibility(
     Ok(())
 }
 
-#[expect(
-    clippy::too_many_lines,
-    reason = "FFmpeg command assembly stays in one place to keep ordering guarantees explicit"
-)]
 /// Builds probe-aware `FFmpeg` arguments for one conversion.
 ///
 /// # Errors
@@ -495,19 +540,46 @@ pub fn build_ffmpeg_args(
     config: &ConversionConfig,
     probe: &ProbeMetadata,
 ) -> Result<Vec<String>, ConversionError> {
+    build_ffmpeg_args_with_gif_policy(input, output, config, probe, GifFramePolicy::Ordinary)
+}
+
+/// A request-local GIF decision. It is never stored in conversion settings.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum GifFramePolicy {
+    #[default]
+    Ordinary,
+    ConfirmedMinimumFrame,
+}
+
+/// Builds export arguments with an independently verified minimum-frame policy.
+///
+/// # Errors
+/// Returns the same validation errors as [`build_ffmpeg_args`].
+#[expect(
+    clippy::too_many_lines,
+    reason = "FFmpeg command assembly stays in one place to keep ordering guarantees explicit"
+)]
+pub fn build_ffmpeg_args_with_gif_policy(
+    input: &str,
+    output: &str,
+    config: &ConversionConfig,
+    probe: &ProbeMetadata,
+    gif_policy: GifFramePolicy,
+) -> Result<Vec<String>, ConversionError> {
+    validate_audio_encoding_tracks(config, probe)?;
+    let trim = OutputTrim::from_config(config)?;
+    let subtitle_trim = SubtitleTrimPlan::for_window(config, &trim);
+    let mut filter_context = source_filter_context(probe);
     let mut args = Vec::new();
 
     // Hardware decode acceleration (must be before -i)
-    if config.hw_decode {
-        args.extend(get_hwaccel_args(&config.video_codec));
+    if config.hw_decode
+        && let Some(encoder) = effective_video_encoder(config, probe)
+    {
+        args.extend(get_hwaccel_args(encoder));
     }
 
-    if let Some(start) = &config.start_time
-        && !start.is_empty()
-    {
-        args.push("-ss".to_string());
-        args.push(start.clone());
-    }
+    trim.append_input_args(&mut args);
 
     args.push("-i".to_string());
     args.push(input.to_string());
@@ -520,29 +592,9 @@ pub fn build_ffmpeg_args(
     }
 
     let first_external_subtitle_input = 1 + usize::from(has_overlay(config));
-    add_external_subtitle_inputs(&mut args, config);
+    add_external_subtitle_inputs(&mut args, config, &trim);
 
-    if let Some(end_str) = &config.end_time
-        && !end_str.is_empty()
-    {
-        if let Some(start_str) = &config.start_time {
-            if start_str.is_empty() {
-                args.push("-to".to_string());
-                args.push(end_str.clone());
-            } else if let (Some(start_t), Some(end_t)) =
-                (parse_time(start_str), parse_time(end_str))
-            {
-                let duration = end_t - start_t;
-                if duration > 0.0 {
-                    args.push("-t".to_string());
-                    args.push(format!("{duration:.3}"));
-                }
-            }
-        } else {
-            args.push("-to".to_string());
-            args.push(end_str.clone());
-        }
-    }
+    trim.append_output_args(&mut args);
 
     add_container_metadata_flags(&mut args, config, probe);
 
@@ -566,6 +618,24 @@ pub fn build_ffmpeg_args(
         if container_supports_audio(&config.container) {
             let audio_tracks = collect_selected_audio_tracks(config, probe)?;
             add_track_maps(&mut args, &audio_tracks, |track| track.index);
+            add_audio_title_metadata(&mut args, config, &audio_tracks);
+            for (output_index, track) in audio_tracks.iter().enumerate() {
+                if config.container.eq_ignore_ascii_case("mov") && track.codec == "g723_1" {
+                    // G.723.1 has 240 samples per packet. Demuxed streams can
+                    // lose this value, causing MOV's edit list to omit the tail.
+                    args.extend([format!("-frame_size:a:{output_index}"), "240".to_string()]);
+                }
+                if config.container.eq_ignore_ascii_case("mkv") && track.codec == "dfpwm" {
+                    // Demuxers can omit the keyframe flag for DFPWM packets;
+                    // otherwise stream copy silently emits an empty track.
+                    args.push(format!("-copyinkf:a:{output_index}"));
+                }
+                if let Some(tag) =
+                    crate::media_rules::audio_stream_copy_tag(&config.container, &track.codec)
+                {
+                    args.extend([format!("-tag:a:{output_index}"), tag.to_string()]);
+                }
+            }
             if audio_tracks.is_empty() {
                 args.push("-an".to_string());
             }
@@ -581,19 +651,57 @@ pub fn build_ffmpeg_args(
             add_subtitle_output_actions(
                 &mut args,
                 &config.container,
+                config.metadata.mode == MetadataMode::Preserve,
                 &subtitle_tracks,
                 &config.external_subtitle_tracks,
             )?;
             add_external_subtitle_output_args(&mut args, config, subtitle_tracks.len(), false);
+            if let Some(plan) = &subtitle_trim {
+                plan.append_args(&mut args);
+            }
         } else {
             args.push("-c".to_string());
             args.push("copy".to_string());
         }
         args.push("-dn".to_string());
+        if config.container.eq_ignore_ascii_case("mkv")
+            && probe.video_codec.as_deref() == Some("rawvideo")
+        {
+            // Matroska needs its VFW representation for untagged raw RGB.
+            // This option also preserves the already supported tagged YUV path.
+            args.extend(["-allow_raw_vfw".to_string(), "1".to_string()]);
+        }
         add_container_output_args(&mut args, &config.container);
         args.push("-n".to_string());
         args.push(output.to_string());
         return Ok(args);
+    }
+
+    // These exact lists feed both FFmpeg's -map options and the main-input
+    // timestamp clock. Separate overlay/sidecar inputs never enter this set.
+    let mapped = resolve_reencode_main_input_map(
+        config,
+        &probe
+            .audio_tracks
+            .iter()
+            .map(|track| track.index)
+            .collect::<Vec<_>>(),
+        &probe
+            .subtitle_tracks
+            .iter()
+            .map(|track| (track.index, track.codec.as_str()))
+            .collect::<Vec<_>>(),
+    )?;
+    let mapped_audio = collect_audio_tracks(&mapped.audio, probe)?;
+    let mapped_subtitles = collect_subtitle_tracks(&mapped.subtitles, probe)?;
+    if !is_audio_only && crate::filters::has_subtitle_burn(config) {
+        configure_subtitle_clock(
+            config,
+            probe,
+            &mut filter_context,
+            &mapped_audio,
+            &mapped_subtitles,
+        )?;
     }
 
     if is_audio_only {
@@ -610,7 +718,17 @@ pub fn build_ffmpeg_args(
         add_audio_codec_args(&mut args, config);
     } else if is_video_only && is_gif_output {
         args.push("-filter_complex".to_string());
-        args.push(build_gif_filter_complex(config));
+        let recover = gif_policy == GifFramePolicy::ConfirmedMinimumFrame
+            && is_gif_minimum_frame_candidate(config);
+        args.push(build_gif_filter_complex_with_eof(
+            config,
+            filter_context,
+            if recover {
+                FrameRateEofAction::Pass
+            } else {
+                FrameRateEofAction::Round
+            },
+        ));
 
         args.push("-map".to_string());
         args.push("[gif_out]".to_string());
@@ -618,6 +736,9 @@ pub fn build_ffmpeg_args(
 
         args.push("-c:v".to_string());
         args.push("gif".to_string());
+        if recover {
+            args.extend(["-frames:v".to_string(), "1".to_string()]);
+        }
 
         args.push("-loop".to_string());
         args.push(config.gif_loop.to_string());
@@ -632,9 +753,17 @@ pub fn build_ffmpeg_args(
 
         if use_overlay {
             args.push("-filter_complex".to_string());
-            args.push(build_overlay_filter_complex(config));
+            args.push(build_visual_filter_complex_with_context(
+                config,
+                VisualFilterProfile::ExportImage,
+                filter_context,
+            ));
         } else {
-            let video_filters = build_video_filters(config, true);
+            let video_filters = build_visual_filter_chain_with_context(
+                config,
+                VisualFilterProfile::ExportImage,
+                filter_context,
+            );
             if !video_filters.is_empty() {
                 args.push("-vf".to_string());
                 args.push(video_filters.join(","));
@@ -660,9 +789,17 @@ pub fn build_ffmpeg_args(
 
         if use_overlay {
             args.push("-filter_complex".to_string());
-            args.push(build_encode_overlay_filter_complex(config));
+            args.push(build_visual_filter_complex_with_context(
+                config,
+                VisualFilterProfile::ExportVideo,
+                filter_context,
+            ));
         } else {
-            let video_filters = build_encode_video_filters(config, true);
+            let video_filters = build_visual_filter_chain_with_context(
+                config,
+                VisualFilterProfile::ExportVideo,
+                filter_context,
+            );
             if !video_filters.is_empty() {
                 args.push("-vf".to_string());
                 args.push(video_filters.join(","));
@@ -677,8 +814,9 @@ pub fn build_ffmpeg_args(
             "0:v:0".to_string()
         });
 
-        let audio_tracks = collect_selected_audio_tracks(config, probe)?;
+        let audio_tracks = mapped_audio;
         add_track_maps(&mut args, &audio_tracks, |track| track.index);
+        add_audio_title_metadata(&mut args, config, &audio_tracks);
 
         if audio_tracks.is_empty() {
             args.push("-an".to_string());
@@ -687,7 +825,7 @@ pub fn build_ffmpeg_args(
         }
 
         let mut subtitle_output_count = 0;
-        let subtitle_tracks = collect_reencode_subtitle_tracks(config, probe)?;
+        let subtitle_tracks = mapped_subtitles;
         if !subtitle_tracks.is_empty() {
             add_track_maps(&mut args, &subtitle_tracks, |track| track.index);
             subtitle_output_count = subtitle_tracks.len();
@@ -697,14 +835,30 @@ pub fn build_ffmpeg_args(
             add_subtitle_output_actions(
                 &mut args,
                 &config.container,
+                config.metadata.mode == MetadataMode::Preserve,
                 &subtitle_tracks,
                 &config.external_subtitle_tracks,
             )?;
             add_external_subtitle_output_args(&mut args, config, subtitle_output_count, false);
+            if let Some(plan) = &subtitle_trim {
+                plan.append_args(&mut args);
+            }
         }
     }
 
     if !is_video_only && !is_image_output && !config.selected_audio_tracks.is_empty() {
+        for (output_index, track) in collect_selected_audio_tracks(config, probe)?
+            .iter()
+            .enumerate()
+        {
+            if mp3_requires_mp4_resampling(
+                &config.container,
+                &config.audio_codec,
+                track.sample_rate.as_deref(),
+            ) {
+                args.extend([format!("-ar:a:{output_index}"), "16000".to_string()]);
+            }
+        }
         let audio_filters = build_audio_filters(config);
         if !audio_filters.is_empty() {
             args.push("-af".to_string());
@@ -797,19 +951,145 @@ fn normalize_gif_dither(dither: &str) -> &'static str {
     }
 }
 
-fn build_gif_filter_complex(config: &ConversionConfig) -> String {
-    let mut filters = build_video_filters(config, true);
-    if config.fps != "original" {
-        filters.push(format!("fps={}", config.fps));
+fn source_filter_context(probe: &ProbeMetadata) -> VisualFilterContext {
+    VisualFilterContext {
+        source_is_palette: probe.pixel_format.as_deref() == Some("pal8"),
+        ..VisualFilterContext::new(probe.width, probe.height)
     }
+}
 
+fn configure_subtitle_clock(
+    config: &ConversionConfig,
+    probe: &ProbeMetadata,
+    context: &mut VisualFilterContext,
+    audio: &[&AudioTrack],
+    subtitles: &[&SubtitleTrack],
+) -> Result<(), ConversionError> {
+    let video_index = probe
+        .source_timing
+        .as_ref()
+        .and_then(|timing| timing.first_video_stream_index);
+    let enabled = video_index
+        .into_iter()
+        .chain(audio.iter().map(|track| track.index))
+        .chain(subtitles.iter().map(|track| track.index))
+        .collect::<Vec<_>>();
+    context.source_clock = crate::source_timing::resolve_source_clock(
+        probe.source_timing.as_ref(),
+        probe.source_format.as_deref(),
+        video_index,
+        &enabled,
+    );
+    let seek = config
+        .start_time
+        .as_deref()
+        .and_then(crate::trim::RawFfmpegTime::parse)
+        .map_or(0, |time| time.microseconds);
+    crate::filters::validate_subtitle_clock(config, context.source_clock, seek)
+}
+
+/// Only explicit-rate GIF reencoding needs an optional minimum-frame check.
+#[must_use]
+pub fn is_gif_minimum_frame_candidate(config: &ConversionConfig) -> bool {
+    config.container.eq_ignore_ascii_case("gif")
+        && !is_copy_mode(config)
+        && config.fps != "original"
+}
+
+/// Builds the exact GIF visual prefix with a null output and one-frame limit.
+///
+/// This low-level helper does not expand application support for GIF subtitles
+/// or overlays. Valid tasks are validated before this optional preflight.
+///
+/// # Errors
+/// Returns an error for invalid trim or source-clock settings.
+pub fn build_gif_probe_args(
+    input: &str,
+    config: &ConversionConfig,
+    probe: &ProbeMetadata,
+    eof_action: FrameRateEofAction,
+) -> Result<Option<Vec<String>>, ConversionError> {
+    if !is_gif_minimum_frame_candidate(config) {
+        return Ok(None);
+    }
+    let trim = OutputTrim::from_config(config)?;
+    let mut context = source_filter_context(probe);
+    if crate::filters::has_subtitle_burn(config) {
+        configure_subtitle_clock(config, probe, &mut context, &[], &[])?;
+    }
+    let mut args = ["-nostdin", "-hide_banner", "-loglevel", "error", "-xerror"]
+        .map(str::to_owned)
+        .to_vec();
+    trim.append_input_args(&mut args);
+    args.extend(["-i".to_owned(), input.to_owned()]);
+    trim.append_output_args(&mut args);
+    let prefix = gif_visual_prefix(config, context, eof_action).join(",");
+    args.extend([
+        "-filter_complex".to_owned(),
+        format!("[0:v:0]{prefix}[probe_out]"),
+    ]);
+    args.extend(
+        [
+            "-map",
+            "[probe_out]",
+            "-an",
+            "-sn",
+            "-dn",
+            "-c:v",
+            "wrapped_avframe",
+            "-fps_mode",
+            "passthrough",
+            "-frames:v",
+            "1",
+            "-progress",
+            "pipe:1",
+            "-nostats",
+            "-f",
+            "null",
+            "-",
+        ]
+        .map(str::to_owned),
+    );
+    Ok(Some(args))
+}
+
+#[cfg(test)]
+fn build_gif_filter_complex(
+    config: &ConversionConfig,
+    filter_context: VisualFilterContext,
+) -> String {
+    build_gif_filter_complex_with_eof(config, filter_context, FrameRateEofAction::Round)
+}
+
+fn gif_visual_prefix(
+    config: &ConversionConfig,
+    filter_context: VisualFilterContext,
+    eof_action: FrameRateEofAction,
+) -> Vec<String> {
+    let mut filters = build_visual_filter_chain_with_context(
+        config,
+        VisualFilterProfile::ExportImage,
+        filter_context,
+    );
+    if config.fps != "original" {
+        filters.push(eof_action.filter(&config.fps));
+    }
+    filters
+}
+
+fn build_gif_filter_complex_with_eof(
+    config: &ConversionConfig,
+    filter_context: VisualFilterContext,
+    eof_action: FrameRateEofAction,
+) -> String {
+    let filters = gif_visual_prefix(config, filter_context, eof_action);
     let chain = if filters.is_empty() {
         "split[gif_src][gif_palette_src]".to_string()
     } else {
         format!("{},split[gif_src][gif_palette_src]", filters.join(","))
     };
 
-    let colors = config.gif_colors.clamp(2, 256);
+    let colors = config.gif_colors.clamp(MIN_GIF_COLORS, 256);
     let dither = normalize_gif_dither(&config.gif_dither);
 
     format!(
@@ -924,17 +1204,8 @@ pub fn validate_task_input(
             "Input path is not a file: {file_path}"
         )));
     }
+    validate_audio_track_count(config)?;
 
-    let start_time = config
-        .start_time
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty());
-    let end_time = config
-        .end_time
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty());
     let processing_mode = config.processing_mode.trim();
 
     if processing_mode != "reencode" && processing_mode != "copy" {
@@ -964,8 +1235,10 @@ pub fn validate_task_input(
             ))
         })?;
         if let Some(profile) = transport_stream_profile(&config.container) {
-            let has_language = non_empty(track.language.as_deref()).is_some();
-            let has_title = non_empty(track.title.as_deref()).is_some();
+            let preserve_text_metadata = config.metadata.mode == MetadataMode::Preserve;
+            let has_language =
+                preserve_text_metadata && non_empty(track.language.as_deref()).is_some();
+            let has_title = preserve_text_metadata && non_empty(track.title.as_deref()).is_some();
             let unsupported_metadata = match profile {
                 TransportStreamProfile::MpegTs188 => {
                     has_title || track.is_default || track.is_forced
@@ -984,30 +1257,7 @@ pub fn validate_task_input(
     }
     let is_copy_mode = processing_mode == "copy";
 
-    if let Some(start) = start_time
-        && parse_time(start).is_none()
-    {
-        return Err(ConversionError::InvalidInput(format!(
-            "Invalid start time: {start}"
-        )));
-    }
-
-    if let Some(end) = end_time
-        && parse_time(end).is_none()
-    {
-        return Err(ConversionError::InvalidInput(format!(
-            "Invalid end time: {end}"
-        )));
-    }
-
-    if let (Some(start), Some(end)) = (start_time, end_time)
-        && let (Some(start_t), Some(end_t)) = (parse_time(start), parse_time(end))
-        && end_t <= start_t
-    {
-        return Err(ConversionError::InvalidInput(
-            "End time must be greater than start time".to_string(),
-        ));
-    }
+    OutputTrim::from_config(config)?;
 
     if !is_copy_mode && config.resolution == "custom" {
         let w_str = config.custom_width.as_deref().unwrap_or("-1");
@@ -1033,9 +1283,11 @@ pub fn validate_task_input(
     }
 
     if !is_copy_mode
-        && config.video_bitrate_mode == "bitrate"
         && !is_audio_only_container(&config.container)
         && !is_video_only_container(&config.container)
+        && !is_image_container(&config.container)
+        && config.video_codec != "prores"
+        && (config.video_codec == "mpeg2video" || config.video_bitrate_mode == "bitrate")
     {
         let bitrate = config.video_bitrate.parse::<f64>().map_err(|_| {
             ConversionError::InvalidInput(format!(
@@ -1043,9 +1295,9 @@ pub fn validate_task_input(
                 config.video_bitrate
             ))
         })?;
-        if bitrate <= 0.0 {
+        if !bitrate.is_finite() || bitrate <= 0.0 {
             return Err(ConversionError::InvalidInput(
-                "Video bitrate must be positive".to_string(),
+                "Video bitrate must be a finite, positive number".to_string(),
             ));
         }
     }
@@ -1086,9 +1338,9 @@ pub fn validate_task_input(
                             config.audio_bitrate
                         ))
                     })?;
-                    if bitrate <= 0.0 {
+                    if !bitrate.is_finite() || bitrate <= 0.0 {
                         return Err(ConversionError::InvalidInput(
-                            "Audio bitrate must be positive".to_string(),
+                            "Audio bitrate must be a finite, positive number".to_string(),
                         ));
                     }
                 }
@@ -1117,6 +1369,17 @@ pub fn validate_task_input(
                     "Invalid audio bitrate mode: {other}"
                 )));
             }
+        }
+        if config.audio_codec == "libopus"
+            && !config.selected_audio_tracks.is_empty()
+            && matches!(config.audio_channels.as_str(), "mono" | "stereo")
+            && let Some(reason) = opus_encoding_error(
+                &config.audio_bitrate,
+                effective_audio_channels(&config.audio_channels, None),
+                None,
+            )
+        {
+            return Err(ConversionError::InvalidInput(reason));
         }
         if config.audio_codec == "mp2"
             && !matches!(
@@ -1250,9 +1513,9 @@ pub fn validate_task_input(
     }
 
     if is_video_only && config.container.eq_ignore_ascii_case("gif") {
-        if !(2..=256).contains(&config.gif_colors) {
+        if !(MIN_GIF_COLORS..=256).contains(&config.gif_colors) {
             return Err(ConversionError::InvalidInput(format!(
-                "GIF palette size must be between 2 and 256 colors: {}",
+                "GIF palette size must be between {MIN_GIF_COLORS} and 256 colors: {}",
                 config.gif_colors
             )));
         }
@@ -1351,12 +1614,274 @@ fn validate_image_encoding_settings(config: &ConversionConfig) -> Result<(), Con
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    mod alac_observer;
+    mod audio_titles;
     use crate::filters::EVEN_DIMENSIONS_FILTER;
+    use crate::types::OverlayConfig;
     use std::{
         fs,
         path::PathBuf,
         time::{SystemTime, UNIX_EPOCH},
     };
+
+    #[test]
+    fn parsed_track_name_uses_existing_preserve_policy_without_leaking_into_clean_or_replace() {
+        let probe = crate::probe::parse_ffprobe_stdout("source.mp4", serde_json::json!({
+            "format":{"tags":{"title":"Global title","name":"Global name"}},
+            "streams":[
+                {"index":0,"codec_type":"video","codec_name":"h264"},
+                {"index":4,"codec_type":"subtitle","codec_name":"mov_text","tags":{"name":"PRIVATE SUBTITLE","handler_name":"SubtitleHandler","language":"pol"}}
+            ]
+        }).to_string()).unwrap();
+        for mode in [
+            MetadataMode::Preserve,
+            MetadataMode::Clean,
+            MetadataMode::Replace,
+        ] {
+            let mut config = sample_config("mkv", "libx264");
+            config.selected_subtitle_tracks = vec![4];
+            config.metadata.mode = mode;
+            if config.metadata.mode == MetadataMode::Replace {
+                config.metadata.title = Some("Replacement title".into());
+            }
+            let args = build_ffmpeg_args("source.mp4", "out.mkv", &config, &probe).unwrap();
+            let tags = args
+                .windows(2)
+                .filter(|pair| pair[0] == "-metadata:s:s:0")
+                .map(|pair| pair[1].as_str())
+                .collect::<Vec<_>>();
+            if config.metadata.mode == MetadataMode::Preserve {
+                assert_eq!(tags, ["language=pol", "title=PRIVATE SUBTITLE"]);
+            } else {
+                assert!(tags.is_empty());
+                assert!(args.windows(2).any(|pair| pair == ["-map_metadata", "-1"]));
+            }
+            assert!(args.windows(2).any(|pair| pair == ["-map", "0:4"]));
+            assert!(
+                !args
+                    .iter()
+                    .any(|arg| arg.contains("SubtitleHandler") || arg.contains("Global name"))
+            );
+            assert_eq!(
+                args.iter().any(|arg| arg == "title=Replacement title"),
+                config.metadata.mode == MetadataMode::Replace
+            );
+        }
+    }
+
+    #[test]
+    fn gif_probe_preserves_structural_geometry_trim_and_only_varies_terminal_fps() {
+        let mut config = sample_config("gif", "gif");
+        config.fps = "8".into();
+        config.start_time = Some(".123456789".into());
+        config.end_time = Some("1.5".into());
+        config.crop = Some(crate::types::CropConfig {
+            enabled: true,
+            x: 3.0,
+            y: 5.0,
+            width: 127.0,
+            height: 129.0,
+            ..crate::types::CropConfig::default()
+        });
+        config.resolution = "custom".into();
+        config.custom_width = Some("131".into());
+        // Leave an odd inner raster and real padding; 131x133 would fit exactly.
+        config.custom_height = Some("139".into());
+        let mut probe = sample_probe();
+        probe.width = Some(320);
+        probe.height = Some(180);
+        let ordinary = build_ffmpeg_args("source.mkv", "out.gif", &config, &probe).unwrap();
+        let normal = build_gif_probe_args("source.mkv", &config, &probe, FrameRateEofAction::Round)
+            .unwrap()
+            .unwrap();
+        let pass = build_gif_probe_args("source.mkv", &config, &probe, FrameRateEofAction::Pass)
+            .unwrap()
+            .unwrap();
+        let value = |args: &[String], flag: &str| {
+            args.windows(2)
+                .find(|pair| pair[0] == flag)
+                .map(|pair| pair[1].clone())
+                .unwrap()
+        };
+        let graph = value(&normal, "-filter_complex");
+        let prefix = graph.strip_suffix("[probe_out]").unwrap();
+        assert!(prefix.contains("xstack="), "GIF prefix: {prefix}");
+        assert!(prefix.contains("blend="), "GIF prefix: {prefix}");
+        assert!(prefix.contains("split="), "GIF prefix: {prefix}");
+        assert!(prefix.ends_with(",fps=8"));
+        assert!(
+            value(&ordinary, "-filter_complex")
+                .starts_with(&format!("{prefix},split[gif_src][gif_palette_src]"))
+        );
+        assert_eq!(
+            value(&pass, "-filter_complex"),
+            format!("{prefix}:eof_action=pass[probe_out]")
+        );
+        assert!(!graph.contains("palette"));
+        for flag in ["-ss", "-i", "-t"] {
+            assert_eq!(value(&normal, flag), value(&ordinary, flag));
+        }
+        assert_eq!(value(&normal, "-ss"), "0.123456789");
+        assert_eq!(value(&normal, "-map"), "[probe_out]");
+        assert_eq!(value(&normal, "-c:v"), "wrapped_avframe");
+        assert_eq!(value(&normal, "-fps_mode"), "passthrough");
+        assert_eq!(value(&normal, "-progress"), "pipe:1");
+        assert_eq!(normal.last().unwrap(), "-");
+        assert!(!normal.contains(&"out.gif".to_string()));
+        assert!(normal.contains(&"-xerror".to_string()));
+        let recovery = build_ffmpeg_args_with_gif_policy(
+            "source.mkv",
+            "out.gif",
+            &config,
+            &probe,
+            GifFramePolicy::ConfirmedMinimumFrame,
+        )
+        .unwrap();
+        let mut restored = recovery;
+        let cap = restored.iter().position(|arg| arg == "-frames:v").unwrap();
+        assert_eq!(restored[cap + 1], "1");
+        restored.drain(cap..cap + 2);
+        assert!(!restored.contains(&"-frames:v".to_string()));
+        let index = restored
+            .iter()
+            .position(|arg| arg == "-filter_complex")
+            .unwrap()
+            + 1;
+        restored[index] = restored[index].replace("fps=8:eof_action=pass", "fps=8");
+        assert_eq!(restored, ordinary);
+    }
+
+    #[test]
+    fn gif_recovery_is_not_persisted_or_applied_to_unrelated_outputs() {
+        for (container, codec, fps) in [
+            ("gif", "gif", "original"),
+            ("mp4", "libx264", "8"),
+            ("png", "png", "8"),
+        ] {
+            let mut config = sample_config(container, codec);
+            config.fps = fps.into();
+            let ordinary = build_ffmpeg_args("source", "out", &config, &sample_probe()).unwrap();
+            assert!(
+                build_gif_probe_args("source", &config, &sample_probe(), FrameRateEofAction::Pass)
+                    .unwrap()
+                    .is_none()
+            );
+            assert_eq!(
+                build_ffmpeg_args_with_gif_policy(
+                    "source",
+                    "out",
+                    &config,
+                    &sample_probe(),
+                    GifFramePolicy::ConfirmedMinimumFrame
+                )
+                .unwrap(),
+                ordinary
+            );
+        }
+        let mut config = sample_config("gif", "gif");
+        config.fps = "8".into();
+        config.processing_mode = "copy".into();
+        assert!(!is_gif_minimum_frame_candidate(&config));
+    }
+
+    #[test]
+    fn raw_gif_helper_preserves_burn_clock_but_application_policy_still_rejects_it() {
+        let mut config = sample_config("gif", "gif");
+        config.fps = "8".into();
+        config.start_time = Some("-.123456789".into());
+        config.subtitle_burn_path = Some("/tmp/captions.srt".into());
+        assert!(validate_task_input("source.mkv", &config).is_err());
+        let probe = sample_probe();
+        let ordinary = build_ffmpeg_args("source.mkv", "out.gif", &config, &probe).unwrap();
+        let args = build_gif_probe_args("source.mkv", &config, &probe, FrameRateEofAction::Round)
+            .unwrap()
+            .unwrap();
+        let graph = &args[args
+            .iter()
+            .position(|arg| arg == "-filter_complex")
+            .unwrap()
+            + 1];
+        let prefix = graph.strip_suffix("[probe_out]").unwrap();
+        assert!(prefix.contains("subtitles="));
+        assert!(
+            prefix.contains("setpts=PTS+(round(-0.123456/TB))"),
+            "GIF prefix: {prefix}"
+        );
+        assert!(
+            prefix.contains("setpts=PTS-(round(-0.123456/TB))"),
+            "GIF prefix: {prefix}"
+        );
+        assert!(ordinary.iter().any(|arg| arg.starts_with(prefix)));
+        config.start_time = None;
+        config.end_time = Some("00:00:00.123456789".into());
+        let args = build_gif_probe_args("source", &config, &probe, FrameRateEofAction::Round)
+            .unwrap()
+            .unwrap();
+        assert!(
+            args.windows(2)
+                .any(|pair| pair == ["-to", "00:00:00.123456789"])
+        );
+    }
+
+    #[test]
+    fn burn_clock_uses_the_same_main_input_tracks_as_export_maps() {
+        let payload = serde_json::json!({"format":{"format_name":"mpegts","start_time":"1.400000"},"streams":[
+            {"index":4,"codec_type":"video","codec_name":"h264","time_base":"1/90000","start_pts":145_920},
+            {"index":7,"codec_type":"audio","codec_name":"aac","channels":2,"time_base":"1/90000","start_pts":126_000},
+            {"index":9,"codec_type":"subtitle","codec_name":"hdmv_pgs_subtitle","time_base":"1/90000","start_pts":126_000}
+        ]});
+        let probe = crate::probe::parse_ffprobe_stdout("source.ts", payload.to_string()).unwrap();
+        for (audio, subtitles, shifted) in [
+            (vec![], vec![], false),
+            (vec![7], vec![], true),
+            (vec![], vec![9], true),
+            (vec![7], vec![9], true),
+        ] {
+            let mut config = sample_config("mkv", "libx264");
+            config.start_time = Some(".123456789".into());
+            config.subtitle_burn_path = Some("/tmp/burn.srt".into());
+            config.selected_audio_tracks = audio.clone();
+            config.selected_subtitle_tracks = subtitles.clone();
+            let argv = build_ffmpeg_args("source.ts", "out.mkv", &config, &probe).unwrap();
+            let graph = argv.windows(2).find(|pair| pair[0] == "-vf").unwrap();
+            assert_eq!(graph[1].contains("round(11111/(90000*TB))"), shifted);
+            for index in audio.iter().chain(&subtitles) {
+                assert!(
+                    argv.windows(2)
+                        .any(|pair| pair[0] == "-map" && pair[1] == format!("0:{index}"))
+                );
+            }
+            assert!(argv.windows(2).any(|pair| pair == ["-ss", "0.123456789"]));
+        }
+    }
+
+    #[test]
+    fn unused_clock_metadata_never_blocks_export_but_used_overflow_does() {
+        use crate::source_timing::{SourceStreamTiming, SourceTiming, TimeBase};
+        let mut probe = sample_probe();
+        probe.source_format = Some("matroska,webm".into());
+        probe.source_timing = Some(SourceTiming {
+            format_start_microseconds: Some(i64::MAX),
+            format_start_invalid: false,
+            first_video_stream_index: Some(0),
+            streams: vec![SourceStreamTiming {
+                index: 0,
+                time_base: TimeBase::new(1, 1_000_000),
+                start_pts: Some(0),
+            }],
+        });
+        let mut config = sample_config("mkv", "libx264");
+        config.start_time = Some("0.000001".into());
+        assert!(build_ffmpeg_args("source.mkv", "out.mkv", &config, &probe).is_ok());
+        config.subtitle_burn_path = Some("/tmp/burn.srt".into());
+        assert!(build_ffmpeg_args("source.mkv", "out.mkv", &config, &probe).is_err());
+        config.start_time = Some("0.0000009".into());
+        assert!(build_ffmpeg_args("source.mkv", "out.mkv", &config, &probe).is_ok());
+        config.start_time = Some("0.000001".into());
+        config.processing_mode = "copy".into();
+        assert!(build_ffmpeg_args("source.mkv", "out.mkv", &config, &probe).is_ok());
+    }
 
     fn sample_config(container: &str, video_codec: &str) -> ConversionConfig {
         ConversionConfig {
@@ -1368,6 +1893,7 @@ mod tests {
             audio_codec: "aac".to_string(),
             audio_bitrate: "128".to_string(),
             audio_bitrate_mode: "bitrate".to_string(),
+            opus_vbr: true,
             audio_quality: "4".to_string(),
             audio_channels: "original".to_string(),
             audio_volume: 100.0,
@@ -1431,6 +1957,783 @@ mod tests {
             }],
             ..ProbeMetadata::default()
         }
+    }
+
+    #[test]
+    fn copy_preflight_checks_only_selected_source_dependent_audio_tracks() {
+        let mut probe = sample_probe();
+        probe.source_format = Some("mov,mp4,m4a,3gp,3g2,mj2".into());
+        probe.audio_tracks.push(AudioTrack {
+            index: 3,
+            codec: "adpcm_swf".into(),
+            codec_tag: Some(0x4653_736d),
+            channels: "1".into(),
+            ..AudioTrack::default()
+        });
+        let mut config = sample_config("mkv", "libx264");
+        config.processing_mode = "copy".into();
+        for selected in [vec![3], vec![1, 3], vec![3, 1]] {
+            config.selected_audio_tracks = selected.clone();
+            let error = build_ffmpeg_args("misleading.wav", "output.mkv", &config, &probe)
+                .unwrap_err()
+                .to_string();
+            assert!(error.contains("track #3"), "{error}");
+            assert!(error.contains("Choose Re-encode"), "{error}");
+            assert_eq!(config.selected_audio_tracks, selected);
+        }
+        for selected in [vec![], vec![1]] {
+            config.selected_audio_tracks = selected;
+            assert!(build_ffmpeg_args("input.mov", "output.mkv", &config, &probe).is_ok());
+        }
+        config.selected_audio_tracks = vec![3];
+        config.processing_mode = "reencode".into();
+        assert!(build_ffmpeg_args("input.mov", "output.mkv", &config, &probe).is_ok());
+        config.processing_mode = "copy".into();
+        for tag in [None, Some(0x5346)] {
+            probe.audio_tracks[1].codec_tag = tag;
+            assert!(build_ffmpeg_args("input.mov", "output.mkv", &config, &probe).is_ok());
+        }
+    }
+
+    #[test]
+    fn hardware_decoding_only_applies_to_an_effective_hardware_video_encoder() {
+        let probe = sample_probe();
+        let mut config = sample_config("mp4", "h264_nvenc");
+        config.hw_decode = true;
+        config.selected_audio_tracks = vec![1];
+        let args = build_ffmpeg_args("input.mp4", "output.mp4", &config, &probe).unwrap();
+        assert!(args_contains_pair(&args, "-hwaccel", "cuda"));
+        assert!(!args.iter().any(|arg| arg == "-hwaccel_output_format"));
+        for container in ["m4a", "png", "gif"] {
+            config.container = container.into();
+            let args = build_ffmpeg_args("input.mp4", "output", &config, &probe).unwrap();
+            assert!(!args.iter().any(|arg| arg == "-hwaccel"), "{container}");
+            assert_eq!(effective_video_encoder(&config, &probe), None);
+        }
+        config.container = "mp4".into();
+        config.processing_mode = "copy".into();
+        let args = build_ffmpeg_args("input.mp4", "output.mp4", &config, &probe).unwrap();
+        assert!(!args.iter().any(|arg| arg == "-hwaccel"));
+        config.processing_mode = "reencode".into();
+        let audio_probe = ProbeMetadata {
+            video_codec: None,
+            ..probe
+        };
+        assert_eq!(effective_video_encoder(&config, &audio_probe), None);
+        let args = build_ffmpeg_args("input.m4a", "output.mp4", &config, &audio_probe).unwrap();
+        assert!(!args.iter().any(|arg| arg == "-hwaccel"));
+    }
+
+    #[test]
+    fn video_encoder_controls_use_codec_specific_ffmpeg_options() {
+        let mut config = sample_config("mov", "prores");
+        for mode in ["crf", "bitrate"] {
+            config.video_bitrate_mode = mode.to_string();
+            config.video_bitrate = "unused".to_string();
+            config.preset = "unused".to_string();
+            let args =
+                build_ffmpeg_args("input.mov", "output.mov", &config, &sample_probe()).unwrap();
+            assert!(args_contains_pair(&args, "-c:v", "prores"));
+            for unused in ["-crf", "-b:v", "-preset"] {
+                assert!(!args.iter().any(|arg| arg == unused));
+            }
+        }
+        config = sample_config("webm", "vp9");
+        config.audio_codec = "libopus".to_string();
+        for speed in ["0", "1", "2", "3", "4", "5", "medium"] {
+            config.preset = speed.to_string();
+            let args =
+                build_ffmpeg_args("input.mov", "output.webm", &config, &sample_probe()).unwrap();
+            assert!(args_contains_pair(&args, "-deadline", "good"));
+            assert!(args_contains_pair(
+                &args,
+                "-cpu-used",
+                if speed == "medium" { "1" } else { speed }
+            ));
+            assert!(!args.iter().any(|arg| arg == "-preset"));
+        }
+        for codec in ["h264_nvenc", "hevc_nvenc", "av1_nvenc"] {
+            config = sample_config("mp4", codec);
+            config.nvenc_spatial_aq = true;
+            config.nvenc_temporal_aq = true;
+            let args =
+                build_ffmpeg_args("input.mov", "output.mp4", &config, &sample_probe()).unwrap();
+            assert!(args_contains_pair(&args, "-spatial-aq", "1"));
+            assert!(args_contains_pair(&args, "-temporal-aq", "1"));
+            assert!(
+                !args
+                    .iter()
+                    .any(|arg| matches!(arg.as_str(), "-spatial_aq" | "-temporal_aq"))
+            );
+        }
+    }
+
+    #[test]
+    fn video_bitrate_validation_checks_only_effective_bitrate_controls() {
+        let input = temporary_input_file("effective-video-bitrate");
+        for (container, codec, mode, used) in [
+            ("mp4", "libx264", "bitrate", true),
+            ("mkv", "mpeg2video", "crf", true),
+            ("mov", "prores", "bitrate", false),
+            ("png", "png", "bitrate", false),
+            ("gif", "gif", "bitrate", false),
+        ] {
+            let mut config = sample_config(container, codec);
+            config.video_bitrate_mode = mode.to_string();
+            // MPEG-2 is offered in transport containers, where MP2 is valid.
+            if codec == "mpeg2video" {
+                config.container = "m2t".to_string();
+                config.audio_codec = "mp2".to_string();
+            }
+            for value in ["NaN", "inf", "0", "invalid"] {
+                config.video_bitrate = value.to_string();
+                let result = validate_task_input(&input.to_string_lossy(), &config);
+                assert_eq!(
+                    result.is_err(),
+                    used,
+                    "{container}/{codec}/{value}: {result:?}"
+                );
+                if used {
+                    assert!(result.unwrap_err().to_string().contains("bitrate"));
+                }
+            }
+        }
+        let _ = fs::remove_file(input);
+    }
+
+    #[test]
+    fn raw_vfw_is_enabled_only_for_matroska_raw_video_copy() {
+        for (container, mode, source_codec, expected) in [
+            ("mkv", "copy", "rawvideo", true),
+            ("mov", "copy", "rawvideo", false),
+            ("mkv", "reencode", "rawvideo", false),
+            ("mkv", "copy", "h264", false),
+        ] {
+            let mut config = sample_config(container, "libx264");
+            config.processing_mode = mode.to_string();
+            let mut probe = sample_probe();
+            probe.video_codec = Some(source_codec.to_string());
+            let args = build_ffmpeg_args(
+                "source.avi",
+                &format!("output.{container}"),
+                &config,
+                &probe,
+            )
+            .unwrap();
+            assert_eq!(args_contains_pair(&args, "-allow_raw_vfw", "1"), expected);
+        }
+    }
+
+    #[test]
+    fn vorbis_copy_uses_the_mov_audio_tag_for_each_output_track() {
+        let mut config = sample_config("mov", "libx264");
+        config.processing_mode = "copy".to_string();
+        config.selected_audio_tracks = vec![2, 1];
+        let mut probe = sample_probe();
+        probe.audio_tracks.push(AudioTrack {
+            index: 2,
+            codec: "vorbis".to_string(),
+            ..AudioTrack::default()
+        });
+        let args = build_ffmpeg_args("source.nut", "output.mov", &config, &probe).unwrap();
+        assert!(args_contains_pair(&args, "-tag:a:0", "0x6f56736d"));
+        assert!(!args.iter().any(|arg| arg == "-tag:a:1"));
+        config.container = "mkv".to_string();
+        let args = build_ffmpeg_args("source.nut", "output.mkv", &config, &probe).unwrap();
+        assert!(!args.iter().any(|arg| arg.starts_with("-tag:a:")));
+    }
+
+    #[test]
+    fn dfpwm_matroska_copy_preserves_packets_without_keyframe_flags() {
+        let mut config = sample_config("mkv", "libx264");
+        config.processing_mode = "copy".to_string();
+        config.selected_audio_tracks = vec![1];
+        let mut probe = sample_probe();
+        probe.audio_tracks[0].codec = "dfpwm".to_string();
+        let args = build_ffmpeg_args("source.nut", "output.mkv", &config, &probe).unwrap();
+        assert!(args.iter().any(|arg| arg == "-copyinkf:a:0"));
+        config.processing_mode = "reencode".to_string();
+        let args = build_ffmpeg_args("source.nut", "output.mkv", &config, &probe).unwrap();
+        assert!(!args.iter().any(|arg| arg.starts_with("-copyinkf")));
+    }
+
+    #[test]
+    fn g723_mov_copy_restores_frame_size_only_for_the_selected_output_stream() {
+        let mut config = sample_config("mov", "libx264");
+        config.processing_mode = "copy".to_string();
+        config.selected_audio_tracks = vec![2, 1];
+        let mut probe = sample_probe();
+        probe.audio_tracks.push(AudioTrack {
+            index: 2,
+            codec: "g723_1".to_string(),
+            channels: "1".to_string(),
+            ..AudioTrack::default()
+        });
+        let args = build_ffmpeg_args("input.nut", "output.mov", &config, &probe).unwrap();
+        assert!(args_contains_pair(&args, "-frame_size:a:0", "240"));
+        assert!(!args.iter().any(|arg| arg == "-frame_size:a:1"));
+        for (container, mode) in [("mkv", "copy"), ("mov", "reencode")] {
+            config.container = container.to_string();
+            config.processing_mode = mode.to_string();
+            let args = build_ffmpeg_args("input.nut", "output.video", &config, &probe).unwrap();
+            assert!(!args.iter().any(|arg| arg.starts_with("-frame_size")));
+        }
+    }
+
+    #[test]
+    fn single_track_audio_outputs_reject_saved_multiple_selections_in_both_modes() {
+        let input = temporary_input_file_with_extension("single-track-limit", "mkv");
+        for container in ["mp3", "wav", "flac"] {
+            for mode in ["copy", "reencode"] {
+                let mut config = sample_config(container, "libx264");
+                config.processing_mode = mode.to_string();
+                config.selected_audio_tracks = vec![1, 2];
+                assert!(
+                    validate_task_input(&input.to_string_lossy(), &config)
+                        .unwrap_err()
+                        .to_string()
+                        .contains("one audio track")
+                );
+                assert!(
+                    build_ffmpeg_args("input.mkv", "output.audio", &config, &sample_probe())
+                        .unwrap_err()
+                        .to_string()
+                        .contains("one audio track")
+                );
+            }
+        }
+        fs::remove_file(input).unwrap();
+    }
+
+    #[test]
+    fn mp3_mp4_resamples_only_selected_low_rate_streams() {
+        let mut config = sample_config("mp4", "libx264");
+        config.audio_codec = "mp3".to_string();
+        config.selected_audio_tracks = vec![2, 1];
+        let mut probe = sample_probe();
+        probe.audio_tracks[0].codec = "mp3".to_string();
+        probe.audio_tracks[0].sample_rate = Some("8000".to_string());
+        probe.audio_tracks.push(AudioTrack {
+            index: 2,
+            codec: "mp3".to_string(),
+            channels: "2".to_string(),
+            sample_rate: Some("48000".to_string()),
+            ..AudioTrack::default()
+        });
+        let args = build_ffmpeg_args("input.mkv", "output.mp4", &config, &probe).unwrap();
+        assert!(args_contains_pair(&args, "-ar:a:1", "16000"));
+        assert!(!args.iter().any(|arg| arg == "-ar:a:0" || arg == "-ar"));
+        config.processing_mode = "copy".to_string();
+        assert!(
+            build_ffmpeg_args("input.mkv", "output.mp4", &config, &probe)
+                .unwrap_err()
+                .to_string()
+                .contains("16 kHz")
+        );
+        config.selected_audio_tracks = vec![2];
+        assert!(build_ffmpeg_args("input.mkv", "output.mp4", &config, &probe).is_ok());
+        config.processing_mode = "reencode".to_string();
+        config.selected_audio_tracks = vec![1];
+        for container in ["mov", "mkv", "mp3"] {
+            config.container = container.to_string();
+            let args = build_ffmpeg_args("input.mkv", "output.audio", &config, &probe).unwrap();
+            assert!(!args.iter().any(|arg| arg.starts_with("-ar")));
+        }
+    }
+
+    #[test]
+    fn opus_checks_every_selected_track_and_explicit_channel_override() {
+        let mut config = sample_config("mkv", "libx264");
+        config.audio_codec = "libopus".to_string();
+        config.audio_bitrate = "320".to_string();
+        let mut probe = sample_probe();
+        probe.audio_tracks.push(AudioTrack {
+            index: 2,
+            codec: "flac".to_string(),
+            channels: "1".to_string(),
+            ..AudioTrack::default()
+        });
+        for selected in [vec![1, 2], vec![2, 1]] {
+            config.selected_audio_tracks = selected;
+            for (mode, allowed) in [("original", false), ("stereo", true), ("mono", false)] {
+                config.audio_channels = mode.to_string();
+                assert_eq!(
+                    build_ffmpeg_args("input.mkv", "output.mkv", &config, &probe).is_ok(),
+                    allowed,
+                    "{mode}"
+                );
+            }
+        }
+        config.audio_channels = "original".to_string();
+        config.audio_bitrate = "128".to_string();
+        config.selected_audio_tracks = vec![2];
+        probe.audio_tracks[1].channels = "6".to_string();
+        probe.audio_tracks[1].channel_layout = Some("5.1(side)".to_string());
+        assert!(
+            build_ffmpeg_args("input.mkv", "output.mkv", &config, &probe)
+                .unwrap_err()
+                .to_string()
+                .contains("channel layout")
+        );
+        probe.audio_tracks[1].channel_layout = Some("5.1".to_string());
+        assert!(build_ffmpeg_args("input.mkv", "output.mkv", &config, &probe).is_ok());
+    }
+
+    #[test]
+    fn stereo_width_never_implicitly_downmixes_original_audio() {
+        let mut config = sample_config("mkv", "libx264");
+        config.audio_codec = "flac".to_string();
+        config.selected_audio_tracks = vec![1];
+        config.audio_filters.stereo_width.enabled = true;
+        config.audio_filters.stereo_width.value = 150;
+        let mut probe = sample_probe();
+        probe.audio_tracks[0].channels = "6".to_string();
+        assert!(
+            build_ffmpeg_args("input.mkv", "output.mkv", &config, &probe)
+                .unwrap_err()
+                .to_string()
+                .contains("Stereo width")
+        );
+        config.audio_channels = "stereo".to_string();
+        assert!(build_ffmpeg_args("input.mkv", "output.mkv", &config, &probe).is_ok());
+        config.audio_channels = "original".to_string();
+        config.audio_filters.stereo_width.value = 100;
+        assert!(build_ffmpeg_args("input.mkv", "output.mkv", &config, &probe).is_ok());
+        config.audio_filters.stereo_width.value = 150;
+        config.selected_audio_tracks.clear();
+        let args = build_ffmpeg_args("input.mkv", "output.mkv", &config, &probe).unwrap();
+        assert!(!args.iter().any(|arg| arg == "-af"));
+    }
+
+    #[test]
+    fn subtitle_copy_and_conversion_decisions_match_in_both_processing_modes() {
+        for mode in ["copy", "reencode"] {
+            for (container, codec, expected) in [
+                ("mkv", "mov_text", Some("srt")),
+                ("mov", "subrip", Some("mov_text")),
+                ("mp4", "ttml", Some("copy")),
+                ("mov", "ttml", Some("copy")),
+                ("webm", "ttml", None),
+                ("mkv", "ttml", None),
+            ] {
+                let mut config = sample_config(
+                    container,
+                    if container == "webm" {
+                        "vp9"
+                    } else {
+                        "libx264"
+                    },
+                );
+                config.processing_mode = mode.to_string();
+                config.selected_subtitle_tracks = vec![2];
+                let mut probe = sample_probe();
+                probe.video_codec =
+                    Some(if container == "webm" { "vp9" } else { "h264" }.to_string());
+                probe.subtitle_tracks = vec![SubtitleTrack {
+                    index: 2,
+                    codec: codec.to_string(),
+                    ..SubtitleTrack::default()
+                }];
+                let result = build_ffmpeg_args(
+                    "source.mkv",
+                    &format!("output.{container}"),
+                    &config,
+                    &probe,
+                );
+                if let Some(expected) = expected {
+                    assert!(args_contains_pair(&result.unwrap(), "-c:s:0", expected));
+                } else {
+                    assert!(result.unwrap_err().to_string().contains("ttml"));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn clean_and_replace_omit_subtitle_text_tags_but_keep_playback_flags() {
+        for mode in ["copy", "reencode"] {
+            for metadata_mode in [
+                MetadataMode::Preserve,
+                MetadataMode::Clean,
+                MetadataMode::Replace,
+            ] {
+                let preserve = metadata_mode == MetadataMode::Preserve;
+                let mut config = sample_config("mov", "libx264");
+                config.processing_mode = mode.to_string();
+                config.metadata.mode = metadata_mode;
+                config.selected_subtitle_tracks = vec![2];
+                config.external_subtitle_tracks = vec![ExternalSubtitleTrack {
+                    path: "/tmp/external.srt".to_string(),
+                    language: Some("pol".to_string()),
+                    title: Some("Private external title".to_string()),
+                    is_default: true,
+                    is_forced: true,
+                }];
+                let mut probe = sample_probe();
+                probe.subtitle_tracks = vec![SubtitleTrack {
+                    index: 2,
+                    codec: "subrip".to_string(),
+                    language: Some("eng".to_string()),
+                    label: Some("Private source title".to_string()),
+                }];
+                let args = build_ffmpeg_args("source.mkv", "output.mov", &config, &probe).unwrap();
+                for tag in [
+                    "language=eng",
+                    "language=pol",
+                    "title=Private source title",
+                    "title=Private external title",
+                    "handler_name=Private external title",
+                ] {
+                    assert_eq!(args.iter().any(|arg| arg == tag), preserve, "{mode}: {tag}");
+                }
+                assert!(args_contains_pair(
+                    &args,
+                    "-disposition:s:1",
+                    "default+forced"
+                ));
+            }
+        }
+    }
+
+    #[test]
+    fn burn_clock_is_shared_by_image_gif_and_overlay_graphs() {
+        for (container, codec, overlay) in [
+            ("png", "png", false),
+            ("gif", "gif", false),
+            ("mp4", "libx264", true),
+        ] {
+            let mut config = sample_config(container, codec);
+            config.subtitle_burn_path = Some("/tmp/sub.srt".to_string());
+            config.start_time = Some("1.234567".to_string());
+            config.end_time = Some("2.345678".to_string());
+            if overlay {
+                config.overlay = Some(crate::types::OverlayConfig {
+                    enabled: true,
+                    path: "/tmp/overlay.png".to_string(),
+                    x: 0.5,
+                    y: 0.5,
+                    width: 0.25,
+                    opacity: 1.0,
+                    anchor: "center".to_string(),
+                });
+            }
+            // These builders share burn construction even where the product's
+            // current UI does not expose subtitles for image/GIF outputs.
+            let args =
+                build_ffmpeg_args("input.mp4", "output.media", &config, &sample_probe()).unwrap();
+            assert!(args.iter().any(|arg| arg.contains(
+                "setpts=PTS+(round(1.234567/TB)),subtitles=filename=/tmp/sub.srt,setpts=PTS-(round(1.234567/TB))"
+            )));
+            assert!(args_contains_pair(&args, "-t", "1.111111"));
+        }
+    }
+
+    #[test]
+    fn gif_palette_requires_space_for_opaque_and_transparent_colors() {
+        let input = temporary_input_file_with_extension("gif-palette-input", "png");
+        let mut config = sample_config("gif", "gif");
+        config.gif_colors = 2;
+        assert!(validate_task_input(&input.to_string_lossy(), &config).is_err());
+        config.gif_colors = MIN_GIF_COLORS;
+        assert!(validate_task_input(&input.to_string_lossy(), &config).is_ok());
+        let graph = build_gif_filter_complex(&config, VisualFilterContext::default());
+        assert!(graph.contains("palettegen=max_colors=3"));
+        assert!(!graph.contains("reserve_transparent=0"));
+        fs::remove_file(input).unwrap();
+    }
+
+    #[test]
+    fn nonfinite_trim_times_are_rejected_before_starting_ffmpeg() {
+        let input = temporary_input_file_with_extension("nonfinite-trim-input", "mp4");
+        for mode in ["copy", "reencode"] {
+            for value in ["NaN", "inf", "-inf", "1e309", "00:00:NaN"] {
+                let mut config = sample_config("mp4", "libx264");
+                config.processing_mode = mode.to_string();
+                config.start_time = Some(value.to_string());
+                let error = validate_task_input(&input.to_string_lossy(), &config).unwrap_err();
+                assert!(error.to_string().contains("Invalid start time"));
+                config.start_time = None;
+                config.end_time = Some(value.to_string());
+                let error = validate_task_input(&input.to_string_lossy(), &config).unwrap_err();
+                assert!(error.to_string().contains("Invalid end time"));
+            }
+        }
+        fs::remove_file(input).unwrap();
+    }
+
+    #[test]
+    fn finite_scientific_start_is_rejected_before_it_can_overflow_trim_duration() {
+        let mut config = sample_config("mkv", "libx264");
+        config.start_time = Some("-1e308".into());
+        config.end_time = Some("1e308".into());
+        assert!(
+            build_ffmpeg_args("input.mkv", "out.mkv", &config, &sample_probe())
+                .unwrap_err()
+                .to_string()
+                .contains("Invalid start time")
+        );
+    }
+
+    #[test]
+    fn subtitle_trim_plan_skips_nontext_and_noop_windows_and_shares_output_precision() {
+        use crate::trim::subtitle_trim_plan;
+        let mut config = sample_config("mkv", "libx264");
+        config.external_subtitle_tracks = vec![ExternalSubtitleTrack {
+            path: "/tmp/captions.SRT".into(),
+            ..ExternalSubtitleTrack::default()
+        }];
+        for start in [
+            None,
+            Some(""),
+            Some("  "),
+            Some("0"),
+            Some("00:00:00.000"),
+            Some("0.0000009"),
+            Some("-1"),
+        ] {
+            config.start_time = start.map(str::to_string);
+            assert!(subtitle_trim_plan(&config).unwrap().is_none());
+        }
+        config.start_time = Some(" 00:00:08.250001 ".into());
+        let plan = subtitle_trim_plan(&config).unwrap().unwrap();
+        assert!(plan.bitstream_filter.contains("max(0,DURATION+min(PTS,0))"));
+        assert!(!plan.bitstream_filter.contains("/tb"));
+        for (start, end, option, length) in [
+            (None, " 00:00:01.234567 ", "-to", "1.234567"),
+            (Some(" "), "1.234567", "-to", "1.234567"),
+            (Some("00:00:08.250001"), "00:00:08.750004", "-t", "0.500003"),
+            (Some("0"), "1", "-t", "1.000"),
+        ] {
+            config.start_time = start.map(str::to_string);
+            config.end_time = Some(end.into());
+            let plan = subtitle_trim_plan(&config).unwrap().unwrap();
+            let args = build_ffmpeg_args("input.mkv", "out.mkv", &config, &sample_probe()).unwrap();
+            assert!(args_contains_pair(
+                &args,
+                option,
+                if option == "-to" { end.trim() } else { length }
+            ));
+            assert!(
+                plan.bitstream_filter
+                    .contains(&format!("gte(pts,{length}/tb)"))
+            );
+            assert!(
+                plan.bitstream_filter
+                    .contains(&format!("min(PTS+DURATION,{length}/TB)"))
+            );
+        }
+        for path in ["/tmp/bitmap.sup", "/tmp/captions.ttml"] {
+            config.external_subtitle_tracks[0].path = path.into();
+            assert!(subtitle_trim_plan(&config).unwrap().is_none());
+        }
+        config.external_subtitle_tracks.clear();
+        config.selected_subtitle_tracks = vec![7];
+        config.subtitle_burn_path = Some("/tmp/burn.srt".into());
+        assert!(subtitle_trim_plan(&config).unwrap().is_none());
+        config.external_subtitle_tracks.push(ExternalSubtitleTrack {
+            path: "/tmp/captions.srt".into(),
+            ..ExternalSubtitleTrack::default()
+        });
+        config.container = "gif".into();
+        assert!(subtitle_trim_plan(&config).unwrap().is_none());
+    }
+
+    #[test]
+    fn raw_time_validation_is_role_aware_and_does_not_rewrite_saved_literals() {
+        let mut config = sample_config("mkv", "libx264");
+        for (start, literal, duration) in [
+            (" .123456789 ", "0.123456789", "1.376543"),
+            ("-.5", "-0.5", "2.000"),
+            ("+.5", "+0.5", "1.000"),
+            ("-00:00:00.5", "-00:00:00.5", "2.000"),
+            ("-1:30", "-1:30", "91.500"),
+        ] {
+            config.start_time = Some(start.into());
+            config.end_time = Some("1.5".into());
+            let args = build_ffmpeg_args("input.mkv", "out.mkv", &config, &sample_probe()).unwrap();
+            assert!(args_contains_pair(&args, "-ss", literal), "{start}");
+            assert!(args_contains_pair(&args, "-t", duration), "{start}");
+            assert_eq!(config.start_time.as_deref(), Some(start));
+        }
+        for (end, duration) in [
+            ("1e-3", "0.001"),
+            ("1:60", "120.000"),
+            ("001:2", "62.000"),
+            ("1.5:2", "92.000"),
+            ("+1:30", "90.000"),
+            ("1:-2", "58.000"),
+        ] {
+            config.start_time = Some("0".into());
+            config.end_time = Some(end.into());
+            let args = build_ffmpeg_args("input.mkv", "out.mkv", &config, &sample_probe()).unwrap();
+            assert!(args_contains_pair(&args, "-t", duration), "{end}");
+            config.start_time = None;
+            assert!(
+                build_ffmpeg_args("input.mkv", "out.mkv", &config, &sample_probe())
+                    .unwrap_err()
+                    .to_string()
+                    .contains("Invalid end time"),
+                "{end}"
+            );
+            config.start_time = Some(end.into());
+            config.end_time = None;
+            assert!(
+                build_ffmpeg_args("input.mkv", "out.mkv", &config, &sample_probe())
+                    .unwrap_err()
+                    .to_string()
+                    .contains("Invalid start time"),
+                "{end}"
+            );
+        }
+        config.start_time = None;
+        config.end_time = Some(".123456789".into());
+        let args = build_ffmpeg_args("input.mkv", "out.mkv", &config, &sample_probe()).unwrap();
+        assert!(args_contains_pair(&args, "-to", "0.123456789"));
+        assert_eq!(config.end_time.as_deref(), Some(".123456789"));
+    }
+
+    #[test]
+    fn raw_end_only_time_keeps_ffmpeg_precision_while_generated_duration_keeps_existing_semantics()
+    {
+        let mut config = sample_config("mkv", "libx264");
+        config.external_subtitle_tracks = vec![ExternalSubtitleTrack {
+            path: "/tmp/captions.srt".into(),
+            ..ExternalSubtitleTrack::default()
+        }];
+        for start in [None, Some(""), Some("  ")] {
+            config.start_time = start.map(str::to_string);
+            for (end, length) in [
+                ("0.9999999", "0.999999"),
+                ("00:00:00.123456789", "0.123456"),
+                ("1.0000009", "1.000000"),
+                ("0.0000009", "0.000000"),
+            ] {
+                config.end_time = Some(end.into());
+                let args =
+                    build_ffmpeg_args("input.mkv", "out.mkv", &config, &sample_probe()).unwrap();
+                assert!(args_contains_pair(&args, "-to", end));
+                let plan = crate::trim::subtitle_trim_plan(&config).unwrap().unwrap();
+                assert!(
+                    plan.bitstream_filter
+                        .contains(&format!("gte(pts,{length}/tb)"))
+                );
+            }
+        }
+        config.end_time = Some("1e-3".into());
+        assert!(
+            build_ffmpeg_args("input.mkv", "out.mkv", &config, &sample_probe())
+                .unwrap_err()
+                .to_string()
+                .contains("Invalid end time")
+        );
+        config.start_time = Some("0".into());
+        let args = build_ffmpeg_args("input.mkv", "out.mkv", &config, &sample_probe()).unwrap();
+        assert!(args_contains_pair(&args, "-ss", "0"));
+        assert!(args_contains_pair(&args, "-t", "0.001"));
+        assert!(
+            crate::trim::subtitle_trim_plan(&config)
+                .unwrap()
+                .unwrap()
+                .bitstream_filter
+                .contains("gte(pts,0.001/tb)")
+        );
+    }
+
+    #[test]
+    fn subtitle_trim_plan_keeps_mixed_output_ordinals_actions_and_metadata_independent() {
+        let mut probe = sample_probe();
+        probe.subtitle_tracks = [(1, "subrip"), (2, "hdmv_pgs_subtitle"), (3, "ass")]
+            .map(|(index, codec)| SubtitleTrack {
+                index,
+                codec: codec.into(),
+                ..SubtitleTrack::default()
+            })
+            .to_vec();
+        for mode in ["copy", "reencode"] {
+            for metadata_mode in [
+                MetadataMode::Preserve,
+                MetadataMode::Clean,
+                MetadataMode::Replace,
+            ] {
+                let mut config = sample_config("mkv", "libx264");
+                config.processing_mode = mode.into();
+                config.start_time = Some("8".into());
+                config.end_time = Some("9".into());
+                config.selected_subtitle_tracks = vec![3, 2, 1];
+                config.metadata.mode = metadata_mode;
+                config.external_subtitle_tracks = ["srt", "sup", "ass", "vtt"]
+                    .map(|extension| ExternalSubtitleTrack {
+                        path: format!("/tmp/captions.{extension}"),
+                        is_forced: true,
+                        ..ExternalSubtitleTrack::default()
+                    })
+                    .to_vec();
+                if mode == "reencode" {
+                    config.overlay = Some(OverlayConfig {
+                        enabled: true,
+                        path: "/tmp/logo.png".into(),
+                        width: 0.25,
+                        opacity: 1.0,
+                        anchor: "center".into(),
+                        ..OverlayConfig::default()
+                    });
+                }
+                let args = build_ffmpeg_args("input.mkv", "out.mkv", &config, &probe).unwrap();
+                let ordinals: Vec<_> = args
+                    .iter()
+                    .filter(|arg| arg.starts_with("-bsf:"))
+                    .map(String::as_str)
+                    .collect();
+                assert_eq!(ordinals, ["-bsf:s:3", "-bsf:s:5", "-bsf:s:6"]);
+                // MKV preserves each native subtitle codec, including imported text.
+                for ordinal in 0..7 {
+                    assert!(args_contains_pair(
+                        &args,
+                        &format!("-c:s:{ordinal}"),
+                        "copy"
+                    ));
+                }
+                assert!(args_contains_pair(&args, "-map", "0:3"));
+                assert!(args_contains_pair(
+                    &args,
+                    "-map",
+                    if mode == "copy" { "1:s:0" } else { "2:s:0" }
+                ));
+                assert!(args_contains_pair(&args, "-disposition:s:3", "forced"));
+                let plan = crate::trim::subtitle_trim_plan(&config).unwrap().unwrap();
+                assert_eq!(plan.output_ordinals, [3, 5, 6]);
+                assert_eq!(plan.required_bitstream_filters(), ["noise", "setts"]);
+                let expected = "noise=amount=0:drop='if(gte(duration,0)*not(eq(pts,nopts))*gt(tb,0),gt(duration,0)*lte(pts+duration,0)+gte(pts,1.000/tb),0)',setts=pts='if(gte(DURATION,0)*not(eq(PTS,NOPTS))*gt(TB,0),max(PTS,0),PTS)':dts='if(gte(DURATION,0)*not(eq(PTS,NOPTS))*gt(TB,0)*not(eq(DTS,NOPTS)),max(DTS,0),DTS)':duration='if(gte(DURATION,0)*not(eq(PTS,NOPTS))*gt(TB,0)*gt(DURATION,0),max(0,min(PTS+DURATION,1.000/TB)-max(PTS,0)),DURATION)'";
+                assert_eq!(plan.bitstream_filter, expected);
+                assert!(args_contains_pair(&args, "-bsf:s:3", expected));
+            }
+        }
+    }
+
+    #[test]
+    fn ignored_transport_subtitle_text_tags_do_not_block_clean_or_replace() {
+        let input = temporary_input_file_with_extension("transport-metadata-input", "mkv");
+        let subtitle = temporary_input_file_with_extension("transport-metadata-sidecar", "sup");
+        for container in ["m2t", "m2ts"] {
+            let mut config = sample_config(container, "libx264");
+            config.audio_codec = "ac3".to_string();
+            config.external_subtitle_tracks = vec![ExternalSubtitleTrack {
+                path: subtitle.to_string_lossy().into_owned(),
+                language: Some("eng".to_string()),
+                title: Some("Private title".to_string()),
+                ..ExternalSubtitleTrack::default()
+            }];
+            assert!(validate_task_input(&input.to_string_lossy(), &config).is_err());
+            for metadata_mode in [MetadataMode::Clean, MetadataMode::Replace] {
+                config.metadata.mode = metadata_mode;
+                assert!(validate_task_input(&input.to_string_lossy(), &config).is_ok());
+                config.external_subtitle_tracks[0].is_forced = true;
+                assert!(validate_task_input(&input.to_string_lossy(), &config).is_err());
+                config.external_subtitle_tracks[0].is_forced = false;
+            }
+        }
+        fs::remove_file(input).unwrap();
+        fs::remove_file(subtitle).unwrap();
     }
 
     #[test]
@@ -1498,14 +2801,88 @@ mod tests {
     }
 
     #[test]
-    fn build_ffmpeg_args_adds_even_dimensions_guard_for_default_video_reencode() {
+    fn build_ffmpeg_args_skips_padding_for_known_even_video_raster() {
         let config = sample_config("mp4", "libx264");
+        let probe = ProbeMetadata {
+            width: Some(1920),
+            height: Some(1080),
+            ..sample_probe()
+        };
+        let args = build_ffmpeg_args("input.mov", "output.mp4", &config, &probe)
+            .expect("known even source should need no visual filter");
+        assert!(!args.iter().any(|arg| arg == "-vf"));
+    }
 
-        let args = build_ffmpeg_args("input.mov", "output.mp4", &config, &sample_probe())
-            .expect("arguments should build");
+    #[test]
+    fn build_ffmpeg_args_copies_libx265_frames_after_visual_filters() {
+        let probe = ProbeMetadata {
+            width: Some(48),
+            height: Some(32),
+            ..sample_probe()
+        };
+        for (flip_vertical, expected_filter) in [(false, "copy"), (true, "vflip,copy")] {
+            let mut config = sample_config("mkv", "libx265");
+            config.flip_vertical = flip_vertical;
+            let args = build_ffmpeg_args("input.mp4", "output.mkv", &config, &probe)
+                .expect("libx265 arguments should build");
 
-        let vf_index = args.iter().position(|arg| arg == "-vf").unwrap();
-        assert_eq!(args[vf_index + 1], EVEN_DIMENSIONS_FILTER);
+            assert!(args_contains_pair(&args, "-vf", expected_filter));
+        }
+    }
+
+    #[test]
+    fn stream_copy_does_not_add_libx265_frame_copy() {
+        let mut config = sample_config("mkv", "libx265");
+        config.processing_mode = "copy".into();
+        let args = build_ffmpeg_args("input.mp4", "output.mkv", &config, &sample_probe())
+            .expect("stream-copy arguments should build");
+
+        assert!(args_contains_pair(&args, "-c", "copy"));
+        assert!(
+            !args
+                .iter()
+                .any(|arg| matches!(arg.as_str(), "-vf" | "-filter_complex"))
+        );
+    }
+
+    #[test]
+    fn build_ffmpeg_args_copies_libx265_frames_after_overlay_composition() {
+        let probe = ProbeMetadata {
+            width: Some(48),
+            height: Some(32),
+            ..sample_probe()
+        };
+        for opacity in [0.0, 1.0] {
+            let mut config = sample_config("mkv", "libx265");
+            config.flip_vertical = true;
+            config.overlay = Some(OverlayConfig {
+                enabled: true,
+                path: "/tmp/logo.png".into(),
+                width: 0.25,
+                opacity,
+                ..OverlayConfig::default()
+            });
+            let args = build_ffmpeg_args("input.mp4", "output.mkv", &config, &probe)
+                .expect("libx265 overlay arguments should build");
+            let graph = args
+                .windows(2)
+                .find(|pair| pair[0] == "-filter_complex")
+                .map(|pair| pair[1].as_str())
+                .expect("overlay should use a complex graph");
+
+            assert!(graph.ends_with(";[video_composed]copy[vout]"), "{graph}");
+            assert_eq!(graph.matches("copy").count(), 1, "{graph}");
+            if opacity > 0.0 {
+                assert!(graph.contains("overlay=x="), "{graph}");
+                assert!(graph.contains(":format=auto[video_composed]"), "{graph}");
+            } else {
+                assert_eq!(
+                    graph,
+                    "[0:v:0]vflip[video_composed];[video_composed]copy[vout]"
+                );
+            }
+            assert!(args_contains_pair(&args, "-map", "[vout]"));
+        }
     }
 
     #[test]
@@ -1742,7 +3119,119 @@ mod tests {
         let args = build_ffmpeg_args("input.mov", "output.tiff", &config, &sample_probe())
             .expect("arguments should build");
 
-        assert!(args_contains_pair(&args, "-compression_algo", "deflate"));
+        assert!(args_contains_pair(&args, "-compression_algo", "8"));
+    }
+
+    #[test]
+    fn opus_output_keeps_target_bitrate_in_both_vbr_modes() {
+        let input = temporary_input_file_with_extension("opus-input", "flac");
+        for bitrate in ["64", "128"] {
+            for opus_vbr in [false, true] {
+                let mut config = sample_config("opus", "libx264");
+                config.audio_codec = "libopus".to_string();
+                config.audio_bitrate = bitrate.to_string();
+                config.opus_vbr = opus_vbr;
+                config.selected_audio_tracks = vec![1];
+                validate_task_input(&input.to_string_lossy(), &config).unwrap();
+                let mut probe = sample_probe();
+                probe.media_kind = "audio".to_string();
+                probe.video_codec = None;
+                probe.audio_tracks[0].codec = "flac".to_string();
+                let args = build_ffmpeg_args("input.flac", "output.opus", &config, &probe).unwrap();
+                assert!(args_contains_pair(&args, "-c:a", "libopus"));
+                assert!(args_contains_pair(&args, "-b:a", &format!("{bitrate}k")));
+                assert!(args_contains_pair(
+                    &args,
+                    "-vbr",
+                    if opus_vbr { "on" } else { "off" }
+                ));
+                assert!(args_contains_pair(&args, "-map", "0:1"));
+                assert!(args.iter().any(|arg| arg == "-vn"));
+                for absent in ["-q:a", "-ar", "-c:v", "-c", "-c:s"] {
+                    assert!(!args.iter().any(|arg| arg == absent), "{absent}: {args:?}");
+                }
+            }
+        }
+        fs::remove_file(input).unwrap();
+    }
+
+    #[test]
+    fn legacy_opus_video_configs_keep_vbr_on() {
+        for (container, video_codec) in [("webm", "vp9"), ("mp4", "libx264")] {
+            let mut config = sample_config(container, video_codec);
+            config.audio_codec = "libopus".to_string();
+            config.selected_audio_tracks = vec![1];
+            let mut legacy = serde_json::to_value(config).unwrap();
+            legacy.as_object_mut().unwrap().remove("opusVbr");
+            let config = serde_json::from_value(legacy).unwrap();
+            let args = build_ffmpeg_args(
+                "input.mov",
+                &format!("output.{container}"),
+                &config,
+                &sample_probe(),
+            )
+            .unwrap();
+            assert!(args_contains_pair(&args, "-b:a", "128k"));
+            assert!(args_contains_pair(&args, "-vbr", "on"));
+            assert!(!args.iter().any(|arg| arg == "-q:a"));
+        }
+    }
+
+    #[test]
+    fn opus_stream_copy_requires_opus_source_and_omits_encoder_options() {
+        let mut config = sample_config("opus", "libx264");
+        config.processing_mode = "copy".to_string();
+        config.audio_codec = "libopus".to_string();
+        config.selected_audio_tracks = vec![1];
+        for opus_vbr in [false, true] {
+            config.opus_vbr = opus_vbr;
+            for codec in ["opus", "flac", "aac"] {
+                let mut probe = sample_probe();
+                probe.audio_tracks[0].codec = codec.to_string();
+                let result = build_ffmpeg_args("input.mkv", "output.opus", &config, &probe);
+                if codec != "opus" {
+                    assert!(result.is_err(), "{codec} must not copy into Ogg Opus");
+                    continue;
+                }
+                let args = result.unwrap();
+                assert!(args_contains_pair(&args, "-c", "copy"));
+                for absent in ["-b:a", "-vbr", "-q:a", "-ar", "-c:a"] {
+                    assert!(!args.iter().any(|arg| arg == absent), "{absent}: {args:?}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn opus_vbr_does_not_change_other_audio_encoder_arguments() {
+        for (codec, mode, expected) in [
+            ("aac", "bitrate", vec!["-c:a", "aac", "-b:a", "128k"]),
+            ("mp3", "bitrate", vec!["-c:a", "mp3", "-b:a", "128k"]),
+            ("mp3", "vbr", vec!["-c:a", "mp3", "-q:a", "4"]),
+            (
+                "libfdk_aac",
+                "bitrate",
+                vec!["-c:a", "libfdk_aac", "-b:a", "128k"],
+            ),
+            ("libfdk_aac", "vbr", vec!["-c:a", "libfdk_aac", "-vbr", "4"]),
+            ("flac", "bitrate", vec!["-c:a", "flac"]),
+            ("pcm_s16le", "bitrate", vec!["-c:a", "pcm_s16le"]),
+            (
+                "mp2",
+                "bitrate",
+                vec!["-c:a", "mp2", "-b:a", "128k", "-ar", "48000"],
+            ),
+        ] {
+            for opus_vbr in [false, true] {
+                let mut config = sample_config("mkv", "libx264");
+                config.audio_codec = codec.to_string();
+                config.audio_bitrate_mode = mode.to_string();
+                config.opus_vbr = opus_vbr;
+                let mut args = Vec::new();
+                add_audio_codec_args(&mut args, &config);
+                assert_eq!(args, expected, "{codec}, {mode}, opus_vbr={opus_vbr}");
+            }
+        }
     }
 
     #[test]

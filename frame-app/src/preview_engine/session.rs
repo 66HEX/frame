@@ -1,19 +1,22 @@
-use std::sync::{Mutex, MutexGuard};
-
+use super::ffmpeg_backend::PreviewPlaybackReader;
 use super::metrics::PreviewRuntimeMetricsStore;
 use super::{
     LatestFrameSnapshot, LatestFrameStore, PreviewCommand, PreviewDimensions, PreviewEngineError,
     PreviewPlaybackSnapshot, PreviewSessionConfig, PreviewSessionSnapshot, PreviewSessionStatus,
     PreviewSourceKind, RunningPreviewProcess, start_ffmpeg_preview_process,
 };
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 pub struct PreviewSession {
+    cancelled: Arc<AtomicBool>,
     config: Mutex<PreviewSessionConfig>,
     dimensions: Mutex<PreviewDimensions>,
     duration_seconds: Mutex<f64>,
     frame_store: LatestFrameStore,
     metrics: PreviewRuntimeMetricsStore,
     pipeline: Mutex<Option<RunningPreviewProcess>>,
+    playback_reader: Mutex<Option<PreviewPlaybackReader>>,
     playing: Mutex<bool>,
     status: Mutex<PreviewSessionStatus>,
 }
@@ -26,20 +29,43 @@ impl PreviewSession {
     /// Returns an error when the config is invalid or the `FFmpeg` preview
     /// process cannot render the initial frame.
     pub fn start(config: PreviewSessionConfig) -> Result<Self, PreviewEngineError> {
+        Self::start_with_cancellation(config, Arc::new(AtomicBool::new(false)))
+    }
+
+    /// Starts a session with a cancellation signal available before any child
+    /// starts or the session object is returned.
+    ///
+    /// # Errors
+    /// Returns the same errors as `start`, including a cancelled initial probe.
+    pub fn start_with_cancellation(
+        config: PreviewSessionConfig,
+        cancelled: Arc<AtomicBool>,
+    ) -> Result<Self, PreviewEngineError> {
         config.validate()?;
+        if cancelled.load(Ordering::Acquire) {
+            return Err(PreviewEngineError::Ffmpeg(
+                "preview request cancelled".into(),
+            ));
+        }
         let frame_store = LatestFrameStore::new();
         let metrics = PreviewRuntimeMetricsStore::new();
 
         match config.source_kind {
             PreviewSourceKind::Image | PreviewSourceKind::Video | PreviewSourceKind::Audio => {
-                let (pipeline, dimensions, duration_seconds) =
-                    start_ffmpeg_preview_process(&config, frame_store.clone(), metrics.clone())?;
+                let (pipeline, dimensions, duration_seconds) = start_ffmpeg_preview_process(
+                    &config,
+                    frame_store.clone(),
+                    metrics.clone(),
+                    Arc::clone(&cancelled),
+                )?;
                 Ok(Self {
+                    cancelled,
                     config: Mutex::new(config),
                     dimensions: Mutex::new(dimensions),
                     duration_seconds: Mutex::new(duration_seconds),
                     frame_store,
                     metrics,
+                    playback_reader: Mutex::new(Some(pipeline.playback_reader())),
                     pipeline: Mutex::new(Some(pipeline)),
                     playing: Mutex::new(false),
                     status: Mutex::new(PreviewSessionStatus::Ready),
@@ -54,12 +80,14 @@ impl PreviewSession {
         let frame_store = LatestFrameStore::new();
         let metrics = PreviewRuntimeMetricsStore::new();
         Self {
+            cancelled: Arc::new(AtomicBool::new(false)),
             dimensions: Mutex::new(config.target_dimensions()),
             duration_seconds: Mutex::new(config.duration_seconds),
             config: Mutex::new(config),
             frame_store,
             metrics,
             pipeline: Mutex::new(None),
+            playback_reader: Mutex::new(None),
             playing: Mutex::new(false),
             status: Mutex::new(PreviewSessionStatus::Ready),
         }
@@ -78,23 +106,22 @@ impl PreviewSession {
     )]
     pub fn reconfigure(&self, config: PreviewSessionConfig) -> Result<(), PreviewEngineError> {
         config.validate()?;
-        let dimensions = {
-            let mut pipeline_guard = lock(&self.pipeline);
-            let playing = *lock(&self.playing);
-            let Some(pipeline) = pipeline_guard.as_mut() else {
-                let (pipeline, dimensions, _) = start_ffmpeg_preview_process(
-                    &config,
-                    self.frame_store.clone(),
-                    self.metrics.clone(),
-                )?;
-                *pipeline_guard = Some(pipeline);
-                self.store_reconfigured_state(config, dimensions);
-                return Ok(());
-            };
-            let seconds = pipeline.position();
-            pipeline.reconfigure(config.clone(), seconds, playing, true)?
+        let mut pipeline_guard = lock(&self.pipeline);
+        let Some(pipeline) = pipeline_guard.as_mut() else {
+            // A queued reconfiguration must not reopen a session already stopped.
+            return Ok(());
         };
-
+        if self.cancelled.load(Ordering::Acquire) {
+            return Err(PreviewEngineError::Ffmpeg(
+                "preview request cancelled".into(),
+            ));
+        }
+        if pipeline.failed() {
+            *lock(&self.playing) = false;
+        }
+        let playing = *lock(&self.playing);
+        let seconds = pipeline.position();
+        let dimensions = pipeline.reconfigure(config.clone(), seconds, playing, true)?;
         self.store_reconfigured_state(config, dimensions);
         Ok(())
     }
@@ -124,31 +151,35 @@ impl PreviewSession {
         reason = "The pipeline mutex guard must live across the selected FFmpeg process command."
     )]
     pub fn command(&self, command: PreviewCommand) -> Result<(), PreviewEngineError> {
-        let next_playing = {
-            let pipeline = lock(&self.pipeline);
-            let Some(pipeline) = pipeline.as_ref() else {
-                return Ok(());
-            };
-
-            match command {
-                PreviewCommand::Play => {
-                    pipeline.resume()?;
-                    Some(true)
-                }
-                PreviewCommand::Pause => {
-                    pipeline.pause()?;
-                    Some(false)
-                }
-                PreviewCommand::SeekFast(seconds) => {
-                    let was_playing = *lock(&self.playing);
-                    pipeline.seek(seconds, !was_playing, false)?;
-                    None
-                }
-                PreviewCommand::SeekPrecise(seconds) => {
-                    let was_playing = *lock(&self.playing);
-                    pipeline.seek(seconds, !was_playing, true)?;
-                    None
-                }
+        let pipeline_guard = lock(&self.pipeline);
+        let Some(pipeline) = pipeline_guard.as_ref() else {
+            return Ok(());
+        };
+        if pipeline.failed() {
+            *lock(&self.playing) = false;
+        }
+        let next_playing = match command {
+            PreviewCommand::Play => {
+                pipeline.resume()?;
+                Some(true)
+            }
+            PreviewCommand::Pause => {
+                pipeline.pause()?;
+                Some(false)
+            }
+            PreviewCommand::SeekFast(seconds) => {
+                let was_playing = *lock(&self.playing);
+                pipeline.seek(seconds, !was_playing, false)?;
+                None
+            }
+            PreviewCommand::SeekPrecise(seconds) => {
+                let was_playing = *lock(&self.playing);
+                pipeline.seek(seconds, !was_playing, true)?;
+                None
+            }
+            PreviewCommand::SeekAndPlay { seconds, precise } => {
+                pipeline.seek(seconds, false, precise)?;
+                Some(true)
             }
         };
 
@@ -161,24 +192,18 @@ impl PreviewSession {
 
     #[must_use]
     pub fn snapshot(&self) -> PreviewSessionSnapshot {
-        let pipeline_snapshot = {
-            let pipeline = lock(&self.pipeline);
-            pipeline
-                .as_ref()
-                .map(|pipeline| (pipeline.duration(), pipeline.ended(), pipeline.position()))
-        };
-        let duration = pipeline_snapshot.map_or_else(
-            || *lock(&self.duration_seconds),
-            |(duration, _, _)| self.update_duration(duration),
-        );
-        let ended = pipeline_snapshot.is_some_and(|(_, ended, _)| ended);
-        let position = pipeline_snapshot.map_or(
-            0.0,
-            |(_, ended, position)| {
-                if ended { duration } else { position }
+        // The command mutex may be held for the entire decode/reconfiguration.
+        // Read only the independently published clock; never join workers here.
+        let duration_seconds = *lock(&self.duration_seconds);
+        let reader = lock(&self.playback_reader).clone();
+        let playback = reader.map_or(
+            PreviewPlaybackSnapshot {
+                position_seconds: 0.0,
+                duration_seconds,
+                playing: false,
             },
+            |reader| reader.snapshot(duration_seconds, *lock(&self.playing)),
         );
-        let playing = pipeline_snapshot.is_some_and(|_| !ended && *lock(&self.playing));
 
         let config = lock(&self.config);
         PreviewSessionSnapshot {
@@ -186,11 +211,7 @@ impl PreviewSession {
             source_kind: config.source_kind,
             dimensions: *lock(&self.dimensions),
             status: lock(&self.status).clone(),
-            playback: PreviewPlaybackSnapshot {
-                position_seconds: position,
-                duration_seconds: duration,
-                playing,
-            },
+            playback,
             frame_generation: self.frame_store.generation(),
             frame_stats: self.frame_store.stats(),
             runtime_metrics: self.metrics.snapshot(),
@@ -203,19 +224,16 @@ impl PreviewSession {
     ///
     /// Returns an error when the preview pipeline cannot stop a child process.
     pub fn stop(&self) -> Result<(), PreviewEngineError> {
+        self.cancelled.store(true, Ordering::Release);
         let pipeline = { lock(&self.pipeline).take() };
+        *lock(&self.playback_reader) = None;
         let result = pipeline.map_or(Ok(()), |mut pipeline| pipeline.stop());
         *lock(&self.playing) = false;
         result
     }
 
-    fn update_duration(&self, duration: f64) -> f64 {
-        if duration.is_finite() && duration > 0.0 {
-            *lock(&self.duration_seconds) = duration;
-            duration
-        } else {
-            *lock(&self.duration_seconds)
-        }
+    pub(crate) fn cancellation_token(&self) -> Arc<AtomicBool> {
+        Arc::clone(&self.cancelled)
     }
 
     fn store_reconfigured_state(
@@ -232,6 +250,7 @@ impl PreviewSession {
 
 impl Drop for PreviewSession {
     fn drop(&mut self) {
+        self.cancelled.store(true, Ordering::Release);
         let pipeline = { lock(&self.pipeline).take() };
         if let Some(mut pipeline) = pipeline {
             let _ = pipeline.stop();
@@ -243,4 +262,130 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+    use std::sync::{Arc, mpsc};
+    use std::thread;
+    use std::time::Duration;
+
+    fn test_config() -> PreviewSessionConfig {
+        PreviewSessionConfig {
+            file_id: "nonblocking-preview".to_string(),
+            path: PathBuf::from("/missing/preview.mp4"),
+            source_kind: PreviewSourceKind::Video,
+            source_width: Some(160),
+            source_height: Some(90),
+            source_is_palette: false,
+            source_is_mpeg_ts: false,
+            source_sample_aspect_ratio: None,
+            request_token: 0,
+            source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
+            preview_burn_clock: None,
+            selected_audio_track: None,
+            duration_seconds: 2.0,
+            max_width: 320,
+            max_height: 180,
+            fps: 30,
+            conversion_config: crate::conversion_runner::core_config_from_gpui(
+                &crate::settings::ConversionConfig::default(),
+            ),
+        }
+    }
+
+    #[test]
+    fn snapshots_do_not_wait_for_pipeline_reconfiguration_or_shutdown() {
+        let session = Arc::new(PreviewSession::new_for_test(test_config()));
+        let frame =
+            super::super::rendered_frame_from_bgra_payload(1, 1, 4, 0, vec![0; 4]).expect("frame");
+        let _ = session.frame_store.publish(frame);
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let worker_session = Arc::clone(&session);
+        let worker = thread::spawn(move || {
+            let guard = lock(&worker_session.pipeline);
+            locked_tx.send(()).unwrap();
+            release_rx.recv().unwrap();
+            drop(guard);
+        });
+        locked_rx.recv().unwrap();
+
+        let (snapshot_tx, snapshot_rx) = mpsc::channel();
+        let reader = thread::spawn(move || {
+            snapshot_tx.send(session.snapshot()).unwrap();
+            assert!(session.latest_frame().is_some());
+        });
+        let snapshot = snapshot_rx.recv_timeout(Duration::from_secs(1));
+        // Release before asserting so a regression reports a failure, not a hang.
+        release_tx.send(()).unwrap();
+        worker.join().unwrap();
+        reader.join().unwrap();
+
+        let snapshot = snapshot.expect("UI snapshot must not wait for the FFmpeg pipeline lock");
+        assert_eq!(snapshot.file_id, "nonblocking-preview");
+        assert_eq!(snapshot.frame_generation, 1);
+    }
+
+    #[test]
+    fn queued_reconfiguration_does_not_restart_a_stopped_session() {
+        let config = test_config();
+        let session = PreviewSession::new_for_test(config.clone());
+        session.stop().expect("stop");
+        let mut replacement = config;
+        replacement.conversion_config.flip_horizontal = true;
+
+        // The missing file would fail if this tried to start a new FFmpeg process.
+        session
+            .reconfigure(replacement)
+            .expect("stopped session stays stopped");
+
+        assert!(lock(&session.pipeline).is_none());
+        assert!(!lock(&session.config).conversion_config.flip_horizontal);
+        assert!(!session.snapshot().playback.playing);
+    }
+
+    #[test]
+    fn failed_audio_seeks_and_reconfigures_stay_paused_until_an_explicit_retry() {
+        let mut config = test_config();
+        config.source_kind = PreviewSourceKind::Audio;
+        config.source_width = None;
+        config.source_height = None;
+        // No selected track is a supported silent audio session: these public
+        // commands exercise the real pipeline without a device or FFmpeg.
+        let session = PreviewSession::start(config.clone()).expect("audio session");
+        for seek in [
+            PreviewCommand::SeekFast(0.5),
+            PreviewCommand::SeekPrecise(0.75),
+        ] {
+            session.command(PreviewCommand::Play).unwrap();
+            lock(&session.pipeline)
+                .as_ref()
+                .unwrap()
+                .fail_audio_output_for_test();
+            assert!(!session.snapshot().playback.playing);
+            session.command(seek).unwrap();
+            assert!(
+                !session.snapshot().playback.playing,
+                "ordinary seek must remain paused after failure"
+            );
+        }
+        session.command(PreviewCommand::Play).unwrap();
+        lock(&session.pipeline)
+            .as_ref()
+            .unwrap()
+            .fail_audio_output_for_test();
+        session.reconfigure(config).unwrap();
+        assert!(!session.snapshot().playback.playing);
+        session
+            .command(PreviewCommand::SeekAndPlay {
+                seconds: 0.2,
+                precise: true,
+            })
+            .unwrap();
+        assert!(session.snapshot().playback.playing);
+        session.stop().unwrap();
+    }
 }

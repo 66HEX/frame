@@ -1,18 +1,13 @@
 //! Source metadata state and ffprobe integration for the GPUI app.
 
-use std::{collections::HashMap, process::Command};
-
-use frame_core::{
-    error::ConversionError,
-    probe::{ffprobe_json_args, parse_ffprobe_stdout},
-    types::{FfprobeTags, ProbeMetadata},
-};
-
-use crate::{
-    file_queue::FileQueue,
-    runtime_binaries::ffprobe_executable,
-    settings::{AudioTrack, SourceKind, SourceMetadata, SourceTags, SubtitleTrack},
-};
+use crate::file_queue::FileQueue;
+use crate::runtime_binaries::ffprobe_executable;
+use crate::settings::{AudioTrack, SourceKind, SourceMetadata, SourceTags, SubtitleTrack};
+use frame_core::error::ConversionError;
+use frame_core::probe::{ffprobe_json_args, parse_ffprobe_stdout};
+use frame_core::types::{FfprobeTags, ProbeMetadata};
+use std::collections::HashMap;
+use std::process::Command;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum MetadataStatus {
@@ -52,6 +47,21 @@ impl SourceMetadataStore {
     pub fn metadata_for(&self, id: &str) -> Option<&SourceMetadata> {
         self.entries
             .get(id)
+            .and_then(|entry| entry.metadata.as_ref())
+    }
+
+    #[must_use]
+    pub fn status_for(&self, id: &str) -> MetadataStatus {
+        self.entries
+            .get(id)
+            .map_or(MetadataStatus::Idle, |entry| entry.status)
+    }
+
+    #[must_use]
+    pub fn ready_metadata_for(&self, id: &str) -> Option<&SourceMetadata> {
+        self.entries
+            .get(id)
+            .filter(|entry| entry.status == MetadataStatus::Ready)
             .and_then(|entry| entry.metadata.as_ref())
     }
 
@@ -96,10 +106,14 @@ impl SourceMetadataStore {
 #[must_use]
 pub fn source_metadata_from_probe(probe: ProbeMetadata) -> SourceMetadata {
     SourceMetadata {
+        sample_aspect_ratio: probe.sample_aspect_ratio,
+        source_timing: probe.source_timing,
+        source_format: probe.source_format,
         media_kind: source_kind_from_probe(&probe.media_kind),
         duration: probe.duration,
         bitrate: probe.bitrate,
         video_codec: probe.video_codec,
+        video_stream_index: probe.video_stream_index,
         audio_codec: probe.audio_codec,
         resolution: probe.resolution,
         frame_rate: probe.frame_rate,
@@ -112,7 +126,9 @@ pub fn source_metadata_from_probe(probe: ProbeMetadata) -> SourceMetadata {
             .map(|track| AudioTrack {
                 index: track.index,
                 codec: track.codec,
+                codec_tag: track.codec_tag,
                 channels: Some(track.channels),
+                channel_layout: track.channel_layout,
                 language: track.language,
                 label: track.label,
                 bitrate_kbps: track.bitrate_kbps,
@@ -160,10 +176,9 @@ pub fn probe_source_metadata_with_executable(
     file_path: &str,
     executable: &str,
 ) -> Result<SourceMetadata, ConversionError> {
-    let output = Command::new(executable)
-        .args(ffprobe_json_args(file_path))
-        .output()
-        .map_err(ConversionError::Io)?;
+    let output =
+        crate::process_launch::output(Command::new(executable).args(ffprobe_json_args(file_path)))
+            .map_err(ConversionError::Io)?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -215,6 +230,7 @@ mod tests {
                 media_kind: "video".to_string(),
                 duration: Some("10.000000".to_string()),
                 video_codec: Some("h264".to_string()),
+                video_stream_index: Some(3),
                 resolution: Some("1920x1080".to_string()),
                 frame_rate: Some(29.97),
                 width: Some(1920),
@@ -225,6 +241,7 @@ mod tests {
 
             assert_eq!(metadata.media_kind, Some(SourceKind::Video));
             assert_eq!(metadata.video_codec.as_deref(), Some("h264"));
+            assert_eq!(metadata.video_stream_index, Some(3));
             assert_eq!(metadata.resolution.as_deref(), Some("1920x1080"));
         }
 
@@ -248,20 +265,33 @@ mod tests {
         fn maps_audio_tracks() {
             let metadata = source_metadata_from_probe(ProbeMetadata {
                 media_kind: "audio".to_string(),
+                source_format: Some("mov,mp4,m4a,3gp,3g2,mj2".into()),
                 audio_tracks: vec![ProbeAudioTrack {
                     index: 1,
                     codec: "aac".to_string(),
+                    codec_tag: Some(0x6134_706d),
                     channels: "2".to_string(),
+                    channel_layout: Some("stereo".to_string()),
                     language: Some("eng".to_string()),
                     label: Some("Main".to_string()),
+                    metadata_title: Some("Genuine source title".to_string()),
                     bitrate_kbps: Some(192.0),
                     sample_rate: Some("48000".to_string()),
                 }],
                 ..ProbeMetadata::default()
             });
 
+            assert_eq!(
+                metadata.source_format.as_deref(),
+                Some("mov,mp4,m4a,3gp,3g2,mj2")
+            );
+            assert_eq!(metadata.audio_tracks[0].codec_tag, Some(0x6134_706d));
             assert_eq!(metadata.audio_tracks[0].label.as_deref(), Some("Main"));
             assert_eq!(metadata.audio_tracks[0].channels.as_deref(), Some("2"));
+            assert_eq!(
+                metadata.audio_tracks[0].channel_layout.as_deref(),
+                Some("stereo")
+            );
         }
 
         #[test]
@@ -281,6 +311,40 @@ mod tests {
                 metadata.subtitle_tracks[0].label.as_deref(),
                 Some("Captions")
             );
+        }
+
+        #[test]
+        fn track_names_do_not_alias_global_title_or_leak_to_unnamed_streams() {
+            for global in [
+                serde_json::json!({"name":"Global name"}),
+                serde_json::json!({"title":"Global title","name":"Global name"}),
+                serde_json::json!({"title":"","name":"Global name"}),
+            ] {
+                let value = serde_json::json!({"format":{"tags":global},"streams":[
+                    {"index":1,"codec_type":"audio","codec_name":"aac","tags":{"name":"Main audio","language":"pol"}},
+                    {"index":2,"codec_type":"subtitle","codec_name":"mov_text","tags":{"name":"Captions","language":"eng"}},
+                    {"index":3,"codec_type":"subtitle","codec_name":"mov_text"}
+                ]});
+                let probe =
+                    frame_core::probe::parse_ffprobe_stdout("source.mp4", value.to_string())
+                        .unwrap();
+                let metadata = source_metadata_from_probe(probe);
+                assert_eq!(
+                    metadata.tags.as_ref().unwrap().title.as_deref(),
+                    global["title"].as_str()
+                );
+                assert_eq!(
+                    metadata.audio_tracks[0].label.as_deref(),
+                    Some("Main audio")
+                );
+                assert_eq!(metadata.audio_tracks[0].language.as_deref(), Some("pol"));
+                assert_eq!(
+                    metadata.subtitle_tracks[0].label.as_deref(),
+                    Some("Captions")
+                );
+                assert_eq!(metadata.subtitle_tracks[0].language.as_deref(), Some("eng"));
+                assert!(metadata.subtitle_tracks[1].label.is_none());
+            }
         }
 
         #[test]
@@ -326,6 +390,27 @@ mod tests {
             let entry = store.entry_for("file-1");
             assert_eq!(entry.status, MetadataStatus::Loading);
             assert_eq!(entry.error, None);
+        }
+
+        #[test]
+        fn borrowed_ready_metadata_requires_ready_status_and_present_metadata() {
+            let mut store = SourceMetadataStore::default();
+            assert_eq!(store.status_for("file"), MetadataStatus::Idle);
+            assert!(store.ready_metadata_for("file").is_none());
+            store.mark_loading("file");
+            assert_eq!(store.status_for("file"), MetadataStatus::Loading);
+            assert!(store.ready_metadata_for("file").is_none());
+            store.mark_ready("file", SourceMetadata::default());
+            assert!(std::ptr::eq(
+                store.metadata_for("file").unwrap(),
+                store.ready_metadata_for("file").unwrap()
+            ));
+            store.entries.get_mut("file").unwrap().metadata = None;
+            assert_eq!(store.status_for("file"), MetadataStatus::Ready);
+            assert!(store.ready_metadata_for("file").is_none());
+            store.mark_error("file", "failed");
+            assert_eq!(store.status_for("file"), MetadataStatus::Error);
+            assert!(store.ready_metadata_for("file").is_none());
         }
 
         #[test]

@@ -1,6 +1,7 @@
-use std::{collections::HashSet, path::Path};
-
-use frame_core::{args::build_output_path, types::ConversionTask};
+use frame_core::args::build_output_path;
+use frame_core::types::ConversionTask;
+use std::collections::HashSet;
+use std::path::Path;
 
 /// Assigns deterministic suffixes to output names that would collide with an
 /// earlier task or an existing filesystem entry.

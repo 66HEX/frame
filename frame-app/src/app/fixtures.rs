@@ -1,7 +1,22 @@
-use super::*;
+mod anamorphic;
 
-use crate::settings::{DeinterlaceMode, FilterStrength};
-use frame_updater::{PlatformAssetKey, UpdateAsset};
+use crate::app::inspector;
+use crate::app::inspector::subtitles::state::{SettingsSubtitleMode, SettingsSubtitlePopover};
+use crate::app::model::{ActiveView, VisualFixture};
+use crate::app::preferences::state::AppearancePopover;
+use crate::app::preview::state::CropSelect;
+use crate::app::root::FrameRoot;
+use crate::app::updates::state::UpdateStatus;
+use crate::appearance::{AppearanceSettings, ScalePreset};
+use crate::file_queue::{FileItem, FileQueue, FileStatus};
+use crate::preview::CropRect;
+use crate::settings::{
+    ConversionConfig, DeinterlaceMode, FilterStrength, PresetDefinition, SettingsTab, SourceKind,
+    SourceMetadata, SourceTags,
+};
+use crate::source_metadata::SourceMetadataStore;
+use frame_core::events::ConversionEvent;
+use frame_updater::{PlatformAssetKey, UpdateAsset, UpdateChannel, UpdateInfo};
 use semver::Version;
 
 const UPDATE_AVAILABLE_RELEASE_NOTES: &str = r"
@@ -58,7 +73,10 @@ impl FrameRoot {
             }
             Some(VisualFixture::PreviewCropCustom) => {
                 self.apply_preview_crop_fixture();
-                self.settings_ui.active_tab = SettingsTab::Video;
+                self.settings_ui.active_tab = SettingsTab::Output;
+                self.settings_ui
+                    .expanded_output_sections
+                    .insert(crate::settings::OutputSection::Video);
                 self.preview_ui.crop_options.popover = None;
                 self.preview_ui.crop_options.custom = true;
                 self.set_crop_custom_mode(false);
@@ -71,8 +89,27 @@ impl FrameRoot {
                     file.config.pixel_format = "yuv420p10le".into();
                 }
             }
+            Some(VisualFixture::SettingsVideoProres) => self.apply_settings_video_prores_fixture(),
+            Some(VisualFixture::SettingsVideoVp9) => self.apply_settings_video_vp9_fixture(),
+            Some(VisualFixture::SettingsVideoHardware) => {
+                self.apply_settings_video_hardware_fixture();
+            }
+            Some(VisualFixture::PreviewAnamorphicCrop) => self.apply_anamorphic_fixture(false),
+            Some(VisualFixture::PreviewAnamorphicOverlay) => self.apply_anamorphic_fixture(true),
             Some(VisualFixture::PreviewCrop) => self.apply_preview_crop_fixture(),
             Some(VisualFixture::PreviewReady) => self.apply_preview_ready_fixture(),
+            Some(VisualFixture::PreviewTransport | VisualFixture::PreviewTrim) => {
+                self.apply_preview_ready_fixture();
+                self.preview_ui.playback_file_id = Some("fixture-preview".into());
+                self.preview_ui.playback = crate::app::preview::preview_playback_state(
+                    crate::preview::PreviewMediaKind::Video,
+                    90.4,
+                    None,
+                    None,
+                );
+                self.preview_ui.transport.hovered = true;
+                self.preview_ui.transport.open = fixture == Some(VisualFixture::PreviewTrim);
+            }
             Some(VisualFixture::SettingsAudio) => self.apply_settings_audio_fixture(),
             Some(VisualFixture::SettingsAudioFilters) => {
                 self.apply_settings_audio_filters_fixture();
@@ -126,15 +163,15 @@ impl FrameRoot {
         self.active_view = ActiveView::Workspace;
         self.file_queue = FileQueue::new();
         self.source_metadata = SourceMetadataStore::default();
-        self.settings_ui.active_tab = SettingsTab::Source;
+        self.settings_ui.active_tab = SettingsTab::Metadata;
     }
     pub(super) fn apply_workspace_audio_fixture(&mut self) {
         self.seed_audio_source_fixture();
-        self.settings_ui.active_tab = SettingsTab::Source;
+        self.settings_ui.active_tab = SettingsTab::Metadata;
     }
     pub(super) fn apply_workspace_image_fixture(&mut self) {
         self.seed_image_source_fixture();
-        self.settings_ui.active_tab = SettingsTab::Source;
+        self.settings_ui.active_tab = SettingsTab::Metadata;
     }
     pub(super) fn apply_workspace_large_queue_fixture(&mut self) {
         const FILE_COUNT: usize = 500;
@@ -211,10 +248,13 @@ impl FrameRoot {
     }
     pub(super) fn apply_settings_source_fixture(&mut self) {
         self.apply_preview_ready_fixture();
-        self.settings_ui.active_tab = SettingsTab::Source;
+        self.settings_ui.active_tab = SettingsTab::Metadata;
     }
     pub(super) fn apply_settings_output_fixture(&mut self) {
         self.apply_preview_ready_fixture();
+        self.settings_ui
+            .expanded_output_sections
+            .insert(crate::settings::OutputSection::General);
         self.settings_ui.active_tab = SettingsTab::Output;
         self.file_queue
             .update_selected_output_name("source_render_review.mov");
@@ -224,7 +264,10 @@ impl FrameRoot {
     }
     pub(super) fn apply_settings_video_fixture(&mut self) {
         self.apply_preview_ready_fixture();
-        self.settings_ui.active_tab = SettingsTab::Video;
+        self.settings_ui.active_tab = SettingsTab::Output;
+        self.settings_ui
+            .expanded_output_sections
+            .insert(crate::settings::OutputSection::Video);
         if let Some(file) = self.file_queue.selected_file_mut() {
             file.config.resolution = "custom".to_string();
             file.config.custom_width = Some("1920".to_string());
@@ -233,9 +276,72 @@ impl FrameRoot {
             file.config.crf = 18;
         }
     }
+    fn apply_settings_video_prores_fixture(&mut self) {
+        self.apply_settings_video_fixture();
+        if let Some(file) = self.file_queue.selected_file_mut() {
+            file.config.container = "mov".into();
+            file.config.video_codec = "prores".into();
+            file.config.pixel_format = "yuv422p10le".into();
+            file.config.preset = "slow".into();
+            file.config.video_bitrate_mode = "bitrate".into();
+            file.config.video_bitrate = "7500".into();
+        }
+    }
+
+    fn apply_settings_video_vp9_fixture(&mut self) {
+        self.apply_settings_video_fixture();
+        if let Some(file) = self.file_queue.selected_file_mut() {
+            file.config.container = "webm".into();
+            file.config.video_codec = "vp9".into();
+            file.config.audio_codec = "libopus".into();
+            file.config.preset = "3".into();
+            file.config.pixel_format = "yuv420p".into();
+            file.config.crf = 0;
+        }
+    }
+
+    fn apply_settings_video_hardware_fixture(&mut self) {
+        use crate::capabilities::{
+            EncoderInventory, HardwareCapabilities, HardwareEncoder, HardwareProbePolicy,
+            HardwareProbeReport, HardwareReason, HardwareStatus,
+        };
+        self.apply_settings_video_fixture();
+        self.available_encoders.h264_nvenc = true;
+        self.available_encoders.h264_videotoolbox = true;
+        self.runtime_capabilities_loading = false;
+        self.hardware_capabilities = HardwareCapabilities {
+            inventory: EncoderInventory::Complete,
+            reports: [
+                (HardwareEncoder::H264Nvenc, false, false),
+                (HardwareEncoder::H264Videotoolbox, false, false),
+                (HardwareEncoder::H264Videotoolbox, true, true),
+            ]
+            .map(|(encoder, allow_software, available)| HardwareProbeReport {
+                policy: HardwareProbePolicy::new(encoder, allow_software),
+                status: if available {
+                    HardwareStatus::Available
+                } else {
+                    HardwareStatus::Unavailable
+                },
+                reason: (!available).then_some(HardwareReason::InitializationFailed),
+                diagnostics: String::new(),
+                checked_at: std::time::SystemTime::UNIX_EPOCH,
+            })
+            .into(),
+        };
+        if let Some(file) = self.file_queue.selected_file_mut() {
+            file.config.video_codec = "h264_nvenc".into();
+            file.config.hw_decode = true;
+            file.config.nvenc_spatial_aq = true;
+        }
+    }
+
     pub(super) fn apply_settings_video_filters_fixture(&mut self) {
         self.apply_preview_ready_fixture();
-        self.settings_ui.active_tab = SettingsTab::VideoFilters;
+        self.settings_ui.active_tab = SettingsTab::Output;
+        self.settings_ui
+            .expanded_output_sections
+            .insert(crate::settings::OutputSection::VideoFilters);
         if let Some(file) = self.file_queue.selected_file_mut() {
             file.config.video_filters.color.brightness.enabled = true;
             file.config.video_filters.color.brightness.value = 18;
@@ -256,7 +362,10 @@ impl FrameRoot {
     }
     pub(super) fn apply_settings_audio_fixture(&mut self) {
         self.seed_audio_source_fixture();
-        self.settings_ui.active_tab = SettingsTab::Audio;
+        self.settings_ui.active_tab = SettingsTab::Output;
+        self.settings_ui
+            .expanded_output_sections
+            .insert(crate::settings::OutputSection::Audio);
         if let Some(file) = self.file_queue.selected_file_mut() {
             file.config.container = "mp3".to_string();
             file.config.audio_codec = "mp3".to_string();
@@ -270,7 +379,10 @@ impl FrameRoot {
     }
     pub(super) fn apply_settings_audio_filters_fixture(&mut self) {
         self.seed_audio_source_fixture();
-        self.settings_ui.active_tab = SettingsTab::AudioFilters;
+        self.settings_ui.active_tab = SettingsTab::Output;
+        self.settings_ui
+            .expanded_output_sections
+            .insert(crate::settings::OutputSection::AudioFilters);
         if let Some(file) = self.file_queue.selected_file_mut() {
             file.config.audio_volume = 132;
             file.config.audio_normalize = true;
@@ -302,11 +414,17 @@ impl FrameRoot {
             file.config.custom_width = Some("2048".to_string());
             file.config.custom_height = Some("1080".to_string());
         }
-        self.settings_ui.active_tab = SettingsTab::Images;
+        self.settings_ui.active_tab = SettingsTab::Output;
+        self.settings_ui
+            .expanded_output_sections
+            .insert(crate::settings::OutputSection::Images);
     }
     pub(super) fn apply_settings_metadata_fixture(&mut self) {
         self.apply_preview_ready_fixture();
-        self.settings_ui.active_tab = SettingsTab::Metadata;
+        self.settings_ui.active_tab = SettingsTab::Output;
+        self.settings_ui
+            .expanded_output_sections
+            .insert(crate::settings::OutputSection::Metadata);
         self.source_metadata.mark_ready(
             "fixture-preview".to_string(),
             SourceMetadata {
@@ -338,7 +456,10 @@ impl FrameRoot {
     }
     pub(super) fn apply_settings_subtitles_fixture(&mut self) {
         self.apply_preview_ready_fixture();
-        self.settings_ui.active_tab = SettingsTab::Subtitles;
+        self.settings_ui.active_tab = SettingsTab::Output;
+        self.settings_ui
+            .expanded_output_sections
+            .insert(crate::settings::OutputSection::Subtitles);
         self.subtitle_font_families = vec![
             "Arial".to_string(),
             "Helvetica Neue".to_string(),
@@ -408,7 +529,7 @@ impl FrameRoot {
         self.subtitle_ui.popover = Some(SettingsSubtitlePopover::FontColor);
         self.subtitle_ui.rendered_popover = Some(SettingsSubtitlePopover::FontColor);
         self.subtitle_ui.font_color_draft = "#FFD166".to_string();
-        self.subtitle_ui.font_color_hsv_draft = settings_panel::hex_to_subtitle_hsv("#ffd166");
+        self.subtitle_ui.font_color_hsv_draft = inspector::hex_to_subtitle_hsv("#ffd166");
     }
     pub(super) fn apply_settings_presets_fixture(&mut self) {
         self.apply_preview_ready_fixture();
@@ -447,7 +568,9 @@ impl FrameRoot {
                     crate::settings::AudioTrack {
                         index: 0,
                         codec: "pcm_s16le".to_string(),
+                        codec_tag: None,
                         channels: Some("2".to_string()),
+                        channel_layout: Some("stereo".to_string()),
                         language: Some("eng".to_string()),
                         label: Some("Main mix".to_string()),
                         bitrate_kbps: Some(1536.0),
@@ -456,7 +579,9 @@ impl FrameRoot {
                     crate::settings::AudioTrack {
                         index: 1,
                         codec: "aac".to_string(),
+                        codec_tag: None,
                         channels: Some("2".to_string()),
+                        channel_layout: Some("stereo".to_string()),
                         language: Some("eng".to_string()),
                         label: Some("Reference".to_string()),
                         bitrate_kbps: Some(192.0),

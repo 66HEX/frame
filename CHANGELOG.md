@@ -9,16 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Native Snapshot Capture:** Adds deterministic GPUI PNG capture for named fixtures, with fixed pointer position, settled motion and synchronous rendering.
 - **Crop Controls:** Adds an animated aspect ratio select with 4:3, 5:4, portrait variants, and custom ratio or pixel fields in the toolbar. Valid custom values update the preview immediately. Resolution follows the crop while editing and is saved as Custom on Apply; canceling preserves previous export settings. The Output tab shows estimated dimensions after crop, rotation, and scaling. Resolves [#167](https://github.com/66HEX/frame/issues/167).
 - **AV1 Encoding Settings:** Exposes SVT-AV1 presets 0–13 directly and clarifies the 10-bit pixel format choice, while preserving existing preset selections. Resolves [#200](https://github.com/66HEX/frame/issues/200).
 - **Preview Control Tooltips:** Adds tooltips to preview tools, zoom, and playback controls on pointer hover and keyboard focus. Escape dismisses the tooltip. Resolves [#176](https://github.com/66HEX/frame/issues/176).
 
 ### Changed
 
+- **Test Organization:** Groups domain and UI regression suites by responsibility, with shared test helpers and adjacent persistence/session tests. Assertions, coverage and serialized formats are preserved.
+- **Application Structure:** Organizes native UI code by feature and settings/FFmpeg internals by responsibility, with explicit imports and stable public entry points. Separates root rendering, focus registration and overlay composition while preserving their order and behavior.
+- **UI Icons:** Replaces Hugeicons with bundled Nucleo UI outline icons that inherit theme colors, with rendering checks at supported sizes.
+- **Theme Colors:** Uses shadcn Mira Neutral tokens from editable CSS.
 - **GPUI Framework:** Updates the vendored GPUI-CE snapshot to `bc57747`, adapting Frame to the new text and rendering APIs while preserving GPU preview transforms, reusable video textures, keyboard focus and accessibility, toolbar drag handling, and rounded Linux window frames.
 
 ### Fixed
 
+- **Keyboard Navigation:** Restores inspector group tab stops, reveals focused controls in long panels, and gives scroll areas visible focus. Removes crop/overlay toolbar traps, restores focus after dialogs and queue action changes, and supports keyboard file selection, release-note scrolling, and long log tab strips.
+- **Preview Responsiveness:** Separates playback snapshots from FFmpeg rebuild locks and stops old sessions in the background. Preset changes retain the last frame, skip intermediate rebuild requests, and reject stale results after a source change.
 - **Reduced Motion:** Follows the system motion preference on macOS, Windows, and Linux desktops exposing the portal setting, including changes made while Frame is running. UI transitions and preview zoom/pan settle immediately when motion is reduced; media playback remains unchanged.
 - **Tab Navigation:** Moves keyboard focus with the selected settings or main-view tab, keeps one Tab stop per tab rail, and restores focus to the fallback tab when the focused section becomes unavailable.
 - **Pointer Targets:** Enlarges slider, scrollbar, crop, overlay, and trim hit areas while retaining their visible sizes. Scrollbars have reserved space beside list content, and neighboring resize handles stay separate on small selections.

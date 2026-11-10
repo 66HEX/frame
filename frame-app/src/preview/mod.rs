@@ -9,7 +9,6 @@ mod timeline;
 
 #[cfg(test)]
 use crate::settings::ProcessingMode;
-
 pub use crop::*;
 pub use media::*;
 pub use overlay::*;

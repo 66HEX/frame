@@ -49,6 +49,7 @@ mod frame_assets {
 
         for icon_name in [
             "arrow-down.svg",
+            "auto-crop.svg",
             "bookmark.svg",
             "captions.svg",
             "check.svg",
@@ -56,6 +57,7 @@ mod frame_assets {
             "copy.svg",
             "crop.svg",
             "download-02.svg",
+            "file.svg",
             "file-down.svg",
             "file-image.svg",
             "file-import.svg",
@@ -84,6 +86,7 @@ mod frame_assets {
             "trash.svg",
             "unfold-more.svg",
             "video-filters.svg",
+            "warning.svg",
         ] {
             assert!(
                 listed.iter().any(|name| name.as_ref() == icon_name),
@@ -101,7 +104,7 @@ mod frame_assets {
     }
 
     #[test]
-    fn ui_icon_assets_use_hugeicons_stroke_style() {
+    fn ui_icon_assets_render_with_nucleo_fill_duo_style() {
         let renderer = gpui::SvgRenderer::new(std::sync::Arc::new(FrameAssets.into()));
 
         for icon in [
@@ -114,6 +117,7 @@ mod frame_assets {
             ICON_UNFOLD_MORE,
             ICON_CLOSE,
             ICON_DOWNLOAD_02,
+            ICON_FILE,
             ICON_FILE_UP,
             ICON_FILE_DOWN,
             ICON_FILE_IMPORT,
@@ -138,6 +142,8 @@ mod frame_assets {
             ICON_FLIP_HORIZONTAL,
             ICON_FLIP_VERTICAL,
             ICON_CROP,
+            ICON_AUTO_CROP,
+            ICON_WARNING,
             ICON_SPINNER,
             ICON_SQUARE,
             ICON_TRASH,
@@ -149,29 +155,53 @@ mod frame_assets {
             let svg = std::str::from_utf8(loaded.as_ref()).expect("svg should be utf8");
 
             assert!(
-                svg.contains(r#"viewBox="0 0 24 24""#),
-                "{icon} should use the Hugeicons 24px grid"
+                svg.contains(r#"viewBox="0 0 18 18""#),
+                "{icon} should use the Nucleo UI 18px grid"
             );
             assert!(
-                svg.contains(r#"fill="none""#),
-                "{icon} should use stroke rendering"
+                svg.contains(r#"fill="currentColor""#),
+                "{icon} should inherit GPUI text_color through filled paths"
             );
             assert!(
-                svg.contains(r#"stroke="currentColor""#),
-                "{icon} should inherit GPUI text_color"
+                !svg.contains(r#"stroke=""#),
+                "{icon} should use Fill Duo geometry, not Outline strokes"
             );
             assert!(
-                svg.contains(r#"stroke-width="1.5""#),
-                "{icon} should use the Hugeicons stroke weight"
+                !svg.contains(r##"="#000""##) && !svg.contains(r#"="black""#),
+                "{icon} should not retain fixed colors from the source SVG"
             );
-            assert!(
-                !svg.contains(r#" key=""#),
-                "{icon} should not include React-only metadata"
-            );
-            renderer
-                .render_single_frame(loaded.as_ref(), 1.0)
-                .unwrap_or_else(|error| panic!("{icon} should render: {error}"));
+            for size in [12.0, 16.0, 18.0, 20.0, 24.0] {
+                let image = renderer
+                    .render_single_frame(loaded.as_ref(), size / 18.0)
+                    .unwrap_or_else(|error| panic!("{icon} should render at {size}px: {error}"));
+                assert!(
+                    image
+                        .as_bytes(0)
+                        .expect("rendered icon should have a frame")
+                        .chunks_exact(4)
+                        .any(|pixel| pixel[3] > 0),
+                    "{icon} should have visible pixels at {size}px"
+                );
+            }
         }
+    }
+
+    #[test]
+    fn duotone_icon_raster_preserves_the_secondary_layer_opacity() {
+        let renderer = gpui::SvgRenderer::new(std::sync::Arc::new(FrameAssets.into()));
+        let svg = FrameAssets.load(ICON_LAYOUT_LIST).unwrap().unwrap();
+        let image = renderer.render_single_frame(svg.as_ref(), 1.0).unwrap();
+        let pixels = image.as_bytes(0).unwrap();
+        // GPUI supersamples SVGs; sample row interiors using the raster size.
+        let width = usize::try_from(image.size(0).width.0).unwrap();
+        let height = usize::try_from(image.size(0).height.0).unwrap();
+        let primary = pixels[(5 * height / 18 * width + width / 2) * 4 + 3];
+        let secondary = pixels[(13 * height / 18 * width + width / 2) * 4 + 3];
+        assert_eq!(primary, 255);
+        assert!(
+            (101..=103).contains(&secondary),
+            "the 40% secondary layer must survive SVG rasterization: {secondary}"
+        );
     }
 
     #[test]
@@ -200,8 +230,8 @@ mod frame_assets {
         assert_eq!(
             listed,
             [
-                SharedString::from("OverusedGrotesk-Roman.ttf"),
-                SharedString::from("OverusedGrotesk-Medium.ttf"),
+                SharedString::from("Inter-Regular.ttf"),
+                SharedString::from("Inter-Medium.ttf"),
             ]
         );
     }

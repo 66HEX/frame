@@ -136,22 +136,24 @@ impl Element for Svg {
                     })
                     .unwrap_or_default();
 
+                // SVG currentColor follows the inherited (and possibly animated)
+                // text style, just like text. An absent local color must not hide it.
+                let color = style
+                    .text
+                    .color
+                    .unwrap_or_else(|| window.text_style().color);
                 if let Some((data, path)) = self.data.as_ref().zip(self.data_path.as_ref()) {
-                    if let Some(color) = style.text.color {
-                        window
-                            .paint_svg(
-                                bounds,
-                                path.clone(),
-                                Some(&**data),
-                                transformation,
-                                color,
-                                cx,
-                            )
-                            .log_err();
-                    }
-                } else if let Some((path, color)) =
-                    self.external_path.as_ref().zip(style.text.color)
-                {
+                    window
+                        .paint_svg(
+                            bounds,
+                            path.clone(),
+                            Some(&**data),
+                            transformation,
+                            color,
+                            cx,
+                        )
+                        .log_err();
+                } else if let Some(path) = self.external_path.as_ref() {
                     let Some(bytes) = window
                         .use_asset::<SvgAsset>(path, cx)
                         .and_then(|asset| asset.log_err())
@@ -169,7 +171,7 @@ impl Element for Svg {
                             cx,
                         )
                         .log_err();
-                } else if let Some((path, color)) = self.path.as_ref().zip(style.text.color) {
+                } else if let Some(path) = self.path.as_ref() {
                     window
                         .paint_svg(bounds, path.clone(), None, transformation, color, cx)
                         .log_err();

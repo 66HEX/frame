@@ -1,7 +1,7 @@
 use crate::{
     Bounds, Font, FontId, FontMetrics, ForegroundDependency, GlyphId, GlyphRenderMode, Pixels,
-    PlatformTextSystem, PreparedRasterStyle, RasterStyleRequest, RenderGlyphParams, Result, Size,
-    TextRenderingMode, ValidatedRasterizedGlyph, px,
+    PlatformTextSystem, PreparedRasterStyle, RasterColorEffect, RasterStyleRequest,
+    RenderGlyphParams, Result, Size, TextRenderingMode, ValidatedRasterizedGlyph, px,
 };
 use anyhow::{Context as _, anyhow};
 use collections::FxHashMap;
@@ -200,15 +200,29 @@ impl TextSystem {
         glyph_id: GlyphId,
         scene_color: Hsla,
         requested_mode: GlyphRenderMode,
+        rendering_mode: TextRenderingMode,
     ) -> PreparedRasterStyle {
-        self.platform_text_system
+        let mut style = self
+            .platform_text_system
             .prepare_raster_style(RasterStyleRequest {
                 font_id,
                 glyph_id,
                 scene_color: crate::hsla_to_rgba(scene_color),
                 requested_mode,
                 foreground_dependency: ForegroundDependency::Full,
-            })
+            });
+        // CoreGraphics grayscale masks can still contain luminance-dependent
+        // font-smoothing dilation. CSS antialiased disables that dilation while
+        // retaining antialiasing and fractional placement. Normalize after the
+        // platform cache, but before the glyph atlas key is formed, so switching
+        // modes cannot reuse a dilated mask. Preblended color artwork is untouched.
+        if rendering_mode == TextRenderingMode::Antialiased
+            && style.mode == GlyphRenderMode::Grayscale
+            && matches!(style.color_effect, RasterColorEffect::Dilation(_))
+        {
+            style.color_effect = RasterColorEffect::Independent;
+        }
+        style
     }
 
     /// Returns the text rendering mode recommended by the platform for the given font and size.
