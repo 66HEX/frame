@@ -518,10 +518,13 @@ fn every_select_and_color_picker_finishes_enter_and_exit_before_unmounting() {
     for case in SELECTS.iter().chain(&OUTPUT_SELECTS).chain(&colors) {
         let mut app = TestAppContext::single();
         let (_, cx) = select_window(&mut app, case, ColorTheme::Dark, ScalePreset::Percent100);
+        let mut now = std::time::Instant::now();
+        cx.set_transition_time(now);
         cx.update(|_, cx| cx.set_reduce_motion(false));
         click(cx, case.trigger);
         let entering = cx.debug_bounds(case.panel).expect(case.trigger);
-        std::thread::sleep(crate::app::motion::SURFACE_MOTION_DURATION);
+        now += crate::app::motion::SURFACE_MOTION_DURATION;
+        cx.set_transition_time(now);
         draw(cx);
         let settled = cx.debug_bounds(case.panel).expect(case.trigger);
         assert!(
@@ -535,7 +538,8 @@ fn every_select_and_color_picker_finishes_enter_and_exit_before_unmounting() {
             "{} must retain its exit frame",
             case.trigger
         );
-        std::thread::sleep(crate::app::motion::SURFACE_MOTION_DURATION);
+        now += crate::app::motion::SURFACE_MOTION_DURATION;
+        cx.set_transition_time(now);
         draw(cx);
         assert!(
             cx.debug_bounds(case.panel).is_none(),

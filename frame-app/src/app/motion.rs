@@ -202,6 +202,8 @@ mod tests {
     #[test]
     fn surface_motion_animates_both_directions_and_can_be_reopened() {
         let mut app = TestAppContext::single();
+        let mut now = std::time::Instant::now();
+        app.set_transition_time(now);
         let (probe, cx) = app.add_window_view(|_, _| MotionProbe::default());
         cx.update(|window, cx| window.draw(cx).clear(cx));
         assert_eq!(probe.read_with(cx, |probe, _| probe.surface), 0.0);
@@ -211,7 +213,8 @@ mod tests {
         });
         cx.update(|window, cx| window.draw(cx).clear(cx));
         assert!(probe.read_with(cx, |probe, _| probe.surface) < 1.0);
-        std::thread::sleep(SURFACE_MOTION_DURATION);
+        now += SURFACE_MOTION_DURATION;
+        cx.set_transition_time(now);
         cx.update(|window, cx| window.draw(cx).clear(cx));
         assert_eq!(probe.read_with(cx, |probe, _| probe.surface), 1.0);
 
@@ -220,7 +223,11 @@ mod tests {
             cx.notify();
         });
         cx.update(|window, cx| window.draw(cx).clear(cx));
+        now += SURFACE_MOTION_DURATION / 2;
+        cx.set_transition_time(now);
+        cx.update(|window, cx| window.draw(cx).clear(cx));
         assert!(probe.read_with(cx, |probe, _| probe.surface) > 0.0);
+        assert!(probe.read_with(cx, |probe, _| probe.surface) < 1.0);
         // Reverse an exit before completion: it must not restart at zero.
         probe.update(cx, |probe, cx| {
             probe.open = true;
@@ -228,7 +235,8 @@ mod tests {
         });
         cx.update(|window, cx| window.draw(cx).clear(cx));
         assert!(probe.read_with(cx, |probe, _| probe.surface) > 0.0);
-        std::thread::sleep(SURFACE_MOTION_DURATION);
+        now += SURFACE_MOTION_DURATION;
+        cx.set_transition_time(now);
         cx.update(|window, cx| window.draw(cx).clear(cx));
         assert_eq!(probe.read_with(cx, |probe, _| probe.surface), 1.0);
         probe.update(cx, |probe, cx| {
@@ -236,7 +244,8 @@ mod tests {
             cx.notify();
         });
         cx.update(|window, cx| window.draw(cx).clear(cx));
-        std::thread::sleep(SURFACE_MOTION_DURATION);
+        now += SURFACE_MOTION_DURATION;
+        cx.set_transition_time(now);
         cx.update(|window, cx| window.draw(cx).clear(cx));
         assert_eq!(probe.read_with(cx, |probe, _| probe.surface), 0.0);
     }

@@ -286,6 +286,8 @@ mod tests {
     #[test]
     fn slider_ring_animates_hover_focus_and_exit_and_respects_disabled() {
         let mut app = TestAppContext::single();
+        let mut now = std::time::Instant::now();
+        app.set_transition_time(now);
         let (probe, cx) = app.add_window_view(|_, cx| SliderProbe {
             root: cx.new(|_| FrameRoot::new()),
             progress: 0.0,
@@ -297,7 +299,8 @@ mod tests {
         cx.simulate_mouse_move(bounds.center(), None, gpui::Modifiers::default());
         draw(cx);
         assert!(probe.read_with(cx, |probe, _| probe.progress) < 1.0);
-        std::thread::sleep(INTERACTION_MOTION_DURATION);
+        now += INTERACTION_MOTION_DURATION;
+        cx.set_transition_time(now);
         draw(cx);
         assert!(probe.read_with(cx, |probe, _| probe.progress) > 0.999);
         cx.simulate_mouse_move(
@@ -307,14 +310,16 @@ mod tests {
         );
         draw(cx);
         assert!(probe.read_with(cx, |probe, _| probe.progress) > 0.0);
-        std::thread::sleep(INTERACTION_MOTION_DURATION);
+        now += INTERACTION_MOTION_DURATION;
+        cx.set_transition_time(now);
         draw(cx);
         assert!(probe.read_with(cx, |probe, _| probe.progress) < 0.001);
         cx.simulate_keystrokes("tab");
         cx.update(Window::focus_next);
         draw(cx);
         assert!(probe.read_with(cx, |probe, _| probe.progress) < 1.0);
-        std::thread::sleep(INTERACTION_MOTION_DURATION);
+        now += INTERACTION_MOTION_DURATION;
+        cx.set_transition_time(now);
         draw(cx);
         assert!(probe.read_with(cx, |probe, _| probe.progress) > 0.999);
         cx.update(|_, cx| cx.set_reduce_motion(true));

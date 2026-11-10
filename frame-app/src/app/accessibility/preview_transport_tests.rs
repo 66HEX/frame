@@ -503,13 +503,15 @@ fn preview_trim_end_cap_accepts_pointer_input_with_surface_motion_enabled() {
             VisualFixture::PreviewReady,
             ScalePreset::Percent125,
         );
+        let now = std::time::Instant::now();
+        cx.set_transition_time(now);
         cx.update(|_, cx| cx.set_reduce_motion(false));
         root.update(cx, |root, cx| {
             root.preview_ui.transport.open = true;
             cx.notify();
         });
         cx.update(|window, cx| window.draw(cx).clear(cx));
-        std::thread::sleep(std::time::Duration::from_millis(elapsed_ms));
+        cx.set_transition_time(now + std::time::Duration::from_millis(elapsed_ms));
         cx.update(|window, cx| window.draw(cx).clear(cx));
         // Paint-space bounds include the entrance scale; debug layout bounds do not.
         let from = painted_end_cap_bounds(cx).center();
