@@ -1,0 +1,744 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-11-10",
+  "application": {
+    "repository": "https://github.com/66HEX/frame",
+    "commit": "297e5cbf96ad8ffdd0b0cf24559760cb5b14db6a",
+    "version": "0.33.1",
+    "tracked_worktree_changes_at_capture": false
+  },
+  "method": {
+    "renderer": "Native GPUI Window::render_to_image GPU readback",
+    "window_logical_pixels": [
+      1200,
+      800
+    ],
+    "image_pixels": [
+      2400,
+      1600
+    ],
+    "display_scale": 2,
+    "ui_scale": "100%",
+    "theme": "Frame Graphite, separate native light and dark renders",
+    "source_import": "Real FileDropEvent through the unchanged application import/probe handler",
+    "interaction": "Native mouse events targeted using the application accessibility tree",
+    "settling": "6 seconds after import, then native controls and 500 ms before readback",
+    "isolation": "FrameRoot::new(): in-memory defaults, persistence=None, AppNotifier::disabled(). User preferences are not read or written; no conversion is started.",
+    "image_processing": "Lossless WebP encoding only. No cropping, resizing, compositing, retouching, mockup, or OS screenshot overlay.",
+    "helper": "scripts/capture-frame-docs.rs",
+    "helper_sha256": "02b2767553142f9f47ffc08237e899239d281cd3b57647c0ed425c980a44e2ac",
+    "build_argv": [
+      "cargo",
+      "build",
+      "-p",
+      "frame-app",
+      "--example",
+      "render-docs-capture",
+      "--features",
+      "gpui_platform/test-support",
+      "--locked"
+    ],
+    "temporary_native_example_removed": true,
+    "media_preparation_script": "scripts/prepare-docs-media.py"
+  },
+  "originals": {
+    "directory": "/tmp/frame-docs-captures",
+    "format": "PNG",
+    "retention": "Original PNGs and native accessibility evidence are kept outside the website repository. Every published WebP decodes to identical RGBA pixels."
+  },
+  "encoding": {
+    "tool": "cwebp",
+    "version": "1.6.0\nlibsharpyuv: 0.4.2",
+    "arguments": [
+      "-lossless",
+      "-exact",
+      "-m",
+      "6"
+    ],
+    "pixel_equality_verified": true
+  },
+  "media_sources": [
+    {
+      "name": "alpine-lake.jpg",
+      "bytes": 315510,
+      "sha256": "1bfbef77dadf872a384d1e78ab4a4e4b908eb8567b061abdf4fa798c62da647f",
+      "type": "public sample photograph",
+      "origin": "static/media/alpine-lake.jpg",
+      "creator": "Philip Ho",
+      "url": "https://unsplash.com/photos/2HFe1VFPlyQ",
+      "license": "https://unsplash.com/license",
+      "dimensions": [
+        1600,
+        1067
+      ]
+    },
+    {
+      "name": "alpine-lake.mp4",
+      "bytes": 386909,
+      "sha256": "f04ac1c099b66082f10b982ec0bb54d75c1231698966a3d01f4b929f5ff897bc",
+      "type": "generated sample media from the credited photograph",
+      "details": "Eight-second H.264 1280x720 24 fps video, quiet generated sine tone encoded to stereo AAC at 48 kHz, and two embedded English mov_text subtitle cues. This is a real encoded media file, not a UI fixture."
+    },
+    {
+      "name": "studio-reference.wav",
+      "bytes": 3456142,
+      "sha256": "25af6b200bb89a83c41d0914fad4de60d01c42474c6e1a23e92c7ce0ce69ecd6",
+      "type": "generated sample audio",
+      "details": "Twelve-second generated tone, stereo PCM 24-bit 48 kHz WAV."
+    },
+    {
+      "name": "unreadable-sample.mp4",
+      "bytes": 72,
+      "sha256": "5299a517fd2e55e6d0f1fd2f72cd06ad20ae07c142988b03dcedb06c1fa1e081",
+      "type": "deliberately invalid troubleshooting sample",
+      "details": "Plain text with an .mp4 extension. Imported through Frame to trigger a real ffprobe failure. Only used in source-error screenshots."
+    },
+    {
+      "name": "captions.srt",
+      "bytes": 124,
+      "sha256": "d9fc129e544ed3269774e917cf34121ac7dc463b27f1a103d16a4f2216731fee",
+      "type": "authored sample captions",
+      "details": "Two short English cues embedded in the generated sample MP4."
+    }
+  ],
+  "scenes": [
+    {
+      "id": "workspace",
+      "description": "Video preview, single-file queue, and Output > General with processing mode, output name, MP4 container, and output dimensions."
+    },
+    {
+      "id": "batch-queue",
+      "description": "Mixed queue with a video, JPEG photograph, and PCM audio file. The video is selected and General output controls are open. Apply to all is unavailable for these incompatible source types."
+    },
+    {
+      "id": "presets",
+      "description": "Native built-in preset list, with Balanced MP4 matching the selected video configuration."
+    },
+    {
+      "id": "video-output",
+      "description": "Video controls for resolution, scaling, frame rate, libx264 encoder, pixel format, encoding speed, and constant quality."
+    },
+    {
+      "id": "video-filters",
+      "description": "Expanded Video filters with the native color adjustment, tone, and detail controls at their defaults."
+    },
+    {
+      "id": "audio-output",
+      "description": "A real PCM WAV source with MP3 output codec, channel, quality, bitrate, and source-track controls. The music icon is the native audio preview."
+    },
+    {
+      "id": "audio-filters",
+      "description": "Expanded Audio filters showing level, normalization, limiter, dynamics, and tone controls for the PCM WAV source."
+    },
+    {
+      "id": "images-output",
+      "description": "JPEG source with General and Images expanded: PNG output, original dimensions, scaling, pixel format, and PNG compression controls."
+    },
+    {
+      "id": "crop-preview",
+      "description": "Native crop editing overlay on the JPEG source, including handles, grid, Free aspect selection, reset, and Apply."
+    },
+    {
+      "id": "subtitles",
+      "description": "Selectable subtitle mode and the real embedded English mov_text source track with Exclude/Include controls. No external subtitle file is imported."
+    },
+    {
+      "id": "source-metadata",
+      "description": "Probed metadata for the real sample MP4: eight-second duration, H.264 High 1280x720 at 24 fps, and stereo AAC audio."
+    },
+    {
+      "id": "output-metadata",
+      "description": "Output metadata in Preserve mode, with editable title, artist, album, and further metadata fields."
+    },
+    {
+      "id": "settings",
+      "description": "Native Settings drawer with unconfigured output folder, appearance, UI scale, max concurrency, and update preferences."
+    },
+    {
+      "id": "trim-preview",
+      "description": "Native trim range and playback controls over the eight-second video preview, with Start and End timecode fields."
+    },
+    {
+      "id": "source-error",
+      "description": "A deliberately invalid .mp4 is processed by the real import/probe path. The native UI reports Preview unavailable and Failed to read source metadata. This is a reproducible troubleshooting example, not a simulated application error."
+    }
+  ],
+  "captures": [
+    {
+      "scene": "workspace",
+      "theme": "dark",
+      "file": "static/media/docs/workspace-dark.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1483408,
+      "sha256": "c0759a970e3df6ef33cd45779ea0286848db1ce569d6d3e545bbbfcdf25f8a39",
+      "rgba_sha256": "be1b7c4e8a5d46e0fa855d359c43c8bb5b7f8a6a4bfd38e16feebb8d6a37175e",
+      "native_png": "/tmp/frame-docs-captures/workspace-dark.png",
+      "native_png_bytes": 3769189,
+      "native_png_sha256": "72adf65e228c16c1947811bbbea0e8e13ce33408e27b8d1674dca7a33a2bb999",
+      "accessibility_evidence": "/tmp/frame-docs-captures/workspace-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "c5eb6b50afd443477975909d2a5c1a2e91447687fd34741631aa02e2842b2348",
+      "source_media": [
+        "alpine-lake.mp4"
+      ]
+    },
+    {
+      "scene": "batch-queue",
+      "theme": "dark",
+      "file": "static/media/docs/batch-queue-dark.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1500512,
+      "sha256": "738d9a7f20c69a7a2b40535af5170d278810c061b62b5f4bfe4f63dbd3be26e8",
+      "rgba_sha256": "711e8b256cfb8a44a8c097bd2c5e9d4587242b694aedaa628048cefc614a8009",
+      "native_png": "/tmp/frame-docs-captures/batch-queue-dark.png",
+      "native_png_bytes": 3799117,
+      "native_png_sha256": "8a70c674427d6699c585b9184d59c87a0c4cf23966a57595fd6791abc9d38981",
+      "accessibility_evidence": "/tmp/frame-docs-captures/batch-queue-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "65d659c72c75b22eaf1493b9d20dc274e82082915583375ec4c84bc5bf4a08f9",
+      "source_media": [
+        "alpine-lake.mp4",
+        "alpine-lake.jpg",
+        "studio-reference.wav"
+      ]
+    },
+    {
+      "scene": "presets",
+      "theme": "dark",
+      "file": "static/media/docs/presets-dark.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1481120,
+      "sha256": "a6e374f2e490ec38e5640c2f8c06cf403800cc7a4e6137f304e8f1d375c3a05e",
+      "rgba_sha256": "1cdb2f1f04ae890adfb894b8130067e2e1461ae4ff0abfdefcba176448ce4c1f",
+      "native_png": "/tmp/frame-docs-captures/presets-dark.png",
+      "native_png_bytes": 3786397,
+      "native_png_sha256": "13e989138ead12b983f8e02b818da93d0c8db590ed2fac3f3d4e0285a90f809d",
+      "accessibility_evidence": "/tmp/frame-docs-captures/presets-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "350d228628d8733442d527e8138eb5cc3eb17c61fd1b1004206079f7067a73ce",
+      "source_media": [
+        "alpine-lake.mp4"
+      ]
+    },
+    {
+      "scene": "video-output",
+      "theme": "dark",
+      "file": "static/media/docs/video-output-dark.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1451342,
+      "sha256": "2940897fad4fd787c40d4abbf13784fe0c0584edcae9bbfe780b915a1538f03a",
+      "rgba_sha256": "35af89a84bebf93879395ffae5e1d73f2ac917901081c9def275c734cacd6aa8",
+      "native_png": "/tmp/frame-docs-captures/video-output-dark.png",
+      "native_png_bytes": 3649459,
+      "native_png_sha256": "a76950feefc4871a74c0453b70aa93232a648892e72fdbf82bc61343229667d2",
+      "accessibility_evidence": "/tmp/frame-docs-captures/video-output-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "a35b4ebe42d5591d24617650ec6ddb492b307c57df39d9797c2846621edbaa98",
+      "source_media": [
+        "alpine-lake.mp4"
+      ]
+    },
+    {
+      "scene": "video-filters",
+      "theme": "dark",
+      "file": "static/media/docs/video-filters-dark.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1485388,
+      "sha256": "677fcdfc341e157739961e0775c5d1fb9bbb09244d1cc7273f5e2a161b8237e7",
+      "rgba_sha256": "ad5e1b95cb7a84ceaed161e043e7476fc8c638b459ff0ab91044a1a80fe3c68a",
+      "native_png": "/tmp/frame-docs-captures/video-filters-dark.png",
+      "native_png_bytes": 3770203,
+      "native_png_sha256": "b30be92922bf666991968801f2c1ec5eba0ad5a62cbbc488dfa3786714d40e3b",
+      "accessibility_evidence": "/tmp/frame-docs-captures/video-filters-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "54c01d18586ece3bb6c674761001db6f8300658846ea94dc30fec89c2092c7f0",
+      "source_media": [
+        "alpine-lake.mp4"
+      ]
+    },
+    {
+      "scene": "audio-output",
+      "theme": "dark",
+      "file": "static/media/docs/audio-output-dark.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 656638,
+      "sha256": "1bf739f89fe82b9711d1a11471ffac96a5259a06e5968dc14a4f71cefe3a01a2",
+      "rgba_sha256": "9137d95b376ec3e976e647721755bd4d9c0c58249359cf4b2670ff46a7035bdd",
+      "native_png": "/tmp/frame-docs-captures/audio-output-dark.png",
+      "native_png_bytes": 2256106,
+      "native_png_sha256": "c5084ec3a0a4acbf7b285c77285a4d17e2814b150e57220fbc82445375f0f08e",
+      "accessibility_evidence": "/tmp/frame-docs-captures/audio-output-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "e95aab9601796601f253f87a334355db7b97e8a5ba36cd343ba03be69a39a052",
+      "source_media": [
+        "studio-reference.wav"
+      ]
+    },
+    {
+      "scene": "audio-filters",
+      "theme": "dark",
+      "file": "static/media/docs/audio-filters-dark.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 697480,
+      "sha256": "aa32520cfaf3b5a14a21daf228e9bbb8ebb48121087c0d61b7a9ae25ee02a152",
+      "rgba_sha256": "1ad29fa9f1a558794df1fbbf6f5b0b4d148e2c06da30ab5ed2e0dd66b0cf5076",
+      "native_png": "/tmp/frame-docs-captures/audio-filters-dark.png",
+      "native_png_bytes": 2356227,
+      "native_png_sha256": "ba01b9c0873ad78e523375287bc8855c0e099b2666e861d90a5eae7b88319410",
+      "accessibility_evidence": "/tmp/frame-docs-captures/audio-filters-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "84bc527b2210737b6544ea01f6b7656b53e613f0295805584b24418545394270",
+      "source_media": [
+        "studio-reference.wav"
+      ]
+    },
+    {
+      "scene": "images-output",
+      "theme": "dark",
+      "file": "static/media/docs/images-output-dark.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1479226,
+      "sha256": "76d7e87a911a9d210437113cab160570bcb3cbfd484a2fa6d83332379c838822",
+      "rgba_sha256": "ca30fe1ca3310ac152a5ee755e230f5e69dcc80696bad9c3415131d313818861",
+      "native_png": "/tmp/frame-docs-captures/images-output-dark.png",
+      "native_png_bytes": 3661031,
+      "native_png_sha256": "da37cac47f7a71ebbffaaff83eee133ef4494b2473c249b692541cd93630885e",
+      "accessibility_evidence": "/tmp/frame-docs-captures/images-output-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "96b2e6eea6a2b7cdf83eee26539697319c2e63ca03104c88c7924467a6785745",
+      "source_media": [
+        "alpine-lake.jpg"
+      ]
+    },
+    {
+      "scene": "crop-preview",
+      "theme": "dark",
+      "file": "static/media/docs/crop-preview-dark.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1477658,
+      "sha256": "cb55d8262bbc33f164d09674152a89bd290ae9bf402d05a3e820bb8d9f14c8e2",
+      "rgba_sha256": "8caa46e222756a5b5d8b87b0c8fdf212a37df8f5f1dcee2cc66e6dc1be764626",
+      "native_png": "/tmp/frame-docs-captures/crop-preview-dark.png",
+      "native_png_bytes": 3772805,
+      "native_png_sha256": "0249b705897dfc7dca16954d1a520407b015a0d755b85c250215579d63daf7e9",
+      "accessibility_evidence": "/tmp/frame-docs-captures/crop-preview-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "ac24317a171cf85a0f9d50bd19488284d5b2ffeff43935d33115aad4894c0a72",
+      "source_media": [
+        "alpine-lake.jpg"
+      ]
+    },
+    {
+      "scene": "subtitles",
+      "theme": "dark",
+      "file": "static/media/docs/subtitles-dark.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1475290,
+      "sha256": "b0ea2f7233d6ad15d6e71fb245cc4d4bb82bf5aca6cd15abb01e7035f4b639c9",
+      "rgba_sha256": "f7c340093d3d5b4a69feda847c6ac9e62aea5728412672c7b2258006c829b800",
+      "native_png": "/tmp/frame-docs-captures/subtitles-dark.png",
+      "native_png_bytes": 3745505,
+      "native_png_sha256": "6254b2e038af4f9a96a90431d2265dad0e37f64c4ce4cca72eb0cc2151df1955",
+      "accessibility_evidence": "/tmp/frame-docs-captures/subtitles-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "5286f6576e1b5191b349f295a98202caeeb2e5a705c7137ce0470781ece55380",
+      "source_media": [
+        "alpine-lake.mp4"
+      ]
+    },
+    {
+      "scene": "source-metadata",
+      "theme": "dark",
+      "file": "static/media/docs/source-metadata-dark.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1508828,
+      "sha256": "dcbef43f0003bc31467a877ef5cb3ef24b2fa624f34f12cb9d20d1c278c18d91",
+      "rgba_sha256": "df1f6a1134eda65f63c3c9aeb4ad8db9d8a22880af02ed817b6520b4187751e5",
+      "native_png": "/tmp/frame-docs-captures/source-metadata-dark.png",
+      "native_png_bytes": 3870412,
+      "native_png_sha256": "c01560cc4ef843917cbaa01a1b6e6ac267b6df30e79c85d5fe251a0bbc0c6a3f",
+      "accessibility_evidence": "/tmp/frame-docs-captures/source-metadata-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "4954a98a8453a7684e478eb597fdb094c880a02562946e2b647a1c46db8726d8",
+      "source_media": [
+        "alpine-lake.mp4"
+      ]
+    },
+    {
+      "scene": "output-metadata",
+      "theme": "dark",
+      "file": "static/media/docs/output-metadata-dark.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1451152,
+      "sha256": "5aa18c0d3a78c08be0145535ac6e027d93fde48c387a3fc6240c31e6b9493077",
+      "rgba_sha256": "80a8949df9f09ea219c305b7b3e9727e73dad7b71f128574ca821f9af7d715ec",
+      "native_png": "/tmp/frame-docs-captures/output-metadata-dark.png",
+      "native_png_bytes": 3629506,
+      "native_png_sha256": "7715c15b4f9056f232420cefd91d1be2bd016de214835d3f7114470c9c9622f6",
+      "accessibility_evidence": "/tmp/frame-docs-captures/output-metadata-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "50168f31a0c1d7d02937d3cf29466fb1ee24a59cdbd3caafd9e80da79c506228",
+      "source_media": [
+        "alpine-lake.mp4"
+      ]
+    },
+    {
+      "scene": "settings",
+      "theme": "dark",
+      "file": "static/media/docs/settings-dark.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 634626,
+      "sha256": "78a3a3358191ae476fd4bfe1472e6c51c34e6840e209da608add8b77273133c5",
+      "rgba_sha256": "80c5eb18f759859f512652af362986876731b482f394f4fcf238578cbb0cb4ce",
+      "native_png": "/tmp/frame-docs-captures/settings-dark.png",
+      "native_png_bytes": 1967974,
+      "native_png_sha256": "0753ada883e62eeb4a149ec5db95af05594262e5f976f27caea23f44ac085888",
+      "accessibility_evidence": "/tmp/frame-docs-captures/settings-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "4377174a6d8f8e9e0e32e296b909ef5d4aaeea1cf3ab4e886f797d70ba6854c5",
+      "source_media": [
+        "alpine-lake.mp4"
+      ]
+    },
+    {
+      "scene": "trim-preview",
+      "theme": "dark",
+      "file": "static/media/docs/trim-preview-dark.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1454124,
+      "sha256": "5c4a811a3d8b162314f955c93ccec65feb1cd99dbeb98519cd887c30aaba19e5",
+      "rgba_sha256": "0fb679049d2e67a44300cf47c1f6fa2012f0652d3cba25b0f5c2559a9c18e09d",
+      "native_png": "/tmp/frame-docs-captures/trim-preview-dark.png",
+      "native_png_bytes": 3755786,
+      "native_png_sha256": "766c5ffb95a0d3fbe975a9b4b80d85d47666375e97405269b8958a8d17355811",
+      "accessibility_evidence": "/tmp/frame-docs-captures/trim-preview-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "8f2f99212a49b03d1714294a12ccf2bd525ca296b12bb43798331a788816d909",
+      "source_media": [
+        "alpine-lake.mp4"
+      ]
+    },
+    {
+      "scene": "workspace",
+      "theme": "light",
+      "file": "static/media/docs/workspace-light.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1388316,
+      "sha256": "744c71052abd61e5cded21bb1a0244170f65ab167353099e20951db0d5e7e1a7",
+      "rgba_sha256": "000df48a1517199ac9fb74012f5d05e52248b5efc9d7a692122045bd78736abc",
+      "native_png": "/tmp/frame-docs-captures/workspace-light.png",
+      "native_png_bytes": 3726148,
+      "native_png_sha256": "9806fa6183e7972d5310fa45417fe624fe76363b27504186b3c7884ddb76d6ba",
+      "accessibility_evidence": "/tmp/frame-docs-captures/workspace-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "c5eb6b50afd443477975909d2a5c1a2e91447687fd34741631aa02e2842b2348",
+      "source_media": [
+        "alpine-lake.mp4"
+      ]
+    },
+    {
+      "scene": "batch-queue",
+      "theme": "light",
+      "file": "static/media/docs/batch-queue-light.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1414450,
+      "sha256": "2b880070aac13c27832fd8aade8af27eced5eeff8d5797f759117459f0bbff7e",
+      "rgba_sha256": "99ffd2f33b2bccb348d0efa760b7f410ae57fca57eeec1803ac0ba45ff056324",
+      "native_png": "/tmp/frame-docs-captures/batch-queue-light.png",
+      "native_png_bytes": 3738980,
+      "native_png_sha256": "cdf0e152eaf2faebb823da683fd9d683d9b9dffa3e80d1c214bfa95c44919cc4",
+      "accessibility_evidence": "/tmp/frame-docs-captures/batch-queue-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "65d659c72c75b22eaf1493b9d20dc274e82082915583375ec4c84bc5bf4a08f9",
+      "source_media": [
+        "alpine-lake.mp4",
+        "alpine-lake.jpg",
+        "studio-reference.wav"
+      ]
+    },
+    {
+      "scene": "presets",
+      "theme": "light",
+      "file": "static/media/docs/presets-light.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1406112,
+      "sha256": "4a19ea991bdec15ca537bf806dceeb9ddea3b0bf1e5360d38dc562675e66bf6f",
+      "rgba_sha256": "eafcdad3e218ec3201a8787097176206f0716f8860467e87135025f0c3a1c78e",
+      "native_png": "/tmp/frame-docs-captures/presets-light.png",
+      "native_png_bytes": 3804267,
+      "native_png_sha256": "3ec3080ec75b846a01fe60b9cd08dd03c138279aad71767d804ea3a96254ae8d",
+      "accessibility_evidence": "/tmp/frame-docs-captures/presets-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "350d228628d8733442d527e8138eb5cc3eb17c61fd1b1004206079f7067a73ce",
+      "source_media": [
+        "alpine-lake.mp4"
+      ]
+    },
+    {
+      "scene": "video-output",
+      "theme": "light",
+      "file": "static/media/docs/video-output-light.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1364384,
+      "sha256": "e69a563b8cd84a8b43bf1effced25949fbbf6e367bbe806ee3a199f8371731a2",
+      "rgba_sha256": "b9609e492e80d381b856d3e80865ffe9f89b8df2203e3268b2bc658f614df44c",
+      "native_png": "/tmp/frame-docs-captures/video-output-light.png",
+      "native_png_bytes": 3593503,
+      "native_png_sha256": "d980f8a42374821771a641cd9a668a2ed2c55b8b41c229f8f03f4ef81949a6a8",
+      "accessibility_evidence": "/tmp/frame-docs-captures/video-output-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "a35b4ebe42d5591d24617650ec6ddb492b307c57df39d9797c2846621edbaa98",
+      "source_media": [
+        "alpine-lake.mp4"
+      ]
+    },
+    {
+      "scene": "video-filters",
+      "theme": "light",
+      "file": "static/media/docs/video-filters-light.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1395494,
+      "sha256": "314ce409851aacc41a9757fd50d5381bef3a82038f1c30f82d75e35de3bcc292",
+      "rgba_sha256": "61353f69b8705d89e16d008dea9a737bc2acc817b2b2c8ae27af5850099e40e1",
+      "native_png": "/tmp/frame-docs-captures/video-filters-light.png",
+      "native_png_bytes": 3713431,
+      "native_png_sha256": "adddbb470f2663b5025ddf1470b80b238561182b4b547d8ce72476813d82ded2",
+      "accessibility_evidence": "/tmp/frame-docs-captures/video-filters-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "54c01d18586ece3bb6c674761001db6f8300658846ea94dc30fec89c2092c7f0",
+      "source_media": [
+        "alpine-lake.mp4"
+      ]
+    },
+    {
+      "scene": "audio-output",
+      "theme": "light",
+      "file": "static/media/docs/audio-output-light.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 492792,
+      "sha256": "5263a3d48be14839e98bd8bf49d61e9719e05fafaab1d0cff0bf9fc2fd90c024",
+      "rgba_sha256": "cf0f95a43f52b912e512bb9208ae26c9e9ddb9f81b1682236551994ed5026dc6",
+      "native_png": "/tmp/frame-docs-captures/audio-output-light.png",
+      "native_png_bytes": 2207479,
+      "native_png_sha256": "91fe3ff8093cf5557ea3671fe3e5c9ee3c2b44b4ac8dc14cea1f856dcf71b045",
+      "accessibility_evidence": "/tmp/frame-docs-captures/audio-output-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "e95aab9601796601f253f87a334355db7b97e8a5ba36cd343ba03be69a39a052",
+      "source_media": [
+        "studio-reference.wav"
+      ]
+    },
+    {
+      "scene": "audio-filters",
+      "theme": "light",
+      "file": "static/media/docs/audio-filters-light.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 528272,
+      "sha256": "42b17cbaff7c8f21cbbde3736cb7a1a135cdb355448ce714192845e04b175482",
+      "rgba_sha256": "2c23ea85d7ed7c6c0a225fb4d3ea4a0615f516014622c5538c87c3264e87595d",
+      "native_png": "/tmp/frame-docs-captures/audio-filters-light.png",
+      "native_png_bytes": 2297508,
+      "native_png_sha256": "80dae283e694ae2bef126ad33d453f3e5933b1c6c3a905e4df50727122998b4d",
+      "accessibility_evidence": "/tmp/frame-docs-captures/audio-filters-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "84bc527b2210737b6544ea01f6b7656b53e613f0295805584b24418545394270",
+      "source_media": [
+        "studio-reference.wav"
+      ]
+    },
+    {
+      "scene": "images-output",
+      "theme": "light",
+      "file": "static/media/docs/images-output-light.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1370852,
+      "sha256": "9ba068c504e6196f69ae6f120c9e1467ec095c825ff83e12c948179c3cb9f2ed",
+      "rgba_sha256": "d976ab4d6c24d53e90931d026ef5cb64837897faa535f32b12f2d58ecc4f40e8",
+      "native_png": "/tmp/frame-docs-captures/images-output-light.png",
+      "native_png_bytes": 3533977,
+      "native_png_sha256": "92de9900a835d6346946a634be2bcff58705719d84d561e3c27b6ce362d21e2c",
+      "accessibility_evidence": "/tmp/frame-docs-captures/images-output-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "96b2e6eea6a2b7cdf83eee26539697319c2e63ca03104c88c7924467a6785745",
+      "source_media": [
+        "alpine-lake.jpg"
+      ]
+    },
+    {
+      "scene": "crop-preview",
+      "theme": "light",
+      "file": "static/media/docs/crop-preview-light.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1388304,
+      "sha256": "6f52e8e59fc839771b7160e68f3030c2a711cbb094e02046f63f21426371fba2",
+      "rgba_sha256": "2b8d950d762dc51dc4de307480c341a9f449ab20c86dcbb711473eb2b78837f1",
+      "native_png": "/tmp/frame-docs-captures/crop-preview-light.png",
+      "native_png_bytes": 3799374,
+      "native_png_sha256": "b94b55d63c488888f068a9ed176db77d8dd327ba868d0ff0a616d8e74e860087",
+      "accessibility_evidence": "/tmp/frame-docs-captures/crop-preview-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "ac24317a171cf85a0f9d50bd19488284d5b2ffeff43935d33115aad4894c0a72",
+      "source_media": [
+        "alpine-lake.jpg"
+      ]
+    },
+    {
+      "scene": "subtitles",
+      "theme": "light",
+      "file": "static/media/docs/subtitles-light.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1379478,
+      "sha256": "f66c0d69be3dc72ca02eb32ae6aa89ad5359c789088795feadaa1e14c2bfa26c",
+      "rgba_sha256": "08ffc899d83d0ef5bf1011dc433b0d509982fbbdfd29379499f9e003c330e7ce",
+      "native_png": "/tmp/frame-docs-captures/subtitles-light.png",
+      "native_png_bytes": 3695737,
+      "native_png_sha256": "72d3f7270ae0bd42fe672480d932e625499cdc9af93839660d6d1e7c73f52e2c",
+      "accessibility_evidence": "/tmp/frame-docs-captures/subtitles-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "5286f6576e1b5191b349f295a98202caeeb2e5a705c7137ce0470781ece55380",
+      "source_media": [
+        "alpine-lake.mp4"
+      ]
+    },
+    {
+      "scene": "source-metadata",
+      "theme": "light",
+      "file": "static/media/docs/source-metadata-light.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1428928,
+      "sha256": "aa26684c0bab6180ea5a76e028f431527407d4dbb00d8ad24ef9262aa46b95d6",
+      "rgba_sha256": "935c88a2df057247b584174a31eb599ea50c541cb2de65f3bd3e37fefe410395",
+      "native_png": "/tmp/frame-docs-captures/source-metadata-light.png",
+      "native_png_bytes": 3889535,
+      "native_png_sha256": "4168dfd1d3890f3a2f5396fbde1dd85397bc88462f7f1721f4472a0a67365a7a",
+      "accessibility_evidence": "/tmp/frame-docs-captures/source-metadata-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "4954a98a8453a7684e478eb597fdb094c880a02562946e2b647a1c46db8726d8",
+      "source_media": [
+        "alpine-lake.mp4"
+      ]
+    },
+    {
+      "scene": "output-metadata",
+      "theme": "light",
+      "file": "static/media/docs/output-metadata-light.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1352402,
+      "sha256": "32b46fc0c6996e4ea65d5c6ad38d4e630bb5e07fe209517d4e4f9ed5d6ad9a64",
+      "rgba_sha256": "768882b1fff83c19ad4dc1a87590b40d7455e0df77e431ff70cb27aaf00dd12b",
+      "native_png": "/tmp/frame-docs-captures/output-metadata-light.png",
+      "native_png_bytes": 3573822,
+      "native_png_sha256": "56187dd5f64e511363338216cabc497207a64595df41969fd19429a7c9d56d6e",
+      "accessibility_evidence": "/tmp/frame-docs-captures/output-metadata-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "50168f31a0c1d7d02937d3cf29466fb1ee24a59cdbd3caafd9e80da79c506228",
+      "source_media": [
+        "alpine-lake.mp4"
+      ]
+    },
+    {
+      "scene": "settings",
+      "theme": "light",
+      "file": "static/media/docs/settings-light.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 655650,
+      "sha256": "794073100708b143366961f21ffd54b149189bc193b0d2104fd76645ca140990",
+      "rgba_sha256": "86b7a7fcd30f0f4ad16111de6b75393a4caa0af524463b94f1077f50f6f1a21f",
+      "native_png": "/tmp/frame-docs-captures/settings-light.png",
+      "native_png_bytes": 2169626,
+      "native_png_sha256": "f34aab447bf0e04940b121553ef88f1e671b33431fc9b0b6c409a6a94b380fbe",
+      "accessibility_evidence": "/tmp/frame-docs-captures/settings-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "4377174a6d8f8e9e0e32e296b909ef5d4aaeea1cf3ab4e886f797d70ba6854c5",
+      "source_media": [
+        "alpine-lake.mp4"
+      ]
+    },
+    {
+      "scene": "trim-preview",
+      "theme": "light",
+      "file": "static/media/docs/trim-preview-light.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1367142,
+      "sha256": "836da04130247abfe6968134703c66a6aaf900d0a6d3eb90ca7d75173c4496ad",
+      "rgba_sha256": "a3a143bcca825660694a6ceea26ce903ac685b6422810335f782cfe7a974fb15",
+      "native_png": "/tmp/frame-docs-captures/trim-preview-light.png",
+      "native_png_bytes": 3733073,
+      "native_png_sha256": "125c05d8211dfb35332ac03d789c84451f1d8b90489a43b54caa0ea56507c817",
+      "accessibility_evidence": "/tmp/frame-docs-captures/trim-preview-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "8f2f99212a49b03d1714294a12ccf2bd525ca296b12bb43798331a788816d909",
+      "source_media": [
+        "alpine-lake.mp4"
+      ]
+    },
+    {
+      "scene": "source-error",
+      "theme": "dark",
+      "file": "static/media/docs/source-error-dark.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 714974,
+      "sha256": "57e6684758e75051583b32115bf4cf4b70a2b03f4960a0bb429f154cd5e291da",
+      "rgba_sha256": "90d37468dd8098fd4d5373680d118f8a62cf0b54c12edb0719e7b1679d86ebf9",
+      "native_png": "/tmp/frame-docs-captures/source-error-dark.png",
+      "native_png_bytes": 2466117,
+      "native_png_sha256": "c5b213e5c4bada8a1e54192b13f1db7321fe523893392d2daff1f2649c1a579d",
+      "accessibility_evidence": "/tmp/frame-docs-captures/source-error-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "c7e6f5d502e7f38922d3345e8dd7b9bba5c1f22cb6ca67036942f244cf52c7de",
+      "source_media": [
+        "unreadable-sample.mp4"
+      ]
+    },
+    {
+      "scene": "source-error",
+      "theme": "light",
+      "file": "static/media/docs/source-error-light.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 528646,
+      "sha256": "c405cec1f5b8a132f3bb4cefa90d18d2cb10bf33b1b647c454c03368ea0bc7ad",
+      "rgba_sha256": "3c079542e02fa871a86d1532c2c6792359192751bb1486f7f5c98175057ce7f8",
+      "native_png": "/tmp/frame-docs-captures/source-error-light.png",
+      "native_png_bytes": 2483402,
+      "native_png_sha256": "e43880de53f96414442e7a4401fdf3b581df7a41222159ba9e5fbc6b226e9514",
+      "accessibility_evidence": "/tmp/frame-docs-captures/source-error-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "c7e6f5d502e7f38922d3345e8dd7b9bba5c1f22cb6ca67036942f244cf52c7de",
+      "source_media": [
+        "unreadable-sample.mp4"
+      ]
+    }
+  ],
+  "total_published_bytes": 36412988,
+  "verification": {
+    "capture_count": 30,
+    "distinct_scenes": 15,
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "all_png_webp_pixels_identical": true,
+    "all_dimensions_match": true,
+    "all_processes_exited_successfully": true,
+    "intentional_failed_preview_only_in_source_error": true,
+    "native_git_status_after_cleanup": ""
+  },
+  "media_preparation": {
+    "script": "scripts/prepare-docs-media.py",
+    "script_sha256": "216d3f089f51455377fc2b0af479689371ed4e74f9516dbee29555a33e32aaa0",
+    "argv": [
+      "python3",
+      "scripts/prepare-docs-media.py",
+      "/tmp/frame-docs-media"
+    ],
+    "verification": {
+      "date": "2026-11-10",
+      "separate_reproduction_directory": "/tmp/frame-docs-media-reproduced-20261110",
+      "ffmpeg_version": "ffmpeg version 8.1 Copyright (c) 2000-2026 the FFmpeg developers",
+      "all_five_media_files_byte_identical": true,
+      "mp4_and_wav_stream_and_format_metadata_identical_excluding_filename": true,
+      "evidence": "/tmp/frame-docs-media-reproduction-report.json",
+      "scope": "Recipe rerun in a separate directory; original inputs and published screenshots were not changed. Encoded file hashes may depend on FFmpeg and codec versions on another machine."
+    }
+  }
+}

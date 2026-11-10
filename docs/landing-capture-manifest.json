@@ -1,0 +1,838 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-11-10T20:33:57+01:00",
+  "scope": "New landing assets only. Existing documentation pages, screenshot assets, and documentation provenance are unchanged.",
+  "application": {
+    "repository": "https://github.com/66HEX/frame",
+    "commit": "fd54171a9cead3bc93194ec33c9507c60ce0a117",
+    "version": "0.33.1",
+    "first_capture_build_tracked_worktree_clean": true,
+    "additional_capture_build_existing_concurrent_changes": [
+      "frame-core/src/args.rs",
+      "frame-core/src/filters.rs",
+      "frame-core/tests/media_integration.rs"
+    ],
+    "concurrent_changes_policy": "Existing edits belong to another task. No tracked native application file was changed or reverted by this capture task."
+  },
+  "method": {
+    "renderer": "Actual FrameRoot in a hidden native GPUI window; Window::render_to_image GPU readback.",
+    "logical_window_pixels": [
+      1200,
+      800
+    ],
+    "native_image_pixels": [
+      2400,
+      1600
+    ],
+    "display_scale": 2,
+    "ui_scale": "100%",
+    "themes": [
+      "dark",
+      "light"
+    ],
+    "interaction": "Real file-drop import and native mouse events using accessibility bounds. The metadata view additionally receives a native ScrollWheelEvent.",
+    "settling": "6 seconds for asynchronous media probes/previews, then 500 milliseconds after controls are opened.",
+    "isolation": "FrameRoot::new() with in-memory defaults, persistence=None, and disabled notifications. User preferences were not read/written; no conversion was started.",
+    "base_helper": "scripts/capture-frame-docs.rs",
+    "base_helper_sha256": "02b2767553142f9f47ffc08237e899239d281cd3b57647c0ed425c980a44e2ac",
+    "temporary_helper": "/tmp/frame-render-landing-capture.rs",
+    "temporary_helper_sha256": "e4ff65b9d7b8939455894b8f4ef6d9137c1e0172c395a8e0b188362917f0a40c",
+    "temporary_helper_changes": [
+      "hero aliases the Video output view",
+      "video-encoders opens the actual encoder combobox (kept as source evidence, not published)",
+      "output-metadata scrolls the native inspector down by a requested 260 logical pixels before capture"
+    ],
+    "temporary_native_example_removed": true,
+    "processing": "Only rectangular crop and lossless WebP encoding. No resizing, image retouching, synthetic interface, compositing, added text, cursor, or OS screen-recording overlay."
+  },
+  "art_direction": {
+    "published_full_screens_per_theme": 4,
+    "published_crops_per_theme": 8,
+    "native_dark_background": "#111113",
+    "recommendations": [
+      "Use one full screenshot as the hero, with restrained shadow and no extra border.",
+      "Use preview-canvas as the dominant image in the editing section; layer the separate video-inspector asset through layout.",
+      "Pair the wide batch queue with the narrow preset crop for workflow.",
+      "Keep audio, metadata, and subtitle panels large enough for real UI labels to remain readable.",
+      "Crop assets preserve original pixels; any clipping, corner radius, or bottom fade should be applied by website layout."
+    ]
+  },
+  "originals_directory": "/tmp/frame-landing-captures",
+  "media_sources": [
+    {
+      "name": "alpine-lake-vertical.mp4",
+      "bytes": 201014,
+      "sha256": "508e35d58f5c4013aa75d851b12c8f3167609d76be5bf3eb4b0c47eed471a6c9",
+      "type": "real derived sample video",
+      "recipe": [
+        "ffmpeg",
+        "-i",
+        "alpine-lake.mp4",
+        "-vf",
+        "crop=406:720,scale=608:1080",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "fast",
+        "-crf",
+        "21",
+        "-c:a",
+        "copy",
+        "-c:s",
+        "copy",
+        "-metadata",
+        "title=Alpine lake — vertical",
+        "alpine-lake-vertical.mp4"
+      ]
+    },
+    {
+      "name": "alpine-lake-web.mp4",
+      "bytes": 203505,
+      "sha256": "d60536ba94d97c54a532c0e47129090bc8d0a87b15f2eae25d5967cb729d1d9c",
+      "type": "real derived sample video",
+      "recipe": [
+        "ffmpeg",
+        "-i",
+        "alpine-lake.mp4",
+        "-vf",
+        "scale=854:480",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "fast",
+        "-crf",
+        "22",
+        "-c:a",
+        "copy",
+        "-c:s",
+        "copy",
+        "-metadata",
+        "title=Alpine lake — web",
+        "alpine-lake-web.mp4"
+      ]
+    },
+    {
+      "name": "alpine-lake.jpg",
+      "bytes": 315510,
+      "sha256": "1bfbef77dadf872a384d1e78ab4a4e4b908eb8567b061abdf4fa798c62da647f",
+      "type": "public photograph",
+      "creator": "Philip Ho",
+      "source": "https://unsplash.com/photos/2HFe1VFPlyQ",
+      "license": "https://unsplash.com/license",
+      "retained_source": "static/media/alpine-lake.jpg"
+    },
+    {
+      "name": "alpine-lake.mp4",
+      "bytes": 386909,
+      "sha256": "f04ac1c099b66082f10b982ec0bb54d75c1231698966a3d01f4b929f5ff897bc",
+      "type": "real generated sample media",
+      "preparation_script": "scripts/prepare-docs-media.py",
+      "note": "Video derived from the attributed photograph; audio is a generated reference tone. Neither is injected application state."
+    },
+    {
+      "name": "studio-reference.wav",
+      "bytes": 3456142,
+      "sha256": "25af6b200bb89a83c41d0914fad4de60d01c42474c6e1a23e92c7ce0ce69ecd6",
+      "type": "real generated sample media",
+      "preparation_script": "scripts/prepare-docs-media.py",
+      "note": "Video derived from the attributed photograph; audio is a generated reference tone. Neither is injected application state."
+    }
+  ],
+  "assets": [
+    {
+      "id": "hero",
+      "theme": "dark",
+      "file": "static/media/landing/hero-dark.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1449814,
+      "sha256": "a0c27cc11fbe1c5c4174a178b98945a565f46e5a66ff1eb41e1063dff8dae6a1",
+      "rgba_sha256": "cf26e2f5f647170e42fc56ac872762bbac7ca2db849cb202409ff98a2887f5d0",
+      "source_native_png": "/tmp/frame-landing-captures/hero-dark.png",
+      "source_native_png_sha256": "2f39a2821d1a85959499705009a95d9482c8f2f1782a7f5d377e4bfa2364d12c",
+      "source_scene": "hero",
+      "source_media": [
+        "alpine-lake.mp4",
+        "alpine-lake-web.mp4",
+        "alpine-lake-vertical.mp4"
+      ],
+      "source_build_existing_changes": [],
+      "crop_xywh": [
+        0,
+        0,
+        2400,
+        1600
+      ],
+      "pixel_exact_crop": true,
+      "accessibility_evidence": "/tmp/frame-landing-captures/hero-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "39bfe2b0baa3718b38a320988d4834f1f67c2e38dc0b45f51b3f899e4bff6b61",
+      "recommended_usage": "Primary landing hero: the real workspace, three compatible video files, Apply to all, and video encoder/quality controls."
+    },
+    {
+      "id": "preview",
+      "theme": "dark",
+      "file": "static/media/landing/preview-dark.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1477658,
+      "sha256": "cb55d8262bbc33f164d09674152a89bd290ae9bf402d05a3e820bb8d9f14c8e2",
+      "rgba_sha256": "8caa46e222756a5b5d8b87b0c8fdf212a37df8f5f1dcee2cc66e6dc1be764626",
+      "source_native_png": "/tmp/frame-landing-captures/crop-preview-dark.png",
+      "source_native_png_sha256": "0249b705897dfc7dca16954d1a520407b015a0d755b85c250215579d63daf7e9",
+      "source_scene": "crop-preview",
+      "source_media": [
+        "alpine-lake.jpg"
+      ],
+      "source_build_existing_changes": [],
+      "crop_xywh": [
+        0,
+        0,
+        2400,
+        1600
+      ],
+      "pixel_exact_crop": true,
+      "accessibility_evidence": "/tmp/frame-landing-captures/crop-preview-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "ac24317a171cf85a0f9d50bd19488284d5b2ffeff43935d33115aad4894c0a72",
+      "recommended_usage": "Large editing section: the native crop editor on the photograph, including grid, handles, aspect control, and Apply."
+    },
+    {
+      "id": "workflow",
+      "theme": "dark",
+      "file": "static/media/landing/workflow-dark.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1481556,
+      "sha256": "acfdd108b8c44d2a547f9ec929c39a1c400a7bd03ec28b7c4ea09759b7226120",
+      "rgba_sha256": "9d3bd4b1bed5058f17430ee24ef79f8dc74f9c5bbf00f64abd5dd3378bcf40e7",
+      "source_native_png": "/tmp/frame-landing-captures/batch-queue-dark.png",
+      "source_native_png_sha256": "8c870e7ec053b2ecc1c9ef941a93406afd3320d815e9f60b2099c86d46a50614",
+      "source_scene": "batch-queue",
+      "source_media": [
+        "alpine-lake.mp4",
+        "alpine-lake-web.mp4",
+        "alpine-lake-vertical.mp4"
+      ],
+      "source_build_existing_changes": [
+        "frame-core/src/args.rs",
+        "frame-core/src/filters.rs",
+        "frame-core/tests/media_integration.rs"
+      ],
+      "crop_xywh": [
+        0,
+        0,
+        2400,
+        1600
+      ],
+      "pixel_exact_crop": true,
+      "accessibility_evidence": "/tmp/frame-landing-captures/batch-queue-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "dd843fb4bb6d51ab4a4a961511579647253a1df3cb1c11e63fcd080be99f56f8",
+      "recommended_usage": "Large workflow section: three real video files with General output settings and Apply to all available."
+    },
+    {
+      "id": "video",
+      "theme": "dark",
+      "file": "static/media/landing/video-dark.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1451342,
+      "sha256": "2940897fad4fd787c40d4abbf13784fe0c0584edcae9bbfe780b915a1538f03a",
+      "rgba_sha256": "35af89a84bebf93879395ffae5e1d73f2ac917901081c9def275c734cacd6aa8",
+      "source_native_png": "/tmp/frame-landing-captures/video-output-dark.png",
+      "source_native_png_sha256": "a76950feefc4871a74c0453b70aa93232a648892e72fdbf82bc61343229667d2",
+      "source_scene": "video-output",
+      "source_media": [
+        "alpine-lake.mp4"
+      ],
+      "source_build_existing_changes": [],
+      "crop_xywh": [
+        0,
+        0,
+        2400,
+        1600
+      ],
+      "pixel_exact_crop": true,
+      "accessibility_evidence": "/tmp/frame-landing-captures/video-output-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "a35b4ebe42d5591d24617650ec6ddb492b307c57df39d9797c2846621edbaa98",
+      "recommended_usage": "Optional full video configuration view for a product section or expanded viewer."
+    },
+    {
+      "id": "preview-canvas",
+      "theme": "dark",
+      "file": "static/media/landing/preview-canvas-dark.webp",
+      "width": 1568,
+      "height": 992,
+      "bytes": 831892,
+      "sha256": "62d6ccd94ceccedaabb96b27b7fbb437af385847962ac38f7c5a54c3a87119cf",
+      "rgba_sha256": "2fe00adc91cb8ae392910aa317779c94a14a85a6edba9f1a6e1b9c2da54dcba4",
+      "source_native_png": "/tmp/frame-landing-captures/crop-preview-dark.png",
+      "source_native_png_sha256": "0249b705897dfc7dca16954d1a520407b015a0d755b85c250215579d63daf7e9",
+      "source_scene": "crop-preview",
+      "source_media": [
+        "alpine-lake.jpg"
+      ],
+      "source_build_existing_changes": [],
+      "crop_xywh": [
+        16,
+        96,
+        1568,
+        992
+      ],
+      "pixel_exact_crop": true,
+      "accessibility_evidence": "/tmp/frame-landing-captures/crop-preview-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "ac24317a171cf85a0f9d50bd19488284d5b2ffeff43935d33115aad4894c0a72",
+      "recommended_usage": "Focused editing illustration. Pair with a separate native inspector crop, and keep its own aspect ratio."
+    },
+    {
+      "id": "trim-detail",
+      "theme": "dark",
+      "file": "static/media/landing/trim-detail-dark.webp",
+      "width": 832,
+      "height": 320,
+      "bytes": 102376,
+      "sha256": "8b185369a50a3ea27b142cf9913a4f5344bf85a3447528d110d85dfb601f655b",
+      "rgba_sha256": "c63f28793363d54a83ea352027156ccf87d05fce662f5892c4f5e3cf6a6eaf9a",
+      "source_native_png": "/tmp/frame-landing-captures/trim-preview-dark.png",
+      "source_native_png_sha256": "766c5ffb95a0d3fbe975a9b4b80d85d47666375e97405269b8958a8d17355811",
+      "source_scene": "trim-preview",
+      "source_media": [
+        "alpine-lake.mp4"
+      ],
+      "source_build_existing_changes": [],
+      "crop_xywh": [
+        384,
+        720,
+        832,
+        320
+      ],
+      "pixel_exact_crop": true,
+      "accessibility_evidence": "/tmp/frame-landing-captures/trim-preview-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "8f2f99212a49b03d1714294a12ccf2bd525ca296b12bb43798331a788816d909",
+      "recommended_usage": "Small precision-editing detail: actual Start/End timecode range and playback capsule. No text or controls were composited."
+    },
+    {
+      "id": "video-inspector",
+      "theme": "dark",
+      "file": "static/media/landing/video-inspector-dark.webp",
+      "width": 784,
+      "height": 1180,
+      "bytes": 292060,
+      "sha256": "1f831b5da752ebb15531b3631e57801d36a67afb7fe9fa7b4001afdafb6987ca",
+      "rgba_sha256": "65e325790fe9d15f139ff93da44071af6d777543095761b8df77fcc1d77e06ec",
+      "source_native_png": "/tmp/frame-landing-captures/video-output-dark.png",
+      "source_native_png_sha256": "a76950feefc4871a74c0453b70aa93232a648892e72fdbf82bc61343229667d2",
+      "source_scene": "video-output",
+      "source_media": [
+        "alpine-lake.mp4"
+      ],
+      "source_build_existing_changes": [],
+      "crop_xywh": [
+        1600,
+        112,
+        784,
+        1180
+      ],
+      "pixel_exact_crop": true,
+      "accessibility_evidence": "/tmp/frame-landing-captures/video-output-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "a35b4ebe42d5591d24617650ec6ddb492b307c57df39d9797c2846621edbaa98",
+      "recommended_usage": "Floating inspector alongside preview imagery. Native resolution, framerate, encoder, pixel format, encoding speed, and CRF controls."
+    },
+    {
+      "id": "audio-inspector",
+      "theme": "dark",
+      "file": "static/media/landing/audio-inspector-dark.webp",
+      "width": 784,
+      "height": 1040,
+      "bytes": 247354,
+      "sha256": "d9a127df4f10984541446b28269bfbe60efcf3afc255057ff0ab5fc907df0f7d",
+      "rgba_sha256": "20d460488cd32a2e6fa0b8d97394c90aa82e7c02e82e2471c844395e40de4c6d",
+      "source_native_png": "/tmp/frame-landing-captures/audio-output-dark.png",
+      "source_native_png_sha256": "c5084ec3a0a4acbf7b285c77285a4d17e2814b150e57220fbc82445375f0f08e",
+      "source_scene": "audio-output",
+      "source_media": [
+        "studio-reference.wav"
+      ],
+      "source_build_existing_changes": [],
+      "crop_xywh": [
+        1600,
+        112,
+        784,
+        1040
+      ],
+      "pixel_exact_crop": true,
+      "accessibility_evidence": "/tmp/frame-landing-captures/audio-output-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "e95aab9601796601f253f87a334355db7b97e8a5ba36cd343ba03be69a39a052",
+      "recommended_usage": "Audio detail section: MP3 codec, channel selection, bitrate, and the real PCM source track."
+    },
+    {
+      "id": "batch-queue",
+      "theme": "dark",
+      "file": "static/media/landing/batch-queue-dark.webp",
+      "width": 1568,
+      "height": 480,
+      "bytes": 234162,
+      "sha256": "84ee42cb1064f75f4b7cf10611e6b0e985aa4da71e1be26306325cb1357341de",
+      "rgba_sha256": "583ffc1b1c971c9525b0040dda1ba2eaa5a6edcadca312dde73502f8ee84e527",
+      "source_native_png": "/tmp/frame-landing-captures/hero-dark.png",
+      "source_native_png_sha256": "2f39a2821d1a85959499705009a95d9482c8f2f1782a7f5d377e4bfa2364d12c",
+      "source_scene": "hero",
+      "source_media": [
+        "alpine-lake.mp4",
+        "alpine-lake-web.mp4",
+        "alpine-lake-vertical.mp4"
+      ],
+      "source_build_existing_changes": [],
+      "crop_xywh": [
+        16,
+        1096,
+        1568,
+        480
+      ],
+      "pixel_exact_crop": true,
+      "accessibility_evidence": "/tmp/frame-landing-captures/hero-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "39bfe2b0baa3718b38a320988d4834f1f67c2e38dc0b45f51b3f899e4bff6b61",
+      "recommended_usage": "Wide workflow detail: three separately encoded real video inputs, all selected. Idle is the actual state; no conversion progress is simulated."
+    },
+    {
+      "id": "presets",
+      "theme": "dark",
+      "file": "static/media/landing/presets-dark.webp",
+      "width": 784,
+      "height": 1320,
+      "bytes": 363602,
+      "sha256": "e5d25377a4e8fe02c996ce1234d5d092810b9be2feb195745bf079aefb3e7cb5",
+      "rgba_sha256": "d21f0e72f4e4be83b4d5faa68c6dec2d8e06cf798f3d02636928274572d75b0e",
+      "source_native_png": "/tmp/frame-landing-captures/presets-dark.png",
+      "source_native_png_sha256": "13e989138ead12b983f8e02b818da93d0c8db590ed2fac3f3d4e0285a90f809d",
+      "source_scene": "presets",
+      "source_media": [
+        "alpine-lake.mp4"
+      ],
+      "source_build_existing_changes": [],
+      "crop_xywh": [
+        1600,
+        112,
+        784,
+        1320
+      ],
+      "pixel_exact_crop": true,
+      "accessibility_evidence": "/tmp/frame-landing-captures/presets-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "350d228628d8733442d527e8138eb5cc3eb17c61fd1b1004206079f7067a73ce",
+      "recommended_usage": "Narrow companion card for the workflow section. Native built-in preset list with Balanced MP4 applied. Display from the top; a CSS bottom fade may keep partial lower entries unobtrusive."
+    },
+    {
+      "id": "metadata-inspector",
+      "theme": "dark",
+      "file": "static/media/landing/metadata-inspector-dark.webp",
+      "width": 784,
+      "height": 1080,
+      "bytes": 248596,
+      "sha256": "8f437f9acdabb66c9af1938515fe1a36511e6a402d1e9d3c88d64153ff1a21fa",
+      "rgba_sha256": "783ca481753e2ea71134a2b98eb5d8c5e4e143dc7fb3434cff25d996ee5d4763",
+      "source_native_png": "/tmp/frame-landing-captures/output-metadata-dark.png",
+      "source_native_png_sha256": "e113efcd4b325669de2457bdb12884e1beb71da2b7286cd78ab24eee8ffdd73c",
+      "source_scene": "output-metadata",
+      "source_media": [
+        "alpine-lake.mp4"
+      ],
+      "source_build_existing_changes": [
+        "frame-core/src/args.rs",
+        "frame-core/src/filters.rs",
+        "frame-core/tests/media_integration.rs"
+      ],
+      "crop_xywh": [
+        1600,
+        320,
+        784,
+        1080
+      ],
+      "pixel_exact_crop": true,
+      "accessibility_evidence": "/tmp/frame-landing-captures/output-metadata-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "4bd374b0cb17261736b9077ca3b64f61dca4109bd086dcb7d40dad08a14286f5",
+      "recommended_usage": "Metadata detail card: Preserve/Clean/Replace, title, artist, album, genre, and date fields. Captured after real native scrolling, then cropped to the section."
+    },
+    {
+      "id": "subtitles-inspector",
+      "theme": "dark",
+      "file": "static/media/landing/subtitles-inspector-dark.webp",
+      "width": 784,
+      "height": 1040,
+      "bytes": 261816,
+      "sha256": "07ff67b610a5128e88eb013639dc61afa0c92644ce65cede0d08cd71e1a912cf",
+      "rgba_sha256": "26259fbce950f1afa785be5daf23be481a4f211ccb94e3c4b3e53b6f9b31b4ad",
+      "source_native_png": "/tmp/frame-landing-captures/subtitles-dark.png",
+      "source_native_png_sha256": "6254b2e038af4f9a96a90431d2265dad0e37f64c4ce4cca72eb0cc2151df1955",
+      "source_scene": "subtitles",
+      "source_media": [
+        "alpine-lake.mp4"
+      ],
+      "source_build_existing_changes": [
+        "frame-core/src/args.rs",
+        "frame-core/src/filters.rs",
+        "frame-core/tests/media_integration.rs"
+      ],
+      "crop_xywh": [
+        1600,
+        552,
+        784,
+        1040
+      ],
+      "pixel_exact_crop": true,
+      "accessibility_evidence": "/tmp/frame-landing-captures/subtitles-dark.png.a11y.txt",
+      "accessibility_evidence_sha256": "5286f6576e1b5191b349f295a98202caeeb2e5a705c7137ce0470781ece55380",
+      "recommended_usage": "Subtitle detail card: selectable versus burn-in mode, external-file control, and the real embedded English mov_text track. Display from the top."
+    },
+    {
+      "id": "hero",
+      "theme": "light",
+      "file": "static/media/landing/hero-light.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1365148,
+      "sha256": "ee6b4e3d65bb9e2eae82846d799c6b113571a565aa4c1fccea980ee19f798f80",
+      "rgba_sha256": "136fdb4f555e3af43042f689490f9131a5320496936936462d3353ff10746c3d",
+      "source_native_png": "/tmp/frame-landing-captures/hero-light.png",
+      "source_native_png_sha256": "274ef2573d8beda02e78a660c67737416fa750228605f7446a0d69b558813fe4",
+      "source_scene": "hero",
+      "source_media": [
+        "alpine-lake.mp4",
+        "alpine-lake-web.mp4",
+        "alpine-lake-vertical.mp4"
+      ],
+      "source_build_existing_changes": [],
+      "crop_xywh": [
+        0,
+        0,
+        2400,
+        1600
+      ],
+      "pixel_exact_crop": true,
+      "accessibility_evidence": "/tmp/frame-landing-captures/hero-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "39bfe2b0baa3718b38a320988d4834f1f67c2e38dc0b45f51b3f899e4bff6b61",
+      "recommended_usage": "Primary landing hero: the real workspace, three compatible video files, Apply to all, and video encoder/quality controls."
+    },
+    {
+      "id": "preview",
+      "theme": "light",
+      "file": "static/media/landing/preview-light.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1388304,
+      "sha256": "6f52e8e59fc839771b7160e68f3030c2a711cbb094e02046f63f21426371fba2",
+      "rgba_sha256": "2b8d950d762dc51dc4de307480c341a9f449ab20c86dcbb711473eb2b78837f1",
+      "source_native_png": "/tmp/frame-landing-captures/crop-preview-light.png",
+      "source_native_png_sha256": "b94b55d63c488888f068a9ed176db77d8dd327ba868d0ff0a616d8e74e860087",
+      "source_scene": "crop-preview",
+      "source_media": [
+        "alpine-lake.jpg"
+      ],
+      "source_build_existing_changes": [],
+      "crop_xywh": [
+        0,
+        0,
+        2400,
+        1600
+      ],
+      "pixel_exact_crop": true,
+      "accessibility_evidence": "/tmp/frame-landing-captures/crop-preview-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "ac24317a171cf85a0f9d50bd19488284d5b2ffeff43935d33115aad4894c0a72",
+      "recommended_usage": "Large editing section: the native crop editor on the photograph, including grid, handles, aspect control, and Apply."
+    },
+    {
+      "id": "workflow",
+      "theme": "light",
+      "file": "static/media/landing/workflow-light.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1393260,
+      "sha256": "9c11e48aa65e6041df14edc398050f6a3c79a301be68bdda733f5367e11b18ff",
+      "rgba_sha256": "a52cd3912a2a9311e33f97eb5e916ce72581b3b66844b9edb670d06ce6d68672",
+      "source_native_png": "/tmp/frame-landing-captures/batch-queue-light.png",
+      "source_native_png_sha256": "a89f19de27321340912896c7e5da3d895005aa1d18504f993cf2539d5653924e",
+      "source_scene": "batch-queue",
+      "source_media": [
+        "alpine-lake.mp4",
+        "alpine-lake-web.mp4",
+        "alpine-lake-vertical.mp4"
+      ],
+      "source_build_existing_changes": [
+        "frame-core/src/args.rs",
+        "frame-core/src/filters.rs",
+        "frame-core/tests/media_integration.rs"
+      ],
+      "crop_xywh": [
+        0,
+        0,
+        2400,
+        1600
+      ],
+      "pixel_exact_crop": true,
+      "accessibility_evidence": "/tmp/frame-landing-captures/batch-queue-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "dd843fb4bb6d51ab4a4a961511579647253a1df3cb1c11e63fcd080be99f56f8",
+      "recommended_usage": "Large workflow section: three real video files with General output settings and Apply to all available."
+    },
+    {
+      "id": "video",
+      "theme": "light",
+      "file": "static/media/landing/video-light.webp",
+      "width": 2400,
+      "height": 1600,
+      "bytes": 1364384,
+      "sha256": "e69a563b8cd84a8b43bf1effced25949fbbf6e367bbe806ee3a199f8371731a2",
+      "rgba_sha256": "b9609e492e80d381b856d3e80865ffe9f89b8df2203e3268b2bc658f614df44c",
+      "source_native_png": "/tmp/frame-landing-captures/video-output-light.png",
+      "source_native_png_sha256": "d980f8a42374821771a641cd9a668a2ed2c55b8b41c229f8f03f4ef81949a6a8",
+      "source_scene": "video-output",
+      "source_media": [
+        "alpine-lake.mp4"
+      ],
+      "source_build_existing_changes": [],
+      "crop_xywh": [
+        0,
+        0,
+        2400,
+        1600
+      ],
+      "pixel_exact_crop": true,
+      "accessibility_evidence": "/tmp/frame-landing-captures/video-output-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "a35b4ebe42d5591d24617650ec6ddb492b307c57df39d9797c2846621edbaa98",
+      "recommended_usage": "Optional full video configuration view for a product section or expanded viewer."
+    },
+    {
+      "id": "preview-canvas",
+      "theme": "light",
+      "file": "static/media/landing/preview-canvas-light.webp",
+      "width": 1568,
+      "height": 992,
+      "bytes": 834144,
+      "sha256": "78a35678c396951ea13ba1a61d0e630762670db9a53ef2eda035adaf98116428",
+      "rgba_sha256": "1741066eb93df852a202ac87641e6658e9256789d4913ec22613df6a4b5cf68d",
+      "source_native_png": "/tmp/frame-landing-captures/crop-preview-light.png",
+      "source_native_png_sha256": "b94b55d63c488888f068a9ed176db77d8dd327ba868d0ff0a616d8e74e860087",
+      "source_scene": "crop-preview",
+      "source_media": [
+        "alpine-lake.jpg"
+      ],
+      "source_build_existing_changes": [],
+      "crop_xywh": [
+        16,
+        96,
+        1568,
+        992
+      ],
+      "pixel_exact_crop": true,
+      "accessibility_evidence": "/tmp/frame-landing-captures/crop-preview-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "ac24317a171cf85a0f9d50bd19488284d5b2ffeff43935d33115aad4894c0a72",
+      "recommended_usage": "Focused editing illustration. Pair with a separate native inspector crop, and keep its own aspect ratio."
+    },
+    {
+      "id": "trim-detail",
+      "theme": "light",
+      "file": "static/media/landing/trim-detail-light.webp",
+      "width": 832,
+      "height": 320,
+      "bytes": 109618,
+      "sha256": "6e75b0c3a0d8a66fc2ac13ec87a47869ee43a0c8d4407d546c6af2f4542ac022",
+      "rgba_sha256": "c3b55333d0e61cf56853dd2ea89436f996d60a08cab627a1de8845ebef76241b",
+      "source_native_png": "/tmp/frame-landing-captures/trim-preview-light.png",
+      "source_native_png_sha256": "125c05d8211dfb35332ac03d789c84451f1d8b90489a43b54caa0ea56507c817",
+      "source_scene": "trim-preview",
+      "source_media": [
+        "alpine-lake.mp4"
+      ],
+      "source_build_existing_changes": [],
+      "crop_xywh": [
+        384,
+        720,
+        832,
+        320
+      ],
+      "pixel_exact_crop": true,
+      "accessibility_evidence": "/tmp/frame-landing-captures/trim-preview-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "8f2f99212a49b03d1714294a12ccf2bd525ca296b12bb43798331a788816d909",
+      "recommended_usage": "Small precision-editing detail: actual Start/End timecode range and playback capsule. No text or controls were composited."
+    },
+    {
+      "id": "video-inspector",
+      "theme": "light",
+      "file": "static/media/landing/video-inspector-light.webp",
+      "width": 784,
+      "height": 1180,
+      "bytes": 239072,
+      "sha256": "896c04477ad3eb09b3aa65931c747e2173ca7b7414f4e6180017d20ade7889a6",
+      "rgba_sha256": "34056967b9a4db5f9ba4dafb06d6a86722c41b7bc212681d0508ad1c93a430fd",
+      "source_native_png": "/tmp/frame-landing-captures/video-output-light.png",
+      "source_native_png_sha256": "d980f8a42374821771a641cd9a668a2ed2c55b8b41c229f8f03f4ef81949a6a8",
+      "source_scene": "video-output",
+      "source_media": [
+        "alpine-lake.mp4"
+      ],
+      "source_build_existing_changes": [],
+      "crop_xywh": [
+        1600,
+        112,
+        784,
+        1180
+      ],
+      "pixel_exact_crop": true,
+      "accessibility_evidence": "/tmp/frame-landing-captures/video-output-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "a35b4ebe42d5591d24617650ec6ddb492b307c57df39d9797c2846621edbaa98",
+      "recommended_usage": "Floating inspector alongside preview imagery. Native resolution, framerate, encoder, pixel format, encoding speed, and CRF controls."
+    },
+    {
+      "id": "audio-inspector",
+      "theme": "light",
+      "file": "static/media/landing/audio-inspector-light.webp",
+      "width": 784,
+      "height": 1040,
+      "bytes": 172586,
+      "sha256": "f2ebb15609ced019d0507608dded89a9f1ae11c8c7d971f5dc50c863a68ff095",
+      "rgba_sha256": "b7ee2c09360b257eb3eb14543d8176115713d69de5bb4b3e8839e1d61f909446",
+      "source_native_png": "/tmp/frame-landing-captures/audio-output-light.png",
+      "source_native_png_sha256": "91fe3ff8093cf5557ea3671fe3e5c9ee3c2b44b4ac8dc14cea1f856dcf71b045",
+      "source_scene": "audio-output",
+      "source_media": [
+        "studio-reference.wav"
+      ],
+      "source_build_existing_changes": [],
+      "crop_xywh": [
+        1600,
+        112,
+        784,
+        1040
+      ],
+      "pixel_exact_crop": true,
+      "accessibility_evidence": "/tmp/frame-landing-captures/audio-output-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "e95aab9601796601f253f87a334355db7b97e8a5ba36cd343ba03be69a39a052",
+      "recommended_usage": "Audio detail section: MP3 codec, channel selection, bitrate, and the real PCM source track."
+    },
+    {
+      "id": "batch-queue",
+      "theme": "light",
+      "file": "static/media/landing/batch-queue-light.webp",
+      "width": 1568,
+      "height": 480,
+      "bytes": 185024,
+      "sha256": "8442bacadd37c06284e42456f55cd109783306c260e2bd75ce66df581f21ccf3",
+      "rgba_sha256": "8b3c7e38bb9d58ff408b44bb4cbe3ada95df9f5af26c592ce1a1cb95c298cc4b",
+      "source_native_png": "/tmp/frame-landing-captures/hero-light.png",
+      "source_native_png_sha256": "274ef2573d8beda02e78a660c67737416fa750228605f7446a0d69b558813fe4",
+      "source_scene": "hero",
+      "source_media": [
+        "alpine-lake.mp4",
+        "alpine-lake-web.mp4",
+        "alpine-lake-vertical.mp4"
+      ],
+      "source_build_existing_changes": [],
+      "crop_xywh": [
+        16,
+        1096,
+        1568,
+        480
+      ],
+      "pixel_exact_crop": true,
+      "accessibility_evidence": "/tmp/frame-landing-captures/hero-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "39bfe2b0baa3718b38a320988d4834f1f67c2e38dc0b45f51b3f899e4bff6b61",
+      "recommended_usage": "Wide workflow detail: three separately encoded real video inputs, all selected. Idle is the actual state; no conversion progress is simulated."
+    },
+    {
+      "id": "presets",
+      "theme": "light",
+      "file": "static/media/landing/presets-light.webp",
+      "width": 784,
+      "height": 1320,
+      "bytes": 276836,
+      "sha256": "0b5ad37546dbae41ca60948e46b3261ef65cf8c346982bf8454d256b7d24a924",
+      "rgba_sha256": "b83b26d163899d5a2a6f70353138ba306be18bbba0203ef1be05dc95260881b4",
+      "source_native_png": "/tmp/frame-landing-captures/presets-light.png",
+      "source_native_png_sha256": "3ec3080ec75b846a01fe60b9cd08dd03c138279aad71767d804ea3a96254ae8d",
+      "source_scene": "presets",
+      "source_media": [
+        "alpine-lake.mp4"
+      ],
+      "source_build_existing_changes": [],
+      "crop_xywh": [
+        1600,
+        112,
+        784,
+        1320
+      ],
+      "pixel_exact_crop": true,
+      "accessibility_evidence": "/tmp/frame-landing-captures/presets-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "350d228628d8733442d527e8138eb5cc3eb17c61fd1b1004206079f7067a73ce",
+      "recommended_usage": "Narrow companion card for the workflow section. Native built-in preset list with Balanced MP4 applied. Display from the top; a CSS bottom fade may keep partial lower entries unobtrusive."
+    },
+    {
+      "id": "metadata-inspector",
+      "theme": "light",
+      "file": "static/media/landing/metadata-inspector-light.webp",
+      "width": 784,
+      "height": 1080,
+      "bytes": 169516,
+      "sha256": "40ee3942b623e7bfa8a5a02ab280178c2dee4afa14e257104286fb7b86e75b7c",
+      "rgba_sha256": "a430480c1927fce8398824235e47c0a15f4f69f846fb62c2f593efd15b4af85e",
+      "source_native_png": "/tmp/frame-landing-captures/output-metadata-light.png",
+      "source_native_png_sha256": "08bc6b2429b39a19f4a211e14fe1965cdd4329d4b59f31937139e8f071a2ef53",
+      "source_scene": "output-metadata",
+      "source_media": [
+        "alpine-lake.mp4"
+      ],
+      "source_build_existing_changes": [
+        "frame-core/src/args.rs",
+        "frame-core/src/filters.rs",
+        "frame-core/tests/media_integration.rs"
+      ],
+      "crop_xywh": [
+        1600,
+        320,
+        784,
+        1080
+      ],
+      "pixel_exact_crop": true,
+      "accessibility_evidence": "/tmp/frame-landing-captures/output-metadata-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "4bd374b0cb17261736b9077ca3b64f61dca4109bd086dcb7d40dad08a14286f5",
+      "recommended_usage": "Metadata detail card: Preserve/Clean/Replace, title, artist, album, genre, and date fields. Captured after real native scrolling, then cropped to the section."
+    },
+    {
+      "id": "subtitles-inspector",
+      "theme": "light",
+      "file": "static/media/landing/subtitles-inspector-light.webp",
+      "width": 784,
+      "height": 1040,
+      "bytes": 195930,
+      "sha256": "da04a322deee6ef06ca14bbc3be9a70c4fab3c76c15270bae1057e082e67e86c",
+      "rgba_sha256": "ca718a75492cfa231189b1f4793803606f126d5931a42033759b49976f16a2d7",
+      "source_native_png": "/tmp/frame-landing-captures/subtitles-light.png",
+      "source_native_png_sha256": "72d3f7270ae0bd42fe672480d932e625499cdc9af93839660d6d1e7c73f52e2c",
+      "source_scene": "subtitles",
+      "source_media": [
+        "alpine-lake.mp4"
+      ],
+      "source_build_existing_changes": [
+        "frame-core/src/args.rs",
+        "frame-core/src/filters.rs",
+        "frame-core/tests/media_integration.rs"
+      ],
+      "crop_xywh": [
+        1600,
+        552,
+        784,
+        1040
+      ],
+      "pixel_exact_crop": true,
+      "accessibility_evidence": "/tmp/frame-landing-captures/subtitles-light.png.a11y.txt",
+      "accessibility_evidence_sha256": "5286f6576e1b5191b349f295a98202caeeb2e5a705c7137ce0470781ece55380",
+      "recommended_usage": "Subtitle detail card: selectable versus burn-in mode, external-file control, and the real embedded English mov_text track. Display from the top."
+    }
+  ],
+  "verification": {
+    "asset_count": 24,
+    "full_screens": 8,
+    "focused_crops": 16,
+    "all_webp_pixels_equal_native_source_region": true,
+    "all_capture_processes_succeeded": true,
+    "all_source_previews_available": true,
+    "total_published_bytes": 16136050,
+    "encoding": "cwebp -lossless -exact -m 6",
+    "remaining_native_worktree_changes": []
+  }
+}
