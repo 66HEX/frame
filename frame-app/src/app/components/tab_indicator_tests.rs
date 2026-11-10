@@ -1,8 +1,8 @@
-//! Inspect the real option-tab rail and its painted shared background. Pin a
-//! native transition mid-flight so loaded CI workers cannot skip the sample.
+//! Inspect the real option-tab rail and its painted shared background with a
+//! controlled native transition clock, including interrupted transitions.
 use crate::app::components::{FrameOption, frame_option_tabs};
 use crate::app::model::ActiveView;
-use crate::app::motion::tab_indicator_ease;
+use crate::app::motion::{tab_indicator_ease, tab_indicator_motion};
 use crate::app::root::FrameRoot;
 use crate::appearance::ColorTheme;
 use crate::theme;
@@ -11,7 +11,7 @@ use gpui::{
     AppContext, Bounds, Context, Entity, Lerp, Modifiers, Pixels, Quad, Subscription,
     TestAppContext, TransitionState, VisualTestContext, Window, div, px,
 };
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 type IndicatorMotion = Entity<TransitionState<Bounds<Pixels>>>;
 
@@ -73,7 +73,9 @@ fn setup(
     app: &mut TestAppContext,
     mode: ColorTheme,
     rem: f32,
-) -> (Entity<TabsTestView>, &mut VisualTestContext) {
+) -> (Entity<TabsTestView>, &mut VisualTestContext, Instant) {
+    let now = Instant::now();
+    app.set_transition_time(now);
     let (view, cx) = app.add_window_view(|_, cx| {
         let root = cx.new(|_| FrameRoot::new());
         let subscription = cx.observe(&root, |_, _, cx| cx.notify());
@@ -89,7 +91,7 @@ fn setup(
         }
     });
     draw(cx);
-    (view, cx)
+    (view, cx, now)
 }
 
 fn draw(cx: &mut VisualTestContext) {
@@ -156,10 +158,10 @@ fn assert_quad_matches(cx: &mut VisualTestContext, mode: ColorTheme, expected: B
     cx.update(|window, _| assert_eq!(quad.bounds, expected.scale(window.scale_factor())));
 }
 
-fn assert_settled(motion: &IndicatorMotion, cx: &VisualTestContext) {
+fn assert_settled(motion: &IndicatorMotion, now: Instant, cx: &VisualTestContext) {
     let mut state = motion.read_with(cx, |state, _| state.clone());
     let expected = *state.value();
-    let sample = state.sample(Instant::now());
+    let sample = state.sample(now);
     assert_eq!(sample.value, expected);
     assert!(
         !sample.is_active,
@@ -171,12 +173,14 @@ fn pin_halfway(
     motion: &IndicatorMotion,
     from: Bounds<Pixels>,
     to: Bounds<Pixels>,
+    now: Instant,
     cx: &mut VisualTestContext,
 ) {
-    let duration = Duration::from_hours(1);
-    let started = Instant::now().checked_sub(duration / 2).unwrap();
+    let timing = tab_indicator_motion();
+    let started = now
+        .checked_sub(timing.forward_pass().duration() / 2)
+        .unwrap();
     motion.update(cx, |state, cx| {
-        let timing = gpui::Motion::new(duration).with_easing(tab_indicator_ease);
         *state = TransitionState::new(from, timing.clone());
         state.set(to, timing, started);
         cx.notify();
@@ -202,11 +206,11 @@ fn option_tab_indicator_starts_settled_and_tracks_unequal_trigger_widths() {
     for mode in ColorTheme::ALL {
         for rem in [16.0, 32.0] {
             let mut app = TestAppContext::single();
-            let (view, cx) = setup(&mut app, mode, rem);
+            let (view, cx, now) = setup(&mut app, mode, rem);
             let geometry = bounds(cx);
             assert!(geometry[1].size.width > geometry[0].size.width);
             let transition = motion(&view, cx);
-            assert_settled(&transition, cx);
+            assert_settled(&transition, now, cx);
             assert_quad_matches(cx, mode, geometry[0]);
             cx.update(|_, cx| cx.set_reduce_motion(true));
             for selected in [1, 2, 0] {
@@ -217,7 +221,7 @@ fn option_tab_indicator_starts_settled_and_tracks_unequal_trigger_widths() {
                     "the moving background cannot reflow labels"
                 );
                 assert_quad_matches(cx, mode, geometry[selected]);
-                assert_settled(&transition, cx);
+                assert_settled(&transition, now, cx);
             }
         }
     }
@@ -227,14 +231,14 @@ fn option_tab_indicator_starts_settled_and_tracks_unequal_trigger_widths() {
 fn option_tab_indicator_moves_and_resizes_as_one_surface() {
     for mode in ColorTheme::ALL {
         let mut app = TestAppContext::single();
-        let (view, cx) = setup(&mut app, mode, 16.0);
+        let (view, cx, now) = setup(&mut app, mode, 16.0);
         let geometry = bounds(cx);
         let transition = motion(&view, cx);
         let from = target(&transition, cx);
         change(&view, 1, cx);
         let to = target(&transition, cx);
         assert_ne!(from.size.width, to.size.width);
-        pin_halfway(&transition, from, to, cx);
+        pin_halfway(&transition, from, to, now, cx);
         draw(cx);
         let quad = active_quad(cx, mode);
         let halfway = geometry[0].lerp(&geometry[1], tab_indicator_ease(0.5));
@@ -260,30 +264,28 @@ fn option_tab_indicator_moves_and_resizes_as_one_surface() {
 #[test]
 fn option_tab_indicator_retargets_from_its_visible_position() {
     let mut app = TestAppContext::single();
-    let (view, cx) = setup(&mut app, ColorTheme::Dark, 16.0);
+    let (view, cx, now) = setup(&mut app, ColorTheme::Dark, 16.0);
     let transition = motion(&view, cx);
     let original_entity = transition.entity_id();
     let first = target(&transition, cx);
     change(&view, 1, cx);
     let second = target(&transition, cx);
-    pin_halfway(&transition, first, second, cx);
+    pin_halfway(&transition, first, second, now, cx);
     draw(cx);
-    let before_change = Instant::now();
     change(&view, 2, cx);
     let mut state = transition.read_with(cx, |state, _| state.clone());
     near_bounds(
-        state.sample(before_change).value,
+        state.sample(now).value,
         first.lerp(&second, tab_indicator_ease(0.5)),
     );
     assert_eq!(motion(&view, cx).entity_id(), original_entity);
     let third = target(&transition, cx);
-    pin_halfway(&transition, second, third, cx);
+    pin_halfway(&transition, second, third, now, cx);
     draw(cx);
-    let before_reverse = Instant::now();
     change(&view, 0, cx);
     let mut state = transition.read_with(cx, |state, _| state.clone());
     near_bounds(
-        state.sample(before_reverse).value,
+        state.sample(now).value,
         second.lerp(&third, tab_indicator_ease(0.5)),
     );
     assert_eq!(*state.value(), first);
@@ -293,7 +295,7 @@ fn option_tab_indicator_retargets_from_its_visible_position() {
 #[test]
 fn option_tab_indicator_snaps_to_resized_geometry_without_animating_layout() {
     let mut app = TestAppContext::single();
-    let (view, cx) = setup(&mut app, ColorTheme::Dark, 16.0);
+    let (view, cx, now) = setup(&mut app, ColorTheme::Dark, 16.0);
     let transition = motion(&view, cx);
     view.update(cx, |view, cx| {
         view.width = 780.0;
@@ -303,14 +305,14 @@ fn option_tab_indicator_snaps_to_resized_geometry_without_animating_layout() {
     draw(cx);
     let selected = bounds(cx)[0];
     assert_quad_matches(cx, ColorTheme::Dark, selected);
-    assert_settled(&transition, cx);
+    assert_settled(&transition, now, cx);
 }
 
 #[test]
 fn disabled_option_tabs_keep_the_selected_surface_and_ignore_activation() {
     for mode in ColorTheme::ALL {
         let mut app = TestAppContext::single();
-        let (view, cx) = setup(&mut app, mode, 16.0);
+        let (view, cx, _) = setup(&mut app, mode, 16.0);
         let geometry = bounds(cx);
         let root = view.read_with(cx, |view, _| view.root.clone());
         cx.simulate_click(geometry[0].center(), Modifiers::default());

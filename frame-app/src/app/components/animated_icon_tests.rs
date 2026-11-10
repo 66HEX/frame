@@ -51,7 +51,6 @@ struct IconTestView {
     state: u8,
     theme: ColorTheme,
     rem: f32,
-    render_started: Instant,
     glyphs: Vec<GlyphSnapshot>,
     _subscription: Subscription,
 }
@@ -60,7 +59,6 @@ impl gpui::Render for IconTestView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         window.set_rem_size(px(self.rem));
         let (control, state, mode) = (self.control, self.state, self.theme);
-        self.render_started = Instant::now();
         let (widget, glyphs) = self.root.update(cx, |_, cx| {
             let palette = theme::palette(mode);
             let widget = match control {
@@ -174,7 +172,11 @@ fn setup(
     state: u8,
     theme: ColorTheme,
     rem: f32,
-) -> (Entity<IconTestView>, &mut VisualTestContext) {
+) -> (Entity<IconTestView>, &mut VisualTestContext, Instant) {
+    // Retargeting and sampling must share a frame timestamp, including renders
+    // dispatched by input events between the explicit draws below.
+    let now = Instant::now();
+    app.set_transition_time(now);
     let (view, cx) = app.add_window_view(|_, cx| {
         let root = cx.new(|_| FrameRoot::new());
         let subscription = cx.observe(&root, |_, _, cx| cx.notify());
@@ -184,13 +186,12 @@ fn setup(
             state,
             theme,
             rem,
-            render_started: Instant::now(),
             glyphs: Vec::new(),
             _subscription: subscription,
         }
     });
     draw(cx);
-    (view, cx)
+    (view, cx, now)
 }
 
 fn draw(cx: &mut VisualTestContext) {
@@ -228,9 +229,9 @@ fn near(actual: f32, expected: f32) {
     assert!((actual - expected).abs() < 0.001, "{actual} != {expected}");
 }
 
-fn assert_settled(mut glyph: GlyphSnapshot, target: f32) {
+fn assert_settled(mut glyph: GlyphSnapshot, target: f32, now: Instant) {
     near(*glyph.state.value(), target);
-    let sample = glyph.state.sample(Instant::now());
+    let sample = glyph.state.sample(now);
     near(sample.value, target);
     assert!(!sample.is_active);
 }
@@ -239,14 +240,14 @@ fn pin_halfway(
     motion: &Entity<TransitionState<f32>>,
     from: f32,
     to: f32,
+    now: Instant,
     cx: &mut VisualTestContext,
 ) {
-    // Native transitions use Instant rather than the TestExecutor clock. Keep a
-    // real partial frame stable even when a busy CI worker delays the next draw.
-    let duration = Duration::from_hours(1);
-    let started = Instant::now().checked_sub(duration / 2).unwrap();
+    let timing = interaction_motion();
+    let started = now
+        .checked_sub(timing.forward_pass().duration() / 2)
+        .unwrap();
     motion.update(cx, |state, cx| {
-        let timing = gpui::Motion::new(duration).with_easing(css_transition_ease);
         *state = TransitionState::new(from, timing.clone());
         state.set(to, timing, started);
         cx.notify();
@@ -263,8 +264,8 @@ fn animated_icons_start_settled_and_preserve_control_geometry() {
                 (Control::Disclosure, assets::ICON_PLUS),
             ] {
                 let mut app = TestAppContext::single();
-                let (view, cx) = setup(&mut app, control, 0, mode, rem);
-                assert_settled(glyph(&view, initial_icon, cx), 1.0);
+                let (view, cx, now) = setup(&mut app, control, 0, mode, rem);
+                assert_settled(glyph(&view, initial_icon, cx), 1.0, now);
                 let before = geometry(cx);
                 change(&view, 1, cx);
                 assert_eq!(geometry(cx), before);
@@ -283,7 +284,7 @@ fn logs_copy_retains_both_glyphs_and_green_feedback_during_crossfade() {
     );
     for mode in ColorTheme::ALL {
         let mut app = TestAppContext::single();
-        let (view, cx) = setup(&mut app, Control::Copy, 0, mode, 16.0);
+        let (view, cx, now) = setup(&mut app, Control::Copy, 0, mode, 16.0);
         let original = glyph(&view, assets::ICON_COPY, cx).motion.entity_id();
         change(&view, 1, cx);
         let copy = glyph(&view, assets::ICON_COPY, cx);
@@ -295,16 +296,15 @@ fn logs_copy_retains_both_glyphs_and_green_feedback_during_crossfade() {
             check.color,
             Some(crate::app::primitives::color(theme::palette(mode).success))
         );
-        pin_halfway(&copy.motion, 1.0, 0.0, cx);
-        pin_halfway(&check.motion, 0.0, 1.0, cx);
+        pin_halfway(&copy.motion, 1.0, 0.0, now, cx);
+        pin_halfway(&check.motion, 0.0, 1.0, now, cx);
         draw(cx);
-        let at = view.read_with(cx, |view, _| view.render_started);
         near(
-            glyph(&view, assets::ICON_COPY, cx).state.sample(at).value,
+            glyph(&view, assets::ICON_COPY, cx).state.sample(now).value,
             1.0 - css_transition_ease(0.5),
         );
         near(
-            glyph(&view, assets::ICON_CHECK, cx).state.sample(at).value,
+            glyph(&view, assets::ICON_CHECK, cx).state.sample(now).value,
             css_transition_ease(0.5),
         );
         assert_eq!(view.read_with(cx, |view, _| view.glyphs.len()), 2);
@@ -316,32 +316,54 @@ fn logs_copy_retains_both_glyphs_and_green_feedback_during_crossfade() {
 #[test]
 fn changing_queue_action_ids_keep_three_glyphs_and_reverse_from_current_values() {
     let mut app = TestAppContext::single();
-    let (view, cx) = setup(&mut app, Control::QueueAction, 0, ColorTheme::Dark, 16.0);
+    let (view, cx, now) = setup(&mut app, Control::QueueAction, 0, ColorTheme::Dark, 16.0);
     let initial_geometry = geometry(cx);
     let play_id = glyph(&view, assets::ICON_PLAY, cx).motion.entity_id();
     change(&view, 1, cx);
-    pin_halfway(&glyph(&view, assets::ICON_PLAY, cx).motion, 1.0, 0.0, cx);
-    pin_halfway(&glyph(&view, assets::ICON_PAUSE, cx).motion, 0.0, 1.0, cx);
+    pin_halfway(
+        &glyph(&view, assets::ICON_PLAY, cx).motion,
+        1.0,
+        0.0,
+        now,
+        cx,
+    );
+    pin_halfway(
+        &glyph(&view, assets::ICON_PAUSE, cx).motion,
+        0.0,
+        1.0,
+        now,
+        cx,
+    );
     change(&view, 2, cx);
-    let at = view.read_with(cx, |view, _| view.render_started);
     near(
-        glyph(&view, assets::ICON_PAUSE, cx).state.sample(at).value,
+        glyph(&view, assets::ICON_PAUSE, cx).state.sample(now).value,
         css_transition_ease(0.5),
     );
-    pin_halfway(&glyph(&view, assets::ICON_PLAY, cx).motion, 1.0, 0.0, cx);
-    pin_halfway(&glyph(&view, assets::ICON_REFRESH, cx).motion, 0.0, 1.0, cx);
+    pin_halfway(
+        &glyph(&view, assets::ICON_PLAY, cx).motion,
+        1.0,
+        0.0,
+        now,
+        cx,
+    );
+    pin_halfway(
+        &glyph(&view, assets::ICON_REFRESH, cx).motion,
+        0.0,
+        1.0,
+        now,
+        cx,
+    );
     change(&view, 0, cx);
-    let at = view.read_with(cx, |view, _| view.render_started);
     let play = glyph(&view, assets::ICON_PLAY, cx);
     assert_eq!(play.motion.entity_id(), play_id);
     near(
-        play.state.clone().sample(at).value,
+        play.state.clone().sample(now).value,
         1.0 - css_transition_ease(0.5),
     );
     near(
         glyph(&view, assets::ICON_REFRESH, cx)
             .state
-            .sample(at)
+            .sample(now)
             .value,
         css_transition_ease(0.5),
     );
@@ -355,18 +377,17 @@ fn changing_queue_action_ids_keep_three_glyphs_and_reverse_from_current_values()
 fn checkbox_glyph_exits_in_place_and_reduced_motion_settles_every_state() {
     for mode in ColorTheme::ALL {
         let mut app = TestAppContext::single();
-        let (view, cx) = setup(&mut app, Control::Checkbox, 0, mode, 16.0);
+        let (view, cx, now) = setup(&mut app, Control::Checkbox, 0, mode, 16.0);
         let initial_geometry = geometry(cx);
         assert!(view.read_with(cx, |view, _| view.glyphs.is_empty()));
         change(&view, 1, cx);
         let check = glyph(&view, assets::ICON_CHECK, cx);
-        pin_halfway(&check.motion, 0.0, 1.0, cx);
+        pin_halfway(&check.motion, 0.0, 1.0, now, cx);
         change(&view, 0, cx);
-        let at = view.read_with(cx, |view, _| view.render_started);
         let exiting = glyph(&view, assets::ICON_CHECK, cx);
         near(*exiting.state.value(), 0.0);
         near(
-            exiting.state.clone().sample(at).value,
+            exiting.state.clone().sample(now).value,
             css_transition_ease(0.5),
         );
         assert_eq!(exiting.motion.entity_id(), check.motion.entity_id());
@@ -381,6 +402,7 @@ fn checkbox_glyph_exits_in_place_and_reduced_motion_settles_every_state() {
             assert_settled(
                 glyph(&view, assets::ICON_CHECK, cx),
                 if state == 0 { 0.0 } else { 1.0 },
+                now,
             );
             assert_eq!(geometry(cx), initial_geometry);
         }

@@ -385,12 +385,11 @@ fn pin_tooltip_mid_transition(
     motion: &Entity<gpui::TransitionState<f32>>,
     from: f32,
     to: f32,
+    now: Instant,
     cx: &mut VisualTestContext,
 ) {
-    // GPUI Transition uses std::time::Instant, not the executor clock. Sampling
-    // halfway through a long run makes this frame independent of test scheduling.
-    let duration = Duration::from_hours(1);
-    let started = Instant::now().checked_sub(duration / 2).unwrap();
+    let duration = INTERACTION_MOTION_DURATION;
+    let started = now.checked_sub(duration / 2).unwrap();
     let timing = gpui::Motion::new(duration).with_easing(crate::app::motion::css_ease);
     motion.update(cx, |state, cx| {
         *state = gpui::TransitionState::new(from, timing.clone());
@@ -428,6 +427,10 @@ fn painted_tooltip_bounds(cx: &mut VisualTestContext) -> gpui::Bounds<gpui::Scal
 #[test]
 fn tooltip_paints_partial_entry_and_exit_instead_of_jumping_to_visible() {
     let mut app = TestAppContext::single();
+    // Hover deadlines still use the executor; only the native transition is
+    // sampled at this fixed timestamp through all draws and input events.
+    let now = Instant::now();
+    app.set_transition_time(now);
     let (view, cx) = preview_view(&mut app);
     cx.update(|_, cx| cx.set_reduce_motion(false));
     draw(cx);
@@ -440,7 +443,7 @@ fn tooltip_paints_partial_entry_and_exit_instead_of_jumping_to_visible() {
     });
     assert!(motion.read_with(cx, |state, _| (*state.value() - 1.0).abs() < f32::EPSILON));
 
-    pin_tooltip_mid_transition(&motion, 0.0, 1.0, cx);
+    pin_tooltip_mid_transition(&motion, 0.0, 1.0, now, cx);
     let entering = painted_tooltip_bounds(cx);
     motion.update(cx, |state, cx| {
         state.jump_to(1.0);
@@ -454,7 +457,7 @@ fn tooltip_paints_partial_entry_and_exit_instead_of_jumping_to_visible() {
     cx.simulate_mouse_move(point(px(600.0), px(50.0)), None, Modifiers::default());
     draw(cx);
     assert!(motion.read_with(cx, |state, _| state.value().abs() < f32::EPSILON));
-    pin_tooltip_mid_transition(&motion, 1.0, 0.0, cx);
+    pin_tooltip_mid_transition(&motion, 1.0, 0.0, now, cx);
     let exiting = painted_tooltip_bounds(cx);
     assert!(exiting.size.width < settled.size.width && exiting.left() < settled.left());
     assert!(exiting.size.width.0 > settled.size.width.0 * 0.95);

@@ -1,6 +1,24 @@
 use super::*;
 use std::time::Duration;
 
+fn motion_test_window(
+    app: &mut TestAppContext,
+    fixture: VisualFixture,
+    scale: ScalePreset,
+) -> (Entity<FrameRoot>, &mut VisualTestContext) {
+    let (root, cx) = test_window(app, fixture, scale);
+    root.update(cx, |root, cx| {
+        // This fixture has a synthetic image, not a decoder. Keep its identity
+        // current on input-triggered renders too, including when adaptive
+        // dimensions settle, so unrelated runtime rebuilds cannot cancel drag.
+        root.preview_ui.static_fixture_file_id =
+            root.file_queue.selected_file().map(|file| file.id.clone());
+        cx.notify();
+    });
+    draw(cx);
+    (root, cx)
+}
+
 fn assert_crop_outline_tracks_handles(cx: &mut VisualTestContext) {
     let outline = cx.debug_bounds("preview-crop-move-handle").unwrap();
     for (id, corner) in [
@@ -20,7 +38,7 @@ fn crop_outline_tracks_handles_on_every_drag_frame() {
     for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
         for resize in [false, true] {
             let mut app = TestAppContext::single();
-            let (_, cx) = test_window(&mut app, VisualFixture::PreviewCropCustom, scale);
+            let (_, cx) = motion_test_window(&mut app, VisualFixture::PreviewCropCustom, scale);
             cx.update(|_, cx| cx.set_reduce_motion(false));
             let id = if resize {
                 "preview-crop-handle-nw"
@@ -37,6 +55,10 @@ fn crop_outline_tracks_handles_on_every_drag_frame() {
                     Modifiers::default(),
                 );
                 draw(cx);
+                assert!(
+                    cx.update(|_, cx| cx.has_active_drag()),
+                    "crop drag stopped at offset {offset}, scale {scale:?}, resize {resize}"
+                );
                 assert_crop_outline_tracks_handles(cx);
                 cx.executor().advance_clock(Duration::from_millis(16));
             }
@@ -51,7 +73,7 @@ fn crop_outline_tracks_handles_on_every_drag_frame() {
 #[test]
 fn overlay_position_updates_without_a_vertical_animation_tail() {
     let mut app = TestAppContext::single();
-    let (root, cx) = test_window(
+    let (root, cx) = motion_test_window(
         &mut app,
         VisualFixture::PreviewReady,
         ScalePreset::Percent100,
