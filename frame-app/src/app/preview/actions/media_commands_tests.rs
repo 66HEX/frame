@@ -375,7 +375,6 @@ fn benchmark_real_ffmpeg_seek_backlog() {
         source_width: Some(benchmark_env("FRAME_PREVIEW_BENCH_WIDTH", 3840)),
         source_height: Some(benchmark_env("FRAME_PREVIEW_BENCH_HEIGHT", 2160)),
         source_is_palette: false,
-        source_is_mpeg_ts: false,
         source_sample_aspect_ratio: None,
         request_token: 0,
         source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,

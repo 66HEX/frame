@@ -120,7 +120,6 @@ fn session_config(options: &Options) -> PreviewSessionConfig {
         source_width: Some(options.width),
         source_height: Some(options.height),
         source_is_palette: false,
-        source_is_mpeg_ts: false,
         source_sample_aspect_ratio: None,
         request_token: 0,
         source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,

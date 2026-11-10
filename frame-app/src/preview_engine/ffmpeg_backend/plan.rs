@@ -13,7 +13,7 @@ pub(super) fn preview_plan(
     realtime: bool,
     precise: bool,
 ) -> Result<PreviewFfmpegPlan, PreviewEngineError> {
-    build_preview_plan(config, seconds, realtime, precise, false, Transport::Raw)
+    build_preview_plan(config, seconds, realtime, precise, false)
 }
 
 pub(super) fn snapshot_preview_plan(
@@ -21,29 +21,7 @@ pub(super) fn snapshot_preview_plan(
     seconds: f64,
     precise: bool,
 ) -> Result<PreviewFfmpegPlan, PreviewEngineError> {
-    build_preview_plan(config, seconds, false, precise, true, Transport::Raw)
-}
-
-pub(super) fn framed_preview_plan(
-    config: &PreviewSessionConfig,
-    seconds: f64,
-    precise: bool,
-    snapshot: bool,
-) -> Result<PreviewFfmpegPlan, PreviewEngineError> {
-    build_preview_plan(
-        config,
-        seconds,
-        !snapshot,
-        precise,
-        snapshot,
-        Transport::Framed,
-    )
-}
-
-#[derive(Clone, Copy, Eq, PartialEq)]
-enum Transport {
-    Raw,
-    Framed,
+    build_preview_plan(config, seconds, false, precise, true)
 }
 
 fn build_preview_plan(
@@ -52,7 +30,6 @@ fn build_preview_plan(
     realtime: bool,
     precise: bool,
     snapshot: bool,
-    transport: Transport,
 ) -> Result<PreviewFfmpegPlan, PreviewEngineError> {
     let end_seconds = parsed_time(config.conversion_config.end_time.as_deref())
         .filter(|end_seconds| *end_seconds > seconds);
@@ -78,17 +55,8 @@ fn build_preview_plan(
         source_is_image: config.source_kind == PreviewSourceKind::Image,
     };
     let path = config.path.to_string_lossy();
-    if transport == Transport::Framed {
-        frame_core::preview::build_ffmpeg_framed_source_preview_args(
-            &path,
-            &config.conversion_config,
-            &options,
-            snapshot,
-        )
-    } else {
-        builder(&path, &config.conversion_config, &options)
-    }
-    .map_err(|err| PreviewEngineError::Ffmpeg(err.to_string()))
+    builder(&path, &config.conversion_config, &options)
+        .map_err(|err| PreviewEngineError::Ffmpeg(err.to_string()))
 }
 
 pub(super) fn preview_audio_plan(

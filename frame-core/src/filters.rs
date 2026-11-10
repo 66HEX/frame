@@ -786,39 +786,12 @@ fn preview_low_res_filters(
     fps: u32,
     frame_policy: PreviewFramePolicy,
 ) -> Vec<String> {
-    preview_transport_filters(width, height, fps, frame_policy, false)
-}
-
-pub(crate) fn build_framed_source_preview_graph(
-    width: u32,
-    height: u32,
-    fps: u32,
-    frame_policy: PreviewFramePolicy,
-) -> String {
-    labeled_filter_chain(
-        &preview_transport_filters(width, height, fps, frame_policy, true),
-        PREVIEW_OUTPUT_LABEL,
-    )
-}
-
-fn preview_transport_filters(
-    width: u32,
-    height: u32,
-    fps: u32,
-    frame_policy: PreviewFramePolicy,
-    capture: bool,
-) -> Vec<String> {
-    let capture = if capture {
-        ":frame_preview_capture=1"
-    } else {
-        ""
-    };
     let mut filters = Vec::new();
     if frame_policy == PreviewFramePolicy::Stream {
         filters.push(format!("fps={fps}"));
     }
     filters.extend([
-        format!("scale={width}:{height}{capture}"),
+        format!("scale={width}:{height}"),
         "setsar=1".to_string(),
         "format=bgra".to_string(),
     ]);

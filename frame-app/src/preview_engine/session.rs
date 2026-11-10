@@ -36,7 +36,7 @@ impl PreviewSession {
     /// starts or the session object is returned.
     ///
     /// # Errors
-    /// Returns the same errors as `start`, including a cancelled initial probe.
+    /// Returns the same errors as `start`, including a cancelled initial preview.
     pub fn start_with_cancellation(
         config: PreviewSessionConfig,
         cancelled: Arc<AtomicBool>,
@@ -52,12 +52,8 @@ impl PreviewSession {
 
         match config.source_kind {
             PreviewSourceKind::Image | PreviewSourceKind::Video | PreviewSourceKind::Audio => {
-                let (pipeline, dimensions, duration_seconds) = start_ffmpeg_preview_process(
-                    &config,
-                    frame_store.clone(),
-                    metrics.clone(),
-                    Arc::clone(&cancelled),
-                )?;
+                let (pipeline, dimensions, duration_seconds) =
+                    start_ffmpeg_preview_process(&config, frame_store.clone(), metrics.clone())?;
                 Ok(Self {
                     cancelled,
                     config: Mutex::new(config),
@@ -280,7 +276,6 @@ mod tests {
             source_width: Some(160),
             source_height: Some(90),
             source_is_palette: false,
-            source_is_mpeg_ts: false,
             source_sample_aspect_ratio: None,
             request_token: 0,
             source_clock: frame_core::source_timing::ResolvedSourceClock::Unknown,
@@ -294,6 +289,16 @@ mod tests {
                 &crate::settings::ConversionConfig::default(),
             ),
         }
+    }
+
+    #[test]
+    fn pre_cancelled_session_does_not_launch_an_initial_preview() {
+        let result =
+            PreviewSession::start_with_cancellation(test_config(), Arc::new(AtomicBool::new(true)));
+        assert!(matches!(
+            result,
+            Err(PreviewEngineError::Ffmpeg(message)) if message == "preview request cancelled"
+        ));
     }
 
     #[test]

@@ -38,8 +38,6 @@ mod audio_queue;
 mod audio_stream;
 mod clock;
 mod decode;
-mod framed;
-mod framed_stream;
 mod plan;
 mod process;
 mod video_stream;
@@ -50,8 +48,6 @@ mod audio_drain_tests;
 mod audio_exit_tests;
 #[cfg(test)]
 mod audio_queue_tests;
-#[cfg(test)]
-mod framed_tests;
 #[cfg(test)]
 mod playback_start_tests;
 #[cfg(test)]
