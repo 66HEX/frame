@@ -18,7 +18,7 @@
 					<Button
 						href={`${releaseUrl}/download/${option.file}`}
 						variant="outline"
-						size="lg"
+						size="default"
 						aria-label={`Download Frame for ${platform.name}: ${option.label}, ${extensions[platform.name]}`}
 					>
 						{platform.name === 'Windows' ? 'Download' : option.label}
