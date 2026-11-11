@@ -8,7 +8,7 @@
 	import { ChevronDownIcon } from '$lib/icons';
 	import { cn } from '$lib/utils';
 	import { githubUrl } from '../data/content';
-	import LandingBrand from './LandingBrand.svelte';
+	import SiteBrand from '$lib/components/layout/SiteBrand.svelte';
 	import HeaderMenuContent from './HeaderMenuContent.svelte';
 	import MobileHeader from './MobileHeader.svelte';
 
@@ -97,7 +97,7 @@
 			<NavigationMenu.Root class="relative" bind:value={() => activeMenu, setActiveMenu} onpointerleave={leaveNavigation} aria-label="Primary navigation">
 				<div class="h-14">
 					<div class="relative mx-auto flex h-14 max-w-6xl items-center justify-between px-6 sm:px-10">
-						<a href="/" aria-label="Frame home"><LandingBrand /></a>
+						<a href="/" aria-label="Frame home"><SiteBrand /></a>
 						<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
 							<NavigationMenu.List class="flex list-none items-center gap-3">
 								{#each menus as menu (menu.value)}

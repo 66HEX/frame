@@ -5,6 +5,7 @@
 	import type { ComponentProps } from 'svelte';
 	import { siteConfig } from '$lib/site/site';
 	import type { DocsNavigationGroup } from '$lib/content/docs';
+	import SiteBrand from '$lib/components/layout/SiteBrand.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import ViewSwitcher from './view-switcher.svelte';
 	import type { ContentSectionConfig } from '$lib/content/types';
@@ -20,7 +21,6 @@
 
 	let { ref = $bindable(null), groups, section, ui, ...restProps }: Props = $props();
 	const sidebar = Sidebar.useSidebar();
-	const identity = $derived(siteConfig);
 
 	const currentPathname = $derived(normalizePathname(page.url.pathname));
 	const navigationGroups = $derived(
@@ -51,25 +51,12 @@
 			<Sidebar.MenuItem>
 				<Sidebar.MenuButton
 					size="lg"
-					class="hover:bg-transparent active:bg-transparent dark:hover:bg-transparent"
-					tooltipContent={identity.name}
+					class="hover:bg-transparent active:bg-transparent dark:hover:bg-transparent focus-visible:ring-ring/50"
+					tooltipContent={siteConfig.name}
 				>
 					{#snippet child({ props })}
-						<a
-							href={resolve('/')}
-							{...props}
-							class="flex items-center gap-1 rounded-md transition-[color,background-color,border-color,box-shadow,scale,background-size] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 motion-reduce:transition-none"
-						>
-							<div class="flex aspect-square items-center justify-center px-1.5 py-2.5">
-								<span class="size-6 text-foreground [&>svg]:size-full mt-0.5" aria-hidden="true">
-									<!-- Trusted build-time SVG; inline rendering is required for currentColor theming. -->
-									<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-									{@html siteConfig.logoRaw}
-								</span>
-							</div>
-							<span class="flex-1 truncate text-start text-xl font-medium tracking-tight"
-								>{identity.name}</span
-							>
+						<a {...props} href={resolve('/')} aria-label="Frame home">
+							<SiteBrand />
 						</a>
 					{/snippet}
 				</Sidebar.MenuButton>

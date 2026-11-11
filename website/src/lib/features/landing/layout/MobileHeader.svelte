@@ -6,7 +6,7 @@
 	import { ChevronDownIcon, Menu2Icon, XmarkIcon } from '$lib/icons';
 	import { githubUrl } from '../data/content';
 	import HeaderMenuContent from './HeaderMenuContent.svelte';
-	import LandingBrand from './LandingBrand.svelte';
+	import SiteBrand from '$lib/components/layout/SiteBrand.svelte';
 
 	let open = $state(false);
 	let expandedGroup = $state('');
@@ -39,7 +39,7 @@
 >
 	<div class="h-14 border-b border-border lg:hidden">
 		<div class="mx-auto flex h-full w-full max-w-6xl items-center justify-between px-6">
-			<a href="/" aria-label="Frame home" class={`rounded-sm ${focusClass}`}><LandingBrand /></a>
+			<a href="/" aria-label="Frame home" class={`rounded-sm ${focusClass}`}><SiteBrand /></a>
 			<Dialog.Trigger aria-label="Open menu" class={iconButtonClass}>
 				<Menu2Icon class="size-5" aria-hidden="true" />
 			</Dialog.Trigger>
@@ -54,7 +54,7 @@
 			<Dialog.Description class="sr-only">Explore Frame, find documentation, and download the app.</Dialog.Description>
 			<div class="mx-auto min-h-full w-full max-w-6xl px-6 pb-8">
 				<div class="flex h-14 items-center justify-between border-b border-border">
-					<a href="/" aria-label="Frame home" class={`rounded-sm ${focusClass}`} onclick={closeMenu}><LandingBrand /></a>
+					<a href="/" aria-label="Frame home" class={`rounded-sm ${focusClass}`} onclick={closeMenu}><SiteBrand /></a>
 					<Dialog.Close aria-label="Close menu" class={iconButtonClass}>
 						<XmarkIcon class="size-5" aria-hidden="true" />
 					</Dialog.Close>
