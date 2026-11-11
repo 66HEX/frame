@@ -19,6 +19,7 @@ use syn::{
 };
 
 const CI_WORKFLOW_PATH: &str = ".github/workflows/ci.yml";
+const HEVC_COMPARISON_WORKFLOW_PATH: &str = ".github/workflows/hevc-runtime-comparison.yml";
 const WEBSITE_WORKFLOW_PATH: &str = ".github/workflows/website.yml";
 const DEPENDENCY_REVIEW_WORKFLOW_PATH: &str = ".github/workflows/dependency-review.yml";
 const CODEQL_WORKFLOW_PATH: &str = ".github/workflows/codeql.yml";
@@ -27,7 +28,7 @@ const RELEASE_WORKFLOW_PATH: &str = ".github/workflows/release.yml";
 const PUBLISH_NIXPKGS_WORKFLOW_PATH: &str = ".github/workflows/publish_nixpkgs.yml";
 const FLATHUB_MANIFEST_TEMPLATE_PATH: &str = "packaging/flathub/io.github._66HEX.Frame.yml.in";
 const FLATHUB_METAINFO_PATH: &str = "packaging/flathub/io.github._66HEX.Frame.metainfo.xml";
-const FFMPEG_VERSION: &str = "8.1.2";
+const FFMPEG_VERSION: &str = "9.0.2";
 const RUST_VERSION: &str = "1.95.0";
 const CARGO_BUNDLE_VERSION: &str = "0.11.0";
 const CARGO_DENY_VERSION: &str = "0.20.2";
@@ -339,23 +340,23 @@ const MACOS_X86_64_BINARIES: &[FfmpegBinaryEntry] = &[
     FfmpegBinaryEntry {
         id: "ffmpeg",
         archive: Some(FfmpegArchive {
-            url: "https://ffmpeg.martin-riedl.de/download/macos/amd64/1783018342_8.1.2/ffmpeg.zip",
-            sha256: "a52ef43883f44c219766d4b3bdde4e635b35465d0b704c01c3a0566b59775df9",
+            url: "https://ffmpeg.martin-riedl.de/download/macos/amd64/1789931006_9.0.2/ffmpeg.zip",
+            sha256: "7c6b4125b191cbf773832dc51f424cf2b6bb7da43007d1e066f95909e47cacd4",
         }),
         expected_names: &["ffmpeg"],
         destination_name: "ffmpeg-x86_64-apple-darwin",
-        sha256: "1ca59dda73668c59898a0b305afd8a88817a989187f222ec62d64e775d614d23",
+        sha256: "b25689cf2211c0582d317e849912769a1f1c93904fe102c485b5364a425633d1",
         make_executable: true,
     },
     FfmpegBinaryEntry {
         id: "ffprobe",
         archive: Some(FfmpegArchive {
-            url: "https://ffmpeg.martin-riedl.de/download/macos/amd64/1783018342_8.1.2/ffprobe.zip",
-            sha256: "5408ca588c8c72b0dde3afe676d0a7acf25ef97e55ae6eba5c7bede1cda42695",
+            url: "https://ffmpeg.martin-riedl.de/download/macos/amd64/1789931006_9.0.2/ffprobe.zip",
+            sha256: "2322438ed2f6319a691291b247d09c69dcaa3a982460d1f269a7e1af335cfdfd",
         }),
         expected_names: &["ffprobe"],
         destination_name: "ffprobe-x86_64-apple-darwin",
-        sha256: "bdb6aff0f1f414382effd97040f7862dc85e67996ac296cb4288beed0e06498f",
+        sha256: "b5df9964b0c2048318fafedcd4e3bbafbc561033cee77de8da1840685d8a9d0d",
         make_executable: true,
     },
 ];
@@ -364,23 +365,23 @@ const MACOS_AARCH64_BINARIES: &[FfmpegBinaryEntry] = &[
     FfmpegBinaryEntry {
         id: "ffmpeg",
         archive: Some(FfmpegArchive {
-            url: "https://ffmpeg.martin-riedl.de/download/macos/arm64/1783011502_8.1.2/ffmpeg.zip",
-            sha256: "ef1aa60006c7b77ce170c1608c08d8e4ba1c30c5746f2ac986ded932d0ac2c3c",
+            url: "https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2/ffmpeg.zip",
+            sha256: "c8ed4c4e6978a03c485edbfe4e0a5dc2380f8a30bba5150531b31b094492d924",
         }),
         expected_names: &["ffmpeg"],
         destination_name: "ffmpeg-aarch64-apple-darwin",
-        sha256: "eaf91238e104dd0e262bc6510e25061855cc99a6955a721b0ac99660d58c473d",
+        sha256: "2e11c6f90993cdb79fff84d3f90044d28316b310e75b3e030cfc9a54f2c9d384",
         make_executable: true,
     },
     FfmpegBinaryEntry {
         id: "ffprobe",
         archive: Some(FfmpegArchive {
-            url: "https://ffmpeg.martin-riedl.de/download/macos/arm64/1783011502_8.1.2/ffprobe.zip",
-            sha256: "c39787f4af7a3932502d2d48db6f6feaaa836b48a73ef78c32cc3285df61dfaf",
+            url: "https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2/ffprobe.zip",
+            sha256: "fcbe839537485eaee7a7a8bc5cbc0f90d53617e80943e8a5b2e31cb851197ea6",
         }),
         expected_names: &["ffprobe"],
         destination_name: "ffprobe-aarch64-apple-darwin",
-        sha256: "ed9dc5871914b466b96b402c9ec0ba68ce4f836e72faa464b1b4e279835bd4a6",
+        sha256: "2738aa46a7f9acbc8ab09a6715554c90f7de603171ac403726765685df6a0059",
         make_executable: true,
     },
 ];
@@ -389,23 +390,23 @@ const LINUX_X86_64_BINARIES: &[FfmpegBinaryEntry] = &[
     FfmpegBinaryEntry {
         id: "ffmpeg",
         archive: Some(FfmpegArchive {
-            url: "https://ffmpeg.martin-riedl.de/download/linux/amd64/1783011670_8.1.2/ffmpeg.zip",
-            sha256: "56452c0bfc4ee0325cd615d62f46ba8264f62eed34f727c2224c6c84fa7b8719",
+            url: "https://ffmpeg.martin-riedl.de/download/linux/amd64/1789931100_9.0.2/ffmpeg.zip",
+            sha256: "fa8ecf4abbd290d98f7d188b8649cc6b391ae209a98452be955a15aab1909d7f",
         }),
         expected_names: &["ffmpeg"],
         destination_name: "ffmpeg-x86_64-unknown-linux-gnu",
-        sha256: "bea0dfb96f7223b1be497cf11ccda9ddd9a39103b948b342bb6db1c60a56be12",
+        sha256: "2624cfce1acdb259fe72b6d020dac937a1e7e66cf3578d8c4d43704e69a42cba",
         make_executable: true,
     },
     FfmpegBinaryEntry {
         id: "ffprobe",
         archive: Some(FfmpegArchive {
-            url: "https://ffmpeg.martin-riedl.de/download/linux/amd64/1783011670_8.1.2/ffprobe.zip",
-            sha256: "c6f2d36e98f9a4445fad0b0be539f4c4faf13fd502116bf131becd53f56cd390",
+            url: "https://ffmpeg.martin-riedl.de/download/linux/amd64/1789931100_9.0.2/ffprobe.zip",
+            sha256: "3f428c49070be3d24ec338602b76d412e401ffcb8a5641ef0e729181a232fc32",
         }),
         expected_names: &["ffprobe"],
         destination_name: "ffprobe-x86_64-unknown-linux-gnu",
-        sha256: "f0a9c3c87d45fe323ae893fe9820150a46f5af9fc5f75066712097f160befac5",
+        sha256: "fa300ee31cd55e7a8d052f16d017fde3b68d842dff39e0c29575ced5278947d6",
         make_executable: true,
     },
 ];
@@ -414,31 +415,31 @@ const LINUX_AARCH64_BINARIES: &[FfmpegBinaryEntry] = &[
     FfmpegBinaryEntry {
         id: "ffmpeg",
         archive: Some(FfmpegArchive {
-            url: "https://ffmpeg.martin-riedl.de/download/linux/arm64/1783010599_8.1.2/ffmpeg.zip",
-            sha256: "ab9e16864b6bf4ae7e13bbdbdc29621be11a5c547c57af8d4250e9fa2f5e6461",
+            url: "https://ffmpeg.martin-riedl.de/download/linux/arm64/1789931697_9.0.2/ffmpeg.zip",
+            sha256: "93a76ae90db5474eecdf951a729857c64f3de23567228d6a7d5e6e8e3cd1021b",
         }),
         expected_names: &["ffmpeg"],
         destination_name: "ffmpeg-aarch64-unknown-linux-gnu",
-        sha256: "93a3684e7467d33881f8fa39e3b8408248d4f95fb2e9f6b18383edcdbd70f163",
+        sha256: "d8802725e54217a3fcb22dfb14d95cb648c0383685802bb155091575cf44a3ff",
         make_executable: true,
     },
     FfmpegBinaryEntry {
         id: "ffprobe",
         archive: Some(FfmpegArchive {
-            url: "https://ffmpeg.martin-riedl.de/download/linux/arm64/1783010599_8.1.2/ffprobe.zip",
-            sha256: "fb78317b81cdeb614533be59e489019b754afd199670666af28f0e9574be395b",
+            url: "https://ffmpeg.martin-riedl.de/download/linux/arm64/1789931697_9.0.2/ffprobe.zip",
+            sha256: "bcbe80fb741c180083327afaf5434812e006b33cacde2016b9aeaf6936128330",
         }),
         expected_names: &["ffprobe"],
         destination_name: "ffprobe-aarch64-unknown-linux-gnu",
-        sha256: "7a4103c64cd78c7c634a5610ea3ae5dd3a97b3714cc831407c668decf6a34c6d",
+        sha256: "814bee3ef4bd807ec3c0baa0dd83acf6f7d399d7df4fe14218f5492211183e76",
         make_executable: true,
     },
 ];
 
 // BtbN retains month-end snapshots for two years; ordinary daily builds expire after 14 days.
 const WINDOWS_X86_64_ARCHIVE: FfmpegArchive = FfmpegArchive {
-    url: "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-06-30-13-34/ffmpeg-n8.1.2-21-gce3c09c101-win64-gpl-8.1.zip",
-    sha256: "682361e32c9631caec09e5d9f09077101c9ed90c14e275f62014fefa6d397990",
+    url: "https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/autobuild-2026-10-31-12-59/ffmpeg-n9.0.2-39-g7adfbe40dc-win64-gpl-9.0.zip",
+    sha256: "693f3e224bc184b40524a62ca47526cfebaf2504414021b92fe75f677ad868b9",
 };
 
 const WINDOWS_X86_64_BINARIES: &[FfmpegBinaryEntry] = &[
@@ -447,7 +448,7 @@ const WINDOWS_X86_64_BINARIES: &[FfmpegBinaryEntry] = &[
         archive: None,
         expected_names: &["ffmpeg.exe"],
         destination_name: "ffmpeg-x86_64-pc-windows-msvc.exe",
-        sha256: "c47e9e15e76897778915ba16e36c8002b0a3f2f9e7c0a71aa1d41459ac1d02d1",
+        sha256: "c930b63cb1ee8b7e2eaf9c15161160edd5c9acad34f0303b5855c8eb142a7e8d",
         make_executable: false,
     },
     FfmpegBinaryEntry {
@@ -455,7 +456,7 @@ const WINDOWS_X86_64_BINARIES: &[FfmpegBinaryEntry] = &[
         archive: None,
         expected_names: &["ffprobe.exe"],
         destination_name: "ffprobe-x86_64-pc-windows-msvc.exe",
-        sha256: "2864c7a71b820b07d3a9666bb4389c8af4bb9449876b07a75b3b7f15adbdafaa",
+        sha256: "075848c1bbb8b4e2e0b0ecba06e8ad06c889a8902ed219d6a9f5758c417ca108",
         make_executable: false,
     },
 ];
@@ -1673,6 +1674,7 @@ fn check_workflows() -> Result<()> {
 fn generated_workflows() -> Vec<(&'static str, String)> {
     vec![
         (CI_WORKFLOW_PATH, ci_workflow()),
+        (HEVC_COMPARISON_WORKFLOW_PATH, hevc_comparison_workflow()),
         (WEBSITE_WORKFLOW_PATH, website_workflow()),
         (
             DEPENDENCY_REVIEW_WORKFLOW_PATH,
@@ -2030,10 +2032,7 @@ __CI_LINUX_SETUP__
           --ignore RUSTSEC-2026-0372
     - name: ci::run_documented_gate
       run: cargo xtask ci
-    - name: ci::setup_ffmpeg
-      run: cargo xtask setup-ffmpeg
-    - name: ci::test_media_conversions
-      run: cargo test --locked -p frame-core --test media_integration -- --ignored --test-threads=1
+__CI_MEDIA_TESTS__
     - name: ci::test_conversion_runner
       run: cargo test --locked -p frame-app conversion_runner::tests -- --ignored --test-threads=1
     timeout-minutes: 60
@@ -2049,6 +2048,7 @@ __CI_LINUX_SETUP__
       run: rustup toolchain install __RUST_VERSION__ --profile minimal --component clippy,rustfmt
     - name: ci::check_macos
       run: cargo check --manifest-path frame-app/Cargo.toml --locked
+__CI_MEDIA_TESTS__
     timeout-minutes: 60
   cargo_check_windows:
     name: cargo check windows
@@ -2069,9 +2069,74 @@ __CI_LINUX_SETUP__
       run: ./script/check-windows-subsystem.ps1 -Path ./target/x86_64-pc-windows-msvc/release/frame.exe
     - name: ci::test_windows_process_launch
       run: 'cargo test --manifest-path frame-app/Cargo.toml --target x86_64-pc-windows-msvc --release --locked --lib process_launch::windows_tests:: -- --test-threads=1'
+__CI_MEDIA_TESTS__
     timeout-minutes: 60
 "
-        .replace("__CI_LINUX_SETUP__", &linux_ci_setup_step()),
+        .replace("__CI_LINUX_SETUP__", &linux_ci_setup_step())
+        .replace("__CI_MEDIA_TESTS__", ci_media_test_steps()),
+    )
+}
+
+const fn ci_media_test_steps() -> &'static str {
+    "    - name: ci::setup_ffmpeg
+      run: cargo xtask setup-ffmpeg
+    - name: ci::test_media_conversions
+      run: cargo test --locked -p frame-core --test media_integration -- --ignored --test-threads=1"
+}
+
+fn hevc_comparison_workflow() -> String {
+    render_workflow(
+        &r"# Generated from xtask::workflows::hevc_comparison
+# Rebuild with `cargo xtask workflows`.
+name: hevc runtime comparison
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/hevc-runtime-comparison.yml'
+      - 'script/compare-hevc-runtimes.py'
+      - 'frame-core/tests/fixtures/hevc-runtime-comparison/**'
+      - 'frame-core/tests/media_integration.rs'
+permissions:
+  contents: read
+concurrency:
+  group: hevc-comparison-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  compare:
+    name: HEVC comparison (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-2022, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v7.0.0
+      with:
+        persist-credentials: false
+    - name: steps::setup_rust
+      run: rustup toolchain install __RUST_VERSION__ --profile minimal --component clippy,rustfmt
+__HEVC_LINUX_SETUP__
+    - name: comparison::run_both_original_packages
+      run: python script/compare-hevc-runtimes.py --repetitions 20
+    - name: comparison::retain_all_results
+      if: always()
+      uses: actions/upload-artifact@v7.0.1
+      with:
+        name: hevc-comparison-${{ matrix.os }}
+        path: target/hevc-runtime-comparison/results
+        if-no-files-found: error
+        retention-days: 30
+    timeout-minutes: 40
+"
+        .replace(
+            "__HEVC_LINUX_SETUP__",
+            &linux_ci_setup_step().replace(
+                "      run: |",
+                "      if: runner.os == 'Linux'\n      run: |",
+            ),
+        ),
     )
 }
 
@@ -4052,7 +4117,7 @@ mod tests {
     #[test]
     fn archive_entry_name_matches_nested_zip_paths() {
         assert!(archive_entry_name_matches(
-            "ffmpeg-n8.1.2-21-gce3c09c101-win64-gpl-8.1/bin/ffprobe.exe",
+            "ffmpeg-n9.0.2-39-g7adfbe40dc-win64-gpl-9.0/bin/ffprobe.exe",
             &["ffprobe.exe"],
         ));
     }
@@ -4108,7 +4173,7 @@ mod tests {
     fn windows_ffmpeg_archive_uses_retained_monthly_snapshot() {
         assert_eq!(
             WINDOWS_X86_64_ARCHIVE.url,
-            "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-06-30-13-34/ffmpeg-n8.1.2-21-gce3c09c101-win64-gpl-8.1.zip"
+            "https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/autobuild-2026-10-31-12-59/ffmpeg-n9.0.2-39-g7adfbe40dc-win64-gpl-9.0.zip"
         );
     }
 
@@ -4172,7 +4237,7 @@ mod tests {
     }
 
     #[test]
-    fn all_ffmpeg_sources_are_pinned_to_version_8_1_2() {
+    fn all_ffmpeg_sources_are_pinned_to_version_9_0_2() {
         let individual_archives = [
             MACOS_X86_64_BINARIES,
             MACOS_AARCH64_BINARIES,
@@ -4523,6 +4588,23 @@ mod tests {
     }
 
     #[test]
+    fn ci_workflow_runs_real_media_conversions_on_all_platforms() {
+        let workflow = ci_workflow();
+        for job_name in ["cargo_xtask_ci", "cargo_check_macos", "cargo_check_windows"] {
+            let job = workflow_job(&workflow, job_name);
+            let setup = job.find("run: cargo xtask setup-ffmpeg").unwrap();
+            let test = job
+                .find("run: cargo test --locked -p frame-core --test media_integration -- --ignored --test-threads=1")
+                .unwrap();
+            assert!(
+                setup < test,
+                "{job_name} must install FFmpeg before testing"
+            );
+            assert!(!job.contains("continue-on-error"));
+        }
+    }
+
+    #[test]
     fn dependabot_groups_the_windows_rs_dependency_family() {
         let config = include_str!("../../../.github/dependabot.yml");
         let windows_group = config
@@ -4639,7 +4721,7 @@ mod tests {
         let metainfo =
             include_str!("../../../packaging/flathub/io.github._66HEX.Frame.metainfo.xml");
 
-        assert!(metainfo.contains(r#"<release version="0.33.1" date="2026-08-27" />"#));
+        assert!(metainfo.contains(r#"<release version="0.34.0" date="2026-11-11" />"#));
     }
 
     #[test]

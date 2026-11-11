@@ -4,6 +4,7 @@ fn generate_alac(
     sandbox: &ConversionRunnerSandbox,
     samples: u32,
     extension: &str,
+    zero_tail: bool,
 ) -> (PathBuf, Vec<u8>) {
     let pcm = (0..samples)
         .flat_map(|index| {
@@ -13,7 +14,7 @@ fn generate_alac(
         .collect::<Vec<_>>();
     let raw = sandbox.path(&format!("source-{samples}-{extension}.s32le"));
     fs::write(&raw, &pcm).unwrap();
-    let source = sandbox.path(&format!("source-{samples}.{extension}"));
+    let source = sandbox.path(&format!("source-{samples}-{zero_tail}.{extension}"));
     let result = crate::process_launch::output(
         Command::new(crate::runtime_binaries::ffmpeg_executable())
             .args([
@@ -38,7 +39,65 @@ fn generate_alac(
         "{}",
         String::from_utf8_lossy(&result.stderr)
     );
+    if zero_tail {
+        assert_eq!(extension, "m4a");
+        zero_terminal_duration(&source, samples);
+        assert_samples(&decoded(&source, 0), &pcm);
+        assert_eq!(
+            packets(&source, 0).last().unwrap()["duration"]
+                .as_i64()
+                .unwrap_or(0),
+            0,
+            "the controlled fixture must enter ALAC tail repair"
+        );
+    }
     (source, pcm)
+}
+
+fn atom_payload(bytes: &mut [u8], kind: [u8; 4]) -> &mut [u8] {
+    let mut offset = 0;
+    let mut found = None;
+    while offset < bytes.len() {
+        assert!(bytes.len() - offset >= 8, "truncated fixture atom");
+        let size = u32::from_be_bytes(bytes[offset..offset + 4].try_into().unwrap()) as usize;
+        assert!(size >= 8 && size <= bytes.len() - offset);
+        if bytes[offset + 4..offset + 8] == kind {
+            assert!(found.is_none(), "fixture must have exactly one {kind:?}");
+            found = Some(offset + 8..offset + size);
+        }
+        offset += size;
+    }
+    &mut bytes[found.expect("missing fixture atom")]
+}
+
+fn zero_terminal_duration(source: &Path, samples: u32) {
+    // Matroska's DefaultDuration changed in FFmpeg 9. Keep repair coverage
+    // independent of muxer defaults by changing only this M4A fixture's timing.
+    let mut bytes = fs::read(source).unwrap();
+    let moov = atom_payload(&mut bytes, *b"moov");
+    let trak = atom_payload(moov, *b"trak");
+    let mdia = atom_payload(trak, *b"mdia");
+    assert_eq!(&atom_payload(mdia, *b"hdlr")[8..12], b"soun");
+    let minf = atom_payload(mdia, *b"minf");
+    let stbl = atom_payload(minf, *b"stbl");
+    let stts = atom_payload(stbl, *b"stts");
+    assert_eq!(&stts[..4], &[0; 4]);
+    let entries = u32::from_be_bytes(stts[4..8].try_into().unwrap()) as usize;
+    assert!(entries > 0);
+    assert_eq!(stts.len(), 8 + entries * 8);
+    let terminal = &mut stts[8 + (entries - 1) * 8..];
+    assert_eq!(&terminal[..4], &1_u32.to_be_bytes());
+    let duration = u32::from_be_bytes(terminal[4..8].try_into().unwrap());
+    assert!(duration > 0 && duration <= samples);
+    terminal[4..8].fill(0);
+
+    // A one-packet MOV otherwise inherits its duration from the media header.
+    let mdhd = atom_payload(mdia, *b"mdhd");
+    assert_eq!(&mdhd[..4], &[0; 4], "fixture uses version-zero mdhd");
+    assert_eq!(&mdhd[12..16], &48_000_u32.to_be_bytes());
+    assert_eq!(&mdhd[16..20], &samples.to_be_bytes());
+    mdhd[16..20].copy_from_slice(&(samples - duration).to_be_bytes());
+    fs::write(source, bytes).unwrap();
 }
 
 fn task(
@@ -142,22 +201,24 @@ fn alac_copy_should_verify_zero_tails_and_preserve_duplicate_and_tiny_pcm() {
     #[cfg(unix)]
     let _serial = crate::bounded_process::serial_test_processes();
     let sandbox = ConversionRunnerSandbox::new("alac-tail");
-    for (samples, extension, repair, duplicate) in [
-        (5000, "mka", true, true),
-        (1, "mka", true, false),
+    for (samples, extension, zero_tail, duplicate) in [
+        (5000, "m4a", true, true),
+        (1, "m4a", true, false),
         (5000, "m4a", false, false),
+        (5000, "mka", false, true),
+        (1, "mka", false, false),
     ] {
-        let (source, expected) = generate_alac(&sandbox, samples, extension);
+        let (source, expected) = generate_alac(&sandbox, samples, extension, zero_tail);
         assert_samples(&decoded(&source, 0), &expected);
         let source_packets = packets(&source, 0);
-        assert_eq!(
-            source_packets.last().unwrap()["duration"]
-                .as_i64()
-                .unwrap_or(0)
-                == 0,
-            repair
-        );
-        let output_name = format!("result-{samples}-{extension}.m4a");
+        let repair = source_packets.last().unwrap()["duration"]
+            .as_i64()
+            .unwrap_or(0)
+            == 0;
+        if extension == "m4a" {
+            assert_eq!(repair, zero_tail);
+        }
+        let output_name = format!("result-{samples}-{extension}-{zero_tail}.m4a");
         let output = sandbox.path(&output_name);
         let controller = ConversionProcessController::default();
         let mut events = Vec::new();
@@ -200,7 +261,7 @@ fn alac_copy_should_cancel_before_publication_and_protect_a_racing_destination()
     #[cfg(unix)]
     let _serial = crate::bounded_process::serial_test_processes();
     let sandbox = ConversionRunnerSandbox::new("alac-publication");
-    let (source, expected) = generate_alac(&sandbox, 5000, "mka");
+    let (source, expected) = generate_alac(&sandbox, 5000, "m4a", true);
     let controller = ConversionProcessController::default();
     for cancel in [true, false] {
         let name = if cancel {
@@ -249,8 +310,8 @@ fn alac_published_task_should_remain_cancellable_while_its_batch_retry_is_queued
     #[cfg(unix)]
     let _serial = crate::bounded_process::serial_test_processes();
     let sandbox = ConversionRunnerSandbox::new("alac-queued-retry");
-    let (repair_source, expected) = generate_alac(&sandbox, 5000, "mka");
-    let (ordinary_source, _) = generate_alac(&sandbox, 5000, "m4a");
+    let (repair_source, expected) = generate_alac(&sandbox, 5000, "m4a", true);
+    let (ordinary_source, _) = generate_alac(&sandbox, 5000, "m4a", false);
     let controller = ConversionProcessController::default();
     controller.update_max_concurrency(1).unwrap();
     let mut prior = task(&sandbox, &repair_source, "prior-b.m4a", false);

@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **FFmpeg:** Updates bundled FFmpeg and FFprobe from 8.1.2 to 9.0.2 on macOS, Windows and Linux. Flatpak and Nixpkgs installations continue to use their distribution's media tools.
 - **Application Icon:** Updates the desktop icons with the new neutral colors across macOS, Windows and Linux.
 - **Interface:** Refreshes both themes with Inter typography, Nucleo icons and consistent controls. The inspector now has Metadata, Output and Presets tabs, with collapsible sections for output settings.
 - **Empty and Drop Screens:** Centers the no-files screen around Open file and Open folder, and simplifies drag feedback to a full-window drop target.

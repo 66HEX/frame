@@ -69,11 +69,11 @@
 			<div data-detail-copy class="flex min-w-0 flex-col lg:flex-1">
 				<h3
 					id={`output-detail-${view.id}`}
-					class="text-xl leading-snug font-medium tracking-tight text-balance"
+					class="text-lg leading-snug font-medium tracking-tight text-balance"
 				>
 					{view.title}
 				</h3>
-				<p class="mt-4 max-w-md text-base leading-relaxed text-pretty text-muted-foreground">
+				<p class="mt-4 max-w-md text-sm leading-relaxed text-pretty text-muted-foreground">
 					{view.text}
 				</p>
 				<div class="mt-5 lg:mt-auto lg:pt-5">

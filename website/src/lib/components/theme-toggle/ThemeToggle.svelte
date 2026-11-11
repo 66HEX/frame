@@ -8,6 +8,8 @@
 	import { contentUiDefaults } from '$lib/site/content-ui';
 	import { ThemeIcon } from '$lib/icons';
 
+	let { showTooltip = true }: { showTooltip?: boolean } = $props();
+
 	const themeStorageKey = contentUiDefaults.theme.storageKey;
 
 	const isDark = $derived(themeStore.isDark);
@@ -65,31 +67,39 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<ActionTooltip content={tooltipLabel} shortcut={keyboardShortcuts.theme.display} side="left">
-	{#snippet trigger({ props })}
-		<Button
-			{...props}
-			type="button"
-			variant="ghost"
-			size="icon-sm"
-			aria-label={tooltipLabel}
-			aria-keyshortcuts={keyboardShortcuts.theme.ariaKeyShortcuts}
-			aria-pressed={isDark}
-			onclick={toggleTheme}
-		>
-			<span class="theme-icon" class:motion-ready={motionReady}>
-				<IconTransition
-					active={isDark}
-					inactiveIcon={ThemeIcon}
-					activeIcon={ThemeIcon}
-					class="size-full"
-					iconClass="size-[18px]"
-					size={18}
-				/>
-			</span>
-		</Button>
-	{/snippet}
-</ActionTooltip>
+{#snippet themeButton(props: Record<string, unknown> = {})}
+	<Button
+		{...props}
+		type="button"
+		variant="ghost"
+		size="icon-sm"
+		aria-label={tooltipLabel}
+		aria-keyshortcuts={keyboardShortcuts.theme.ariaKeyShortcuts}
+		aria-pressed={isDark}
+		onclick={toggleTheme}
+	>
+		<span class="theme-icon" class:motion-ready={motionReady}>
+			<IconTransition
+				active={isDark}
+				inactiveIcon={ThemeIcon}
+				activeIcon={ThemeIcon}
+				class="size-full"
+				iconClass="size-[18px]"
+				size={18}
+			/>
+		</span>
+	</Button>
+{/snippet}
+
+{#if showTooltip}
+	<ActionTooltip content={tooltipLabel} shortcut={keyboardShortcuts.theme.display} side="left">
+		{#snippet trigger({ props })}
+			{@render themeButton(props)}
+		{/snippet}
+	</ActionTooltip>
+{:else}
+	{@render themeButton()}
+{/if}
 
 <style>
 	.theme-icon {

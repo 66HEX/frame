@@ -5,9 +5,9 @@
 <figure
 	data-hero-preview
 	aria-label="The Frame workspace"
-	class="-my-8 -ms-8 -me-6 h-112 overflow-hidden p-8 mask-b-from-70% mask-b-to-90% mask-alpha md:-mx-10 md:h-auto md:mask-b-from-65%"
+	class="-my-8 -ms-8 -me-6 h-112 overflow-hidden p-8 md:-mx-10 md:h-auto"
 >
-	<!-- The padded mask contains the shadow while keeping the screenshot aligned.
+	<!-- The padding contains the shadow while keeping the screenshot aligned.
 	     Paint the shadow above the image so its inset highlights stay visible. -->
 	<div
 		data-hero-capture

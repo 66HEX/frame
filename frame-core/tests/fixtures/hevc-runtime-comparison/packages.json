@@ -1,0 +1,115 @@
+{
+  "fixture": {
+    "path": "frame-core/tests/fixtures/hevc-runtime-comparison/source.mp4",
+    "sha256": "7f6305a110472c03914114ed3a16c5fbd2606344026b73ccf3aa440832815a56",
+    "origin": "Historical 48x32, six-frame H.264/AAC fixture generated with the original Linux FFmpeg 8.1.2 package during PR #238 diagnosis."
+  },
+  "versions": {
+    "8.1.2": {
+      "source_commit": "a8e86c2bf0ac951e388602fe6f87af4912cef86e",
+      "platforms": {
+        "linux-x86_64": [
+          {
+            "id": "ffmpeg",
+            "member_name": "ffmpeg",
+            "sha256": "bea0dfb96f7223b1be497cf11ccda9ddd9a39103b948b342bb6db1c60a56be12",
+            "url": "https://ffmpeg.martin-riedl.de/download/linux/amd64/1783011670_8.1.2/ffmpeg.zip",
+            "archive_sha256": "56452c0bfc4ee0325cd615d62f46ba8264f62eed34f727c2224c6c84fa7b8719"
+          },
+          {
+            "id": "ffprobe",
+            "member_name": "ffprobe",
+            "sha256": "f0a9c3c87d45fe323ae893fe9820150a46f5af9fc5f75066712097f160befac5",
+            "url": "https://ffmpeg.martin-riedl.de/download/linux/amd64/1783011670_8.1.2/ffprobe.zip",
+            "archive_sha256": "c6f2d36e98f9a4445fad0b0be539f4c4faf13fd502116bf131becd53f56cd390"
+          }
+        ],
+        "macos-arm64": [
+          {
+            "id": "ffmpeg",
+            "member_name": "ffmpeg",
+            "sha256": "eaf91238e104dd0e262bc6510e25061855cc99a6955a721b0ac99660d58c473d",
+            "url": "https://ffmpeg.martin-riedl.de/download/macos/arm64/1783011502_8.1.2/ffmpeg.zip",
+            "archive_sha256": "ef1aa60006c7b77ce170c1608c08d8e4ba1c30c5746f2ac986ded932d0ac2c3c"
+          },
+          {
+            "id": "ffprobe",
+            "member_name": "ffprobe",
+            "sha256": "ed9dc5871914b466b96b402c9ec0ba68ce4f836e72faa464b1b4e279835bd4a6",
+            "url": "https://ffmpeg.martin-riedl.de/download/macos/arm64/1783011502_8.1.2/ffprobe.zip",
+            "archive_sha256": "c39787f4af7a3932502d2d48db6f6feaaa836b48a73ef78c32cc3285df61dfaf"
+          }
+        ],
+        "windows-x86_64": [
+          {
+            "id": "ffmpeg",
+            "member_name": "ffmpeg.exe",
+            "sha256": "c47e9e15e76897778915ba16e36c8002b0a3f2f9e7c0a71aa1d41459ac1d02d1",
+            "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-06-30-13-34/ffmpeg-n8.1.2-21-gce3c09c101-win64-gpl-8.1.zip",
+            "archive_sha256": "682361e32c9631caec09e5d9f09077101c9ed90c14e275f62014fefa6d397990"
+          },
+          {
+            "id": "ffprobe",
+            "member_name": "ffprobe.exe",
+            "sha256": "2864c7a71b820b07d3a9666bb4389c8af4bb9449876b07a75b3b7f15adbdafaa",
+            "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-06-30-13-34/ffmpeg-n8.1.2-21-gce3c09c101-win64-gpl-8.1.zip",
+            "archive_sha256": "682361e32c9631caec09e5d9f09077101c9ed90c14e275f62014fefa6d397990"
+          }
+        ]
+      }
+    },
+    "9.0.2": {
+      "source_commit": "cebb1e3f3f3de70605ea7c17a7b3856a8d61f0fa",
+      "platforms": {
+        "linux-x86_64": [
+          {
+            "id": "ffmpeg",
+            "member_name": "ffmpeg",
+            "sha256": "2624cfce1acdb259fe72b6d020dac937a1e7e66cf3578d8c4d43704e69a42cba",
+            "url": "https://ffmpeg.martin-riedl.de/download/linux/amd64/1789931100_9.0.2/ffmpeg.zip",
+            "archive_sha256": "fa8ecf4abbd290d98f7d188b8649cc6b391ae209a98452be955a15aab1909d7f"
+          },
+          {
+            "id": "ffprobe",
+            "member_name": "ffprobe",
+            "sha256": "fa300ee31cd55e7a8d052f16d017fde3b68d842dff39e0c29575ced5278947d6",
+            "url": "https://ffmpeg.martin-riedl.de/download/linux/amd64/1789931100_9.0.2/ffprobe.zip",
+            "archive_sha256": "3f428c49070be3d24ec338602b76d412e401ffcb8a5641ef0e729181a232fc32"
+          }
+        ],
+        "macos-arm64": [
+          {
+            "id": "ffmpeg",
+            "member_name": "ffmpeg",
+            "sha256": "2e11c6f90993cdb79fff84d3f90044d28316b310e75b3e030cfc9a54f2c9d384",
+            "url": "https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2/ffmpeg.zip",
+            "archive_sha256": "c8ed4c4e6978a03c485edbfe4e0a5dc2380f8a30bba5150531b31b094492d924"
+          },
+          {
+            "id": "ffprobe",
+            "member_name": "ffprobe",
+            "sha256": "2738aa46a7f9acbc8ab09a6715554c90f7de603171ac403726765685df6a0059",
+            "url": "https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2/ffprobe.zip",
+            "archive_sha256": "fcbe839537485eaee7a7a8bc5cbc0f90d53617e80943e8a5b2e31cb851197ea6"
+          }
+        ],
+        "windows-x86_64": [
+          {
+            "id": "ffmpeg",
+            "member_name": "ffmpeg.exe",
+            "sha256": "c930b63cb1ee8b7e2eaf9c15161160edd5c9acad34f0303b5855c8eb142a7e8d",
+            "url": "https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/autobuild-2026-10-31-12-59/ffmpeg-n9.0.2-39-g7adfbe40dc-win64-gpl-9.0.zip",
+            "archive_sha256": "693f3e224bc184b40524a62ca47526cfebaf2504414021b92fe75f677ad868b9"
+          },
+          {
+            "id": "ffprobe",
+            "member_name": "ffprobe.exe",
+            "sha256": "075848c1bbb8b4e2e0b0ecba06e8ad06c889a8902ed219d6a9f5758c417ca108",
+            "url": "https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/autobuild-2026-10-31-12-59/ffmpeg-n9.0.2-39-g7adfbe40dc-win64-gpl-9.0.zip",
+            "archive_sha256": "693f3e224bc184b40524a62ca47526cfebaf2504414021b92fe75f677ad868b9"
+          }
+        ]
+      }
+    }
+  }
+}

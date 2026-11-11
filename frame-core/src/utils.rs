@@ -66,7 +66,8 @@ pub fn is_videotoolbox_codec(codec: &str) -> bool {
 #[must_use]
 pub fn map_nvenc_preset(preset: &str) -> String {
     match preset {
-        "default" => "default".to_string(),
+        // FFmpeg 9 removed the legacy name; p4 is the current NVENC default.
+        "default" => "p4".to_string(),
         "fast" | "medium" | "slow" | "p1" | "p2" | "p3" | "p4" | "p5" | "p6" | "p7" => {
             preset.to_string()
         }

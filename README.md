@@ -220,6 +220,36 @@ To update:
 flatpak update io.github._66HEX.Frame
 ```
 
+### Nixpkgs (Linux)
+
+Frame is available as [`frame-media-converter` in Nixpkgs](https://github.com/NixOS/nixpkgs/blob/nixos-unstable/pkgs/by-name/fr/frame-media-converter/package.nix)
+on `nixos-unstable`, for x86_64 and aarch64 Linux. The package uses FFmpeg and
+FFprobe from Nixpkgs, and Nix manages application updates.
+
+With Nix installed and the [`nix-command` and `flakes` features enabled](https://nix.dev/concepts/flakes#running-commands),
+run Frame without installing it in your profile:
+
+```bash
+nix run github:NixOS/nixpkgs/nixos-unstable#frame-media-converter
+```
+
+To install it in your user profile:
+
+```bash
+nix profile add github:NixOS/nixpkgs/nixos-unstable#frame-media-converter
+```
+
+Older Nix versions use `nix profile install` in place of `nix profile add`.
+Launch the installed application with `frame`. To update it:
+
+```bash
+nix profile upgrade frame-media-converter
+```
+
+If your profile contains multiple copies, check the entry name with
+`nix profile list`. For declarative NixOS installation, see the
+[Nixpkgs installation guide](https://framegui.app/docs/installation#nixpkgs).
+
 ### Build from Source
 
 If you prefer to build the application yourself or want to contribute, follow
