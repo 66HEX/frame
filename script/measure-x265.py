@@ -208,15 +208,18 @@ def benchmark(tools, source, output, folder, repetitions):
 
 
 def check_presets(output, root, sources, fixture, data, sets, manifest):
-    configured = (runtime.ROOT / "frame-app/src/settings/model/codecs.rs").read_text()
+    configured = (runtime.ROOT / "frame-app/src/settings/model/codecs.rs").read_text(encoding="utf-8")
     presets = re.search(r'const VIDEO_PRESETS:.*?=\s*\[(.*?)\];', configured, re.S)
     if not presets or tuple(re.findall(r'"([^"]+)"', presets[1])) != FRAME_PRESETS:
         raise RuntimeError("Preset matrix must match the Frame video preset list")
     generator = sets["8.1.2"]
     generated = [
-        make_source(generator, sources, width, 64, bits, 12, chroma)
-        for width, chroma in [(32, "420"), (48, "420"), (48, "422"), (48, "444"),
-                              (62, "420"), (64, "420"), (66, "420")]
+        make_source(generator, sources, width, height, bits, 12, chroma)
+        for width, height, chroma in [
+            (16, 16, "420"), (16, 64, "420"), (24, 64, "420"), (30, 64, "420"),
+            (32, 64, "420"), (48, 16, "420"), (48, 64, "420"), (48, 64, "422"),
+            (48, 64, "444"), (62, 64, "420"), (64, 64, "420"), (66, 64, "420"),
+        ]
         for bits in (8, 10)
     ]
     cases = [{**fixture, "label": "historical-48x32"}, *generated]
