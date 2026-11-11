@@ -42,7 +42,7 @@ readme = "README.md"
 accesskit = { version = "0.25.0", features = ["enumn"] }
 accesskit_consumer = "0.39.0"
 accesskit_macos = "0.27.0"
-accesskit_unix = "0.23.0"
+accesskit_unix = "0.24.0"
 accesskit_windows = "0.35.0"
 anyhow = "1.0.86"
 async-task = "4.7"
