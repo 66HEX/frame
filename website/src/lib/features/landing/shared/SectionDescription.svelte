@@ -12,7 +12,7 @@
 
 <p
 	class={cn(
-		'text-base leading-relaxed text-pretty text-muted-foreground md:text-xl md:leading-normal',
+		'text-base leading-relaxed text-pretty text-muted-foreground md:leading-normal',
 		className
 	)}
 	{...props}
