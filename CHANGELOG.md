@@ -53,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Filesystem I/O:** Updates `rustix` to fix unsafe handling of empty extended-attribute buffers. [Upstream advisory](https://rustsec.org/advisories/RUSTSEC-2026-0486.html).
 - **Executor Shutdown:** Updates `async-executor` to fix a use-after-free during task shutdown. [Upstream fix](https://github.com/smol-rs/async-executor/releases/tag/v1.14.1).
 - **TLS and I/O Dependencies:** Updates shipped dependencies with upstream TLS and asynchronous I/O safety fixes. [TLS advisory](https://rustsec.org/advisories/RUSTSEC-2026-0349.html), [I/O advisory](https://rustsec.org/advisories/RUSTSEC-2026-0386.html).
 
