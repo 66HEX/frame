@@ -57,6 +57,10 @@ const ACTION_CODEQL_SHA: &str = "24c54180a607b1449ed407dd24f251e4e9147c8d";
 const ACTION_ATTEST_BUILD_PROVENANCE_SHA: &str = "4d101475d8b20a2381f78447822ac1eab6504dd8";
 const ACTION_INSTALL_NIX_SHA: &str = "75c75c31ebece974e48ebc36b4ad125bd97bd97b";
 const ACTION_SETUP_NODE_SHA: &str = "949feb2413d6458794dcd2491c4babbbce0c15c1";
+const UBUNTU_ARCHIVE_SUBSTITUTIONS: &str = concat!(
+    r"s|mirror\+file:/etc/apt/apt-mirrors\.txt|https://archive.ubuntu.com/ubuntu/|g;",
+    r"s|https?://azure\.archive\.ubuntu\.com/ubuntu|https://archive.ubuntu.com/ubuntu|g"
+);
 
 #[cfg(test)]
 mod monorepo_tests;
@@ -1952,9 +1956,20 @@ fn disable_checkout_credentials(workflow: &str) -> String {
     rendered
 }
 
+fn linux_ci_setup_step() -> String {
+    // GitHub's Ubuntu images use a mirror+file URI in either .list or deb822
+    // sources. Bypass the Azure mirror without changing suites or signing keys.
+    r"    - name: steps::setup_linux
+      run: |
+        sudo find /etc/apt -maxdepth 2 -type f \( -name '*.list' -o -name '*.sources' \) -exec sed -E -i '__UBUNTU_ARCHIVE_SUBSTITUTIONS__' {} +
+        sudo apt-get update
+        sudo apt-get install -y clang desktop-file-utils libasound2-dev libdrm-dev libfontconfig1-dev libfreetype6-dev libx11-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev pkg-config"
+        .replace("__UBUNTU_ARCHIVE_SUBSTITUTIONS__", UBUNTU_ARCHIVE_SUBSTITUTIONS)
+}
+
 fn ci_workflow() -> String {
     render_workflow(
-        r"# Generated from xtask::workflows::ci
+        &r"# Generated from xtask::workflows::ci
 # Rebuild with `cargo xtask workflows`.
 name: ci
 on:
@@ -1978,10 +1993,7 @@ jobs:
         persist-credentials: false
     - name: steps::setup_rust
       run: rustup toolchain install __RUST_VERSION__ --profile minimal --component clippy,rustfmt
-    - name: steps::setup_linux
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y clang desktop-file-utils libasound2-dev libdrm-dev libfontconfig1-dev libfreetype6-dev libx11-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev pkg-config
+__CI_LINUX_SETUP__
     - name: security::validate_workflow_syntax
       run: |
         mkdir -p target/actionlint
@@ -2051,7 +2063,8 @@ jobs:
     - name: ci::test_windows_process_launch
       run: 'cargo test --manifest-path frame-app/Cargo.toml --target x86_64-pc-windows-msvc --release --locked --lib process_launch::windows_tests:: -- --test-threads=1'
     timeout-minutes: 60
-",
+"
+        .replace("__CI_LINUX_SETUP__", &linux_ci_setup_step()),
     )
 }
 

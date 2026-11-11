@@ -1,4 +1,68 @@
+use std::io::Write;
+
 use super::*;
+
+#[test]
+fn linux_ci_uses_the_official_archive_without_changing_apt_trust_or_suites() {
+    let cases = [
+        (
+            "deb http://azure.archive.ubuntu.com/ubuntu jammy main restricted\n",
+            "deb https://archive.ubuntu.com/ubuntu jammy main restricted\n",
+        ),
+        (
+            "deb-src https://azure.archive.ubuntu.com/ubuntu/ jammy-updates universe\n",
+            "deb-src https://archive.ubuntu.com/ubuntu/ jammy-updates universe\n",
+        ),
+        (
+            "deb [arch=amd64 signed-by=/keys/ubuntu.gpg] mirror+file:/etc/apt/apt-mirrors.txt jammy-security main\n",
+            "deb [arch=amd64 signed-by=/keys/ubuntu.gpg] https://archive.ubuntu.com/ubuntu/ jammy-security main\n",
+        ),
+        (
+            "Types: deb\nURIs: mirror+file:/etc/apt/apt-mirrors.txt\nSuites: jammy jammy-updates jammy-security\nComponents: main universe\nSigned-By: /keys/ubuntu.gpg\n",
+            "Types: deb\nURIs: https://archive.ubuntu.com/ubuntu/\nSuites: jammy jammy-updates jammy-security\nComponents: main universe\nSigned-By: /keys/ubuntu.gpg\n",
+        ),
+        (
+            "deb [signed-by=/keys/microsoft.gpg] https://packages.microsoft.com/ubuntu/22.04/prod jammy main\n",
+            "deb [signed-by=/keys/microsoft.gpg] https://packages.microsoft.com/ubuntu/22.04/prod jammy main\n",
+        ),
+    ];
+    for (input, expected) in cases {
+        assert_eq!(rewrite_apt_source(input), expected);
+        assert_eq!(rewrite_apt_source(expected), expected);
+    }
+
+    let workflow = ci_workflow();
+    let rewrite = workflow.find(UBUNTU_ARCHIVE_SUBSTITUTIONS).unwrap();
+    assert!(rewrite < workflow.find("sudo apt-get update").unwrap());
+    assert!(workflow.contains("-name '*.list' -o -name '*.sources'"));
+    for forbidden in [
+        "--allow-unauthenticated",
+        "trusted=yes",
+        "Verify-Peer=false",
+    ] {
+        assert!(!workflow.contains(forbidden));
+    }
+}
+
+fn rewrite_apt_source(input: &str) -> String {
+    let mut child = Command::new("sed")
+        .arg("-E")
+        .arg(UBUNTU_ARCHIVE_SUBSTITUTIONS)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(input.as_bytes())
+        .unwrap();
+    let output = child.wait_with_output().unwrap();
+    assert!(output.status.success(), "{output:?}");
+    String::from_utf8(output.stdout).unwrap()
+}
 
 #[test]
 fn flathub_archive_keeps_native_sources_and_excludes_only_the_root_website() {
