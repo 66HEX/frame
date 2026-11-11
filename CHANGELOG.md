@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-11-11
+
 ### Added
 
 - **Auto Crop:** Detects black bars using up to five samples across the selected video range. The proposed crop can be adjusted in the preview before applying it. Resolves [#210](https://github.com/66HEX/frame/issues/210).
@@ -919,7 +921,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.33.1...HEAD
+[Unreleased]: https://github.com/66HEX/frame/compare/0.34.0...HEAD
+[0.34.0]: https://github.com/66HEX/frame/compare/0.33.1...0.34.0
 [0.33.1]: https://github.com/66HEX/frame/compare/0.33.0...0.33.1
 [0.33.0]: https://github.com/66HEX/frame/compare/0.32.0...0.33.0
 [0.32.0]: https://github.com/66HEX/frame/compare/0.31.1...0.32.0
