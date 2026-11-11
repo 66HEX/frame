@@ -19,7 +19,7 @@
 	<Accordion.Root type="multiple" class="min-w-0">
 		{#each faqItems as item (item.question)}
 			<Accordion.Item value={item.question}>
-				<Accordion.Trigger>{item.question}</Accordion.Trigger>
+				<Accordion.Trigger class="h-20 flex items-center text-lg font-medium tracking-tight">{item.question}</Accordion.Trigger>
 				<Accordion.Content><p>{item.answer}</p></Accordion.Content>
 			</Accordion.Item>
 		{/each}
