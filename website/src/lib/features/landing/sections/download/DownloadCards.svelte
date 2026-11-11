@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
 	import { downloads, releaseUrl } from '../../data/content';
+	import TextLink from '../../shared/TextLink.svelte';
 	const extensions: Record<string, string> = { macOS: '.dmg', Windows: '.exe', Linux: '.AppImage' };
 </script>
 
@@ -12,6 +13,9 @@
 			<div class="min-w-0">
 				<h3 class="text-lg font-medium tracking-tight">{platform.name}</h3>
 				<p class="mt-1 text-sm leading-6 text-muted-foreground">{platform.description}</p>
+				{#if platform.name === 'Linux'}
+					<TextLink href="/docs/installation#nixpkgs">Install with Nixpkgs</TextLink>
+				{/if}
 			</div>
 			<div class="flex shrink-0 flex-wrap gap-2">
 				{#each platform.options as option (option.file)}

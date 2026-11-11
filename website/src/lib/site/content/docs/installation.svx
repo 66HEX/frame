@@ -45,6 +45,34 @@ flatpak install flathub io.github._66HEX.Frame
 
 AppImage downloads are also available on the GitHub release page. Choose x86_64 for a typical Intel or AMD computer, or aarch64 for an ARM64 computer, then allow the downloaded file to run as an executable in your file manager.
 
+### Nixpkgs
+
+Frame is available as [`frame-media-converter` in Nixpkgs](https://github.com/NixOS/nixpkgs/blob/nixos-unstable/pkgs/by-name/fr/frame-media-converter/package.nix), on the `nixos-unstable` branch, for x86_64 and aarch64 Linux. This package uses FFmpeg and FFprobe from Nixpkgs. Updates are managed through Nix.
+
+With Nix installed and the [`nix-command` and `flakes` features enabled](https://nix.dev/concepts/flakes#running-commands), run Frame without adding it to your profile:
+
+```bash
+nix run github:NixOS/nixpkgs/nixos-unstable#frame-media-converter
+```
+
+To install it in your user profile:
+
+```bash
+nix profile add github:NixOS/nixpkgs/nixos-unstable#frame-media-converter
+```
+
+On older Nix versions, use `nix profile install` in place of `nix profile add`. After installation, launch Frame from your application menu or run `frame` in a terminal.
+
+For a NixOS configuration that already uses `nixos-unstable`, add `pkgs.frame-media-converter` to your existing `environment.systemPackages` list:
+
+```nix
+{ pkgs, ... }: {
+  environment.systemPackages = [ pkgs.frame-media-converter ];
+}
+```
+
+Then apply your configuration with `sudo nixos-rebuild switch`. The package must come from `nixos-unstable`; the commands above select that branch explicitly, even if your default Nixpkgs source uses a stable release. See the [NixOS package management guide](https://nixos.org/manual/nixos/stable/#sec-package-management) for declarative installation.
+
 ## Updates
 
 Native release builds include an updater. Frame verifies the release manifest signature and the downloaded package before installation. If you installed through a package manager, you can update through that same package manager:
@@ -60,5 +88,13 @@ winget upgrade --id 66HEX.Frame -e
 ```bash
 flatpak update io.github._66HEX.Frame
 ```
+
+For an installation made with `nix profile add`:
+
+```bash
+nix profile upgrade frame-media-converter
+```
+
+If you have more than one copy in your profile, use `nix profile list` to find the correct entry name. For declarative NixOS installations, update your `nixos-unstable` channel or flake input and rebuild the configuration.
 
 After installation, continue with [your first conversion](/docs/getting-started).
