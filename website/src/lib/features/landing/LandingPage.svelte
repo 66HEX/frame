@@ -1,7 +1,6 @@
 <script lang="ts">
 	import LandingLayout from './layout/LandingLayout.svelte';
 	import HeroSection from './sections/hero/HeroSection.svelte';
-	import FeaturesSection from './sections/features/FeaturesSection.svelte';
 	import PreviewSection from './sections/preview/PreviewSection.svelte';
 	import WorkflowSection from './sections/workflow/WorkflowSection.svelte';
 	import DetailsSection from './sections/details/DetailsSection.svelte';
@@ -12,7 +11,6 @@
 
 <LandingLayout>
 	<HeroSection />
-	<FeaturesSection />
 	<PreviewSection />
 	<WorkflowSection />
 	<DetailsSection />
