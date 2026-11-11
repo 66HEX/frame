@@ -130,6 +130,10 @@ if (-not $PackageOnly) {
     Prepare-BundleDirectory
 }
 
+# Check the application copied into the installer, including separately restored
+# PackageOnly inputs. The installer and updater helper have different entrypoints.
+& "$PSScriptRoot\check-windows-subsystem.ps1" -Path "$InnoDir\Frame.exe"
+
 if ($PrepareOnly) {
     Write-Output "Prepared unsigned installer inputs at $InnoDir"
     exit 0

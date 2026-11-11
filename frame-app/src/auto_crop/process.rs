@@ -41,11 +41,6 @@ pub(super) fn analyze_window(
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::piped());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x0800_0000);
-    }
     let mut child = ChildGuard(
         crate::process_launch::spawn(&mut command)
             .map_err(|error| AutoCropError::Unavailable(error.to_string()))?,

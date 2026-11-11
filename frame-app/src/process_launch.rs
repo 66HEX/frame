@@ -38,6 +38,15 @@ pub fn with_launch_gate<T>(launch: impl FnOnce() -> T) -> T {
 }
 
 pub fn spawn(command: &mut Command) -> io::Result<Child> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        use windows::Win32::System::Threading::CREATE_NO_WINDOW;
+
+        // FFmpeg, FFprobe and the update helper are background console programs.
+        // Keep their explicit pipes while preventing Windows from opening a console.
+        command.creation_flags(CREATE_NO_WINDOW.0);
+    }
     with_launch_gate(|| command.spawn())
 }
 
@@ -54,3 +63,6 @@ pub fn output(command: &mut Command) -> io::Result<Output> {
 pub fn status(command: &mut Command) -> io::Result<std::process::ExitStatus> {
     spawn(command)?.wait()
 }
+
+#[cfg(all(test, windows))]
+mod windows_tests;

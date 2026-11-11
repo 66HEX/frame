@@ -2019,6 +2019,13 @@ jobs:
       run: rustup toolchain install __RUST_VERSION__ --profile minimal --component clippy,rustfmt
     - name: ci::check_windows
       run: cargo check --manifest-path frame-app/Cargo.toml --target x86_64-pc-windows-msvc --locked
+    - name: ci::build_windows_release
+      run: cargo build --manifest-path frame-app/Cargo.toml --target x86_64-pc-windows-msvc --release --locked
+    - name: ci::verify_windows_gui_subsystem
+      shell: pwsh
+      run: ./script/check-windows-subsystem.ps1 -Path ./target/x86_64-pc-windows-msvc/release/frame.exe
+    - name: ci::test_windows_process_launch
+      run: 'cargo test --manifest-path frame-app/Cargo.toml --target x86_64-pc-windows-msvc --release --locked --lib process_launch::windows_tests:: -- --test-threads=1'
     timeout-minutes: 60
 ",
     )
@@ -4374,13 +4381,23 @@ mod tests {
     }
 
     #[test]
-    fn ci_workflow_checks_the_windows_target_on_a_windows_runner() {
+    fn ci_workflow_checks_windows_release_and_background_processes() {
         let workflow = ci_workflow();
         let windows_job = workflow_job(&workflow, "cargo_check_windows");
 
         assert!(windows_job.contains("runs-on: windows-2022"));
         assert!(windows_job.contains(
             "cargo check --manifest-path frame-app/Cargo.toml --target x86_64-pc-windows-msvc --locked"
+        ));
+        assert!(windows_job.contains("name: cargo check windows"));
+        assert!(windows_job.contains(
+            "cargo build --manifest-path frame-app/Cargo.toml --target x86_64-pc-windows-msvc --release --locked"
+        ));
+        assert!(windows_job.contains(
+            "./script/check-windows-subsystem.ps1 -Path ./target/x86_64-pc-windows-msvc/release/frame.exe"
+        ));
+        assert!(windows_job.contains(
+            "cargo test --manifest-path frame-app/Cargo.toml --target x86_64-pc-windows-msvc --release --locked --lib process_launch::windows_tests::"
         ));
     }
 

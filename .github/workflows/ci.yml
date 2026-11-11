@@ -99,4 +99,11 @@ jobs:
         test "$(rustc --version | awk '{print $2}')" = "1.95.0"
     - name: ci::check_windows
       run: cargo check --manifest-path frame-app/Cargo.toml --target x86_64-pc-windows-msvc --locked
+    - name: ci::build_windows_release
+      run: cargo build --manifest-path frame-app/Cargo.toml --target x86_64-pc-windows-msvc --release --locked
+    - name: ci::verify_windows_gui_subsystem
+      shell: pwsh
+      run: ./script/check-windows-subsystem.ps1 -Path ./target/x86_64-pc-windows-msvc/release/frame.exe
+    - name: ci::test_windows_process_launch
+      run: 'cargo test --manifest-path frame-app/Cargo.toml --target x86_64-pc-windows-msvc --release --locked --lib process_launch::windows_tests:: -- --test-threads=1'
     timeout-minutes: 60
