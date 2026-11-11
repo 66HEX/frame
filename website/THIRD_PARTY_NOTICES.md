@@ -21,11 +21,11 @@ Website interface icons use Nucleo UI 1.9.0 Outline (`outline`, 18px grid), from
 
 The source names, archive version, integrity hashes, and license links are preserved in [the icon notice](src/lib/icons/NOTICE.md) and its accompanying manifest. Current Frame brand asset provenance is documented separately below.
 
-## Inter
+## Overused Grotesk
 
-Inter is copyright 2016 The Inter Project Authors and is distributed under the SIL Open Font License 1.1. The full license is retained at [src/lib/assets/fonts/inter/LICENSE.txt](src/lib/assets/fonts/inter/LICENSE.txt).
+Overused Grotesk is copyright 2023–2024 Bao Nguyen (RandomMaerks) and is distributed under the SIL Open Font License 1.1. The full license is retained at [src/lib/assets/fonts/overused-grotesk/LICENSE.txt](src/lib/assets/fonts/overused-grotesk/LICENSE.txt).
 
-The Regular and Medium WOFF2 files were converted from Frame's bundled Inter TTF files without changing their glyph outlines. The Latin and Latin Extended variable WOFF2 files came from the installed `@fontsource-variable/inter` package in the local Frame Mira reference project. The website uses the same typeface as the native application.
+The website uses the Roman variable WOFF2. The link preview renderer uses the static Regular and Medium WOFF2 files. All three files come from the [Overused Grotesk v0.5-alpha.2 release](https://github.com/RandomMaerks/Overused-Grotesk/releases/tag/v0.5-alpha.2).
 
 ## Frame branding and application
 

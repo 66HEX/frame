@@ -1,6 +1,6 @@
 import ImageResponse from '@takumi-rs/image-response';
-import interRegularDataUri from '$lib/assets/fonts/inter/Inter-Regular.woff2?inline';
-import interMediumDataUri from '$lib/assets/fonts/inter/Inter-Medium.woff2?inline';
+import overusedGroteskRegularDataUri from '$lib/assets/fonts/overused-grotesk/OverusedGroteskRoman-Roman.woff2?inline';
+import overusedGroteskMediumDataUri from '$lib/assets/fonts/overused-grotesk/OverusedGroteskRoman-Medium.woff2?inline';
 import { siteConfig } from '$lib/site/site';
 import { ogThemeColors, toSvgColor, withAlpha } from '$lib/seo/og-theme';
 
@@ -62,21 +62,21 @@ const dataUriToArrayBuffer = (dataUri: string) => {
 };
 
 const fontDataPromise = Promise.all([
-	Promise.resolve(dataUriToArrayBuffer(interRegularDataUri)),
-	Promise.resolve(dataUriToArrayBuffer(interMediumDataUri))
+	Promise.resolve(dataUriToArrayBuffer(overusedGroteskRegularDataUri)),
+	Promise.resolve(dataUriToArrayBuffer(overusedGroteskMediumDataUri))
 ]);
 
 const takumiFontLoaders = [
 	{
-		key: 'inter-regular',
-		name: 'Inter',
+		key: 'overused-grotesk-regular',
+		name: 'Overused Grotesk',
 		weight: 400,
 		style: 'normal' as const,
 		data: async () => (await fontDataPromise)[0]
 	},
 	{
-		key: 'inter-medium',
-		name: 'Inter',
+		key: 'overused-grotesk-medium',
+		name: 'Overused Grotesk',
 		weight: 500,
 		style: 'normal' as const,
 		data: async () => (await fontDataPromise)[1]
@@ -171,7 +171,7 @@ const createComponent = ({
 				overflow: 'hidden',
 				backgroundColor: colors.background,
 				color: colors.foreground,
-				fontFamily: 'Inter, sans-serif'
+				fontFamily: 'Overused Grotesk, sans-serif'
 			}
 		},
 		el('div', {

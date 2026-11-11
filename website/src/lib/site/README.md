@@ -97,7 +97,7 @@ The shell preserves the Spektral sidebar and responsive table of contents. Keybo
 ## Identity and assets
 
 - `site.ts`: product name, canonical URL, descriptions, social links, icons, and browser theme colors.
-- `theme.css`: Graphite colors, Inter fonts, shadcn geometry, and shared surfaces.
+- `theme.css`: Graphite colors, Overused Grotesk, shadcn geometry, and shared surfaces.
 - `content-ui.ts`: documentation labels, search limits, navigation, page actions, and theme defaults.
 - `labels.ts`: shared control labels and copy feedback.
 - `assets/`: Frame logo and app icons. See its `NOTICE.md` for provenance.
