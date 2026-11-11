@@ -293,16 +293,6 @@
 	}
 }
 
-.hero-glow {
-	background: radial-gradient(
-		ellipse 130% 107.5% at 50% 10% in srgb,
-		transparent 37%,
-		var(--primary) 69%,
-		color-mix(in srgb, var(--primary-to) 12%, var(--primary-foreground)) 100%
-	);
-	filter: blur(clamp(1rem, 3.125vw, 2.5rem));
-}
-
 /* Native Frame surface treatments, available to composed landing sections. */
 @utility surface-raised {
     background-image: linear-gradient(var(--surface-highlight), transparent);
