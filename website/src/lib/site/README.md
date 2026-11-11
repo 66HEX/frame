@@ -2,6 +2,8 @@
 
 This directory contains Frame's website identity, theme, interface copy, and documentation. It uses the file-based content system retained from Spektral.
 
+Run the commands in this guide from the monorepo's `website/` directory. Published pages stay in `website/src/lib/site/content/docs/`; the ignored root `docs/website/` directory is for working notes.
+
 ## Add or edit a documentation page
 
 Create a Markdown file under `content/docs/` with a `.svx`, `.mdx`, or `.md` extension. All three use mdsvex and accept Svelte syntax for embedded components.
@@ -80,7 +82,7 @@ Place the screenshot next to the instructions it illustrates:
 
 The component follows the website theme and loads article images lazily. Its lightbox fits the image to the viewport over a dim overlay, with a bare close icon in the screen corner. A FLIP animation moves the image between its thumbnail and fitted view while the overlay fades; reduced-motion preferences skip that movement. Clicking the overlay or pressing Escape closes the image and restores focus. Captions stay in the article, and the lightbox title and description are available to screen readers.
 
-Capture provenance and dimensions are recorded in [the screenshot manifest](../../../docs/screenshot-manifest.json).
+Capture provenance and dimensions are recorded in the [archived screenshot manifest](https://github.com/66HEX/frame/blob/497c40c383d705f58d5deebd4062948e23ffcc9b/docs/screenshot-manifest.json).
 
 Use one to three relevant views in a guide. Describe the visible state in the caption and the useful visual information in the alt text. Check both theme files before referencing a scene. Imports and component markup are excluded from the search text by the existing Markdown parser.
 

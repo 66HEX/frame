@@ -123,6 +123,26 @@ details, tier suggestions, and a launch checklist.
   FFprobe binaries under `frame-app/resources/binaries/`. Native bundles include
   those tools and detect encoder capabilities from the bundled FFmpeg at startup.
 
+## Repository Layout
+
+This repository contains the native application and the [Frame website](website/README.md),
+including its public documentation. Each uses its own toolchain and lockfile.
+
+| Directory | Responsibility |
+| --- | --- |
+| `frame-app/` | Native desktop application and bundled assets |
+| `frame-core/` | Conversion logic and media compatibility rules |
+| `frame-updater/` | Signed update verification and installation helper |
+| `website/` | SvelteKit landing page, user documentation, and Cloudflare Worker |
+| `tooling/`, `script/`, `packaging/` | CI generation, release tooling, and native packages |
+| `vendor/` | Vendored native dependencies |
+| `docs/` | Ignored local engineering notes and migration records |
+
+Cargo commands run from the repository root. Website commands run from `website/`
+or use `pnpm --dir website`; Node.js is not needed to build the desktop application.
+The website's original history is preserved under the signed Git tag
+`archive/website-pre-monorepo`.
+
 ## Technical Stack
 
 ### Native Application
@@ -272,11 +292,24 @@ cargo xtask setup-ffmpeg
 
 ## Development Checks
 
-Run the main checks before submitting changes:
+Run the native checks before submitting application or release-tooling changes:
 
 ```bash
 cargo xtask ci
 ```
+
+For the website, use Node 24 and the pinned pnpm version in
+[`website/package.json`](website/package.json):
+
+```bash
+pnpm --dir website install --frozen-lockfile
+pnpm --dir website check
+pnpm --dir website test
+pnpm --dir website build
+```
+
+See [website setup and deployment](website/README.md) and the
+[contribution guide](CONTRIBUTING.md) for the complete workflow.
 
 ## Star History
 
@@ -295,4 +328,7 @@ cargo xtask ci
 
 ## License
 
-GPLv3 License. See [LICENSE](LICENSE) for details.
+The native application and core use GPLv3. See [LICENSE](LICENSE).
+The website retains its own [MIT template license](website/LICENSE);
+fonts, icons, screenshots, and branding have the terms listed in
+[the website's third-party notices](website/THIRD_PARTY_NOTICES.md).

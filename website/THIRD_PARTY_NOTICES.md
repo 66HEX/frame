@@ -31,13 +31,13 @@ The Regular and Medium WOFF2 files were converted from Frame's bundled Inter TTF
 
 The Frame logomark comes from `frame-app/assets/icons/frame.svg` in [66HEX/frame](https://github.com/66HEX/frame). PNG app icons were retained from the previous Frame landing page. See [the artwork notice](src/lib/site/assets/NOTICE.md).
 
-The Frame desktop application is licensed under [GPL-3.0](https://github.com/66HEX/frame/blob/main/LICENSE). Its license is separate from the retained MIT website template. Product artwork and branding are not relicensed by the template notice.
+The Frame desktop application is licensed under [GPL-3.0](../LICENSE). Its license is separate from the retained MIT website template. Product artwork and branding are not relicensed by the template notice.
 
 ## Native application screenshots
 
 `static/media/frame-dark.png` and `static/media/frame-light.png` are original 2400 × 1600 captures of the native Frame application. The website displays `frame-dark.webp` and `frame-light.webp`, lossless copies in the same directory that decode to identical pixels, in the matching theme. They show Frame's native interface.
 
-`static/media/docs/` contains 15 additional native views in light and dark themes, captured at 2400 × 1600 and stored as lossless WebP. The screenshots were rendered by the real application's GPUI window renderer without recreating or compositing interface elements. Capture details and hashes are recorded in [docs/screenshot-manifest.json](docs/screenshot-manifest.json). Their sample video uses the photograph credited below, a generated reference tone, and original sample subtitles. The audio fixture is a generated reference tone. The troubleshooting fixture is deliberately unreadable media. The fixture generation recipe is retained in [scripts/prepare-docs-media.py](scripts/prepare-docs-media.py).
+`static/media/docs/` contains 15 additional native views in light and dark themes, captured at 2400 × 1600 and stored as lossless WebP. The screenshots were rendered by the real application's GPUI window renderer without recreating or compositing interface elements. Capture details and hashes are recorded in the [archived screenshot manifest](https://github.com/66HEX/frame/blob/497c40c383d705f58d5deebd4062948e23ffcc9b/docs/screenshot-manifest.json). Their sample video uses the photograph credited below, a generated reference tone, and original sample subtitles. The audio fixture is a generated reference tone. The troubleshooting fixture is deliberately unreadable media. The fixture generation recipe is retained in [scripts/prepare-docs-media.py](scripts/prepare-docs-media.py).
 
 ## Sample photograph
 

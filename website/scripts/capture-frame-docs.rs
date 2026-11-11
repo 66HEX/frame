@@ -1,18 +1,19 @@
 //! Reproducible native Frame documentation capture helper.
 //!
-//! First, from the website checkout, prepare the same real sample media:
-//! python3 scripts/prepare-docs-media.py /tmp/frame-docs-media
+//! First, from the Frame monorepo root, prepare the same real sample media:
+//! python3 website/scripts/prepare-docs-media.py /tmp/frame-docs-media
 //! The recipe copies the attributed photograph, generates MP4 and WAV files with
 //! FFmpeg, and writes subtitle cues and a deliberately invalid troubleshooting sample.
 //!
-//! This is an executable example for the sibling Frame application, not website code.
-//! Copy it to frame-app/examples/render-docs-capture.rs in a clean Frame checkout, then:
+//! Run this helper as a temporary example in the monorepo's desktop application.
+//! Copy website/scripts/capture-frame-docs.rs to frame-app/examples/render-docs-capture.rs
+//! in a clean checkout, then run from the repository root:
 //! cargo build -p frame-app --example render-docs-capture --features gpui_platform/test-support --locked
 //!
 //! Arguments: <scene-id> <output.png> <real-source-path> [more-real-source-paths...]
 //! Set FRAME_VISUAL_THEME to light/dark and FRAME_FFMPEG_PATH / FRAME_FFPROBE_PATH
 //! to the native app's bundled binaries. Run on a 2x display for 2400 x 1600 output.
-//! Example, from the Frame checkout with those environment variables set:
+//! Example, from the repository root with those environment variables set:
 //! mkdir -p /tmp/frame-docs-captures
 //! target/debug/examples/render-docs-capture video-output /tmp/frame-docs-captures/video-output-dark.png /tmp/frame-docs-media/alpine-lake.mp4
 //! Use studio-reference.wav for audio scenes, alpine-lake.jpg for images-output
