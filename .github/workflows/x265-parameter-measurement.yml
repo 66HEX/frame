@@ -1,0 +1,32 @@
+name: x265 parameter measurement
+on:
+  push:
+    branches:
+      - test/hevc-x265-parameters
+permissions:
+  contents: read
+jobs:
+  measure:
+    name: x265 parameters (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Measure stability, speed and image quality
+        run: python script/measure-x265.py
+      - name: Retain per-trial results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: x265-parameters-${{ matrix.os }}
+          path: target/x265-measurement/results
+          if-no-files-found: error
+          retention-days: 30
