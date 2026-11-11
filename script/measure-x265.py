@@ -20,6 +20,10 @@ runtime = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(runtime)
 OPTIONS = {"default": None, "asm-0": "asm=0", "asm-sse2": "asm=sse2", "cutree-0": "cutree=0"}
 FILTERS = ("copy", "vflip,copy")
+FRAME_PRESETS = (
+    "ultrafast", "superfast", "veryfast", "faster", "fast", "medium",
+    "slow", "slower", "veryslow",
+)
 
 
 def log_text(path):
@@ -39,13 +43,14 @@ def check_frames(tools, output, source, log):
     return len(frames) == source["frames"]
 
 
-def encode(tools, source, output, filters, option, log, crf=28, benchmark=False):
+def encode(tools, source, output, filters, option, log, crf=28, benchmark=False,
+           preset="ultrafast"):
     command = [tools["ffmpeg"]]
     if benchmark:
         command += ["-benchmark"]
     command += [
         "-i", source["path"], "-c:v", "libx265", "-crf", str(crf),
-        "-preset", "ultrafast", "-vf", filters,
+        "-preset", preset, "-vf", filters,
     ]
     if option:
         command += ["-x265-params", option]
@@ -75,10 +80,10 @@ def encode(tools, source, output, filters, option, log, crf=28, benchmark=False)
     return result
 
 
-def make_source(tools, folder, width, height, bits, frames):
-    label = f"{width}x{height}-{bits}bit-{frames}f"
+def make_source(tools, folder, width, height, bits, frames, chroma="420"):
+    label = f"{width}x{height}-{chroma}-{bits}bit-{frames}f"
     path = folder / f"{label}.y4m"
-    pixel_format = "yuv420p" if bits == 8 else "yuv420p10le"
+    pixel_format = f"yuv{chroma}p" + ("10le" if bits == 10 else "")
     runtime.checked([
         tools["ffmpeg"], "-v", "error", "-f", "lavfi", "-i",
         f"testsrc2=size={width}x{height}:rate=25", "-frames:v", str(frames),
@@ -202,12 +207,63 @@ def benchmark(tools, source, output, folder, repetitions):
     return results
 
 
+def check_presets(output, root, sources, fixture, data, sets, manifest):
+    configured = (runtime.ROOT / "frame-app/src/settings/model/codecs.rs").read_text()
+    presets = re.search(r'const VIDEO_PRESETS:.*?=\s*\[(.*?)\];', configured, re.S)
+    if not presets or tuple(re.findall(r'"([^"]+)"', presets[1])) != FRAME_PRESETS:
+        raise RuntimeError("Preset matrix must match the Frame video preset list")
+    generator = sets["8.1.2"]
+    generated = [
+        make_source(generator, sources, width, 64, bits, 12, chroma)
+        for width, chroma in [(32, "420"), (48, "420"), (48, "422"), (48, "444"),
+                              (62, "420"), (64, "420"), (66, "420")]
+        for bits in (8, 10)
+    ]
+    cases = [{**fixture, "label": "historical-48x32"}, *generated]
+    data["sources"] = [{k: v for k, v in case.items() if k != "path"} for case in cases]
+    failed = False
+    for version, tools in sets.items():
+        target = output / f"{version}.mkv"
+        result = {}
+        data["versions"][version] = result
+        for preset in FRAME_PRESETS:
+            folder = root / version / preset
+            folder.mkdir()
+            trials = []
+            for case in cases:
+                historical = case["label"] == "historical-48x32"
+                option = "asm=sse2" if case["size"][0] < 64 else None
+                for filters in FILTERS:
+                    for n in range(20 if historical else 5):
+                        name = f"{case['label']}-{'flip' if filters != 'copy' else 'plain'}-{n + 1:02}"
+                        outcome = encode(tools, case, target, filters, option, folder / f"{name}.log",
+                                         preset=preset)
+                        trials.append({
+                            "case": case["label"], "filters": filters, "option": option,
+                            "log": f"{version}/{preset}/{name}.log", **outcome,
+                        })
+            passed = sum(trial["decoded"] for trial in trials)
+            failed |= passed != len(trials)
+            result[preset] = {"passed": passed, "trials": trials}
+            runtime.write_json(root / "summary.json", data)
+            print(f"{data['platform']} {version} {preset}: {passed}/{len(trials)}", flush=True)
+        for entry in manifest["versions"][version]["platforms"][data["platform"]]:
+            runtime.verify(tools[entry["id"]], entry["sha256"])
+        target.unlink(missing_ok=True)
+    for case in cases:
+        runtime.verify(case["path"], case["sha256"])
+    data["completed"] = True
+    runtime.write_json(root / "summary.json", data)
+    return int(failed)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=runtime.ROOT / "target/x265-measurement")
     parser.add_argument("--repetitions", type=int, default=100)
     parser.add_argument("--boundary-repetitions", type=int, default=3)
     parser.add_argument("--benchmark-repetitions", type=int, default=5)
+    parser.add_argument("--check-presets", action="store_true")
     args = parser.parse_args()
     if min(args.repetitions, args.boundary_repetitions, args.benchmark_repetitions) < 1:
         parser.error("repetition counts must be positive")
@@ -246,6 +302,8 @@ def main():
         logs = root / version
         logs.mkdir()
         sets[version] = runtime.install(package["platforms"][key], output / version, downloads, logs)
+    if args.check_presets:
+        return check_presets(output, root, sources, fixture, data, sets, manifest)
     generator = sets["8.1.2"]
     boundary = [make_source(generator, sources, w, 64, b, 12)
                 for w in (32, 48, 62, 64, 66) for b in (8, 10)]
