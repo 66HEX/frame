@@ -1,0 +1,57 @@
+---
+title: Presets
+description: Use a built-in configuration or save your own output settings.
+order: 20
+---
+
+<script>
+  import DocsScreenshot from '$lib/features/docs/DocsScreenshot.svelte';
+</script>
+
+Presets collect output settings so you can reuse a conversion setup. Open the **Presets** inspector tab with a source selected.
+
+## Choose a built-in preset
+
+Frame includes these starting points:
+
+| Preset | Intended use |
+| --- | --- |
+| Balanced MP4 | General-purpose video conversion. |
+| Archive H.265 | An H.265 configuration for archiving video. |
+| Web Share | Video prepared for sharing. |
+| GIF Web Small | A smaller animated GIF. |
+| GIF High Quality | An animated GIF with more detail. |
+| Audio MP3 | MP3 audio output. |
+| Audio FLAC (Lossless) | Lossless FLAC audio output. |
+| Discord | A video configuration for sharing on Discord. |
+
+Preset availability depends on the selected source. A preset that cannot be applied to that media type is disabled.
+
+Names describe the intended use; they do not guarantee a particular file size or compatibility with every service. Check the actual output settings and test the result in its destination.
+
+<DocsScreenshot
+  scene="presets"
+  alt="Frame Presets inspector showing saved configurations and the field for saving a custom preset."
+  caption="The Presets tab keeps reusable output configurations together."
+/>
+
+## Save a custom preset
+
+1. Select a source and configure it in **Output**.
+2. Open **Presets**.
+3. Enter a name in **Preset label**.
+4. Choose **Save**.
+
+Use a name that helps you recognize the destination or quality level later, such as “Client review MP4”. The preset is saved with the app's settings.
+
+## Apply a preset to a batch
+
+Select **Apply preset to all files** beside a preset and review the confirmation. Frame checks compatibility before applying a preset to other sources.
+
+After applying it, inspect a file from each kind of source in your queue. Sources with different dimensions or track layouts can still need individual adjustments.
+
+## Adjust or remove a preset
+
+Applying a preset fills in the output configuration. You can then change individual settings for the selected file. To preserve an adjusted setup, save it as a custom preset with a recognizable name.
+
+Custom presets have a **Delete preset** action. Built-in presets cannot be deleted.

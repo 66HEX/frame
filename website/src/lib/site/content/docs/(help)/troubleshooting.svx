@@ -1,0 +1,65 @@
+---
+title: Troubleshooting
+description: Resolve installation, preview, compatibility, and conversion problems.
+order: 10
+---
+
+<script>
+  import DocsScreenshot from '$lib/features/docs/DocsScreenshot.svelte';
+</script>
+
+Start with the selected file's settings and conversion log. A problem that affects one source often comes from that file's streams, output format, or a specific processing option.
+
+## Frame will not open
+
+Current macOS builds are not notarized, and Windows builds are not certificate signed. Follow the platform-specific steps in [installation](/docs/installation) for a copy from the official release page.
+
+For Linux, check that the package matches your processor architecture. If you use an AppImage, the file must be executable. The Flathub package uses its runtime for media tools.
+
+## The main action does not say Start
+
+The action tells you what is missing. **Add a source** means the queue is empty; **Select files** means no files are checked; **Choose output** means a destination is needed. **Nothing pending** means there is no selected pending conversion to run.
+
+See [batch conversion](/docs/batch-conversion) for the queue workflow.
+
+## A source file cannot be read
+
+If Frame shows **Preview unavailable** and **Failed to read source metadata**, it could not inspect the source. The error details can include a failed FFprobe process.
+
+Check that the original file opens in a media player and that its download or copy finished. A supported filename extension does not guarantee valid media inside the file. Try a known working source to distinguish a file problem from an installation problem.
+
+<DocsScreenshot
+  scene="source-error"
+  alt="Frame showing Preview unavailable and Failed to read source metadata for unreadable-sample.mp4."
+  caption="A failed source probe appears in the preview and the Metadata tab."
+/>
+
+## A source or setting is unavailable
+
+Check the supported formats in the [video](/docs/video), [audio](/docs/audio), or [image](/docs/images) guide. Some image formats, including AVIF and HEIC, are accepted as inputs without being offered as outputs.
+
+The chosen container limits codecs and track types. Try a compatible preset first, then adjust one setting at a time. A disabled preset may not apply to the selected source type.
+
+## Audio or subtitles are missing
+
+Review the checked source tracks in the Output inspector. Frame exports selected tracks only. Then confirm that the output container supports the track format.
+
+Selectable subtitles also require support in the player. If they must always be visible, consider [burn-in](/docs/subtitles#burn-subtitles-into-the-picture).
+
+## Hardware encoding fails
+
+A hardware encoder needs a compatible device and runtime. macOS uses VideoToolbox options; supported Windows machines can use NVIDIA NVENC. Linux bundles use software encoders.
+
+Try the corresponding software encoder to isolate the problem. Include the encoder name and the relevant log message when reporting a failure.
+
+## Preview is unavailable or slow
+
+Select a supported source and allow it to finish loading. High-resolution video, difficult codecs, and filters can increase preview work.
+
+Try a shorter or smaller source and simplify the processing settings. Check a short conversion separately: the exported result and preview playback are different parts of the workflow.
+
+## Report a reproducible problem
+
+Open an issue on [Frame's GitHub repository](https://github.com/66HEX/frame/issues). Include your operating system, Frame version, source format and codecs, output settings, steps to reproduce, and the relevant log excerpt.
+
+Remove private file paths and sensitive metadata from anything you share. If possible, provide a small sample that you have permission to publish.

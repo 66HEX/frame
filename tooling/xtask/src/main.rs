@@ -19,6 +19,7 @@ use syn::{
 };
 
 const CI_WORKFLOW_PATH: &str = ".github/workflows/ci.yml";
+const WEBSITE_WORKFLOW_PATH: &str = ".github/workflows/website.yml";
 const DEPENDENCY_REVIEW_WORKFLOW_PATH: &str = ".github/workflows/dependency-review.yml";
 const CODEQL_WORKFLOW_PATH: &str = ".github/workflows/codeql.yml";
 const RUN_BUNDLING_WORKFLOW_PATH: &str = ".github/workflows/run_bundling.yml";
@@ -55,6 +56,18 @@ const ACTION_DEPENDENCY_REVIEW_SHA: &str = "a1d282b36b6f3519aa1f3fc636f609c47ddd
 const ACTION_CODEQL_SHA: &str = "24c54180a607b1449ed407dd24f251e4e9147c8d";
 const ACTION_ATTEST_BUILD_PROVENANCE_SHA: &str = "4d101475d8b20a2381f78447822ac1eab6504dd8";
 const ACTION_INSTALL_NIX_SHA: &str = "75c75c31ebece974e48ebc36b4ad125bd97bd97b";
+const ACTION_SETUP_NODE_SHA: &str = "949feb2413d6458794dcd2491c4babbbce0c15c1";
+const UBUNTU_ARCHIVE_SELECTION: &str = r"        ubuntu_archive='https://archive.ubuntu.com/ubuntu'
+        if ! getent ahosts archive.ubuntu.com >/dev/null; then
+          ubuntu_archive='https://mirrors.edge.kernel.org/ubuntu'
+        fi";
+const UBUNTU_ARCHIVE_SUBSTITUTIONS: &str = concat!(
+    r"s|mirror\+file:/etc/apt/apt-mirrors\.txt|${ubuntu_archive}/|g;",
+    r"s|https?://(azure\.)?archive\.ubuntu\.com/ubuntu|${ubuntu_archive}|g"
+);
+
+#[cfg(test)]
+mod monorepo_tests;
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -590,17 +603,7 @@ fn flathub_sources(args: &[String]) -> Result<()> {
         }
     }
 
-    run_command_path(
-        "git",
-        &[
-            "archive".to_string(),
-            "--format=tar.gz".to_string(),
-            format!("--prefix=frame-{}/", options.version),
-            "-o".to_string(),
-            path_to_string_lossy(&source_archive),
-            "HEAD".to_string(),
-        ],
-    )?;
+    archive_flathub_source(&root, &source_archive, &options.version)?;
     let vendor_config = run_command_capture(
         "cargo",
         &[
@@ -647,6 +650,26 @@ fn flathub_sources(args: &[String]) -> Result<()> {
     println!("Wrote {}", vendor_archive.display());
     println!("Wrote {}", checksums_path.display());
     Ok(())
+}
+
+fn archive_flathub_source(root: &Path, archive: &Path, version: &str) -> Result<()> {
+    // The native source distribution does not need website assets. Keep normal
+    // repository archives complete by applying the exclusion only here.
+    run_command_path_in(
+        root,
+        "git",
+        &[
+            "archive".to_string(),
+            "--format=tar.gz".to_string(),
+            format!("--prefix=frame-{version}/"),
+            "-o".to_string(),
+            path_to_string_lossy(archive),
+            "HEAD".to_string(),
+            "--".to_string(),
+            ".".to_string(),
+            ":(top,exclude)website".to_string(),
+        ],
+    )
 }
 
 fn flathub_manifest(args: &[String]) -> Result<()> {
@@ -1650,6 +1673,7 @@ fn check_workflows() -> Result<()> {
 fn generated_workflows() -> Vec<(&'static str, String)> {
     vec![
         (CI_WORKFLOW_PATH, ci_workflow()),
+        (WEBSITE_WORKFLOW_PATH, website_workflow()),
         (
             DEPENDENCY_REVIEW_WORKFLOW_PATH,
             dependency_review_workflow(),
@@ -1711,6 +1735,10 @@ fn run_command(program: &str, args: &[&str]) -> Result<()> {
 }
 
 fn run_command_path(program: impl AsRef<OsStr>, args: &[String]) -> Result<()> {
+    run_command_path_in(&repo_root()?, program, args)
+}
+
+fn run_command_path_in(root: &Path, program: impl AsRef<OsStr>, args: &[String]) -> Result<()> {
     let program = program.as_ref();
     println!(
         "$ {} {}",
@@ -1722,7 +1750,7 @@ fn run_command_path(program: impl AsRef<OsStr>, args: &[String]) -> Result<()> {
     );
     let status = Command::new(program)
         .args(args)
-        .current_dir(repo_root()?)
+        .current_dir(root)
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
@@ -1875,6 +1903,10 @@ fn pin_workflow_actions(workflow: &mut String) {
             "github/codeql-action/analyze@v4.37.1",
             format!("github/codeql-action/analyze@{ACTION_CODEQL_SHA} # v4.38.3"),
         ),
+        (
+            "actions/setup-node@v7.1.0",
+            format!("actions/setup-node@{ACTION_SETUP_NODE_SHA} # v7.1.0"),
+        ),
     ];
     for (reference, pinned) in action_replacements {
         *workflow = workflow.replace(reference, &pinned);
@@ -1928,9 +1960,23 @@ fn disable_checkout_credentials(workflow: &str) -> String {
     rendered
 }
 
+fn linux_ci_setup_step() -> String {
+    // GitHub's Ubuntu images use a mirror+file URI in either .list or deb822
+    // sources. Keep Ubuntu's signing keys when its archive DNS needs a fallback.
+    r#"    - name: steps::setup_linux
+      run: |
+__UBUNTU_ARCHIVE_SELECTION__
+        echo "Using Ubuntu archive: $ubuntu_archive"
+        sudo find /etc/apt -maxdepth 2 -type f \( -name '*.list' -o -name '*.sources' \) -exec sed -E -i "__UBUNTU_ARCHIVE_SUBSTITUTIONS__" {} +
+        sudo apt-get update
+        sudo apt-get install -y clang desktop-file-utils libasound2-dev libdrm-dev libfontconfig1-dev libfreetype6-dev libx11-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev pkg-config"#
+        .replace("__UBUNTU_ARCHIVE_SELECTION__", UBUNTU_ARCHIVE_SELECTION)
+        .replace("__UBUNTU_ARCHIVE_SUBSTITUTIONS__", UBUNTU_ARCHIVE_SUBSTITUTIONS)
+}
+
 fn ci_workflow() -> String {
     render_workflow(
-        r"# Generated from xtask::workflows::ci
+        &r"# Generated from xtask::workflows::ci
 # Rebuild with `cargo xtask workflows`.
 name: ci
 on:
@@ -1954,10 +2000,7 @@ jobs:
         persist-credentials: false
     - name: steps::setup_rust
       run: rustup toolchain install __RUST_VERSION__ --profile minimal --component clippy,rustfmt
-    - name: steps::setup_linux
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y clang desktop-file-utils libasound2-dev libdrm-dev libfontconfig1-dev libfreetype6-dev libx11-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev pkg-config
+__CI_LINUX_SETUP__
     - name: security::validate_workflow_syntax
       run: |
         mkdir -p target/actionlint
@@ -2027,7 +2070,65 @@ jobs:
     - name: ci::test_windows_process_launch
       run: 'cargo test --manifest-path frame-app/Cargo.toml --target x86_64-pc-windows-msvc --release --locked --lib process_launch::windows_tests:: -- --test-threads=1'
     timeout-minutes: 60
-",
+"
+        .replace("__CI_LINUX_SETUP__", &linux_ci_setup_step()),
+    )
+}
+
+fn website_workflow() -> String {
+    render_workflow(
+        r#"# Generated from xtask::workflows::website
+# Rebuild with `cargo xtask workflows`.
+name: website
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+permissions:
+  contents: read
+concurrency:
+  group: website-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  website_checks:
+    name: website checks
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: website
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v7.0.0
+    - name: steps::setup_node
+      uses: actions/setup-node@v7.1.0
+      with:
+        node-version-file: website/.nvmrc
+        package-manager-cache: false
+    - name: steps::setup_pnpm
+      run: |
+        node --input-type=commonjs -e '
+          const { execFileSync } = require("node:child_process");
+          const { packageManager } = require("./package.json");
+          if (!/^pnpm@\d+\.\d+\.\d+$/.test(packageManager)) {
+            throw new Error("website/package.json must pin an exact pnpm version");
+          }
+          execFileSync("npm", ["install", "--global", packageManager], { stdio: "inherit" });
+        '
+    - name: website::install
+      run: pnpm install --frozen-lockfile
+    - name: website::check
+      run: pnpm check
+    - name: website::test
+      run: pnpm test
+    - name: website::build
+      run: pnpm build
+    - name: website::verify_worker_bundle
+      run: pnpm exec wrangler deploy --dry-run --outdir .wrangler/dry-run
+    timeout-minutes: 20
+"#,
     )
 }
 
@@ -2093,6 +2194,26 @@ jobs:
       with:
         category: /language:rust
     timeout-minutes: 30
+  analyze_website:
+    name: codeql website
+    runs-on: ubuntu-24.04
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v7.0.0
+    - name: security::initialize_codeql_website
+      uses: github/codeql-action/init@v4.37.1
+      with:
+        languages: javascript-typescript
+        build-mode: none
+        queries: security-extended
+        config: |
+          paths:
+            - website
+    - name: security::analyze_website
+      uses: github/codeql-action/analyze@v4.37.1
+      with:
+        category: /language:javascript-typescript/website
+    timeout-minutes: 20
 ",
     )
 }

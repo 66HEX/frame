@@ -28,6 +28,12 @@ jobs:
         test "$(rustc --version | awk '{print $2}')" = "1.95.0"
     - name: steps::setup_linux
       run: |
+        ubuntu_archive='https://archive.ubuntu.com/ubuntu'
+        if ! getent ahosts archive.ubuntu.com >/dev/null; then
+          ubuntu_archive='https://mirrors.edge.kernel.org/ubuntu'
+        fi
+        echo "Using Ubuntu archive: $ubuntu_archive"
+        sudo find /etc/apt -maxdepth 2 -type f \( -name '*.list' -o -name '*.sources' \) -exec sed -E -i "s|mirror\+file:/etc/apt/apt-mirrors\.txt|${ubuntu_archive}/|g;s|https?://(azure\.)?archive\.ubuntu\.com/ubuntu|${ubuntu_archive}|g" {} +
         sudo apt-get update
         sudo apt-get install -y clang desktop-file-utils libasound2-dev libdrm-dev libfontconfig1-dev libfreetype6-dev libx11-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev pkg-config
     - name: security::validate_workflow_syntax

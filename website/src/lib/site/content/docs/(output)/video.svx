@@ -1,0 +1,57 @@
+---
+title: Video
+description: Choose a container, codec, quality level, and output dimensions.
+order: 10
+---
+
+<script>
+  import DocsScreenshot from '$lib/features/docs/DocsScreenshot.svelte';
+</script>
+
+Video controls are in the **Output** inspector. The **General** section chooses the output container; the **Video** section controls encoding. Available options depend on the source, selected container, and detected encoders.
+
+## Container and codec
+
+A container holds video, audio, subtitle tracks, and metadata. A codec describes how an individual stream is encoded.
+
+Frame can export MP4, MKV, WebM, MOV, M2T, MTS, M2TS, and GIF. Video encoders include H.264, H.265, VP9, AV1, ProRes, and MPEG-2 where the selected container supports them.
+
+Use MP4 with H.264 as a practical starting point for general playback. If you choose a newer codec or a different pixel format, verify that the destination player supports it.
+
+<DocsScreenshot
+  scene="video-output"
+  alt="Frame Output inspector with video format and encoding controls."
+  caption="Video encoding controls change with the selected format and encoder."
+/>
+
+## Control quality and size
+
+**CRF** targets a quality level. For encoders that expose CRF, lower values generally preserve more detail and produce larger files. The resulting size varies with the source.
+
+**Target bitrate** controls the requested bitrate. It is useful when you have a delivery requirement, but the same bitrate can look very different across codecs, resolutions, and scenes.
+
+Encoder presets trade encoding speed for compression efficiency. A slower preset can reduce size at comparable quality, but takes longer to process. The available preset scale depends on the codec.
+
+## Resolution and frame rate
+
+Choose a resolution preset or enter custom dimensions. Review the aspect ratio and crop so the output keeps the composition you intend.
+
+Frame also supports frame-rate conversion, scaling, and pixel-format selection. Increasing resolution does not recover detail missing from the source. Change frame rate when the delivery format requires it, and check motion in the exported clip.
+
+## Hardware encoding
+
+macOS bundles include VideoToolbox H.264 and HEVC encoders. Windows bundles include NVIDIA NVENC options for supported hardware. Linux bundles use software encoders.
+
+The app detects encoder capabilities at startup. A hardware option requires a compatible machine and runtime; its availability and quality settings can differ from a software encoder.
+
+## Video filters
+
+The **Video filters** section includes brightness, contrast, saturation, gamma, hue, color temperature, sharpening, Gaussian blur, denoise, deband, vignette, grayscale, and deinterlacing.
+
+Apply only the adjustments you need and check a short export. Multiple filters can increase processing time. Use [preview and trim](/docs/preview) to choose a representative range.
+
+<DocsScreenshot
+  scene="video-filters"
+  alt="Frame Output inspector showing video filter controls beside the media preview."
+  caption="Use Video filters to adjust the picture before export."
+/>

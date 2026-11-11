@@ -1,0 +1,49 @@
+---
+title: Subtitles
+description: Choose subtitle streams or burn text into the exported video.
+order: 40
+---
+
+<script>
+  import DocsScreenshot from '$lib/features/docs/DocsScreenshot.svelte';
+</script>
+
+Open **Subtitles** in the Output inspector. Decide whether the result should contain selectable subtitle tracks or text permanently rendered into the picture.
+
+## Select source tracks
+
+Check the subtitle streams you want to export. Frame includes only the selected source tracks. Track availability depends on what FFprobe detects in the source.
+
+A subtitle stream's format matters as well as its language. Text subtitles and bitmap subtitles have different container and conversion constraints.
+
+## Add external subtitles
+
+Use **Add subtitle files** for selectable subtitle tracks, or **Add subtitle file** in burn-in mode. Text subtitle inputs include SRT, ASS, and VTT.
+
+Check the subtitle timing against the video, especially after choosing a trim range. Use a short export to verify the final result.
+
+## Selectable subtitles
+
+Selectable tracks let a compatible player turn subtitles on and off. MP4, MOV, MKV, and WebM support text-subtitle workflows subject to the selected container's rules.
+
+The container and player determine which subtitle formats are accepted. If a track cannot be included in the chosen output, change the subtitle handling or use a compatible container.
+
+## Burn subtitles into the picture
+
+Burn-in renders the text as part of the video. The viewer sees it in any player that can play the video, and it cannot be switched off afterward.
+
+Frame exposes font, size, color, outline, and position controls. Review the text against both bright and dark scenes, and leave enough space around the edges for the intended display.
+
+Burn-in requires video processing, so it affects the encoded picture and conversion time.
+
+<DocsScreenshot
+  scene="subtitles"
+  alt="Frame Output inspector open to subtitle selection and handling controls."
+  caption="The Subtitles section controls which text appears in the output and how it is included."
+/>
+
+## Transport streams and bitmap subtitles
+
+M2T, MTS, and M2TS workflows include specialized subtitle handling for PGS, DVB subtitles, DVB teletext, ARIB captions, and HDMV sources where compatible. M2T converts PGS/DVD bitmap subtitles to standard DVB subtitles rather than placing them in private data.
+
+For broadcast or disc workflows, verify the exported stream in the target tool. These formats have stricter compatibility rules than a typical web video.

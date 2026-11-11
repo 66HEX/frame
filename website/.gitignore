@@ -1,0 +1,22 @@
+# dependencies
+node_modules
+.pnpm-store
+package-lock.json
+yarn.lock
+
+# build artifacts
+dist
+build
+.svelte-kit
+.turbo
+.wrangler
+*.tsbuildinfo
+
+# environments
+.env
+.env.*
+
+# misc
+.DS_Store
+*.log
+.vercel

@@ -1,0 +1,7 @@
+<!-- Native macOS window chrome, aligned to the 2400 × 1600 hero capture.
+     Fixed platform colors belong to this artwork, not the website theme. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1600" viewBox="0 0 2400 1600">
+  <circle cx="40" cy="56" r="12" fill="#ff5f57" />
+  <circle cx="80" cy="56" r="12" fill="#febc2e" />
+  <circle cx="120" cy="56" r="12" fill="#28c840" />
+</svg>

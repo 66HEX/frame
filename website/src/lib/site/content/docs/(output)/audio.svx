@@ -1,0 +1,57 @@
+---
+title: Audio
+description: Select tracks, encode audio, and apply filters.
+order: 20
+---
+
+<script>
+  import DocsScreenshot from '$lib/features/docs/DocsScreenshot.svelte';
+</script>
+
+Frame can convert an audio file or export audio from a video source. Choose the output format in **General**, then configure the **Audio** section.
+
+## Choose the tracks
+
+Check the source audio tracks you want to export. Only selected tracks are included. This matters for sources with several languages, commentary tracks, or alternate mixes.
+
+Review track selection after changing the output format. The container determines the supported audio codecs and track combinations.
+
+## Choose an audio format
+
+Audio output formats include MP3, M4A, WAV, FLAC, and Opus. The available encoders also cover AAC, AC-3, ALAC, PCM, and transport-stream audio where supported.
+
+| Goal | Starting point |
+| --- | --- |
+| Widely supported compressed audio | MP3 or AAC in M4A |
+| Preserve a lossless source | FLAC or an appropriate PCM/WAV configuration |
+| Compact audio for a compatible destination | Opus |
+
+Converting a lossy source to FLAC or WAV does not restore discarded detail. It changes the output encoding and can increase the file size.
+
+## Bitrate, quality, and channels
+
+Set the bitrate or VBR quality when the chosen encoder supports it. Use the channel layout controls to match the intended output, and adjust volume if needed.
+
+Check the exported file at a normal listening level. Changing channels or gain can alter a mix even when the video is unchanged.
+
+<DocsScreenshot
+  scene="audio-output"
+  alt="Frame Output inspector with audio track and encoding settings."
+  caption="Choose the audio tracks and encoding settings for the output."
+/>
+
+## Audio filters
+
+Frame provides normalization, limiting, compression, bass and treble adjustment, high-pass and low-pass filters, noise reduction, de-essing, and stereo-width controls.
+
+Start with one filter and compare the result. A limiter controls peaks; a compressor changes dynamic range. Heavy noise reduction or compression can introduce audible artifacts.
+
+<DocsScreenshot
+  scene="audio-filters"
+  alt="Frame Output inspector showing audio filter controls."
+  caption="Audio filters provide adjustments for levels, dynamics, and tone."
+/>
+
+## Reuse an audio setup
+
+Use **Audio MP3** or **Audio FLAC (Lossless)** in the Presets tab, or save a custom preset after configuring the output. See [presets](/docs/presets) and [batch conversion](/docs/batch-conversion).
