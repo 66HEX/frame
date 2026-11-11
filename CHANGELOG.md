@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Windows Console Windows:** Prevents an extra console when opening Frame and when running media tools or the update helper. Resolves [#237](https://github.com/66HEX/frame/issues/237).
+- **Linux Window Frame:** Removes the application-drawn outer shadow, rounded frame and surrounding margin while retaining Frame's titlebar and window controls. Tiled windows use the full available area. Resolves [#64](https://github.com/66HEX/frame/issues/64).
 - **Keyboard Focus and Menus:** Keeps focus with the selected tab, reveals focused controls in long panels, and restores focus after dialogs and queue changes. Dropdowns and color pickers stay within the window and retain keyboard access after pointer interaction. Source information and update release notes can be scrolled with the keyboard.
 - **Toolbar Window Dragging:** Prevents toolbar buttons and tabs from dragging the window on macOS and Linux. Empty titlebar space remains draggable, and macOS retains its configured double-click action. Resolves [#175](https://github.com/66HEX/frame/issues/175).
 - **Preview Responsiveness:** Keeps playback and scrubbing responsive while settings change and prevents outdated seek or source-change results from replacing the current preview. Paused previews no longer keep polling for frames.
