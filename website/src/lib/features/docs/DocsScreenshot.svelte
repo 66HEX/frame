@@ -12,12 +12,13 @@
 	let trigger = $state<HTMLButtonElement | null>(null);
 	let viewport = $state<HTMLDivElement | null>(null);
 	let overlay = $state<HTMLElement | null>(null);
-	let backdropOpacity = $state(0);
+	let content = $state<HTMLElement | null>(null);
+	let dialogOpacity = $state(0);
 	let requestedOpen = false;
 	let operation = 0;
 	let floatingImage: HTMLImageElement | null = null;
 	let animation: Animation | null = null;
-	let backdropAnimation: Animation | null = null;
+	let fadeAnimations: Animation[] = [];
 	const sources = $derived({
 		light: `/media/docs/${scene}-light.webp`,
 		dark: `/media/docs/${scene}-dark.webp`
@@ -29,11 +30,15 @@
 		);
 	}
 
-	function removeAnimation() {
+	function cancelAnimations() {
 		animation?.cancel();
 		animation = null;
-		backdropAnimation?.cancel();
-		backdropAnimation = null;
+		for (const fade of fadeAnimations) fade.cancel();
+		fadeAnimations = [];
+	}
+
+	function removeAnimation() {
+		cancelAnimations();
 		floatingImage?.remove();
 		floatingImage = null;
 	}
@@ -42,7 +47,7 @@
 		operation += 1;
 		removeAnimation();
 		moving = false;
-		backdropOpacity = requestedOpen ? 1 : 0;
+		dialogOpacity = requestedOpen ? 1 : 0;
 		open = requestedOpen;
 	}
 
@@ -58,7 +63,7 @@
 		// opening returns smoothly from that point instead of jumping to full size.
 		const interruptedRect = floatingImage?.getBoundingClientRect();
 		const fromOpacity = overlay ? Number(getComputedStyle(overlay).opacity) : 0;
-		// Freeze both visible layers before cancelling their animations. Decoding
+		// Freeze the visible layers before cancelling their animations. Decoding
 		// or the next Svelte render must not reveal the previous destination.
 		if (floatingImage && interruptedRect) {
 			Object.assign(floatingImage.style, {
@@ -68,11 +73,9 @@
 			});
 		}
 		if (overlay) overlay.style.opacity = `${fromOpacity}`;
-		backdropOpacity = fromOpacity;
-		animation?.cancel();
-		animation = null;
-		backdropAnimation?.cancel();
-		backdropAnimation = null;
+		if (content) content.style.opacity = `${fromOpacity}`;
+		dialogOpacity = fromOpacity;
+		cancelAnimations();
 
 		if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
 			settleImmediately();
@@ -143,10 +146,11 @@
 				],
 				timing
 			);
-			backdropAnimation = overlay?.animate(
-				[{ opacity: fromOpacity }, { opacity: nextOpen ? 1 : 0 }], timing
-			) ?? null;
-			await Promise.all([animation.finished, backdropAnimation?.finished]);
+			const fade = [{ opacity: fromOpacity }, { opacity: nextOpen ? 1 : 0 }];
+			for (const layer of [overlay, content]) {
+				if (layer) fadeAnimations.push(layer.animate(fade, timing));
+			}
+			await Promise.all([animation.finished, ...fadeAnimations.map((fade) => fade.finished)]);
 		} catch {
 			// Cancellation is expected when Escape, another request, or a resize
 			// interrupts the movement. The latest operation owns the image layer.
@@ -155,7 +159,7 @@
 
 		open = nextOpen;
 		moving = false;
-		backdropOpacity = nextOpen ? 1 : 0;
+		dialogOpacity = nextOpen ? 1 : 0;
 		await tick();
 		if (currentOperation !== operation) return;
 		removeAnimation();
@@ -192,20 +196,21 @@
 						aria-label={`View full size: ${caption}`}
 						class="group relative block w-full cursor-zoom-in overflow-hidden rounded-lg bg-card text-start shadow-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
 					>
-						<img src={sources.light} {alt} width="2400" height="1600" loading="lazy" decoding="async" class="block h-auto w-full dark:hidden" style:opacity={moving ? 0 : 1} />
-						<img src={sources.dark} {alt} width="2400" height="1600" loading="lazy" decoding="async" class="hidden h-auto w-full dark:block" style:opacity={moving ? 0 : 1} />
+						<img src={sources.light} {alt} width="2400" height="1600" loading="lazy" decoding="async" class="block h-auto w-full transition-none dark:hidden" class:invisible={open || moving} />
+						<img src={sources.dark} {alt} width="2400" height="1600" loading="lazy" decoding="async" class="hidden h-auto w-full transition-none dark:block" class:invisible={open || moving} />
 					</button>
 				{/snippet}
 			</Dialog.Trigger>
 		</Card.Root>
 
 		<Dialog.Portal>
-			<Dialog.Overlay bind:ref={overlay} style={`opacity: ${backdropOpacity}`} onclick={() => changeOpen(false)} class="bg-black/80 supports-backdrop-filter:backdrop-blur-none data-open:animate-none data-closed:animate-none" />
+			<Dialog.Overlay bind:ref={overlay} style={`opacity: ${dialogOpacity}`} onclick={() => changeOpen(false)} class="bg-black/80 supports-backdrop-filter:backdrop-blur-none data-open:animate-none data-closed:animate-none" />
 			<DialogPrimitive.Content
+				bind:ref={content}
 				data-screenshot-dialog={scene}
 				data-moving={moving}
 				class="pointer-events-none! fixed inset-0 z-[100] grid place-items-center bg-transparent px-3 pt-[var(--screenshot-top)] pb-3 outline-none"
-				style="--screenshot-top: max(4.5rem, calc(env(safe-area-inset-top) + 3.5rem))"
+				style={`--screenshot-top: max(4.5rem, calc(env(safe-area-inset-top) + 3.5rem)); opacity: ${dialogOpacity}`}
 			>
 				<Dialog.Title class="sr-only">{caption}</Dialog.Title>
 				<Dialog.Description class="sr-only">{alt} Press Escape or click outside the image to close.</Dialog.Description>
