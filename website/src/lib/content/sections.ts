@@ -197,22 +197,27 @@ function decodeHtmlEntities(value: string) {
 }
 
 function normalizeHeadingText(rawText: string) {
-	return decodeHtmlEntities(
-		rawText
-			.replace(/\s+#+\s*$/g, '')
-			.replace(/\\([\\`*_[\]{}()#+.!|-])/g, '$1')
-			.replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
-			.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-			.replace(/`([^`]*)`/g, '$1')
-			.replace(/<[^>]+>/g, '')
-			.replace(/\{([^{}]*)\}/g, '$1')
-			.replace(/[*_~]/g, '')
-			.replace(/\s+/g, ' ')
-			.trim()
-	);
+	let text = rawText
+		.replace(/\s+#+\s*$/g, '')
+		.replace(/\\([\\`*_[\]{}()#+.!|-])/g, '$1')
+		.replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+		.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+		.replace(/`([^`]*)`/g, '$1')
+		.replace(/\{([^{}]*)\}/g, '$1')
+		.replace(/[*_~]/g, '');
+	let previous: string;
+	do {
+		previous = text;
+		// Removing an inner tag can expose another tag in malformed markup.
+		text = text.replace(/<[^<>]+>/g, '');
+	} while (text !== previous);
+
+	// These labels are plain text rendered with Svelte's escaping, not HTML.
+	// Decode last so literal encoded angle brackets remain visible in headings.
+	return decodeHtmlEntities(text.replace(/\s+/g, ' ').trim());
 }
 
-function extractTocHeadings(source: string, selector: string): ContentTocHeading[] {
+export function extractTocHeadings(source: string, selector: string): ContentTocHeading[] {
 	const levels = extractHeadingLevels(selector);
 	const slugger = new GithubSlugger();
 	const headings: ContentTocHeading[] = [];

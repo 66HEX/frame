@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { getDocsDocument, getNavigationGroups } from './docs';
 import {
   contentSections,
+  extractTocHeadings,
   getContentSectionHref,
   getContentSectionManifest,
   getContentSectionMetadata,
@@ -77,5 +78,31 @@ describe('Frame documentation migration', () => {
     expect(getContentSectionRawSource('docs', 'not-a-real-guide')).toBeNull();
     await expect(getContentSectionModule('docs', 'not-a-real-guide')).resolves.toBeNull();
     await expect(getContentSectionModule('playground', '')).resolves.toBeNull();
+  });
+});
+
+describe('documentation heading text', () => {
+  it('removes reconstructed tags without leaving tag fragments in labels', () => {
+    const headings = extractTocHeadings(
+      '## Read <scr<script>ipt>example</scr</script>ipt> safely',
+      'h2'
+    );
+    expect(headings).toEqual([{ id: 'read-example-safely', text: 'Read example safely', level: 2 }]);
+  });
+
+  it('preserves adjacent formatted words and duplicate heading anchors', () => {
+    const source = [
+      '## **Video** <em>con</em>version and [audio](/docs/audio)',
+      '## **Video** <em>con</em>version and [audio](/docs/audio)'
+    ].join('\n');
+    expect(extractTocHeadings(source, 'h2')).toEqual([
+      { id: 'video-conversion-and-audio', text: 'Video conversion and audio', level: 2 },
+      { id: 'video-conversion-and-audio-1', text: 'Video conversion and audio', level: 2 }
+    ]);
+  });
+
+  it('preserves encoded angle brackets as plain text', () => {
+    const [heading] = extractTocHeadings('## Literal &lt;script&gt; and &#60;video&#62;', 'h2');
+    expect(heading.text).toBe('Literal <script> and <video>');
   });
 });
