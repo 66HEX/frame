@@ -16,6 +16,7 @@ use crate::codec::{
 use crate::container::{
     TransportStreamProfile, is_transport_stream_container, transport_stream_profile,
 };
+use crate::dimensions::output_dimensions;
 use crate::error::ConversionError;
 use crate::filters::{
     FrameRateEofAction, VisualFilterContext, VisualFilterProfile, build_audio_filters,
@@ -782,6 +783,20 @@ pub fn build_ffmpeg_args_with_gif_policy(
         args.push("1".to_string());
     } else {
         add_video_codec_args(&mut args, config);
+        // Stock x265 builds can crash with automatic SIMD on narrow frames.
+        // SSE2 passed all Frame presets with stock FFmpeg 8.1.2 and 9.0.2:
+        // https://github.com/66HEX/frame/actions/runs/43091762760
+        // Use the final padded raster so wider exports retain automatic SIMD.
+        if cfg!(all(
+            target_arch = "x86_64",
+            any(target_os = "linux", target_os = "windows")
+        )) && config.video_codec == "libx265"
+            && let Some((width, height)) = filter_context.source_dimensions
+            && output_dimensions(config, width, height, probe.pixel_format.as_deref())
+                .is_some_and(|(width, _)| width < 64)
+        {
+            args.extend(["-x265-params".to_string(), "asm=sse2".to_string()]);
+        }
         if has_custom_pixel_format(config) {
             args.push("-pix_fmt".to_string());
             args.push(config.pixel_format.trim().to_string());
@@ -2842,17 +2857,65 @@ mod tests {
     }
 
     #[test]
+    fn x265_sse2_uses_the_final_padded_width() {
+        let supported_platform = cfg!(all(
+            target_arch = "x86_64",
+            any(target_os = "linux", target_os = "windows")
+        ));
+        for (width, height, rotation, crop_width, canvas_width, narrow) in [
+            (62, 96, "0", None, None, true),
+            (63, 96, "0", None, None, false),
+            (96, 48, "90", None, None, true),
+            (128, 96, "0", Some(48.0), None, true),
+            (48, 96, "0", None, Some("64"), false),
+            (128, 96, "0", None, Some("48"), true),
+        ] {
+            let mut config = sample_config("mkv", "libx265");
+            config.rotation = rotation.into();
+            if let Some(width) = crop_width {
+                config.crop = Some(crate::types::CropConfig {
+                    enabled: true,
+                    width,
+                    height: 48.0,
+                    ..crate::types::CropConfig::default()
+                });
+            }
+            if let Some(width) = canvas_width {
+                config.resolution = "custom".into();
+                config.custom_width = Some(width.into());
+                config.custom_height = Some("96".into());
+            }
+            let probe = ProbeMetadata {
+                width: Some(width),
+                height: Some(height),
+                ..sample_probe()
+            };
+            let args = build_ffmpeg_args("input.mp4", "output.mkv", &config, &probe).unwrap();
+            assert_eq!(
+                args_contains_pair(&args, "-x265-params", "asm=sse2"),
+                supported_platform && narrow,
+                "{width}x{height}, rotation {rotation}, crop {crop_width:?}, canvas {canvas_width:?}"
+            );
+        }
+    }
+
+    #[test]
     fn stream_copy_does_not_add_libx265_frame_copy() {
         let mut config = sample_config("mkv", "libx265");
         config.processing_mode = "copy".into();
-        let args = build_ffmpeg_args("input.mp4", "output.mkv", &config, &sample_probe())
+        let probe = ProbeMetadata {
+            width: Some(48),
+            height: Some(32),
+            ..sample_probe()
+        };
+        let args = build_ffmpeg_args("input.mp4", "output.mkv", &config, &probe)
             .expect("stream-copy arguments should build");
 
         assert!(args_contains_pair(&args, "-c", "copy"));
         assert!(
             !args
                 .iter()
-                .any(|arg| matches!(arg.as_str(), "-vf" | "-filter_complex"))
+                .any(|arg| matches!(arg.as_str(), "-vf" | "-filter_complex" | "-x265-params"))
         );
     }
 
