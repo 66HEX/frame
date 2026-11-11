@@ -19,6 +19,7 @@ use syn::{
 };
 
 const CI_WORKFLOW_PATH: &str = ".github/workflows/ci.yml";
+const WEBSITE_WORKFLOW_PATH: &str = ".github/workflows/website.yml";
 const DEPENDENCY_REVIEW_WORKFLOW_PATH: &str = ".github/workflows/dependency-review.yml";
 const CODEQL_WORKFLOW_PATH: &str = ".github/workflows/codeql.yml";
 const RUN_BUNDLING_WORKFLOW_PATH: &str = ".github/workflows/run_bundling.yml";
@@ -55,6 +56,10 @@ const ACTION_DEPENDENCY_REVIEW_SHA: &str = "a1d282b36b6f3519aa1f3fc636f609c47ddd
 const ACTION_CODEQL_SHA: &str = "24c54180a607b1449ed407dd24f251e4e9147c8d";
 const ACTION_ATTEST_BUILD_PROVENANCE_SHA: &str = "4d101475d8b20a2381f78447822ac1eab6504dd8";
 const ACTION_INSTALL_NIX_SHA: &str = "75c75c31ebece974e48ebc36b4ad125bd97bd97b";
+const ACTION_SETUP_NODE_SHA: &str = "949feb2413d6458794dcd2491c4babbbce0c15c1";
+
+#[cfg(test)]
+mod monorepo_tests;
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -590,17 +595,7 @@ fn flathub_sources(args: &[String]) -> Result<()> {
         }
     }
 
-    run_command_path(
-        "git",
-        &[
-            "archive".to_string(),
-            "--format=tar.gz".to_string(),
-            format!("--prefix=frame-{}/", options.version),
-            "-o".to_string(),
-            path_to_string_lossy(&source_archive),
-            "HEAD".to_string(),
-        ],
-    )?;
+    archive_flathub_source(&root, &source_archive, &options.version)?;
     let vendor_config = run_command_capture(
         "cargo",
         &[
@@ -647,6 +642,26 @@ fn flathub_sources(args: &[String]) -> Result<()> {
     println!("Wrote {}", vendor_archive.display());
     println!("Wrote {}", checksums_path.display());
     Ok(())
+}
+
+fn archive_flathub_source(root: &Path, archive: &Path, version: &str) -> Result<()> {
+    // The native source distribution does not need website assets. Keep normal
+    // repository archives complete by applying the exclusion only here.
+    run_command_path_in(
+        root,
+        "git",
+        &[
+            "archive".to_string(),
+            "--format=tar.gz".to_string(),
+            format!("--prefix=frame-{version}/"),
+            "-o".to_string(),
+            path_to_string_lossy(archive),
+            "HEAD".to_string(),
+            "--".to_string(),
+            ".".to_string(),
+            ":(top,exclude)website".to_string(),
+        ],
+    )
 }
 
 fn flathub_manifest(args: &[String]) -> Result<()> {
@@ -1650,6 +1665,7 @@ fn check_workflows() -> Result<()> {
 fn generated_workflows() -> Vec<(&'static str, String)> {
     vec![
         (CI_WORKFLOW_PATH, ci_workflow()),
+        (WEBSITE_WORKFLOW_PATH, website_workflow()),
         (
             DEPENDENCY_REVIEW_WORKFLOW_PATH,
             dependency_review_workflow(),
@@ -1711,6 +1727,10 @@ fn run_command(program: &str, args: &[&str]) -> Result<()> {
 }
 
 fn run_command_path(program: impl AsRef<OsStr>, args: &[String]) -> Result<()> {
+    run_command_path_in(&repo_root()?, program, args)
+}
+
+fn run_command_path_in(root: &Path, program: impl AsRef<OsStr>, args: &[String]) -> Result<()> {
     let program = program.as_ref();
     println!(
         "$ {} {}",
@@ -1722,7 +1742,7 @@ fn run_command_path(program: impl AsRef<OsStr>, args: &[String]) -> Result<()> {
     );
     let status = Command::new(program)
         .args(args)
-        .current_dir(repo_root()?)
+        .current_dir(root)
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
@@ -1874,6 +1894,10 @@ fn pin_workflow_actions(workflow: &mut String) {
         (
             "github/codeql-action/analyze@v4.37.1",
             format!("github/codeql-action/analyze@{ACTION_CODEQL_SHA} # v4.38.3"),
+        ),
+        (
+            "actions/setup-node@v7.1.0",
+            format!("actions/setup-node@{ACTION_SETUP_NODE_SHA} # v7.1.0"),
         ),
     ];
     for (reference, pinned) in action_replacements {
@@ -2031,6 +2055,63 @@ jobs:
     )
 }
 
+fn website_workflow() -> String {
+    render_workflow(
+        r#"# Generated from xtask::workflows::website
+# Rebuild with `cargo xtask workflows`.
+name: website
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+permissions:
+  contents: read
+concurrency:
+  group: website-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  website_checks:
+    name: website checks
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: website
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v7.0.0
+    - name: steps::setup_node
+      uses: actions/setup-node@v7.1.0
+      with:
+        node-version-file: website/.nvmrc
+        package-manager-cache: false
+    - name: steps::setup_pnpm
+      run: |
+        node --input-type=commonjs -e '
+          const { execFileSync } = require("node:child_process");
+          const { packageManager } = require("./package.json");
+          if (!/^pnpm@\d+\.\d+\.\d+$/.test(packageManager)) {
+            throw new Error("website/package.json must pin an exact pnpm version");
+          }
+          execFileSync("npm", ["install", "--global", packageManager], { stdio: "inherit" });
+        '
+    - name: website::install
+      run: pnpm install --frozen-lockfile
+    - name: website::check
+      run: pnpm check
+    - name: website::test
+      run: pnpm test
+    - name: website::build
+      run: pnpm build
+    - name: website::verify_worker_bundle
+      run: pnpm exec wrangler deploy --dry-run --outdir .wrangler/dry-run
+    timeout-minutes: 20
+"#,
+    )
+}
+
 fn dependency_review_workflow() -> String {
     render_workflow(
         r"# Generated from xtask::workflows::dependency_review
@@ -2093,6 +2174,26 @@ jobs:
       with:
         category: /language:rust
     timeout-minutes: 30
+  analyze_website:
+    name: codeql website
+    runs-on: ubuntu-24.04
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v7.0.0
+    - name: security::initialize_codeql_website
+      uses: github/codeql-action/init@v4.37.1
+      with:
+        languages: javascript-typescript
+        build-mode: none
+        queries: security-extended
+        config: |
+          paths:
+            - website
+    - name: security::analyze_website
+      uses: github/codeql-action/analyze@v4.37.1
+      with:
+        category: /language:javascript-typescript/website
+    timeout-minutes: 20
 ",
     )
 }

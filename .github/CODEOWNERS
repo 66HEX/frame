@@ -1,6 +1,9 @@
 # Default ownership.
 * @66HEX
 
+# Website source and Cloudflare build configuration.
+/website/ @66HEX
+
 # Release and supply-chain trust boundaries.
 /.github/ @66HEX
 /tooling/xtask/ @66HEX

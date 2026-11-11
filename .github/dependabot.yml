@@ -27,6 +27,21 @@ updates:
     commit-message:
       prefix: "deps(cargo)"
 
+  - package-ecosystem: npm
+    directory: /website
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:15"
+      timezone: Europe/Warsaw
+    open-pull-requests-limit: 10
+    groups:
+      website-patch-updates:
+        update-types:
+          - patch
+    commit-message:
+      prefix: "deps(website)"
+
   - package-ecosystem: github-actions
     directory: /
     schedule:

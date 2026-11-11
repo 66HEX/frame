@@ -1,0 +1,53 @@
+# Generated from xtask::workflows::website
+# Rebuild with `cargo xtask workflows`.
+name: website
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+permissions:
+  contents: read
+concurrency:
+  group: website-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  website_checks:
+    name: website checks
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: website
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - name: steps::setup_node
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version-file: website/.nvmrc
+        package-manager-cache: false
+    - name: steps::setup_pnpm
+      run: |
+        node --input-type=commonjs -e '
+          const { execFileSync } = require("node:child_process");
+          const { packageManager } = require("./package.json");
+          if (!/^pnpm@\d+\.\d+\.\d+$/.test(packageManager)) {
+            throw new Error("website/package.json must pin an exact pnpm version");
+          }
+          execFileSync("npm", ["install", "--global", packageManager], { stdio: "inherit" });
+        '
+    - name: website::install
+      run: pnpm install --frozen-lockfile
+    - name: website::check
+      run: pnpm check
+    - name: website::test
+      run: pnpm test
+    - name: website::build
+      run: pnpm build
+    - name: website::verify_worker_bundle
+      run: pnpm exec wrangler deploy --dry-run --outdir .wrangler/dry-run
+    timeout-minutes: 20
