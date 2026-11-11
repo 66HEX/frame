@@ -45,7 +45,7 @@
 				href={`${githubUrl}/releases`}>Release notes</a
 			><a class={linkClass} href={`${githubUrl}/issues`}>Report an issue</a><a
 				class={linkClass}
-				href={`${githubUrl}/blob/main/LICENSE`}>GPLv3 license</a
+				href={`${githubUrl}/blob/master/LICENSE`}>GPLv3 license</a
 			>
 		</nav>
 	</Container>
