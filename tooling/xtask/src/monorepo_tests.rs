@@ -3,7 +3,7 @@ use std::io::Write;
 use super::*;
 
 #[test]
-fn linux_ci_uses_the_official_archive_without_changing_apt_trust_or_suites() {
+fn linux_ci_preserves_apt_trust_and_suites_with_either_archive() {
     let cases = [
         (
             "deb http://azure.archive.ubuntu.com/ubuntu jammy main restricted\n",
@@ -22,13 +22,34 @@ fn linux_ci_uses_the_official_archive_without_changing_apt_trust_or_suites() {
             "Types: deb\nURIs: https://archive.ubuntu.com/ubuntu/\nSuites: jammy jammy-updates jammy-security\nComponents: main universe\nSigned-By: /keys/ubuntu.gpg\n",
         ),
         (
+            "deb https://archive.ubuntu.com/ubuntu/ jammy main\n",
+            "deb https://archive.ubuntu.com/ubuntu/ jammy main\n",
+        ),
+        (
+            "deb http://archive.ubuntu.com/ubuntu jammy main\n",
+            "deb https://archive.ubuntu.com/ubuntu jammy main\n",
+        ),
+        (
             "deb [signed-by=/keys/microsoft.gpg] https://packages.microsoft.com/ubuntu/22.04/prod jammy main\n",
             "deb [signed-by=/keys/microsoft.gpg] https://packages.microsoft.com/ubuntu/22.04/prod jammy main\n",
         ),
     ];
-    for (input, expected) in cases {
-        assert_eq!(rewrite_apt_source(input), expected);
-        assert_eq!(rewrite_apt_source(expected), expected);
+    for primary_dns_resolves in [true, false] {
+        for (input, primary_expected) in cases {
+            let expected = if primary_dns_resolves {
+                primary_expected.to_string()
+            } else {
+                primary_expected.replace(
+                    "https://archive.ubuntu.com/ubuntu",
+                    "https://mirrors.edge.kernel.org/ubuntu",
+                )
+            };
+            assert_eq!(rewrite_apt_source(input, primary_dns_resolves), expected);
+            assert_eq!(
+                rewrite_apt_source(&expected, primary_dns_resolves),
+                expected
+            );
+        }
     }
 
     let workflow = ci_workflow();
@@ -39,15 +60,46 @@ fn linux_ci_uses_the_official_archive_without_changing_apt_trust_or_suites() {
         "--allow-unauthenticated",
         "trusted=yes",
         "Verify-Peer=false",
+        "--allow-insecure-repositories",
+        "Check-Valid-Until=false",
     ] {
         assert!(!workflow.contains(forbidden));
     }
 }
 
-fn rewrite_apt_source(input: &str) -> String {
-    let mut child = Command::new("sed")
-        .arg("-E")
-        .arg(UBUNTU_ARCHIVE_SUBSTITUTIONS)
+#[test]
+fn ubuntu_archive_falls_back_only_when_the_primary_dns_lookup_fails() {
+    for (resolves, expected) in [
+        (true, "https://archive.ubuntu.com/ubuntu"),
+        (false, "https://mirrors.edge.kernel.org/ubuntu"),
+    ] {
+        let script = format!(
+            "{}\nprintf '%s' \"$ubuntu_archive\"",
+            mock_ubuntu_archive_selection(resolves)
+        );
+        let output = Command::new("bash")
+            .args(["-e", "-c", &script])
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{output:?}");
+        assert_eq!(String::from_utf8(output.stdout).unwrap(), expected);
+    }
+}
+
+fn mock_ubuntu_archive_selection(primary_dns_resolves: bool) -> String {
+    let status = if primary_dns_resolves { 0 } else { 2 };
+    format!(
+        "getent() {{ test \"$*\" = 'ahosts archive.ubuntu.com' || exit 3; return {status}; }}\n{UBUNTU_ARCHIVE_SELECTION}"
+    )
+}
+
+fn rewrite_apt_source(input: &str, primary_dns_resolves: bool) -> String {
+    let script = format!(
+        "{}\nsed -E \"{UBUNTU_ARCHIVE_SUBSTITUTIONS}\"",
+        mock_ubuntu_archive_selection(primary_dns_resolves)
+    );
+    let mut child = Command::new("bash")
+        .args(["-e", "-c", &script])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

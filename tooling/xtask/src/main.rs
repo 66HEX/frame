@@ -57,9 +57,13 @@ const ACTION_CODEQL_SHA: &str = "24c54180a607b1449ed407dd24f251e4e9147c8d";
 const ACTION_ATTEST_BUILD_PROVENANCE_SHA: &str = "4d101475d8b20a2381f78447822ac1eab6504dd8";
 const ACTION_INSTALL_NIX_SHA: &str = "75c75c31ebece974e48ebc36b4ad125bd97bd97b";
 const ACTION_SETUP_NODE_SHA: &str = "949feb2413d6458794dcd2491c4babbbce0c15c1";
+const UBUNTU_ARCHIVE_SELECTION: &str = r"        ubuntu_archive='https://archive.ubuntu.com/ubuntu'
+        if ! getent ahosts archive.ubuntu.com >/dev/null; then
+          ubuntu_archive='https://mirrors.edge.kernel.org/ubuntu'
+        fi";
 const UBUNTU_ARCHIVE_SUBSTITUTIONS: &str = concat!(
-    r"s|mirror\+file:/etc/apt/apt-mirrors\.txt|https://archive.ubuntu.com/ubuntu/|g;",
-    r"s|https?://azure\.archive\.ubuntu\.com/ubuntu|https://archive.ubuntu.com/ubuntu|g"
+    r"s|mirror\+file:/etc/apt/apt-mirrors\.txt|${ubuntu_archive}/|g;",
+    r"s|https?://(azure\.)?archive\.ubuntu\.com/ubuntu|${ubuntu_archive}|g"
 );
 
 #[cfg(test)]
@@ -1958,12 +1962,15 @@ fn disable_checkout_credentials(workflow: &str) -> String {
 
 fn linux_ci_setup_step() -> String {
     // GitHub's Ubuntu images use a mirror+file URI in either .list or deb822
-    // sources. Bypass the Azure mirror without changing suites or signing keys.
-    r"    - name: steps::setup_linux
+    // sources. Keep Ubuntu's signing keys when its archive DNS needs a fallback.
+    r#"    - name: steps::setup_linux
       run: |
-        sudo find /etc/apt -maxdepth 2 -type f \( -name '*.list' -o -name '*.sources' \) -exec sed -E -i '__UBUNTU_ARCHIVE_SUBSTITUTIONS__' {} +
+__UBUNTU_ARCHIVE_SELECTION__
+        echo "Using Ubuntu archive: $ubuntu_archive"
+        sudo find /etc/apt -maxdepth 2 -type f \( -name '*.list' -o -name '*.sources' \) -exec sed -E -i "__UBUNTU_ARCHIVE_SUBSTITUTIONS__" {} +
         sudo apt-get update
-        sudo apt-get install -y clang desktop-file-utils libasound2-dev libdrm-dev libfontconfig1-dev libfreetype6-dev libx11-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev pkg-config"
+        sudo apt-get install -y clang desktop-file-utils libasound2-dev libdrm-dev libfontconfig1-dev libfreetype6-dev libx11-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev pkg-config"#
+        .replace("__UBUNTU_ARCHIVE_SELECTION__", UBUNTU_ARCHIVE_SELECTION)
         .replace("__UBUNTU_ARCHIVE_SUBSTITUTIONS__", UBUNTU_ARCHIVE_SUBSTITUTIONS)
 }
 
