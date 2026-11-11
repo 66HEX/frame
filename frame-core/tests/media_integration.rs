@@ -611,23 +611,37 @@ fn h264_mp4_reencode_should_write_h264_video_and_aac_audio() -> TestResult {
 #[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 fn hevc_mkv_reencode_should_write_hevc_video() -> TestResult {
+    assert_hevc_mkv_reencode(false)
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn hevc_mkv_vflip_reencode_should_write_hevc_video() -> TestResult {
+    assert_hevc_mkv_reencode(true)
+}
+
+fn assert_hevc_mkv_reencode(flip_vertical: bool) -> TestResult {
     let tools = Toolchain::discover()?;
     let sandbox = Sandbox::new("hevc_mkv_reencode")?;
     let input = sandbox.path("source.mp4");
 
-    generate_h264_aac_source(&tools, &input, 0.5, 48, 32)?;
-    for flip_vertical in [false, true] {
-        let output = sandbox.path(&format!("output-vflip-{flip_vertical}.mkv"));
-        let mut config = video_config("mkv", "libx265", "aac");
-        config.flip_vertical = flip_vertical;
-        convert(&tools, &input, &output, &config)?;
-
-        let metadata = probe_media(&tools, &output)?;
-        assert_eq!(metadata.video_codec.as_deref(), Some("hevc"));
-        assert_eq!(metadata.width, Some(48));
-        assert_eq!(metadata.height, Some(32));
-        decode_media(&tools, &output)?;
+    // Runtime comparisons must use identical bytes, independent of the muxer version.
+    if let Some(source) = env::var_os("FRAME_TEST_HEVC_SOURCE") {
+        fs::copy(&source, &input)
+            .map_err(|error| format!("failed to copy HEVC comparison source: {error}"))?;
+    } else {
+        generate_h264_aac_source(&tools, &input, 0.5, 48, 32)?;
     }
+    let output = sandbox.path(&format!("output-vflip-{flip_vertical}.mkv"));
+    let mut config = video_config("mkv", "libx265", "aac");
+    config.flip_vertical = flip_vertical;
+    convert(&tools, &input, &output, &config)?;
+
+    let metadata = probe_media(&tools, &output)?;
+    assert_eq!(metadata.video_codec.as_deref(), Some("hevc"));
+    assert_eq!(metadata.width, Some(48));
+    assert_eq!(metadata.height, Some(32));
+    decode_media(&tools, &output)?;
     Ok(())
 }
 
@@ -3799,10 +3813,22 @@ fn run_tool(tool: &Path, args: &[String]) -> TestResult {
 }
 
 fn run_tool_output(tool: &Path, args: &[String]) -> Result<Vec<u8>, String> {
+    let trace = env::var_os("FRAME_TEST_TRACE_TOOLS").is_some();
+    if trace {
+        eprintln!("media-test tool: {}; arguments: {args:?}", tool.display());
+    }
     let output = Command::new(tool)
         .args(args)
         .output()
         .map_err(|error| format!("failed to run {}: {error}", command_label(tool, args)))?;
+    if trace {
+        eprintln!(
+            "media-test status: {}\nstdout:\n{}\nstderr:\n{}",
+            output.status,
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
     if output.status.success() {
         return Ok(output.stdout);
     }

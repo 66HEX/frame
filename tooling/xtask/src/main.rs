@@ -19,6 +19,7 @@ use syn::{
 };
 
 const CI_WORKFLOW_PATH: &str = ".github/workflows/ci.yml";
+const HEVC_COMPARISON_WORKFLOW_PATH: &str = ".github/workflows/hevc-runtime-comparison.yml";
 const WEBSITE_WORKFLOW_PATH: &str = ".github/workflows/website.yml";
 const DEPENDENCY_REVIEW_WORKFLOW_PATH: &str = ".github/workflows/dependency-review.yml";
 const CODEQL_WORKFLOW_PATH: &str = ".github/workflows/codeql.yml";
@@ -1673,6 +1674,7 @@ fn check_workflows() -> Result<()> {
 fn generated_workflows() -> Vec<(&'static str, String)> {
     vec![
         (CI_WORKFLOW_PATH, ci_workflow()),
+        (HEVC_COMPARISON_WORKFLOW_PATH, hevc_comparison_workflow()),
         (WEBSITE_WORKFLOW_PATH, website_workflow()),
         (
             DEPENDENCY_REVIEW_WORKFLOW_PATH,
@@ -2080,6 +2082,62 @@ const fn ci_media_test_steps() -> &'static str {
       run: cargo xtask setup-ffmpeg
     - name: ci::test_media_conversions
       run: cargo test --locked -p frame-core --test media_integration -- --ignored --test-threads=1"
+}
+
+fn hevc_comparison_workflow() -> String {
+    render_workflow(
+        &r"# Generated from xtask::workflows::hevc_comparison
+# Rebuild with `cargo xtask workflows`.
+name: hevc runtime comparison
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/hevc-runtime-comparison.yml'
+      - 'script/compare-hevc-runtimes.py'
+      - 'frame-core/tests/fixtures/hevc-runtime-comparison/**'
+      - 'frame-core/tests/media_integration.rs'
+permissions:
+  contents: read
+concurrency:
+  group: hevc-comparison-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  compare:
+    name: HEVC comparison (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-2022, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@v7.0.0
+      with:
+        persist-credentials: false
+    - name: steps::setup_rust
+      run: rustup toolchain install __RUST_VERSION__ --profile minimal --component clippy,rustfmt
+__HEVC_LINUX_SETUP__
+    - name: comparison::run_both_original_packages
+      run: python script/compare-hevc-runtimes.py --repetitions 20
+    - name: comparison::retain_all_results
+      if: always()
+      uses: actions/upload-artifact@v7.0.1
+      with:
+        name: hevc-comparison-${{ matrix.os }}
+        path: target/hevc-runtime-comparison/results
+        if-no-files-found: error
+        retention-days: 30
+    timeout-minutes: 40
+"
+        .replace(
+            "__HEVC_LINUX_SETUP__",
+            &linux_ci_setup_step().replace(
+                "      run: |",
+                "      if: runner.os == 'Linux'\n      run: |",
+            ),
+        ),
+    )
 }
 
 fn website_workflow() -> String {

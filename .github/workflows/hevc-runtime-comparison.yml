@@ -1,0 +1,57 @@
+# Generated from xtask::workflows::hevc_comparison
+# Rebuild with `cargo xtask workflows`.
+name: hevc runtime comparison
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/hevc-runtime-comparison.yml'
+      - 'script/compare-hevc-runtimes.py'
+      - 'frame-core/tests/fixtures/hevc-runtime-comparison/**'
+      - 'frame-core/tests/media_integration.rs'
+permissions:
+  contents: read
+concurrency:
+  group: hevc-comparison-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  compare:
+    name: HEVC comparison (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-2022, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - name: steps::setup_rust
+      shell: bash
+      run: |
+        rustup toolchain install 1.95.0 --profile minimal --component clippy,rustfmt
+        rustup default 1.95.0
+        test "$(rustc --version | awk '{print $2}')" = "1.95.0"
+    - name: steps::setup_linux
+      if: runner.os == 'Linux'
+      run: |
+        ubuntu_archive='https://archive.ubuntu.com/ubuntu'
+        if ! getent ahosts archive.ubuntu.com >/dev/null; then
+          ubuntu_archive='https://mirrors.edge.kernel.org/ubuntu'
+        fi
+        echo "Using Ubuntu archive: $ubuntu_archive"
+        sudo find /etc/apt -maxdepth 2 -type f \( -name '*.list' -o -name '*.sources' \) -exec sed -E -i "s|mirror\+file:/etc/apt/apt-mirrors\.txt|${ubuntu_archive}/|g;s|https?://(azure\.)?archive\.ubuntu\.com/ubuntu|${ubuntu_archive}|g" {} +
+        sudo apt-get update
+        sudo apt-get install -y clang desktop-file-utils libasound2-dev libdrm-dev libfontconfig1-dev libfreetype6-dev libx11-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev pkg-config
+    - name: comparison::run_both_original_packages
+      run: python script/compare-hevc-runtimes.py --repetitions 20
+    - name: comparison::retain_all_results
+      if: always()
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: hevc-comparison-${{ matrix.os }}
+        path: target/hevc-runtime-comparison/results
+        if-no-files-found: error
+        retention-days: 30
+    timeout-minutes: 40
