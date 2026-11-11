@@ -1,4 +1,4 @@
-name: x265 parameter measurement
+name: x265 Frame integration
 on:
   push:
     branches:
@@ -20,13 +20,25 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Verify SSE2 across Frame presets
-        run: python script/measure-x265.py --check-presets
+      - name: Install the Frame Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal
+          rustup default 1.95.0
+      - name: Install font dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfontconfig1-dev libfreetype6-dev pkg-config
+      - name: Check Frame argument generation
+        run: 'cargo test --locked -p frame-core --lib args::tests::'
+      - name: Run Frame HEVC tests on both original packages
+        run: python script/compare-hevc-runtimes.py --output target/x265-measurement --repetitions 20
       - name: Retain per-trial results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: x265-parameters-${{ matrix.os }}
+          name: x265-frame-integration-${{ matrix.os }}
           path: target/x265-measurement/results
           if-no-files-found: error
           retention-days: 30
