@@ -1,0 +1,64 @@
+---
+title: Installation
+description: Install Frame on macOS, Windows, or Linux and keep it up to date.
+order: 10
+---
+
+Download the current release from [Frame on GitHub](https://github.com/66HEX/frame/releases/latest). Choose the package for your operating system and processor. Release packages include the media tools they need; the Flatpak uses the Freedesktop runtime.
+
+## macOS
+
+Use the Apple Silicon package for an M-series Mac, or the Intel package for an Intel Mac. Open the DMG and move Frame to Applications.
+
+You can also install through the Frame Homebrew tap:
+
+```bash
+brew tap 66HEX/frame
+brew install --cask frame
+```
+
+The current macOS release is ad-hoc signed and is not notarized. If macOS blocks a copy downloaded from the official release page, the repository documents this command after installation:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Frame.app
+```
+
+Only use it for the official Frame download you intended to install.
+
+## Windows
+
+Download the Windows installer from the release page and run it. Frame is also available through WinGet:
+
+```bash
+winget install --id 66HEX.Frame -e
+```
+
+Current Windows builds are not certificate signed. SmartScreen may show a warning. For the official installer, select **More info**, then **Run anyway**.
+
+## Linux
+
+Install from Flathub:
+
+```bash
+flatpak install flathub io.github._66HEX.Frame
+```
+
+AppImage downloads are also available on the GitHub release page. Choose x86_64 for a typical Intel or AMD computer, or aarch64 for an ARM64 computer, then allow the downloaded file to run as an executable in your file manager.
+
+## Updates
+
+Native release builds include an updater. Frame verifies the release manifest signature and the downloaded package before installation. If you installed through a package manager, you can update through that same package manager:
+
+```bash
+brew upgrade --cask frame
+```
+
+```bash
+winget upgrade --id 66HEX.Frame -e
+```
+
+```bash
+flatpak update io.github._66HEX.Frame
+```
+
+After installation, continue with [your first conversion](/docs/getting-started).

@@ -1,0 +1,53 @@
+---
+title: Preview and trim
+description: Check the selected source, set a time range, and adjust the picture before export.
+order: 30
+---
+
+<script>
+  import DocsScreenshot from '$lib/features/docs/DocsScreenshot.svelte';
+</script>
+
+Select a video or image in the queue to display it in the preview. The preview helps you inspect the source and the effect of supported edits before running a conversion.
+
+## Play and seek
+
+Move the pointer over the preview, or focus its controls, to reveal the playback controls. Use the play button or **Space** to toggle playback when the preview has focus.
+
+Use the timeline to move to another position. You can inspect a moment in the clip before changing a crop, overlay, or output setting.
+
+## Set a trim range
+
+Select the time display to open the trim popover. Set the start and end times for the section you want to export. Check the range in the preview before starting the conversion.
+
+Press **Escape** to close the popover and return focus to its trigger. While a time field is being edited, the first Escape cancels that edit.
+
+<DocsScreenshot
+  scene="trim-preview"
+  alt="Frame video preview with the trim popover open, showing Start and End time fields."
+  caption="Open the time display to edit the start and end of the trim range."
+/>
+
+## Crop and transform
+
+Use the preview's crop controls to choose the visible area. Frame also supports rotation and horizontal or vertical flipping. Pan and zoom help you inspect the preview.
+
+Output dimensions and scaling are separate from moving around the preview. Review the output resolution in the inspector if your goal is to change the exported dimensions.
+
+<DocsScreenshot
+  scene="crop-preview"
+  alt="Frame preview with crop controls visible over the selected media."
+  caption="Adjust the crop in the preview before checking the output dimensions."
+/>
+
+## Add an overlay
+
+Frame can place an image overlay over a video. Use the overlay controls to position it and review the composition. Crop and overlay editing modes hide the playback controls while you work on the picture.
+
+## Verify the export
+
+Preview responsiveness depends on the source and processing settings. High-resolution clips, difficult codecs, and filters can require more work to display.
+
+The encoded output is the final check for file size, playback compatibility, and quality. Convert a short representative range before running a long batch with a new configuration.
+
+If the preview is unavailable, check [troubleshooting](/docs/troubleshooting). A preview problem and a failed export can have different causes; consult the conversion log for the export itself.

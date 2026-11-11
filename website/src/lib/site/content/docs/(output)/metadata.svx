@@ -1,0 +1,53 @@
+---
+title: Metadata
+description: Inspect a source and decide which metadata the export should retain.
+order: 50
+---
+
+<script>
+  import DocsScreenshot from '$lib/features/docs/DocsScreenshot.svelte';
+</script>
+
+Frame separates source inspection from output metadata settings. The **Metadata** inspector tab describes the input. The **Metadata** section inside **Output** controls what is written to the exported file.
+
+## Inspect the source
+
+Select a queue entry and open the Metadata tab. Frame reads source information with FFprobe, including the detected media streams and their properties.
+
+Use this view to check the actual codec, dimensions, frame rate, and audio or subtitle streams before choosing an output. The filename alone does not identify those details.
+
+<DocsScreenshot
+  scene="source-metadata"
+  alt="Frame Metadata inspector showing the selected source’s media information."
+  caption="The Metadata tab describes the source file."
+/>
+
+## Preserve metadata
+
+Preserving metadata keeps supported source fields in the output. Which fields survive also depends on the selected container and FFmpeg's support for it.
+
+Inspect the exported file when a specific field matters to your workflow. Different players can display the same metadata differently.
+
+## Clean metadata
+
+Choose the metadata-cleaning option when you do not want to carry source metadata into the output. This is useful when preparing files for sharing.
+
+Metadata cleaning does not remove information visible or audible in the media itself. Check the content as well as the exported file's fields before distributing sensitive material.
+
+## Replace fields
+
+You can replace supported generic metadata fields with values appropriate for the output. Apply the change to the selected file and verify the exported metadata after conversion.
+
+When applying settings across a batch, review fields that should differ between files, such as their titles.
+
+<DocsScreenshot
+  scene="output-metadata"
+  alt="Frame Output inspector open to metadata settings for the exported file."
+  caption="Output metadata settings determine what is written to the exported file."
+/>
+
+## Transport-stream service metadata
+
+For MPEG-TS and M2TS workflows, Frame reads program information through FFprobe and supports service name and provider metadata. These fields describe a transport-stream program rather than a conventional music or video tag.
+
+Check the resulting program information in the playback or broadcast tool that will consume the file.

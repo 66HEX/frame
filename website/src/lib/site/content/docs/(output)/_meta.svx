@@ -1,0 +1,5 @@
+---
+group:
+  label: Output settings
+  order: 200
+---

@@ -1,0 +1,31 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "frame-landing-page",
+	"compatibility_date": "2026-07-01",
+	"compatibility_flags": ["nodejs_compat"],
+	"observability": {
+		"enabled": true
+	},
+	"main": ".svelte-kit/cloudflare/_worker.js",
+	"assets": {
+		"binding": "ASSETS",
+		"directory": ".svelte-kit/cloudflare"
+	},
+	"routes": [
+		{
+			"pattern": "framegui.app/*",
+			"zone_name": "framegui.app"
+		},
+		{
+			"pattern": "www.framegui.app/*",
+			"zone_name": "framegui.app"
+		}
+	],
+	"rules": [
+		{
+			"type": "Text",
+			"globs": ["**/*.ttf"],
+			"fallthrough": true
+		}
+	]
+}

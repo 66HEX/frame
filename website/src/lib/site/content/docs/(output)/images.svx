@@ -1,0 +1,51 @@
+---
+title: Images and GIFs
+description: Convert still images or create an animated GIF from video.
+order: 30
+---
+
+<script>
+  import DocsScreenshot from '$lib/features/docs/DocsScreenshot.svelte';
+</script>
+
+Frame supports still-image conversion and animated GIF output. Select a source, choose the output format in **General**, then review the relevant image or video controls.
+
+## Still-image formats
+
+Supported image inputs include PNG, JPEG, WebP, BMP, TIFF, AVIF, HEIC, and HEIF. Output formats are PNG, JPEG, WebP, BMP, and TIFF.
+
+AVIF, HEIC, and HEIF are input formats in the current app; they are not output options.
+
+## Choose image settings
+
+The **Images** section changes with the output format:
+
+| Format | Available controls |
+| --- | --- |
+| JPEG | Quality and Huffman mode |
+| WebP | Lossy or lossless mode, quality, compression, and presets |
+| PNG | Compression and prediction |
+| TIFF | Compression selection |
+
+Choose the format for the destination. JPEG is useful for photographs, while PNG is a common choice for graphics that need lossless storage. WebP can be useful when the receiving application supports it.
+
+Use crop, rotation, and flipping where needed. Check output dimensions in the inspector before converting a batch of images.
+
+<DocsScreenshot
+  scene="images-output"
+  alt="Frame with a still image selected and the Images output controls visible."
+  caption="Image encoding options follow the selected output format."
+/>
+
+## Create an animated GIF
+
+Add a video source and choose GIF output, or apply **GIF Web Small** or **GIF High Quality** from Presets. Use the preview to trim the source to the part you want to animate.
+
+GIF controls include frame rate, color count, dithering, and loop count. These settings affect both appearance and size:
+
+- A shorter duration and smaller dimensions usually have the largest effect on size.
+- A lower frame rate reduces the number of frames.
+- Fewer colors can reduce detail in gradients and complex scenes.
+- Dithering can soften color banding, but changes the texture of the image.
+
+Export a short sample and check it in the destination application. If the result is too large, reduce duration or dimensions before making smaller quality adjustments.
