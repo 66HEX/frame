@@ -468,6 +468,6 @@ impl Render for FrameRoot {
 
         self.finish_accessibility_frame(window, cx, Some(&app_root_focus));
 
-        linux_window_frame(root, window, palette)
+        linux_window_frame(root, window, cx)
     }
 }

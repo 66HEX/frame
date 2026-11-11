@@ -1,3 +1,5 @@
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+
 use frame_app::app::{init_app, open_frame_window};
 use frame_app::app_info::FRAME_APP_NAME;
 use frame_app::assets;

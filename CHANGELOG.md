@@ -20,12 +20,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Application Icon:** Updates the desktop icons with the new neutral colors across macOS, Windows and Linux.
 - **Interface:** Refreshes both themes with Inter typography, Nucleo icons and consistent controls. The inspector now has Metadata, Output and Presets tabs, with collapsible sections for output settings.
 - **Empty and Drop Screens:** Centers the no-files screen around Open file and Open folder, and simplifies drag feedback to a full-window drop target.
 - **Preview Controls:** Moves playback and trimming into controls over the preview, simplifies crop and overlay toolbars, and improves resize-handle contrast. Sliders, scrollbars and editing handles have larger pointer targets.
 
 ### Fixed
 
+- **Windows Console Windows:** Prevents an extra console when opening Frame and when running media tools or the update helper. Resolves [#237](https://github.com/66HEX/frame/issues/237).
+- **Linux Window Frame:** Removes the application-drawn outer shadow, rounded frame and surrounding margin while retaining Frame's titlebar and window controls. Tiled windows use the full available area. Resolves [#64](https://github.com/66HEX/frame/issues/64).
 - **Keyboard Focus and Menus:** Keeps focus with the selected tab, reveals focused controls in long panels, and restores focus after dialogs and queue changes. Dropdowns and color pickers stay within the window and retain keyboard access after pointer interaction. Source information and update release notes can be scrolled with the keyboard.
 - **Toolbar Window Dragging:** Prevents toolbar buttons and tabs from dragging the window on macOS and Linux. Empty titlebar space remains draggable, and macOS retains its configured double-click action. Resolves [#175](https://github.com/66HEX/frame/issues/175).
 - **Preview Responsiveness:** Keeps playback and scrubbing responsive while settings change and prevents outdated seek or source-change results from replacing the current preview. Paused previews no longer keep polling for frames.
@@ -50,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Filesystem I/O:** Updates `rustix` to fix unsafe handling of empty extended-attribute buffers. [Upstream advisory](https://rustsec.org/advisories/RUSTSEC-2026-0486.html).
 - **Executor Shutdown:** Updates `async-executor` to fix a use-after-free during task shutdown. [Upstream fix](https://github.com/smol-rs/async-executor/releases/tag/v1.14.1).
 - **TLS and I/O Dependencies:** Updates shipped dependencies with upstream TLS and asynchronous I/O safety fixes. [TLS advisory](https://rustsec.org/advisories/RUSTSEC-2026-0349.html), [I/O advisory](https://rustsec.org/advisories/RUSTSEC-2026-0386.html).
 

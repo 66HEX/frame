@@ -46,6 +46,9 @@ raw-window-handle = "0.6"
 csscolorparser = "0.9.0"
 gpui = { package = "gpui-ce", git = "https://github.com/gpui-ce/gpui-ce", rev = "bc577476a0eb55173ef985585cfb487f75ab1cab", features = ["test-support"] }
 
+[target.'cfg(windows)'.dev-dependencies]
+windows = { version = "0.62.2", features = ["Win32_System_Console"] }
+
 [build-dependencies]
 csscolorparser = "0.9.0"
 embed-resource = "3.0.9"
@@ -55,7 +58,7 @@ serde_json = "1.0.150"
 [package.metadata.bundle]
 name = "Frame"
 identifier = "Frame"
-icon = ["resources/app-icons/icon.png"]
+icon = ["resources/app-icons/icon.icns", "resources/app-icons/icon.png"]
 resources = ["resources/binaries"]
 osx_minimum_system_version = "10.15.7"
 

@@ -1,6 +1,4 @@
 use crate::app::input::constants::{FRAME_TEXT_INPUT_CONTEXT, FRAME_TIMECODE_INPUT_CONTEXT};
-#[cfg(target_os = "linux")]
-use crate::app::layout::LINUX_WINDOW_FRAME_INSET;
 use crate::app::layout::{WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH};
 use crate::app::root::FrameRoot;
 use crate::app::{
@@ -10,8 +8,6 @@ use crate::app::{
     TextInputSelectRight,
 };
 use crate::app_info::FRAME_APP_ID;
-#[cfg(target_os = "linux")]
-use crate::theme;
 use gpui::prelude::*;
 use gpui::{
     App, Bounds, KeyBinding, Menu, MenuItem, Pixels, SharedString, TextRenderingMode,
@@ -120,11 +116,6 @@ pub fn frame_window_options(bounds: Bounds<Pixels>) -> WindowOptions {
         // otherwise move the window even when a toolbar control consumes the press.
         is_movable: !cfg!(target_os = "macos"),
         app_owns_titlebar_drag: true,
-        #[cfg(target_os = "linux")]
-        client_side_frame: Some(gpui::ClientSideFrameOptions {
-            corner_radius: px(theme::RADIUS_LG + LINUX_WINDOW_FRAME_INSET),
-        }),
-        #[cfg(not(target_os = "linux"))]
         client_side_frame: None,
         app_id: Some(FRAME_APP_ID.to_owned()),
         #[cfg(any(target_os = "linux", target_os = "freebsd"))]

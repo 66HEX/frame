@@ -1,6 +1,18 @@
 use super::*;
 
 #[test]
+fn keeps_client_titlebar_without_a_custom_outer_frame() {
+    let options = frame_window_options(Bounds::default());
+
+    assert!(options.client_side_frame.is_none());
+    assert_eq!(
+        options.window_decorations,
+        Some(gpui::WindowDecorations::Client)
+    );
+    assert!(options.is_resizable);
+}
+
+#[test]
 fn keeps_transparent_titlebar_with_native_controls_in_frame_slot() {
     let options = frame_window_options(Bounds::default());
     let titlebar = options

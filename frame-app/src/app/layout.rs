@@ -6,8 +6,6 @@ pub const WINDOW_MIN_WIDTH: f32 = 1200.0;
 
 pub const WINDOW_MIN_HEIGHT: f32 = 800.0;
 
-pub const LINUX_WINDOW_FRAME_INSET: f32 = 24.0;
-
 pub const CONTENT_PADDING: f32 = 16.0;
 
 pub const TITLEBAR_HEIGHT: f32 = 40.0;
