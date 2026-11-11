@@ -2069,6 +2069,17 @@ mod tests {
     }
 
     #[test]
+    fn legacy_nvenc_default_preset_uses_supported_p4_for_each_encoder() {
+        for codec in ["h264_nvenc", "hevc_nvenc", "av1_nvenc"] {
+            let mut config = sample_config("mp4", codec);
+            config.preset = "default".to_string();
+            let args =
+                build_ffmpeg_args("input.mov", "output.mp4", &config, &sample_probe()).unwrap();
+            assert!(args_contains_pair(&args, "-preset", "p4"), "{codec}");
+        }
+    }
+
+    #[test]
     fn video_bitrate_validation_checks_only_effective_bitrate_controls() {
         let input = temporary_input_file("effective-video-bitrate");
         for (container, codec, mode, used) in [
