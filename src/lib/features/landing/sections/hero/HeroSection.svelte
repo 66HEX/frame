@@ -28,13 +28,4 @@
 		</div>
 	</div>
 	<div class="mt-11 md:mt-14 lg:mt-18"><FramePreview /></div>
-	<div
-		class="flex flex-col items-start justify-between gap-3 pt-6 md:flex-row md:items-center md:gap-6 md:pt-8 md:pb-12"
-	>
-		<p class="text-sm leading-normal text-muted-foreground">
-			macOS<span class="px-3.5 text-muted-foreground md:px-5">·</span>Windows<span
-				class="px-3.5 text-muted-foreground md:px-5">·</span
-			>Linux
-		</p>
-	</div>
 </section>
