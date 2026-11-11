@@ -4639,7 +4639,7 @@ mod tests {
         let metainfo =
             include_str!("../../../packaging/flathub/io.github._66HEX.Frame.metainfo.xml");
 
-        assert!(metainfo.contains(r#"<release version="0.33.1" date="2026-08-27" />"#));
+        assert!(metainfo.contains(r#"<release version="0.34.0" date="2026-11-11" />"#));
     }
 
     #[test]

@@ -12,7 +12,7 @@ body:
     attributes:
       label: Frame version
       description: Find this in Frame's About dialog or on the downloaded release.
-      placeholder: e.g. 0.31.1
+      placeholder: e.g. 0.34.0
     validations:
       required: true
 

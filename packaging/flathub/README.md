@@ -36,17 +36,19 @@ manifest in the same way the release workflow updates Homebrew and WinGet.
 
 ## Local Artifact Preparation
 
-For a release tag, prepare Flathub inputs with:
+The examples below prepare the next release, 0.34.0. Its download URLs become
+available after the release assets are published. From the release checkout,
+prepare Flathub inputs with:
 
 ```bash
-cargo xtask flathub-sources --version 0.30.0
+cargo xtask flathub-sources --version 0.34.0
 ```
 
 This creates:
 
 ```text
-target/flathub/frame-0.30.0-source.tar.gz
-target/flathub/frame-0.30.0-cargo-vendor.tar.gz
+target/flathub/frame-0.34.0-source.tar.gz
+target/flathub/frame-0.34.0-cargo-vendor.tar.gz
 target/flathub/checksums.env
 ```
 
@@ -54,10 +56,10 @@ Render the Flathub repository files with:
 
 ```bash
 cargo xtask flathub-manifest \
-  --version 0.30.0 \
-  --source-url https://github.com/66HEX/frame/releases/download/0.30.0/frame-0.30.0-source.tar.gz \
+  --version 0.34.0 \
+  --source-url https://github.com/66HEX/frame/releases/download/0.34.0/frame-0.34.0-source.tar.gz \
   --source-sha256 "$(grep FRAME_SOURCE_SHA256 target/flathub/checksums.env | cut -d= -f2)" \
-  --vendor-url https://github.com/66HEX/frame/releases/download/0.30.0/frame-0.30.0-cargo-vendor.tar.gz \
+  --vendor-url https://github.com/66HEX/frame/releases/download/0.34.0/frame-0.34.0-cargo-vendor.tar.gz \
   --vendor-sha256 "$(grep FRAME_CARGO_VENDOR_SHA256 target/flathub/checksums.env | cut -d= -f2)" \
   --out target/flathub/repo
 ```
