@@ -125,7 +125,7 @@
 		{/if}
 	</div>
 {:else}
-	<div class="w-screen max-w-5xl pt-9 pr-6 pb-10 pl-4">
+	<div class="w-screen max-w-6xl pt-9 px-8 pb-8">
 		<div class="grid grid-cols-4 gap-4">
 			{#if menu === 'product'}
 				<div class="-mr-2 border-r border-border pr-2">

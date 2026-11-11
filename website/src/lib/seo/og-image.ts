@@ -1,7 +1,6 @@
 import ImageResponse from '@takumi-rs/image-response';
-import interRegularDataUri from '$lib/assets/fonts/inter/Inter-Regular.woff2?inline';
-import interMediumDataUri from '$lib/assets/fonts/inter/Inter-Medium.woff2?inline';
-import { siteConfig } from '$lib/site/site';
+import overusedGroteskRegularDataUri from '$lib/assets/fonts/overused-grotesk/OverusedGroteskRoman-Roman.woff2?inline';
+import overusedGroteskMediumDataUri from '$lib/assets/fonts/overused-grotesk/OverusedGroteskRoman-Medium.woff2?inline';
 import { ogThemeColors, toSvgColor, withAlpha } from '$lib/seo/og-theme';
 
 const OG_WIDTH = 1200;
@@ -62,21 +61,21 @@ const dataUriToArrayBuffer = (dataUri: string) => {
 };
 
 const fontDataPromise = Promise.all([
-	Promise.resolve(dataUriToArrayBuffer(interRegularDataUri)),
-	Promise.resolve(dataUriToArrayBuffer(interMediumDataUri))
+	Promise.resolve(dataUriToArrayBuffer(overusedGroteskRegularDataUri)),
+	Promise.resolve(dataUriToArrayBuffer(overusedGroteskMediumDataUri))
 ]);
 
 const takumiFontLoaders = [
 	{
-		key: 'inter-regular',
-		name: 'Inter',
+		key: 'overused-grotesk-regular',
+		name: 'Overused Grotesk',
 		weight: 400,
 		style: 'normal' as const,
 		data: async () => (await fontDataPromise)[0]
 	},
 	{
-		key: 'inter-medium',
-		name: 'Inter',
+		key: 'overused-grotesk-medium',
+		name: 'Overused Grotesk',
 		weight: 500,
 		style: 'normal' as const,
 		data: async () => (await fontDataPromise)[1]
@@ -86,13 +85,8 @@ const takumiFontLoaders = [
 const colors = {
 	background: toSvgColor(ogThemeColors.dark.background),
 	foreground: toSvgColor(ogThemeColors.dark.foreground),
-	accent: toSvgColor(ogThemeColors.dark.accent),
 	guide: withAlpha(ogThemeColors.dark.shadowHighlight, 0.1)
 };
-
-const logoDataUri = `data:image/svg+xml,${encodeURIComponent(
-	siteConfig.logoRaw.replaceAll('currentColor', withAlpha(colors.foreground, 0.58))
-)}`;
 
 const verticalDivider = (left: number) =>
 	el(
@@ -171,51 +165,13 @@ const createComponent = ({
 				overflow: 'hidden',
 				backgroundColor: colors.background,
 				color: colors.foreground,
-				fontFamily: 'Inter, sans-serif'
+				fontFamily: 'Overused Grotesk, sans-serif'
 			}
 		},
-		el('div', {
-			style: {
-				position: 'absolute',
-				top: -90,
-				right: -90,
-				bottom: -90,
-				left: -90,
-				backgroundColor: colors.background,
-				backgroundImage: `radial-gradient(ellipse 50% 80% at 50% 50%, rgba(0, 0, 0, 0) 72%, rgba(0, 0, 0, 0.92) 100%), radial-gradient(ellipse 100% 110% at 50% 0%, ${colors.background} 37%, ${colors.accent} 69%, ${colors.foreground} 100%)`,
-				backgroundPosition: 'center',
-				backgroundRepeat: 'no-repeat',
-				backgroundSize: `${OG_WIDTH.toString()}px ${OG_HEIGHT.toString()}px`,
-				filter: 'blur(90px)'
-			}
-		}),
 		verticalDivider(OG_GRID_INSET),
 		verticalDivider(OG_WIDTH - OG_GRID_INSET),
 		horizontalDivider(OG_GRID_INSET),
 		horizontalDivider(OG_HEIGHT - OG_GRID_INSET),
-		el(
-			'div',
-			{
-				style: {
-					position: 'absolute',
-					bottom: OG_GRID_INSET + 60,
-					right: OG_GRID_INSET + 12,
-					display: 'flex',
-					alignItems: 'center',
-					gap: 14,
-					height: 28
-				}
-			},
-			el('img', {
-				src: logoDataUri,
-				alt: '',
-				style: {
-					display: 'flex',
-					width: 120,
-					height: 120
-				}
-			})
-		),
 		el(
 			'div',
 			{
