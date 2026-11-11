@@ -38,7 +38,7 @@
 	}}
 >
 	<div class="h-14 border-b border-border lg:hidden">
-		<div class="mx-auto flex h-full w-full max-w-5xl items-center justify-between px-6">
+		<div class="mx-auto flex h-full w-full max-w-6xl items-center justify-between px-6">
 			<a href="/" aria-label="Frame home" class={`rounded-sm ${focusClass}`}><LandingBrand /></a>
 			<Dialog.Trigger aria-label="Open menu" class={iconButtonClass}>
 				<Menu2Icon class="size-5" aria-hidden="true" />
@@ -52,7 +52,7 @@
 		>
 			<Dialog.Title class="sr-only">Frame navigation</Dialog.Title>
 			<Dialog.Description class="sr-only">Explore Frame, find documentation, and download the app.</Dialog.Description>
-			<div class="mx-auto min-h-full w-full max-w-5xl px-6 pb-8">
+			<div class="mx-auto min-h-full w-full max-w-6xl px-6 pb-8">
 				<div class="flex h-14 items-center justify-between border-b border-border">
 					<a href="/" aria-label="Frame home" class={`rounded-sm ${focusClass}`} onclick={closeMenu}><LandingBrand /></a>
 					<Dialog.Close aria-label="Close menu" class={iconButtonClass}>

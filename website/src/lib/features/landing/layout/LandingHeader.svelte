@@ -126,7 +126,7 @@
 					</div>
 				</div>
 				<div class="header-viewport-wrapper pointer-events-none fixed inset-x-0 top-12">
-					<NavigationMenu.Viewport onpointerenter={cancelHoverTimer} onpointerleave={leaveNavigation} class="frame-nav-viewport pointer-events-auto relative mx-auto mt-1.5 w-full max-w-5xl origin-top overflow-hidden data-[state=closed]:pointer-events-none" />
+					<NavigationMenu.Viewport onpointerenter={cancelHoverTimer} onpointerleave={leaveNavigation} class="frame-nav-viewport pointer-events-auto relative mx-auto mt-1.5 w-full max-w-6xl origin-top overflow-hidden data-[state=closed]:pointer-events-none" />
 				</div>
 			</NavigationMenu.Root>
 		{:else}
