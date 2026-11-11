@@ -58,7 +58,7 @@ serde_json = "1.0.150"
 [package.metadata.bundle]
 name = "Frame"
 identifier = "Frame"
-icon = ["resources/app-icons/icon.png"]
+icon = ["resources/app-icons/icon.icns", "resources/app-icons/icon.png"]
 resources = ["resources/binaries"]
 osx_minimum_system_version = "10.15.7"
 
