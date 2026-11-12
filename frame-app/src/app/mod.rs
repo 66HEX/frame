@@ -11,10 +11,10 @@ mod logs;
 pub(crate) mod model;
 mod motion;
 mod preferences;
-#[cfg(feature = "qa-harness")]
-pub mod qa;
 mod preview;
 mod primitives;
+#[cfg(feature = "qa-harness")]
+pub mod qa;
 mod queue;
 mod render;
 mod root;

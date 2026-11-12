@@ -46,10 +46,10 @@ mod startup_pipe;
 mod startup_process;
 mod video_stream;
 
-#[cfg(test)]
-mod audio_drain_tests;
 #[cfg(all(test, unix))]
 mod audio_cleanup_tests;
+#[cfg(test)]
+mod audio_drain_tests;
 #[cfg(all(test, unix))]
 mod audio_exit_tests;
 #[cfg(test)]
