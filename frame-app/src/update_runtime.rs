@@ -21,6 +21,11 @@ const UPDATE_PUBLIC_KEY_ENV: &str = "FRAME_UPDATE_PUBLIC_KEY";
 /// version cannot be parsed, the cache directory is unavailable, or client
 /// configuration validation fails.
 pub fn build_update_client(channel: UpdateChannel) -> Result<UpdateClient, UpdateError> {
+    if cfg!(feature = "qa-harness") {
+        return Err(UpdateError::Disabled(
+            "Updates are disabled in this QA build.".to_string(),
+        ));
+    }
     let public_keys = configured_public_keys();
     if public_keys.is_empty() {
         return Err(UpdateError::Disabled(
@@ -41,6 +46,9 @@ pub fn build_update_client(channel: UpdateChannel) -> Result<UpdateClient, Updat
 
 #[must_use]
 pub fn updates_disabled_explanation() -> Option<String> {
+    if cfg!(feature = "qa-harness") {
+        return Some("Updates are disabled in this QA build.".to_string());
+    }
     if let Some(explanation) = std::env::var(UPDATE_EXPLANATION_ENV)
         .ok()
         .map(|value| value.trim().to_string())

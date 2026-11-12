@@ -188,7 +188,7 @@ impl FrameRoot {
         Self::new_inner(None, AppSettings::default(), notifier)
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "qa-harness"))]
     pub(crate) fn new_with_persistence(persistence: AppPersistence) -> Self {
         Self::new_with_persistence_and_notifier(persistence, AppNotifier::disabled())
     }

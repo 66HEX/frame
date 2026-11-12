@@ -11,6 +11,8 @@ mod logs;
 pub(crate) mod model;
 mod motion;
 mod preferences;
+#[cfg(feature = "qa-harness")]
+pub mod qa;
 mod preview;
 mod primitives;
 mod queue;

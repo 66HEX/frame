@@ -11,6 +11,14 @@ build = "build.rs"
 name = "frame"
 path = "src/main.rs"
 
+[[bin]]
+name = "frame-qa"
+path = "src/bin/frame-qa.rs"
+required-features = ["qa-harness"]
+
+[features]
+qa-harness = []
+
 [dependencies]
 cpal = "0.18.1"
 directories = "6.0.0"
