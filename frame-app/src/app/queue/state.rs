@@ -1,4 +1,4 @@
-pub(in crate::app) const FILE_LIST_ACTIONS_WIDTH: f32 = 64.0;
+pub(in crate::app) const FILE_LIST_ACTIONS_WIDTH: f32 = 128.0;
 
 pub(in crate::app) const FILE_LIST_ACTION_BUTTON_SIZE: f32 = 24.0;
 
