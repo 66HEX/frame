@@ -5,6 +5,7 @@ mod completion;
 mod config;
 mod controller;
 mod gif;
+mod opus;
 mod output_paths;
 mod process;
 mod publication;

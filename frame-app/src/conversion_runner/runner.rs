@@ -163,7 +163,18 @@ fn run_prepared_conversion_task_with_control(
             emit,
         );
     }
-    let Some(prepared) = prepare_gif_export(
+    let opus_proof = if crate::runtime_environment::is_flatpak() {
+        None
+    } else {
+        let result = super::opus::check(task, &probe, &ffprobe_executable(), || {
+            controller.is_cancelled(&task.id)
+        });
+        if finish_preflight_cancellation(&task.id, controller, emit)? {
+            return Ok(());
+        }
+        result?
+    };
+    let Some(mut prepared) = prepare_gif_export(
         task,
         &output_path,
         &probe,
@@ -175,6 +186,7 @@ fn run_prepared_conversion_task_with_control(
     else {
         return Ok(());
     };
+    prepared.opus_proof = opus_proof;
 
     if !super::subtitles::check_subtitle_trim_with_control(
         &task.config,
@@ -212,7 +224,7 @@ fn run_final_conversion(
     output_path: &str,
     executable: &str,
     ordinary_args: Vec<String>,
-    prepared: PreparedGifExport,
+    prepared: PreparedExport,
     controller: &ConversionProcessController,
     emit: &mut impl FnMut(ConversionEvent),
 ) -> Result<(), ConversionError> {
@@ -260,7 +272,7 @@ fn run_final_conversion_with_publication(
     publication: OutputPublication<'_>,
     executable: &str,
     ordinary_args: Vec<String>,
-    prepared: PreparedGifExport,
+    prepared: PreparedExport,
     controller: &ConversionProcessController,
     emit: &mut impl FnMut(ConversionEvent),
 ) -> Result<(), ConversionError> {
@@ -309,9 +321,10 @@ fn run_final_conversion_with_publication(
     } else {
         None
     };
-    let PreparedGifExport {
+    let PreparedExport {
         mut args,
         proof: recovery_proof,
+        opus_proof,
     } = prepared;
     let mut was_cancelled = false;
     let mut started = false;
@@ -343,6 +356,9 @@ fn run_final_conversion_with_publication(
         was_cancelled = controller.take_cancelled(&task.id)?;
         if was_cancelled {
             return Ok(());
+        }
+        if let Some(proof) = &opus_proof {
+            proof.check_unchanged()?;
         }
         let mut command = if let Some(stage) = &stage {
             stage.ensure_unwritten().map_err(ConversionError::Io)?;
@@ -624,9 +640,10 @@ fn check_hardware_encoder(
     Ok(true)
 }
 
-struct PreparedGifExport {
+struct PreparedExport {
     args: Vec<String>,
     proof: Option<Box<super::gif::GifProof>>,
+    opus_proof: Option<super::opus::OpusProof>,
 }
 
 fn prepare_gif_export(
@@ -637,7 +654,7 @@ fn prepare_gif_export(
     controller: &ConversionProcessController,
     emit: &mut impl FnMut(ConversionEvent),
     ordinary_args: &[String],
-) -> Result<Option<PreparedGifExport>, ConversionError> {
+) -> Result<Option<PreparedExport>, ConversionError> {
     let check = super::gif::check_gif_minimum_frame(
         &task.file_path,
         &task.config,
@@ -702,7 +719,11 @@ fn prepare_gif_export(
         }
         super::gif::GifDecision::Ordinary | super::gif::GifDecision::Cancelled => None,
     };
-    Ok(Some(PreparedGifExport { args, proof }))
+    Ok(Some(PreparedExport {
+        args,
+        proof,
+        opus_proof: None,
+    }))
 }
 
 fn spawn_batch_worker(
@@ -756,14 +777,25 @@ fn probe_conversion_source(
     let result = crate::source_probe::probe(executable, std::path::Path::new(file_path), || {
         controller.is_cancelled(id)
     });
+    if finish_preflight_cancellation(id, controller, emit)? {
+        return Ok(None);
+    }
+    result.map(Some)
+}
+
+fn finish_preflight_cancellation(
+    id: &str,
+    controller: &ConversionProcessController,
+    emit: &mut impl FnMut(ConversionEvent),
+) -> Result<bool, ConversionError> {
     if controller.take_cancelled(id)? {
         emit(ConversionEvent::log(id, "[INFO] Task cancelled"));
         // A diagnostic callback may repeat cancellation before the terminal event.
         controller.take_cancelled(id)?;
         emit(ConversionEvent::cancelled(id));
-        return Ok(None);
+        return Ok(true);
     }
-    result.map(Some)
+    Ok(false)
 }
 
 fn stream_ffmpeg_stderr(

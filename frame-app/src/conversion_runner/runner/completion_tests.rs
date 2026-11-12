@@ -181,9 +181,10 @@ fn final_spawn_failure_keeps_its_error_and_does_not_report_completion() {
         "output",
         &missing_executable,
         vec!["-n".into(), "output".into()],
-        PreparedGifExport {
+        PreparedExport {
             args: vec!["-n".into(), "output".into()],
             proof: None,
+            opus_proof: None,
         },
         &controller,
         &mut |event| events.push(event),
@@ -228,7 +229,11 @@ fn sandboxed_direct_publication_keeps_its_original_output_path_and_lifecycle() {
         OutputPublication::for_environment(output_path, true),
         &ffmpeg_executable(),
         args.clone(),
-        PreparedGifExport { args, proof: None },
+        PreparedExport {
+            args,
+            proof: None,
+            opus_proof: None,
+        },
         &controller,
         &mut |event| match event {
             ConversionEvent::Log(log) if log.line.starts_with("[INFO] Running ") => {
