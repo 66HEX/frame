@@ -76,23 +76,23 @@
 			</p>
 			<div class="mt-8 flex flex-wrap items-center gap-3" data-sveltekit-reload>
 				{#if canRetry}
-					<Button href={page.url.href} size="lg">
+					<Button href={page.url.href} size="default">
 						<ArrowRotateClockwiseIcon aria-hidden="true" />
 						Reload page
 					</Button>
-					<Button href={resolve('/')} variant="outline" size="lg">
+					<Button href={resolve('/')} variant="outline" size="default">
 						<ArrowLeftIcon aria-hidden="true" />
 						Back to home
 					</Button>
 				{:else}
-					<Button href={resolve('/')} size="lg">
+					<Button href={resolve('/')} size="default">
 						<ArrowLeftIcon aria-hidden="true" />
 						Back to home
 					</Button>
 					<Button
 						href={resolve('/[section]/[...slug]', { section: 'docs', slug: '' })}
 						variant="outline"
-						size="lg"
+						size="default"
 					>
 						<BookOpenIcon aria-hidden="true" />
 						Browse docs
