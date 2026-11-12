@@ -20,6 +20,8 @@ pub struct FileItem {
     pub path: String,
     pub is_selected_for_conversion: bool,
     pub conversion_error: Option<String>,
+    /// Actual published path for the current attempt, never a predicted filename.
+    pub output_path: Option<String>,
 }
 
 impl FileItem {
@@ -39,6 +41,7 @@ impl FileItem {
             path,
             is_selected_for_conversion: true,
             conversion_error: None,
+            output_path: None,
         }
     }
 
@@ -50,6 +53,13 @@ impl FileItem {
     #[must_use]
     pub const fn locks_settings(&self) -> bool {
         self.status.locks_settings()
+    }
+
+    #[must_use]
+    pub fn completed_output_path(&self) -> Option<&str> {
+        (self.status == FileStatus::Completed)
+            .then_some(self.output_path.as_deref())
+            .flatten()
     }
 
     #[must_use]

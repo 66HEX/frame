@@ -587,3 +587,28 @@ fn prepare_file_for_reconversion_rejects_idle_file() {
 
     assert!(!queue.prepare_file_for_reconversion("first"));
 }
+#[test]
+fn preparing_reconversion_forgets_the_previous_attempt_output() {
+    let mut queue = FileQueue::new();
+    let mut file = sample_file("first", "/tmp/source.mp4", 10);
+    file.status = FileStatus::Completed;
+    file.output_path = Some("/tmp/output/source (2).mp4".into());
+    queue.add_file(file);
+
+    assert!(queue.prepare_file_for_reconversion("first"));
+    assert_eq!(queue.file_by_id("first").unwrap().output_path, None);
+}
+
+#[test]
+fn queueing_retry_forgets_any_output_from_the_previous_attempt() {
+    let mut queue = FileQueue::new();
+    let mut file = sample_file("first", "/tmp/source.mp4", 10);
+    file.status = FileStatus::Error;
+    file.output_path = Some("/tmp/previous-success.mp4".into());
+    queue.add_file(file);
+
+    let queued = queue.queue_selected_pending_conversions();
+
+    assert_eq!(queued[0].output_path, None);
+    assert_eq!(queue.file_by_id("first").unwrap().output_path, None);
+}

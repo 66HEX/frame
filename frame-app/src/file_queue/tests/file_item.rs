@@ -30,6 +30,43 @@ fn from_path_initializes_per_file_conversion_config() {
 }
 
 #[test]
+fn only_a_completed_attempt_exposes_its_output_path() {
+    let mut file = FileItem::from_path("1", "/tmp/video.mp4", 10);
+    file.output_path = Some("/tmp/published/video (2).mkv".into());
+    for status in [
+        FileStatus::Idle,
+        FileStatus::Queued,
+        FileStatus::Converting,
+        FileStatus::Paused,
+        FileStatus::Cancelling,
+        FileStatus::Error,
+    ] {
+        file.status = status;
+        assert_eq!(file.completed_output_path(), None, "{status:?}");
+    }
+    file.status = FileStatus::Completed;
+    assert_eq!(
+        file.completed_output_path(),
+        Some("/tmp/published/video (2).mkv")
+    );
+}
+
+#[test]
+fn settings_changes_do_not_reconstruct_a_completed_output_path() {
+    let mut file = FileItem::from_path("1", "/tmp/video.mp4", 10);
+    file.status = FileStatus::Completed;
+    file.output_path = Some("/tmp/published/video (2).mkv".into());
+
+    file.output_name = "new name".into();
+    file.config.container = "webm".into();
+
+    assert_eq!(
+        file.completed_output_path(),
+        Some("/tmp/published/video (2).mkv")
+    );
+}
+
+#[test]
 fn from_os_path_reads_size_from_existing_file() {
     let path = temp_file_path("size-source.mp4");
     std::fs::write(&path, [1_u8, 2, 3]).expect("test file should be written");
