@@ -69,6 +69,17 @@ __LINUX_SETUP__
       run: python script/native-qa.py build --output target/native-qa --archive-limit-mib 100
     - name: qa::verify_relocated_package
       run: python script/native-qa.py verify --output target/native-qa
+    - name: qa::report_evidence
+      if: always()
+      shell: bash
+      run: |
+        python - <<'PY'
+        from pathlib import Path
+        for name in ('build.json', 'verification.json', 'evidence.json'):
+            path = Path('target/native-qa') / name
+            if path.is_file():
+                print(path.read_text(encoding='utf-8'))
+        PY
     - name: qa::upload
       uses: actions/upload-artifact@v7.0.1
       with:
@@ -137,5 +148,19 @@ mod tests {
             workflow
                 .contains("python -B -m unittest discover -s script/tests -p test_native_qa.py -v")
         );
+    }
+
+    #[test]
+    fn native_qa_keeps_failed_verification_evidence_in_job_logs() {
+        let workflow = workflow();
+        let report = workflow
+            .find("qa::report_evidence")
+            .expect("evidence log step");
+        let upload = workflow.find("qa::upload").unwrap();
+        let step = &workflow[report..upload];
+        assert!(step.contains("if: always()"));
+        assert!(step.contains("evidence.json"));
+        assert!(step.contains("verification.json"));
+        assert!(step.contains("print(path.read_text"));
     }
 }

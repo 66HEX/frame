@@ -78,6 +78,17 @@ jobs:
       run: python script/native-qa.py build --output target/native-qa --archive-limit-mib 100
     - name: qa::verify_relocated_package
       run: python script/native-qa.py verify --output target/native-qa
+    - name: qa::report_evidence
+      if: always()
+      shell: bash
+      run: |
+        python - <<'PY'
+        from pathlib import Path
+        for name in ('build.json', 'verification.json', 'evidence.json'):
+            path = Path('target/native-qa') / name
+            if path.is_file():
+                print(path.read_text(encoding='utf-8'))
+        PY
     - name: qa::upload
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
