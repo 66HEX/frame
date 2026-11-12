@@ -48,13 +48,16 @@ __LINUX_SETUP__
     - name: qa::setup_media_tools
       run: cargo xtask setup-ffmpeg
     - name: qa::test_process_lifecycle
-      run: cargo test --locked --release -p frame-app --features qa-harness --lib bounded_process -- --test-threads=1
+      run: cargo test --locked --release -p frame-app --features qa-harness --lib bounded_process -- --include-ignored --test-threads=1
     - name: qa::test_source_probe
       run: cargo test --locked --release -p frame-app --features qa-harness --lib source_probe -- --include-ignored --test-threads=1
     - name: qa::test_publication
       run: cargo test --locked --release -p frame-app --features qa-harness --lib conversion_runner -- --include-ignored --test-threads=1
     - name: qa::test_preview_lifecycle
       run: cargo test --locked --release -p frame-app --features qa-harness --lib preview_engine -- --test-threads=1
+    - name: qa::test_preview_pipe_throughput
+      if: runner.os != 'Windows'
+      run: cargo test --locked --release -p frame-app --features qa-harness --lib full_resolution_frame_does_not_pay_a_polling_sleep_for_each_producer_burst -- --ignored --test-threads=1
     - name: qa::test_preview_runtime
       run: cargo test --locked --release -p frame-app --features qa-harness --lib preview_engine::tests::ffmpeg_ -- --ignored --test-threads=1 --skip ffmpeg_preview_session_collects_audio_video_metrics_for_sync_fixture --skip ffmpeg_audio_prewarm_wakes_through_preview_session_lifecycle
     - name: qa::test_isolated_profile
