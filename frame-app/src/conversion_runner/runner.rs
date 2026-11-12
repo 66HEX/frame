@@ -452,7 +452,7 @@ fn finish_staged_conversion(
         task.id.clone(),
         "[INFO] Export verified; preparing publication",
     ));
-    let publication = publish_staged_output(stage, &task.id, controller);
+    let publication = publish_staged_output(stage, &task.id, controller, outcome.was_cancelled);
     match publication.result {
         Ok(PublicationDecision::Published) => {}
         result => {
