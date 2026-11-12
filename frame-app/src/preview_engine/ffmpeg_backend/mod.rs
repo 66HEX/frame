@@ -40,6 +40,9 @@ mod clock;
 mod decode;
 mod plan;
 mod process;
+mod startup_cleanup;
+mod startup_pipe;
+mod startup_process;
 mod video_stream;
 
 #[cfg(test)]

@@ -53,14 +53,14 @@ fn limits() -> Limits {
 
 #[test]
 fn isolated_domain_runs_while_default_capability_permit_is_occupied() {
+    static PREVIEW: ExecutionDomain = ExecutionDomain::new();
     let _serial = serial();
     let permit = acquire_permit(Instant::now() + Duration::from_secs(1), &|| false).unwrap();
-    static PREVIEW: ExecutionDomain = ExecutionDomain::new();
     let result = PREVIEW.run(
         &spec("success"),
         &[37],
         Limits {
-            timeout: Duration::from_millis(200),
+            timeout: Duration::from_secs(2),
             ..limits()
         },
         || false,
@@ -554,4 +554,56 @@ fn batch_wrapper_matches_std_command_arguments_and_rejects_newlines() {
             ));
         }
     }
+}
+
+#[test]
+fn startup_cleanup_returns_with_a_single_owned_pending_slot() {
+    struct HeldCleanup(Arc<AtomicBool>);
+    impl CleanupTask for HeldCleanup {
+        fn cleanup_step(&mut self) -> bool {
+            self.0.load(Ordering::Acquire)
+        }
+    }
+    static STARTUP: ExecutionDomain = ExecutionDomain::new();
+    let release = Arc::new(AtomicBool::new(false));
+    let reservation = STARTUP
+        .reserve(Instant::now() + Duration::from_secs(1), || false)
+        .unwrap();
+    let worker_release = Arc::clone(&release);
+    let (done_tx, done_rx) = std::sync::mpsc::channel();
+    let worker = std::thread::spawn(move || {
+        let result = reservation.cleanup(HeldCleanup(worker_release), Duration::from_millis(20));
+        done_tx.send(result).unwrap();
+    });
+    let result = done_rx.recv_timeout(Duration::from_millis(200));
+    if result.is_err() {
+        release.store(true, Ordering::Release);
+    }
+    worker.join().unwrap();
+    let result = result.expect("startup cleanup must return while an owned worker remains pending");
+    assert_eq!(result, CleanupOutcome::Pending);
+    let directory = TestDirectory::new();
+    let marker = directory.0.join("must-not-spawn");
+    let mut command = spec("empty");
+    command
+        .env
+        .push(("FRAME_BOUNDED_MARKER".into(), marker.as_os_str().to_owned()));
+    let blocked = STARTUP.run(&command, &[], limits(), || false).unwrap_err();
+    assert_eq!(blocked.reason, StopReason::CleanupInProgress);
+    assert!(
+        !marker.exists(),
+        "pending cleanup must prevent another child"
+    );
+    release.store(true, Ordering::Release);
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while STARTUP.cleanup_pending.load(Ordering::Acquire) && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert!(
+        STARTUP
+            .run(&command, &[], limits(), || false)
+            .unwrap()
+            .success
+    );
+    assert!(marker.exists());
 }

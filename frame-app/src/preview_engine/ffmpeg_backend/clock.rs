@@ -256,7 +256,7 @@ impl RunningPreviewProcess {
         render_elapsed: Duration,
         generation: u64,
     ) {
-        if !self.playback_generation_matches(generation) {
+        if self.cancelled.load(Ordering::Acquire) || !self.playback_generation_matches(generation) {
             return;
         }
         self.metrics

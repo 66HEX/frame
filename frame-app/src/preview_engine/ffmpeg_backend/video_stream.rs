@@ -1,3 +1,4 @@
+use crate::bounded_process::{ExecutionDomain, ProcessReservation};
 use crate::numeric::u64_to_f64;
 use crate::preview_engine::error::PreviewEngineError;
 use crate::preview_engine::ffmpeg_backend::audio_stream::{AudioStartStatus, PendingAudioStart};
@@ -6,13 +7,15 @@ use crate::preview_engine::ffmpeg_backend::clock::{
     update_last_frame_seconds, wait_for_frame_presentation_time,
 };
 use crate::preview_engine::ffmpeg_backend::decode::{
-    FrameStreamSpec, RenderImageIdentity, read_stream_frame, rendered_preview_frame_from_payload,
+    DecodedPreviewFrame, FrameStreamSpec, RenderImageIdentity, read_stream_frame,
+    rendered_preview_frame_from_payload,
 };
 use crate::preview_engine::ffmpeg_backend::plan::preview_plan;
 use crate::preview_engine::ffmpeg_backend::process::{
     ProcessHandles, RunningPreviewProcess, RunningProcessState, lock_process, push_stderr_line,
     spawn_stderr_worker,
 };
+use crate::preview_engine::ffmpeg_backend::startup_pipe::{STARTUP_TIMEOUT, StartupPipe};
 use crate::preview_engine::frame_store::LatestFrameStore;
 use crate::preview_engine::metrics::PreviewRuntimeMetricsStore;
 use crate::preview_engine::types::{PreviewDimensions, PreviewSessionConfig};
@@ -31,6 +34,8 @@ pub(super) struct SpawnedVideoStream {
     pub(super) stderr_worker: JoinHandle<()>,
     pub(super) stop_requested: Arc<AtomicBool>,
     pub(super) spec: FrameStreamSpec,
+    reservation: ProcessReservation,
+    deadline: Instant,
 }
 
 pub(super) struct VideoStdoutWorkerConfig {
@@ -76,23 +81,37 @@ impl RunningPreviewProcess {
         seconds: f64,
         precise: bool,
     ) -> Result<PreviewDimensions, PreviewEngineError> {
+        static STARTUPS: ExecutionDomain = ExecutionDomain::new();
+        let deadline = Instant::now() + STARTUP_TIMEOUT;
+        let reservation = STARTUPS
+            .reserve(deadline, || self.cancelled.load(Ordering::Acquire))
+            .map_err(|error| {
+                PreviewEngineError::Ffmpeg(format!("preview startup stopped: {error}"))
+            })?;
         let (generation, prewarmed_audio) = self.prepare_video_start_generation(seconds);
         let pending_audio = prewarmed_audio.map_or_else(
             || self.start_audio_for_video_generation(config, seconds, precise, generation),
             Some,
         );
 
-        let mut stream = self.spawn_video_stream(config, seconds, precise, generation)?;
+        let mut stream =
+            self.spawn_video_stream(config, seconds, precise, generation, reservation, deadline)?;
 
         let first_frame = match read_stream_frame(
-            &mut stream.stdout,
+            &mut StartupPipe::new(&mut stream.stdout, &self.cancelled, stream.deadline),
             &stream.spec,
             seconds,
             self.next_render_image_identity(),
         ) {
             Ok(frame) => frame,
             Err(error) => {
-                return Err(self.fail_video_start(generation, error, Some(stream.into_handles())));
+                let (handles, reservation) = stream.into_handles();
+                return Err(self.fail_video_start_bounded(
+                    generation,
+                    error,
+                    Some(handles),
+                    reservation,
+                ));
             }
         };
         let first_frame_read_elapsed = stream
@@ -115,9 +134,42 @@ impl RunningPreviewProcess {
             }
         }
 
+        if self.cancelled.load(Ordering::Acquire) || Instant::now() >= deadline {
+            let (handles, reservation) = stream.into_handles();
+            return Err(self.fail_video_start_bounded(
+                generation,
+                PreviewEngineError::Ffmpeg("preview startup cancelled or timed out".into()),
+                Some(handles),
+                reservation,
+            ));
+        }
+
+        self.finish_video_start(
+            stream,
+            first_frame,
+            seconds,
+            generation,
+            first_frame_read_ms,
+        )
+    }
+
+    fn finish_video_start(
+        &self,
+        stream: SpawnedVideoStream,
+        first_frame: DecodedPreviewFrame,
+        seconds: f64,
+        generation: u64,
+        first_frame_read_ms: u64,
+    ) -> Result<PreviewDimensions, PreviewEngineError> {
         let stop_result = self.stop_video_process();
         if let Err(error) = stop_result {
-            return Err(self.fail_video_start(generation, error, Some(stream.into_handles())));
+            let (handles, reservation) = stream.into_handles();
+            return Err(self.fail_video_start_bounded(
+                generation,
+                error,
+                Some(handles),
+                reservation,
+            ));
         }
 
         let dimensions = PreviewDimensions {
@@ -150,7 +202,12 @@ impl RunningPreviewProcess {
                     audio_start: None,
                     audio_exit: None,
                 };
-                return Err(self.fail_video_start(generation, error, Some(handles)));
+                return Err(self.fail_video_start_bounded(
+                    generation,
+                    error,
+                    Some(handles),
+                    stream.reservation,
+                ));
             }
         };
 
@@ -164,6 +221,7 @@ impl RunningPreviewProcess {
             audio_exit: None,
         };
         drop(state);
+        drop(stream.reservation);
 
         self.metrics
             .record_video_first_frame_read_duration(generation, first_frame_read_ms);
@@ -207,31 +265,43 @@ impl RunningPreviewProcess {
         seconds: f64,
         precise: bool,
         generation: u64,
+        reservation: ProcessReservation,
+        deadline: Instant,
     ) -> Result<SpawnedVideoStream, PreviewEngineError> {
-        let plan = preview_plan(config, seconds, true, precise)
-            .map_err(|error| self.fail_video_start(generation, error, None))?;
+        let plan = match preview_plan(config, seconds, true, precise) {
+            Ok(plan) => plan,
+            Err(error) => {
+                return Err(self.fail_video_start_bounded(generation, error, None, reservation));
+            }
+        };
         let spawned_at = Instant::now();
-        let mut child = crate::process_launch::spawn(
+        let child = super::startup_process::spawn(
             Command::new(&self.executable)
                 .args(&plan.args)
                 .stdin(Stdio::null())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped()),
-        )
-        .map_err(|err| {
-            self.fail_video_start(
-                generation,
-                PreviewEngineError::Ffmpeg(format!("failed to start: {err}")),
-                None,
-            )
-        })?;
+            &self.cancelled,
+            deadline,
+        );
+        let mut child = match child {
+            Ok(child) => child,
+            Err(error) => {
+                return Err(self.fail_video_start_bounded(
+                    generation,
+                    PreviewEngineError::Ffmpeg(format!("failed to start: {error}")),
+                    None,
+                    reservation,
+                ));
+            }
+        };
         self.metrics.record_video_process_spawn();
 
         let stop_requested = Arc::new(AtomicBool::new(false));
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
         let (Some(stdout), Some(stderr)) = (stdout, stderr) else {
-            return Err(self.fail_video_start(
+            return Err(self.fail_video_start_bounded(
                 generation,
                 PreviewEngineError::Ffmpeg("ffmpeg output pipes were not captured".to_string()),
                 Some(ProcessHandles {
@@ -242,6 +312,7 @@ impl RunningPreviewProcess {
                     audio_start: None,
                     audio_exit: None,
                 }),
+                reservation,
             ));
         };
         let stderr_worker = match spawn_stderr_worker(
@@ -251,7 +322,7 @@ impl RunningPreviewProcess {
         ) {
             Ok(worker) => worker,
             Err(error) => {
-                return Err(self.fail_video_start(
+                return Err(self.fail_video_start_bounded(
                     generation,
                     error,
                     Some(ProcessHandles {
@@ -262,6 +333,7 @@ impl RunningPreviewProcess {
                         audio_start: None,
                         audio_exit: None,
                     }),
+                    reservation,
                 ));
             }
         };
@@ -271,6 +343,8 @@ impl RunningPreviewProcess {
             stdout,
             stderr_worker,
             stop_requested,
+            reservation,
+            deadline,
             spec: FrameStreamSpec {
                 presentation: crate::preview_engine::PreviewRenderPresentation {
                     pixel_aspect_ratio: plan.pixel_aspect_ratio,
@@ -292,15 +366,18 @@ impl RunningPreviewProcess {
 }
 
 impl SpawnedVideoStream {
-    fn into_handles(self) -> ProcessHandles {
-        ProcessHandles {
-            child: Some(self.child),
-            stdout_worker: None,
-            stderr_worker: Some(self.stderr_worker),
-            stop_requested: Some(self.stop_requested),
-            audio_start: None,
-            audio_exit: None,
-        }
+    fn into_handles(self) -> (ProcessHandles, ProcessReservation) {
+        (
+            ProcessHandles {
+                child: Some(self.child),
+                stdout_worker: None,
+                stderr_worker: Some(self.stderr_worker),
+                stop_requested: Some(self.stop_requested),
+                audio_start: None,
+                audio_exit: None,
+            },
+            self.reservation,
+        )
     }
 }
 

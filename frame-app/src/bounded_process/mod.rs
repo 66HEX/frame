@@ -224,7 +224,7 @@ static DEFAULT_DOMAIN: ExecutionDomain = ExecutionDomain::new();
 
 /// A fixed process budget whose cleanup supervisor lives for the application.
 /// Callers must reuse a static domain rather than allocate one per request.
-pub(crate) struct ExecutionDomain {
+pub struct ExecutionDomain {
     active: AtomicBool,
     cleanup_pending: AtomicBool,
     slot: OnceLock<Result<CleanupSlot, String>>,
@@ -253,9 +253,52 @@ fn acquire_permit(deadline: Instant, cancelled: &dyn Fn() -> bool) -> Result<Per
     DEFAULT_DOMAIN.acquire_permit(deadline, cancelled)
 }
 
-trait CleanupTask: Send {
+pub trait CleanupTask: Send {
     /// Performs only nonblocking cleanup steps; true means all ownership ended.
     fn cleanup_step(&mut self) -> bool;
+}
+
+/// Reserves a domain until startup hands off its child or cleanup finishes.
+pub struct ProcessReservation {
+    permit: Permit,
+    slot: &'static CleanupSlot,
+}
+
+impl ProcessReservation {
+    pub fn cleanup(self, task: impl CleanupTask + 'static, timeout: Duration) -> CleanupOutcome {
+        let mut owner = CleanupGuard::new(
+            ReservedCleanup {
+                task,
+                _permit: self.permit,
+            },
+            self.slot,
+        );
+        let deadline = Instant::now()
+            .checked_add(timeout)
+            .unwrap_or_else(Instant::now);
+        loop {
+            if owner.cleanup_step() {
+                owner.complete();
+                return CleanupOutcome::Complete;
+            }
+            if Instant::now() >= deadline {
+                supervise_cleanup(self.slot, Box::new(owner.into_inner()));
+                return CleanupOutcome::Pending;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+}
+
+struct ReservedCleanup<T> {
+    task: T,
+    _permit: Permit,
+}
+
+impl<T: CleanupTask> CleanupTask for ReservedCleanup<T> {
+    fn cleanup_step(&mut self) -> bool {
+        self.task.cleanup_step()
+    }
 }
 
 /// Transfers all ownership to the supervisor even when a caller callback panics.
@@ -338,7 +381,7 @@ pub fn run(
 }
 
 impl ExecutionDomain {
-    pub(crate) const fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             active: AtomicBool::new(false),
             cleanup_pending: AtomicBool::new(false),
@@ -404,7 +447,17 @@ impl ExecutionDomain {
             .map_err(|error| early_error(StopReason::Io(error.clone())))
     }
 
-    pub(crate) fn run(
+    pub fn reserve(
+        &'static self,
+        deadline: Instant,
+        cancelled: impl Fn() -> bool,
+    ) -> Result<ProcessReservation, ProcessError> {
+        let permit = self.acquire_permit(deadline, &cancelled)?;
+        let slot = self.cleanup_slot()?;
+        Ok(ProcessReservation { permit, slot })
+    }
+
+    pub fn run(
         &'static self,
         command: &CommandSpec,
         input: &[u8],

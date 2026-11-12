@@ -52,8 +52,12 @@ impl PreviewSession {
 
         match config.source_kind {
             PreviewSourceKind::Image | PreviewSourceKind::Video | PreviewSourceKind::Audio => {
-                let (pipeline, dimensions, duration_seconds) =
-                    start_ffmpeg_preview_process(&config, frame_store.clone(), metrics.clone())?;
+                let (pipeline, dimensions, duration_seconds) = start_ffmpeg_preview_process(
+                    &config,
+                    frame_store.clone(),
+                    metrics.clone(),
+                    Arc::clone(&cancelled),
+                )?;
                 Ok(Self {
                     cancelled,
                     config: Mutex::new(config),
@@ -151,6 +155,11 @@ impl PreviewSession {
         let Some(pipeline) = pipeline_guard.as_ref() else {
             return Ok(());
         };
+        if self.cancelled.load(Ordering::Acquire) {
+            return Err(PreviewEngineError::Ffmpeg(
+                "preview request cancelled".into(),
+            ));
+        }
         if pipeline.failed() {
             *lock(&self.playing) = false;
         }
@@ -394,3 +403,6 @@ mod tests {
         session.stop().unwrap();
     }
 }
+
+#[cfg(all(test, unix))]
+mod startup_cancellation_tests;
