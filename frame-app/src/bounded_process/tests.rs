@@ -131,6 +131,14 @@ fn fake_process() {
             .unwrap();
         }
         "no-read" => std::thread::sleep(Duration::from_secs(30)),
+        "bulk-output" => {
+            let chunk = vec![0xa5; 64 * 1024];
+            let mut stdout = std::io::stdout().lock();
+            for _ in 0..1024 {
+                stdout.write_all(&chunk).unwrap();
+            }
+            eprintln!("bulk output complete");
+        }
         "flood" | "endless-flood" => {
             let bytes = vec![b'x'; 8192];
             for _ in 0..if mode == "flood" { 256 } else { usize::MAX } {
@@ -156,6 +164,46 @@ fn fake_process() {
         _ => panic!("unknown fixture mode"),
     }
     std::process::exit(0);
+}
+
+#[cfg(unix)]
+#[test]
+#[ignore = "large pipe throughput regression; run without competing builds"]
+fn large_stdout_does_not_sleep_between_readable_chunks() {
+    static BULK: ExecutionDomain = ExecutionDomain::new();
+    const PAYLOAD_BYTES: usize = 64 * 1024 * 1024;
+    let result = BULK
+        .run(
+            &spec("bulk-output"),
+            &[],
+            Limits {
+                timeout: Duration::from_millis(1500),
+                cleanup_timeout: Duration::from_secs(1),
+                stdout_bytes: PAYLOAD_BYTES + 1024,
+                stderr_bytes: 1024,
+            },
+            || false,
+        )
+        .unwrap_or_else(|error| {
+            panic!(
+                "ready data must drain without a fixed delay per 64 KiB: {:?}",
+                error.reason
+            )
+        });
+    assert!(result.success);
+    assert!(!result.stdout.truncated);
+    let payload_start = result
+        .stdout
+        .bytes
+        .len()
+        .checked_sub(PAYLOAD_BYTES)
+        .unwrap();
+    assert!(
+        result.stdout.bytes[payload_start..]
+            .iter()
+            .all(|byte| *byte == 0xa5)
+    );
+    assert!(String::from_utf8_lossy(&result.stderr.bytes).contains("bulk output complete"));
 }
 
 #[test]
