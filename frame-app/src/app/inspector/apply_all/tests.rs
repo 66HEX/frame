@@ -763,3 +763,117 @@ fn copy_adpcm_source_verdict_is_not_cached_by_codec() {
         assert_eq!(policy.audio_verdicts.entries, [("adpcm_swf", true)]);
     }
 }
+
+#[test]
+fn selected_preset_snapshot_freezes_checkmarks_and_revalidates_each_target() {
+    let mut root = batch_root();
+    root.file_queue
+        .file_by_id_mut("donor")
+        .unwrap()
+        .is_selected_for_conversion = false;
+    for (id, status, kind) in [
+        ("valid", FileStatus::Error, SourceKind::Video),
+        ("deselected", FileStatus::Idle, SourceKind::Video),
+        ("late-checked", FileStatus::Idle, SourceKind::Video),
+        ("locked", FileStatus::Idle, SourceKind::Video),
+        ("removed", FileStatus::Idle, SourceKind::Video),
+        ("replaced", FileStatus::Idle, SourceKind::Video),
+        ("changed-source", FileStatus::Idle, SourceKind::Video),
+        ("image", FileStatus::Idle, SourceKind::Image),
+        ("audio", FileStatus::Idle, SourceKind::Audio),
+        ("completed", FileStatus::Completed, SourceKind::Video),
+    ] {
+        add_target(&mut root, id, status, kind);
+    }
+    root.file_queue
+        .file_by_id_mut("late-checked")
+        .unwrap()
+        .is_selected_for_conversion = false;
+    let preset = root
+        .presets
+        .iter()
+        .find(|preset| preset.id == "archive-hq")
+        .unwrap()
+        .clone();
+    let all = root.snapshot_batch(&preset, None);
+    let selected = root.selected_batch_snapshot(&all);
+    assert_eq!(selected.targets.len(), 6);
+    assert_eq!(selected.skipped, 3);
+
+    root.file_queue
+        .file_by_id_mut("deselected")
+        .unwrap()
+        .is_selected_for_conversion = false;
+    root.file_queue
+        .file_by_id_mut("late-checked")
+        .unwrap()
+        .is_selected_for_conversion = true;
+    root.file_queue.file_by_id_mut("locked").unwrap().status = FileStatus::Queued;
+    root.file_queue.remove_file("removed");
+    root.file_queue.file_by_id_mut("replaced").unwrap().path = "/tmp/replaced-source.mov".into();
+    root.source_metadata
+        .mark_ready("changed-source", metadata(SourceKind::Image, "png", ""));
+    add_target(&mut root, "new", FileStatus::Idle, SourceKind::Video);
+    let before = root.file_queue.files().to_vec();
+    assert!(root.apply_all_snapshot(&selected));
+    for old in before {
+        let actual = root.file_queue.file_by_id(&old.id).unwrap();
+        if old.id == "valid" {
+            assert_eq!(actual.config.video_codec, "libx265");
+            assert_eq!(
+                actual.config.selected_audio_tracks,
+                old.config.selected_audio_tracks
+            );
+            assert_eq!(
+                actual.config.selected_subtitle_tracks,
+                old.config.selected_subtitle_tracks
+            );
+            assert_eq!(
+                actual.config.external_subtitle_tracks,
+                old.config.external_subtitle_tracks
+            );
+            assert_eq!(
+                actual.config.subtitle_burn_path,
+                old.config.subtitle_burn_path
+            );
+            assert_eq!(actual.status, FileStatus::Error);
+        } else {
+            assert_eq!(actual, &old, "{} must stay unchanged", old.id);
+        }
+    }
+    root.file_queue.select_existing_file("valid");
+    assert_eq!(root.selected_applied_preset_id(), Some("archive-hq"));
+}
+
+#[test]
+fn applying_output_settings_clears_previous_named_preset_lineage() {
+    let mut root = batch_root();
+    add_target(&mut root, "target", FileStatus::Idle, SourceKind::Video);
+    root.file_queue.select_existing_file("target");
+    assert!(root.apply_preset_to_selected("archive-hq"));
+    root.file_queue.select_existing_file("donor");
+    let snapshot = root.snapshot_apply_all().unwrap();
+    assert!(root.apply_all_snapshot(&snapshot));
+    root.file_queue.select_existing_file("target");
+    assert_eq!(root.selected_applied_preset_id(), None);
+}
+
+#[test]
+fn empty_selected_scope_changes_nothing_even_when_files_are_checked_later() {
+    let mut root = batch_root();
+    add_target(&mut root, "target", FileStatus::Idle, SourceKind::Video);
+    root.file_queue
+        .file_by_id_mut("target")
+        .unwrap()
+        .is_selected_for_conversion = false;
+    let all = root.snapshot_apply_all().unwrap();
+    let selected = root.selected_batch_snapshot(&all);
+    assert!(selected.targets.is_empty());
+    root.file_queue
+        .file_by_id_mut("target")
+        .unwrap()
+        .is_selected_for_conversion = true;
+    let before = root.file_queue.files().to_vec();
+    assert!(!root.apply_all_snapshot(&selected));
+    assert_eq!(root.file_queue.files(), before);
+}

@@ -102,6 +102,7 @@ pub(super) fn settings_state<'a>(
         preset_name: "",
         preset_name_focus: None,
         presets: &[],
+        applied_preset_id: None,
         subtitle_fonts: &[],
         available_encoders: empty_encoders(),
         available_filters: empty_filters(),

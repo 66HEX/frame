@@ -1,5 +1,7 @@
 use super::*;
 
+type ConfigEdit = fn(&mut ConversionConfig);
+
 fn image_metadata() -> SourceMetadata {
     SourceMetadata {
         media_kind: Some(SourceKind::Image),
@@ -73,22 +75,22 @@ fn configs_match_detects_audio_bitrate_changes() {
 fn preset_options_detect_changes_to_preset_owned_settings() {
     let preset = default_presets().remove(0);
     let baseline = preset.config.clone();
-    let changes: [(&str, fn(&mut ConversionConfig)); 8] = [
+    let changes: [(&str, ConfigEdit); 8] = [
         ("FPS", |config| config.fps = "24".to_string()),
         ("video filter", |config| {
-            config.video_filters.grayscale = true
+            config.video_filters.grayscale = true;
         }),
         ("audio filter", |config| {
-            config.audio_filters.compressor_enabled = true
+            config.audio_filters.compressor_enabled = true;
         }),
         ("audio bitrate", |config| {
-            config.audio_bitrate = "320".to_string()
+            config.audio_bitrate = "320".to_string();
         }),
         ("metadata", |config| {
-            config.metadata.mode = MetadataMode::Clean
+            config.metadata.mode = MetadataMode::Clean;
         }),
         ("processing mode", |config| {
-            config.processing_mode = ProcessingMode::Copy
+            config.processing_mode = ProcessingMode::Copy;
         }),
         ("trim", |config| config.start_time = Some("1".to_string())),
         ("rotation", |config| config.rotation = "90".to_string()),
