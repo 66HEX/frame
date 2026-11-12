@@ -69,6 +69,7 @@ const UBUNTU_ARCHIVE_SUBSTITUTIONS: &str = concat!(
 
 #[cfg(test)]
 mod monorepo_tests;
+mod native_qa;
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -1682,6 +1683,10 @@ fn generated_workflows() -> Vec<(&'static str, String)> {
         ),
         (CODEQL_WORKFLOW_PATH, codeql_workflow()),
         (RUN_BUNDLING_WORKFLOW_PATH, run_bundling_workflow()),
+        (
+            ".github/workflows/native-qa.yml",
+            render_workflow(&native_qa::workflow()),
+        ),
         (RELEASE_WORKFLOW_PATH, release_workflow()),
         (PUBLISH_NIXPKGS_WORKFLOW_PATH, publish_nixpkgs_workflow()),
     ]
