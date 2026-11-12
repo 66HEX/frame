@@ -46,6 +46,7 @@ impl Read for StartupPipe<'_> {
                 let count = buffer.len().min(available);
                 return self.stdout.read(&mut buffer[..count]);
             }
+            #[cfg(not(unix))]
             std::thread::sleep(Duration::from_millis(5));
         }
     }
@@ -59,8 +60,10 @@ fn available_bytes(stdout: &ChildStdout) -> io::Result<Option<usize>> {
         events: libc::POLLIN,
         revents: 0,
     };
+    // Wait for the producer instead of sleeping after observing an empty pipe.
+    // Every bounded wait returns to the cancellation/deadline checks above.
     // SAFETY: the descriptor borrows a live pipe, and poll receives one valid entry.
-    let result = unsafe { libc::poll(&raw mut descriptor, 1, 0) };
+    let result = unsafe { libc::poll(&raw mut descriptor, 1, 5) };
     if result < 0 {
         let error = io::Error::last_os_error();
         if error.kind() == io::ErrorKind::Interrupted {
@@ -121,7 +124,7 @@ mod tests {
                     "--nocapture",
                 ])
                 .env("FRAME_PREVIEW_PIPE_MODE", mode)
-                .stdin(Stdio::null())
+                .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::null()),
         )
@@ -134,6 +137,21 @@ mod tests {
         let Ok(mode) = std::env::var("FRAME_PREVIEW_PIPE_MODE") else {
             return;
         };
+        if mode == "paced-frame" {
+            let mut stdout = std::io::stdout().lock();
+            let mut stdin = std::io::stdin().lock();
+            stdout.write_all(b"FRAME_PIPE_READY\n").unwrap();
+            stdout.flush().unwrap();
+            for chunk in vec![37; 1920 * 1080 * 4].chunks(8192) {
+                stdin.read_exact(&mut [0]).unwrap();
+                std::thread::sleep(Duration::from_millis(1));
+                stdout.write_all(chunk).unwrap();
+                stdout.flush().unwrap();
+            }
+            drop(stdin);
+            drop(stdout);
+            std::process::exit(0);
+        }
         if mode == "partial" || mode == "complete" {
             std::io::stdout()
                 .write_all(&vec![37; if mode == "partial" { 64 } else { 64 * 1024 }])
@@ -178,5 +196,53 @@ mod tests {
         child.wait().unwrap();
         result.unwrap();
         assert!(started.elapsed() < Duration::from_secs(1));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[ignore = "native throughput timing probe; run without competing benchmarks"]
+    fn full_resolution_frame_does_not_pay_a_polling_sleep_for_each_producer_burst() {
+        let mut child = fixture("paced-frame");
+        let mut stdout = child.stdout.take().unwrap();
+        let mut stdin = child.stdin.take().unwrap();
+        let cancelled = AtomicBool::new(false);
+        let mut pipe = StartupPipe::new(
+            &mut stdout,
+            &cancelled,
+            Instant::now() + Duration::from_secs(15),
+        );
+        let mut pixels = vec![0; 1920 * 1080 * 4];
+        let result = (|| -> io::Result<Duration> {
+            // Discard the test harness preamble before requesting any pixels.
+            // The child waits for each request, so this never consumes frame data.
+            let mut line = Vec::new();
+            loop {
+                let mut byte = [0];
+                pipe.read_exact(&mut byte)?;
+                line.push(byte[0]);
+                if byte[0] == b'\n' {
+                    if line == b"FRAME_PIPE_READY\n" {
+                        break;
+                    }
+                    line.clear();
+                }
+            }
+            let started = Instant::now();
+            for chunk in pixels.chunks_mut(8192) {
+                stdin.write_all(&[1])?;
+                pipe.read_exact(chunk)?;
+            }
+            Ok(started.elapsed())
+        })();
+        // Even a failed timing/read assertion leaves no native child behind.
+        let _ = child.kill();
+        child.wait().unwrap();
+        let elapsed = result.unwrap();
+        assert!(pixels.iter().all(|byte| *byte == 37));
+        eprintln!("full-resolution burst delivery: {elapsed:?}");
+        assert!(
+            elapsed < Duration::from_millis(3500),
+            "first-frame pipe added a polling sleep to each producer burst: {elapsed:?}"
+        );
     }
 }
