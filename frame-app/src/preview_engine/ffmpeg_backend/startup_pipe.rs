@@ -137,6 +137,18 @@ mod tests {
         let Ok(mode) = std::env::var("FRAME_PREVIEW_PIPE_MODE") else {
             return;
         };
+        if mode == "cancel-silent" || mode == "cancel-partial" {
+            let mut stdout = std::io::stdout().lock();
+            stdout.write_all(b"FRAME_PIPE_READY\n").unwrap();
+            stdout.flush().unwrap();
+            std::io::stdin().read_exact(&mut [0]).unwrap();
+            if mode == "cancel-partial" {
+                stdout.write_all(&[37; 64]).unwrap();
+                stdout.flush().unwrap();
+            }
+            std::thread::sleep(Duration::from_secs(5));
+            std::process::exit(0);
+        }
         if mode == "paced-frame" {
             let mut stdout = std::io::stdout().lock();
             let mut stdin = std::io::stdin().lock();
@@ -196,6 +208,77 @@ mod tests {
         child.wait().unwrap();
         result.unwrap();
         assert!(started.elapsed() < Duration::from_secs(1));
+    }
+
+    #[test]
+    fn cancellation_interrupts_a_silent_or_partial_frame_and_allows_a_fresh_read() {
+        for mode in ["cancel-silent", "cancel-partial"] {
+            let mut child = fixture(mode);
+            let mut stdout = child.stdout.take().unwrap();
+            let cancelled = AtomicBool::new(false);
+            let mut pipe = StartupPipe::new(
+                &mut stdout,
+                &cancelled,
+                Instant::now() + Duration::from_secs(3),
+            );
+            let result = (|| -> io::Result<(io::Result<()>, Duration, Vec<u8>)> {
+                // The native child is running and waiting for our acknowledgement;
+                // neither startup scheduling nor libtest text counts as frame data.
+                let mut line = Vec::new();
+                loop {
+                    let mut byte = [0];
+                    pipe.read_exact(&mut byte)?;
+                    line.push(byte[0]);
+                    if byte[0] == b'\n' {
+                        if line == b"FRAME_PIPE_READY\n" {
+                            break;
+                        }
+                        line.clear();
+                    }
+                }
+                child.stdin.as_mut().unwrap().write_all(&[1])?;
+                let mut pixels = vec![0; 4096];
+                let offset = if mode == "cancel-partial" {
+                    pipe.read_exact(&mut pixels[..64])?;
+                    64
+                } else {
+                    0
+                };
+                let started = Instant::now();
+                let read = std::thread::scope(|scope| {
+                    scope.spawn(|| {
+                        std::thread::sleep(Duration::from_millis(50));
+                        cancelled.store(true, Ordering::Release);
+                    });
+                    pipe.read_exact(&mut pixels[offset..])
+                });
+                Ok((read, started.elapsed(), pixels))
+            })();
+            // Reap before every assertion, including when the cancellation fails.
+            let _ = child.kill();
+            let status = child.wait().unwrap();
+            assert_eq!(child.try_wait().unwrap(), Some(status));
+            let (read, elapsed, pixels) = result.unwrap();
+            let error = read.expect_err("cancellation must interrupt an incomplete frame");
+            assert!(error.to_string().contains("cancelled"), "{mode}: {error}");
+            assert!(elapsed < Duration::from_secs(1), "{mode}: {elapsed:?}");
+            if mode == "cancel-partial" {
+                assert_eq!(&pixels[..64], &[37; 64]);
+            }
+
+            cancelled.store(false, Ordering::Release);
+            let mut retry = fixture("complete");
+            let mut stdout = retry.stdout.take().unwrap();
+            let read = StartupPipe::new(
+                &mut stdout,
+                &cancelled,
+                Instant::now() + Duration::from_secs(1),
+            )
+            .read_exact(&mut vec![0; 4096]);
+            let _ = retry.kill();
+            retry.wait().unwrap();
+            read.expect("a fresh read must succeed after cancellation cleanup");
+        }
     }
 
     #[cfg(unix)]
