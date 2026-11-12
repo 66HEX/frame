@@ -51,6 +51,26 @@ fn limits() -> Limits {
     }
 }
 
+#[test]
+fn isolated_domain_runs_while_default_capability_permit_is_occupied() {
+    let _serial = serial();
+    let permit = acquire_permit(Instant::now() + Duration::from_secs(1), &|| false).unwrap();
+    static PREVIEW: ExecutionDomain = ExecutionDomain::new();
+    let result = PREVIEW.run(
+        &spec("success"),
+        &[37],
+        Limits {
+            timeout: Duration::from_millis(200),
+            ..limits()
+        },
+        || false,
+    );
+    drop(permit);
+    let output = result.expect("snapshot domain must not wait for capability probes");
+    assert!(output.success);
+    assert!(output.progress.ended);
+}
+
 pub(super) fn serial() -> std::sync::MutexGuard<'static, ()> {
     PROCESS_TESTS
         .lock()
@@ -365,13 +385,14 @@ fn unwind_retains_child_and_permit_until_supervised_cleanup_finishes() {
     });
     assert!(panic.is_err());
     let deadline = Instant::now() + Duration::from_secs(3);
-    while (ACTIVE.load(Ordering::Acquire) || CLEANUP_PENDING.load(Ordering::Acquire))
+    while (DEFAULT_DOMAIN.active.load(Ordering::Acquire)
+        || DEFAULT_DOMAIN.cleanup_pending.load(Ordering::Acquire))
         && Instant::now() < deadline
     {
         std::thread::sleep(Duration::from_millis(10));
     }
     assert!(
-        !ACTIVE.load(Ordering::Acquire),
+        !DEFAULT_DOMAIN.active.load(Ordering::Acquire),
         "supervisor must reap the child and release its permit"
     );
     assert!(
