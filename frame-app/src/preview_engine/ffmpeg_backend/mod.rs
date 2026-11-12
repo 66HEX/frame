@@ -36,6 +36,7 @@ mod audio_exit;
 mod audio_output;
 mod audio_queue;
 mod audio_stream;
+mod cleanup_broker;
 mod clock;
 mod decode;
 mod plan;
@@ -47,6 +48,8 @@ mod video_stream;
 
 #[cfg(test)]
 mod audio_drain_tests;
+#[cfg(all(test, unix))]
+mod audio_cleanup_tests;
 #[cfg(all(test, unix))]
 mod audio_exit_tests;
 #[cfg(test)]

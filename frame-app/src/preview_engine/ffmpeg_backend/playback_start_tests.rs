@@ -40,6 +40,7 @@ fn new_process() -> RunningPreviewProcess {
         PreviewRuntimeMetricsStore::new(),
         "/missing/ffmpeg".into(),
     )
+    .unwrap()
 }
 
 struct Waiter {

@@ -20,8 +20,8 @@ use windows::Win32::System::Threading::{GetExitCodeProcess, WaitForSingleObject}
 
 use super::{
     CapturedOutput, CleanupGuard, CleanupOutcome, CleanupSlot, CleanupTask, CommandSpec, Duration,
-    Instant, Limits, Permit, ProcessError, ProcessOutput, ProgressParser, ProgressProof,
-    StopReason, early_error, stop_reason, supervise_cleanup,
+    Instant, Limits, Permit, ProcessCallbacks, ProcessError, ProcessOutput, ProgressParser,
+    ProgressProof, StopReason, early_error, stop_reason, supervise_cleanup,
 };
 use launch::handle;
 
@@ -313,10 +313,11 @@ pub(super) fn run(
     input: &[u8],
     limits: Limits,
     deadline: Instant,
-    cancelled: &dyn Fn() -> bool,
+    callbacks: ProcessCallbacks<'_>,
     permit: Permit,
     slot: &CleanupSlot,
 ) -> Result<ProcessOutput, ProcessError> {
+    let cancelled = callbacks.cancelled;
     let launched = launch::spawn(spec, deadline, cancelled).map_err(early_error)?;
     let mut owner = CleanupGuard::new(
         OwnedProcess {
@@ -333,6 +334,7 @@ pub(super) fn run(
         },
         slot,
     );
+    (callbacks.spawned)();
     let setup = (|| {
         launch::fault(spec, "process")?;
         owner.stdout_reader = Some(reader(

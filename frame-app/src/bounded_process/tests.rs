@@ -582,6 +582,7 @@ fn startup_cleanup_returns_with_a_single_owned_pending_slot() {
     worker.join().unwrap();
     let result = result.expect("startup cleanup must return while an owned worker remains pending");
     assert_eq!(result, CleanupOutcome::Pending);
+    assert!(STARTUP.cleanup_in_progress());
     let directory = TestDirectory::new();
     let marker = directory.0.join("must-not-spawn");
     let mut command = spec("empty");
@@ -606,4 +607,79 @@ fn startup_cleanup_returns_with_a_single_owned_pending_slot() {
             .success
     );
     assert!(marker.exists());
+}
+
+#[test]
+fn spawn_observer_does_not_count_a_cancelled_or_missing_process() {
+    static OBSERVED: ExecutionDomain = ExecutionDomain::new();
+    let count = std::sync::atomic::AtomicUsize::new(0);
+    let missing = CommandSpec::new("/missing/frame-bounded-observer-child");
+    for cancelled in [false, true] {
+        assert!(
+            OBSERVED
+                .run_observed(
+                    &missing,
+                    &[],
+                    limits(),
+                    || cancelled,
+                    || {
+                        count.fetch_add(1, Ordering::Relaxed);
+                    }
+                )
+                .is_err()
+        );
+    }
+    assert_eq!(
+        count.load(Ordering::Acquire),
+        0,
+        "no process exists to report to the spawn observer"
+    );
+}
+
+#[test]
+fn spawn_observer_panic_keeps_the_launched_child_owned() {
+    static OBSERVED: ExecutionDomain = ExecutionDomain::new();
+    let directory = TestDirectory::new();
+    let marker = directory.0.join("started");
+    let mut command = spec("no-read");
+    command
+        .env
+        .push(("FRAME_BOUNDED_MARKER".into(), marker.as_os_str().to_owned()));
+    let result = std::panic::catch_unwind(|| {
+        let _ = OBSERVED.run_observed(
+            &command,
+            &[],
+            limits(),
+            || false,
+            || {
+                let deadline = Instant::now() + Duration::from_millis(500);
+                while !marker.exists() && Instant::now() < deadline {
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+                panic!("injected spawn observer panic");
+            },
+        );
+    });
+    assert!(result.is_err());
+    assert!(
+        marker.exists(),
+        "observer must run only after the child actually launched"
+    );
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while (OBSERVED.active.load(Ordering::Acquire)
+        || OBSERVED.cleanup_pending.load(Ordering::Acquire))
+        && Instant::now() < deadline
+    {
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert!(
+        !OBSERVED.active.load(Ordering::Acquire),
+        "panic lost the child's cleanup owner"
+    );
+    assert!(
+        OBSERVED
+            .run(&spec("empty"), &[], limits(), || false)
+            .unwrap()
+            .success
+    );
 }

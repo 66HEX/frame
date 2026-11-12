@@ -3,6 +3,7 @@ use crate::preview_engine::ffmpeg_backend::audio_exit::AudioProcessExit;
 use crate::preview_engine::ffmpeg_backend::audio_stream::{
     AudioStartStatus, PendingAudioStart, lock_pending_audio_start,
 };
+use crate::preview_engine::ffmpeg_backend::cleanup_broker::CleanupBroker;
 use crate::preview_engine::ffmpeg_backend::clock::{
     AudioPlaybackStart, PreviewPlaybackClock, clamp_seek_seconds, initial_start_seconds,
     lock_playback, parsed_time,
@@ -32,6 +33,7 @@ pub struct RunningPreviewProcess {
     pub(super) metrics: PreviewRuntimeMetricsStore,
     pub(super) executable: String,
     pub(super) cancelled: Arc<AtomicBool>,
+    pub(super) cleanup: &'static CleanupBroker,
     pub(super) process: Arc<Mutex<RunningProcessState>>,
     pub(super) audio_process: Arc<Mutex<RunningProcessState>>,
     pub(super) pending_audio_start: Arc<Mutex<Option<PendingAudioStart>>>,
@@ -240,14 +242,16 @@ impl RunningPreviewProcess {
         frame_store: LatestFrameStore,
         metrics: PreviewRuntimeMetricsStore,
         executable: String,
-    ) -> Self {
+    ) -> Result<Self, PreviewEngineError> {
+        let cleanup = CleanupBroker::shared()?;
         let start_seconds = initial_start_seconds(&config);
-        Self {
+        Ok(Self {
             config,
             frame_store,
             metrics,
             executable,
             cancelled: Arc::new(AtomicBool::new(false)),
+            cleanup,
             process: Arc::new(Mutex::new(RunningProcessState::default())),
             audio_process: Arc::new(Mutex::new(RunningProcessState::default())),
             pending_audio_start: Arc::new(Mutex::new(None)),
@@ -264,7 +268,7 @@ impl RunningPreviewProcess {
             render_image_id: RenderImage::new_image_id(),
             render_image_version: Arc::new(AtomicU64::new(1)),
             stderr: Arc::new(Mutex::new(VecDeque::with_capacity(STDERR_RING_LINES))),
-        }
+        })
     }
 
     pub(super) fn next_render_image_identity(&self) -> RenderImageIdentity {
@@ -300,7 +304,7 @@ impl RunningPreviewProcess {
         let mut handles = self.detach_failed_video_start(generation);
         handles.extend(candidate);
         for handles in handles {
-            let _ = stop_process_handles(handles);
+            let _ = stop_process_handles(self.cleanup, handles);
         }
         error
     }
@@ -338,13 +342,13 @@ impl RunningPreviewProcess {
 
     pub(super) fn stop_video_process(&self) -> Result<(), PreviewEngineError> {
         let handles = take_process_handles(&self.process);
-        stop_process_handles(handles)
+        stop_process_handles(self.cleanup, handles)
     }
 
     pub(super) fn stop_audio_process(&self) -> Result<(), PreviewEngineError> {
         *lock_pending_audio_start(&self.pending_audio_start) = None;
         let handles = take_process_handles(&self.audio_process);
-        stop_process_handles(handles)
+        stop_process_handles(self.cleanup, handles)
     }
 
     pub(super) fn take_audio_handles_for_exit(
@@ -396,12 +400,15 @@ impl RunningPreviewProcess {
             .as_ref()
             .map(|exit| (Arc::clone(exit), exit.record_exit(status)));
 
-        // A finished audio child can leave a live worker with prewarmed or
-        // buffered PCM. Keep its handles and Ready message until the consumer
-        // exits; joining now could block forever before Play starts the clock.
-        if state.audio_start.is_some()
-            && state
-                .stdout_worker
+        // Retain every unfinished reader with the session. Audio may still
+        // contain prewarmed PCM; video/stderr can still have inherited writers.
+        // Natural exit polling must never join either kind of live worker.
+        if state
+            .stdout_worker
+            .as_ref()
+            .is_some_and(|worker| !worker.is_finished())
+            || state
+                .stderr_worker
                 .as_ref()
                 .is_some_and(|worker| !worker.is_finished())
         {
@@ -439,41 +446,11 @@ impl RunningPreviewProcess {
     }
 }
 
-pub(super) fn stop_process_handles(handles: ProcessHandles) -> Result<(), PreviewEngineError> {
-    // Classify a child that already exited before requesting intentional stop.
-    // A kill performed below must never become a decoder-failure diagnostic.
-    let mut child = handles.child;
-    let already_exited = child
-        .as_mut()
-        .and_then(|child| child.try_wait().ok())
-        .flatten();
-    if let Some(status) = already_exited
-        && let Some(exit) = &handles.audio_exit
-    {
-        exit.publish(exit.record_exit(status));
-    }
-    if let Some(stop_requested) = &handles.stop_requested {
-        if let Some(start) = &handles.audio_start {
-            start.request_stop(stop_requested);
-        } else {
-            stop_requested.store(true, Ordering::SeqCst);
-        }
-    }
-    if let Some(exit) = &handles.audio_exit {
-        exit.cancel();
-    }
-    let mut result = Ok(());
-    if let Some(mut child) = child {
-        if already_exited.is_none()
-            && let Err(error) = child.kill()
-        {
-            result = Err(PreviewEngineError::Io(error));
-        }
-        let _ = child.wait();
-    }
-    join_worker(handles.stdout_worker);
-    join_worker(handles.stderr_worker);
-    result
+pub(super) fn stop_process_handles(
+    cleanup: &CleanupBroker,
+    handles: ProcessHandles,
+) -> Result<(), PreviewEngineError> {
+    cleanup.retire(handles)
 }
 
 pub(super) fn take_process_handles(process: &Mutex<RunningProcessState>) -> ProcessHandles {
@@ -527,7 +504,7 @@ pub(in crate::preview_engine) fn start_ffmpeg_preview_process(
     cancelled: Arc<AtomicBool>,
 ) -> Result<(RunningPreviewProcess, PreviewDimensions, f64), PreviewEngineError> {
     let executable = ffmpeg_executable();
-    let mut process = RunningPreviewProcess::new(config.clone(), frame_store, metrics, executable);
+    let mut process = RunningPreviewProcess::new(config.clone(), frame_store, metrics, executable)?;
     process.cancelled = cancelled;
     let dimensions = if matches!(
         config.source_kind,
@@ -665,7 +642,8 @@ mod tests {
             LatestFrameStore::new(),
             PreviewRuntimeMetricsStore::new(),
             "/missing/ffmpeg".into(),
-        );
+        )
+        .unwrap();
         {
             let mut playback = lock_playback(&process.playback);
             playback.generation = 7;
@@ -691,7 +669,8 @@ mod tests {
                 LatestFrameStore::new(),
                 PreviewRuntimeMetricsStore::new(),
                 "/missing/ffmpeg".into(),
-            );
+            )
+            .unwrap();
             {
                 let mut clock = lock_playback(&process.playback);
                 clock.last_frame_seconds = 50.0;
@@ -729,7 +708,8 @@ mod tests {
             LatestFrameStore::new(),
             PreviewRuntimeMetricsStore::new(),
             "/missing/ffmpeg".into(),
-        );
+        )
+        .unwrap();
         process.fail_audio_output_for_test();
         let mut child = std::process::Command::new("sh")
             .args(["-c", "exit 0"])
@@ -822,7 +802,8 @@ mod cancellation_guard_tests {
             LatestFrameStore::new(),
             PreviewRuntimeMetricsStore::new(),
             "/missing/ffmpeg".into(),
-        );
+        )
+        .unwrap();
         let frame = crate::preview_engine::rendered_frame_from_bgra_payload(1, 1, 4, 0, vec![0; 4])
             .unwrap();
         process.cancelled.store(true, Ordering::Release);
@@ -831,5 +812,68 @@ mod cancellation_guard_tests {
             process.frame_store.latest().is_none(),
             "cancelled preview published a stale completed frame"
         );
+    }
+}
+
+#[cfg(all(test, unix))]
+mod reaping_cleanup_tests {
+    use super::*;
+    use std::process::{Command, Stdio};
+    use std::sync::mpsc;
+    use std::time::Duration;
+
+    #[test]
+    fn finished_video_reaping_preserves_inherited_pipe_ownership_without_joining() {
+        let process = Arc::new(
+            RunningPreviewProcess::new(
+                super::super::tests::preview_config(),
+                LatestFrameStore::new(),
+                PreviewRuntimeMetricsStore::new(),
+                "/missing/ffmpeg".into(),
+            )
+            .unwrap(),
+        );
+        let mut child = crate::process_launch::spawn(
+            Command::new("sh")
+                .args(["-c", "sleep 3 & exit 0"])
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::piped()),
+        )
+        .unwrap();
+        let stop = Arc::new(AtomicBool::new(false));
+        let stderr_worker = spawn_stderr_worker(
+            child.stderr.take().unwrap(),
+            Arc::clone(&process.stderr),
+            Arc::clone(&stop),
+        )
+        .unwrap();
+        child.wait().unwrap();
+        *lock_process(&process.process) = RunningProcessState {
+            child: Some(child),
+            stderr_worker: Some(stderr_worker),
+            stop_requested: Some(stop),
+            ..RunningProcessState::default()
+        };
+        let (done_tx, done_rx) = mpsc::channel();
+        let reaping = Arc::clone(&process);
+        let worker = thread::spawn(move || {
+            done_tx
+                .send(reaping.reap_finished_process(&reaping.process, true))
+                .unwrap();
+        });
+        let result = done_rx.recv_timeout(Duration::from_millis(200));
+        worker.join().unwrap();
+        assert!(!result.expect("reaping must not join a reader whose inherited pipe remains open"));
+        assert!(lock_process(&process.process).stderr_worker.is_some());
+        assert!(process.stop_running_processes().is_err());
+        let deadline = Instant::now() + Duration::from_secs(4);
+        while process.cleanup.check_admission().is_err() {
+            assert!(
+                Instant::now() < deadline,
+                "retired reaper ownership did not finish"
+            );
+            thread::sleep(Duration::from_millis(10));
+        }
     }
 }

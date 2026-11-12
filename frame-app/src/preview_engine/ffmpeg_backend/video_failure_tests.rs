@@ -43,6 +43,7 @@ fn new_process() -> RunningPreviewProcess {
         PreviewRuntimeMetricsStore::new(),
         "/missing/ffmpeg".into(),
     )
+    .unwrap()
 }
 
 fn sleeping_handles() -> ProcessHandles {

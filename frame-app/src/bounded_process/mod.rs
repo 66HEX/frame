@@ -230,6 +230,12 @@ pub struct ExecutionDomain {
     slot: OnceLock<Result<CleanupSlot, String>>,
 }
 
+#[derive(Clone, Copy)]
+struct ProcessCallbacks<'a> {
+    cancelled: &'a dyn Fn() -> bool,
+    spawned: &'a dyn Fn(),
+}
+
 struct Permit(&'static ExecutionDomain);
 
 impl Drop for Permit {
@@ -447,6 +453,10 @@ impl ExecutionDomain {
             .map_err(|error| early_error(StopReason::Io(error.clone())))
     }
 
+    pub fn cleanup_in_progress(&self) -> bool {
+        self.cleanup_pending.load(Ordering::Acquire)
+    }
+
     pub fn reserve(
         &'static self,
         deadline: Instant,
@@ -464,6 +474,17 @@ impl ExecutionDomain {
         limits: Limits,
         cancelled: impl Fn() -> bool,
     ) -> Result<ProcessOutput, ProcessError> {
+        self.run_observed(command, input, limits, cancelled, || {})
+    }
+
+    pub fn run_observed(
+        &'static self,
+        command: &CommandSpec,
+        input: &[u8],
+        limits: Limits,
+        cancelled: impl Fn() -> bool,
+        spawned: impl Fn(),
+    ) -> Result<ProcessOutput, ProcessError> {
         let deadline = Instant::now()
             .checked_add(limits.timeout)
             .ok_or_else(|| early_error(StopReason::Io("invalid process deadline".into())))?;
@@ -474,10 +495,14 @@ impl ExecutionDomain {
         }
         let permit = self.acquire_permit(deadline, &cancelled)?;
         let slot = self.cleanup_slot()?;
+        let callbacks = ProcessCallbacks {
+            cancelled: &cancelled,
+            spawned: &spawned,
+        };
         #[cfg(unix)]
-        return unix::run(command, input, limits, deadline, &cancelled, permit, slot);
+        return unix::run(command, input, limits, deadline, callbacks, permit, slot);
         #[cfg(windows)]
-        return windows::run(command, input, limits, deadline, &cancelled, permit, slot);
+        return windows::run(command, input, limits, deadline, callbacks, permit, slot);
         #[cfg(not(any(unix, windows)))]
         Err(early_error(StopReason::Io(
             "bounded processes are unavailable on this platform".into(),

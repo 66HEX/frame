@@ -20,18 +20,25 @@ use crate::preview_engine::metrics::PreviewRuntimeMetricsStore;
 use crate::preview_engine::types::PreviewSessionConfig;
 use std::collections::VecDeque;
 use std::io::{ErrorKind, Read};
-use std::process::{Command, Stdio};
+use std::process::{Child, ChildStderr, ChildStdout, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, mpsc};
 use std::thread;
 use std::thread::JoinHandle;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 pub(super) const AUDIO_READ_BUFFER_BYTES: usize = 8192;
 
 pub(super) const AUDIO_START_READY_TIMEOUT: Duration = Duration::from_secs(2);
 
 pub(super) const AUDIO_PREBUFFER_MS: u32 = 30;
+
+struct SpawnedAudioDecoder {
+    child: Child,
+    stdout: ChildStdout,
+    stderr: ChildStderr,
+    output_spec: AudioOutputSpec,
+}
 
 pub(super) struct AudioStdoutWorkerConfig {
     pub(super) stderr_lines: Arc<Mutex<VecDeque<String>>>,
@@ -144,27 +151,12 @@ impl RunningPreviewProcess {
             return Ok(PendingAudioStart::OutputDisabled);
         }
 
-        self.stop_audio_process()?;
-        let output_spec = AudioOutputSpec::default_output()?;
-        let plan = preview_audio_plan(config, seconds, true, precise, output_spec)?;
-        let mut child = crate::process_launch::spawn(
-            Command::new(&self.executable)
-                .args(&plan.args)
-                .stdin(Stdio::null())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped()),
-        )
-        .map_err(|err| {
-            PreviewEngineError::Ffmpeg(format!("failed to start audio preview: {err}"))
-        })?;
-        self.metrics.record_audio_process_spawn();
-
-        let stdout = child.stdout.take().ok_or_else(|| {
-            PreviewEngineError::Ffmpeg("ffmpeg audio stdout was not captured".to_string())
-        })?;
-        let stderr = child.stderr.take().ok_or_else(|| {
-            PreviewEngineError::Ffmpeg("ffmpeg audio stderr was not captured".to_string())
-        })?;
+        let SpawnedAudioDecoder {
+            child,
+            stdout,
+            stderr,
+            output_spec,
+        } = self.spawn_audio_decoder(config, seconds, precise)?;
         let stop_requested = Arc::new(AtomicBool::new(false));
         let audio_start = Arc::new(AudioPlaybackStart::new(
             Arc::clone(&self.playback),
@@ -191,14 +183,17 @@ impl RunningPreviewProcess {
         ) {
             Ok(worker) => worker,
             Err(error) => {
-                let _ = stop_process_handles(ProcessHandles {
-                    child: Some(child),
-                    stdout_worker: None,
-                    stderr_worker: None,
-                    stop_requested: Some(stop_requested),
-                    audio_start: Some(audio_start),
-                    audio_exit: Some(exit),
-                });
+                let _ = stop_process_handles(
+                    self.cleanup,
+                    ProcessHandles {
+                        child: Some(child),
+                        stdout_worker: None,
+                        stderr_worker: None,
+                        stop_requested: Some(stop_requested),
+                        audio_start: Some(audio_start),
+                        audio_exit: Some(exit),
+                    },
+                );
                 return Err(error);
             }
         };
@@ -217,14 +212,17 @@ impl RunningPreviewProcess {
         ) {
             Ok(worker) => worker,
             Err(error) => {
-                let _ = stop_process_handles(ProcessHandles {
-                    child: Some(child),
-                    stdout_worker: Some(stdout_worker),
-                    stderr_worker: None,
-                    stop_requested: Some(stop_requested),
-                    audio_start: Some(audio_start),
-                    audio_exit: Some(exit),
-                });
+                let _ = stop_process_handles(
+                    self.cleanup,
+                    ProcessHandles {
+                        child: Some(child),
+                        stdout_worker: Some(stdout_worker),
+                        stderr_worker: None,
+                        stop_requested: Some(stop_requested),
+                        audio_start: Some(audio_start),
+                        audio_exit: Some(exit),
+                    },
+                );
                 return Err(error);
             }
         };
@@ -247,19 +245,83 @@ impl RunningPreviewProcess {
         })
     }
 
+    fn spawn_audio_decoder(
+        &self,
+        config: &PreviewSessionConfig,
+        seconds: f64,
+        precise: bool,
+    ) -> Result<SpawnedAudioDecoder, PreviewEngineError> {
+        self.stop_audio_process()?;
+        self.cleanup.check_admission()?;
+        super::video_stream::check_startup_cleanup()?;
+        let output_spec = AudioOutputSpec::default_output()?;
+        let plan = preview_audio_plan(config, seconds, true, precise, output_spec)?;
+        let mut child = super::startup_process::spawn(
+            Command::new(&self.executable)
+                .args(&plan.args)
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped()),
+            &self.cancelled,
+            Instant::now() + super::startup_pipe::STARTUP_TIMEOUT,
+        )
+        .map_err(|err| {
+            PreviewEngineError::Ffmpeg(format!("failed to start audio preview: {err}"))
+        })?;
+        self.metrics.record_audio_process_spawn();
+
+        let (Some(stdout), Some(stderr)) = (child.stdout.take(), child.stderr.take()) else {
+            let _ = stop_process_handles(
+                self.cleanup,
+                ProcessHandles {
+                    child: Some(child),
+                    stdout_worker: None,
+                    stderr_worker: None,
+                    stop_requested: None,
+                    audio_start: None,
+                    audio_exit: None,
+                },
+            );
+            return Err(PreviewEngineError::Ffmpeg(
+                "ffmpeg audio output pipes were not captured".into(),
+            ));
+        };
+        Ok(SpawnedAudioDecoder {
+            child,
+            stdout,
+            stderr,
+            output_spec,
+        })
+    }
+
     pub(super) fn finish_audio_start(&self, pending: PendingAudioStart) -> AudioStartStatus {
+        let (status, handles) = self.resolve_audio_start(pending);
+        if let Some(handles) = handles {
+            let _ = stop_process_handles(self.cleanup, handles);
+        }
+        status
+    }
+
+    pub(super) fn resolve_audio_start(
+        &self,
+        pending: PendingAudioStart,
+    ) -> (AudioStartStatus, Option<ProcessHandles>) {
         let PendingAudioStart::Waiting {
             generation,
             ready_rx,
             exit,
         } = pending
         else {
-            return AudioStartStatus::OutputDisabled;
+            return (AudioStartStatus::OutputDisabled, None);
         };
-        let status = match ready_rx.recv_timeout(AUDIO_START_READY_TIMEOUT) {
+        let status = match self.wait_audio_ready(&ready_rx) {
             Ok(AudioWorkerStatus::Ready) => AudioStartStatus::Ready,
             Ok(AudioWorkerStatus::ReadyAtEof) => {
-                match exit.wait_for_exit(&self.audio_process, AUDIO_EXIT_TIMEOUT) {
+                match exit.wait_for_exit_cancellable(
+                    &self.audio_process,
+                    AUDIO_EXIT_TIMEOUT,
+                    || self.cancelled.load(Ordering::Acquire),
+                ) {
                     AudioExitOutcome::Exited(status) if status.success() => AudioStartStatus::Ready,
                     _ => AudioStartStatus::Failed,
                 }
@@ -274,7 +336,7 @@ impl RunningPreviewProcess {
             status,
             AudioStartStatus::Ready | AudioStartStatus::OutputDisabled
         ) {
-            return status;
+            return (status, None);
         }
         push_stderr_line(
             &self.stderr,
@@ -287,13 +349,33 @@ impl RunningPreviewProcess {
         );
         // A cancelled, older proof must never stop the replacement child.
         let handles = self.take_audio_handles_for_exit(&exit);
-        if let Some(handles) = handles {
-            if let Some(start) = &handles.audio_start {
-                start.mark_output_failed((!self.has_visual_stream()).then_some(generation));
-            }
-            let _ = stop_process_handles(handles);
+        if let Some(start) = handles
+            .as_ref()
+            .and_then(|handles| handles.audio_start.as_ref())
+        {
+            start.mark_output_failed((!self.has_visual_stream()).then_some(generation));
         }
-        status
+        (status, handles)
+    }
+
+    fn wait_audio_ready(
+        &self,
+        ready_rx: &mpsc::Receiver<AudioWorkerStatus>,
+    ) -> Result<AudioWorkerStatus, mpsc::RecvTimeoutError> {
+        let deadline = Instant::now() + AUDIO_START_READY_TIMEOUT;
+        loop {
+            if self.cancelled.load(Ordering::Acquire) {
+                return Ok(AudioWorkerStatus::Failed);
+            }
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                return Err(mpsc::RecvTimeoutError::Timeout);
+            }
+            match ready_rx.recv_timeout(remaining.min(Duration::from_millis(10))) {
+                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                result => return result,
+            }
+        }
     }
 
     pub(super) fn prewarm_audio_for_generation(

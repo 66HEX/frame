@@ -39,6 +39,7 @@ fn new_process() -> RunningPreviewProcess {
         PreviewRuntimeMetricsStore::new(),
         "/missing/ffmpeg".into(),
     )
+    .unwrap()
 }
 
 fn install_child(
@@ -548,4 +549,54 @@ fn real_output_observes_short_and_late_decoder_failures_with_empty_stderr() {
         drop(process);
         std::fs::remove_file(path).unwrap();
     }
+}
+
+#[test]
+fn audio_readiness_wait_observes_session_cancellation() {
+    let process = Arc::new(new_process());
+    let exit = install_child(&process, "exec sleep 2", false);
+    let (ready_tx, ready_rx) = mpsc::channel();
+    let cancelling = Arc::clone(&process);
+    let signal = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(30));
+        cancelling
+            .cancelled
+            .store(true, std::sync::atomic::Ordering::Release);
+    });
+    let started = Instant::now();
+    let status = process.finish_audio_start(PendingAudioStart::Waiting {
+        generation: 0,
+        ready_rx,
+        exit,
+    });
+    signal.join().unwrap();
+    drop(ready_tx);
+    assert!(
+        started.elapsed() < Duration::from_millis(500),
+        "audio readiness ignored the session cancellation signal"
+    );
+    assert_eq!(status, AudioStartStatus::Failed);
+    assert!(lock_process(&process.audio_process).child.is_none());
+}
+
+#[test]
+fn audio_eof_wait_observes_session_cancellation() {
+    let process = Arc::new(new_process());
+    let exit = install_child(&process, "exec sleep 2", false);
+    let cancelling = Arc::clone(&process);
+    let signal = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(30));
+        cancelling
+            .cancelled
+            .store(true, std::sync::atomic::Ordering::Release);
+    });
+    let started = Instant::now();
+    let status = process.finish_audio_start(pending(exit, AudioWorkerStatus::ReadyAtEof));
+    signal.join().unwrap();
+    assert!(
+        started.elapsed() < Duration::from_millis(500),
+        "audio exit proof ignored the session cancellation signal"
+    );
+    assert_eq!(status, AudioStartStatus::Failed);
+    assert!(lock_process(&process.audio_process).child.is_none());
 }

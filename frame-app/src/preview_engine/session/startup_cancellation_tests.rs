@@ -268,3 +268,140 @@ fn cancellation_guard_rejects_a_queued_play_command() {
     assert!(session.command(PreviewCommand::Play).is_err());
     assert!(!session.snapshot().playback.playing);
 }
+
+#[test]
+fn playing_seek_does_not_block_on_an_old_streams_inherited_pipes() {
+    let fake = SilentPreviewChild::new();
+    let frame_script = "#!/bin/sh\nexec dd if=/dev/zero bs=57600 count=1 2>/dev/null\n";
+    fs::write(&fake.executable, frame_script).unwrap();
+    let video = video_config();
+    let mut audio = video.clone();
+    audio.source_kind = PreviewSourceKind::Audio;
+    let session = Arc::new(PreviewSession::start(audio).unwrap());
+    lock(&session.pipeline)
+        .as_mut()
+        .unwrap()
+        .set_test_executable(fake.executable.to_string_lossy().into_owned());
+    session.reconfigure(video).unwrap();
+    let marker = fake.marker.to_string_lossy().replace('\'', "'\\''");
+    fs::write(
+        &fake.executable,
+        format!("#!/bin/sh\nsleep 3 &\nprintf '%s' \"$$\" > '{marker}'\ndd if=/dev/zero bs=57600 count=1 2>/dev/null\nexec sleep 3\n"),
+    )
+    .unwrap();
+    session.command(PreviewCommand::Play).unwrap();
+    let old_pid = fake.wait_for_pid();
+    fs::write(&fake.executable, frame_script).unwrap();
+
+    let (done_tx, done_rx) = mpsc::channel();
+    let seeking_session = Arc::clone(&session);
+    let seeking = thread::spawn(move || {
+        done_tx
+            .send(seeking_session.command(PreviewCommand::SeekAndPlay {
+                seconds: 0.5,
+                precise: true,
+            }))
+            .unwrap();
+    });
+    let result = done_rx.recv_timeout(Duration::from_secs(2));
+    seeking.join().unwrap();
+    session.stop().unwrap();
+    let error = result
+        .expect("seek handoff must not wait for the old stream's inherited pipe writers")
+        .expect_err("the incomplete old cleanup must reject publication of the candidate");
+    assert!(error.to_string().contains("cleanup"), "{error}");
+    // SAFETY: signal zero only observes our original, directly owned child.
+    assert_eq!(
+        unsafe { libc::kill(old_pid, 0) },
+        -1,
+        "old direct child was not reaped"
+    );
+    // A successful retry proves the original handles remained owned until their
+    // inherited pipes closed and the startup permit was released.
+    let video = video_config();
+    let mut audio = video.clone();
+    audio.source_kind = PreviewSourceKind::Audio;
+    let retry = PreviewSession::start(audio).unwrap();
+    lock(&retry.pipeline)
+        .as_mut()
+        .unwrap()
+        .set_test_executable(fake.executable.to_string_lossy().into_owned());
+    retry.reconfigure(video).unwrap();
+    let deadline = Instant::now() + Duration::from_secs(4);
+    loop {
+        match retry.command(PreviewCommand::Play) {
+            Ok(()) => break,
+            Err(error) => {
+                assert!(error.to_string().contains("CleanupInProgress"), "{error}");
+                assert!(
+                    Instant::now() < deadline,
+                    "old stream cleanup never released its permit"
+                );
+                thread::sleep(Duration::from_millis(10));
+            }
+        }
+    }
+    retry.stop().unwrap();
+}
+
+#[test]
+fn stop_of_a_playing_stream_retains_pending_pipes_and_blocks_new_spawns() {
+    let fake = SilentPreviewChild::new();
+    let frame_script = "#!/bin/sh\nexec dd if=/dev/zero bs=57600 count=1 2>/dev/null\n";
+    fs::write(&fake.executable, frame_script).unwrap();
+    let video = video_config();
+    let mut audio = video.clone();
+    audio.source_kind = PreviewSourceKind::Audio;
+    let session = Arc::new(PreviewSession::start(audio.clone()).unwrap());
+    lock(&session.pipeline)
+        .as_mut()
+        .unwrap()
+        .set_test_executable(fake.executable.to_string_lossy().into_owned());
+    session.reconfigure(video.clone()).unwrap();
+    let marker = fake.marker.to_string_lossy().replace('\'', "'\\''");
+    fs::write(&fake.executable, format!("#!/bin/sh\nsleep 3 &\nprintf '%s' \"$$\" > '{marker}'\ndd if=/dev/zero bs=57600 count=1 2>/dev/null\nexec sleep 3\n")).unwrap();
+    session.command(PreviewCommand::Play).unwrap();
+    let old_pid = fake.wait_for_pid();
+    fs::write(&fake.executable, format!("#!/bin/sh\nprintf '%s' \"$$\" > '{marker}'\nexec dd if=/dev/zero bs=57600 count=1 2>/dev/null\n")).unwrap();
+    let retry = PreviewSession::start(audio).unwrap();
+    lock(&retry.pipeline)
+        .as_mut()
+        .unwrap()
+        .set_test_executable(fake.executable.to_string_lossy().into_owned());
+    retry.reconfigure(video).unwrap();
+    fs::remove_file(&fake.marker).unwrap();
+
+    let (done_tx, done_rx) = mpsc::channel();
+    let stopping_session = Arc::clone(&session);
+    let stopping = thread::spawn(move || done_tx.send(stopping_session.stop()).unwrap());
+    let result = done_rx.recv_timeout(Duration::from_secs(2));
+    stopping.join().unwrap();
+    let result =
+        result.expect("Stop must not join a playing stream's inherited pipes without a bound");
+    assert!(result.unwrap_err().to_string().contains("cleanup"));
+    // SAFETY: signal zero only queries our directly owned child.
+    assert_eq!(unsafe { libc::kill(old_pid, 0) }, -1);
+    for _ in 0..5 {
+        let error = retry.command(PreviewCommand::Play).unwrap_err();
+        assert!(error.to_string().contains("cleanup"), "{error}");
+        assert!(
+            !fake.marker.exists(),
+            "a new child escaped the pending-cleanup gate"
+        );
+    }
+    let deadline = Instant::now() + Duration::from_secs(4);
+    loop {
+        match retry.command(PreviewCommand::Play) {
+            Ok(()) => break,
+            Err(error) => {
+                assert!(
+                    Instant::now() < deadline,
+                    "cleanup did not release admission: {error}"
+                );
+                thread::sleep(Duration::from_millis(10));
+            }
+        }
+    }
+    assert!(fake.marker.exists());
+    retry.stop().unwrap();
+}

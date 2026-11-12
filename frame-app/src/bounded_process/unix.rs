@@ -8,8 +8,8 @@ use std::process::{Child, Command, ExitStatus, Stdio};
 
 use super::{
     CapturedOutput, CleanupGuard, CleanupOutcome, CleanupSlot, CleanupTask, CommandSpec, Duration,
-    Instant, Limits, Permit, ProcessError, ProcessOutput, ProgressParser, StopReason, early_error,
-    stop_reason, supervise_cleanup,
+    Instant, Limits, Permit, ProcessCallbacks, ProcessError, ProcessOutput, ProgressParser,
+    StopReason, early_error, stop_reason, supervise_cleanup,
 };
 
 struct OwnedProcess {
@@ -170,10 +170,11 @@ pub(super) fn run(
     input: &[u8],
     limits: Limits,
     deadline: Instant,
-    cancelled: &dyn Fn() -> bool,
+    callbacks: ProcessCallbacks<'_>,
     permit: Permit,
     slot: &CleanupSlot,
 ) -> Result<ProcessOutput, ProcessError> {
+    let cancelled = callbacks.cancelled;
     let mut command = Command::new(&spec.program);
     if let Some(argv0) = &spec.argv0 {
         command.arg0(argv0);
@@ -221,6 +222,7 @@ pub(super) fn run(
         },
         slot,
     );
+    (callbacks.spawned)();
     let setup = [&owner.stdin, &owner.stdout, &owner.stderr]
         .into_iter()
         .flatten()

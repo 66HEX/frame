@@ -28,6 +28,17 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
+static STARTUPS: ExecutionDomain = ExecutionDomain::new();
+
+pub(super) fn check_startup_cleanup() -> Result<(), PreviewEngineError> {
+    if STARTUPS.cleanup_in_progress() {
+        return Err(PreviewEngineError::Ffmpeg(
+            "preview startup stopped: CleanupInProgress".into(),
+        ));
+    }
+    Ok(())
+}
+
 pub(super) struct SpawnedVideoStream {
     pub(super) child: Child,
     pub(super) stdout: ChildStdout,
@@ -81,7 +92,7 @@ impl RunningPreviewProcess {
         seconds: f64,
         precise: bool,
     ) -> Result<PreviewDimensions, PreviewEngineError> {
-        static STARTUPS: ExecutionDomain = ExecutionDomain::new();
+        self.cleanup.check_admission()?;
         let deadline = Instant::now() + STARTUP_TIMEOUT;
         let reservation = STARTUPS
             .reserve(deadline, || self.cancelled.load(Ordering::Acquire))
@@ -123,7 +134,11 @@ impl RunningPreviewProcess {
             u64::try_from(first_frame_read_elapsed.as_millis()).unwrap_or(u64::MAX);
 
         if let Some(pending_audio) = pending_audio {
-            match self.finish_audio_start(pending_audio) {
+            let (status, handles) = self.resolve_audio_start(pending_audio);
+            if let Some(handles) = handles {
+                stream = self.retire_for_handoff(generation, stream, handles)?;
+            }
+            match status {
                 AudioStartStatus::Ready | AudioStartStatus::OutputDisabled => {}
                 AudioStartStatus::TimedOut | AudioStartStatus::Failed => {
                     push_stderr_line(
@@ -161,16 +176,7 @@ impl RunningPreviewProcess {
         generation: u64,
         first_frame_read_ms: u64,
     ) -> Result<PreviewDimensions, PreviewEngineError> {
-        let stop_result = self.stop_video_process();
-        if let Err(error) = stop_result {
-            let (handles, reservation) = stream.into_handles();
-            return Err(self.fail_video_start_bounded(
-                generation,
-                error,
-                Some(handles),
-                reservation,
-            ));
-        }
+        let stream = self.retire_video_for_handoff(generation, stream)?;
 
         let dimensions = PreviewDimensions {
             width: stream.spec.width,
@@ -366,7 +372,7 @@ impl RunningPreviewProcess {
 }
 
 impl SpawnedVideoStream {
-    fn into_handles(self) -> (ProcessHandles, ProcessReservation) {
+    pub(super) fn into_handles(self) -> (ProcessHandles, ProcessReservation) {
         (
             ProcessHandles {
                 child: Some(self.child),

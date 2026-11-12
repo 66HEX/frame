@@ -139,9 +139,8 @@ fn capture_snapshot(
             "single frame render cancelled".into(),
         ));
     }
-    metrics.record_video_process_spawn();
     let output = SNAPSHOTS
-        .run(
+        .run_observed(
             command,
             &[],
             Limits {
@@ -151,6 +150,7 @@ fn capture_snapshot(
                 stderr_bytes: 64 * 1024,
             },
             || cancelled.load(Ordering::Acquire),
+            || metrics.record_video_process_spawn(),
         )
         .map_err(|error| {
             PreviewEngineError::Ffmpeg(format!(
@@ -322,5 +322,28 @@ mod snapshot_tests {
             Duration::from_secs(3),
         )
         .unwrap();
+    }
+}
+
+#[cfg(test)]
+mod spawn_metric_tests {
+    use super::*;
+
+    #[test]
+    fn missing_snapshot_executable_does_not_increment_spawn_metrics() {
+        let metrics = PreviewRuntimeMetricsStore::new();
+        let result = capture_snapshot(
+            &CommandSpec::new("/missing/frame-snapshot-ffmpeg"),
+            4,
+            &metrics,
+            &AtomicBool::new(false),
+            Duration::from_secs(1),
+        );
+        assert!(result.is_err());
+        assert_eq!(
+            metrics.snapshot().video_process_spawns,
+            0,
+            "a failed launch must not count as a spawned FFmpeg process"
+        );
     }
 }
