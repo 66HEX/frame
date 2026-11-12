@@ -10,7 +10,6 @@ use frame_core::args::{
 };
 use frame_core::error::ConversionError;
 use frame_core::events::ConversionEvent;
-use frame_core::probe::{ffprobe_json_args, parse_ffprobe_stdout};
 use frame_core::types::{ConversionConfig as CoreConversionConfig, ConversionTask, ProbeMetadata};
 use frame_core::utils::{DURATION_REGEX, TIME_REGEX, parse_time};
 use std::collections::VecDeque;
@@ -122,7 +121,16 @@ fn run_prepared_conversion_task_with_control(
     }
 
     validate_task_input(&task.file_path, &task.config)?;
-    let probe = probe_media_file(&task.file_path)?;
+    let Some(probe) = probe_conversion_source(
+        &task.file_path,
+        &ffprobe_executable(),
+        &task.id,
+        controller,
+        emit,
+    )?
+    else {
+        return Ok(());
+    };
 
     let output_path = build_output_path(
         &task.output_directory,
@@ -738,24 +746,24 @@ pub(super) fn emit_cancelled_task(id: &str, emit: &mut impl FnMut(ConversionEven
     emit(ConversionEvent::cancelled(id.to_string()));
 }
 
-fn probe_media_file(file_path: &str) -> Result<ProbeMetadata, ConversionError> {
-    let output = crate::process_launch::output(
-        Command::new(ffprobe_executable()).args(ffprobe_json_args(file_path)),
-    )
-    .map_err(ConversionError::Io)?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let message = if stderr.trim().is_empty() {
-            format!("ffprobe exited with status {}", output.status)
-        } else {
-            stderr.trim().to_string()
-        };
-        return Err(ConversionError::Probe(message));
+fn probe_conversion_source(
+    file_path: &str,
+    executable: &str,
+    id: &str,
+    controller: &ConversionProcessController,
+    emit: &mut impl FnMut(ConversionEvent),
+) -> Result<Option<ProbeMetadata>, ConversionError> {
+    let result = crate::source_probe::probe(executable, std::path::Path::new(file_path), || {
+        controller.is_cancelled(id)
+    });
+    if controller.take_cancelled(id)? {
+        emit(ConversionEvent::log(id, "[INFO] Task cancelled"));
+        // A diagnostic callback may repeat cancellation before the terminal event.
+        controller.take_cancelled(id)?;
+        emit(ConversionEvent::cancelled(id));
+        return Ok(None);
     }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    parse_ffprobe_stdout(file_path, stdout)
+    result.map(Some)
 }
 
 fn stream_ffmpeg_stderr(
@@ -865,3 +873,5 @@ pub(super) fn ffmpeg_progress_from_line(
 
 #[cfg(test)]
 mod completion_tests;
+#[cfg(all(test, unix))]
+mod probe_tests;
