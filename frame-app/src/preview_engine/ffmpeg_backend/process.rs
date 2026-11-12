@@ -617,6 +617,7 @@ mod tests {
 
     #[test]
     fn resume_keeps_a_playing_generation_without_starting_another_process() {
+        let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
         let config = PreviewSessionConfig {
             file_id: "already-playing".into(),
             path: "/missing/preview.mp4".into(),
@@ -658,6 +659,7 @@ mod tests {
 
     #[test]
     fn failed_audio_retry_clamps_to_source_or_trim_end_and_uses_a_new_generation() {
+        let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
         for (trim_end, expected_seconds) in [(None, 12.499), (Some("00:00:04.000"), 3.999)] {
             let mut config = super::super::tests::preview_config();
             config.source_kind = PreviewSourceKind::Audio;
@@ -701,6 +703,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn reaping_an_audio_failure_does_not_turn_it_into_natural_eof() {
+        let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
         let mut config = super::super::tests::preview_config();
         config.source_kind = PreviewSourceKind::Audio;
         let process = RunningPreviewProcess::new(
@@ -797,6 +800,7 @@ mod cancellation_guard_tests {
 
     #[test]
     fn cancellation_guard_prevents_a_completed_frame_from_being_published() {
+        let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
         let process = RunningPreviewProcess::new(
             super::super::tests::preview_config(),
             LatestFrameStore::new(),
@@ -824,6 +828,7 @@ mod reaping_cleanup_tests {
 
     #[test]
     fn finished_video_reaping_preserves_inherited_pipe_ownership_without_joining() {
+        let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
         let process = Arc::new(
             RunningPreviewProcess::new(
                 super::super::tests::preview_config(),

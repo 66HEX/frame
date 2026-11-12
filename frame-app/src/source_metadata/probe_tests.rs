@@ -38,6 +38,7 @@ const VALID_METADATA: &str = "printf '%s\\n' '{\"streams\":[{\"index\":0,\"codec
 
 #[test]
 fn importer_uses_the_production_probe_deadline_and_can_probe_again() {
+    let _serial = crate::source_probe::serial_test_probes();
     let fixture = Fixture::new();
     let executable = fixture.executable(&format!("sleep 16\n{VALID_METADATA}"));
     let started = Instant::now();
@@ -59,6 +60,7 @@ fn importer_uses_the_production_probe_deadline_and_can_probe_again() {
 
 #[test]
 fn importer_rejects_metadata_larger_than_the_bounded_probe_output() {
+    let _serial = crate::source_probe::serial_test_probes();
     let fixture = Fixture::new();
     let executable = fixture.executable("dd if=/dev/zero bs=1024 count=4097 2>/dev/null");
     let result = probe_source_metadata_with_executable("source.mp4", &executable);

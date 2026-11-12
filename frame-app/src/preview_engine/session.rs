@@ -363,6 +363,7 @@ mod tests {
 
     #[test]
     fn failed_audio_seeks_and_reconfigures_stay_paused_until_an_explicit_retry() {
+        let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
         let mut config = test_config();
         config.source_kind = PreviewSourceKind::Audio;
         config.source_width = None;

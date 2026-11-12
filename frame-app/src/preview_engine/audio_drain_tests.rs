@@ -82,6 +82,7 @@ fn with_watchdog(operation: impl FnOnce() + Send + 'static) {
 #[test]
 #[ignore = "requires FFmpeg and a default audio output device; run with --ignored"]
 fn ffmpeg_audio_drain_preserves_all_samples_for_normal_short_sources() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     for milliseconds in [100, 500, 1_000, 2_000] {
         let path = audio_fixture(milliseconds);
         let config = audio_config(path.clone(), milliseconds);
@@ -118,6 +119,7 @@ fn ffmpeg_audio_drain_preserves_all_samples_for_normal_short_sources() {
 #[test]
 #[ignore = "requires FFmpeg and a default audio output device; run with --ignored"]
 fn ffmpeg_audio_below_prebuffer_plays_every_complete_sample() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     for milliseconds in [10, 20] {
         let path = audio_fixture(milliseconds);
         let config = audio_config(path.clone(), milliseconds);
@@ -139,6 +141,7 @@ fn ffmpeg_audio_below_prebuffer_plays_every_complete_sample() {
 #[test]
 #[ignore = "requires FFmpeg and a default audio output device; run with --ignored"]
 fn ffmpeg_audio_drain_does_not_end_a_longer_video() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let path = std::env::temp_dir().join(format!(
         "frame-audio-drain-short-track-{}.mkv",
         std::process::id()

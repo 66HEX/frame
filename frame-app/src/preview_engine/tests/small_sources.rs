@@ -121,6 +121,7 @@ fn tiny_video(path: &std::path::Path, png: &std::path::Path) {
 #[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 fn ffmpeg_tiny_sources_keep_exact_pixels_and_presentation_through_seek_and_rotation() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     for (width, height) in [(1, 1), (400, 4), (4, 400)] {
         let root = std::env::temp_dir().join(format!(
             "frame-tiny-preview-{}-{width}x{height}",
@@ -197,6 +198,7 @@ fn ffmpeg_tiny_sources_keep_exact_pixels_and_presentation_through_seek_and_rotat
 #[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 fn ffmpeg_tiny_source_crop_and_overlay_keep_the_accepted_output_raster() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let root = std::env::temp_dir().join(format!("frame-tiny-composition-{}", std::process::id()));
     std::fs::create_dir_all(&root).unwrap();
     let source = root.join("source.png");

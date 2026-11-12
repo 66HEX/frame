@@ -29,6 +29,7 @@ impl Drop for Fixture {
 
 #[test]
 fn cancellation_during_source_probe_is_terminal_and_allows_same_id_retry() {
+    let _serial = crate::source_probe::serial_test_probes();
     let fixture = Fixture::new();
     let executable = fixture.0.join("ffprobe");
     fs::write(&executable, b"#!/bin/sh\nfor source in \"$@\"; do :; done\nprintf started > \"${source}.started\"\nsleep 2\nexit 1\n").unwrap();

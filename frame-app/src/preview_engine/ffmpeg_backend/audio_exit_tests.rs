@@ -87,6 +87,7 @@ fn pending(exit: Arc<AudioProcessExit>, status: AudioWorkerStatus) -> PendingAud
 
 #[test]
 fn short_pcm_requires_successful_child_exit() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     for (script, expected) in [
         ("exit 0", AudioStartStatus::Ready),
         ("exit 7", AudioStartStatus::Failed),
@@ -114,6 +115,7 @@ fn short_pcm_requires_successful_child_exit() {
 
 #[test]
 fn disconnected_readiness_fails_and_cleans_up() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let process = new_process();
     let exit = install_child(&process, "exec sleep 10", false);
     let (ready_tx, ready_rx) = mpsc::channel();
@@ -132,6 +134,7 @@ fn disconnected_readiness_fails_and_cleans_up() {
 
 #[test]
 fn closed_pipes_without_child_exit_fail_bounded_proof_and_cleanup() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let process = new_process();
     let exit = install_child(&process, "exec sleep 10", false);
     let began = Instant::now();
@@ -153,6 +156,7 @@ fn closed_pipes_without_child_exit_fail_bounded_proof_and_cleanup() {
 
 #[test]
 fn stderr_observer_waits_for_registration_and_records_an_instant_exit() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let process = new_process();
     let stop = Arc::new(AtomicBool::new(false));
     let exit = Arc::new(AudioProcessExit::new(
@@ -202,6 +206,7 @@ fn stderr_observer_waits_for_registration_and_records_an_instant_exit() {
 
 #[test]
 fn abandoned_registration_releases_observer() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let process = new_process();
     let exit = Arc::new(AudioProcessExit::new(
         Arc::new(AtomicBool::new(false)),
@@ -218,6 +223,7 @@ fn abandoned_registration_releases_observer() {
 
 #[test]
 fn observer_proof_and_reaper_share_one_exit_classification() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     for _ in 0..32 {
         let process = Arc::new(new_process());
         let exit = install_child(&process, "exit 6", true);
@@ -262,6 +268,7 @@ fn observer_proof_and_reaper_share_one_exit_classification() {
 
 #[test]
 fn cancellation_interrupts_exit_observer_and_never_reports_intentional_kill() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     for drop_process in [false, true] {
         let process = new_process();
         let exit = install_child(&process, "exec sleep 10", false);
@@ -298,6 +305,7 @@ fn cancellation_interrupts_exit_observer_and_never_reports_intentional_kill() {
 
 #[test]
 fn stale_short_proof_does_not_stop_replacement_child() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let process = new_process();
     let old = install_child(&process, "exec sleep 10", false);
     process.stop_audio_process().unwrap();
@@ -318,6 +326,7 @@ fn stale_short_proof_does_not_stop_replacement_child() {
 
 #[test]
 fn late_nonzero_exit_after_ready_is_reported_without_reaping_or_ui_polling() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let process = new_process();
     let exit = install_child(&process, "sleep 0.05; exit 17", false);
     let observed_exit = Arc::clone(&exit);
@@ -382,6 +391,7 @@ fn real_output_short_pcm_eof_matrix_preserves_frames_and_rejects_invalid_input()
     use super::audio_stream::{
         AudioStdoutWorkerConfig, audio_prebuffer_samples, spawn_audio_stdout_worker,
     };
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let spec = AudioOutputSpec::default_output().unwrap();
     let frame_bytes = usize::from(spec.channels) * 4;
     let frames_10ms = usize::try_from(spec.sample_rate).unwrap() / 100;
@@ -482,6 +492,7 @@ fn real_output_short_pcm_eof_matrix_preserves_frames_and_rejects_invalid_input()
 #[ignore = "requires a default audio output device; run with --ignored"]
 fn real_output_observes_short_and_late_decoder_failures_with_empty_stderr() {
     use std::os::unix::fs::PermissionsExt;
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let spec = AudioOutputSpec::default_output().unwrap();
     let frame_bytes = usize::from(spec.channels) * 4;
     let prebuffer_bytes = super::audio_stream::audio_prebuffer_samples(spec) * 4;
@@ -553,6 +564,7 @@ fn real_output_observes_short_and_late_decoder_failures_with_empty_stderr() {
 
 #[test]
 fn audio_readiness_wait_observes_session_cancellation() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let process = Arc::new(new_process());
     let exit = install_child(&process, "exec sleep 2", false);
     let (ready_tx, ready_rx) = mpsc::channel();
@@ -581,6 +593,7 @@ fn audio_readiness_wait_observes_session_cancellation() {
 
 #[test]
 fn audio_eof_wait_observes_session_cancellation() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let process = Arc::new(new_process());
     let exit = install_child(&process, "exec sleep 2", false);
     let cancelling = Arc::clone(&process);

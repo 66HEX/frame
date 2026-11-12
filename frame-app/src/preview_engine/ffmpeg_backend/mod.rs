@@ -57,6 +57,8 @@ mod audio_queue_tests;
 #[cfg(test)]
 mod playback_start_tests;
 #[cfg(test)]
+pub(in crate::preview_engine) mod test_support;
+#[cfg(test)]
 mod tests;
 #[cfg(all(test, unix))]
 mod video_failure_tests;

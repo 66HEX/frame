@@ -45,6 +45,7 @@ fn fallback_config() -> PreviewSessionConfig {
 
 #[test]
 fn failed_audio_fallback_does_not_block_video_on_an_inherited_pipe() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let directory = Directory::new();
     let executable = directory.0.join("video-ffmpeg");
     fs::write(
@@ -70,7 +71,7 @@ fn failed_audio_fallback_does_not_block_video_on_an_inherited_pipe() {
         Command::new("sh")
             .args([
                 "-c",
-                &format!("sleep 3 &\nprintf started > '{marker_quoted}'\nexec sleep 3"),
+                &format!("sleep 6 &\nprintf started > '{marker_quoted}'\nexec sleep 6"),
             ])
             .stdin(Stdio::null())
             .stdout(Stdio::null())
@@ -116,7 +117,9 @@ fn failed_audio_fallback_does_not_block_video_on_an_inherited_pipe() {
             .send(starting.start_video_streaming_with_config(&next_config, 0.0, true))
             .unwrap();
     });
-    let result = done_rx.recv_timeout(Duration::from_secs(2));
+    // Leave startup scheduling headroom under the full parallel test suite,
+    // while still requiring return well before the inherited writer exits.
+    let result = done_rx.recv_timeout(Duration::from_secs(3));
     worker.join().unwrap();
     process.stop_running_processes().unwrap();
     let error = result
@@ -128,7 +131,7 @@ fn failed_audio_fallback_does_not_block_video_on_an_inherited_pipe() {
         unsafe { libc::kill(i32::try_from(child_pid).unwrap(), 0) },
         -1
     );
-    let deadline = Instant::now() + Duration::from_secs(4);
+    let deadline = Instant::now() + Duration::from_secs(8);
     loop {
         match process.start_video_streaming_with_config(&config, 0.0, true) {
             Ok(_) => break,

@@ -280,6 +280,7 @@ mod snapshot_tests {
 
     #[test]
     fn snapshot_retains_a_whole_frame_larger_than_the_probe_default() {
+        let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
         let payload = capture_snapshot(
             &fixture("complete"),
             64 * 1024,
@@ -293,6 +294,7 @@ mod snapshot_tests {
 
     #[test]
     fn snapshot_requires_complete_payload_and_successful_process_exit() {
+        let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
         let metrics = PreviewRuntimeMetricsStore::new();
         let partial = capture_snapshot(
             &fixture("partial"),
@@ -331,6 +333,7 @@ mod spawn_metric_tests {
 
     #[test]
     fn missing_snapshot_executable_does_not_increment_spawn_metrics() {
+        let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
         let metrics = PreviewRuntimeMetricsStore::new();
         let result = capture_snapshot(
             &CommandSpec::new("/missing/frame-snapshot-ffmpeg"),

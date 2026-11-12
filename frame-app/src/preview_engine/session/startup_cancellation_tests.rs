@@ -83,6 +83,7 @@ fn video_config() -> PreviewSessionConfig {
 
 #[test]
 fn stop_cancels_an_inflight_snapshot_before_waiting_for_pipeline_lock() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let fake = SilentPreviewChild::new();
     let video = video_config();
     let mut audio = video.clone();
@@ -123,6 +124,7 @@ fn stop_cancels_an_inflight_snapshot_before_waiting_for_pipeline_lock() {
 
 #[test]
 fn stop_cancels_stream_start_before_the_first_frame_arrives() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let fake = SilentPreviewChild::new();
     let silence = fs::read(&fake.executable).unwrap();
     fs::write(
@@ -173,6 +175,7 @@ fn stop_cancels_stream_start_before_the_first_frame_arrives() {
 
 #[test]
 fn cancelled_stream_start_does_not_join_an_inherited_stderr_pipe_forever() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let fake = SilentPreviewChild::new();
     fs::write(
         &fake.executable,
@@ -261,6 +264,7 @@ fn cancelled_stream_start_does_not_join_an_inherited_stderr_pipe_forever() {
 
 #[test]
 fn cancellation_guard_rejects_a_queued_play_command() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let mut config = video_config();
     config.source_kind = PreviewSourceKind::Audio;
     let session = PreviewSession::start(config).unwrap();
@@ -271,6 +275,7 @@ fn cancellation_guard_rejects_a_queued_play_command() {
 
 #[test]
 fn playing_seek_does_not_block_on_an_old_streams_inherited_pipes() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let fake = SilentPreviewChild::new();
     let frame_script = "#!/bin/sh\nexec dd if=/dev/zero bs=57600 count=1 2>/dev/null\n";
     fs::write(&fake.executable, frame_script).unwrap();
@@ -346,6 +351,7 @@ fn playing_seek_does_not_block_on_an_old_streams_inherited_pipes() {
 
 #[test]
 fn stop_of_a_playing_stream_retains_pending_pipes_and_blocks_new_spawns() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let fake = SilentPreviewChild::new();
     let frame_script = "#!/bin/sh\nexec dd if=/dev/zero bs=57600 count=1 2>/dev/null\n";
     fs::write(&fake.executable, frame_script).unwrap();

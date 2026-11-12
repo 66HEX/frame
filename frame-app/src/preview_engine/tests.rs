@@ -280,6 +280,7 @@ fn test_preview_session_snapshot_exposes_runtime_metrics() {
 #[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 fn ffmpeg_preview_session_publishes_first_video_frame() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let path = temp_preview_video("first-frame");
     let config = real_video_preview_config(path.clone());
 
@@ -301,6 +302,7 @@ fn ffmpeg_preview_session_publishes_first_video_frame() {
 #[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 fn ffmpeg_preview_session_can_play_pause_and_seek() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let path = temp_preview_video("playback");
     let config = real_video_preview_config(path.clone());
 
@@ -324,6 +326,7 @@ fn ffmpeg_preview_session_can_play_pause_and_seek() {
 #[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 fn ffmpeg_seek_and_play_matches_precise_frame_with_one_process_spawn() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let path = temp_preview_video("atomic-seek-play");
     let config = real_video_preview_config(path.clone());
     let baseline = PreviewSession::start(config.clone()).expect("baseline session");
@@ -372,6 +375,7 @@ fn ffmpeg_seek_and_play_matches_precise_frame_with_one_process_spawn() {
 #[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 fn ffmpeg_play_is_idempotent_and_restarts_after_eof() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let path = temp_preview_video("idempotent-play-eof");
     let mut config = real_video_preview_config(path.clone());
     config.conversion_config.start_time = Some("00:00:00.250".into());
@@ -426,6 +430,7 @@ fn ffmpeg_play_is_idempotent_and_restarts_after_eof() {
 #[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 fn ffmpeg_preview_session_reconfigure_preserves_playback_position() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let path = temp_preview_video("reconfigure");
     let config = real_video_preview_config(path.clone());
 
@@ -449,6 +454,7 @@ fn ffmpeg_preview_session_reconfigure_preserves_playback_position() {
 #[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 fn ffmpeg_preview_session_reports_eof_through_read_only_snapshots() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let path = temp_preview_video("read-only-eof");
     let session = PreviewSession::start(real_video_preview_config(path.clone())).expect("session");
     session.command(PreviewCommand::Play).expect("play");
@@ -473,6 +479,7 @@ fn ffmpeg_preview_session_reports_eof_through_read_only_snapshots() {
 #[test]
 #[ignore = "requires FFmpeg plus a default audio output device; run with --ignored"]
 fn ffmpeg_preview_session_collects_audio_video_metrics_for_sync_fixture() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let path = temp_preview_av_sync_video("av-sync");
     let mut config = real_av_preview_config(path.clone());
     config.conversion_config.audio_volume = 0.0;
@@ -509,6 +516,7 @@ fn ffmpeg_preview_session_collects_audio_video_metrics_for_sync_fixture() {
 #[test]
 #[ignore = "requires FFmpeg plus a default audio output device; run with --ignored"]
 fn ffmpeg_audio_prewarm_wakes_through_preview_session_lifecycle() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let path = temp_preview_av_sync_video("audio-prewarm-lifecycle");
     let mut config = real_av_preview_config(path.clone());
     config.conversion_config.audio_volume = 0.0;
@@ -725,6 +733,7 @@ fn temp_preview_av_sync_video(label: &str) -> PathBuf {
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 fn ffmpeg_snapshot_stream_seek_and_reconfigure_keep_frame_owned_presentation() {
     use frame_core::aspect::{DisplayRatio, SampleAspectRatio};
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let path = temp_preview_video("presentation-ownership");
     let mut config = real_video_preview_config(path.clone());
     config.source_sample_aspect_ratio = SampleAspectRatio::new(2, 1);

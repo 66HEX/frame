@@ -84,12 +84,18 @@ fn probe_command(
 }
 
 #[cfg(test)]
+pub fn serial_test_probes() -> std::sync::MutexGuard<'static, ()> {
+    static PROBES: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    PROBES
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::Instant;
-
-    static PROCESS_TESTS: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     struct Directory(std::path::PathBuf);
     impl Directory {
@@ -167,7 +173,7 @@ mod tests {
 
     #[test]
     fn cancellation_is_observed_before_probe_spawn() {
-        let _serial = PROCESS_TESTS.lock().unwrap();
+        let _serial = serial_test_probes();
         let directory = Directory::new();
         let marker = directory.0.join("started");
         let result = probe_command(
@@ -185,7 +191,7 @@ mod tests {
 
     #[test]
     fn silent_probe_has_a_deadline_and_releases_its_process_budget() {
-        let _serial = PROCESS_TESTS.lock().unwrap();
+        let _serial = serial_test_probes();
         let directory = Directory::new();
         let marker = directory.0.join("started");
         let started = Instant::now();
@@ -215,7 +221,7 @@ mod tests {
     }
     #[test]
     fn running_probe_cancel_is_prompt_and_releases_the_budget() {
-        let _serial = PROCESS_TESTS.lock().unwrap();
+        let _serial = serial_test_probes();
         let directory = Directory::new();
         let marker = directory.0.join("started");
         let started = Instant::now();
@@ -241,7 +247,7 @@ mod tests {
 
     #[test]
     fn oversized_metadata_is_rejected_and_stderr_is_bounded() {
-        let _serial = PROCESS_TESTS.lock().unwrap();
+        let _serial = serial_test_probes();
         let directory = Directory::new();
         let marker = directory.0.join("started");
         let budget = Limits {
@@ -275,6 +281,7 @@ mod tests {
     #[test]
     #[ignore = "requires the selected FFprobe runtime"]
     fn real_probe_preserves_audio_metadata() {
+        let _serial = serial_test_probes();
         let directory = Directory::new();
         let path = directory.0.join("probe fixture.wav");
         let sample_bytes = 960_u32;
