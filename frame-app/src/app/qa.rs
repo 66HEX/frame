@@ -4,12 +4,16 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+pub mod export;
+
 #[derive(Debug)]
 pub struct QaProfile {
     directory: PathBuf,
 }
 
 impl QaProfile {
+    /// # Errors
+    /// Returns an error if the path is relative, already exists, or cannot be written.
     pub fn create(directory: &Path) -> io::Result<Self> {
         if !directory.is_absolute() {
             return Err(io::Error::new(
@@ -46,7 +50,9 @@ impl QaProfile {
     }
 }
 
-pub fn open_qa_window(cx: &mut gpui::App, profile: QaProfile) {
+/// # Errors
+/// Returns an error when the platform cannot create the QA window.
+pub fn open_qa_window(cx: &mut gpui::App, profile: &QaProfile) -> Result<(), String> {
     use crate::app::layout::{WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH};
     use crate::app::root::FrameRoot;
     use gpui::{Bounds, px, size};
@@ -62,7 +68,8 @@ pub fn open_qa_window(cx: &mut gpui::App, profile: QaProfile) {
             root
         })
     })
-    .expect("failed to open Frame QA window");
+    .map(|_| ())
+    .map_err(|error| error.to_string())
 }
 
 #[cfg(test)]
