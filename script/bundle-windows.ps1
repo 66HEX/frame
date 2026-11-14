@@ -4,6 +4,7 @@ Param(
     [Parameter()][Alias('h')][switch]$Help,
     [Parameter()][switch]$PrepareOnly,
     [Parameter()][switch]$PackageOnly,
+    [Parameter()][switch]$SkipSetupFfmpeg,
     [Parameter()][Alias('a')][string]$Architecture
 )
 
@@ -19,6 +20,7 @@ function Help-Info {
     Write-Output "  -Install, -i      Run the installer after building."
     Write-Output "  -PrepareOnly      Build binaries and prepare installer inputs without signing."
     Write-Output "  -PackageOnly      Package prepared inputs without running Cargo."
+    Write-Output "  -SkipSetupFfmpeg  FFmpeg binaries are already prepared (used by cargo xtask)."
     Write-Output "  -Help, -h         Show this help message."
 }
 
@@ -49,6 +51,12 @@ $ReleaseDir = "$TargetDir\$Target\release"
 $InnoDir = "$RepoRoot\target\inno\$Architecture"
 $InstallerPath = "$RepoRoot\target\Frame-$Architecture.exe"
 $Version = (Select-String -Path "$RepoRoot\frame-app\Cargo.toml" -Pattern '^version = "(.+)"$').Matches[0].Groups[1].Value
+
+function Get-RuntimeBinaryPaths {
+    @("ffmpeg-$Target.exe", "ffprobe-$Target.exe") | ForEach-Object {
+        "$RepoRoot\frame-app\resources\binaries\$_"
+    }
+}
 
 function Invoke-Checked {
     param(
@@ -81,12 +89,11 @@ function Prepare-BundleDirectory {
     Copy-Item -Path "$ReleaseDir\frame.exe" -Destination "$InnoDir\Frame.exe" -Force
     Copy-Item -Path "$ReleaseDir\frame-update-helper.exe" -Destination "$InnoDir\frame-update-helper.exe" -Force
     Copy-Item -Path "$RepoRoot\frame-app\resources\app-icons\icon.ico" -Destination "$InnoDir\app-icon.ico" -Force
-    foreach ($binary in @("ffmpeg-$Target.exe", "ffprobe-$Target.exe")) {
-        $source = "$RepoRoot\frame-app\resources\binaries\$binary"
+    foreach ($source in Get-RuntimeBinaryPaths) {
         if (-not (Test-Path $source)) {
             throw "Missing runtime binary: $source"
         }
-        Copy-Item -Path $source -Destination "$InnoDir\binaries\$binary" -Force
+        Copy-Item -Path $source -Destination "$InnoDir\binaries\$(Split-Path -Leaf $source)" -Force
     }
 }
 
@@ -118,12 +125,21 @@ function Build-Installer {
 if (-not $PackageOnly) {
     Initialize-VsDevShell
     Invoke-Checked rustup target add $Target
-    Push-Location $RepoRoot
-    try {
-        Invoke-Checked cargo xtask setup-ffmpeg --platform win32 --arch $Architecture
+    if ($SkipSetupFfmpeg) {
+        foreach ($runtimeBinary in Get-RuntimeBinaryPaths) {
+            if (-not (Test-Path $runtimeBinary)) {
+                throw "Missing runtime binary: $runtimeBinary"
+            }
+        }
     }
-    finally {
-        Pop-Location
+    else {
+        Push-Location $RepoRoot
+        try {
+            Invoke-Checked cargo xtask setup-ffmpeg --platform win32 --arch $Architecture
+        }
+        finally {
+            Pop-Location
+        }
     }
     Invoke-Checked cargo build --manifest-path "$RepoRoot\frame-app\Cargo.toml" --release --target $Target
     Invoke-Checked cargo build --manifest-path "$RepoRoot\frame-updater\Cargo.toml" --release --target $Target --bin frame-update-helper
