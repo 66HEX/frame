@@ -193,11 +193,71 @@ fn bundle(args: &[String]) -> Result<()> {
     match platform.as_str() {
         "macos" | "mac" | "darwin" => run_script("./script/bundle-mac", &script_args),
         "linux" => run_script("./script/bundle-linux", &script_args),
-        "windows" | "win" => run_script("./script/bundle-windows.ps1", &script_args),
+        "windows" | "win" => bundle_windows(&script_args),
         other => Err(XtaskError::Usage(format!(
             "unknown bundle platform `{other}`"
         ))),
     }
+}
+
+const WINDOWS_BUNDLE_HOST_ERROR: &str = "Windows bundles must be built on Windows.";
+const WINDOWS_PREPARED_FFMPEG_FLAG: &str = "-SkipSetupFfmpeg";
+
+fn bundle_windows(args: &[&str]) -> Result<()> {
+    if !cfg!(target_os = "windows") {
+        return Err(XtaskError::Usage(WINDOWS_BUNDLE_HOST_ERROR.to_string()));
+    }
+    // bundle-windows.ps1 only supports x86_64 hosts; let it report unsupported
+    // platforms and architectures before touching the binary cache.
+    let prepare_ffmpeg = cfg!(target_arch = "x86_64") && windows_bundle_should_prepare_ffmpeg(args);
+    if prepare_ffmpeg {
+        setup_ffmpeg(&[
+            "--platform".to_string(),
+            "win32".to_string(),
+            "--arch".to_string(),
+            "x86_64".to_string(),
+        ])?;
+    }
+    let script_args = windows_bundle_script_args(args, prepare_ffmpeg);
+    run_script("./script/bundle-windows.ps1", &script_args)
+}
+
+fn windows_bundle_should_prepare_ffmpeg(args: &[&str]) -> bool {
+    let skip = args.iter().any(|arg| {
+        ["-PackageOnly", "-Help", "-h", WINDOWS_PREPARED_FFMPEG_FLAG]
+            .iter()
+            .any(|flag| arg.eq_ignore_ascii_case(flag))
+    });
+    if skip {
+        return false;
+    }
+    windows_bundle_architecture(args).is_none_or(|arch| arch.eq_ignore_ascii_case("x86_64"))
+}
+
+fn windows_bundle_architecture<'a>(args: &[&'a str]) -> Option<&'a str> {
+    for (index, arg) in args.iter().enumerate() {
+        let (name, inline) = match arg.split_once(':') {
+            Some((name, value)) => (name, Some(value)),
+            None => (*arg, None),
+        };
+        if name.eq_ignore_ascii_case("-Architecture") || name.eq_ignore_ascii_case("-a") {
+            let value = inline.or_else(|| args.get(index + 1).copied());
+            // The script reports a dangling switch; don't prepare binaries for it.
+            return Some(value.unwrap_or(""));
+        }
+    }
+    None
+}
+
+fn windows_bundle_script_args<'a>(args: &[&'a str], prepared: bool) -> Vec<&'a str> {
+    let mut script_args = args.to_vec();
+    let already_forwarded = script_args
+        .iter()
+        .any(|arg| arg.eq_ignore_ascii_case(WINDOWS_PREPARED_FFMPEG_FLAG));
+    if prepared && !already_forwarded {
+        script_args.push(WINDOWS_PREPARED_FFMPEG_FLAG);
+    }
+    script_args
 }
 
 fn setup_ffmpeg(args: &[String]) -> Result<()> {
@@ -1694,9 +1754,7 @@ fn run_script(script: &str, args: &[&str]) -> Result<()> {
         .is_some_and(|extension| extension.eq_ignore_ascii_case("ps1"));
 
     if is_powershell_script && !cfg!(target_os = "windows") {
-        return Err(XtaskError::Usage(
-            "Windows bundles must be built on Windows.".to_string(),
-        ));
+        return Err(XtaskError::Usage(WINDOWS_BUNDLE_HOST_ERROR.to_string()));
     }
 
     if cfg!(target_os = "windows") && is_powershell_script {
@@ -1714,12 +1772,15 @@ fn run_script(script: &str, args: &[&str]) -> Result<()> {
 fn run_command(program: &str, args: &[&str]) -> Result<()> {
     let root = repo_root()?;
     println!("$ {} {}", program, args.join(" "));
-    let status = Command::new(program)
+    let mut command = Command::new(program);
+    command
         .args(args)
         .current_dir(root)
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
+        .stderr(Stdio::inherit());
+    scrub_cargo_run_env(&mut command);
+    let status = command
         .status()
         .map_err(|source| XtaskError::CommandSpawn {
             program: program.to_string(),
@@ -1733,6 +1794,23 @@ fn run_command(program: &str, args: &[&str]) -> Result<()> {
             program: program.to_string(),
             status,
         })
+    }
+}
+
+fn is_cargo_run_env(key: &str) -> bool {
+    key == "CARGO_MANIFEST_DIR" || key == "CARGO_MANIFEST_PATH" || key.starts_with("CARGO_PKG_")
+}
+
+fn scrub_cargo_run_env(command: &mut Command) {
+    // `cargo run` injects package variables such as CARGO_MANIFEST_DIR into the
+    // running xtask. Nested cargo builds then fingerprint them differently from
+    // plain-shell builds (ring hashes CARGO_MANIFEST_DIR), which rebuilds the TLS
+    // stack and tries to relink the running xtask.exe. Drop them before spawning.
+    for (key, _) in env::vars_os() {
+        let key = key.to_string_lossy();
+        if is_cargo_run_env(&key) {
+            command.env_remove(key.as_ref());
+        }
     }
 }
 
@@ -4783,5 +4861,93 @@ mod tests {
         assert!(!workflow.contains(":linux-aarch64:linux_appimage"));
         assert!(!workflow.contains(":linux-x86_64:flatpak"));
         assert!(!workflow.contains(":linux-aarch64:flatpak"));
+    }
+
+    #[test]
+    fn windows_bundle_appends_prepared_ffmpeg_flag() {
+        let args = ["-Install", "-Architecture", "x86_64"];
+
+        let script_args = windows_bundle_script_args(&args, true);
+
+        assert_eq!(
+            script_args,
+            vec![
+                "-Install",
+                "-Architecture",
+                "x86_64",
+                WINDOWS_PREPARED_FFMPEG_FLAG
+            ]
+        );
+        assert_eq!(windows_bundle_script_args(&args, false), args.to_vec());
+    }
+
+    #[test]
+    fn windows_bundle_args_do_not_duplicate_skip_flag() {
+        let args = ["-skipsetupffmpeg", "-Install"];
+
+        let script_args = windows_bundle_script_args(&args, true);
+        let occurrences = script_args
+            .iter()
+            .filter(|arg| arg.eq_ignore_ascii_case(WINDOWS_PREPARED_FFMPEG_FLAG))
+            .count();
+
+        assert_eq!(occurrences, 1);
+        assert_eq!(script_args, args.to_vec());
+    }
+
+    #[test]
+    fn windows_bundle_skips_ffmpeg_for_help_and_package_only() {
+        assert!(!windows_bundle_should_prepare_ffmpeg(&["-PackageOnly"]));
+        assert!(!windows_bundle_should_prepare_ffmpeg(&["-packageonly"]));
+        assert!(!windows_bundle_should_prepare_ffmpeg(&["-Help"]));
+        assert!(!windows_bundle_should_prepare_ffmpeg(&["-help"]));
+        assert!(!windows_bundle_should_prepare_ffmpeg(&["-h"]));
+        assert!(!windows_bundle_should_prepare_ffmpeg(&[
+            "-Architecture",
+            "x86_64",
+            "-h"
+        ]));
+        assert!(windows_bundle_should_prepare_ffmpeg(&[]));
+        assert!(windows_bundle_should_prepare_ffmpeg(&["-Install"]));
+        assert!(windows_bundle_should_prepare_ffmpeg(&[
+            "-Architecture",
+            "x86_64"
+        ]));
+    }
+
+    #[test]
+    fn windows_bundle_respects_architecture_and_manual_skip() {
+        assert!(windows_bundle_should_prepare_ffmpeg(&[
+            "-Architecture",
+            "x86_64"
+        ]));
+        assert!(!windows_bundle_should_prepare_ffmpeg(&[
+            "-Architecture",
+            "arm64"
+        ]));
+        assert!(!windows_bundle_should_prepare_ffmpeg(&["-a", "arm64"]));
+        assert!(!windows_bundle_should_prepare_ffmpeg(&[
+            "-Architecture:arm64"
+        ]));
+        assert!(!windows_bundle_should_prepare_ffmpeg(&["-a:arm64"]));
+        assert!(windows_bundle_should_prepare_ffmpeg(&[
+            "-Architecture:x86_64"
+        ]));
+        assert!(!windows_bundle_should_prepare_ffmpeg(&["-Architecture"]));
+        assert!(!windows_bundle_should_prepare_ffmpeg(&["-SkipSetupFfmpeg"]));
+        assert!(!windows_bundle_should_prepare_ffmpeg(&[
+            "-skipsetupffmpeg",
+            "-Install"
+        ]));
+    }
+
+    #[test]
+    fn cargo_run_env_matches_package_variables_only() {
+        assert!(is_cargo_run_env("CARGO_MANIFEST_DIR"));
+        assert!(is_cargo_run_env("CARGO_MANIFEST_PATH"));
+        assert!(is_cargo_run_env("CARGO_PKG_NAME"));
+        assert!(!is_cargo_run_env("CARGO"));
+        assert!(!is_cargo_run_env("CARGO_HOME"));
+        assert!(!is_cargo_run_env("CARGO_TARGET_DIR"));
     }
 }
