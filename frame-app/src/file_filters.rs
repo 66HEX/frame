@@ -327,6 +327,52 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
+    fn discover_supported_source_paths_follows_symlinked_directories() {
+        let root = unique_test_dir("symlinked-directory");
+        let target = unique_test_dir("symlinked-directory-target");
+        std::fs::create_dir_all(&root).expect("test media directory should be created");
+        std::fs::create_dir_all(&target).expect("test media directory should be created");
+        std::fs::write(target.join("clip.mp4"), b"").expect("test source file should be written");
+        std::fs::write(target.join("notes.txt"), b"").expect("test source file should be written");
+        std::os::unix::fs::symlink(&target, root.join("linked"))
+            .expect("symlinked directory should be created");
+
+        let paths = discover_supported_source_paths(vec![root.clone()]);
+
+        std::fs::remove_dir_all(&root).expect("test media directory should be removed");
+        std::fs::remove_dir_all(&target).expect("test media directory should be removed");
+        assert_eq!(paths, [root.join("linked").join("clip.mp4")]);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn discover_supported_source_paths_skips_symlink_loops_and_duplicate_targets() {
+        let root = unique_test_dir("symlink-loop");
+        let target = root.join("target");
+        std::fs::create_dir_all(&target).expect("test media directory should be created");
+        std::fs::write(target.join("clip.mp4"), b"").expect("test source file should be written");
+        std::os::unix::fs::symlink(&target, root.join("linked"))
+            .expect("symlinked directory should be created");
+        std::os::unix::fs::symlink(&target, root.join("also-linked"))
+            .expect("symlinked directory should be created");
+        std::os::unix::fs::symlink(&root, target.join("loop-back"))
+            .expect("symlinked directory should be created");
+
+        let paths = discover_supported_source_paths(vec![root.clone()]);
+
+        std::fs::remove_dir_all(&root).expect("test media directory should be removed");
+        assert_eq!(
+            paths,
+            [
+                root.join("also-linked").join("clip.mp4"),
+                root.join("linked").join("clip.mp4"),
+                root.join("target").join("clip.mp4"),
+            ]
+        );
+    }
+
+    #[test]
     fn source_file_extensions_match_original_dialog_groups() {
         let grouped = VIDEO_FILE_EXTENSIONS
             .iter()
