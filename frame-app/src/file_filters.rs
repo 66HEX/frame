@@ -1,6 +1,7 @@
 //! File extension filters for native source and subtitle pickers.
 
 use crate::settings::SourceKind;
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 pub const VIDEO_FILE_EXTENSIONS: &[&str] = &[
@@ -105,25 +106,50 @@ fn discover_supported_source_path(path: PathBuf) -> Vec<PathBuf> {
 
 fn supported_source_paths_in_directory(root: &Path) -> Vec<PathBuf> {
     let mut paths = Vec::new();
-    collect_supported_source_paths_in_directory(root, &mut paths);
+    let mut visited_directories = HashSet::new();
+    if let Ok(canonical_root) = std::fs::canonicalize(root) {
+        visited_directories.insert(canonical_root);
+    }
+    collect_supported_source_paths_in_directory(root, &mut paths, &mut visited_directories);
     paths.sort();
     paths
 }
 
-fn collect_supported_source_paths_in_directory(root: &Path, paths: &mut Vec<PathBuf>) {
+fn collect_supported_source_paths_in_directory(
+    root: &Path,
+    paths: &mut Vec<PathBuf>,
+    visited_directories: &mut HashSet<PathBuf>,
+) {
     let Ok(entries) = std::fs::read_dir(root) else {
         return;
     };
 
     for entry in entries.filter_map(Result::ok) {
         let path = entry.path();
-        let Ok(file_type) = entry.file_type() else {
+        // `DirEntry::file_type` does not follow symlinks, so a symlinked
+        // directory reports neither `is_dir()` nor `is_file()` and was
+        // silently skipped. `metadata` follows symlinks instead, so linked
+        // directories are traversed and linked files are collected under
+        // the path the user actually picked.
+        let Ok(metadata) = std::fs::metadata(&path) else {
             continue;
         };
 
-        if file_type.is_dir() {
-            collect_supported_source_paths_in_directory(&path, paths);
-        } else if file_type.is_file() && is_supported_source_path(&path) {
+        if metadata.is_dir() {
+            // Guard against symlink loops: only recurse into a directory
+            // whose canonical path is not already on the current walk. A
+            // directory reached through a different symlink path is still
+            // traversed, so the same files can legitimately appear under
+            // each distinct path.
+            let Ok(canonical_path) = std::fs::canonicalize(&path) else {
+                continue;
+            };
+            if !visited_directories.insert(canonical_path.clone()) {
+                continue;
+            }
+            collect_supported_source_paths_in_directory(&path, paths, visited_directories);
+            visited_directories.remove(&canonical_path);
+        } else if metadata.is_file() && is_supported_source_path(&path) {
             paths.push(path);
         }
     }
