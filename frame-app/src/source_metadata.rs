@@ -8,6 +8,9 @@ use frame_core::types::{FfprobeTags, ProbeMetadata};
 use std::collections::HashMap;
 use std::path::Path;
 
+mod requests;
+pub(crate) use requests::{SourceMetadataProbe, SourceMetadataProbes};
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum MetadataStatus {
     #[default]
@@ -161,8 +164,14 @@ pub fn source_metadata_from_probe(probe: ProbeMetadata) -> SourceMetadata {
 /// Returns an error when ffprobe cannot be executed, exits unsuccessfully, or
 /// exceeds the probe time or output limit, or emits invalid metadata.
 pub fn probe_source_metadata(file_path: &str) -> Result<SourceMetadata, ConversionError> {
-    let executable = ffprobe_executable();
-    probe_source_metadata_with_executable(file_path, &executable)
+    probe_source_metadata_cancellable(file_path, &|| false)
+}
+
+pub(crate) fn probe_source_metadata_cancellable(
+    file_path: &str,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<SourceMetadata, ConversionError> {
+    probe_source_metadata_with_executable_cancellable(file_path, &ffprobe_executable(), cancelled)
 }
 
 /// Probes source metadata with a specific ffprobe executable.
@@ -175,7 +184,15 @@ pub fn probe_source_metadata_with_executable(
     file_path: &str,
     executable: &str,
 ) -> Result<SourceMetadata, ConversionError> {
-    crate::source_probe::probe(executable, Path::new(file_path), || false)
+    probe_source_metadata_with_executable_cancellable(file_path, executable, &|| false)
+}
+
+pub(crate) fn probe_source_metadata_with_executable_cancellable(
+    file_path: &str,
+    executable: &str,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<SourceMetadata, ConversionError> {
+    crate::source_probe::probe(executable, Path::new(file_path), cancelled)
         .map(source_metadata_from_probe)
 }
 

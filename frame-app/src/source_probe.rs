@@ -40,7 +40,7 @@ pub fn probe(
     )
 }
 
-fn probe_command(
+pub fn probe_command(
     command: &CommandSpec,
     path: &Path,
     limits: Limits,

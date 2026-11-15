@@ -24,7 +24,7 @@ use crate::notifications::AppNotifier;
 use crate::settings::{
     ConversionConfig, PresetDefinition, SourceMetadata, default_presets, normalize_output_config,
 };
-use crate::source_metadata::SourceMetadataStore;
+use crate::source_metadata::{SourceMetadataProbes, SourceMetadataStore};
 use frame_core::capabilities::{AvailableEncoders, AvailableFilters};
 use frame_core::types::DEFAULT_MAX_CONCURRENCY;
 use frame_updater::UpdateChannel;
@@ -56,6 +56,7 @@ pub struct FrameRoot {
     pub(in crate::app) default_output_directory: Option<std::path::PathBuf>,
     pub(in crate::app) text_input_ui: FrameTextInputUiState,
     pub(in crate::app) source_metadata: SourceMetadataStore,
+    pub(in crate::app) metadata_probes: SourceMetadataProbes,
     pub(in crate::app) conversion_processes: ConversionProcessController,
     pub(in crate::app) available_encoders: AvailableEncoders,
     pub(in crate::app) available_filters: AvailableFilters,
@@ -250,6 +251,7 @@ impl FrameRoot {
             default_output_directory: persisted_settings.default_output_directory,
             text_input_ui: FrameTextInputUiState::default(),
             source_metadata: SourceMetadataStore::default(),
+            metadata_probes: SourceMetadataProbes::default(),
             conversion_processes,
             available_encoders: AvailableEncoders::default(),
             available_filters: AvailableFilters::default(),
