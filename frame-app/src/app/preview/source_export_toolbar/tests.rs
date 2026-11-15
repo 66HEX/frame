@@ -116,6 +116,10 @@ fn source_frame_ui_keyboard_starts_a_frozen_source_request() {
             });
     });
     tab_to(cx, "Export source frame");
+    cx.executor()
+        .advance_clock(std::time::Duration::from_millis(700));
+    draw(cx);
+    assert!(cx.debug_bounds("tooltip-source-frame-export").is_some());
     press(cx, "enter");
     let requests = cx.update(|_, cx| cx.global::<SourceFrameRequests>().exports.borrow().clone());
     assert_eq!(
@@ -303,7 +307,7 @@ fn source_frame_ui_keeps_actions_when_the_preview_disappears() {
 }
 
 #[test]
-fn source_frame_export_control_is_named_and_outside_the_viewport() {
+fn source_frame_export_control_is_a_named_icon_inside_the_viewport_toolbar() {
     for theme in ColorTheme::ALL {
         for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
             let mut app = TestAppContext::single();
@@ -313,7 +317,10 @@ fn source_frame_export_control_is_named_and_outside_the_viewport() {
                 .expect("Export source frame must be visible in the preview panel");
             let viewport = cx.debug_bounds("preview-viewport").unwrap();
             let panel = cx.debug_bounds("preview-panel").unwrap();
-            assert!(button.top() >= viewport.bottom());
+            assert!(button.top() >= viewport.top());
+            assert!(button.bottom() <= viewport.bottom());
+            assert!((button.size.width - button.size.height).abs() <= px(1.0));
+            assert!(cx.debug_bounds("source-frame-export-toolbar").is_none());
             assert!(button.left() >= panel.left());
             assert!(button.right() <= panel.right());
             assert!(button.bottom() <= panel.bottom());
@@ -329,5 +336,92 @@ fn source_frame_export_control_is_named_and_outside_the_viewport() {
                         })
             }));
         }
+    }
+}
+
+#[test]
+fn source_frame_export_icon_is_hidden_when_the_source_cannot_export() {
+    for reason in ["folder", "audio", "busy"] {
+        let mut app = TestAppContext::single();
+        let (root, cx) = window(&mut app, ColorTheme::Dark, ScalePreset::Percent100);
+        root.update(cx, |root, cx| {
+            match reason {
+                "folder" => root.default_output_directory = None,
+                "audio" => root.source_metadata.mark_ready(
+                    "source-frame",
+                    SourceMetadata {
+                        media_kind: Some(SourceKind::Audio),
+                        ..SourceMetadata::default()
+                    },
+                ),
+                _ => {
+                    test_support::begin(
+                        root,
+                        SourceFrameExportRequest::for_test(
+                            "busy".into(),
+                            "source-frame".into(),
+                            PathBuf::from("/tmp/source.mov"),
+                            0,
+                            0,
+                            PathBuf::from("/tmp/frame.png"),
+                        ),
+                    );
+                }
+            }
+            cx.notify();
+        });
+        draw(cx);
+        assert!(
+            cx.debug_bounds("source-frame-export").is_none(),
+            "hidden for {reason}"
+        );
+        cx.update(|window, _| {
+            assert!(
+                !window
+                    .a11y_tree()
+                    .unwrap()
+                    .nodes
+                    .iter()
+                    .any(|(_, node)| node.label() == Some("Export source frame"))
+            )
+        });
+    }
+}
+
+#[test]
+fn source_frame_export_icon_remains_available_when_transform_tools_are_hidden() {
+    for audio_only in [true, false] {
+        let mut app = TestAppContext::single();
+        let (root, cx) = window(&mut app, ColorTheme::Dark, ScalePreset::Percent200);
+        root.update(cx, |root, cx| {
+            if audio_only {
+                root.file_queue
+                    .selected_file_mut()
+                    .unwrap()
+                    .config
+                    .container = "wav".into();
+            } else {
+                root.preview_ui.transport.open = true;
+            }
+            cx.notify();
+        });
+        draw(cx);
+        root.read_with(cx, |root, _| {
+            assert!(
+                root.source_frame_export_render_state()
+                    .disabled_reason
+                    .is_none()
+            )
+        });
+        let button = cx
+            .debug_bounds("source-frame-export")
+            .expect("source frame action remains available");
+        let viewport = cx.debug_bounds("preview-viewport").unwrap();
+        assert!(button.left() >= viewport.left() && button.top() >= viewport.top());
+        assert!(button.right() <= viewport.right() && button.bottom() <= viewport.bottom());
+        assert!(cx.debug_bounds("preview-tool-rotate").is_none());
+        tab_to(cx, "Export source frame");
+        press(cx, "enter");
+        cx.update(|_, cx| assert_eq!(cx.global::<SourceFrameRequests>().exports.borrow().len(), 1));
     }
 }

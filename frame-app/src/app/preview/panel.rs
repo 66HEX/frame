@@ -275,16 +275,27 @@ pub(in crate::app) fn preview_panel(
             props.timecode_focuses,
             props.transport,
             card_bounds,
+            props
+                .source_export
+                .disabled_reason
+                .is_none()
+                .then_some(props.source_export_focuses.export),
             window,
             cx,
         ))
-        .child(super::source_export_toolbar::source_export_toolbar(
-            &props.source_export,
-            props.source_export_focuses,
-            palette,
-            window,
-            cx,
-        ))
+        .when(
+            props.source_export.status
+                != super::actions::source_export::SourceFrameExportStatus::Idle,
+            |panel| {
+                panel.child(super::source_export_toolbar::source_export_toolbar(
+                    &props.source_export,
+                    props.source_export_focuses,
+                    palette,
+                    window,
+                    cx,
+                ))
+            },
+        )
 }
 
 pub(in crate::app) fn preview_shell_state(input: PreviewShellStateInput<'_>) -> PreviewShellState {

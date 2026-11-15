@@ -10,7 +10,9 @@ use crate::app::preview::panel::{
     PreviewTimecodeInputFocuses, PreviewViewportFocuses,
 };
 use crate::app::preview::state::PreviewTransportState;
-use crate::app::preview::toolbar::{preview_toolbar, preview_zoom_toolbar};
+use crate::app::preview::toolbar::{
+    preview_toolbar, preview_zoom_toolbar, source_frame_only_toolbar,
+};
 use crate::app::preview::viewport::bounds::{
     PreviewCanvasBoundsProbe, PreviewCanvasPanDrag, normalized_point_from_bounds,
     preview_scroll_delta_y,
@@ -35,12 +37,17 @@ use std::cell::Cell;
 use std::rc::Rc;
 use std::sync::Arc;
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Viewport receives the independently guarded source-frame action alongside existing media controls."
+)]
 pub(in crate::app) fn preview_viewport(
     state: &PreviewShellState,
     focuses: PreviewViewportFocuses<'_>,
     timecode_inputs: PreviewTimecodeInputFocuses<'_>,
     transport: PreviewTransportState,
     card_bounds: Rc<Cell<Bounds<Pixels>>>,
+    source_frame_export: Option<&gpui::FocusHandle>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
@@ -113,16 +120,29 @@ pub(in crate::app) fn preview_viewport(
         viewport = viewport.child(overlay_controls);
     }
 
-    if preview_visual_controls_visible(state) {
-        let ui_scale = f64::from(window.rem_size().as_f32() / crate::appearance::BASE_REM_PX);
-        let compact_trim = transport.open
-            && (state.canvas.viewport_width
-                < f64::from(crate::app::layout::PREVIEW_TRIM_PANEL_WIDTH + 120.0) * ui_scale
-                || state.canvas.viewport_height < 360.0 * ui_scale);
+    let visual_controls_visible = preview_visual_controls_visible(state);
+    let ui_scale = f64::from(window.rem_size().as_f32() / crate::appearance::BASE_REM_PX);
+    let compact_trim = transport.open
+        && (state.canvas.viewport_width
+            < f64::from(crate::app::layout::PREVIEW_TRIM_PANEL_WIDTH + 120.0) * ui_scale
+            || state.canvas.viewport_height < 360.0 * ui_scale);
+    if visual_controls_visible {
         if !compact_trim {
-            viewport = viewport.child(preview_toolbar(state, focuses.tools, window, cx));
+            viewport = viewport.child(preview_toolbar(
+                state,
+                focuses.tools,
+                source_frame_export,
+                window,
+                cx,
+            ));
         }
         viewport = viewport.child(preview_zoom_toolbar(state, window, cx));
+    }
+
+    if (!visual_controls_visible || compact_trim)
+        && let Some(focus) = source_frame_export
+    {
+        viewport = viewport.child(source_frame_only_toolbar(focus, palette, window, cx));
     }
 
     if let Some(transport) = crate::app::preview::preview_transport(

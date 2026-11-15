@@ -29,6 +29,7 @@ pub const ICON_FOLDER_IMPORT: &str = "icons/folder-import.svg";
 pub const ICON_HARD_DRIVE: &str = "icons/hard-drive.svg";
 pub const ICON_FILE_VIDEO: &str = "icons/file-video.svg";
 pub const ICON_FILE_IMAGE: &str = "icons/file-image.svg";
+pub const ICON_CAMERA_FRAME: &str = "icons/camera-frame.svg";
 pub const ICON_MUSIC: &str = "icons/music.svg";
 pub const ICON_VIDEO_FILTERS: &str = "icons/video-filters.svg";
 pub const ICON_AUDIO_FILTERS: &str = "icons/audio-filters.svg";
@@ -75,6 +76,7 @@ const FOLDER_IMPORT_SVG: &str = include_str!("../../assets/icons/nucleo/18px_fol
 const HARD_DRIVE_SVG: &str = include_str!("../../assets/icons/nucleo/18px_hard-drive.svg");
 const FILE_VIDEO_SVG: &str = include_str!("../../assets/icons/nucleo/18px_film.svg");
 const FILE_IMAGE_SVG: &str = include_str!("../../assets/icons/nucleo/18px_file-image.svg");
+const CAMERA_FRAME_SVG: &str = include_str!("../../assets/icons/nucleo/18px_camera-frame.svg");
 const MUSIC_SVG: &str = include_str!("../../assets/icons/nucleo/18px_music-note.svg");
 const VIDEO_FILTERS_SVG: &str = include_str!("../../assets/icons/nucleo/18px_filters.svg");
 const AUDIO_FILTERS_SVG: &str = include_str!("../../assets/icons/nucleo/18px_waveform-lines.svg");
@@ -128,6 +130,7 @@ impl AssetSource for FrameAssets {
             ICON_HARD_DRIVE => Cow::Borrowed(HARD_DRIVE_SVG.as_bytes()),
             ICON_FILE_VIDEO => Cow::Borrowed(FILE_VIDEO_SVG.as_bytes()),
             ICON_FILE_IMAGE => Cow::Borrowed(FILE_IMAGE_SVG.as_bytes()),
+            ICON_CAMERA_FRAME => Cow::Borrowed(CAMERA_FRAME_SVG.as_bytes()),
             ICON_MUSIC => Cow::Borrowed(MUSIC_SVG.as_bytes()),
             ICON_VIDEO_FILTERS => Cow::Borrowed(VIDEO_FILTERS_SVG.as_bytes()),
             ICON_AUDIO_FILTERS => Cow::Borrowed(AUDIO_FILTERS_SVG.as_bytes()),
@@ -178,6 +181,7 @@ impl AssetSource for FrameAssets {
                 SharedString::from("auto-crop.svg"),
                 SharedString::from("bookmark.svg"),
                 SharedString::from("captions.svg"),
+                SharedString::from("camera-frame.svg"),
                 SharedString::from("check.svg"),
                 SharedString::from("close.svg"),
                 SharedString::from("copy.svg"),

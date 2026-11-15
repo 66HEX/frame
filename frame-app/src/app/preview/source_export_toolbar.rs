@@ -26,33 +26,11 @@ pub(in crate::app) fn source_export_toolbar(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
-    let enabled = state.disabled_reason.is_none();
-    let description = state.disabled_reason.map_or_else(
-        || SOURCE_FRAME_DESCRIPTION.to_owned(),
-        |reason| format!("{SOURCE_FRAME_DESCRIPTION} {reason}"),
-    );
-    let export = frame_text_button_with_focus(
-        "source-frame-export",
-        "Export source frame",
-        ButtonVariant::Secondary,
-        false,
-        enabled,
-        focuses.export,
-        palette,
-        window,
-        cx,
-    )
-    .aria_description(description.clone())
-    .on_click(cx.listener(|root, _: &ClickEvent, _, cx| root.start_source_frame_export(cx)));
-    let export = FrameTooltip::new("source-frame-export", description)
-        .placement(TooltipPlacement::Above)
-        .for_control(export, Some(focuses.export), enabled, palette, window, cx);
     let mut controls = div()
         .flex()
         .flex_wrap()
         .items_center()
-        .gap(theme::ui_rem(theme::metrics::CONTROL_GAP))
-        .child(export);
+        .gap(theme::ui_rem(theme::metrics::CONTROL_GAP));
     if state.running {
         controls = controls.child(
             frame_text_button_with_focus(
