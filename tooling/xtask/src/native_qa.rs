@@ -45,6 +45,10 @@ jobs:
         rustup default __RUST_VERSION__
         test "$(rustc --version | awk '{print $2}')" = "__RUST_VERSION__"
 __LINUX_SETUP__
+    - name: qa::test_windows_job_helper
+      if: runner.os == 'Windows'
+      shell: powershell
+      run: '& .\script\qa\tests\test-windows-job.ps1 -Runs .\target\native-qa-helper'
     - name: qa::setup_media_tools
       run: cargo xtask setup-ffmpeg
     - name: qa::test_process_lifecycle
@@ -56,6 +60,8 @@ __LINUX_SETUP__
       run: cargo test --locked --release -p frame-app --features qa-harness --lib source_metadata -- --test-threads=1
     - name: qa::test_publication
       run: cargo test --locked --release -p frame-app --features qa-harness --lib conversion_runner -- --include-ignored --test-threads=1
+    - name: qa::test_source_frame_export
+      run: cargo test --locked --release -p frame-app --features qa-harness --lib frame_export -- --include-ignored --test-threads=1
     - name: qa::test_preview_lifecycle
       run: cargo test --locked --release -p frame-app --features qa-harness --lib preview_engine -- --test-threads=1
     - name: qa::test_preview_pipe_throughput
@@ -87,6 +93,9 @@ __LINUX_SETUP__
             path = Path('target/native-qa') / name
             if path.is_file():
                 print(path.read_text(encoding='utf-8'))
+        helper = Path('target/native-qa-helper/windows-job-self-test.json')
+        if helper.is_file():
+            print(helper.read_text(encoding='utf-8-sig'))
         PY
     - name: qa::upload
       uses: actions/upload-artifact@v7.0.1
@@ -179,5 +188,26 @@ mod tests {
         assert!(
             workflow.contains("--lib preview_engine::tests::small_sources::ffmpeg_ -- --ignored")
         );
+    }
+
+    #[test]
+    fn native_qa_exercises_source_frame_publication_and_runtime_oracles() {
+        let workflow = workflow();
+        assert!(workflow.contains("--lib frame_export -- --include-ignored --test-threads=1"));
+        let step = workflow.find("qa::test_source_frame_export").unwrap();
+        let end = workflow[step..].find("\n    - name:").unwrap() + step;
+        assert!(!workflow[step..end].contains("if:"));
+    }
+
+    #[test]
+    fn native_qa_checks_windows_qa_job_ownership_with_powershell_five() {
+        let workflow = workflow();
+        let step = workflow.find("qa::test_windows_job_helper").unwrap();
+        let end = workflow[step..].find("\n    - name:").unwrap() + step;
+        let helper = &workflow[step..end];
+        assert!(helper.contains("if: runner.os == 'Windows'"));
+        assert!(helper.contains("shell: powershell"));
+        assert!(helper.contains("test-windows-job.ps1"));
+        assert!(workflow.contains("target/native-qa-helper/windows-job-self-test.json"));
     }
 }
