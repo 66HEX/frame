@@ -307,6 +307,41 @@ fn logs_tab_indicator_tracks_the_selected_file_after_keyboard_scroll() {
 }
 
 #[test]
+fn inspector_source_tab_is_named_for_its_content_and_keeps_output_metadata() {
+    for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+        let mut app = TestAppContext::single();
+        let (root, cx) = test_window(&mut app, VisualFixture::SettingsVideo, scale);
+        cx.update(|window, _| window.set_a11y_forced(true));
+        draw(cx);
+        click(cx, "settings-tab-metadata");
+        assert_eq!(
+            root.read_with(cx, |root, _| root.settings_ui.active_tab),
+            SettingsTab::Metadata
+        );
+        cx.update(|window, _| {
+            let tree = window.a11y_tree().unwrap();
+            for role in [gpui::Role::Tab, gpui::Role::TabPanel] {
+                assert!(
+                    tree.nodes
+                        .iter()
+                        .any(|(_, node)| { node.role() == role && node.label() == Some("Source") }),
+                    "the inspector source tab and its panel must be named Source"
+                );
+            }
+            assert!(!tree.nodes.iter().any(|(_, node)| {
+                node.role() == gpui::Role::Tab && node.label() == Some("Metadata")
+            }));
+        });
+        press(cx, "right");
+        assert_eq!(
+            root.read_with(cx, |root, _| root.settings_ui.active_tab),
+            SettingsTab::Output
+        );
+        assert_eq!(crate::settings::OutputSection::Metadata.label(), "Metadata");
+    }
+}
+
+#[test]
 fn tab_rails_move_focus_with_each_arrow_and_offer_one_tab_stop() {
     for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
         let mut app = TestAppContext::single();

@@ -616,7 +616,7 @@ fn preview_transport_reveals_on_keyboard_focus_and_returns_focus_after_trim() {
             press(cx, "escape");
             assert!(cx.debug_bounds("preview-trim-panel").is_none());
             assert_eq!(focus(cx), trigger_focus);
-            tab_to_label(cx, "Metadata");
+            tab_to_label(cx, "Source");
             assert!(cx.debug_bounds("preview-playback-toggle").is_none());
         }
     }
@@ -634,6 +634,7 @@ fn preview_trim_floats_without_reflow_or_collisions_at_the_minimum_window_size()
         let padding = px(crate::app::layout::PREVIEW_PANEL_PADDING * scale.factor());
         assert!((viewport.top() - card.top() - padding).abs() < px(0.5));
         assert!((card.bottom() - viewport.bottom() - padding).abs() < px(0.5));
+        assert!(cx.debug_bounds("source-frame-export-toolbar").is_none());
 
         cx.simulate_mouse_move(viewport.center(), None, Modifiers::default());
         draw(cx);
@@ -648,6 +649,7 @@ fn preview_trim_floats_without_reflow_or_collisions_at_the_minimum_window_size()
         open_preview_trim(cx);
         let panel = cx.debug_bounds("preview-trim-panel").unwrap();
         assert_eq!(cx.debug_bounds("preview-viewport").unwrap(), viewport);
+        assert!(cx.debug_bounds("source-frame-export-toolbar").is_none());
         assert_inside(viewport, panel);
         assert!(panel.bottom() <= play.top(), "trim opens above transport");
         for id in [
@@ -656,6 +658,7 @@ fn preview_trim_floats_without_reflow_or_collisions_at_the_minimum_window_size()
             "preview-tool-flip-vertical",
             "preview-tool-crop",
             "preview-tool-overlay",
+            "source-frame-export",
             "preview-zoom-out",
             "preview-zoom-in",
         ] {

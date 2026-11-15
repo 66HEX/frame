@@ -1,5 +1,7 @@
 use super::*;
 
+type ConfigEdit = fn(&mut ConversionConfig);
+
 fn image_metadata() -> SourceMetadata {
     SourceMetadata {
         media_kind: Some(SourceKind::Image),
@@ -53,7 +55,7 @@ fn default_presets_match_original_builtin_order() {
 }
 
 #[test]
-fn configs_match_uses_original_core_fields() {
+fn configs_match_detects_audio_bitrate_changes() {
     let config = ConversionConfig {
         video_bitrate_mode: "bitrate".to_string(),
         video_bitrate: "6000".to_string(),
@@ -66,7 +68,81 @@ fn configs_match_uses_original_core_fields() {
         ..ConversionConfig::default()
     };
 
-    assert!(configs_match(&config, &same));
+    assert!(!configs_match(&config, &same));
+}
+
+#[test]
+fn preset_options_detect_changes_to_preset_owned_settings() {
+    let preset = default_presets().remove(0);
+    let baseline = preset.config.clone();
+    let changes: [(&str, ConfigEdit); 8] = [
+        ("FPS", |config| config.fps = "24".to_string()),
+        ("video filter", |config| {
+            config.video_filters.grayscale = true;
+        }),
+        ("audio filter", |config| {
+            config.audio_filters.compressor_enabled = true;
+        }),
+        ("audio bitrate", |config| {
+            config.audio_bitrate = "320".to_string();
+        }),
+        ("metadata", |config| {
+            config.metadata.mode = MetadataMode::Clean;
+        }),
+        ("processing mode", |config| {
+            config.processing_mode = ProcessingMode::Copy;
+        }),
+        ("trim", |config| config.start_time = Some("1".to_string())),
+        ("rotation", |config| config.rotation = "90".to_string()),
+    ];
+
+    for (label, change) in changes {
+        let mut config = baseline.clone();
+        change(&mut config);
+        let options = preset_options(&config, std::slice::from_ref(&preset), None);
+        assert!(!options[0].is_selected, "{label} must clear Applied");
+        assert_eq!(options[0].status, None, "{label}");
+    }
+}
+
+#[test]
+fn preset_options_recognize_normalized_application_with_source_tracks() {
+    let metadata = video_metadata();
+    for preset in default_presets() {
+        let mut config = ConversionConfig {
+            selected_audio_tracks: vec![1],
+            selected_subtitle_tracks: vec![2],
+            external_subtitle_tracks: vec![ExternalSubtitleTrack {
+                path: "/tmp/own-captions.srt".to_string(),
+                ..ExternalSubtitleTrack::default()
+            }],
+            subtitle_burn_path: Some("/tmp/own-burn.ass".to_string()),
+            ..ConversionConfig::default()
+        };
+        apply_preset(&mut config, &preset, Some(&metadata));
+        let options = preset_options(&config, std::slice::from_ref(&preset), Some(&metadata));
+        assert!(
+            options[0].is_selected,
+            "{} must be Applied after normalization",
+            preset.id
+        );
+    }
+}
+
+#[test]
+fn configs_match_ignores_only_source_track_bindings() {
+    let original = ConversionConfig::default();
+    let another_source = ConversionConfig {
+        selected_audio_tracks: vec![7],
+        selected_subtitle_tracks: vec![9],
+        external_subtitle_tracks: vec![ExternalSubtitleTrack {
+            path: "/tmp/another-source.srt".to_string(),
+            ..ExternalSubtitleTrack::default()
+        }],
+        subtitle_burn_path: Some("/tmp/another-source.ass".to_string()),
+        ..original.clone()
+    };
+    assert!(configs_match(&original, &another_source));
 }
 
 #[test]

@@ -12,6 +12,7 @@ pub mod conversion_events;
 pub mod conversion_runner;
 pub mod file_filters;
 pub mod file_queue;
+pub(crate) mod frame_export;
 pub mod native_dialogs;
 pub mod notifications;
 pub(crate) mod numeric;
@@ -22,9 +23,11 @@ pub mod runtime_binaries;
 pub(crate) mod runtime_environment;
 pub mod settings;
 pub mod source_metadata;
+pub(crate) mod source_probe;
 pub mod theme;
 pub mod update_runtime;
 pub(crate) mod update_session;
+pub(crate) mod workspace_recovery;
 
 pub use app::layout::*;
 pub use app::model::{

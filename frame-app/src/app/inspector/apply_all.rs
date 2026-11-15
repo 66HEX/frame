@@ -32,6 +32,7 @@ pub(in crate::app) enum ApplyAllAvailability {
     Enabled,
 }
 
+#[derive(Clone)]
 struct FileIdentity {
     id: String,
     path: String,
@@ -46,10 +47,19 @@ impl From<&FileItem> for FileIdentity {
     }
 }
 
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum BatchScope {
+    Selected,
+    All,
+}
+
+#[derive(Clone)]
 struct ApplyAllSnapshot {
-    donor: FileIdentity,
+    donor: Option<FileIdentity>,
     preset: PresetDefinition,
     targets: Vec<FileIdentity>,
+    scope: BatchScope,
+    skipped: usize,
 }
 
 // These necessary conditions avoid cloning large configurations for obvious rejects.
@@ -253,39 +263,85 @@ impl FrameRoot {
 
     fn snapshot_apply_all(&self) -> Option<ApplyAllSnapshot> {
         let donor = self.apply_all_donor().ok()?;
-        let mut policy = CandidatePolicy::new(&donor.config);
         let preset = create_custom_preset(String::new(), "Output settings", &donor.config);
+        let snapshot = self.snapshot_batch(&preset, Some(donor));
+        (!snapshot.targets.is_empty()).then_some(snapshot)
+    }
+
+    fn snapshot_batch(
+        &self,
+        preset: &PresetDefinition,
+        donor: Option<&FileItem>,
+    ) -> ApplyAllSnapshot {
+        let mut policy = CandidatePolicy::new(&preset.config);
+        let mut considered = 0;
         let targets = self
             .file_queue
             .files()
             .iter()
             .filter_map(|target| {
-                if target.id == donor.id || !target.status.is_actionable_for_conversion() {
+                if donor.is_some_and(|donor| target.id == donor.id) {
+                    return None;
+                }
+                considered += 1;
+                if !target.status.is_actionable_for_conversion() {
                     return None;
                 }
                 let metadata = self.source_metadata.ready_metadata_for(&target.id)?;
                 (policy.may_apply(&target.config, metadata)
-                    && candidate_for(&preset, &target.config, metadata).is_some())
+                    && candidate_for(preset, &target.config, metadata).is_some())
                 .then(|| FileIdentity::from(target))
             })
             .collect::<Vec<_>>();
-        (!targets.is_empty()).then(|| ApplyAllSnapshot {
-            donor: FileIdentity::from(donor),
-            preset,
+        ApplyAllSnapshot {
+            donor: donor.map(FileIdentity::from),
+            preset: preset.clone(),
+            skipped: considered - targets.len(),
             targets,
-        })
+            scope: BatchScope::All,
+        }
+    }
+
+    fn selected_batch_snapshot(&self, all: &ApplyAllSnapshot) -> ApplyAllSnapshot {
+        let selected: HashSet<_> = self
+            .file_queue
+            .files()
+            .iter()
+            .filter(|file| {
+                file.is_selected_for_conversion
+                    && all.donor.as_ref().is_none_or(|donor| donor.id != file.id)
+            })
+            .map(|file| file.id.as_str())
+            .collect();
+        let targets: Vec<_> = all
+            .targets
+            .iter()
+            .filter(|target| selected.contains(target.id.as_str()))
+            .cloned()
+            .collect();
+        let skipped = selected.len() - targets.len();
+        ApplyAllSnapshot {
+            targets,
+            scope: BatchScope::Selected,
+            skipped,
+            donor: all.donor.clone(),
+            preset: all.preset.clone(),
+        }
     }
 
     fn apply_all_snapshot(&mut self, snapshot: &ApplyAllSnapshot) -> bool {
         if self.update_installation_in_progress() {
             return false;
         }
-        let Some(donor) = self.file_queue.file_by_id(&snapshot.donor.id) else {
-            return false;
-        };
-        if donor.path != snapshot.donor.path || self.check_apply_all_donor(donor).is_err() {
-            return false;
+        if let Some(identity) = &snapshot.donor {
+            let Some(donor) = self.file_queue.file_by_id(&identity.id) else {
+                return false;
+            };
+            if donor.path != identity.path || self.check_apply_all_donor(donor).is_err() {
+                return false;
+            }
         }
+        self.prune_applied_presets();
         let identities: HashSet<_> = snapshot
             .targets
             .iter()
@@ -293,9 +349,17 @@ impl FrameRoot {
             .collect();
         let mut policy = CandidatePolicy::new(&snapshot.preset.config);
         let mut changed = false;
+        let named_preset = self
+            .presets
+            .iter()
+            .any(|preset| preset.id == snapshot.preset.id);
         for target in self.file_queue.files_mut() {
-            if target.id == snapshot.donor.id
+            if snapshot
+                .donor
+                .as_ref()
+                .is_some_and(|donor| target.id == donor.id)
                 || !target.status.is_actionable_for_conversion()
+                || (snapshot.scope == BatchScope::Selected && !target.is_selected_for_conversion)
                 || !identities.contains(&(target.id.as_str(), target.path.as_str()))
             {
                 continue;
@@ -306,11 +370,30 @@ impl FrameRoot {
             if !policy.may_apply(&target.config, metadata) {
                 continue;
             }
-            if let Some(candidate) = candidate_for(&snapshot.preset, &target.config, metadata)
-                && candidate != target.config
-            {
+            let Some(candidate) = candidate_for(&snapshot.preset, &target.config, metadata) else {
+                continue;
+            };
+            if candidate != target.config {
                 target.config = candidate;
                 changed = true;
+            }
+            if named_preset {
+                let previous = self.settings_ui.applied_presets.insert(
+                    target.id.clone(),
+                    super::state::AppliedPreset {
+                        path: target.path.clone(),
+                        preset_id: snapshot.preset.id.clone(),
+                    },
+                );
+                changed |= previous.is_none_or(|previous| {
+                    previous.path != target.path || previous.preset_id != snapshot.preset.id
+                });
+            } else {
+                changed |= self
+                    .settings_ui
+                    .applied_presets
+                    .remove(&target.id)
+                    .is_some();
             }
         }
         changed
@@ -320,25 +403,76 @@ impl FrameRoot {
         let Some(snapshot) = self.snapshot_apply_all() else {
             return;
         };
-        let count = snapshot.targets.len();
-        let noun = if count == 1 { "file" } else { "files" };
+        self.confirm_batch_snapshot(snapshot, window, cx);
+    }
+
+    pub(in crate::app) fn confirm_preset_batch(
+        &self,
+        preset: &PresetDefinition,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.update_installation_in_progress() {
+            return;
+        }
+        self.confirm_batch_snapshot(self.snapshot_batch(preset, None), window, cx);
+    }
+
+    #[cfg(test)]
+    pub(in crate::app) fn apply_preset_to_all_pending(
+        &mut self,
+        preset: &PresetDefinition,
+    ) -> bool {
+        let snapshot = self.snapshot_batch(preset, None);
+        self.apply_all_snapshot(&snapshot)
+    }
+
+    fn confirm_batch_snapshot(
+        &self,
+        all: ApplyAllSnapshot,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if all.targets.is_empty() {
+            return;
+        }
+        let selected = self.selected_batch_snapshot(&all);
+        let describe = |snapshot: &ApplyAllSnapshot| {
+            let count = snapshot.targets.len();
+            let noun = if count == 1 { "file" } else { "files" };
+            format!("{count} {noun}; {} skipped.", snapshot.skipped)
+        };
         let detail = format!(
-            "Replace output settings for {count} other pending {noun}, including unchecked files. Each file keeps its own track selections and subtitle files where the new settings support them. Incompatible files and files still loading or unavailable are skipped."
+            "Replace output settings.\nSelected for conversion: {}\nAll files: {}",
+            describe(&selected),
+            describe(&all),
         );
-        let receiver = window.prompt(
-            PromptLevel::Warning,
-            "Apply settings to all?",
-            Some(&detail),
-            &[
-                PromptButton::ok("Apply settings"),
-                PromptButton::cancel("Cancel"),
-            ],
-            cx,
-        );
+        let title = if all.donor.is_some() {
+            "Apply output settings?".to_string()
+        } else {
+            format!("Apply \"{}\"?", all.preset.name)
+        };
+        let mut choices = Vec::new();
+        if !selected.targets.is_empty() {
+            choices.push((
+                format!("Apply to selected ({})", selected.targets.len()),
+                selected,
+            ));
+        }
+        choices.push((format!("Apply to all ({})", all.targets.len()), all));
+        let mut buttons: Vec<_> = choices
+            .iter()
+            .map(|(label, _)| PromptButton::ok(label.clone()))
+            .collect();
+        buttons.push(PromptButton::cancel("Cancel"));
+        let receiver = window.prompt(PromptLevel::Warning, &title, Some(&detail), &buttons, cx);
         cx.spawn(async move |this, cx| {
-            if receiver.await != Ok(0) {
+            let Ok(answer) = receiver.await else {
                 return;
-            }
+            };
+            let Some((_, snapshot)) = choices.into_iter().nth(answer) else {
+                return;
+            };
             this.update(cx, |root, cx| {
                 if root.apply_all_snapshot(&snapshot) {
                     cx.notify();
@@ -372,7 +506,7 @@ pub(super) fn apply_all_control(
         .child(
             frame_text_button(
                 "settings-apply-all",
-                "Apply to all",
+                "Apply to files…",
                 if palette.is_light() {
                     ButtonVariant::Accent
                 } else {

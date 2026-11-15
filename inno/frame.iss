@@ -6,7 +6,7 @@
 #define AppSetupName "Frame-x86_64"
 #endif
 #ifndef AppVersion
-#define AppVersion "0.34.0"
+#define AppVersion "0.35.0"
 #endif
 #ifndef OutputDir
 #define OutputDir "..\target"

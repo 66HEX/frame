@@ -152,7 +152,7 @@ impl ConversionEventState {
                 }
             }
             ConversionEvent::Completed(payload) => {
-                queue.update_status(&payload.id, FileStatus::Completed, 100);
+                queue.complete_conversion(&payload.id, payload.output_path);
             }
             ConversionEvent::Error(payload) => {
                 if queue.file_by_id(&payload.id).is_some() {
@@ -267,6 +267,50 @@ mod tests {
         let file = queue.file_by_id("task-1").expect("file should exist");
         assert_eq!(file.status, FileStatus::Completed);
         assert_eq!(file.progress_percent, 100);
+    }
+
+    #[test]
+    fn completed_retains_the_actual_output_path_after_collision_suffixing() {
+        let mut queue = queue_with_file(FileStatus::Converting);
+        let mut state = ConversionEventState::new();
+        let actual_path = "/tmp/Zażółć export/source (2).mkv";
+
+        state.apply_conversion_event(
+            &mut queue,
+            ConversionEvent::completed("task-1", actual_path),
+        );
+
+        assert_eq!(
+            queue.file_by_id("task-1").unwrap().output_path.as_deref(),
+            Some(actual_path)
+        );
+    }
+
+    #[test]
+    fn failed_attempt_does_not_expose_a_previous_successful_output() {
+        let mut queue = queue_with_file(FileStatus::Converting);
+        queue.file_by_id_mut("task-1").unwrap().output_path =
+            Some("/tmp/previous-success.mp4".into());
+        let mut state = ConversionEventState::new();
+
+        state.apply_conversion_event(
+            &mut queue,
+            ConversionEvent::error("task-1", "failed before publication"),
+        );
+
+        assert_eq!(queue.file_by_id("task-1").unwrap().output_path, None);
+    }
+
+    #[test]
+    fn cancelled_attempt_does_not_expose_a_previous_successful_output() {
+        let mut queue = queue_with_file(FileStatus::Converting);
+        queue.file_by_id_mut("task-1").unwrap().output_path =
+            Some("/tmp/previous-success.mp4".into());
+        let mut state = ConversionEventState::new();
+
+        state.apply_conversion_event(&mut queue, ConversionEvent::cancelled("task-1"));
+
+        assert_eq!(queue.file_by_id("task-1").unwrap().output_path, None);
     }
 
     #[test]

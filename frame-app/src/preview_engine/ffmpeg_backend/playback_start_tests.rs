@@ -40,6 +40,7 @@ fn new_process() -> RunningPreviewProcess {
         PreviewRuntimeMetricsStore::new(),
         "/missing/ffmpeg".into(),
     )
+    .unwrap()
 }
 
 struct Waiter {
@@ -113,6 +114,7 @@ impl Waiter {
 
 #[test]
 fn parked_audio_wait_rechecks_spurious_wakes_and_starts() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let process = new_process();
     let waiter = Waiter::new(&process);
     waiter.wait_until_parked(&process, 1);
@@ -124,6 +126,7 @@ fn parked_audio_wait_rechecks_spurious_wakes_and_starts() {
 
 #[test]
 fn parked_audio_wait_is_released_by_stop_generation_replacement_and_end() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     for event in ["stop", "generation", "ended"] {
         let process = new_process();
         let waiter = Waiter::new(&process);
@@ -144,6 +147,7 @@ fn parked_audio_wait_is_released_by_stop_generation_replacement_and_end() {
 
 #[test]
 fn audio_start_and_stop_do_not_lose_wakes_before_or_during_wait() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     for _ in 0..64 {
         let process = new_process();
         process.start_playback_generation(0, 0.0);
@@ -163,6 +167,7 @@ fn audio_start_and_stop_do_not_lose_wakes_before_or_during_wait() {
 
 #[test]
 fn stopping_and_dropping_process_join_a_parked_audio_worker() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     for drop_process in [false, true] {
         let process = new_process();
         let mut waiter = Waiter::new(&process);
@@ -201,6 +206,7 @@ fn exited_child() -> std::process::Child {
 #[cfg(unix)]
 #[test]
 fn reaping_exited_child_preserves_parked_audio_until_play() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let process = Arc::new(new_process());
     let mut waiter = Waiter::new(&process);
     waiter.wait_until_parked(&process, 1);

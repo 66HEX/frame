@@ -6,6 +6,13 @@ use crate::update_runtime::unix_timestamp;
 use crate::update_session::{UpdateSessionError, UpdateSessionSnapshot, UpdateSessionStore};
 use gpui::Context;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::app) enum UpdateSessionRestore {
+    Absent,
+    Restored,
+    Blocked,
+}
+
 impl FrameRoot {
     pub(in crate::app) fn update_session_store(
         &self,
@@ -32,27 +39,33 @@ impl FrameRoot {
         )
     }
 
-    pub(in crate::app) fn restore_pending_update_session(&mut self, cx: &mut Context<Self>) {
+    pub(in crate::app) fn restore_pending_update_session(
+        &mut self,
+        cx: &mut Context<Self>,
+    ) -> UpdateSessionRestore {
         let Ok(store) = self.update_session_store() else {
-            return;
+            return UpdateSessionRestore::Absent;
         };
         let snapshot = match store.load() {
             Ok(Some(snapshot)) => snapshot,
-            Ok(None) => return,
+            Ok(None) => return UpdateSessionRestore::Absent,
             Err(error) => {
                 eprintln!("Failed to load pending update session: {error}");
-                return;
+                return UpdateSessionRestore::Blocked;
             }
         };
+        let native_recovery = !crate::runtime_environment::is_flatpak();
+        let pending_recovery = native_recovery.then(|| snapshot.clone());
         let restored = match snapshot.restore() {
             Ok(restored) => restored,
             Err(error) => {
                 eprintln!("Failed to restore pending update session: {error}");
-                return;
+                return UpdateSessionRestore::Blocked;
             }
         };
 
         self.active_view = restored.active_view;
+        self.metadata_probes.cancel_all();
         self.file_queue = restored.queue;
         self.next_file_sequence = restored.next_file_sequence;
         self.conversion_events = ConversionEventState::new();
@@ -60,13 +73,24 @@ impl FrameRoot {
         self.active_conversion_task_ids.clear();
         self.is_processing = false;
 
-        if let Err(error) = store.consume() {
-            eprintln!("Failed to consume restored update session: {error}");
-        }
+        let outcome = pending_recovery.map_or_else(
+            || match store.consume() {
+                Ok(()) => UpdateSessionRestore::Restored,
+                Err(error) => {
+                    eprintln!("Failed to consume restored update session: {error}");
+                    UpdateSessionRestore::Blocked
+                }
+            },
+            |snapshot| {
+                self.retain_pending_update(snapshot);
+                UpdateSessionRestore::Restored
+            },
+        );
 
         for (file_id, file_path) in restored.probe_targets {
             self.queue_restored_source_metadata_probe(file_id, file_path, cx);
         }
         cx.notify();
+        outcome
     }
 }

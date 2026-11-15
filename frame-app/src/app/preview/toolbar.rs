@@ -6,6 +6,9 @@ use crate::app::layout::{
 use crate::app::preview::crop_overlay::FlipAxis;
 use crate::app::preview::panel::{PreviewShellState, PreviewToolFocuses};
 use crate::app::preview::preview_visual_controls_enabled;
+use crate::app::preview::source_export_toolbar::{
+    SourceFrameExportControl, SourceFrameToolbarAction,
+};
 use crate::app::preview::state::PreviewCanvasZoomDirection;
 use crate::app::primitives::{ButtonVariant, color};
 use crate::app::root::FrameRoot;
@@ -47,21 +50,44 @@ pub(in crate::app) const fn preview_toolbar_center_margin() -> f32 {
 pub(in crate::app) fn preview_toolbar(
     state: &PreviewShellState,
     focuses: PreviewToolFocuses<'_>,
+    source_frame_export: Option<SourceFrameExportControl<'_>>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     let palette = state.palette;
     let transform_enabled = preview_visual_controls_enabled(state);
     let crop_enabled = transform_enabled && state.crop.has_crop_dimensions;
+    let overlay_visible = state.availability.media_kind != crate::preview::PreviewMediaKind::Image;
     let overlay_enabled = transform_enabled && state.availability.overlay_available;
+    let center_margin = preview_toolbar_center_margin()
+        + if overlay_visible {
+            0.0
+        } else {
+            f32::midpoint(PREVIEW_TOOLBAR_BUTTON_SIZE, PREVIEW_TOOLBAR_GAP)
+        }
+        - if source_frame_export.is_some() {
+            f32::midpoint(PREVIEW_TOOLBAR_BUTTON_SIZE, PREVIEW_TOOLBAR_GAP)
+        } else {
+            0.0
+        };
+    let ui_scale = f64::from(window.rem_size().as_f32() / crate::appearance::BASE_REM_PX);
+    let horizontal = state.canvas.viewport_height > 0.0
+        && state.canvas.viewport_height
+            < f64::from((-center_margin).mul_add(2.0, PREVIEW_TOOLBAR_OFFSET * 2.0)) * ui_scale;
 
     frame_toolbar(palette)
         .absolute()
         .top(relative(0.5))
-        .mt(theme::ui_rem(preview_toolbar_center_margin()))
+        .mt(theme::ui_rem(center_margin))
         .left(theme::ui_rem(PREVIEW_TOOLBAR_OFFSET))
         .flex()
         .flex_col()
+        .when(horizontal, |toolbar| {
+            toolbar
+                .flex_row()
+                .top(theme::ui_rem(PREVIEW_TOOLBAR_OFFSET))
+                .mt_0()
+        })
         .gap(theme::ui_rem(PREVIEW_TOOLBAR_GAP))
         .child(
             preview_tool_button(
@@ -136,25 +162,106 @@ pub(in crate::app) fn preview_toolbar(
                 }
             })),
         )
-        .child(
-            preview_tool_button_with_focus(
-                "preview-tool-overlay",
-                assets::ICON_FILE_IMAGE,
-                "Overlay image",
-                Some(state.overlay.overlay_mode || state.overlay.has_overlay),
-                overlay_enabled,
-                focuses.overlay,
-                TooltipPlacement::Right,
-                palette,
-                window,
-                cx,
+        .when(overlay_visible, |toolbar| {
+            toolbar.child(
+                preview_tool_button_with_focus(
+                    "preview-tool-overlay",
+                    assets::ICON_FILE_IMAGE,
+                    "Overlay image",
+                    Some(state.overlay.overlay_mode || state.overlay.has_overlay),
+                    overlay_enabled,
+                    focuses.overlay,
+                    TooltipPlacement::Right,
+                    palette,
+                    window,
+                    cx,
+                )
+                .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
+                    if root.trigger_selected_overlay(window, cx) {
+                        cx.notify();
+                    }
+                })),
             )
-            .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
-                if root.trigger_selected_overlay(window, cx) {
-                    cx.notify();
-                }
-            })),
-        )
+        })
+        .when_some(source_frame_export, |toolbar, control| {
+            toolbar.child(source_frame_export_button(control, palette, window, cx))
+        })
+}
+
+pub(in crate::app) fn source_frame_only_toolbar(
+    control: SourceFrameExportControl<'_>,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    frame_toolbar(palette)
+        .absolute()
+        .top(theme::ui_rem(PREVIEW_TOOLBAR_OFFSET))
+        .left(theme::ui_rem(PREVIEW_TOOLBAR_OFFSET))
+        .child(source_frame_export_button(control, palette, window, cx))
+}
+
+fn source_frame_export_button(
+    control: SourceFrameExportControl<'_>,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    let action = control.action;
+    let (icon, label, description) = match action {
+        SourceFrameToolbarAction::Export => (
+            assets::ICON_CAMERA_FRAME,
+            "Export source frame",
+            super::source_export_toolbar::SOURCE_FRAME_DESCRIPTION,
+        ),
+        SourceFrameToolbarAction::Cancel => (
+            assets::ICON_CLOSE,
+            if control.enabled {
+                "Cancel export"
+            } else {
+                "Cancelling export…"
+            },
+            "Cancel the current source frame export.",
+        ),
+    };
+    preview_tool_button_with_focus(
+        "source-frame-export",
+        icon,
+        label,
+        None,
+        control.enabled,
+        control.focus,
+        TooltipPlacement::Right,
+        palette,
+        window,
+        cx,
+    )
+    .aria_description(description)
+    .on_click(
+        cx.listener(move |root, _: &ClickEvent, _, cx| match action {
+            SourceFrameToolbarAction::Export => root.start_source_frame_export(cx),
+            SourceFrameToolbarAction::Cancel => root.cancel_source_frame_export(cx),
+        }),
+    )
+}
+
+pub(in crate::app) fn source_frame_cancel_button(
+    focus: &FocusHandle,
+    enabled: bool,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    source_frame_export_button(
+        SourceFrameExportControl {
+            focus,
+            enabled,
+            action: SourceFrameToolbarAction::Cancel,
+        },
+        palette,
+        window,
+        cx,
+    )
 }
 
 pub(in crate::app) fn preview_zoom_toolbar(

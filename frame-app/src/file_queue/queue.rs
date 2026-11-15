@@ -284,6 +284,18 @@ impl FileQueue {
         file.status = FileStatus::Idle;
         file.progress_percent = 0;
         file.conversion_error = None;
+        file.output_path = None;
+        true
+    }
+
+    pub fn complete_conversion(&mut self, id: &str, output_path: String) -> bool {
+        let Some(file) = self.file_by_id_mut(id) else {
+            return false;
+        };
+        file.status = FileStatus::Completed;
+        file.progress_percent = 100;
+        file.conversion_error = None;
+        file.output_path = Some(output_path);
         true
     }
 
@@ -291,6 +303,9 @@ impl FileQueue {
         if let Some(file) = self.files.iter_mut().find(|file| file.id == id) {
             file.status = status;
             file.progress_percent = progress_percent.min(100);
+            if status != FileStatus::Completed {
+                file.output_path = None;
+            }
             true
         } else {
             false
@@ -301,6 +316,7 @@ impl FileQueue {
         if let Some(file) = self.files.iter_mut().find(|file| file.id == id) {
             file.status = FileStatus::Error;
             file.conversion_error = Some(error.into());
+            file.output_path = None;
             true
         } else {
             false
@@ -361,6 +377,7 @@ impl FileQueue {
             file.status = FileStatus::Queued;
             file.progress_percent = 0;
             file.conversion_error = None;
+            file.output_path = None;
             pending_files.push(file.clone());
         }
 

@@ -10,7 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 static NEXT: AtomicU64 = AtomicU64::new(0);
 
-pub(super) struct StagedOutput {
+pub struct StagedOutput {
     destination: PathBuf,
     directory: PathBuf,
     directory_handle: File,

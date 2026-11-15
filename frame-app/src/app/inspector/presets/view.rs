@@ -10,7 +10,9 @@ use crate::settings::{
 };
 use crate::{assets, theme};
 use gpui::prelude::{FluentBuilder, ParentElement, Styled};
-use gpui::{ClickEvent, Context, FocusHandle, StatefulInteractiveElement, Window, div};
+use gpui::{
+    ClickEvent, Context, FocusHandle, InteractiveElement, StatefulInteractiveElement, Window, div,
+};
 
 #[derive(Clone, Copy)]
 pub(in crate::app) struct SettingsPresetsTabState<'a> {
@@ -20,6 +22,7 @@ pub(in crate::app) struct SettingsPresetsTabState<'a> {
     pub(in crate::app) preset_name: &'a str,
     pub(in crate::app) preset_name_focus: Option<&'a FocusHandle>,
     pub(in crate::app) presets: &'a [PresetDefinition],
+    pub(in crate::app) applied_preset_id: Option<&'a str>,
     pub(in crate::app) palette: &'static theme::ThemePalette,
 }
 
@@ -30,7 +33,13 @@ pub(in crate::app) fn settings_presets_tab(
 ) -> gpui::Div {
     let palette = state.palette;
     let mut list = crate::app::components::frame_list_group();
-    for option in preset_options(state.config, state.presets, state.metadata) {
+    for mut option in preset_options(state.config, state.presets, state.metadata) {
+        if !option.is_selected
+            && option.is_compatible
+            && state.applied_preset_id == Some(option.preset.id.as_str())
+        {
+            option.status = Some("Modified");
+        }
         list = list.child(settings_preset_row(
             option,
             state.settings_disabled,
@@ -127,6 +136,11 @@ fn settings_preset_row(
     let is_enabled = !settings_disabled && option.is_compatible;
     let selected = option.is_selected;
     let status = option.status;
+    let status_id = format!(
+        "preset-{}-{}",
+        status.unwrap_or_default().to_lowercase(),
+        preset.id
+    );
 
     frame_list_item(
         format!("preset-{}", preset.id),
@@ -137,6 +151,7 @@ fn settings_preset_row(
         window,
         cx,
     )
+    .when_some(status, gpui::StatefulInteractiveElement::aria_description)
     .on_click(cx.listener(move |root, _: &ClickEvent, _window, cx| {
         cx.stop_propagation();
         if is_enabled && root.apply_preset_to_selected(&preset_id) {
@@ -159,6 +174,8 @@ fn settings_preset_row(
             .when_some(status, |this, status| {
                 this.child(
                     div()
+                        .id(status_id.clone())
+                        .debug_selector(move || status_id)
                         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                         .font_weight(theme::TEXT_WEIGHT_REGULAR)
                         .text_color(color(if selected && option.is_compatible {
@@ -173,7 +190,7 @@ fn settings_preset_row(
                 this.child(settings_preset_icon_button(
                     format!("settings-preset-apply-all-{apply_all_id}"),
                     assets::ICON_LIST_CHECKS,
-                    "Apply preset to all files",
+                    "Apply preset to files…",
                     FrameIconButtonVariant::Ghost,
                     !settings_disabled,
                     palette,

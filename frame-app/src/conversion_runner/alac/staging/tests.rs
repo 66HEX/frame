@@ -107,7 +107,7 @@ fn failed_publication_has_a_terminal_decision_before_cleanup_callbacks() {
 }
 
 #[test]
-fn replaced_stage_and_directory_are_left_untouched() {
+fn replaced_stage_is_left_untouched() {
     let fixture = Fixture::new();
     let stage = fixture.stage(b"owned original");
     let stage_path = stage.path().to_path_buf();
@@ -118,7 +118,12 @@ fn replaced_stage_and_directory_are_left_untouched() {
     assert!(!stage.cleanup().is_empty());
     assert_eq!(fs::read(&stage_path).unwrap(), b"unowned replacement");
     assert!(!fixture.destination().exists());
+}
 
+#[cfg(unix)]
+#[test]
+fn replaced_sealed_directory_is_left_untouched() {
+    let fixture = Fixture::new();
     let stage = fixture.stage(b"second original");
     let directory = stage.directory.clone();
     fs::rename(&directory, fixture.0.join("moved-private-directory")).unwrap();
@@ -128,6 +133,56 @@ fn replaced_stage_and_directory_are_left_untouched() {
     assert!(stage.publish().is_err());
     assert!(!stage.cleanup().is_empty());
     assert_eq!(fs::read(stage_path).unwrap(), b"replacement directory file");
+}
+
+#[cfg(windows)]
+#[test]
+fn sealed_file_blocks_directory_rename_without_preventing_publication() {
+    let fixture = Fixture::new();
+    let stage = fixture.stage(b"retained verified original");
+    let directory = stage.directory.clone();
+    let moved = fixture.0.join("moved-private-directory");
+    // Windows rejects renaming a directory containing an open file, even when
+    // that file permits delete sharing. The failed mutation must leave it usable.
+    assert_eq!(
+        fs::rename(&directory, &moved).unwrap_err().kind(),
+        io::ErrorKind::PermissionDenied
+    );
+    assert!(!moved.exists());
+    stage.ensure_unchanged().unwrap();
+    assert_eq!(
+        fs::read(stage.path()).unwrap(),
+        b"retained verified original"
+    );
+    stage.publish().unwrap();
+    assert!(stage.cleanup().is_empty());
+    assert!(!directory.exists());
+    assert_eq!(
+        fs::read(fixture.destination()).unwrap(),
+        b"retained verified original"
+    );
+}
+
+#[test]
+fn replaced_unsealed_directory_rejects_launch_seal_and_publication() {
+    let fixture = Fixture::new();
+    let mut stage = StagedOutput::create(&fixture.destination()).unwrap();
+    let directory = stage.directory.clone();
+    let moved = fixture.0.join("moved-empty-private-directory");
+    fs::rename(&directory, &moved).unwrap();
+    fs::create_dir(&directory).unwrap();
+    let stage_path = stage.path().to_path_buf();
+    fs::write(&stage_path, b"unowned replacement directory file").unwrap();
+    assert!(stage.ensure_unwritten().is_err());
+    assert!(stage.seal().is_err());
+    assert!(stage.publish().is_err());
+    assert!(!stage.cleanup().is_empty());
+    assert_eq!(
+        fs::read(stage_path).unwrap(),
+        b"unowned replacement directory file"
+    );
+    assert!(moved.is_dir());
+    assert!(!fixture.destination().exists());
 }
 
 #[test]

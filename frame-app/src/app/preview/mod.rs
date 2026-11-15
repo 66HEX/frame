@@ -9,6 +9,8 @@ use gpui::prelude::Styled;
 pub(super) use overlay::*;
 pub(super) use panel::*;
 pub(super) use timeline::*;
+#[cfg(not(test))]
+pub(super) use toolbar::source_frame_cancel_button;
 #[cfg(test)]
 pub(super) use toolbar::*;
 pub(super) use viewport::*;
@@ -19,6 +21,7 @@ mod crop_options;
 mod crop_overlay;
 mod overlay;
 mod panel;
+pub(in crate::app) mod source_export_toolbar;
 mod timeline;
 mod toolbar;
 mod viewport;

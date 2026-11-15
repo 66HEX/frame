@@ -3,6 +3,9 @@
 mod command;
 mod launch;
 
+#[cfg(test)]
+mod rundown_tests;
+
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::os::windows::io::{AsRawHandle, OwnedHandle};
@@ -20,8 +23,8 @@ use windows::Win32::System::Threading::{GetExitCodeProcess, WaitForSingleObject}
 
 use super::{
     CapturedOutput, CleanupGuard, CleanupOutcome, CleanupSlot, CleanupTask, CommandSpec, Duration,
-    Instant, Limits, Permit, ProcessError, ProcessOutput, ProgressParser, ProgressProof,
-    StopReason, early_error, stop_reason, supervise_cleanup,
+    Instant, Limits, Permit, ProcessCallbacks, ProcessError, ProcessOutput, ProgressParser,
+    ProgressProof, StopReason, early_error, stop_reason, supervise_cleanup,
 };
 use launch::handle;
 
@@ -313,10 +316,11 @@ pub(super) fn run(
     input: &[u8],
     limits: Limits,
     deadline: Instant,
-    cancelled: &dyn Fn() -> bool,
+    callbacks: ProcessCallbacks<'_>,
     permit: Permit,
     slot: &CleanupSlot,
 ) -> Result<ProcessOutput, ProcessError> {
+    let cancelled = callbacks.cancelled;
     let launched = launch::spawn(spec, deadline, cancelled).map_err(early_error)?;
     let mut owner = CleanupGuard::new(
         OwnedProcess {
@@ -333,6 +337,7 @@ pub(super) fn run(
         },
         slot,
     );
+    (callbacks.spawned)();
     let setup = (|| {
         launch::fault(spec, "process")?;
         owner.stdout_reader = Some(reader(
@@ -374,12 +379,11 @@ pub(super) fn run(
             match owner.job_empty() {
                 Ok(true) => {}
                 Ok(false) => {
-                    return Err(stop(
-                        owner,
-                        StopReason::Io("process descendants have not finished".into()),
-                        limits,
-                        slot,
-                    ));
+                    // The leader and pipes can finish before job accounting
+                    // drains, including when a descendant has separate stdio.
+                    // Keep ownership and recheck under the original deadline/cancel.
+                    std::thread::sleep(Duration::from_millis(2));
+                    continue;
                 }
                 Err(error) => {
                     return Err(stop(owner, StopReason::Io(error.to_string()), limits, slot));

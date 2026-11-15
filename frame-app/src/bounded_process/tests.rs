@@ -51,6 +51,26 @@ fn limits() -> Limits {
     }
 }
 
+#[test]
+fn isolated_domain_runs_while_default_capability_permit_is_occupied() {
+    static PREVIEW: ExecutionDomain = ExecutionDomain::new();
+    let _serial = serial();
+    let permit = acquire_permit(Instant::now() + Duration::from_secs(1), &|| false).unwrap();
+    let result = PREVIEW.run(
+        &spec("success"),
+        &[37],
+        Limits {
+            timeout: Duration::from_secs(2),
+            ..limits()
+        },
+        || false,
+    );
+    drop(permit);
+    let output = result.expect("snapshot domain must not wait for capability probes");
+    assert!(output.success);
+    assert!(output.progress.ended);
+}
+
 pub(super) fn serial() -> std::sync::MutexGuard<'static, ()> {
     PROCESS_TESTS
         .lock()
@@ -111,6 +131,16 @@ fn fake_process() {
             .unwrap();
         }
         "no-read" => std::thread::sleep(Duration::from_secs(30)),
+        #[cfg(windows)]
+        "detached-descendant" => detached_descendant(),
+        "bulk-output" => {
+            let chunk = vec![0xa5; 64 * 1024];
+            let mut stdout = std::io::stdout().lock();
+            for _ in 0..1024 {
+                stdout.write_all(&chunk).unwrap();
+            }
+            eprintln!("bulk output complete");
+        }
         "flood" | "endless-flood" => {
             let bytes = vec![b'x'; 8192];
             for _ in 0..if mode == "flood" { 256 } else { usize::MAX } {
@@ -136,6 +166,73 @@ fn fake_process() {
         _ => panic!("unknown fixture mode"),
     }
     std::process::exit(0);
+}
+
+#[cfg(windows)]
+fn detached_descendant() {
+    let child = spec("no-read");
+    let mut command = Command::new(child.program);
+    command
+        .args(child.args)
+        .envs(child.env)
+        .env(
+            "FRAME_BOUNDED_MARKER",
+            std::env::var_os("FRAME_BOUNDED_MEMBER_MARKER").unwrap(),
+        )
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    #[expect(
+        clippy::zombie_processes,
+        reason = "fixture leaves a real job member with no inherited capture pipes after the leader exits"
+    )]
+    let _descendant = crate::process_launch::spawn(&mut command).unwrap();
+    let release = PathBuf::from(std::env::var_os("FRAME_BOUNDED_LEADER_RELEASE").unwrap());
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !release.exists() {
+        assert!(Instant::now() < deadline, "leader was not released");
+        std::thread::sleep(Duration::from_millis(2));
+    }
+}
+
+#[cfg(unix)]
+#[test]
+#[ignore = "large pipe throughput regression; run without competing builds"]
+fn large_stdout_does_not_sleep_between_readable_chunks() {
+    static BULK: ExecutionDomain = ExecutionDomain::new();
+    const PAYLOAD_BYTES: usize = 64 * 1024 * 1024;
+    let result = BULK
+        .run(
+            &spec("bulk-output"),
+            &[],
+            Limits {
+                timeout: Duration::from_millis(1500),
+                cleanup_timeout: Duration::from_secs(1),
+                stdout_bytes: PAYLOAD_BYTES + 1024,
+                stderr_bytes: 1024,
+            },
+            || false,
+        )
+        .unwrap_or_else(|error| {
+            panic!(
+                "ready data must drain without a fixed delay per 64 KiB: {:?}",
+                error.reason
+            )
+        });
+    assert!(result.success);
+    assert!(!result.stdout.truncated);
+    let payload_start = result
+        .stdout
+        .bytes
+        .len()
+        .checked_sub(PAYLOAD_BYTES)
+        .unwrap();
+    assert!(
+        result.stdout.bytes[payload_start..]
+            .iter()
+            .all(|byte| *byte == 0xa5)
+    );
+    assert!(String::from_utf8_lossy(&result.stderr.bytes).contains("bulk output complete"));
 }
 
 #[test]
@@ -365,13 +462,14 @@ fn unwind_retains_child_and_permit_until_supervised_cleanup_finishes() {
     });
     assert!(panic.is_err());
     let deadline = Instant::now() + Duration::from_secs(3);
-    while (ACTIVE.load(Ordering::Acquire) || CLEANUP_PENDING.load(Ordering::Acquire))
+    while (DEFAULT_DOMAIN.active.load(Ordering::Acquire)
+        || DEFAULT_DOMAIN.cleanup_pending.load(Ordering::Acquire))
         && Instant::now() < deadline
     {
         std::thread::sleep(Duration::from_millis(10));
     }
     assert!(
-        !ACTIVE.load(Ordering::Acquire),
+        !DEFAULT_DOMAIN.active.load(Ordering::Acquire),
         "supervisor must reap the child and release its permit"
     );
     assert!(
@@ -533,4 +631,132 @@ fn batch_wrapper_matches_std_command_arguments_and_rejects_newlines() {
             ));
         }
     }
+}
+
+#[test]
+fn startup_cleanup_returns_with_a_single_owned_pending_slot() {
+    struct HeldCleanup(Arc<AtomicBool>);
+    impl CleanupTask for HeldCleanup {
+        fn cleanup_step(&mut self) -> bool {
+            self.0.load(Ordering::Acquire)
+        }
+    }
+    static STARTUP: ExecutionDomain = ExecutionDomain::new();
+    let release = Arc::new(AtomicBool::new(false));
+    let reservation = STARTUP
+        .reserve(Instant::now() + Duration::from_secs(1), || false)
+        .unwrap();
+    let worker_release = Arc::clone(&release);
+    let (done_tx, done_rx) = std::sync::mpsc::channel();
+    let worker = std::thread::spawn(move || {
+        let result = reservation.cleanup(HeldCleanup(worker_release), Duration::from_millis(20));
+        done_tx.send(result).unwrap();
+    });
+    let result = done_rx.recv_timeout(Duration::from_millis(200));
+    if result.is_err() {
+        release.store(true, Ordering::Release);
+    }
+    worker.join().unwrap();
+    let result = result.expect("startup cleanup must return while an owned worker remains pending");
+    assert_eq!(result, CleanupOutcome::Pending);
+    assert!(STARTUP.cleanup_in_progress());
+    let directory = TestDirectory::new();
+    let marker = directory.0.join("must-not-spawn");
+    let mut command = spec("empty");
+    command
+        .env
+        .push(("FRAME_BOUNDED_MARKER".into(), marker.as_os_str().to_owned()));
+    let blocked = STARTUP.run(&command, &[], limits(), || false).unwrap_err();
+    assert_eq!(blocked.reason, StopReason::CleanupInProgress);
+    assert!(
+        !marker.exists(),
+        "pending cleanup must prevent another child"
+    );
+    release.store(true, Ordering::Release);
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while STARTUP.cleanup_pending.load(Ordering::Acquire) && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert!(
+        STARTUP
+            .run(&command, &[], limits(), || false)
+            .unwrap()
+            .success
+    );
+    assert!(marker.exists());
+}
+
+#[test]
+fn spawn_observer_does_not_count_a_cancelled_or_missing_process() {
+    static OBSERVED: ExecutionDomain = ExecutionDomain::new();
+    let count = std::sync::atomic::AtomicUsize::new(0);
+    let missing = CommandSpec::new("/missing/frame-bounded-observer-child");
+    for cancelled in [false, true] {
+        assert!(
+            OBSERVED
+                .run_observed(
+                    &missing,
+                    &[],
+                    limits(),
+                    || cancelled,
+                    || {
+                        count.fetch_add(1, Ordering::Relaxed);
+                    }
+                )
+                .is_err()
+        );
+    }
+    assert_eq!(
+        count.load(Ordering::Acquire),
+        0,
+        "no process exists to report to the spawn observer"
+    );
+}
+
+#[test]
+fn spawn_observer_panic_keeps_the_launched_child_owned() {
+    static OBSERVED: ExecutionDomain = ExecutionDomain::new();
+    let directory = TestDirectory::new();
+    let marker = directory.0.join("started");
+    let mut command = spec("no-read");
+    command
+        .env
+        .push(("FRAME_BOUNDED_MARKER".into(), marker.as_os_str().to_owned()));
+    let result = std::panic::catch_unwind(|| {
+        let _ = OBSERVED.run_observed(
+            &command,
+            &[],
+            limits(),
+            || false,
+            || {
+                let deadline = Instant::now() + Duration::from_millis(500);
+                while !marker.exists() && Instant::now() < deadline {
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+                panic!("injected spawn observer panic");
+            },
+        );
+    });
+    assert!(result.is_err());
+    assert!(
+        marker.exists(),
+        "observer must run only after the child actually launched"
+    );
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while (OBSERVED.active.load(Ordering::Acquire)
+        || OBSERVED.cleanup_pending.load(Ordering::Acquire))
+        && Instant::now() < deadline
+    {
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert!(
+        !OBSERVED.active.load(Ordering::Acquire),
+        "panic lost the child's cleanup owner"
+    );
+    assert!(
+        OBSERVED
+            .run(&spec("empty"), &[], limits(), || false)
+            .unwrap()
+            .success
+    );
 }

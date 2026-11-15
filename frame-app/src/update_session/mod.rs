@@ -151,6 +151,9 @@ impl UpdateSessionSnapshot {
 
             if source_exists {
                 file.status = persisted.status.into();
+                if file.status == FileStatus::Completed {
+                    file.output_path = persisted.output_path;
+                }
                 file.progress_percent = if file.status == FileStatus::Completed {
                     100
                 } else {
@@ -260,6 +263,8 @@ struct PersistedFileItem {
     selected_for_conversion: bool,
     status: PersistedFileStatus,
     conversion_error: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    output_path: Option<String>,
     config: ConversionConfig,
 }
 
@@ -278,6 +283,7 @@ impl TryFrom<&FileItem> for PersistedFileItem {
             } else {
                 None
             },
+            output_path: file.completed_output_path().map(str::to_owned),
             config: file.config.clone(),
         })
     }

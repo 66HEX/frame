@@ -15,6 +15,7 @@ use gpui::{
 };
 
 pub fn init_app(cx: &mut App, name: impl Into<SharedString>) {
+    cx.set_prompt_builder(super::prompts::render_prompt);
     #[cfg(not(test))]
     super::system_motion::observe(cx);
     cx.activate(true);
@@ -89,7 +90,7 @@ pub fn open_frame_window(cx: &mut App) {
     cx.open_window(frame_window_options(bounds), |_, cx| {
         cx.new(|cx| {
             let mut root = FrameRoot::new_with_platform_persistence();
-            root.restore_pending_update_session(cx);
+            root.initialize_workspace(cx);
             root.load_runtime_capabilities(cx);
             root.startup_update_check(cx);
             root

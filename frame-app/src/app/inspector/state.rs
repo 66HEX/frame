@@ -12,6 +12,11 @@ use frame_core::capabilities::{AvailableEncoders, AvailableFilters};
 use frame_core::types::DEFAULT_MAX_CONCURRENCY;
 use gpui::{FocusHandle, ScrollHandle};
 
+pub(in crate::app) struct AppliedPreset {
+    pub(in crate::app) path: String,
+    pub(in crate::app) preset_id: String,
+}
+
 pub(in crate::app) struct SettingsUiState {
     pub(in crate::app) is_open: bool,
     pub(in crate::app) is_present: bool,
@@ -28,6 +33,7 @@ pub(in crate::app) struct SettingsUiState {
     pub(in crate::app) ui_scale_scroll_handle: ScrollHandle,
     pub(in crate::app) preset_name_draft: String,
     pub(in crate::app) next_custom_preset_sequence: u64,
+    pub(in crate::app) applied_presets: std::collections::HashMap<String, AppliedPreset>,
 }
 
 impl Default for SettingsUiState {
@@ -48,6 +54,7 @@ impl Default for SettingsUiState {
             ui_scale_scroll_handle: ScrollHandle::new(),
             preset_name_draft: String::new(),
             next_custom_preset_sequence: 0,
+            applied_presets: std::collections::HashMap::new(),
         }
     }
 }
@@ -89,6 +96,7 @@ pub(in crate::app) struct SettingsRenderState<'a> {
     pub(in crate::app) preset_name: &'a str,
     pub(in crate::app) preset_name_focus: Option<&'a FocusHandle>,
     pub(in crate::app) presets: &'a [PresetDefinition],
+    pub(in crate::app) applied_preset_id: Option<&'a str>,
     pub(in crate::app) subtitle_fonts: &'a [String],
     pub(in crate::app) available_encoders: &'a AvailableEncoders,
     pub(in crate::app) available_filters: &'a AvailableFilters,
@@ -122,6 +130,7 @@ impl crate::app::root::FrameRoot {
         &mut self,
         metadata: Option<&SourceMetadata>,
     ) {
+        self.prune_applied_presets();
         if self.selected_config().is_none() {
             self.settings_ui.active_tab = SettingsTab::Metadata;
         }

@@ -5,6 +5,57 @@ use std::time::{SystemTime, UNIX_EPOCH};
 static TEST_PATH_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 #[test]
+fn completed_output_path_survives_the_update_session_json_round_trip() {
+    let source_path = create_test_source("published-source.mp4");
+    let mut queue = FileQueue::new();
+    let mut file = FileItem::from_os_path("completed", &source_path);
+    file.status = FileStatus::Completed;
+    file.output_path = Some("/exports/Zażółć/source (2).mkv".into());
+    queue.add_file(file);
+    let snapshot =
+        UpdateSessionSnapshot::capture(&queue, ActiveView::Workspace, "0.34.0", "0.35.0", 42)
+            .unwrap();
+
+    let bytes = serde_json::to_vec(&snapshot).unwrap();
+    let restored = serde_json::from_slice::<UpdateSessionSnapshot>(&bytes)
+        .unwrap()
+        .restore()
+        .unwrap();
+    remove_test_source(&source_path);
+
+    assert_eq!(
+        restored.queue.files()[0].completed_output_path(),
+        Some("/exports/Zażółć/source (2).mkv")
+    );
+}
+
+#[test]
+fn older_completed_session_without_output_path_does_not_guess_the_result() {
+    let source_path = create_test_source("old-published-source.mp4");
+    let mut queue = FileQueue::new();
+    let mut file = FileItem::from_os_path("completed", &source_path);
+    file.status = FileStatus::Completed;
+    queue.add_file(file);
+    let snapshot =
+        UpdateSessionSnapshot::capture(&queue, ActiveView::Workspace, "0.34.0", "0.35.0", 42)
+            .unwrap();
+    let mut value = serde_json::to_value(snapshot).unwrap();
+    value["files"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("outputPath");
+
+    let restored = serde_json::from_value::<UpdateSessionSnapshot>(value)
+        .unwrap()
+        .restore()
+        .unwrap();
+    remove_test_source(&source_path);
+
+    assert_eq!(restored.queue.files()[0].status, FileStatus::Completed);
+    assert_eq!(restored.queue.files()[0].completed_output_path(), None);
+}
+
+#[test]
 fn capture_and_restore_preserves_queue_order_selection_and_config() {
     let first_path = create_test_source("first.mp4");
     let second_path = create_test_source("second.mov");

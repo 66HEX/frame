@@ -32,6 +32,10 @@ fn settings_drawer_floats_inside_the_viewport_with_the_card_surface() {
                 near(panel.size.width, (384.0 * scale.factor()).min(width * 0.75));
                 assert!(panel.left() > px(0.0));
                 assert_eq!(body.intersect(&panel), body);
+                near(
+                    body.top() - panel.top(),
+                    crate::app::layout::PANEL_HEADER_HEIGHT * scale.factor(),
+                );
 
                 cx.update(|window, _| {
                     let native_scale = window.scale_factor();
@@ -61,6 +65,15 @@ fn settings_drawer_floats_inside_the_viewport_with_the_card_surface() {
                         "all four rounded corners must remain inside the window"
                     );
                 });
+                let close = cx.debug_bounds("app-settings-close").unwrap();
+                near(
+                    close.center().y - panel.top(),
+                    crate::app::layout::PANEL_HEADER_HEIGHT * scale.factor() / 2.0,
+                );
+                near(panel.right() - close.right(), 16.0 * scale.factor());
+                cx.simulate_click(close.center(), Modifiers::default());
+                draw(cx);
+                assert!(!root.read_with(cx, |root, _| root.settings_ui.is_open));
             }
         }
     }

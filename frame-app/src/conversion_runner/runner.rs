@@ -1,6 +1,7 @@
 use super::completion::CompletionFile;
 use super::controller::ConversionProcessController;
 use super::output_paths::disambiguate_output_paths;
+use super::{PublicationDecision, StagedOutput, publish_staged_output};
 use crate::capabilities::{HardwareEncoder, HardwareProbePolicy, probe_hardware_encoder};
 use crate::runtime_binaries::{ffmpeg_executable, ffprobe_executable};
 use frame_core::args::{
@@ -9,7 +10,6 @@ use frame_core::args::{
 };
 use frame_core::error::ConversionError;
 use frame_core::events::ConversionEvent;
-use frame_core::probe::{ffprobe_json_args, parse_ffprobe_stdout};
 use frame_core::types::{ConversionConfig as CoreConversionConfig, ConversionTask, ProbeMetadata};
 use frame_core::utils::{DURATION_REGEX, TIME_REGEX, parse_time};
 use std::collections::VecDeque;
@@ -121,7 +121,16 @@ fn run_prepared_conversion_task_with_control(
     }
 
     validate_task_input(&task.file_path, &task.config)?;
-    let probe = probe_media_file(&task.file_path)?;
+    let Some(probe) = probe_conversion_source(
+        &task.file_path,
+        &ffprobe_executable(),
+        &task.id,
+        controller,
+        emit,
+    )?
+    else {
+        return Ok(());
+    };
 
     let output_path = build_output_path(
         &task.output_directory,
@@ -130,6 +139,15 @@ fn run_prepared_conversion_task_with_control(
     );
     let ordinary_args = build_ffmpeg_args(&task.file_path, &output_path, &task.config, &probe)?;
     let executable = ffmpeg_executable();
+    if !super::stabilization::check_with_control(
+        &task.config,
+        &executable,
+        &task.id,
+        controller,
+        emit,
+    )? {
+        return Ok(());
+    }
     if let Some(observer) =
         build_alac_copy_observer(&task.file_path, &output_path, &task.config, &probe)?
     {
@@ -154,7 +172,18 @@ fn run_prepared_conversion_task_with_control(
             emit,
         );
     }
-    let Some(prepared) = prepare_gif_export(
+    let opus_proof = if crate::runtime_environment::is_flatpak() {
+        None
+    } else {
+        let result = super::opus::check(task, &probe, &ffprobe_executable(), || {
+            controller.is_cancelled(&task.id)
+        });
+        if finish_preflight_cancellation(&task.id, controller, emit)? {
+            return Ok(());
+        }
+        result?
+    };
+    let Some(mut prepared) = prepare_gif_export(
         task,
         &output_path,
         &probe,
@@ -166,6 +195,7 @@ fn run_prepared_conversion_task_with_control(
     else {
         return Ok(());
     };
+    prepared.opus_proof = opus_proof;
 
     if !super::subtitles::check_subtitle_trim_with_control(
         &task.config,
@@ -203,10 +233,59 @@ fn run_final_conversion(
     output_path: &str,
     executable: &str,
     ordinary_args: Vec<String>,
-    prepared: PreparedGifExport,
+    prepared: PreparedExport,
     controller: &ConversionProcessController,
     emit: &mut impl FnMut(ConversionEvent),
 ) -> Result<(), ConversionError> {
+    let publication =
+        OutputPublication::for_environment(output_path, crate::runtime_environment::is_flatpak());
+    run_final_conversion_with_publication(
+        task,
+        publication,
+        executable,
+        ordinary_args,
+        prepared,
+        controller,
+        emit,
+    )
+}
+
+#[derive(Clone, Copy)]
+enum OutputPublication<'a> {
+    Direct(&'a str),
+    Staged(&'a str),
+}
+
+impl<'a> OutputPublication<'a> {
+    const fn for_environment(path: &'a str, flatpak: bool) -> Self {
+        if flatpak {
+            Self::Direct(path)
+        } else {
+            Self::Staged(path)
+        }
+    }
+
+    const fn path(self) -> &'a str {
+        match self {
+            Self::Direct(path) | Self::Staged(path) => path,
+        }
+    }
+}
+
+#[expect(
+    clippy::too_many_lines,
+    reason = "Keep completion, staged file, child ownership and cleanup in one ordered lifecycle."
+)]
+fn run_final_conversion_with_publication(
+    task: &ConversionTask,
+    publication: OutputPublication<'_>,
+    executable: &str,
+    ordinary_args: Vec<String>,
+    prepared: PreparedExport,
+    controller: &ConversionProcessController,
+    emit: &mut impl FnMut(ConversionEvent),
+) -> Result<(), ConversionError> {
+    let output_path = publication.path();
     let mut completion = match CompletionFile::create() {
         Ok(owner) => owner,
         Err(error) => {
@@ -226,18 +305,45 @@ fn run_final_conversion(
             );
         }
     };
-    let PreparedGifExport {
+    let mut stage = if matches!(publication, OutputPublication::Staged(_)) {
+        match StagedOutput::create(std::path::Path::new(output_path)) {
+            Ok(stage) => Some(stage),
+            Err(error) => {
+                let mut diagnostics = error.diagnostics;
+                diagnostics.extend(completion.cleanup());
+                return finish_final_conversion(
+                    task,
+                    output_path,
+                    controller,
+                    emit,
+                    FinalOutcome {
+                        result: Err(ConversionError::Worker(format!(
+                            "Could not prepare a private export: {}",
+                            error.error
+                        ))),
+                        was_cancelled: false,
+                        diagnostics,
+                    },
+                );
+            }
+        }
+    } else {
+        None
+    };
+    let PreparedExport {
         mut args,
         proof: recovery_proof,
+        opus_proof,
     } = prepared;
     let mut was_cancelled = false;
+    let mut started = false;
     let result = (|| {
         emit(ConversionEvent::log(
             task.id.clone(),
             format!(
                 "[INFO] Running {executable} -progress {} {}",
                 completion.path().display(),
-                args.join(" ")
+                logged_export_args(&args, stage.as_ref())
             ),
         ));
         // The log callback may replace source/runtime. Only the base media args
@@ -252,7 +358,7 @@ fn run_final_conversion(
                 format!(
                     "[INFO] GIF proof changed before launch; using ordinary export: {executable} -progress {} {}",
                     completion.path().display(),
-                    args.join(" ")
+                    logged_export_args(&args, stage.as_ref())
                 ),
             ));
         }
@@ -260,12 +366,27 @@ fn run_final_conversion(
         if was_cancelled {
             return Ok(());
         }
-        run_final_child(
-            &mut final_command(executable, &args, completion.path()),
+        if let Some(proof) = &opus_proof {
+            proof.check_unchanged()?;
+        }
+        let mut command = if let Some(stage) = &stage {
+            stage.ensure_unwritten().map_err(ConversionError::Io)?;
+            if args.last().map(String::as_str) != Some(output_path) {
+                return Err(ConversionError::Worker(
+                    "Export arguments do not identify the expected output file.".into(),
+                ));
+            }
+            final_command_to_path(executable, &args, completion.path(), stage.path())
+        } else {
+            final_command(executable, &args, completion.path())
+        };
+        run_final_child_observed(
+            &mut command,
             task,
             controller,
             emit,
             &mut was_cancelled,
+            &mut started,
         )?;
         completion.verify().map_err(|reason| {
             ConversionError::Worker(format!(
@@ -274,6 +395,25 @@ fn run_final_conversion(
         })
     })();
     let diagnostics = completion.cleanup();
+    if let Some(mut stage) = stage.take() {
+        let sealed = if started {
+            stage.seal().map_err(ConversionError::Io)
+        } else {
+            Ok(())
+        };
+        return finish_staged_conversion(
+            task,
+            output_path,
+            stage,
+            controller,
+            emit,
+            FinalOutcome {
+                result: result.and(sealed),
+                was_cancelled,
+                diagnostics,
+            },
+        );
+    }
     finish_final_conversion(
         task,
         output_path,
@@ -285,6 +425,83 @@ fn run_final_conversion(
             diagnostics,
         },
     )
+}
+
+fn logged_export_args(args: &[String], stage: Option<&StagedOutput>) -> String {
+    stage.map_or_else(
+        || args.join(" "),
+        |stage| {
+            format!(
+                "{} {}",
+                args[..args.len().saturating_sub(1)].join(" "),
+                stage.path().display()
+            )
+        },
+    )
+}
+
+fn final_command_to_path(
+    executable: &str,
+    args: &[String],
+    progress_path: &std::path::Path,
+    output_path: &std::path::Path,
+) -> Command {
+    let mut command = final_command(
+        executable,
+        &args[..args.len().saturating_sub(1)],
+        progress_path,
+    );
+    command.arg(output_path);
+    command
+}
+
+fn finish_staged_conversion(
+    task: &ConversionTask,
+    output_path: &str,
+    stage: StagedOutput,
+    controller: &ConversionProcessController,
+    emit: &mut impl FnMut(ConversionEvent),
+    mut outcome: FinalOutcome,
+) -> Result<(), ConversionError> {
+    if outcome.result.is_err() || outcome.was_cancelled {
+        outcome.diagnostics.extend(stage.cleanup());
+        return finish_final_conversion(task, output_path, controller, emit, outcome);
+    }
+    for diagnostic in outcome.diagnostics {
+        emit(ConversionEvent::log(
+            task.id.clone(),
+            format!("[WARN] Export cleanup: {diagnostic}"),
+        ));
+    }
+    emit(ConversionEvent::log(
+        task.id.clone(),
+        "[INFO] Export verified; preparing publication",
+    ));
+    let publication = publish_staged_output(stage, &task.id, controller, outcome.was_cancelled);
+    match publication.result {
+        Ok(PublicationDecision::Published) => {}
+        result => {
+            return finish_final_conversion(
+                task,
+                output_path,
+                controller,
+                emit,
+                FinalOutcome {
+                    was_cancelled: matches!(result, Ok(PublicationDecision::Cancelled)),
+                    result: result.map(|_| ()),
+                    diagnostics: publication.diagnostics,
+                },
+            );
+        }
+    }
+    for diagnostic in publication.diagnostics {
+        emit(ConversionEvent::log(
+            task.id.clone(),
+            format!("[WARN] Export cleanup: {diagnostic}"),
+        ));
+    }
+    emit(ConversionEvent::completed(task.id.clone(), output_path));
+    Ok(())
 }
 
 fn final_command(executable: &str, args: &[String], progress_path: &std::path::Path) -> Command {
@@ -432,9 +649,10 @@ fn check_hardware_encoder(
     Ok(true)
 }
 
-struct PreparedGifExport {
+struct PreparedExport {
     args: Vec<String>,
     proof: Option<Box<super::gif::GifProof>>,
+    opus_proof: Option<super::opus::OpusProof>,
 }
 
 fn prepare_gif_export(
@@ -445,7 +663,7 @@ fn prepare_gif_export(
     controller: &ConversionProcessController,
     emit: &mut impl FnMut(ConversionEvent),
     ordinary_args: &[String],
-) -> Result<Option<PreparedGifExport>, ConversionError> {
+) -> Result<Option<PreparedExport>, ConversionError> {
     let check = super::gif::check_gif_minimum_frame(
         &task.file_path,
         &task.config,
@@ -510,7 +728,11 @@ fn prepare_gif_export(
         }
         super::gif::GifDecision::Ordinary | super::gif::GifDecision::Cancelled => None,
     };
-    Ok(Some(PreparedGifExport { args, proof }))
+    Ok(Some(PreparedExport {
+        args,
+        proof,
+        opus_proof: None,
+    }))
 }
 
 fn spawn_batch_worker(
@@ -554,24 +776,35 @@ pub(super) fn emit_cancelled_task(id: &str, emit: &mut impl FnMut(ConversionEven
     emit(ConversionEvent::cancelled(id.to_string()));
 }
 
-fn probe_media_file(file_path: &str) -> Result<ProbeMetadata, ConversionError> {
-    let output = crate::process_launch::output(
-        Command::new(ffprobe_executable()).args(ffprobe_json_args(file_path)),
-    )
-    .map_err(ConversionError::Io)?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let message = if stderr.trim().is_empty() {
-            format!("ffprobe exited with status {}", output.status)
-        } else {
-            stderr.trim().to_string()
-        };
-        return Err(ConversionError::Probe(message));
+fn probe_conversion_source(
+    file_path: &str,
+    executable: &str,
+    id: &str,
+    controller: &ConversionProcessController,
+    emit: &mut impl FnMut(ConversionEvent),
+) -> Result<Option<ProbeMetadata>, ConversionError> {
+    let result = crate::source_probe::probe(executable, std::path::Path::new(file_path), || {
+        controller.is_cancelled(id)
+    });
+    if finish_preflight_cancellation(id, controller, emit)? {
+        return Ok(None);
     }
+    result.map(Some)
+}
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    parse_ffprobe_stdout(file_path, stdout)
+fn finish_preflight_cancellation(
+    id: &str,
+    controller: &ConversionProcessController,
+    emit: &mut impl FnMut(ConversionEvent),
+) -> Result<bool, ConversionError> {
+    if controller.take_cancelled(id)? {
+        emit(ConversionEvent::log(id, "[INFO] Task cancelled"));
+        // A diagnostic callback may repeat cancellation before the terminal event.
+        controller.take_cancelled(id)?;
+        emit(ConversionEvent::cancelled(id));
+        return Ok(true);
+    }
+    Ok(false)
 }
 
 fn stream_ffmpeg_stderr(
@@ -681,3 +914,5 @@ pub(super) fn ffmpeg_progress_from_line(
 
 #[cfg(test)]
 mod completion_tests;
+#[cfg(all(test, unix))]
+mod probe_tests;

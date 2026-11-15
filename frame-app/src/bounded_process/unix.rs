@@ -8,8 +8,8 @@ use std::process::{Child, Command, ExitStatus, Stdio};
 
 use super::{
     CapturedOutput, CleanupGuard, CleanupOutcome, CleanupSlot, CleanupTask, CommandSpec, Duration,
-    Instant, Limits, Permit, ProcessError, ProcessOutput, ProgressParser, StopReason, early_error,
-    stop_reason, supervise_cleanup,
+    Instant, Limits, Permit, ProcessCallbacks, ProcessError, ProcessOutput, ProgressParser,
+    StopReason, early_error, stop_reason, supervise_cleanup,
 };
 
 struct OwnedProcess {
@@ -101,11 +101,12 @@ fn drain(
     capture: &mut CapturedOutput,
     limit: usize,
     mut progress: Option<&mut ProgressParser>,
-) -> io::Result<()> {
+) -> io::Result<usize> {
     let Some(file) = pipe.as_mut() else {
-        return Ok(());
+        return Ok(0);
     };
     let mut bytes = [0_u8; 8192];
+    let mut transferred = 0;
     // A continuously writing child must not starve the other pipe or the timer.
     for _ in 0..8 {
         match file.read(&mut bytes) {
@@ -114,6 +115,7 @@ fn drain(
                 break;
             }
             Ok(count) => {
+                transferred += count;
                 capture.extend(&bytes[..count], limit);
                 if let Some(parser) = progress.as_deref_mut() {
                     parser.feed(&bytes[..count]);
@@ -124,7 +126,7 @@ fn drain(
             Err(error) => return Err(error),
         }
     }
-    Ok(())
+    Ok(transferred)
 }
 
 fn stop(
@@ -170,10 +172,11 @@ pub(super) fn run(
     input: &[u8],
     limits: Limits,
     deadline: Instant,
-    cancelled: &dyn Fn() -> bool,
+    callbacks: ProcessCallbacks<'_>,
     permit: Permit,
     slot: &CleanupSlot,
 ) -> Result<ProcessOutput, ProcessError> {
+    let cancelled = callbacks.cancelled;
     let mut command = Command::new(&spec.program);
     if let Some(argv0) = &spec.argv0 {
         command.arg0(argv0);
@@ -221,6 +224,7 @@ pub(super) fn run(
         },
         slot,
     );
+    (callbacks.spawned)();
     let setup = [&owner.stdin, &owner.stdout, &owner.stderr]
         .into_iter()
         .flatten()
@@ -247,13 +251,17 @@ pub(super) fn run(
         if written == input.len() {
             owner.stdin = None;
         }
+        let mut made_progress = false;
         if let Some(pipe) = owner.stdin.as_mut() {
             match pipe.write(&input[written..input.len().min(written.saturating_add(8192))]) {
                 Ok(0) => {
                     stdin_error = Some("child stdin accepted zero bytes".into());
                     owner.stdin = None;
                 }
-                Ok(count) => written += count,
+                Ok(count) => {
+                    written += count;
+                    made_progress = true;
+                }
                 Err(error)
                     if matches!(
                         error.kind(),
@@ -271,16 +279,22 @@ pub(super) fn run(
             limits.stdout_bytes,
             Some(&mut progress),
         )
-        .and_then(|()| drain(&mut owner.stderr, &mut stderr, limits.stderr_bytes, None));
-        if let Err(error) = drained {
-            return Err(stop(
-                owner,
-                StopReason::Io(error.to_string()),
-                limits,
-                slot,
-                stdout,
-                stderr,
-            ));
+        .and_then(|read_stdout| {
+            drain(&mut owner.stderr, &mut stderr, limits.stderr_bytes, None)
+                .map(|read_stderr| read_stdout > 0 || read_stderr > 0)
+        });
+        match drained {
+            Ok(did_read) => made_progress |= did_read,
+            Err(error) => {
+                return Err(stop(
+                    owner,
+                    StopReason::Io(error.to_string()),
+                    limits,
+                    slot,
+                    stdout,
+                    stderr,
+                ));
+            }
         }
         match owner.exit_observed() {
             Ok(true) if owner.stdout.is_none() && owner.stderr.is_none() => {
@@ -320,7 +334,9 @@ pub(super) fn run(
                 ));
             }
         }
-        std::thread::sleep(Duration::from_millis(2));
+        if !made_progress {
+            std::thread::sleep(Duration::from_millis(2));
+        }
     }
 }
 

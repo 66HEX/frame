@@ -178,6 +178,7 @@ fn normalize_video_config_values(config: &mut ConversionConfig, metadata: Option
         config.selected_audio_tracks.clear();
         config.selected_subtitle_tracks.clear();
         config.video_filters.deinterlace = crate::settings::model::DeinterlaceMode::Off;
+        config.video_filters.stabilization_enabled = false;
         reset_subtitle_settings(config);
     }
 

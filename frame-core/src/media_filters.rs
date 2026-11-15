@@ -27,6 +27,7 @@ pub fn has_active_video_filters(filters: &VideoFiltersConfig) -> bool {
         || filters.temperature.enabled
         || filters.sharpen.enabled
         || filters.gaussian_blur.enabled
+        || filters.stabilization_enabled
         || filters.denoise_enabled
         || filters.deband.enabled
         || filters.vignette.enabled
@@ -89,6 +90,10 @@ pub fn build_video_pre_scale_filters(config: &VideoFiltersConfig, is_image: bool
             DeinterlaceMode::Off => unreachable!("guarded by matches"),
         };
         filters.push(format!("bwdif=mode=send_frame:parity=auto:deint={deint}"));
+    }
+
+    if config.stabilization_enabled && !is_image {
+        filters.push("deshake=rx=16:ry=16:edge=mirror".to_string());
     }
 
     filters
@@ -254,6 +259,12 @@ pub fn validate_media_filters(config: &ConversionConfig) -> Result<(), Conversio
         ));
     }
 
+    if is_image && config.video_filters.stabilization_enabled {
+        return Err(ConversionError::InvalidInput(
+            "Stabilization requires video output".to_string(),
+        ));
+    }
+
     validate_video_filters(&config.video_filters)?;
     validate_audio_filters(&config.audio_filters)
 }
@@ -415,6 +426,27 @@ fn validate_u32(
 mod tests {
     use super::*;
     use crate::types::{AudioFiltersConfig, VideoColorFiltersConfig};
+
+    #[test]
+    fn stabilization_emits_single_pass_filter_and_requires_video_reencode() {
+        let filters: VideoFiltersConfig =
+            serde_json::from_value(serde_json::json!({"stabilizationEnabled": true})).unwrap();
+        assert_eq!(
+            build_video_pre_scale_filters(&filters, false),
+            ["deshake=rx=16:ry=16:edge=mirror"]
+        );
+        assert!(build_video_pre_scale_filters(&filters, true).is_empty());
+        for (mode, container) in [("copy", "mp4"), ("reencode", "png"), ("reencode", "wav")] {
+            let mut config = test_config();
+            config.video_filters = filters;
+            config.processing_mode = mode.into();
+            config.container = container.into();
+            assert!(
+                validate_media_filters(&config).is_err(),
+                "accepted {mode}/{container}"
+            );
+        }
+    }
 
     #[test]
     fn default_video_filters_emit_empty_chains() {

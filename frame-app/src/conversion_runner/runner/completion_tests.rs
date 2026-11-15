@@ -181,9 +181,10 @@ fn final_spawn_failure_keeps_its_error_and_does_not_report_completion() {
         "output",
         &missing_executable,
         vec!["-n".into(), "output".into()],
-        PreparedGifExport {
+        PreparedExport {
             args: vec!["-n".into(), "output".into()],
             proof: None,
+            opus_proof: None,
         },
         &controller,
         &mut |event| events.push(event),
@@ -195,4 +196,90 @@ fn final_spawn_failure_keeps_its_error_and_does_not_report_completion() {
         event,
         ConversionEvent::Completed(_) | ConversionEvent::Started(_)
     )));
+}
+
+#[test]
+#[ignore = "requires FFmpeg; run with --ignored"]
+fn sandboxed_direct_publication_keeps_its_original_output_path_and_lifecycle() {
+    let sandbox = CompletionFile::create().unwrap();
+    let output = sandbox.path().with_file_name("direct.png");
+    let output_path = output.to_str().unwrap();
+    let args: Vec<String> = [
+        "-n",
+        "-f",
+        "lavfi",
+        "-i",
+        "color=size=32x32:duration=0.1",
+        "-frames:v",
+        "1",
+        "-update",
+        "1",
+        output_path,
+    ]
+    .into_iter()
+    .map(str::to_owned)
+    .collect();
+    let task = task();
+    let controller = ConversionProcessController::default();
+    let mut entries_at_launch = None;
+    let mut completed = None;
+
+    run_final_conversion_with_publication(
+        &task,
+        OutputPublication::for_environment(output_path, true),
+        &ffmpeg_executable(),
+        args.clone(),
+        PreparedExport {
+            args,
+            proof: None,
+            opus_proof: None,
+        },
+        &controller,
+        &mut |event| match event {
+            ConversionEvent::Log(log) if log.line.starts_with("[INFO] Running ") => {
+                assert!(log.line.ends_with(output_path));
+                entries_at_launch =
+                    Some(std::fs::read_dir(output.parent().unwrap()).unwrap().count());
+            }
+            ConversionEvent::Completed(event) => completed = Some(event.output_path),
+            _ => {}
+        },
+    )
+    .unwrap();
+
+    assert_eq!(
+        entries_at_launch,
+        Some(1),
+        "only the sandbox owner exists; no staging directory"
+    );
+    assert_eq!(completed.as_deref(), Some(output_path));
+    assert!(output.is_file());
+    std::fs::remove_file(output).unwrap();
+    assert!(sandbox.cleanup().is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+fn staged_command_preserves_non_utf8_output_path_without_shell_reconstruction() {
+    use std::os::unix::ffi::OsStringExt;
+    let path = std::path::PathBuf::from(std::ffi::OsString::from_vec(
+        b"/tmp/frame-\xff/result.png".to_vec(),
+    ));
+    let args = vec![
+        "-n".into(),
+        "-i".into(),
+        "source".into(),
+        "public.png".into(),
+    ];
+    let command = final_command_to_path("ffmpeg", &args, std::path::Path::new("progress"), &path);
+    let actual = command.get_args().collect::<Vec<_>>();
+
+    assert_eq!(actual.last().copied(), Some(path.as_os_str()));
+    assert_eq!(
+        actual[2..actual.len() - 1],
+        args[..args.len() - 1]
+            .iter()
+            .map(std::ffi::OsStr::new)
+            .collect::<Vec<_>>()
+    );
 }

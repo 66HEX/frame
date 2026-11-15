@@ -229,6 +229,7 @@ impl FrameRoot {
         }
         let removed = self.file_queue.remove_file(id).is_some();
         if removed {
+            self.metadata_probes.cancel(id);
             self.source_metadata.remove(id);
             self.conversion_events.remove_logs(id);
             self.refresh_processing_state_from_queue();

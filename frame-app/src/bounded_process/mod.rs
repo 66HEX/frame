@@ -1,7 +1,7 @@
 //! Bounded, owned processes for runtime discovery and short capability probes.
 //!
-//! A permit limits this helper to one active process or supervised cleanup.
-//! Ordinary conversions do not use that permit and remain concurrent.
+//! Each static execution domain owns one active process or supervised cleanup.
+//! The default domain isolates capability probes from other short operations.
 
 use std::ffi::OsString;
 use std::fmt;
@@ -220,14 +220,27 @@ fn early_error(reason: StopReason) -> ProcessError {
     }
 }
 
-static ACTIVE: AtomicBool = AtomicBool::new(false);
-static CLEANUP_PENDING: AtomicBool = AtomicBool::new(false);
+static DEFAULT_DOMAIN: ExecutionDomain = ExecutionDomain::new();
 
-struct Permit;
+/// A fixed process budget whose cleanup supervisor lives for the application.
+/// Callers must reuse a static domain rather than allocate one per request.
+pub struct ExecutionDomain {
+    active: AtomicBool,
+    cleanup_pending: AtomicBool,
+    slot: OnceLock<Result<CleanupSlot, String>>,
+}
+
+#[derive(Clone, Copy)]
+struct ProcessCallbacks<'a> {
+    cancelled: &'a dyn Fn() -> bool,
+    spawned: &'a dyn Fn(),
+}
+
+struct Permit(&'static ExecutionDomain);
 
 impl Drop for Permit {
     fn drop(&mut self) {
-        ACTIVE.store(false, Ordering::Release);
+        self.0.active.store(false, Ordering::Release);
     }
 }
 
@@ -241,27 +254,57 @@ fn stop_reason(deadline: Instant, cancelled: &dyn Fn() -> bool) -> Option<StopRe
     }
 }
 
+#[cfg(test)]
 fn acquire_permit(deadline: Instant, cancelled: &dyn Fn() -> bool) -> Result<Permit, ProcessError> {
-    loop {
-        if let Some(reason) = stop_reason(deadline, cancelled) {
-            return Err(early_error(reason));
+    DEFAULT_DOMAIN.acquire_permit(deadline, cancelled)
+}
+
+pub trait CleanupTask: Send {
+    /// Performs only nonblocking cleanup steps; true means all ownership ended.
+    fn cleanup_step(&mut self) -> bool;
+}
+
+/// Reserves a domain until startup hands off its child or cleanup finishes.
+pub struct ProcessReservation {
+    permit: Permit,
+    slot: &'static CleanupSlot,
+}
+
+impl ProcessReservation {
+    pub fn cleanup(self, task: impl CleanupTask + 'static, timeout: Duration) -> CleanupOutcome {
+        let mut owner = CleanupGuard::new(
+            ReservedCleanup {
+                task,
+                _permit: self.permit,
+            },
+            self.slot,
+        );
+        let deadline = Instant::now()
+            .checked_add(timeout)
+            .unwrap_or_else(Instant::now);
+        loop {
+            if owner.cleanup_step() {
+                owner.complete();
+                return CleanupOutcome::Complete;
+            }
+            if Instant::now() >= deadline {
+                supervise_cleanup(self.slot, Box::new(owner.into_inner()));
+                return CleanupOutcome::Pending;
+            }
+            std::thread::sleep(Duration::from_millis(5));
         }
-        if CLEANUP_PENDING.load(Ordering::Acquire) {
-            return Err(early_error(StopReason::CleanupInProgress));
-        }
-        if ACTIVE
-            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-            .is_ok()
-        {
-            return Ok(Permit);
-        }
-        std::thread::sleep(Duration::from_millis(5));
     }
 }
 
-trait CleanupTask: Send {
-    /// Performs only nonblocking cleanup steps; true means all ownership ended.
-    fn cleanup_step(&mut self) -> bool;
+struct ReservedCleanup<T> {
+    task: T,
+    _permit: Permit,
+}
+
+impl<T: CleanupTask> CleanupTask for ReservedCleanup<T> {
+    fn cleanup_step(&mut self) -> bool {
+        self.task.cleanup_step()
+    }
 }
 
 /// Transfers all ownership to the supervisor even when a caller callback panics.
@@ -313,46 +356,21 @@ impl<T: CleanupTask + 'static> Drop for CleanupGuard<T> {
     }
 }
 
-type CleanupSlot = Arc<(Mutex<Option<Box<dyn CleanupTask>>>, Condvar)>;
+type CleanupSlot = Arc<(
+    Mutex<Option<Box<dyn CleanupTask>>>,
+    Condvar,
+    &'static AtomicBool,
+)>;
 
+#[cfg(all(test, unix))]
 fn cleanup_slot() -> Result<&'static CleanupSlot, ProcessError> {
-    static SLOT: OnceLock<Result<CleanupSlot, String>> = OnceLock::new();
-    SLOT.get_or_init(|| {
-        let slot: CleanupSlot = Arc::new((Mutex::new(None), Condvar::new()));
-        let worker = Arc::clone(&slot);
-        std::thread::Builder::new()
-            .name("frame-probe-cleanup".into())
-            .spawn(move || {
-                loop {
-                    let (lock, wake) = &*worker;
-                    let mut pending = lock
-                        .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner);
-                    while pending.is_none() {
-                        pending = wake
-                            .wait(pending)
-                            .unwrap_or_else(std::sync::PoisonError::into_inner);
-                    }
-                    let mut task = pending.take().expect("cleanup task is present");
-                    drop(pending);
-                    while !task.cleanup_step() {
-                        std::thread::sleep(Duration::from_millis(25));
-                    }
-                    drop(task);
-                    CLEANUP_PENDING.store(false, Ordering::Release);
-                }
-            })
-            .map_err(|error| error.to_string())?;
-        Ok(slot)
-    })
-    .as_ref()
-    .map_err(|error| early_error(StopReason::Io(error.clone())))
+    DEFAULT_DOMAIN.cleanup_slot()
 }
 
 fn supervise_cleanup(slot: &CleanupSlot, task: Box<dyn CleanupTask>) {
-    CLEANUP_PENDING.store(true, Ordering::Release);
-    let (lock, wake) = &**slot;
-    // The single permit remains inside task, so no second task can reach here.
+    let (lock, wake, pending_flag) = &**slot;
+    pending_flag.store(true, Ordering::Release);
+    // The domain's permit remains inside task, so no second task can reach here.
     *lock
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(task);
@@ -365,22 +383,129 @@ pub fn run(
     limits: Limits,
     cancelled: impl Fn() -> bool,
 ) -> Result<ProcessOutput, ProcessError> {
-    let deadline = Instant::now()
-        .checked_add(limits.timeout)
-        .ok_or_else(|| early_error(StopReason::Io("invalid process deadline".into())))?;
-    if Instant::now().checked_add(limits.cleanup_timeout).is_none() {
-        return Err(early_error(StopReason::Io(
-            "invalid cleanup deadline".into(),
-        )));
+    DEFAULT_DOMAIN.run(command, input, limits, cancelled)
+}
+
+impl ExecutionDomain {
+    pub const fn new() -> Self {
+        Self {
+            active: AtomicBool::new(false),
+            cleanup_pending: AtomicBool::new(false),
+            slot: OnceLock::new(),
+        }
     }
-    let permit = acquire_permit(deadline, &cancelled)?;
-    let slot = cleanup_slot()?;
-    #[cfg(unix)]
-    return unix::run(command, input, limits, deadline, &cancelled, permit, slot);
-    #[cfg(windows)]
-    return windows::run(command, input, limits, deadline, &cancelled, permit, slot);
-    #[cfg(not(any(unix, windows)))]
-    Err(early_error(StopReason::Io(
-        "bounded processes are unavailable on this platform".into(),
-    )))
+
+    fn acquire_permit(
+        &'static self,
+        deadline: Instant,
+        cancelled: &dyn Fn() -> bool,
+    ) -> Result<Permit, ProcessError> {
+        loop {
+            if let Some(reason) = stop_reason(deadline, cancelled) {
+                return Err(early_error(reason));
+            }
+            if self.cleanup_pending.load(Ordering::Acquire) {
+                return Err(early_error(StopReason::CleanupInProgress));
+            }
+            if self
+                .active
+                .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+                .is_ok()
+            {
+                return Ok(Permit(self));
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+
+    fn cleanup_slot(&'static self) -> Result<&'static CleanupSlot, ProcessError> {
+        self.slot
+            .get_or_init(|| {
+                let slot: CleanupSlot =
+                    Arc::new((Mutex::new(None), Condvar::new(), &self.cleanup_pending));
+                let worker = Arc::clone(&slot);
+                std::thread::Builder::new()
+                    .name("frame-probe-cleanup".into())
+                    .spawn(move || {
+                        loop {
+                            let (lock, wake, pending_flag) = &*worker;
+                            let mut pending = lock
+                                .lock()
+                                .unwrap_or_else(std::sync::PoisonError::into_inner);
+                            while pending.is_none() {
+                                pending = wake
+                                    .wait(pending)
+                                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                            }
+                            let mut task = pending.take().expect("cleanup task is present");
+                            drop(pending);
+                            while !task.cleanup_step() {
+                                std::thread::sleep(Duration::from_millis(25));
+                            }
+                            drop(task);
+                            pending_flag.store(false, Ordering::Release);
+                        }
+                    })
+                    .map_err(|error| error.to_string())?;
+                Ok(slot)
+            })
+            .as_ref()
+            .map_err(|error| early_error(StopReason::Io(error.clone())))
+    }
+
+    pub fn cleanup_in_progress(&self) -> bool {
+        self.cleanup_pending.load(Ordering::Acquire)
+    }
+
+    pub fn reserve(
+        &'static self,
+        deadline: Instant,
+        cancelled: impl Fn() -> bool,
+    ) -> Result<ProcessReservation, ProcessError> {
+        let permit = self.acquire_permit(deadline, &cancelled)?;
+        let slot = self.cleanup_slot()?;
+        Ok(ProcessReservation { permit, slot })
+    }
+
+    pub fn run(
+        &'static self,
+        command: &CommandSpec,
+        input: &[u8],
+        limits: Limits,
+        cancelled: impl Fn() -> bool,
+    ) -> Result<ProcessOutput, ProcessError> {
+        self.run_observed(command, input, limits, cancelled, || {})
+    }
+
+    pub fn run_observed(
+        &'static self,
+        command: &CommandSpec,
+        input: &[u8],
+        limits: Limits,
+        cancelled: impl Fn() -> bool,
+        spawned: impl Fn(),
+    ) -> Result<ProcessOutput, ProcessError> {
+        let deadline = Instant::now()
+            .checked_add(limits.timeout)
+            .ok_or_else(|| early_error(StopReason::Io("invalid process deadline".into())))?;
+        if Instant::now().checked_add(limits.cleanup_timeout).is_none() {
+            return Err(early_error(StopReason::Io(
+                "invalid cleanup deadline".into(),
+            )));
+        }
+        let permit = self.acquire_permit(deadline, &cancelled)?;
+        let slot = self.cleanup_slot()?;
+        let callbacks = ProcessCallbacks {
+            cancelled: &cancelled,
+            spawned: &spawned,
+        };
+        #[cfg(unix)]
+        return unix::run(command, input, limits, deadline, callbacks, permit, slot);
+        #[cfg(windows)]
+        return windows::run(command, input, limits, deadline, callbacks, permit, slot);
+        #[cfg(not(any(unix, windows)))]
+        Err(early_error(StopReason::Io(
+            "bounded processes are unavailable on this platform".into(),
+        )))
+    }
 }

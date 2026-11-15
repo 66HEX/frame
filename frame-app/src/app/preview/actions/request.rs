@@ -251,6 +251,7 @@ pub(super) fn hash_video_filters(filters: &VideoFiltersConfig, state: &mut Defau
     hash_filter_value(&filters.temperature, state);
     hash_filter_value(&filters.sharpen, state);
     hash_filter_value(&filters.gaussian_blur, state);
+    filters.stabilization_enabled.hash(state);
     filters.denoise_enabled.hash(state);
     if filters.denoise_enabled {
         filters.denoise_strength.hash(state);
@@ -332,4 +333,20 @@ pub(super) fn preview_selected_audio_track(
             .iter()
             .any(|track| track.index == *index)
     })
+}
+
+#[cfg(test)]
+mod stabilization_tests {
+    use super::*;
+
+    #[test]
+    fn stabilization_changes_preview_visual_identity() {
+        let mut filters = VideoFiltersConfig::default();
+        let mut before = DefaultHasher::new();
+        hash_video_filters(&filters, &mut before);
+        filters.stabilization_enabled = true;
+        let mut after = DefaultHasher::new();
+        hash_video_filters(&filters, &mut after);
+        assert_ne!(before.finish(), after.finish());
+    }
 }

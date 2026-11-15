@@ -1,6 +1,6 @@
 use crate::app::root::FrameRoot;
-use crate::settings::{PresetDefinition, apply_preset, create_custom_preset};
-use gpui::{Context, PromptButton, PromptLevel, Window};
+use crate::settings::{apply_preset, create_custom_preset};
+use gpui::{Context, Window};
 
 impl FrameRoot {
     pub(in crate::app) fn save_preset_from_draft(&mut self) -> bool {
@@ -46,6 +46,8 @@ impl FrameRoot {
             return false;
         }
 
+        self.prune_applied_presets();
+
         true
     }
 
@@ -61,11 +63,72 @@ impl FrameRoot {
         else {
             return false;
         };
-        let metadata = self.selected_source_metadata();
-        if !crate::settings::preset_is_compatible(&preset, metadata.as_ref()) {
+        let Some(file_id) = self.file_queue.selected_file_id().map(str::to_string) else {
+            return false;
+        };
+        let Some(metadata) = self.source_metadata.ready_metadata_for(&file_id).cloned() else {
+            return false;
+        };
+        if !crate::settings::preset_is_compatible(&preset, Some(&metadata)) {
             return false;
         }
-        self.update_selected_config(|config| apply_preset(config, &preset, metadata.as_ref()))
+        let changed =
+            self.update_selected_config(|config| apply_preset(config, &preset, Some(&metadata)));
+        self.remember_applied_preset(&file_id, preset_id) | changed
+    }
+
+    pub(in crate::app) fn selected_applied_preset_id(&self) -> Option<&str> {
+        let file = self.file_queue.selected_file()?;
+        self.settings_ui
+            .applied_presets
+            .get(&file.id)
+            .filter(|applied| applied.path == file.path)
+            .map(|applied| applied.preset_id.as_str())
+    }
+
+    pub(in crate::app) fn prune_applied_presets(&mut self) {
+        if self.settings_ui.applied_presets.is_empty() {
+            return;
+        }
+        let files: std::collections::HashSet<_> = self
+            .file_queue
+            .files()
+            .iter()
+            .map(|file| (file.id.as_str(), file.path.as_str()))
+            .collect();
+        self.settings_ui.applied_presets.retain(|id, applied| {
+            files.contains(&(id.as_str(), applied.path.as_str()))
+                && self
+                    .presets
+                    .iter()
+                    .any(|preset| preset.id == applied.preset_id)
+        });
+    }
+
+    pub(in crate::app) fn remember_applied_preset(
+        &mut self,
+        file_id: &str,
+        preset_id: &str,
+    ) -> bool {
+        self.prune_applied_presets();
+        let Some(file) = self.file_queue.file_by_id(file_id) else {
+            return false;
+        };
+        let changed = self
+            .settings_ui
+            .applied_presets
+            .get(file_id)
+            .is_none_or(|applied| applied.path != file.path || applied.preset_id != preset_id);
+        if changed {
+            self.settings_ui.applied_presets.insert(
+                file.id.clone(),
+                crate::app::inspector::state::AppliedPreset {
+                    path: file.path.clone(),
+                    preset_id: preset_id.to_string(),
+                },
+            );
+        }
+        changed
     }
 
     pub(in crate::app) fn confirm_apply_preset_to_all(
@@ -86,58 +149,7 @@ impl FrameRoot {
             return;
         };
 
-        let detail = format!(
-            "This will apply \"{}\" to all pending files in the queue. Existing settings will be overwritten.",
-            preset.name
-        );
-        let receiver = window.prompt(
-            PromptLevel::Warning,
-            "Apply to all?",
-            Some(&detail),
-            &[PromptButton::ok("Apply"), PromptButton::cancel("Cancel")],
-            cx,
-        );
-
-        cx.spawn(async move |this, cx| {
-            let Ok(answer) = receiver.await else {
-                return;
-            };
-            if answer != 0 {
-                return;
-            }
-
-            this.update(cx, |root, cx| {
-                if root.apply_preset_to_all_pending(&preset) {
-                    cx.notify();
-                }
-            })
-            .ok();
-        })
-        .detach();
-    }
-
-    pub(in crate::app) fn apply_preset_to_all_pending(
-        &mut self,
-        preset: &PresetDefinition,
-    ) -> bool {
-        if self.update_installation_in_progress() {
-            return false;
-        }
-        let mut changed = false;
-        for file in self.file_queue.files_mut() {
-            if !file.status.is_actionable_for_conversion() {
-                continue;
-            }
-            let metadata = self.source_metadata.metadata_for(&file.id).cloned();
-            if !crate::settings::preset_is_compatible(preset, metadata.as_ref()) {
-                continue;
-            }
-            if apply_preset(&mut file.config, preset, metadata.as_ref()) {
-                changed = true;
-            }
-        }
-
-        changed
+        self.confirm_preset_batch(&preset, window, cx);
     }
 
     fn next_custom_preset_identity(&self) -> (String, u64) {

@@ -1,5 +1,44 @@
 use super::*;
 
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn native_export_keeps_the_final_destination_private_until_completion() {
+    let sandbox = ConversionRunnerSandbox::new("publication-private");
+    let input = sandbox.path("source.mp4");
+    generate_runner_source(&input);
+    let output = sandbox.path("Zażółć result.mp4");
+    let task = completion_task(
+        &sandbox,
+        &input,
+        "Zażółć result.mp4",
+        &GpuiConversionConfig::default(),
+    );
+    let mut observed_encoding_progress = false;
+    let mut exposed_before_completion = false;
+    let mut completed_path = None;
+
+    run_conversion_task(task, |event| match event {
+        ConversionEvent::Progress(progress) if progress.progress > 0.0 => {
+            observed_encoding_progress = true;
+            exposed_before_completion |= output.exists();
+        }
+        ConversionEvent::Completed(completed) => completed_path = Some(completed.output_path),
+        _ => {}
+    })
+    .expect("native export should complete");
+
+    assert!(
+        observed_encoding_progress,
+        "fixture must observe an active export"
+    );
+    assert!(
+        !exposed_before_completion,
+        "the public output must not contain a partial export"
+    );
+    assert_eq!(completed_path.as_deref(), output.to_str());
+    assert!(output.is_file());
+}
+
 fn completion_task(
     sandbox: &ConversionRunnerSandbox,
     input: &Path,
@@ -48,12 +87,12 @@ fn final_completion_should_reject_png_and_recovered_gif_overwrite_races() {
                 injected = true;
             }
             events.push(event);
-        }).expect_err("exit zero without terminal progress must not complete");
+        }).expect_err("publication must reject a destination created after planning");
         assert!(injected);
         assert!(
             error
                 .to_string()
-                .contains("did not confirm that the export finished"),
+                .contains("Could not publish the completed export"),
             "{error}"
         );
         assert_eq!(fs::read(&output).unwrap(), b"sentinel must survive");
@@ -157,6 +196,7 @@ fn final_completion_should_cancel_a_started_child_and_allow_same_id_retry() {
     );
     assert_eq!(controller.active_process_count().unwrap(), 0);
     assert!(!controller.take_cancelled(&task_id).unwrap());
+    assert!(!sandbox.path("cancelled.mp4").exists());
 
     let retry = completion_task(
         &sandbox,
@@ -168,4 +208,72 @@ fn final_completion_should_cancel_a_started_child_and_allow_same_id_retry() {
         .expect("same-id retry should complete");
     assert!(matches!(events.last(), Some(ConversionEvent::Completed(_))));
     assert_eq!(controller.active_process_count().unwrap(), 0);
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn native_publication_cancellation_before_cutoff_cleans_up_and_can_retry() {
+    let sandbox = ConversionRunnerSandbox::new("publication-cancel-cutoff");
+    let input = sandbox.path("source.mp4");
+    generate_runner_source(&input);
+    let source_bytes = fs::read(&input).unwrap();
+    let output = sandbox.path("result.mp4");
+    let task = completion_task(
+        &sandbox,
+        &input,
+        "result.mp4",
+        &GpuiConversionConfig::default(),
+    );
+    let controller = ConversionProcessController::default();
+    let mut events = Vec::new();
+    let mut reached_cutoff = false;
+    run_conversion_task_with_control(task.clone(), &controller, &mut |event| {
+        if matches!(&event, ConversionEvent::Log(log) if log.line == "[INFO] Export verified; preparing publication") {
+            reached_cutoff = true;
+            controller.cancel_task(&task.id).unwrap();
+        }
+        events.push(event);
+    }).unwrap();
+
+    assert!(reached_cutoff);
+    assert!(matches!(events.last(), Some(ConversionEvent::Cancelled(_))));
+    assert!(!output.exists());
+    assert_eq!(fs::read(&input).unwrap(), source_bytes);
+    assert_eq!(
+        fs::read_dir(&sandbox.root).unwrap().count(),
+        1,
+        "only source remains"
+    );
+    run_conversion_task_with_control(task, &controller, &mut |event| events.push(event)).unwrap();
+    assert!(matches!(events.last(), Some(ConversionEvent::Completed(_))));
+    assert!(output.is_file());
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn native_publication_late_cancellation_keeps_the_published_result() {
+    let sandbox = ConversionRunnerSandbox::new("publication-late-cancel");
+    let input = sandbox.path("source.mp4");
+    generate_runner_source(&input);
+    let output = sandbox.path("result.mp4");
+    let task = completion_task(
+        &sandbox,
+        &input,
+        "result.mp4",
+        &GpuiConversionConfig::default(),
+    );
+    let controller = ConversionProcessController::default();
+    let mut completed = false;
+    run_conversion_task_with_control(task.clone(), &controller, &mut |event| {
+        if matches!(event, ConversionEvent::Completed(_)) {
+            completed = true;
+            controller.cancel_task(&task.id).unwrap();
+        }
+    })
+    .unwrap();
+
+    assert!(completed);
+    assert!(output.is_file());
+    assert!(!controller.is_cancelled(&task.id));
+    assert_eq!(fs::read_dir(&sandbox.root).unwrap().count(), 2);
 }

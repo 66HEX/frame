@@ -1,4 +1,5 @@
 use super::*;
+use crate::app::prompts::tests::{answer_prompt, pending_prompt};
 use crate::appearance::{ColorTheme, ScalePreset};
 use crate::settings::{OutputSection, SettingsTab};
 use gpui::{Entity, Modifiers, TestAppContext, VisualTestContext, px, size};
@@ -72,7 +73,7 @@ fn assert_reason(cx: &mut VisualTestContext, expected: &str) {
             .nodes
             .iter()
             .find(|(_, node)| {
-                node.role() == gpui::Role::Button && node.label() == Some("Apply to all")
+                node.role() == gpui::Role::Button && node.label() == Some("Apply to files…")
             })
             .expect("Apply to all AX button");
         assert!(button.is_disabled());
@@ -102,7 +103,7 @@ fn output_button_visibility_keyboard_prompt_cancel_and_render_sync() {
                         serde_json::from_str(&window.debug_a11y_tree_json().unwrap()).unwrap();
                     tree["gpui_focus"]
                         .as_str()
-                        .is_some_and(|id| tree["nodes"][id]["aria"]["label"] == "Apply to all")
+                        .is_some_and(|id| tree["nodes"][id]["aria"]["label"] == "Apply to files…")
                 });
                 if focused {
                     break;
@@ -110,12 +111,13 @@ fn output_button_visibility_keyboard_prompt_cancel_and_render_sync() {
             }
             assert!(focused, "keyboard must reach Apply to all");
             press(cx, "enter");
-            let (title, detail) = cx.pending_prompt().expect("native prompt opened");
-            assert_eq!(title, "Apply settings to all?");
-            assert!(detail.contains("1 other pending file, including unchecked files"));
-            assert!(detail.contains("subtitle files where the new settings support them"));
+            let (title, detail) = pending_prompt(cx).expect("native prompt opened");
+            assert_eq!(title, "Apply output settings?");
+            assert!(detail.contains("All files: 1 file; 0 skipped."));
+            assert_eq!(detail.lines().count(), 3);
+            assert!(!detail.contains("Applying to all"));
             let before = root.read_with(cx, |root, _| root.file_queue.files().to_vec());
-            cx.simulate_prompt_answer("Cancel");
+            answer_prompt(cx, "Cancel");
             draw(cx);
             assert_eq!(
                 root.read_with(cx, |root, _| root.file_queue.files().to_vec()),
@@ -132,7 +134,7 @@ fn output_button_visibility_keyboard_prompt_cancel_and_render_sync() {
                     .quality = 22;
                 hold_preview_request(root);
             });
-            cx.simulate_prompt_answer("Apply settings");
+            answer_prompt(cx, "Apply to all (1)");
             cx.run_until_parked();
             root.read_with(cx, |root, _| {
                 assert_eq!(root.selected_config().unwrap().quality, 80);
@@ -208,7 +210,7 @@ fn disabled_button_explains_readiness_status_and_updater_without_opening_prompt(
                 draw(cx);
                 assert_reason(cx, reason);
                 click_apply(cx);
-                assert!(!cx.has_pending_prompt());
+                assert!(!cx.update(|window, _| window.has_active_prompt()));
             }
         }
     }
@@ -235,7 +237,7 @@ fn prompt_keeps_committed_crop_and_skips_targets_locked_while_waiting() {
         root.file_queue.file_by_id_mut("target").unwrap().status = FileStatus::Queued;
     });
     let before = root.read_with(cx, |root, _| root.file_queue.files().to_vec());
-    cx.simulate_prompt_answer("Apply settings");
+    answer_prompt(cx, "Apply to all (1)");
     draw(cx);
     assert_eq!(
         root.read_with(cx, |root, _| root.file_queue.files().to_vec()),
@@ -247,7 +249,7 @@ fn prompt_keeps_committed_crop_and_skips_targets_locked_while_waiting() {
     });
     draw(cx);
     click_apply(cx);
-    cx.simulate_prompt_answer("Apply settings");
+    answer_prompt(cx, "Apply to all (1)");
     draw(cx);
     assert!(root.read_with(cx, |root, _| {
         root.file_queue
@@ -257,4 +259,169 @@ fn prompt_keeps_committed_crop_and_skips_targets_locked_while_waiting() {
             .crop
             .is_none()
     }));
+}
+
+#[test]
+fn preset_batch_confirmation_reports_selected_all_and_skipped_counts() {
+    let mut app = TestAppContext::single();
+    let (root, cx) = window(&mut app, ColorTheme::Dark, ScalePreset::Percent100);
+    root.update(cx, |root, _| {
+        add_target(root, "unchecked", FileStatus::Idle, SourceKind::Video);
+        root.file_queue
+            .file_by_id_mut("unchecked")
+            .unwrap()
+            .is_selected_for_conversion = false;
+        add_target(root, "loading", FileStatus::Idle, SourceKind::Video);
+        root.source_metadata.mark_loading("loading");
+    });
+    let before = root.read_with(cx, |root, _| root.file_queue.files().to_vec());
+    cx.update(|window, cx| {
+        root.update(cx, |root, cx| {
+            root.confirm_apply_preset_to_all("archive-hq", window, cx);
+        });
+    });
+    let (_, detail) = pending_prompt(cx).expect("preset scope confirmation");
+    assert!(
+        detail.contains("Selected for conversion: 2 files; 1 skipped."),
+        "{detail}"
+    );
+    assert!(
+        detail.contains("All files: 3 files; 1 skipped."),
+        "{detail}"
+    );
+    assert_eq!(detail.lines().count(), 3);
+    assert!(!detail.contains("Each file keeps"));
+    answer_prompt(cx, "Cancel");
+    draw(cx);
+    assert_eq!(
+        root.read_with(cx, |root, _| root.file_queue.files().to_vec()),
+        before
+    );
+}
+
+#[test]
+fn selected_preset_reports_modified_after_fps_edit() {
+    let mut app = TestAppContext::single();
+    let (root, cx) = window(&mut app, ColorTheme::Dark, ScalePreset::Percent100);
+    root.update(cx, |root, cx| {
+        root.settings_ui.active_tab = SettingsTab::Presets;
+        assert!(root.apply_preset_to_selected("balanced-mp4"));
+        root.update_selected_config(|config| {
+            config.fps = "24".into();
+            true
+        });
+        hold_preview_request(root);
+        cx.notify();
+    });
+    draw(cx);
+    assert!(cx.debug_bounds("preset-modified-balanced-mp4").is_some());
+    cx.update(|window, _| {
+        let tree = window.a11y_tree().unwrap();
+        let (_, preset) = tree
+            .nodes
+            .iter()
+            .find(|(_, node)| node.label() == Some("Balanced MP4"))
+            .unwrap();
+        assert_eq!(preset.description(), Some("Modified"));
+    });
+    root.update(cx, |root, cx| {
+        assert!(root.apply_preset_to_selected("balanced-mp4"));
+        root.update_selected_config(|config| {
+            config.selected_audio_tracks = vec![7];
+            config.selected_subtitle_tracks.clear();
+            config.external_subtitle_tracks[0].path = "/tmp/own-captions.srt".into();
+            true
+        });
+        hold_preview_request(root);
+        cx.notify();
+    });
+    draw(cx);
+    assert!(cx.debug_bounds("preset-modified-balanced-mp4").is_none());
+    assert!(cx.debug_bounds("preset-applied-balanced-mp4").is_some());
+}
+
+#[test]
+fn preset_batch_with_zero_targets_does_not_open_a_confirmation() {
+    let mut app = TestAppContext::single();
+    let (root, cx) = window(&mut app, ColorTheme::Dark, ScalePreset::Percent100);
+    root.update(cx, |root, _| {
+        root.source_metadata.mark_loading("donor");
+        root.source_metadata.mark_error("target", "probe failed");
+    });
+    let before = root.read_with(cx, |root, _| root.file_queue.files().to_vec());
+    cx.update(|window, cx| {
+        root.update(cx, |root, cx| {
+            root.confirm_apply_preset_to_all("archive-hq", window, cx);
+        });
+    });
+    assert!(!cx.update(|window, _| window.has_active_prompt()));
+    assert_eq!(
+        root.read_with(cx, |root, _| root.file_queue.files().to_vec()),
+        before
+    );
+}
+
+#[test]
+fn preset_confirmation_freezes_targets_and_rechecks_readiness() {
+    let mut app = TestAppContext::single();
+    let (root, cx) = window(&mut app, ColorTheme::Dark, ScalePreset::Percent100);
+    cx.update(|window, cx| {
+        root.update(cx, |root, cx| {
+            root.confirm_apply_preset_to_all("archive-hq", window, cx);
+        });
+    });
+    root.update(cx, |root, _| {
+        add_target(root, "new", FileStatus::Idle, SourceKind::Video);
+        root.source_metadata.mark_loading("target");
+    });
+    let before = root.read_with(cx, |root, _| root.file_queue.files().to_vec());
+    answer_prompt(cx, "Apply to all (2)");
+    draw(cx);
+    root.read_with(cx, |root, _| {
+        for old in before.iter().filter(|file| file.id != "donor") {
+            assert_eq!(
+                root.file_queue.file_by_id(&old.id).unwrap(),
+                old,
+                "new files and files no longer ready must remain unchanged"
+            );
+        }
+        assert_eq!(
+            root.file_queue
+                .file_by_id("donor")
+                .unwrap()
+                .config
+                .video_codec,
+            "libx265"
+        );
+    });
+}
+
+#[test]
+fn output_confirmation_can_apply_only_to_selected_files() {
+    let mut app = TestAppContext::single();
+    let (root, cx) = window(&mut app, ColorTheme::Dark, ScalePreset::Percent100);
+    root.update(cx, |root, _| {
+        add_target(root, "unchecked", FileStatus::Idle, SourceKind::Video);
+        root.file_queue
+            .file_by_id_mut("unchecked")
+            .unwrap()
+            .is_selected_for_conversion = false;
+    });
+    click_apply(cx);
+    answer_prompt(cx, "Apply to selected (1)");
+    draw(cx);
+    root.read_with(cx, |root, _| {
+        assert_eq!(
+            root.file_queue.file_by_id("target").unwrap().config.quality,
+            80
+        );
+        assert_ne!(
+            root.file_queue
+                .file_by_id("unchecked")
+                .unwrap()
+                .config
+                .quality,
+            80
+        );
+    });
 }

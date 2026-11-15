@@ -36,12 +36,18 @@ mod audio_exit;
 mod audio_output;
 mod audio_queue;
 mod audio_stream;
+mod cleanup_broker;
 mod clock;
 mod decode;
 mod plan;
 mod process;
+mod startup_cleanup;
+mod startup_pipe;
+mod startup_process;
 mod video_stream;
 
+#[cfg(all(test, unix))]
+mod audio_cleanup_tests;
 #[cfg(test)]
 mod audio_drain_tests;
 #[cfg(all(test, unix))]
@@ -50,6 +56,8 @@ mod audio_exit_tests;
 mod audio_queue_tests;
 #[cfg(test)]
 mod playback_start_tests;
+#[cfg(test)]
+pub(in crate::preview_engine) mod test_support;
 #[cfg(test)]
 mod tests;
 #[cfg(all(test, unix))]

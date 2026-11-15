@@ -22,7 +22,7 @@ pub(super) struct CompletionFile {
 }
 
 #[derive(Debug)]
-pub(super) struct SetupError {
+pub struct SetupError {
     pub error: io::Error,
     pub diagnostics: Vec<String>,
 }

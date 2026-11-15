@@ -3,6 +3,7 @@ use crate::preview_engine::ffmpeg_backend::audio_exit::AudioProcessExit;
 use crate::preview_engine::ffmpeg_backend::audio_stream::{
     AudioStartStatus, PendingAudioStart, lock_pending_audio_start,
 };
+use crate::preview_engine::ffmpeg_backend::cleanup_broker::CleanupBroker;
 use crate::preview_engine::ffmpeg_backend::clock::{
     AudioPlaybackStart, PreviewPlaybackClock, clamp_seek_seconds, initial_start_seconds,
     lock_playback, parsed_time,
@@ -16,7 +17,7 @@ use crate::preview_engine::types::{PreviewDimensions, PreviewSessionConfig, Prev
 use crate::runtime_binaries::ffmpeg_executable;
 use gpui::{ImageId, RenderImage};
 use std::collections::VecDeque;
-use std::io::{BufRead, BufReader, Read};
+use std::io::Read;
 use std::process::Child;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
@@ -31,6 +32,8 @@ pub struct RunningPreviewProcess {
     pub(super) frame_store: LatestFrameStore,
     pub(super) metrics: PreviewRuntimeMetricsStore,
     pub(super) executable: String,
+    pub(super) cancelled: Arc<AtomicBool>,
+    pub(super) cleanup: &'static CleanupBroker,
     pub(super) process: Arc<Mutex<RunningProcessState>>,
     pub(super) audio_process: Arc<Mutex<RunningProcessState>>,
     pub(super) pending_audio_start: Arc<Mutex<Option<PendingAudioStart>>>,
@@ -61,6 +64,11 @@ pub(super) struct ProcessHandles {
 }
 
 impl RunningPreviewProcess {
+    #[cfg(test)]
+    pub(in crate::preview_engine) fn set_test_executable(&mut self, executable: String) {
+        self.executable = executable;
+    }
+
     #[cfg(test)]
     pub(in crate::preview_engine) fn fail_audio_output_for_test(&self) {
         let generation = lock_playback(&self.playback).generation;
@@ -189,6 +197,7 @@ impl RunningPreviewProcess {
                     precise,
                     self.next_render_image_identity(),
                     &self.metrics,
+                    &self.cancelled,
                 )?;
                 let dimensions = frame.frame.dimensions();
                 self.stop_running_processes()?;
@@ -233,13 +242,16 @@ impl RunningPreviewProcess {
         frame_store: LatestFrameStore,
         metrics: PreviewRuntimeMetricsStore,
         executable: String,
-    ) -> Self {
+    ) -> Result<Self, PreviewEngineError> {
+        let cleanup = CleanupBroker::shared()?;
         let start_seconds = initial_start_seconds(&config);
-        Self {
+        Ok(Self {
             config,
             frame_store,
             metrics,
             executable,
+            cancelled: Arc::new(AtomicBool::new(false)),
+            cleanup,
             process: Arc::new(Mutex::new(RunningProcessState::default())),
             audio_process: Arc::new(Mutex::new(RunningProcessState::default())),
             pending_audio_start: Arc::new(Mutex::new(None)),
@@ -256,7 +268,7 @@ impl RunningPreviewProcess {
             render_image_id: RenderImage::new_image_id(),
             render_image_version: Arc::new(AtomicU64::new(1)),
             stderr: Arc::new(Mutex::new(VecDeque::with_capacity(STDERR_RING_LINES))),
-        }
+        })
     }
 
     pub(super) fn next_render_image_identity(&self) -> RenderImageIdentity {
@@ -282,16 +294,26 @@ impl RunningPreviewProcess {
     /// Failure and detachment share the generation lock so a stale attempt
     /// cannot remove a replacement's registered processes or pending prewarm.
     /// Candidate handles belong exclusively to this attempt, even when stale.
-    #[expect(
-        clippy::significant_drop_tightening,
-        reason = "The playback guard must serialize generation changes with pending/state detachment."
-    )]
+    #[cfg(test)]
     pub(super) fn fail_video_start(
         &self,
         generation: u64,
         error: PreviewEngineError,
         candidate: Option<ProcessHandles>,
     ) -> PreviewEngineError {
+        let mut handles = self.detach_failed_video_start(generation);
+        handles.extend(candidate);
+        for handles in handles {
+            let _ = stop_process_handles(self.cleanup, handles);
+        }
+        error
+    }
+
+    #[expect(
+        clippy::significant_drop_tightening,
+        reason = "The playback guard serializes generation failure and process detachment."
+    )]
+    pub(super) fn detach_failed_video_start(&self, generation: u64) -> Vec<ProcessHandles> {
         let registered = {
             let mut playback = lock_playback(&self.playback);
             if playback.generation_matches(generation) {
@@ -308,30 +330,25 @@ impl RunningPreviewProcess {
             }
         };
         if let Some((video, audio, update)) = registered {
-            // Wake parked consumers and make read-only snapshots show failure
-            // before any child wait or worker join can block this caller.
             self.playback_changed.notify_all();
             if let Some((exit, update)) = update {
                 exit.publish(update);
             }
-            let _ = stop_process_handles(video);
-            let _ = stop_process_handles(audio);
+            vec![video, audio]
+        } else {
+            Vec::new()
         }
-        if let Some(candidate) = candidate {
-            let _ = stop_process_handles(candidate);
-        }
-        error
     }
 
     pub(super) fn stop_video_process(&self) -> Result<(), PreviewEngineError> {
         let handles = take_process_handles(&self.process);
-        stop_process_handles(handles)
+        stop_process_handles(self.cleanup, handles)
     }
 
     pub(super) fn stop_audio_process(&self) -> Result<(), PreviewEngineError> {
         *lock_pending_audio_start(&self.pending_audio_start) = None;
         let handles = take_process_handles(&self.audio_process);
-        stop_process_handles(handles)
+        stop_process_handles(self.cleanup, handles)
     }
 
     pub(super) fn take_audio_handles_for_exit(
@@ -383,12 +400,15 @@ impl RunningPreviewProcess {
             .as_ref()
             .map(|exit| (Arc::clone(exit), exit.record_exit(status)));
 
-        // A finished audio child can leave a live worker with prewarmed or
-        // buffered PCM. Keep its handles and Ready message until the consumer
-        // exits; joining now could block forever before Play starts the clock.
-        if state.audio_start.is_some()
-            && state
-                .stdout_worker
+        // Retain every unfinished reader with the session. Audio may still
+        // contain prewarmed PCM; video/stderr can still have inherited writers.
+        // Natural exit polling must never join either kind of live worker.
+        if state
+            .stdout_worker
+            .as_ref()
+            .is_some_and(|worker| !worker.is_finished())
+            || state
+                .stderr_worker
                 .as_ref()
                 .is_some_and(|worker| !worker.is_finished())
         {
@@ -426,41 +446,11 @@ impl RunningPreviewProcess {
     }
 }
 
-pub(super) fn stop_process_handles(handles: ProcessHandles) -> Result<(), PreviewEngineError> {
-    // Classify a child that already exited before requesting intentional stop.
-    // A kill performed below must never become a decoder-failure diagnostic.
-    let mut child = handles.child;
-    let already_exited = child
-        .as_mut()
-        .and_then(|child| child.try_wait().ok())
-        .flatten();
-    if let Some(status) = already_exited
-        && let Some(exit) = &handles.audio_exit
-    {
-        exit.publish(exit.record_exit(status));
-    }
-    if let Some(stop_requested) = &handles.stop_requested {
-        if let Some(start) = &handles.audio_start {
-            start.request_stop(stop_requested);
-        } else {
-            stop_requested.store(true, Ordering::SeqCst);
-        }
-    }
-    if let Some(exit) = &handles.audio_exit {
-        exit.cancel();
-    }
-    let mut result = Ok(());
-    if let Some(mut child) = child {
-        if already_exited.is_none()
-            && let Err(error) = child.kill()
-        {
-            result = Err(PreviewEngineError::Io(error));
-        }
-        let _ = child.wait();
-    }
-    join_worker(handles.stdout_worker);
-    join_worker(handles.stderr_worker);
-    result
+pub(super) fn stop_process_handles(
+    cleanup: &CleanupBroker,
+    handles: ProcessHandles,
+) -> Result<(), PreviewEngineError> {
+    cleanup.retire(handles)
 }
 
 pub(super) fn take_process_handles(process: &Mutex<RunningProcessState>) -> ProcessHandles {
@@ -511,9 +501,11 @@ pub(in crate::preview_engine) fn start_ffmpeg_preview_process(
     config: &PreviewSessionConfig,
     frame_store: LatestFrameStore,
     metrics: PreviewRuntimeMetricsStore,
+    cancelled: Arc<AtomicBool>,
 ) -> Result<(RunningPreviewProcess, PreviewDimensions, f64), PreviewEngineError> {
     let executable = ffmpeg_executable();
-    let process = RunningPreviewProcess::new(config.clone(), frame_store, metrics, executable);
+    let mut process = RunningPreviewProcess::new(config.clone(), frame_store, metrics, executable)?;
+    process.cancelled = cancelled;
     let dimensions = if matches!(
         config.source_kind,
         PreviewSourceKind::Video | PreviewSourceKind::Image
@@ -543,19 +535,43 @@ pub(super) fn spawn_stderr_worker_with_completion(
     thread::Builder::new()
         .name("frame-preview-ffmpeg-stderr".to_string())
         .spawn(move || {
-            let reader = BufReader::new(stderr);
-            for line in reader.lines() {
-                if stop_requested.load(Ordering::SeqCst) {
-                    break;
-                }
-                let Ok(line) = line else {
-                    break;
+            let mut stderr = stderr;
+            let mut chunk = [0_u8; 8192];
+            let mut pending = Vec::with_capacity(4096);
+            while !stop_requested.load(Ordering::Acquire) {
+                let count = match stderr.read(&mut chunk) {
+                    Ok(0) => {
+                        if !pending.is_empty() {
+                            push_stderr_bytes(&lines, &pending);
+                        }
+                        break;
+                    }
+                    Ok(count) => count,
+                    Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                    Err(_) => break,
                 };
-                push_stderr_line(&lines, line);
+                for &byte in &chunk[..count] {
+                    if byte == b'\n' {
+                        push_stderr_bytes(&lines, &pending);
+                        pending.clear();
+                    } else if pending.len() < 4096 {
+                        pending.push(byte);
+                    }
+                }
             }
             on_complete();
         })
         .map_err(|err| PreviewEngineError::Ffmpeg(format!("failed to spawn stderr worker: {err}")))
+}
+
+fn push_stderr_bytes(lines: &Arc<Mutex<VecDeque<String>>>, bytes: &[u8]) {
+    let decoded = String::from_utf8_lossy(bytes);
+    let decoded = decoded.trim_end_matches('\r');
+    let mut end = decoded.len().min(4096);
+    while !decoded.is_char_boundary(end) {
+        end -= 1;
+    }
+    push_stderr_line(lines, decoded[..end].to_owned());
 }
 
 pub(super) fn push_stderr_line(lines: &Arc<Mutex<VecDeque<String>>>, line: String) {
@@ -601,6 +617,7 @@ mod tests {
 
     #[test]
     fn resume_keeps_a_playing_generation_without_starting_another_process() {
+        let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
         let config = PreviewSessionConfig {
             file_id: "already-playing".into(),
             path: "/missing/preview.mp4".into(),
@@ -626,7 +643,8 @@ mod tests {
             LatestFrameStore::new(),
             PreviewRuntimeMetricsStore::new(),
             "/missing/ffmpeg".into(),
-        );
+        )
+        .unwrap();
         {
             let mut playback = lock_playback(&process.playback);
             playback.generation = 7;
@@ -641,6 +659,7 @@ mod tests {
 
     #[test]
     fn failed_audio_retry_clamps_to_source_or_trim_end_and_uses_a_new_generation() {
+        let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
         for (trim_end, expected_seconds) in [(None, 12.499), (Some("00:00:04.000"), 3.999)] {
             let mut config = super::super::tests::preview_config();
             config.source_kind = PreviewSourceKind::Audio;
@@ -652,7 +671,8 @@ mod tests {
                 LatestFrameStore::new(),
                 PreviewRuntimeMetricsStore::new(),
                 "/missing/ffmpeg".into(),
-            );
+            )
+            .unwrap();
             {
                 let mut clock = lock_playback(&process.playback);
                 clock.last_frame_seconds = 50.0;
@@ -683,6 +703,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn reaping_an_audio_failure_does_not_turn_it_into_natural_eof() {
+        let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
         let mut config = super::super::tests::preview_config();
         config.source_kind = PreviewSourceKind::Audio;
         let process = RunningPreviewProcess::new(
@@ -690,7 +711,8 @@ mod tests {
             LatestFrameStore::new(),
             PreviewRuntimeMetricsStore::new(),
             "/missing/ffmpeg".into(),
-        );
+        )
+        .unwrap();
         process.fail_audio_output_for_test();
         let mut child = std::process::Command::new("sh")
             .args(["-c", "exit 0"])
@@ -704,5 +726,159 @@ mod tests {
         assert!(playback.position_seconds.abs() < f64::EPSILON);
         assert!(process.failed());
         assert!(!process.ended());
+    }
+}
+
+#[cfg(test)]
+mod bounded_stderr_tests {
+    use super::*;
+    use std::sync::atomic::AtomicUsize;
+
+    #[test]
+    fn stderr_worker_checks_stop_between_chunks_without_newlines() {
+        struct LongLine {
+            calls: Arc<AtomicUsize>,
+            stop: Arc<AtomicBool>,
+        }
+        impl Read for LongLine {
+            fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+                let call = self.calls.fetch_add(1, Ordering::SeqCst);
+                if call == 100 {
+                    return Ok(0);
+                }
+                buffer.fill(b'x');
+                self.stop.store(true, Ordering::Release);
+                Ok(buffer.len())
+            }
+        }
+        let calls = Arc::new(AtomicUsize::new(0));
+        let stop = Arc::new(AtomicBool::new(false));
+        let lines = Arc::new(Mutex::new(VecDeque::new()));
+        spawn_stderr_worker(
+            LongLine {
+                calls: Arc::clone(&calls),
+                stop: Arc::clone(&stop),
+            },
+            lines,
+            stop,
+        )
+        .unwrap()
+        .join()
+        .unwrap();
+        assert!(
+            calls.load(Ordering::Acquire) <= 2,
+            "stderr drain ignored cancellation until line end"
+        );
+    }
+
+    #[test]
+    fn stderr_worker_bounds_each_line_and_preserves_later_diagnostics() {
+        let mut bytes = vec![b'x'; 256 * 1024];
+        bytes.extend_from_slice(b"\nlast diagnostic\n");
+        let lines = Arc::new(Mutex::new(VecDeque::new()));
+        spawn_stderr_worker(
+            std::io::Cursor::new(bytes),
+            Arc::clone(&lines),
+            Arc::new(AtomicBool::new(false)),
+        )
+        .unwrap()
+        .join()
+        .unwrap();
+        let lines = lock_stderr(&lines);
+        assert!(
+            lines.iter().all(|line| line.len() <= 4096),
+            "one stderr line escaped its buffer limit"
+        );
+        assert_eq!(lines.back().map(String::as_str), Some("last diagnostic"));
+        drop(lines);
+    }
+}
+
+#[cfg(test)]
+mod cancellation_guard_tests {
+    use super::*;
+
+    #[test]
+    fn cancellation_guard_prevents_a_completed_frame_from_being_published() {
+        let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
+        let process = RunningPreviewProcess::new(
+            super::super::tests::preview_config(),
+            LatestFrameStore::new(),
+            PreviewRuntimeMetricsStore::new(),
+            "/missing/ffmpeg".into(),
+        )
+        .unwrap();
+        let frame = crate::preview_engine::rendered_frame_from_bgra_payload(1, 1, 4, 0, vec![0; 4])
+            .unwrap();
+        process.cancelled.store(true, Ordering::Release);
+        process.publish_frame_for_generation(frame, std::time::Duration::ZERO, 0);
+        assert!(
+            process.frame_store.latest().is_none(),
+            "cancelled preview published a stale completed frame"
+        );
+    }
+}
+
+#[cfg(all(test, unix))]
+mod reaping_cleanup_tests {
+    use super::*;
+    use std::process::{Command, Stdio};
+    use std::sync::mpsc;
+    use std::time::Duration;
+
+    #[test]
+    fn finished_video_reaping_preserves_inherited_pipe_ownership_without_joining() {
+        let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
+        let process = Arc::new(
+            RunningPreviewProcess::new(
+                super::super::tests::preview_config(),
+                LatestFrameStore::new(),
+                PreviewRuntimeMetricsStore::new(),
+                "/missing/ffmpeg".into(),
+            )
+            .unwrap(),
+        );
+        let mut child = crate::process_launch::spawn(
+            Command::new("sh")
+                .args(["-c", "sleep 3 & exit 0"])
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::piped()),
+        )
+        .unwrap();
+        let stop = Arc::new(AtomicBool::new(false));
+        let stderr_worker = spawn_stderr_worker(
+            child.stderr.take().unwrap(),
+            Arc::clone(&process.stderr),
+            Arc::clone(&stop),
+        )
+        .unwrap();
+        child.wait().unwrap();
+        *lock_process(&process.process) = RunningProcessState {
+            child: Some(child),
+            stderr_worker: Some(stderr_worker),
+            stop_requested: Some(stop),
+            ..RunningProcessState::default()
+        };
+        let (done_tx, done_rx) = mpsc::channel();
+        let reaping = Arc::clone(&process);
+        let worker = thread::spawn(move || {
+            done_tx
+                .send(reaping.reap_finished_process(&reaping.process, true))
+                .unwrap();
+        });
+        let result = done_rx.recv_timeout(Duration::from_millis(200));
+        worker.join().unwrap();
+        assert!(!result.expect("reaping must not join a reader whose inherited pipe remains open"));
+        assert!(lock_process(&process.process).stderr_worker.is_some());
+        assert!(process.stop_running_processes().is_err());
+        let deadline = Instant::now() + Duration::from_secs(4);
+        while process.cleanup.check_admission().is_err() {
+            assert!(
+                Instant::now() < deadline,
+                "retired reaper ownership did not finish"
+            );
+            thread::sleep(Duration::from_millis(10));
+        }
     }
 }

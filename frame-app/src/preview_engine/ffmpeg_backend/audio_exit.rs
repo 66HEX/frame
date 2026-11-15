@@ -121,18 +121,27 @@ impl AudioProcessExit {
         result
     }
 
-    #[expect(
-        clippy::significant_drop_tightening,
-        reason = "The cache guard is consumed by Condvar::wait_timeout, which atomically releases it while waiting."
-    )]
     pub(super) fn wait_for_exit(
         &self,
         process: &Mutex<RunningProcessState>,
         timeout: Duration,
     ) -> AudioExitOutcome {
+        self.wait_for_exit_cancellable(process, timeout, || false)
+    }
+
+    #[expect(
+        clippy::significant_drop_tightening,
+        reason = "The cache guard is consumed by Condvar::wait_timeout, which atomically releases it while waiting."
+    )]
+    pub(super) fn wait_for_exit_cancellable(
+        &self,
+        process: &Mutex<RunningProcessState>,
+        timeout: Duration,
+        cancelled: impl Fn() -> bool,
+    ) -> AudioExitOutcome {
         let deadline = Instant::now() + timeout;
         loop {
-            if self.stop_requested.load(Ordering::SeqCst) {
+            if cancelled() || self.stop_requested.load(Ordering::SeqCst) {
                 self.cancel();
                 return AudioExitOutcome::Cancelled;
             }
@@ -152,7 +161,8 @@ impl AudioProcessExit {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             // Stop publishes cancellation and wakes this wait immediately. An
             // observer only enters this bounded loop after stderr/PCM EOF.
-            if self.stop_requested.load(Ordering::SeqCst)
+            if cancelled()
+                || self.stop_requested.load(Ordering::SeqCst)
                 || !matches!(*outcome, AudioExitOutcome::Pending)
             {
                 drop(outcome);

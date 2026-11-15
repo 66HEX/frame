@@ -115,6 +115,7 @@ impl Render for FrameRoot {
         let preview_presentation = self.preview_ui.rendered_presentation;
         let preview_render_image = self.preview_render_image();
         let preview_runtime_error = self.preview_runtime_error();
+        let source_export = self.source_frame_export_render_state();
         let preview_availability = preview_control_availability(PreviewControlInput {
             metadata_status: if source_metadata.is_some() {
                 PreviewMetadataStatus::Ready
@@ -132,6 +133,7 @@ impl Render for FrameRoot {
             self.preview_ui.timeline_track_bounds = None;
         }
         let PreviewFocusHandles {
+            source_frame_export_focus,
             preview_viewport_focus,
             preview_crop_tool_focus,
             preview_overlay_tool_focus,
@@ -149,6 +151,7 @@ impl Render for FrameRoot {
             overlay_toolbar_last_focus,
         } = self.prepare_preview_focus(
             PreviewFocusContext {
+                source_export: &source_export,
                 preview_availability: &preview_availability,
                 preview_crop: &preview_crop,
                 preview_overlay: &preview_overlay,
@@ -330,6 +333,7 @@ impl Render for FrameRoot {
                     preset_name: &self.settings_ui.preset_name_draft,
                     preset_name_focus: Some(&preset_name_focus),
                     presets: &self.presets,
+                    applied_preset_id: self.selected_applied_preset_id(),
                     subtitle_fonts: &self.subtitle_font_families,
                     available_encoders: &self.available_encoders,
                     available_filters: &self.available_filters,
@@ -341,6 +345,11 @@ impl Render for FrameRoot {
                     &self.file_list_scroll_handle,
                     &settings,
                     PreviewPanelProps {
+                        source_export: source_export.clone(),
+                        source_export_focuses:
+                            preview::source_export_toolbar::SourceFrameExportFocuses {
+                                export: &source_frame_export_focus,
+                            },
                         canvas: preview_canvas,
                         crop: preview_crop,
                         overlay: preview_overlay,
@@ -405,6 +414,20 @@ impl Render for FrameRoot {
             )),
         };
 
+        let source_activity = (active_content_view != Some(ActiveView::Workspace)
+            && source_export.running)
+            .then(|| {
+                preview::source_frame_cancel_button(
+                    &source_frame_export_focus,
+                    source_export.status
+                        != preview::actions::source_export::SourceFrameExportStatus::Cancelling,
+                    palette,
+                    window,
+                    cx,
+                )
+                .into_any_element()
+            });
+
         let mut root = div()
             .id(APP_ROOT_FOCUS_ID)
             .size_full()
@@ -460,7 +483,7 @@ impl Render for FrameRoot {
                     }
                 },
             ))
-            .child(titlebar(state, palette, window, cx))
+            .child(titlebar(state, source_activity, palette, window, cx))
             .child(content)
             .child(FileDropLifecycleProbe { owner: cx.entity() });
 

@@ -69,6 +69,7 @@ const UBUNTU_ARCHIVE_SUBSTITUTIONS: &str = concat!(
 
 #[cfg(test)]
 mod monorepo_tests;
+mod native_qa;
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -1682,6 +1683,10 @@ fn generated_workflows() -> Vec<(&'static str, String)> {
         ),
         (CODEQL_WORKFLOW_PATH, codeql_workflow()),
         (RUN_BUNDLING_WORKFLOW_PATH, run_bundling_workflow()),
+        (
+            ".github/workflows/native-qa.yml",
+            render_workflow(&native_qa::workflow()),
+        ),
         (RELEASE_WORKFLOW_PATH, release_workflow()),
         (PUBLISH_NIXPKGS_WORKFLOW_PATH, publish_nixpkgs_workflow()),
     ]
@@ -3972,6 +3977,47 @@ impl From<frame_updater::UpdateError> for XtaskError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cargo_run_selects_the_desktop_app_when_qa_binary_is_present() {
+        let output = Command::new(env!("CARGO"))
+            .args([
+                "metadata",
+                "--manifest-path",
+                concat!(env!("CARGO_MANIFEST_DIR"), "/../../frame-app/Cargo.toml"),
+                "--format-version",
+                "1",
+                "--no-deps",
+                "--locked",
+                "--offline",
+            ])
+            .output()
+            .expect("Cargo metadata must be available to the developer run command");
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let metadata: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        let app = metadata["packages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|package| package["name"] == "frame-app")
+            .unwrap();
+        let targets = app["targets"].as_array().unwrap();
+        assert!(targets.iter().any(|target| target["name"] == "frame-qa"));
+        assert_eq!(
+            app["default_run"], "frame",
+            "cargo xtask run must select Frame without --bin"
+        );
+        let selected = targets
+            .iter()
+            .find(|target| target["name"] == app["default_run"])
+            .unwrap();
+        assert_eq!(selected["kind"], serde_json::json!(["bin"]));
+        assert!(selected.get("required-features").is_none());
+    }
 
     #[test]
     fn theme_color_audit_accepts_current_source_inventory() {
