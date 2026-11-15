@@ -10,6 +10,7 @@ use gpui::{ClickEvent, Context, FocusHandle, InteractiveElement, Window, div};
 
 pub(in crate::app) const SOURCE_FRAME_DESCRIPTION: &str =
     "Save a full-resolution PNG from the source, without conversion settings.";
+pub(in crate::app) const SOURCE_FRAME_FOOTER_BOTTOM_PADDING: f32 = 8.0;
 
 #[derive(Clone, Copy)]
 pub(in crate::app) struct SourceFrameExportFocuses<'a> {
@@ -93,7 +94,7 @@ pub(in crate::app) fn source_export_toolbar(
     let message = source_export_status(state);
     let status = div()
         .id("source-frame-export-status")
-        .w_full()
+        .flex_1()
         .min_w_0()
         .truncate()
         .text_color(color(palette.text_muted))
@@ -108,12 +109,13 @@ pub(in crate::app) fn source_export_toolbar(
         .for_control(status, None, true, palette, window, cx);
     div()
         .id("source-frame-export-toolbar")
+        .debug_selector(|| "source-frame-export-toolbar".into())
         .flex_none()
         .flex()
-        .flex_col()
+        .items_center()
         .min_w_0()
         .gap(theme::ui_rem(theme::metrics::CONTROL_GAP))
-        .pt(theme::ui_rem(8.0))
+        .pt(theme::ui_rem(4.0))
         .child(controls)
         .child(status)
 }

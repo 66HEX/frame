@@ -266,6 +266,9 @@ pub(in crate::app) fn preview_panel(
         .debug_selector(|| "preview-panel".to_owned())
         .on_prepaint(move |info, _, _| measured_card_bounds.set(info.bounds))
         .p(theme::ui_rem(PREVIEW_PANEL_PADDING))
+        .pb(theme::ui_rem(
+            super::source_export_toolbar::SOURCE_FRAME_FOOTER_BOTTOM_PADDING,
+        ))
         .child(preview_viewport(
             &state,
             props.viewport_focuses,
