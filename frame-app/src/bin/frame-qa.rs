@@ -5,7 +5,7 @@ use frame_core::events::ConversionEvent;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
-const USAGE: &str = "Usage: frame-qa --qa-directory ABSOLUTE_NEW_DIRECTORY | --plan REQUEST.json | --export REQUEST.json";
+const USAGE: &str = "Usage: frame-qa --qa-directory ABSOLUTE_NEW_DIRECTORY | --plan REQUEST.json | --export REQUEST.json | --export-frame REQUEST.json";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = std::env::args_os().skip(1).collect::<Vec<_>>();
@@ -14,6 +14,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     if flag == "--plan" || flag == "--export" {
         return run_headless(&PathBuf::from(directory), flag == "--export");
+    }
+    if flag == "--export-frame" {
+        let output = frame_app::app::qa::source_frame::export(&PathBuf::from(directory))?;
+        let mut stdout = io::stdout().lock();
+        serde_json::to_writer(
+            &mut stdout,
+            &serde_json::json!({"status": "published", "outputPath": output}),
+        )?;
+        writeln!(stdout)?;
+        return Ok(());
     }
     if flag != "--qa-directory" {
         return Err(USAGE.into());

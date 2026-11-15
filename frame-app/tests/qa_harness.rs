@@ -49,6 +49,64 @@ fn headless_qa_rejects_malformed_requests_without_starting_the_ui() {
 }
 
 #[test]
+fn headless_source_frame_rejects_malformed_requests_without_starting_the_ui() {
+    let sandbox = Sandbox::new();
+    let request = sandbox.0.join("invalid-frame.json");
+    fs::write(&request, b"{not valid JSON}").unwrap();
+
+    let output = run_qa("--export-frame", &request);
+
+    assert!(!output.status.success());
+    let error = String::from_utf8_lossy(&output.stderr);
+    assert!(error.contains("request JSON"), "{error}");
+    assert_eq!(fs::read_dir(&sandbox.0).unwrap().count(), 1);
+}
+
+#[test]
+#[ignore = "requires FFmpeg; run with --ignored"]
+fn headless_source_frame_publishes_original_pixels_without_replacing_a_result() {
+    let sandbox = Sandbox::new();
+    let source = sandbox.0.join("Zażółć source.png");
+    let original = image::RgbaImage::from_fn(33, 19, |x, y| {
+        image::Rgba([(x * 7) as u8, (y * 11) as u8, (x + y) as u8, 127])
+    });
+    original.save(&source).unwrap();
+    let source_before = fs::read(&source).unwrap();
+    let output_directory = sandbox.0.join("output's space");
+    fs::create_dir(&output_directory).unwrap();
+    let sentinel = output_directory.join("Zażółć source_frame_0.png");
+    fs::write(&sentinel, b"existing frame must survive").unwrap();
+    let request = sandbox.0.join("frame-request.json");
+    fs::write(
+        &request,
+        serde_json::to_vec(&serde_json::json!({
+            "input": source,
+            "outputDirectory": output_directory,
+            "positionMicroseconds": 0,
+            "videoStreamIndex": 0
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+
+    let exported = run_qa("--export-frame", &request);
+
+    assert!(
+        exported.status.success(),
+        "{}",
+        String::from_utf8_lossy(&exported.stderr)
+    );
+    let result: serde_json::Value = serde_json::from_slice(&exported.stdout).unwrap();
+    assert_eq!(result["status"], "published");
+    let output = Path::new(result["outputPath"].as_str().unwrap());
+    assert_ne!(output, sentinel);
+    assert_eq!(image::open(output).unwrap().into_rgba8(), original);
+    assert_eq!(fs::read(&source).unwrap(), source_before);
+    assert_eq!(fs::read(&sentinel).unwrap(), b"existing frame must survive");
+    assert_eq!(fs::read_dir(&output_directory).unwrap().count(), 2);
+}
+
+#[test]
 #[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
 fn headless_qa_exports_through_the_app_runner_and_reports_the_actual_result() {
     let sandbox = Sandbox::new();

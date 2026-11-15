@@ -5,6 +5,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 pub mod export;
+pub mod source_frame;
 
 #[derive(Debug)]
 pub struct QaProfile {
