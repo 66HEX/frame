@@ -80,6 +80,7 @@ pub struct VideoFiltersConfig {
     pub temperature: FilterValue<u32>,
     pub sharpen: FilterValue<u32>,
     pub gaussian_blur: FilterValue<u32>,
+    pub stabilization_enabled: bool,
     pub denoise_enabled: bool,
     pub denoise_strength: FilterStrength,
     pub deband: FilterValue<u32>,
@@ -108,6 +109,7 @@ impl Default for VideoFiltersConfig {
                 enabled: false,
                 value: DEFAULT_VIDEO_FILTER_BLUR,
             },
+            stabilization_enabled: false,
             denoise_enabled: false,
             denoise_strength: FilterStrength::Medium,
             deband: FilterValue {

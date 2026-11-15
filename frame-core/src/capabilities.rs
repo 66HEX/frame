@@ -37,6 +37,7 @@ pub struct AvailableFilters {
     pub deband: bool,
     pub vignette: bool,
     pub bwdif: bool,
+    pub deshake: bool,
     pub highpass: bool,
     pub lowpass: bool,
     pub afftdn: bool,
@@ -93,6 +94,7 @@ pub fn parse_available_filters(ffmpeg_filters_stdout: impl AsRef<str>) -> Availa
         deband: filter_list_contains(stdout, "deband"),
         vignette: filter_list_contains(stdout, "vignette"),
         bwdif: filter_list_contains(stdout, "bwdif"),
+        deshake: filter_list_contains(stdout, "deshake"),
         highpass: filter_list_contains(stdout, "highpass"),
         lowpass: filter_list_contains(stdout, "lowpass"),
         afftdn: filter_list_contains(stdout, "afftdn"),
@@ -119,6 +121,17 @@ fn filter_list_contains(stdout: &str, name: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn stabilization_capability_requires_the_exact_runtime_filter() {
+        for (listing, expected) in [
+            (" .. deshake V->V Stabilize shaky video.\n", true),
+            (" .. deshake_opencl V->V Other filter.\n", false),
+            ("", false),
+        ] {
+            let parsed = serde_json::to_value(super::parse_available_filters(listing)).unwrap();
+            assert_eq!(parsed["deshake"], expected);
+        }
+    }
     use super::*;
 
     #[test]
@@ -227,6 +240,7 @@ Filters:
                 deband: true,
                 vignette: true,
                 bwdif: true,
+                deshake: false,
                 highpass: true,
                 lowpass: true,
                 afftdn: true,

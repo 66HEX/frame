@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Video Stabilization:** Adds a single-pass Stabilize video control for playback and export when FFmpeg provides the `deshake` filter. Stabilization reduces camera shake over successive frames; a paused image cannot show its effect. Addresses [#249](https://github.com/66HEX/frame/issues/249).
 - **Workspace Recovery:** Native installations can restore prepared queues after restarting Frame, including per-file settings, output names, selection and confirmed results. Restore is explicit; interrupted conversions remain stopped until restarted manually.
 - **Source Frame Export:** Saves the frame at the captured playhead as a full-resolution PNG, with separate Open and Show in folder actions. The image uses source pixels, including rotation, sample aspect ratio and transparency, without conversion effects.
 - **Completed Results:** Adds Open and Show in folder actions for each successfully published conversion result.

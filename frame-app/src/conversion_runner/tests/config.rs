@@ -59,6 +59,7 @@ fn core_config_from_gpui_preserves_active_conversion_fields() {
                 enabled: true,
                 value: 10,
             },
+            stabilization_enabled: true,
             denoise_enabled: true,
             denoise_strength: FilterStrength::High,
             deband: FilterValue {
@@ -178,6 +179,7 @@ fn core_config_from_gpui_preserves_active_conversion_fields() {
     assert_eq!(core.audio_channels, "stereo");
     assert_eq!(core.audio_volume, 125.0);
     assert!(core.audio_normalize);
+    assert!(core.video_filters.stabilization_enabled);
     assert_eq!(core.video_codec, "libx265");
     assert_eq!(core.video_bitrate_mode, "bitrate");
     assert_eq!(core.video_bitrate, "9000");

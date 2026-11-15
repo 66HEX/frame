@@ -76,11 +76,22 @@ pub fn detect_available_filters() -> Result<AvailableFilters, CapabilityDetectio
 pub fn detect_available_filters_with_executable(
     executable: &str,
 ) -> Result<AvailableFilters, CapabilityDetectionError> {
+    detect_available_filters_with_control(executable, || false)
+}
+
+/// Reads filters from the selected runtime with bounded cancellation.
+///
+/// # Errors
+/// Returns an error if the complete runtime inventory cannot be verified.
+pub fn detect_available_filters_with_control(
+    executable: &str,
+    cancelled: impl Fn() -> bool,
+) -> Result<AvailableFilters, CapabilityDetectionError> {
     let (stdout, stderr) = bounded_listing(
         executable,
         &ffmpeg_filter_list_args(),
         ListingKind::Filters,
-        || false,
+        cancelled,
     )?;
     available_filters_from_output(true, &stdout, &stderr)
 }

@@ -10,6 +10,7 @@ mod output_paths;
 mod process;
 mod publication;
 mod runner;
+mod stabilization;
 mod subtitles;
 #[cfg(test)]
 mod tests;

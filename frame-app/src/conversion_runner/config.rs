@@ -121,6 +121,7 @@ pub fn core_video_filters_from_gpui(filters: &GpuiVideoFiltersConfig) -> CoreVid
         temperature: core_filter_value_from_gpui(filters.temperature),
         sharpen: core_filter_value_from_gpui(filters.sharpen),
         gaussian_blur: core_filter_value_from_gpui(filters.gaussian_blur),
+        stabilization_enabled: filters.stabilization_enabled,
         denoise_enabled: filters.denoise_enabled,
         denoise_strength: core_filter_strength_from_gpui(filters.denoise_strength),
         deband: core_filter_value_from_gpui(filters.deband),

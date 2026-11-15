@@ -29,6 +29,7 @@ fn empty_filters() -> &'static AvailableFilters {
         deband: false,
         vignette: false,
         bwdif: false,
+        deshake: false,
         highpass: false,
         lowpass: false,
         afftdn: false,

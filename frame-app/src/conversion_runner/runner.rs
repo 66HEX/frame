@@ -139,6 +139,15 @@ fn run_prepared_conversion_task_with_control(
     );
     let ordinary_args = build_ffmpeg_args(&task.file_path, &output_path, &task.config, &probe)?;
     let executable = ffmpeg_executable();
+    if !super::stabilization::check_with_control(
+        &task.config,
+        &executable,
+        &task.id,
+        controller,
+        emit,
+    )? {
+        return Ok(());
+    }
     if let Some(observer) =
         build_alac_copy_observer(&task.file_path, &output_path, &task.config, &probe)?
     {
