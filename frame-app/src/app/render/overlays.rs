@@ -24,6 +24,10 @@ impl FrameRoot {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> gpui::Stateful<gpui::Div> {
+        if let Some(recovery) = self.render_recovery_overlay(palette, window, cx) {
+            return root.child(recovery);
+        }
+
         if self.settings_ui.is_present {
             let update_install_ready = self.can_install_downloaded_update();
             let theme_popover_active = self.settings_ui.theme_popover.is_open();
@@ -221,10 +225,6 @@ impl FrameRoot {
                 window,
                 cx,
             ));
-        }
-
-        if let Some(recovery) = self.render_recovery_overlay(palette, window, cx) {
-            root = root.child(recovery);
         }
 
         root

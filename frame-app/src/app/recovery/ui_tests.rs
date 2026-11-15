@@ -134,6 +134,70 @@ fn invalid_recovery_notice_offers_only_continue_and_keeps_writer_disabled() {
     root.read_with(cx, |root, _| assert!(!root.workspace_recovery.ready));
 }
 
+fn assert_recovery_keeps_focus_over_pending_modal(update: bool) {
+    let mut app = TestAppContext::single();
+    let (root, cx) = window(&mut app, ScalePreset::Percent100);
+    root.update(cx, |root, cx| {
+        if update {
+            root.apply_update_available_fixture();
+        } else {
+            root.settings_ui.is_present = true;
+            root.settings_ui.is_open = true;
+        }
+        cx.notify();
+    });
+    draw(cx);
+    assert_eq!(focus_label(cx), "Restore queue");
+    for expected in ["Discard queue", "Later"] {
+        press(cx, "tab");
+        assert_eq!(focus_label(cx), expected);
+        root.update(cx, |_, cx| cx.notify());
+        draw(cx);
+        assert_eq!(focus_label(cx), expected);
+    }
+    cx.update(|window, _| {
+        let tree = window.a11y_tree().unwrap();
+        let dialogs = tree
+            .nodes
+            .iter()
+            .filter(|(_, node)| matches!(node.role(), gpui::Role::Dialog | gpui::Role::AlertDialog))
+            .collect::<Vec<_>>();
+        assert_eq!(dialogs.len(), 1);
+        assert_eq!(dialogs[0].1.label(), Some("Restore prepared queue?"));
+    });
+    root.read_with(cx, |root, _| {
+        if update {
+            assert!(root.update_ui.dialog_present && root.update_ui.dialog_open);
+            assert!(matches!(
+                root.update_ui.status,
+                crate::app::updates::state::UpdateStatus::Available(_)
+            ));
+        } else {
+            assert!(root.settings_ui.is_present && root.settings_ui.is_open);
+        }
+    });
+    press(cx, "escape");
+    assert!(cx.debug_bounds("recovery-dialog").is_none());
+    assert_eq!(
+        focus_label(cx),
+        if update {
+            "Close update dialog"
+        } else {
+            "Close settings"
+        }
+    );
+}
+
+#[test]
+fn recovery_keeps_keyboard_focus_while_an_update_dialog_waits() {
+    assert_recovery_keeps_focus_over_pending_modal(true);
+}
+
+#[test]
+fn recovery_keeps_keyboard_focus_while_settings_waits() {
+    assert_recovery_keeps_focus_over_pending_modal(false);
+}
+
 #[test]
 fn loading_recovery_blocks_background_clicks_and_has_no_destructive_action() {
     let mut app = TestAppContext::single();
