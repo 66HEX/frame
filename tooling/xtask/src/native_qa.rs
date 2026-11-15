@@ -60,6 +60,8 @@ __LINUX_SETUP__
     - name: qa::test_importer
       if: runner.os == 'Linux'
       run: cargo test --locked --release -p frame-app --features qa-harness --lib source_metadata -- --test-threads=1
+    - name: qa::test_import_lifecycle
+      run: cargo test --locked --release -p frame-app --features qa-harness --lib app::queue::metadata -- --test-threads=1
     - name: qa::test_publication
       run: cargo test --locked --release -p frame-app --features qa-harness --lib conversion_runner -- --include-ignored --test-threads=1
     - name: qa::test_source_frame_export
@@ -71,10 +73,14 @@ __LINUX_SETUP__
       run: cargo test --locked --release -p frame-app --features qa-harness --lib full_resolution_frame_does_not_pay_a_polling_sleep_for_each_producer_burst -- --ignored --test-threads=1
     - name: qa::test_preview_runtime
       run: cargo test --locked --release -p frame-app --features qa-harness --lib preview_engine::tests::ffmpeg_ -- --ignored --test-threads=1 --skip ffmpeg_preview_session_collects_audio_video_metrics_for_sync_fixture --skip ffmpeg_audio_prewarm_wakes_through_preview_session_lifecycle
+    - name: qa::test_temporal_snapshot
+      run: cargo test --locked --release -p frame-app --features qa-harness --lib preview_engine::tests::temporal_snapshot -- --ignored --test-threads=1
     - name: qa::test_small_source_preview
       run: cargo test --locked --release -p frame-app --features qa-harness --lib preview_engine::tests::small_sources::ffmpeg_ -- --ignored --test-threads=1
     - name: qa::test_isolated_profile
       run: cargo test --locked --release -p frame-app --features qa-harness --lib app::qa -- --test-threads=1
+    - name: qa::test_workspace_recovery
+      run: cargo test --locked --release -p frame-app --features qa-harness --lib recovery -- --test-threads=1
     - name: qa::test_command_line
       run: cargo test --locked --release -p frame-app --features qa-harness --test qa_harness -- --include-ignored --test-threads=1
     - name: qa::test_package_contract
@@ -300,6 +306,21 @@ mod tests {
     #[test]
     fn native_qa_includes_importer_and_small_source_integration() {
         let workflow = workflow();
+        for (step, selector) in [
+            ("qa::test_import_lifecycle", "app::queue::metadata --"),
+            ("qa::test_workspace_recovery", "recovery --"),
+            (
+                "qa::test_temporal_snapshot",
+                "preview_engine::tests::temporal_snapshot -- --ignored",
+            ),
+        ] {
+            assert!(
+                workflow.contains(&format!(
+                    "- name: {step}\n      run: cargo test --locked --release -p frame-app --features qa-harness --lib {selector} --test-threads=1"
+                )),
+                "missing unconditional native product coverage: {step}"
+            );
+        }
         assert!(workflow.contains("--lib source_metadata -- --test-threads=1"));
         assert!(
             workflow.contains("--lib preview_engine::tests::small_sources::ffmpeg_ -- --ignored")
