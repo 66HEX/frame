@@ -616,7 +616,7 @@ fn preview_transport_reveals_on_keyboard_focus_and_returns_focus_after_trim() {
             press(cx, "escape");
             assert!(cx.debug_bounds("preview-trim-panel").is_none());
             assert_eq!(focus(cx), trigger_focus);
-            tab_to_label(cx, "Metadata");
+            tab_to_label(cx, "Source");
             assert!(cx.debug_bounds("preview-playback-toggle").is_none());
         }
     }

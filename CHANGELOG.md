@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Inspector:** Renames the source-information tab from Metadata to Source.
 - **Batch Settings:** Adds a selected-files scope alongside Apply to all for output settings and presets, with counts of compatible and skipped files.
 - **Dialogs:** Unifies confirmation and update dialogs with animated opening and closing, separated footers and right-aligned primary actions.
 
