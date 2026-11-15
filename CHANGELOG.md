@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-11-15
+
+### Added
+
+- **Workspace Recovery:** Native installations can restore prepared queues after restarting Frame, including per-file settings, output names, selection and confirmed results. Restore is explicit; interrupted conversions remain stopped until restarted manually.
+- **Source Frame Export:** Saves the frame at the captured playhead as a full-resolution PNG, with separate Open and Show in folder actions. The image uses source pixels, including rotation, sample aspect ratio and transparency, without conversion effects.
+- **Completed Results:** Adds Open and Show in folder actions for each successfully published conversion result.
+- **Batch Settings:** Applies output settings to selected files or all compatible pending files while retaining each file's own track choices.
+
+### Fixed
+
+- **Safe Output Publication:** Validates native conversion results before publishing them and preserves existing destination files. Cancellation and failed attempts no longer leave misleading completed results or overwrite a previous output.
+- **Queue and Preset State:** Retains the confirmed output path for each attempt and across updater handoff. Preset matching compares all settings after normalization.
+- **Import Responsiveness:** Limits concurrent metadata probes, reports stalled sources and cancels probes when files are removed or replaced. Late responses cannot overwrite replacement imports.
+- **Preview Startup and Shutdown:** Bounds snapshot and first-frame waits, cleans up canceled media processes and reads ready frame data without repeated polling delays.
+- **Deinterlaced Snapshots:** Preserves the selected frame when source resolution changes, including variable-frame-rate timestamps and subtitle cues.
+- **Source Frame Lifetime:** Keeps the captured source file available while a PNG export is running, including Windows file deletion and rename cases.
+- **Audio Stream Copy:** Stages ALAC outputs before publication and rejects Opus copy trims whose packet timing cannot preserve the selected content safely.
+- **Recovery Dialogs:** Keeps recovery ahead of pending update and settings dialogs, preserves unreadable or newer recovery files, and releases profile ownership correctly when closing.
+
+### Security
+
+- **QUIC Dependencies:** Updates `quinn-proto` and `quinn-udp` to patched releases without adding audit exceptions.
+
 ## [0.34.0] - 2026-11-11
 
 ### Added
@@ -921,7 +945,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic media metadata probing via FFprobe.
 - Preset-based configuration system.
 
-[Unreleased]: https://github.com/66HEX/frame/compare/0.34.0...HEAD
+[Unreleased]: https://github.com/66HEX/frame/compare/0.35.0...HEAD
+[0.35.0]: https://github.com/66HEX/frame/compare/0.34.0...0.35.0
 [0.34.0]: https://github.com/66HEX/frame/compare/0.33.1...0.34.0
 [0.33.1]: https://github.com/66HEX/frame/compare/0.33.0...0.33.1
 [0.33.0]: https://github.com/66HEX/frame/compare/0.32.0...0.33.0
