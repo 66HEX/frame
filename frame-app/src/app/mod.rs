@@ -13,6 +13,7 @@ mod motion;
 mod preferences;
 mod preview;
 mod primitives;
+mod prompts;
 #[cfg(feature = "qa-harness")]
 pub mod qa;
 mod queue;

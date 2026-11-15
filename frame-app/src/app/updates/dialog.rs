@@ -1,9 +1,9 @@
-use crate::app::components::FrameStyle;
-use crate::app::components::frame_text_button;
-use crate::app::layout::PANEL_HEADER_HEIGHT;
+use crate::app::components::{
+    frame_dialog_close_button, frame_dialog_footer, frame_dialog_header, frame_dialog_overlay,
+    frame_dialog_panel, frame_text_button,
+};
 use crate::app::motion::{motion_is_hidden, surface_motion};
-use crate::app::preferences::view::app_settings_close_button;
-use crate::app::primitives::{ButtonVariant, action_button, color, panel_bottom_separator};
+use crate::app::primitives::{ButtonVariant, action_button, color};
 use crate::app::root::FrameRoot;
 use crate::app::updates::preferences::{update_download_detail, update_progress_bar};
 use crate::app::updates::release_notes::{update_release_notes_block, update_release_notes_text};
@@ -45,49 +45,40 @@ pub(in crate::app) fn update_dialog(
         });
     }
 
-    div()
-        .id("update-dialog")
-        .absolute()
-        .inset_0()
-        .flex()
-        .items_center()
-        .justify_center()
-        .p_4()
-        .bg(color(palette.overlay_backdrop))
-        .opacity(progress)
-        .backdrop_blur(theme::ui_rem(4.0).to_pixels(window.rem_size()))
-        .occlude()
-        .on_key_down(
-            cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
-                match event.keystroke.key.as_str() {
-                    "escape" if !root.update_ui.status.is_busy() => {
-                        root.close_update_dialog();
-                        root.restore_focus_after_update_dialog_close(window, cx);
-                        cx.stop_propagation();
-                        cx.notify();
-                    }
-                    "tab" => {
-                        crate::app::accessibility::handle_focus_scope_tab_navigation(
-                            event, &scope, window, cx,
-                        );
-                    }
-                    _ => {}
+    frame_dialog_overlay(
+        "update-dialog",
+        update_dialog_panel(0.0, view, window, cx),
+        progress,
+        is_open,
+        palette,
+        window,
+    )
+    .on_key_down(
+        cx.listener(move |root, event: &gpui::KeyDownEvent, window, cx| {
+            match event.keystroke.key.as_str() {
+                "escape" if !root.update_ui.status.is_busy() => {
+                    root.close_update_dialog();
+                    root.restore_focus_after_update_dialog_close(window, cx);
+                    cx.stop_propagation();
+                    cx.notify();
                 }
-            }),
-        )
-        .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
-            cx.stop_propagation();
-            if !root.update_ui.status.is_busy() {
-                root.close_update_dialog();
-                root.restore_focus_after_update_dialog_close(window, cx);
-                cx.notify();
+                "tab" => {
+                    crate::app::accessibility::handle_focus_scope_tab_navigation(
+                        event, &scope, window, cx,
+                    );
+                }
+                _ => {}
             }
-        }))
-        .child(crate::app::components::frame_surface_motion(
-            update_dialog_panel(0.0, view, window, cx),
-            progress,
-            crate::app::components::SurfaceOrigin::Center,
-        ))
+        }),
+    )
+    .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
+        cx.stop_propagation();
+        if !root.update_ui.status.is_busy() {
+            root.close_update_dialog();
+            root.restore_focus_after_update_dialog_close(window, cx);
+            cx.notify();
+        }
+    }))
 }
 
 pub(in crate::app) fn update_dialog_panel(
@@ -97,50 +88,44 @@ pub(in crate::app) fn update_dialog_panel(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let palette = view.palette;
-    let mut panel = div()
-        .id("update-dialog-panel")
-        .role(gpui::Role::AlertDialog)
-        .aria_modal(true)
-        .aria_label(update_dialog_title(view.status))
-        .track_focus(view.panel_focus)
-        .tab_stop(false)
-        .mt(theme::ui_rem(panel_offset))
-        .w_full()
-        .max_w(theme::ui_rem(640.0))
-        .max_h(relative(0.86))
-        .overflow_hidden()
-        .dialog_surface(palette)
-        .occlude()
-        .on_click(cx.listener(|_, _: &ClickEvent, _window, cx| {
-            cx.stop_propagation();
-        }))
-        .child(update_dialog_header(
-            view.status,
-            view.close_focus,
-            palette,
-            window,
-            cx,
-        ))
-        .child(update_dialog_body(
-            view.status,
-            view.info,
-            view.install_ready,
-            view.release_notes_scroll_handle,
-            palette,
-        ))
-        .child(update_dialog_footer(
-            view.status,
-            view.install_ready,
-            palette,
-            window,
-            cx,
-        ));
+    let mut panel = frame_dialog_panel(
+        "update-dialog-panel",
+        &update_dialog_title(view.status),
+        None,
+        view.panel_focus,
+        palette,
+        window,
+    )
+    .role(gpui::Role::AlertDialog)
+    .mt(theme::ui_rem(panel_offset))
+    .max_h(relative(0.86))
+    .overflow_y_scroll()
+    .child(update_dialog_header(
+        view.status,
+        view.close_focus,
+        palette,
+        window,
+        cx,
+    ))
+    .child(update_dialog_body(
+        view.status,
+        view.info,
+        view.install_ready,
+        view.release_notes_scroll_handle,
+        palette,
+    ));
 
     if matches!(view.status, UpdateStatus::Downloading { .. }) {
         panel = panel.child(update_dialog_download_state(view.status, palette));
     }
 
-    panel
+    panel.child(update_dialog_footer(
+        view.status,
+        view.install_ready,
+        palette,
+        window,
+        cx,
+    ))
 }
 
 pub(in crate::app) fn update_dialog_header(
@@ -150,54 +135,30 @@ pub(in crate::app) fn update_dialog_header(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    let mut title_stack = div().flex().flex_col().gap_1();
-    if let Some(kicker) = update_dialog_kicker(status) {
-        title_stack = title_stack.child(
-            div()
-                .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-                .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-                .text_color(color(palette.text_muted))
-                .child(theme::ui_text(kicker)),
-        );
-    }
-    title_stack = title_stack.child(
-        div()
-            .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-            .font_weight(theme::TEXT_WEIGHT_MEDIUM)
-            .text_color(color(palette.text_primary))
-            .child(theme::ui_text_owned(update_dialog_title(status))),
-    );
-
-    div()
-        .relative()
-        .h(theme::ui_rem(PANEL_HEADER_HEIGHT))
-        .w_full()
-        .flex()
-        .items_center()
-        .justify_between()
-        .gap_4()
-        .px_4()
-        .child(title_stack)
-        .child(
-            app_settings_close_button(
-                "update-dialog-close",
-                "Close update dialog",
-                !status.is_busy(),
-                close_focus,
-                palette,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
-                cx.stop_propagation();
-                if !root.update_ui.status.is_busy() {
-                    root.close_update_dialog();
-                    root.restore_focus_after_update_dialog_close(window, cx);
-                    cx.notify();
-                }
-            })),
+    frame_dialog_header(
+        &update_dialog_title(status),
+        update_dialog_kicker(status),
+        palette,
+    )
+    .child(
+        frame_dialog_close_button(
+            "update-dialog-close",
+            "Close update dialog",
+            !status.is_busy(),
+            close_focus,
+            palette,
+            window,
+            cx,
         )
-        .child(panel_bottom_separator(palette))
+        .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
+            cx.stop_propagation();
+            if !root.update_ui.status.is_busy() {
+                root.close_update_dialog();
+                root.restore_focus_after_update_dialog_close(window, cx);
+                cx.notify();
+            }
+        })),
+    )
 }
 
 pub(in crate::app) fn update_dialog_body(
@@ -208,13 +169,13 @@ pub(in crate::app) fn update_dialog_body(
     palette: &'static theme::ThemePalette,
 ) -> gpui::Div {
     let notes = update_release_notes_text(info);
-    let mut body = div().flex().flex_col().gap_3().p_4();
+    let mut body = div().flex().flex_col().gap_3();
 
     if let Some(summary) = update_dialog_summary(status, notes.is_some(), install_ready) {
         body = body.child(
             div()
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-                .line_height(theme::ui_rem(16.0))
+                .line_height(relative(1.625))
                 .text_color(color(palette.text_muted))
                 .child(theme::ui_text_owned(summary)),
         );
@@ -238,7 +199,7 @@ pub(in crate::app) fn update_dialog_body(
                 .bg(color(palette.danger_surface))
                 .p_3()
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
-                .line_height(theme::ui_rem(16.0))
+                .line_height(relative(1.625))
                 .text_color(color(palette.danger))
                 .child(error.clone()),
         );
@@ -262,8 +223,6 @@ pub(in crate::app) fn update_dialog_download_state(
     };
 
     div()
-        .px_4()
-        .pb_4()
         .flex()
         .flex_col()
         .gap_2()
@@ -283,20 +242,12 @@ pub(in crate::app) fn update_dialog_footer(
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    div()
-        .relative()
-        .w_full()
-        .flex()
-        .items_center()
-        .justify_end()
-        .gap_3()
-        .pb_4()
-        .px_4()
+    frame_dialog_footer(palette, window)
         .child(
             frame_text_button(
                 "update-dialog-later",
                 "Later",
-                ButtonVariant::Ghost,
+                ButtonVariant::Outline,
                 false,
                 !status.is_busy(),
                 palette,

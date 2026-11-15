@@ -6,8 +6,45 @@ pub(super) const SURFACE_MOTION_DURATION: Duration = Duration::from_millis(100);
 pub(super) const INTERACTION_MOTION_DURATION: Duration = Duration::from_millis(150);
 pub(super) const MOTION_DONE_EPSILON: f32 = 0.001;
 
-const SETTINGS_DRAWER_SLIDE_DISTANCE: f32 = 384.0 * 0.1;
-pub(super) const SETTINGS_DRAWER_EDGE_INSET: f32 = 8.0;
+/// Retains dialog content during its exit animation and supports reversing it.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(super) struct DialogPresence {
+    open: bool,
+    present: bool,
+}
+
+impl DialogPresence {
+    pub(super) const fn is_open(self) -> bool {
+        self.open
+    }
+    pub(super) const fn is_present(self) -> bool {
+        self.present
+    }
+
+    pub(super) const fn open(&mut self) -> bool {
+        let changed = !self.open || !self.present;
+        self.open = true;
+        self.present = true;
+        changed
+    }
+
+    pub(super) const fn close(&mut self) -> bool {
+        let changed = self.open;
+        self.open = false;
+        changed
+    }
+
+    pub(super) fn finish_close(&mut self, progress: f32) -> bool {
+        if self.open || !self.present || !motion_is_hidden(progress) {
+            return false;
+        }
+        self.present = false;
+        true
+    }
+}
+
+const SETTINGS_DRAWER_SLIDE_DISTANCE: f32 = 40.0;
+pub(super) const SETTINGS_DRAWER_EDGE_INSET: f32 = 0.0;
 const POPOVER_SLIDE_DISTANCE: f32 = 8.0;
 
 /// CSS `ease`, the default timing function of tw-animate-css enter/exit keyframes.

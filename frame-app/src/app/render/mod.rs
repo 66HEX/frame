@@ -134,8 +134,6 @@ impl Render for FrameRoot {
         }
         let PreviewFocusHandles {
             source_frame_export_focus,
-            source_frame_cancel_focus,
-            source_frame_open_focus,
             preview_viewport_focus,
             preview_crop_tool_focus,
             preview_overlay_tool_focus,
@@ -351,8 +349,6 @@ impl Render for FrameRoot {
                         source_export_focuses:
                             preview::source_export_toolbar::SourceFrameExportFocuses {
                                 export: &source_frame_export_focus,
-                                cancel: &source_frame_cancel_focus,
-                                open: &source_frame_open_focus,
                             },
                         canvas: preview_canvas,
                         crop: preview_crop,
@@ -476,28 +472,6 @@ impl Render for FrameRoot {
             .child(titlebar(state, palette, window, cx))
             .child(content)
             .child(FileDropLifecycleProbe { owner: cx.entity() });
-
-        if active_content_view != Some(ActiveView::Workspace)
-            && source_export.status
-                != preview::actions::source_export::SourceFrameExportStatus::Idle
-        {
-            root = root.child(
-                div()
-                    .px(theme::ui_rem(CONTENT_PADDING))
-                    .pb(theme::ui_rem(CONTENT_PADDING))
-                    .child(preview::source_export_toolbar::source_export_toolbar(
-                        &source_export,
-                        preview::source_export_toolbar::SourceFrameExportFocuses {
-                            export: &source_frame_export_focus,
-                            cancel: &source_frame_cancel_focus,
-                            open: &source_frame_open_focus,
-                        },
-                        palette,
-                        window,
-                        cx,
-                    )),
-            );
-        }
 
         root = self.render_overlays(root, palette, window, cx);
 

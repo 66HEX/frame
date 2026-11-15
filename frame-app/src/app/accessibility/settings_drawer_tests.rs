@@ -1,4 +1,4 @@
-//! Native geometry and modal interactions of the floating settings drawer.
+//! Native geometry and modal interactions of the Mira settings sheet.
 use super::*;
 use crate::appearance::ColorTheme;
 
@@ -10,7 +10,7 @@ fn near(actual: Pixels, expected: f32) {
 }
 
 #[test]
-fn settings_drawer_floats_inside_the_viewport_with_the_card_surface() {
+fn settings_sheet_meets_viewport_edges_with_the_popover_surface() {
     for mode in ColorTheme::ALL {
         for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
             for width in [1200.0_f32, 800.0] {
@@ -25,11 +25,18 @@ fn settings_drawer_floats_inside_the_viewport_with_the_card_surface() {
                 draw(cx);
                 let panel = cx.debug_bounds("app-settings-panel").unwrap();
                 let body = cx.debug_bounds("app-settings-scroll-body").unwrap();
-                let inset = 8.0 * scale.factor();
+                let inset = 0.0;
                 near(panel.top(), inset);
                 near(viewport.width - panel.right(), inset);
                 near(viewport.height - panel.bottom(), inset);
-                near(panel.size.width, (384.0 * scale.factor()).min(width * 0.75));
+                near(
+                    panel.size.width,
+                    if width >= 640.0 * scale.factor() {
+                        (384.0 * scale.factor()).min(width * 0.75)
+                    } else {
+                        width * 0.75
+                    },
+                );
                 assert!(panel.left() > px(0.0));
                 assert_eq!(body.intersect(&panel), body);
 
@@ -44,30 +51,34 @@ fn settings_drawer_floats_inside_the_viewport_with_the_card_surface() {
                         .expect("the drawer must paint a visible surface");
                     assert_eq!(
                         background.background,
-                        theme::shadows::surface_fill(palette.surface, palette),
-                        "settings use the card token including its surface light"
+                        gpui::Background::from(crate::app::primitives::color(
+                            palette.token("popover")
+                        )),
+                        "Mira Sheet uses flat popover fill"
                     );
-                    assert_ne!(
-                        background.background,
-                        theme::shadows::surface_fill(palette.surface_elevated, palette),
-                        "the old popover fill must not remain"
+                    assert_eq!(
+                        background.corner_radii,
+                        gpui::Corners::all(gpui::ScaledPixels(0.0))
                     );
-                    let radius =
-                        gpui::ScaledPixels(theme::RADIUS_XL * scale.factor() * native_scale);
-                    assert_eq!(background.corner_radii, gpui::Corners::all(radius));
                     assert_eq!(
                         background.bounds.intersect(&background.content_mask.bounds),
                         background.bounds,
-                        "all four rounded corners must remain inside the window"
+                        "the full-height sheet remains inside the window"
                     );
                 });
+                let close = cx.debug_bounds("app-settings-close").unwrap();
+                near(close.top() - panel.top(), 16.0 * scale.factor());
+                near(panel.right() - close.right(), 16.0 * scale.factor());
+                cx.simulate_click(close.center(), Modifiers::default());
+                draw(cx);
+                assert!(!root.read_with(cx, |root, _| root.settings_ui.is_open));
             }
         }
     }
 }
 
 #[test]
-fn settings_drawer_exposed_margins_dismiss_and_restore_the_settings_trigger() {
+fn settings_sheet_backdrop_dismisses_and_restores_the_settings_trigger() {
     let mut app = TestAppContext::single();
     let (root, cx) = test_window(
         &mut app,
@@ -80,25 +91,15 @@ fn settings_drawer_exposed_margins_dismiss_and_restore_the_settings_trigger() {
     click(cx, "titlebar-settings");
     press(cx, "escape");
     let trigger = focus(cx);
-    for edge in ["top", "right", "bottom"] {
-        press(cx, "enter");
-        assert!(root.read_with(cx, |root, _| root.settings_ui.is_open));
-        let panel = cx.debug_bounds("app-settings-panel").unwrap();
-        let position = match edge {
-            "top" => point(panel.center().x, px(4.0)),
-            "right" => point(viewport.width - px(4.0), panel.center().y),
-            _ => point(panel.center().x, viewport.height - px(4.0)),
-        };
-        assert!(!panel.contains(&position));
-        cx.simulate_click(position, Modifiers::default());
-        draw(cx);
-        assert!(!root.read_with(cx, |root, _| root.settings_ui.is_open));
-        assert_eq!(
-            focus(cx),
-            trigger,
-            "focus must return after clicking {edge}"
-        );
-    }
+    press(cx, "enter");
+    assert!(root.read_with(cx, |root, _| root.settings_ui.is_open));
+    let panel = cx.debug_bounds("app-settings-panel").unwrap();
+    let position = point(panel.left() / 2.0, panel.center().y);
+    assert!(!panel.contains(&position));
+    cx.simulate_click(position, Modifiers::default());
+    draw(cx);
+    assert!(!root.read_with(cx, |root, _| root.settings_ui.is_open));
+    assert_eq!(focus(cx), trigger, "focus returns after backdrop click");
 }
 
 #[test]

@@ -15,6 +15,7 @@ use gpui::{
 };
 
 pub fn init_app(cx: &mut App, name: impl Into<SharedString>) {
+    cx.set_prompt_builder(super::prompts::render_prompt);
     #[cfg(not(test))]
     super::system_motion::observe(cx);
     cx.activate(true);

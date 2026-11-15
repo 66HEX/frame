@@ -24,8 +24,14 @@ impl FrameRoot {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> gpui::Stateful<gpui::Div> {
+        if window.has_active_prompt() {
+            return root;
+        }
         if let Some(recovery) = self.render_recovery_overlay(palette, window, cx) {
             return root.child(recovery);
+        }
+        if let Some(source_export) = self.render_source_frame_export_overlay(palette, window, cx) {
+            return root.child(source_export);
         }
 
         if self.settings_ui.is_present {

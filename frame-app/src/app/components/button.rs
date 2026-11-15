@@ -134,7 +134,7 @@ pub(in crate::app) fn frame_text_button_inner(
     clippy::too_many_arguments,
     reason = "One shared button constructor owns all Mira variants and sizes."
 )]
-pub(in crate::app) fn frame_button_base(
+pub(in crate::app) fn frame_button_base<T: 'static>(
     id: impl Into<String>,
     label: &str,
     variant: ButtonVariant,
@@ -143,7 +143,7 @@ pub(in crate::app) fn frame_button_base(
     size: theme::metrics::ControlSize,
     palette: &'static theme::ThemePalette,
     _window: &mut Window,
-    _cx: &mut Context<FrameRoot>,
+    _cx: &mut Context<T>,
 ) -> gpui::Stateful<gpui::Div> {
     frame_control_base(
         id,

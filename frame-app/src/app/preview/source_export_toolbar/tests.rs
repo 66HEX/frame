@@ -35,6 +35,7 @@ fn window(
             source_directory: Some(source_directory.clone()),
             exports: std::cell::RefCell::default(),
             opened: std::cell::RefCell::default(),
+            revealed: std::cell::RefCell::default(),
         });
         let mut root = FrameRoot::new();
         root.appearance.color_theme = theme;
@@ -103,6 +104,257 @@ fn tab_to(cx: &mut VisualTestContext, label: &str) {
 }
 
 #[test]
+fn source_frame_dialog_never_changes_the_preview_bounds() {
+    for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+        let mut app = TestAppContext::single();
+        let (root, cx) = window(&mut app, ColorTheme::Dark, scale);
+        let before = cx.debug_bounds("preview-viewport").unwrap();
+        let request = SourceFrameExportRequest::for_test(
+            "dialog-layout".into(),
+            "source-frame".into(),
+            PathBuf::from("/tmp/source.mov"),
+            0,
+            0,
+            PathBuf::from("/tmp/frame.png"),
+        );
+        root.update(cx, |root, _| test_support::begin(root, request));
+        draw(cx);
+        assert_eq!(
+            cx.debug_bounds("preview-viewport").unwrap(),
+            before,
+            "starting an export must not shrink the preview"
+        );
+        root.update(cx, |root, _| {
+            assert!(test_support::complete(
+                root,
+                "dialog-layout",
+                SourceFrameExportOutcome::Published {
+                    path: PathBuf::from("/tmp/published.png"),
+                }
+            ));
+        });
+        draw(cx);
+        assert_eq!(
+            cx.debug_bounds("preview-viewport").unwrap(),
+            before,
+            "publishing a result must not shrink the preview"
+        );
+        assert!(cx.debug_bounds("source-frame-export-toolbar").is_none());
+        assert!(
+            cx.debug_bounds("source-frame-dialog").is_some(),
+            "completion opens a result dialog"
+        );
+    }
+}
+
+#[test]
+fn source_frame_icon_does_not_blink_during_same_source_output_refresh() {
+    for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+        let mut app = TestAppContext::single();
+        let (root, cx) = window(&mut app, ColorTheme::Dark, scale);
+        let before = cx.debug_bounds("source-frame-export").unwrap();
+        root.update(cx, |root, cx| {
+            root.file_queue
+                .selected_file_mut()
+                .unwrap()
+                .config
+                .video_bitrate = "2500k".into();
+            root.preview_ui.pending_runtime_key = root.preview_ui.runtime_key.clone();
+            cx.notify();
+        });
+        draw(cx);
+        assert_eq!(
+            cx.debug_bounds("source-frame-export"),
+            Some(before),
+            "refreshing processed output must not hide or move the source-frame icon"
+        );
+        root.read_with(cx, |root, _| {
+            assert!(
+                root.source_frame_export_render_state()
+                    .disabled_reason
+                    .is_some()
+            );
+        });
+        cx.simulate_click(before.center(), gpui::Modifiers::default());
+        cx.update(|_, cx| {
+            assert!(
+                cx.global::<SourceFrameRequests>()
+                    .exports
+                    .borrow()
+                    .is_empty()
+            );
+        });
+        root.update(cx, |root, cx| {
+            root.preview_ui.pending_runtime_key = None;
+            cx.notify();
+        });
+        draw(cx);
+        assert_eq!(cx.debug_bounds("source-frame-export"), Some(before));
+        root.read_with(cx, |root, _| {
+            assert!(
+                root.source_frame_export_render_state()
+                    .disabled_reason
+                    .is_none()
+            );
+        });
+    }
+}
+
+#[test]
+fn source_frame_dialog_traps_focus_until_cancel_settles_and_restores_trigger() {
+    for error in [false, true] {
+        let mut app = TestAppContext::single();
+        let (root, cx) = window(&mut app, ColorTheme::Dark, ScalePreset::Percent100);
+        tab_to(cx, "Export source frame");
+        press(cx, "enter");
+        let id = cx.update(|_, cx| {
+            cx.global::<SourceFrameRequests>().exports.borrow()[0]
+                .id
+                .clone()
+        });
+        assert_eq!(focused_label(cx).as_deref(), Some("Cancel export"));
+        assert!(cx.debug_bounds("source-frame-close").is_none());
+        press(cx, "escape");
+        assert!(cx.debug_bounds("source-frame-dialog").is_some());
+        press(cx, "tab");
+        assert_eq!(focused_label(cx).as_deref(), Some("Cancel export"));
+        press(cx, "enter");
+        assert!(cx.debug_bounds("source-frame-dialog").is_some());
+        root.update(cx, |root, _| {
+            if error {
+                assert!(test_support::fail(root, &id, "The source was removed."));
+            } else {
+                assert!(test_support::complete(
+                    root,
+                    &id,
+                    SourceFrameExportOutcome::Cancelled
+                ));
+            }
+        });
+        draw(cx);
+        assert_eq!(focused_label(cx).as_deref(), Some("Close"));
+        assert!(cx.debug_bounds("source-frame-open").is_none());
+        press(cx, "tab");
+        assert_eq!(
+            focused_label(cx).as_deref(),
+            Some("Close source frame dialog")
+        );
+        press(cx, "tab");
+        assert_eq!(focused_label(cx).as_deref(), Some("Close"));
+        press(cx, "escape");
+        assert!(cx.debug_bounds("source-frame-dialog").is_none());
+        assert_eq!(focused_label(cx).as_deref(), Some("Export source frame"));
+    }
+}
+
+#[test]
+fn source_frame_result_reveal_and_open_survive_source_removal_and_dialog_dismissal() {
+    let mut app = TestAppContext::single();
+    let (root, cx) = window(&mut app, ColorTheme::Light, ScalePreset::Percent100);
+    let path = root.read_with(cx, |root, _| {
+        root.default_output_directory
+            .as_ref()
+            .unwrap()
+            .join("published.png")
+    });
+    std::fs::write(&path, b"actual published path fixture").unwrap();
+    root.update(cx, |root, _| {
+        test_support::begin(
+            root,
+            SourceFrameExportRequest::for_test(
+                "result-actions".into(),
+                "source-frame".into(),
+                PathBuf::from("/tmp/source.mov"),
+                0,
+                0,
+                path.clone(),
+            ),
+        );
+        root.file_queue.remove_file("source-frame");
+        assert!(test_support::complete(
+            root,
+            "result-actions",
+            SourceFrameExportOutcome::Published { path: path.clone() }
+        ));
+    });
+    draw(cx);
+    assert!(cx.debug_bounds("preview-panel").is_none());
+    tab_to(cx, "Show in folder");
+    press(cx, "enter");
+    tab_to(cx, "Open image");
+    press(cx, "enter");
+    cx.update(|_, cx| {
+        assert_eq!(
+            *cx.global::<SourceFrameRequests>().revealed.borrow(),
+            vec![path.clone()]
+        );
+        assert_eq!(
+            *cx.global::<SourceFrameRequests>().opened.borrow(),
+            vec![path.clone()]
+        );
+    });
+    press(cx, "escape");
+    assert!(cx.debug_bounds("source-frame-dialog").is_none());
+    assert!(cx.debug_bounds("source-frame-export-toolbar").is_none());
+    root.read_with(cx, |root, _| {
+        assert_eq!(
+            root.preview_ui.source_export.result.as_ref().unwrap().path,
+            path
+        );
+    });
+    cx.update(|window, cx| assert!(window.focused(cx).is_some()));
+}
+
+#[test]
+fn source_frame_result_dialog_keeps_its_content_during_animated_exit() {
+    use std::time::{Duration, Instant};
+    let mut app = TestAppContext::single();
+    let (root, cx) = window(&mut app, ColorTheme::Dark, ScalePreset::Percent100);
+    let now = Instant::now();
+    cx.set_transition_time(now);
+    cx.update(|_, cx| cx.set_reduce_motion(false));
+    root.update(cx, |root, cx| {
+        test_support::begin(
+            root,
+            SourceFrameExportRequest::for_test(
+                "animated".into(),
+                "source-frame".into(),
+                PathBuf::from("/tmp/source.mov"),
+                0,
+                0,
+                PathBuf::from("/tmp/frame.png"),
+            ),
+        );
+        assert!(test_support::complete(
+            root,
+            "animated",
+            SourceFrameExportOutcome::Published {
+                path: PathBuf::from("/tmp/frame.png")
+            }
+        ));
+        cx.notify();
+    });
+    draw(cx);
+    cx.set_transition_time(now + Duration::from_millis(100));
+    draw(cx);
+    press(cx, "escape");
+    assert!(cx.debug_bounds("source-frame-dialog").is_some());
+    cx.set_transition_time(now + Duration::from_millis(150));
+    draw(cx);
+    assert!(
+        cx.debug_bounds("source-frame-open").is_some(),
+        "result actions remain mounted through exit"
+    );
+    cx.set_transition_time(now + Duration::from_millis(200));
+    draw(cx);
+    assert!(cx.debug_bounds("source-frame-dialog").is_none());
+    assert_eq!(focused_label(cx).as_deref(), Some("Export source frame"));
+    root.read_with(cx, |root, _| {
+        assert!(root.preview_ui.source_export.result.is_some());
+    });
+}
+
+#[test]
 fn source_frame_ui_keyboard_starts_a_frozen_source_request() {
     let mut app = TestAppContext::single();
     let (root, cx) = window(&mut app, ColorTheme::Dark, ScalePreset::Percent100);
@@ -135,10 +387,7 @@ fn source_frame_ui_keyboard_starts_a_frozen_source_request() {
             &root.file_queue.selected_file().unwrap().path
         ))
     );
-    assert_eq!(
-        focused_label(cx).as_deref(),
-        Some("Cancel source frame export")
-    );
+    assert_eq!(focused_label(cx).as_deref(), Some("Cancel export"));
 }
 
 #[test]
@@ -155,7 +404,7 @@ fn source_frame_ui_cancel_uses_the_dedicated_attempt() {
     );
     let controller = root.update(cx, |root, _| test_support::begin(root, request));
     draw(cx);
-    tab_to(cx, "Cancel source frame export");
+    tab_to(cx, "Cancel export");
     press(cx, "enter");
     assert!(
         controller.is_cancelled("ui-export"),
@@ -190,7 +439,7 @@ fn source_frame_ui_open_uses_the_actual_result_after_output_settings_change() {
         ));
     });
     draw(cx);
-    tab_to(cx, "Open result");
+    tab_to(cx, "Open image");
     press(cx, "enter");
     let opened = cx.update(|_, cx| cx.global::<SourceFrameRequests>().opened.borrow().clone());
     std::fs::remove_file(&path).unwrap();
@@ -232,16 +481,28 @@ fn source_frame_ui_open_reports_a_missing_result_without_changing_the_queue() {
     });
     let before = root.read_with(cx, |root, _| root.file_queue.files().to_vec());
     draw(cx);
-    tab_to(cx, "Open result");
+    tab_to(cx, "Open image");
     press(cx, "enter");
-    let (title, detail) = cx
-        .pending_prompt()
-        .expect("missing source frame must produce a visible error");
-    assert_eq!(title, "Source frame not found");
-    assert!(detail.contains(path.to_str().unwrap()));
-    cx.simulate_prompt_answer("Close");
+    cx.update(|window, _| {
+        let tree = window.a11y_tree().unwrap();
+        let (_, prompt) = tree
+            .nodes
+            .iter()
+            .find(|(_, node)| node.label() == Some("Source frame not found"))
+            .expect("missing result dialog");
+        assert!(
+            prompt
+                .description()
+                .unwrap()
+                .contains(path.to_str().unwrap())
+        );
+    });
+    let close = cx
+        .debug_bounds("frame-prompt-action-0")
+        .expect("custom prompt Close action");
+    cx.simulate_click(close.center(), gpui::Modifiers::default());
     draw(cx);
-    assert_eq!(focused_label(cx).as_deref(), Some("Open result"));
+    assert_eq!(focused_label(cx).as_deref(), Some("Open image"));
     assert_eq!(
         root.read_with(cx, |root, _| root.file_queue.files().to_vec()),
         before
@@ -275,7 +536,7 @@ fn source_frame_ui_keeps_actions_when_the_preview_disappears() {
             cx.debug_bounds("source-frame-cancel").is_some(),
             "Cancel must remain reachable outside the preview"
         );
-        tab_to(cx, "Cancel source frame export");
+        tab_to(cx, "Cancel export");
         press(cx, "enter");
         assert!(controller.is_cancelled("detached-export"));
         cx.update(|window, _| {
@@ -318,7 +579,10 @@ fn source_frame_export_control_is_a_named_icon_inside_the_viewport_toolbar() {
             let viewport = cx.debug_bounds("preview-viewport").unwrap();
             let panel = cx.debug_bounds("preview-panel").unwrap();
             assert!(button.top() >= viewport.top());
-            assert!(button.bottom() <= viewport.bottom());
+            assert!(
+                button.bottom() <= viewport.bottom(),
+                "button={button:?}, viewport={viewport:?}"
+            );
             assert!((button.size.width - button.size.height).abs() <= px(1.0));
             assert!(cx.debug_bounds("source-frame-export-toolbar").is_none());
             assert!(button.left() >= panel.left());
@@ -383,7 +647,7 @@ fn source_frame_export_icon_is_hidden_when_the_source_cannot_export() {
                     .nodes
                     .iter()
                     .any(|(_, node)| node.label() == Some("Export source frame"))
-            )
+            );
         });
     }
 }
@@ -411,7 +675,7 @@ fn source_frame_export_icon_remains_available_when_transform_tools_are_hidden() 
                 root.source_frame_export_render_state()
                     .disabled_reason
                     .is_none()
-            )
+            );
         });
         let button = cx
             .debug_bounds("source-frame-export")

@@ -7,6 +7,7 @@ pub(in crate::app) struct SourceFrameRequests {
     pub(in crate::app) source_directory: Option<PathBuf>,
     pub(in crate::app) exports: RefCell<Vec<SourceFrameExportRequest>>,
     pub(in crate::app) opened: RefCell<Vec<PathBuf>>,
+    pub(in crate::app) revealed: RefCell<Vec<PathBuf>>,
 }
 
 impl Global for SourceFrameRequests {}
@@ -27,10 +28,20 @@ pub(in crate::app) fn capture_export(cx: &App, request: &SourceFrameExportReques
     true
 }
 
-pub(in crate::app) fn capture_open(cx: &App, path: &Path) {
+pub(in crate::app) fn capture_result_action(cx: &App, path: &Path, reveal: bool) {
     if let Some(requests) = cx.try_global::<SourceFrameRequests>() {
-        requests.opened.borrow_mut().push(path.to_path_buf());
+        if reveal {
+            requests.revealed.borrow_mut().push(path.to_path_buf());
+        } else {
+            requests.opened.borrow_mut().push(path.to_path_buf());
+        }
     }
+}
+
+pub(in crate::app) fn fail(root: &mut FrameRoot, id: &str, message: &str) -> bool {
+    root.preview_ui
+        .source_export
+        .complete(id, Err(ConversionError::InvalidInput(message.into())))
 }
 
 pub(in crate::app) fn begin(

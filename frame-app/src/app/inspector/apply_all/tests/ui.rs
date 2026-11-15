@@ -1,4 +1,5 @@
 use super::*;
+use crate::app::prompts::tests::{answer_prompt, pending_prompt};
 use crate::appearance::{ColorTheme, ScalePreset};
 use crate::settings::{OutputSection, SettingsTab};
 use gpui::{Entity, Modifiers, TestAppContext, VisualTestContext, px, size};
@@ -110,12 +111,12 @@ fn output_button_visibility_keyboard_prompt_cancel_and_render_sync() {
             }
             assert!(focused, "keyboard must reach Apply to all");
             press(cx, "enter");
-            let (title, detail) = cx.pending_prompt().expect("native prompt opened");
+            let (title, detail) = pending_prompt(cx).expect("native prompt opened");
             assert_eq!(title, "Apply output settings?");
             assert!(detail.contains("All files: 1 file; 0 skipped."));
             assert!(detail.contains("subtitle files where the new settings support them"));
             let before = root.read_with(cx, |root, _| root.file_queue.files().to_vec());
-            cx.simulate_prompt_answer("Cancel");
+            answer_prompt(cx, "Cancel");
             draw(cx);
             assert_eq!(
                 root.read_with(cx, |root, _| root.file_queue.files().to_vec()),
@@ -132,7 +133,7 @@ fn output_button_visibility_keyboard_prompt_cancel_and_render_sync() {
                     .quality = 22;
                 hold_preview_request(root);
             });
-            cx.simulate_prompt_answer("Apply to all (1)");
+            answer_prompt(cx, "Apply to all (1)");
             cx.run_until_parked();
             root.read_with(cx, |root, _| {
                 assert_eq!(root.selected_config().unwrap().quality, 80);
@@ -208,7 +209,7 @@ fn disabled_button_explains_readiness_status_and_updater_without_opening_prompt(
                 draw(cx);
                 assert_reason(cx, reason);
                 click_apply(cx);
-                assert!(!cx.has_pending_prompt());
+                assert!(!cx.update(|window, _| window.has_active_prompt()));
             }
         }
     }
@@ -235,7 +236,7 @@ fn prompt_keeps_committed_crop_and_skips_targets_locked_while_waiting() {
         root.file_queue.file_by_id_mut("target").unwrap().status = FileStatus::Queued;
     });
     let before = root.read_with(cx, |root, _| root.file_queue.files().to_vec());
-    cx.simulate_prompt_answer("Apply to all (1)");
+    answer_prompt(cx, "Apply to all (1)");
     draw(cx);
     assert_eq!(
         root.read_with(cx, |root, _| root.file_queue.files().to_vec()),
@@ -247,7 +248,7 @@ fn prompt_keeps_committed_crop_and_skips_targets_locked_while_waiting() {
     });
     draw(cx);
     click_apply(cx);
-    cx.simulate_prompt_answer("Apply to all (1)");
+    answer_prompt(cx, "Apply to all (1)");
     draw(cx);
     assert!(root.read_with(cx, |root, _| {
         root.file_queue
@@ -278,7 +279,7 @@ fn preset_batch_confirmation_reports_selected_all_and_skipped_counts() {
             root.confirm_apply_preset_to_all("archive-hq", window, cx);
         });
     });
-    let (_, detail) = cx.pending_prompt().expect("preset scope confirmation");
+    let (_, detail) = pending_prompt(cx).expect("preset scope confirmation");
     assert!(
         detail.contains("Selected for conversion: 2 files; 1 skipped."),
         "{detail}"
@@ -287,7 +288,7 @@ fn preset_batch_confirmation_reports_selected_all_and_skipped_counts() {
         detail.contains("All files: 3 files; 1 skipped."),
         "{detail}"
     );
-    cx.simulate_prompt_answer("Cancel");
+    answer_prompt(cx, "Cancel");
     draw(cx);
     assert_eq!(
         root.read_with(cx, |root, _| root.file_queue.files().to_vec()),
@@ -350,7 +351,7 @@ fn preset_batch_with_zero_targets_does_not_open_a_confirmation() {
             root.confirm_apply_preset_to_all("archive-hq", window, cx);
         });
     });
-    assert!(!cx.has_pending_prompt());
+    assert!(!cx.update(|window, _| window.has_active_prompt()));
     assert_eq!(
         root.read_with(cx, |root, _| root.file_queue.files().to_vec()),
         before
@@ -371,7 +372,7 @@ fn preset_confirmation_freezes_targets_and_rechecks_readiness() {
         root.source_metadata.mark_loading("target");
     });
     let before = root.read_with(cx, |root, _| root.file_queue.files().to_vec());
-    cx.simulate_prompt_answer("Apply to all (2)");
+    answer_prompt(cx, "Apply to all (2)");
     draw(cx);
     root.read_with(cx, |root, _| {
         for old in before.iter().filter(|file| file.id != "donor") {
@@ -404,7 +405,7 @@ fn output_confirmation_can_apply_only_to_selected_files() {
             .is_selected_for_conversion = false;
     });
     click_apply(cx);
-    cx.simulate_prompt_answer("Apply to selected (1)");
+    answer_prompt(cx, "Apply to selected (1)");
     draw(cx);
     root.read_with(cx, |root, _| {
         assert_eq!(

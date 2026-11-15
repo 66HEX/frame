@@ -631,16 +631,10 @@ fn preview_trim_floats_without_reflow_or_collisions_at_the_minimum_window_size()
         move_outside_preview(cx);
         let viewport = cx.debug_bounds("preview-viewport").unwrap();
         let card = cx.debug_bounds("preview-panel").unwrap();
-        let source_export = cx.debug_bounds("source-frame-export-toolbar").unwrap();
         let padding = px(crate::app::layout::PREVIEW_PANEL_PADDING * scale.factor());
         assert!((viewport.top() - card.top() - padding).abs() < px(0.5));
-        let footer_padding = px(
-            crate::app::preview::source_export_toolbar::SOURCE_FRAME_FOOTER_BOTTOM_PADDING
-                * scale.factor(),
-        );
-        assert!((card.bottom() - source_export.bottom() - footer_padding).abs() < px(0.5));
-        assert!(source_export.top() >= viewport.bottom());
-        assert_inside(card, source_export);
+        assert!((card.bottom() - viewport.bottom() - padding).abs() < px(0.5));
+        assert!(cx.debug_bounds("source-frame-export-toolbar").is_none());
 
         cx.simulate_mouse_move(viewport.center(), None, Modifiers::default());
         draw(cx);
@@ -655,12 +649,8 @@ fn preview_trim_floats_without_reflow_or_collisions_at_the_minimum_window_size()
         open_preview_trim(cx);
         let panel = cx.debug_bounds("preview-trim-panel").unwrap();
         assert_eq!(cx.debug_bounds("preview-viewport").unwrap(), viewport);
-        assert_eq!(
-            cx.debug_bounds("source-frame-export-toolbar").unwrap(),
-            source_export
-        );
+        assert!(cx.debug_bounds("source-frame-export-toolbar").is_none());
         assert_inside(viewport, panel);
-        assert_disjoint(panel, source_export);
         assert!(panel.bottom() <= play.top(), "trim opens above transport");
         for id in [
             "preview-tool-rotate",
@@ -668,6 +658,7 @@ fn preview_trim_floats_without_reflow_or_collisions_at_the_minimum_window_size()
             "preview-tool-flip-vertical",
             "preview-tool-crop",
             "preview-tool-overlay",
+            "source-frame-export",
             "preview-zoom-out",
             "preview-zoom-in",
         ] {

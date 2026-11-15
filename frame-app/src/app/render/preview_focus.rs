@@ -1,9 +1,6 @@
 use crate::app::accessibility::FrameFocusKey;
 use crate::app::input::FrameTextInputKind;
-use crate::app::model::ActiveView;
-use crate::app::preview::actions::source_export::{
-    SourceFrameExportRenderState, SourceFrameExportStatus,
-};
+use crate::app::preview::actions::source_export::SourceFrameExportRenderState;
 use crate::app::preview::state::CropSelect;
 use crate::app::preview::{PreviewCropRenderState, PreviewOverlayRenderState};
 use crate::app::root::FrameRoot;
@@ -13,8 +10,6 @@ use std::sync::Arc;
 
 pub(super) struct PreviewFocusHandles {
     pub(super) source_frame_export_focus: FocusHandle,
-    pub(super) source_frame_cancel_focus: FocusHandle,
-    pub(super) source_frame_open_focus: FocusHandle,
     pub(super) preview_viewport_focus: FocusHandle,
     pub(super) preview_crop_tool_focus: FocusHandle,
     pub(super) preview_overlay_tool_focus: FocusHandle,
@@ -93,49 +88,16 @@ impl FrameRoot {
             cx,
         );
         let can_export = source_export.disabled_reason.is_none();
-        let can_cancel =
-            source_export.running && source_export.status != SourceFrameExportStatus::Cancelling;
-        let can_open = source_export.result_name.is_some();
         let source_frame_export_focus = self.ensure_focus(
             FrameFocusKey::Control("source-frame-export".into()),
             can_export,
             cx,
         );
-        let source_frame_cancel_focus = self.ensure_focus(
-            FrameFocusKey::Control("source-frame-cancel".into()),
-            can_cancel,
-            cx,
-        );
-        let source_frame_open_focus = self.ensure_focus(
-            FrameFocusKey::Control("source-frame-open".into()),
-            can_open,
-            cx,
-        );
-        let source_export_fallback = if self.file_queue.files().is_empty() {
-            crate::app::accessibility::welcome_open_file_focus(window, cx)
-        } else if self.active_view == ActiveView::Workspace
-            && self.file_queue.selected_file().is_some()
-            && preview_viewport_enabled
+        if !can_export
+            && source_frame_export_focus.is_focused(window)
+            && !self.preview_ui.source_export.dialog.is_present()
         {
-            preview_viewport_focus.clone()
-        } else {
-            crate::app::accessibility::titlebar_settings_focus(window, cx)
-        };
-        if !can_export && source_frame_export_focus.is_focused(window) {
-            if can_cancel {
-                source_frame_cancel_focus.focus(window, cx);
-            } else {
-                source_export_fallback.focus(window, cx);
-            }
-        }
-        if !can_cancel && source_frame_cancel_focus.is_focused(window) {
-            if can_open {
-                source_frame_open_focus.focus(window, cx);
-            } else if can_export {
-                source_frame_export_focus.focus(window, cx);
-            } else {
-                source_export_fallback.focus(window, cx);
-            }
+            app_root_focus.focus(window, cx);
         }
         let crop_width_focus = self.ensure_text_input_focus(FrameTextInputKind::CropWidth, cx);
         let crop_height_focus = self.ensure_text_input_focus(FrameTextInputKind::CropHeight, cx);
@@ -248,8 +210,6 @@ impl FrameRoot {
         }
         PreviewFocusHandles {
             source_frame_export_focus,
-            source_frame_cancel_focus,
-            source_frame_open_focus,
             preview_viewport_focus,
             preview_crop_tool_focus,
             preview_overlay_tool_focus,

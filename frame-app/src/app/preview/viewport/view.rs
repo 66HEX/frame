@@ -47,7 +47,7 @@ pub(in crate::app) fn preview_viewport(
     timecode_inputs: PreviewTimecodeInputFocuses<'_>,
     transport: PreviewTransportState,
     card_bounds: Rc<Cell<Bounds<Pixels>>>,
-    source_frame_export: Option<&gpui::FocusHandle>,
+    source_frame_export: Option<(&gpui::FocusHandle, bool)>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {

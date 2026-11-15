@@ -1,3 +1,4 @@
+use crate::app::prompts::tests::{answer_prompt, pending_prompt};
 use crate::app::root::FrameRoot;
 use crate::appearance::{ColorTheme, ScalePreset};
 use crate::file_queue::{FileItem, FileStatus};
@@ -5,17 +6,20 @@ use crate::settings::{SourceKind, SourceMetadata};
 use gpui::{Entity, Global, Modifiers, TestAppContext, VisualTestContext, px, size};
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 struct TestDirectory(PathBuf);
 
 impl TestDirectory {
     fn new() -> Self {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let sequence = NEXT.fetch_add(1, Ordering::Relaxed);
         let nonce = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
         let path = std::env::temp_dir().join(format!(
-            "frame-result-actions-{}-{nonce}",
+            "frame-result-actions-{}-{nonce}-{sequence}",
             std::process::id()
         ));
         std::fs::create_dir(&path).unwrap();
@@ -204,11 +208,11 @@ fn missing_result_reports_its_path_without_changing_completion_or_losing_focus()
     let before = root.read_with(cx, |root, _| root.file_queue.files().to_vec());
     tab_to(cx, "Open result");
     press(cx, "enter");
-    let (title, detail) = cx.pending_prompt().expect("visible missing-result error");
+    let (title, detail) = pending_prompt(cx).expect("visible missing-result error");
     assert_eq!(title, "Result file not found");
     assert!(detail.contains(output.to_str().unwrap()));
     assert!(detail.contains("Convert again"));
-    cx.simulate_prompt_answer("Close");
+    answer_prompt(cx, "Close");
     draw(cx);
     assert_eq!(focused_label(cx).as_deref(), Some("Open result"));
     assert!(cx.update(|_, cx| cx.global::<ResultRequests>().0.borrow().is_empty()));

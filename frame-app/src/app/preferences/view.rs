@@ -4,14 +4,13 @@ use crate::app::components::popover_state::PopoverState;
 use crate::app::components::{frame_text_button, frame_text_button_with_focus};
 use crate::app::input::{FrameTextInputKind, FrameTextInputSpec, frame_text_input};
 use crate::app::inspector::{settings_hint_text, settings_section};
-use crate::app::layout::PANEL_HEADER_HEIGHT;
 use crate::app::motion::{
     SETTINGS_DRAWER_EDGE_INSET, drawer_motion, motion_is_hidden, settings_drawer_right_inset,
     surface_motion,
 };
 use crate::app::preferences::appearance::app_settings_appearance_section;
 use crate::app::preferences::state::AppearancePopover;
-use crate::app::primitives::{ButtonVariant, color, icon_svg, panel_bottom_separator};
+use crate::app::primitives::{ButtonVariant, color, icon_svg};
 use crate::app::root::FrameRoot;
 use crate::app::updates::preferences::{AppSettingsUpdateFocuses, app_settings_updates_section};
 use crate::app::updates::state::UpdateStatus;
@@ -83,6 +82,7 @@ pub(in crate::app) fn app_settings_drawer(
     let right_inset = settings_drawer_right_inset(progress);
     let first_focus = props.close_focus.clone();
     let last_focus = props.last_focus.clone();
+    let close_pressed_top = theme::ui_rem(16.0).to_pixels(window.rem_size()) + gpui::px(1.0);
     let theme_trigger_focus = props.theme_focuses.trigger.clone();
     let ui_scale_trigger_focus = props.ui_scale_focuses.trigger.clone();
 
@@ -153,13 +153,14 @@ pub(in crate::app) fn app_settings_drawer(
                 .top(theme::ui_rem(SETTINGS_DRAWER_EDGE_INSET))
                 .right(theme::ui_rem(right_inset))
                 .bottom(theme::ui_rem(SETTINGS_DRAWER_EDGE_INSET))
-                .w(theme::ui_rem(384.0))
-                .max_w(relative(0.75))
+                .w(relative(0.75))
+                .when(window.viewport_size().width >= theme::ui_rem(640.0).to_pixels(window.rem_size()), |panel| panel.max_w(theme::ui_rem(384.0)))
                 .flex()
                 .flex_col()
-                .rounded(theme::ui_rem(theme::RADIUS_XL))
-                .bg(theme::shadows::surface_fill(palette.surface, palette))
-                .text_color(color(palette.token("card-foreground")))
+                .border_l_1()
+                .border_color(color(palette.token("border")))
+                .bg(color(palette.token("popover")))
+                .text_color(color(palette.token("popover-foreground")))
                 .shadow(theme::shadows::ShadowLevel::Lg.shadows())
                 .opacity(progress)
                 .occlude()
@@ -176,14 +177,14 @@ pub(in crate::app) fn app_settings_drawer(
                 }))
                 .child(
                     div()
-                        .h(theme::ui_rem(PANEL_HEADER_HEIGHT))
                         .w_full()
                         .relative()
                         .flex()
                         .items_center()
                         .justify_between()
-                        .px_4()
-                        .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
+                        .p(theme::ui_rem(24.0))
+                        .text_size(theme::ui_rem(14.0))
+                        .line_height(relative(20.0 / 14.0))
                         .font_weight(theme::TEXT_WEIGHT_MEDIUM)
                         .text_color(color(palette.text_primary))
                         .child(theme::ui_text("Settings"))
@@ -197,6 +198,10 @@ pub(in crate::app) fn app_settings_drawer(
                                 window,
                                 cx,
                             )
+                            .absolute()
+                            .top(theme::ui_rem(16.0))
+                            .right(theme::ui_rem(16.0))
+                            .active_style(move |style| style.absolute().top(close_pressed_top))
                             .on_click(
                                 cx.listener(|root, _: &ClickEvent, window, cx| {
                                     cx.stop_propagation();
@@ -205,8 +210,7 @@ pub(in crate::app) fn app_settings_drawer(
                                     cx.notify();
                                 }),
                             ),
-                        )
-                        .child(panel_bottom_separator(palette)),
+                        ),
                 )
                 .child(
                     div()
@@ -218,7 +222,8 @@ pub(in crate::app) fn app_settings_drawer(
                         .overflow_y_scroll()
                         .track_scroll(props.scroll_handle)
                         .justify_between()
-                        .p_4()
+                        .px(theme::ui_rem(24.0))
+                        .pb(theme::ui_rem(24.0))
                         .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                         .child(
                             div()

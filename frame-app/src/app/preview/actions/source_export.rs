@@ -35,6 +35,7 @@ pub(in crate::app) struct SourceFrameExportUiState {
     job: Option<SourceFrameExportJob>,
     pub(in crate::app) status: SourceFrameExportStatus,
     pub(in crate::app) result: Option<SourceFrameExportResult>,
+    pub(in crate::app) dialog: crate::app::motion::DialogPresence,
 }
 
 impl SourceFrameExportUiState {
@@ -54,6 +55,7 @@ impl SourceFrameExportUiState {
             controller: controller.clone(),
         });
         self.status = SourceFrameExportStatus::Exporting;
+        self.dialog.open();
         Ok(controller)
     }
 
@@ -91,6 +93,7 @@ impl SourceFrameExportUiState {
             Ok(SourceFrameExportOutcome::Cancelled) => SourceFrameExportStatus::Cancelled,
             Err(error) => SourceFrameExportStatus::Error(error.to_string()),
         };
+        self.dialog.open();
         true
     }
 }
@@ -207,6 +210,7 @@ fn source_frame_intent(
 
 #[derive(Clone, Debug, PartialEq)]
 pub(in crate::app) struct SourceFrameExportRenderState {
+    pub(in crate::app) visible: bool,
     pub(in crate::app) disabled_reason: Option<&'static str>,
     pub(in crate::app) status: SourceFrameExportStatus,
     pub(in crate::app) running: bool,
@@ -219,7 +223,21 @@ impl FrameRoot {
     }
 
     pub(in crate::app) fn source_frame_export_render_state(&self) -> SourceFrameExportRenderState {
+        let visible = !crate::runtime_environment::is_flatpak()
+            && !self.source_frame_export_running()
+            && self.default_output_directory.is_some()
+            && self.file_queue.selected_file().is_some_and(|file| {
+                self.source_metadata
+                    .ready_metadata_for(&file.id)
+                    .is_some_and(|metadata| {
+                        matches!(
+                            metadata.source_kind(),
+                            SourceKind::Video | SourceKind::Image
+                        ) && metadata.video_stream_index.is_some()
+                    })
+            });
         SourceFrameExportRenderState {
+            visible,
             disabled_reason: source_frame_context(self, crate::runtime_environment::is_flatpak())
                 .err(),
             status: self.preview_ui.source_export.status.clone(),
@@ -268,6 +286,7 @@ impl FrameRoot {
             Ok(request) => request,
             Err(error) => {
                 self.preview_ui.source_export.status = SourceFrameExportStatus::Error(error);
+                self.preview_ui.source_export.dialog.open();
                 cx.notify();
                 return;
             }
@@ -277,6 +296,7 @@ impl FrameRoot {
             Err(error) => {
                 self.preview_ui.source_export.status =
                     SourceFrameExportStatus::Error(error.to_string());
+                self.preview_ui.source_export.dialog.open();
                 cx.notify();
                 return;
             }
@@ -320,6 +340,23 @@ impl FrameRoot {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        self.access_source_frame_result(false, window, cx);
+    }
+
+    pub(in crate::app) fn reveal_source_frame_result(
+        &self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.access_source_frame_result(true, window, cx);
+    }
+
+    fn access_source_frame_result(
+        &self,
+        reveal: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some(result) = &self.preview_ui.source_export.result else {
             return;
         };
@@ -327,9 +364,13 @@ impl FrameRoot {
         let (title, detail) = match std::fs::metadata(path) {
             Ok(metadata) if metadata.is_file() => {
                 #[cfg(test)]
-                test_support::capture_open(cx, path);
+                test_support::capture_result_action(cx, path, reveal);
                 #[cfg(not(test))]
-                cx.open_with_system(path);
+                if reveal {
+                    cx.reveal_path(path);
+                } else {
+                    cx.open_with_system(path);
+                }
                 return;
             }
             Ok(_) => (

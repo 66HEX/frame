@@ -266,36 +266,19 @@ pub(in crate::app) fn preview_panel(
         .debug_selector(|| "preview-panel".to_owned())
         .on_prepaint(move |info, _, _| measured_card_bounds.set(info.bounds))
         .p(theme::ui_rem(PREVIEW_PANEL_PADDING))
-        .pb(theme::ui_rem(
-            super::source_export_toolbar::SOURCE_FRAME_FOOTER_BOTTOM_PADDING,
-        ))
         .child(preview_viewport(
             &state,
             props.viewport_focuses,
             props.timecode_focuses,
             props.transport,
             card_bounds,
-            props
-                .source_export
-                .disabled_reason
-                .is_none()
-                .then_some(props.source_export_focuses.export),
+            props.source_export.visible.then_some((
+                props.source_export_focuses.export,
+                props.source_export.disabled_reason.is_none(),
+            )),
             window,
             cx,
         ))
-        .when(
-            props.source_export.status
-                != super::actions::source_export::SourceFrameExportStatus::Idle,
-            |panel| {
-                panel.child(super::source_export_toolbar::source_export_toolbar(
-                    &props.source_export,
-                    props.source_export_focuses,
-                    palette,
-                    window,
-                    cx,
-                ))
-            },
-        )
 }
 
 pub(in crate::app) fn preview_shell_state(input: PreviewShellStateInput<'_>) -> PreviewShellState {

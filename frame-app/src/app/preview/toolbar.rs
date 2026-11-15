@@ -47,7 +47,7 @@ pub(in crate::app) const fn preview_toolbar_center_margin() -> f32 {
 pub(in crate::app) fn preview_toolbar(
     state: &PreviewShellState,
     focuses: PreviewToolFocuses<'_>,
-    source_frame_export: Option<&FocusHandle>,
+    source_frame_export: Option<(&FocusHandle, bool)>,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
@@ -57,10 +57,14 @@ pub(in crate::app) fn preview_toolbar(
     let overlay_enabled = transform_enabled && state.availability.overlay_available;
     let center_margin = preview_toolbar_center_margin()
         - if source_frame_export.is_some() {
-            (PREVIEW_TOOLBAR_BUTTON_SIZE + PREVIEW_TOOLBAR_GAP) / 2.0
+            f32::midpoint(PREVIEW_TOOLBAR_BUTTON_SIZE, PREVIEW_TOOLBAR_GAP)
         } else {
             0.0
         };
+    let ui_scale = f64::from(window.rem_size().as_f32() / crate::appearance::BASE_REM_PX);
+    let horizontal = state.canvas.viewport_height > 0.0
+        && state.canvas.viewport_height
+            < f64::from((-center_margin).mul_add(2.0, PREVIEW_TOOLBAR_OFFSET * 2.0)) * ui_scale;
 
     frame_toolbar(palette)
         .absolute()
@@ -69,6 +73,12 @@ pub(in crate::app) fn preview_toolbar(
         .left(theme::ui_rem(PREVIEW_TOOLBAR_OFFSET))
         .flex()
         .flex_col()
+        .when(horizontal, |toolbar| {
+            toolbar
+                .flex_row()
+                .top(theme::ui_rem(PREVIEW_TOOLBAR_OFFSET))
+                .mt_0()
+        })
         .gap(theme::ui_rem(PREVIEW_TOOLBAR_GAP))
         .child(
             preview_tool_button(
@@ -162,13 +172,15 @@ pub(in crate::app) fn preview_toolbar(
                 }
             })),
         )
-        .when_some(source_frame_export, |toolbar, focus| {
-            toolbar.child(source_frame_export_button(focus, palette, window, cx))
+        .when_some(source_frame_export, |toolbar, (focus, enabled)| {
+            toolbar.child(source_frame_export_button(
+                focus, enabled, palette, window, cx,
+            ))
         })
 }
 
 pub(in crate::app) fn source_frame_only_toolbar(
-    focus: &FocusHandle,
+    control: (&FocusHandle, bool),
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
@@ -177,11 +189,14 @@ pub(in crate::app) fn source_frame_only_toolbar(
         .absolute()
         .top(theme::ui_rem(PREVIEW_TOOLBAR_OFFSET))
         .left(theme::ui_rem(PREVIEW_TOOLBAR_OFFSET))
-        .child(source_frame_export_button(focus, palette, window, cx))
+        .child(source_frame_export_button(
+            control.0, control.1, palette, window, cx,
+        ))
 }
 
 fn source_frame_export_button(
     focus: &FocusHandle,
+    enabled: bool,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
@@ -191,7 +206,7 @@ fn source_frame_export_button(
         assets::ICON_CAMERA_FRAME,
         "Export source frame",
         None,
-        true,
+        enabled,
         focus,
         TooltipPlacement::Right,
         palette,
