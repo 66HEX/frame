@@ -65,6 +65,7 @@ pub fn open_qa_window(cx: &mut gpui::App, profile: &QaProfile) -> Result<(), Str
     cx.open_window(options, |_, cx| {
         cx.new(|cx| {
             let mut root = FrameRoot::new_with_persistence(profile.persistence());
+            root.initialize_workspace(cx);
             root.load_runtime_capabilities(cx);
             root
         })

@@ -16,6 +16,7 @@ mod primitives;
 #[cfg(feature = "qa-harness")]
 pub mod qa;
 mod queue;
+mod recovery;
 mod render;
 mod root;
 mod runtime;

@@ -178,7 +178,7 @@ impl FrameRoot {
                 .background_spawn(async move { discover_supported_source_paths(paths) })
                 .await;
             let Ok(imports) = this.update(cx, |root, _cx| {
-                if root.update_installation_in_progress() {
+                if root.update_installation_in_progress() || root.recovery_blocks_workspace() {
                     Vec::new()
                 } else {
                     root.allocate_file_imports(paths)
@@ -204,7 +204,7 @@ impl FrameRoot {
                 .collect::<Vec<_>>();
 
             this.update(cx, |root, cx| {
-                if root.update_installation_in_progress() {
+                if root.update_installation_in_progress() || root.recovery_blocks_workspace() {
                     return;
                 }
                 if root.file_queue.add_files(files) > 0 {
@@ -222,6 +222,9 @@ impl FrameRoot {
         &mut self,
         paths: Vec<PathBuf>,
     ) -> Vec<(String, PathBuf)> {
+        if self.recovery_blocks_workspace() {
+            return Vec::new();
+        }
         filter_supported_source_paths(paths)
             .into_iter()
             .map(|path| {

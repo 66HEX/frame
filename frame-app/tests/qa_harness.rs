@@ -68,7 +68,12 @@ fn headless_source_frame_publishes_original_pixels_without_replacing_a_result() 
     let sandbox = Sandbox::new();
     let source = sandbox.0.join("Zażółć source.png");
     let original = image::RgbaImage::from_fn(33, 19, |x, y| {
-        image::Rgba([(x * 7) as u8, (y * 11) as u8, (x + y) as u8, 127])
+        image::Rgba([
+            u8::try_from(x * 7).unwrap(),
+            u8::try_from(y * 11).unwrap(),
+            u8::try_from(x + y).unwrap(),
+            127,
+        ])
     });
     original.save(&source).unwrap();
     let source_before = fs::read(&source).unwrap();

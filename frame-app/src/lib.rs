@@ -27,6 +27,7 @@ pub(crate) mod source_probe;
 pub mod theme;
 pub mod update_runtime;
 pub(crate) mod update_session;
+pub(crate) mod workspace_recovery;
 
 pub use app::layout::*;
 pub use app::model::{

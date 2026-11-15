@@ -223,6 +223,10 @@ impl FrameRoot {
             ));
         }
 
+        if let Some(recovery) = self.render_recovery_overlay(palette, window, cx) {
+            root = root.child(recovery);
+        }
+
         root
     }
 }
