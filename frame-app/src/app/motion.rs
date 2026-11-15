@@ -43,8 +43,8 @@ impl DialogPresence {
     }
 }
 
-const SETTINGS_DRAWER_SLIDE_DISTANCE: f32 = 40.0;
-pub(super) const SETTINGS_DRAWER_EDGE_INSET: f32 = 0.0;
+const SETTINGS_DRAWER_SLIDE_DISTANCE: f32 = 384.0 * 0.1;
+pub(super) const SETTINGS_DRAWER_EDGE_INSET: f32 = 8.0;
 const POPOVER_SLIDE_DISTANCE: f32 = 8.0;
 
 /// CSS `ease`, the default timing function of tw-animate-css enter/exit keyframes.

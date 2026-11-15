@@ -16,8 +16,8 @@ fn app_settings_close_keeps_drawer_present_until_motion_finishes() {
 
 #[test]
 fn app_settings_drawer_motion_keeps_final_edge_inset() {
-    assert_eq!(settings_drawer_right_inset(1.0), 0.0);
-    assert!((settings_drawer_right_inset(0.0) + 40.0).abs() < 0.001);
+    assert_eq!(settings_drawer_right_inset(1.0), 8.0);
+    assert!((settings_drawer_right_inset(0.0) + 30.4).abs() < 0.001);
 }
 
 #[test]

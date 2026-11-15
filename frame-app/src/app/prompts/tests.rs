@@ -184,7 +184,7 @@ fn mira_prompt_response_waits_for_exit_and_blocks_repeated_activation() {
 }
 
 #[test]
-fn update_dialog_and_settings_sheet_match_mira_geometry() {
+fn update_dialog_matches_mira_geometry() {
     for theme in [ColorTheme::Dark, ColorTheme::Light] {
         let mut app = TestAppContext::single();
         let (root, cx) = setup(&mut app, theme, ScalePreset::Percent100, true);
@@ -203,7 +203,7 @@ fn update_dialog_and_settings_sheet_match_mira_geometry() {
 }
 
 #[test]
-fn settings_sheet_matches_mira_edges() {
+fn settings_drawer_preserves_version_034_edge_insets() {
     for theme in [ColorTheme::Dark, ColorTheme::Light] {
         let mut app = TestAppContext::single();
         let (root, cx) = setup(&mut app, theme, ScalePreset::Percent100, true);
@@ -214,9 +214,9 @@ fn settings_sheet_matches_mira_edges() {
         });
         draw(cx);
         let panel = cx.debug_bounds("app-settings-panel").unwrap();
-        assert_eq!(panel.top(), px(0.0), "Mira Sheet reaches the top edge");
-        assert_eq!(panel.bottom(), px(960.0));
-        assert_eq!(panel.right(), px(1280.0));
+        assert_eq!(panel.top(), px(8.0), "the settings drawer keeps its inset");
+        assert_eq!(panel.bottom(), px(952.0));
+        assert_eq!(panel.right(), px(1272.0));
         press(cx, "escape");
         assert!(cx.debug_bounds("app-settings-panel").is_none());
     }
