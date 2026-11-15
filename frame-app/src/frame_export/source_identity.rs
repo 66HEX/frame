@@ -66,12 +66,11 @@ mod tests {
     use super::*;
     use std::io::Read;
 
-    #[test]
     #[expect(
         clippy::used_underscore_binding,
         reason = "the lifecycle test observes a guard retained only for ownership in production"
     )]
-    fn cloned_identity_retains_the_unlinked_source_until_last_drop() {
+    fn check_deleted_source_lifecycle() {
         let folder = super::super::tests::Directory::new();
         let source = folder.0.join("source.mov");
         std::fs::write(&source, b"original object").unwrap();
@@ -81,6 +80,7 @@ mod tests {
         drop(captured);
 
         std::fs::remove_file(&source).unwrap();
+        #[cfg(unix)]
         std::fs::write(&source, b"replacement object").unwrap();
         let mut reader = retained._file.try_clone().unwrap();
         let mut original = Vec::new();
@@ -94,5 +94,20 @@ mod tests {
             owner.upgrade().is_none(),
             "last request must release its source"
         );
+        #[cfg(windows)]
+        std::fs::write(&source, b"replacement object").unwrap();
+        assert_eq!(std::fs::read(&source).unwrap(), b"replacement object");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cloned_identity_retains_the_unlinked_source_until_last_drop() {
+        check_deleted_source_lifecycle();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn cloned_identity_retains_the_delete_pending_source_until_last_drop() {
+        check_deleted_source_lifecycle();
     }
 }

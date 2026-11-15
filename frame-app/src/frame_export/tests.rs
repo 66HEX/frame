@@ -336,7 +336,10 @@ fn source_frame_identity_rejects_modified_or_replaced_input() {
     let captured = source_identity::SourceIdentity::capture(&source).unwrap();
     let retained = captured.clone();
     drop(captured);
+    #[cfg(unix)]
     fs::remove_file(&source).unwrap();
+    #[cfg(windows)]
+    fs::rename(&source, folder.0.join("replaced.mov")).unwrap();
     fs::write(&source, b"modified source with different size").unwrap();
     assert!(retained.ensure_unchanged().is_err());
 }
