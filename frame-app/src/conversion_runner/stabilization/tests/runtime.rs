@@ -48,6 +48,7 @@ fn variation(bytes: &[u8], width: usize, height: usize) -> u64 {
     reason = "The independent pixel oracle exercises preview and published export on the same translated source."
 )]
 fn stabilization_runtime_reduces_translation_jitter_with_production_preview_plan() {
+    #[cfg(unix)]
     let _serial = crate::bounded_process::serial_test_processes();
     let directory =
         std::env::temp_dir().join(format!("frame-stabilization-pixels-{}", std::process::id()));
