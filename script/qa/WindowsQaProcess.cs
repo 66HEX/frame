@@ -62,6 +62,12 @@ public static class WindowsQaProcess
         throw new TimeoutException("Owned QA job did not stop within cleanup deadline");
     }
     public static int Run(string executable, string arguments, string directory, string stdout, string stderr, string ffmpeg, string ffprobe, int timeoutMs) {
+        bool timedOut;
+        return Run(executable,arguments,directory,stdout,stderr,ffmpeg,ffprobe,timeoutMs,out timedOut);
+    }
+    public static int Run(string executable, string arguments, string directory, string stdout, string stderr, string ffmpeg, string ffprobe, int timeoutMs, out bool timedOut) {
+        timedOut=false;
+        if(timeoutMs<=0) throw new ArgumentOutOfRangeException("timeoutMs");
         IntPtr job=IntPtr.Zero, output=IntPtr.Zero, error=IntPtr.Zero, input=IntPtr.Zero, environment=IntPtr.Zero;
         ProcessInfo process=new ProcessInfo(); bool assigned=false;
         try {
@@ -82,7 +88,7 @@ public static class WindowsQaProcess
             Check(ResumeThread(process.Thread)!=UInt32.MaxValue);
             Close(ref process.Thread);
             uint wait=WaitForSingleObject(process.Process,(uint)timeoutMs);
-            if(wait==0x102) { StopJob(job,124); return 124; }
+            if(wait==0x102) { timedOut=true; StopJob(job,124); return 124; }
             Check(wait==0);
             uint code; Check(GetExitCodeProcess(process.Process,out code));
             // Parent exit does not release ownership of descendants. Stop them before reading logs.

@@ -63,9 +63,15 @@ if($child.HasExited){throw 'Child exited before parent exit could exercise job c
     [void]$cases.Add('unicode-apostrophe-space-path')
     $out=Join-Path $root 'timeout.stdout'; $err=Join-Path $root 'timeout.stderr'
     $clock.Restart()
-    $code=[WindowsQaProcess]::Run($shell,'-NoProfile -Command "Start-Sleep -Seconds 60"',$root,$out,$err,'unused','unused',500)
-    if($code -ne 124 -or $clock.Elapsed.TotalSeconds -gt 7){throw 'Timeout did not terminate owned job within deadline'}
+    $timedOut=$false
+    $code=[WindowsQaProcess]::Run($shell,'-NoProfile -Command "Start-Sleep -Seconds 60"',$root,$out,$err,'unused','unused',500,[ref]$timedOut)
+    if($code -ne 124 -or -not $timedOut -or $clock.Elapsed.TotalSeconds -gt 7){throw 'Timeout did not terminate owned job within deadline'}
     [void]$cases.Add('timeout')
+    $out=Join-Path $root 'exit124.stdout'; $err=Join-Path $root 'exit124.stderr'
+    $timedOut=$true
+    $code=[WindowsQaProcess]::Run($shell,'-NoProfile -Command "exit 124"',$root,$out,$err,'unused','unused',10000,[ref]$timedOut)
+    if($code -ne 124 -or $timedOut){throw 'Normal exit 124 was misreported as timeout'}
+    [void]$cases.Add('normal-exit-124')
     Write-Report @{status='PASS'; cases=$cases.ToArray(); shell=$shell; version=$PSVersionTable.PSVersion.ToString(); helperSha256=(Get-FileHash -LiteralPath $helper -Algorithm SHA256).Hash.ToLowerInvariant(); reportDirectory=$root}
 } catch {
     Write-Report @{status='FAIL'; cases=$cases.ToArray(); error=$_.Exception.Message; version=$PSVersionTable.PSVersion.ToString(); reportDirectory=$root}

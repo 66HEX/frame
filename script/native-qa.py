@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import platform
 import re
+import signal
 import stat
 import struct
 import subprocess
@@ -163,10 +164,74 @@ def unpack_verified(archive, destination, target):
 
 
 def run_command(args, *, cwd, env, timeout):
-    return subprocess.run(
-        args, cwd=cwd, env=env, timeout=timeout,
-        capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
-    )
+    if not math.isfinite(timeout) or not 0 < timeout <= 2_147_483:
+        raise ValueError("QA command timeout must be finite, positive and representable")
+    with tempfile.TemporaryDirectory(prefix="frame-qa-command-") as temporary:
+        folder = Path(temporary)
+        stdout, stderr = folder / "stdout", folder / "stderr"
+        if os.name == "nt":
+            code, timed_out = _run_windows_command(args, cwd, env, timeout, folder, stdout, stderr)
+        else:
+            code, timed_out = _run_posix_command(args, cwd, env, timeout, stdout, stderr)
+        output = stdout.read_text(encoding="utf-8", errors="replace")
+        errors = stderr.read_text(encoding="utf-8", errors="replace")
+        if timed_out:
+            raise subprocess.TimeoutExpired(args, timeout, output=output, stderr=errors)
+        return subprocess.CompletedProcess(args, code, output, errors)
+
+
+def _run_posix_command(args, cwd, env, timeout, stdout, stderr):
+    with stdout.open("wb") as output, stderr.open("wb") as errors:
+        process = subprocess.Popen(args, cwd=cwd, env=env, stdin=subprocess.DEVNULL,
+                                   stdout=output, stderr=errors, start_new_session=True)
+        timed_out = False
+        try:
+            code = process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            timed_out, code = True, None
+        finally:
+            # The session belongs only to this command. Parent exit does not
+            # release descendants, including ones holding inherited output.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait(timeout=5)
+        return code, timed_out
+
+
+def _run_windows_command(args, cwd, env, timeout, folder, stdout, stderr):
+    request, response = folder / "request.json", folder / "response.json"
+    request.write_text(json.dumps({
+        "executable": str(args[0]), "arguments": subprocess.list2cmdline([str(arg) for arg in args[1:]]),
+        "directory": str(Path(cwd).resolve()), "stdout": str(stdout), "stderr": str(stderr),
+        "ffmpeg": env.get("FRAME_FFMPEG_PATH", ""), "ffprobe": env.get("FRAME_FFPROBE_PATH", ""),
+        "timeoutMs": math.ceil(timeout * 1000),
+    }), encoding="utf-8")
+    shell = Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+    bridge = Path(__file__).resolve().parent / "qa/run-process.ps1"
+    diagnostics = folder / "bridge.log"
+    with diagnostics.open("wb") as log:
+        process = subprocess.Popen(
+            [str(shell), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
+             str(bridge), "-Request", str(request), "-Response", str(response)],
+            cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+        )
+        try:
+            code = process.wait(timeout=timeout + 20)
+        except BaseException:
+            # Closing this PowerShell process closes its noninherited job handle,
+            # which terminates the application and its descendants as well.
+            process.kill()
+            process.wait(timeout=5)
+            raise
+    if code or not response.is_file():
+        raise ValueError("Windows QA process ownership failed: " + diagnostics.read_text(
+            encoding="utf-8", errors="replace")[-4000:])
+    result = json.loads(response.read_text(encoding="utf-8-sig"))
+    if type(result.get("exitCode")) is not int or type(result.get("timedOut")) is not bool:
+        raise ValueError("Invalid Windows QA process result")
+    return result["exitCode"], result["timedOut"]
 
 
 def create_synthetic_wav(path):

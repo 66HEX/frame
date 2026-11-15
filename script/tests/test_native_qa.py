@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 import zipfile
@@ -104,6 +105,105 @@ class CommandTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="frame-native-qa-missing-") as directory:
             result = subprocess.run([sys.executable, "-B", str(SCRIPT), "verify", "--output", directory], capture_output=True, text=True, check=False)
         self.assertNotEqual(result.returncode, 0)
+
+
+class OwnedProcessTests(unittest.TestCase):
+    @staticmethod
+    def process_running(pid):
+        if os.name == "nt":
+            import ctypes
+            from ctypes import wintypes
+            kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+            kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+            kernel.OpenProcess.restype = wintypes.HANDLE
+            kernel.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+            kernel.WaitForSingleObject.restype = wintypes.DWORD
+            kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+            handle = kernel.OpenProcess(0x100000, False, pid)
+            if not handle:
+                if ctypes.get_last_error() != 87:
+                    raise ctypes.WinError(ctypes.get_last_error())
+                return False
+            try:
+                result = kernel.WaitForSingleObject(handle, 0)
+                if result not in (0, 0x102):
+                    raise ctypes.WinError(ctypes.get_last_error())
+                return result == 0x102
+            finally:
+                kernel.CloseHandle(handle)
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        status = Path(f"/proc/{pid}/stat")
+        if status.is_file():
+            try:
+                if status.read_text().split(")", 1)[1].split()[0] == "Z":
+                    return False
+            except FileNotFoundError:
+                return False
+        return True
+
+    def assert_owned_descendant_stopped(self, parent_exits):
+        with tempfile.TemporaryDirectory(prefix="frame QA Zażółć's space ") as temporary:
+            folder = Path(temporary)
+            marker = folder / "child.pid"
+            code = (
+                "import subprocess,sys,time,pathlib; "
+                "child=subprocess.Popen([sys.executable,'-c','import time; time.sleep(30)']); "
+                "pathlib.Path(sys.argv[1]).write_text(str(child.pid)); "
+                "print('parent-output',flush=True); print('parent-error',file=sys.stderr,flush=True); "
+                + ("sys.exit(0)" if parent_exits else "time.sleep(30)")
+            )
+            started = time.monotonic()
+            try:
+                args = [sys.executable, "-c", code, str(marker)]
+                if parent_exits:
+                    result = native_qa.run_command(args, cwd=folder, env=dict(os.environ), timeout=2)
+                    self.assertEqual(result.returncode, 0)
+                    self.assertIn("parent-output", result.stdout)
+                    self.assertIn("parent-error", result.stderr)
+                else:
+                    with self.assertRaises(subprocess.TimeoutExpired) as caught:
+                        native_qa.run_command(args, cwd=folder, env=dict(os.environ), timeout=2)
+                    output = caught.exception.stdout
+                    output = output.decode() if isinstance(output, bytes) else output
+                    self.assertIn("parent-output", output)
+                self.assertLess(time.monotonic() - started, 15, "parent exit and timeout must be bounded")
+                child = int(marker.read_text())
+                deadline = time.monotonic() + 2
+                while self.process_running(child) and time.monotonic() < deadline:
+                    time.sleep(0.02)
+                self.assertFalse(self.process_running(child), "owned descendant survived QA command completion")
+            finally:
+                if marker.exists():
+                    child = int(marker.read_text())
+                    if self.process_running(child):
+                        import signal
+                        os.kill(child, signal.SIGTERM if os.name == "nt" else signal.SIGKILL)
+
+    def test_timeout_stops_the_owned_descendant_and_preserves_partial_output(self):
+        self.assert_owned_descendant_stopped(parent_exits=False)
+
+    def test_parent_exit_stops_descendants_without_waiting_for_inherited_output(self):
+        self.assert_owned_descendant_stopped(parent_exits=True)
+
+    def test_argument_environment_and_working_directory_round_trip_without_a_shell(self):
+        with tempfile.TemporaryDirectory(prefix="frame QA Unicode Zażółć's ") as temporary:
+            arguments = ["space word", 'double"quote', "Zażółć's", "backslash\\", "$(echo should-not-run)"]
+            code = "import json,sys,os; print(json.dumps([sys.argv[1:],os.environ['FRAME_QA_TEST_VALUE'],os.getcwd()]))"
+            result = native_qa.run_command([sys.executable, "-c", code, *arguments], cwd=temporary,
+                                          env=dict(os.environ, FRAME_QA_TEST_VALUE="value's space"), timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            actual_arguments, environment, directory = json.loads(result.stdout)
+            self.assertEqual(actual_arguments, arguments)
+            self.assertEqual(environment, "value's space")
+            self.assertEqual(Path(directory).resolve(), Path(temporary).resolve())
+
+    def test_normal_exit_124_is_not_misreported_as_a_timeout(self):
+        result = native_qa.run_command([sys.executable, "-c", "raise SystemExit(124)"], cwd=Path.cwd(),
+                                      env=dict(os.environ), timeout=10)
+        self.assertEqual(result.returncode, 124)
 
 
 class RevisionTests(unittest.TestCase):
