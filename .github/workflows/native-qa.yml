@@ -22,10 +22,13 @@ jobs:
         include:
           - runner: ubuntu-22.04
             platform: linux-x86_64
+            archive_limit_mib: 80
           - runner: ubuntu-22.04-arm
             platform: linux-aarch64
+            archive_limit_mib: 80
           - runner: windows-2022
             platform: windows-x86_64
+            archive_limit_mib: 140
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     env:
@@ -89,7 +92,7 @@ jobs:
     - name: qa::build
       run: cargo build --release --locked -p frame-app --features qa-harness --bin frame-qa
     - name: qa::package
-      run: python script/native-qa.py build --output target/native-qa --archive-limit-mib 100
+      run: python script/native-qa.py build --output target/native-qa --archive-limit-mib ${{ matrix.archive_limit_mib }}
     - name: qa::verify_relocated_package
       run: python script/native-qa.py verify --output target/native-qa
     - name: qa::report_evidence

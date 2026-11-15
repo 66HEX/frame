@@ -88,10 +88,75 @@ class PackageTests(PackageFixture):
             self.build()
         self.assertFalse((self.output / self.target.archive_name).exists())
 
-    def test_archive_limit_cannot_exceed_the_ci_storage_policy(self):
-        self.create_inputs()
-        with self.assertRaisesRegex(ValueError, "100"):
-            self.build(archive_limit_mib=101)
+    def test_archive_size_policy_is_target_specific_and_keeps_ci_total_bounded(self):
+        limits = {}
+        for system, machine, expected in [
+            ("Windows", "AMD64", 140), ("Linux", "x86_64", 80),
+            ("Linux", "aarch64", 80), ("Darwin", "x86_64", 100),
+            ("Darwin", "arm64", 100),
+        ]:
+            with self.subTest(system=system, machine=machine):
+                target = native_qa.identify_target(system, machine)
+                self.assertEqual(target.archive_limit_mib, expected)
+                limits[(target.platform, target.architecture)] = target.archive_limit_mib
+        self.assertEqual(sum(value for (system, _), value in limits.items() if system != "macos"), 300)
+
+    def test_explicit_archive_limits_cannot_exceed_the_target_policy(self):
+        for system, machine, maximum in [
+            ("Windows", "AMD64", 140), ("Linux", "x86_64", 80),
+            ("Linux", "aarch64", 80), ("Darwin", "x86_64", 100),
+        ]:
+            with self.subTest(system=system, machine=machine):
+                self.target = native_qa.identify_target(system, machine)
+                self.create_inputs()
+                for limit in (0, -1, float("nan"), float("inf"), maximum + 1):
+                    with self.subTest(limit=limit), self.assertRaisesRegex(ValueError, str(maximum)):
+                        self.build(archive_limit_mib=limit)
+                self.assertTrue(self.build(archive_limit_mib=maximum).is_file())
+                self.assertTrue(self.build(archive_limit_mib=1).is_file())
+
+    def test_default_windows_cli_budget_builds_and_verifies_more_than_100_mib(self):
+        self.target = native_qa.identify_target("Windows", "AMD64")
+        inputs = self.create_inputs()
+        chunk = os.urandom(1024 * 1024)
+        expected_hash = hashlib.sha256()
+        with inputs[self.target.app_name].open("wb") as output:
+            for _ in range(101):
+                output.write(chunk)
+                expected_hash.update(chunk)
+        metadata = {"git_sha": "a" * 40, "pr_head_sha": "a" * 40,
+                    "github_sha": "a" * 40, "build_id": "size-test", "source_dirty": False}
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with patch.object(native_qa, "__file__", str(self.repo / "script/native-qa.py")), \
+             patch.object(native_qa, "identify_target", return_value=self.target), \
+             patch.object(native_qa, "repository_metadata", return_value=metadata), \
+             patch.dict(os.environ, {"CARGO_TARGET_DIR": str(self.repo / "target"), "CARGO_BUILD_TARGET": ""}), \
+             redirect_stdout(stdout), redirect_stderr(stderr):
+            code = native_qa.main(["build", "--output", str(self.output)])
+        self.assertEqual(code, 0, stderr.getvalue())
+        archive = self.output / self.target.archive_name
+        self.assertEqual(json.loads(stdout.getvalue())["archiveBytes"], archive.stat().st_size)
+        self.assertGreater(archive.stat().st_size, 100 * 1024 * 1024)
+        self.assertLessEqual(archive.stat().st_size, 140 * 1024 * 1024)
+        relocated = self.repo.parent / "relocated"
+        manifest = native_qa.unpack_verified(archive, relocated, self.target)
+        self.assertEqual(manifest["files"][self.target.app_name]["size"], 101 * 1024 * 1024)
+        self.assertEqual(native_qa.sha256_file(relocated / self.target.app_name), expected_hash.hexdigest())
+
+    def test_unpack_rejects_an_archive_above_each_target_budget(self):
+        oversized = self.repo.parent / "oversized.zip"
+        for system, machine, maximum in [
+            ("Windows", "AMD64", 140), ("Linux", "x86_64", 80),
+            ("Linux", "aarch64", 80), ("Darwin", "arm64", 100),
+        ]:
+            with self.subTest(system=system, machine=machine):
+                with oversized.open("wb") as output:
+                    output.truncate(maximum * 1024 * 1024 + 1)
+                destination = self.repo.parent / "must-not-unpack"
+                with self.assertRaisesRegex(ValueError, str(maximum)):
+                    native_qa.unpack_verified(oversized, destination,
+                                             native_qa.identify_target(system, machine))
+                self.assertFalse(destination.exists())
 
 
 class CommandTests(unittest.TestCase):

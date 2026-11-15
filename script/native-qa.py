@@ -41,6 +41,10 @@ class Target:
     def archive_name(self):
         return f"frame-native-qa-{self.platform}-{self.architecture}.zip"
 
+    @property
+    def archive_limit_mib(self):
+        return {"windows": 140, "linux": 80, "macos": 100}[self.platform]
+
 
 def identify_target(system=None, machine=None):
     system = (system or platform.system()).lower()
@@ -60,9 +64,11 @@ def identify_target(system=None, machine=None):
 
 
 def build_package(repo_root, output_dir, *, target, git_sha, pr_head_sha, build_id,
-                  archive_limit_mib=100, source_dirty=False, binary_path=None, github_sha=None):
-    if not math.isfinite(archive_limit_mib) or not 0 < archive_limit_mib <= 100:
-        raise ValueError("Archive limit must be greater than zero and at most 100 MiB")
+                  archive_limit_mib=None, source_dirty=False, binary_path=None, github_sha=None):
+    maximum = target.archive_limit_mib
+    archive_limit_mib = maximum if archive_limit_mib is None else archive_limit_mib
+    if not math.isfinite(archive_limit_mib) or not 0 < archive_limit_mib <= maximum:
+        raise ValueError(f"Archive limit must be greater than zero and at most {maximum} MiB")
     repo_root, output_dir = Path(repo_root), Path(output_dir)
     inputs = {
         target.app_name: Path(binary_path) if binary_path else repo_root / "target" / "release" / target.app_name,
@@ -124,8 +130,8 @@ def sha256_file(path):
 
 
 def unpack_verified(archive, destination, target):
-    if Path(archive).stat().st_size > 100 * 1024 * 1024:
-        raise ValueError("Archive exceeds the 100 MiB verification limit")
+    if Path(archive).stat().st_size > target.archive_limit_mib * 1024 * 1024:
+        raise ValueError(f"Archive exceeds the {target.archive_limit_mib} MiB verification limit")
     expected = {target.app_name, *(f"binaries/{name}" for name in target.runtime_names)}
     with zipfile.ZipFile(archive) as package:
         members = package.namelist()
@@ -420,7 +426,7 @@ def main(argv=None):
     commands = parser.add_subparsers(dest="command", required=True)
     build = commands.add_parser("build", help="Package an already-built release QA application")
     build.add_argument("--output", type=Path, default=Path("target/native-qa"))
-    build.add_argument("--archive-limit-mib", type=float, default=100)
+    build.add_argument("--archive-limit-mib", type=float)
     verify = commands.add_parser("verify", help="Unpack and exercise the package outside the checkout")
     verify.add_argument("--output", type=Path, default=Path("target/native-qa"))
     args = parser.parse_args(argv)

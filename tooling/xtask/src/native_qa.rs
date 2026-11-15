@@ -22,10 +22,13 @@ jobs:
         include:
           - runner: ubuntu-22.04
             platform: linux-x86_64
+            archive_limit_mib: 80
           - runner: ubuntu-22.04-arm
             platform: linux-aarch64
+            archive_limit_mib: 80
           - runner: windows-2022
             platform: windows-x86_64
+            archive_limit_mib: 140
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     env:
@@ -79,7 +82,7 @@ __LINUX_SETUP__
     - name: qa::build
       run: cargo build --release --locked -p frame-app --features qa-harness --bin frame-qa
     - name: qa::package
-      run: python script/native-qa.py build --output target/native-qa --archive-limit-mib 100
+      run: python script/native-qa.py build --output target/native-qa --archive-limit-mib ${{ matrix.archive_limit_mib }}
     - name: qa::verify_relocated_package
       run: python script/native-qa.py verify --output target/native-qa
     - name: qa::report_evidence
@@ -179,8 +182,29 @@ mod tests {
         assert!(!workflow.contains("self-hosted"));
         assert!(workflow.contains("timeout-minutes: 90"));
         assert!(workflow.contains("retention-days: 1"));
-        assert!(workflow.contains("--archive-limit-mib 100"));
         assert!(!workflow.contains("actions/cache"));
+    }
+
+    #[test]
+    fn native_qa_splits_the_same_archive_budget_between_platforms() {
+        let workflow = workflow();
+        let limits = workflow
+            .lines()
+            .filter_map(|line| line.trim().strip_prefix("archive_limit_mib: "))
+            .map(|value| value.parse::<u32>().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(limits, [80, 80, 140]);
+        assert_eq!(limits.iter().sum::<u32>(), 300);
+        for (platform, limit) in [
+            ("linux-x86_64", 80),
+            ("linux-aarch64", 80),
+            ("windows-x86_64", 140),
+        ] {
+            assert!(workflow.contains(&format!(
+                "platform: {platform}\n            archive_limit_mib: {limit}"
+            )));
+        }
+        assert!(workflow.contains("--archive-limit-mib ${{ matrix.archive_limit_mib }}"));
     }
 
     #[test]
