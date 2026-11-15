@@ -97,7 +97,9 @@ jobs:
       shell: bash
       run: |
         python - <<'PY'
+        import sys
         from pathlib import Path
+        sys.stdout.reconfigure(encoding='utf-8')
         for name in ('build.json', 'verification.json', 'evidence.json'):
             path = Path('target/native-qa') / name
             if path.is_file():

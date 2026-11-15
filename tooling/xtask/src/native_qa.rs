@@ -87,7 +87,9 @@ __LINUX_SETUP__
       shell: bash
       run: |
         python - <<'PY'
+        import sys
         from pathlib import Path
+        sys.stdout.reconfigure(encoding='utf-8')
         for name in ('build.json', 'verification.json', 'evidence.json'):
             path = Path('target/native-qa') / name
             if path.is_file():
@@ -180,6 +182,57 @@ mod tests {
         assert!(step.contains("evidence.json"));
         assert!(step.contains("verification.json"));
         assert!(step.contains("print(path.read_text"));
+    }
+
+    #[test]
+    fn native_qa_reports_unicode_evidence_with_a_legacy_stdout_encoding() {
+        let workflow = workflow();
+        let report = workflow
+            .split_once("- name: qa::report_evidence")
+            .unwrap()
+            .1;
+        let python = report
+            .split_once("python - <<'PY'\n")
+            .unwrap()
+            .1
+            .split_once("        PY\n")
+            .unwrap()
+            .0
+            .lines()
+            .map(|line| line.strip_prefix("        ").unwrap())
+            .collect::<Vec<_>>()
+            .join("\n");
+        let directory = tempfile::tempdir().unwrap();
+        let helper_folder = directory.path().join("target/native-qa-helper");
+        std::fs::create_dir_all(&helper_folder).unwrap();
+        let helper = r#"{"status":"PASS","reportDirectory":"Zażółć's space"}"#;
+        std::fs::write(
+            helper_folder.join("windows-job-self-test.json"),
+            format!("\u{feff}{helper}"),
+        )
+        .unwrap();
+        let output_folder = directory.path().join("target/native-qa");
+        std::fs::create_dir_all(&output_folder).unwrap();
+        let evidence = r#"{"output":"Zażółć's space/klatka.png"}"#;
+        for name in ["build.json", "verification.json", "evidence.json"] {
+            std::fs::write(output_folder.join(name), evidence).unwrap();
+        }
+        let output = std::process::Command::new(if cfg!(windows) { "python" } else { "python3" })
+            .args(["-c", &python])
+            .env("PYTHONIOENCODING", "cp1252")
+            .current_dir(directory.path())
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "evidence reporter failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let lines = String::from_utf8(output.stdout).unwrap();
+        assert_eq!(
+            lines.lines().collect::<Vec<_>>(),
+            [evidence, evidence, evidence, helper]
+        );
     }
 
     #[test]
