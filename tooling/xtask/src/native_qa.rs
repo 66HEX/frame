@@ -1,5 +1,4 @@
-pub fn workflow() -> String {
-    r#"# Generated from xtask::native_qa.
+const TEMPLATE: &str = r#"# Generated from xtask::native_qa.
 # Rebuild with `cargo xtask workflows`.
 name: native-qa
 on:
@@ -105,8 +104,10 @@ __LINUX_SETUP__
         if-no-files-found: error
         compression-level: 0
         retention-days: 1
-"#
-    .replace(
+"#;
+
+pub fn workflow() -> String {
+    TEMPLATE.replace(
         "__LINUX_SETUP__",
         &super::linux_ci_setup_step().replace(
             "    - name: steps::setup_linux\n",
