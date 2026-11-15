@@ -36,13 +36,7 @@ pub(super) fn settings_video_stabilization_control(
     crate::app::components::frame_checkbox_row_with_focus(
         "settings-video-stabilization-toggle",
         "Stabilize video",
-        if available {
-            "Reduces camera shake during playback and export. A paused frame cannot show stabilization."
-        } else if checked {
-            "Unavailable in this FFmpeg build. Turn off stabilization before exporting."
-        } else {
-            "Unavailable in this FFmpeg build."
-        },
+        "",
         checked,
         disabled,
         &focus,

@@ -27,7 +27,7 @@ fn focus_stabilization_with_tab(cx: &mut VisualTestContext) {
 
 #[test]
 fn stabilization_control_requires_runtime_filter_and_can_clear_saved_setting() {
-    for (available, checked) in [(true, false), (false, false), (false, true)] {
+    for (available, checked) in [(true, false), (true, true), (false, false), (false, true)] {
         let mut app = TestAppContext::single();
         let (root, cx) = app.add_window_view(|_, cx| {
             crate::app::init_app(cx, "Stabilization test");
@@ -62,6 +62,10 @@ fn stabilization_control_requires_runtime_filter_and_can_clear_saved_setting() {
         let bounds = cx
             .debug_bounds("settings-video-stabilization-toggle")
             .unwrap();
+        assert!(
+            bounds.size.height <= px(24.0),
+            "stabilization must remain a single label-and-checkbox row without a hint: {bounds:?}"
+        );
         if available || checked {
             focus_stabilization_with_tab(cx);
             cx.simulate_keystrokes("space");
