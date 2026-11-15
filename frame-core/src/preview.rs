@@ -94,8 +94,8 @@ pub fn build_ffmpeg_preview_args(
 
 /// Builds a snapshot preview plan without the terminal playback FPS filter.
 ///
-/// This releases the first processed frame before a format change can discard
-/// frames buffered by that filter. Export commands are unchanged.
+/// Deinterlacing receives a repeated selected frame as its temporal neighbour,
+/// retaining that frame's timestamp before another format can reset the graph.
 ///
 /// The snapshot caller must retain its one-frame output limit. Streaming callers
 /// use [`build_ffmpeg_preview_args`] and preserve ordinary FPS rounding.
@@ -921,6 +921,9 @@ mod tests {
         let terminal = ",fps=8,scale=";
         assert_eq!(stream.args[index].matches(terminal).count(), 1);
         stream.args[index] = stream.args[index].replace(terminal, ",scale=");
+        assert!(!stream.args[index].contains("loop="));
+        stream.args[index] =
+            stream.args[index].replace("bwdif=", "loop=loop=1:size=1:start=0,bwdif=");
         assert_eq!(snapshot, stream);
     }
 

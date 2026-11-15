@@ -788,3 +788,6 @@ fn ffmpeg_snapshot_stream_seek_and_reconfigure_keep_frame_owned_presentation() {
 
 #[path = "tests/small_sources.rs"]
 mod small_sources;
+
+#[path = "tests/temporal_snapshot.rs"]
+mod temporal_snapshot;
