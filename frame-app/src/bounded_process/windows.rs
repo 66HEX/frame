@@ -3,6 +3,9 @@
 mod command;
 mod launch;
 
+#[cfg(test)]
+mod rundown_tests;
+
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::os::windows::io::{AsRawHandle, OwnedHandle};
@@ -376,12 +379,11 @@ pub(super) fn run(
             match owner.job_empty() {
                 Ok(true) => {}
                 Ok(false) => {
-                    return Err(stop(
-                        owner,
-                        StopReason::Io("process descendants have not finished".into()),
-                        limits,
-                        slot,
-                    ));
+                    // ActiveProcesses also counts exited processes while other
+                    // references are being released. Keep the job and permit
+                    // owned, and recheck under the original deadline/cancel.
+                    std::thread::sleep(Duration::from_millis(2));
+                    continue;
                 }
                 Err(error) => {
                     return Err(stop(owner, StopReason::Io(error.to_string()), limits, slot));
