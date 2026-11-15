@@ -272,10 +272,11 @@ pub(in crate::app) fn preview_panel(
             props.timecode_focuses,
             props.transport,
             card_bounds,
-            props.source_export.visible.then_some((
-                props.source_export_focuses.export,
-                props.source_export.disabled_reason.is_none(),
-            )),
+            props.source_export.visible.then(|| {
+                props
+                    .source_export
+                    .toolbar_control(props.source_export_focuses.export)
+            }),
             window,
             cx,
         ))

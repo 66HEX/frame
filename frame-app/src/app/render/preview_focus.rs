@@ -1,5 +1,6 @@
 use crate::app::accessibility::FrameFocusKey;
 use crate::app::input::FrameTextInputKind;
+use crate::app::model::ActiveView;
 use crate::app::preview::actions::source_export::SourceFrameExportRenderState;
 use crate::app::preview::state::CropSelect;
 use crate::app::preview::{PreviewCropRenderState, PreviewOverlayRenderState};
@@ -87,7 +88,7 @@ impl FrameRoot {
             overlay_tool_enabled,
             cx,
         );
-        let can_export = source_export.disabled_reason.is_none();
+        let can_export = source_export.control_enabled();
         let source_frame_export_focus = self.ensure_focus(
             FrameFocusKey::Control("source-frame-export".into()),
             can_export,
@@ -97,7 +98,13 @@ impl FrameRoot {
             && source_frame_export_focus.is_focused(window)
             && !self.preview_ui.source_export.dialog.is_present()
         {
-            app_root_focus.focus(window, cx);
+            if self.file_queue.files().is_empty() {
+                crate::app::accessibility::welcome_open_file_focus(window, cx).focus(window, cx);
+            } else if self.active_view == ActiveView::Workspace && preview_viewport_enabled {
+                preview_viewport_focus.focus(window, cx);
+            } else {
+                crate::app::accessibility::titlebar_settings_focus(window, cx).focus(window, cx);
+            }
         }
         let crop_width_focus = self.ensure_text_input_focus(FrameTextInputKind::CropWidth, cx);
         let crop_height_focus = self.ensure_text_input_focus(FrameTextInputKind::CropHeight, cx);

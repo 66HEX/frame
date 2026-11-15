@@ -17,7 +17,6 @@ use gpui::{ClickEvent, Context, FocusHandle, KeyDownEvent, Window};
 
 #[derive(Clone, Copy)]
 enum Action {
-    Cancel,
     Close,
     Reveal,
     Open,
@@ -26,7 +25,6 @@ enum Action {
 impl Action {
     const fn id(self) -> &'static str {
         match self {
-            Self::Cancel => "source-frame-cancel",
             Self::Close => "source-frame-dismiss",
             Self::Reveal => "source-frame-reveal",
             Self::Open => "source-frame-open",
@@ -34,7 +32,6 @@ impl Action {
     }
     const fn label(self) -> &'static str {
         match self {
-            Self::Cancel => "Cancel export",
             Self::Close => "Close",
             Self::Reveal => "Show in folder",
             Self::Open => "Open image",
@@ -42,7 +39,6 @@ impl Action {
     }
     fn apply(self, root: &mut FrameRoot, window: &mut Window, cx: &mut Context<FrameRoot>) {
         match self {
-            Self::Cancel => root.cancel_source_frame_export(cx),
             Self::Close => root.close_source_frame_dialog(cx),
             Self::Reveal => root.reveal_source_frame_result(window, cx),
             Self::Open => root.open_source_frame_result(window, cx),
@@ -63,7 +59,8 @@ impl FrameRoot {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Option<gpui::Stateful<gpui::Div>> {
-        if !self.preview_ui.source_export.dialog.is_present() {
+        if self.source_frame_export_running() || !self.preview_ui.source_export.dialog.is_present()
+        {
             return None;
         }
         let open = self.preview_ui.source_export.dialog.is_open();
@@ -119,18 +116,15 @@ impl FrameRoot {
             cx,
         );
         let mut footer = frame_dialog_footer(palette, window);
-        let actions: &[Action] = if state.running {
-            &[Action::Cancel]
-        } else if state.status == SourceFrameExportStatus::Saved && state.result_name.is_some() {
-            &[Action::Close, Action::Reveal, Action::Open]
-        } else {
-            &[Action::Close]
-        };
+        let actions: &[Action] =
+            if state.status == SourceFrameExportStatus::Saved && state.result_name.is_some() {
+                &[Action::Close, Action::Reveal, Action::Open]
+            } else {
+                &[Action::Close]
+            };
         let mut initial_focus = None;
         for action in actions {
-            let enabled = open
-                && (!matches!(action, Action::Cancel)
-                    || state.status != SourceFrameExportStatus::Cancelling);
+            let enabled = open;
             let focus = self.ensure_focus(FrameFocusKey::Control(action.id().into()), enabled, cx);
             if enabled && (initial_focus.is_none() || matches!(action, Action::Open)) {
                 initial_focus = Some(focus.clone());

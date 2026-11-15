@@ -414,6 +414,20 @@ impl Render for FrameRoot {
             )),
         };
 
+        let source_activity = (active_content_view != Some(ActiveView::Workspace)
+            && source_export.running)
+            .then(|| {
+                preview::source_frame_cancel_button(
+                    &source_frame_export_focus,
+                    source_export.status
+                        != preview::actions::source_export::SourceFrameExportStatus::Cancelling,
+                    palette,
+                    window,
+                    cx,
+                )
+                .into_any_element()
+            });
+
         let mut root = div()
             .id(APP_ROOT_FOCUS_ID)
             .size_full()
@@ -469,7 +483,7 @@ impl Render for FrameRoot {
                     }
                 },
             ))
-            .child(titlebar(state, palette, window, cx))
+            .child(titlebar(state, source_activity, palette, window, cx))
             .child(content)
             .child(FileDropLifecycleProbe { owner: cx.entity() });
 

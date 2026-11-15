@@ -55,7 +55,7 @@ impl SourceFrameExportUiState {
             controller: controller.clone(),
         });
         self.status = SourceFrameExportStatus::Exporting;
-        self.dialog.open();
+        self.dialog = crate::app::motion::DialogPresence::default();
         Ok(controller)
     }
 
@@ -93,7 +93,9 @@ impl SourceFrameExportUiState {
             Ok(SourceFrameExportOutcome::Cancelled) => SourceFrameExportStatus::Cancelled,
             Err(error) => SourceFrameExportStatus::Error(error.to_string()),
         };
-        self.dialog.open();
+        if self.status != SourceFrameExportStatus::Cancelled {
+            self.dialog.open();
+        }
         true
     }
 }
@@ -217,6 +219,16 @@ pub(in crate::app) struct SourceFrameExportRenderState {
     pub(in crate::app) result_name: Option<String>,
 }
 
+impl SourceFrameExportRenderState {
+    pub(in crate::app) fn control_enabled(&self) -> bool {
+        if self.running {
+            self.status != SourceFrameExportStatus::Cancelling
+        } else {
+            self.disabled_reason.is_none()
+        }
+    }
+}
+
 impl FrameRoot {
     pub(in crate::app) const fn source_frame_export_running(&self) -> bool {
         self.preview_ui.source_export.job.is_some()
@@ -224,18 +236,18 @@ impl FrameRoot {
 
     pub(in crate::app) fn source_frame_export_render_state(&self) -> SourceFrameExportRenderState {
         let visible = !crate::runtime_environment::is_flatpak()
-            && !self.source_frame_export_running()
-            && self.default_output_directory.is_some()
-            && self.file_queue.selected_file().is_some_and(|file| {
-                self.source_metadata
-                    .ready_metadata_for(&file.id)
-                    .is_some_and(|metadata| {
-                        matches!(
-                            metadata.source_kind(),
-                            SourceKind::Video | SourceKind::Image
-                        ) && metadata.video_stream_index.is_some()
-                    })
-            });
+            && (self.source_frame_export_running()
+                || (self.default_output_directory.is_some()
+                    && self.file_queue.selected_file().is_some_and(|file| {
+                        self.source_metadata
+                            .ready_metadata_for(&file.id)
+                            .is_some_and(|metadata| {
+                                matches!(
+                                    metadata.source_kind(),
+                                    SourceKind::Video | SourceKind::Image
+                                ) && metadata.video_stream_index.is_some()
+                            })
+                    })));
         SourceFrameExportRenderState {
             visible,
             disabled_reason: source_frame_context(self, crate::runtime_environment::is_flatpak())
