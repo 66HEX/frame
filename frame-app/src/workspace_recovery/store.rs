@@ -10,10 +10,18 @@ static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 #[derive(Debug)]
 pub struct RecoveryStore {
     path: PathBuf,
-    _lock: File,
+    lock: File,
     state: StoreState,
     last_written: Option<(String, u64)>,
     previous_revision: Option<(String, u64)>,
+}
+
+impl Drop for RecoveryStore {
+    fn drop(&mut self) {
+        // A fork or duplicated descriptor can outlive this owner. End profile
+        // ownership now instead of waiting for every inherited handle to close.
+        let _ = self.lock.unlock();
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -53,11 +61,16 @@ impl RecoveryStore {
         }
         Ok(Self {
             path,
-            _lock: lock,
+            lock,
             state: StoreState::NotLoaded,
             last_written: None,
             previous_revision: None,
         })
+    }
+
+    #[cfg(test)]
+    pub(super) fn duplicate_lock_for_test(&self) -> io::Result<File> {
+        self.lock.try_clone()
     }
 
     pub fn load(&mut self) -> Result<Option<RecoverySnapshot>, RecoveryError> {

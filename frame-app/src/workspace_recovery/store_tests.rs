@@ -65,6 +65,29 @@ fn profile_has_one_writer_and_drop_releases_the_lock() {
 }
 
 #[test]
+fn dropping_profile_owner_releases_lock_while_a_duplicate_descriptor_survives() {
+    let fixture = Fixture::new();
+    let path = fixture.0.join("settings.json");
+    let owner = RecoveryStore::open(&path).unwrap();
+    let inherited = owner.duplicate_lock_for_test().unwrap();
+    assert!(matches!(
+        RecoveryStore::open(&path),
+        Err(RecoveryError::ProfileInUse)
+    ));
+
+    drop(owner);
+    let next_owner = RecoveryStore::open(&path)
+        .expect("a duplicated descriptor must not retain a released profile's ownership");
+    drop(inherited);
+    assert!(matches!(
+        RecoveryStore::open(&path),
+        Err(RecoveryError::ProfileInUse)
+    ));
+    drop(next_owner);
+    let _last_owner = RecoveryStore::open(&path).unwrap();
+}
+
+#[test]
 fn flatpak_refuses_before_creating_any_directory_or_file() {
     let fixture = Fixture::new();
     let directory = fixture.0.join("must-not-exist");
