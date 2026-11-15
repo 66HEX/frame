@@ -57,8 +57,14 @@ pub(in crate::app) fn preview_toolbar(
     let palette = state.palette;
     let transform_enabled = preview_visual_controls_enabled(state);
     let crop_enabled = transform_enabled && state.crop.has_crop_dimensions;
+    let overlay_visible = state.availability.media_kind != crate::preview::PreviewMediaKind::Image;
     let overlay_enabled = transform_enabled && state.availability.overlay_available;
     let center_margin = preview_toolbar_center_margin()
+        + if overlay_visible {
+            0.0
+        } else {
+            f32::midpoint(PREVIEW_TOOLBAR_BUTTON_SIZE, PREVIEW_TOOLBAR_GAP)
+        }
         - if source_frame_export.is_some() {
             f32::midpoint(PREVIEW_TOOLBAR_BUTTON_SIZE, PREVIEW_TOOLBAR_GAP)
         } else {
@@ -156,25 +162,27 @@ pub(in crate::app) fn preview_toolbar(
                 }
             })),
         )
-        .child(
-            preview_tool_button_with_focus(
-                "preview-tool-overlay",
-                assets::ICON_FILE_IMAGE,
-                "Overlay image",
-                Some(state.overlay.overlay_mode || state.overlay.has_overlay),
-                overlay_enabled,
-                focuses.overlay,
-                TooltipPlacement::Right,
-                palette,
-                window,
-                cx,
+        .when(overlay_visible, |toolbar| {
+            toolbar.child(
+                preview_tool_button_with_focus(
+                    "preview-tool-overlay",
+                    assets::ICON_FILE_IMAGE,
+                    "Overlay image",
+                    Some(state.overlay.overlay_mode || state.overlay.has_overlay),
+                    overlay_enabled,
+                    focuses.overlay,
+                    TooltipPlacement::Right,
+                    palette,
+                    window,
+                    cx,
+                )
+                .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
+                    if root.trigger_selected_overlay(window, cx) {
+                        cx.notify();
+                    }
+                })),
             )
-            .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
-                if root.trigger_selected_overlay(window, cx) {
-                    cx.notify();
-                }
-            })),
-        )
+        })
         .when_some(source_frame_export, |toolbar, control| {
             toolbar.child(source_frame_export_button(control, palette, window, cx))
         })

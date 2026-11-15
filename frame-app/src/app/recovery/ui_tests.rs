@@ -64,31 +64,36 @@ fn focus_label(cx: &mut VisualTestContext) -> String {
 }
 
 #[test]
-fn recovery_dialog_places_restore_last_and_close_preserves_the_queue() {
-    let mut app = TestAppContext::single();
-    let (root, cx) = window(&mut app, ScalePreset::Percent100);
-    let restore = cx.debug_bounds("recovery-restore").unwrap();
-    let later = cx.debug_bounds("recovery-later").unwrap();
-    let discard = cx.debug_bounds("recovery-discard").unwrap();
-    assert!(
-        restore.left() >= later.right() && restore.left() >= discard.right(),
-        "the primary Restore action belongs on the right of the Mira footer"
-    );
-    let close = cx
-        .debug_bounds("recovery-close")
-        .expect("Mira close action");
-    cx.simulate_click(close.center(), Modifiers::default());
-    draw(cx);
-    assert!(
-        cx.debug_bounds("recovery-dialog").is_none(),
-        "close={close:?}, pending={:?}, focus={}",
-        root.read_with(cx, |root, _| root.recovery_prompt_count()),
-        focus_label(cx)
-    );
-    root.read_with(cx, |root, _| {
-        assert!(!root.workspace_recovery.ready);
-        assert!(root.file_queue.files().is_empty());
-    });
+fn recovery_dialog_has_only_ghost_later_and_primary_restore_in_the_footer() {
+    for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+        let mut app = TestAppContext::single();
+        let (root, cx) = window(&mut app, scale);
+        let restore = cx.debug_bounds("recovery-restore").unwrap();
+        let later = cx.debug_bounds("recovery-later").unwrap();
+        assert!(cx.debug_bounds("recovery-discard").is_none());
+        assert!(restore.left() >= later.right());
+        assert!(cx.debug_bounds("recovery-close").is_some());
+        cx.update(|window, _| {
+            let bounds = later.scale(window.scale_factor());
+            assert!(
+                !window.painted_quads().iter().any(|quad| {
+                    quad.bounds == bounds
+                        && quad
+                            .background
+                            .as_solid()
+                            .is_some_and(|fill| gpui::hsla_to_rgba(fill).alpha > 0.001)
+                }),
+                "Later must use the transparent Ghost variant"
+            );
+        });
+        cx.simulate_click(later.center(), Modifiers::default());
+        draw(cx);
+        assert!(cx.debug_bounds("recovery-dialog").is_none());
+        root.read_with(cx, |root, _| {
+            assert!(!root.workspace_recovery.ready);
+            assert!(root.file_queue.files().is_empty());
+        });
+    }
 }
 
 #[test]
@@ -120,8 +125,7 @@ fn recovery_prompt_has_safe_focus_trap_and_escape_defers_without_starting() {
         let (root, cx) = window(&mut app, scale);
         assert!(cx.debug_bounds("recovery-dialog").is_some());
         assert_eq!(focus_label(cx), "Restore queue");
-        let bounds = ["recovery-discard", "recovery-later", "recovery-restore"]
-            .map(|id| cx.debug_bounds(id).unwrap());
+        let bounds = ["recovery-later", "recovery-restore"].map(|id| cx.debug_bounds(id).unwrap());
         for bounds in bounds {
             assert!(bounds.left() >= px(0.0) && bounds.right() <= px(1280.0));
             assert!(bounds.top() >= px(0.0) && bounds.bottom() <= px(960.0));
@@ -130,12 +134,7 @@ fn recovery_prompt_has_safe_focus_trap_and_escape_defers_without_starting() {
         for pair in bounds.windows(2) {
             assert!(pair[0].right() <= pair[1].left() || pair[0].bottom() <= pair[1].top());
         }
-        for expected in [
-            "Close recovery dialog",
-            "Discard queue",
-            "Later",
-            "Restore queue",
-        ] {
+        for expected in ["Discard queue", "Later", "Restore queue"] {
             press(cx, "tab");
             assert_eq!(focus_label(cx), expected);
         }
@@ -203,7 +202,7 @@ fn assert_recovery_keeps_focus_over_pending_modal(update: bool) {
     });
     draw(cx);
     assert_eq!(focus_label(cx), "Restore queue");
-    for expected in ["Close recovery dialog", "Discard queue", "Later"] {
+    for expected in ["Discard queue", "Later"] {
         press(cx, "tab");
         assert_eq!(focus_label(cx), expected);
         root.update(cx, |_, cx| cx.notify());
@@ -297,11 +296,13 @@ fn recovery_loading_focus_moves_to_restore_when_the_saved_queue_is_ready() {
 }
 
 #[test]
-fn restore_and_discard_keyboard_actions_resolve_the_real_store_without_starting_conversions() {
+fn recovery_restore_close_and_later_resolve_or_preserve_the_real_store() {
     use std::fs;
     use std::sync::atomic::{AtomicU64, Ordering};
     static SEQUENCE: AtomicU64 = AtomicU64::new(0);
-    for restore in [true, false] {
+    for action in ["restore", "close-keyboard", "close-pointer", "later"] {
+        let restore = action == "restore";
+        let later = action == "later";
         let directory = std::env::temp_dir().join(format!(
             "frame-recovery-ui-{}-{}",
             std::process::id(),
@@ -326,30 +327,38 @@ fn restore_and_discard_keyboard_actions_resolve_the_real_store_without_starting_
                 cx.notify();
             });
             draw(cx);
-            if !restore {
-                press(cx, "tab");
-                press(cx, "tab");
-            }
-            assert_eq!(
-                focus_label(cx),
-                if restore {
-                    "Restore queue"
-                } else {
-                    "Discard queue"
+            match action {
+                "restore" => press(cx, "enter"),
+                "close-keyboard" => {
+                    press(cx, "tab");
+                    assert_eq!(focus_label(cx), "Discard queue");
+                    press(cx, "enter");
                 }
-            );
-            press(cx, "enter");
+                "close-pointer" | "later" => {
+                    let id = if later {
+                        "recovery-later"
+                    } else {
+                        "recovery-close"
+                    };
+                    let bounds = cx.debug_bounds(id).unwrap();
+                    cx.simulate_click(bounds.center(), Modifiers::default());
+                    draw(cx);
+                }
+                _ => unreachable!(),
+            }
             assert!(cx.debug_bounds("recovery-dialog").is_none());
             root.update(cx, |root, _| {
                 assert_eq!(root.file_queue.files().len(), usize::from(restore));
                 assert!(!root.is_processing);
                 assert!(root.active_conversion_task_ids.is_empty());
                 assert!(root.recovery_prompt_count().is_none());
-                root.prepare_recovery_write()
-                    .unwrap()
-                    .unwrap()
-                    .save()
-                    .unwrap();
+                let write = root.prepare_recovery_write().unwrap();
+                if later {
+                    assert!(write.is_none(), "Later preserves the saved queue");
+                    assert!(!root.workspace_recovery.ready);
+                } else {
+                    write.unwrap().save().unwrap();
+                }
             });
             cx.update(|window, cx| {
                 window.remove_window();
@@ -360,13 +369,13 @@ fn restore_and_discard_keyboard_actions_resolve_the_real_store_without_starting_
         let mut reopened = RecoveryStore::open(&settings).unwrap();
         assert_eq!(
             reopened.load().unwrap().unwrap().file_count(),
-            usize::from(restore)
+            usize::from(restore || later)
         );
         drop(reopened);
         let stored: RecoverySnapshot =
             serde_json::from_slice(&fs::read(directory.join("workspace-recovery.json")).unwrap())
                 .unwrap();
-        assert_eq!(stored.file_count(), usize::from(restore));
+        assert_eq!(stored.file_count(), usize::from(restore || later));
         fs::remove_dir_all(directory).unwrap();
     }
 }

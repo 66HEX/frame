@@ -55,7 +55,8 @@ struct RecoveryView {
     title: &'static str,
     description: String,
     actions: &'static [RecoveryAction],
-    dismiss: Option<RecoveryAction>,
+    close_action: Option<RecoveryAction>,
+    escape_action: Option<RecoveryAction>,
 }
 
 #[derive(Default)]
@@ -71,7 +72,8 @@ impl FrameRoot {
                 title: "Loading saved queue…",
                 description: "Checking the previous workspace.".into(),
                 actions: &[],
-                dismiss: None,
+                close_action: None,
+                escape_action: None,
             })
         } else if let Some(count) = self.recovery_prompt_count().filter(|count| *count > 0) {
             let files = if count == 1 {
@@ -84,19 +86,17 @@ impl FrameRoot {
                 description: format!(
                     "{files} can be restored. Conversions will not start automatically. Later keeps this queue for the next start; new changes will not be saved for recovery."
                 ),
-                actions: &[
-                    RecoveryAction::Discard,
-                    RecoveryAction::Later,
-                    RecoveryAction::Restore,
-                ],
-                dismiss: Some(RecoveryAction::Later),
+                actions: &[RecoveryAction::Later, RecoveryAction::Restore],
+                close_action: Some(RecoveryAction::Discard),
+                escape_action: Some(RecoveryAction::Later),
             })
         } else {
             self.recovery_notice().map(|notice| RecoveryView {
                 title: "Queue recovery unavailable",
                 description: notice.into(),
                 actions: &[RecoveryAction::Continue],
-                dismiss: Some(RecoveryAction::Continue),
+                close_action: Some(RecoveryAction::Continue),
+                escape_action: Some(RecoveryAction::Continue),
             })
         }
     }
@@ -136,7 +136,7 @@ impl FrameRoot {
                     if open {
                         match event.keystroke.key.as_str() {
                             "escape" => {
-                                if let Some(action) = view.dismiss {
+                                if let Some(action) = view.escape_action {
                                     action.apply(root, cx);
                                 }
                             }
@@ -188,13 +188,17 @@ impl FrameRoot {
             palette,
         ))
         .child(footer);
-        if let Some(action) = view.dismiss {
+        if let Some(action) = view.close_action {
             let close =
                 self.ensure_focus(FrameFocusKey::Control("recovery-close".into()), open, cx);
             panel = panel.child(
                 frame_dialog_close_button(
                     "recovery-close",
-                    "Close recovery dialog",
+                    if matches!(action, RecoveryAction::Discard) {
+                        "Discard queue"
+                    } else {
+                        "Close recovery dialog"
+                    },
                     open,
                     &close,
                     palette,
@@ -218,8 +222,8 @@ fn recovery_button(
 ) -> gpui::Stateful<gpui::Div> {
     let variant = match action {
         RecoveryAction::Restore => ButtonVariant::Primary,
-        RecoveryAction::Discard => ButtonVariant::Ghost,
-        RecoveryAction::Later | RecoveryAction::Continue => ButtonVariant::Secondary,
+        RecoveryAction::Discard | RecoveryAction::Later => ButtonVariant::Ghost,
+        RecoveryAction::Continue => ButtonVariant::Secondary,
     };
     frame_text_button_with_focus(
         action.id(),
