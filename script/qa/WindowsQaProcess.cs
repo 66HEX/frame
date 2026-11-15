@@ -88,9 +88,12 @@ public static class WindowsQaProcess
             Check(ResumeThread(process.Thread)!=UInt32.MaxValue);
             Close(ref process.Thread);
             uint wait=WaitForSingleObject(process.Process,(uint)timeoutMs);
-            if(wait==0x102) { timedOut=true; StopJob(job,124); return 124; }
+            if(wait==0x102) { timedOut=true; Close(ref process.Process); StopJob(job,124); return 124; }
             Check(wait==0);
             uint code; Check(GetExitCodeProcess(process.Process,out code));
+            // ActiveProcesses drops only after process references are released.
+            // The job still owns the tree while its termination is verified.
+            Close(ref process.Process);
             // Parent exit does not release ownership of descendants. Stop them before reading logs.
             StopJob(job,0);
             return unchecked((int)code);
