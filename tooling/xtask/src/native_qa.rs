@@ -13,7 +13,7 @@ jobs:
   package:
     if: >-
       github.event.action == 'labeled' &&
-      github.event.label.name == 'qa-native' &&
+      (github.event.label.name == 'qa-native' || github.event.label.name == 'qa-native-check') &&
       github.event.repository.private == false
     name: native QA (${{ matrix.platform }})
     strategy:
@@ -99,6 +99,7 @@ __LINUX_SETUP__
             print(helper.read_text(encoding='utf-8-sig'))
         PY
     - name: qa::upload
+      if: github.event.label.name == 'qa-native'
       uses: actions/upload-artifact@v7.0.1
       with:
         name: frame-qa-${{ github.event.pull_request.head.sha }}-${{ matrix.platform }}
@@ -130,6 +131,43 @@ mod tests {
         assert!(workflow.contains("github.event.repository.private == false"));
         assert!(!workflow.contains("pull_request_target"));
         assert!(!workflow.contains("secrets."));
+    }
+
+    #[test]
+    fn native_qa_accepts_only_package_or_check_labels_for_the_same_job() {
+        let workflow = workflow();
+        let condition = workflow
+            .split_once("    if: >-\n")
+            .unwrap()
+            .1
+            .split_once("\n    name:")
+            .unwrap()
+            .0;
+        assert_eq!(
+            condition.lines().map(str::trim).collect::<Vec<_>>(),
+            [
+                "github.event.action == 'labeled' &&",
+                "(github.event.label.name == 'qa-native' || github.event.label.name == 'qa-native-check') &&",
+                "github.event.repository.private == false",
+            ]
+        );
+        assert_eq!(workflow.matches("- runner:").count(), 3);
+        assert_eq!(workflow.matches("qa::package\n").count(), 1);
+        assert_eq!(
+            workflow.matches("qa::verify_relocated_package\n").count(),
+            1
+        );
+    }
+
+    #[test]
+    fn native_qa_upload_requires_the_package_label() {
+        let workflow = workflow();
+        let upload = workflow.split_once("- name: qa::upload\n").unwrap().1;
+        let guard = upload
+            .lines()
+            .map(str::trim)
+            .find(|line| line.starts_with("if:"));
+        assert_eq!(guard, Some("if: github.event.label.name == 'qa-native'"));
     }
 
     #[test]
