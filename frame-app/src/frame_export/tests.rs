@@ -13,10 +13,10 @@ fn serial_export_processes() -> std::sync::MutexGuard<'static, ()> {
         .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
-struct Directory(PathBuf);
+pub(super) struct Directory(pub(super) PathBuf);
 
 impl Directory {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         static NEXT: AtomicU64 = AtomicU64::new(0);
         let path = std::env::temp_dir().join(format!(
             "frame-source-export-{}-{}",
@@ -334,9 +334,11 @@ fn source_frame_identity_rejects_modified_or_replaced_input() {
     assert!(captured.ensure_unchanged().is_err());
 
     let captured = source_identity::SourceIdentity::capture(&source).unwrap();
+    let retained = captured.clone();
+    drop(captured);
     fs::remove_file(&source).unwrap();
     fs::write(&source, b"modified source with different size").unwrap();
-    assert!(captured.ensure_unchanged().is_err());
+    assert!(retained.ensure_unchanged().is_err());
 }
 
 #[test]
