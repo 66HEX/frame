@@ -2,7 +2,7 @@ use frame_updater::{UpdateInfo, UpdatePackage};
 use gpui::ScrollHandle;
 
 pub(in crate::app) const UPDATE_INSTALL_WAIT_MESSAGE: &str =
-    "Finish or cancel active conversions before installing the update.";
+    "Finish or cancel active conversions and frame exports before installing the update.";
 
 #[derive(Clone, Debug)]
 pub(in crate::app) struct UpdateUiState {

@@ -25,6 +25,7 @@ mod playback;
 mod request;
 mod runtime;
 mod scheduling;
+pub(in crate::app) mod source_export;
 mod trim_seek;
 
 #[cfg(test)]

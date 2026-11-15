@@ -1,5 +1,9 @@
 use crate::app::accessibility::FrameFocusKey;
 use crate::app::input::FrameTextInputKind;
+use crate::app::model::ActiveView;
+use crate::app::preview::actions::source_export::{
+    SourceFrameExportRenderState, SourceFrameExportStatus,
+};
 use crate::app::preview::state::CropSelect;
 use crate::app::preview::{PreviewCropRenderState, PreviewOverlayRenderState};
 use crate::app::root::FrameRoot;
@@ -8,6 +12,9 @@ use gpui::{Context, FocusHandle, RenderImage, Window};
 use std::sync::Arc;
 
 pub(super) struct PreviewFocusHandles {
+    pub(super) source_frame_export_focus: FocusHandle,
+    pub(super) source_frame_cancel_focus: FocusHandle,
+    pub(super) source_frame_open_focus: FocusHandle,
     pub(super) preview_viewport_focus: FocusHandle,
     pub(super) preview_crop_tool_focus: FocusHandle,
     pub(super) preview_overlay_tool_focus: FocusHandle,
@@ -27,6 +34,7 @@ pub(super) struct PreviewFocusHandles {
 
 #[derive(Clone, Copy)]
 pub(super) struct PreviewFocusContext<'a> {
+    pub(super) source_export: &'a SourceFrameExportRenderState,
     pub(super) preview_availability: &'a PreviewControlAvailability,
     pub(super) preview_crop: &'a PreviewCropRenderState,
     pub(super) preview_overlay: &'a PreviewOverlayRenderState,
@@ -46,6 +54,7 @@ impl FrameRoot {
         cx: &mut Context<Self>,
     ) -> PreviewFocusHandles {
         let PreviewFocusContext {
+            source_export,
             preview_availability,
             preview_crop,
             preview_overlay,
@@ -83,6 +92,51 @@ impl FrameRoot {
             overlay_tool_enabled,
             cx,
         );
+        let can_export = source_export.disabled_reason.is_none();
+        let can_cancel =
+            source_export.running && source_export.status != SourceFrameExportStatus::Cancelling;
+        let can_open = source_export.result_name.is_some();
+        let source_frame_export_focus = self.ensure_focus(
+            FrameFocusKey::Control("source-frame-export".into()),
+            can_export,
+            cx,
+        );
+        let source_frame_cancel_focus = self.ensure_focus(
+            FrameFocusKey::Control("source-frame-cancel".into()),
+            can_cancel,
+            cx,
+        );
+        let source_frame_open_focus = self.ensure_focus(
+            FrameFocusKey::Control("source-frame-open".into()),
+            can_open,
+            cx,
+        );
+        let source_export_fallback = if self.file_queue.files().is_empty() {
+            crate::app::accessibility::welcome_open_file_focus(window, cx)
+        } else if self.active_view == ActiveView::Workspace
+            && self.file_queue.selected_file().is_some()
+            && preview_viewport_enabled
+        {
+            preview_viewport_focus.clone()
+        } else {
+            crate::app::accessibility::titlebar_settings_focus(window, cx)
+        };
+        if !can_export && source_frame_export_focus.is_focused(window) {
+            if can_cancel {
+                source_frame_cancel_focus.focus(window, cx);
+            } else {
+                source_export_fallback.focus(window, cx);
+            }
+        }
+        if !can_cancel && source_frame_cancel_focus.is_focused(window) {
+            if can_open {
+                source_frame_open_focus.focus(window, cx);
+            } else if can_export {
+                source_frame_export_focus.focus(window, cx);
+            } else {
+                source_export_fallback.focus(window, cx);
+            }
+        }
         let crop_width_focus = self.ensure_text_input_focus(FrameTextInputKind::CropWidth, cx);
         let crop_height_focus = self.ensure_text_input_focus(FrameTextInputKind::CropHeight, cx);
         let crop_option_focuses: Vec<_> = ASPECT_OPTIONS
@@ -193,6 +247,9 @@ impl FrameRoot {
             overlay_toolbar_first_focus.focus(window, cx);
         }
         PreviewFocusHandles {
+            source_frame_export_focus,
+            source_frame_cancel_focus,
+            source_frame_open_focus,
             preview_viewport_focus,
             preview_crop_tool_focus,
             preview_overlay_tool_focus,

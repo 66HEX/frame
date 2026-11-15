@@ -19,6 +19,7 @@ mod crop_options;
 mod crop_overlay;
 mod overlay;
 mod panel;
+pub(in crate::app) mod source_export_toolbar;
 mod timeline;
 mod toolbar;
 mod viewport;
