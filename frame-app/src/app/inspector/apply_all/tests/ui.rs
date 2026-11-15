@@ -114,7 +114,8 @@ fn output_button_visibility_keyboard_prompt_cancel_and_render_sync() {
             let (title, detail) = pending_prompt(cx).expect("native prompt opened");
             assert_eq!(title, "Apply output settings?");
             assert!(detail.contains("All files: 1 file; 0 skipped."));
-            assert!(detail.contains("subtitle files where the new settings support them"));
+            assert_eq!(detail.lines().count(), 3);
+            assert!(!detail.contains("Applying to all"));
             let before = root.read_with(cx, |root, _| root.file_queue.files().to_vec());
             answer_prompt(cx, "Cancel");
             draw(cx);
@@ -288,6 +289,8 @@ fn preset_batch_confirmation_reports_selected_all_and_skipped_counts() {
         detail.contains("All files: 3 files; 1 skipped."),
         "{detail}"
     );
+    assert_eq!(detail.lines().count(), 3);
+    assert!(!detail.contains("Each file keeps"));
     answer_prompt(cx, "Cancel");
     draw(cx);
     assert_eq!(

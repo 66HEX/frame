@@ -411,7 +411,7 @@ impl FrameRoot {
             gpui::PromptLevel::Warning,
             title,
             Some(&detail),
-            &[gpui::PromptButton::cancel("Close")],
+            &[gpui::PromptButton::cancel("Cancel")],
             cx,
         );
         cx.spawn(async move |_, _| {

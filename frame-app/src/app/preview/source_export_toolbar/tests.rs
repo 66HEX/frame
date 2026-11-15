@@ -104,7 +104,7 @@ fn tab_to(cx: &mut VisualTestContext, label: &str) {
 }
 
 #[test]
-fn source_frame_saved_footer_has_ghost_reveal_and_primary_open_without_duplicate_close() {
+fn source_frame_saved_footer_orders_ghost_cancel_reveal_and_primary_open() {
     for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
         let mut app = TestAppContext::single();
         let (root, cx) = window(&mut app, ColorTheme::Dark, scale);
@@ -131,24 +131,22 @@ fn source_frame_saved_footer_has_ghost_reveal_and_primary_open_without_duplicate
         draw(cx);
         let reveal = cx.debug_bounds("source-frame-reveal").unwrap();
         let open = cx.debug_bounds("source-frame-open").unwrap();
-        let reveal_is_ghost = cx.update(|window, _| {
+        let cancel = cx.debug_bounds("source-frame-dismiss").unwrap();
+        crate::app::prompts::tests::assert_ghost_action(cx, "source-frame-dismiss");
+        assert!(cancel.right() <= reveal.left() || reveal.bottom() <= cancel.top());
+        cx.update(|window, _| {
             let bounds = reveal.scale(window.scale_factor());
-            !window.painted_quads().iter().any(|quad| {
-                quad.bounds == bounds
-                    && quad
-                        .background
-                        .as_solid()
-                        .is_some_and(|fill| gpui::hsla_to_rgba(fill).alpha > 0.001)
-            })
+            assert!(
+                window.painted_quads().iter().any(|quad| {
+                    quad.bounds == bounds
+                        && quad
+                            .background
+                            .as_solid()
+                            .is_some_and(|fill| gpui::hsla_to_rgba(fill).alpha > 0.001)
+                }),
+                "Show in folder is stronger than Ghost Cancel"
+            );
         });
-        assert_eq!(
-            (
-                cx.debug_bounds("source-frame-dismiss").is_none(),
-                reveal_is_ghost
-            ),
-            (true, true),
-            "a saved result uses the X to close and a transparent Ghost reveal action"
-        );
         assert!(reveal.right() <= open.left() || open.bottom() <= reveal.top());
         assert!(cx.debug_bounds("source-frame-close").is_some());
         cx.update(|window, _| {
@@ -164,6 +162,15 @@ fn source_frame_saved_footer_has_ghost_reveal_and_primary_open_without_duplicate
                             && (fill.alpha - expected.alpha).abs() < 0.001
                     })
             }));
+        });
+        cx.simulate_click(cancel.center(), gpui::Modifiers::default());
+        draw(cx);
+        assert!(cx.debug_bounds("source-frame-dialog").is_none());
+        root.read_with(cx, |root, _| {
+            assert_eq!(
+                root.source_frame_export_render_state().status,
+                crate::app::preview::actions::source_export::SourceFrameExportStatus::Saved
+            );
         });
     }
 }
@@ -305,14 +312,14 @@ fn source_frame_toolbar_cancel_stays_in_place_and_only_terminal_errors_open_a_di
         draw(cx);
         assert!(cx.debug_bounds("source-frame-open").is_none());
         if error {
-            assert_eq!(focused_label(cx).as_deref(), Some("Close"));
+            assert_eq!(focused_label(cx).as_deref(), Some("Cancel"));
             press(cx, "tab");
             assert_eq!(
                 focused_label(cx).as_deref(),
                 Some("Close source frame dialog")
             );
             press(cx, "tab");
-            assert_eq!(focused_label(cx).as_deref(), Some("Close"));
+            assert_eq!(focused_label(cx).as_deref(), Some("Cancel"));
             press(cx, "escape");
             assert_eq!(focused_label(cx).as_deref(), Some("Export source frame"));
         }

@@ -64,17 +64,19 @@ fn focus_label(cx: &mut VisualTestContext) -> String {
 }
 
 #[test]
-fn recovery_dialog_has_only_ghost_later_and_primary_restore_in_the_footer() {
+fn recovery_dialog_orders_ghost_cancel_before_later_and_primary_restore() {
     for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
         let mut app = TestAppContext::single();
         let (root, cx) = window(&mut app, scale);
         let restore = cx.debug_bounds("recovery-restore").unwrap();
         let later = cx.debug_bounds("recovery-later").unwrap();
+        let cancel = cx.debug_bounds("recovery-cancel").unwrap();
+        assert!(cancel.right() <= later.left());
         assert!(cx.debug_bounds("recovery-discard").is_none());
         assert!(restore.left() >= later.right());
         assert!(cx.debug_bounds("recovery-close").is_some());
         cx.update(|window, _| {
-            let bounds = later.scale(window.scale_factor());
+            let bounds = cancel.scale(window.scale_factor());
             assert!(
                 !window.painted_quads().iter().any(|quad| {
                     quad.bounds == bounds
@@ -83,10 +85,10 @@ fn recovery_dialog_has_only_ghost_later_and_primary_restore_in_the_footer() {
                             .as_solid()
                             .is_some_and(|fill| gpui::hsla_to_rgba(fill).alpha > 0.001)
                 }),
-                "Later must use the transparent Ghost variant"
+                "Cancel must use the transparent Ghost variant"
             );
         });
-        cx.simulate_click(later.center(), Modifiers::default());
+        cx.simulate_click(cancel.center(), Modifiers::default());
         draw(cx);
         assert!(cx.debug_bounds("recovery-dialog").is_none());
         root.read_with(cx, |root, _| {
@@ -125,7 +127,8 @@ fn recovery_prompt_has_safe_focus_trap_and_escape_defers_without_starting() {
         let (root, cx) = window(&mut app, scale);
         assert!(cx.debug_bounds("recovery-dialog").is_some());
         assert_eq!(focus_label(cx), "Restore queue");
-        let bounds = ["recovery-later", "recovery-restore"].map(|id| cx.debug_bounds(id).unwrap());
+        let bounds = ["recovery-cancel", "recovery-later", "recovery-restore"]
+            .map(|id| cx.debug_bounds(id).unwrap());
         for bounds in bounds {
             assert!(bounds.left() >= px(0.0) && bounds.right() <= px(1280.0));
             assert!(bounds.top() >= px(0.0) && bounds.bottom() <= px(960.0));
@@ -134,7 +137,7 @@ fn recovery_prompt_has_safe_focus_trap_and_escape_defers_without_starting() {
         for pair in bounds.windows(2) {
             assert!(pair[0].right() <= pair[1].left() || pair[0].bottom() <= pair[1].top());
         }
-        for expected in ["Discard queue", "Later", "Restore queue"] {
+        for expected in ["Discard queue", "Cancel", "Later", "Restore queue"] {
             press(cx, "tab");
             assert_eq!(focus_label(cx), expected);
         }
@@ -169,7 +172,7 @@ fn recovery_prompt_has_safe_focus_trap_and_escape_defers_without_starting() {
 }
 
 #[test]
-fn invalid_recovery_notice_offers_only_continue_and_keeps_writer_disabled() {
+fn invalid_recovery_notice_offers_cancel_and_continue_and_keeps_writer_disabled() {
     let mut app = TestAppContext::single();
     let (root, cx) = window(&mut app, ScalePreset::Percent100);
     root.update(cx, |root, cx| {
@@ -180,6 +183,7 @@ fn invalid_recovery_notice_offers_only_continue_and_keeps_writer_disabled() {
     });
     draw(cx);
     assert!(cx.debug_bounds("recovery-continue").is_some());
+    crate::app::prompts::tests::assert_ghost_action(cx, "recovery-cancel");
     assert!(cx.debug_bounds("recovery-discard").is_none());
     assert!(cx.debug_bounds("recovery-restore").is_none());
     assert_eq!(focus_label(cx), "Continue");
@@ -202,7 +206,7 @@ fn assert_recovery_keeps_focus_over_pending_modal(update: bool) {
     });
     draw(cx);
     assert_eq!(focus_label(cx), "Restore queue");
-    for expected in ["Discard queue", "Later"] {
+    for expected in ["Discard queue", "Cancel", "Later"] {
         press(cx, "tab");
         assert_eq!(focus_label(cx), expected);
         root.update(cx, |_, cx| cx.notify());
@@ -265,6 +269,10 @@ fn loading_recovery_blocks_background_clicks_and_has_no_destructive_action() {
     assert!(cx.debug_bounds("recovery-dialog").is_some());
     assert!(cx.debug_bounds("recovery-discard").is_none());
     assert!(cx.debug_bounds("recovery-continue").is_none());
+    let cancel = cx.debug_bounds("recovery-cancel").unwrap();
+    cx.simulate_click(cancel.center(), Modifiers::default());
+    draw(cx);
+    assert!(root.read_with(cx, |root, _| root.recovery_loading()));
     let bounds = cx.debug_bounds("welcome-open-file").unwrap();
     cx.simulate_click(bounds.center(), Modifiers::default());
     press(cx, "escape");
@@ -300,9 +308,15 @@ fn recovery_restore_close_and_later_resolve_or_preserve_the_real_store() {
     use std::fs;
     use std::sync::atomic::{AtomicU64, Ordering};
     static SEQUENCE: AtomicU64 = AtomicU64::new(0);
-    for action in ["restore", "close-keyboard", "close-pointer", "later"] {
+    for action in [
+        "restore",
+        "close-keyboard",
+        "close-pointer",
+        "later",
+        "cancel",
+    ] {
         let restore = action == "restore";
-        let later = action == "later";
+        let later = matches!(action, "later" | "cancel");
         let directory = std::env::temp_dir().join(format!(
             "frame-recovery-ui-{}-{}",
             std::process::id(),
@@ -334,8 +348,10 @@ fn recovery_restore_close_and_later_resolve_or_preserve_the_real_store() {
                     assert_eq!(focus_label(cx), "Discard queue");
                     press(cx, "enter");
                 }
-                "close-pointer" | "later" => {
-                    let id = if later {
+                "close-pointer" | "later" | "cancel" => {
+                    let id = if action == "cancel" {
+                        "recovery-cancel"
+                    } else if later {
                         "recovery-later"
                     } else {
                         "recovery-close"
@@ -378,4 +394,28 @@ fn recovery_restore_close_and_later_resolve_or_preserve_the_real_store() {
         assert_eq!(stored.file_count(), usize::from(restore || later));
         fs::remove_dir_all(directory).unwrap();
     }
+}
+
+#[test]
+fn recovery_cancel_cannot_disable_saving_after_the_queue_has_been_resolved() {
+    let mut app = TestAppContext::single();
+    let (root, cx) = window(&mut app, ScalePreset::Percent100);
+    let now = std::time::Instant::now();
+    cx.set_transition_time(now);
+    cx.update(|_, cx| cx.set_reduce_motion(false));
+    root.update(cx, |root, cx| {
+        root.workspace_recovery.pending = None;
+        root.workspace_recovery.ready = true;
+        cx.notify();
+    });
+    draw(cx);
+    let cancel = cx
+        .debug_bounds("recovery-cancel")
+        .expect("exit retains the old content");
+    cx.simulate_click(cancel.center(), Modifiers::default());
+    draw(cx);
+    assert!(root.read_with(cx, |root, _| root.workspace_recovery.ready));
+    cx.set_transition_time(now + std::time::Duration::from_millis(100));
+    draw(cx);
+    assert!(cx.debug_bounds("recovery-dialog").is_none());
 }

@@ -106,11 +106,17 @@ impl Render for FramePrompt {
             .actions
             .iter()
             .position(|action| matches!(action, PromptButton::Ok(_)))
-            .or_else(|| (!self.actions.is_empty()).then_some(0));
-        let mut order: Vec<_> = (0..self.actions.len())
-            .filter(|index| Some(*index) != primary)
-            .collect();
-        order.extend(primary);
+            .or_else(|| self.actions.iter().position(|action| !action.is_cancel()));
+        let mut order: Vec<_> = (0..self.actions.len()).collect();
+        order.sort_by_key(|index| {
+            if self.actions[*index].is_cancel() {
+                0
+            } else if Some(*index) == primary {
+                2
+            } else {
+                1
+            }
+        });
         let mut footer = frame_dialog_footer(palette, window);
         for index in order {
             let label = self.actions[index].label().to_string();
@@ -118,7 +124,9 @@ impl Render for FramePrompt {
                 frame_button_base(
                     format!("frame-prompt-action-{index}"),
                     &label,
-                    if Some(index) == primary {
+                    if self.actions[index].is_cancel() {
+                        ButtonVariant::Ghost
+                    } else if Some(index) == primary {
                         ButtonVariant::Primary
                     } else {
                         ButtonVariant::Outline

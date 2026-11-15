@@ -14,6 +14,7 @@ use gpui::{ClickEvent, Context, FocusHandle, KeyDownEvent, Window};
 
 #[derive(Clone, Copy)]
 enum RecoveryAction {
+    Cancel,
     Restore,
     Discard,
     Later,
@@ -23,6 +24,7 @@ enum RecoveryAction {
 impl RecoveryAction {
     const fn id(self) -> &'static str {
         match self {
+            Self::Cancel => "recovery-cancel",
             Self::Restore => "recovery-restore",
             Self::Discard => "recovery-discard",
             Self::Later => "recovery-later",
@@ -31,6 +33,7 @@ impl RecoveryAction {
     }
     const fn label(self) -> &'static str {
         match self {
+            Self::Cancel => "Cancel",
             Self::Restore => "Restore queue",
             Self::Discard => "Discard queue",
             Self::Later => "Later",
@@ -42,9 +45,10 @@ impl RecoveryAction {
             return;
         }
         match self {
+            Self::Cancel if root.recovery_notice().is_some() => root.dismiss_recovery_notice(cx),
+            Self::Cancel | Self::Later => root.defer_workspace_recovery(cx),
             Self::Restore => root.restore_workspace(cx),
             Self::Discard => root.discard_workspace(cx),
-            Self::Later => root.defer_workspace_recovery(cx),
             Self::Continue => root.dismiss_recovery_notice(cx),
         }
     }
@@ -71,7 +75,7 @@ impl FrameRoot {
             Some(RecoveryView {
                 title: "Loading saved queue…",
                 description: "Checking the previous workspace.".into(),
-                actions: &[],
+                actions: &[RecoveryAction::Cancel],
                 close_action: None,
                 escape_action: None,
             })
@@ -86,7 +90,11 @@ impl FrameRoot {
                 description: format!(
                     "{files} can be restored. Conversions will not start automatically. Later keeps this queue for the next start; new changes will not be saved for recovery."
                 ),
-                actions: &[RecoveryAction::Later, RecoveryAction::Restore],
+                actions: &[
+                    RecoveryAction::Cancel,
+                    RecoveryAction::Later,
+                    RecoveryAction::Restore,
+                ],
                 close_action: Some(RecoveryAction::Discard),
                 escape_action: Some(RecoveryAction::Later),
             })
@@ -94,7 +102,7 @@ impl FrameRoot {
             self.recovery_notice().map(|notice| RecoveryView {
                 title: "Queue recovery unavailable",
                 description: notice.into(),
-                actions: &[RecoveryAction::Continue],
+                actions: &[RecoveryAction::Cancel, RecoveryAction::Continue],
                 close_action: Some(RecoveryAction::Continue),
                 escape_action: Some(RecoveryAction::Continue),
             })
@@ -161,12 +169,18 @@ impl FrameRoot {
         let scope = self.ensure_focus(FrameFocusKey::Control("recovery-dialog".into()), false, cx);
         let mut footer = frame_dialog_footer(palette, window);
         let mut initial_focus = None;
+        let enabled = open && !self.recovery_loading();
         for action in view.actions {
-            let focus = self.ensure_focus(FrameFocusKey::Control(action.id().into()), open, cx);
-            if initial_focus.is_none() || matches!(action, RecoveryAction::Restore) {
+            let focus = self.ensure_focus(FrameFocusKey::Control(action.id().into()), enabled, cx);
+            if enabled
+                && (initial_focus.is_none()
+                    || matches!(action, RecoveryAction::Restore | RecoveryAction::Continue))
+            {
                 initial_focus = Some(focus.clone());
             }
-            footer = footer.child(recovery_button(*action, &focus, open, palette, window, cx));
+            footer = footer.child(recovery_button(
+                *action, &focus, enabled, palette, window, cx,
+            ));
         }
         if open
             && (!scope.contains_focused(window, cx)
@@ -221,9 +235,9 @@ fn recovery_button(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Stateful<gpui::Div> {
     let variant = match action {
-        RecoveryAction::Restore => ButtonVariant::Primary,
-        RecoveryAction::Discard | RecoveryAction::Later => ButtonVariant::Ghost,
-        RecoveryAction::Continue => ButtonVariant::Secondary,
+        RecoveryAction::Cancel | RecoveryAction::Discard => ButtonVariant::Ghost,
+        RecoveryAction::Later => ButtonVariant::Secondary,
+        RecoveryAction::Restore | RecoveryAction::Continue => ButtonVariant::Primary,
     };
     frame_text_button_with_focus(
         action.id(),
@@ -238,6 +252,8 @@ fn recovery_button(
     )
     .on_click(cx.listener(move |root, _: &ClickEvent, _, cx| {
         cx.stop_propagation();
-        action.apply(root, cx);
+        if enabled {
+            action.apply(root, cx);
+        }
     }))
 }

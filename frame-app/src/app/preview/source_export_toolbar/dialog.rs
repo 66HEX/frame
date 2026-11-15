@@ -17,7 +17,7 @@ use gpui::{ClickEvent, Context, FocusHandle, KeyDownEvent, Window};
 
 #[derive(Clone, Copy)]
 enum Action {
-    Close,
+    Cancel,
     Reveal,
     Open,
 }
@@ -25,21 +25,21 @@ enum Action {
 impl Action {
     const fn id(self) -> &'static str {
         match self {
-            Self::Close => "source-frame-dismiss",
+            Self::Cancel => "source-frame-dismiss",
             Self::Reveal => "source-frame-reveal",
             Self::Open => "source-frame-open",
         }
     }
     const fn label(self) -> &'static str {
         match self {
-            Self::Close => "Close",
+            Self::Cancel => "Cancel",
             Self::Reveal => "Show in folder",
             Self::Open => "Open image",
         }
     }
     fn apply(self, root: &mut FrameRoot, window: &mut Window, cx: &mut Context<FrameRoot>) {
         match self {
-            Self::Close => root.close_source_frame_dialog(cx),
+            Self::Cancel => root.close_source_frame_dialog(cx),
             Self::Reveal => root.reveal_source_frame_result(window, cx),
             Self::Open => root.open_source_frame_result(window, cx),
         }
@@ -118,9 +118,9 @@ impl FrameRoot {
         let mut footer = frame_dialog_footer(palette, window);
         let actions: &[Action] =
             if state.status == SourceFrameExportStatus::Saved && state.result_name.is_some() {
-                &[Action::Reveal, Action::Open]
+                &[Action::Cancel, Action::Reveal, Action::Open]
             } else {
-                &[Action::Close]
+                &[Action::Cancel]
             };
         let mut initial_focus = None;
         for action in actions {
@@ -210,7 +210,7 @@ fn action_button(
         action.label(),
         if matches!(action, Action::Open) {
             ButtonVariant::Primary
-        } else if matches!(action, Action::Reveal) {
+        } else if matches!(action, Action::Cancel) {
             ButtonVariant::Ghost
         } else {
             ButtonVariant::Secondary

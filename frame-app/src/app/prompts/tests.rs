@@ -10,6 +10,23 @@ fn draw(cx: &mut VisualTestContext) {
     cx.update(|window, cx| window.draw(cx).clear(cx));
 }
 
+pub(in crate::app) fn assert_ghost_action(cx: &mut VisualTestContext, id: &'static str) {
+    let bounds = cx.debug_bounds(id).expect("explicit Cancel action");
+    cx.update(|window, _| {
+        let bounds = bounds.scale(window.scale_factor());
+        assert!(
+            !window.painted_quads().iter().any(|quad| {
+                quad.bounds == bounds
+                    && quad
+                        .background
+                        .as_solid()
+                        .is_some_and(|fill| gpui::hsla_to_rgba(fill).alpha > 0.001)
+            }),
+            "{id} must use the transparent Ghost variant"
+        );
+    });
+}
+
 pub(in crate::app) fn pending_prompt(cx: &mut VisualTestContext) -> Option<(String, String)> {
     draw(cx);
     cx.update(|window, _| {
@@ -132,6 +149,8 @@ fn mira_prompt_uses_shared_shell_primary_right_and_preserves_response_indices() 
                 (primary.left() >= secondary.right() || primary.top() >= secondary.bottom())
                     && (primary.left() >= cancel.right() || primary.top() >= cancel.bottom())
             );
+            assert!(cancel.right() <= secondary.left() || cancel.bottom() <= secondary.top());
+            assert_ghost_action(cx, "frame-prompt-action-2");
             assert_eq!(response(), None);
             cx.simulate_click(secondary.center(), Modifiers::default());
             draw(cx);
@@ -197,8 +216,17 @@ fn update_dialog_matches_mira_geometry() {
         assert_eq!(panel.size.width, px(384.0), "Mira Dialog max width");
         let later = cx.debug_bounds("update-dialog-later").unwrap();
         let primary = cx.debug_bounds("update-dialog-download").unwrap();
-        assert!(primary.left() >= later.right());
-        press(cx, "escape");
+        let cancel = cx.debug_bounds("update-dialog-cancel").unwrap();
+        assert!(cancel.right() <= later.left() || cancel.bottom() <= later.top());
+        assert!(primary.left() >= later.right() || primary.top() >= later.bottom());
+        assert_ghost_action(cx, "update-dialog-cancel");
+        cx.simulate_click(cancel.center(), Modifiers::default());
+        draw(cx);
+        assert!(!root.read_with(cx, |root, _| root.update_ui.dialog_open));
+        assert!(root.read_with(cx, |root, _| matches!(
+            root.update_ui.status,
+            crate::app::updates::state::UpdateStatus::Available(_)
+        )));
     }
 }
 
@@ -268,6 +296,19 @@ fn update_downloading_content_precedes_its_footer() {
         cx.notify();
     });
     draw(cx);
+    let cancel = cx.debug_bounds("update-dialog-cancel").unwrap();
+    assert_ghost_action(cx, "update-dialog-cancel");
+    cx.update(|window, _| {
+        let tree = window.a11y_tree().unwrap();
+        assert!(
+            tree.nodes
+                .iter()
+                .any(|(_, node)| node.label() == Some("Cancel") && node.is_disabled())
+        );
+    });
+    cx.simulate_click(cancel.center(), Modifiers::default());
+    draw(cx);
+    assert!(root.read_with(cx, |root, _| root.update_ui.dialog_open));
     let busy = cx.debug_bounds("update-dialog-busy").unwrap();
     cx.update(|window, _| {
         let tree = window.a11y_tree().unwrap();

@@ -212,7 +212,7 @@ fn missing_result_reports_its_path_without_changing_completion_or_losing_focus()
     assert_eq!(title, "Result file not found");
     assert!(detail.contains(output.to_str().unwrap()));
     assert!(detail.contains("Convert again"));
-    answer_prompt(cx, "Close");
+    answer_prompt(cx, "Cancel");
     draw(cx);
     assert_eq!(focused_label(cx).as_deref(), Some("Open result"));
     assert!(cx.update(|_, cx| cx.global::<ResultRequests>().0.borrow().is_empty()));

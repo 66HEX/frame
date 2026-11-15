@@ -90,7 +90,7 @@ impl FrameRoot {
             PromptLevel::Warning,
             title,
             Some(&detail),
-            &[PromptButton::cancel("Close")],
+            &[PromptButton::cancel("Cancel")],
             cx,
         );
         cx.spawn(async move |_, _| {

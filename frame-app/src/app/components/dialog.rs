@@ -85,7 +85,7 @@ pub(in crate::app) fn frame_dialog_header(
         })
 }
 
-/// Add secondary actions first and the primary action last, as in the reference.
+/// Order footer actions from Ghost Cancel through secondary actions to Primary.
 pub(in crate::app) fn frame_dialog_footer(palette: &theme::ThemePalette, window: &Window) -> Div {
     div()
         .flex_shrink_0()

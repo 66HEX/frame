@@ -243,25 +243,32 @@ pub(in crate::app) fn update_dialog_footer(
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     frame_dialog_footer(palette, window)
-        .child(
-            frame_text_button(
-                "update-dialog-later",
-                "Later",
-                ButtonVariant::Outline,
-                false,
-                !status.is_busy(),
-                palette,
-                window,
-                cx,
-            )
-            .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
-                cx.stop_propagation();
-                if !root.update_ui.status.is_busy() {
-                    root.close_update_dialog();
-                    root.restore_focus_after_update_dialog_close(window, cx);
-                    cx.notify();
-                }
-            })),
+        .children(
+            [
+                ("update-dialog-cancel", "Cancel", ButtonVariant::Ghost),
+                ("update-dialog-later", "Later", ButtonVariant::Outline),
+            ]
+            .into_iter()
+            .map(|(id, label, variant)| {
+                frame_text_button(
+                    id,
+                    label,
+                    variant,
+                    false,
+                    !status.is_busy(),
+                    palette,
+                    window,
+                    cx,
+                )
+                .on_click(cx.listener(|root, _: &ClickEvent, window, cx| {
+                    cx.stop_propagation();
+                    if !root.update_ui.status.is_busy() {
+                        root.close_update_dialog();
+                        root.restore_focus_after_update_dialog_close(window, cx);
+                        cx.notify();
+                    }
+                }))
+            }),
         )
         .child(update_dialog_primary_action(
             status,
@@ -314,7 +321,7 @@ pub(in crate::app) fn update_dialog_primary_action(
         UpdateStatus::Error(_) => frame_text_button(
             "update-dialog-dismiss",
             "Dismiss",
-            ButtonVariant::Secondary,
+            ButtonVariant::Primary,
             false,
             true,
             palette,
@@ -330,7 +337,7 @@ pub(in crate::app) fn update_dialog_primary_action(
         UpdateStatus::Downloading { .. } | UpdateStatus::Installing => frame_text_button(
             "update-dialog-busy",
             "Working",
-            ButtonVariant::Secondary,
+            ButtonVariant::Primary,
             false,
             false,
             palette,
@@ -343,7 +350,7 @@ pub(in crate::app) fn update_dialog_primary_action(
         | UpdateStatus::Disabled(_) => frame_text_button(
             "update-dialog-close",
             "Close",
-            ButtonVariant::Secondary,
+            ButtonVariant::Primary,
             false,
             true,
             palette,

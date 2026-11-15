@@ -443,14 +443,9 @@ impl FrameRoot {
             format!("{count} {noun}; {} skipped.", snapshot.skipped)
         };
         let detail = format!(
-            "Replace output settings.\nSelected for conversion: {}\nAll files: {}\nApplying to all includes unchecked files. {}Each file keeps its own track selections and subtitle files where the new settings support them. Incompatible files and files still loading or unavailable are skipped.",
+            "Replace output settings.\nSelected for conversion: {}\nAll files: {}",
             describe(&selected),
             describe(&all),
-            if all.donor.is_some() {
-                "The current file is unchanged. "
-            } else {
-                ""
-            }
         );
         let title = if all.donor.is_some() {
             "Apply output settings?".to_string()
