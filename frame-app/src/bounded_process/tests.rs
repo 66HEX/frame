@@ -131,6 +131,8 @@ fn fake_process() {
             .unwrap();
         }
         "no-read" => std::thread::sleep(Duration::from_secs(30)),
+        #[cfg(windows)]
+        "detached-descendant" => detached_descendant(),
         "bulk-output" => {
             let chunk = vec![0xa5; 64 * 1024];
             let mut stdout = std::io::stdout().lock();
@@ -164,6 +166,33 @@ fn fake_process() {
         _ => panic!("unknown fixture mode"),
     }
     std::process::exit(0);
+}
+
+#[cfg(windows)]
+fn detached_descendant() {
+    let child = spec("no-read");
+    let mut command = Command::new(child.program);
+    command
+        .args(child.args)
+        .envs(child.env)
+        .env(
+            "FRAME_BOUNDED_MARKER",
+            std::env::var_os("FRAME_BOUNDED_MEMBER_MARKER").unwrap(),
+        )
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    #[expect(
+        clippy::zombie_processes,
+        reason = "fixture leaves a real job member with no inherited capture pipes after the leader exits"
+    )]
+    let _descendant = crate::process_launch::spawn(&mut command).unwrap();
+    let release = PathBuf::from(std::env::var_os("FRAME_BOUNDED_LEADER_RELEASE").unwrap());
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !release.exists() {
+        assert!(Instant::now() < deadline, "leader was not released");
+        std::thread::sleep(Duration::from_millis(2));
+    }
 }
 
 #[cfg(unix)]

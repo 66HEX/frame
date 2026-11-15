@@ -379,9 +379,9 @@ pub(super) fn run(
             match owner.job_empty() {
                 Ok(true) => {}
                 Ok(false) => {
-                    // ActiveProcesses also counts exited processes while other
-                    // references are being released. Keep the job and permit
-                    // owned, and recheck under the original deadline/cancel.
+                    // The leader and pipes can finish before job accounting
+                    // drains, including when a descendant has separate stdio.
+                    // Keep ownership and recheck under the original deadline/cancel.
                     std::thread::sleep(Duration::from_millis(2));
                     continue;
                 }

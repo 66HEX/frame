@@ -1,12 +1,14 @@
-use super::super::{CleanupOutcome, ExecutionDomain, Limits, StopReason, tests};
+use super::super::{ExecutionDomain, Limits, StopReason, tests};
 use super::handle;
 use std::os::windows::io::{FromRawHandle, OwnedHandle};
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, mpsc};
 use std::time::{Duration, Instant};
-use windows::Win32::Foundation::WAIT_OBJECT_0;
+use windows::Win32::Foundation::{WAIT_OBJECT_0, WAIT_TIMEOUT};
 use windows::Win32::System::Threading::{
-    OpenProcess, PROCESS_SYNCHRONIZE, PROCESS_TERMINATE, TerminateProcess, WaitForSingleObject,
+    GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SYNCHRONIZE,
+    PROCESS_TERMINATE, TerminateProcess, WaitForSingleObject,
 };
 
 #[derive(Clone, Copy)]
@@ -16,8 +18,8 @@ enum Completion {
     Cancelled,
 }
 
-fn hold_exited_fixture(marker: &std::path::Path) -> OwnedHandle {
-    let startup_deadline = Instant::now() + Duration::from_secs(1);
+fn open_fixture(marker: &Path) -> OwnedHandle {
+    let startup_deadline = Instant::now() + Duration::from_secs(3);
     let pid = loop {
         if let Ok(contents) = std::fs::read_to_string(marker)
             && let Ok(pid) = contents.parse::<u32>()
@@ -27,19 +29,43 @@ fn hold_exited_fixture(marker: &std::path::Path) -> OwnedHandle {
         assert!(Instant::now() < startup_deadline, "fixture did not start");
         std::thread::sleep(Duration::from_millis(2));
     };
-    // SAFETY: this is our fixture PID. Keep an independent process reference
-    // after exit so job accounting cannot finish until this handle is dropped.
-    let process = unsafe {
-        let raw = OpenProcess(PROCESS_SYNCHRONIZE | PROCESS_TERMINATE, false, pid).unwrap();
-        OwnedHandle::from_raw_handle(raw.0)
-    };
-    // SAFETY: the owned process handle has terminate/synchronize rights. Exit 0
-    // makes the distinction between process completion and job rundown explicit.
+    // SAFETY: this is our fixture PID, which remains alive until explicitly released.
     unsafe {
-        TerminateProcess(handle(&process), 0).unwrap();
-        assert_eq!(WaitForSingleObject(handle(&process), 1000), WAIT_OBJECT_0);
+        let raw = OpenProcess(
+            PROCESS_SYNCHRONIZE | PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION,
+            false,
+            pid,
+        )
+        .unwrap();
+        OwnedHandle::from_raw_handle(raw.0)
     }
-    process
+}
+
+fn hold_running_member(folder: &Path) -> OwnedHandle {
+    let leader = open_fixture(&folder.join("leader.pid"));
+    let member = open_fixture(&folder.join("member.pid"));
+    std::fs::write(folder.join("leader.release"), []).unwrap();
+    // SAFETY: both independently owned handles have synchronization/query rights.
+    // The leader exits normally; only the live member keeps the job nonempty.
+    unsafe {
+        assert_eq!(WaitForSingleObject(handle(&leader), 3000), WAIT_OBJECT_0);
+        let mut exit_code = 1;
+        GetExitCodeProcess(handle(&leader), &raw mut exit_code).unwrap();
+        assert_eq!(exit_code, 0);
+        assert_eq!(WaitForSingleObject(handle(&member), 0), WAIT_TIMEOUT);
+    }
+    member
+}
+
+fn wait_for_cleanup(domain: &ExecutionDomain) {
+    let cleanup_deadline = Instant::now() + Duration::from_secs(3);
+    while domain.cleanup_in_progress() && Instant::now() < cleanup_deadline {
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert!(
+        !domain.cleanup_in_progress(),
+        "rundown must release its owner"
+    );
 }
 
 fn check_rundown(completion: Completion) {
@@ -52,15 +78,18 @@ fn check_rundown(completion: Completion) {
         NEXT.fetch_add(1, Ordering::Relaxed)
     ));
     std::fs::create_dir(&folder).unwrap();
-    let marker = folder.join("child.pid");
-    let mut command = tests::spec("no-read");
-    command
-        .env
-        .push(("FRAME_BOUNDED_MARKER".into(), marker.as_os_str().to_owned()));
+    let mut command = tests::spec("detached-descendant");
+    for (key, file) in [
+        ("FRAME_BOUNDED_MARKER", "leader.pid"),
+        ("FRAME_BOUNDED_MEMBER_MARKER", "member.pid"),
+        ("FRAME_BOUNDED_LEADER_RELEASE", "leader.release"),
+    ] {
+        command.env.push((key.into(), folder.join(file).into()));
+    }
     let cancelled = Arc::new(AtomicBool::new(false));
     let worker_cancelled = Arc::clone(&cancelled);
     let limits = Limits {
-        timeout: Duration::from_secs(2),
+        timeout: Duration::from_secs(5),
         cleanup_timeout: Duration::from_millis(20),
         stdout_bytes: 1024,
         stderr_bytes: 1024,
@@ -72,7 +101,7 @@ fn check_rundown(completion: Completion) {
         }))
         .unwrap();
     });
-    let process = hold_exited_fixture(&marker);
+    let member = hold_running_member(&folder);
     let before_cancel = if matches!(completion, Completion::Cancelled) {
         let result = receive.recv_timeout(Duration::from_millis(150));
         cancelled.store(true, Ordering::Release);
@@ -84,7 +113,7 @@ fn check_rundown(completion: Completion) {
     let wait = if matches!(completion, Completion::Success) {
         Duration::from_millis(150)
     } else {
-        Duration::from_secs(3)
+        Duration::from_secs(6)
     };
     let early = match before_cancel {
         Some(Ok(result)) => Ok(result),
@@ -94,24 +123,23 @@ fn check_rundown(completion: Completion) {
         Some(Err(mpsc::RecvTimeoutError::Timeout)) | None => receive.recv_timeout(wait),
     };
     let waited_for_release = matches!(&early, Err(mpsc::RecvTimeoutError::Timeout));
-    drop(process);
+    if matches!(completion, Completion::Success) {
+        // SAFETY: this owned handle has terminate rights; release our live fixture.
+        unsafe { TerminateProcess(handle(&member), 0).unwrap() };
+    }
     let result = early.unwrap_or_else(|_| receive.recv_timeout(Duration::from_secs(3)).unwrap());
     worker.join().unwrap();
-    let cleanup_deadline = Instant::now() + Duration::from_secs(3);
-    while DOMAIN.cleanup_in_progress() && Instant::now() < cleanup_deadline {
-        std::thread::sleep(Duration::from_millis(5));
-    }
-    std::fs::remove_dir_all(folder).unwrap();
-    assert!(
-        !DOMAIN.cleanup_in_progress(),
-        "rundown must release its owner"
+    // SAFETY: our handle stays live even after the job terminates the member.
+    assert_eq!(
+        unsafe { WaitForSingleObject(handle(&member), 3000) },
+        WAIT_OBJECT_0,
+        "completion must leave no live member"
     );
+    wait_for_cleanup(&DOMAIN);
+    std::fs::remove_dir_all(folder).unwrap();
     match completion {
         Completion::Success => {
-            assert!(
-                waited_for_release,
-                "job references must drain before success"
-            );
+            assert!(waited_for_release, "job members must drain before success");
             let output = result.expect("job rundown must not replace the successful exit");
             assert!(output.success);
             assert_eq!(output.code, Some(0));
@@ -125,7 +153,7 @@ fn check_rundown(completion: Completion) {
             }
             assert!(
                 !waited_for_release,
-                "stop must return while the reference is held"
+                "stop must return without externally releasing the member"
             );
             let error = result.expect_err("rundown must remain bounded and cancellable");
             let reason = if matches!(completion, Completion::Deadline) {
@@ -134,13 +162,16 @@ fn check_rundown(completion: Completion) {
                 StopReason::Cancelled
             };
             assert_eq!(error.reason, reason);
-            assert_eq!(error.cleanup, CleanupOutcome::Pending);
         }
     }
+    let next = DOMAIN
+        .run(&tests::spec("empty"), &[], limits, || false)
+        .expect("finished cleanup must admit the next process");
+    assert!(next.success);
 }
 
 #[test]
-fn successful_exit_waits_for_job_references_to_drain() {
+fn successful_exit_waits_for_job_members_to_drain() {
     check_rundown(Completion::Success);
 }
 
