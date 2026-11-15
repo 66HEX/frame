@@ -104,6 +104,71 @@ fn tab_to(cx: &mut VisualTestContext, label: &str) {
 }
 
 #[test]
+fn source_frame_saved_footer_has_ghost_reveal_and_primary_open_without_duplicate_close() {
+    for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+        let mut app = TestAppContext::single();
+        let (root, cx) = window(&mut app, ColorTheme::Dark, scale);
+        root.update(cx, |root, _| {
+            test_support::begin(
+                root,
+                SourceFrameExportRequest::for_test(
+                    "saved-footer".into(),
+                    "source-frame".into(),
+                    PathBuf::from("/tmp/source.mov"),
+                    0,
+                    0,
+                    PathBuf::from("/tmp/frame.png"),
+                ),
+            );
+            assert!(test_support::complete(
+                root,
+                "saved-footer",
+                SourceFrameExportOutcome::Published {
+                    path: PathBuf::from("/tmp/frame.png")
+                }
+            ));
+        });
+        draw(cx);
+        let reveal = cx.debug_bounds("source-frame-reveal").unwrap();
+        let open = cx.debug_bounds("source-frame-open").unwrap();
+        let reveal_is_ghost = cx.update(|window, _| {
+            let bounds = reveal.scale(window.scale_factor());
+            !window.painted_quads().iter().any(|quad| {
+                quad.bounds == bounds
+                    && quad
+                        .background
+                        .as_solid()
+                        .is_some_and(|fill| gpui::hsla_to_rgba(fill).alpha > 0.001)
+            })
+        });
+        assert_eq!(
+            (
+                cx.debug_bounds("source-frame-dismiss").is_none(),
+                reveal_is_ghost
+            ),
+            (true, true),
+            "a saved result uses the X to close and a transparent Ghost reveal action"
+        );
+        assert!(reveal.right() <= open.left() || open.bottom() <= reveal.top());
+        assert!(cx.debug_bounds("source-frame-close").is_some());
+        cx.update(|window, _| {
+            let bounds = open.scale(window.scale_factor());
+            let expected = crate::theme::palette(ColorTheme::Dark).primary;
+            assert!(window.painted_quads().iter().any(|quad| {
+                quad.bounds == bounds
+                    && quad.background.as_solid().is_some_and(|fill| {
+                        let fill = gpui::hsla_to_rgba(fill);
+                        (fill.red - expected.red).abs() < 0.001
+                            && (fill.green - expected.green).abs() < 0.001
+                            && (fill.blue - expected.blue).abs() < 0.001
+                            && (fill.alpha - expected.alpha).abs() < 0.001
+                    })
+            }));
+        });
+    }
+}
+
+#[test]
 fn source_frame_dialog_never_changes_the_preview_bounds() {
     for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
         let mut app = TestAppContext::single();

@@ -118,7 +118,7 @@ impl FrameRoot {
         let mut footer = frame_dialog_footer(palette, window);
         let actions: &[Action] =
             if state.status == SourceFrameExportStatus::Saved && state.result_name.is_some() {
-                &[Action::Close, Action::Reveal, Action::Open]
+                &[Action::Reveal, Action::Open]
             } else {
                 &[Action::Close]
             };
@@ -210,6 +210,8 @@ fn action_button(
         action.label(),
         if matches!(action, Action::Open) {
             ButtonVariant::Primary
+        } else if matches!(action, Action::Reveal) {
+            ButtonVariant::Ghost
         } else {
             ButtonVariant::Secondary
         },
