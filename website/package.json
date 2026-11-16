@@ -39,7 +39,7 @@
     "typescript": "^6.0.3",
     "vite": "^8.2.4",
     "vitest": "^4.1.12",
-    "wrangler": "^4.125.0"
+    "wrangler": "^4.161.0"
   },
   "dependencies": {
     "@takumi-rs/image-response": "1.0.0-rc.12",
