@@ -52,7 +52,7 @@ use strum::IntoEnumIterator;
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-static CLIPBOARD: Mutex<Option<GlobalClipboard>> = parking_lot::const_mutex(None);
+static CLIPBOARD: Mutex<Option<GlobalClipboard>> = Mutex::new(None);
 
 x11rb::atom_manager! {
     pub Atoms: AtomCookies {
