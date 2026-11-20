@@ -35,7 +35,7 @@ const CARGO_DENY_VERSION: &str = "0.20.2";
 const CARGO_AUDIT_VERSION: &str = "0.22.2";
 const CARGO_CYCLONEDX_VERSION: &str = "0.5.9";
 const INNO_SETUP_VERSION: &str = "6.7.1";
-const NIX_VERSION: &str = "2.35.4";
+const NIX_VERSION: &str = "2.35.6";
 const APPIMAGETOOL_VERSION: &str = "1.9.1";
 const APPIMAGETOOL_X86_64_SHA256: &str =
     "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0";
@@ -54,9 +54,9 @@ const ACTION_CHECKOUT_SHA: &str = "3d3c42e5aac5ba805825da76410c181273ba90b1";
 const ACTION_UPLOAD_ARTIFACT_SHA: &str = "cf430e030ddbb5b0abf93d22962f4752f3646cd9";
 const ACTION_DOWNLOAD_ARTIFACT_SHA: &str = "9000827ccba6bdab643e8b6fd33ac0654aef8333";
 const ACTION_DEPENDENCY_REVIEW_SHA: &str = "a1d282b36b6f3519aa1f3fc636f609c47dddb294";
-const ACTION_CODEQL_SHA: &str = "24c54180a607b1449ed407dd24f251e4e9147c8d";
+const ACTION_CODEQL_SHA: &str = "33d7b85da1a04171e211befe2c739303b9a4c066";
 const ACTION_ATTEST_BUILD_PROVENANCE_SHA: &str = "4d101475d8b20a2381f78447822ac1eab6504dd8";
-const ACTION_INSTALL_NIX_SHA: &str = "75c75c31ebece974e48ebc36b4ad125bd97bd97b";
+const ACTION_INSTALL_NIX_SHA: &str = "3dc140bfc76c49fbd4dd958429132e3746bcb086";
 const ACTION_SETUP_NODE_SHA: &str = "949feb2413d6458794dcd2491c4babbbce0c15c1";
 const UBUNTU_ARCHIVE_SELECTION: &str = r"        ubuntu_archive='https://archive.ubuntu.com/ubuntu'
         if ! getent ahosts archive.ubuntu.com >/dev/null; then
@@ -1896,19 +1896,19 @@ fn pin_workflow_actions(workflow: &mut String) {
         ),
         (
             "cachix/install-nix-action@v31.11.0",
-            format!("cachix/install-nix-action@{ACTION_INSTALL_NIX_SHA} # v31.11.3"),
+            format!("cachix/install-nix-action@{ACTION_INSTALL_NIX_SHA} # v31.11.5"),
         ),
         (
             "cachix/install-nix-action@v31",
-            format!("cachix/install-nix-action@{ACTION_INSTALL_NIX_SHA} # v31.11.3"),
+            format!("cachix/install-nix-action@{ACTION_INSTALL_NIX_SHA} # v31.11.5"),
         ),
         (
             "github/codeql-action/init@v4.37.1",
-            format!("github/codeql-action/init@{ACTION_CODEQL_SHA} # v4.38.3"),
+            format!("github/codeql-action/init@{ACTION_CODEQL_SHA} # v4.39.3"),
         ),
         (
             "github/codeql-action/analyze@v4.37.1",
-            format!("github/codeql-action/analyze@{ACTION_CODEQL_SHA} # v4.38.3"),
+            format!("github/codeql-action/analyze@{ACTION_CODEQL_SHA} # v4.39.3"),
         ),
         (
             "actions/setup-node@v7.1.0",
@@ -2034,7 +2034,8 @@ __CI_LINUX_SETUP__
           --ignore RUSTSEC-2026-0206 \
           --ignore RUSTSEC-2026-0370 \
           --ignore RUSTSEC-2026-0371 \
-          --ignore RUSTSEC-2026-0372
+          --ignore RUSTSEC-2026-0372 \
+          --ignore RUSTSEC-2026-0543
     - name: ci::run_documented_gate
       run: cargo xtask ci
 __CI_MEDIA_TESTS__

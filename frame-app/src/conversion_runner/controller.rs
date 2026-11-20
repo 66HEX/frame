@@ -214,8 +214,8 @@ fn process_start_time(pid: u32) -> Option<u64> {
     }
 
     let target = Pid::from_u32(pid);
-    let mut system = System::new();
-    system.refresh_processes(ProcessesToUpdate::Some(&[target]));
+    let mut system = System::new().ok()?;
+    system.refresh_processes(ProcessesToUpdate::Some(&[target]), true);
     system.process(target).map(sysinfo::Process::start_time)
 }
 
