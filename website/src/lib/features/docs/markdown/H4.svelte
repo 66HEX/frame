@@ -13,7 +13,7 @@
 <h4
 	{id}
 	{...restProps}
-	class={cn('mt-8 scroll-mt-24 text-base font-medium text-foreground', className)}
+	class={cn('mt-8 scroll-mt-24 text-title-1 font-semibold text-foreground', className)}
 >
 	{@render children?.()}
 </h4>

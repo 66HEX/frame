@@ -12,12 +12,12 @@
 	<div class="mx-auto w-full max-w-6xl px-6 pt-14 md:px-10 md:pt-20 lg:pt-26">
 		<h1
 			id="hero-title"
-			class="mx-auto max-w-4xl text-center text-4xl leading-none font-medium tracking-tight md:text-5xl"
+			class="mx-auto max-w-4xl text-center text-title-5 font-medium text-balance sm:text-title-7 lg:text-title-8"
 		>
 			Every format.<br />One workspace.
 		</h1>
 		<div class="mt-6 flex flex-col items-center gap-6 text-center md:mt-8 md:gap-8">
-			<p class="max-w-2xl text-base sm:text-lg leading-relaxed text-pretty text-muted-foreground">
+			<p class="max-w-2xl text-regular text-pretty text-muted-foreground sm:text-large">
 				Video, audio, and images. All in a native app.<br class="hidden sm:block" /> The power of FFmpeg,
 				with a little more control.
 			</p>
@@ -31,6 +31,18 @@
 </section>
 
 <style>
+	.hero-glow {
+		--hero-glow-primary: #fc4f4a;
+		--hero-glow-secondary: #234a57;
+		--hero-glow-accent: #f5a4a9;
+	}
+
+	:global(.dark) .hero-glow {
+		--hero-glow-primary: #e31616;
+		--hero-glow-secondary: #234a57;
+		--hero-glow-accent: #fd837c;
+	}
+
 	.hero-glow::before {
 		content: '';
 		position: absolute;
@@ -38,17 +50,17 @@
 		z-index: -1;
 		pointer-events: none;
 		border-radius: inherit;
-		opacity: 0.35;
+		opacity: 1;
 		background: radial-gradient(
 			ellipse 130% 107.5% at 50% 10% in srgb,
 			transparent 37%,
-			var(--primary) 69%,
-			color-mix(in srgb, var(--primary-to) 12%, var(--primary-foreground)) 100%
+			color-mix(in srgb, var(--hero-glow-primary) 78%, var(--hero-glow-secondary)) 69%,
+			color-mix(in srgb, var(--hero-glow-accent) 28%, var(--primary-foreground)) 100%
 		);
 		filter: blur(clamp(1rem, 3.125vw, 2.5rem));
 	}
 
 	:global(.dark) .hero-glow::before {
-		opacity: 1;
+		opacity: 0.65;
 	}
 </style>

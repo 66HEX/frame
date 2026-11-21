@@ -8,18 +8,18 @@ order: 50
   import DocsScreenshot from '$lib/features/docs/DocsScreenshot.svelte';
 </script>
 
-Frame separates source inspection from output metadata settings. The **Metadata** inspector tab describes the input. The **Metadata** section inside **Output** controls what is written to the exported file.
+Frame separates source inspection from output metadata settings. The **Source** inspector tab describes the input. The **Metadata** section inside **Output** controls what is written to the exported file.
 
 ## Inspect the source
 
-Select a queue entry and open the Metadata tab. Frame reads source information with FFprobe, including the detected media streams and their properties.
+Select a queue entry and open the **Source** tab. Frame reads source information with FFprobe, including the detected media streams and their properties.
 
 Use this view to check the actual codec, dimensions, frame rate, and audio or subtitle streams before choosing an output. The filename alone does not identify those details.
 
 <DocsScreenshot
   scene="source-metadata"
-  alt="Frame Metadata inspector showing the selected source’s media information."
-  caption="The Metadata tab describes the source file."
+  alt="Frame Source inspector showing the selected source’s media information."
+  caption="The Source tab describes the input file."
 />
 
 ## Preserve metadata

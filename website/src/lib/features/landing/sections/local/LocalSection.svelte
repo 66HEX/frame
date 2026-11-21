@@ -46,8 +46,8 @@
 		{#each benefits as benefit (benefit.title)}
 			<div>
 				<benefit.icon class="mb-4 size-5 text-muted-foreground" />
-				<h3 class="text-base font-medium">{benefit.title}</h3>
-				<p class="mt-2 text-sm leading-6 text-muted-foreground">{benefit.description}</p>
+				<h3 class="text-regular font-medium">{benefit.title}</h3>
+				<p class="mt-2 text-small text-muted-foreground">{benefit.description}</p>
 			</div>
 		{/each}
 	</div>

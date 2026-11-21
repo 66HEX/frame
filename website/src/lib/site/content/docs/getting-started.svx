@@ -14,7 +14,7 @@ This walkthrough uses a video source and the Balanced MP4 preset. The same queue
 
 Drop a supported file into Frame, or choose **Add source** to open the file picker. Frame inspects the source and adds it to the queue.
 
-Select the file's row. Its preview and inspector now refer to that file. The **Metadata** tab shows the source details, including the streams Frame detected.
+Select the file's row. Its preview and inspector now refer to that file. The **Source** tab shows the source details, including the streams Frame detected.
 
 ## Choose an output
 

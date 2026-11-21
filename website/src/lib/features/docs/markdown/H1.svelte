@@ -9,7 +9,7 @@
 <h1
 	{...restProps}
 	class={cn(
-		'font-heading text-3xl leading-tight font-medium tracking-tight text-balance text-foreground',
+		'font-heading text-title-4 font-semibold text-balance text-foreground',
 		className
 	)}
 >
