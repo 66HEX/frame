@@ -345,7 +345,7 @@
 						data-open={popupEntered ? '' : undefined}
 						data-ending-style={popupState === 'closing' ? '' : undefined}
 						class={cn(
-							'linear-nav-popup pointer-events-auto relative max-w-full overflow-hidden rounded-[14px] shadow-lg backdrop-blur-[24px]',
+							'linear-nav-popup pointer-events-auto relative max-w-full overflow-hidden rounded-xl bg-muted text-card-foreground shadow-sm',
 							popupTransitionsEnabled && 'linear-nav-popup-transitions'
 						)}
 						style:height={popupHeight !== null ? `${popupHeight}px` : undefined}
@@ -412,11 +412,6 @@
 		transform-origin: top;
 		opacity: 0;
 		transform: scale(0.98);
-		background: color-mix(in oklab, var(--popover) 85%, transparent);
-	}
-
-	:global(html.dark) .linear-nav-popup {
-		background: color-mix(in oklab, var(--background) 85%, transparent);
 	}
 
 	.linear-nav-popup[data-open] {
