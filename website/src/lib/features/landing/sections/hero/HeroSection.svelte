@@ -3,12 +3,14 @@
 	import { ArrowRightIcon } from '$lib/icons';
 	import TextLink from '../../shared/TextLink.svelte';
 	import FramePreview from './FramePreview.svelte';
+	import HeroShader from './HeroShader.svelte';
 </script>
 
 <section
 	aria-labelledby="hero-title"
-	class="hero-glow relative isolate mx-3 mb-12 overflow-hidden rounded-lg pb-16 md:mx-4 md:mb-20 md:pb-24"
+	class="relative isolate mx-3 mb-12 overflow-hidden rounded-lg pb-16 md:mx-4 md:mb-20 md:pb-24"
 >
+	<HeroShader />
 	<div class="mx-auto w-full max-w-7xl px-6 pt-14 md:px-10 md:pt-20 lg:pt-26">
 		<h1
 			id="hero-title"
@@ -29,38 +31,3 @@
 		<div class="mt-11 md:mt-14 lg:mt-18"><FramePreview /></div>
 	</div>
 </section>
-
-<style>
-	.hero-glow {
-		--hero-glow-primary: #fc4f4a;
-		--hero-glow-secondary: #234a57;
-		--hero-glow-accent: #f5a4a9;
-	}
-
-	:global(.dark) .hero-glow {
-		--hero-glow-primary: #e31616;
-		--hero-glow-secondary: #234a57;
-		--hero-glow-accent: #fd837c;
-	}
-
-	.hero-glow::before {
-		content: '';
-		position: absolute;
-		inset: 0;
-		z-index: -1;
-		pointer-events: none;
-		border-radius: inherit;
-		opacity: 1;
-		background: radial-gradient(
-			ellipse 130% 107.5% at 50% 10% in srgb,
-			transparent 37%,
-			color-mix(in srgb, var(--hero-glow-primary) 78%, var(--hero-glow-secondary)) 69%,
-			color-mix(in srgb, var(--hero-glow-accent) 28%, var(--primary-foreground)) 100%
-		);
-		filter: blur(clamp(1rem, 3.125vw, 2.5rem));
-	}
-
-	:global(.dark) .hero-glow::before {
-		opacity: 0.65;
-	}
-</style>
