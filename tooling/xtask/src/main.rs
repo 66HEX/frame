@@ -3334,7 +3334,7 @@ jobs:
       - publish_release
     environment: production-distribution
     steps:
-    - name: release::download_macos_dmgs
+    - name: release::download_homebrew_assets
       id: hashes
       env:
         GH_TOKEN: ${{ github.token }}
@@ -3348,10 +3348,12 @@ jobs:
         gh release download "$VERSION" --repo 66HEX/frame --pattern "Frame-x86_64.AppImage" --dir target/homebrew
         gh release download "$VERSION" --repo 66HEX/frame --pattern SHA256SUMS --dir target/homebrew
         (cd target/homebrew && sha256sum --check --strict --ignore-missing SHA256SUMS)
-        echo "HASH_ARM=$(sha256sum target/homebrew/Frame-aarch64.dmg | awk '{print $1}')" >> "$GITHUB_OUTPUT"
-        echo "HASH_INTEL=$(sha256sum target/homebrew/Frame-x86_64.dmg | awk '{print $1}')" >> "$GITHUB_OUTPUT"
-        echo "HASH_ARM_LINUX=$(sha256sum target/homebrew/Frame-aarch64.AppImage | awk '{print $1}')" >> "$GITHUB_OUTPUT"
-        echo "HASH_INTEL_LINUX=$(sha256sum target/homebrew/Frame-x86_64.AppImage | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+        {
+          echo "HASH_ARM=$(sha256sum target/homebrew/Frame-aarch64.dmg | awk '{print $1}')"
+          echo "HASH_INTEL=$(sha256sum target/homebrew/Frame-x86_64.dmg | awk '{print $1}')"
+          echo "HASH_ARM_LINUX=$(sha256sum target/homebrew/Frame-aarch64.AppImage | awk '{print $1}')"
+          echo "HASH_INTEL_LINUX=$(sha256sum target/homebrew/Frame-x86_64.AppImage | awk '{print $1}')"
+        } >> "$GITHUB_OUTPUT"
     - name: release::checkout_tap
       uses: actions/checkout@v4
       with:
@@ -3403,8 +3405,8 @@ jobs:
             app_image "Frame-#{arch}.AppImage", target: "Frame.AppImage"
 
             zap trash: [
-              "~/.cache/Frame",
-              "~/.config/Frame",
+              "~/.cache/frame",
+              "~/.config/frame",
             ]
           end
 
