@@ -1,16 +1,11 @@
 <script lang="ts">
-	import { NavigationMenu } from 'bits-ui';
 	import {
 		ArrowRightIcon,
 		BookOpenIcon,
-		ChevronExpandYIcon,
 		CircleQuestionIcon,
 		FileIcon,
 		Grid2x2Icon,
 		LayersIcon,
-		MagnifierIcon,
-		TableOfContentsIcon,
-		WorkflowIcon,
 		type IconComponent
 	} from '$lib/icons';
 	import { githubUrl, releaseUrl } from '../data/content';
@@ -39,20 +34,29 @@
 	];
 
 	const toolLinks: MenuLink[] = [
-		{ title: 'Preview', description: 'Check your edits before export', href: '/docs/preview', icon: MagnifierIcon },
-		{ title: 'Batch conversion', description: 'Process files together', href: '/docs/batch-conversion', icon: WorkflowIcon },
-		{ title: 'Presets', description: 'Save your output settings', href: '/docs/presets', icon: LayersIcon },
-		{ title: 'Subtitles', description: 'Choose tracks or burn in text', href: '/docs/subtitles', icon: BookOpenIcon },
-		{ title: 'Metadata', description: 'Keep the details you need', href: '/docs/metadata', icon: TableOfContentsIcon },
-		{ title: 'Video filters', description: 'Adjust the picture', href: '/docs/video#video-filters', icon: ChevronExpandYIcon }
+		{ title: 'Preview', description: 'Check your edits before export', href: '/docs/preview', icon: FileIcon },
+		{ title: 'Batch conversion', description: 'Process files together', href: '/docs/batch-conversion', icon: LayersIcon },
+		{ title: 'Presets', description: 'Save your output settings', href: '/docs/presets', icon: Grid2x2Icon }
 	];
 
-	const resourceLinks: MenuLink[] = [
+	const productSecondaryLinks = [
+		{ title: 'Subtitles', href: '/docs/subtitles' },
+		{ title: 'Metadata', href: '/docs/metadata' },
+		{ title: 'Video filters', href: '/docs/video#video-filters' },
+		{ title: 'Download Frame', href: '/#download' }
+	];
+
+	const resourceLeftLinks: MenuLink[] = [
 		{ title: 'Getting started', description: 'Make your first conversion', href: '/docs/getting-started', icon: ArrowRightIcon },
-		{ title: 'Installation', description: 'Set up Frame on your computer', href: '/docs/installation', icon: FileIcon },
+		{ title: 'Installation', description: 'Set up Frame on your computer', href: '/docs/installation', icon: FileIcon }
+	];
+
+	const resourceMiddleLinks: MenuLink[] = [
 		{ title: 'Documentation', description: 'Find guides for every workflow', href: '/docs', icon: BookOpenIcon },
 		{ title: 'Troubleshooting', description: 'Get help with common issues', href: '/docs/troubleshooting', icon: CircleQuestionIcon }
 	];
+
+	const resourceMobileLinks: MenuLink[] = [...resourceLeftLinks, ...resourceMiddleLinks];
 
 	const projectLinks = [
 		{ title: 'GitHub', href: githubUrl },
@@ -61,124 +65,146 @@
 	];
 
 	const focusClass = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
-	const desktopLinkClass = `grid grid-cols-[auto_1fr] items-center gap-2.5 rounded-md p-2 transition-colors hover:bg-muted/60 ${focusClass}`;
-	const mobileLinkClass = `flex min-h-10 items-center gap-3 rounded-md px-4 py-2 text-base leading-6 transition-colors hover:bg-muted/60 ${focusClass}`;
+	const mobileLinkClass = `flex min-h-10 items-center gap-3 rounded-md px-4 py-2 text-regular transition-colors hover:bg-muted/60 ${focusClass}`;
 </script>
 
-{#snippet linkContents(item: MenuLink)}
-	{#if mobile}
-		<item.icon class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-		<span>{item.title}</span>
-	{:else}
-		<span class="flex size-9 items-center justify-center rounded-md bg-card text-muted-foreground shadow-sm">
-			<item.icon class="size-4" aria-hidden="true" />
-		</span>
-		<span class="min-w-0">
-			<span class="block text-sm leading-5 font-medium">{item.title}</span>
-			<span class="mt-0.5 line-clamp-1 text-xs leading-4 text-muted-foreground">{item.description}</span>
-		</span>
-	{/if}
-{/snippet}
-
-{#snippet menuLink(item: MenuLink)}
+{#snippet mobileMenuLink(item: MenuLink)}
 	<li>
-		{#if mobile}
-			<a href={item.href} class={mobileLinkClass} onclick={() => onNavigate?.()}>
-				{@render linkContents(item)}
-			</a>
-		{:else}
-			<NavigationMenu.Link href={item.href} class={desktopLinkClass} onSelect={() => onNavigate?.()}>
-				{@render linkContents(item)}
-			</NavigationMenu.Link>
-		{/if}
+		<a href={item.href} class={mobileLinkClass} onclick={() => onNavigate?.()}>
+			<item.icon class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+			<span>{item.title}</span>
+		</a>
 	</li>
 {/snippet}
 
-{#snippet projectLink(item: { title: string; href: string })}
+{#snippet mobileProjectLink(item: { title: string; href: string })}
 	<li>
-		{#if mobile}
-			<a href={item.href} class={mobileLinkClass} onclick={() => onNavigate?.()}>{item.title}</a>
-		{:else}
-			<NavigationMenu.Link
-				href={item.href}
-				class={`block rounded-md px-2 py-2 text-sm leading-5 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground ${focusClass}`}
-				onSelect={() => onNavigate?.()}
-			>{item.title}</NavigationMenu.Link>
-		{/if}
+		<a href={item.href} class={mobileLinkClass} onclick={() => onNavigate?.()}>{item.title}</a>
+	</li>
+{/snippet}
+
+{#snippet desktopRichLink(item: MenuLink)}
+	<li>
+		<a
+			href={item.href}
+			class={`linear-inline-link flex flex-col gap-1 rounded-[6px] px-4 py-3.5 pr-6 text-mini transition-[background-color,color] duration-120 ease-out hover:bg-foreground/[0.04] ${focusClass}`}
+			onclick={() => onNavigate?.()}
+		>
+			<span class="font-medium leading-none text-foreground/90">{item.title}</span>
+			<span class="font-normal text-muted-foreground">{item.description}</span>
+		</a>
+	</li>
+{/snippet}
+
+{#snippet desktopCompactLink(item: { title: string; href: string })}
+	<li>
+		<a
+			href={item.href}
+			class={`linear-inline-link block rounded-[6px] px-4 py-2.5 text-mini font-medium leading-none text-foreground/85 transition-[background-color,color] duration-120 ease-out hover:bg-foreground/[0.04] hover:text-foreground ${focusClass}`}
+			onclick={() => onNavigate?.()}
+		>
+			{item.title}
+		</a>
 	</li>
 {/snippet}
 
 {#if mobile}
 	<div class="pb-3">
 		<ul aria-label={menu === 'product' ? 'Media' : 'Get started'}>
-			{#each menu === 'product' ? mediaLinks : resourceLinks as item (item.href)}
-				{@render menuLink(item)}
+			{#each menu === 'product' ? mediaLinks : resourceMobileLinks as item (item.href)}
+				{@render mobileMenuLink(item)}
 			{/each}
 		</ul>
 		{#if menu === 'resources'}
 			<p class="mt-4 px-4 pb-2 text-xs font-medium text-muted-foreground">Project</p>
 			<ul aria-label="Project">
 				{#each projectLinks as item (item.href)}
-					{@render projectLink(item)}
+					{@render mobileProjectLink(item)}
 				{/each}
 			</ul>
 		{/if}
 	</div>
 {:else}
-	<div class="w-screen max-w-6xl pt-9 px-8 pb-8">
-		<div class="grid grid-cols-4 gap-4">
-			{#if menu === 'product'}
-				<div class="-mr-2 border-r border-border pr-2">
-					<p class="mb-2 px-2 text-xs leading-4 font-medium text-muted-foreground">Media</p>
-					<ul aria-label="Media" class="space-y-2">
+	<div class="p-2">
+		<div class="linear-feature-grid rounded-[6px]">
+			<div
+				class="linear-sub-items grid gap-x-6 p-3"
+				style:grid-template-columns="244px 244px 192px"
+			>
+				{#if menu === 'product'}
+					<ul aria-label="Media" class="linear-nav-column relative flex flex-col gap-0.5">
 						{#each mediaLinks as item (item.href)}
-							{@render menuLink(item)}
+							{@render desktopRichLink(item)}
 						{/each}
 					</ul>
-				</div>
-				<div class="col-span-2">
-					<p class="mb-2 px-2 text-xs leading-4 font-medium text-muted-foreground">Tools</p>
-					<ul aria-label="Tools" class="grid grid-cols-2 gap-x-4 gap-y-2">
+					<ul aria-label="Tools" class="linear-nav-column relative flex flex-col gap-0.5">
 						{#each toolLinks as item (item.href)}
-							{@render menuLink(item)}
+							{@render desktopRichLink(item)}
 						{/each}
 					</ul>
-				</div>
-				<div>
-					<p class="mb-4 px-2 text-xs leading-4 font-medium text-muted-foreground">Latest release</p>
-					<NavigationMenu.Link
-						href={releaseUrl}
-						class={`group block overflow-hidden rounded-md bg-card shadow-sm ${focusClass}`}
-						onSelect={() => onNavigate?.()}
-					>
-						<div class="h-26 overflow-hidden" aria-hidden="true">
-							<img src="/media/landing/hero-light.webp" alt="" width="2400" height="1600" loading="lazy" decoding="async" class="size-full object-cover object-top dark:hidden" />
-							<img src="/media/landing/hero-dark.webp" alt="" width="2400" height="1600" loading="lazy" decoding="async" class="hidden size-full object-cover object-top dark:block" />
-						</div>
-						<div class="p-3">
-							<span class="flex items-center justify-between gap-2 text-sm leading-5 font-medium">What’s new in Frame <ArrowRightIcon class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" /></span>
-							<span class="mt-1 block text-xs leading-4 text-muted-foreground">Read the latest release notes.</span>
-						</div>
-					</NavigationMenu.Link>
-				</div>
-			{:else}
-				<div class="col-span-2 border-r border-border pr-4">
-					<p class="mb-2 px-2 text-xs leading-4 font-medium text-muted-foreground">Get started</p>
-					<ul aria-label="Get started" class="grid grid-cols-2 gap-x-4 gap-y-2">
-						{#each resourceLinks as item (item.href)}
-							{@render menuLink(item)}
+					<ul aria-label="More features" class="linear-nav-column relative flex flex-col gap-0.5 pt-1">
+						{#each productSecondaryLinks as item (item.href)}
+							{@render desktopCompactLink(item)}
 						{/each}
 					</ul>
-				</div>
-				<div>
-					<p class="mb-2 px-2 text-xs leading-4 font-medium text-muted-foreground">Project</p>
-					<ul aria-label="Project">
+				{:else}
+					<ul aria-label="Get started" class="linear-nav-column relative flex flex-col gap-0.5">
+						{#each resourceLeftLinks as item (item.href)}
+							{@render desktopRichLink(item)}
+						{/each}
+					</ul>
+					<ul aria-label="Documentation" class="linear-nav-column relative flex flex-col gap-0.5">
+						{#each resourceMiddleLinks as item (item.href)}
+							{@render desktopRichLink(item)}
+						{/each}
+					</ul>
+					<ul aria-label="Project" class="linear-nav-column relative flex flex-col gap-0.5 pt-1">
 						{#each projectLinks as item (item.href)}
-							{@render projectLink(item)}
+							{@render desktopCompactLink(item)}
 						{/each}
 					</ul>
-				</div>
-			{/if}
+				{/if}
+			</div>
 		</div>
+		{#if menu === 'product'}
+			<div class="linear-content-footer mt-2 flex overflow-hidden rounded-[6px]">
+				<a
+					href={releaseUrl}
+					class={`flex min-w-0 flex-1 items-center justify-between gap-6 rounded-[6px] px-7 py-3.5 text-mini transition-[background-color] duration-120 ease-out hover:bg-foreground/[0.04] ${focusClass}`}
+					onclick={() => onNavigate?.()}
+				>
+					<span class="flex min-w-0 items-center gap-2">
+						<span class="font-medium text-foreground/90">New</span>
+						<span class="truncate text-muted-foreground">What’s new in Frame</span>
+					</span>
+					<span class="flex shrink-0 items-center gap-1.5 text-muted-foreground">
+						<span>Read release notes</span>
+						<ArrowRightIcon class="size-3.5 text-muted-foreground/75" aria-hidden="true" />
+					</span>
+				</a>
+			</div>
+		{/if}
 	</div>
 {/if}
+
+<style>
+	.linear-feature-grid {
+		background: color-mix(in oklab, var(--foreground) 3%, transparent);
+		box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--foreground) 8%, transparent);
+	}
+
+	.linear-sub-items {
+		-webkit-mask-image: linear-gradient(90deg, transparent 0, #000 12px calc(100% - 12px), transparent 100%);
+		mask-image: linear-gradient(90deg, transparent 0, #000 12px calc(100% - 12px), transparent 100%);
+	}
+
+	.linear-nav-column:not(:last-child)::after {
+		content: '';
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		right: -12px;
+		width: 1px;
+		background: color-mix(in oklab, var(--foreground) 8%, transparent);
+	}
+</style>
