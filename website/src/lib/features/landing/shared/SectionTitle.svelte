@@ -12,7 +12,7 @@
 
 <h2
 	class={cn(
-		'text-3xl font-medium tracking-tight text-balance md:text-5xl',
+		'text-title-4 font-medium text-balance md:text-title-5 lg:text-title-6',
 		className
 	)}
 	{...props}

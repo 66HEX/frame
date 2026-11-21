@@ -31,7 +31,7 @@ Check that the original file opens in a media player and that its download or co
 <DocsScreenshot
   scene="source-error"
   alt="Frame showing Preview unavailable and Failed to read source metadata for unreadable-sample.mp4."
-  caption="A failed source probe appears in the preview and the Metadata tab."
+  caption="A failed source probe appears in the preview and the Source tab."
 />
 
 ## A source or setting is unavailable

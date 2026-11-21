@@ -9,7 +9,7 @@
 			variant: {
 				default: "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 active:shadow-[var(--shadow-recessed)]",
 				outline: "bg-card text-card-foreground shadow-xs hover:bg-accent aria-expanded:bg-accent active:shadow-[var(--shadow-recessed)]",
-				secondary: "bg-secondary text-secondary-foreground shadow-xs hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary active:shadow-[var(--shadow-recessed)]",
+				secondary: "bg-secondary text-secondary-foreground shadow-xs hover:bg-[color-mix(in_oklab,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary active:shadow-[var(--shadow-recessed)]",
 				ghost: "text-foreground hover:bg-accent hover:text-accent-foreground aria-expanded:bg-accent aria-expanded:text-accent-foreground",
 				destructive: "bg-destructive/10 hover:bg-destructive/20 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/20 text-destructive dark:hover:bg-destructive/30",
 				link: "text-primary underline-offset-4 hover:underline",

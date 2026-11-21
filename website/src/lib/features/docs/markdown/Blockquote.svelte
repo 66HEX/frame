@@ -9,7 +9,7 @@
 <blockquote
 	{...restProps}
 	class={cn(
-		'mt-6 border-s-2 ps-6 text-base leading-7 text-muted-foreground italic [&>p]:mt-0',
+		'mt-6 border-s-2 ps-6 text-regular text-muted-foreground italic [&>p]:mt-0',
 		className
 	)}
 >
