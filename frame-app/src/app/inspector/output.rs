@@ -5,7 +5,8 @@ use crate::app::inspector::shared::settings_hint_text;
 use crate::app::root::FrameRoot;
 use crate::settings::{
     ConversionConfig, SourceMetadata, apply_output_container, apply_processing_mode,
-    normalize_output_config, output_container_options, output_processing_mode_options,
+    container_supports_audio, normalize_output_config, output_container_options,
+    output_processing_mode_options,
 };
 use crate::theme;
 use gpui::prelude::{FluentBuilder, ParentElement};
@@ -150,8 +151,18 @@ pub(in crate::app) fn settings_container_grid(
 
                 let metadata = root.selected_source_metadata();
                 let changed = root.update_selected_config(|config| {
-                    apply_output_container(config, &container)
-                        | normalize_output_config(config, metadata.as_ref())
+                    let had_audio_container = container_supports_audio(&config.container);
+                    let container_changed = apply_output_container(config, &container);
+                    if !had_audio_container
+                        && container_supports_audio(&config.container)
+                        && config.selected_audio_tracks.is_empty()
+                        && let Some(first_track) = metadata
+                            .as_ref()
+                            .and_then(|metadata| metadata.audio_tracks.first())
+                    {
+                        config.selected_audio_tracks.push(first_track.index);
+                    }
+                    container_changed | normalize_output_config(config, metadata.as_ref())
                 });
                 if changed {
                     root.sync_inspector_availability(metadata.as_ref());
