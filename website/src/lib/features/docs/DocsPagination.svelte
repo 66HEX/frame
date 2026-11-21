@@ -17,7 +17,7 @@
 	} = $props();
 
 	const linkClass =
-		'group flex flex-col justify-between gap-3 rounded-lg bg-card p-4 shadow-sm transition-[color,background-color,border-color,box-shadow,scale,background-size] outline-none focus-visible:ring-3 focus-visible:ring-ring/50 motion-reduce:transition-none hover:bg-[color-mix(in_lab,var(--color-card),var(--color-muted)_50%)]';
+		'group flex flex-col justify-between gap-3 rounded-lg bg-card p-4 border border-border transition-[color,background-color,border-color,box-shadow,scale,background-size] outline-none focus-visible:ring-3 focus-visible:ring-ring/50 motion-reduce:transition-none hover:bg-[color-mix(in_lab,var(--color-card),var(--color-muted)_50%)]';
 </script>
 
 {#if previous || next}
