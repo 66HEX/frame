@@ -10,7 +10,7 @@
 	} = $props();
 </script>
 
-<div class="mt-10 grid gap-4 text-sm md:mt-14 md:grid-cols-2 md:gap-16">
+<div class="mt-10 grid gap-4 text-small md:mt-14 md:grid-cols-2 md:gap-16">
 	<p class="text-muted-foreground">{description}</p>
 	<div class="grid grid-cols-2 gap-x-6 gap-y-1">
 		{#each links as link (link.label)}

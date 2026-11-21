@@ -11,8 +11,8 @@
 			class="flex min-w-0 flex-col gap-5 py-6 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
 		>
 			<div class="min-w-0">
-				<h3 class="text-lg font-medium tracking-tight">{platform.name}</h3>
-				<p class="mt-1 text-sm leading-6 text-muted-foreground">{platform.description}</p>
+				<h3 class="text-title-1 font-medium">{platform.name}</h3>
+				<p class="mt-1 text-small text-muted-foreground">{platform.description}</p>
 				{#if platform.name === 'Linux'}
 					<TextLink href="/docs/installation#nixpkgs">Install with Nixpkgs</TextLink>
 				{/if}

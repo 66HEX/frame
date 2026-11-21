@@ -12,7 +12,7 @@
 
 <a
 	class={cn(
-		'inline-flex min-h-10 items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground',
+		'inline-flex min-h-10 items-center gap-2 text-small text-muted-foreground transition-colors hover:text-foreground',
 		className
 	)}
 	{...props}

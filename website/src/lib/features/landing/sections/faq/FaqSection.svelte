@@ -19,8 +19,8 @@
 	<Accordion.Root type="multiple" class="min-w-0">
 		{#each faqItems as item (item.question)}
 			<Accordion.Item value={item.question}>
-				<Accordion.Trigger class="h-20 flex items-center text-lg font-medium tracking-tight">{item.question}</Accordion.Trigger>
-				<Accordion.Content><p>{item.answer}</p></Accordion.Content>
+				<Accordion.Trigger class="flex min-h-20 items-center text-left text-title-1 font-medium">{item.question}</Accordion.Trigger>
+				<Accordion.Content><p class="text-regular text-muted-foreground">{item.answer}</p></Accordion.Content>
 			</Accordion.Item>
 		{/each}
 	</Accordion.Root>

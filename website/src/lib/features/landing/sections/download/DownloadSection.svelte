@@ -10,7 +10,7 @@
 	<div class="grid items-start gap-12 lg:grid-cols-2 lg:gap-16">
 		<div>
 			<SectionTitle id="download-title">Make your next conversion a good one.</SectionTitle>
-			<p class="mt-6 max-w-sm text-base leading-relaxed text-pretty text-muted-foreground md:text-xl md:leading-normal">
+			<p class="mt-6 max-w-sm text-regular text-pretty text-muted-foreground md:text-title-2">
 				Free and open source.<br />Pick your platform and bring your files.
 			</p>
 			<div class="mt-6 flex flex-wrap gap-x-6 gap-y-1">
