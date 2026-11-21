@@ -275,7 +275,7 @@
 							: 'border-transparent bg-transparent'
 					)}
 				></div>
-				<div class="relative z-10 mx-auto flex h-full w-full max-w-6xl items-center justify-between px-6 sm:px-10">
+				<div class="relative z-10 mx-auto flex h-full w-full max-w-7xl items-center justify-between px-6 sm:px-10">
 					<div class="flex flex-1 justify-start items-center">
 						<a href="/" aria-label="Frame home" class={`rounded-md flex items-center ${focusClass}`}>
 							<SiteBrand />
@@ -335,7 +335,7 @@
 			</div>
 			{#if popupState !== 'closed' && activeMenu}
 				<div
-					class="pointer-events-none absolute top-[calc(100%-4px)] right-0 left-0 mx-auto flex max-w-6xl justify-end px-6 sm:px-10"
+					class="pointer-events-none absolute top-[calc(100%-4px)] right-0 left-0 mx-auto flex max-w-7xl justify-end px-6 sm:px-10"
 				>
 					<div
 						bind:this={popupEl}
