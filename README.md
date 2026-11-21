@@ -194,13 +194,13 @@ To update:
 winget upgrade --id 66HEX.Frame -e
 ```
 
-### Homebrew (macOS)
+### Homebrew (macOS & Linux)
 
-For macOS users, Frame is available through the custom Homebrew tap:
+Frame is available through the custom Homebrew tap on macOS (DMG, with
+quarantine removed automatically) and Linux (AppImage):
 
 ```bash
-brew tap 66HEX/frame
-brew install --cask frame
+brew install 66HEX/frame/frame
 ```
 
 ### Flathub (Linux)
