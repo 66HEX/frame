@@ -33,7 +33,6 @@ const RUST_VERSION: &str = "1.95.0";
 const CARGO_BUNDLE_VERSION: &str = "0.11.0";
 const CARGO_DENY_VERSION: &str = "0.20.2";
 const CARGO_AUDIT_VERSION: &str = "0.22.2";
-const CARGO_CYCLONEDX_VERSION: &str = "0.5.9";
 const INNO_SETUP_VERSION: &str = "6.7.1";
 const NIX_VERSION: &str = "2.35.6";
 const APPIMAGETOOL_VERSION: &str = "1.9.1";
@@ -117,6 +116,10 @@ fn run_xtask() -> Result<()> {
             let args = args.collect::<Vec<_>>();
             flathub_sources(&args)
         }
+        "sbom" => {
+            let args = args.collect::<Vec<_>>();
+            release_sbom(&args)
+        }
         "flathub-manifest" => {
             let args = args.collect::<Vec<_>>();
             flathub_manifest(&args)
@@ -156,6 +159,7 @@ Commands:
   sign-update-manifest Sign update-manifest.json with FRAME_UPDATE_SIGNING_KEY
   flathub-sources   Create Flathub source and cargo-vendor release archives
   flathub-manifest  Render Flathub repository manifest files
+  sbom --out <path> Write the frame-app CycloneDX SBOM from the crate graph cargo builds
   ci                Run local formatting, tests, lints, and script checks
   workflows         Regenerate GitHub Actions workflows
   workflows --check Verify checked-in workflows match the generator exactly
@@ -754,6 +758,37 @@ fn flathub_manifest(args: &[String]) -> Result<()> {
     )?;
     println!("Wrote {}", out_dir.display());
     Ok(())
+}
+
+fn release_sbom(args: &[String]) -> Result<()> {
+    let [flag, out] = args else {
+        return Err(XtaskError::Usage(
+            "usage: cargo xtask sbom --out <path>".to_string(),
+        ));
+    };
+    if flag != "--out" {
+        return Err(XtaskError::Usage(format!("unknown sbom option `{flag}`")));
+    }
+    let root = repo_root()?;
+    let bom = frame_app_sbom(&root)?;
+    fs::write(root.join(out), serde_json::to_vec_pretty(&bom)?)?;
+    println!("Wrote {out}");
+    Ok(())
+}
+
+/// The release SBOM for `frame-app`, resolved with `cargo tree --target all` so it lists only
+/// crates some shipped target compiles, not the workspace-unified `cargo metadata` set.
+fn frame_app_sbom(root: &Path) -> Result<serde_json::Value> {
+    let mut cargo = sbom_attest::CargoOptions::new(root.join("frame-app/Cargo.toml"));
+    cargo.packages = vec!["frame-app".to_string()];
+    cargo.target = Some("all".to_string());
+    cargo.locked = true;
+    let inventory = sbom_attest::generate(&sbom_attest::GenerateOptions {
+        cargo: Some(cargo),
+        ..Default::default()
+    })
+    .map_err(|error| XtaskError::Usage(format!("SBOM generation failed: {error:#}")))?;
+    Ok(sbom_attest::to_cyclonedx(&inventory))
 }
 
 fn render_flathub_manifest_template(template: &str, options: &FlathubManifestOptions) -> String {
@@ -1884,7 +1919,6 @@ fn render_workflow(template: &str) -> String {
         ("__CARGO_BUNDLE_VERSION__", CARGO_BUNDLE_VERSION),
         ("__CARGO_DENY_VERSION__", CARGO_DENY_VERSION),
         ("__CARGO_AUDIT_VERSION__", CARGO_AUDIT_VERSION),
-        ("__CARGO_CYCLONEDX_VERSION__", CARGO_CYCLONEDX_VERSION),
         ("__INNO_SETUP_VERSION__", INNO_SETUP_VERSION),
         ("__NIX_VERSION__", NIX_VERSION),
         ("__APPIMAGETOOL_VERSION__", APPIMAGETOOL_VERSION),
@@ -3096,15 +3130,7 @@ jobs:
           --release-notes-markdown "$(< target/release-files/release-notes.md)" \
           --out target/release-files/update-manifest.json
     - name: security::generate_cyclonedx_sbom
-      run: |
-        cargo install cargo-cyclonedx --version __CARGO_CYCLONEDX_VERSION__ --locked
-        cargo cyclonedx \
-          --manifest-path frame-app/Cargo.toml \
-          --format json \
-          --target all \
-          --override-filename Frame.cdx \
-          --spec-version 1.5
-        cp frame-app/Frame.cdx.json target/release-files/Frame.cdx.json
+      run: cargo xtask sbom --out target/release-files/Frame.cdx.json
     - name: release::build_isolated_manifest_signer
       run: cargo build --manifest-path tooling/manifest-signer/Cargo.toml --release --locked
     - name: release::upload_unsigned_metadata
@@ -4122,6 +4148,21 @@ mod tests {
             .unwrap();
         assert_eq!(selected["kind"], serde_json::json!(["bin"]));
         assert!(selected.get("required-features").is_none());
+    }
+
+    #[test]
+    fn release_sbom_lists_only_crates_frame_app_compiles() {
+        let bom = frame_app_sbom(&repo_root().unwrap()).unwrap();
+        let names: Vec<&str> = bom["components"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|component| component["name"].as_str())
+            .collect();
+        assert!(names.contains(&"gpui-ce"));
+        // In Cargo.lock, but no frame-app target compiles them.
+        assert!(!names.contains(&"proptest"));
+        assert!(!names.contains(&"borsh"));
     }
 
     #[test]

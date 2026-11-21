@@ -563,15 +563,7 @@ jobs:
           --release-notes-markdown "$(< target/release-files/release-notes.md)" \
           --out target/release-files/update-manifest.json
     - name: security::generate_cyclonedx_sbom
-      run: |
-        cargo install cargo-cyclonedx --version 0.5.9 --locked
-        cargo cyclonedx \
-          --manifest-path frame-app/Cargo.toml \
-          --format json \
-          --target all \
-          --override-filename Frame.cdx \
-          --spec-version 1.5
-        cp frame-app/Frame.cdx.json target/release-files/Frame.cdx.json
+      run: cargo xtask sbom --out target/release-files/Frame.cdx.json
     - name: release::build_isolated_manifest_signer
       run: cargo build --manifest-path tooling/manifest-signer/Cargo.toml --release --locked
     - name: release::upload_unsigned_metadata

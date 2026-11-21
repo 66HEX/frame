@@ -5590,6 +5590,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sbom-attest"
+version = "0.4.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ee5b4af7745a23d9657bf43c66a8eb4ecb35312148336b888072bffacd5f67f"
+dependencies = [
+ "anyhow",
+ "serde_json",
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "schemars"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7809,6 +7820,7 @@ name = "xtask"
 version = "0.1.0"
 dependencies = [
  "frame-updater",
+ "sbom-attest",
  "semver",
  "serde",
  "serde_json",
