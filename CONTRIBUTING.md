@@ -152,6 +152,28 @@ with Chocolatey:
 choco install innosetup --no-progress -y
 ```
 
+`script/bundle-windows.ps1` writes `target\Frame-x86_64.exe` and installs
+nothing unless you pass `-Install`/`-i`. The launch uses `Start-Process`
+without `-Wait`, so the script returns without waiting for or verifying the
+installer.
+
+The installer is per-user (`PrivilegesRequired=lowest`,
+`DefaultDirName={localappdata}\Programs\Frame`), so it appears in
+Settings > Apps for the current account only. The desktop shortcut is an
+optional task and is unchecked by default. To install quietly:
+
+```powershell
+.\target\Frame-x86_64.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
+```
+
+That install does not start Frame after installation. The Visual Studio
+developer shell is discovered with vswhere, and the Inno Setup compiler from
+PATH, the registry, or the default install directories; pass
+`-VsInstallPath <root>` (the directory containing
+`Common7\Tools\Launch-VsDevShell.ps1`), `-ISCCPath <ISCC.exe>`, or set the
+`ISCC_PATH` environment variable to override them. Pass `-SkipDevShell` to
+skip the developer shell import.
+
 ### Local Setup
 
 1. **Clone the repository:**

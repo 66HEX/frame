@@ -1,17 +1,20 @@
-[CmdletBinding()]
+[CmdletBinding(PositionalBinding = $false)]
 Param(
     [Parameter()][Alias('i')][switch]$Install,
     [Parameter()][Alias('h')][switch]$Help,
     [Parameter()][switch]$PrepareOnly,
     [Parameter()][switch]$PackageOnly,
-    [Parameter()][Alias('a')][string]$Architecture
+    [Parameter(Position = 0)][Alias('a')][string]$Architecture,
+    [Parameter()][string]$VsInstallPath,
+    [Parameter()][string]$ISCCPath,
+    [Parameter()][switch]$SkipDevShell
 )
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 
 function Help-Info {
-    Write-Output "Usage: bundle-windows.ps1 [-Architecture x86_64] [-Install] [-PrepareOnly|-PackageOnly]"
+    Write-Output "Usage: bundle-windows.ps1 [-Architecture x86_64] [-Install] [-PrepareOnly|-PackageOnly] [-VsInstallPath <root>] [-ISCCPath <exe>] [-SkipDevShell]"
     Write-Output "Build the Frame installer for Windows."
     Write-Output ""
     Write-Output "Options:"
@@ -19,6 +22,9 @@ function Help-Info {
     Write-Output "  -Install, -i      Run the installer after building."
     Write-Output "  -PrepareOnly      Build binaries and prepare installer inputs without signing."
     Write-Output "  -PackageOnly      Package prepared inputs without running Cargo."
+    Write-Output "  -VsInstallPath    Visual Studio installation root containing Common7\Tools\Launch-VsDevShell.ps1."
+    Write-Output "  -ISCCPath         Path to Inno Setup's ISCC.exe. The ISCC_PATH environment variable is honoured too."
+    Write-Output "  -SkipDevShell     Do not import the Visual Studio developer shell before building."
     Write-Output "  -Help, -h         Show this help message."
 }
 
@@ -63,13 +69,144 @@ function Invoke-Checked {
     }
 }
 
+function Find-VsDevShell {
+    param([string]$InstallPath)
+
+    $relativePath = 'Common7\Tools\Launch-VsDevShell.ps1'
+
+    # An explicit path is authoritative: do not silently fall back to another
+    # Visual Studio installation when the requested one is unusable.
+    if ($InstallPath) {
+        $candidate = Join-Path $InstallPath $relativePath
+        if (-not (Test-Path $candidate)) {
+            throw "Launch-VsDevShell.ps1 not found at $candidate (from -VsInstallPath). Point -VsInstallPath at a Visual Studio installation root containing Common7\Tools."
+        }
+        return $candidate
+    }
+
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+    if (-not (Test-Path $vswhere)) {
+        return $null
+    }
+
+    $arguments = @(
+        '-latest',
+        '-products', '*',
+        '-requires', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64',
+        '-property', 'installationPath'
+    )
+
+    # CONTRIBUTING documents the VS 2022 generation, but plain -latest can
+    # return a newer Visual Studio. Prefer 2022 and only then accept any
+    # installed version.
+    try {
+        $installations = @(& $vswhere @arguments -version '[17.0,18.0)')
+        $installations += @(& $vswhere @arguments)
+    }
+    catch {
+        return $null
+    }
+    $installations = $installations | Where-Object { $_ } | Select-Object -Unique
+
+    foreach ($installation in $installations) {
+        $candidate = Join-Path $installation.Trim() $relativePath
+        if (Test-Path $candidate) {
+            return $candidate
+        }
+    }
+
+    return $null
+}
+
 function Initialize-VsDevShell {
-    $vsDevShell = 'C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\Launch-VsDevShell.ps1'
-    if (Test-Path $vsDevShell) {
-        Push-Location
+    $vsDevShell = Find-VsDevShell -InstallPath $VsInstallPath
+    if (-not $vsDevShell) {
+        Write-Warning 'Visual Studio C++ tools not found; continuing without a developer shell. Pass -VsInstallPath <root> if Visual Studio lives elsewhere, or -SkipDevShell to skip this step.'
+        return
+    }
+
+    Write-Output "Using Visual Studio developer shell: $vsDevShell"
+    Push-Location
+    try {
         & $vsDevShell -Arch amd64 -HostArch amd64
+    }
+    finally {
         Pop-Location
     }
+}
+
+function Test-ISCCPath {
+    param([string]$Path)
+
+    if (-not $Path) {
+        return $false
+    }
+    try {
+        if ([IO.Path]::GetExtension($Path) -ne '.exe') {
+            return $false
+        }
+        return Test-Path -LiteralPath $Path -PathType Leaf
+    }
+    catch {
+        return $false
+    }
+}
+
+function Find-ISCC {
+    param([string]$ExplicitPath)
+
+    if ($ExplicitPath) {
+        if (-not (Test-ISCCPath $ExplicitPath)) {
+            throw "ISCC.exe not found at $ExplicitPath (from -ISCCPath)"
+        }
+        return $ExplicitPath
+    }
+
+    if ($env:ISCC_PATH) {
+        if (-not (Test-ISCCPath $env:ISCC_PATH)) {
+            throw "ISCC.exe not found at $env:ISCC_PATH (from ISCC_PATH)"
+        }
+        return $env:ISCC_PATH
+    }
+
+    $command = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+    if ($command -and (Test-ISCCPath $command.Source)) {
+        return $command.Source
+    }
+
+    $uninstallKeys = @(
+        'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Inno Setup 6_is1',
+        'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Inno Setup 6_is1'
+    )
+    foreach ($key in $uninstallKeys) {
+        foreach ($valueName in @('InstallLocation', 'Inno Setup: App Path')) {
+            $entry = Get-ItemProperty -Path $key -Name $valueName -ErrorAction SilentlyContinue
+            if (-not $entry) {
+                continue
+            }
+            $installLocation = $entry.$valueName
+            if (-not $installLocation) {
+                continue
+            }
+            $candidate = Join-Path $installLocation 'ISCC.exe'
+            if (Test-ISCCPath $candidate) {
+                return $candidate
+            }
+        }
+    }
+
+    $fallbacks = @(
+        'C:\Program Files (x86)\Inno Setup 6\ISCC.exe',
+        'C:\Program Files\Inno Setup 6\ISCC.exe',
+        "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+    )
+    foreach ($candidate in $fallbacks) {
+        if (Test-ISCCPath $candidate) {
+            return $candidate
+        }
+    }
+
+    return $null
 }
 
 function Prepare-BundleDirectory {
@@ -91,9 +228,8 @@ function Prepare-BundleDirectory {
 }
 
 function Build-Installer {
-    $innoSetupPath = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
-    if (-not (Test-Path $innoSetupPath)) {
-        throw "Inno Setup is required at $innoSetupPath"
+    if (-not $ISCC) {
+        throw 'ISCC.exe has not been resolved; this is a bug in bundle-windows.ps1'
     }
 
     if (Test-Path $InstallerPath) {
@@ -108,15 +244,36 @@ function Build-Installer {
         "/dResourcesDir=$InnoDir"
     )
 
-    Invoke-Checked $innoSetupPath "$RepoRoot\inno\frame.iss" @definitions
+    Invoke-Checked $ISCC "$RepoRoot\inno\frame.iss" @definitions
 
     if (-not (Test-Path $InstallerPath)) {
         throw "Missing generated installer: $InstallerPath"
     }
 }
 
+# Resolve Inno Setup before any Cargo work so a missing compiler fails fast.
+# -PrepareOnly stops at unsigned inputs and does not need Inno Setup.
+$ISCC = $null
+if (-not $PrepareOnly) {
+    $ISCC = Find-ISCC -ExplicitPath $ISCCPath
+    if (-not $ISCC) {
+        $checked = @(
+            'ISCC.exe on PATH',
+            'HKLM\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Inno Setup 6_is1',
+            'HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Inno Setup 6_is1',
+            'C:\Program Files (x86)\Inno Setup 6\ISCC.exe',
+            'C:\Program Files\Inno Setup 6\ISCC.exe',
+            "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+        )
+        throw ("Inno Setup 6 (ISCC.exe) not found. Checked:`n  " + ($checked -join "`n  ") + "`nPass -ISCCPath <ISCC.exe> or set ISCC_PATH if it lives elsewhere.`nInstall it with: choco install innosetup")
+    }
+    Write-Output "Using Inno Setup compiler: $ISCC"
+}
+
 if (-not $PackageOnly) {
-    Initialize-VsDevShell
+    if (-not $SkipDevShell) {
+        Initialize-VsDevShell
+    }
     Invoke-Checked rustup target add $Target
     Push-Location $RepoRoot
     try {
