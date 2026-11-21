@@ -43,7 +43,7 @@ If this is your first time using Frame, [install the app](/docs/installation) an
 
 The queue holds your source files. Select a row to inspect that file and change its conversion settings. The preview shows the selected source, while the inspector has three tabs:
 
-- **Metadata** shows information read from the source.
+- **Source** shows information read from the source.
 - **Output** controls the container, encoding, filters, tracks, and output metadata.
 - **Presets** applies a saved configuration or saves your current settings.
 
@@ -53,7 +53,7 @@ App **Settings** contains the default output folder, maximum concurrency, appear
 
 Frame supports common video, audio, and image formats. The output container determines which codecs and tracks are available. Hardware encoders also depend on your operating system and the encoders available in your FFmpeg build.
 
-A file extension does not describe everything inside a media file. For example, two MP4 files can use different video codecs, audio codecs, and pixel formats. Check the Metadata tab when a source behaves differently than expected.
+A file extension does not describe everything inside a media file. For example, two MP4 files can use different video codecs, audio codecs, and pixel formats. Check the **Source** tab when a source behaves differently than expected.
 
 ## Get help
 

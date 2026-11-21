@@ -8,13 +8,14 @@ use crate::app::layout::{FILE_ROW_HEIGHT, WORKSPACE_GAP};
 use crate::app::primitives::{
     FrameSurface, button_mouse_down, color, element_id, panel_bottom_separator,
 };
+use crate::app::queue::results::ResultAction;
 use crate::app::queue::state::{
     FILE_LIST_ACTION_BUTTON_SIZE, FILE_LIST_ACTION_ICON_SIZE, FILE_LIST_ACTIONS_WIDTH,
 };
 use crate::app::root::FrameRoot;
 use crate::file_queue::{
-    BatchSelectionState, FileItem, FileQueue, FileStateTone, RowActionAvailability,
-    RowPrimaryAction, RowSecondaryAction, format_file_size,
+    BatchSelectionState, FileItem, FileQueue, FileStateTone, RowPrimaryAction, RowSecondaryAction,
+    format_file_size,
 };
 use crate::numeric::usize_to_f32;
 use crate::{assets, theme};
@@ -405,8 +406,7 @@ pub(in crate::app) fn file_list_row(
                 )),
         )
         .child(row_actions_cell(
-            file.id.clone(),
-            file.row_actions(),
+            file,
             group_name,
             return_focus,
             palette,
@@ -441,14 +441,15 @@ pub(in crate::app) fn row_label(
 }
 
 pub(in crate::app) fn row_actions_cell(
-    file_id: String,
-    actions: RowActionAvailability,
+    file: &FileItem,
     group_name: String,
     return_focus: &QueueReturnFocus,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> impl IntoElement {
+    let file_id = file.id.clone();
+    let actions = file.row_actions();
     let mut cell = div()
         .id(element_id("file-row-actions", &file_id))
         .ml_4()
@@ -467,6 +468,19 @@ pub(in crate::app) fn row_actions_cell(
             cx.stop_propagation();
         }));
 
+    for action in [ResultAction::Open, ResultAction::Reveal] {
+        if let Some(button) = row_result_action_button(
+            &file_id,
+            file.completed_output_path().is_some(),
+            action,
+            palette,
+            window,
+            cx,
+        ) {
+            cell = cell.child(button);
+        }
+    }
+
     if let Some(primary) =
         row_primary_action_button(file_id.clone(), actions.primary, palette, window, cx)
     {
@@ -484,6 +498,46 @@ pub(in crate::app) fn row_actions_cell(
     }
 
     cell
+}
+
+fn row_result_action_button(
+    file_id: &str,
+    available: bool,
+    action: ResultAction,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> Option<gpui::Stateful<gpui::Div>> {
+    let focus = row_action_focus(file_id, action.key(), window, cx);
+    if !available {
+        if focus.is_focused(window) {
+            row_action_focus(file_id, "secondary", window, cx).focus(window, cx);
+        }
+        return None;
+    }
+    let id = file_id.to_string();
+    let key = format!("file-row-action-{}", action.key());
+    Some(
+        row_action_button(
+            element_id(&key, file_id),
+            element_id(&key, file_id),
+            match action {
+                ResultAction::Open => assets::ICON_FILE,
+                ResultAction::Reveal => assets::ICON_FOLDER_IMPORT,
+            },
+            action.label(),
+            true,
+            RowActionTone::Normal,
+            Some(&focus),
+            palette,
+            window,
+            cx,
+        )
+        .on_click(cx.listener(move |root, _: &ClickEvent, window, cx| {
+            cx.stop_propagation();
+            root.open_completed_result(&id, action, window, cx);
+        })),
+    )
 }
 
 fn row_primary_action_button(

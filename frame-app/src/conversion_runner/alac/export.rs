@@ -1,12 +1,12 @@
-//! Final conversion uses the existing process runner. Only repaired ALAC output
-//! is staged; publication has one controller-serialized cancellation cutoff.
+//! Final conversion uses the existing process runner. Native outputs are staged;
+//! repaired ALAC also receives semantic postflight before publication.
 
 use super::output;
 use super::prepare::{self, Bindings, Preparation, PreparedRepair};
 use super::process::Failure;
 use super::staging::StagedOutput;
 use crate::capabilities::runtime::Runtime;
-use crate::conversion_runner::completion::CompletionFile;
+use crate::conversion_runner::completion::{CompletionFile, SetupError};
 use crate::conversion_runner::controller::ConversionProcessController;
 use crate::conversion_runner::runner::{run_final_child, run_final_child_observed};
 use frame_core::args::AlacCopyObserver;
@@ -103,8 +103,8 @@ fn ordinary(
     controller: &ConversionProcessController,
     emit: &mut impl FnMut(ConversionEvent),
 ) -> Result<(), ConversionError> {
-    let mut completion = match CompletionFile::create() {
-        Ok(owner) => owner,
+    let (mut completion, mut stage) = match prepare_ordinary_output(output_path) {
+        Ok(files) => files,
         Err(error) => {
             return failed(
                 task,
@@ -116,36 +116,99 @@ fn ordinary(
             );
         }
     };
-    let mut was_cancelled = false;
+    let mut lifecycle = ChildState::default();
     let result = (|| {
         bindings.check(&|| controller.is_cancelled(&task.id))?;
         let args = observer.export_args(&[])?;
-        let mut command = command(&bindings.ffmpeg, &args, completion.path(), None)?;
+        let mut command = command(
+            &bindings.ffmpeg,
+            &args,
+            completion.path(),
+            stage.as_ref().map(StagedOutput::path),
+        )?;
         log_command(task, &command, emit);
         bindings.check(&|| controller.is_cancelled(&task.id))?;
-        was_cancelled = controller
+        if let Some(stage) = &stage {
+            stage
+                .ensure_unwritten()
+                .map_err(|error| Failure::invalid(&error))?;
+        }
+        lifecycle.cancelled = controller
             .take_cancelled(&task.id)
             .map_err(|error| Failure::invalid(&error))?;
-        if was_cancelled {
+        if lifecycle.cancelled {
             return Err(Failure::Cancelled);
         }
-        run_final_child(&mut command, task, controller, emit, &mut was_cancelled)
-            .map_err(|error| Failure::invalid(&error))?;
+        if stage.is_some() {
+            run_final_child_observed(
+                &mut command,
+                task,
+                controller,
+                emit,
+                &mut lifecycle.cancelled,
+                &mut lifecycle.started,
+            )
+        } else {
+            run_final_child(
+                &mut command,
+                task,
+                controller,
+                emit,
+                &mut lifecycle.cancelled,
+            )
+        }
+        .map_err(|error| Failure::invalid(&error))?;
         completion
             .verify()
             .map_err(|error| Failure::invalid(&error))
     })();
-    let cleanup = completion.cleanup();
+    let sealed = stage
+        .as_mut()
+        .filter(|_| lifecycle.started)
+        .map_or(Ok(()), |stage| {
+            stage.seal().map_err(|error| Failure::invalid(&error))
+        });
+    let result = result.and(sealed);
+    let cancelled = lifecycle.cancelled;
+    let mut cleanup = completion.cleanup();
     if let Err(failure) = result {
-        failed(task, controller, emit, &failure, was_cancelled, cleanup)
+        if let Some(stage) = stage {
+            cleanup.extend(stage.cleanup());
+        }
+        failed(task, controller, emit, &failure, cancelled, cleanup)
     } else {
         diagnostics(&task.id, cleanup, emit);
-        if consume_cancellation(task, controller, emit, was_cancelled)? {
+        if let Some(stage) = stage {
+            emit(ConversionEvent::log(
+                task.id.clone(),
+                "[INFO] Export verified; preparing publication",
+            ));
+            return publish(task, output_path, stage, controller, emit, cancelled);
+        }
+        if consume_cancellation(task, controller, emit, cancelled)? {
             return Ok(());
         }
         emit(ConversionEvent::completed(task.id.clone(), output_path));
         Ok(())
     }
+}
+
+fn prepare_ordinary_output(
+    output_path: &str,
+) -> Result<(CompletionFile, Option<StagedOutput>), SetupError> {
+    let completion = CompletionFile::create()?;
+    let stage = if crate::runtime_environment::is_flatpak() {
+        None
+    } else {
+        match StagedOutput::create(Path::new(output_path)) {
+            Ok(stage) => Some(stage),
+            Err(mut error) => {
+                error.diagnostics.extend(completion.cleanup());
+                return Err(error);
+            }
+        }
+    };
+    Ok((completion, stage))
 }
 
 fn repaired(

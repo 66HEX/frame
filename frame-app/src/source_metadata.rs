@@ -4,10 +4,12 @@ use crate::file_queue::FileQueue;
 use crate::runtime_binaries::ffprobe_executable;
 use crate::settings::{AudioTrack, SourceKind, SourceMetadata, SourceTags, SubtitleTrack};
 use frame_core::error::ConversionError;
-use frame_core::probe::{ffprobe_json_args, parse_ffprobe_stdout};
 use frame_core::types::{FfprobeTags, ProbeMetadata};
 use std::collections::HashMap;
-use std::process::Command;
+use std::path::Path;
+
+mod requests;
+pub(crate) use requests::{SourceMetadataProbe, SourceMetadataProbes};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum MetadataStatus {
@@ -160,10 +162,16 @@ pub fn source_metadata_from_probe(probe: ProbeMetadata) -> SourceMetadata {
 /// # Errors
 ///
 /// Returns an error when ffprobe cannot be executed, exits unsuccessfully, or
-/// emits metadata that cannot be parsed.
+/// exceeds the probe time or output limit, or emits invalid metadata.
 pub fn probe_source_metadata(file_path: &str) -> Result<SourceMetadata, ConversionError> {
-    let executable = ffprobe_executable();
-    probe_source_metadata_with_executable(file_path, &executable)
+    probe_source_metadata_cancellable(file_path, &|| false)
+}
+
+pub(crate) fn probe_source_metadata_cancellable(
+    file_path: &str,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<SourceMetadata, ConversionError> {
+    probe_source_metadata_with_executable_cancellable(file_path, &ffprobe_executable(), cancelled)
 }
 
 /// Probes source metadata with a specific ffprobe executable.
@@ -171,27 +179,21 @@ pub fn probe_source_metadata(file_path: &str) -> Result<SourceMetadata, Conversi
 /// # Errors
 ///
 /// Returns an error when the executable cannot be launched, exits with a
-/// non-zero status, or emits invalid probe JSON.
+/// non-zero status, exceeds the probe time or output limit, or emits invalid JSON.
 pub fn probe_source_metadata_with_executable(
     file_path: &str,
     executable: &str,
 ) -> Result<SourceMetadata, ConversionError> {
-    let output =
-        crate::process_launch::output(Command::new(executable).args(ffprobe_json_args(file_path)))
-            .map_err(ConversionError::Io)?;
+    probe_source_metadata_with_executable_cancellable(file_path, executable, &|| false)
+}
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let message = if stderr.trim().is_empty() {
-            format!("ffprobe exited with status {}", output.status)
-        } else {
-            stderr.trim().to_string()
-        };
-        return Err(ConversionError::Probe(message));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    parse_ffprobe_stdout(file_path, stdout).map(source_metadata_from_probe)
+pub(crate) fn probe_source_metadata_with_executable_cancellable(
+    file_path: &str,
+    executable: &str,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<SourceMetadata, ConversionError> {
+    crate::source_probe::probe(executable, Path::new(file_path), cancelled)
+        .map(source_metadata_from_probe)
 }
 
 fn source_kind_from_probe(kind: &str) -> Option<SourceKind> {
@@ -213,6 +215,9 @@ fn source_tags_from_probe(tags: FfprobeTags) -> SourceTags {
         comment: tags.comment.or(tags.description_upper),
     }
 }
+
+#[cfg(all(test, unix))]
+mod probe_tests;
 
 #[cfg(test)]
 mod tests {

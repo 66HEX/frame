@@ -101,6 +101,8 @@ pub struct VideoFiltersConfig {
     pub sharpen: FilterValue<u32>,
     /// Gaussian blur amount, 0..100.
     pub gaussian_blur: FilterValue<u32>,
+    /// Reduces camera shake with the single-pass `deshake` video filter.
+    pub stabilization_enabled: bool,
     /// Enables `hqdn3d` with a fixed strength preset.
     pub denoise_enabled: bool,
     /// Denoise strength preset.
@@ -135,6 +137,7 @@ impl Default for VideoFiltersConfig {
                 enabled: false,
                 value: 20,
             },
+            stabilization_enabled: false,
             denoise_enabled: false,
             denoise_strength: FilterStrength::Medium,
             deband: FilterValue {

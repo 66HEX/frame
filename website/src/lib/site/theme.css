@@ -5,10 +5,18 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @font-face {
-    font-family: 'Overused Grotesk';
-    src: url('../assets/fonts/overused-grotesk/OverusedGroteskRoman-VF.woff2') format('woff2');
-    font-weight: 300 900;
+    font-family: 'Inter';
+    src: url('../assets/fonts/inter/InterVariable.woff2') format('woff2');
+    font-weight: 100 900;
     font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Inter';
+    src: url('../assets/fonts/inter/InterVariable-Italic.woff2') format('woff2');
+    font-weight: 100 900;
+    font-style: italic;
     font-display: swap;
 }
 
@@ -135,8 +143,117 @@
 	--radius-3xl: calc(var(--radius) + 12px);
 	--radius-4xl: calc(var(--radius) + 16px);
 	--radius-full: 9999px;
-	--font-sans: 'Overused Grotesk', 'Helvetica Neue', Arial, sans-serif;
+	--font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 	--font-heading: var(--font-sans);
+
+	/* Linear variable Inter weights */
+	--font-weight-light: 300;
+	--font-weight-normal: 400;
+	--font-weight-medium: 510;
+	--font-weight-semibold: 590;
+	--font-weight-bold: 680;
+
+	/* Linear type scale (size, line-height, letter-spacing) */
+	--text-tiny: 0.625rem;
+	--text-tiny--line-height: 1.5;
+	--text-tiny--letter-spacing: -0.015em;
+
+	--text-micro: 0.75rem;
+	--text-micro--line-height: 1.4;
+	--text-micro--letter-spacing: 0;
+
+	--text-mini: 0.8125rem;
+	--text-mini--line-height: 1.5;
+	--text-mini--letter-spacing: -0.01em;
+
+	--text-small: 0.875rem;
+	--text-small--line-height: 1.5;
+	--text-small--letter-spacing: -0.013em;
+
+	--text-regular: 0.9375rem;
+	--text-regular--line-height: 1.6;
+	--text-regular--letter-spacing: -0.011em;
+
+	--text-large: 1.0625rem;
+	--text-large--line-height: 1.6;
+	--text-large--letter-spacing: 0;
+
+	--text-title-1: 1.0625rem;
+	--text-title-1--line-height: 1.4;
+	--text-title-1--letter-spacing: -0.012em;
+
+	--text-title-2: 1.25rem;
+	--text-title-2--line-height: 1.33;
+	--text-title-2--letter-spacing: -0.012em;
+
+	--text-title-3: 1.5rem;
+	--text-title-3--line-height: 1.33;
+	--text-title-3--letter-spacing: -0.012em;
+
+	--text-title-4: 2rem;
+	--text-title-4--line-height: 1.125;
+	--text-title-4--letter-spacing: -0.022em;
+
+	--text-title-5: 2.5rem;
+	--text-title-5--line-height: 1.1;
+	--text-title-5--letter-spacing: -0.022em;
+
+	--text-title-6: 3rem;
+	--text-title-6--line-height: 1;
+	--text-title-6--letter-spacing: -0.022em;
+
+	--text-title-7: 3.5rem;
+	--text-title-7--line-height: 1.1;
+	--text-title-7--letter-spacing: -0.022em;
+
+	--text-title-8: 4rem;
+	--text-title-8--line-height: 1.06;
+	--text-title-8--letter-spacing: -0.022em;
+
+	--text-title-9: 4.5rem;
+	--text-title-9--line-height: 1;
+	--text-title-9--letter-spacing: -0.022em;
+
+	/* Align default Tailwind text sizes with Linear's line-height and letter-spacing */
+	--text-xs: 0.75rem;
+	--text-xs--line-height: 1.4;
+	--text-xs--letter-spacing: 0;
+
+	--text-sm: 0.875rem;
+	--text-sm--line-height: 1.5;
+	--text-sm--letter-spacing: -0.013em;
+
+	--text-base: 1rem;
+	--text-base--line-height: 1.6;
+	--text-base--letter-spacing: -0.011em;
+
+	--text-lg: 1.125rem;
+	--text-lg--line-height: 1.4;
+	--text-lg--letter-spacing: -0.012em;
+
+	--text-xl: 1.25rem;
+	--text-xl--line-height: 1.33;
+	--text-xl--letter-spacing: -0.012em;
+
+	--text-2xl: 1.5rem;
+	--text-2xl--line-height: 1.33;
+	--text-2xl--letter-spacing: -0.012em;
+
+	--text-3xl: 2rem;
+	--text-3xl--line-height: 1.125;
+	--text-3xl--letter-spacing: -0.022em;
+
+	--text-4xl: 2.5rem;
+	--text-4xl--line-height: 1.1;
+	--text-4xl--letter-spacing: -0.022em;
+
+	--text-5xl: 3rem;
+	--text-5xl--line-height: 1;
+	--text-5xl--letter-spacing: -0.022em;
+
+	--text-6xl: 4rem;
+	--text-6xl--line-height: 1.06;
+	--text-6xl--letter-spacing: -0.022em;
 
 	/* Exact Graphite shadow scale shared with the native application. */
 --shadow-2xs:
@@ -212,8 +329,21 @@
 	html {
 		@apply font-sans;
 		font-kerning: normal;
-		font-optical-sizing: none;
+		font-optical-sizing: auto;
+		font-variation-settings: 'opsz' auto;
+		font-feature-settings: 'cv01', 'ss03';
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+		text-rendering: optimizeLegibility;
 		color-scheme: light;
+	}
+	code,
+	pre,
+	kbd,
+	samp,
+	.font-mono {
+		font-variation-settings: normal;
+		font-feature-settings: normal;
 	}
 	html.dark {
 		color-scheme: dark;

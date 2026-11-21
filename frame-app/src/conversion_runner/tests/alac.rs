@@ -1,5 +1,97 @@
 use super::*;
 
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn ordinary_alac_copy_keeps_the_output_private_until_publication() {
+    let sandbox = ConversionRunnerSandbox::new("alac-ordinary-publication");
+    let (source, expected) = generate_alac(&sandbox, 8192, "m4a", false);
+    let source_bytes = fs::read(&source).unwrap();
+    let output = sandbox.path("ordinary.m4a");
+    let mut observed_progress = false;
+    let mut exposed_before_completion = false;
+    let mut repaired = false;
+    run_conversion_task(
+        task(&sandbox, &source, "ordinary.m4a", false),
+        |event| match event {
+            ConversionEvent::Progress(progress) if progress.progress > 0.0 => {
+                observed_progress = true;
+                exposed_before_completion |= output.exists();
+            }
+            ConversionEvent::Log(log) => {
+                repaired |= log.line.contains("observing repaired packet timing");
+            }
+            _ => {}
+        },
+    )
+    .unwrap();
+
+    assert!(!repaired, "the fixture must use ordinary ALAC Copy");
+    assert!(observed_progress);
+    assert!(
+        !exposed_before_completion,
+        "ordinary ALAC Copy exposed a partial final output"
+    );
+    assert_samples(&decoded(&output, 0), &expected);
+    assert_eq!(fs::read(source).unwrap(), source_bytes);
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe; run with --ignored"]
+fn ordinary_alac_copy_cleans_cancelled_or_racing_publication_and_retries() {
+    let sandbox = ConversionRunnerSandbox::new("alac-ordinary-cutoff");
+    let (source, expected) = generate_alac(&sandbox, 8192, "m4a", false);
+    for cancel in [true, false] {
+        let controller = ConversionProcessController::default();
+        let name = if cancel {
+            "cancelled.m4a"
+        } else {
+            "collision.m4a"
+        };
+        let output = sandbox.path(name);
+        let task = task(&sandbox, &source, name, false);
+        let mut events = Vec::new();
+        let result = run_conversion_task_with_control(task.clone(), &controller, &mut |event| {
+            if matches!(&event, ConversionEvent::Log(log) if log.line == "[INFO] Export verified; preparing publication")
+            {
+                assert_eq!(controller.active_process_count().unwrap(), 0);
+                if cancel {
+                    controller.cancel_task(&task.id).unwrap();
+                } else {
+                    fs::write(&output, b"keep existing destination").unwrap();
+                }
+            }
+            events.push(event);
+        });
+        assert_eq!(result.is_ok(), cancel);
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, ConversionEvent::Completed(_)))
+        );
+        assert!(!fs::read_dir(&sandbox.root).unwrap().any(|entry| {
+            entry
+                .unwrap()
+                .file_name()
+                .to_string_lossy()
+                .starts_with(".frame-alac-")
+        }));
+        if cancel {
+            assert!(matches!(events.last(), Some(ConversionEvent::Cancelled(_))));
+            assert!(!output.exists());
+        } else {
+            assert_eq!(fs::read(&output).unwrap(), b"keep existing destination");
+        }
+        let mut retried_output = None;
+        run_conversion_task_with_control(task, &controller, &mut |event| {
+            if let ConversionEvent::Completed(completed) = event {
+                retried_output = Some(completed.output_path);
+            }
+        })
+        .unwrap();
+        assert_samples(&decoded(Path::new(&retried_output.unwrap()), 0), &expected);
+    }
+}
+
 fn generate_alac(
     sandbox: &ConversionRunnerSandbox,
     samples: u32,

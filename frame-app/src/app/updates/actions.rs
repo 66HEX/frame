@@ -41,6 +41,7 @@ impl FrameRoot {
 
     fn conversions_settled_for_update(&self) -> bool {
         all_conversions_settled(&self.file_queue)
+            && !self.source_frame_export_running()
             && self
                 .conversion_processes
                 .active_process_count()

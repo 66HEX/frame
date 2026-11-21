@@ -165,6 +165,9 @@ pub(in crate::app) struct PreviewTimecodeInputFocuses<'a> {
 }
 
 pub(in crate::app) struct PreviewPanelProps<'a> {
+    pub(in crate::app) source_export: super::actions::source_export::SourceFrameExportRenderState,
+    pub(in crate::app) source_export_focuses:
+        super::source_export_toolbar::SourceFrameExportFocuses<'a>,
     pub(in crate::app) canvas: PreviewCanvasRenderState,
     pub(in crate::app) crop: PreviewCropRenderState,
     pub(in crate::app) overlay: PreviewOverlayRenderState,
@@ -269,6 +272,11 @@ pub(in crate::app) fn preview_panel(
             props.timecode_focuses,
             props.transport,
             card_bounds,
+            props.source_export.visible.then(|| {
+                props
+                    .source_export
+                    .toolbar_control(props.source_export_focuses.export)
+            }),
             window,
             cx,
         ))

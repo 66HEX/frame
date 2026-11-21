@@ -62,16 +62,16 @@
 <LandingLayout>
 	<section aria-labelledby="error-title">
 		<Container class="flex min-h-128 flex-col items-start justify-center py-20 md:py-28 lg:py-32">
-			<p class="mb-6 text-sm font-medium text-muted-foreground tabular-nums" aria-hidden="true">
+			<p class="mb-6 text-small font-medium text-muted-foreground tabular-nums" aria-hidden="true">
 				{status}
 			</p>
 			<h1
 				id="error-title"
-				class="max-w-4xl text-4xl leading-none font-medium tracking-tight text-balance md:text-5xl lg:text-6xl"
+				class="max-w-4xl text-title-5 font-medium text-balance md:text-title-6 lg:text-title-7"
 			>
 				<span class="sr-only">Error {status}: </span>{message.title}
 			</h1>
-			<p class="mt-6 max-w-xl text-base leading-relaxed text-pretty text-muted-foreground">
+			<p class="mt-6 max-w-xl text-regular text-pretty text-muted-foreground md:text-large">
 				{message.description}
 			</p>
 			<div class="mt-8 flex flex-wrap items-center gap-3" data-sveltekit-reload>

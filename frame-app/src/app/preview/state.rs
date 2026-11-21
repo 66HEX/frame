@@ -104,6 +104,7 @@ pub(in crate::app) struct PreviewTransportState {
 }
 
 pub(in crate::app) struct PreviewUiState {
+    pub(in crate::app) source_export: super::actions::source_export::SourceFrameExportUiState,
     // Only deterministic visual fixtures seed this; real sessions always own frames.
     pub(in crate::app) static_fixture_file_id: Option<String>,
     pub(in crate::app) canvas_file_id: Option<String>,
@@ -152,6 +153,7 @@ pub(in crate::app) struct PreviewUiState {
 impl Default for PreviewUiState {
     fn default() -> Self {
         Self {
+            source_export: super::actions::source_export::SourceFrameExportUiState::default(),
             static_fixture_file_id: None,
             canvas_file_id: None,
             canvas: PreviewCanvasState::default(),

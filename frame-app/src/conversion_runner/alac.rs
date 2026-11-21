@@ -5,6 +5,6 @@ mod output;
 mod prepare;
 mod process;
 mod scans;
-mod staging;
+pub(super) mod staging;
 
 pub(super) use export::run;

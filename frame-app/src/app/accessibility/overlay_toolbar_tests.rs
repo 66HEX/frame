@@ -7,6 +7,111 @@ const CONTROLS: [&str; 4] = [
     "preview-overlay-done",
 ];
 
+fn assert_overlay_tool_visibility(case: &str, visible: bool) {
+    for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+        let mut app = TestAppContext::single();
+        let (root, cx) = test_window(&mut app, VisualFixture::PreviewReady, scale);
+        root.update(cx, |root, cx| {
+            let id = root.file_queue.selected_file_id().unwrap().to_owned();
+            let mut metadata = root.selected_source_metadata().unwrap();
+            metadata.media_kind = Some(match case {
+                "image" => crate::settings::SourceKind::Image,
+                "audio" => crate::settings::SourceKind::Audio,
+                _ => crate::settings::SourceKind::Video,
+            });
+            let config = &mut root.file_queue.selected_file_mut().unwrap().config;
+            config.container = match case {
+                "image" => "png",
+                "gif" => "gif",
+                "audio" | "audio-output" => "wav",
+                _ => "mp4",
+            }
+            .into();
+            config.processing_mode = if case == "copy" {
+                crate::settings::ProcessingMode::Copy
+            } else {
+                crate::settings::ProcessingMode::Reencode
+            };
+            if case == "loading" {
+                root.source_metadata.mark_loading(id.clone());
+            } else {
+                root.source_metadata.mark_ready(id.clone(), metadata);
+            }
+            if case == "locked-video" {
+                root.file_queue
+                    .update_status(&id, crate::file_queue::FileStatus::Converting, 10);
+            }
+            cx.notify();
+        });
+        cx.update(|window, _| window.set_a11y_forced(true));
+        draw(cx);
+        assert_eq!(
+            cx.debug_bounds("preview-tool-overlay").is_some(),
+            visible,
+            "overlay icon visibility for {case} at {scale:?}"
+        );
+        cx.update(|window, _| {
+            let tree = window.a11y_tree().unwrap();
+            let overlay = tree
+                .nodes
+                .iter()
+                .find(|(_, node)| node.label() == Some("Overlay image"));
+            assert_eq!(
+                overlay.is_some(),
+                visible,
+                "overlay accessibility for {case}"
+            );
+            if let Some((_, overlay)) = overlay {
+                assert_eq!(
+                    overlay.is_disabled(),
+                    matches!(case, "locked-video" | "copy" | "gif")
+                );
+            }
+        });
+        if let Some(first) = cx.debug_bounds("preview-tool-rotate") {
+            let last = cx
+                .debug_bounds(if visible {
+                    "preview-tool-overlay"
+                } else {
+                    "preview-tool-crop"
+                })
+                .unwrap();
+            let viewport = cx.debug_bounds("preview-viewport").unwrap();
+            let controls_center = (first.top() + last.bottom()) / 2.0;
+            assert!(
+                (controls_center - viewport.center().y).abs() <= px(1.0),
+                "the visible toolbar remains centered for {case}"
+            );
+        }
+    }
+}
+
+#[test]
+fn preview_overlay_tool_visibility_hides_unsupported_image_source() {
+    assert_overlay_tool_visibility("image", false);
+}
+
+#[test]
+fn preview_overlay_tool_visibility_preserves_supported_and_temporarily_locked_video() {
+    assert_overlay_tool_visibility("video", true);
+    assert_overlay_tool_visibility("locked-video", true);
+}
+
+#[test]
+fn preview_overlay_tool_visibility_preserves_existing_video_mode_visibility() {
+    for case in ["copy", "gif"] {
+        assert_overlay_tool_visibility(case, true);
+    }
+    for case in ["audio-output", "loading"] {
+        assert_overlay_tool_visibility(case, false);
+    }
+}
+
+#[test]
+fn preview_overlay_tool_visibility_hides_audio_source() {
+    assert_overlay_tool_visibility("audio", false);
+}
+
 fn bounds(cx: &mut VisualTestContext, id: &'static str) -> Bounds<Pixels> {
     cx.debug_bounds(id)
         .unwrap_or_else(|| panic!("missing {id}"))

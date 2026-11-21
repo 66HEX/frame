@@ -40,13 +40,12 @@ pub(in crate::app) trait FrameStyle: Styled + Sized {
     }
 
     fn dialog_surface(self, palette: &theme::ThemePalette) -> Self {
-        self.rounded(theme::ui_rem(theme::RADIUS_XL))
-            .bg(theme::shadows::surface_fill(
-                palette.surface_elevated,
-                palette,
-            ))
+        self.rounded(theme::ui_rem(theme::RADIUS_BASE * 1.4))
+            .bg(color(palette.token("popover")))
             .text_color(color(palette.token("popover-foreground")))
-            .shadow(theme::shadows::ShadowLevel::Xl.shadows())
+            .shadow_none()
+            .ring(px(1.0))
+            .ring_color(color(palette.token("foreground").with_opacity(0.1)))
     }
 
     fn tab_surface(self, selected: bool, palette: &theme::ThemePalette) -> Self {

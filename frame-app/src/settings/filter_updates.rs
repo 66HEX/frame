@@ -124,6 +124,12 @@ pub fn apply_video_denoise(
     before != config.video_filters
 }
 
+pub const fn apply_video_stabilization(config: &mut ConversionConfig, enabled: bool) -> bool {
+    let before = config.video_filters.stabilization_enabled;
+    config.video_filters.stabilization_enabled = enabled;
+    before != enabled
+}
+
 pub const fn apply_video_grayscale(config: &mut ConversionConfig, enabled: bool) -> bool {
     let before = config.video_filters.grayscale;
     config.video_filters.grayscale = enabled;
@@ -238,6 +244,7 @@ pub fn has_active_video_filters(config: &ConversionConfig) -> bool {
         || filters.temperature.enabled
         || filters.sharpen.enabled
         || filters.gaussian_blur.enabled
+        || filters.stabilization_enabled
         || filters.denoise_enabled
         || filters.deband.enabled
         || filters.vignette.enabled
@@ -307,6 +314,37 @@ fn normalize_pass_gap(filters: &mut AudioFiltersConfig, edited: PassFilterEdited
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn stabilization_persists_active_intent_and_reset_clears_it() {
+        let mut config = ConversionConfig {
+            video_filters: serde_json::from_value(
+                serde_json::json!({"stabilizationEnabled": true}),
+            )
+            .unwrap(),
+            ..Default::default()
+        };
+        assert!(has_active_video_filters(&config));
+        assert!(!apply_video_stabilization(&mut config, true));
+        let legacy: VideoFiltersConfig = serde_json::from_str("{}").unwrap();
+        assert!(!legacy.stabilization_enabled);
+        let saved = serde_json::to_value(&config).unwrap();
+        assert_eq!(saved["videoFilters"]["stabilizationEnabled"], true);
+        assert!(reset_video_filters(&mut config));
+        assert!(!has_active_video_filters(&config));
+    }
+
+    #[test]
+    fn stabilization_is_removed_for_still_image_sources() {
+        let mut config = ConversionConfig::default();
+        apply_video_stabilization(&mut config, true);
+        let metadata = crate::settings::SourceMetadata {
+            media_kind: Some(crate::settings::SourceKind::Image),
+            ..Default::default()
+        };
+        crate::settings::normalize_output_config(&mut config, Some(&metadata));
+        assert!(!config.video_filters.stabilization_enabled);
+    }
 
     #[test]
     fn reset_audio_filters_preserves_audio_bitrate_mode() {

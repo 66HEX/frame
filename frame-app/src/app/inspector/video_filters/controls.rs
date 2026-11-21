@@ -11,11 +11,64 @@ use crate::app::primitives::ButtonVariant;
 use crate::app::root::FrameRoot;
 use crate::settings::{
     DeinterlaceMode, FilterStrength, apply_video_deinterlace, apply_video_denoise,
-    apply_video_grayscale, reset_video_filters,
+    apply_video_grayscale, apply_video_stabilization, reset_video_filters,
 };
 use crate::{assets, theme};
 use gpui::prelude::*;
-use gpui::{ClickEvent, Context, Window, div};
+use gpui::{ClickEvent, Context, KeyDownEvent, Window, div};
+
+pub(super) fn settings_video_stabilization_control(
+    checked: bool,
+    available: bool,
+    settings_disabled: bool,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Stateful<gpui::Div> {
+    let disabled = settings_disabled || (!available && !checked);
+    let focus = window
+        .use_keyed_state("settings-video-stabilization-focus", cx, |_, cx| {
+            cx.focus_handle()
+        })
+        .read(cx)
+        .clone()
+        .tab_stop(!disabled);
+    crate::app::components::frame_checkbox_row_with_focus(
+        "settings-video-stabilization-toggle",
+        "Stabilize video",
+        "",
+        checked,
+        disabled,
+        &focus,
+        palette,
+        window,
+        cx,
+        move |root, _event, _window, cx| {
+            toggle_stabilization(root, checked, disabled, cx);
+        },
+    )
+    .debug_selector(|| "settings-video-stabilization-toggle".into())
+    .on_key_down(cx.listener(move |root, event: &KeyDownEvent, window, cx| {
+        if focus.is_focused(window) && matches!(event.keystroke.key.as_str(), "space" | "enter") {
+            cx.stop_propagation();
+            toggle_stabilization(root, checked, disabled, cx);
+        }
+    }))
+}
+
+fn toggle_stabilization(
+    root: &mut FrameRoot,
+    checked: bool,
+    disabled: bool,
+    cx: &mut Context<FrameRoot>,
+) {
+    if disabled || (!checked && !root.available_filters.deshake) {
+        return;
+    }
+    if root.update_selected_config(|config| apply_video_stabilization(config, !checked)) {
+        cx.notify();
+    }
+}
 
 pub(super) fn settings_video_filter_reset(
     target: VideoFilterRangeTarget,

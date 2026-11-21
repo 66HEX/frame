@@ -39,6 +39,7 @@ impl gpui::Render for TitlebarTestView {
                 .child(titlebar_for_platform(
                     platform,
                     state,
+                    None,
                     theme::palette(ColorTheme::Dark),
                     window,
                     cx,

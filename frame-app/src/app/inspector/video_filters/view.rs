@@ -2,6 +2,7 @@ use crate::app::inspector::panel::settings_field;
 use crate::app::inspector::video_filters::controls::{
     settings_video_deinterlace_control, settings_video_denoise_control,
     settings_video_filters_reset_all, settings_video_grayscale_control,
+    settings_video_stabilization_control,
 };
 use crate::app::inspector::video_filters::range::{
     VideoFilterRangeTarget, settings_video_filter_range_field,
@@ -190,6 +191,16 @@ pub(in crate::app) fn settings_video_filters_tab(
         );
 
     if !is_image_source {
+        content = content.child(settings_field("Motion", palette).child(
+            settings_video_stabilization_control(
+                filters.stabilization_enabled,
+                available_filters.deshake,
+                settings_disabled,
+                palette,
+                window,
+                cx,
+            ),
+        ));
         content = content.child(settings_field("Interlace", palette).child(
             settings_video_deinterlace_control(
                 filters.deinterlace,

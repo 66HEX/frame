@@ -1,0 +1,128 @@
+# Generated from xtask::native_qa.
+# Rebuild with `cargo xtask workflows`.
+name: native-qa
+on:
+  pull_request:
+    types: [labeled]
+permissions:
+  contents: read
+concurrency:
+  group: native-qa-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  package:
+    if: >-
+      github.event.action == 'labeled' &&
+      (github.event.label.name == 'qa-native' || github.event.label.name == 'qa-native-check') &&
+      github.event.repository.private == false
+    name: native QA (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            platform: linux-x86_64
+            archive_limit_mib: 80
+          - runner: ubuntu-22.04-arm
+            platform: linux-aarch64
+            archive_limit_mib: 80
+          - runner: windows-2022
+            platform: windows-x86_64
+            archive_limit_mib: 140
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    env:
+      CARGO_BUILD_JOBS: 3
+      FRAME_QA_PR_HEAD: ${{ github.event.pull_request.head.sha }}
+    steps:
+    - name: steps::checkout_repo
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+        ref: ${{ github.event.pull_request.head.sha }}
+    - name: steps::setup_rust
+      shell: bash
+      run: |
+        rustup toolchain install 1.95.0 --profile minimal
+        rustup default 1.95.0
+        test "$(rustc --version | awk '{print $2}')" = "1.95.0"
+    - name: steps::setup_linux
+      if: runner.os == 'Linux'
+      run: |
+        ubuntu_archive='https://archive.ubuntu.com/ubuntu'
+        if ! getent ahosts archive.ubuntu.com >/dev/null; then
+          ubuntu_archive='https://mirrors.edge.kernel.org/ubuntu'
+        fi
+        echo "Using Ubuntu archive: $ubuntu_archive"
+        sudo find /etc/apt -maxdepth 2 -type f \( -name '*.list' -o -name '*.sources' \) -exec sed -E -i "s|mirror\+file:/etc/apt/apt-mirrors\.txt|${ubuntu_archive}/|g;s|https?://(azure\.)?archive\.ubuntu\.com/ubuntu|${ubuntu_archive}|g" {} +
+        sudo apt-get update
+        sudo apt-get install -y clang desktop-file-utils libasound2-dev libdrm-dev libfontconfig1-dev libfreetype6-dev libx11-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev pkg-config
+    - name: qa::test_windows_job_helper
+      if: runner.os == 'Windows'
+      shell: powershell
+      run: '& .\script\qa\tests\test-windows-job.ps1 -Runs .\target\native-qa-helper'
+    - name: qa::setup_media_tools
+      run: cargo xtask setup-ffmpeg
+    - name: qa::test_process_lifecycle
+      run: cargo test --locked --release -p frame-app --features qa-harness --lib bounded_process -- --include-ignored --test-threads=1
+    - name: qa::test_source_probe
+      run: cargo test --locked --release -p frame-app --features qa-harness --lib source_probe -- --include-ignored --test-threads=1
+    - name: qa::test_importer
+      if: runner.os == 'Linux'
+      run: cargo test --locked --release -p frame-app --features qa-harness --lib source_metadata -- --test-threads=1
+    - name: qa::test_import_lifecycle
+      run: cargo test --locked --release -p frame-app --features qa-harness --lib app::queue::metadata -- --test-threads=1
+    - name: qa::test_publication
+      run: cargo test --locked --release -p frame-app --features qa-harness --lib conversion_runner -- --include-ignored --test-threads=1
+    - name: qa::test_source_frame_export
+      run: cargo test --locked --release -p frame-app --features qa-harness --lib frame_export -- --include-ignored --test-threads=1
+    - name: qa::test_preview_lifecycle
+      run: cargo test --locked --release -p frame-app --features qa-harness --lib preview_engine -- --test-threads=1
+    - name: qa::test_preview_pipe_throughput
+      if: runner.os != 'Windows'
+      run: cargo test --locked --release -p frame-app --features qa-harness --lib full_resolution_frame_does_not_pay_a_polling_sleep_for_each_producer_burst -- --ignored --test-threads=1
+    - name: qa::test_preview_runtime
+      run: cargo test --locked --release -p frame-app --features qa-harness --lib preview_engine::tests::ffmpeg_ -- --ignored --test-threads=1 --skip ffmpeg_preview_session_collects_audio_video_metrics_for_sync_fixture --skip ffmpeg_audio_prewarm_wakes_through_preview_session_lifecycle
+    - name: qa::test_temporal_snapshot
+      run: cargo test --locked --release -p frame-app --features qa-harness --lib preview_engine::tests::temporal_snapshot -- --ignored --test-threads=1
+    - name: qa::test_small_source_preview
+      run: cargo test --locked --release -p frame-app --features qa-harness --lib preview_engine::tests::small_sources::ffmpeg_ -- --ignored --test-threads=1
+    - name: qa::test_isolated_profile
+      run: cargo test --locked --release -p frame-app --features qa-harness --lib app::qa -- --test-threads=1
+    - name: qa::test_workspace_recovery
+      run: cargo test --locked --release -p frame-app --features qa-harness --lib recovery -- --test-threads=1
+    - name: qa::test_command_line
+      run: cargo test --locked --release -p frame-app --features qa-harness --test qa_harness -- --include-ignored --test-threads=1
+    - name: qa::test_package_contract
+      run: python -B -m unittest discover -s script/tests -p test_native_qa.py -v
+    - name: qa::build
+      run: cargo build --release --locked -p frame-app --features qa-harness --bin frame-qa
+    - name: qa::package
+      run: python script/native-qa.py build --output target/native-qa --archive-limit-mib ${{ matrix.archive_limit_mib }}
+    - name: qa::verify_relocated_package
+      run: python script/native-qa.py verify --output target/native-qa
+    - name: qa::report_evidence
+      if: always()
+      shell: bash
+      run: |
+        python - <<'PY'
+        import sys
+        from pathlib import Path
+        sys.stdout.reconfigure(encoding='utf-8')
+        for name in ('build.json', 'verification.json', 'evidence.json'):
+            path = Path('target/native-qa') / name
+            if path.is_file():
+                print(path.read_text(encoding='utf-8'))
+        helper = Path('target/native-qa-helper/windows-job-self-test.json')
+        if helper.is_file():
+            print(helper.read_text(encoding='utf-8-sig'))
+        PY
+    - name: qa::upload
+      if: github.event.label.name == 'qa-native'
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: frame-qa-${{ github.event.pull_request.head.sha }}-${{ matrix.platform }}
+        path: target/native-qa/*.zip
+        if-no-files-found: error
+        compression-level: 0
+        retention-days: 1

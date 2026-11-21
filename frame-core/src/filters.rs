@@ -671,7 +671,7 @@ fn build_preview_filter_complex(
     frame_policy: PreviewFramePolicy,
 ) -> String {
     let source_time_seconds = SubtitleClock::NumericPreview(source_time_seconds);
-    let base_filters = match base {
+    let mut base_filters = match base {
         VisualFilterBase::Source => Vec::new(),
         VisualFilterBase::Video => {
             build_encode_video_filters_at_time(config, true, source_time_seconds, context)
@@ -680,6 +680,15 @@ fn build_preview_filter_complex(
             build_video_filters_at_time(config, true, source_time_seconds, context)
         }
     };
+    if frame_policy == PreviewFramePolicy::Snapshot
+        && let Some(index) = base_filters
+            .iter()
+            .position(|filter| filter.starts_with("bwdif="))
+    {
+        // Supply a same-frame temporal neighbour before another decoded frame
+        // can reinitialize the graph. loop retains the selected frame's PTS.
+        base_filters.insert(index, "loop=loop=1:size=1:start=0".to_string());
+    }
     let mut preview_filters = Vec::new();
     if base == VisualFilterBase::Image {
         preview_filters.extend(image_output_format(config).map(str::to_owned));

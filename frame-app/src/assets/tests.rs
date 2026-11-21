@@ -125,6 +125,7 @@ mod frame_assets {
             ICON_HARD_DRIVE,
             ICON_FILE_VIDEO,
             ICON_FILE_IMAGE,
+            ICON_CAMERA_FRAME,
             ICON_MUSIC,
             ICON_VIDEO_FILTERS,
             ICON_AUDIO_FILTERS,

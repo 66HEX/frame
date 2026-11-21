@@ -52,3 +52,9 @@ mod tab_indicator;
 pub(in crate::app) use tab_indicator::FrameTabIndicator;
 
 pub(in crate::app) use option_tabs::{frame_option_tabs, frame_tab_trigger};
+
+#[cfg(test)]
+mod dialog_tests;
+
+mod dialog;
+pub(in crate::app) use dialog::*;

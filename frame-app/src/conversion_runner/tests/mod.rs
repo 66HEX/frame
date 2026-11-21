@@ -20,6 +20,7 @@ mod completion;
 mod config;
 mod controller;
 mod ffmpeg;
+mod opus;
 mod paths;
 mod progress;
 

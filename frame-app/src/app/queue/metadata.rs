@@ -1,6 +1,8 @@
 use crate::app::root::FrameRoot;
 use crate::settings::{SourceMetadata, initialize_output_config};
-use crate::source_metadata::{SourceMetadataEntry, probe_source_metadata};
+use crate::source_metadata::{
+    SourceMetadataEntry, SourceMetadataProbe, probe_source_metadata_cancellable,
+};
 use frame_core::error::ConversionError;
 use gpui::Context;
 use gpui::prelude::*;
@@ -41,17 +43,22 @@ impl FrameRoot {
         normalize_selected_config: bool,
         cx: &mut Context<Self>,
     ) {
-        self.source_metadata.mark_loading(file_id.clone());
+        let Some(request) = self.begin_source_metadata_probe(file_id, file_path) else {
+            return;
+        };
         cx.notify();
 
         cx.spawn(async move |this, cx| {
-            let result = cx
-                .background_spawn(async move { probe_source_metadata(&file_path) })
+            let (request, result) = cx
+                .background_spawn(async move {
+                    let result = request.run_with(probe_source_metadata_cancellable);
+                    (request, result)
+                })
                 .await;
 
             this.update(cx, |root, cx| {
                 root.complete_source_metadata_probe(
-                    &file_id,
+                    &request,
                     result,
                     normalize_selected_config,
                     || cx.notify(),
@@ -62,14 +69,36 @@ impl FrameRoot {
         .detach();
     }
 
+    fn begin_source_metadata_probe(
+        &mut self,
+        file_id: String,
+        file_path: String,
+    ) -> Option<SourceMetadataProbe> {
+        if self
+            .file_queue
+            .file_by_id(&file_id)
+            .is_none_or(|file| file.path != file_path)
+        {
+            return None;
+        }
+        self.source_metadata.mark_loading(file_id.clone());
+        Some(self.metadata_probes.begin(file_id, file_path))
+    }
+
     fn complete_source_metadata_probe(
         &mut self,
-        file_id: &str,
+        request: &SourceMetadataProbe,
         result: Result<SourceMetadata, ConversionError>,
         normalize_selected_config: bool,
         notify: impl FnOnce(),
     ) {
-        if self.file_queue.file_by_id(file_id).is_none() {
+        let file_id = request.file_id.as_str();
+        if !self.metadata_probes.finish(request)
+            || self
+                .file_queue
+                .file_by_id(file_id)
+                .is_none_or(|file| file.path != request.file_path)
+        {
             return;
         }
         match result {
@@ -117,6 +146,11 @@ mod tests {
         root
     }
 
+    fn request(root: &mut FrameRoot, id: &str) -> SourceMetadataProbe {
+        let path = root.file_queue.file_by_id(id).unwrap().path.clone();
+        root.begin_source_metadata_probe(id.into(), path).unwrap()
+    }
+
     #[test]
     fn removed_probe_success_and_error_do_not_restore_metadata_or_notify() {
         for result in [
@@ -124,10 +158,11 @@ mod tests {
             Err(ConversionError::Probe("late failure".into())),
         ] {
             let mut root = root_with_file("old");
+            let request = request(&mut root, "old");
             assert!(root.remove_file_from_queue("old"));
             let before = root.source_metadata.clone();
             let mut notifications = 0;
-            root.complete_source_metadata_probe("old", result, true, || notifications += 1);
+            root.complete_source_metadata_probe(&request, result, true, || notifications += 1);
             assert_eq!(root.source_metadata, before);
             assert!(root.file_queue.files().is_empty());
             assert_eq!(notifications, 0);
@@ -137,6 +172,7 @@ mod tests {
     #[test]
     fn old_probe_completion_cannot_mutate_a_reimport_with_a_new_id() {
         let mut root = root_with_file("old");
+        let request = request(&mut root, "old");
         assert!(root.remove_file_from_queue("old"));
         root.file_queue
             .add_file(FileItem::from_path("new", "/tmp/reimport.wav", 1));
@@ -147,7 +183,7 @@ mod tests {
             Ok(metadata()),
             Err(ConversionError::Probe("late failure".into())),
         ] {
-            root.complete_source_metadata_probe("old", result, true, || notifications += 1);
+            root.complete_source_metadata_probe(&request, result, true, || notifications += 1);
         }
         assert_eq!(
             root.source_metadata.entry_for("old").status,
@@ -159,7 +195,8 @@ mod tests {
         );
         assert_eq!(root.file_queue.file_by_id("new").unwrap().config, before);
         assert_eq!(notifications, 0);
-        root.complete_source_metadata_probe("new", Ok(metadata()), true, || notifications += 1);
+        let next = self::request(&mut root, "new");
+        root.complete_source_metadata_probe(&next, Ok(metadata()), true, || notifications += 1);
         assert_eq!(
             root.source_metadata.entry_for("new").status,
             MetadataStatus::Ready
@@ -175,7 +212,10 @@ mod tests {
                 .add_file(FileItem::from_path("unselected", "/tmp/other.wav", 1));
             root.subtitle_ui.external_track_index = Some(9);
             let mut notifications = 0;
-            root.complete_source_metadata_probe(id, Ok(metadata()), true, || notifications += 1);
+            let request = request(&mut root, id);
+            root.complete_source_metadata_probe(&request, Ok(metadata()), true, || {
+                notifications += 1;
+            });
             assert_eq!(
                 root.file_queue.file_by_id(id).unwrap().config.container,
                 "mp3"
@@ -219,7 +259,8 @@ mod tests {
                 root.update_ui.status = UpdateStatus::Installing;
             }
             let mut notifications = 0;
-            root.complete_source_metadata_probe("existing", Ok(metadata()), normalize, || {
+            let request = request(&mut root, "existing");
+            root.complete_source_metadata_probe(&request, Ok(metadata()), normalize, || {
                 notifications += 1;
             });
             assert_eq!(
@@ -238,8 +279,9 @@ mod tests {
     fn existing_probe_error_still_publishes_error_and_notifies_once() {
         let mut root = root_with_file("existing");
         let mut notifications = 0;
+        let request = request(&mut root, "existing");
         root.complete_source_metadata_probe(
-            "existing",
+            &request,
             Err(ConversionError::Probe("failure".into())),
             false,
             || notifications += 1,
@@ -250,3 +292,6 @@ mod tests {
         assert_eq!(notifications, 1);
     }
 }
+
+#[cfg(test)]
+mod lifecycle_tests;

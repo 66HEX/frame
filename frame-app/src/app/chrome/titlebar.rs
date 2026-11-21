@@ -40,29 +40,41 @@ impl FrameTitlebarPlatform {
 
 pub(in crate::app) fn titlebar(
     state: FrameAppState,
+    source_activity: Option<gpui::AnyElement>,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
-    titlebar_for_platform(FrameTitlebarPlatform::current(), state, palette, window, cx)
+    titlebar_for_platform(
+        FrameTitlebarPlatform::current(),
+        state,
+        source_activity,
+        palette,
+        window,
+        cx,
+    )
 }
 
 pub(in crate::app) fn titlebar_for_platform(
     platform: FrameTitlebarPlatform,
     state: FrameAppState,
+    source_activity: Option<gpui::AnyElement>,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
 ) -> gpui::Div {
     match platform {
-        FrameTitlebarPlatform::Macos => macos_titlebar(state, palette, window, cx),
-        FrameTitlebarPlatform::Windows => windows_titlebar(state, palette, window, cx),
-        FrameTitlebarPlatform::Linux => linux_titlebar(state, palette, window, cx),
+        FrameTitlebarPlatform::Macos => macos_titlebar(state, source_activity, palette, window, cx),
+        FrameTitlebarPlatform::Windows => {
+            windows_titlebar(state, source_activity, palette, window, cx)
+        }
+        FrameTitlebarPlatform::Linux => linux_titlebar(state, source_activity, palette, window, cx),
     }
 }
 
 pub(in crate::app) fn macos_titlebar(
     state: FrameAppState,
+    source_activity: Option<gpui::AnyElement>,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
@@ -97,6 +109,7 @@ pub(in crate::app) fn macos_titlebar(
                 .items_center()
                 .mt_2()
                 .gap_2()
+                .children(source_activity)
                 .child(titlebar_settings_button(palette, window, cx))
                 .when(show_workspace_controls, |this| {
                     this.child(titlebar_add_source_button(palette, window, cx))
@@ -107,6 +120,7 @@ pub(in crate::app) fn macos_titlebar(
 
 pub(in crate::app) fn windows_titlebar(
     state: FrameAppState,
+    source_activity: Option<gpui::AnyElement>,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
@@ -120,6 +134,7 @@ pub(in crate::app) fn windows_titlebar(
         .child(platform_titlebar_content(
             FrameTitlebarPlatform::Windows,
             state,
+            source_activity,
             palette,
             window,
             cx,
@@ -129,6 +144,7 @@ pub(in crate::app) fn windows_titlebar(
 
 pub(in crate::app) fn linux_titlebar(
     state: FrameAppState,
+    source_activity: Option<gpui::AnyElement>,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
@@ -142,6 +158,7 @@ pub(in crate::app) fn linux_titlebar(
         .child(platform_titlebar_content(
             FrameTitlebarPlatform::Linux,
             state,
+            source_activity,
             palette,
             window,
             cx,
@@ -208,6 +225,7 @@ pub(super) fn titlebar_drag_surface(
 pub(in crate::app) fn platform_titlebar_content(
     platform: FrameTitlebarPlatform,
     state: FrameAppState,
+    source_activity: Option<gpui::AnyElement>,
     palette: &'static theme::ThemePalette,
     window: &mut Window,
     cx: &mut Context<FrameRoot>,
@@ -230,7 +248,9 @@ pub(in crate::app) fn platform_titlebar_content(
             .flex()
             .items_center()
             .justify_end()
+            .gap_2()
             .pr(theme::ui_rem(window_controls_width + CONTENT_PADDING))
+            .children(source_activity)
             .child(titlebar_settings_button(palette, window, cx));
     }
 
@@ -267,6 +287,7 @@ pub(in crate::app) fn platform_titlebar_content(
                         .flex()
                         .items_center()
                         .gap_2()
+                        .children(source_activity)
                         .when(show_workspace_controls, |this| {
                             this.child(titlebar_settings_button(palette, window, cx))
                                 .child(titlebar_add_source_button(palette, window, cx))

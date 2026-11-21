@@ -9,7 +9,9 @@
 //! and shell activation are not covered by this cooperative app contract.
 
 use std::io;
-use std::process::{Child, Command, Output, Stdio};
+use std::process::{Child, Command};
+#[cfg(test)]
+use std::process::{Output, Stdio};
 
 #[cfg(windows)]
 static LAUNCH_GATE: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -51,6 +53,7 @@ pub fn spawn(command: &mut Command) -> io::Result<Child> {
 }
 
 /// Captures the same default streams as `Command::output`, waiting outside the gate.
+#[cfg(test)]
 pub fn output(command: &mut Command) -> io::Result<Output> {
     command
         .stdin(Stdio::null())

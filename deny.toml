@@ -12,6 +12,7 @@ ignore = [
   { id = "RUSTSEC-2026-0370", reason = "zvariant was merged into zbus 6; current AccessKit, ashpd, notify-rust, and oo7 require zbus 5, so migration must preserve Linux accessibility, portals, notifications, and credential storage together; this is an unmaintained advisory, not a reported vulnerability" },
   { id = "RUSTSEC-2026-0371", reason = "zbus_names was merged into zbus 6; the Linux desktop dependency stack still requires zbus 5; remove with its coordinated migration; this is an unmaintained advisory, not a reported vulnerability" },
   { id = "RUSTSEC-2026-0372", reason = "zvariant_derive was merged into zbus 6; the Linux desktop dependency stack still requires zbus 5; remove with its coordinated migration; this is an unmaintained advisory, not a reported vulnerability" },
+  { id = "RUSTSEC-2026-0543", reason = "chrono is required by vendored gpui-ce and gpui_ce_scheduler; this is an unmaintained advisory with no upstream patch yet, not a reported vulnerability or unsoundness" },
 ]
 
 [licenses]

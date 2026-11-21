@@ -42,7 +42,7 @@ readme = "README.md"
 accesskit = { version = "0.25.0", features = ["enumn"] }
 accesskit_consumer = "0.39.0"
 accesskit_macos = "0.27.0"
-accesskit_unix = "0.23.0"
+accesskit_unix = "0.24.0"
 accesskit_windows = "0.35.0"
 anyhow = "1.0.86"
 async-task = "4.7"
@@ -83,7 +83,7 @@ inventory = "0.3.19"
 itertools = "0.15.0"
 log = { version = "0.4.16", features = ["kv_unstable_serde", "serde"] }
 palette = { version = "0.7.6", features = ["serializing"] }
-parking_lot = "0.12.1"
+parking_lot = "0.13.0"
 phf = { version = "0.13.1", features = ["macros"] }
 postage = { version = "0.5", features = ["futures-traits"] }
 proptest = { version = "1.10", features = ["attr-macro"] }
@@ -113,7 +113,7 @@ skrifa = "0.44.0"
 block = "0.1"
 block2 = "0.6"
 cbindgen = { version = "0.28.0", default-features = false }
-core-foundation = "=0.10.0"
+core-foundation = "=0.10.1"
 core-foundation-sys = "0.8.6"
 core-graphics = "0.24"
 core-text = "21"

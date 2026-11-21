@@ -8,7 +8,7 @@ impl SettingsTab {
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
-            Self::Metadata => "Metadata",
+            Self::Metadata => "Source",
             Self::Output => "Output",
             Self::Presets => "Presets",
         }

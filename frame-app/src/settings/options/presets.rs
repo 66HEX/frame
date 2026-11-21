@@ -163,7 +163,9 @@ pub fn preset_options(
         .iter()
         .map(|preset| {
             let is_compatible = preset_is_compatible(preset, metadata);
-            let is_selected = configs_match(config, &preset.config);
+            let mut applied = config.clone();
+            crate::settings::apply_preset(&mut applied, preset, metadata);
+            let is_selected = is_compatible && configs_match(config, &applied);
             PresetOption {
                 preset: preset.clone(),
                 is_selected,
@@ -182,29 +184,17 @@ pub fn preset_options(
 
 #[must_use]
 pub fn configs_match(a: &ConversionConfig, b: &ConversionConfig) -> bool {
-    if a.container != b.container
-        || a.video_codec != b.video_codec
-        || a.audio_codec != b.audio_codec
-        || a.resolution != b.resolution
-        || a.preset != b.preset
-        || a.video_bitrate_mode != b.video_bitrate_mode
-    {
-        return false;
-    }
+    preset_settings(a) == preset_settings(b)
+}
 
-    if a.video_bitrate_mode == "crf" {
-        if a.crf != b.crf || a.quality != b.quality {
-            return false;
-        }
-    } else if a.video_bitrate != b.video_bitrate {
-        return false;
-    }
-
-    if a.resolution == "custom" {
-        return a.custom_width == b.custom_width && a.custom_height == b.custom_height;
-    }
-
-    true
+fn preset_settings(config: &ConversionConfig) -> ConversionConfig {
+    let mut settings = config.clone();
+    // These bindings belong to each source; every other setting belongs to the preset.
+    settings.selected_audio_tracks.clear();
+    settings.selected_subtitle_tracks.clear();
+    settings.external_subtitle_tracks.clear();
+    settings.subtitle_burn_path = None;
+    settings
 }
 
 #[must_use]
@@ -221,13 +211,6 @@ pub fn preset_is_compatible(preset: &PresetDefinition, metadata: Option<&SourceM
 
 #[must_use]
 pub fn create_custom_preset(id: String, name: &str, config: &ConversionConfig) -> PresetDefinition {
-    let mut preset_config = config.clone();
-    // Source-bound selections must not leak into a reusable preset.
-    preset_config.selected_audio_tracks.clear();
-    preset_config.selected_subtitle_tracks.clear();
-    preset_config.external_subtitle_tracks.clear();
-    preset_config.subtitle_burn_path = None;
-
     PresetDefinition::custom(
         id,
         if name.trim().is_empty() {
@@ -235,7 +218,7 @@ pub fn create_custom_preset(id: String, name: &str, config: &ConversionConfig) -
         } else {
             name.trim().to_string()
         },
-        preset_config,
+        preset_settings(config),
     )
 }
 

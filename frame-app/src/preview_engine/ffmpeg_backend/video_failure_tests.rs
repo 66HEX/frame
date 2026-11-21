@@ -43,6 +43,7 @@ fn new_process() -> RunningPreviewProcess {
         PreviewRuntimeMetricsStore::new(),
         "/missing/ffmpeg".into(),
     )
+    .unwrap()
 }
 
 fn sleeping_handles() -> ProcessHandles {
@@ -87,6 +88,7 @@ fn child_alive(pid: u32) -> bool {
 
 #[test]
 fn video_failure_marks_and_notifies_before_blocking_cleanup() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let process = Arc::new(new_process());
     process.park_playback_generation(0, 1.25);
     let (release_tx, release_rx) = mpsc::channel();
@@ -146,6 +148,7 @@ fn video_failure_marks_and_notifies_before_blocking_cleanup() {
 
 #[test]
 fn stale_video_failure_preserves_replacement_but_disposes_owned_candidate() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let process = new_process();
     let recovered_generation = process.prepare_playback_generation(0.5);
     process.start_playback_generation(recovered_generation, 0.5);
@@ -201,6 +204,7 @@ fn stale_video_failure_preserves_replacement_but_disposes_owned_candidate() {
 
 #[test]
 fn preflight_and_paused_single_frame_errors_preserve_the_existing_generation() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let mut process = new_process();
     process.start_playback_generation(0, 0.25);
     let old = sleeping_handles();
@@ -223,6 +227,7 @@ fn preflight_and_paused_single_frame_errors_preserve_the_existing_generation() {
 
 #[test]
 fn video_plan_spawn_and_first_frame_failures_cleanup_old_child_and_freeze_generation() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     for stage in ["plan", "spawn", "first frame"] {
         let mut process = new_process();
         let old = sleeping_handles();
@@ -253,6 +258,7 @@ fn video_plan_spawn_and_first_frame_failures_cleanup_old_child_and_freeze_genera
 
 #[test]
 fn video_failure_cancels_reused_audio_prewarm_generation() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let process = new_process();
     let mut handles = sleeping_handles();
     let pid = handles.child.as_ref().unwrap().id();
@@ -309,6 +315,7 @@ fn fail_reconfigure(session: &PreviewSession, valid: &PreviewSessionConfig) {
 #[test]
 #[ignore = "requires FFmpeg and a default audio output device; run with --ignored"]
 fn real_video_failure_preserves_frame_pauses_ordinary_commands_and_allows_explicit_retry() {
+    let _fixture = crate::preview_engine::ffmpeg_backend::test_support::process_fixture();
     let path = std::env::temp_dir().join(format!("frame-video-failure-{}.mp4", std::process::id()));
     let status = crate::process_launch::status(
         Command::new(crate::runtime_binaries::ffmpeg_executable())

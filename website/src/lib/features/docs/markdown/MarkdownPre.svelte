@@ -102,7 +102,7 @@
 		/>
 	</div>
 
-	<div class="rounded-lg bg-card shadow-sm">
+	<div class="rounded-lg bg-card border border-border">
 		<CodeBlock
 			{code}
 			{htmlLight}
