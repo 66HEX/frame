@@ -31,6 +31,18 @@
 </section>
 
 <style>
+	.hero-glow {
+		--hero-glow-primary: #fc4f4a;
+		--hero-glow-secondary: #234a57;
+		--hero-glow-accent: #f5a4a9;
+	}
+
+	:global(.dark) .hero-glow {
+		--hero-glow-primary: #e31616;
+		--hero-glow-secondary: #234a57;
+		--hero-glow-accent: #fd837c;
+	}
+
 	.hero-glow::before {
 		content: '';
 		position: absolute;
@@ -38,17 +50,17 @@
 		z-index: -1;
 		pointer-events: none;
 		border-radius: inherit;
-		opacity: 0.35;
+		opacity: 1;
 		background: radial-gradient(
 			ellipse 130% 107.5% at 50% 10% in srgb,
 			transparent 37%,
-			var(--primary) 69%,
-			color-mix(in srgb, var(--primary-to) 12%, var(--primary-foreground)) 100%
+			color-mix(in srgb, var(--hero-glow-primary) 78%, var(--hero-glow-secondary)) 69%,
+			color-mix(in srgb, var(--hero-glow-accent) 28%, var(--primary-foreground)) 100%
 		);
 		filter: blur(clamp(1rem, 3.125vw, 2.5rem));
 	}
 
 	:global(.dark) .hero-glow::before {
-		opacity: 1;
+		opacity: 0.65;
 	}
 </style>
