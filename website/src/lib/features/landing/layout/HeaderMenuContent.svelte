@@ -87,10 +87,10 @@
 	<li>
 		<a
 			href={item.href}
-			class={`linear-inline-link flex flex-col gap-1 rounded-[6px] px-4 py-3.5 pr-6 text-mini transition-[background-color,color] duration-120 ease-out hover:bg-foreground/[0.04] ${focusClass}`}
+			class={`linear-inline-link flex flex-col gap-1 rounded-lg p-4 text-mini transition-[background-color,color] duration-120 ease-out hover:bg-foreground/[0.04] ${focusClass}`}
 			onclick={() => onNavigate?.()}
 		>
-			<span class="font-medium leading-none text-foreground/90">{item.title}</span>
+			<span class="font-medium leading-none text-foreground">{item.title}</span>
 			<span class="font-normal text-muted-foreground">{item.description}</span>
 		</a>
 	</li>
@@ -100,7 +100,7 @@
 	<li>
 		<a
 			href={item.href}
-			class={`linear-inline-link block rounded-[6px] px-4 py-2.5 text-mini font-medium leading-none text-foreground/85 transition-[background-color,color] duration-120 ease-out hover:bg-foreground/[0.04] hover:text-foreground ${focusClass}`}
+			class={`linear-inline-link block rounded-lg px-4 py-2.5 text-mini font-medium leading-none text-foreground transition-[background-color,color] duration-120 ease-out hover:bg-foreground/[0.04] hover:text-foreground ${focusClass}`}
 			onclick={() => onNavigate?.()}
 		>
 			{item.title}
@@ -125,10 +125,10 @@
 		{/if}
 	</div>
 {:else}
-	<div class="p-2">
-		<div class="linear-feature-grid rounded-[6px]">
+	<div class="p-1">
+		<div class="rounded-lg border border-border bg-card">
 			<div
-				class="linear-sub-items grid gap-x-6 p-3"
+				class="linear-sub-items grid gap-x-6 p-4"
 				style:grid-template-columns="244px 244px 192px"
 			>
 				{#if menu === 'product'}
@@ -167,14 +167,14 @@
 			</div>
 		</div>
 		{#if menu === 'product'}
-			<div class="linear-content-footer mt-2 flex overflow-hidden rounded-[6px]">
+			<div class="linear-content-footer mt-1 flex overflow-hidden rounded-lg">
 				<a
 					href={releaseUrl}
-					class={`flex min-w-0 flex-1 items-center justify-between gap-6 rounded-[6px] px-7 py-3.5 text-mini transition-[background-color] duration-120 ease-out hover:bg-foreground/[0.04] ${focusClass}`}
+					class={`flex min-w-0 flex-1 items-center justify-between gap-6 rounded-lg px-8 py-4 text-mini transition-[background-color] duration-120 ease-out hover:bg-foreground/[0.04] ${focusClass}`}
 					onclick={() => onNavigate?.()}
 				>
 					<span class="flex min-w-0 items-center gap-2">
-						<span class="font-medium text-foreground/90">New</span>
+						<span class="font-medium text-foreground">New</span>
 						<span class="truncate text-muted-foreground">What’s new in Frame</span>
 					</span>
 					<span class="flex shrink-0 items-center gap-1.5 text-muted-foreground">
@@ -188,11 +188,6 @@
 {/if}
 
 <style>
-	.linear-feature-grid {
-		background: color-mix(in oklab, var(--foreground) 3%, transparent);
-		box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--foreground) 8%, transparent);
-	}
-
 	.linear-sub-items {
 		-webkit-mask-image: linear-gradient(90deg, transparent 0, #000 12px calc(100% - 12px), transparent 100%);
 		mask-image: linear-gradient(90deg, transparent 0, #000 12px calc(100% - 12px), transparent 100%);
@@ -205,6 +200,6 @@
 		bottom: 0;
 		right: -12px;
 		width: 1px;
-		background: color-mix(in oklab, var(--foreground) 8%, transparent);
+		background: var(--border);
 	}
 </style>

@@ -9,7 +9,7 @@
 	aria-labelledby="hero-title"
 	class="hero-glow relative isolate mx-3 mb-12 overflow-hidden rounded-lg pb-16 md:mx-4 md:mb-20 md:pb-24"
 >
-	<div class="mx-auto w-full max-w-6xl px-6 pt-14 md:px-10 md:pt-20 lg:pt-26">
+	<div class="mx-auto w-full max-w-7xl px-6 pt-14 md:px-10 md:pt-20 lg:pt-26">
 		<h1
 			id="hero-title"
 			class="mx-auto max-w-4xl text-center text-title-5 font-medium text-balance sm:text-title-7 lg:text-title-8"

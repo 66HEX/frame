@@ -275,7 +275,7 @@
 							: 'border-transparent bg-transparent'
 					)}
 				></div>
-				<div class="relative z-10 mx-auto flex h-full w-full max-w-6xl items-center justify-between px-6 sm:px-10">
+				<div class="relative z-10 mx-auto flex h-full w-full max-w-7xl items-center justify-between px-6 sm:px-10">
 					<div class="flex flex-1 justify-start items-center">
 						<a href="/" aria-label="Frame home" class={`rounded-md flex items-center ${focusClass}`}>
 							<SiteBrand />
@@ -335,7 +335,7 @@
 			</div>
 			{#if popupState !== 'closed' && activeMenu}
 				<div
-					class="pointer-events-none absolute top-[calc(100%-4px)] right-0 left-0 mx-auto flex max-w-6xl justify-end px-6 sm:px-10"
+					class="pointer-events-none absolute top-[calc(100%-4px)] right-0 left-0 mx-auto flex max-w-7xl justify-end px-6 sm:px-10"
 				>
 					<div
 						bind:this={popupEl}
@@ -345,7 +345,7 @@
 						data-open={popupEntered ? '' : undefined}
 						data-ending-style={popupState === 'closing' ? '' : undefined}
 						class={cn(
-							'linear-nav-popup pointer-events-auto relative max-w-full overflow-hidden rounded-[14px] shadow-lg backdrop-blur-[24px]',
+							'linear-nav-popup pointer-events-auto relative max-w-full overflow-hidden rounded-xl bg-muted text-card-foreground shadow-sm',
 							popupTransitionsEnabled && 'linear-nav-popup-transitions'
 						)}
 						style:height={popupHeight !== null ? `${popupHeight}px` : undefined}
@@ -412,11 +412,6 @@
 		transform-origin: top;
 		opacity: 0;
 		transform: scale(0.98);
-		background: color-mix(in oklab, var(--popover) 85%, transparent);
-	}
-
-	:global(html.dark) .linear-nav-popup {
-		background: color-mix(in oklab, var(--background) 85%, transparent);
 	}
 
 	.linear-nav-popup[data-open] {

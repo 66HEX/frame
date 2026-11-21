@@ -171,7 +171,7 @@
 	></div>
 	<div class="relative z-10 flex h-full flex-col">
 		<div class="h-14 shrink-0 border-b border-border">
-			<div class="mx-auto flex h-full w-full max-w-6xl items-center justify-between px-6 md:px-10">
+			<div class="mx-auto flex h-full w-full max-w-7xl items-center justify-between px-6 md:px-10">
 				<a
 					href="/"
 					aria-label="Frame home"
@@ -215,7 +215,7 @@
 				open && !isTransitioning ? 'overflow-y-auto' : 'overflow-y-hidden'
 			)}
 		>
-			<div class="mx-auto w-full max-w-6xl px-6 pb-8 md:px-10">
+			<div class="mx-auto w-full max-w-7xl px-6 pb-8 md:px-10">
 				<nav aria-label="Mobile navigation" class="-mx-4">
 					<Accordion.Root type="single" bind:value={expandedGroup}>
 						{#each menus as menu (menu.value)}
