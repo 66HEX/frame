@@ -3266,10 +3266,14 @@ jobs:
         mkdir -p target/homebrew
         gh release download "$VERSION" --repo 66HEX/frame --pattern Frame-aarch64.dmg --dir target/homebrew
         gh release download "$VERSION" --repo 66HEX/frame --pattern Frame-x86_64.dmg --dir target/homebrew
+        gh release download "$VERSION" --repo 66HEX/frame --pattern "Frame-aarch64.AppImage" --dir target/homebrew
+        gh release download "$VERSION" --repo 66HEX/frame --pattern "Frame-x86_64.AppImage" --dir target/homebrew
         gh release download "$VERSION" --repo 66HEX/frame --pattern SHA256SUMS --dir target/homebrew
         (cd target/homebrew && sha256sum --check --strict --ignore-missing SHA256SUMS)
         echo "HASH_ARM=$(sha256sum target/homebrew/Frame-aarch64.dmg | awk '{print $1}')" >> "$GITHUB_OUTPUT"
         echo "HASH_INTEL=$(sha256sum target/homebrew/Frame-x86_64.dmg | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+        echo "HASH_ARM_LINUX=$(sha256sum target/homebrew/Frame-aarch64.AppImage | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+        echo "HASH_INTEL_LINUX=$(sha256sum target/homebrew/Frame-x86_64.AppImage | awk '{print $1}')" >> "$GITHUB_OUTPUT"
     - name: release::checkout_tap
       uses: actions/checkout@v4
       with:
@@ -3282,6 +3286,8 @@ jobs:
         VERSION: ${{ needs.prepare_release.outputs.tag }}
         HASH_ARM: ${{ steps.hashes.outputs.HASH_ARM }}
         HASH_INTEL: ${{ steps.hashes.outputs.HASH_INTEL }}
+        HASH_ARM_LINUX: ${{ steps.hashes.outputs.HASH_ARM_LINUX }}
+        HASH_INTEL_LINUX: ${{ steps.hashes.outputs.HASH_INTEL_LINUX }}
         GH_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
       shell: bash
       run: |
@@ -3289,27 +3295,45 @@ jobs:
         cat <<EOF > Casks/frame.rb
         cask "frame" do
           arch arm: "aarch64", intel: "x86_64"
+          os macos: "dmg", linux: "AppImage"
 
           version "$VERSION"
-          sha256 arm:   "$HASH_ARM",
-                 intel: "$HASH_INTEL"
+          sha256 arm:          "$HASH_ARM",
+                 intel:        "$HASH_INTEL",
+                 arm64_linux:  "$HASH_ARM_LINUX",
+                 x86_64_linux: "$HASH_INTEL_LINUX"
 
-          url "https://github.com/66HEX/frame/releases/download/#{version}/Frame-#{arch}.dmg"
+          on_macos do
+            auto_updates true
+
+            app "Frame.app"
+
+            postflight_steps do
+              run "/usr/bin/xattr",
+                  args: ["-rd", "com.apple.quarantine", "{{appdir}}/Frame.app"]
+            end
+
+            zap trash: [
+              "~/Library/Application Support/com.66hex.frame",
+              "~/Library/Caches/com.66hex.frame",
+              "~/Library/Preferences/com.66hex.frame.plist",
+              "~/Library/Saved Application State/com.66hex.frame.savedState",
+            ]
+          end
+
+          on_linux do
+            app_image "Frame-#{arch}.AppImage", target: "Frame.AppImage"
+
+            zap trash: [
+              "~/.cache/Frame",
+              "~/.config/Frame",
+            ]
+          end
+
+          url "https://github.com/66HEX/frame/releases/download/#{version}/Frame-#{arch}.#{os}"
           name "Frame"
           desc "High-performance media conversion utility"
           homepage "https://github.com/66HEX/frame"
-
-          auto_updates true
-
-          app "Frame.app"
-
-          zap trash: [
-            "~/Library/Application Support/com.66hex.frame",
-            "~/Library/Caches/com.66hex.frame",
-            "~/Library/Preferences/com.66hex.frame.plist",
-            "~/Library/Saved Application State/com.66hex.frame.savedState",
-          ]
-
         end
         EOF
 
