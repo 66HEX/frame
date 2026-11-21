@@ -13,11 +13,10 @@ Use the Apple Silicon package for an M-series Mac, or the Intel package for an I
 You can also install through the Frame Homebrew tap:
 
 ```bash
-brew tap 66HEX/frame
-brew install --cask frame
+brew install 66HEX/frame/frame
 ```
 
-The current macOS release is ad-hoc signed and is not notarized. If macOS blocks a copy downloaded from the official release page, the repository documents this command after installation:
+When installed with Homebrew, the quarantine attribute is removed automatically. The current macOS release is ad-hoc signed and is not notarized. If macOS blocks a copy downloaded manually from the official release page, run:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/Frame.app
@@ -42,6 +41,14 @@ Install from Flathub:
 ```bash
 flatpak install flathub io.github._66HEX.Frame
 ```
+
+You can also install with Homebrew on Linux:
+
+```bash
+brew install 66HEX/frame/frame
+```
+
+This installs the AppImage for your architecture.
 
 AppImage downloads are also available on the GitHub release page. Choose x86_64 for a typical Intel or AMD computer, or aarch64 for an ARM64 computer, then allow the downloaded file to run as an executable in your file manager.
 
