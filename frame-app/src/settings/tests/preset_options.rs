@@ -225,6 +225,47 @@ fn apply_preset_preserves_explicit_source_track_selections() {
 }
 
 #[test]
+fn apply_preset_restores_default_audio_track_after_gif_preset() {
+    let presets = default_presets();
+    let gif_preset = presets
+        .iter()
+        .find(|preset| preset.config.container == "gif")
+        .expect("gif preset should exist");
+    let video_preset = presets
+        .iter()
+        .find(|preset| preset.id == "balanced-mp4")
+        .expect("balanced-mp4 preset should exist");
+    let metadata = video_metadata();
+    let mut config = ConversionConfig {
+        selected_audio_tracks: vec![1],
+        ..ConversionConfig::default()
+    };
+
+    apply_preset(&mut config, gif_preset, Some(&metadata));
+    assert!(config.selected_audio_tracks.is_empty());
+
+    apply_preset(&mut config, video_preset, Some(&metadata));
+    assert_eq!(config.selected_audio_tracks, [1]);
+}
+
+#[test]
+fn apply_preset_preserves_explicit_audio_exclusion_between_audio_presets() {
+    let preset = default_presets()
+        .into_iter()
+        .find(|preset| preset.id == "archive-hq")
+        .expect("archive preset should exist");
+    let mut config = ConversionConfig {
+        container: "mp4".to_string(),
+        selected_audio_tracks: Vec::new(),
+        ..ConversionConfig::default()
+    };
+
+    apply_preset(&mut config, &preset, Some(&video_metadata()));
+
+    assert!(config.selected_audio_tracks.is_empty());
+}
+
+#[test]
 fn apply_preset_preserves_source_subtitle_files() {
     let preset = default_presets()
         .into_iter()
