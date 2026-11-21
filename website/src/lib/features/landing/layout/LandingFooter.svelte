@@ -12,24 +12,24 @@
 	>
 		<div class="col-span-full sm:col-span-2">
 			<a href="/" aria-label="Frame home"><SiteBrand /></a>
-			<p class="mt-5 text-sm leading-6 text-muted-foreground">
+			<p class="mt-5 text-mini text-muted-foreground">
 				Native by design.<br />Open by default.
 			</p>
 		</div>
 		<nav
 			aria-label="Product links"
-			class="flex flex-col items-start gap-3 text-sm text-muted-foreground"
+			class="flex flex-col items-start gap-3 text-mini text-muted-foreground"
 		>
-			<h2 class="mb-2 text-sm font-medium text-foreground">Product</h2>
+			<h2 class="mb-2 text-mini font-medium text-foreground">Product</h2>
 			<a class={linkClass} href="/#features">Features</a><a class={linkClass} href="/#workflow"
 				>Workflow</a
 			><a class={linkClass} href="/#download">Download</a>
 		</nav>
 		<nav
 			aria-label="Learn about Frame"
-			class="flex flex-col items-start gap-3 text-sm text-muted-foreground"
+			class="flex flex-col items-start gap-3 text-mini text-muted-foreground"
 		>
-			<h2 class="mb-2 text-sm font-medium text-foreground">Resources</h2>
+			<h2 class="mb-2 text-mini font-medium text-foreground">Resources</h2>
 			<a class={linkClass} href="/docs">Documentation</a><a
 				class={linkClass}
 				href="/docs/getting-started">Getting started</a
@@ -37,9 +37,9 @@
 		</nav>
 		<nav
 			aria-label="Project links"
-			class="flex flex-col items-start gap-3 text-sm text-muted-foreground"
+			class="flex flex-col items-start gap-3 text-mini text-muted-foreground"
 		>
-			<h2 class="mb-2 text-sm font-medium text-foreground">Open source</h2>
+			<h2 class="mb-2 text-mini font-medium text-foreground">Open source</h2>
 			<a class={linkClass} href={githubUrl}>GitHub</a><a
 				class={linkClass}
 				href={`${githubUrl}/releases`}>Release notes</a
@@ -49,7 +49,7 @@
 			>
 		</nav>
 	</Container>
-	<Container class="flex flex-wrap justify-between gap-4 pb-8 text-xs text-muted-foreground"
+	<Container class="flex flex-wrap justify-between gap-4 pb-8 text-micro text-muted-foreground"
 		><span>© {new Date().getFullYear()} Frame</span><a
 			href="https://madebyhex.com/"
 			class="hover:text-foreground">Built by Marek Jóźwiak</a

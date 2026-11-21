@@ -8,7 +8,7 @@
 
 <p
 	{...restProps}
-	class={cn('mt-4 max-w-prose text-base leading-7 text-muted-foreground', className)}
+	class={cn('mt-4 max-w-prose text-regular text-muted-foreground', className)}
 >
 	{@render children?.()}
 </p>

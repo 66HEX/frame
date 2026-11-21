@@ -1,6 +1,6 @@
 import ImageResponse from '@takumi-rs/image-response';
-import overusedGroteskRegularDataUri from '$lib/assets/fonts/overused-grotesk/OverusedGroteskRoman-Roman.woff2?inline';
-import overusedGroteskMediumDataUri from '$lib/assets/fonts/overused-grotesk/OverusedGroteskRoman-Medium.woff2?inline';
+import interRegularDataUri from '$lib/assets/fonts/inter/Inter-Regular.woff2?inline';
+import interMediumDataUri from '$lib/assets/fonts/inter/Inter-Medium.woff2?inline';
 import { ogThemeColors, toSvgColor, withAlpha } from '$lib/seo/og-theme';
 
 const OG_WIDTH = 1200;
@@ -61,21 +61,21 @@ const dataUriToArrayBuffer = (dataUri: string) => {
 };
 
 const fontDataPromise = Promise.all([
-	Promise.resolve(dataUriToArrayBuffer(overusedGroteskRegularDataUri)),
-	Promise.resolve(dataUriToArrayBuffer(overusedGroteskMediumDataUri))
+	Promise.resolve(dataUriToArrayBuffer(interRegularDataUri)),
+	Promise.resolve(dataUriToArrayBuffer(interMediumDataUri))
 ]);
 
 const takumiFontLoaders = [
 	{
-		key: 'overused-grotesk-regular',
-		name: 'Overused Grotesk',
+		key: 'inter-regular',
+		name: 'Inter',
 		weight: 400,
 		style: 'normal' as const,
 		data: async () => (await fontDataPromise)[0]
 	},
 	{
-		key: 'overused-grotesk-medium',
-		name: 'Overused Grotesk',
+		key: 'inter-medium',
+		name: 'Inter',
 		weight: 500,
 		style: 'normal' as const,
 		data: async () => (await fontDataPromise)[1]
@@ -149,8 +149,8 @@ const createComponent = ({
 	title,
 	description,
 	titleFontSize = 64,
-	titleLineHeight = 1.02,
-	descriptionLineHeight = 1.3
+	titleLineHeight = 1.06,
+	descriptionLineHeight = 1.35
 }: OgImageOptions) =>
 	el(
 		'div',
@@ -165,7 +165,7 @@ const createComponent = ({
 				overflow: 'hidden',
 				backgroundColor: colors.background,
 				color: colors.foreground,
-				fontFamily: 'Overused Grotesk, sans-serif'
+				fontFamily: 'Inter, sans-serif'
 			}
 		},
 		verticalDivider(OG_GRID_INSET),
@@ -194,7 +194,7 @@ const createComponent = ({
 						color: colors.foreground,
 						fontSize: titleFontSize,
 						fontWeight: 500,
-						letterSpacing: '-0.035em',
+						letterSpacing: '-0.022em',
 						lineHeight: titleLineHeight,
 						textAlign: 'left',
 						textWrapStyle: 'pretty'
@@ -211,6 +211,7 @@ const createComponent = ({
 						color: withAlpha(colors.foreground, 0.58),
 						fontSize: 25,
 						fontWeight: 400,
+						letterSpacing: '-0.012em',
 						lineHeight: descriptionLineHeight,
 						textAlign: 'left',
 						textWrapStyle: 'pretty'

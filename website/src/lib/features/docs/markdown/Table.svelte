@@ -13,7 +13,7 @@
 <Card.Root size="sm" class="my-6 gap-0 bg-muted px-1 pt-0 pb-1 transition-shadow has-[[data-scrollable]:focus-visible]:ring-ring/50 has-[[data-scrollable]:focus-visible]:ring-[3px] has-[[data-scrollable]:focus-visible]:outline-1">
 	<div class="relative min-w-0">
 		<div
-			class="pointer-events-none absolute inset-x-0 top-11 bottom-0 rounded-lg bg-card shadow-sm"
+			class="pointer-events-none absolute inset-x-0 top-11 bottom-0 rounded-lg bg-card border border-border"
 			aria-hidden="true"
 		></div>
 
