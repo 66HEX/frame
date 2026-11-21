@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **MPEG-PS Source Files:** Adds `.mpg` and `.mpeg` video files to the supported source extensions for drag-and-drop and the file picker. Resolves [#270](https://github.com/66HEX/frame/issues/270).
+
+### Changed
+
+- **Homebrew Distribution:** Expands the custom Homebrew tap cask (`brew install 66HEX/frame/frame`) to support Linux AppImages alongside macOS DMGs, automatically strips the macOS quarantine attribute on install, and updates installation docs.
+
+### Fixed
+
+- **Audio Track Selection After Non-Audio Presets:** Restores the default source audio track when switching from a non-audio container or preset (such as GIF) back to an audio-supporting format, while preserving explicit audio exclusion between audio-capable formats. Resolves [#273](https://github.com/66HEX/frame/issues/273).
+- **Windows Bundling:** Stops `cargo xtask bundle windows` from re-entering Cargo via `script/bundle-windows.ps1` and scrubs Cargo package environment variables from child processes so Windows builds no longer fail trying to relink `xtask.exe`. Resolves [#254](https://github.com/66HEX/frame/issues/254).
+
+### Security
+
+- **Dependencies:** Integrates Rust, website, and GitHub Actions dependency updates and security patches.
+
 ## [0.35.0] - 2026-11-15
 
 ### Added

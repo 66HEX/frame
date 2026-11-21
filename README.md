@@ -62,7 +62,7 @@ details, tier suggestions, and a launch checklist.
 
 - **Media Types:** Video, audio, and image sources.
 - **Supported Source Files:**
-  - **Video:** `mp4`, `mov`, `mkv`, `avi`, `webm`, `ts`, `mts`, `m2t`, `m2ts`, `gif`
+  - **Video:** `mp4`, `mov`, `mkv`, `avi`, `webm`, `mpg`, `mpeg`, `ts`, `mts`, `m2t`, `m2ts`, `gif`
   - **Audio:** `mp3`, `m4a`, `wav`, `flac`, `opus`
   - **Image:** `png`, `jpg`, `jpeg`, `webp`, `bmp`, `tif`, `tiff`, `avif`,
     `heic`, `heif`
@@ -194,13 +194,13 @@ To update:
 winget upgrade --id 66HEX.Frame -e
 ```
 
-### Homebrew (macOS)
+### Homebrew (macOS & Linux)
 
-For macOS users, Frame is available through the custom Homebrew tap:
+Frame is available through the custom Homebrew tap on macOS (DMG, with
+quarantine removed automatically) and Linux (AppImage):
 
 ```bash
-brew tap 66HEX/frame
-brew install --cask frame
+brew install 66HEX/frame/frame
 ```
 
 ### Flathub (Linux)
