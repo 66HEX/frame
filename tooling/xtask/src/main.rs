@@ -3334,7 +3334,7 @@ jobs:
       - publish_release
     environment: production-distribution
     steps:
-    - name: release::download_macos_dmgs
+    - name: release::download_homebrew_assets
       id: hashes
       env:
         GH_TOKEN: ${{ github.token }}
@@ -3403,8 +3403,8 @@ jobs:
             app_image "Frame-#{arch}.AppImage", target: "Frame.AppImage"
 
             zap trash: [
-              "~/.cache/Frame",
-              "~/.config/Frame",
+              "~/.cache/frame",
+              "~/.config/frame",
             ]
           end
 
