@@ -116,7 +116,7 @@ cbindgen = { version = "0.28.0", default-features = false }
 core-foundation = "=0.10.1"
 core-foundation-sys = "0.8.6"
 core-graphics = "0.24"
-core-text = "21"
+core-text = "22"
 core-video = { version = "0.6.1", features = ["metal"] }
 foreign-types = "0.5"
 media = { path = "crates/gpui_media", version = "0.2.2", package = "gpui_ce_media" }
