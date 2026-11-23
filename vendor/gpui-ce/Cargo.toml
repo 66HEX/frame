@@ -52,7 +52,7 @@ collections = { path = "crates/gpui_collections", version = "0.2.2", package = "
 dunce = "1.0"
 etagere = "0.2"
 fontique = { version = "0.11.1", default-features = false }
-parley = { version = "0.11", default-features = false, features = ["std"] }
+parley = { version = "0.13", default-features = false, features = ["std"] }
 heapless = "0.9.2"
 pathfinder_geometry = "0.5"
 raw-window-handle = "0.6"
