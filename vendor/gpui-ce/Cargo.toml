@@ -50,7 +50,7 @@ backtrace = "0.3"
 bitflags = "2.6.0"
 collections = { path = "crates/gpui_collections", version = "0.2.2", package = "gpui_ce_collections" }
 dunce = "1.0"
-etagere = "0.2"
+etagere = "0.3"
 fontique = { version = "0.11.1", default-features = false }
 parley = { version = "0.11", default-features = false, features = ["std"] }
 heapless = "0.9.2"
