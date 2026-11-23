@@ -109,7 +109,7 @@ pollster = "1.0.1"
 url = "2.2"
 uuid = { version = "1.1.2", features = ["v4", "v5", "v7", "serde"] }
 web-time = "1.1.0"
-skrifa = "0.44.0"
+skrifa = "0.50.0"
 block = "0.1"
 block2 = "0.6"
 cbindgen = { version = "0.28.0", default-features = false }
