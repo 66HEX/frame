@@ -31,7 +31,7 @@
     "rehype-slug": "^6.0.0",
     "shadcn-svelte": "1.8.1",
     "shiki": "^4.0.1",
-    "svelte": "^5.57.3",
+    "svelte": "^5.58.0",
     "svelte-check": "^4.7.6",
     "tailwind-variants": "^4.0.2",
     "tailwindcss": "^4.1.18",
