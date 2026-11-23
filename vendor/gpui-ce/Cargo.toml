@@ -84,7 +84,7 @@ itertools = "0.15.0"
 log = { version = "0.4.16", features = ["kv_unstable_serde", "serde"] }
 palette = { version = "0.7.6", features = ["serializing"] }
 parking_lot = "0.13.0"
-phf = { version = "0.13.1", features = ["macros"] }
+phf = { version = "0.14.0", features = ["macros"] }
 postage = { version = "0.5", features = ["futures-traits"] }
 proptest = { version = "1.10", features = ["attr-macro"] }
 chrono = { version = "0.4", features = ["serde"] }
