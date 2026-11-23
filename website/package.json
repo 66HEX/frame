@@ -42,7 +42,7 @@
     "wrangler": "^4.161.0"
   },
   "dependencies": {
-    "@takumi-rs/image-response": "2.20.0",
+    "@takumi-rs/image-response": "2.21.0",
     "clsx": "^2.1.1",
     "pixi.js": "8.20.1",
     "tailwind-merge": "^3.5.0",
