@@ -111,32 +111,45 @@ pub(in crate::app) fn file_list_header(
         ));
 
     frame_panel_header()
+        .gap_0()
+        .pl(theme::ui_rem(theme::metrics::CARD_PADDING))
         .pr(theme::ui_rem(crate::app::components::FRAME_SCROLLBAR_WIDTH))
         .child(
-            div()
-                .flex_1()
-                .grid()
-                .grid_cols(12)
-                .gap(theme::ui_rem(WORKSPACE_GAP))
-                .items_center()
+            file_list_columns_grid()
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .text_color(color(palette.text_muted))
                 .child(
                     div()
                         .col_span(1)
+                        .min_w_0()
+                        .debug_selector(|| "file-list-header-col-checkbox".to_string())
                         .flex()
                         .items_center()
                         .child(header_checkbox),
                 )
-                .child(header_label("Name", 5, false))
-                .child(header_label("Size", 2, true))
-                .child(header_label("Target", 2, true))
-                .child(header_label("State", 2, true)),
+                .child(
+                    header_label("Name", 5, false)
+                        .debug_selector(|| "file-list-header-col-name".to_string()),
+                )
+                .child(
+                    header_label("Size", 2, true)
+                        .debug_selector(|| "file-list-header-col-size".to_string()),
+                )
+                .child(
+                    header_label("Target", 2, true)
+                        .debug_selector(|| "file-list-header-col-target".to_string()),
+                )
+                .child(
+                    header_label("State", 2, true)
+                        .debug_selector(|| "file-list-header-col-state".to_string()),
+                ),
         )
         .child(
             div()
                 .ml_4()
                 .w(theme::ui_rem(FILE_LIST_ACTIONS_WIDTH))
+                .flex_shrink_0()
+                .debug_selector(|| "file-list-header-col-actions".to_string())
                 .text_size(theme::ui_rem(theme::TEXT_UI_BASE_SIZE))
                 .font_weight(theme::TEXT_WEIGHT_MEDIUM)
                 .text_color(color(palette.text_muted))
@@ -344,8 +357,9 @@ pub(in crate::app) fn file_list_row(
         .group(group_name.clone())
         .flex()
         .items_center()
+        .gap_0()
         .relative()
-        .px_4()
+        .pl(theme::ui_rem(theme::metrics::CARD_PADDING))
         .pr(theme::ui_rem(crate::app::components::FRAME_SCROLLBAR_WIDTH))
         .bg(if is_selected {
             color(palette.fill_subtle)
@@ -358,53 +372,7 @@ pub(in crate::app) fn file_list_row(
                 cx.notify();
             }
         }))
-        .child(
-            div()
-                .flex_1()
-                .grid()
-                .grid_cols(12)
-                .gap(theme::ui_rem(WORKSPACE_GAP))
-                .items_center()
-                .text_size(theme::ui_rem(theme::TEXT_ROW_BASE_SIZE))
-                .child(
-                    div()
-                        .col_span(1)
-                        .flex()
-                        .items_center()
-                        .child(row_checkbox_control(
-                            file.id.as_str(),
-                            file.name.as_str(),
-                            file.is_selected_for_conversion,
-                            palette,
-                            window,
-                            cx,
-                        )),
-                )
-                .child(row_label(
-                    file.name.clone(),
-                    5,
-                    false,
-                    color(palette.text_primary),
-                ))
-                .child(row_label(
-                    format_file_size(file.size_bytes),
-                    2,
-                    true,
-                    color(palette.text_muted),
-                ))
-                .child(row_label(
-                    file.original_format.clone(),
-                    2,
-                    true,
-                    color(palette.text_muted),
-                ))
-                .child(row_label(
-                    file.row_state_label(),
-                    2,
-                    true,
-                    state_tone_color(file.row_state_tone(), palette),
-                )),
-        )
+        .child(file_list_row_columns(file, palette, window, cx))
         .child(row_actions_cell(
             file,
             group_name,
@@ -416,9 +384,82 @@ pub(in crate::app) fn file_list_row(
         .child(panel_bottom_separator(palette))
 }
 
+fn file_list_row_columns(
+    file: &FileItem,
+    palette: &'static theme::ThemePalette,
+    window: &mut Window,
+    cx: &mut Context<FrameRoot>,
+) -> gpui::Div {
+    let row_col_selector = |column: &'static str| {
+        let id = file.id.clone();
+        move || format!("file-list-row-{id}-col-{column}")
+    };
+
+    file_list_columns_grid()
+        .text_size(theme::ui_rem(theme::TEXT_ROW_BASE_SIZE))
+        .child(
+            div()
+                .col_span(1)
+                .min_w_0()
+                .debug_selector(row_col_selector("checkbox"))
+                .flex()
+                .items_center()
+                .child(row_checkbox_control(
+                    file.id.as_str(),
+                    file.name.as_str(),
+                    file.is_selected_for_conversion,
+                    palette,
+                    window,
+                    cx,
+                )),
+        )
+        .child(
+            row_label(file.name.clone(), 5, false, color(palette.text_primary))
+                .debug_selector(row_col_selector("name")),
+        )
+        .child(
+            row_label(
+                format_file_size(file.size_bytes),
+                2,
+                true,
+                color(palette.text_muted),
+            )
+            .debug_selector(row_col_selector("size")),
+        )
+        .child(
+            row_label(
+                file.original_format.clone(),
+                2,
+                true,
+                color(palette.text_muted),
+            )
+            .debug_selector(row_col_selector("target")),
+        )
+        .child(
+            row_label(
+                file.row_state_label(),
+                2,
+                true,
+                state_tone_color(file.row_state_tone(), palette),
+            )
+            .debug_selector(row_col_selector("state")),
+        )
+}
+
+fn file_list_columns_grid() -> gpui::Div {
+    div()
+        .flex_1()
+        .min_w_0()
+        .grid()
+        .grid_cols(12)
+        .gap(theme::ui_rem(WORKSPACE_GAP))
+        .items_center()
+}
+
 pub(in crate::app) fn header_label(label: &'static str, span: u16, align_right: bool) -> gpui::Div {
     let cell = div()
         .col_span(span)
+        .min_w_0()
         .truncate()
         .font_weight(theme::TEXT_WEIGHT_MEDIUM);
     let cell = if align_right { cell.text_right() } else { cell };
@@ -433,6 +474,7 @@ pub(in crate::app) fn row_label(
 ) -> gpui::Div {
     let cell = div()
         .col_span(span)
+        .min_w_0()
         .truncate()
         .whitespace_nowrap()
         .text_color(text_color);
@@ -452,8 +494,13 @@ pub(in crate::app) fn row_actions_cell(
     let actions = file.row_actions();
     let mut cell = div()
         .id(element_id("file-row-actions", &file_id))
+        .debug_selector({
+            let id = file_id.clone();
+            move || format!("file-list-row-{id}-col-actions")
+        })
         .ml_4()
         .w(theme::ui_rem(FILE_LIST_ACTIONS_WIDTH))
+        .flex_shrink_0()
         .h_full()
         .flex()
         .items_center()
