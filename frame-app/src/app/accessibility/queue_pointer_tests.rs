@@ -378,15 +378,11 @@ fn header_and_row_columns_align_horizontally_across_scales_and_widths() {
 
                 assert!(
                     (header.left() - row.left()).abs() <= px(0.5),
-                    "column `{column}` left mismatch at width {width} scale {scale:?}: header={:?}, row={:?}",
-                    header.left(),
-                    row.left()
+                    "header and row left edges must align for every column"
                 );
                 assert!(
                     (header.right() - row.right()).abs() <= px(0.5),
-                    "column `{column}` right mismatch at width {width} scale {scale:?}: header={:?}, row={:?}",
-                    header.right(),
-                    row.right()
+                    "header and row right edges must align for every column"
                 );
             }
         }
