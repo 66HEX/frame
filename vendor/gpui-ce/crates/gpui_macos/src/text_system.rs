@@ -131,11 +131,8 @@ mod renderer {
         geometry::CGAffineTransform,
     };
     use core_text::{
-        font,
+        font::{self, CTFont},
         font_descriptor::{self, CTFontDescriptor, kCTFontOrientationDefault},
-    };
-    use font_kit::{
-        canvas::RasterizationOptions, font::Font as FontKitFont, hinting::HintingOptions,
     };
     use gpui::{
         Bounds, DevicePixels, FontId, GlyphRenderMode, Pixels, PreparedRasterStyle,
@@ -144,7 +141,11 @@ mod renderer {
     };
     use gpui_parley::{ColorGlyphKind, FontDataBlob, FontSynthesis, GlyphRasterizer, RasterFace};
     use objc2::rc::autoreleasepool;
-    use pathfinder_geometry::{rect::RectI, transform2d::Transform2F};
+    use pathfinder_geometry::{
+        rect::{RectF, RectI},
+        transform2d::Transform2F,
+        vector::Vector2F,
+    };
     use skrifa::{FontRef, Tag, raw::MinByteRange};
     use std::{
         collections::{HashMap, hash_map::Entry},
@@ -174,7 +175,7 @@ mod renderer {
 
     struct NativeFace {
         descriptor: CTFontDescriptor,
-        font: FontKitFont,
+        font: CTFont,
         synthesis: FontSynthesis,
         has_default_variations: bool,
         // CoreText may defer reading tables from descriptors created from in-memory data until a
@@ -236,13 +237,12 @@ mod renderer {
                 && native.has_default_variations
             {
                 let scale = Transform2F::from_scale(params.scale_factor);
-                let rect = native.font.raster_bounds(
+                let rect = ct_font_raster_bounds(
+                    &native.font,
                     params.glyph_id.0,
                     params.font_size.into(),
                     scale,
-                    HintingOptions::None,
-                    RasterizationOptions::GrayscaleAa,
-                )?;
+                );
                 let bounds = bounds_from_rect_i(rect);
 
                 if bounds.size.width.0 == 0 || bounds.size.height.0 == 0 {
@@ -534,7 +534,7 @@ mod renderer {
 
             let has_default_variations = face.has_default_variations()?;
             let core_text_font = font::new_from_descriptor(&descriptor, 0.0);
-            let font = FontKitFont::from_core_graphics_font(core_text_font.copy_to_CGFont());
+            let font = font::new_from_CGFont(&core_text_font.copy_to_CGFont(), 16.0);
 
             Ok(Self {
                 descriptor,
@@ -544,6 +544,29 @@ mod renderer {
                 _source_data: source_data,
             })
         }
+    }
+
+    fn ct_font_raster_bounds(
+        font: &CTFont,
+        glyph_id: u32,
+        point_size: f32,
+        transform: Transform2F,
+    ) -> RectI {
+        let rect =
+            font.get_bounding_rects_for_glyphs(kCTFontOrientationDefault, &[glyph_id as u16]);
+        let units_per_em = font.units_per_em();
+        let units_per_point = (units_per_em as f64) / font.pt_size();
+        let typographic_bounds = RectF::new(
+            Vector2F::new(rect.origin.x as f32, rect.origin.y as f32),
+            Vector2F::new(rect.size.width as f32, rect.size.height as f32),
+        ) * units_per_point as f32;
+        let typographic_raster_bounds = typographic_bounds * (point_size / units_per_em as f32);
+        let new_origin = Vector2F::new(
+            typographic_raster_bounds.origin_x(),
+            -typographic_raster_bounds.origin_y() - typographic_raster_bounds.height(),
+        );
+        let typographic_raster_bounds = RectF::new(new_origin, typographic_raster_bounds.size());
+        (transform * typographic_raster_bounds).round_out().to_i32()
     }
 
     fn source_from_bytes(bytes: Vec<u8>) -> Arc<SendCFData> {

@@ -1,8 +1,4 @@
 <script module lang="ts">
-	import MarkdownPre from './markdown/MarkdownPre.svelte';
-
-	Reflect.set(globalThis, '__DocsMarkdownPre', MarkdownPre);
-
 	export { default as a } from './markdown/Link.svelte';
 	export { default as blockquote } from './markdown/Blockquote.svelte';
 	export { default as code } from './markdown/Code.svelte';
@@ -14,6 +10,7 @@
 	export { default as li } from './markdown/ListItem.svelte';
 	export { default as ol } from './markdown/OrderedList.svelte';
 	export { default as p } from './markdown/Paragraph.svelte';
+	export { default as pre } from './markdown/MarkdownPre.svelte';
 	export { default as strong } from './markdown/Strong.svelte';
 	export { default as table } from './markdown/Table.svelte';
 	export { default as tbody } from './markdown/Tbody.svelte';

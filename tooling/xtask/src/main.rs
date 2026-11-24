@@ -53,7 +53,7 @@ const ACTIONLINT_LINUX_X86_64_SHA256: &str =
 const ACTION_CHECKOUT_SHA: &str = "3d3c42e5aac5ba805825da76410c181273ba90b1";
 const ACTION_UPLOAD_ARTIFACT_SHA: &str = "cf430e030ddbb5b0abf93d22962f4752f3646cd9";
 const ACTION_DOWNLOAD_ARTIFACT_SHA: &str = "9000827ccba6bdab643e8b6fd33ac0654aef8333";
-const ACTION_DEPENDENCY_REVIEW_SHA: &str = "a1d282b36b6f3519aa1f3fc636f609c47dddb294";
+const ACTION_DEPENDENCY_REVIEW_SHA: &str = "bbc44d14a204704ccc493733616cd1e93a0321ec";
 const ACTION_CODEQL_SHA: &str = "33d7b85da1a04171e211befe2c739303b9a4c066";
 const ACTION_ATTEST_BUILD_PROVENANCE_SHA: &str = "4d101475d8b20a2381f78447822ac1eab6504dd8";
 const ACTION_INSTALL_NIX_SHA: &str = "3dc140bfc76c49fbd4dd958429132e3746bcb086";
@@ -1964,7 +1964,7 @@ fn pin_workflow_actions(workflow: &mut String) {
         ),
         (
             "actions/dependency-review-action@v5.0.0",
-            format!("actions/dependency-review-action@{ACTION_DEPENDENCY_REVIEW_SHA} # v5.0.0"),
+            format!("actions/dependency-review-action@{ACTION_DEPENDENCY_REVIEW_SHA} # v5.0.1"),
         ),
         (
             "actions/attest-build-provenance@v4.1.1",

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { CodeBlock, CopyCodeButton } from '$lib/components/code-block';
 	import * as Card from '$lib/components/ui/card';
 	import {
@@ -23,18 +24,22 @@
 		htmlDark,
 		lang,
 		label,
-		raw
+		raw,
+		code: codeProp,
+		children
 	}: {
-		htmlLight: string;
+		htmlLight?: string | undefined;
 		htmlDark?: string | undefined;
 		lang?: string | undefined;
 		label?: string | undefined;
-		raw?: string;
+		raw?: string | undefined;
+		code?: string | undefined;
+		children?: Snippet | undefined;
 	} = $props();
 
 	const language = $derived((lang ?? 'text').toLowerCase());
 	const fileName = $derived(inferFileName(language));
-	const code = $derived(raw ?? '');
+	const code = $derived(codeProp ?? raw ?? '');
 
 	const languageIcons: Record<string, IconComponent> = {
 		svelte: FrameworkSvelteIcon,
@@ -107,6 +112,7 @@
 			{code}
 			{htmlLight}
 			{htmlDark}
+			{children}
 			label={label ?? `${language} code example`}
 			framed={false}
 			copyable={false}

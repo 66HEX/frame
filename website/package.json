@@ -18,8 +18,8 @@
   },
   "devDependencies": {
     "@internationalized/date": "^3.12.0",
-    "@sveltejs/adapter-cloudflare": "^8.0.2",
-    "@sveltejs/kit": "^3.0.0",
+    "@sveltejs/adapter-cloudflare": "^9.0.0",
+    "@sveltejs/kit": "^3.4.0",
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
     "@tailwindcss/vite": "^4.1.17",
     "@types/hast": "^3.0.4",
@@ -27,11 +27,11 @@
     "@types/unist": "^3.0.3",
     "bits-ui": "^2.21.0",
     "github-slugger": "^2.0.0",
-    "mdsvex": "^0.12.6",
+    "mdsvex": "^1.0.1",
     "rehype-slug": "^6.0.0",
     "shadcn-svelte": "1.8.1",
     "shiki": "^4.0.1",
-    "svelte": "^5.57.3",
+    "svelte": "^5.58.0",
     "svelte-check": "^4.7.6",
     "tailwind-variants": "^4.0.2",
     "tailwindcss": "^4.1.18",
@@ -42,10 +42,10 @@
     "wrangler": "^4.161.0"
   },
   "dependencies": {
-    "@takumi-rs/image-response": "2.20.0",
+    "@takumi-rs/image-response": "2.21.0",
     "clsx": "^2.1.1",
-    "pixi.js": "8.20.1",
-    "tailwind-merge": "^3.5.0",
+    "pixi.js": "8.23.0",
+    "tailwind-merge": "^3.7.1",
     "yaml": "^2.9.1"
   }
 }
