@@ -326,3 +326,65 @@ fn first_scrollbar_drag_from_an_unfocused_queue_keeps_scrolling() {
         assert_eq!(selected(&root, cx), before);
     }
 }
+
+#[test]
+fn header_and_row_columns_align_horizontally_across_scales_and_widths() {
+    for scale in [ScalePreset::Percent100, ScalePreset::Percent200] {
+        let mut app = TestAppContext::single();
+        let (_root, cx) = queue_window(&mut app, scale);
+
+        for width in [960.0_f32, 1200.0, 1440.0] {
+            cx.simulate_resize(size(px(width * scale.factor()), px(800.0 * scale.factor())));
+            draw(cx);
+
+            for (column, header_selector, row_selector) in [
+                (
+                    "checkbox",
+                    "file-list-header-col-checkbox",
+                    "file-list-row-fixture-preview-col-checkbox",
+                ),
+                (
+                    "name",
+                    "file-list-header-col-name",
+                    "file-list-row-fixture-preview-col-name",
+                ),
+                (
+                    "size",
+                    "file-list-header-col-size",
+                    "file-list-row-fixture-preview-col-size",
+                ),
+                (
+                    "target",
+                    "file-list-header-col-target",
+                    "file-list-row-fixture-preview-col-target",
+                ),
+                (
+                    "state",
+                    "file-list-header-col-state",
+                    "file-list-row-fixture-preview-col-state",
+                ),
+                (
+                    "actions",
+                    "file-list-header-col-actions",
+                    "file-list-row-fixture-preview-col-actions",
+                ),
+            ] {
+                let header = cx
+                    .debug_bounds(header_selector)
+                    .unwrap_or_else(|| panic!("missing header bounds for column `{column}`"));
+                let row = cx
+                    .debug_bounds(row_selector)
+                    .unwrap_or_else(|| panic!("missing row bounds for column `{column}`"));
+
+                assert!(
+                    (header.left() - row.left()).abs() <= px(0.5),
+                    "header and row left edges must align for every column"
+                );
+                assert!(
+                    (header.right() - row.right()).abs() <= px(0.5),
+                    "header and row right edges must align for every column"
+                );
+            }
+        }
+    }
+}
