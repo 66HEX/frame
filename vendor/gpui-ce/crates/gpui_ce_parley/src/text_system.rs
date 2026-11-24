@@ -21,6 +21,7 @@ use parley::{
     FontContext, FontFamily, FontFamilyName, FontFeature, FontFeatures, FontStyle,
     FontVariation as ParleyFontVariation, FontWeight, GenericFamily, InlineBox, InlineBoxKind,
     Layout, LayoutContext, Line, LineHeight, PositionedLayoutItem, Selection, StyleProperty,
+    VerticalAlign,
 };
 use skrifa::instance::NormalizedCoord;
 use std::{
@@ -489,6 +490,17 @@ fn prepare_bidi_text(
     let mut prepared = String::new();
     let mut backend_to_source = vec![0];
     let mut source_to_backend = vec![0; text.len() + 1];
+    let mut prepared_inline_boxes = Vec::with_capacity(inline_boxes.len());
+
+    let mut boxes_by_index = inline_boxes
+        .iter()
+        .enumerate()
+        .filter(|(_, inline_box)| {
+            inline_box.index <= text.len() && text.is_char_boundary(inline_box.index)
+        })
+        .collect::<Vec<_>>();
+    boxes_by_index.sort_by_key(|(order, inline_box)| (inline_box.index, *order));
+    let mut next_box = 0;
 
     let append_synthetic = |character: char,
                             source_idx: usize,
@@ -525,6 +537,24 @@ fn prepare_bidi_text(
         }
 
         source_to_backend[source_idx] = prepared.len();
+
+        while let Some(&(_, inline_box)) = boxes_by_index.get(next_box) {
+            if inline_box.index != source_idx {
+                break;
+            }
+            let backend_idx = prepared.len();
+            append_synthetic(
+                '\u{fffc}',
+                source_idx,
+                &mut prepared,
+                &mut backend_to_source,
+            );
+            prepared_inline_boxes.push(InlineBoxRequest {
+                index: backend_idx,
+                ..*inline_box
+            });
+            next_box += 1;
+        }
 
         if source_idx == text.len() {
             break;
@@ -569,20 +599,13 @@ fn prepare_bidi_text(
             ..style.clone()
         })
         .collect();
-    let inline_boxes = inline_boxes
-        .iter()
-        .map(|inline_box| InlineBoxRequest {
-            index: map.backend_index(inline_box.index),
-            ..*inline_box
-        })
-        .collect();
 
     PreparedBidiText {
         text: prepared,
         runs,
         run_sources,
         text_styles,
-        inline_boxes,
+        inline_boxes: prepared_inline_boxes,
         map,
     }
 }
@@ -1057,7 +1080,7 @@ impl PlatformTextLayout for ParleyLayout {
     }
 
     fn size(&self) -> Size<Pixels> {
-        let width = if self.text.is_empty() && self.layout.inline_boxes().is_empty() {
+        let width = if self.text.is_empty() && self.layout.inline_boxes().len() == 0 {
             Pixels::ZERO
         } else {
             px(self.layout.width())
@@ -1126,7 +1149,7 @@ impl PlatformTextLayout for ParleyLayout {
             return None;
         }
 
-        if self.text.is_empty() && self.layout.inline_boxes().is_empty() {
+        if self.text.is_empty() && self.layout.inline_boxes().len() == 0 {
             return Some(Bounds::new(
                 point(self.inline_lines[0].origin.x, Pixels::ZERO),
                 size(Pixels::ZERO, line_height),
@@ -1152,7 +1175,7 @@ impl PlatformTextLayout for ParleyLayout {
         caret: CaretPosition,
         direction: VisualDirection,
     ) -> Option<CaretPosition> {
-        if self.text.is_empty() && self.layout.inline_boxes().is_empty() {
+        if self.text.is_empty() && self.layout.inline_boxes().len() == 0 {
             return None;
         }
 
@@ -1753,6 +1776,11 @@ impl ParleyTextSystem {
         let wrap = (wrap_width.is_some() || line_clamp.is_some())
             .then_some((wrap_width.unwrap_or(Pixels::MAX), line_clamp));
         let source_text_len = text.len();
+        for inline_box in inline_boxes {
+            if inline_box.index > source_text_len || !text.is_char_boundary(inline_box.index) {
+                anyhow::bail!("inline box index does not align with the input text");
+            }
+        }
         let source_runs = runs;
         let prepared = prepare_bidi_text(
             text,
@@ -1768,7 +1796,7 @@ impl ParleyTextSystem {
         let text_styles = prepared.text_styles.as_slice();
         let inline_boxes = prepared.inline_boxes.as_slice();
         let run_ranges = run_ranges(runs);
-        let line_height = if text.is_empty() {
+        let line_height = if source_text_len == 0 {
             text_styles
                 .last()
                 .map(|style| style.line_height)
@@ -1848,6 +1876,17 @@ impl ParleyTextSystem {
                     .collect::<Vec<_>>()
             });
 
+            let default_families = face_families(".SystemUIFont", &self.system_font_fallback)
+                .chain(
+                    self.additional_fallbacks
+                        .iter()
+                        .map(|family| FontFamilyName::Named(Cow::Borrowed(family.as_str()))),
+                )
+                .chain(std::iter::once(FontFamilyName::Generic(
+                    GenericFamily::SansSerif,
+                )))
+                .collect::<Vec<_>>();
+
             let mut state = self.parley.lock();
             let ParleyState {
                 font_context,
@@ -1855,6 +1894,9 @@ impl ParleyTextSystem {
             } = &mut *state;
             let mut builder = layout_context.ranged_builder(font_context, text, 1.0, false);
             builder.set_line_break_override(Some(CHROMIUM_LINE_BREAK_OVERRIDE));
+            builder.push_default(StyleProperty::FontFamily(FontFamily::from(
+                default_families.as_slice(),
+            )));
             builder.push_default(StyleProperty::FontSize(f32::from(font_size)));
 
             let default_optical_settings = self.automatic_optical_sizing.then(|| {
@@ -1953,6 +1995,8 @@ impl ParleyTextSystem {
                     index: inline_box.index,
                     width: f32::from(inline_box.size.width),
                     height: f32::from(inline_box.size.height),
+                    baseline: None,
+                    vertical_align: VerticalAlign::BASELINE,
                 });
             }
 
@@ -1963,6 +2007,41 @@ impl ParleyTextSystem {
 
             layout
         };
+
+        // Parley uses an unbounded line width for empty layouts. Align their empty
+        // row here so centered and right-aligned carets stay inside the container.
+        let empty_alignment = (text.is_empty() && inline_boxes.is_empty()).then(|| {
+            let width = alignment_width
+                .or_else(|| wrap.map(|(width, _max_lines)| width))
+                .filter(|width| *width < Pixels::MAX)
+                .unwrap_or_default();
+
+            match text_align {
+                TextAlign::Start if layout.is_rtl() => width,
+                TextAlign::End if !layout.is_rtl() => width,
+                TextAlign::Right => width,
+                TextAlign::Center => width / 2.,
+                _ => Pixels::ZERO,
+            }
+        });
+
+        if empty_alignment.is_none() {
+            let alignment = match text_align {
+                TextAlign::Start => Alignment::Start,
+                TextAlign::End => Alignment::End,
+                TextAlign::Left => Alignment::Left,
+                TextAlign::Center => Alignment::Center,
+                TextAlign::Right => Alignment::Right,
+            };
+
+            layout.set_alignment(
+                alignment,
+                AlignmentOptions {
+                    align_when_overflowing: true,
+                    last_line_alignment: None,
+                },
+            );
+        }
 
         if let Some((wrap_width, max_lines)) = wrap {
             if let Some(max_lines) = max_lines {
@@ -1994,40 +2073,6 @@ impl ParleyTextSystem {
             breaker.finish();
         } else {
             layout.break_all_lines(None);
-        }
-
-        // Parley uses an unbounded line width for empty layouts. Align their empty
-        // row here so centered and right-aligned carets stay inside the container.
-        let empty_alignment = (text.is_empty() && inline_boxes.is_empty()).then(|| {
-            let width = alignment_width
-                .or_else(|| wrap.map(|(width, _max_lines)| width))
-                .filter(|width| *width < Pixels::MAX)
-                .unwrap_or_default();
-
-            match text_align {
-                TextAlign::Start if layout.is_rtl() => width,
-                TextAlign::End if !layout.is_rtl() => width,
-                TextAlign::Right => width,
-                TextAlign::Center => width / 2.,
-                _ => Pixels::ZERO,
-            }
-        });
-
-        if empty_alignment.is_none() {
-            let alignment = match text_align {
-                TextAlign::Start => Alignment::Start,
-                TextAlign::End => Alignment::End,
-                TextAlign::Left => Alignment::Left,
-                TextAlign::Center => Alignment::Center,
-                TextAlign::Right => Alignment::Right,
-            };
-
-            layout.align(
-                alignment,
-                AlignmentOptions {
-                    align_when_overflowing: true,
-                },
-            );
         }
 
         let paragraph_direction = if layout.is_rtl() {
@@ -2090,7 +2135,7 @@ impl ParleyTextSystem {
                     .normalized_coords()
                     .iter()
                     .copied()
-                    .map(NormalizedCoord::from_bits)
+                    .map(|coord| NormalizedCoord::from_bits(coord.to_bits()))
                     .collect::<Vec<_>>();
                 let shaping_variations = self
                     .automatic_optical_sizing
@@ -2104,7 +2149,7 @@ impl ParleyTextSystem {
                 )?;
 
                 let baseline = glyph_run.baseline();
-                let run_metrics = glyph_run.run().metrics();
+                let run_metrics = glyph_run.run().font_metrics();
 
                 // Resolve leading from the input ranges. Parley 0.11 can report the
                 // following style's line height in a shaped run's cached metrics.
@@ -2117,9 +2162,9 @@ impl ParleyTextSystem {
                     .map(|style| f32::from(style.line_height))
                     .reduce(f32::max)
                     .unwrap_or_else(|| {
-                        line_height
-                            .map(f32::from)
-                            .unwrap_or(run_metrics.line_height)
+                        line_height.map(f32::from).unwrap_or(
+                            run_metrics.ascent + run_metrics.descent + run_metrics.leading,
+                        )
                     });
 
                 let half_leading =
@@ -2199,8 +2244,8 @@ impl ParleyTextSystem {
             inline_text_bounds.push((text_top, text_bottom));
 
             width = width.max(line_advance);
-            ascent = ascent.max(px(metrics.ascent));
-            descent = descent.max(px(metrics.descent));
+            ascent = ascent.max(px(metrics.baseline - metrics.content_block_min_coord));
+            descent = descent.max(px(metrics.content_block_max_coord - metrics.baseline));
         }
 
         if visual_lines.is_empty() {

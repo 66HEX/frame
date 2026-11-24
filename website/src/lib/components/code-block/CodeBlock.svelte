@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { labels } from '$lib/site/labels';
 	import * as Card from '$lib/components/ui/card';
 	import HorizontalScrollArea from '$lib/components/scroll-area/HorizontalScrollArea.svelte';
@@ -7,8 +8,9 @@
 
 	type Props = {
 		code: string;
-		htmlLight: string;
+		htmlLight?: string | undefined;
 		htmlDark?: string | undefined;
+		children?: Snippet | undefined;
 		label?: string;
 		lineNumbers?: boolean;
 		compact?: boolean;
@@ -21,6 +23,7 @@
 		code,
 		htmlLight,
 		htmlDark,
+		children,
 		label = labels.code.example,
 		lineNumbers = true,
 		compact = false,
@@ -55,24 +58,33 @@
 			class:with-line-numbers={lineNumbers}
 			class:with-copy-action={copyable}
 		>
-			<div class="shiki-theme-light">
+			{#if children}
 				<HorizontalScrollArea
 					{label}
 					class="code-scroll-area w-full min-w-0"
 				>
-					<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-					{@html htmlLight}
+					{@render children()}
 				</HorizontalScrollArea>
-			</div>
-			<div class="shiki-theme-dark">
-				<HorizontalScrollArea
-					{label}
-					class="code-scroll-area w-full min-w-0"
-				>
-					<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-					{@html htmlDark ?? htmlLight}
-				</HorizontalScrollArea>
-			</div>
+			{:else if htmlLight}
+				<div class="shiki-theme-light">
+					<HorizontalScrollArea
+						{label}
+						class="code-scroll-area w-full min-w-0"
+					>
+						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+						{@html htmlLight}
+					</HorizontalScrollArea>
+				</div>
+				<div class="shiki-theme-dark">
+					<HorizontalScrollArea
+						{label}
+						class="code-scroll-area w-full min-w-0"
+					>
+						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+						{@html htmlDark ?? htmlLight}
+					</HorizontalScrollArea>
+				</div>
+			{/if}
 		</div>
 	</Card.Content>
 </Card.Root>
@@ -88,6 +100,11 @@
 
 	:global(.dark) .shiki-theme-dark {
 		display: block;
+	}
+
+	:global(.dark) .code-content :global(.shiki),
+	:global(.dark) .code-content :global(.shiki span) {
+		color: var(--shiki-dark) !important;
 	}
 
 	.code-content :global(.shiki) {

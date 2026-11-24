@@ -237,14 +237,14 @@ impl ColorGlyphClassifier<'_> {
         glyph_id: GlyphId,
     ) -> impl Iterator<Item = ColorGlyphKind> {
         let skrifa_id = skrifa::GlyphId::new(glyph_id.0);
-        let has_colr_v1 = self.colr.as_ref().is_some_and(|colr| {
-            colr.v1_base_glyph(skrifa_id)
-                .is_ok_and(|glyph| glyph.is_some())
-        });
-        let has_colr_v0 = self.colr.as_ref().is_some_and(|colr| {
-            colr.v0_base_glyph(skrifa_id)
-                .is_ok_and(|glyph| glyph.is_some())
-        });
+        let has_colr_v1 = self
+            .colr
+            .as_ref()
+            .is_some_and(|colr| colr.v1_base_glyph(skrifa_id).is_some());
+        let has_colr_v0 = self
+            .colr
+            .as_ref()
+            .is_some_and(|colr| colr.v0_base_glyph(skrifa_id).is_some());
 
         let has_sbix_bitmap = self
             .sbix
@@ -296,17 +296,13 @@ impl ColorGlyphClassifier<'_> {
             return false;
         };
 
-        let Some(mut layers) = colr
-            .v0_base_glyph(skrifa::GlyphId::new(glyph_id.0))
-            .ok()
-            .flatten()
-        else {
+        let Some(mut layers) = colr.v0_base_glyph(skrifa::GlyphId::new(glyph_id.0)) else {
             return false;
         };
 
         layers.all(|layer_idx| {
             colr.v0_layer(layer_idx)
-                .is_ok_and(|(_glyph_id, palette_idx)| palette_idx != u16::MAX)
+                .is_some_and(|(_glyph_id, palette_idx)| palette_idx != u16::MAX)
         })
     }
 }
