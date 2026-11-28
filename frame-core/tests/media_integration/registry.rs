@@ -199,6 +199,42 @@ fn check_video_registry(hardware: Option<&[&str]>) -> TestResult {
     Ok(())
 }
 
+fn audio_packet_hashes(tools: &Toolchain, output: &Path) -> TestResult<String> {
+    let bytes = run_tool_output(
+        &tools.ffprobe,
+        &args(&[
+            "-v",
+            "error",
+            "-select_streams",
+            "a:0",
+            "-show_packets",
+            "-show_entries",
+            "packet=data_hash:packet_side_data=",
+            "-show_data_hash",
+            "sha256",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            &path_arg(output),
+        ]),
+    )?;
+    let hashes = String::from_utf8(bytes).map_err(|error| error.to_string())?;
+    assert!(
+        !hashes.is_empty(),
+        "no audio packets in {}",
+        output.display()
+    );
+    for line in hashes.lines() {
+        assert!(
+            line.strip_prefix("SHA256:")
+                .is_some_and(|digest| digest.len() == 64
+                    && digest.bytes().all(|byte| byte.is_ascii_hexdigit())),
+            "invalid packet hash in {}: {line}",
+            output.display(),
+        );
+    }
+    Ok(hashes)
+}
+
 #[test]
 #[ignore = "requires release codecs, the Frame worker and independent reference tools"]
 fn audio_codec_container_registry_produces_decodable_selected_tracks() -> TestResult {
@@ -236,19 +272,24 @@ fn audio_codec_container_registry_produces_decodable_selected_tracks() -> TestRe
                 "libx264"
             };
             let mut config = video_config(container, video, audio);
-            config.audio_bitrate = "192".into();
             config.selected_audio_tracks = vec![1];
             config.audio_channels = "stereo".into();
-            let modes: &[&str] = if audio == "libfdk_aac" {
-                &["bitrate", "vbr"]
+            let profiles: &[(&str, &str)] = if audio == "libfdk_aac" {
+                &[("bitrate", "192"), ("vbr", "1"), ("vbr", "5")]
             } else {
-                &["bitrate"]
+                &[("bitrate", "192")]
             };
-            for mode in modes {
-                config.audio_bitrate_mode = (*mode).into();
-                let output = sandbox.path(&format!("{audio}-{mode}.{container}"));
+            let mut fingerprints = std::collections::HashSet::new();
+            for &(mode, value) in profiles {
+                config.audio_bitrate_mode = mode.into();
+                if mode == "vbr" {
+                    config.audio_quality = value.into();
+                } else {
+                    config.audio_bitrate = value.into();
+                }
+                let output = sandbox.path(&format!("{audio}-{mode}{value}.{container}"));
                 convert(&tools, &input, &output, &config)
-                    .map_err(|e| format!("{container}/{audio}/{mode}: {e}"))?;
+                    .map_err(|e| format!("{container}/{audio}/{mode}{value}: {e}"))?;
                 let metadata = probe_media(&tools, &output)?;
                 assert_eq!(
                     metadata.audio_codec.as_deref(),
@@ -258,6 +299,26 @@ fn audio_codec_container_registry_produces_decodable_selected_tracks() -> TestRe
                 );
                 assert_eq!(metadata.audio_tracks.len(), 1);
                 decode_media(&tools, &output)?;
+                if audio == "libfdk_aac" {
+                    let track = &metadata.audio_tracks[0];
+                    assert_eq!(track.channels, "2", "{}", output.display());
+                    assert_eq!(
+                        track.channel_layout.as_deref(),
+                        Some("stereo"),
+                        "{}",
+                        output.display()
+                    );
+                    assert_eq!(
+                        track.sample_rate.as_deref(),
+                        Some("48000"),
+                        "{}",
+                        output.display()
+                    );
+                    assert!(
+                        fingerprints.insert(audio_packet_hashes(&tools, &output)?),
+                        "{container}/{audio}/{mode}{value} produced the same AAC packets as an earlier profile",
+                    );
+                }
             }
             if audio == "libfdk_aac" {
                 fdk_outputs.push(container.as_str());
