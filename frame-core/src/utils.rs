@@ -150,16 +150,14 @@ pub fn parse_time(time_str: &str) -> Option<f64> {
 
 #[must_use]
 pub fn get_hwaccel_args(video_codec: &str) -> Vec<String> {
-    if is_nvenc_codec(video_codec) {
-        // Without an explicit CUDA output format FFmpeg transfers decoded frames
-        // back to their native software format, retaining depth for CPU filters.
-        // See n8.1.2 ffmpeg_dec.c hwaccel_retrieve_data and ffmpeg_demux.c defaults.
-        vec!["-hwaccel".to_string(), "cuda".to_string()]
-    } else if is_videotoolbox_codec(video_codec) {
-        vec!["-hwaccel".to_string(), "videotoolbox".to_string()]
-    } else {
-        vec![]
-    }
+    let device = match video_codec {
+        "h264_nvenc" | "hevc_nvenc" | "av1_nvenc" => "cuda",
+        "h264_videotoolbox" | "hevc_videotoolbox" => "videotoolbox",
+        "h264_vaapi" | "hevc_vaapi" | "av1_vaapi" => "vaapi",
+        "hevc_amf" => "d3d11va",
+        _ => return Vec::new(),
+    };
+    vec!["-hwaccel".into(), device.into()]
 }
 
 #[must_use]

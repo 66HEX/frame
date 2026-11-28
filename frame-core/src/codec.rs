@@ -25,7 +25,7 @@ pub fn add_video_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
     // Quick Look requires the hvc1 sample entry for newly encoded HEVC in MP4/MOV.
     if matches!(
         config.video_codec.as_str(),
-        "libx265" | "hevc_videotoolbox" | "hevc_nvenc"
+        "libx265" | "hevc_videotoolbox" | "hevc_nvenc" | "hevc_vaapi" | "hevc_amf"
     ) && (config.container.eq_ignore_ascii_case("mp4")
         || config.container.eq_ignore_ascii_case("mov"))
     {
@@ -48,6 +48,14 @@ pub fn add_video_codec_args(args: &mut Vec<String>, config: &ConversionConfig) {
 
     if is_still_image_codec {
         add_still_image_codec_args(args, config);
+        return;
+    }
+
+    if matches!(
+        config.video_codec.as_str(),
+        "h264_vaapi" | "hevc_vaapi" | "av1_vaapi" | "hevc_amf"
+    ) {
+        args.extend(["-b:v".into(), format!("{}k", config.video_bitrate)]);
         return;
     }
 
