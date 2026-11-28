@@ -616,10 +616,26 @@ pub enum MetadataMode {
     Replace,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct EncodingStats {
+    pub frame: Option<u64>,
+    pub fps: Option<f64>,
+    pub size_bytes: Option<u64>,
+    pub bitrate_kbps: Option<f64>,
+    pub speed: Option<f64>,
+    pub media_seconds: f64,
+    pub elapsed_seconds: f64,
+    pub eta_seconds: Option<f64>,
+    pub duration_seconds: Option<f64>,
+    pub pass: Option<u8>,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct ProgressPayload {
     pub id: String,
     pub progress: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stats: Option<EncodingStats>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]

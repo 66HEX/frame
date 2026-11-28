@@ -1,3 +1,5 @@
+mod stats;
+
 use super::completion::CompletionFile;
 use super::controller::ConversionProcessController;
 use super::output_paths::disambiguate_output_paths;
@@ -555,7 +557,7 @@ pub(super) fn run_final_child_observed(
                     "Media worker error output was unavailable".to_string(),
                 ))
             },
-            |mut stderr| stream_ffmpeg_stderr(&mut stderr, task, emit),
+            |mut stderr| stream_ffmpeg_stderr(&mut stderr, task, controller, emit),
         )
     };
     let status = child.wait().map_err(ConversionError::Io);
@@ -822,69 +824,47 @@ fn finish_preflight_cancellation(
 fn stream_ffmpeg_stderr(
     stderr: &mut impl Read,
     task: &ConversionTask,
+    controller: &ConversionProcessController,
     emit: &mut impl FnMut(ConversionEvent),
 ) -> Result<(), ConversionError> {
     let mut buffer = [0_u8; 4096];
     let mut pending = String::new();
     let mut total_duration = None;
     let expected_duration = expected_duration_seconds(&task.config);
-
+    let mut stats = stats::WorkerProgress::default();
+    let mut handle_line = |line: &str| {
+        if line.is_empty() {
+            return;
+        }
+        emit(ConversionEvent::log(task.id.clone(), line));
+        if let Some((progress, sample)) = stats.read(line, || controller.encoding_elapsed(&task.id))
+        {
+            emit(ConversionEvent::Progress(
+                frame_core::types::ProgressPayload {
+                    id: task.id.clone(),
+                    progress,
+                    stats: Some(sample),
+                },
+            ));
+        } else if let Some(progress) =
+            ffmpeg_progress_from_line(line, expected_duration, &mut total_duration)
+        {
+            emit(ConversionEvent::progress(task.id.clone(), progress));
+        }
+    };
     loop {
         let read = stderr.read(&mut buffer).map_err(ConversionError::Io)?;
         if read == 0 {
             break;
         }
-
         pending.push_str(&String::from_utf8_lossy(&buffer[..read]));
-        drain_ffmpeg_segments(
-            &mut pending,
-            task,
-            expected_duration,
-            &mut total_duration,
-            emit,
-        );
-    }
-
-    if !pending.trim().is_empty() {
-        handle_ffmpeg_line(
-            pending.trim(),
-            task,
-            expected_duration,
-            &mut total_duration,
-            emit,
-        );
-    }
-
-    Ok(())
-}
-
-fn drain_ffmpeg_segments(
-    pending: &mut String,
-    task: &ConversionTask,
-    expected_duration: f64,
-    total_duration: &mut Option<f64>,
-    emit: &mut impl FnMut(ConversionEvent),
-) {
-    while let Some(separator_index) = pending.find(['\r', '\n']) {
-        let segment = pending[..separator_index].trim().to_string();
-        pending.drain(..=separator_index);
-        if !segment.is_empty() {
-            handle_ffmpeg_line(&segment, task, expected_duration, total_duration, emit);
+        while let Some(separator) = pending.find(['\r', '\n']) {
+            handle_line(pending[..separator].trim());
+            pending.drain(..=separator);
         }
     }
-}
-
-fn handle_ffmpeg_line(
-    line: &str,
-    task: &ConversionTask,
-    expected_duration: f64,
-    total_duration: &mut Option<f64>,
-    emit: &mut impl FnMut(ConversionEvent),
-) {
-    emit(ConversionEvent::log(task.id.clone(), line));
-    if let Some(progress) = ffmpeg_progress_from_line(line, expected_duration, total_duration) {
-        emit(ConversionEvent::progress(task.id.clone(), progress));
-    }
+    handle_line(pending.trim());
+    Ok(())
 }
 
 pub(super) fn expected_duration_seconds(config: &CoreConversionConfig) -> f64 {

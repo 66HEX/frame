@@ -34,6 +34,16 @@ Each row names an observable result and the corresponding test entry point. The 
 | Queue, persistence and publication | Queue concurrency, cancellation, process pause/resume, bounded probes, completion evidence, output-name collisions, staged files and crash recovery. Keep Flatpak-specific behavior. | `conversion_runner`, `bounded_process`, `workspace_recovery`, `qa_harness` |
 | Presets and UI | Previously serialized settings retain their defaults and produce valid plans. Applying a preset preserves per-source track choices. UI availability reflects runtime capabilities. | `frame-app::settings`, `app_persistence`, `app::tests` and queue/import integration tests |
 
+The following features extend that baseline on the same worker.
+
+| Feature | Observable result | Test entry points |
+| --- | --- | --- |
+| Independent video and audio modes (#306) | Selected streams can be copied while the other media type is encoded. Copied packets retain payload, order and timestamps. | `media_integration::mixed_modes`, `qa_harness` |
+| Two-pass video (#307) | x264, x265 and VP9 analyze and encode the same trimmed and filtered video. Concurrent exports keep separate pass data. | `frame-media/tests/two_pass.rs`, `conversion_runner::pass_directory`, `qa_harness` |
+| Audio track metadata (#308) | Per-track language, title and default playback selection survive export according to container and privacy settings. | `media_integration::audio_titles`, `qa_harness` |
+| Audio sample rate (#309) | Each encoded track uses its selected supported rate. Copied audio keeps its original rate. | `media_integration::sample_rates`, `qa_harness` |
+| Encoding statistics (#310) | Per-task frame counts, output bytes and clocks match exported media. Progress accounts for both passes and elapsed encoding time excludes pauses. | `frame-media/tests/conversion.rs`, `conversion_runner::runner::stats`, `conversion_events::encoding_stats_tests`, `qa_harness` |
+
 ## Platform matrix
 
 | Target | Distribution and library resolution | Evidence required for release |

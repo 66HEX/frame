@@ -51,6 +51,7 @@ pub enum VisualFixture {
     UpdateAvailable,
     WorkspaceAudio,
     WorkspaceEmpty,
+    WorkspaceEncodingStats,
     WorkspaceImage,
     WorkspaceLargeQueue,
 }
@@ -89,6 +90,7 @@ pub fn visual_fixture_from_env_value(value: Option<&str>) -> Option<VisualFixtur
         Some("settings-video-filters") => Some(VisualFixture::SettingsVideoFilters),
         Some("update-available") => Some(VisualFixture::UpdateAvailable),
         Some("workspace-audio") => Some(VisualFixture::WorkspaceAudio),
+        Some("workspace-encoding-stats") => Some(VisualFixture::WorkspaceEncodingStats),
         Some("workspace-empty") => Some(VisualFixture::WorkspaceEmpty),
         Some("workspace-image") => Some(VisualFixture::WorkspaceImage),
         Some("workspace-large-queue") => Some(VisualFixture::WorkspaceLargeQueue),

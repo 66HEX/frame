@@ -30,6 +30,7 @@ impl ConversionEvent {
         Self::Progress(ProgressPayload {
             id: id.into(),
             progress,
+            stats: None,
         })
     }
 

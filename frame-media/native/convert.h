@@ -90,7 +90,7 @@ extern int frame_output_open(void *io, const char *path, int overwrite, int prog
 extern int frame_output_write(void *io, const uint8_t *buffer, int size);
 extern int64_t frame_output_seek(void *io, int64_t offset, int whence);
 extern const char *frame_pass_path(void *io);
-extern void frame_output_pass(void *io, int pass, int64_t duration);
+extern void frame_output_pass(void *io, int pass, int64_t duration, int64_t video_duration, int has_video);
 extern void frame_output_quiet(void *io, int quiet);
 extern void frame_output_stats(void *io, int64_t frames, int64_t time_us);
 #endif

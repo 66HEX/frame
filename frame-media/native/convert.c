@@ -238,12 +238,6 @@ static int setup_muxer(const ConvertPlan *p, AVFormatContext *out, ConvertTrack 
             return err;
         if ((err = copy_chapters(p, primary, out)) < 0)
             return err;
-        if (!p->video_pass && primary->duration > 0 && av_log_get_level() >= AV_LOG_INFO) {
-            int64_t secs = primary->duration / AV_TIME_BASE;
-            fprintf(stderr, "Duration: %02" PRId64 ":%02" PRId64 ":%02" PRId64 ".%03" PRId64 "\n",
-                    secs / 3600, (secs / 60) % 60, secs % 60,
-                    (primary->duration % AV_TIME_BASE) / 1000);
-        }
     }
     AVDictionary *options = NULL;
     static const char *const keys[] = {
@@ -304,8 +298,78 @@ static void free_track(ConvertTrack *t) {
     avcodec_free_context(&t->subdecoder);
 }
 
+static int64_t stream_end_us(const AVFormatContext *input, const AVStream *stream) {
+    if (stream->duration > 0) {
+        int64_t start = stream->start_time == AV_NOPTS_VALUE ? input->start_time :
+                        av_rescale_q(stream->start_time, stream->time_base, AV_TIME_BASE_Q);
+        int64_t duration = av_rescale_q(stream->duration, stream->time_base, AV_TIME_BASE_Q);
+        return av_sat_add64(start == AV_NOPTS_VALUE ? 0 : start, duration);
+    }
+    if (av_match_name("matroska", input->iformat->name)) {
+        const AVDictionaryEntry *tag = av_dict_get(stream->metadata, "DURATION", NULL, 0);
+        int64_t end;
+        // matroskaenc.c writes max(packet timestamp + packet duration) on
+        // the container timeline. A delayed track's start is already included.
+        if (tag && av_parse_time(&end, tag->value, 1) == 0 && end > 0)
+            return end;
+    }
+    return AV_NOPTS_VALUE;
+}
+
+static int all_timed_streams_selected(const AVFormatContext *input, const ConvertTrack *tracks,
+                                      int count) {
+    for (unsigned i = 0; i < input->nb_streams; ++i) {
+        const AVStream *stream = input->streams[i];
+        enum AVMediaType type = stream->codecpar->codec_type;
+        if ((type != AVMEDIA_TYPE_VIDEO && type != AVMEDIA_TYPE_AUDIO && type != AVMEDIA_TYPE_SUBTITLE)
+            || (stream->disposition & AV_DISPOSITION_ATTACHED_PIC))
+            continue;
+        int selected = 0;
+        for (int k = 0; k < count && !selected; ++k)
+            selected = tracks[k].src == stream;
+        if (!selected)
+            return 0;
+    }
+    return 1;
+}
+
+static int64_t output_duration(const ConvertPlan *p, const ConvertTrack *tracks, int count) {
+    int64_t longest = -1;
+    for (int i = 0; i < p->sources_len; ++i) {
+        const Source *source = &p->sources[i];
+        const AVFormatContext *input = source->input;
+        if (!input)
+            continue;
+        int64_t origin = frame_clock_origin(input, source->mapped, source->mapped_count, source->seek);
+        int missing = 0, missing_media = 0;
+        for (int k = 0; k < count; ++k) {
+            if (tracks[k].source != source)
+                continue;
+            int64_t end = stream_end_us(input, tracks[k].src);
+            if (end == AV_NOPTS_VALUE) {
+                missing = 1;
+                missing_media |= tracks[k].kind != 's';
+            } else {
+                longest = FFMAX(longest, FFMAX(0, av_sat_sub64(end, origin)));
+            }
+        }
+        // The format duration can be set by an unselected track. It is
+        // meaningful only if every potentially longer stream is included.
+        if (missing && input->duration > 0 && all_timed_streams_selected(input, tracks, count)) {
+            int64_t start = input->start_time == AV_NOPTS_VALUE ? 0 : input->start_time;
+            int64_t end = av_sat_add64(start, input->duration);
+            longest = FFMAX(longest, FFMAX(0, av_sat_sub64(end, origin)));
+        } else if (missing_media) {
+            return FFMAX(0, p->duration);
+        }
+    }
+    if (longest < 0)
+        return FFMAX(0, p->duration);
+    return p->duration < 0 ? longest : FFMIN(longest, p->duration);
+}
+
 static int analyze_video(ConvertPlan *p, const AVFormatContext *out, ConvertTrack *tracks,
-                         int count, void *io) {
+                         int count, int64_t duration, void *io) {
     const ConvertTrack *video = NULL;
     for (int i = 0; i < count; ++i) {
         if (tracks[i].kind == 'v') {
@@ -343,10 +407,8 @@ static int analyze_video(ConvertPlan *p, const AVFormatContext *out, ConvertTrac
     ConvertTrack first = *video;
     first.analysis_io = io;
     p->video_pass = 1;
-    int64_t duration = p->duration >= 0
-                           ? p->duration
-                           : FFMAX(0, av_sat_sub64(video->input->duration, video->source->seek));
-    frame_output_pass(io, 1, duration);
+    int64_t video_duration = output_duration(p, video, 1);
+    frame_output_pass(io, 1, duration, video_duration, 1);
     err = configure_track(p, &first, analysis);
     if (err >= 0) {
         while ((err = frame_read_encoded(&first, first.next)) == 0)
@@ -361,13 +423,11 @@ static int analyze_video(ConvertPlan *p, const AVFormatContext *out, ConvertTrac
                 err = AVERROR(ENOMEM);
         }
     }
-    if (!duration)
-        duration = first.analysis_end;
     free_track(&first); // x264 and x265 finalize their stats files on close
     avformat_free_context(analysis);
     if (err >= 0) {
         p->video_pass = 2;
-        frame_output_pass(io, 2, duration);
+        frame_output_pass(io, 2, duration, video_duration, 1);
     }
     return err;
 }
@@ -400,12 +460,18 @@ static int convert(ConvertPlan *p, AVFormatContext **outp, ConvertTrack *tracks,
         for (int k = 0; k < *count - 1; ++k)
             track->ordinal += tracks[k].kind == track->kind;
     }
+    const int64_t duration = output_duration(p, tracks, *count);
     const char *two_pass = frame_plan_opt(p, "frame_two_pass");
     if (two_pass) {
         if (strcmp(two_pass, "1"))
             return AVERROR(EINVAL);
-        if ((err = analyze_video(p, out, tracks, *count, io)) < 0)
+        if ((err = analyze_video(p, out, tracks, *count, duration, io)) < 0)
             return err;
+    } else {
+        int has_video = 0;
+        for (int i = 0; i < *count; ++i)
+            has_video |= tracks[i].kind == 'v';
+        frame_output_pass(io, 0, duration, 0, has_video);
     }
     const char *progress = frame_plan_opt(p, "progress");
     if (progress && frame_output_open(io, progress, 1, 1) < 0)

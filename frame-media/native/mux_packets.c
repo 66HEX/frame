@@ -22,8 +22,11 @@ static int write_packet(Writer *w, ConvertTrack *t, AVPacket *pkt, AVRational tb
     int err = av_interleaved_write_frame(w->format, pkt);
     if (err < 0)
         return err;
-    if (t->kind == 'v' && !t->ordinal)
-        w->video_frames++;
+    if (t->kind == 'v' && !t->ordinal) {
+        // Re-encoding counts submitted frames, including encoder lookahead.
+        // Stream copy counts muxed video access units without decoding them.
+        w->video_frames = t->encoder ? t->frames : w->video_frames + 1;
+    }
     frame_output_stats(w->io, w->video_frames, end);
     return 0;
 }
