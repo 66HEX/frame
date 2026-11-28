@@ -17,19 +17,27 @@ static int append_constraints(const ConvertPlan *p, const ConvertTrack *t, const
         if (rate)
             av_bprintf(tail, "fps=%s,", rate);
         const char *fixed = frame_plan_opt(p, "pix_fmt");
-        if (fixed) {
-            if (av_get_pix_fmt(fixed) == AV_PIX_FMT_NONE)
-                return AVERROR(EINVAL);
-            av_bprintf(tail, "format=pix_fmts=%s", fixed);
-        } else {
-            const enum AVPixelFormat *fmts = NULL;
+        const enum AVPixelFormat *fmts = NULL;
 #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100)
-            if ((err = avcodec_get_supported_config(NULL, codec, AV_CODEC_CONFIG_PIX_FORMAT, 0,
-                                                    (const void **)&fmts, NULL)) < 0)
-                return err;
+        if ((err = avcodec_get_supported_config(NULL, codec, AV_CODEC_CONFIG_PIX_FORMAT, 0, (const void **)&fmts, NULL)) < 0) return err;
 #else
-            fmts = codec->pix_fmts;
+        fmts = codec->pix_fmts;
 #endif
+        if (fixed) {
+            enum AVPixelFormat requested = av_get_pix_fmt(fixed);
+            if (requested == AV_PIX_FMT_NONE) return AVERROR(EINVAL);
+            enum AVPixelFormat best = requested;
+            if (fmts) {
+                best = AV_PIX_FMT_NONE;
+                for (const enum AVPixelFormat *f = fmts; *f != AV_PIX_FMT_NONE; ++f) {
+                    const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(*f);
+                    if (desc && !(desc->flags & AV_PIX_FMT_FLAG_HWACCEL))
+                        best = av_find_best_pix_fmt_of_2(best, *f, requested, 1, NULL);
+                }
+            }
+            if (best == AV_PIX_FMT_NONE) return AVERROR(EINVAL);
+            av_bprintf(tail, "format=pix_fmts=%s", av_get_pix_fmt_name(best));
+        } else {
             if (!fmts)
                 av_bprintf(tail, "null");
             else {
@@ -45,6 +53,7 @@ static int append_constraints(const ConvertPlan *p, const ConvertTrack *t, const
                     return AVERROR(ENOSYS);
             }
         }
+        if (codec->id == AV_CODEC_ID_MJPEG) av_bprintf(tail, ":color_ranges=pc");
     } else {
         const enum AVSampleFormat *fmts = NULL;
         const int *rates = NULL;

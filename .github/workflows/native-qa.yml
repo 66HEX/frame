@@ -22,13 +22,13 @@ jobs:
         include:
           - runner: ubuntu-22.04
             platform: linux-x86_64
-            archive_limit_mib: 80
+            archive_limit_mib: 180
           - runner: ubuntu-22.04-arm
             platform: linux-aarch64
-            archive_limit_mib: 80
+            archive_limit_mib: 180
           - runner: windows-2022
             platform: windows-x86_64
-            archive_limit_mib: 140
+            archive_limit_mib: 240
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     env:
@@ -61,6 +61,17 @@ jobs:
       if: runner.os == 'Windows'
       shell: powershell
       run: '& .\script\qa\tests\test-windows-job.ps1 -Runs .\target\native-qa-helper'
+    - name: qa::setup_media_sdk
+      run: python script/media-worker.py setup-ci
+    - name: qa::build_media_worker
+      run: cargo build --release --locked --package frame-media
+    - name: qa::package_media_worker
+      shell: bash
+      run: |
+        bundle=target/native-qa-worker
+        libs="$bundle/lib"
+        if [[ "$RUNNER_OS" == Windows ]]; then libs="$bundle"; fi
+        python script/media-worker.py bundle --bin-dir "$bundle" --lib-dir "$libs"
     - name: qa::setup_media_tools
       run: cargo xtask setup-ffmpeg
     - name: qa::test_process_lifecycle

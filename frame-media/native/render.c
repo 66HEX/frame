@@ -263,7 +263,7 @@ int frame_render_open(FrameRenderer **result, const FrameRenderPlan *plan)
     *result = NULL;
     if (!r) return AVERROR(ENOMEM);
     int rc = AVERROR(ENOMEM);
-    r->count = plan->overlay ? 2 : 1;
+    r->count = plan->overlay && strstr(plan->graph, "[1:v:0]") ? 2 : 1;
     r->graph = avfilter_graph_alloc();
     if (!r->graph) goto fail;
     r->graph->nb_threads = plan->threads;
@@ -271,7 +271,14 @@ int frame_render_open(FrameRenderer **result, const FrameRenderPlan *plan)
         rc = open_input(&r->inputs[i], i ? plan->overlay : plan->path,
                 plan->audio ? AVMEDIA_TYPE_AUDIO : AVMEDIA_TYPE_VIDEO,
                 i ? -1 : plan->stream, i ? 0 : plan->start_us, plan, i == 0);
-        if (rc < 0 || (rc = next_decoded(&r->inputs[i])) < 0) goto fail;
+        if (rc < 0) goto fail;
+        // Configure filters from the first selected video frame. A keyframe
+        // before an accurate seek can have different dimensions or bit depth.
+        do {
+            rc = next_decoded(&r->inputs[i]);
+            if (rc < 0) goto fail;
+        } while (i == 0 && !plan->audio && plan->start_us > 0 && !plan->fast_seek &&
+                 r->inputs[i].frame->pts < 0);
     }
     if ((rc = configure_graph(r, plan)) < 0) goto fail;
     for (int i = 0; i < r->count; ++i)
