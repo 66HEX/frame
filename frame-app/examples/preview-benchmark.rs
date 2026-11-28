@@ -6,7 +6,7 @@ use frame_app::preview_engine::{
     PreviewCommand, PreviewRenderedFrame, PreviewRuntimeMetrics, PreviewSession,
     PreviewSessionConfig, PreviewSourceKind,
 };
-use frame_app::runtime_binaries::ffmpeg_executable;
+use frame_app::runtime_binaries::media_worker_executable;
 use frame_app::settings::ConversionConfig;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -47,8 +47,10 @@ fn main() -> BenchmarkResult<()> {
         return Ok(());
     };
     let tool_deadline = Deadline::new(options.timeout_seconds, "FFmpeg version query");
-    let executable = ffmpeg_executable();
-    let version = Command::new(&executable).arg("-version").output()?;
+    let executable = media_worker_executable();
+    let version = Command::new(&executable)
+        .args(["capabilities", "version"])
+        .output()?;
     if !version.status.success() {
         return Err("FFmpeg version query failed".into());
     }

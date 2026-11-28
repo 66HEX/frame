@@ -49,7 +49,11 @@ Source: "{#ResourcesDir}\frame-media.exe"; DestDir: "{app}"; Flags: ignoreversio
 Source: "{#ResourcesDir}\frame-update-helper.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#ResourcesDir}\*.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#ResourcesDir}\frame-media.LICENSE"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#ResourcesDir}\binaries\*"; DestDir: "{app}\binaries"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[InstallDelete]
+Type: files; Name: "{app}\binaries\ffmpeg-x86_64-pc-windows-msvc.exe"
+Type: files; Name: "{app}\binaries\ffprobe-x86_64-pc-windows-msvc.exe"
+Type: dirifempty; Name: "{app}\binaries"
 
 [Icons]
 Name: "{autoprograms}\Frame"; Filename: "{app}\Frame.exe"

@@ -58,6 +58,9 @@ def fetch_sdk(target):
 
 
 def mac_sdk(target):
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        subprocess.run(["brew", "install", "autoconf", "autoconf-archive", "automake",
+                        "libtool", "nasm", "ninja", "pkgconf"], check=True)
     version = json.loads((PORTS / "vcpkg.json").read_text())["builtin-baseline"]
     checkout = CACHE / f"vcpkg-{version}"
     if not checkout.exists():
@@ -73,12 +76,20 @@ def mac_sdk(target):
     # build to the exact builtin port selected by the pinned baseline.
     overlay = CACHE / f"ports-{version}"
     extra = (PORTS / "x265-multilib.cmake").read_bytes()
-    overlay = overlay / hashlib.sha256(extra).hexdigest()
+    libass = json.loads((checkout / "ports/libass/vcpkg.json").read_text())
+    # libass auto-detects both libraries with pkg-config. Declare them as
+    # dependencies to prevent accidental linkage to a developer's Homebrew.
+    libass["dependencies"].append("libunibreak")
+    libass["dependencies"].append({"name": "fontconfig", "platform": "osx"})
+    libass_manifest = json.dumps(libass).encode()
+    overlay = overlay / hashlib.sha256(extra + libass_manifest).hexdigest()
     if not overlay.exists():
         overlay.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(dir=overlay.parent) as temporary:
             stage = Path(temporary) / "ports"
             shutil.copytree(checkout / "ports/x265", stage / "x265")
+            shutil.copytree(checkout / "ports/libass", stage / "libass")
+            (stage / "libass/vcpkg.json").write_bytes(libass_manifest)
             with (stage / "x265/portfile.cmake").open("ab") as output:
                 output.write(b"\nvcpkg_find_acquire_program(NINJA)\n" + extra)
             stage.rename(overlay)
@@ -128,17 +139,28 @@ def relocate_macos(worker, libraries):
             if dep.startswith(("/usr/lib/", "/System/Library/")):
                 continue
             name = Path(dep).name
-            if name not in {lib.name for lib in libraries}:
+            # vcpkg records the full patch version in LC_LOAD_DYLIB. The
+            # bundle uses the ABI major so patch updates preserve its layout.
+            match = next((lib for lib in libraries if re.fullmatch(
+                re.escape(lib.stem) + r"(?:\.\d+)*\.dylib", name)), None)
+            if match is None:
                 raise ValueError(f"{binary.name} requires an unpackaged dylib: {dep}")
-            args.extend(["-change", dep, destination + name])
+            args.extend(["-change", dep, destination + match.name])
         if args:
             subprocess.run(["install_name_tool", *args, binary], check=True)
         subprocess.run(["codesign", "--force", "--sign", "-", binary], check=True)
 
 
+def verify_no_cli(package):
+    for path in package.rglob("*"):
+        if path.is_file() and re.fullmatch(r"ff(?:mpeg|probe)(?:-[\w.-]+|\.exe)?", path.name, re.I):
+            raise ValueError(f"Package includes a legacy CLI: {path.relative_to(package)}")
+
+
 def smoke(worker):
     env = {k: v for k, v in os.environ.items() if k not in {
         "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH", "DYLD_FALLBACK_LIBRARY_PATH", "FFMPEG_DIR"}}
+    env["PATH"] = ""
     if os.name == "nt":
         # The actual installer lives beside the six DLLs. Exclude developer
         # and runner SDK directories from Windows' fallback search path.
@@ -152,7 +174,12 @@ def smoke(worker):
             return subprocess.check_output([worker.resolve(), *args], cwd=temporary, env=env,
                                            text=True, timeout=30)
         encoders = invoke(["capabilities", "-encoders"])
-        for codec in ("libx264", "libx265", "libvpx-vp9", "libsvtav1", "libopus", "libmp3lame", "libwebp"):
+        required = ["libx264", "libx265", "libvpx-vp9", "libsvtav1", "libopus", "libmp3lame", "libwebp"]
+        if sys.platform == "darwin":
+            required.extend(["h264_videotoolbox", "hevc_videotoolbox"])
+        if sys.platform == "win32":
+            required.extend(["h264_nvenc", "hevc_nvenc", "av1_nvenc"])
+        for codec in required:
             if not re.search(r"\b" + re.escape(codec) + r"\b", encoders):
                 raise ValueError(f"SDK missing encoder {codec}")
         filters = invoke(["capabilities", "-filters"])
@@ -205,13 +232,17 @@ def main():
     parser.add_argument("--target")
     parser.add_argument("--bin-dir", type=Path)
     parser.add_argument("--lib-dir", type=Path)
+    parser.add_argument("--package-root", type=Path)
     parser.add_argument("--profile", choices=("debug", "release"), default="release")
     args = parser.parse_args()
-    host = re.search(r"^host: (.+)$", subprocess.check_output(["rustc", "-vV"], text=True), re.M)[1]
-    target = args.target or host
+    target = args.target
+    if not target:
+        target = re.search(r"^host: (.+)$", subprocess.check_output(["rustc", "-vV"], text=True), re.M)[1]
     if target not in ARCHIVES and target not in MAC_TRIPLETS:
         parser.error(f"Unsupported target {target}")
     if args.action == "verify":
+        if args.package_root:
+            verify_no_cli(args.package_root)
         smoke(args.bin_dir / ("frame-media.exe" if target.endswith("msvc") else "frame-media"))
         return
     sdk = sdk_for(target)
@@ -224,12 +255,29 @@ def main():
             elif target in MAC_TRIPLETS:
                 print(f"DYLD_LIBRARY_PATH={sdk / 'lib'}", file=output)
         if target.endswith("msvc"):
+            # Worker tests deliberately clear PATH. Mirror Windows installer
+            # placement beside Cargo's executable for both supported profiles.
+            for base in (TARGET_DIR, TARGET_DIR / target):
+                for profile in ("debug", "release"):
+                    dest = base / profile
+                    dest.mkdir(parents=True, exist_ok=True)
+                    for dll in runtime_libraries(sdk, target):
+                        local = dest / dll.name
+                        if local.exists() and os.path.samefile(dll, local):
+                            continue
+                        local.unlink(missing_ok=True)
+                        try:
+                            os.link(dll, local)
+                        except OSError:
+                            shutil.copy2(dll, local)
             with open(os.environ["GITHUB_PATH"], "a", encoding="utf8") as output:
                 print(sdk / "bin", file=output)
     else:
         if not args.bin_dir or not args.lib_dir:
             parser.error("bundle requires --bin-dir and --lib-dir")
         bundle(target, sdk, args.bin_dir, args.lib_dir, args.profile)
+        if args.package_root:
+            verify_no_cli(args.package_root)
 
 
 if __name__ == "__main__":

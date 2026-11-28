@@ -14,10 +14,10 @@
 </div>
 
 **Frame** is a native media conversion utility built in Rust. It provides a
-desktop interface for FFmpeg operations, with granular control over video,
+desktop interface for local media conversion, with granular control over video,
 audio, image, subtitle, and metadata settings. The application uses a GPUI-CE
-front end and a reusable Rust conversion core for FFmpeg argument generation,
-source probing, compatibility validation, task control, and progress parsing.
+front end, a Rust conversion planner and an isolated worker linked to the FFmpeg
+libraries. The worker inspects, filters, encodes and muxes media.
 
 <br />
 <div align="center">
@@ -105,9 +105,8 @@ details, tier suggestions, and a launch checklist.
   and HDMV subtitle workflows for M2T/MTS/M2TS. M2T converts bitmap PGS/DVDSub
   to standard DVB subtitles instead of private data.
 - **Metadata:** Preserve, clean, or replace generic metadata fields, plus
-  MPEG-TS/M2TS program service name and provider metadata read through
-  `ffprobe -show_programs`.
-- **Metadata Probing:** Automated source inspection through `ffprobe`.
+  MPEG-TS/M2TS program service name and provider metadata read from libavformat programs.
+- **Metadata Probing:** Source inspection through the isolated `frame-media` worker.
 
 ### Architecture & Workflow
 
@@ -116,12 +115,11 @@ details, tier suggestions, and a launch checklist.
 - **Shared Conversion Core:** `frame-core` owns FFmpeg arguments, media rules,
   probing types, filter construction, and validation logic.
 - **Concurrent Processing:** Rust task controller for queueing and limiting
-  simultaneous FFmpeg processes.
-- **Real-time Telemetry:** FFmpeg progress and log events are parsed and shown
+  simultaneous media workers.
+- **Real-time Telemetry:** Worker progress and log events are parsed and shown
   in the app while conversions run.
-- **Runtime Binaries:** Local development uses platform-specific FFmpeg and
-  FFprobe binaries under `frame-app/resources/binaries/`. Native bundles include
-  those tools and detect encoder capabilities from the bundled FFmpeg at startup.
+- **Runtime Binaries:** The desktop app launches its sibling `frame-media`. It reads
+  codec and filter capabilities from the libraries loaded by that worker.
 
 ## Repository Layout
 
@@ -156,7 +154,7 @@ The website's original history is preserved under the signed Git tag
 
 ### Conversion Core
 
-- **Runtime Tools:** FFmpeg and FFprobe.
+- **Media worker:** libavformat, libavcodec, libavfilter, libswscale, libswresample and libavutil.
 - **Serialization:** `serde`, `serde_json`.
 - **Error Handling:** `thiserror`.
 - **Media Rules:** Shared JSON compatibility matrix consumed by Rust code.
@@ -206,9 +204,7 @@ brew install 66HEX/frame/frame
 ### Flathub (Linux)
 
 The production Flatpak is distributed through Flathub under
-`io.github._66HEX.Frame`. The Flathub build uses FFmpeg, FFprobe, codecs, and
-media libraries from the Freedesktop runtime instead of bundled sidecar media
-tools.
+`io.github._66HEX.Frame`. The Flathub build links the media worker against the Freedesktop media libraries.
 
 ```bash
 flatpak install flathub io.github._66HEX.Frame
@@ -223,8 +219,7 @@ flatpak update io.github._66HEX.Frame
 ### Nixpkgs (Linux)
 
 Frame is available as [`frame-media-converter` in Nixpkgs](https://github.com/NixOS/nixpkgs/blob/nixos-unstable/pkgs/by-name/fr/frame-media-converter/package.nix)
-on `nixos-unstable`, for x86_64 and aarch64 Linux. The package uses FFmpeg and
-FFprobe from Nixpkgs, and Nix manages application updates.
+on `nixos-unstable`, for x86_64 and aarch64 Linux. The package uses the Nixpkgs media libraries, and Nix manages application updates.
 
 With Nix installed and the [`nix-command` and `flakes` features enabled](https://nix.dev/concepts/flakes#running-commands),
 run Frame without installing it in your profile:
@@ -268,15 +263,12 @@ git clone https://github.com/66HEX/frame.git
 cd frame
 ```
 
-**3. Setup Runtime Binaries**
+**3. Prepare the media SDK**
 
-Frame requires FFmpeg and FFprobe runtime binaries. Release and development
-tasks download the platform-specific tools into ignored local runtime paths. To
-prepare them manually:
-
-```bash
-cargo xtask setup-ffmpeg
-```
+Install the FFmpeg development headers and libraries for your target, including
+the codecs you intend to use. Set `FFMPEG_DIR` to the SDK prefix or configure
+pkg-config for the six libraries listed above. Windows needs the SDK DLLs on
+the loader's search path for local builds. Native packaging uses pinned SDKs.
 
 **4. Run or Build**
 

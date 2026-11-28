@@ -36,6 +36,7 @@ struct Output {
     progress: Option<Sink>,
     error: Option<io::Error>,
     last_report: Option<Instant>,
+    quiet: bool,
     frames: i64,
     time_us: i64,
 }
@@ -140,12 +141,18 @@ extern "C" fn frame_output_seek(state: &mut Output, offset: i64, whence: c_int) 
 }
 
 #[unsafe(no_mangle)]
+const extern "C" fn frame_output_quiet(state: &mut Output, quiet: c_int) {
+    state.quiet = quiet != 0;
+}
+
+#[unsafe(no_mangle)]
 extern "C" fn frame_output_stats(state: &mut Output, frames: i64, time_us: i64) {
     state.frames = frames;
     state.time_us = state.time_us.max(time_us);
-    if state
-        .last_report
-        .is_some_and(|last| last.elapsed() < Duration::from_millis(250))
+    if state.quiet
+        || state
+            .last_report
+            .is_some_and(|last| last.elapsed() < Duration::from_millis(250))
     {
         return;
     }
@@ -197,6 +204,9 @@ pub fn run(args: &[OsString]) -> Result<(), String> {
     if let Some(media) = &mut state.media {
         media.flush().map_err(|error| error.to_string())?;
     }
+    state.last_report = None;
+    let (frames, time_us) = (state.frames, state.time_us);
+    frame_output_stats(&mut state, frames, time_us);
     if let Some(progress) = &mut state.progress {
         writeln!(
             progress,

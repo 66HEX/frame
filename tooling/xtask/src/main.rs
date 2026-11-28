@@ -151,7 +151,7 @@ Commands:
   bundle linux      Build the Linux tarball package
   bundle linux --all Build Linux tarball, AppImage, and Flatpak test packages
   bundle windows    Build the Windows Inno Setup installer
-  setup-ffmpeg      Download FFmpeg and FFprobe runtime binaries
+  setup-ffmpeg      Download FFmpeg and FFprobe reference tools for tests
   update-manifest   Generate a signed-update manifest from release artifacts
   sign-update-manifest Sign update-manifest.json with FRAME_UPDATE_SIGNING_KEY
   flathub-sources   Create Flathub source and cargo-vendor release archives
@@ -235,63 +235,12 @@ fn bundle(args: &[String]) -> Result<()> {
 }
 
 const WINDOWS_BUNDLE_HOST_ERROR: &str = "Windows bundles must be built on Windows.";
-const WINDOWS_PREPARED_FFMPEG_FLAG: &str = "-SkipSetupFfmpeg";
 
 fn bundle_windows(args: &[&str]) -> Result<()> {
     if !cfg!(target_os = "windows") {
         return Err(XtaskError::Usage(WINDOWS_BUNDLE_HOST_ERROR.to_string()));
     }
-    // bundle-windows.ps1 only supports x86_64 hosts; let it report unsupported
-    // platforms and architectures before touching the binary cache.
-    let prepare_ffmpeg = cfg!(target_arch = "x86_64") && windows_bundle_should_prepare_ffmpeg(args);
-    if prepare_ffmpeg {
-        setup_ffmpeg(&[
-            "--platform".to_string(),
-            "win32".to_string(),
-            "--arch".to_string(),
-            "x86_64".to_string(),
-        ])?;
-    }
-    let script_args = windows_bundle_script_args(args, prepare_ffmpeg);
-    run_script("./script/bundle-windows.ps1", &script_args)
-}
-
-fn windows_bundle_should_prepare_ffmpeg(args: &[&str]) -> bool {
-    let skip = args.iter().any(|arg| {
-        ["-PackageOnly", "-Help", "-h", WINDOWS_PREPARED_FFMPEG_FLAG]
-            .iter()
-            .any(|flag| arg.eq_ignore_ascii_case(flag))
-    });
-    if skip {
-        return false;
-    }
-    windows_bundle_architecture(args).is_none_or(|arch| arch.eq_ignore_ascii_case("x86_64"))
-}
-
-fn windows_bundle_architecture<'a>(args: &[&'a str]) -> Option<&'a str> {
-    for (index, arg) in args.iter().enumerate() {
-        let (name, inline) = match arg.split_once(':') {
-            Some((name, value)) => (name, Some(value)),
-            None => (*arg, None),
-        };
-        if name.eq_ignore_ascii_case("-Architecture") || name.eq_ignore_ascii_case("-a") {
-            let value = inline.or_else(|| args.get(index + 1).copied());
-            // The script reports a dangling switch; don't prepare binaries for it.
-            return Some(value.unwrap_or(""));
-        }
-    }
-    None
-}
-
-fn windows_bundle_script_args<'a>(args: &[&'a str], prepared: bool) -> Vec<&'a str> {
-    let mut script_args = args.to_vec();
-    let already_forwarded = script_args
-        .iter()
-        .any(|arg| arg.eq_ignore_ascii_case(WINDOWS_PREPARED_FFMPEG_FLAG));
-    if prepared && !already_forwarded {
-        script_args.push(WINDOWS_PREPARED_FFMPEG_FLAG);
-    }
-    script_args
+    run_script("./script/bundle-windows.ps1", args)
 }
 
 fn setup_ffmpeg(args: &[String]) -> Result<()> {
@@ -2207,6 +2156,7 @@ __CI_MEDIA_TESTS__
     - name: steps::setup_rust
       run: rustup toolchain install __RUST_VERSION__ --profile minimal --component clippy,rustfmt
 __CI_WORKER_TESTS__
+__CI_MEDIA_TESTS__
     timeout-minutes: 90
 "
         .replace("__CI_WORKER_TESTS__", CI_WORKER_TESTS)
@@ -3743,6 +3693,11 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>, version_expression: &str) -
           perl -0pi -e 's/version = "[^"]+";/version = "$ENV{VERSION}";/' "$package_path"
           perl -0pi -e 's/hash = "[^"]+";/hash = lib.fakeHash;/' "$package_path"
           perl -0pi -e 's/cargoHash = "[^"]+";/cargoHash = lib.fakeHash;/' "$package_path"
+          # Preserve downstream changes, including nixfmt's shared cargoFlags list.
+          perl -0pi -e 's/(cargo(?:Build|Test)?Flags\s*=\s*\[[^\]]*?"frame-app")(?![^\]]*"frame-media")/$1 "--package" "frame-media"/gs' "$package_path"
+          perl -0pi -e 's/(\bbuildInputs\s*=\s*\[)(?![^\]]*\bffmpeg\b)/$1 ffmpeg/gs' "$package_path"
+          sed -i '/--prefix PATH : ${lib.makeBinPath \[ ffmpeg \]}/d; /--set FRAME_USE_SYSTEM_MEDIA_TOOLS 1/d' "$package_path"
+          grep -q '"frame-media"' "$package_path"
         else
           mkdir -p "$(dirname "$package_path")"
           cat > "$package_path" <<'EOF'
@@ -3821,8 +3776,6 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>, version_expression: &str) -
 
           postFixup = ''
             wrapProgram $out/bin/frame \
-              --prefix PATH : ${lib.makeBinPath [ ffmpeg ]} \
-              --set FRAME_USE_SYSTEM_MEDIA_TOOLS 1 \
               --set FRAME_UPDATE_EXPLANATION \
                 'This Nixpkgs build is managed by Nix. Install updates through your Nix profile, flake, or NixOS configuration.'
           '';
@@ -4896,11 +4849,13 @@ mod tests {
     }
 
     #[test]
-    fn flathub_template_uses_runtime_media_tools_without_bundled_binaries() {
+    fn flathub_template_builds_the_worker_against_runtime_libraries() {
         let template = include_str!("../../../packaging/flathub/io.github._66HEX.Frame.yml.in");
 
         assert!(template.contains("install -Dm755 target/release/frame /app/bin/frame"));
-        assert!(template.contains("--env=FRAME_USE_SYSTEM_MEDIA_TOOLS=1"));
+        assert!(
+            template.contains("install -Dm755 target/release/frame-media /app/bin/frame-media")
+        );
         assert!(template.contains("packaging/flathub/io.github._66HEX.Frame.desktop"));
         assert!(template.contains("packaging/flathub/io.github._66HEX.Frame.metainfo.xml"));
         assert!(!template.contains("desktop-file-edit"));
@@ -4998,84 +4953,6 @@ mod tests {
         assert!(!workflow.contains(":linux-aarch64:linux_appimage"));
         assert!(!workflow.contains(":linux-x86_64:flatpak"));
         assert!(!workflow.contains(":linux-aarch64:flatpak"));
-    }
-
-    #[test]
-    fn windows_bundle_appends_prepared_ffmpeg_flag() {
-        let args = ["-Install", "-Architecture", "x86_64"];
-
-        let script_args = windows_bundle_script_args(&args, true);
-
-        assert_eq!(
-            script_args,
-            vec![
-                "-Install",
-                "-Architecture",
-                "x86_64",
-                WINDOWS_PREPARED_FFMPEG_FLAG
-            ]
-        );
-        assert_eq!(windows_bundle_script_args(&args, false), args.to_vec());
-    }
-
-    #[test]
-    fn windows_bundle_args_do_not_duplicate_skip_flag() {
-        let args = ["-skipsetupffmpeg", "-Install"];
-
-        let script_args = windows_bundle_script_args(&args, true);
-        let occurrences = script_args
-            .iter()
-            .filter(|arg| arg.eq_ignore_ascii_case(WINDOWS_PREPARED_FFMPEG_FLAG))
-            .count();
-
-        assert_eq!(occurrences, 1);
-        assert_eq!(script_args, args.to_vec());
-    }
-
-    #[test]
-    fn windows_bundle_skips_ffmpeg_for_help_and_package_only() {
-        assert!(!windows_bundle_should_prepare_ffmpeg(&["-PackageOnly"]));
-        assert!(!windows_bundle_should_prepare_ffmpeg(&["-packageonly"]));
-        assert!(!windows_bundle_should_prepare_ffmpeg(&["-Help"]));
-        assert!(!windows_bundle_should_prepare_ffmpeg(&["-help"]));
-        assert!(!windows_bundle_should_prepare_ffmpeg(&["-h"]));
-        assert!(!windows_bundle_should_prepare_ffmpeg(&[
-            "-Architecture",
-            "x86_64",
-            "-h"
-        ]));
-        assert!(windows_bundle_should_prepare_ffmpeg(&[]));
-        assert!(windows_bundle_should_prepare_ffmpeg(&["-Install"]));
-        assert!(windows_bundle_should_prepare_ffmpeg(&[
-            "-Architecture",
-            "x86_64"
-        ]));
-    }
-
-    #[test]
-    fn windows_bundle_respects_architecture_and_manual_skip() {
-        assert!(windows_bundle_should_prepare_ffmpeg(&[
-            "-Architecture",
-            "x86_64"
-        ]));
-        assert!(!windows_bundle_should_prepare_ffmpeg(&[
-            "-Architecture",
-            "arm64"
-        ]));
-        assert!(!windows_bundle_should_prepare_ffmpeg(&["-a", "arm64"]));
-        assert!(!windows_bundle_should_prepare_ffmpeg(&[
-            "-Architecture:arm64"
-        ]));
-        assert!(!windows_bundle_should_prepare_ffmpeg(&["-a:arm64"]));
-        assert!(windows_bundle_should_prepare_ffmpeg(&[
-            "-Architecture:x86_64"
-        ]));
-        assert!(!windows_bundle_should_prepare_ffmpeg(&["-Architecture"]));
-        assert!(!windows_bundle_should_prepare_ffmpeg(&["-SkipSetupFfmpeg"]));
-        assert!(!windows_bundle_should_prepare_ffmpeg(&[
-            "-skipsetupffmpeg",
-            "-Install"
-        ]));
     }
 
     #[test]

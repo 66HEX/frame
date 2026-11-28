@@ -160,3 +160,40 @@ fn unknown_export_option_fails_before_creating_output() {
     );
     assert!(!output.exists());
 }
+
+#[cfg(unix)]
+#[test]
+fn copy_and_completion_preserve_non_utf8_paths_and_quiet_output() {
+    use std::os::unix::ffi::OsStrExt;
+    let dir = tempdir().unwrap();
+    let source = dir.path().join(OsStr::from_bytes(b"input-\xff.wav"));
+    let output = dir.path().join(OsStr::from_bytes(b"output-\xfe.wav"));
+    let progress = dir.path().join(OsStr::from_bytes(b"proof-\xfd"));
+    let original = wav(&source);
+    let result = worker(
+        "convert",
+        [
+            OsStr::new("-progress"),
+            progress.as_os_str(),
+            "-loglevel".as_ref(),
+            "error".as_ref(),
+            "-xerror".as_ref(),
+            "-i".as_ref(),
+            source.as_os_str(),
+            "-map".as_ref(),
+            "0:0".as_ref(),
+            "-c".as_ref(),
+            "copy".as_ref(),
+            "-n".as_ref(),
+            output.as_os_str(),
+        ],
+    );
+    success(&result);
+    assert!(result.stderr.is_empty());
+    assert!(fs::read(output).unwrap().ends_with(&original));
+    assert!(
+        fs::read_to_string(progress)
+            .unwrap()
+            .ends_with("progress=end\n")
+    );
+}

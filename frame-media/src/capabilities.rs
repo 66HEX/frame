@@ -3,6 +3,8 @@ use std::ffi::{CString, OsStr, OsString, c_char, c_int};
 use std::io::Read;
 
 unsafe extern "C" {
+    fn frame_library_paths() -> c_int;
+    fn frame_library_versions() -> c_int;
     fn frame_inventory(kind: c_int) -> c_int;
     fn frame_check_encoder(name: *const c_char, allow_sw: c_int, input: *const u8) -> c_int;
 }
@@ -10,6 +12,19 @@ unsafe extern "C" {
 /// # Errors
 /// Returns a diagnostic when the registry cannot be read or the requested encoder fails.
 pub fn run(args: &[OsString]) -> Result<(), String> {
+    if let [operation] = args {
+        // SAFETY: both functions read static library information and write to stdout.
+        let result = match operation.to_str() {
+            Some("libraries") => Some(unsafe { frame_library_paths() }),
+            Some("version") => Some(unsafe { frame_library_versions() }),
+            _ => None,
+        };
+        if let Some(code) = result {
+            return (code >= 0)
+                .then_some(())
+                .ok_or_else(|| "could not inspect loaded libraries".into());
+        }
+    }
     let last = args.last().and_then(|s| s.to_str());
     let kind = match last {
         Some("-encoders") => 0,

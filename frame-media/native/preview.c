@@ -50,14 +50,14 @@ done:
 
 int frame_preview(const char *path, const char *overlay, const char *graph, const char *tail,
                   int output, int stream, const char *start, const char *duration, int fast,
-                  int realtime, int threads, int64_t limit, int progress, int verbose)
+                  int realtime, int threads, int64_t limit, int progress, int verbose, int strict, int passthrough)
 {
 #ifdef _WIN32
     if (_setmode(_fileno(stdout), _O_BINARY) == -1) return AVERROR(EIO);
 #endif
     av_log_set_level(verbose ? AV_LOG_INFO : AV_LOG_WARNING);
     FrameRenderPlan plan = {.path=path, .overlay=overlay, .graph=graph, .tail=tail,
-        .audio=output == RAW_AUDIO, .stream=stream, .duration_us=-1, .fast_seek=fast, .threads=threads};
+        .audio=output == RAW_AUDIO, .stream=stream, .duration_us=-1, .fast_seek=fast, .threads=threads, .strict=strict};
     int rc = 0;
     if (start && (rc = av_parse_time(&plan.start_us, start, 1)) < 0) return rc;
     if (duration && (rc = av_parse_time(&plan.duration_us, duration, 1)) < 0) return rc;
@@ -79,8 +79,17 @@ int frame_preview(const char *path, const char *overlay, const char *graph, cons
         }
         if (output == RAW_BGRA) {
             if (frame->format != AV_PIX_FMT_BGRA) { rc = AVERROR_BUG; break; }
-            for (int row = 0; rc >= 0 && row < frame->height; ++row)
-                rc = write_bytes(frame->data[0] + (ptrdiff_t)row * frame->linesize[0], (size_t)frame->width * 4);
+            // Raw playback uses the frame rate of the terminal fps filter. A
+            // reconfigured filter graph may produce its first frame late.
+            AVRational rate = av_buffersink_get_frame_rate(frame_render_sink(renderer));
+            int64_t tick = !passthrough && rate.num > 0 && frame->pts != AV_NOPTS_VALUE
+                ? av_rescale_q(frame->pts, tb, av_inv_q(rate)) : count;
+            int64_t copies = FFMIN(limit - count, FFMAX(1, av_sat_add64(av_sat_sub64(tick, count), 1)));
+            for (int64_t i = 0; i < copies && rc >= 0; ++i) {
+                for (int row = 0; rc >= 0 && row < frame->height; ++row)
+                    rc = write_bytes(frame->data[0] + (ptrdiff_t)row * frame->linesize[0], (size_t)frame->width * 4);
+            }
+            count += copies - 1;
         } else if (output == RAW_AUDIO) {
             if (frame->format != AV_SAMPLE_FMT_FLT) { rc = AVERROR_BUG; break; }
             rc = write_bytes(frame->data[0], (size_t)frame->nb_samples * frame->ch_layout.nb_channels * sizeof(float));

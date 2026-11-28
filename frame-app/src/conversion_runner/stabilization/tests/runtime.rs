@@ -3,10 +3,14 @@ use crate::bounded_process::{CommandSpec, ExecutionDomain, Limits};
 use std::ffi::OsString;
 use std::time::Duration;
 
-fn run(args: Vec<OsString>) -> Vec<u8> {
+fn run(executable: String, args: Vec<OsString>) -> Vec<u8> {
     static DOMAIN: ExecutionDomain = ExecutionDomain::new();
-    let mut command = CommandSpec::new(crate::runtime_binaries::ffmpeg_executable());
-    command.args = args;
+    let mut command = CommandSpec::new(executable);
+    command.args.extend(
+        crate::runtime_binaries::worker_subcommand(&command.program, "preview")
+            .map(Into::<OsString>::into),
+    );
+    command.args.extend(args);
     let output = DOMAIN
         .run(
             &command,
@@ -66,13 +70,16 @@ fn stabilization_runtime_reduces_translation_jitter_with_production_preview_plan
         .unwrap();
     }
     let input = directory.join("shake.mkv");
-    run(["-v", "error", "-framerate", "25", "-i"]
-        .map(OsString::from)
-        .into_iter()
-        .chain([directory.join("%02d.png").into_os_string()])
-        .chain(["-c:v", "ffv1"].map(Into::into))
-        .chain([input.clone().into_os_string()])
-        .collect());
+    run(
+        crate::runtime_binaries::ffmpeg_executable(),
+        ["-v", "error", "-framerate", "25", "-i"]
+            .map(OsString::from)
+            .into_iter()
+            .chain([directory.join("%02d.png").into_os_string()])
+            .chain(["-c:v", "ffv1"].map(Into::into))
+            .chain([input.clone().into_os_string()])
+            .collect(),
+    );
     let options = frame_core::preview::PreviewFfmpegOptions {
         start_seconds: 0.0,
         end_seconds: None,
@@ -95,7 +102,7 @@ fn stabilization_runtime_reduces_translation_jitter_with_production_preview_plan
         config.video_filters.stabilization_enabled = enabled;
         check_support(
             &config,
-            &crate::runtime_binaries::ffmpeg_executable(),
+            &crate::runtime_binaries::media_worker_executable(),
             || false,
         )
         .unwrap();
@@ -106,7 +113,10 @@ fn stabilization_runtime_reduces_translation_jitter_with_production_preview_plan
         )
         .unwrap();
         assert_eq!((plan.width, plan.height), (width, height));
-        let bytes = run(plan.args.into_iter().map(Into::into).collect());
+        let bytes = run(
+            crate::runtime_binaries::media_worker_executable(),
+            plan.args.into_iter().map(Into::into).collect(),
+        );
         assert_eq!(bytes.len(), 32 * plan.frame_bytes);
         outputs.push(bytes);
     }
@@ -143,7 +153,10 @@ fn stabilization_runtime_reduces_translation_jitter_with_production_preview_plan
         config.video_filters.stabilization_enabled = false;
         let plan =
             frame_core::preview::build_ffmpeg_preview_args(&output, &config, &options).unwrap();
-        let pixels = run(plan.args.into_iter().map(Into::into).collect());
+        let pixels = run(
+            crate::runtime_binaries::media_worker_executable(),
+            plan.args.into_iter().map(Into::into).collect(),
+        );
         assert_eq!(pixels.len(), 32 * plan.frame_bytes);
         exported.push(variation(&pixels, width as usize, height as usize));
     }

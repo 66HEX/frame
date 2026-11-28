@@ -172,4 +172,8 @@ jobs:
       run: cargo test --locked --package frame-media
     - name: ci::test_worker_packaging
       run: python -B -m unittest discover -s script/tests -p test_media_worker.py -v
+    - name: ci::setup_ffmpeg
+      run: cargo xtask setup-ffmpeg
+    - name: ci::test_media_conversions
+      run: cargo test --locked -p frame-core --test media_integration -- --ignored --test-threads=1
     timeout-minutes: 90

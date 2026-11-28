@@ -154,11 +154,11 @@ mod tests {
         let Ok(mode) = std::env::var("FRAME_SOURCE_PROBE_MODE") else {
             return;
         };
-        std::fs::write(
-            std::env::var_os("FRAME_SOURCE_PROBE_MARKER").unwrap(),
-            std::process::id().to_string(),
-        )
-        .unwrap();
+        let marker =
+            std::path::PathBuf::from(std::env::var_os("FRAME_SOURCE_PROBE_MARKER").unwrap());
+        let staged = marker.with_extension("starting");
+        std::fs::write(&staged, std::process::id().to_string()).unwrap();
+        std::fs::rename(staged, marker).unwrap();
         if mode == "silent" {
             std::thread::sleep(Duration::from_secs(2));
         }
@@ -305,7 +305,7 @@ mod tests {
         wav.extend(vec![0; sample_bytes as usize]);
         std::fs::write(&path, wav).unwrap();
         let metadata = probe(
-            &crate::runtime_binaries::ffprobe_executable(),
+            &crate::runtime_binaries::media_worker_executable(),
             &path,
             || false,
         )

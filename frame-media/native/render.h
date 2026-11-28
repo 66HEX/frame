@@ -19,6 +19,9 @@ typedef struct FrameRenderPlan {
     int fast_seek;
     int threads;               /* 0 for automatic */
     const char *hardware_device;
+    const int *mapped_streams;
+    int mapped_count;
+    int strict;
 } FrameRenderPlan;
 
 typedef struct FrameRenderer FrameRenderer;

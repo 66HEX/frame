@@ -499,7 +499,7 @@ mod tests {
     #[test]
     #[ignore = "requires the bundled runtime and operational VideoToolbox hardware"]
     fn bundled_videotoolbox_encoders_complete_a_real_strict_probe() {
-        let executable = crate::runtime_binaries::ffmpeg_executable();
+        let executable = crate::runtime_binaries::media_worker_executable();
         let compiled =
             crate::capabilities::detect_available_encoders_with_executable(&executable).unwrap();
         for encoder in [

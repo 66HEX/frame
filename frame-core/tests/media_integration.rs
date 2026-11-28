@@ -28,10 +28,14 @@ type TestResult<T = ()> = Result<T, String>;
 mod adpcm;
 #[path = "media_integration/audio_titles.rs"]
 mod audio_titles;
+#[path = "media_integration/cadence_clock.rs"]
+mod cadence_clock;
 #[path = "media_integration/gif_frames.rs"]
 mod gif_frames;
 #[path = "media_integration/overlay_depth.rs"]
 mod overlay_depth;
+#[path = "media_integration/registry.rs"]
+mod registry;
 #[path = "media_integration/subtitle_trim.rs"]
 mod subtitle_trim;
 #[path = "media_integration/tiff.rs"]
@@ -43,7 +47,7 @@ mod time_grammar;
 struct Toolchain {
     ffmpeg: PathBuf,
     ffprobe: PathBuf,
-    worker: PathBuf,
+    worker: Option<PathBuf>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -68,8 +72,19 @@ struct Sandbox {
 
 impl Toolchain {
     fn discover() -> TestResult<Self> {
+        Self::discover_tools(true)
+    }
+
+    fn discover_tools(require_worker: bool) -> TestResult<Self> {
         let ffmpeg = discover_tool("ffmpeg", "FRAME_TEST_FFMPEG")?;
         let ffprobe = discover_tool("ffprobe", "FRAME_TEST_FFPROBE")?;
+        if !require_worker {
+            return Ok(Self {
+                ffmpeg,
+                ffprobe,
+                worker: None,
+            });
+        }
         let worker = match env::var_os("FRAME_TEST_MEDIA_WORKER") {
             Some(path) => PathBuf::from(path),
             None => env::current_exe()
@@ -88,7 +103,7 @@ impl Toolchain {
         Ok(Self {
             ffmpeg,
             ffprobe,
-            worker,
+            worker: Some(worker),
         })
     }
 
@@ -96,7 +111,12 @@ impl Toolchain {
         let mut request = Vec::with_capacity(args.len() + 1);
         request.push(operation.to_string());
         request.extend_from_slice(args);
-        run_tool_output(&self.worker, &request)
+        run_tool_output(
+            self.worker
+                .as_ref()
+                .ok_or("No native worker for a historical CLI comparison")?,
+            &request,
+        )
     }
 }
 
@@ -515,12 +535,13 @@ fn transport_stream_combined_processing_graph_should_preserve_existing_features(
 }
 
 #[test]
-#[ignore = "requires FFmpeg/FFprobe and FRAME_TEST_PGS_FIXTURE pointing to a .sup file"]
+#[ignore = "requires FFmpeg/FFprobe fixture tools; run with --ignored"]
 fn pgs_sidecar_should_copy_to_m2ts_and_transcode_to_dvb_for_m2t() -> TestResult {
-    let Some(pgs_fixture) = env::var_os("FRAME_TEST_PGS_FIXTURE").map(PathBuf::from) else {
-        eprintln!("skipping PGS test: FRAME_TEST_PGS_FIXTURE is not set");
-        return Ok(());
-    };
+    // A synthetic 8x8 white bitmap followed by a clear display set at one second.
+    let pgs_fixture = env::var_os("FRAME_TEST_PGS_FIXTURE").map_or_else(
+        || Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/caption.sup"),
+        PathBuf::from,
+    );
     let tools = Toolchain::discover()?;
     let sandbox = Sandbox::new("pgs_transport_stream")?;
     let input = sandbox.path("source.mp4");
@@ -648,7 +669,8 @@ fn hevc_mkv_vflip_reencode_should_write_hevc_video() -> TestResult {
 }
 
 fn assert_hevc_mkv_reencode(flip_vertical: bool) -> TestResult {
-    let tools = Toolchain::discover()?;
+    let historical = env::var_os("FRAME_TEST_HISTORICAL_HEVC").is_some();
+    let tools = Toolchain::discover_tools(!historical)?;
     let sandbox = Sandbox::new("hevc_mkv_reencode")?;
     let input = sandbox.path("source.mp4");
 
@@ -662,7 +684,14 @@ fn assert_hevc_mkv_reencode(flip_vertical: bool) -> TestResult {
     let output = sandbox.path(&format!("output-vflip-{flip_vertical}.mkv"));
     let mut config = video_config("mkv", "libx265", "aac");
     config.flip_vertical = flip_vertical;
-    convert(&tools, &input, &output, &config)?;
+    if historical {
+        let metadata = probe_media(&tools, &input)?;
+        let args = build_ffmpeg_args(&path_arg(&input), &path_arg(&output), &config, &metadata)
+            .map_err(|error| error.to_string())?;
+        run_tool(&tools.ffmpeg, &args)?;
+    } else {
+        convert(&tools, &input, &output, &config)?;
+    }
 
     let metadata = probe_media(&tools, &output)?;
     assert_eq!(metadata.video_codec.as_deref(), Some("hevc"));
@@ -1134,7 +1163,7 @@ fn prores_should_ignore_unused_quality_drafts_and_choose_profile_from_pixels() -
         let probe = probe_media(&tools, &input)?;
         let command = build_ffmpeg_args(&path_arg(&input), &path_arg(&output), &config, &probe)
             .map_err(|error| error.to_string())?;
-        let result = Command::new(&tools.worker)
+        let result = Command::new(tools.worker.as_ref().ok_or("missing worker")?)
             .arg("convert")
             .args(&command)
             .output()
