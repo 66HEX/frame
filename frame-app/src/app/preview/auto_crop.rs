@@ -216,7 +216,7 @@ impl FrameRoot {
                             "Analysis took too long. Try again or adjust the frame manually."
                         }
                         AutoCropError::Unavailable(_) => {
-                            "Auto crop is unavailable. Check your FFmpeg installation."
+                            "Frame could not start auto crop. Adjust the frame manually."
                         }
                         _ => {
                             "Could not analyze this video. Try again or adjust the frame manually."

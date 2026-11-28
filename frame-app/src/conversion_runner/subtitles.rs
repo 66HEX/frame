@@ -54,7 +54,7 @@ pub fn check_subtitle_trim_support(
         Ok(())
     } else {
         Err(ConversionError::InvalidInput(format!(
-            "This FFmpeg cannot trim imported text subtitles. Use a build with these bitstream filters: {}.",
+            "This build of Frame cannot trim imported text subtitles. Use a build with the required bitstream filters ({}).",
             missing.join(", ")
         )))
     }
