@@ -77,7 +77,7 @@ pub(super) fn analyze_window(
     let status = status?;
     if !status.success() {
         return Err(AutoCropError::Failed(if captured.diagnostic.is_empty() {
-            format!("FFmpeg exited with {status}")
+            format!("The media worker exited with {status}")
         } else {
             captured.diagnostic
         }));

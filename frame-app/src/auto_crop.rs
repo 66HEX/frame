@@ -32,9 +32,9 @@ pub enum AutoCropError {
     Cancelled,
     #[error("Auto crop took too long. Try a shorter selection or crop manually.")]
     TimedOut,
-    #[error("FFmpeg could not be started: {0}")]
+    #[error("Frame could not start the media worker. {0}")]
     Unavailable(String),
-    #[error("FFmpeg could not analyze this video: {0}")]
+    #[error("Frame could not analyze this video. {0}")]
     Failed(String),
     #[error("No reliable crop was found. Adjust the crop manually.")]
     NoReliableCrop,
@@ -53,7 +53,7 @@ const SAMPLE_SECONDS: f64 = 2.0;
 ///
 /// # Errors
 /// Returns an error for invalid metadata, cancellation, a timed-out or failed
-/// `FFmpeg` process, or samples without enough reliable visible content.
+/// media worker, or samples without enough reliable visible content.
 pub fn detect_auto_crop(
     request: &AutoCropRequest,
     cancelled: &AtomicBool,

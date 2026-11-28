@@ -390,7 +390,7 @@ fn run_final_conversion_with_publication(
         )?;
         completion.verify().map_err(|reason| {
             ConversionError::Worker(format!(
-                "FFmpeg did not confirm that the export finished: {reason}. Check the conversion log."
+                "The media worker could not confirm the export finished. {reason}. Check the conversion log."
             ))
         })
     })();
@@ -563,7 +563,7 @@ pub(super) fn run_final_child_observed(
         child.stderr.take().map_or_else(
             || {
                 Err(ConversionError::Worker(
-                    "ffmpeg stderr was not captured".to_string(),
+                    "Media worker error output was unavailable".to_string(),
                 ))
             },
             |mut stderr| stream_ffmpeg_stderr(&mut stderr, task, emit),
@@ -580,7 +580,7 @@ pub(super) fn run_final_child_observed(
         Ok(())
     } else {
         Err(ConversionError::Worker(format!(
-            "ffmpeg exited with status {status}"
+            "The media worker exited with status {status}"
         )))
     }
 }

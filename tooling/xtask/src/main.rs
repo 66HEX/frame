@@ -1864,6 +1864,7 @@ fn run_command_capture(program: &str, args: &[String]) -> Result<String> {
 
 fn render_workflow(template: &str) -> String {
     let replacements = [
+        ("__RESTORE_MEDIA_SDK_CACHE__", RESTORE_MEDIA_SDK_CACHE),
         ("__RUST_VERSION__", RUST_VERSION),
         ("__CARGO_BUNDLE_VERSION__", CARGO_BUNDLE_VERSION),
         ("__CARGO_DENY_VERSION__", CARGO_DENY_VERSION),
@@ -2201,14 +2202,16 @@ __CI_MEDIA_TESTS__
     )
 }
 
-const CI_WORKER_TESTS: &str = "    - name: ci::restore_sdk_cache
+const RESTORE_MEDIA_SDK_CACHE: &str = "    - name: steps::restore_sdk_cache
       id: sdk-cache
       if: runner.os == 'macOS'
       uses: actions/cache/restore@v6.1.0
       with:
         path: target/media-sdk/archives
         key: libav-macos-${{ runner.arch }}-${{ hashFiles('packaging/media/**', 'script/media-worker.py') }}
-        restore-keys: libav-macos-${{ runner.arch }}-
+        restore-keys: libav-macos-${{ runner.arch }}-";
+
+const CI_WORKER_TESTS: &str = "__RESTORE_MEDIA_SDK_CACHE__
     - name: ci::setup_media_sdk
       run: python script/media-worker.py setup-ci
     - name: ci::save_sdk_cache
@@ -2504,8 +2507,8 @@ const fn setup_dmgbuild_step() -> &'static str {
 
 fn linux_job(arch: &str, runner: &str) -> String {
     let appimagetool_arch = arch;
-    let linux_packages = "clang curl desktop-file-utils file libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync";
-    let bundle_args = "--tarball --appimage";
+    let linux_packages = "clang curl desktop-file-utils file libfontconfig1-dev libfreetype6-dev libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libdrm-dev pkg-config patchelf zsync flatpak flatpak-builder";
+    let bundle_args = "--all";
     let timeout_minutes = 90;
 
     format!(
@@ -2521,6 +2524,8 @@ fn linux_job(arch: &str, runner: &str) -> String {
       run: |
         sudo apt-get update
         sudo apt-get install -y {linux_packages}
+        flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+        flatpak install --user --no-related -y --noninteractive flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
     - name: steps::setup_appimagetool
       run: |
         curl --fail --location --proto '=https' --tlsv1.2 --output /tmp/appimagetool.AppImage https://github.com/AppImage/appimagetool/releases/download/__APPIMAGETOOL_VERSION__/appimagetool-{appimagetool_arch}.AppImage
@@ -2529,7 +2534,7 @@ fn linux_job(arch: &str, runner: &str) -> String {
     - name: ./script/bundle-linux
       env:
         APPIMAGETOOL: /tmp/appimagetool.AppImage
-      run: ./script/bundle-linux {bundle_args}
+      run: dbus-run-session -- ./script/bundle-linux {bundle_args}
     - name: run_bundling::verify_appimage_update_information
       shell: bash
       run: |
@@ -2547,6 +2552,13 @@ fn linux_job(arch: &str, runner: &str) -> String {
         for root in frame.app squashfs-root/usr; do
           python3 "$GITHUB_WORKSPACE/script/media-worker.py" verify --bin-dir "$root/bin" --lib-dir "$root/lib" --package-root "$root"
         done
+    - name: run_bundling::verify_installed_devel_flatpak
+      shell: bash
+      run: |
+        flatpak install --user --noninteractive -y target/release/Frame-{arch}.flatpak
+        dbus-run-session -- flatpak run --user --filesystem="$GITHUB_WORKSPACE/script:ro" --env=PATH= \
+          --command=/usr/bin/python3 io.github._66HEX.Frame.Devel//devel "$GITHUB_WORKSPACE/script/media-worker.py" \
+          verify --target {arch}-unknown-linux-gnu --bin-dir /app/bin --lib-dir /app/lib --package-root /app
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@v7.0.1
       with:
@@ -2588,7 +2600,8 @@ fn macos_job(arch: &str, target: &str, runner: &str) -> String {
     env:
       CARGO_INCREMENTAL: 0
     steps:
-{checkout}{rust}{dmgbuild}    - name: steps::install_cargo_bundle
+{checkout}{rust}{dmgbuild}__RESTORE_MEDIA_SDK_CACHE__
+    - name: steps::install_cargo_bundle
       run: cargo install cargo-bundle --version __CARGO_BUNDLE_VERSION__ --locked
     - name: ./script/bundle-mac
       env:
@@ -2606,7 +2619,7 @@ fn macos_job(arch: &str, target: &str, runner: &str) -> String {
         name: Frame-{arch}.app.zip
         path: target/{target}/release/Frame-{arch}.app.zip
         if-no-files-found: error
-    timeout-minutes: 60
+    timeout-minutes: 150
 ",
         if_expression = bundle_if_expression(),
         checkout = checkout_step(),
@@ -2899,6 +2912,7 @@ jobs:
       run: test -n "$FRAME_UPDATE_PUBLIC_KEY"
     - name: steps::setup_rust
       uses: dtolnay/rust-toolchain@stable
+__RESTORE_MEDIA_SDK_CACHE__
     - name: steps::install_cargo_bundle
       run: cargo install cargo-bundle --locked
     - name: release::build_macos_x86_64_unsigned
@@ -2917,7 +2931,7 @@ jobs:
         path: target/Frame-x86_64-unsigned.app.zip
         if-no-files-found: error
         retention-days: 3
-    timeout-minutes: 90
+    timeout-minutes: 150
 
   package_macos_x86_64:
     runs-on: macos-26-intel
@@ -2985,6 +2999,7 @@ jobs:
       run: test -n "$FRAME_UPDATE_PUBLIC_KEY"
     - name: steps::setup_rust
       uses: dtolnay/rust-toolchain@stable
+__RESTORE_MEDIA_SDK_CACHE__
     - name: steps::install_cargo_bundle
       run: cargo install cargo-bundle --locked
     - name: release::build_macos_aarch64_unsigned
@@ -3003,7 +3018,7 @@ jobs:
         path: target/Frame-aarch64-unsigned.app.zip
         if-no-files-found: error
         retention-days: 3
-    timeout-minutes: 90
+    timeout-minutes: 150
 
   package_macos_aarch64:
     runs-on: macos-26
@@ -3917,6 +3932,10 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>, version_expression: &str) -
         nix-build -A "$NIXPKGS_PACKAGE"
         nix-shell -I nixpkgs="$PWD" -p nixfmt-rfc-style --run "nixfmt $package_path maintainers/maintainer-list.nix"
         nix-build -A "$NIXPKGS_PACKAGE"
+        source_dir="$(nix-build --no-out-link -A "$NIXPKGS_PACKAGE.src")"
+        media_libs="$(nix-build --no-out-link -A ffmpeg.lib)"
+        python3 "$source_dir/script/media-worker.py" verify --target x86_64-unknown-linux-gnu \
+          --package-root result --bin-dir result/bin --lib-dir "$media_libs/lib"
         nix-build lib/tests/maintainers.nix
 
         git config user.name "github-actions[bot]"
@@ -3956,7 +3975,12 @@ fn nixpkgs_release_jobs(prepare_needs: Option<&str>, version_expression: &str) -
         path: nixpkgs
     - name: release::build_nixpkgs_aarch64
       working-directory: nixpkgs
-      run: nix-build -A "$NIXPKGS_PACKAGE"
+      run: |
+        nix-build -A "$NIXPKGS_PACKAGE"
+        source_dir="$(nix-build --no-out-link -A "$NIXPKGS_PACKAGE.src")"
+        media_libs="$(nix-build --no-out-link -A ffmpeg.lib)"
+        python3 "$source_dir/script/media-worker.py" verify --target aarch64-unknown-linux-gnu \
+          --package-root result --bin-dir result/bin --lib-dir "$media_libs/lib"
     timeout-minutes: 90
 
   publish_nixpkgs:
@@ -4603,6 +4627,9 @@ mod tests {
         assert!(workflow.contains("needs: [prepare_release, publish_release]"));
         assert!(workflow.contains("runs-on: ubuntu-22.04-arm"));
         assert!(workflow.contains("release::build_nixpkgs_aarch64"));
+        for target in ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"] {
+            assert!(workflow.contains(&format!("media-worker.py\" verify --target {target}")));
+        }
         assert!(workflow.contains("- validate_nixpkgs_aarch64"));
         assert!(workflow.contains("NIXPKGS_GITHUB_TOKEN"));
         assert!(workflow.contains("NIXPKGS_UPSTREAM: NixOS/nixpkgs"));

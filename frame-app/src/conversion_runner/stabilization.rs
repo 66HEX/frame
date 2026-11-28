@@ -46,7 +46,7 @@ fn check_support(
     }
     if config.video_filters.stabilization_enabled && !available.deshake {
         return Err(ConversionError::InvalidInput(
-            "This FFmpeg does not support video stabilization. Disable Stabilize video or use an FFmpeg build with the deshake filter.".into(),
+            "This build of Frame does not support video stabilization. Turn off Stabilize video before exporting.".into(),
         ));
     }
     Ok(())
