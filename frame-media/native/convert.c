@@ -60,7 +60,7 @@ static int input_for_map(ConvertTrack *t, const ConvertPlan *p, const char *map)
     }
     t->origin = av_sat_add64(t->source->seek,
                              t->input->start_time == AV_NOPTS_VALUE ? 0 : t->input->start_time);
-    if (t->source->seek > 0) {
+    if (t->source->seek > 0 && (t->input_num == 0 || t->kind != 's')) {
         err = avformat_seek_file(t->input, -1, INT64_MIN, t->origin, t->origin, 0);
         if (err < 0)
             return err;
@@ -87,7 +87,12 @@ static int configure_track(const ConvertPlan *p, ConvertTrack *t, AVFormatContex
     if (!strcmp(codec, "copy")) {
         if ((err = avcodec_parameters_copy(t->dst->codecpar, t->src->codecpar)) < 0)
             return err;
-        t->dst->codecpar->codec_tag = 0;
+        const AVCodecParameters *par = t->src->codecpar;
+        unsigned default_tag;
+        if (out->oformat->codec_tag &&
+            av_codec_get_id(out->oformat->codec_tag, par->codec_tag) != par->codec_id &&
+            av_codec_get_tag2(out->oformat->codec_tag, par->codec_id, &default_tag))
+            t->dst->codecpar->codec_tag = 0;
         t->dst->time_base = t->packet_tb = t->src->time_base;
         t->dst->avg_frame_rate = t->src->avg_frame_rate;
         t->dst->sample_aspect_ratio = t->src->sample_aspect_ratio;
@@ -127,9 +132,10 @@ static int configure_track(const ConvertPlan *p, ConvertTrack *t, AVFormatContex
             if ((err = set_metadata(&t->dst->metadata, opt.value)) < 0)
                 return err;
         } else if (frame_option_matches(opt.name, "disposition", t)) {
-            if ((err = av_disposition_from_string(opt.value)) < 0 && strcmp(opt.value, "0"))
-                return err;
-            t->dst->disposition = err < 0 ? 0 : err;
+            if (!strcmp(opt.value, "default+forced")) t->dst->disposition = AV_DISPOSITION_DEFAULT | AV_DISPOSITION_FORCED;
+            else if (!strcmp(opt.value, "0")) t->dst->disposition = 0;
+            else if ((err = av_disposition_from_string(opt.value)) < 0) return err;
+            else t->dst->disposition = err;
         }
     }
     return 0;

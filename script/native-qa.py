@@ -43,7 +43,7 @@ class Target:
                     "avfilter": 12, "swscale": 10, "swresample": 7}
         pattern = {"linux": "lib/lib{}.so.{}", "windows": "{}-{}.dll",
                    "macos": "Frameworks/lib{}.{}.dylib"}[self.platform]
-        return (f"frame-media{self.suffix}",
+        return (f"frame-media{self.suffix}", "frame-media.LICENSE",
                 *(pattern.format(lib, version) for lib, version in versions.items()))
 
     @property

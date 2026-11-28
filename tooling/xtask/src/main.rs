@@ -2205,7 +2205,7 @@ __CI_MEDIA_TESTS__
       with:
         persist-credentials: false
     - name: steps::setup_rust
-      run: rustup toolchain install __RUST_VERSION__ --profile minimal
+      run: rustup toolchain install __RUST_VERSION__ --profile minimal --component clippy,rustfmt
 __CI_WORKER_TESTS__
     timeout-minutes: 90
 "

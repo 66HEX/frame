@@ -139,6 +139,10 @@ def relocate_macos(worker, libraries):
 def smoke(worker):
     env = {k: v for k, v in os.environ.items() if k not in {
         "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH", "DYLD_FALLBACK_LIBRARY_PATH", "FFMPEG_DIR"}}
+    if os.name == "nt":
+        # The actual installer lives beside the six DLLs. Exclude developer
+        # and runner SDK directories from Windows' fallback search path.
+        env["PATH"] = str(Path(env["SystemRoot"]) / "System32")
     with tempfile.TemporaryDirectory() as temporary:
         fixture = Path(temporary) / "relocation test.wav"
         with wave.open(str(fixture), "wb") as output:
@@ -182,13 +186,17 @@ def bundle(target, sdk, bin_dir, lib_dir, profile):
     if target in MAC_TRIPLETS:
         relocate_macos(worker, installed)
     smoke(worker)
-    notices = lib_dir / "frame-media-licenses"
-    notices.mkdir(exist_ok=True)
+    notices = bin_dir / "frame-media.LICENSE"
     if (sdk / "LICENSE.txt").is_file():
-        shutil.copy2(sdk / "LICENSE.txt", notices / "FFmpeg.txt")
+        shutil.copy2(sdk / "LICENSE.txt", notices)
     else:
-        for copyright_file in sorted((sdk / "share").glob("*/copyright")):
-            shutil.copy2(copyright_file, notices / f"{copyright_file.parent.name}.txt")
+        copyrights = sorted((sdk / "share").glob("*/copyright"))
+        if not copyrights:
+            raise ValueError(f"SDK is missing distribution licenses: {sdk}")
+        with notices.open("wb") as output:
+            for path in copyrights:
+                output.write(f"\n{path.parent.name}\n\n".encode())
+                output.write(path.read_bytes())
 
 
 def main():

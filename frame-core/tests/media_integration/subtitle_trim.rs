@@ -355,7 +355,7 @@ fn mixed_subtitle_ordinals_should_clip_only_imported_text_and_preserve_bitmap_pa
         let baseline = sandbox.path(&format!("baseline-{mode}.mkv"));
         let mut baseline_args = without_subtitle_bsfs(&argv);
         *baseline_args.last_mut().unwrap() = path_arg(&baseline);
-        run_tool(&tools.ffmpeg, &baseline_args)?;
+        tools.native("convert", &baseline_args)?;
         for ordinal in [0, 1, 2, 4] {
             let selector = format!("s:{ordinal}");
             let actual = packets(&tools, &output, &selector)?;
