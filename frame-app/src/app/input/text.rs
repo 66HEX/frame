@@ -29,6 +29,8 @@ pub(super) fn sanitize_replacement_text(kind: FrameTextInputKind, value: &str) -
         | FrameTextInputKind::MetadataServiceProvider
         | FrameTextInputKind::PresetName
         | FrameTextInputKind::ExternalSubtitleLanguage
+        | FrameTextInputKind::AudioTrackLanguage
+        | FrameTextInputKind::AudioTrackTitle
         | FrameTextInputKind::ExternalSubtitleTitle => {
             value.chars().filter(|ch| !ch.is_control()).collect()
         }

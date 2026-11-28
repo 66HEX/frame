@@ -133,6 +133,8 @@ pub fn source_metadata_from_probe(probe: ProbeMetadata) -> SourceMetadata {
                 channel_layout: track.channel_layout,
                 language: track.language,
                 label: track.label,
+                metadata_title: track.metadata_title,
+                is_default: track.is_default,
                 bitrate_kbps: track.bitrate_kbps,
                 sample_rate: track.sample_rate,
             })
@@ -284,6 +286,7 @@ mod tests {
                     language: Some("eng".to_string()),
                     label: Some("Main".to_string()),
                     metadata_title: Some("Genuine source title".to_string()),
+                    is_default: true,
                     bitrate_kbps: Some(192.0),
                     sample_rate: Some("48000".to_string()),
                 }],
@@ -296,6 +299,11 @@ mod tests {
             );
             assert_eq!(metadata.audio_tracks[0].codec_tag, Some(0x6134_706d));
             assert_eq!(metadata.audio_tracks[0].label.as_deref(), Some("Main"));
+            assert_eq!(
+                metadata.audio_tracks[0].metadata_title.as_deref(),
+                Some("Genuine source title")
+            );
+            assert!(metadata.audio_tracks[0].is_default);
             assert_eq!(metadata.audio_tracks[0].channels.as_deref(), Some("2"));
             assert_eq!(
                 metadata.audio_tracks[0].channel_layout.as_deref(),

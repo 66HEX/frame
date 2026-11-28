@@ -32,6 +32,13 @@ fn add_target(root: &mut FrameRoot, id: &str, status: FileStatus, kind: SourceKi
     let mut file = FileItem::from_path(id, format!("/tmp/{id}.mov"), 100);
     file.status = status;
     file.config.selected_audio_tracks = vec![3, 7];
+    file.config.audio_track_overrides.insert(
+        3,
+        frame_core::types::AudioTrackOverride {
+            title: Some(id.to_owned()),
+            ..Default::default()
+        },
+    );
     file.config.selected_subtitle_tracks = vec![4];
     file.config.external_subtitle_tracks = vec![ExternalSubtitleTrack {
         path: format!("/tmp/{id}.srt"),
@@ -153,6 +160,10 @@ fn batch_preserves_source_bound_state_and_all_non_config_fields_without_persiste
             assert_eq!(
                 new.config.selected_audio_tracks,
                 old.config.selected_audio_tracks
+            );
+            assert_eq!(
+                new.config.audio_track_overrides,
+                old.config.audio_track_overrides
             );
             assert_eq!(new.config.selected_subtitle_tracks, [4]);
             assert_eq!(

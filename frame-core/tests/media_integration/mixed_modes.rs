@@ -140,6 +140,14 @@ fn alac_copy_observer_accepts_real_reencoded_video_and_duplicate_audio_maps() ->
     config.set_audio_copy(true);
     config.flip_vertical = true;
     config.selected_audio_tracks = vec![1, 1];
+    config.audio_track_overrides.insert(
+        1,
+        frame_core::types::AudioTrackOverride {
+            language: Some("pol".into()),
+            title: Some("Source mix".into()),
+            is_default: Some(true),
+        },
+    );
     let observer = build_alac_copy_observer(
         &path_arg(&source),
         &path_arg(&output),
@@ -165,5 +173,11 @@ fn alac_copy_observer_accepts_real_reencoded_video_and_duplicate_audio_maps() ->
     assert!(!expected.as_array().unwrap().is_empty());
     assert_eq!(packets(&tools, &output, "a:0")?, expected);
     assert_eq!(packets(&tools, &output, "a:1")?, expected);
+    let probe = probe_media(&tools, &output)?;
+    for (ordinal, track) in probe.audio_tracks.iter().enumerate() {
+        assert_eq!(track.language.as_deref(), Some("pol"));
+        assert_eq!(track.metadata_title.as_deref(), Some("Source mix"));
+        assert_eq!(track.is_default, ordinal == 0);
+    }
     Ok(())
 }

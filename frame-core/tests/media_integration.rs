@@ -3303,6 +3303,7 @@ fn base_config(container: &str, video_codec: &str) -> ConversionConfig {
         video_filters: frame_core::types::VideoFiltersConfig::default(),
         audio_filters: frame_core::types::AudioFiltersConfig::default(),
         selected_audio_tracks: Vec::new(),
+        audio_track_overrides: std::collections::BTreeMap::new(),
         selected_subtitle_tracks: Vec::new(),
         external_subtitle_tracks: Vec::new(),
         subtitle_burn_path: None,

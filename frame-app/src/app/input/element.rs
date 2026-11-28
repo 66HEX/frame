@@ -289,6 +289,7 @@ pub(in crate::app) fn frame_text_input(
 
     let mut field = div()
         .id(id)
+        .debug_selector(|| id.to_owned())
         .min_h(theme::ui_rem(SETTINGS_CONTROL_HEIGHT))
         .w_full()
         .flex()

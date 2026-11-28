@@ -176,6 +176,7 @@ mod visual_fixture_env {
             ("preview-transport", VisualFixture::PreviewTransport),
             ("preview-trim", VisualFixture::PreviewTrim),
             ("settings-audio", VisualFixture::SettingsAudio),
+            ("settings-audio-tracks", VisualFixture::SettingsAudioTracks),
             (
                 "settings-audio-filters",
                 VisualFixture::SettingsAudioFilters,

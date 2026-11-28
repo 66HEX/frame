@@ -139,6 +139,7 @@ fn core_config_from_gpui_preserves_active_conversion_fields() {
             aspect_ratio: Some("16:9".to_string()),
         }),
         overlay: None,
+        audio_track_overrides: std::collections::BTreeMap::new(),
         selected_audio_tracks: vec![1, 2],
         selected_subtitle_tracks: vec![3],
         video_codec: "libx265".to_string(),

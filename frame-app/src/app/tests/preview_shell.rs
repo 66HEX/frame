@@ -69,6 +69,7 @@ pub(super) fn settings_state<'a>(
         settings_disabled: false,
         output_name: "",
         output_name_focus: None,
+        audio_editor: crate::app::inspector::audio::TrackEditor::default(),
         audio_bitrate_focus: None,
         video_width_focus: None,
         video_height_focus: None,

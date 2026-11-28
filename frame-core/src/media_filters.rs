@@ -612,6 +612,7 @@ mod tests {
             video_filters: VideoFiltersConfig::default(),
             audio_filters: AudioFiltersConfig::default(),
             selected_audio_tracks: vec![],
+            audio_track_overrides: std::collections::BTreeMap::new(),
             selected_subtitle_tracks: vec![],
             external_subtitle_tracks: vec![],
             subtitle_burn_path: None,

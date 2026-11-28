@@ -333,6 +333,7 @@ fn settings_output_section(
             settings.settings_disabled,
             settings.available_encoders,
             settings.audio_bitrate_focus,
+            settings.audio_editor,
             palette,
             window,
             cx,

@@ -192,3 +192,26 @@ pub(super) fn is_known_audio_channels(channels: &str) -> bool {
         .iter()
         .any(|definition| definition.id == channels)
 }
+
+pub fn apply_audio_track_default(config: &mut ConversionConfig, index: u32, value: bool) -> bool {
+    if !config.selected_audio_tracks.contains(&index)
+        || !frame_core::media_rules::audio_track_metadata_support(&config.container).default_flag
+    {
+        return false;
+    }
+    if value {
+        for (source, edit) in &mut config.audio_track_overrides {
+            if *source != index && edit.is_default == Some(true) {
+                edit.is_default = Some(false);
+            }
+        }
+    }
+    let current = &mut config
+        .audio_track_overrides
+        .entry(index)
+        .or_default()
+        .is_default;
+    let changed = *current != Some(value);
+    *current = Some(value);
+    changed
+}

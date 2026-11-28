@@ -2,6 +2,12 @@
 
 use crate::media_rules::is_audio_stream_codec_allowed;
 
+mod track_metadata;
+pub use track_metadata::{
+    audio_track_default_actions, audio_track_default_error, audio_track_language_value,
+    audio_track_metadata_error,
+};
+
 #[must_use]
 pub fn audio_track_limit(container: &str) -> Option<usize> {
     matches!(

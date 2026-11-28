@@ -110,6 +110,7 @@ impl FrameRoot {
                 self.preview_ui.transport.hovered = true;
                 self.preview_ui.transport.open = fixture == Some(VisualFixture::PreviewTrim);
             }
+            Some(VisualFixture::SettingsAudioTracks) => self.apply_audio_tracks_fixture(),
             Some(VisualFixture::SettingsAudio) => self.apply_settings_audio_fixture(),
             Some(VisualFixture::SettingsAudioFilters) => {
                 self.apply_settings_audio_filters_fixture();
@@ -384,6 +385,34 @@ impl FrameRoot {
             file.config.selected_audio_tracks = vec![1];
         }
     }
+    fn apply_audio_tracks_fixture(&mut self) {
+        self.apply_preview_ready_fixture();
+        self.settings_ui.active_tab = SettingsTab::Output;
+        self.settings_ui
+            .expanded_output_sections
+            .insert(crate::settings::OutputSection::Audio);
+        let mut metadata = self.selected_source_metadata().unwrap();
+        let mut mix = metadata.audio_tracks[0].clone();
+        mix.language = Some("eng".into());
+        mix.metadata_title = Some("Main mix".into());
+        mix.label.clone_from(&mix.metadata_title);
+        mix.is_default = true;
+        let commentary = crate::settings::AudioTrack {
+            index: 2,
+            language: Some("pol".into()),
+            metadata_title: Some("Director commentary".into()),
+            label: Some("Director commentary".into()),
+            is_default: false,
+            ..mix.clone()
+        };
+        metadata.audio_tracks = vec![mix, commentary];
+        self.source_metadata.mark_ready("fixture-preview", metadata);
+        let file = self.file_queue.selected_file_mut().unwrap();
+        file.config.container = "mkv".into();
+        file.config.processing_mode = crate::settings::ProcessingMode::CopyAudio;
+        file.config.selected_audio_tracks = vec![1, 2];
+    }
+
     pub(super) fn apply_settings_audio_filters_fixture(&mut self) {
         self.seed_audio_source_fixture();
         self.settings_ui.active_tab = SettingsTab::Output;
@@ -580,6 +609,8 @@ impl FrameRoot {
                         channels: Some("2".to_string()),
                         channel_layout: Some("stereo".to_string()),
                         language: Some("eng".to_string()),
+                        metadata_title: Some("Main mix".to_string()),
+                        is_default: true,
                         label: Some("Main mix".to_string()),
                         bitrate_kbps: Some(1536.0),
                         sample_rate: Some("48000".to_string()),
@@ -591,6 +622,8 @@ impl FrameRoot {
                         channels: Some("2".to_string()),
                         channel_layout: Some("stereo".to_string()),
                         language: Some("eng".to_string()),
+                        metadata_title: Some("Reference".to_string()),
+                        is_default: false,
                         label: Some("Reference".to_string()),
                         bitrate_kbps: Some(192.0),
                         sample_rate: Some("48000".to_string()),

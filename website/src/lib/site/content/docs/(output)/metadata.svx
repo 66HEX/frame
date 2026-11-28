@@ -12,7 +12,7 @@ Frame separates source inspection from output metadata settings. The **Source** 
 
 ## Inspect the source
 
-Select a queue entry and open the **Source** tab. Frame reads source information with FFprobe, including the detected media streams and their properties.
+Select a queue entry and open the **Source** tab. Frame lists the detected media streams and their properties.
 
 Use this view to check the actual codec, dimensions, frame rate, and audio or subtitle streams before choosing an output. The filename alone does not identify those details.
 
@@ -48,6 +48,6 @@ When applying settings across a batch, review fields that should differ between 
 
 ## Transport-stream service metadata
 
-For MPEG-TS and M2TS workflows, Frame reads program information through FFprobe and supports service name and provider metadata. These fields describe a transport-stream program rather than a conventional music or video tag.
+For MPEG-TS and M2TS workflows, Frame reads program information from the source and supports service name and provider metadata. These fields describe a transport-stream program rather than a conventional music or video tag.
 
 Check the resulting program information in the playback or broadcast tool that will consume the file.

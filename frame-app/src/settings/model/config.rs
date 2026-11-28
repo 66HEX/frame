@@ -52,6 +52,8 @@ pub struct ConversionConfig {
     pub flip_vertical: bool,
     pub crop: Option<CropSettings>,
     pub overlay: Option<OverlaySettings>,
+    pub audio_track_overrides:
+        std::collections::BTreeMap<u32, frame_core::types::AudioTrackOverride>,
     pub selected_audio_tracks: Vec<u32>,
     pub selected_subtitle_tracks: Vec<u32>,
     pub external_subtitle_tracks: Vec<ExternalSubtitleTrack>,
@@ -129,6 +131,7 @@ impl Default for ConversionConfig {
             flip_vertical: false,
             crop: None,
             overlay: None,
+            audio_track_overrides: std::collections::BTreeMap::new(),
             selected_audio_tracks: Vec::new(),
             selected_subtitle_tracks: Vec::new(),
             external_subtitle_tracks: Vec::new(),

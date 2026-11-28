@@ -43,13 +43,15 @@ pub(in crate::app) enum FrameTextInputKind {
     MetadataServiceProvider,
     PresetName,
     ExternalSubtitleLanguage,
+    AudioTrackLanguage,
+    AudioTrackTitle,
     ExternalSubtitleTitle,
     SubtitleFontColorHex,
     SubtitleOutlineColorHex,
 }
 
 impl FrameTextInputKind {
-    pub(in crate::app) const ALL: [Self; 24] = [
+    pub(in crate::app) const ALL: [Self; 26] = [
         Self::MaxConcurrency,
         Self::OutputName,
         Self::AudioBitrate,
@@ -71,6 +73,8 @@ impl FrameTextInputKind {
         Self::MetadataServiceProvider,
         Self::PresetName,
         Self::ExternalSubtitleLanguage,
+        Self::AudioTrackLanguage,
+        Self::AudioTrackTitle,
         Self::ExternalSubtitleTitle,
         Self::SubtitleFontColorHex,
         Self::SubtitleOutlineColorHex,
@@ -99,6 +103,8 @@ impl FrameTextInputKind {
             Self::MetadataServiceProvider => "MPEG transport stream service provider",
             Self::PresetName => "Preset name",
             Self::ExternalSubtitleLanguage => "Selectable subtitle language",
+            Self::AudioTrackLanguage => "Audio track language",
+            Self::AudioTrackTitle => "Audio track title",
             Self::ExternalSubtitleTitle => "Selectable subtitle title",
             Self::SubtitleFontColorHex => "Subtitle font color",
             Self::SubtitleOutlineColorHex => "Subtitle outline color",
@@ -223,6 +229,8 @@ pub(in crate::app) struct FrameTextInputStore {
     metadata_service_provider: FrameTextInputRuntime,
     preset_name: FrameTextInputRuntime,
     external_subtitle_language: FrameTextInputRuntime,
+    audio_track_language: FrameTextInputRuntime,
+    audio_track_title: FrameTextInputRuntime,
     external_subtitle_title: FrameTextInputRuntime,
     subtitle_font_color: FrameTextInputRuntime,
     subtitle_outline_color: FrameTextInputRuntime,
@@ -252,6 +260,8 @@ impl FrameTextInputStore {
             FrameTextInputKind::MetadataServiceProvider => &self.metadata_service_provider,
             FrameTextInputKind::PresetName => &self.preset_name,
             FrameTextInputKind::ExternalSubtitleLanguage => &self.external_subtitle_language,
+            FrameTextInputKind::AudioTrackLanguage => &self.audio_track_language,
+            FrameTextInputKind::AudioTrackTitle => &self.audio_track_title,
             FrameTextInputKind::ExternalSubtitleTitle => &self.external_subtitle_title,
             FrameTextInputKind::SubtitleFontColorHex => &self.subtitle_font_color,
             FrameTextInputKind::SubtitleOutlineColorHex => &self.subtitle_outline_color,
@@ -284,6 +294,8 @@ impl FrameTextInputStore {
             FrameTextInputKind::MetadataServiceProvider => &mut self.metadata_service_provider,
             FrameTextInputKind::PresetName => &mut self.preset_name,
             FrameTextInputKind::ExternalSubtitleLanguage => &mut self.external_subtitle_language,
+            FrameTextInputKind::AudioTrackLanguage => &mut self.audio_track_language,
+            FrameTextInputKind::AudioTrackTitle => &mut self.audio_track_title,
             FrameTextInputKind::ExternalSubtitleTitle => &mut self.external_subtitle_title,
             FrameTextInputKind::SubtitleFontColorHex => &mut self.subtitle_font_color,
             FrameTextInputKind::SubtitleOutlineColorHex => &mut self.subtitle_outline_color,
@@ -314,6 +326,8 @@ pub(in crate::app) struct FrameTextInputFocusStore {
     metadata_service_provider: Option<FocusHandle>,
     preset_name: Option<FocusHandle>,
     external_subtitle_language: Option<FocusHandle>,
+    audio_track_language: Option<FocusHandle>,
+    audio_track_title: Option<FocusHandle>,
     external_subtitle_title: Option<FocusHandle>,
     subtitle_font_color: Option<FocusHandle>,
     subtitle_outline_color: Option<FocusHandle>,
@@ -345,6 +359,8 @@ impl FrameTextInputFocusStore {
             FrameTextInputKind::ExternalSubtitleLanguage => {
                 self.external_subtitle_language.as_ref()
             }
+            FrameTextInputKind::AudioTrackLanguage => self.audio_track_language.as_ref(),
+            FrameTextInputKind::AudioTrackTitle => self.audio_track_title.as_ref(),
             FrameTextInputKind::ExternalSubtitleTitle => self.external_subtitle_title.as_ref(),
             FrameTextInputKind::SubtitleFontColorHex => self.subtitle_font_color.as_ref(),
             FrameTextInputKind::SubtitleOutlineColorHex => self.subtitle_outline_color.as_ref(),
@@ -377,6 +393,8 @@ impl FrameTextInputFocusStore {
             FrameTextInputKind::MetadataServiceProvider => &mut self.metadata_service_provider,
             FrameTextInputKind::PresetName => &mut self.preset_name,
             FrameTextInputKind::ExternalSubtitleLanguage => &mut self.external_subtitle_language,
+            FrameTextInputKind::AudioTrackLanguage => &mut self.audio_track_language,
+            FrameTextInputKind::AudioTrackTitle => &mut self.audio_track_title,
             FrameTextInputKind::ExternalSubtitleTitle => &mut self.external_subtitle_title,
             FrameTextInputKind::SubtitleFontColorHex => &mut self.subtitle_font_color,
             FrameTextInputKind::SubtitleOutlineColorHex => &mut self.subtitle_outline_color,

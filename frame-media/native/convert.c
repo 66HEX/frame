@@ -151,7 +151,11 @@ static int configure_track(const ConvertPlan *p, ConvertTrack *t, AVFormatContex
             if ((err = set_metadata(&t->dst->metadata, opt.value)) < 0)
                 return err;
         } else if (frame_option_matches(opt.name, "disposition", t)) {
-            if (!strcmp(opt.value, "default+forced"))
+            if (!strcmp(opt.value, "+default"))
+                t->dst->disposition |= AV_DISPOSITION_DEFAULT;
+            else if (!strcmp(opt.value, "-default"))
+                t->dst->disposition &= ~AV_DISPOSITION_DEFAULT;
+            else if (!strcmp(opt.value, "default+forced"))
                 t->dst->disposition = AV_DISPOSITION_DEFAULT | AV_DISPOSITION_FORCED;
             else if (!strcmp(opt.value, "0"))
                 t->dst->disposition = 0;
@@ -200,9 +204,13 @@ static void set_implicit_defaults(const ConvertPlan *p, ConvertTrack *tracks, in
     int counts[AVMEDIA_TYPE_NB] = {0};
     AVStream *first[AVMEDIA_TYPE_NB] = {0};
     int marked[AVMEDIA_TYPE_NB] = {0};
+    int audio_default_edited = 0;
     for (int i = 0; i < count; ++i) {
-        if (frame_track_opt(p, &tracks[i], "disposition"))
-            return;
+        if (frame_track_opt(p, &tracks[i], "disposition")) {
+            if (tracks[i].kind != 'a')
+                return;
+            audio_default_edited = 1;
+        }
         AVStream *stream = tracks[i].dst;
         enum AVMediaType type = stream->codecpar->codec_type;
         counts[type]++;
@@ -211,7 +219,7 @@ static void set_implicit_defaults(const ConvertPlan *p, ConvertTrack *tracks, in
             first[type] = stream;
     }
     for (int type = 0; type < AVMEDIA_TYPE_NB; ++type)
-        if (counts[type] > 1 && first[type] && !marked[type])
+        if (!(type == AVMEDIA_TYPE_AUDIO && audio_default_edited) && counts[type] > 1 && first[type] && !marked[type])
             first[type]->disposition |= AV_DISPOSITION_DEFAULT;
 }
 

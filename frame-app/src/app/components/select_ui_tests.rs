@@ -859,3 +859,120 @@ fn two_pass_checkbox_follows_target_bitrate_and_rejects_incompatible_video_modes
     assert!(cx.debug_bounds(case.panel).is_none());
     assert!(!root.read_with(cx, |root, _| root.selected_config().unwrap().video_two_pass));
 }
+
+#[test]
+fn audio_track_editor_keeps_edits_bound_to_the_source_track_when_switching_focus() {
+    use crate::app::input::FrameTextInputKind::{AudioTrackLanguage, AudioTrackTitle};
+    use crate::settings::ProcessingMode;
+    let case = SelectCase {
+        fixture: VisualFixture::SettingsAudioTracks,
+        trigger: "audio-metadata-track",
+        panel: "audio-track-title",
+    };
+    let mut app = TestAppContext::single();
+    let (root, cx) = select_window(&mut app, &case, ColorTheme::Dark, ScalePreset::Percent100);
+    let select_all = if cfg!(target_os = "macos") {
+        "cmd-a"
+    } else {
+        "ctrl-a"
+    };
+    assert_eq!(
+        root.read_with(cx, |root, _| root.text_input_value(AudioTrackTitle)),
+        "Main mix"
+    );
+    click(cx, case.panel);
+    press(cx, select_all);
+    cx.simulate_input("Score");
+    draw(cx);
+    click(cx, case.trigger);
+    click(cx, "audio-metadata-track-2");
+    assert_eq!(
+        root.read_with(cx, |root, _| root.text_input_value(AudioTrackTitle)),
+        "Director commentary"
+    );
+    assert_eq!(
+        root.read_with(cx, |root, _| root.text_input_value(AudioTrackLanguage)),
+        "pol"
+    );
+    click(cx, "audio-track-language");
+    press(cx, select_all);
+    press(cx, "backspace");
+    click(cx, "audio-track-default-true");
+    root.read_with(cx, |root, _| {
+        let config = root.selected_config().unwrap();
+        assert_eq!(
+            config.audio_track_overrides[&1].title.as_deref(),
+            Some("Score")
+        );
+        assert_eq!(
+            config.audio_track_overrides[&2].language.as_deref(),
+            Some("")
+        );
+        assert_eq!(config.audio_track_overrides[&2].is_default, Some(true));
+        assert_eq!(config.audio_track_overrides[&2].title, None);
+    });
+    root.update(cx, |root, cx| {
+        root.update_selected_config(|config| {
+            config.processing_mode = ProcessingMode::Reencode;
+            true
+        });
+        cx.notify();
+    });
+    draw(cx);
+    click(cx, case.trigger);
+    click(cx, "audio-metadata-track-1");
+    assert_eq!(
+        root.read_with(cx, |root, _| root.text_input_value(AudioTrackTitle)),
+        "Score"
+    );
+    click(cx, "audio-track-default-true");
+    assert_eq!(
+        root.read_with(cx, |root, _| root
+            .selected_config()
+            .unwrap()
+            .audio_track_overrides[&2]
+            .is_default),
+        Some(false)
+    );
+}
+
+#[test]
+fn changing_files_while_editing_audio_never_redirects_pending_input_to_another_source() {
+    use crate::app::input::FrameTextInputKind::AudioTrackTitle;
+    use crate::file_queue::FileItem;
+    let case = SelectCase {
+        fixture: VisualFixture::SettingsAudioTracks,
+        trigger: "audio-metadata-track",
+        panel: "audio-track-title",
+    };
+    let mut app = TestAppContext::single();
+    let (root, cx) = select_window(&mut app, &case, ColorTheme::Dark, ScalePreset::Percent100);
+    click(cx, case.panel);
+    root.update(cx, |root, cx| {
+        let mut source = root.selected_source_metadata().unwrap();
+        source.audio_tracks[0].metadata_title = Some("Second file".into());
+        let mut file = FileItem::from_path("other", "/tmp/second.mkv", 10);
+        file.config.container = "mkv".into();
+        file.config.selected_audio_tracks = vec![1];
+        root.file_queue.add_file(file);
+        root.source_metadata.mark_ready("other", source);
+        assert!(root.file_queue.select_existing_file("other"));
+        assert!(
+            root.write_text_input_value(AudioTrackTitle, "stale")
+                .is_none()
+        );
+        cx.notify();
+    });
+    draw(cx);
+    root.read_with(cx, |root, _| {
+        assert_eq!(root.text_input_value(AudioTrackTitle), "Second file");
+        assert_ne!(root.text_input_ui.active, Some(AudioTrackTitle));
+        assert!(
+            root.selected_config()
+                .unwrap()
+                .audio_track_overrides
+                .is_empty()
+        );
+    });
+    assert!(cx.debug_bounds(case.trigger).is_none());
+}

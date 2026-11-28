@@ -271,7 +271,7 @@ fn probe_streams(path: &Path) -> Vec<serde_json::Value> {
             "error",
             "-count_frames",
             "-show_entries",
-            "stream=codec_name,nb_read_frames",
+            "stream=codec_name,nb_read_frames:stream_tags=title,language:stream_disposition=default,comment",
             "-of",
             "json",
         ])
@@ -337,4 +337,74 @@ fn headless_two_pass_export_publishes_the_selected_trim_with_audio() {
     assert_eq!(streams[0]["nb_read_frames"], "30");
     assert_eq!(streams[1]["codec_name"], "flac");
     assert_eq!(fs::read_dir(out).unwrap().count(), 1);
+}
+
+#[test]
+#[ignore = "requires FFmpeg/FFprobe and the Frame media worker; run with --ignored"]
+fn headless_copy_writes_audio_labels_and_moves_default_to_the_selected_track() {
+    let sandbox = Sandbox::new();
+    let input = generate_av_source(&sandbox);
+    let bilingual = sandbox.0.join("bilingual.mkv");
+    let source = Command::new(frame_app::runtime_binaries::ffmpeg_executable())
+        .args(["-v", "error", "-i"])
+        .arg(input)
+        .args([
+            "-map",
+            "0:v:0",
+            "-map",
+            "0:a:0",
+            "-map",
+            "0:a:0",
+            "-c",
+            "copy",
+            "-metadata:s:a:0",
+            "title=Old title",
+            "-metadata:s:a:0",
+            "language=eng",
+            "-disposition:a:0",
+            "default+comment",
+            "-disposition:a:1",
+            "0",
+        ])
+        .arg(&bilingual)
+        .output()
+        .unwrap();
+    assert!(
+        source.status.success(),
+        "{}",
+        String::from_utf8_lossy(&source.stderr)
+    );
+
+    let request = sandbox.0.join("track-names.json");
+    fs::write(
+        &request,
+        serde_json::to_vec(&serde_json::json!({
+            "input": bilingual, "outputDirectory": sandbox.0, "outputName": "labelled.mkv",
+            "config": {
+                "container": "mkv", "processingMode": "copy", "selectedAudioTracks": [2, 1],
+                "audioTrackOverrides": {
+                    "1": {"title": ""},
+                    "2": {"title": "Głos reżysera", "language": "pol", "isDefault": true}
+                }
+            }
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let result = run_qa("--export", &request);
+    assert!(
+        result.status.success(),
+        "{} {}",
+        String::from_utf8_lossy(&result.stderr),
+        String::from_utf8_lossy(&result.stdout)
+    );
+    let streams = probe_streams(&sandbox.0.join("labelled.mkv"));
+    assert_eq!(streams.len(), 3);
+    assert_eq!(streams[1]["tags"]["title"], "Głos reżysera");
+    assert_eq!(streams[1]["tags"]["language"], "pol");
+    assert_eq!(streams[1]["disposition"]["default"], 1);
+    assert!(streams[2]["tags"]["title"].is_null());
+    assert_eq!(streams[2]["tags"]["language"], "eng");
+    assert_eq!(streams[2]["disposition"]["default"], 0);
+    assert_eq!(streams[2]["disposition"]["comment"], 1);
 }

@@ -340,25 +340,73 @@ fn add_subtitle_action_arg(args: &mut Vec<String>, output_index: usize, action: 
     );
 }
 
-fn add_audio_title_metadata(
+fn validate_audio_track_metadata(config: &ConversionConfig) -> Result<(), ConversionError> {
+    crate::audio_rules::audio_track_metadata_error(
+        &config.container,
+        &config.selected_audio_tracks,
+        &config.audio_track_overrides,
+        config.metadata.mode == MetadataMode::Preserve,
+    )
+    .map_or(Ok(()), |reason| Err(ConversionError::InvalidInput(reason)))
+}
+
+fn add_audio_track_metadata(
     args: &mut Vec<String>,
     config: &ConversionConfig,
     tracks: &[&AudioTrack],
-) {
-    if config.metadata.mode != MetadataMode::Preserve
-        || !(config.container.eq_ignore_ascii_case("mp4")
-            || config.container.eq_ignore_ascii_case("mov"))
-    {
-        return;
-    }
-    for (output_index, track) in tracks.iter().enumerate() {
-        if let Some(title) = &track.metadata_title {
+) -> Result<(), ConversionError> {
+    let support = crate::media_rules::audio_track_metadata_support(&config.container);
+    let dispositions = crate::audio_rules::audio_track_default_actions(
+        &config.container,
+        &config.selected_audio_tracks,
+        &config.audio_track_overrides,
+        |source| {
+            tracks
+                .iter()
+                .any(|track| track.index == source && track.is_default)
+        },
+    )
+    .map_err(ConversionError::InvalidInput)?;
+    let preserve = config.metadata.mode == MetadataMode::Preserve;
+    let mov_title = config.container.eq_ignore_ascii_case("mp4")
+        || config.container.eq_ignore_ascii_case("mov");
+    for (ordinal, (track, disposition)) in tracks.iter().zip(dispositions).enumerate() {
+        let edit = config.audio_track_overrides.get(&track.index);
+        let mut metadata = |key: &str, value: &str| {
+            args.extend([format!("-metadata:s:a:{ordinal}"), format!("{key}={value}")]);
+        };
+        if preserve && support.language {
+            if let Some(value) = edit.and_then(|e| e.language.as_deref()) {
+                let language =
+                    crate::audio_rules::audio_track_language_value(&config.container, value)
+                        .map_err(ConversionError::InvalidInput)?;
+                metadata("language", &language);
+            } else if is_transport_stream_container(&config.container)
+                && let Some(language) = &track.language
+            {
+                // The service metadata policy disables implicit stream-tag copying.
+                metadata("language", language);
+            }
+        }
+        if preserve && support.title {
+            if let Some(title) = edit.and_then(|e| e.title.as_deref()) {
+                // QuickTime exposes the genuine track title as "name" on readback.
+                // Remove the inherited alias so replacing/clearing a title cannot
+                // carry the old one into Matroska as a second tag.
+                metadata("name", "");
+                metadata("title", title);
+            } else if mov_title && let Some(title) = &track.metadata_title {
+                metadata("title", title);
+            }
+        }
+        if let Some(default) = disposition {
             args.extend([
-                format!("-metadata:s:a:{output_index}"),
-                format!("title={title}"),
+                format!("-disposition:a:{ordinal}"),
+                if default { "+default" } else { "-default" }.into(),
             ]);
         }
     }
+    Ok(())
 }
 
 fn add_track_maps<T>(args: &mut Vec<String>, tracks: &[&T], index: impl Fn(&T) -> u32) {
@@ -578,6 +626,7 @@ fn build_output_args(
     purpose: OutputPurpose,
 ) -> Result<Vec<String>, ConversionError> {
     validate_audio_encoding_tracks(config, probe)?;
+    validate_audio_track_metadata(config)?;
     let trim = OutputTrim::from_config(config)?;
     let subtitle_trim = SubtitleTrimPlan::for_window(config, &trim);
     let mut filter_context = source_filter_context(probe);
@@ -658,6 +707,7 @@ fn build_output_args(
         }
         add_track_maps(&mut args, &audio_tracks, |track| track.index);
 
+        add_audio_track_metadata(&mut args, config, &audio_tracks)?;
         add_output_audio_codec(&mut args, config, &audio_tracks);
     } else if is_video_only && is_gif_output {
         args.push("-filter_complex".to_string());
@@ -750,7 +800,7 @@ fn build_output_args(
 
         let audio_tracks = mapped_audio;
         add_track_maps(&mut args, &audio_tracks, |track| track.index);
-        add_audio_title_metadata(&mut args, config, &audio_tracks);
+        add_audio_track_metadata(&mut args, config, &audio_tracks)?;
 
         if audio_tracks.is_empty() {
             args.push("-an".to_string());
@@ -1233,6 +1283,7 @@ pub fn validate_task_input(
     }
     validate_audio_track_count(config)?;
 
+    validate_audio_track_metadata(config)?;
     let processing_mode = config.processing_mode.trim();
 
     if !matches!(
@@ -1934,6 +1985,7 @@ mod tests {
             video_filters: crate::types::VideoFiltersConfig::default(),
             audio_filters: crate::types::AudioFiltersConfig::default(),
             selected_audio_tracks: vec![],
+            audio_track_overrides: std::collections::BTreeMap::new(),
             selected_subtitle_tracks: vec![],
             external_subtitle_tracks: vec![],
             subtitle_burn_path: None,

@@ -3,6 +3,14 @@ use crate::app::root::FrameRoot;
 use gpui::{Context, FocusHandle, Window};
 
 impl FrameRoot {
+    pub(in crate::app) fn reset_text_input(&mut self, kind: FrameTextInputKind) {
+        if self.text_input_ui.active == Some(kind) {
+            self.stop_text_input_cursor();
+        }
+        self.text_input_ui.focuses.clear(kind);
+        *self.text_input_runtime_mut(kind) = FrameTextInputRuntime::default();
+    }
+
     pub(in crate::app) const fn text_input_runtime(
         &self,
         kind: FrameTextInputKind,

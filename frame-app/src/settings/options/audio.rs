@@ -94,6 +94,14 @@ pub fn audio_settings_error(
     {
         return Some(reason);
     }
+    if let Some(reason) = frame_core::audio_rules::audio_track_metadata_error(
+        &config.container,
+        &config.selected_audio_tracks,
+        &config.audio_track_overrides,
+        config.metadata.mode == crate::settings::MetadataMode::Preserve,
+    ) {
+        return Some(reason);
+    }
     let metadata = metadata?;
     for track in metadata
         .audio_tracks
@@ -222,4 +230,37 @@ pub fn audio_track_options(
                 .collect()
         })
         .unwrap_or_default()
+}
+
+#[must_use]
+pub fn audio_track_is_default(
+    config: &ConversionConfig,
+    metadata: &SourceMetadata,
+    track: &AudioTrack,
+) -> bool {
+    let source_default = |index| {
+        metadata
+            .audio_tracks
+            .iter()
+            .any(|source| source.index == index && source.is_default)
+    };
+    let projected = frame_core::audio_rules::audio_track_default_actions(
+        &config.container,
+        &config.selected_audio_tracks,
+        &config.audio_track_overrides,
+        source_default,
+    );
+    let ordinal = config
+        .selected_audio_tracks
+        .iter()
+        .position(|index| *index == track.index);
+    ordinal
+        .and_then(|index| projected.ok()?.get(index).copied().flatten())
+        .or_else(|| {
+            config
+                .audio_track_overrides
+                .get(&track.index)
+                .and_then(|edit| edit.is_default)
+        })
+        .unwrap_or(track.is_default)
 }

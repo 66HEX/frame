@@ -22,6 +22,30 @@ use std::sync::LazyLock;
 
 use crate::container::media_rules_key;
 
+/// Per-stream audio fields that the output muxer can store and read back.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AudioTrackMetadataSupport {
+    pub language: bool,
+    pub title: bool,
+    pub default_flag: bool,
+}
+
+#[must_use]
+pub fn audio_track_metadata_support(container: &str) -> AudioTrackMetadataSupport {
+    let (language, title, default_flag) = match container.to_ascii_lowercase().as_str() {
+        "mkv" | "webm" | "mp4" | "mov" => (true, true, true),
+        "m4a" => (true, false, true),
+        "opus" => (true, true, false),
+        "m2t" | "m2ts" | "mts" => (true, false, false),
+        _ => (false, false, false),
+    };
+    AudioTrackMetadataSupport {
+        language,
+        title,
+        default_flag,
+    }
+}
+
 const ANY_CODEC_TOKEN: &str = "*";
 
 #[derive(Debug, Deserialize)]

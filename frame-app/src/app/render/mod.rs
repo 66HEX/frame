@@ -175,6 +175,11 @@ impl Render for FrameRoot {
                     self.ensure_text_input_focus(FrameTextInputKind::OutputName, cx);
                 let audio_bitrate_focus =
                     self.ensure_text_input_focus(FrameTextInputKind::AudioBitrate, cx);
+                self.sync_audio_editor(&selected_config_snapshot, source_metadata.as_ref());
+                let audio_language_focus =
+                    self.ensure_text_input_focus(FrameTextInputKind::AudioTrackLanguage, cx);
+                let audio_title_focus =
+                    self.ensure_text_input_focus(FrameTextInputKind::AudioTrackTitle, cx);
                 let video_width_focus =
                     self.ensure_text_input_focus(FrameTextInputKind::VideoCustomWidth, cx);
                 let video_height_focus =
@@ -268,6 +273,15 @@ impl Render for FrameRoot {
                     settings_disabled: self.file_queue.selected_file_locked(),
                     output_name: &selected_output_name,
                     output_name_focus: Some(&output_name_focus),
+                    audio_editor: crate::app::inspector::audio::TrackEditor {
+                        index: self
+                            .settings_ui
+                            .audio_editor
+                            .as_ref()
+                            .map(|(_, index)| *index),
+                        language: Some(&audio_language_focus),
+                        title: Some(&audio_title_focus),
+                    },
                     audio_bitrate_focus: Some(&audio_bitrate_focus),
                     // Draft crop dimensions are display-only until Apply commits them.
                     video_width_focus: (!self.preview_ui.crop_mode).then_some(&video_width_focus),

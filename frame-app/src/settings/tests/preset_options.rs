@@ -289,6 +289,14 @@ fn apply_preset_preserves_source_subtitle_files() {
 #[test]
 fn create_custom_preset_omits_source_specific_track_state() {
     let config = ConversionConfig {
+        audio_track_overrides: [(
+            1,
+            frame_core::types::AudioTrackOverride {
+                title: Some("private track".into()),
+                ..Default::default()
+            },
+        )]
+        .into(),
         selected_audio_tracks: vec![1],
         selected_subtitle_tracks: vec![2],
         external_subtitle_tracks: vec![ExternalSubtitleTrack {
@@ -301,6 +309,7 @@ fn create_custom_preset_omits_source_specific_track_state() {
 
     let preset = create_custom_preset("custom-1".to_string(), "Custom", &config);
 
+    assert!(preset.config.audio_track_overrides.is_empty());
     assert!(preset.config.selected_audio_tracks.is_empty());
     assert!(preset.config.selected_subtitle_tracks.is_empty());
     assert!(preset.config.external_subtitle_tracks.is_empty());

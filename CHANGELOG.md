@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Video and Audio Modes:** Choose which streams to re-encode and which to copy. For example, resize the video while keeping the original audio tracks. Resolves [#306](https://github.com/66HEX/frame/issues/306).
 - **Two-Pass Encoding:** H.264 (x264), HEVC (x265) and VP9 can analyze the video before encoding it at the requested average bitrate. Resolves [#307](https://github.com/66HEX/frame/issues/307).
+- **Audio Track Metadata:** Set the language and title of each selected audio track and choose which one players should play by default. Resolves [#308](https://github.com/66HEX/frame/issues/308).
 - **MPEG-PS Source Files:** Adds `.mpg` and `.mpeg` video files to the supported source extensions for drag-and-drop and the file picker. Resolves [#270](https://github.com/66HEX/frame/issues/270).
 
 ### Changed

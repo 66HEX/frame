@@ -134,6 +134,8 @@ static void show_stream(AVFormatContext *format, AVStream *stream,
     printf(",\"time_base\":\"%d/%d\"", stream->time_base.num, stream->time_base.den);
     timestamp("start_pts", stream->start_time);
     if (mode == METADATA) {
+        if (p->codec_type == AVMEDIA_TYPE_AUDIO)
+            printf(",\"disposition\":{\"default\":%d}", !!(stream->disposition & AV_DISPOSITION_DEFAULT));
         printf(",\"codec_tag\":\"0x%04" PRIx32 "\"", p->codec_tag);
         printf(",\"avg_frame_rate\":\"%d/%d\"", stream->avg_frame_rate.num, stream->avg_frame_rate.den);
         if (p->bit_rate > 0) printf(",\"bit_rate\":\"%" PRId64 "\"", p->bit_rate);

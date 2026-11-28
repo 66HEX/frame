@@ -6,7 +6,7 @@ pub(super) use video::*;
 pub(super) use video_filters::*;
 
 pub(in crate::app) mod apply_all;
-mod audio;
+pub(in crate::app) mod audio;
 mod audio_filters;
 mod images;
 mod metadata;

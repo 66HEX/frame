@@ -1,6 +1,7 @@
 //! Shared conversion, probing, and event payload types.
 
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 pub const DEFAULT_MAX_CONCURRENCY: usize = 2;
 pub const VOLUME_EPSILON: f64 = 0.01;
@@ -236,6 +237,8 @@ pub struct AudioTrack {
     /// Genuine title/name metadata, without the display label's handler fallback.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata_title: Option<String>,
+    #[serde(default)]
+    pub is_default: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bitrate_kbps: Option<f64>,
     pub sample_rate: Option<String>,
@@ -248,6 +251,19 @@ pub struct SubtitleTrack {
     pub codec: String,
     pub language: Option<String>,
     pub label: Option<String>,
+}
+
+/// Explicit edits for a source audio stream. Missing fields inherit. An empty
+/// language or title removes that tag. Text is exported only in Preserve mode.
+#[derive(Debug, Serialize, Deserialize, Default, Clone, Eq, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct AudioTrackOverride {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_default: Option<bool>,
 }
 
 /// A sidecar subtitle file that should remain selectable in the exported media.
@@ -351,6 +367,8 @@ pub struct ConversionConfig {
     #[serde(default)]
     pub audio_filters: AudioFiltersConfig,
     pub selected_audio_tracks: Vec<u32>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub audio_track_overrides: BTreeMap<u32, AudioTrackOverride>,
     pub selected_subtitle_tracks: Vec<u32>,
     #[serde(default)]
     pub external_subtitle_tracks: Vec<ExternalSubtitleTrack>,
@@ -647,6 +665,8 @@ pub struct FfprobeProgram {
 
 #[derive(Deserialize)]
 pub struct FfprobeStream {
+    #[serde(default)]
+    pub disposition: FfprobeDisposition,
     pub sample_aspect_ratio: Option<String>,
     pub index: u32,
     pub codec_type: String,
@@ -670,6 +690,12 @@ pub struct FfprobeStream {
     pub ts_packetsize: Option<String>,
     #[serde(default)]
     pub side_data_list: Vec<FfprobeSideData>,
+}
+
+#[derive(Default, Deserialize)]
+pub struct FfprobeDisposition {
+    #[serde(default)]
+    pub default: i32,
 }
 
 #[derive(Deserialize)]

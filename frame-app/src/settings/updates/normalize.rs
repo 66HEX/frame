@@ -31,6 +31,11 @@ pub fn normalize_output_config(
 ) -> bool {
     let before = config.clone();
     let source_kind = source_kind_for(metadata);
+    if let Some(metadata) = metadata {
+        config
+            .audio_track_overrides
+            .retain(|index, _| metadata.audio_track(*index).is_some());
+    }
 
     if source_kind == SourceKind::Audio && !is_audio_only_container(&config.container) {
         config.container = "mp3".to_string();

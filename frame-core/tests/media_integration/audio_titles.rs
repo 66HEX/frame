@@ -152,3 +152,230 @@ fn genuine_audio_names_should_survive_mp4_mov_copy_without_changing_packets() ->
     }
     Ok(())
 }
+
+fn create_disposition_source(tools: &Toolchain, mp4: &Path, source: &Path) -> TestResult {
+    run_tool(
+        &tools.ffmpeg,
+        &args(&[
+            "-v",
+            "error",
+            "-i",
+            &path_arg(mp4),
+            "-map",
+            "0",
+            "-c",
+            "copy",
+            "-metadata:s:a:0",
+            "language=eng",
+            "-metadata:s:a:0",
+            "title=Remove this title",
+            "-metadata:s:a:1",
+            "language=ita",
+            "-metadata:s:a:1",
+            "title=Old title",
+            "-disposition:a:0",
+            "default+comment",
+            "-disposition:a:1",
+            "hearing_impaired",
+            &path_arg(source),
+        ]),
+    )
+}
+
+#[test]
+#[ignore = "requires the Frame worker and independent reference tools"]
+fn edited_audio_metadata_round_trips_without_losing_original_dispositions() -> TestResult {
+    use frame_core::types::AudioTrackOverride;
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("audio-metadata-edits")?;
+    let mp4 = sandbox.path("source.mp4");
+    generate_named_audio_source(&tools, &mp4)?;
+    let source = sandbox.path("source.mkv");
+    create_disposition_source(&tools, &mp4, &source)?;
+
+    for processing in ["copy", "reencode"] {
+        for mode in [
+            MetadataMode::Preserve,
+            MetadataMode::Clean,
+            MetadataMode::Replace,
+        ] {
+            let mut config = video_config("mkv", "libx264", "flac");
+            config.processing_mode = processing.into();
+            config.selected_audio_tracks = vec![1, 2, 2];
+            config.metadata.mode.clone_from(&mode);
+            if mode == MetadataMode::Replace {
+                config.metadata.title = Some("Global title".into());
+            }
+            config.audio_track_overrides.insert(
+                1,
+                AudioTrackOverride {
+                    title: Some(String::new()),
+                    language: Some(String::new()),
+                    is_default: None,
+                },
+            );
+            config.audio_track_overrides.insert(
+                2,
+                AudioTrackOverride {
+                    title: Some("Nowy ♥ = mix".into()),
+                    language: Some("pl-PL".into()),
+                    is_default: Some(true),
+                },
+            );
+
+            let output = sandbox.path(&format!("{processing}-{mode:?}.mkv"));
+            convert(&tools, &source, &output, &config)?;
+            let facts = packet_and_stream_facts(&tools, &output)?;
+            let audio: Vec<_> = facts["streams"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|s| s["codec_type"] == "audio")
+                .collect();
+            assert_eq!(audio.len(), 3);
+            for (ordinal, stream) in audio.into_iter().enumerate() {
+                let expected = mode == MetadataMode::Preserve && ordinal > 0;
+                assert_eq!(
+                    stream["tags"]["language"].as_str(),
+                    expected.then_some("pl-PL")
+                );
+                assert_eq!(
+                    stream["tags"]["title"].as_str(),
+                    expected.then_some("Nowy ♥ = mix")
+                );
+                assert!(
+                    stream["tags"]
+                        .as_object()
+                        .unwrap()
+                        .keys()
+                        .all(|key| !key.eq_ignore_ascii_case("name"))
+                );
+                assert_eq!(stream["disposition"]["default"], usize::from(ordinal == 1));
+                assert_eq!(stream["disposition"]["comment"], usize::from(ordinal == 0));
+                assert_eq!(
+                    stream["disposition"]["hearing_impaired"],
+                    usize::from(ordinal != 0)
+                );
+            }
+            let native = tools.native("probe", &["metadata".into(), path_arg(&output)])?;
+            let probed =
+                parse_ffprobe_stdout(&path_arg(&output), std::str::from_utf8(&native).unwrap())
+                    .map_err(|e| e.to_string())?;
+            assert_eq!(
+                probed
+                    .audio_tracks
+                    .iter()
+                    .map(|t| t.is_default)
+                    .collect::<Vec<_>>(),
+                [false, true, false]
+            );
+            if processing == "copy" {
+                for (ordinal, original) in [0, 1, 1].into_iter().enumerate() {
+                    let source_packets = packets(&tools, &source, &format!("a:{original}"))?;
+                    assert!(!source_packets.as_array().unwrap().is_empty());
+                    assert_eq!(
+                        packets(&tools, &output, &format!("a:{ordinal}"))?,
+                        source_packets
+                    );
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires the Frame worker and independent reference tools"]
+fn mp4_family_stores_edited_track_names_and_selects_an_eligible_default() -> TestResult {
+    use frame_core::types::AudioTrackOverride;
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("mov-audio-edits")?;
+    let source = sandbox.path("source.mp4");
+    generate_named_audio_source(&tools, &source)?;
+    for container in ["mp4", "mov", "m4a"] {
+        let mut config = video_config(container, "libx264", "aac");
+        config.processing_mode = "copy".into();
+        config.selected_audio_tracks = vec![1, 3];
+        config.audio_track_overrides.insert(
+            1,
+            AudioTrackOverride {
+                language: Some("deu".into()),
+                title: Some(String::new()),
+                is_default: Some(false),
+            },
+        );
+        config.audio_track_overrides.insert(
+            3,
+            AudioTrackOverride {
+                language: Some("pol".into()),
+                title: Some("Dialog ♥".into()),
+                is_default: None,
+            },
+        );
+        let output = sandbox.path(&format!("edited.{container}"));
+        convert(&tools, &source, &output, &config)?;
+        let result = probe_media(&tools, &output)?;
+        assert_eq!(result.audio_tracks.len(), 2);
+        assert!(!result.audio_tracks[0].is_default);
+        assert!(result.audio_tracks[1].is_default);
+        assert_eq!(result.audio_tracks[0].metadata_title, None);
+        assert_eq!(
+            result.audio_tracks[0].language.as_deref(),
+            Some(if container == "mov" { "ger" } else { "deu" })
+        );
+        assert_eq!(result.audio_tracks[1].language.as_deref(), Some("pol"));
+        assert_eq!(
+            result.audio_tracks[1].metadata_title.as_deref(),
+            (container != "m4a").then_some("Dialog ♥")
+        );
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "requires the Frame worker and independent reference tools"]
+fn webm_ogg_transport_and_single_audio_muxers_apply_their_supported_track_fields() -> TestResult {
+    use frame_core::types::AudioTrackOverride;
+    let tools = Toolchain::discover()?;
+    let sandbox = Sandbox::new("audio-edit-containers")?;
+    let source = sandbox.path("source.mp4");
+    generate_named_audio_source(&tools, &source)?;
+    for (container, video, audio, lang, title, default) in [
+        ("webm", "vp9", "libopus", true, true, true),
+        ("opus", "libx264", "libopus", true, true, false),
+        ("m2t", "libx264", "mp2", true, false, false),
+        ("mts", "libx264", "ac3", true, false, false),
+        ("m2ts", "libx264", "ac3", true, false, false),
+        ("flac", "libx264", "flac", false, false, false),
+        ("wav", "libx264", "pcm_s16le", false, false, false),
+        ("mp3", "libx264", "mp3", false, false, false),
+    ] {
+        let mut config = video_config(container, video, audio);
+        config.selected_audio_tracks = vec![1];
+        config.audio_track_overrides.insert(
+            1,
+            AudioTrackOverride {
+                language: Some("pol".into()),
+                title: Some("Commentary".into()),
+                is_default: Some(true),
+            },
+        );
+        let output = sandbox.path(&format!("tracks.{container}"));
+        convert(&tools, &source, &output, &config)?;
+        let result = probe_media(&tools, &output)?;
+        assert_eq!(result.audio_tracks.len(), 1, "{container}");
+        let track = &result.audio_tracks[0];
+        assert_eq!(
+            track.language.as_deref(),
+            lang.then_some("pol"),
+            "{container}"
+        );
+        assert_eq!(
+            track.metadata_title.as_deref(),
+            title.then_some("Commentary"),
+            "{container}"
+        );
+        assert_eq!(track.is_default, default, "{container}");
+    }
+    Ok(())
+}

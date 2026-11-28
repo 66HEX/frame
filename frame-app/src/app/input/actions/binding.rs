@@ -76,6 +76,9 @@ impl FrameRoot {
                     })
                 })
                 .unwrap_or_default(),
+            FrameTextInputKind::AudioTrackLanguage | FrameTextInputKind::AudioTrackTitle => {
+                self.audio_track_input_value(kind).unwrap_or_default()
+            }
             FrameTextInputKind::PresetName => self.settings_ui.preset_name_draft.clone(),
             FrameTextInputKind::ExternalSubtitleLanguage
             | FrameTextInputKind::ExternalSubtitleTitle => self
@@ -109,6 +112,9 @@ impl FrameRoot {
         candidate: &str,
     ) -> Option<String> {
         match kind {
+            FrameTextInputKind::AudioTrackLanguage | FrameTextInputKind::AudioTrackTitle => {
+                self.write_audio_track_input(kind, candidate)
+            }
             FrameTextInputKind::CropWidth | FrameTextInputKind::CropHeight => {
                 if self.text_input_disabled(kind) || !self.preview_ui.crop_mode {
                     return None;

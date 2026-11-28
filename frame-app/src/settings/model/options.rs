@@ -87,3 +87,16 @@ pub struct AudioTrackOption {
     pub is_selected: bool,
     pub is_disabled: bool,
 }
+
+impl AudioTrackOption {
+    #[must_use]
+    pub fn description(&self) -> String {
+        if let Some(reason) = self.copy_error {
+            return reason.to_owned();
+        }
+        if self.bitrate.is_empty() {
+            return self.detail.clone();
+        }
+        format!("{} · {}", self.detail, self.bitrate)
+    }
+}
